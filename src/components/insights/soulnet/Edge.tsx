@@ -12,7 +12,27 @@ interface EdgeProps {
   isHighlighted: boolean;
   dimmed: boolean;
   maxThickness?: number;
+  startNodeType?: 'entity' | 'emotion';
+  endNodeType?: 'entity' | 'emotion';
+  startNodeScale?: number;
+  endNodeScale?: number;
 }
+
+// Calculate surface connection point for different node types
+const calculateSurfacePoint = (
+  center: THREE.Vector3, 
+  direction: THREE.Vector3, 
+  nodeType: 'entity' | 'emotion', 
+  scale: number = 1
+): THREE.Vector3 => {
+  // Base radius for different node types
+  const baseRadius = nodeType === 'entity' ? 0.7 : 0.55;
+  const actualRadius = baseRadius * scale;
+  
+  // Normalize direction and scale by radius
+  const normalizedDirection = direction.clone().normalize();
+  return center.clone().add(normalizedDirection.multiplyScalar(actualRadius));
+};
 
 export const Edge: React.FC<EdgeProps> = ({ 
   start, 
@@ -20,7 +40,11 @@ export const Edge: React.FC<EdgeProps> = ({
   value, 
   isHighlighted, 
   dimmed,
-  maxThickness = 5
+  maxThickness = 5,
+  startNodeType = 'entity',
+  endNodeType = 'emotion',
+  startNodeScale = 1,
+  endNodeScale = 1
 }) => {
   const { theme } = useTheme();
   const ref = useRef<THREE.Group>(null);
@@ -31,13 +55,24 @@ export const Edge: React.FC<EdgeProps> = ({
     try {
       const startVec = new THREE.Vector3(...start);
       const endVec = new THREE.Vector3(...end);
-      const midPoint = startVec.clone().add(endVec).multiplyScalar(0.5);
+      
+      // Calculate direction vectors for surface connection
+      const startToEnd = endVec.clone().sub(startVec);
+      const endToStart = startVec.clone().sub(endVec);
+      
+      // Get surface connection points instead of center points
+      const startSurface = calculateSurfacePoint(startVec, startToEnd, startNodeType, startNodeScale);
+      const endSurface = calculateSurfacePoint(endVec, endToStart, endNodeType, endNodeScale);
+      
+      // Create control point for smooth curve
+      const midPoint = startSurface.clone().add(endSurface).multiplyScalar(0.5);
       const midOffset = 0.5;
       midPoint.y += midOffset;
+      
       const curve = new THREE.QuadraticBezierCurve3(
-        startVec,
+        startSurface,
         midPoint,
-        endVec
+        endSurface
       );
       return curve.getPoints(30);
     } catch (error) {
@@ -47,7 +82,7 @@ export const Edge: React.FC<EdgeProps> = ({
         new THREE.Vector3(0, 0.1, 0)
       ];
     }
-  }, [start, end]);
+  }, [start, end, startNodeType, endNodeType, startNodeScale, endNodeScale]);
 
   // Create line geometry once
   const lineGeometry = useMemo(() => {
@@ -106,6 +141,8 @@ export const Edge: React.FC<EdgeProps> = ({
       transparent: true,
       opacity: getEdgeOpacity,
       linewidth: thickness,
+      depthWrite: false, // Prevent z-fighting
+      depthTest: true,   // Maintain proper depth testing
     });
   }, [getEdgeColor, getEdgeOpacity, thickness]);
 
@@ -114,6 +151,7 @@ export const Edge: React.FC<EdgeProps> = ({
       <primitive 
         object={new THREE.Line(lineGeometry, material)} 
         ref={lineRef}
+        renderOrder={10} // Render edges before nodes
       />
     </group>
   );

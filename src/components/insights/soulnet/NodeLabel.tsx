@@ -30,6 +30,42 @@ const containsDevanagari = (text: string): boolean => {
   return devanagariPattern.test(text);
 };
 
+// Calculate relative luminance for adaptive text color
+const calculateLuminance = (color: string): number => {
+  // Convert hex to RGB
+  const hex = color.replace('#', '');
+  const r = parseInt(hex.substr(0, 2), 16) / 255;
+  const g = parseInt(hex.substr(2, 2), 16) / 255;
+  const b = parseInt(hex.substr(4, 2), 16) / 255;
+  
+  // Apply gamma correction
+  const sRGBtoLinear = (c: number) => c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4);
+  
+  const rLinear = sRGBtoLinear(r);
+  const gLinear = sRGBtoLinear(g);
+  const bLinear = sRGBtoLinear(b);
+  
+  // Calculate relative luminance
+  return 0.2126 * rLinear + 0.7152 * gLinear + 0.0722 * bLinear;
+};
+
+// Get adaptive text color based on node color and type
+const getAdaptiveTextColor = (nodeColor: string, nodeType: 'entity' | 'emotion', theme: string, isHighlighted: boolean): string => {
+  if (nodeType === 'emotion') {
+    // For emotion nodes, use the theme color but ensure contrast
+    const luminance = calculateLuminance(nodeColor);
+    return luminance > 0.5 ? '#000000' : '#ffffff';
+  }
+  
+  // For entity nodes (typically white/gray)
+  if (isHighlighted) {
+    return theme === 'light' ? '#000000' : '#ffffff';
+  }
+  
+  // For non-highlighted entity nodes, use high contrast
+  return theme === 'light' ? '#1a1a1a' : '#ffffff';
+};
+
 // Improved entity text formatting for better visual balance
 const formatEntityText = (text: string): string => {
   if (!text || text.length <= 4) return text;
@@ -76,6 +112,7 @@ interface NodeLabelProps {
   cameraZoom?: number;
   themeHex: string;
   forceVisible?: boolean;
+  nodeColor?: string;
 }
 
 export const NodeLabel: React.FC<NodeLabelProps> = ({
@@ -86,7 +123,8 @@ export const NodeLabel: React.FC<NodeLabelProps> = ({
   shouldShowLabel,
   cameraZoom,
   themeHex,
-  forceVisible = false
+  forceVisible = false,
+  nodeColor = '#ffffff'
 }) => {
   const { theme } = useTheme();
   const { currentLanguage, translate } = useTranslation();
@@ -188,19 +226,21 @@ export const NodeLabel: React.FC<NodeLabelProps> = ({
     return baseOffset;
   }, [type]);
 
-  // Text color logic with good contrast
+  // Adaptive text color based on node color and type
   const textColor = useMemo(() => {
-    return type === 'entity' 
-      ? (theme === 'light' ? '#1a1a1a' : '#ffffff')
-      : themeHex;
-  }, [type, theme, themeHex]);
+    return getAdaptiveTextColor(nodeColor, type, theme, isHighlighted);
+  }, [nodeColor, type, theme, isHighlighted]);
 
-  // Outline for better visibility
+  // Enhanced outline for better visibility
   const outlineWidth = useMemo(() => {
-    return isHighlighted ? 0.015 : 0.01;
+    return isHighlighted ? 0.02 : 0.015; // Increased outline width
   }, [isHighlighted]);
   
-  const outlineColor = theme === 'light' ? '#ffffff' : '#000000';
+  // Adaptive outline color for maximum contrast
+  const outlineColor = useMemo(() => {
+    const textLuminance = calculateLuminance(textColor);
+    return textLuminance > 0.5 ? '#000000' : '#ffffff';
+  }, [textColor]);
 
   // FIXED: Use relative positioning instead of absolute world position
   const labelPosition: [number, number, number] = [0, verticalOffset, 0];

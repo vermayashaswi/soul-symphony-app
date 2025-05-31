@@ -1,4 +1,3 @@
-
 import React, { useRef, useEffect, useMemo, useState } from 'react';
 import '@/types/three-reference';
 import { OrbitControls } from '@react-three/drei';
@@ -240,6 +239,29 @@ export const SoulNetVisualization: React.FC<SoulNetVisualizationProps> = ({
     return calculateConnectionPercentages(selectedNode, validData.links);
   }, [selectedNode, validData?.links]);
 
+  // Create a map for quick node lookup with geometry info
+  const nodeMap = useMemo(() => {
+    const map = new Map();
+    validData.nodes.forEach(node => {
+      const baseScale = node.type === 'entity' ? 0.7 : 0.55;
+      const isNodeHighlighted = selectedNode === node.id || highlightedNodes.has(node.id);
+      const connectionStrength = selectedNode && highlightedNodes.has(node.id) 
+        ? connectionStrengths.get(node.id) || 0.5
+        : 0.5;
+      
+      const scale = isNodeHighlighted 
+        ? baseScale * (1.2 + (selectedNode === node.id ? 0.3 : connectionStrength * 0.5))
+        : baseScale * (0.8 + node.value * 0.5);
+      
+      map.set(node.id, { 
+        ...node, 
+        scale,
+        isHighlighted: isNodeHighlighted
+      });
+    });
+    return map;
+  }, [validData.nodes, selectedNode, highlightedNodes, connectionStrengths]);
+
   // Adjust controls with increased max zoom-out distances for complete view
   useEffect(() => {
     if (controlsRef.current) {
@@ -292,15 +314,15 @@ export const SoulNetVisualization: React.FC<SoulNetVisualizationProps> = ({
         }}
       />
       
-      {/* Display edges */}
+      {/* Display edges with proper surface connections */}
       {validData.links.map((link, index) => {
         if (!link || typeof link !== 'object') {
           console.warn(`Invalid link at index ${index}`, link);
           return null;
         }
         
-        const sourceNode = validData.nodes.find(n => n && n.id === link.source);
-        const targetNode = validData.nodes.find(n => n && n.id === link.target);
+        const sourceNode = nodeMap.get(link.source);
+        const targetNode = nodeMap.get(link.target);
         
         if (!sourceNode || !targetNode) {
           console.warn(`Missing source or target node for link: ${link.source} -> ${link.target}`);
@@ -336,6 +358,10 @@ export const SoulNetVisualization: React.FC<SoulNetVisualizationProps> = ({
             isHighlighted={!!isHighlight}
             dimmed={shouldDim && !isHighlight}
             maxThickness={isHighlight ? 10 : 4}
+            startNodeType={sourceNode.type}
+            endNodeType={targetNode.type}
+            startNodeScale={sourceNode.scale}
+            endNodeScale={targetNode.scale}
           />
         );
       })}

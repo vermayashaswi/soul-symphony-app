@@ -170,6 +170,7 @@ export const Node: React.FC<NodeProps> = ({
         cameraZoom={cameraZoom}
         themeHex={themeHex}
         forceVisible={forceShowLabels}
+        nodeColor={displayColor}
       />
 
       <ConnectionPercentage
