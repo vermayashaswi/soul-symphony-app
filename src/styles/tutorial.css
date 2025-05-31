@@ -131,54 +131,24 @@ body.tutorial-active {
   z-index: 10000 !important;
 }
 
-/* Steps 3 & 4: Enhanced tab highlighting with maximum brightness and z-index */
+/* FIXED: Steps 3 & 4 - Enhanced tab highlighting with bright container and clean text */
 .record-entry-tab.tutorial-target,
 .entries-tab.tutorial-target {
   z-index: 30000 !important; /* Match modal z-index for same layer appearance */
   position: relative !important;
-  box-shadow: 0 0 50px 30px var(--color-theme) !important; /* Increased glow intensity */
+  box-shadow: 0 0 50px 30px var(--color-theme) !important; /* Strong glow */
   animation: ultra-bright-pulse 1.5s infinite alternate !important; /* Enhanced animation */
-  outline: 3px solid white !important; /* Thicker outline */
+  outline: 3px solid white !important; /* White outline */
   opacity: 1 !important;
-  transform: translateZ(0) scale(1.1) !important; /* Larger scale for prominence */
-  border: 3px solid white !important; /* Thicker border */
-  background-color: rgba(255, 255, 255, 0.95) !important; /* Brighter background */
-  backdrop-filter: brightness(1.5) !important; /* Brightness filter for extra glow */
+  transform: translateZ(0) scale(1.05) !important; /* Slight scale for prominence */
+  border: 3px solid white !important; /* White border */
+  background-color: rgba(26, 31, 44, 0.98) !important; /* Match tutorial modal background */
+  backdrop-filter: brightness(1.3) !important; /* Brightness filter for extra visibility */
+  border-radius: 8px !important; /* Rounded corners to match modal style */
 }
 
-/* Enhanced text visibility for Record Entry tab in both light and dark modes */
-.record-entry-tab.tutorial-target * {
-  color: #000 !important; /* Black text for maximum contrast */
-  text-shadow: none !important;
-  font-weight: bold !important;
-  background-color: rgba(255, 255, 255, 0.9) !important; /* Bright white background */
-  padding: 2px 6px !important;
-  border-radius: 4px !important;
-  box-shadow: 0 0 15px rgba(155, 135, 245, 0.8) !important; /* Bright purple glow */
-}
-
-/* Enhanced text visibility for Past Entries tab in both light and dark modes */
-.entries-tab.tutorial-target * {
-  color: #000 !important; /* Black text for maximum contrast */
-  text-shadow: none !important;
-  font-weight: bold !important;
-  background-color: rgba(255, 255, 255, 0.9) !important; /* Bright white background */
-  padding: 2px 6px !important;
-  border-radius: 4px !important;
-  box-shadow: 0 0 15px rgba(155, 135, 245, 0.8) !important; /* Bright purple glow */
-}
-
-/* Dark mode specific enhancements for maximum visibility */
-body.dark .record-entry-tab.tutorial-target span,
-body.dark .record-entry-tab.tutorial-target div,
-body.dark .entries-tab.tutorial-target span,
-body.dark .entries-tab.tutorial-target div {
-  color: #000 !important; /* Force black text even in dark mode */
-  background-color: rgba(255, 255, 255, 0.95) !important; /* Bright white background */
-  text-shadow: none !important;
-  box-shadow: 0 0 20px rgba(155, 135, 245, 1) !important; /* Maximum purple glow */
-  border: 1px solid var(--color-theme) !important; /* Purple border for extra definition */
-}
+/* REMOVED: All the problematic text highlighting styles that were making text appear dull */
+/* The previous styles with white backgrounds, padding, and text shadows have been removed */
 
 /* Step 5: Chat question highlight styling - Enhanced for maximum visibility */
 .chat-question-highlight.tutorial-target {
@@ -386,16 +356,16 @@ body.tutorial-active[data-current-step="5"] .p-2.border-t.border-border {
   100% { box-shadow: 0 0 50px 30px var(--color-theme); opacity: 1; }
 }
 
-/* NEW: Ultra bright pulse animation for steps 3 & 4 tab highlighting */
+/* UPDATED: Ultra bright pulse animation for steps 3 & 4 - cleaner and brighter */
 @keyframes ultra-bright-pulse {
   0% { 
     box-shadow: 0 0 40px 25px var(--color-theme); 
-    filter: brightness(1.2) saturate(1.3);
-    opacity: 0.9;
+    filter: brightness(1.1);
+    opacity: 0.95;
   }
   100% { 
-    box-shadow: 0 0 70px 40px var(--color-theme); 
-    filter: brightness(1.5) saturate(1.5);
+    box-shadow: 0 0 60px 35px var(--color-theme); 
+    filter: brightness(1.2);
     opacity: 1;
   }
 }
