@@ -1,4 +1,3 @@
-
 import React, { useMemo, useRef, useEffect, useState } from 'react';
 import ThreeDimensionalText from './ThreeDimensionalText';
 import { useTheme } from '@/hooks/use-theme';

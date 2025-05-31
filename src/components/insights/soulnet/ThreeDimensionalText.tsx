@@ -47,12 +47,12 @@ export const ThreeDimensionalText: React.FC<ThreeDimensionalTextProps> = ({
   position,
   color = 'white',
   size = 1.2,
-  bold = false,
+  bold = true, // Changed default to true for consistency
   backgroundColor,
   opacity = 1,
   visible = true,
   skipTranslation = false,
-  outlineWidth = 0.005,
+  outlineWidth = 0.02, // Increased default outline width
   outlineColor = '#000000',
   renderOrder = 1,
 }) => {
@@ -146,7 +146,7 @@ export const ThreeDimensionalText: React.FC<ThreeDimensionalTextProps> = ({
     return 1.4;
   };
 
-  console.log(`[ThreeDimensionalText] Rendering: "${translatedText}" at position:`, position, 'size:', effectiveSize);
+  console.log(`[ThreeDimensionalText] Rendering: "${translatedText}" at position:`, position, 'size:', effectiveSize, 'bold:', bold);
   
   return (
     <Text

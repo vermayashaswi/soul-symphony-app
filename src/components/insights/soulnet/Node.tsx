@@ -171,6 +171,7 @@ export const Node: React.FC<NodeProps> = ({
         themeHex={themeHex}
         forceVisible={forceShowLabels}
         nodeColor={displayColor}
+        nodeScale={scale} // Pass the calculated scale for dynamic positioning
       />
 
       <ConnectionPercentage
