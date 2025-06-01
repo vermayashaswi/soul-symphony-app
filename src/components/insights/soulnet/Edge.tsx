@@ -65,14 +65,12 @@ export const Edge: React.FC<EdgeProps> = ({
   }
 
   return (
-    <line geometry={geometry}>
-      <lineBasicMaterial
-        color={color}
-        transparent={true}
-        opacity={opacity}
-        linewidth={lineWidth}
-      />
-    </line>
+    <primitive object={new THREE.Line(geometry, new THREE.LineBasicMaterial({
+      color: color,
+      transparent: true,
+      opacity: opacity,
+      linewidth: lineWidth
+    }))} />
   );
 };
 
