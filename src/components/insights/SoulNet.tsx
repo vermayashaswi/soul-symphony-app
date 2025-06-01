@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import '@/types/three-reference';
 import { Canvas } from '@react-three/fiber';
@@ -12,9 +11,10 @@ import { EmptyState } from './soulnet/EmptyState';
 import { FullscreenWrapper } from './soulnet/FullscreenWrapper';
 import SoulNetDescription from './soulnet/SoulNetDescription';
 import { useUserColorThemeHex } from './soulnet/useUserColorThemeHex';
+import { SoulNetInitializer } from './soulnet/SoulNetInitializer';
+import { useSoulNetState } from './soulnet/SoulNetStateManager';
 import { cn } from '@/lib/utils';
 import { TranslatableText } from '@/components/translation/TranslatableText';
-import { useTranslation } from '@/contexts/TranslationContext';
 
 interface NodeData {
   id: string;
@@ -39,26 +39,34 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
   const [graphData, setGraphData] = useState<{nodes: NodeData[], links: LinkData[]}>({ nodes: [], links: [] });
   const [loading, setLoading] = useState(true);
   const [isFullScreen, setIsFullScreen] = useState(false);
-  const [canvasError, setCanvasError] = useState<Error | null>(null);
-  const [retryCount, setRetryCount] = useState(0);
-  const [canvasReady, setCanvasReady] = useState(false);
-  const [selectedEntity, setSelectedEntity] = useState<string | null>(null);
-  const [error, setError] = useState<Error | null>(null);
-  const [initializationStage, setInitializationStage] = useState<'idle' | 'data-loading' | 'data-processing' | 'canvas-preparing' | 'ready'>('idle');
+  const [dataError, setDataError] = useState<Error | null>(null);
   
   const isMobile = useIsMobile();
   const themeHex = useUserColorThemeHex();
-  const { currentLanguage } = useTranslation();
-  const initializationRef = useRef<boolean>(false);
   const mountedRef = useRef<boolean>(true);
 
-  console.log("[SoulNet] Enhanced initialization management", { 
+  const {
+    isInitialized,
+    canvasReady,
+    selectedNode,
+    cameraZoom,
+    error: canvasError,
+    retryCount,
+    setInitialized,
+    setCanvasReady,
+    setSelectedNode,
+    setCameraZoom,
+    setError,
+    resetState,
+    cleanup
+  } = useSoulNetState();
+
+  console.log("[SoulNet] Simplified render", { 
     userId, 
     timeRange, 
-    currentLanguage,
-    canvasReady,
     hasData: graphData.nodes.length > 0,
-    initializationStage,
+    canvasReady,
+    isInitialized,
     retryCount
   });
 
@@ -66,41 +74,21 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
   useEffect(() => {
     return () => {
       mountedRef.current = false;
+      cleanup();
     };
-  }, []);
+  }, [cleanup]);
 
-  // Enhanced canvas readiness with proper state management
-  useEffect(() => {
-    if (graphData.nodes.length > 0 && !canvasReady && initializationStage !== 'ready') {
-      console.log("[SoulNet] Preparing canvas with enhanced safety");
-      setInitializationStage('canvas-preparing');
-      
-      const readyTimer = setTimeout(() => {
-        if (mountedRef.current) {
-          setCanvasReady(true);
-          setInitializationStage('ready');
-          console.log("[SoulNet] Canvas ready with enhanced initialization");
-        }
-      }, 200);
-      
-      return () => clearTimeout(readyTimer);
-    }
-  }, [graphData.nodes.length, canvasReady, initializationStage]);
-
-  // Enhanced data fetching with proper error handling and state management
+  // Simple data fetching
   useEffect(() => {
     if (!userId || !mountedRef.current) return;
 
-    const fetchEntityEmotionData = async () => {
+    const fetchData = async () => {
       try {
         setLoading(true);
-        setError(null);
-        setCanvasError(null);
-        setInitializationStage('data-loading');
-        initializationRef.current = false;
+        setDataError(null);
+        resetState();
         
         const startDate = getStartDate(timeRange);
-        console.log(`[SoulNet] Enhanced data fetch from ${startDate.toISOString()} for user ${userId}`);
         
         const { data: entries, error } = await supabase
           .from('Journal Entries')
@@ -111,41 +99,23 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
 
         if (!mountedRef.current) return;
 
-        if (error) {
-          console.error('[SoulNet] Error fetching journal entries:', error);
-          throw error;
-        }
+        if (error) throw error;
 
-        console.log(`[SoulNet] Enhanced fetch completed: ${entries?.length || 0} entries`);
+        console.log(`[SoulNet] Fetched ${entries?.length || 0} entries`);
         
         if (!entries || entries.length === 0) {
-          setLoading(false);
           setGraphData({ nodes: [], links: [] });
-          setInitializationStage('ready');
+          setLoading(false);
           return;
         }
 
-        setInitializationStage('data-processing');
-        
-        // Process data with safety checks
         const processedData = processEntities(entries);
-        
-        if (!mountedRef.current) return;
-        
-        console.log("[SoulNet] Enhanced data processing completed", {
-          nodes: processedData.nodes.length,
-          links: processedData.links.length
-        });
-        
         setGraphData(processedData);
-        initializationRef.current = true;
         
       } catch (error) {
         if (!mountedRef.current) return;
-        
-        console.error('[SoulNet] Enhanced error handling:', error);
-        setError(error instanceof Error ? error : new Error('Unknown error occurred'));
-        setInitializationStage('idle');
+        console.error('[SoulNet] Data fetch error:', error);
+        setDataError(error instanceof Error ? error : new Error('Unknown error'));
       } finally {
         if (mountedRef.current) {
           setLoading(false);
@@ -153,88 +123,85 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
       }
     };
 
-    fetchEntityEmotionData();
-  }, [userId, timeRange]);
+    fetchData();
+  }, [userId, timeRange, resetState]);
 
   const handleNodeSelect = useCallback((id: string) => {
-    console.log(`[SoulNet] Enhanced node selection: ${id}`);
-    if (selectedEntity === id) {
-      setSelectedEntity(null);
+    if (selectedNode === id) {
+      setSelectedNode(null);
     } else {
-      setSelectedEntity(id);
+      setSelectedNode(id);
       if (navigator.vibrate) {
         navigator.vibrate(50);
       }
     }
-  }, [selectedEntity]);
+  }, [selectedNode, setSelectedNode]);
 
   const toggleFullScreen = useCallback(() => {
     setIsFullScreen(prev => {
-      if (!prev) setSelectedEntity(null);
-      console.log(`[SoulNet] Enhanced fullscreen toggle: ${!prev}`);
+      if (!prev) setSelectedNode(null);
       return !prev;
     });
-  }, []);
+  }, [setSelectedNode]);
 
   const handleCanvasError = useCallback((error: Error) => {
-    console.error('[SoulNet] Enhanced canvas error handling:', error);
-    setCanvasError(error);
-    setRetryCount(prev => prev + 1);
+    console.error('[SoulNet] Canvas error:', error);
+    setError(error);
     setCanvasReady(false);
-    setInitializationStage('idle');
-  }, []);
+  }, [setError, setCanvasReady]);
 
   const handleRetry = useCallback(() => {
-    console.log('[SoulNet] Enhanced manual retry initiated');
-    setCanvasError(null);
-    setError(null);
-    setRetryCount(0);
-    setCanvasReady(false);
-    setInitializationStage('idle');
-    initializationRef.current = false;
-    
-    // Reset canvas readiness after a brief delay
+    console.log('[SoulNet] Manual retry');
+    resetState();
     setTimeout(() => {
       if (graphData.nodes.length > 0 && mountedRef.current) {
-        setInitializationStage('canvas-preparing');
+        setCanvasReady(true);
       }
     }, 300);
-  }, [graphData.nodes.length]);
+  }, [graphData.nodes.length, resetState, setCanvasReady]);
 
-  // Enhanced loading state with stage information
+  const handleInitialized = useCallback(() => {
+    setInitialized(true);
+    setCanvasReady(true);
+  }, [setInitialized, setCanvasReady]);
+
+  const handleCameraZoomChange = useCallback((zoom: number) => {
+    setCameraZoom(zoom);
+  }, [setCameraZoom]);
+
+  // Show loading state
   if (loading) {
     return (
       <div className="bg-background rounded-xl shadow-sm border w-full p-6">
         <LoadingState />
-        <div className="text-center mt-2">
-          <p className="text-sm text-muted-foreground">
-            {initializationStage === 'data-loading' && 'Loading journal data...'}
-            {initializationStage === 'data-processing' && 'Processing insights...'}
-            {initializationStage === 'canvas-preparing' && 'Preparing visualization...'}
-          </p>
-        </div>
       </div>
     );
   }
   
-  if (error) return (
-    <div className="bg-background rounded-xl shadow-sm border w-full p-6">
-      <h2 className="text-xl font-semibold text-red-600 mb-4">
-        <TranslatableText text="Error Loading Soul-Net" />
-      </h2>
-      <p className="text-muted-foreground mb-4">{error.message}</p>
-      <button 
-        className="px-4 py-2 bg-primary text-white rounded-md" 
-        onClick={handleRetry}
-      >
-        <TranslatableText text="Retry" />
-      </button>
-    </div>
-  );
+  // Show data error
+  if (dataError) {
+    return (
+      <div className="bg-background rounded-xl shadow-sm border w-full p-6">
+        <h2 className="text-xl font-semibold text-red-600 mb-4">
+          <TranslatableText text="Error Loading Soul-Net" />
+        </h2>
+        <p className="text-muted-foreground mb-4">{dataError.message}</p>
+        <button 
+          className="px-4 py-2 bg-primary text-white rounded-md" 
+          onClick={handleRetry}
+        >
+          <TranslatableText text="Retry" />
+        </button>
+      </div>
+    );
+  }
   
-  if (graphData.nodes.length === 0) return <EmptyState />;
+  // Show empty state
+  if (graphData.nodes.length === 0) {
+    return <EmptyState />;
+  }
 
-  // Enhanced error handling for persistent canvas errors
+  // Show persistent canvas error
   if (canvasError && retryCount > 2) {
     return (
       <div className="bg-background rounded-xl shadow-sm border w-full p-6">
@@ -248,14 +215,12 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
           <p className="text-yellow-700 dark:text-yellow-400 mb-3">
             <TranslatableText text="The visualization is being optimized for better performance. Your data is safe." />
           </p>
-          <div className="space-x-2">
-            <button
-              className="px-4 py-2 bg-yellow-600 text-white rounded hover:bg-yellow-700"
-              onClick={handleRetry}
-            >
-              <TranslatableText text="Try Again" />
-            </button>
-          </div>
+          <button
+            className="px-4 py-2 bg-yellow-600 text-white rounded hover:bg-yellow-700"
+            onClick={handleRetry}
+          >
+            <TranslatableText text="Try Again" />
+          </button>
         </div>
       </div>
     );
@@ -267,8 +232,6 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
     }
     return <TranslatableText text="Drag to rotate • Scroll to zoom • Click a node to highlight connections" forceTranslate={true} />;
   };
-
-  console.log(`[SoulNet] Enhanced render with canvas ready: ${canvasReady}, stage: ${initializationStage}, nodes: ${graphData.nodes.length}`);
 
   return (
     <div className={cn(
@@ -302,8 +265,11 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
             </div>
           }
         >
-          <div className="relative">
-            {canvasReady && initializationStage === 'ready' && (
+          <SoulNetInitializer
+            hasData={graphData.nodes.length > 0}
+            onInitialized={handleInitialized}
+          >
+            {canvasReady && isInitialized && (
               <Canvas
                 style={{
                   width: '100%',
@@ -312,7 +278,6 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
                   maxHeight: isFullScreen ? 'none' : '500px',
                   position: 'relative',
                   zIndex: 5,
-                  transition: 'all 0.3s ease-in-out',
                 }}
                 camera={{ 
                   position: [0, 0, isFullScreen ? 40 : 45],
@@ -320,7 +285,7 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
                   far: 1000,
                   fov: isFullScreen ? 60 : 50
                 }}
-                onPointerMissed={() => setSelectedEntity(null)}
+                onPointerMissed={() => setSelectedNode(null)}
                 gl={{ 
                   preserveDrawingBuffer: true,
                   antialias: !isMobile,
@@ -331,35 +296,22 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
                   precision: isMobile ? 'mediump' : 'highp'
                 }}
                 onCreated={(state) => {
-                  console.log('[SoulNet] Canvas created successfully', state);
+                  console.log('[SoulNet] Canvas created successfully');
                 }}
-                onError={(error) => {
-                  console.error('[SoulNet] Canvas creation error:', error);
-                  handleCanvasError(error);
-                }}
+                onError={handleCanvasError}
               >
                 <SimplifiedSoulNetVisualization
                   data={graphData}
-                  selectedNode={selectedEntity}
+                  selectedNode={selectedNode}
                   onNodeClick={handleNodeSelect}
                   themeHex={themeHex}
                   isFullScreen={isFullScreen}
                   shouldShowLabels={true}
+                  onCameraZoomChange={handleCameraZoomChange}
                 />
               </Canvas>
             )}
-            
-            {(!canvasReady || initializationStage !== 'ready') && (
-              <div className="flex items-center justify-center" style={{ height: '500px' }}>
-                <div className="text-center">
-                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-2"></div>
-                  <p className="text-sm text-muted-foreground">
-                    {initializationStage === 'canvas-preparing' ? 'Preparing visualization...' : 'Loading...'}
-                  </p>
-                </div>
-              </div>
-            )}
-          </div>
+          </SoulNetInitializer>
         </RenderingErrorBoundary>
       </FullscreenWrapper>
       
