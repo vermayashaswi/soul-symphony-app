@@ -162,7 +162,6 @@ export const HtmlLabelOverlay: React.FC<HtmlLabelOverlayProps> = ({
               <TranslatableText 
                 text={node.id} 
                 forceTranslate={true}
-                skipTranslation={false}
               />
             </div>
             
