@@ -30,7 +30,6 @@ interface SimplifiedSoulNetVisualizationProps {
   themeHex: string;
   isFullScreen?: boolean;
   shouldShowLabels?: boolean;
-  onCameraZoomChange?: (zoom: number) => void;
 }
 
 export const SimplifiedSoulNetVisualization: React.FC<SimplifiedSoulNetVisualizationProps> = ({
@@ -39,17 +38,15 @@ export const SimplifiedSoulNetVisualization: React.FC<SimplifiedSoulNetVisualiza
   onNodeClick,
   themeHex,
   isFullScreen = false,
-  shouldShowLabels = true,
-  onCameraZoomChange
+  shouldShowLabels = true
 }) => {
   const { camera } = useThree();
   const { theme } = useTheme();
   const controlsRef = useRef<any>(null);
   const [cameraZoom, setCameraZoom] = useState<number>(45);
-  const [isReady, setIsReady] = useState(false);
   const mountedRef = useRef<boolean>(true);
   
-  console.log("[SimplifiedSoulNetVisualization] Simple render with data:", data.nodes.length, "nodes");
+  console.log("[SimplifiedSoulNetVisualization] Render with data:", data.nodes.length, "nodes");
 
   // Cleanup on unmount
   useEffect(() => {
@@ -87,9 +84,9 @@ export const SimplifiedSoulNetVisualization: React.FC<SimplifiedSoulNetVisualiza
     return new THREE.Vector3(avgX, avgY, 0);
   }, [validData.nodes]);
 
-  // Simple initialization
+  // Simple camera initialization
   useEffect(() => {
-    if (validData.nodes.length === 0 || isReady) return;
+    if (validData.nodes.length === 0 || !camera || !mountedRef.current) return;
     
     const timer = setTimeout(() => {
       if (mountedRef.current && camera) {
@@ -97,20 +94,19 @@ export const SimplifiedSoulNetVisualization: React.FC<SimplifiedSoulNetVisualiza
         camera.position.set(centerPosition.x, centerPosition.y, targetZ);
         camera.lookAt(centerPosition.x, centerPosition.y, 0);
         camera.updateProjectionMatrix();
-        setIsReady(true);
+        console.log("[SimplifiedSoulNetVisualization] Camera initialized");
       }
-    }, 100);
+    }, 50);
     
     return () => clearTimeout(timer);
-  }, [camera, validData.nodes, centerPosition, isFullScreen, isReady]);
+  }, [camera, validData.nodes, centerPosition, isFullScreen]);
 
   // Simple camera zoom tracking
   useFrame(() => {
-    if (camera && isReady && mountedRef.current) {
+    if (camera && mountedRef.current) {
       const currentZ = camera.position.z;
       if (Math.abs(currentZ - cameraZoom) > 1) {
         setCameraZoom(currentZ);
-        onCameraZoomChange?.(currentZ);
       }
     }
   });
@@ -142,10 +138,10 @@ export const SimplifiedSoulNetVisualization: React.FC<SimplifiedSoulNetVisualiza
     highlightedNodes,
     theme: theme || 'light',
     cameraZoom,
-    shouldShowLabels: shouldShowLabels && isReady
+    shouldShowLabels: shouldShowLabels
   });
 
-  if (!isReady || validData.nodes.length === 0) {
+  if (validData.nodes.length === 0) {
     return (
       <>
         <ambientLight intensity={0.6} />
