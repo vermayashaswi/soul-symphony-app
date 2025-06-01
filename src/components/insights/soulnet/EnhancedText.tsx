@@ -35,14 +35,15 @@ export const EnhancedText: React.FC<EnhancedTextProps> = ({
   const [displayText, setDisplayText] = useState('');
   const [fontUrl, setFontUrl] = useState('');
   const [hasError, setHasError] = useState(false);
-  const [fontInfo, setFontInfo] = useState<any>(null);
+  const [retryCount, setRetryCount] = useState(0);
   const textRef = useRef<THREE.Mesh>(null);
+  const mountedRef = useRef(true);
 
-  // Initialize text and determine font URL with enhanced logging
+  // Initialize text and determine font URL
   useEffect(() => {
     if (!text || typeof text !== 'string') {
       setDisplayText('Node');
-      setFontUrl(consolidatedFontService.getFontUrl('Helvetiker'));
+      setFontUrl('https://threejs.org/examples/fonts/helvetiker_regular.typeface.json');
     } else {
       const cleanText = text.trim();
       const limitedText = cleanText.length > 50 ? cleanText.substring(0, 50) + '...' : cleanText;
@@ -50,46 +51,47 @@ export const EnhancedText: React.FC<EnhancedTextProps> = ({
       
       setDisplayText(finalText);
       
-      // Test Devanagari support and get detailed font info
-      const testResult = consolidatedFontService.testDevanagariSupport(finalText);
-      setFontInfo(testResult);
-      
       // Get appropriate font URL for the text
       const dynamicFontUrl = consolidatedFontService.getFontUrlForText(finalText);
       setFontUrl(dynamicFontUrl);
       
-      console.log(`[EnhancedText] Enhanced font analysis:`, {
-        text: finalText,
-        scriptType: testResult.scriptType,
-        fontName: testResult.fontName,
-        fontUrl: dynamicFontUrl,
-        hasDevanagari: testResult.hasDevanagari
-      });
+      console.log(`[EnhancedText] Text: "${finalText}", Font URL: ${dynamicFontUrl}`);
     }
     setIsReady(true);
   }, [text]);
 
-  // Load font using useLoader hook with enhanced error handling
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      mountedRef.current = false;
+    };
+  }, []);
+
+  // Load font with enhanced error handling
   let font;
   try {
-    if (fontUrl) {
+    if (fontUrl && !hasError) {
       font = useLoader(FontLoader, fontUrl, (loader) => {
         console.log(`[EnhancedText] Loading font from: ${fontUrl}`);
       });
-      
-      if (font && fontInfo?.hasDevanagari) {
-        console.log(`[EnhancedText] Successfully loaded Devanagari font for text: "${displayText}"`);
-      }
     }
   } catch (error) {
     console.warn('[EnhancedText] Font loading error:', error);
-    console.log('[EnhancedText] Font info during error:', fontInfo);
-    setHasError(true);
+    if (!hasError && retryCount < 2) {
+      setTimeout(() => {
+        if (mountedRef.current) {
+          setRetryCount(prev => prev + 1);
+          console.log(`[EnhancedText] Retrying font load, attempt ${retryCount + 1}`);
+        }
+      }, 1000);
+    } else {
+      setHasError(true);
+    }
   }
 
   // Billboard effect
   useFrame(({ camera }) => {
-    if (textRef.current && visible && isReady && font) {
+    if (textRef.current && visible && isReady && font && !hasError) {
       try {
         textRef.current.quaternion.copy(camera.quaternion);
         if (textRef.current.material) {
@@ -102,15 +104,8 @@ export const EnhancedText: React.FC<EnhancedTextProps> = ({
     }
   });
 
-  // Handle font loading errors
   const handleError = (error: any) => {
     console.error('[EnhancedText] Render error:', error);
-    console.log('[EnhancedText] Error context:', {
-      text: displayText,
-      fontUrl,
-      fontInfo,
-      hasError
-    });
     setHasError(true);
   };
 
@@ -120,66 +115,34 @@ export const EnhancedText: React.FC<EnhancedTextProps> = ({
 
   // Enhanced configuration based on script type
   const getTextConfig = () => {
-    const scriptType = fontInfo?.scriptType || 'latin';
+    const scriptType = consolidatedFontService.detectScriptType(displayText);
     
     switch (scriptType) {
       case 'devanagari':
         return {
-          maxWidth: 85,
-          letterSpacing: 0.18,
-          lineHeight: 2.1,
-          sdfGlyphSize: 512
+          maxWidth: 30,
+          letterSpacing: 0.15,
+          lineHeight: 1.8,
+          sdfGlyphSize: 256
         };
       case 'arabic':
         return {
-          maxWidth: 75,
+          maxWidth: 28,
           letterSpacing: 0.12,
-          lineHeight: 2.0,
-          sdfGlyphSize: 512
-        };
-      case 'chinese':
-      case 'japanese':
-      case 'korean':
-        return {
-          maxWidth: 65,
-          letterSpacing: 0.06,
-          lineHeight: 1.9,
-          sdfGlyphSize: 512
-        };
-      case 'bengali':
-      case 'tamil':
-      case 'telugu':
-      case 'gujarati':
-      case 'kannada':
-      case 'malayalam':
-      case 'oriya':
-      case 'gurmukhi':
-        return {
-          maxWidth: 75,
-          letterSpacing: 0.12,
-          lineHeight: 2.0,
-          sdfGlyphSize: 512
-        };
-      case 'thai':
-        return {
-          maxWidth: 70,
-          letterSpacing: 0.1,
-          lineHeight: 1.95,
-          sdfGlyphSize: 512
+          lineHeight: 1.7,
+          sdfGlyphSize: 256
         };
       default:
         return {
           maxWidth: maxWidth,
           letterSpacing: 0.03,
-          lineHeight: 1.5,
+          lineHeight: 1.4,
           sdfGlyphSize: 256
         };
     }
   };
 
   const textConfig = getTextConfig();
-
-  console.log(`[EnhancedText] Rendering text: "${displayText}" with font analysis:`, fontInfo);
 
   return (
     <Text
@@ -201,8 +164,6 @@ export const EnhancedText: React.FC<EnhancedTextProps> = ({
       letterSpacing={textConfig.letterSpacing}
       lineHeight={textConfig.lineHeight}
       sdfGlyphSize={textConfig.sdfGlyphSize}
-      overflowWrap="normal"
-      whiteSpace="normal"
       onError={handleError}
     >
       {displayText}

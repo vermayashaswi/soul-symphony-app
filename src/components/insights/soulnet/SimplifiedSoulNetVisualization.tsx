@@ -4,7 +4,6 @@ import { OrbitControls } from '@react-three/drei';
 import { useThree, useFrame } from '@react-three/fiber';
 import Node from './Node';
 import Edge from './Edge';
-import FallbackVisualization from './FallbackVisualization';
 import * as THREE from 'three';
 
 interface NodeData {
@@ -80,7 +79,7 @@ export const SimplifiedSoulNetVisualization: React.FC<SimplifiedSoulNetVisualiza
     }
   }, [validData.nodes]);
 
-  // Staged initialization with proper timing
+  // Staged initialization with proper timing to prevent flickering
   useEffect(() => {
     if (validData.nodes.length === 0 || initializationRef.current) return;
     
@@ -104,18 +103,18 @@ export const SimplifiedSoulNetVisualization: React.FC<SimplifiedSoulNetVisualiza
         console.error('[SimplifiedSoulNetVisualization] Basic stage error:', error);
         setRenderingStage('initial');
       }
-    }, 100);
+    }, 200);
 
     // Stage 3: Enhanced render with longer delay
     const enhancedTimer = setTimeout(() => {
       try {
         setRenderingStage('enhanced');
-        console.log('[SimplifiedSoulNetVisualization] Moving to enhanced stage');
+        console.log('[SimplifiedSoulNetVisualization] Moving to enhanced stage with full text rendering');
       } catch (error) {
         console.error('[SimplifiedSoulNetVisualization] Enhanced stage error:', error);
         // Stay in basic stage on error
       }
-    }, 500);
+    }, 800);
 
     return () => {
       clearTimeout(basicTimer);
@@ -154,26 +153,13 @@ export const SimplifiedSoulNetVisualization: React.FC<SimplifiedSoulNetVisualiza
     }
   }, [selectedNode, validData.links, renderingStage]);
 
-  // Render nothing during initial stage
+  // Render nothing during initial stage to prevent flickering
   if (renderingStage === 'initial' || validData.nodes.length === 0) {
     return (
       <>
         <ambientLight intensity={0.6} />
         <pointLight position={[5, 5, 5]} intensity={0.4} />
       </>
-    );
-  }
-
-  // Fallback for persistent errors
-  if (renderingStage === 'basic' && !isInitialized) {
-    console.log('[SimplifiedSoulNetVisualization] Using fallback visualization');
-    return (
-      <FallbackVisualization
-        data={validData}
-        selectedNode={selectedNode}
-        onNodeClick={onNodeClick}
-        themeHex={themeHex}
-      />
     );
   }
 
@@ -193,7 +179,7 @@ export const SimplifiedSoulNetVisualization: React.FC<SimplifiedSoulNetVisualiza
           target={centerPosition}
         />
 
-        {/* Render edges only in enhanced stage */}
+        {/* Render edges only in enhanced stage to reduce initial load */}
         {renderingStage === 'enhanced' && validData.links.map((link, index) => {
           try {
             const sourceNode = validData.nodes.find(n => n.id === link.source);
@@ -264,12 +250,10 @@ export const SimplifiedSoulNetVisualization: React.FC<SimplifiedSoulNetVisualiza
   } catch (error) {
     console.error('[SimplifiedSoulNetVisualization] Main render error:', error);
     return (
-      <FallbackVisualization
-        data={validData}
-        selectedNode={selectedNode}
-        onNodeClick={onNodeClick}
-        themeHex={themeHex}
-      />
+      <>
+        <ambientLight intensity={0.6} />
+        <pointLight position={[5, 5, 5]} intensity={0.4} />
+      </>
     );
   }
 };

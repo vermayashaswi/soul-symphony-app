@@ -1,6 +1,6 @@
 
 import React, { useMemo, useRef, useEffect, useState } from 'react';
-import ThreeDimensionalText from './ThreeDimensionalText';
+import ReliableText from './ReliableText';
 import { useTheme } from '@/hooks/use-theme';
 import { useTranslation } from '@/contexts/TranslationContext';
 import { onDemandTranslationCache } from '@/utils/website-translations';
@@ -33,46 +33,6 @@ const calculateLabelOffset = (nodeType: 'entity' | 'emotion', nodeScale: number)
     const cornerDistance = Math.sqrt(3) * (cubeSize / 2);
     return cornerDistance * nodeScale * 1.3;
   }
-};
-
-// Simplified entity text formatting - no manual wrapping for non-Latin scripts
-const formatEntityText = (text: string, scriptType: string): string => {
-  if (!text || text.length <= 4) return text;
-  
-  // For non-Latin scripts (especially Devanagari), don't split manually
-  if (scriptType !== 'latin') {
-    console.log(`[NodeLabel] Preserving ${scriptType} text without manual wrapping: "${text}"`);
-    return text;
-  }
-  
-  // Only apply manual formatting for Latin scripts
-  const words = text.trim().split(/\s+/);
-  
-  if (words.length === 1) {
-    const word = words[0];
-    if (word.length <= 8) return word;
-    
-    const midPoint = Math.ceil(word.length / 2);
-    return word.substring(0, midPoint) + '\n' + word.substring(midPoint);
-  }
-  
-  if (words.length === 2) {
-    return words.join('\n');
-  }
-  
-  const totalLength = text.length;
-  const targetFirstLineLength = Math.ceil(totalLength / 2);
-  
-  let firstLine = '';
-  let wordIndex = 0;
-  
-  while (wordIndex < words.length && (firstLine + words[wordIndex]).length <= targetFirstLineLength) {
-    firstLine += (firstLine ? ' ' : '') + words[wordIndex];
-    wordIndex++;
-  }
-  
-  const secondLine = words.slice(wordIndex).join(' ');
-  return firstLine + '\n' + secondLine;
 };
 
 interface NodeLabelProps {
@@ -109,7 +69,6 @@ export const NodeLabel: React.FC<NodeLabelProps> = ({
   const [fontReady, setFontReady] = useState(false);
   const translationInProgress = useRef<boolean>(false);
   const mounted = useRef<boolean>(true);
-  const scriptTypeRef = useRef<string>('latin');
   
   console.log(`[NodeLabel] Processing label for node ${id}, language: ${currentLanguage}, shouldShow: ${shouldShowLabel}`);
   
@@ -126,7 +85,6 @@ export const NodeLabel: React.FC<NodeLabelProps> = ({
       try {
         console.log('[NodeLabel] Checking font readiness...');
         
-        // Wait for consolidated font service to be ready
         await consolidatedFontService.waitForFonts();
         
         if (mounted) {
@@ -136,7 +94,7 @@ export const NodeLabel: React.FC<NodeLabelProps> = ({
       } catch (error) {
         console.warn('[NodeLabel] Font loading check failed:', error);
         if (mounted) {
-          setFontReady(true); // Assume ready on error
+          setFontReady(true); // Assume ready on error to prevent blocking
         }
       }
     };
@@ -151,15 +109,11 @@ export const NodeLabel: React.FC<NodeLabelProps> = ({
   // Enhanced translation handling with race condition prevention
   useEffect(() => {
     if (!isVisible || !id || !fontReady) {
-      if (!fontReady) {
-        console.log(`[NodeLabel] Fonts not ready, waiting...`);
-      }
       return;
     }
     
     // Prevent multiple simultaneous translations
     if (translationInProgress.current) {
-      console.log(`[NodeLabel] Translation already in progress for ${id}`);
       return;
     }
     
@@ -172,12 +126,7 @@ export const NodeLabel: React.FC<NodeLabelProps> = ({
           if (mounted.current) {
             setTranslatedText(id);
             setIsTranslationReady(true);
-            scriptTypeRef.current = consolidatedFontService.detectScriptType(id);
-            
-            // Preload fonts for the detected script
-            await consolidatedFontService.preloadFontsForScript(scriptTypeRef.current);
-            
-            console.log(`[NodeLabel] Using English text: "${id}", script: ${scriptTypeRef.current}`);
+            console.log(`[NodeLabel] Using English text: "${id}"`);
           }
           return;
         }
@@ -188,12 +137,7 @@ export const NodeLabel: React.FC<NodeLabelProps> = ({
         if (cachedTranslation && mounted.current) {
           setTranslatedText(cachedTranslation);
           setIsTranslationReady(true);
-          scriptTypeRef.current = consolidatedFontService.detectScriptType(cachedTranslation);
-          
-          // Preload fonts for the detected script
-          await consolidatedFontService.preloadFontsForScript(scriptTypeRef.current);
-          
-          console.log(`[NodeLabel] Using cached translation: "${id}" -> "${cachedTranslation}", script: ${scriptTypeRef.current}`);
+          console.log(`[NodeLabel] Using cached translation: "${id}" -> "${cachedTranslation}"`);
           return;
         }
         
@@ -207,21 +151,11 @@ export const NodeLabel: React.FC<NodeLabelProps> = ({
             setTranslatedText(result);
             setIsTranslationReady(true);
             onDemandTranslationCache.setTranslation(id, result, currentLanguage);
-            scriptTypeRef.current = consolidatedFontService.detectScriptType(result);
-            
-            // Preload fonts for the detected script
-            await consolidatedFontService.preloadFontsForScript(scriptTypeRef.current);
-            
-            console.log(`[NodeLabel] Translation complete: "${id}" -> "${result}", script: ${scriptTypeRef.current}`);
+            console.log(`[NodeLabel] Translation complete: "${id}" -> "${result}"`);
           } else if (mounted.current) {
             // Fallback to original on invalid result
             setTranslatedText(id);
             setIsTranslationReady(true);
-            scriptTypeRef.current = consolidatedFontService.detectScriptType(id);
-            
-            // Preload fonts for the detected script
-            await consolidatedFontService.preloadFontsForScript(scriptTypeRef.current);
-            
             console.warn(`[NodeLabel] Invalid translation result, using original: "${id}"`);
           }
         }
@@ -230,10 +164,6 @@ export const NodeLabel: React.FC<NodeLabelProps> = ({
         if (mounted.current) {
           setTranslatedText(id);
           setIsTranslationReady(true);
-          scriptTypeRef.current = consolidatedFontService.detectScriptType(id);
-          
-          // Preload fonts even for fallback
-          await consolidatedFontService.preloadFontsForScript(scriptTypeRef.current);
         }
       } finally {
         translationInProgress.current = false;
@@ -259,54 +189,23 @@ export const NodeLabel: React.FC<NodeLabelProps> = ({
       mounted.current = false;
     };
   }, []);
-  
-  // Enhanced text formatting with script-aware processing
-  const formattedText = useMemo(() => {
-    if (!translatedText) return id;
-    
-    if (type === 'entity') {
-      return formatEntityText(translatedText, scriptTypeRef.current);
-    }
-    return translatedText;
-  }, [translatedText, type, id]);
 
-  // Enhanced dynamic font sizing with script-specific adjustments
+  // Enhanced dynamic font sizing
   const dynamicFontSize = useMemo(() => {
     let z = cameraZoom !== undefined ? cameraZoom : 45;
     if (typeof z !== 'number' || Number.isNaN(z)) z = 45;
     
     const baseSize = 0.35 + Math.max(0, (45 - z) * 0.007);
-    
-    let sizeAdjustment = 0;
-    switch (scriptTypeRef.current) {
-      case 'devanagari':
-        sizeAdjustment = 0.12;
-        break;
-      case 'arabic':
-      case 'bengali':
-      case 'thai':
-        sizeAdjustment = 0.09;
-        break;
-      case 'chinese':
-      case 'japanese':
-      case 'korean':
-        sizeAdjustment = 0.06;
-        break;
-      default:
-        sizeAdjustment = 0;
-    }
-    
     const minSize = 0.28;
     const maxSize = 0.65;
     
-    return Math.max(Math.min(baseSize + sizeAdjustment, maxSize), minSize);
+    return Math.max(Math.min(baseSize, maxSize), minSize);
   }, [cameraZoom]);
 
   // Don't render until both font and translation are ready
-  const shouldRender = isVisible && isTranslationReady && fontReady && formattedText;
+  const shouldRender = isVisible && isTranslationReady && fontReady && translatedText;
   
   if (!shouldRender) {
-    console.log(`[NodeLabel] Not rendering: isVisible=${isVisible}, translationReady=${isTranslationReady}, fontReady=${fontReady}, text="${formattedText}"`);
     return null;
   }
 
@@ -335,20 +234,20 @@ export const NodeLabel: React.FC<NodeLabelProps> = ({
 
   const labelPosition: [number, number, number] = [0, geometricOffset, 0];
   
-  console.log(`[NodeLabel] Rendering stable label "${formattedText}" for ${id}, script: ${scriptTypeRef.current}, fontSize: ${dynamicFontSize}`);
+  console.log(`[NodeLabel] Rendering stable label "${translatedText}" for ${id}, fontSize: ${dynamicFontSize}`);
 
   return (
-    <ThreeDimensionalText
-      text={formattedText}
+    <ReliableText
+      text={translatedText}
       position={labelPosition}
       color={textColor}
       size={dynamicFontSize}
-      bold={isHighlighted || isSelected}
       visible={true}
-      skipTranslation={true}
+      renderOrder={15}
+      bold={isHighlighted || isSelected}
       outlineWidth={outlineConfig.width}
       outlineColor={outlineConfig.color}
-      renderOrder={15}
+      maxWidth={25}
     />
   );
 };

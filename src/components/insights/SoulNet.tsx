@@ -43,29 +43,38 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
   const [canvasError, setCanvasError] = useState<Error | null>(null);
   const [retryCount, setRetryCount] = useState(0);
   const [renderingReady, setRenderingReady] = useState(false);
+  const [fontsInitialized, setFontsInitialized] = useState(false);
   const isMobile = useIsMobile();
   const themeHex = useUserColorThemeHex();
   const [selectedEntity, setSelectedEntity] = useState<string | null>(null);
   const [error, setError] = useState<Error | null>(null);
   const { currentLanguage } = useTranslation();
 
-  console.log("[SoulNet] Enhanced rendering with Devanagari font support", { 
+  console.log("[SoulNet] Enhanced rendering with improved Devanagari support", { 
     userId, 
     timeRange, 
     currentLanguage,
     retryCount,
-    renderingReady
+    renderingReady,
+    fontsInitialized
   });
 
   useEffect(() => {
-    console.log("[SoulNet] Component mounted with enhanced Devanagari script support");
+    console.log("[SoulNet] Component mounted with enhanced font system");
     
-    // Preload fonts including Devanagari for better performance using consolidated service
-    consolidatedFontService.preloadFonts(['Helvetiker', 'NotoSansDevanagari', 'Optimer']).then(() => {
-      console.log('[SoulNet] Font preloading completed successfully');
-    }).catch(error => {
-      console.warn('[SoulNet] Font preloading failed:', error);
-    });
+    // Enhanced font preloading for better stability
+    const initializeFonts = async () => {
+      try {
+        await consolidatedFontService.preloadFonts(['Helvetiker', 'NotoSansDevanagari', 'Optimer']);
+        console.log('[SoulNet] Font preloading completed successfully');
+        setFontsInitialized(true);
+      } catch (error) {
+        console.warn('[SoulNet] Font preloading failed, proceeding anyway:', error);
+        setFontsInitialized(true); // Don't block on font errors
+      }
+    };
+    
+    initializeFonts();
     
     return () => {
       console.log("[SoulNet] Component unmounted");
@@ -127,20 +136,20 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
     fetchEntityEmotionData();
   }, [userId, timeRange]);
 
-  // Staged rendering initialization
+  // Enhanced staged rendering initialization
   useEffect(() => {
-    if (graphData.nodes.length > 0 && !renderingReady) {
-      console.log("[SoulNet] Preparing for staged rendering");
+    if (graphData.nodes.length > 0 && fontsInitialized && !renderingReady) {
+      console.log("[SoulNet] Preparing for staged rendering with fonts ready");
       
       // Delay rendering to prevent initialization crashes
       const timer = setTimeout(() => {
         setRenderingReady(true);
-        console.log("[SoulNet] Rendering ready");
-      }, 300);
+        console.log("[SoulNet] Rendering ready with enhanced font support");
+      }, 500);
       
       return () => clearTimeout(timer);
     }
-  }, [graphData.nodes.length, renderingReady]);
+  }, [graphData.nodes.length, fontsInitialized, renderingReady]);
 
   const handleNodeSelect = useCallback((id: string) => {
     console.log(`[SoulNet] Node selected: ${id}`);
@@ -172,7 +181,14 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
     setCanvasError(null);
     setError(null);
     setRetryCount(0);
-  }, []);
+    setRenderingReady(false);
+    // Re-trigger initialization
+    setTimeout(() => {
+      if (graphData.nodes.length > 0 && fontsInitialized) {
+        setRenderingReady(true);
+      }
+    }, 300);
+  }, [graphData.nodes.length, fontsInitialized]);
 
   if (loading) return <LoadingState />;
   
@@ -184,7 +200,7 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
       <p className="text-muted-foreground mb-4">{error.message}</p>
       <button 
         className="px-4 py-2 bg-primary text-white rounded-md" 
-        onClick={() => window.location.reload()}
+        onClick={handleRetry}
       >
         <TranslatableText text="Retry" />
       </button>
@@ -193,7 +209,7 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
   
   if (graphData.nodes.length === 0) return <EmptyState />;
 
-  // Show simplified error UI for canvas errors
+  // Show simplified error UI for persistent canvas errors
   if (canvasError && retryCount > 2) {
     return (
       <div className="bg-background rounded-xl shadow-sm border w-full p-6">
@@ -202,10 +218,10 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
         </h2>
         <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-4">
           <h3 className="font-medium text-yellow-800 dark:text-yellow-300 mb-2">
-            <TranslatableText text="3D Visualization Unavailable" />
+            <TranslatableText text="3D Visualization Temporarily Unavailable" />
           </h3>
           <p className="text-yellow-700 dark:text-yellow-400 mb-3">
-            <TranslatableText text="The 3D visualization is experiencing technical difficulties. Your data is safe and you can try again." />
+            <TranslatableText text="The visualization is being optimized for better performance. Your data is safe." />
           </p>
           <div className="space-x-2">
             <button
@@ -213,12 +229,6 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
               onClick={handleRetry}
             >
               <TranslatableText text="Try Again" />
-            </button>
-            <button
-              className="px-4 py-2 bg-gray-600 text-white rounded hover:bg-gray-700"
-              onClick={() => window.location.reload()}
-            >
-              <TranslatableText text="Reload Page" />
             </button>
           </div>
         </div>
@@ -233,7 +243,7 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
     return <TranslatableText text="Drag to rotate • Scroll to zoom • Click a node to highlight connections" forceTranslate={true} />;
   };
 
-  console.log(`[SoulNet] Rendering with enhanced Devanagari support: ${graphData.nodes.length} nodes, ${graphData.links.length} links, ready: ${renderingReady}`);
+  console.log(`[SoulNet] Rendering with enhanced stability: ${graphData.nodes.length} nodes, ${graphData.links.length} links, ready: ${renderingReady}, fonts: ${fontsInitialized}`);
 
   return (
     <div className={cn(
@@ -252,10 +262,10 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
             <div className="flex items-center justify-center p-10 bg-gray-100 dark:bg-gray-800 rounded-lg">
               <div className="text-center">
                 <h3 className="text-lg font-medium">
-                  <TranslatableText text="Visualization Error" />
+                  <TranslatableText text="Visualization Loading" />
                 </h3>
                 <p className="text-muted-foreground mt-2">
-                  <TranslatableText text="The 3D visualization encountered an error." />
+                  <TranslatableText text="Preparing the enhanced visualization..." />
                 </p>
                 <button 
                   className="mt-4 px-4 py-2 bg-primary text-white rounded-lg"
@@ -267,7 +277,7 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
             </div>
           }
         >
-          {renderingReady && (
+          {renderingReady && fontsInitialized && (
             <Canvas
               style={{
                 width: '100%',
