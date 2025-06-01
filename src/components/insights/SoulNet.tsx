@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import '@/types/three-reference';  // Fixed import path
 import { Canvas } from '@react-three/fiber';
@@ -150,8 +151,8 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
     return <TranslatableText text="Drag to rotate • Scroll to zoom • Click a node to highlight connections" forceTranslate={true} />;
   };
 
-  // Clean shouldShowLabels logic - only show when node is selected or in fullscreen
-  const shouldShowLabels = isFullScreen || selectedEntity !== null;
+  // Always show labels for better UX
+  const shouldShowLabels = true;
 
   // Calculate connected nodes for HTML overlay
   const getConnectedNodes = (nodeId: string | null): Set<string> => {

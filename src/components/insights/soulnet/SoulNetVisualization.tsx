@@ -46,15 +46,12 @@ function getConnectedNodes(nodeId: string, links: LinkData[]): Set<string> {
 
 // Calculate relative connection strength within connected nodes
 function calculateRelativeStrengths(nodeId: string, links: LinkData[]): Map<string, number> {
-  // Safety check for invalid inputs
   if (!nodeId || !links || !Array.isArray(links)) return new Map<string, number>();
   
-  // Get all links associated with this node
   const nodeLinks = links.filter(link => 
     link && typeof link === 'object' && (link.source === nodeId || link.target === nodeId)
   );
   
-  // Find min and max values
   let minValue = Infinity;
   let maxValue = -Infinity;
   
@@ -63,17 +60,14 @@ function calculateRelativeStrengths(nodeId: string, links: LinkData[]): Map<stri
     if (link.value > maxValue) maxValue = link.value;
   });
 
-  // Create normalized strength map
   const strengthMap = new Map<string, number>();
   
-  // If all values are the same, use a default value
   if (maxValue === minValue || maxValue - minValue < 0.001) {
     nodeLinks.forEach(link => {
       const connectedNodeId = link.source === nodeId ? link.target : link.source;
-      strengthMap.set(connectedNodeId, 0.8); // Higher default value for better visibility
+      strengthMap.set(connectedNodeId, 0.8);
     });
   } else {
-    // Normalize values to 0.3-1.0 range for better visibility
     nodeLinks.forEach(link => {
       const connectedNodeId = link.source === nodeId ? link.target : link.source;
       const normalizedValue = 0.3 + (0.7 * (link.value - minValue) / (maxValue - minValue));
@@ -81,7 +75,6 @@ function calculateRelativeStrengths(nodeId: string, links: LinkData[]): Map<stri
     });
   }
   
-  // Log the calculated strengths for debugging
   console.log(`Connection strengths for ${nodeId}:`, Object.fromEntries(strengthMap));
   return strengthMap;
 }
@@ -123,7 +116,7 @@ export const SoulNetVisualization: React.FC<SoulNetVisualizationProps> = ({
     return data;
   }, [data]);
   
-  // Use memoization to prevent recalculation of center position on every render
+  // Calculate center position
   const centerPosition = useMemo(() => {
     if (!validData.nodes || validData.nodes.length === 0) {
       return new THREE.Vector3(0, 0, 0);
@@ -150,10 +143,8 @@ export const SoulNetVisualization: React.FC<SoulNetVisualizationProps> = ({
   }, [validData.nodes]);
 
   useEffect(() => {
-    // Force a re-render after selection changes to ensure visuals update
     if (selectedNode) {
       console.log(`Selected node: ${selectedNode}`);
-      // Force multiple updates to ensure the visual changes apply
       setForceUpdate(prev => prev + 1);
       const timer = setTimeout(() => {
         setForceUpdate(prev => prev + 1);
@@ -163,7 +154,7 @@ export const SoulNetVisualization: React.FC<SoulNetVisualizationProps> = ({
     }
   }, [selectedNode]);
 
-  // Optimized camera initialization with increased distance for complete view
+  // Camera initialization
   useEffect(() => {
     if (camera && validData.nodes?.length > 0 && !isInitialized) {
       console.log("Initializing camera position for complete visualization view");
@@ -179,7 +170,7 @@ export const SoulNetVisualization: React.FC<SoulNetVisualizationProps> = ({
     }
   }, [camera, validData.nodes, centerPosition, isInitialized]);
 
-  // Track camera zoom with throttling to improve performance
+  // Track camera zoom
   useEffect(() => {
     const updateCameraDistance = () => {
       if (camera) {
@@ -194,19 +185,19 @@ export const SoulNetVisualization: React.FC<SoulNetVisualizationProps> = ({
     return () => clearInterval(intervalId);
   }, [camera, cameraZoom]);
 
-  // Memoize connected nodes to prevent unnecessary recalculations
+  // Memoize connected nodes
   const highlightedNodes = useMemo(() => {
     if (!selectedNode || !validData || !validData.links) return new Set<string>();
     return getConnectedNodes(selectedNode, validData.links);
   }, [selectedNode, validData?.links]);
 
-  // Calculate relative strength of connections for the selected node
+  // Calculate connection strengths
   const connectionStrengths = useMemo(() => {
     if (!selectedNode || !validData || !validData.links) return new Map<string, number>();
     return calculateRelativeStrengths(selectedNode, validData.links);
   }, [selectedNode, validData?.links]);
 
-  // Create a map for quick node lookup with geometry info
+  // Create node map for quick lookup
   const nodeMap = useMemo(() => {
     const map = new Map();
     validData.nodes.forEach(node => {
@@ -229,12 +220,10 @@ export const SoulNetVisualization: React.FC<SoulNetVisualizationProps> = ({
     return map;
   }, [validData.nodes, selectedNode, highlightedNodes, connectionStrengths]);
 
-  // Adjust controls with increased max zoom-out distances for complete view
+  // Adjust controls
   useEffect(() => {
     if (controlsRef.current) {
       controlsRef.current.dampingFactor = isFullScreen ? 0.08 : 0.05;
-      
-      // Increased distance limits to allow complete visualization view
       controlsRef.current.minDistance = isFullScreen ? 8 : 10;
       controlsRef.current.maxDistance = isFullScreen ? 80 : 60;
     }
@@ -242,7 +231,6 @@ export const SoulNetVisualization: React.FC<SoulNetVisualizationProps> = ({
 
   const shouldDim = !!selectedNode;
 
-  // Custom node click handler with debugging
   const handleNodeClick = (id: string, e: any) => {
     console.log(`Node clicked in visualization: ${id}`);
     onNodeClick(id);
@@ -281,7 +269,7 @@ export const SoulNetVisualization: React.FC<SoulNetVisualizationProps> = ({
         }}
       />
       
-      {/* Display edges with proper surface connections */}
+      {/* Display edges */}
       {validData.links.map((link, index) => {
         if (!link || typeof link !== 'object') {
           console.warn(`Invalid link at index ${index}`, link);
@@ -299,19 +287,15 @@ export const SoulNetVisualization: React.FC<SoulNetVisualizationProps> = ({
         const isHighlight = selectedNode &&
           (link.source === selectedNode || link.target === selectedNode);
           
-        // Get relative strength for this connection if it's highlighted
-        let relativeStrength = 0.3; // default lower value
+        let relativeStrength = 0.3;
         
         if (isHighlight && selectedNode) {
           const connectedNodeId = link.source === selectedNode ? link.target : link.source;
-          // Use higher base value for highlighted connections
           relativeStrength = connectionStrengths.get(connectedNodeId) || 0.7;
         } else {
-          // Use original link value, but scaled down for non-highlighted links
           relativeStrength = link.value * 0.5;
         }
         
-        // Skip rendering this edge if positions aren't valid
         if (!Array.isArray(sourceNode.position) || !Array.isArray(targetNode.position)) {
           return null;
         }
@@ -333,7 +317,7 @@ export const SoulNetVisualization: React.FC<SoulNetVisualizationProps> = ({
         );
       })}
       
-      {/* Display nodes - labels are now handled by HTML overlay */}
+      {/* Display nodes - no labels, handled by HTML overlay */}
       {validData.nodes.map(node => {
         if (!node || typeof node !== 'object' || !node.id) {
           console.warn("Invalid node:", node);
@@ -343,12 +327,10 @@ export const SoulNetVisualization: React.FC<SoulNetVisualizationProps> = ({
         const dimmed = shouldDim && !(selectedNode === node.id || highlightedNodes.has(node.id));
         const isHighlighted = selectedNode === node.id || highlightedNodes.has(node.id);
         
-        // Calculate connection strength if this is a connected node
         const connectionStrength = selectedNode && highlightedNodes.has(node.id) 
           ? connectionStrengths.get(node.id) || 0.5
           : 0.5;
           
-        // Skip rendering this node if position isn't valid
         if (!Array.isArray(node.position)) {
           console.warn(`Node ${node.id} has invalid position:`, node.position);
           return null;
@@ -361,15 +343,15 @@ export const SoulNetVisualization: React.FC<SoulNetVisualizationProps> = ({
             isSelected={selectedNode === node.id}
             onClick={handleNodeClick}
             highlightedNodes={highlightedNodes}
-            showLabel={false} // Labels are now handled by HTML overlay
+            showLabel={false} // Always false - handled by HTML overlay
             dimmed={dimmed}
             themeHex={themeHex}
             selectedNodeId={selectedNode}
             cameraZoom={cameraZoom}
             isHighlighted={isHighlighted}
             connectionStrength={connectionStrength}
-            connectionPercentage={0} // Not needed for 3D nodes anymore
-            showPercentage={false} // Not needed for 3D nodes anymore
+            connectionPercentage={0}
+            showPercentage={false}
             forceShowLabels={false}
           />
         );
