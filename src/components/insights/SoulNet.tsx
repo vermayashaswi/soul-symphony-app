@@ -10,6 +10,7 @@ import { EmptyState } from './soulnet/EmptyState';
 import { FullscreenWrapper } from './soulnet/FullscreenWrapper';
 import SoulNetDescription from './soulnet/SoulNetDescription';
 import { useUserColorThemeHex } from './soulnet/useUserColorThemeHex';
+import { HTMLLabelOverlay } from './soulnet/HTMLLabelOverlay';
 import { cn } from '@/lib/utils';
 import ErrorBoundary from './ErrorBoundary';
 import { TranslatableText } from '@/components/translation/TranslatableText';
@@ -123,6 +124,35 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
     });
   }, []);
 
+  // Generate HTML labels data for overlay
+  const generateLabelsData = () => {
+    if (!graphData.nodes.length) return [];
+
+    return graphData.nodes.map(node => {
+      const isHighlighted = selectedEntity !== null && (
+        selectedEntity === node.id ||
+        graphData.links.some(link => 
+          (link.source === selectedEntity && link.target === node.id) ||
+          (link.target === selectedEntity && link.source === node.id)
+        )
+      );
+
+      const isSelected = selectedEntity === node.id;
+      const shouldShow = isFullScreen || isSelected || isHighlighted;
+
+      return {
+        id: node.id,
+        text: node.id,
+        position: node.position,
+        isVisible: shouldShow,
+        isHighlighted,
+        isSelected,
+        nodeType: node.type,
+        color: node.type === 'entity' ? '#ffffff' : themeHex
+      };
+    });
+  };
+
   if (loading) return <LoadingState />;
   if (error) return (
     <div className="bg-background rounded-xl shadow-sm border w-full p-6">
@@ -147,9 +177,6 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
     }
     return <TranslatableText text="Drag to rotate • Scroll to zoom • Click a node to highlight connections" forceTranslate={true} />;
   };
-
-  // Clean shouldShowLabels logic - only show when node is selected or in fullscreen
-  const shouldShowLabels = isFullScreen || selectedEntity !== null;
 
   return (
     <div className={cn(
@@ -180,43 +207,47 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
             </div>
           </div>
         }>
-          <Canvas
-            style={{
-              width: '100%',
-              height: '100%',
-              maxWidth: isFullScreen ? 'none' : '800px',
-              maxHeight: isFullScreen ? 'none' : '500px',
-              position: 'relative',
-              zIndex: 5,
-              transition: 'all 0.3s ease-in-out',
-            }}
-            camera={{ 
-              position: [0, 0, isFullScreen ? 40 : 45],
-              near: 1, 
-              far: 1000,
-              fov: isFullScreen ? 60 : 50
-            }}
-            onPointerMissed={() => setSelectedEntity(null)}
-            gl={{ 
-              preserveDrawingBuffer: true,
-              antialias: !isMobile,
-              powerPreference: 'high-performance',
-              alpha: true,
-              depth: true,
-              stencil: false,
-              precision: isMobile ? 'mediump' : 'highp',
-              logarithmicDepthBuffer: true
-            }}
-          >
-            <SoulNetVisualization
-              data={graphData}
-              selectedNode={selectedEntity}
-              onNodeClick={handleNodeSelect}
-              themeHex={themeHex}
-              isFullScreen={isFullScreen}
-              shouldShowLabels={shouldShowLabels}
-            />
-          </Canvas>
+          <div className="relative">
+            <Canvas
+              style={{
+                width: '100%',
+                height: '100%',
+                maxWidth: isFullScreen ? 'none' : '800px',
+                maxHeight: isFullScreen ? 'none' : '500px',
+                position: 'relative',
+                zIndex: 5,
+                transition: 'all 0.3s ease-in-out',
+              }}
+              camera={{ 
+                position: [0, 0, isFullScreen ? 40 : 45],
+                near: 1, 
+                far: 1000,
+                fov: isFullScreen ? 60 : 50
+              }}
+              onPointerMissed={() => setSelectedEntity(null)}
+              gl={{ 
+                preserveDrawingBuffer: true,
+                antialias: !isMobile,
+                powerPreference: 'high-performance',
+                alpha: true,
+                depth: true,
+                stencil: false,
+                precision: isMobile ? 'mediump' : 'highp',
+                logarithmicDepthBuffer: true
+              }}
+            >
+              <SoulNetVisualization
+                data={graphData}
+                selectedNode={selectedEntity}
+                onNodeClick={handleNodeSelect}
+                themeHex={themeHex}
+                isFullScreen={isFullScreen}
+                shouldShowLabels={false} // Disable 3D labels, use HTML overlay instead
+              />
+            </Canvas>
+            
+            <HTMLLabelOverlay labels={generateLabelsData()} />
+          </div>
         </ErrorBoundary>
       </FullscreenWrapper>
       

@@ -1,8 +1,8 @@
+
 import React, { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import '@/types/three-reference';
 import * as THREE from 'three';
 import { NodeMesh } from './NodeMesh';
-import { NodeLabel } from './NodeLabel';
 import { ConnectionPercentage } from './ConnectionPercentage';
 import { useTheme } from '@/hooks/use-theme';
 
@@ -57,9 +57,6 @@ export const Node: React.FC<NodeProps> = ({
   
   // Debug logging for node rendering
   console.log(`[Node] Rendering node ${node.id} at position:`, node.position, 'isHighlighted:', isHighlighted, 'showLabel:', showLabel);
-  
-  // Clean label visibility logic - only show for selected/highlighted nodes
-  const shouldShowLabel = forceShowLabels || showLabel || isHighlighted || isSelected;
   
   // Track state changes that might cause flickering
   useEffect(() => {
@@ -161,20 +158,6 @@ export const Node: React.FC<NodeProps> = ({
         onPointerLeave={() => setIsTouching(false)}
       />
       
-      <NodeLabel
-        id={node.id}
-        type={node.type}
-        position={[0, 0, 0]}
-        isHighlighted={isHighlighted}
-        isSelected={isSelected}
-        shouldShowLabel={shouldShowLabel}
-        cameraZoom={cameraZoom}
-        themeHex={themeHex}
-        forceVisible={forceShowLabels}
-        nodeColor={displayColor}
-        nodeScale={scale}
-      />
-
       <ConnectionPercentage
         position={node.position}
         percentage={connectionPercentage}
