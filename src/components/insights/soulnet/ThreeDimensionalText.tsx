@@ -21,7 +21,7 @@ interface ThreeDimensionalTextProps {
   renderOrder?: number;
 }
 
-// Helper function to detect non-Latin script
+// Enhanced script detection with better coverage
 const containsNonLatinScript = (text: string): boolean => {
   if (!text) return false;
   
@@ -31,7 +31,16 @@ const containsNonLatinScript = (text: string): boolean => {
     chinese: /[\u4E00-\u9FFF]/,
     japanese: /[\u3040-\u309F\u30A0-\u30FF]/,
     korean: /[\uAC00-\uD7AF]/,
-    cyrillic: /[\u0400-\u04FF]/
+    cyrillic: /[\u0400-\u04FF]/,
+    thai: /[\u0E00-\u0E7F]/,
+    bengali: /[\u0980-\u09FF]/,
+    gujarati: /[\u0A80-\u0AFF]/,
+    gurmukhi: /[\u0A00-\u0A7F]/,
+    kannada: /[\u0C80-\u0CFF]/,
+    malayalam: /[\u0D00-\u0D7F]/,
+    oriya: /[\u0B00-\u0B7F]/,
+    tamil: /[\u0B80-\u0BFF]/,
+    telugu: /[\u0C00-\u0C7F]/
   };
   
   return Object.values(patterns).some(pattern => pattern.test(text));
@@ -41,6 +50,40 @@ const containsDevanagari = (text: string): boolean => {
   if (!text) return false;
   const devanagariPattern = /[\u0900-\u097F]/;
   return devanagariPattern.test(text);
+};
+
+// Text validation utility
+const validateText = (text: string): { isValid: boolean; reason?: string } => {
+  if (!text || typeof text !== 'string') {
+    return { isValid: false, reason: 'Text is empty or not a string' };
+  }
+  
+  if (text.trim().length === 0) {
+    return { isValid: false, reason: 'Text is only whitespace' };
+  }
+  
+  if (text.length > 200) {
+    return { isValid: false, reason: 'Text is too long for 3D rendering' };
+  }
+  
+  return { isValid: true };
+};
+
+// Enhanced fallback text generation
+const generateFallbackText = (originalText: string): string => {
+  if (!originalText) return 'Text';
+  
+  // Try to extract English words first
+  const englishWords = originalText.match(/[a-zA-Z]+/g);
+  if (englishWords && englishWords.length > 0) {
+    return englishWords.slice(0, 2).join(' ');
+  }
+  
+  // Extract first few characters if no English words
+  const firstChars = originalText.substring(0, 10).trim();
+  if (firstChars) return firstChars;
+  
+  return 'Entity';
 };
 
 export const ThreeDimensionalText: React.FC<ThreeDimensionalTextProps> = ({
@@ -59,24 +102,25 @@ export const ThreeDimensionalText: React.FC<ThreeDimensionalTextProps> = ({
 }) => {
   const { translate, currentLanguage } = useTranslation();
   const [displayText, setDisplayText] = useState(text);
+  const [fallbackText, setFallbackText] = useState<string | null>(null);
+  const [renderError, setRenderError] = useState<string | null>(null);
   const { camera } = useThree();
   const textRef = useRef<THREE.Mesh>(null);
   const lastCameraPosition = useRef<THREE.Vector3>(new THREE.Vector3());
   const isNonLatinScript = useRef<boolean>(false);
   const isDevanagari = useRef<boolean>(false);
+  const retryCount = useRef<number>(0);
   
-  // Enhanced billboarding with improved stability and performance
+  // Enhanced billboarding with improved stability
   useFrame(() => {
     if (textRef.current && camera && visible) {
       const distanceMoved = camera.position.distanceTo(lastCameraPosition.current);
       
-      // Update orientation if camera moved significantly
       if (distanceMoved > 0.05) {
         textRef.current.quaternion.copy(camera.quaternion);
         lastCameraPosition.current.copy(camera.position);
       }
       
-      // Apply render order consistently
       if (textRef.current && textRef.current.material) {
         (textRef.current.material as any).depthTest = false;
         (textRef.current.material as any).depthWrite = false;
@@ -85,81 +129,124 @@ export const ThreeDimensionalText: React.FC<ThreeDimensionalTextProps> = ({
     }
   });
 
+  // Enhanced text processing with fallback mechanism
   useEffect(() => {
-    // If skipTranslation is true, use the text as-is without any translation
-    if (skipTranslation) {
-      setDisplayText(text);
-      isNonLatinScript.current = containsNonLatinScript(text);
-      isDevanagari.current = containsDevanagari(text);
-      console.log(`[ThreeDimensionalText] Skipping translation for: "${text}"`);
-      return;
-    }
-
-    // Only translate if not skipping and language is not English
-    if (currentLanguage === 'en' || !text) {
-      setDisplayText(text);
-      isNonLatinScript.current = containsNonLatinScript(text);
-      isDevanagari.current = containsDevanagari(text);
-      return;
-    }
-    
-    const translateText = async () => {
-      try {
-        const result = await translate(text);
-        setDisplayText(result);
-        
-        isNonLatinScript.current = containsNonLatinScript(result);
-        isDevanagari.current = containsDevanagari(result);
-        
-        console.log(`[ThreeDimensionalText] Translated "${text}" to "${result}"`);
-      } catch (e) {
-        console.error('[ThreeDimensionalText] Translation error:', e);
+    const processText = async () => {
+      console.log(`[ThreeDimensionalText] Processing text: "${text}", skipTranslation: ${skipTranslation}, language: ${currentLanguage}`);
+      
+      // Reset error state
+      setRenderError(null);
+      
+      // Validate input text
+      const validation = validateText(text);
+      if (!validation.isValid) {
+        console.warn(`[ThreeDimensionalText] Text validation failed: ${validation.reason}`);
+        const fallback = generateFallbackText(text);
+        setDisplayText(fallback);
+        setFallbackText(fallback);
+        return;
+      }
+      
+      // If skipTranslation is true, use the text as-is
+      if (skipTranslation) {
         setDisplayText(text);
         isNonLatinScript.current = containsNonLatinScript(text);
         isDevanagari.current = containsDevanagari(text);
+        console.log(`[ThreeDimensionalText] Skipping translation for: "${text}"`);
+        return;
+      }
+
+      // Use original text if English or no translation needed
+      if (currentLanguage === 'en' || !text) {
+        setDisplayText(text);
+        isNonLatinScript.current = containsNonLatinScript(text);
+        isDevanagari.current = containsDevanagari(text);
+        return;
+      }
+      
+      // Attempt translation with fallback
+      try {
+        console.log(`[ThreeDimensionalText] Attempting translation of: "${text}"`);
+        const result = await translate(text);
+        
+        // Validate translated result
+        const translatedValidation = validateText(result);
+        if (!translatedValidation.isValid) {
+          console.warn(`[ThreeDimensionalText] Translated text validation failed, using fallback`);
+          const fallback = generateFallbackText(text);
+          setDisplayText(fallback);
+          setFallbackText(fallback);
+          return;
+        }
+        
+        setDisplayText(result);
+        isNonLatinScript.current = containsNonLatinScript(result);
+        isDevanagari.current = containsDevanagari(result);
+        
+        console.log(`[ThreeDimensionalText] Successfully translated "${text}" to "${result}"`);
+        
+        // Clear any previous fallback
+        setFallbackText(null);
+        retryCount.current = 0;
+      } catch (error) {
+        console.error('[ThreeDimensionalText] Translation error:', error);
+        retryCount.current++;
+        
+        // Generate and use fallback text
+        const fallback = generateFallbackText(text);
+        setDisplayText(fallback);
+        setFallbackText(fallback);
+        isNonLatinScript.current = containsNonLatinScript(fallback);
+        isDevanagari.current = containsDevanagari(fallback);
+        
+        console.log(`[ThreeDimensionalText] Using fallback text: "${fallback}" (retry ${retryCount.current})`);
       }
     };
     
-    translateText();
+    processText();
   }, [text, currentLanguage, translate, skipTranslation]);
 
-  if (!visible || !text) {
-    console.log(`[ThreeDimensionalText] Not rendering: visible=${visible}, text="${text}"`);
+  // Don't render if not visible or no valid text
+  if (!visible || !displayText) {
+    console.log(`[ThreeDimensionalText] Not rendering: visible=${visible}, displayText="${displayText}"`);
     return null;
   }
 
-  // Increased effective size by 1.25x (from 2.0 to 2.5)
+  // Enhanced sizing with better proportions
   const effectiveSize = size * 2.5;
   
-  // Enhanced text configuration for better readability
-  const getMaxWidth = () => {
+  // Enhanced configuration based on script type
+  const getTextConfig = () => {
     if (isDevanagari.current) {
-      return 80;
+      return {
+        maxWidth: 80,
+        letterSpacing: 0.15,
+        lineHeight: 2.0,
+        sdfGlyphSize: 512, // Higher resolution for complex scripts
+        font: 'Noto Sans Devanagari'
+      };
     } else if (isNonLatinScript.current) {
-      return 60;
+      return {
+        maxWidth: 60,
+        letterSpacing: 0.08,
+        lineHeight: 1.8,
+        sdfGlyphSize: 256,
+        font: 'Noto Sans'
+      };
     }
-    return 25;
+    return {
+      maxWidth: 25,
+      letterSpacing: 0.02,
+      lineHeight: 1.4,
+      sdfGlyphSize: 128,
+      font: 'Inter'
+    };
   };
 
-  const getLetterSpacing = () => {
-    if (isDevanagari.current) {
-      return 0.15;
-    } else if (isNonLatinScript.current) {
-      return 0.08;
-    }
-    return 0.02;
-  };
-
-  const getLineHeight = () => {
-    if (isDevanagari.current) {
-      return 2.0;
-    } else if (isNonLatinScript.current) {
-      return 1.8;
-    }
-    return 1.4;
-  };
-
-  console.log(`[ThreeDimensionalText] Rendering: "${displayText}" at position:`, position, 'size:', effectiveSize, 'bold:', bold, 'skipTranslation:', skipTranslation);
+  const textConfig = getTextConfig();
+  
+  console.log(`[ThreeDimensionalText] Rendering: "${displayText}" at position:`, position, 
+    'config:', textConfig, 'fallback:', fallbackText, 'skipTranslation:', skipTranslation);
   
   return (
     <Text
@@ -172,21 +259,27 @@ export const ThreeDimensionalText: React.FC<ThreeDimensionalTextProps> = ({
       anchorY="middle"
       outlineWidth={outlineWidth}
       outlineColor={outlineColor}
-      maxWidth={getMaxWidth()}
+      maxWidth={textConfig.maxWidth}
       overflowWrap="normal"
       whiteSpace="normal"
       textAlign="center"
-      letterSpacing={getLetterSpacing()}
-      sdfGlyphSize={isDevanagari.current ? 256 : 128}
+      letterSpacing={textConfig.letterSpacing}
+      sdfGlyphSize={textConfig.sdfGlyphSize}
       renderOrder={renderOrder}
-      lineHeight={getLineHeight()}
-      // Enhanced material properties for maximum visibility
+      lineHeight={textConfig.lineHeight}
+      // Enhanced material properties for cross-script compatibility
       material-transparent={true}
       material-opacity={opacity}
       material-toneMapped={false}
       material-side={THREE.DoubleSide}
       material-depthTest={false}
       material-depthWrite={false}
+      // Force font loading for better script support
+      font={`/fonts/${textConfig.font}-Regular.woff`}
+      onError={(error) => {
+        console.error(`[ThreeDimensionalText] Render error for "${displayText}":`, error);
+        setRenderError(error.message);
+      }}
     >
       {displayText}
     </Text>

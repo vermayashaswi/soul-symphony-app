@@ -1,4 +1,3 @@
-
 import type { Config } from "tailwindcss";
 
 export default {
@@ -100,11 +99,16 @@ export default {
 			stroke: {
 				theme: 'var(--color-theme)',
 			},
+			fontFamily: {
+				sans: ['Inter', 'ui-sans-serif', 'system-ui', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'Roboto', 'sans-serif'],
+				devanagari: ['Noto Sans Devanagari', 'Inter', 'ui-sans-serif', 'system-ui', 'sans-serif'],
+				'noto-sans': ['Noto Sans', 'Inter', 'ui-sans-serif', 'system-ui', 'sans-serif'],
+			},
 			borderRadius: {
 				lg: 'var(--radius)',
 				md: 'calc(var(--radius) - 2px)',
 				sm: 'calc(var(--radius) - 4px)',
-				full: '9999px', // Ensure full is truly circular
+				full: '9999px',
 			},
 			keyframes: {
 				'accordion-down': {
