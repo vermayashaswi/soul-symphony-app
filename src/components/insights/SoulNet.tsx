@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import '@/types/three-reference';
 import { Canvas } from '@react-three/fiber';
@@ -305,12 +304,6 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
                 logarithmicDepthBuffer: false, // Disable for better compatibility
                 failIfMajorPerformanceCaveat: false // Don't fail on slow devices
               }}
-              onCreated={({ gl }) => {
-                // Additional WebGL optimizations
-                gl.debug.checkShaderErrors = false;
-                gl.capabilities.isWebGL2 = false; // Force WebGL1 for compatibility
-              }}
-              onError={handleCanvasError}
             >
               <SoulNetVisualization
                 data={graphData}

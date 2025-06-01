@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import '@/types/three-reference';
 import { OrbitControls } from '@react-three/drei';

@@ -1,4 +1,3 @@
-
 import React, { useRef, useMemo } from 'react';
 import * as THREE from 'three';
 import '@/types/three-reference';  // Fixed import path
@@ -8,7 +7,7 @@ import { useTheme } from '@/hooks/use-theme';
 interface EdgeProps {
   start: [number, number, number];
   end: [number, number, number];
-  value: number;
+  strength: number; // Added this prop
   isHighlighted: boolean;
   dimmed: boolean;
   maxThickness?: number;
@@ -37,7 +36,7 @@ const calculateSurfacePoint = (
 export const Edge: React.FC<EdgeProps> = ({ 
   start, 
   end, 
-  value, 
+  strength, // Now using the strength prop
   isHighlighted, 
   dimmed,
   maxThickness = 5,
@@ -130,9 +129,9 @@ export const Edge: React.FC<EdgeProps> = ({
     }
   });
 
-  // Reduce non-highlighted lines thickness by 3x
-  const baseThickness = isHighlighted ? 1 : 1; // Adjust non-highlighted base thickness
-  const thickness = baseThickness + (value * (isHighlighted ? maxThickness * 2/3 : maxThickness / 3));
+  // Update the thickness calculation to use strength instead of value
+  const baseThickness = isHighlighted ? 1 : 1;
+  const thickness = baseThickness + (strength * (isHighlighted ? maxThickness * 2/3 : maxThickness / 3));
   
   // Create material with appropriate properties
   const material = useMemo(() => {
