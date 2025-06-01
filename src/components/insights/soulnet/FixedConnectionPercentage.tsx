@@ -15,7 +15,7 @@ export const FixedConnectionPercentage: React.FC<FixedConnectionPercentageProps>
   isVisible,
   nodeType = 'emotion'
 }) => {
-  console.log(`[FixedConnectionPercentage] Rendering ${percentage}% at`, position, 'visible:', isVisible);
+  console.log(`[FixedConnectionPercentage] Enhanced rendering ${percentage}% at`, position, 'visible:', isVisible);
 
   // Format percentage
   const formattedPercentage = useMemo(() => {
@@ -29,14 +29,14 @@ export const FixedConnectionPercentage: React.FC<FixedConnectionPercentageProps>
     return null;
   }
 
-  // Position the percentage in front of the node
+  // Position the percentage in front of the node with better Z offset
   const percentagePosition: [number, number, number] = [
     position[0],
     position[1],
-    position[2] + 2.0 // Move forward in Z to ensure visibility
+    position[2] + 2.5 // Increased Z offset for better visibility
   ];
 
-  console.log(`[FixedConnectionPercentage] Final render: "${formattedPercentage}" at`, percentagePosition);
+  console.log(`[FixedConnectionPercentage] Enhanced final render: "${formattedPercentage}" at`, percentagePosition);
 
   return (
     <ReliableText
@@ -47,7 +47,7 @@ export const FixedConnectionPercentage: React.FC<FixedConnectionPercentageProps>
       visible={true}
       renderOrder={20} // Higher than labels
       bold={true}
-      outlineWidth={0.05}
+      outlineWidth={0.06} // Increased outline
       outlineColor="#000000"
       maxWidth={10}
     />

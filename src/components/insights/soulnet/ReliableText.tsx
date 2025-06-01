@@ -3,6 +3,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Text } from '@react-three/drei';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
+import { simpleFontService } from '@/utils/simpleFontService';
 
 interface ReliableTextProps {
   text: string;
@@ -31,16 +32,26 @@ export const ReliableText: React.FC<ReliableTextProps> = ({
 }) => {
   const [isReady, setIsReady] = useState(false);
   const [displayText, setDisplayText] = useState('');
+  const [fontFamily, setFontFamily] = useState('Inter, system-ui, sans-serif');
   const textRef = useRef<THREE.Mesh>(null);
 
-  // Initialize with clean text
+  // Initialize with clean text and dynamic font selection
   useEffect(() => {
     if (!text || typeof text !== 'string') {
       setDisplayText('Node');
+      setFontFamily(simpleFontService.getFontFamily('latin'));
     } else {
       const cleanText = text.trim();
       const limitedText = cleanText.length > 50 ? cleanText.substring(0, 50) + '...' : cleanText;
-      setDisplayText(limitedText || 'Node');
+      const finalText = limitedText || 'Node';
+      
+      setDisplayText(finalText);
+      
+      // Get appropriate font family for the text
+      const dynamicFontFamily = simpleFontService.getFontFamilyForText(finalText);
+      setFontFamily(dynamicFontFamily);
+      
+      console.log(`[ReliableText] Text: "${finalText}", Script: ${simpleFontService.detectScriptType(finalText)}, Font: ${dynamicFontFamily}`);
     }
     setIsReady(true);
   }, [text]);
@@ -74,7 +85,7 @@ export const ReliableText: React.FC<ReliableTextProps> = ({
       anchorY="middle"
       maxWidth={maxWidth}
       textAlign="center"
-      font={bold ? "Inter, system-ui, sans-serif" : "Inter, system-ui, sans-serif"}
+      font={fontFamily}
       fontWeight={bold ? "bold" : "normal"}
       material-transparent={true}
       material-depthTest={false}

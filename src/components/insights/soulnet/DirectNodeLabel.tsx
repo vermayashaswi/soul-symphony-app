@@ -31,17 +31,16 @@ export const DirectNodeLabel: React.FC<DirectNodeLabelProps> = ({
   const [displayText, setDisplayText] = useState<string>(id);
   const [isReady, setIsReady] = useState(false);
 
-  console.log(`[DirectNodeLabel] Rendering label for ${id}, visible: ${shouldShowLabel}`);
+  console.log(`[DirectNodeLabel] Enhanced rendering label for ${id}, visible: ${shouldShowLabel}`);
 
-  // Initialize component
+  // Initialize component with enhanced font support
   useEffect(() => {
     const init = async () => {
       try {
-        // Don't wait for fonts, just check readiness
+        // Ensure font service is ready for script detection
         if (simpleFontService.isReady()) {
           setIsReady(true);
         } else {
-          // Start fonts but don't block
           simpleFontService.waitForFonts().then(() => setIsReady(true));
           // Fallback timeout
           setTimeout(() => setIsReady(true), 100);
@@ -55,7 +54,7 @@ export const DirectNodeLabel: React.FC<DirectNodeLabelProps> = ({
     init();
   }, []);
 
-  // Handle translation
+  // Handle translation with script detection
   useEffect(() => {
     if (!isReady || !shouldShowLabel) return;
 
@@ -69,6 +68,11 @@ export const DirectNodeLabel: React.FC<DirectNodeLabelProps> = ({
         const translated = await translate(id);
         if (translated && typeof translated === 'string') {
           setDisplayText(translated);
+          
+          // Log script detection for debugging
+          const scriptType = simpleFontService.detectScriptType(translated);
+          const fontFamily = simpleFontService.getFontFamily(scriptType);
+          console.log(`[DirectNodeLabel] Translation: "${id}" -> "${translated}", Script: ${scriptType}, Font: ${fontFamily}`);
         } else {
           setDisplayText(id);
         }
@@ -113,7 +117,7 @@ export const DirectNodeLabel: React.FC<DirectNodeLabelProps> = ({
     return null;
   }
 
-  console.log(`[DirectNodeLabel] Rendering text "${displayText}" at position`, labelPosition);
+  console.log(`[DirectNodeLabel] Enhanced rendering text "${displayText}" at position`, labelPosition);
 
   return (
     <ReliableText
