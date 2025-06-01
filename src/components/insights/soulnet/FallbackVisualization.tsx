@@ -72,9 +72,11 @@ export const FallbackVisualization: React.FC<FallbackVisualizationProps> = ({
           >
             <sphereGeometry args={[1, 16, 16]} />
             <meshPhongMaterial 
-              color={color}
-              transparent
-              opacity={0.8}
+              args={[{ 
+                color: color,
+                transparent: true,
+                opacity: 0.8
+              }]}
             />
           </mesh>
         );
@@ -100,10 +102,11 @@ export const FallbackVisualization: React.FC<FallbackVisualizationProps> = ({
           <line key={`fallback-line-${index}`}>
             <bufferGeometry attach="geometry" {...geometry} />
             <lineBasicMaterial 
-              attach="material" 
-              color={themeHex}
-              opacity={0.3}
-              transparent
+              args={[{
+                color: themeHex,
+                opacity: 0.3,
+                transparent: true
+              }]}
             />
           </line>
         );
