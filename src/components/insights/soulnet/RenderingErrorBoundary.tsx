@@ -28,11 +28,11 @@ class RenderingErrorBoundary extends Component<Props, State> {
   static getDerivedStateFromError(error: Error): Partial<State> {
     console.error('[RenderingErrorBoundary] Caught error:', error);
     
-    return (prevState: State) => ({
+    return {
       hasError: true, 
       error,
-      errorCount: prevState.errorCount + 1
-    });
+      errorCount: 1
+    };
   }
 
   componentDidCatch(error: Error, errorInfo: ErrorInfo): void {

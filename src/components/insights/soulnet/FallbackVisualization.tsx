@@ -73,7 +73,7 @@ export const FallbackVisualization: React.FC<FallbackVisualizationProps> = ({
             <sphereGeometry args={[1, 16, 16]} />
             <meshPhongMaterial 
               color={color}
-              transparent
+              transparent={true}
               opacity={0.8}
             />
           </mesh>
@@ -103,7 +103,7 @@ export const FallbackVisualization: React.FC<FallbackVisualizationProps> = ({
               attach="material" 
               color={themeHex}
               opacity={0.3}
-              transparent
+              transparent={true}
             />
           </line>
         );

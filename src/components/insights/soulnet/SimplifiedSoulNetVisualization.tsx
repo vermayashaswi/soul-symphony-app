@@ -155,8 +155,8 @@ export const SimplifiedSoulNetVisualization: React.FC<SimplifiedSoulNetVisualiza
           }}
         />
 
-        {/* Render edges in simplified mode */}
-        {renderingMode !== 'fallback' && validData.links.map((link, index) => {
+        {/* Render edges in non-fallback mode */}
+        {validData.links.map((link, index) => {
           const sourceNode = validData.nodes.find(n => n.id === link.source);
           const targetNode = validData.nodes.find(n => n.id === link.target);
           

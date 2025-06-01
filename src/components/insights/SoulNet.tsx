@@ -14,6 +14,7 @@ import { useUserColorThemeHex } from './soulnet/useUserColorThemeHex';
 import { cn } from '@/lib/utils';
 import { TranslatableText } from '@/components/translation/TranslatableText';
 import { useTranslation } from '@/contexts/TranslationContext';
+import { onDemandTranslationCache } from '@/utils/website-translations';
 
 interface NodeData {
   id: string;
@@ -266,7 +267,6 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
               stencil: false,
               precision: isMobile ? 'mediump' : 'highp'
             }}
-            onError={handleCanvasError}
           >
             <SimplifiedSoulNetVisualization
               data={graphData}
