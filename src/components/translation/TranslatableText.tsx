@@ -1,19 +1,18 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { useTranslation } from '@/contexts/TranslationContext';
 import { useLocation } from 'react-router-dom';
 import { isWebsiteRoute } from '@/routes/RouteHelpers';
 
 interface TranslatableTextProps {
-  text: string;
+  text: string; // This must remain a string type
   className?: string;
   as?: keyof JSX.IntrinsicElements;
   sourceLanguage?: string;
   entryId?: number;
-  forceTranslate?: boolean;
-  onTranslationStart?: () => void;
-  onTranslationEnd?: () => void;
-  style?: React.CSSProperties;
+  forceTranslate?: boolean; // Prop to force translation regardless of route
+  onTranslationStart?: () => void; // Added callback for translation start
+  onTranslationEnd?: () => void; // Added callback for translation end
+  style?: React.CSSProperties; // Add style prop to the interface
 }
 
 export function TranslatableText({ 
@@ -25,62 +24,59 @@ export function TranslatableText({
   forceTranslate = false,
   onTranslationStart,
   onTranslationEnd,
-  style
+  style // Add style to the destructuring
 }: TranslatableTextProps) {
-  const [translatedText, setTranslatedText] = useState<string>(text);
+  const [translatedText, setTranslatedText] = useState<string>(text); // Initialize with source text
   const [isLoading, setIsLoading] = useState(false);
   const { translate, currentLanguage, getCachedTranslation } = useTranslation();
   const location = useLocation();
   const prevLangRef = useRef<string>(currentLanguage);
   const initialLoadDoneRef = useRef<boolean>(false);
-  const textRef = useRef<string>(text);
+  const textRef = useRef<string>(text); // Track text changes
   const mountedRef = useRef<boolean>(true);
-  const translationAttemptRef = useRef<number>(0);
   
+  // Check if on website route - but allow forced translation
   const pathname = location.pathname;
   const isOnWebsite = isWebsiteRoute(pathname);
   
+  // Helper function to clean translation results
   const cleanTranslationResult = (result: string): string => {
     if (!result) return '';
+    
+    // Remove language code suffix like "(hi)" or "[hi]" that might be appended
     const languageCodeRegex = /\s*[\(\[]([a-z]{2})[\)\]]\s*$/i;
     return result.replace(languageCodeRegex, '').trim();
   };
   
+  // Function to translate text with better error handling
   const translateText = async () => {
+    // Skip translation if text is empty
     if (!text?.trim()) {
       setTranslatedText('');
       return;
     }
 
-    // Enhanced debug logging for force translate
-    console.log(`TranslatableText: Translation check for "${text}" - forceTranslate: ${forceTranslate}, isOnWebsite: ${isOnWebsite}, currentLanguage: ${currentLanguage}`);
-
+    // CRITICAL FIX: Don't skip translation on website routes if forceTranslate is true
     if (isOnWebsite && !forceTranslate) {
-      console.log(`TranslatableText: Skipping translation for "${text}" - on website without force translate`);
+      console.log(`TranslatableText: Skipping translation for "${text}" because on website route without force translate`);
       setTranslatedText(text);
       return;
     }
 
+    // Skip translation if already in English and not forcing
     if (currentLanguage === 'en') {
-      console.log(`TranslatableText: Skipping translation for "${text}" - already in English`);
       setTranslatedText(text);
       return;
     }
     
-    // Check cache first
+    // Check for cached translation first to prevent flicker
     const cachedResult = getCachedTranslation(text, currentLanguage);
     if (cachedResult) {
-      console.log(`TranslatableText: Using cached translation for "${text}": "${cachedResult}"`);
       setTranslatedText(cachedResult);
       return;
     }
     
-    // Increment attempt counter for debugging
-    translationAttemptRef.current += 1;
-    const attemptNumber = translationAttemptRef.current;
-    
-    console.log(`TranslatableText: Starting translation attempt #${attemptNumber} for "${text}" to ${currentLanguage}`);
-    
+    // Only initiate translation if not in English or if language has changed
     if (!isLoading) {
       setIsLoading(true);
       if (onTranslationStart) {
@@ -89,26 +85,27 @@ export function TranslatableText({
     }
       
     try {
-      // Force translation by using staticTranslationService directly
-      console.log(`TranslatableText: Calling translate service for "${text.substring(0, 30)}..." to ${currentLanguage}`);
+      console.log(`TranslatableText: Translating "${text.substring(0, 30)}..." to ${currentLanguage}`);
+      // IMPORTANT CHANGE: Always use "en" as the default source language regardless of what was provided
       const result = await translate(text, "en", entryId);
       
-      console.log(`TranslatableText: Translation service returned for "${text.substring(0, 30)}...": "${result?.substring(0, 30) || 'null'}..."`);
-      
+      // Only update if the component is still mounted, the language hasn't changed during translation
+      // and the input text is still the same as when we started
       if (mountedRef.current && prevLangRef.current === currentLanguage && textRef.current === text) {
         if (result) {
+          // Clean the translation result before setting it
           const cleanedResult = cleanTranslationResult(result);
-          console.log(`TranslatableText: Setting translated text for "${text.substring(0, 30)}...": "${cleanedResult.substring(0, 30)}..."`);
-          setTranslatedText(cleanedResult || text);
+          console.log(`TranslatableText: Translation result for "${text.substring(0, 30)}...": "${cleanedResult.substring(0, 30)}..."`);
+          setTranslatedText(cleanedResult || text); // Fallback to original if cleaning removes everything
         } else {
-          console.log(`TranslatableText: Empty translation result for "${text.substring(0, 30)}...", using original`);
-          setTranslatedText(text);
+          console.log(`TranslatableText: Empty translation result for "${text.substring(0, 30)}..."`);
+          setTranslatedText(text); // Fallback to original if result is empty
         }
       }
     } catch (error) {
       console.error(`TranslatableText: Translation error for "${text.substring(0, 30)}..."`, error);
       if (mountedRef.current && prevLangRef.current === currentLanguage && textRef.current === text) {
-        setTranslatedText(text);
+        setTranslatedText(text); // Fallback to original
       }
     } finally {
       if (mountedRef.current) {
@@ -120,11 +117,13 @@ export function TranslatableText({
     }
   };
 
+  // Effect to handle translation when text or language changes
   useEffect(() => {
     mountedRef.current = true;
+    
+    // Update the refs with current values
     prevLangRef.current = currentLanguage;
     textRef.current = text;
-    translationAttemptRef.current = 0; // Reset attempt counter
 
     const handleTranslation = async () => {
       if (mountedRef.current) {
@@ -142,12 +141,15 @@ export function TranslatableText({
     };
   }, [text, currentLanguage, sourceLanguage, entryId, forceTranslate]);
   
+  // Listen to language change events to force re-translate
   useEffect(() => {
     const handleLanguageChange = () => {
-      console.log(`TranslatableText: Language change event detected for "${text.substring(0, 30)}..." - new language: ${currentLanguage}`);
+      console.log(`TranslatableText: Language change event for "${text.substring(0, 30)}..."`);
+      // Update the refs
       prevLangRef.current = currentLanguage;
       textRef.current = text;
-      translationAttemptRef.current = 0; // Reset attempt counter
+      
+      // Then retranslate
       translateText();
     };
     
@@ -156,8 +158,9 @@ export function TranslatableText({
     return () => {
       window.removeEventListener('languageChange', handleLanguageChange as EventListener);
     };
-  }, [text, sourceLanguage, entryId, currentLanguage, forceTranslate]);
+  }, [text, sourceLanguage, entryId, currentLanguage]);
 
+  // Using React.createElement to avoid type confusion with Three.js components
   return React.createElement(
     Component, 
     { 
@@ -166,11 +169,9 @@ export function TranslatableText({
       'data-translated': translatedText !== text ? 'true' : 'false',
       'data-lang': currentLanguage,
       'data-force-translate': forceTranslate ? 'true' : 'false',
-      'data-original-text': text,
-      'data-translation-attempts': translationAttemptRef.current,
-      style
+      style // Pass style prop to the element
     }, 
-    translatedText || text
+    translatedText || text  // Ensure we always show something, even if translation fails
   );
 }
 

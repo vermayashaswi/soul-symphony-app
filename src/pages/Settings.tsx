@@ -396,7 +396,7 @@ export default function Settings() {
       <div className={cn("max-w-3xl mx-auto px-4", isMobile ? "pt-0" : "pt-2")}>
         <div className="mb-6">
           <h1 className="text-3xl font-bold mb-2 text-theme-color">
-            <TranslatableText text="settings" forceTranslate={true} />
+            <TranslatableText text="Settings" forceTranslate={true} />
           </h1>
           <p className="text-muted-foreground">
             <TranslatableText text="Personalize your SOuLO experience" />
@@ -505,7 +505,7 @@ export default function Settings() {
                   onClick={handleLogout}
                 >
                   <LogOut className="h-4 w-4" />
-                  <TranslatableText text="logout" forceTranslate={true} />
+                  <TranslatableText text="Logout" />
                 </Button>
               </div>
             </div>
@@ -741,27 +741,23 @@ export default function Settings() {
               </Button>
             </div>
             
-            <div className="mt-6 flex flex-col sm:flex-row justify-center gap-3">
+            <div className="mt-6 text-center flex justify-center gap-3">
               <Button 
                 variant="default" 
-                className="gap-2 bg-theme-color hover:bg-theme-color/90 flex-1 sm:flex-none whitespace-normal text-center min-h-[44px] px-6" 
+                className="gap-2 bg-theme-color hover:bg-theme-color/90" 
                 onClick={handleContactSupport}
               >
-                <Mail className="h-4 w-4 flex-shrink-0" />
-                <span className="leading-tight">
-                  <TranslatableText text="Contact Support" />
-                </span>
+                <Mail className="h-4 w-4" />
+                <TranslatableText text="Contact Support" />
               </Button>
               
               <Button 
                 variant="outline" 
-                className="gap-2 border-theme-color text-theme-color hover:bg-theme-color/10 flex-1 sm:flex-none whitespace-normal text-center min-h-[44px] px-6" 
+                className="gap-2 border-theme-color text-theme-color hover:bg-theme-color/10" 
                 onClick={resetTutorial}
               >
-                <RefreshCw className="h-4 w-4 flex-shrink-0" />
-                <span className="leading-tight">
-                  <TranslatableText text="Restart Tutorial" />
-                </span>
+                <RefreshCw className="h-4 w-4" />
+                <TranslatableText text="Restart Tutorial" />
               </Button>
             </div>
           </motion.div>

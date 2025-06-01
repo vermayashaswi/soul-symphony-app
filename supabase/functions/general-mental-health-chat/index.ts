@@ -1,3 +1,4 @@
+
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 
 const corsHeaders = {
@@ -5,92 +6,103 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+const openaiApiKey = Deno.env.get('OPENAI_API_KEY');
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    const { message, conversationContext = [] } = await req.json();
-
-    if (!message) {
-      return new Response(
-        JSON.stringify({ error: 'Message is required' }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
-      );
+    if (!openaiApiKey) {
+      throw new Error('OpenAI API key not configured');
     }
 
-    const openAiApiKey = Deno.env.get('OPENAI_API_KEY');
-    if (!openAiApiKey) {
-      return new Response(
-        JSON.stringify({ error: 'OpenAI API key not configured' }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 500 }
-      );
+    const { message } = await req.json();
+    
+    console.log('[General Mental Health Chat] Processing message:', message);
+
+    // Check if this is a simple greeting or conversational message
+    const isGreeting = /^(hi|hello|hey|sup|what's up|howdy|good morning|good afternoon|good evening|how are you|how's it going)\??!?$/i.test(message.trim());
+    const isSimpleConversational = message.trim().length < 10 && !/\b(anxious|depressed|sad|help|advice|how to|why|what|mental health|stress|confidence|mood|feeling)\b/i.test(message);
+
+    if (isGreeting || isSimpleConversational) {
+      // Return a simple, friendly greeting without invoking OpenAI
+      const greetingResponses = [
+        "Hello! I'm here to help with mental health information and support. What would you like to know about?",
+        "Hi there! How can I assist you with mental health topics today?",
+        "Hey! I'm your mental health assistant. Feel free to ask me about wellness, coping strategies, or any mental health questions.",
+        "Hello! I'm here to provide mental health education and support. What's on your mind?"
+      ];
+      
+      const randomGreeting = greetingResponses[Math.floor(Math.random() * greetingResponses.length)];
+      
+      console.log('[General Mental Health Chat] Responding with greeting:', randomGreeting);
+      
+      return new Response(JSON.stringify({ response: randomGreeting }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
     }
 
-    console.log(`[General Mental Health] Processing: "${message}" with ${conversationContext.length} context messages`);
+    // For actual mental health questions, use OpenAI
+    const systemPrompt = `You are a helpful mental health education assistant. Provide general, evidence-based information about mental health topics. 
 
-    // Build messages array with conversation context
-    const messages = [
-      {
-        role: 'system',
-        content: `You are a mental health assistant for SOULo, a voice journaling app. Provide helpful, supportive general mental health guidance.
+IMPORTANT GUIDELINES:
+- Provide educational information, not personalized therapy or medical advice
+- Keep responses under 200 words but comprehensive
+- Use markdown formatting with headers and bullet points
+- Be warm, supportive, and encouraging
+- Include practical, actionable strategies
+- Mention when professional help might be beneficial
+- Do NOT analyze personal data or journal entries
+- Focus on general strategies that work for most people
 
-Guidelines:
-- Be empathetic and supportive
-- Provide evidence-based mental health information
-- Suggest practical coping strategies
-- Encourage professional help when appropriate
-- Keep responses concise and actionable
-- For personalized insights, suggest the user ask about their journal entries specifically
+Structure your response with:
+- A clear header (##)
+- Practical strategies with bullet points
+- Encouraging conclusion
+- Suggestion to seek personalized insights if relevant
 
-If the question is about the user's personal patterns or experiences, gently suggest they ask something like "How am I doing?" to get personalized insights from their journal entries.`
-      }
-    ];
-
-    // Add conversation context (last 5 messages to keep context manageable)
-    if (conversationContext.length > 0) {
-      messages.push(...conversationContext.slice(-5));
-    }
-
-    // Add current user message
-    messages.push({ role: 'user', content: message });
+The user asked: "${message}"`;
 
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${openAiApiKey}`,
+        'Authorization': `Bearer ${openaiApiKey}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
         model: 'gpt-4o-mini',
-        messages: messages,
-        max_tokens: 800,
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: message }
+        ],
         temperature: 0.7,
+        max_tokens: 400,
       }),
     });
 
     if (!response.ok) {
-      const errorText = await response.text();
-      console.error('[General Mental Health] OpenAI API error:', errorText);
       throw new Error(`OpenAI API error: ${response.status}`);
     }
 
     const data = await response.json();
-    const responseContent = data.choices[0]?.message?.content || 'I apologize, but I was unable to generate a helpful response. Please try rephrasing your question.';
+    const generatedResponse = data.choices[0].message.content;
 
-    console.log(`[General Mental Health] Generated response with conversation context`);
+    console.log('[General Mental Health Chat] Generated response length:', generatedResponse.length);
 
-    return new Response(
-      JSON.stringify({ response: responseContent }),
-      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    );
+    return new Response(JSON.stringify({ response: generatedResponse }), {
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    });
 
   } catch (error) {
-    console.error('[General Mental Health] Error:', error);
-    return new Response(
-      JSON.stringify({ error: 'Failed to generate response' }),
-      { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 500 }
-    );
+    console.error('[General Mental Health Chat] Error:', error);
+    return new Response(JSON.stringify({
+      error: 'Failed to generate response',
+      message: error.message
+    }), {
+      status: 500,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    });
   }
 });

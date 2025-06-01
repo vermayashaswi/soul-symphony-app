@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useJournalEntries } from '@/hooks/use-journal-entries';
 import { processRecording, getEntryIdForProcessingId, removeProcessingEntryById } from '@/utils/audio-processing';
@@ -31,6 +32,7 @@ const Journal = () => {
   const [profileCheckRetryCount, setProfileCheckRetryCount] = useState(0);
   const [lastProfileErrorTime, setLastProfileErrorTime] = useState(0);
   const [showRetryButton, setShowRetryButton] = useState(false);
+  const [toastIds, setToastIds] = useState<{ [key: string]: string }>({});
   const [notifiedEntryIds, setNotifiedEntryIds] = useState<Set<number>>(new Set());
   const [profileCheckTimeoutId, setProfileCheckTimeoutId] = useState<NodeJS.Timeout | null>(null);
   const [entryHasBeenProcessed, setEntryHasBeenProcessed] = useState(false);
@@ -130,6 +132,16 @@ const Journal = () => {
           
           setTimeout(() => {
             setProcessingEntries(prev => prev.filter(id => id !== event.detail.tempId));
+            
+            if (toastIds[event.detail.tempId]) {
+              toast.dismiss(toastIds[event.detail.tempId]);
+              
+              setToastIds(prev => {
+                const newToastIds = { ...prev };
+                delete newToastIds[event.detail.tempId];
+                return newToastIds;
+              });
+            }
           }, 3000);
           
           toast.success('Journal entry analyzed and saved', {
@@ -171,13 +183,17 @@ const Journal = () => {
       
       clearAllToasts();
     };
-  }, [processingEntries, fetchEntries, deletedProcessingIds]);
+  }, [processingEntries, toastIds, fetchEntries, deletedProcessingIds]);
 
   useEffect(() => {
     clearAllToasts();
     
     return () => {
       clearAllToasts();
+      
+      Object.values(toastIds).forEach(id => {
+        if (id) toast.dismiss(id);
+      });
       
       if (profileCheckTimeoutId) {
         clearTimeout(profileCheckTimeoutId);
@@ -242,6 +258,20 @@ const Journal = () => {
           
           if (connectedProcessingEntries.length > 0) {
             setProcessingEntries(prev => prev.filter(id => !connectedProcessingEntries.includes(id)));
+            
+            connectedProcessingEntries.forEach(tempId => {
+              if (toastIds[tempId]) {
+                toast.dismiss(toastIds[tempId]);
+              }
+            });
+            
+            setToastIds(prev => {
+              const newToastIds = { ...prev };
+              connectedProcessingEntries.forEach(tempId => {
+                delete newToastIds[tempId];
+              });
+              return newToastIds;
+            });
           }
           
           const fetchIntervals = [1000, 2000];
@@ -270,15 +300,19 @@ const Journal = () => {
         setEntriesReady(true);
       }
     }
-  }, [entries, processingEntries, entriesReady, activeTab, fetchEntries, notifiedEntryIds]);
+  }, [entries, processingEntries, toastIds, entriesReady, activeTab, fetchEntries, notifiedEntryIds]);
 
   useEffect(() => {
     return () => {
+      Object.values(toastIds).forEach(id => {
+        if (id) toast.dismiss(id);
+      });
+      
       if (profileCheckTimeoutId) {
         clearTimeout(profileCheckTimeoutId);
       }
     };
-  }, [profileCheckTimeoutId]);
+  }, [toastIds, profileCheckTimeoutId]);
 
   useEffect(() => {
     if (user?.id && isCheckingProfile && !profileCheckedOnceRef.current) {
@@ -491,12 +525,29 @@ const Journal = () => {
         setActiveTab('entries');
       }, 50);
       
+      const toastId = toast.loading('Processing your journal entry with AI...', {
+        duration: 15000,
+        closeButton: false,
+        onAutoClose: () => {
+          if (toastId) {
+            const updatedToastIds = { ...toastIds };
+            Object.keys(updatedToastIds).forEach(key => {
+              if (updatedToastIds[key] === String(toastId)) {
+                delete updatedToastIds[key];
+              }
+            });
+            setToastIds(updatedToastIds);
+          }
+        }
+      });
+      
       console.log('[Journal] Starting processing for audio file:', audioBlob.size, 'bytes');
       const { success, tempId, error } = await processRecording(audioBlob, user.id);
       
       if (success && tempId) {
         console.log('[Journal] Processing started with tempId:', tempId);
         setProcessingEntries(prev => [...prev, tempId]);
+        setToastIds(prev => ({ ...prev, [tempId]: String(toastId) }));
         setLastAction(`Processing Started (${tempId})`);
         
         // Create a temporary processing entry to be displayed while the real one is being processed
@@ -539,10 +590,20 @@ const Journal = () => {
               console.log('[Journal] Maximum processing time reached for tempId:', tempId);
               setLastAction(`Max Processing Time Reached (${tempId})`);
               
-              toast.success('Journal entry processed', { 
-                duration: 3000,
-                closeButton: false
-              });
+              if (toastIds[tempId]) {
+                toast.dismiss(toastIds[tempId]);
+                
+                toast.success('Journal entry processed', { 
+                  duration: 3000,
+                  closeButton: false
+                });
+                
+                setToastIds(prev => {
+                  const newToastIds = { ...prev };
+                  delete newToastIds[tempId];
+                  return newToastIds;
+                });
+              }
               
               // Remove the temporary entry from localEntries if it's still there
               setLocalEntries(prev => prev.filter(entry => !(entry.tempId === tempId)));
@@ -561,6 +622,8 @@ const Journal = () => {
         console.error('[Journal] Processing failed:', error);
         setProcessingError(error || 'Unknown error occurred');
         setLastAction(`Processing Failed: ${error || 'Unknown'}`);
+        
+        toast.dismiss(toastId);
         
         await new Promise(resolve => setTimeout(resolve, 150));
         
@@ -618,6 +681,10 @@ const Journal = () => {
         const mappedId = getEntryIdForProcessingId(tempId);
         if (mappedId === entryId) {
           tempIdsToDelete.push(tempId);
+          
+          if (toastIds[tempId]) {
+            toast.dismiss(toastIds[tempId]);
+          }
         }
       });
       
@@ -642,6 +709,14 @@ const Journal = () => {
         tempId => !tempIdsToDelete.includes(tempId) && getEntryIdForProcessingId(tempId) !== entryId
       );
       setProcessingEntries(updatedProcessingEntries);
+      
+      const updatedToastIds = { ...toastIds };
+      Object.keys(updatedToastIds).forEach(key => {
+        if (key.includes(String(entryId)) || tempIdsToDelete.includes(key)) {
+          delete updatedToastIds[key];
+        }
+      });
+      setToastIds(updatedToastIds);
       
       setNotifiedEntryIds(prev => {
         const updated = new Set(prev);
@@ -749,7 +824,7 @@ const Journal = () => {
       setIsDeletingEntry(false);
       setDeletingEntryId(null);
     }
-  }, [user?.id, processingEntries, fetchEntries, entries, hasLocalChanges, isDeletingEntry]);
+  }, [user?.id, processingEntries, toastIds, fetchEntries, entries, hasLocalChanges, isDeletingEntry]);
 
   const resetError = useCallback(() => {
     setHasRenderError(false);

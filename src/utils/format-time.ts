@@ -1,3 +1,4 @@
+
 import { formatDate } from 'date-fns';
 import { 
   validateDateRange,
@@ -38,15 +39,15 @@ export function formatTime(seconds: number): string {
   return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
 }
 
-// Updated formatShortDate function to return objects for translation
-export function formatShortDate(date: Date | string): { type: 'translatable' | 'formatted', text: string, formatPattern?: string } {
+// NEW: Add formatShortDate function for journal entries
+export function formatShortDate(date: Date | string): string {
   try {
     const inputDate = typeof date === 'string' ? new Date(date) : date;
     
     // Validate the date
     if (!inputDate || isNaN(inputDate.getTime())) {
       console.error('[formatShortDate] Invalid date:', date);
-      return { type: 'translatable', text: 'Recently' };
+      return 'Recently';
     }
     
     const now = new Date();
@@ -54,39 +55,30 @@ export function formatShortDate(date: Date | string): { type: 'translatable' | '
     
     // Today
     if (diffInDays === 0) {
-      return { type: 'translatable', text: 'Today' };
+      return 'Today';
     }
     
     // Yesterday
     if (diffInDays === 1) {
-      return { type: 'translatable', text: 'Yesterday' };
+      return 'Yesterday';
     }
     
-    // This week (within 6 days) - return day name for translation
+    // This week (within 6 days)
     if (diffInDays < 7) {
-      const dayName = formatDate(inputDate, 'EEEE'); // Day name in English
-      return { type: 'translatable', text: dayName };
+      return formatDate(inputDate, 'EEEE'); // Day name
     }
     
-    // This year - return formatted date for translation
+    // This year
     if (inputDate.getFullYear() === now.getFullYear()) {
-      const formattedDate = formatDate(inputDate, 'MMM d');
-      return { type: 'formatted', text: formattedDate, formatPattern: 'MMM d' };
+      return formatDate(inputDate, 'MMM d');
     }
     
-    // Previous years - return formatted date for translation
-    const formattedDate = formatDate(inputDate, 'MMM d, yyyy');
-    return { type: 'formatted', text: formattedDate, formatPattern: 'MMM d, yyyy' };
+    // Previous years
+    return formatDate(inputDate, 'MMM d, yyyy');
   } catch (error) {
     console.error('[formatShortDate] Error formatting date:', error);
-    return { type: 'translatable', text: 'Recently' };
+    return 'Recently';
   }
-}
-
-// Keep the original function for backward compatibility but mark as deprecated
-export function formatShortDateLegacy(date: Date | string): string {
-  const result = formatShortDate(date);
-  return result.text;
 }
 
 export function isValidTimeRange(startDate: string, endDate: string): boolean {

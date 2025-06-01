@@ -1,3 +1,4 @@
+
 import { ChatMessage, ChatThread, MessageResponse, SubQueryResponse, isThreadMetadata, subQueryResponseToJson, jsonToSubQueryResponse } from './types';
 import { supabase } from '@/integrations/supabase/client';
 import { v4 as uuidv4 } from 'uuid';
@@ -6,7 +7,7 @@ import { isDirectDateQuery, getClientTimeInfo } from '@/services/dateService';
 import { performanceMonitor, withPerformanceMonitoring, monitorChatOperation } from '@/utils/performance-monitor';
 
 /**
- * Send a message to the AI assistant and get a response with enhanced RAG pipeline
+ * Send a message to the AI assistant and get a response with enhanced error handling and performance monitoring
  */
 export async function sendMessage(
   message: string,
@@ -155,6 +156,9 @@ export async function sendMessage(
       originalTopic: metadataObj.topicContext
     });
     
+    // Check if the message appears to be mental health related
+    const isMentalHealthQuery = detectMentalHealthQuery(message);
+    
     // Create a placeholder/processing message in the database
     const processingMessageId = uuidv4();
     await supabase.from('chat_messages').insert({
@@ -167,101 +171,13 @@ export async function sendMessage(
       created_at: new Date().toISOString()
     });
     
-    // STAGE 1: Query Classification
-    console.log(`[sendMessage] STAGE 1: Query Classification`);
-    const classificationResponse = await withPerformanceMonitoring(
-      'query-classification',
-      async () => {
-        const classificationPromise = supabase.functions.invoke('chat-query-classifier', {
-          body: { message, conversationContext }
-        });
-        
-        const timeoutPromise = new Promise((_, reject) => {
-          setTimeout(() => reject(new Error('Classification timeout')), 5000);
-        });
-        
-        return await Promise.race([classificationPromise, timeoutPromise]);
-      }
-    );
-    
-    if ((classificationResponse as any).error) {
-      console.error('Classification error:', (classificationResponse as any).error);
-    }
-    
-    const classification = (classificationResponse as any).data || { 
-      category: 'JOURNAL_SPECIFIC', 
-      shouldUseJournal: true,
-      confidence: 0.7
-    };
-    
-    console.log(`[sendMessage] Classification result:`, classification);
-    
-    // Handle general mental health questions without journal analysis
-    if (classification.category === 'GENERAL_MENTAL_HEALTH' || classification.category === 'CONVERSATIONAL') {
-      console.log(`[sendMessage] Handling general question without journal analysis`);
-      
-      try {
-        const generalResponse = await supabase.functions.invoke('general-mental-health-chat', {
-          body: { 
-            message,
-            conversationContext: conversationContext.slice(-5) // Pass conversation context
-          }
-        });
-        
-        const finalResponse = (generalResponse as any).data?.response || getGeneralMentalHealthFallback(message);
-        
-        await supabase.from('chat_messages')
-          .update({
-            content: finalResponse,
-            is_processing: false
-          })
-          .eq('id', processingMessageId);
-        
-        await supabase.from('chat_threads')
-          .update({ processing_status: 'idle' })
-          .eq('id', threadId);
-        
-        performanceMonitor.endOperation(operationId, 'success');
-        
-        return {
-          response: finalResponse,
-          status: 'success',
-          messageId: processingMessageId,
-        };
-      } catch (error) {
-        console.error('General chat error:', error);
-        const fallbackResponse = getGeneralMentalHealthFallback(message);
-        
-        await supabase.from('chat_messages')
-          .update({
-            content: fallbackResponse,
-            is_processing: false
-          })
-          .eq('id', processingMessageId);
-        
-        await supabase.from('chat_threads')
-          .update({ processing_status: 'idle' })
-          .eq('id', threadId);
-        
-        return {
-          response: fallbackResponse,
-          status: 'success',
-          messageId: processingMessageId,
-        };
-      }
-    }
-    
-    // STAGE 2: Query Planning for journal-specific questions
-    console.log(`[sendMessage] STAGE 2: Query Planning`);
-    
-    await supabase.from('chat_messages')
-      .update({ content: "Creating analysis plan..." })
-      .eq('id', processingMessageId);
+    // Step 1: Get intelligent query plan with enhanced monitoring and reduced timeout
+    console.log(`[sendMessage] Calling smart-query-planner with complete conversation context`);
     
     const queryPlannerParams = {
       message,
       userId: userIdString,
-      conversationContext,
+      conversationContext, // Now includes up to 10 messages with full context
       isFollowUp: conversationContext.length > 0,
       timezoneOffset: clientTimeInfo.timezoneOffset,
       timezoneName: clientTimeInfo.timezoneName,
@@ -269,21 +185,24 @@ export async function sendMessage(
       referenceDate,
       preserveTopicContext,
       timeRange,
+      // Enhanced context parameters
       threadMetadata: metadataObj,
       isAnalysisFollowUp,
       originalQueryScope: metadataObj.lastQueryScope || null
     };
     
+    // Enhanced query planner call with reduced timeout and better error handling
     let queryPlanResponse;
     try {
       queryPlanResponse = await monitorChatOperation(
         async () => {
+          // Create a promise race with timeout
           const queryPlannerPromise = supabase.functions.invoke('smart-query-planner', {
             body: queryPlannerParams
           });
           
           const timeoutPromise = new Promise((_, reject) => {
-            setTimeout(() => reject(new Error('Query planner timeout')), 8000);
+            setTimeout(() => reject(new Error('Query planner timeout')), 6000);
           });
           
           return await Promise.race([queryPlannerPromise, timeoutPromise]);
@@ -301,23 +220,35 @@ export async function sendMessage(
             strategy: "hybrid",
             queryType: "journal_specific",
             requiresJournalData: true,
-            isEmotionQuery: /\b(emotion|feel|mood|happy|sad|anxious|excited)\b/i.test(message),
-            isPersonalityQuery: /\b(am|are)\s+(i|we)\b/i.test(message),
-            subQuestions: [message],
+            subQuestions: [{
+              question: message,
+              searchPlan: {
+                vectorSearch: {
+                  enabled: true,
+                  threshold: 0.1,
+                  query: message,
+                  dateFilter: null
+                },
+                sqlQueries: [],
+                fallbackStrategy: isAnalysisFollowUp ? "comprehensive_analysis" : "recent_entries"
+              }
+            }],
             searchParameters: {
               vectorThreshold: 0.1,
-              useEmotionSQL: /\b(emotion|feel|mood|happy|sad|anxious|excited)\b/i.test(message),
+              useEmotionSQL: false,
               useThemeSQL: false,
               dateRange: null,
-              fallbackStrategy: isAnalysisFollowUp ? "comprehensive_analysis" : "recent_entries"
+              fallbackStrategy: isAnalysisFollowUp ? "comprehensive_analysis" : "recent_entries",
+              sqlQueries: [],
+              executeSQLQueries: false
             },
             filters: { date_range: null, emotions: null, themes: null },
             domainContext: metadataObj.topicContext || "general_insights",
             confidence: 0.5,
             reasoning: "Fallback due to planner timeout",
+            // Preserve context flags
             useAllEntries: isAnalysisFollowUp,
-            hasPersonalPronouns: /\b(my|me|i|myself)\b/i.test(message),
-            needsSegmentation: false
+            hasPersonalPronouns: /\b(my|me|i|myself)\b/i.test(message)
           }
         }
       };
@@ -326,10 +257,10 @@ export async function sendMessage(
     console.log(`[sendMessage] Query planner response received`);
     
     // Check if we have a direct response that doesn't need further processing
-    if ((queryPlanResponse as any).data && (queryPlanResponse as any).data.directResponse) {
+    if (queryPlanResponse.data && queryPlanResponse.data.directResponse) {
       await supabase.from('chat_messages')
         .update({
-          content: (queryPlanResponse as any).data.directResponse,
+          content: queryPlanResponse.data.directResponse,
           is_processing: false
         })
         .eq('id', processingMessageId);
@@ -352,61 +283,23 @@ export async function sendMessage(
       performanceMonitor.endOperation(operationId, 'success');
       
       return {
-        response: (queryPlanResponse as any).data.directResponse,
+        response: queryPlanResponse.data.directResponse,
         status: 'success',
         messageId: processingMessageId,
       };
     }
     
     // Extract the enhanced query plan
-    const queryPlan = (queryPlanResponse as any).data?.queryPlan || {};
-    console.log(`[sendMessage] Enhanced query plan received:`, {
-      strategy: queryPlan.strategy,
-      isEmotionQuery: queryPlan.isEmotionQuery,
-      isPersonalityQuery: queryPlan.isPersonalityQuery,
-      needsSegmentation: queryPlan.needsSegmentation,
-      subQuestions: queryPlan.subQuestions?.length || 0
-    });
-    
-    // STAGE 3: Query Segmentation (if needed)
-    let finalSubQuestions = queryPlan.subQuestions || [message];
-    
-    if (queryPlan.needsSegmentation && queryPlan.subQuestions && queryPlan.subQuestions.length > 1) {
-      console.log(`[sendMessage] STAGE 3: Query Segmentation - Processing ${queryPlan.subQuestions.length} sub-questions`);
-      
-      await supabase.from('chat_messages')
-        .update({ content: "Breaking down complex question..." })
-        .eq('id', processingMessageId);
-      
-      try {
-        const segmentResponse = await supabase.functions.invoke('segment-complex-query', {
-          body: {
-            originalQuery: message,
-            subQuestions: queryPlan.subQuestions,
-            conversationContext: conversationContext.slice(-3), // Pass conversation context
-            queryPlan
-          }
-        });
-        
-        if ((segmentResponse as any).data && (segmentResponse as any).data.subQuestions) {
-          finalSubQuestions = (segmentResponse as any).data.subQuestions;
-          console.log(`[sendMessage] Enhanced segmentation completed: ${finalSubQuestions.length} segments`);
-        }
-      } catch (error) {
-        console.error('Segmentation error:', error);
-        // Fall back to original sub-questions
-      }
-    } else {
-      console.log(`[sendMessage] No segmentation needed - single query processing`);
-    }
+    const queryPlan = queryPlanResponse.data?.queryPlan || {};
+    console.log(`[sendMessage] Enhanced query plan received with context awareness`);
     
     // Update processing message based on query plan
-    let processingContent = "Analyzing your entries...";
+    let processingContent = "Processing your request...";
     
     if (queryPlan.isPersonalityQuery) {
-      processingContent = "Analyzing personality patterns from your journal...";
+      processingContent = "Analyzing personality patterns...";
     } else if (queryPlan.isEmotionQuery) {
-      processingContent = "Analyzing emotional patterns from your entries...";
+      processingContent = "Analyzing emotional patterns...";
     } else if (queryPlan.needsComprehensiveAnalysis || queryPlan.useAllEntries) {
       processingContent = "Performing comprehensive analysis of all entries...";
     } else if (isAnalysisFollowUp) {
@@ -434,13 +327,14 @@ export async function sendMessage(
     
     console.log(`[sendMessage] Using date range:`, dateRange);
     
-    // STAGE 4: Sub-Query Processing with Enhanced Analysis
-    console.log(`[sendMessage] STAGE 4: Enhanced Sub-Query Processing`);
+    // Step 2: Execute intelligent search and response generation with enhanced monitoring and reduced timeout
+    console.log(`[sendMessage] Calling chat-with-rag with auth token and full context`);
     
     let queryResponse;
     try {
       queryResponse = await monitorChatOperation(
         async () => {
+          // Create a promise race with timeout
           const chatRagPromise = supabase.functions.invoke('chat-with-rag', {
             body: {
               message,
@@ -448,11 +342,12 @@ export async function sendMessage(
               threadId,
               timeRange: dateRange,
               referenceDate,
-              conversationContext, // Already being passed
+              conversationContext, // Full 10-message context
               queryPlan,
-              subQuestions: finalSubQuestions,
+              isMentalHealthQuery,
               clientTimeInfo: clientTimeInfo,
               userTimezone: userTimezone,
+              // Enhanced context parameters
               threadMetadata: metadataObj,
               useAllEntries: queryPlan.useAllEntries || isAnalysisFollowUp,
               hasPersonalPronouns: queryPlan.hasPersonalPronouns || /\b(my|me|i|myself)\b/i.test(message),
@@ -464,12 +359,12 @@ export async function sendMessage(
           });
           
           const timeoutPromise = new Promise((_, reject) => {
-            setTimeout(() => reject(new Error('Chat-with-rag timeout')), 15000);
+            setTimeout(() => reject(new Error('Chat-with-rag timeout')), 12000);
           });
           
           return await Promise.race([chatRagPromise, timeoutPromise]);
         },
-        'rag-pipeline',
+        'response-generation',
         { message, userId: userIdString, strategy: queryPlan.strategy }
       );
     } catch (error) {
@@ -506,20 +401,20 @@ export async function sendMessage(
       };
     }
     
-    console.log(`[sendMessage] Enhanced RAG response received`);
+    console.log(`[sendMessage] Chat-with-rag response received`);
     
-    if ((queryResponse as any).error) {
-      console.error('Error from chat-with-rag:', (queryResponse as any).error);
-      throw new Error(`Chat service error: ${(queryResponse as any).error.message || (queryResponse as any).error}`);
+    if (queryResponse.error) {
+      console.error('Error from chat-with-rag:', queryResponse.error);
+      throw new Error(`Chat service error: ${queryResponse.error.message || queryResponse.error}`);
     }
     
-    if (!(queryResponse as any).data) {
+    if (!queryResponse.data) {
       console.error('No data received from chat-with-rag:', queryResponse);
       throw new Error('Failed to get response from chat engine');
     }
     
     // The backend returns { data: "response string" }
-    const finalResponse = (queryResponse as any).data;
+    const finalResponse = queryResponse.data;
     
     console.log(`[sendMessage] Final response received, length: ${finalResponse?.length || 0}`);
     
@@ -579,9 +474,7 @@ export async function sendMessage(
       domainContext: queryPlan.domainContext || null,
       searchStrategy: queryPlan.strategy || 'hybrid',
       lastUpdated: new Date().toISOString(),
-      conversationLength: conversationContext.length + 1,
-      processedSubQuestions: finalSubQuestions.length,
-      usedEnhancedRAG: true
+      conversationLength: conversationContext.length + 1 // Track conversation depth
     };
     
     await updateThreadMetadata(threadId, updatedMetadata);
@@ -706,6 +599,7 @@ async function processMultiPartQuery(
     
     const subQueryResponses: SubQueryResponse[] = [];
     for (const subQuery of subQueries) {
+      // Use chat-with-rag for all sub-queries too
       const queryResponse = await supabase.functions.invoke('chat-with-rag', {
         body: {
           message: subQuery,
@@ -715,8 +609,7 @@ async function processMultiPartQuery(
           referenceDate,
           subQueryMode: true,
           clientTimeInfo: clientTimeInfo,
-          userTimezone: userTimezone,
-          conversationContext: [] // Pass empty context for sub-queries to avoid confusion
+          userTimezone: userTimezone
         }
       });
       
@@ -738,8 +631,7 @@ async function processMultiPartQuery(
     const combinedResponse = await supabase.functions.invoke('combine-segment-responses', {
       body: {
         originalQuery: message,
-        subQueryResponses,
-        conversationContext: [] // Pass context for combining responses
+        subQueryResponses
       }
     });
     
@@ -996,60 +888,3 @@ export const updateThreadTitle = async (threadId: string, title: string): Promis
     return false;
   }
 };
-
-function getGeneralMentalHealthFallback(message: string): string {
-  const lowerMessage = message.toLowerCase();
-  
-  if (lowerMessage.includes('confident')) {
-    return `## Building Confidence: General Strategies
-
-**Practical Ways to Become More Confident:**
-
-- **Practice self-compassion** - Treat yourself with the same kindness you'd show a good friend
-- **Set small, achievable goals** - Build momentum with consistent small wins
-- **Challenge negative self-talk** - Notice and reframe harsh inner criticism
-- **Focus on your strengths** - Make a list of things you're good at and review it regularly
-- **Step outside your comfort zone gradually** - Take on challenges that stretch but don't overwhelm you
-- **Improve your posture and body language** - Stand tall, make eye contact, and take up space
-- **Learn new skills** - Competence builds confidence naturally
-- **Exercise regularly** - Physical activity boosts mood and self-esteem
-- **Practice mindfulness** - Stay present instead of worrying about future judgments
-
-**Remember:** Confidence is built through consistent practice and self-acceptance, not perfection. Start with one or two strategies that resonate with you and build from there.
-
-Would you like me to analyze your personal confidence patterns from your journal entries? Just ask something like "How can I become more confident?" to get personalized insights.`;
-  }
-  
-  if (lowerMessage.includes('anxiety') || lowerMessage.includes('stress')) {
-    return `## Managing Anxiety and Stress: General Approaches
-
-**Evidence-Based Strategies:**
-
-- **Deep breathing exercises** - Practice 4-7-8 breathing or box breathing
-- **Progressive muscle relaxation** - Tense and release muscle groups systematically
-- **Mindfulness meditation** - Focus on the present moment without judgment
-- **Regular exercise** - Physical activity reduces stress hormones
-- **Maintain good sleep hygiene** - Aim for 7-9 hours of quality sleep
-- **Limit caffeine and alcohol** - These can worsen anxiety symptoms
-- **Connect with others** - Share your feelings with trusted friends or family
-- **Practice grounding techniques** - Use the 5-4-3-2-1 sensory method
-- **Consider professional help** - Therapy can provide personalized coping strategies
-
-**When to seek professional help:** If anxiety significantly impacts your daily life, work, or relationships.
-
-For personalized insights about your stress patterns, I can analyze your journal entries if you'd like!`;
-  }
-
-  return `I'd be happy to help with general mental health information! However, for the most helpful response, could you be more specific about what you're looking for?
-
-**I can provide general information about:**
-- Stress and anxiety management
-- Building confidence and self-esteem  
-- Improving mood and emotional well-being
-- Sleep and lifestyle factors
-- Mindfulness and coping strategies
-
-**For personalized insights,** I can also analyze your journal entries to understand your unique patterns and provide tailored advice. Just ask a more personal question like "How can I..." or "What helps me..." and I'll look at your journal data.
-
-What specific aspect of mental health would you like to explore?`;
-}

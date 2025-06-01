@@ -1,11 +1,13 @@
 
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
+import { useTranslation } from '@/contexts/TranslationContext';
 
 export function useOnboarding() {
   const [onboardingComplete, setOnboardingComplete] = useState<boolean | null>(null);
   const [loading, setLoading] = useState(true);
   const [displayName, setDisplayName] = useState<string | null>(null);
+  const { currentLanguage } = useTranslation();
 
   useEffect(() => {
     // Check if onboarding is complete

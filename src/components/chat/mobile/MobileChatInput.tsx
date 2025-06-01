@@ -5,7 +5,6 @@ import { Send, Loader2 } from "lucide-react";
 import { useDebugLog } from "@/utils/debug/DebugContext";
 import { Input } from "@/components/ui/input";
 import { useTutorial } from "@/contexts/TutorialContext";
-import { useTranslation } from "@/contexts/TranslationContext";
 
 interface MobileChatInputProps {
   onSendMessage: (message: string, isAudio?: boolean) => void;
@@ -19,36 +18,15 @@ export default function MobileChatInput({
   userId
 }: MobileChatInputProps) {
   const [inputValue, setInputValue] = useState("");
-  const [placeholderText, setPlaceholderText] = useState("Type your message...");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isKeyboardVisible, setIsKeyboardVisible] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const inputContainerRef = useRef<HTMLDivElement>(null);
   const chatDebug = useDebugLog();
   const { isActive, isInStep } = useTutorial();
-  const { translate, currentLanguage } = useTranslation();
   
   // Check if we're in step 5 (chat question step)
   const isInChatTutorialStep = isActive && isInStep(5);
-
-  // Translate placeholder text when language changes
-  useEffect(() => {
-    const translatePlaceholder = async () => {
-      try {
-        if (currentLanguage === 'en') {
-          setPlaceholderText("Type your message...");
-        } else {
-          const translated = await translate("Type your message...");
-          setPlaceholderText(translated || "Type your message...");
-        }
-      } catch (error) {
-        console.error('Error translating placeholder:', error);
-        setPlaceholderText("Type your message...");
-      }
-    };
-
-    translatePlaceholder();
-  }, [currentLanguage, translate]);
 
   // If we're in step 5 of the tutorial, don't render anything at all
   if (isInChatTutorialStep) {
@@ -202,7 +180,7 @@ export default function MobileChatInput({
           value={inputValue}
           onChange={handleInputChange}
           onKeyDown={handleKeyPress}
-          placeholder={placeholderText}
+          placeholder="Type your message..."
           className="w-full pr-10 focus:outline-none focus:ring-2 focus:ring-primary border-2 border-primary/40 shadow-[0_0_8px_rgba(155,135,245,0.5)] bg-background text-foreground"
           disabled={isLoading || isSubmitting}
         />

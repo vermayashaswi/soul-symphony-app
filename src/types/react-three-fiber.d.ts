@@ -15,23 +15,6 @@ declare module '@react-three/fiber' {
     ambientLight: any;
     pointLight: any;
     hemisphereLight: any;
-    directionalLight: any;
-    points: any;
-    bufferGeometry: any;
-    bufferAttribute: {
-      attach: string;
-      count: number;
-      array: Float32Array | number[];
-      itemSize: number;
-    };
-    pointsMaterial: {
-      size?: number;
-      color?: string | number;
-      sizeAttenuation?: boolean;
-      transparent?: boolean;
-      opacity?: number;
-    };
-    fog: any;
   }
 
   export interface ThreeEvent<T> extends Event {
@@ -49,7 +32,7 @@ declare module '@react-three/fiber' {
     camera: THREE.Camera;
     size: { width: number; height: number };
     viewport: { width: number; height: number; initialDpr: number; dpr: number; factor: number; distance: number };
-    clock: THREE.Clock;
+    clock: THREE.Clock; // Added the missing clock property
   }
 
   export function Canvas(props: {
@@ -83,22 +66,19 @@ declare namespace JSX {
     ambientLight: any;
     pointLight: any;
     hemisphereLight: any;
-    directionalLight: any;
-    points: any;
-    bufferGeometry: any;
-    bufferAttribute: {
-      attach: string;
-      count: number;
-      array: Float32Array | number[];
-      itemSize: number;
-    };
-    pointsMaterial: {
-      size?: number;
-      color?: string | number;
-      sizeAttenuation?: boolean;
-      transparent?: boolean;
-      opacity?: number;
-    };
-    fog: any;
   }
+}
+
+// Fix for ThreeElements interface
+interface ThreeElements {
+  group: any;
+  mesh: any;
+  primitive: any;
+  sphereGeometry: any;
+  boxGeometry: any;
+  meshStandardMaterial: any;
+  meshBasicMaterial: any;
+  ambientLight: any;
+  pointLight: any;
+  hemisphereLight: any;
 }

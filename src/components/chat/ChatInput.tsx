@@ -6,7 +6,6 @@ import { Textarea } from "@/components/ui/textarea";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { motion } from "framer-motion";
 import { useTutorial } from "@/contexts/TutorialContext";
-import { useTranslation } from "@/contexts/TranslationContext";
 
 interface ChatInputProps {
   onSendMessage: (message: string) => void;
@@ -20,34 +19,13 @@ const ChatInput: React.FC<ChatInputProps> = ({
   userId
 }) => {
   const [message, setMessage] = useState("");
-  const [placeholderText, setPlaceholderText] = useState("Type your message...");
   const isMobile = useIsMobile();
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const inputContainerRef = useRef<HTMLDivElement>(null);
   const { isActive, isInStep, tutorialCompleted } = useTutorial();
-  const { translate, currentLanguage } = useTranslation();
   
   // Check if we're in the chat tutorial step
   const isInTutorial = isActive && isInStep(5);
-
-  // Translate placeholder text when language changes
-  useEffect(() => {
-    const translatePlaceholder = async () => {
-      try {
-        if (currentLanguage === 'en') {
-          setPlaceholderText("Type your message...");
-        } else {
-          const translated = await translate("Type your message...");
-          setPlaceholderText(translated || "Type your message...");
-        }
-      } catch (error) {
-        console.error('Error translating placeholder:', error);
-        setPlaceholderText("Type your message...");
-      }
-    };
-
-    translatePlaceholder();
-  }, [currentLanguage, translate]);
 
   // Effect to manage visibility during and after tutorial
   useEffect(() => {
@@ -139,7 +117,7 @@ const ChatInput: React.FC<ChatInputProps> = ({
             ref={textareaRef}
             value={message}
             onChange={handleTextareaChange}
-            placeholder={placeholderText}
+            placeholder="Type your message..."
             className="min-h-[24px] h-[32px] text-sm md:text-base resize-none rounded-full pl-4 pr-12 py-0 shadow-sm border-muted bg-background text-foreground overflow-hidden"
             disabled={isLoading}
             onKeyDown={(e) => {

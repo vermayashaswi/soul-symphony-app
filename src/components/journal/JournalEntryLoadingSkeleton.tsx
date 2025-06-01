@@ -123,9 +123,9 @@ export default function JournalEntryLoadingSkeleton({
             <div className="h-4 w-4 rounded-full bg-primary relative z-10"></div>
           </div>
           
-          {/* Debug info - now completely invisible */}
+          {/* Debug info */}
           {tempId && (
-            <div className="absolute bottom-2 right-2 text-xs text-muted-foreground opacity-0" 
+            <div className="absolute bottom-2 right-2 text-xs text-muted-foreground opacity-50" 
                  data-temp-id={tempId}>
               {tempId.substring(0, 8)}...
             </div>

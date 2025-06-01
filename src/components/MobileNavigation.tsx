@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from 'react';
 import { useLocation, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
@@ -8,7 +9,6 @@ import { useIsMobile } from '@/hooks/use-mobile';
 import { TranslatableText } from '@/components/translation/TranslatableText';
 import { useTutorial } from '@/contexts/TutorialContext';
 import { useAuth } from '@/contexts/AuthContext';
-import { useTranslation } from '@/contexts/TranslationContext';
 
 interface MobileNavigationProps {
   onboardingComplete: boolean | null;
@@ -21,20 +21,6 @@ const MobileNavigation: React.FC<MobileNavigationProps> = ({ onboardingComplete 
   const [isKeyboardVisible, setIsKeyboardVisible] = useState(false);
   const { isActive: isTutorialActive } = useTutorial();
   const { user } = useAuth();
-  const { currentLanguage } = useTranslation();
-  
-  // Debug: Force component re-render when language changes
-  const [renderKey, setRenderKey] = useState(0);
-  
-  useEffect(() => {
-    const handleLanguageChange = () => {
-      console.log('MobileNavigation: Language change detected, forcing re-render');
-      setRenderKey(prev => prev + 1);
-    };
-    
-    window.addEventListener('languageChange', handleLanguageChange);
-    return () => window.removeEventListener('languageChange', handleLanguageChange);
-  }, []);
   
   useEffect(() => {
     const handleVisualViewportResize = () => {
@@ -69,18 +55,28 @@ const MobileNavigation: React.FC<MobileNavigationProps> = ({ onboardingComplete 
   }, []);
   
   useEffect(() => {
+    // Comprehensive list of paths where navigation should be hidden - must match ViewportManager
     const onboardingOrAuthPaths = [
       '/app/onboarding',
       '/app/auth',
       '/onboarding',
       '/auth',
       '/app',
-      '/'
+      '/' // Also hide on root path
     ];
     
+    // Check if current path is in the list of paths where navigation should be hidden
     const isOnboardingOrAuth = onboardingOrAuthPaths.includes(location.pathname);
+    
+    // Explicit check for app root path - hide navigation here regardless of onboarding status
     const isAppRoot = location.pathname === '/app';
     
+    // Only show navigation if:
+    // 1. We're on mobile or in native app
+    // 2. Keyboard is not visible
+    // 3. We're not on an onboarding/auth screen
+    // 4. User is authenticated
+    // 5. Onboarding is complete if we're checking
     const shouldShowNav = (isMobile || isNativeApp()) && 
                           !isKeyboardVisible && 
                           !isOnboardingOrAuth &&
@@ -97,24 +93,22 @@ const MobileNavigation: React.FC<MobileNavigationProps> = ({ onboardingComplete 
       isAppRoot,
       hasUser: !!user,
       onboardingComplete,
-      isTutorialActive,
-      currentLanguage,
-      renderKey
+      isTutorialActive
     });
     
     setIsVisible(shouldShowNav);
-  }, [location.pathname, isMobile, isKeyboardVisible, isTutorialActive, user, onboardingComplete, currentLanguage, renderKey]);
+  }, [location.pathname, isMobile, isKeyboardVisible, isTutorialActive, user, onboardingComplete]);
   
   if (!isVisible) {
     return null;
   }
   
+  // Additional safety check - don't show if onboarding is not complete
   if (onboardingComplete === false || location.pathname === '/app') {
     console.log('MobileNavigation: Not rendering due to onboarding status or /app path');
     return null;
   }
   
-  // Navigation items with English text for translation
   const navItems = [
     { path: '/app/home', icon: Home, label: 'Home' },
     { path: '/app/journal', icon: BookOpen, label: 'Journal' },
@@ -127,17 +121,14 @@ const MobileNavigation: React.FC<MobileNavigationProps> = ({ onboardingComplete 
     return location.pathname.startsWith(path);
   };
   
-  console.log('MobileNavigation: Rendering with language:', currentLanguage, 'renderKey:', renderKey);
-  
   return (
     <motion.div 
-      key={`nav-${renderKey}-${currentLanguage}`} // Force re-render on language change
       className={cn(
         "fixed bottom-0 left-0 right-0 bg-background border-t border-muted",
-        isTutorialActive && "opacity-30 pointer-events-none"
+        isTutorialActive && "opacity-30 pointer-events-none" // Fade out and disable interaction during tutorial
       )}
       style={{
-        zIndex: 9998,
+        zIndex: 9998, // Lower z-index than tutorial overlay (9999)
         paddingTop: '0.40rem',
         paddingBottom: 'max(0.40rem, env(safe-area-inset-bottom))',
         height: 'calc(3.6rem + env(safe-area-inset-bottom))'
@@ -150,11 +141,9 @@ const MobileNavigation: React.FC<MobileNavigationProps> = ({ onboardingComplete 
         {navItems.map((item) => {
           const isActive = getActiveStatus(item.path);
           
-          console.log(`MobileNavigation: Rendering nav item "${item.label}" for path ${item.path} with language ${currentLanguage}`);
-          
           return (
             <Link
-              key={`${item.path}-${renderKey}`}
+              key={item.path}
               to={item.path}
               className={cn(
                 "flex flex-col items-center py-1 transition-colors",
@@ -174,13 +163,7 @@ const MobileNavigation: React.FC<MobileNavigationProps> = ({ onboardingComplete 
                 )}
               </div>
               <span className="text-xs mt-0.5">
-                <TranslatableText 
-                  key={`${item.label}-${renderKey}-${currentLanguage}`}
-                  text={item.label} 
-                  forceTranslate={true}
-                  onTranslationStart={() => console.log(`MobileNavigation: Translation started for "${item.label}" to ${currentLanguage}`)}
-                  onTranslationEnd={() => console.log(`MobileNavigation: Translation completed for "${item.label}" to ${currentLanguage}`)}
-                />
+                <TranslatableText text={item.label} />
               </span>
             </Link>
           );

@@ -273,18 +273,18 @@ export function JournalEntryCard({
       // Make sure we pass a valid date string to formatShortDate
       if (!safeEntry.created_at) {
         console.error('[JournalEntryCard] Invalid created_at:', safeEntry.created_at);
-        return { type: 'translatable' as const, text: 'Recently' };
+        return 'Recently';
       }
       
-      // formatShortDate now returns an object with translation info
+      // formatShortDate already handles both string and Date inputs with validation
       const formatted = formatShortDate(safeEntry.created_at);
       return formatted;
     } catch (error) {
       console.error('[JournalEntryCard] Error formatting date:', error, 'Input:', safeEntry.created_at);
-      return { type: 'translatable' as const, text: 'Recently' };
+      return 'Recently';
     }
   })();
-
+  
   const initialThemes = extractThemes();
   
   // Determine if this is a processing entry
@@ -469,10 +469,7 @@ export function JournalEntryCard({
               <div className="flex items-center space-x-3">
                 <div className="flex flex-col">
                   <h3 className="scroll-m-20 text-base md:text-lg font-semibold tracking-tight">
-                    <TranslatableText 
-                      text={createdAtFormatted.text} 
-                      forceTranslate={createdAtFormatted.type === 'translatable'}
-                    />
+                    {formatShortDate(safeEntry.created_at)}
                   </h3>
                 </div>
               </div>
@@ -533,15 +530,10 @@ export function JournalEntryCard({
             <div className="flex items-center space-x-3">
               <div className="flex flex-col">
                 <h3 className="scroll-m-20 text-base md:text-lg font-semibold tracking-tight">
-                  <TranslatableText 
-                    text={createdAtFormatted.text} 
-                    forceTranslate={createdAtFormatted.type === 'translatable'}
-                  />
+                  {createdAtFormatted}
                 </h3>
                 {entry.Edit_Status === 1 && (
-                  <span className="text-xs text-muted-foreground">
-                    <TranslatableText text="(edited)" forceTranslate={true} />
-                  </span>
+                  <span className="text-xs text-muted-foreground">(edited)</span>
                 )}
               </div>
             </div>
