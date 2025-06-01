@@ -36,26 +36,8 @@ const JournalSearch: React.FC<JournalSearchProps> = ({ entries, onSelectEntry, o
   const [typingIndex, setTypingIndex] = useState(0);
   const [isFocused, setIsFocused] = useState(false);
   const [translatedPrompts, setTranslatedPrompts] = useState<string[]>([]);
-  const [translatedSearchFor, setTranslatedSearchFor] = useState<string>("Search for");
   const inputRef = useRef<HTMLInputElement>(null);
   const mobile = useIsMobile();
-
-  // Translate "Search for" text
-  useEffect(() => {
-    const translateSearchFor = async () => {
-      if (translate) {
-        const translated = await translate("Search for", "en");
-        setTranslatedSearchFor(translated);
-      }
-    };
-    
-    translateSearchFor();
-    
-    window.addEventListener('languageChange', translateSearchFor as EventListener);
-    return () => {
-      window.removeEventListener('languageChange', translateSearchFor as EventListener);
-    };
-  }, [translate]);
 
   // Translate the search prompts when language changes
   useEffect(() => {
@@ -229,7 +211,7 @@ const JournalSearch: React.FC<JournalSearchProps> = ({ entries, onSelectEntry, o
             <Input
               ref={inputRef}
               type="text"
-              placeholder={`${translatedSearchFor} ${typingPlaceholder}${isTyping ? '|' : ''}`}
+              placeholder={`Search for ${typingPlaceholder}${isTyping ? '|' : ''}`}
               value={searchQuery}
               onChange={handleSearchChange}
               onFocus={handleFocus}

@@ -1,6 +1,5 @@
 
 import { processingStateManager } from './processing-state-manager';
-import { immediateProcessingStateSync } from './processing-state-sync';
 
 /**
  * Set processing intent immediately when audio processing starts
@@ -9,38 +8,28 @@ import { immediateProcessingStateSync } from './processing-state-sync';
 export const setProcessingIntent = (intent: boolean) => {
   console.log(`[ProcessingIntent] Setting processing intent: ${intent}`);
   
-  // Use immediate sync for critical state changes
-  immediateProcessingStateSync(() => {
-    // Set flag in processing state manager
-    processingStateManager.setProcessingIntent(intent);
-    
-    // Dispatch immediate events for UI components
-    if (intent) {
-      window.dispatchEvent(new CustomEvent('immediateProcessingStarted', {
-        detail: { 
-          tempId: 'intent-started',
-          timestamp: Date.now(),
-          immediate: true 
-        }
-      }));
-      
-      window.dispatchEvent(new CustomEvent('processingIntent', {
-        detail: { 
-          intent: true, 
-          timestamp: Date.now(),
-          immediate: true 
-        }
-      }));
-    } else {
-      window.dispatchEvent(new CustomEvent('processingIntent', {
-        detail: { 
-          intent: false, 
-          timestamp: Date.now(),
-          immediate: true 
-        }
-      }));
+  // Set flag in processing state manager
+  processingStateManager.setProcessingIntent(intent);
+  
+  // Dispatch immediate event for UI components
+  window.dispatchEvent(new CustomEvent('processingIntent', {
+    detail: { 
+      intent, 
+      timestamp: Date.now(),
+      immediate: true 
     }
-  });
+  }));
+  
+  // Also dispatch immediate processing started event if setting intent to true
+  if (intent) {
+    window.dispatchEvent(new CustomEvent('immediateProcessingStarted', {
+      detail: { 
+        tempId: 'intent-started',
+        timestamp: Date.now(),
+        immediate: true 
+      }
+    }));
+  }
 };
 
 /**
@@ -55,19 +44,5 @@ export const hasProcessingIntent = (): boolean => {
  */
 export const clearProcessingIntent = () => {
   console.log('[ProcessingIntent] Clearing processing intent');
-  setProcessingIntent(false);
-};
-
-/**
- * Get current processing intent state with additional context
- */
-export const getProcessingIntentState = () => {
-  const hasIntent = hasProcessingIntent();
-  const timestamp = Date.now();
-  
-  return {
-    hasIntent,
-    timestamp,
-    isActive: hasIntent
-  };
+  processingStateManager.setProcessingIntent(false);
 };
