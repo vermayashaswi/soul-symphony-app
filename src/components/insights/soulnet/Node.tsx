@@ -1,8 +1,9 @@
+
 import React, { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import '@/types/three-reference';
 import * as THREE from 'three';
 import { NodeMesh } from './NodeMesh';
-import { NodeLabel } from './NodeLabel';
+import ProgressiveNodeLabel from './ProgressiveNodeLabel';
 import { ConnectionPercentage } from './ConnectionPercentage';
 import { useTheme } from '@/hooks/use-theme';
 
@@ -51,34 +52,13 @@ export const Node: React.FC<NodeProps> = ({
   const [isTouching, setIsTouching] = useState(false);
   const [touchStartTime, setTouchStartTime] = useState<number | null>(null);
   const [touchStartPosition, setTouchStartPosition] = useState<{x: number, y: number} | null>(null);
-  const prevHighlightedRef = useRef<boolean>(isHighlighted);
-  const prevSelectedRef = useRef<boolean>(isSelected);
-  const nodeRef = useRef<{ isAnimating: boolean }>({ isAnimating: false });
   
-  // Debug logging for node rendering
-  console.log(`[Node] Rendering node ${node.id} at position:`, node.position, 'isHighlighted:', isHighlighted, 'showLabel:', showLabel);
+  console.log(`[Node] Rendering enhanced node ${node.id} with progressive label`);
   
-  // Clean label visibility logic - only show for selected/highlighted nodes
+  // Simplified label visibility logic
   const shouldShowLabel = forceShowLabels || showLabel || isHighlighted || isSelected;
   
-  // Track state changes that might cause flickering
-  useEffect(() => {
-    if (prevHighlightedRef.current !== isHighlighted || prevSelectedRef.current !== isSelected) {
-      console.log(`Node ${node.id}: State change - highlighted: ${prevHighlightedRef.current} → ${isHighlighted}, selected: ${prevSelectedRef.current} → ${isSelected}`);
-      prevHighlightedRef.current = isHighlighted;
-      prevSelectedRef.current = isSelected;
-      
-      // Mark node as animating to stabilize transitions
-      nodeRef.current.isAnimating = true;
-      
-      // Reset animation flag after transition period
-      setTimeout(() => {
-        nodeRef.current.isAnimating = false;
-      }, 300);
-    }
-  }, [isHighlighted, isSelected, node.id]);
-  
-  // Restored original scale calculation for better proportions
+  // Simplified scale calculation
   const baseScale = node.type === 'entity' ? 0.7 : 0.55;
   const scale = isHighlighted 
     ? baseScale * (1.2 + (isSelected ? 0.3 : connectionStrength * 0.5))
@@ -98,8 +78,7 @@ export const Node: React.FC<NodeProps> = ({
     setIsTouching(true);
     setTouchStartTime(Date.now());
     setTouchStartPosition({x: e.clientX, y: e.clientY});
-    console.log(`Node pointer down: ${node.id}`);
-  }, [node.id]);
+  }, []);
 
   const handlePointerUp = useCallback((e: any) => {
     e.stopPropagation();
@@ -109,15 +88,12 @@ export const Node: React.FC<NodeProps> = ({
         const deltaY = Math.abs(e.clientY - touchStartPosition.y);
         
         if (deltaX < 10 && deltaY < 10) {
-          console.log(`Node clicked: ${node.id}, isHighlighted: ${isHighlighted}`);
           onClick(node.id, e);
-          
           if (navigator.vibrate) {
             navigator.vibrate(50);
           }
         }
       } else {
-        console.log(`Node clicked (no start position): ${node.id}`);
         onClick(node.id, e);
       }
     }
@@ -125,7 +101,7 @@ export const Node: React.FC<NodeProps> = ({
     setIsTouching(false);
     setTouchStartTime(null);
     setTouchStartPosition(null);
-  }, [node.id, onClick, touchStartTime, touchStartPosition, isHighlighted]);
+  }, [node.id, onClick, touchStartTime, touchStartPosition]);
 
   useEffect(() => {
     if (isTouching && touchStartTime) {
@@ -141,7 +117,6 @@ export const Node: React.FC<NodeProps> = ({
     }
   }, [isTouching, touchStartTime]);
 
-  // Show percentages for all highlighted nodes that aren't selected and have a non-zero percentage
   const shouldShowPercentage = showPercentage && isHighlighted && connectionPercentage > 0;
   
   return (
@@ -161,7 +136,7 @@ export const Node: React.FC<NodeProps> = ({
         onPointerLeave={() => setIsTouching(false)}
       />
       
-      <NodeLabel
+      <ProgressiveNodeLabel
         id={node.id}
         type={node.type}
         position={[0, 0, 0]}
@@ -170,8 +145,6 @@ export const Node: React.FC<NodeProps> = ({
         shouldShowLabel={shouldShowLabel}
         cameraZoom={cameraZoom}
         themeHex={themeHex}
-        forceVisible={forceShowLabels}
-        nodeColor={displayColor}
         nodeScale={scale}
       />
 

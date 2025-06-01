@@ -1,21 +1,19 @@
-
 import React, { useState, useEffect, useCallback } from 'react';
-import '@/types/three-reference';  // Fixed import path
+import '@/types/three-reference';
 import { Canvas } from '@react-three/fiber';
 import { TimeRange } from '@/hooks/use-insights-data';
 import { supabase } from '@/integrations/supabase/client';
 import { useIsMobile } from '@/hooks/use-mobile';
-import SoulNetVisualization from './soulnet/SoulNetVisualization';
+import SimplifiedSoulNetVisualization from './soulnet/SimplifiedSoulNetVisualization';
+import RenderingErrorBoundary from './soulnet/RenderingErrorBoundary';
 import { LoadingState } from './soulnet/LoadingState';
 import { EmptyState } from './soulnet/EmptyState';
 import { FullscreenWrapper } from './soulnet/FullscreenWrapper';
 import SoulNetDescription from './soulnet/SoulNetDescription';
 import { useUserColorThemeHex } from './soulnet/useUserColorThemeHex';
 import { cn } from '@/lib/utils';
-import ErrorBoundary from './ErrorBoundary';
 import { TranslatableText } from '@/components/translation/TranslatableText';
 import { useTranslation } from '@/contexts/TranslationContext';
-import { onDemandTranslationCache } from '@/utils/website-translations';
 
 interface NodeData {
   id: string;
@@ -40,14 +38,20 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
   const [graphData, setGraphData] = useState<{nodes: NodeData[], links: LinkData[]}>({ nodes: [], links: [] });
   const [loading, setLoading] = useState(true);
   const [isFullScreen, setIsFullScreen] = useState(false);
+  const [canvasError, setCanvasError] = useState<Error | null>(null);
+  const [retryCount, setRetryCount] = useState(0);
   const isMobile = useIsMobile();
   const themeHex = useUserColorThemeHex();
   const [selectedEntity, setSelectedEntity] = useState<string | null>(null);
   const [error, setError] = useState<Error | null>(null);
-  const [debugInfo, setDebugInfo] = useState<{[key: string]: any}>({});
   const { currentLanguage } = useTranslation();
 
-  console.log("[SoulNet] Rendering component with enhanced Devanagari support", { userId, timeRange, currentLanguage });
+  console.log("[SoulNet] Enhanced rendering with simplified components", { 
+    userId, 
+    timeRange, 
+    currentLanguage,
+    retryCount 
+  });
 
   useEffect(() => {
     console.log("[SoulNet] Component mounted with enhanced script support");
@@ -69,8 +73,6 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
       setLoading(true);
       setError(null);
       
-      const startTime = performance.now();
-      
       try {
         const startDate = getStartDate(timeRange);
         console.log(`[SoulNet] Fetching data from ${startDate.toISOString()} for user ${userId}`);
@@ -87,15 +89,7 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
           throw error;
         }
 
-        const fetchTime = performance.now() - startTime;
-        console.log(`[SoulNet] Fetched ${entries?.length || 0} entries in ${fetchTime.toFixed(2)}ms`);
-        
-        setDebugInfo(prev => ({
-          ...prev,
-          fetchTime,
-          entriesCount: entries?.length || 0,
-          fetchDate: new Date().toISOString()
-        }));
+        console.log(`[SoulNet] Fetched ${entries?.length || 0} entries`);
         
         if (!entries || entries.length === 0) {
           setLoading(false);
@@ -103,31 +97,16 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
           return;
         }
 
-        const processStartTime = performance.now();
         const processedData = processEntities(entries);
-        const processTime = performance.now() - processStartTime;
-        
-        console.log("[SoulNet] Enhanced data processing completed", {
+        console.log("[SoulNet] Data processing completed", {
           nodes: processedData.nodes.length,
-          links: processedData.links.length,
-          processTime: `${processTime.toFixed(2)}ms`
+          links: processedData.links.length
         });
-        
-        setDebugInfo(prev => ({
-          ...prev,
-          processTime,
-          nodesCount: processedData.nodes.length,
-          linksCount: processedData.links.length
-        }));
         
         setGraphData(processedData);
       } catch (error) {
         console.error('[SoulNet] Error processing entity-emotion data:', error);
         setError(error instanceof Error ? error : new Error('Unknown error occurred'));
-        setDebugInfo(prev => ({
-          ...prev,
-          error: error instanceof Error ? error.message : 'Unknown error'
-        }));
       } finally {
         setLoading(false);
       }
@@ -156,6 +135,18 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
     });
   }, []);
 
+  const handleCanvasError = useCallback((error: Error) => {
+    console.error('[SoulNet] Canvas error:', error);
+    setCanvasError(error);
+    setRetryCount(prev => prev + 1);
+  }, []);
+
+  const handleRetry = useCallback(() => {
+    setCanvasError(null);
+    setError(null);
+    setRetryCount(0);
+  }, []);
+
   if (loading) return <LoadingState />;
   
   if (error) return (
@@ -164,14 +155,6 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
         <TranslatableText text="Error Loading Soul-Net" />
       </h2>
       <p className="text-muted-foreground mb-4">{error.message}</p>
-      {Object.keys(debugInfo).length > 0 && (
-        <details className="mb-4">
-          <summary className="cursor-pointer text-sm text-muted-foreground">Debug Information</summary>
-          <pre className="text-xs mt-2 p-2 bg-muted rounded">
-            {JSON.stringify(debugInfo, null, 2)}
-          </pre>
-        </details>
-      )}
       <button 
         className="px-4 py-2 bg-primary text-white rounded-md" 
         onClick={() => window.location.reload()}
@@ -183,7 +166,39 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
   
   if (graphData.nodes.length === 0) return <EmptyState />;
 
-  // Enhanced device-specific instructions
+  // Show simplified error UI for canvas errors
+  if (canvasError && retryCount > 2) {
+    return (
+      <div className="bg-background rounded-xl shadow-sm border w-full p-6">
+        <h2 className="text-xl font-semibold mb-4">
+          <TranslatableText text="Soul-Net Visualization" />
+        </h2>
+        <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-4">
+          <h3 className="font-medium text-yellow-800 dark:text-yellow-300 mb-2">
+            <TranslatableText text="3D Visualization Unavailable" />
+          </h3>
+          <p className="text-yellow-700 dark:text-yellow-400 mb-3">
+            <TranslatableText text="The 3D visualization is experiencing technical difficulties. Your data is safe and you can try again." />
+          </p>
+          <div className="space-x-2">
+            <button
+              className="px-4 py-2 bg-yellow-600 text-white rounded hover:bg-yellow-700"
+              onClick={handleRetry}
+            >
+              <TranslatableText text="Try Again" />
+            </button>
+            <button
+              className="px-4 py-2 bg-gray-600 text-white rounded hover:bg-gray-700"
+              onClick={() => window.location.reload()}
+            >
+              <TranslatableText text="Reload Page" />
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   const getInstructions = () => {
     if (isMobile) {
       return <TranslatableText text="Drag to rotate • Pinch to zoom • Tap a node to highlight connections" forceTranslate={true} />;
@@ -191,10 +206,7 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
     return <TranslatableText text="Drag to rotate • Scroll to zoom • Click a node to highlight connections" forceTranslate={true} />;
   };
 
-  // FIXED: Always show labels by default to enable Devanagari script rendering
-  const shouldShowLabels = true;
-
-  console.log(`[SoulNet] Rendering visualization with ${graphData.nodes.length} nodes, ${graphData.links.length} links, shouldShowLabels: ${shouldShowLabels}`);
+  console.log(`[SoulNet] Rendering enhanced visualization with ${graphData.nodes.length} nodes, ${graphData.links.length} links`);
 
   return (
     <div className={cn(
@@ -207,32 +219,27 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
         isFullScreen={isFullScreen}
         toggleFullScreen={toggleFullScreen}
       >
-        <ErrorBoundary fallback={
-          <div className="flex items-center justify-center p-10 bg-gray-100 dark:bg-gray-800 rounded-lg">
-            <div className="text-center">
-              <h3 className="text-lg font-medium">
-                <TranslatableText text="Error in Soul-Net Visualization" forceTranslate={true} />
-              </h3>
-              <p className="text-muted-foreground mt-2">
-                <TranslatableText text="There was a problem rendering the visualization." forceTranslate={true} />
-              </p>
-              {Object.keys(debugInfo).length > 0 && (
-                <details className="mt-4">
-                  <summary className="cursor-pointer text-sm">Debug Info</summary>
-                  <pre className="text-xs mt-2 p-2 bg-background rounded max-w-md overflow-auto">
-                    {JSON.stringify(debugInfo, null, 2)}
-                  </pre>
-                </details>
-              )}
-              <button 
-                className="mt-4 px-4 py-2 bg-primary text-white rounded-lg"
-                onClick={() => window.location.reload()}
-              >
-                <TranslatableText text="Reload" forceTranslate={true} />
-              </button>
+        <RenderingErrorBoundary
+          onError={handleCanvasError}
+          fallback={
+            <div className="flex items-center justify-center p-10 bg-gray-100 dark:bg-gray-800 rounded-lg">
+              <div className="text-center">
+                <h3 className="text-lg font-medium">
+                  <TranslatableText text="Visualization Error" />
+                </h3>
+                <p className="text-muted-foreground mt-2">
+                  <TranslatableText text="The 3D visualization encountered an error." />
+                </p>
+                <button 
+                  className="mt-4 px-4 py-2 bg-primary text-white rounded-lg"
+                  onClick={handleRetry}
+                >
+                  <TranslatableText text="Retry" />
+                </button>
+              </div>
             </div>
-          </div>
-        }>
+          }
+        >
           <Canvas
             style={{
               width: '100%',
@@ -257,20 +264,20 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
               alpha: true,
               depth: true,
               stencil: false,
-              precision: isMobile ? 'mediump' : 'highp',
-              logarithmicDepthBuffer: true
+              precision: isMobile ? 'mediump' : 'highp'
             }}
+            onError={handleCanvasError}
           >
-            <SoulNetVisualization
+            <SimplifiedSoulNetVisualization
               data={graphData}
               selectedNode={selectedEntity}
               onNodeClick={handleNodeSelect}
               themeHex={themeHex}
               isFullScreen={isFullScreen}
-              shouldShowLabels={shouldShowLabels}
+              shouldShowLabels={true}
             />
           </Canvas>
-        </ErrorBoundary>
+        </RenderingErrorBoundary>
       </FullscreenWrapper>
       
       {!isFullScreen && (
@@ -309,7 +316,7 @@ const getStartDate = (range: TimeRange) => {
 };
 
 const processEntities = (entries: any[]) => {
-  console.log("[SoulNet] Processing entities for", entries.length, "entries with enhanced script support");
+  console.log("[SoulNet] Processing entities for", entries.length, "entries");
   
   const entityEmotionMap: Record<string, {emotions: Record<string, number>}> = {};
   
@@ -332,7 +339,7 @@ const processEntities = (entries: any[]) => {
     });
   });
 
-  console.log("[SoulNet] Enhanced entity emotion map:", entityEmotionMap);
+  console.log("[SoulNet] Entity emotion map:", entityEmotionMap);
   return generateGraph(entityEmotionMap);
 };
 
@@ -348,7 +355,7 @@ const generateGraph = (entityEmotionMap: Record<string, {emotions: Record<string
   const EMOTION_Y_SPAN = 6;
   const ENTITY_Y_SPAN = 3;
 
-  console.log("[SoulNet] Generating enhanced graph with", entityList.length, "entities");
+  console.log("[SoulNet] Generating graph with", entityList.length, "entities");
   
   entityList.forEach((entity, entityIndex) => {
     entityNodes.add(entity);
@@ -392,7 +399,7 @@ const generateGraph = (entityEmotionMap: Record<string, {emotions: Record<string
     });
   });
 
-  console.log("[SoulNet] Generated enhanced graph with", nodes.length, "nodes and", links.length, "links");
+  console.log("[SoulNet] Generated graph with", nodes.length, "nodes and", links.length, "links");
   return { nodes, links };
 };
 
