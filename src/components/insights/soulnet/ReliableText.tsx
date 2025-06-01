@@ -3,7 +3,7 @@ import React, { useState, useEffect, useRef, Suspense } from 'react';
 import { Text } from '@react-three/drei';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
-import { localFontService } from '@/services/localFontService';
+import { threejsFontService } from '@/services/threejsFontService';
 import EnhancedText from './EnhancedText';
 
 interface ReliableTextProps {
@@ -36,12 +36,9 @@ export const ReliableText: React.FC<ReliableTextProps> = ({
   const [useEnhanced, setUseEnhanced] = useState(false);
   const [hasError, setHasError] = useState(false);
   const textRef = useRef<THREE.Mesh>(null);
-  const mounted = useRef(true);
 
   // Initialize with clean text and script detection
   useEffect(() => {
-    if (!mounted.current) return;
-
     if (!text || typeof text !== 'string') {
       setDisplayText('Node');
     } else {
@@ -52,7 +49,7 @@ export const ReliableText: React.FC<ReliableTextProps> = ({
       setDisplayText(finalText);
       
       // Determine if we need enhanced font loading
-      const scriptType = localFontService.detectScriptType(finalText);
+      const scriptType = threejsFontService.detectScriptType(finalText);
       const needsEnhanced = scriptType !== 'latin';
       setUseEnhanced(needsEnhanced);
       
@@ -63,7 +60,7 @@ export const ReliableText: React.FC<ReliableTextProps> = ({
 
   // Billboard effect for fallback text
   useFrame(({ camera }) => {
-    if (textRef.current && visible && isReady && !useEnhanced && mounted.current) {
+    if (textRef.current && visible && isReady && !useEnhanced) {
       try {
         textRef.current.quaternion.copy(camera.quaternion);
         if (textRef.current.material) {
@@ -78,20 +75,11 @@ export const ReliableText: React.FC<ReliableTextProps> = ({
 
   const handleError = (error: any) => {
     console.error('[ReliableText] Render error, falling back:', error);
-    if (mounted.current) {
-      setHasError(true);
-      setUseEnhanced(false);
-    }
+    setHasError(true);
+    setUseEnhanced(false);
   };
 
-  // Cleanup on unmount
-  useEffect(() => {
-    return () => {
-      mounted.current = false;
-    };
-  }, []);
-
-  if (!visible || !isReady || !displayText || !mounted.current) {
+  if (!visible || !isReady || !displayText) {
     return null;
   }
 
