@@ -1,10 +1,10 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { Text } from '@react-three/drei';
-import { useFrame, useLoader } from '@react-three/fiber';
-import { FontLoader } from 'three/examples/jsm/loaders/FontLoader.js';
+import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
-import { threejsFontService } from '@/services/threejsFontService';
+import { localFontService } from '@/services/localFontService';
+import SafeFontLoader from './SafeFontLoader';
 
 interface EnhancedTextProps {
   text: string;
@@ -34,15 +34,19 @@ export const EnhancedText: React.FC<EnhancedTextProps> = ({
   const [isReady, setIsReady] = useState(false);
   const [displayText, setDisplayText] = useState('');
   const [fontUrl, setFontUrl] = useState('');
-  const [hasError, setHasError] = useState(false);
+  const [fallbackUrl, setFallbackUrl] = useState('');
   const [fontInfo, setFontInfo] = useState<any>(null);
   const textRef = useRef<THREE.Mesh>(null);
+  const mounted = useRef(true);
 
-  // Initialize text and determine font URL with enhanced logging
+  // Initialize text and determine font URLs
   useEffect(() => {
+    if (!mounted.current) return;
+
     if (!text || typeof text !== 'string') {
       setDisplayText('Node');
-      setFontUrl(threejsFontService.getFontUrl('Helvetiker'));
+      setFontUrl(localFontService.getFontUrl('Helvetiker'));
+      setFallbackUrl(localFontService.getFallbackUrl('Helvetiker'));
     } else {
       const cleanText = text.trim();
       const limitedText = cleanText.length > 50 ? cleanText.substring(0, 50) + '...' : cleanText;
@@ -50,46 +54,32 @@ export const EnhancedText: React.FC<EnhancedTextProps> = ({
       
       setDisplayText(finalText);
       
-      // Test Devanagari support and get detailed font info
-      const testResult = threejsFontService.testDevanagariSupport(finalText);
+      // Test Devanagari support and get font info
+      const testResult = localFontService.testDevanagariSupport(finalText);
       setFontInfo(testResult);
       
-      // Get appropriate font URL for the text
-      const dynamicFontUrl = threejsFontService.getFontUrlForText(finalText);
-      setFontUrl(dynamicFontUrl);
+      // Get local and fallback font URLs
+      const localUrl = localFontService.getFontUrlForText(finalText, true);
+      const fallbackUrl = localFontService.getFallbackUrl(testResult.fontName);
       
-      console.log(`[EnhancedText] Enhanced font analysis:`, {
+      setFontUrl(localUrl);
+      setFallbackUrl(fallbackUrl);
+      
+      console.log(`[EnhancedText] Font configuration:`, {
         text: finalText,
         scriptType: testResult.scriptType,
         fontName: testResult.fontName,
-        fontUrl: dynamicFontUrl,
+        localUrl,
+        fallbackUrl,
         hasDevanagari: testResult.hasDevanagari
       });
     }
     setIsReady(true);
   }, [text]);
 
-  // Load font using useLoader hook with enhanced error handling
-  let font;
-  try {
-    if (fontUrl) {
-      font = useLoader(FontLoader, fontUrl, (loader) => {
-        console.log(`[EnhancedText] Loading font from: ${fontUrl}`);
-      });
-      
-      if (font && fontInfo?.hasDevanagari) {
-        console.log(`[EnhancedText] Successfully loaded Devanagari font for text: "${displayText}"`);
-      }
-    }
-  } catch (error) {
-    console.warn('[EnhancedText] Font loading error:', error);
-    console.log('[EnhancedText] Font info during error:', fontInfo);
-    setHasError(true);
-  }
-
   // Billboard effect
   useFrame(({ camera }) => {
-    if (textRef.current && visible && isReady && font) {
+    if (textRef.current && visible && isReady && mounted.current) {
       try {
         textRef.current.quaternion.copy(camera.quaternion);
         if (textRef.current.material) {
@@ -102,45 +92,58 @@ export const EnhancedText: React.FC<EnhancedTextProps> = ({
     }
   });
 
-  // Handle font loading errors
-  const handleError = (error: any) => {
-    console.error('[EnhancedText] Render error:', error);
-    console.log('[EnhancedText] Error context:', {
-      text: displayText,
-      fontUrl,
-      fontInfo,
-      hasError
-    });
-    setHasError(true);
-  };
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      mounted.current = false;
+    };
+  }, []);
 
-  if (!visible || !isReady || !font || hasError) {
+  if (!visible || !isReady || !mounted.current) {
     return null;
   }
 
-  console.log(`[EnhancedText] Rendering text: "${displayText}" with font analysis:`, fontInfo);
+  console.log(`[EnhancedText] Rendering with SafeFontLoader: "${displayText}"`);
 
   return (
-    <Text
-      ref={textRef}
-      position={position}
-      color={color}
-      fontSize={size}
-      anchorX="center"
-      anchorY="middle"
-      maxWidth={maxWidth}
-      textAlign="center"
-      font={font}
-      fontWeight={bold ? "bold" : "normal"}
-      material-transparent={true}
-      material-depthTest={false}
-      renderOrder={renderOrder}
-      outlineWidth={outlineWidth}
-      outlineColor={outlineColor}
-      onError={handleError}
+    <SafeFontLoader
+      fontUrl={fontUrl}
+      fallbackFont={fallbackUrl}
+      retryCount={2}
     >
-      {displayText}
-    </Text>
+      {(font, isLoading, hasError) => {
+        if (isLoading || !font) {
+          return null;
+        }
+
+        if (hasError) {
+          console.warn(`[EnhancedText] Font loading failed for "${displayText}", skipping render`);
+          return null;
+        }
+
+        return (
+          <Text
+            ref={textRef}
+            position={position}
+            color={color}
+            fontSize={size}
+            anchorX="center"
+            anchorY="middle"
+            maxWidth={maxWidth}
+            textAlign="center"
+            font={font}
+            fontWeight={bold ? "bold" : "normal"}
+            material-transparent={true}
+            material-depthTest={false}
+            renderOrder={renderOrder}
+            outlineWidth={outlineWidth}
+            outlineColor={outlineColor}
+          >
+            {displayText}
+          </Text>
+        );
+      }}
+    </SafeFontLoader>
   );
 };
 
