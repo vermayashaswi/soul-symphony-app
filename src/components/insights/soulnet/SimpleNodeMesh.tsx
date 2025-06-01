@@ -67,10 +67,12 @@ export const SimpleNodeMesh: React.FC<SimpleNodeMeshProps> = ({
       {geometry}
       <meshPhongMaterial
         ref={materialRef}
-        color={displayColor}
-        transparent={true}
-        opacity={dimmed ? 0.4 : 1.0}
-        shininess={100}
+        args={[{
+          color: displayColor,
+          transparent: true,
+          opacity: dimmed ? 0.4 : 1.0,
+          shininess: 100
+        }]}
       />
     </mesh>
   );
