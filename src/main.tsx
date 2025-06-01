@@ -8,6 +8,7 @@ import './styles/tutorial.css' // Import tutorial-specific styles
 import { AuthProvider } from './contexts/AuthContext'
 import { ThemeProvider } from './hooks/use-theme'
 import { BrowserRouter } from 'react-router-dom'
+import { TranslationProvider } from './contexts/TranslationContext'
 
 // iOS Viewport Height Fix - addresses the iOS Safari issue with viewport height
 const fixViewportHeight = () => {
@@ -65,9 +66,11 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
     <BrowserRouter>
       <ThemeProvider>
-        <AuthProvider>
-          <App />
-        </AuthProvider>
+        <TranslationProvider>
+          <AuthProvider>
+            <App />
+          </AuthProvider>
+        </TranslationProvider>
       </ThemeProvider>
     </BrowserRouter>
   </React.StrictMode>,
