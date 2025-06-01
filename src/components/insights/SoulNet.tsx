@@ -39,7 +39,6 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
   const [graphData, setGraphData] = useState<{nodes: NodeData[], links: LinkData[]}>({ nodes: [], links: [] });
   const [loading, setLoading] = useState(true);
   const [isFullScreen, setIsFullScreen] = useState(false);
-  const [forceShowLabels, setForceShowLabels] = useState(false);
   const isMobile = useIsMobile();
   const themeHex = useUserColorThemeHex();
   const [selectedEntity, setSelectedEntity] = useState<string | null>(null);
@@ -59,30 +58,6 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
   useEffect(() => {
     onDemandTranslationCache.clearLanguage(currentLanguage);
   }, [currentLanguage]);
-
-  // Enhanced tutorial debugging listener
-  useEffect(() => {
-    const handleTutorialDebug = (event: CustomEvent) => {
-      const { step, forceShowLabels: shouldForceShowLabels } = event.detail;
-      console.log('[SoulNet] Tutorial debug event:', { step, shouldForceShowLabels });
-      
-      if (step === 9 && shouldForceShowLabels) {
-        console.log('[SoulNet] Forcing labels to be visible for tutorial step 9');
-        setForceShowLabels(true);
-        
-        // Also trigger a canvas refresh
-        setTimeout(() => {
-          window.dispatchEvent(new Event('resize'));
-        }, 100);
-      }
-    };
-
-    window.addEventListener('tutorial-soul-net-debug', handleTutorialDebug as EventListener);
-    
-    return () => {
-      window.removeEventListener('tutorial-soul-net-debug', handleTutorialDebug as EventListener);
-    };
-  }, []);
 
   useEffect(() => {
     if (!userId) return;
@@ -173,9 +148,6 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
     return <TranslatableText text="Drag to rotate • Scroll to zoom • Click a node to highlight connections" forceTranslate={true} />;
   };
 
-  // Enhanced shouldShowLabels logic that includes tutorial debugging
-  const shouldShowLabels = forceShowLabels || isFullScreen || selectedEntity !== null;
-
   return (
     <div className={cn(
       "bg-background rounded-xl shadow-sm border w-full",
@@ -239,7 +211,6 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
               onNodeClick={handleNodeSelect}
               themeHex={themeHex}
               isFullScreen={isFullScreen}
-              shouldShowLabels={shouldShowLabels}
             />
           </Canvas>
         </ErrorBoundary>
@@ -250,12 +221,6 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
           <p className="text-xs text-muted-foreground">
             {getInstructions()}
           </p>
-          {/* Debug info for tutorial step 9 */}
-          {forceShowLabels && (
-            <p className="text-xs text-blue-500 mt-1">
-              Tutorial Mode: Labels Force Enabled
-            </p>
-          )}
         </div>
       )}
     </div>

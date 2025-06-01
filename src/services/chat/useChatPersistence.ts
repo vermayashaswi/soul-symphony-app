@@ -1,10 +1,11 @@
+
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { 
   createThread, 
   getUserChatThreads, 
-  getChatMessages,
-  createChatMessage,
+  getThreadMessages,
+  saveMessage,
   updateThreadTitle
 } from "@/services/chat/messageService";
 import { v4 as uuidv4 } from "uuid";
@@ -74,14 +75,14 @@ export const useChatPersistence = (userId: string | undefined) => {
   // Load messages for active thread
   useEffect(() => {
     const loadMessages = async () => {
-      if (!activeThread || !userId) {
+      if (!activeThread) {
         setMessages([]);
         return;
       }
       
       setLoading(true);
       try {
-        const threadMessages = await getChatMessages(activeThread, userId);
+        const threadMessages = await getThreadMessages(activeThread);
         if (threadMessages) {
           // Convert ChatMessage to ChatMessagePersistence
           const persistenceMessages: ChatMessagePersistence[] = threadMessages.map(msg => ({
@@ -102,7 +103,7 @@ export const useChatPersistence = (userId: string | undefined) => {
     };
     
     loadMessages();
-  }, [activeThread, userId]);
+  }, [activeThread]);
 
   // Set up real-time subscription to thread messages
   useEffect(() => {
@@ -205,7 +206,7 @@ export const useChatPersistence = (userId: string | undefined) => {
     setMessages(prev => [...prev, tempMessage]);
     
     try {
-      const savedMessage = await createChatMessage(activeThread, content, 'user', userId);
+      const savedMessage = await saveMessage(activeThread, content, 'user');
       
       if (savedMessage) {
         // Convert to ChatMessagePersistence to avoid type mismatch

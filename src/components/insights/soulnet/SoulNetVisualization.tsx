@@ -1,3 +1,4 @@
+
 import React, { useRef, useEffect, useMemo, useState } from 'react';
 import '@/types/three-reference';  // Fixed import path
 import { OrbitControls } from '@react-three/drei';
@@ -26,7 +27,6 @@ interface SoulNetVisualizationProps {
   onNodeClick: (id: string) => void;
   themeHex: string;
   isFullScreen?: boolean;
-  shouldShowLabels?: boolean;
   translatedLabels?: Map<string, string>;
 }
 
@@ -119,8 +119,7 @@ export const SoulNetVisualization: React.FC<SoulNetVisualizationProps> = ({
   selectedNode,
   onNodeClick,
   themeHex,
-  isFullScreen = false,
-  shouldShowLabels = false
+  isFullScreen = false
 }) => {
   const { camera, size } = useThree();
   const controlsRef = useRef<any>(null);
@@ -345,8 +344,7 @@ export const SoulNetVisualization: React.FC<SoulNetVisualizationProps> = ({
           return null;
         }
         
-        // Enhanced label visibility logic that considers shouldShowLabels prop
-        const showLabel = shouldShowLabels || !selectedNode || node.id === selectedNode || highlightedNodes.has(node.id);
+        const showLabel = !selectedNode || node.id === selectedNode || highlightedNodes.has(node.id);
         const dimmed = shouldDim && !(selectedNode === node.id || highlightedNodes.has(node.id));
         const isHighlighted = selectedNode === node.id || highlightedNodes.has(node.id);
         

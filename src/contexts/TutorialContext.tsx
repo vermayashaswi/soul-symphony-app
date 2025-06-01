@@ -43,7 +43,6 @@ interface TutorialContextType {
   skipTutorial: () => void;
   completeTutorial: () => void;
   resetTutorial: () => void;
-  startTutorial: () => void;
   tutorialCompleted: boolean;
   isInStep: (stepId: number) => boolean;
   navigationState: {
@@ -182,74 +181,17 @@ export const TutorialProvider: React.FC<{ children: ReactNode }> = ({ children }
     targetRoute: null as string | null
   });
   const [tutorialCompleted, setTutorialCompleted] = useState(false);
-  const [pendingTutorialStart, setPendingTutorialStart] = useState(false);
   
   // Enhanced logging for debugging
   useEffect(() => {
-    console.log('[TutorialContext] Current state:', {
+    console.log('TutorialProvider - Current state:', {
       isActive,
       currentStep,
       currentStepID: steps[currentStep]?.id,
       currentPath: location.pathname,
-      navigationState,
-      pendingTutorialStart,
-      tutorialChecked
+      navigationState
     });
-  }, [isActive, currentStep, steps, location.pathname, navigationState, pendingTutorialStart, tutorialChecked]);
-  
-  // Function to manually start the tutorial with proper navigation
-  const startTutorial = () => {
-    console.log('[TutorialContext] Starting tutorial manually');
-    
-    // Set the tutorial as pending start until we're on the right route
-    setPendingTutorialStart(true);
-    setCurrentStep(0);
-    setTutorialCompleted(false);
-    
-    // If we're not on an app route, navigate to home first
-    if (!isAppRoute(location.pathname)) {
-      console.log('[TutorialContext] Not on app route, navigating to /app/home');
-      setNavigationState({
-        inProgress: true,
-        targetRoute: '/app/home'
-      });
-      navigate('/app/home');
-    } else {
-      // We're already on an app route, activate tutorial immediately
-      console.log('[TutorialContext] Already on app route, activating tutorial');
-      setIsActive(true);
-      setPendingTutorialStart(false);
-    }
-  };
-  
-  // Enhanced navigation completion handler
-  useEffect(() => {
-    if (navigationState.inProgress && navigationState.targetRoute === location.pathname) {
-      console.log(`[TutorialContext] Navigation complete: arrived at ${location.pathname}`);
-      setNavigationState({
-        inProgress: false,
-        targetRoute: null
-      });
-      
-      // If tutorial was pending start, activate it now
-      if (pendingTutorialStart) {
-        console.log('[TutorialContext] Activating tutorial after navigation completion');
-        setIsActive(true);
-        setPendingTutorialStart(false);
-      }
-      
-      // After navigation completes, check for elements that need to be highlighted
-      const currentStepData = steps[currentStep];
-      if (currentStepData && currentStepData.waitForElement) {
-        console.log(`[TutorialContext] Step ${currentStepData.id} is waiting for element: ${currentStepData.targetElement}`);
-        
-        // Wait for the DOM to be ready after navigation
-        setTimeout(() => {
-          checkForTargetElement(currentStepData);
-        }, 500);
-      }
-    }
-  }, [location.pathname, navigationState.inProgress, navigationState.targetRoute, pendingTutorialStart, currentStep, steps]);
+  }, [isActive, currentStep, steps, location.pathname, navigationState]);
   
   // Check if tutorial should be active based on user's profile and current route
   useEffect(() => {
@@ -257,8 +199,6 @@ export const TutorialProvider: React.FC<{ children: ReactNode }> = ({ children }
       if (!user || tutorialChecked) return;
       
       try {
-        console.log('[TutorialContext] Checking tutorial status for user:', user.id);
-        
         const { data, error } = await supabase
           .from('profiles')
           .select('tutorial_completed, tutorial_step')
@@ -266,37 +206,24 @@ export const TutorialProvider: React.FC<{ children: ReactNode }> = ({ children }
           .single();
         
         if (error) {
-          console.error('[TutorialContext] Error fetching tutorial status:', error);
-          setTutorialChecked(true);
+          console.error('Error fetching tutorial status:', error);
           return;
         }
         
+        // Only activate tutorial if tutorial is not completed
         const shouldActivate = data?.tutorial_completed === 'NO';
+        
+        // Set the current tutorial step (default to 0 if null)
         const startingStep = data?.tutorial_step || 0;
         
-        console.log('[TutorialContext] Tutorial status check result:', {
-          shouldActivate,
-          startingStep,
-          tutorialCompleted: data?.tutorial_completed,
-          currentPath: location.pathname,
-          isAppRoute: isAppRoute(location.pathname)
-        });
-        
         if (shouldActivate) {
-          console.log('[TutorialContext] Tutorial should be activated at step:', startingStep);
+          console.log('Activating tutorial at step:', startingStep);
           setCurrentStep(startingStep);
+          setIsActive(true);
           
-          // Always start tutorial, but handle navigation properly
-          if (isAppRoute(location.pathname)) {
-            console.log('[TutorialContext] On app route, activating tutorial immediately');
-            setIsActive(true);
-          } else {
-            console.log('[TutorialContext] Not on app route, will navigate and then activate');
-            setPendingTutorialStart(true);
-            setNavigationState({
-              inProgress: true,
-              targetRoute: '/app/home'
-            });
+          // If we're not on an app route, navigate to the app home
+          if (!isAppRoute(location.pathname)) {
+            console.log('Not on app route, will navigate to /app/home');
             navigate('/app/home');
           }
         }
@@ -304,13 +231,34 @@ export const TutorialProvider: React.FC<{ children: ReactNode }> = ({ children }
         setTutorialCompleted(data?.tutorial_completed === 'YES');
         setTutorialChecked(true);
       } catch (error) {
-        console.error('[TutorialContext] Error in tutorial check:', error);
-        setTutorialChecked(true);
+        console.error('Error in tutorial check:', error);
       }
     };
     
     checkTutorialStatus();
   }, [user, location.pathname, tutorialChecked, navigate]);
+  
+  // Enhanced route change detection for navigation between steps
+  useEffect(() => {
+    if (navigationState.inProgress && navigationState.targetRoute === location.pathname) {
+      console.log(`Navigation complete: arrived at ${location.pathname}`);
+      setNavigationState({
+        inProgress: false,
+        targetRoute: null
+      });
+      
+      // After navigation completes, check for elements that need to be highlighted
+      const currentStepData = steps[currentStep];
+      if (currentStepData && currentStepData.waitForElement) {
+        console.log(`Step ${currentStepData.id} is waiting for element: ${currentStepData.targetElement}`);
+        
+        // Wait for the DOM to be ready after navigation
+        setTimeout(() => {
+          checkForTargetElement(currentStepData);
+        }, 500);
+      }
+    }
+  }, [location.pathname, navigationState.inProgress, navigationState.targetRoute]);
   
   // Helper function to check for target elements and apply highlighting
   const checkForTargetElement = (stepData: TutorialStep) => {
@@ -337,7 +285,7 @@ export const TutorialProvider: React.FC<{ children: ReactNode }> = ({ children }
     );
     
     if (!found) {
-      console.warn(`[TutorialContext] Could not find any target element for step ${stepData.id}`);
+      console.warn(`Could not find any target element for step ${stepData.id}`);
     }
   };
   
@@ -352,25 +300,25 @@ export const TutorialProvider: React.FC<{ children: ReactNode }> = ({ children }
         .eq('id', user.id);
         
       if (error) {
-        console.error('[TutorialContext] Error updating tutorial step:', error);
+        console.error('Error updating tutorial step:', error);
       } else {
-        console.log('[TutorialContext] Tutorial step updated in database:', step);
+        console.log('Tutorial step updated in database:', step);
       }
     } catch (error) {
-      console.error('[TutorialContext] Error updating tutorial step:', error);
+      console.error('Error updating tutorial step:', error);
     }
   };
   
-  // Enhanced function to mark tutorial as completed with better cleanup
+  // Enhanced function to mark tutorial as completed with better cleanup - REMOVED TOAST
   const completeTutorial = async () => {
     if (!user) return;
     
     try {
-      console.log('[TutorialContext] Starting tutorial completion cleanup process');
+      console.log('Starting tutorial completion cleanup process');
       
       // First, clean up any lingering tutorial classes and styling before database update
       const cleanupTutorialElements = () => {
-        console.log('[TutorialContext] Running thorough tutorial cleanup');
+        console.log('Running thorough tutorial cleanup');
         
         // Remove tutorial active class from body and data attribute
         document.body.classList.remove('tutorial-active');
@@ -389,7 +337,7 @@ export const TutorialProvider: React.FC<{ children: ReactNode }> = ({ children }
           '[class*="tutorial-"]'
         );
         
-        console.log(`[TutorialContext] Found ${targetElements.length} tutorial elements to clean up`);
+        console.log(`Found ${targetElements.length} tutorial elements to clean up`);
         
         // Remove all tutorial-related classes from elements
         targetElements.forEach(el => {
@@ -449,7 +397,7 @@ export const TutorialProvider: React.FC<{ children: ReactNode }> = ({ children }
         // Force update the EmptyChatState component if present
         const emptyChatState = document.querySelector('.flex.flex-col.items-center.justify-center.p-6.text-center.h-full');
         if (emptyChatState) {
-          console.log('[TutorialContext] Refreshing EmptyChatState visibility');
+          console.log('Refreshing EmptyChatState visibility');
           if (emptyChatState instanceof HTMLElement) {
             emptyChatState.style.visibility = 'visible';
             emptyChatState.style.display = 'flex';
@@ -463,7 +411,6 @@ export const TutorialProvider: React.FC<{ children: ReactNode }> = ({ children }
       
       // Update state before database update to prevent UI flickering
       setIsActive(false);
-      setPendingTutorialStart(false);
       
       // Then update database
       const { error } = await supabase
@@ -475,14 +422,16 @@ export const TutorialProvider: React.FC<{ children: ReactNode }> = ({ children }
         .eq('id', user.id);
         
       if (error) {
-        console.error('[TutorialContext] Error completing tutorial:', error);
+        console.error('Error completing tutorial:', error);
         return;
       }
       
       // Update state after database update
       setTutorialCompleted(true);
       
-      console.log('[TutorialContext] Tutorial marked as completed');
+      // REMOVED TOAST NOTIFICATION
+      
+      console.log('Tutorial marked as completed');
       
       // Run multiple cleanup passes to ensure everything is properly reset
       setTimeout(cleanupTutorialElements, 100);
@@ -490,23 +439,23 @@ export const TutorialProvider: React.FC<{ children: ReactNode }> = ({ children }
       
       // Force a UI refresh after tutorial completion
       setTimeout(() => {
-        console.log('[TutorialContext] Triggering UI refresh after tutorial');
+        console.log('Triggering UI refresh after tutorial');
         window.dispatchEvent(new Event('resize'));
         
         // Force page to re-render if needed
         const currentPath = window.location.pathname;
         if (currentPath === '/app/chat') {
-          console.log('[TutorialContext] On chat page, forcing re-render');
+          console.log('On chat page, forcing re-render');
           const event = new CustomEvent('chatRefreshNeeded');
           window.dispatchEvent(event);
         }
         
         // Navigate to home page after tutorial completion
-        console.log('[TutorialContext] Tutorial complete, navigating to home page');
+        console.log('Tutorial complete, navigating to home page');
         navigate('/app/home', { replace: true });
       }, 200);
     } catch (error) {
-      console.error('[TutorialContext] Error completing tutorial:', error);
+      console.error('Error completing tutorial:', error);
     }
   };
   
@@ -516,7 +465,7 @@ export const TutorialProvider: React.FC<{ children: ReactNode }> = ({ children }
       const newStep = currentStep + 1;
       const nextStepData = steps[newStep];
       
-      console.log(`[TutorialContext] Moving to tutorial step ${newStep} (ID: ${nextStepData.id})`);
+      console.log(`Moving to tutorial step ${newStep} (ID: ${nextStepData.id})`);
       
       // First update the current step in state and database
       setCurrentStep(newStep);
@@ -539,7 +488,7 @@ export const TutorialProvider: React.FC<{ children: ReactNode }> = ({ children }
       
       // Handle navigation if needed
       if (nextStepData.navigateTo && location.pathname !== nextStepData.navigateTo) {
-        console.log(`[TutorialContext] Navigation needed for step ${nextStepData.id} to ${nextStepData.navigateTo}`);
+        console.log(`Navigation needed for step ${nextStepData.id} to ${nextStepData.navigateTo}`);
         
         setNavigationState({
           inProgress: true,
@@ -558,7 +507,7 @@ export const TutorialProvider: React.FC<{ children: ReactNode }> = ({ children }
       }
     } else {
       // Last step, complete the tutorial
-      console.log('[TutorialContext] Completing tutorial - reached the end');
+      console.log('Completing tutorial - reached the end');
       completeTutorial();
     }
   };
@@ -569,7 +518,7 @@ export const TutorialProvider: React.FC<{ children: ReactNode }> = ({ children }
       const newStep = currentStep - 1;
       const prevStepData = steps[newStep];
       
-      console.log(`[TutorialContext] Moving to previous step ${newStep} (ID: ${prevStepData.id})`);
+      console.log(`Moving to previous step ${newStep} (ID: ${prevStepData.id})`);
       
       // First update the current step in state and database
       setCurrentStep(newStep);
@@ -592,7 +541,7 @@ export const TutorialProvider: React.FC<{ children: ReactNode }> = ({ children }
       
       // Handle navigation if needed
       if (prevStepData.navigateTo && location.pathname !== prevStepData.navigateTo) {
-        console.log(`[TutorialContext] Navigation needed for step ${prevStepData.id} to ${prevStepData.navigateTo}`);
+        console.log(`Navigation needed for step ${prevStepData.id} to ${prevStepData.navigateTo}`);
         
         setNavigationState({
           inProgress: true,
@@ -623,12 +572,11 @@ export const TutorialProvider: React.FC<{ children: ReactNode }> = ({ children }
         .eq('id', user.id);
         
       if (error) {
-        console.error('[TutorialContext] Error skipping tutorial:', error);
+        console.error('Error skipping tutorial:', error);
         return;
       }
       
       setIsActive(false);
-      setPendingTutorialStart(false);
       setTutorialCompleted(true);
       
       // Clean up any lingering tutorial classes
@@ -647,15 +595,15 @@ export const TutorialProvider: React.FC<{ children: ReactNode }> = ({ children }
         }
       });
       
-      console.log('[TutorialContext] Tutorial skipped by user, navigating to home');
+      console.log('Tutorial skipped by user, navigating to home');
       // Navigate to home page after skipping the tutorial
       navigate('/app/home', { replace: true });
     } catch (error) {
-      console.error('[TutorialContext] Error skipping tutorial:', error);
+      console.error('Error skipping tutorial:', error);
     }
   };
   
-  // Enhanced reset tutorial function
+  // Enhanced reset tutorial function - REMOVED TOAST
   const resetTutorial = async () => {
     if (!user) return;
     
@@ -669,14 +617,13 @@ export const TutorialProvider: React.FC<{ children: ReactNode }> = ({ children }
         .eq('id', user.id);
         
       if (error) {
-        console.error('[TutorialContext] Error resetting tutorial:', error);
+        console.error('Error resetting tutorial:', error);
         return;
       }
       
       setCurrentStep(0);
       setTutorialChecked(false);
       setTutorialCompleted(false);
-      setPendingTutorialStart(false);
       setNavigationState({
         inProgress: false,
         targetRoute: null
@@ -685,15 +632,15 @@ export const TutorialProvider: React.FC<{ children: ReactNode }> = ({ children }
       // Only navigate if we're not already on the app home page
       if (location.pathname !== '/app/home') {
         // First navigate to app home - use replace to prevent back navigation
-        console.log('[TutorialContext] Tutorial reset - redirecting to app home');
+        console.log('Tutorial reset - redirecting to app home');
         
         navigate('/app/home', { replace: true });
       } else {
-        // If already on /app/home, just set active tutorial
+        // If already on /app/home, just set active tutorial without toast
         setIsActive(true);
       }
     } catch (error) {
-      console.error('[TutorialContext] Error resetting tutorial:', error);
+      console.error('Error resetting tutorial:', error);
     }
   };
   
@@ -708,7 +655,6 @@ export const TutorialProvider: React.FC<{ children: ReactNode }> = ({ children }
     skipTutorial,
     completeTutorial,
     resetTutorial,
-    startTutorial,
     tutorialCompleted,
     isInStep: (stepId: number) => isActive && steps[currentStep]?.id === stepId,
     navigationState

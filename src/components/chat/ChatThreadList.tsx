@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -5,7 +6,7 @@ import { Separator } from "@/components/ui/separator";
 import { Pencil, Check, X, Plus, Loader2 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { TranslatableText } from "@/components/translation/TranslatableText";
-import { getChatThreads, updateChatThread } from "@/services/chat/threadService";
+import { fetchChatThreads, updateThreadTitle } from "@/services/chat/threadService";
 import { useAuth } from "@/contexts/AuthContext";
 
 interface ChatThreadListProps {
@@ -44,7 +45,7 @@ export const ChatThreadList: React.FC<ChatThreadListProps> = ({
       
       setIsLoading(true);
       try {
-        const threadsData = await getChatThreads(user.id);
+        const threadsData = await fetchChatThreads(user.id);
         setThreads(threadsData);
       } catch (error) {
         console.error("Error loading threads:", error);
@@ -114,10 +115,10 @@ export const ChatThreadList: React.FC<ChatThreadListProps> = ({
   };
   
   const handleEditSave = async (threadId: string) => {
-    if (!editedTitle.trim() || !user?.id) return;
+    if (!editedTitle.trim()) return;
     
     try {
-      const success = await updateChatThread(threadId, { title: editedTitle.trim() }, user.id);
+      const success = await updateThreadTitle(threadId, editedTitle.trim());
       if (success) {
         setThreads(prevThreads =>
           prevThreads.map(thread =>

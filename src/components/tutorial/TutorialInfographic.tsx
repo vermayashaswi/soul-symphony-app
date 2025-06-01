@@ -192,66 +192,44 @@ const TutorialInfographic: React.FC<TutorialInfographicProps> = ({ type, classNa
                 { short: 'F', full: 'Friday' },
                 { short: 'S', full: 'Saturday' }
               ].map((day, i) => (
-                <div key={i} className="text-[10px] text-center text-[#aaadb0] mb-1">
+                <div key={i} className="text-[10px] text-center text-[#aaadb0]">
                   <TranslatableText text={day.short} forceTranslate={true} />
                 </div>
               ))}
               
-              {/* Calendar cells - realistic mood data pattern */}
-              {/* Week 1 */}
-              <div className="aspect-square rounded bg-green-500/80 flex items-center justify-center text-[10px] text-white font-medium">1</div>
-              <div className="aspect-square rounded bg-yellow-500/80 flex items-center justify-center text-[10px] text-white font-medium">2</div>
-              <div className="aspect-square rounded bg-green-500/80 flex items-center justify-center text-[10px] text-white font-medium">3</div>
-              <div className="aspect-square rounded border border-gray-600/50 flex items-center justify-center text-[10px] text-gray-500">4</div>
-              <div className="aspect-square rounded bg-red-500/80 flex items-center justify-center text-[10px] text-white font-medium">5</div>
-              <div className="aspect-square rounded bg-green-500/80 flex items-center justify-center text-[10px] text-white font-medium">6</div>
-              <div className="aspect-square rounded bg-green-500/80 flex items-center justify-center text-[10px] text-white font-medium">7</div>
+              {/* Calendar cells - first week */}
+              <div className="aspect-square rounded bg-[#9b87f5]/20 flex items-center justify-center text-[10px] text-white">1</div>
+              <div className="aspect-square rounded bg-[#9b87f5]/50 flex items-center justify-center text-[10px] text-white">2</div>
+              <div className="aspect-square rounded bg-[#9b87f5]/30 flex items-center justify-center text-[10px] text-white">3</div>
+              <div className="aspect-square rounded bg-[#9b87f5]/10 flex items-center justify-center text-[10px] text-white">4</div>
+              <div className="aspect-square rounded bg-[#9b87f5]/80 flex items-center justify-center text-[10px] text-white">5</div>
+              <div className="aspect-square rounded bg-[#9b87f5]/60 flex items-center justify-center text-[10px] text-white">6</div>
+              <div className="aspect-square rounded bg-[#9b87f5]/40 flex items-center justify-center text-[10px] text-white">7</div>
               
-              {/* Week 2 */}
-              <div className="aspect-square rounded bg-yellow-500/80 flex items-center justify-center text-[10px] text-white font-medium">8</div>
-              <div className="aspect-square rounded bg-green-500/80 flex items-center justify-center text-[10px] text-white font-medium">9</div>
-              <div className="aspect-square rounded bg-green-500/80 flex items-center justify-center text-[10px] text-white font-medium">10</div>
-              <div className="aspect-square rounded bg-yellow-500/80 flex items-center justify-center text-[10px] text-white font-medium">11</div>
-              <div className="aspect-square rounded border border-gray-600/50 flex items-center justify-center text-[10px] text-gray-500">12</div>
-              <div className="aspect-square rounded border border-gray-600/50 flex items-center justify-center text-[10px] text-gray-500">13</div>
-              <div className="aspect-square rounded bg-red-500/80 flex items-center justify-center text-[10px] text-white font-medium">14</div>
-              
-              {/* Week 3 */}
-              <div className="aspect-square rounded bg-yellow-500/80 flex items-center justify-center text-[10px] text-white font-medium">15</div>
-              <div className="aspect-square rounded bg-green-500/80 flex items-center justify-center text-[10px] text-white font-medium">16</div>
-              <div className="aspect-square rounded bg-green-500/80 flex items-center justify-center text-[10px] text-white font-medium">17</div>
-              <div className="aspect-square rounded bg-yellow-500/80 flex items-center justify-center text-[10px] text-white font-medium">18</div>
-              <div className="aspect-square rounded bg-green-500/80 flex items-center justify-center text-[10px] text-white font-medium">19</div>
-              <div className="aspect-square rounded border border-gray-600/50 flex items-center justify-center text-[10px] text-gray-500">20</div>
-              <div className="aspect-square rounded bg-green-500/80 flex items-center justify-center text-[10px] text-white font-medium">21</div>
+              {/* Calendar cells - second week */}
+              <div className="aspect-square rounded bg-[#9b87f5]/30 flex items-center justify-center text-[10px] text-white">8</div>
+              <div className="aspect-square rounded bg-[#9b87f5]/90 flex items-center justify-center text-[10px] text-white">9</div>
+              <div className="aspect-square rounded bg-[#9b87f5]/70 flex items-center justify-center text-[10px] text-white">10</div>
+              <div className="aspect-square rounded bg-[#9b87f5]/50 flex items-center justify-center text-[10px] text-white">11</div>
+              <div className="aspect-square rounded bg-[#9b87f5]/20 flex items-center justify-center text-[10px] text-white">12</div>
+              <div className="aspect-square rounded bg-[#9b87f5]/40 flex items-center justify-center text-[10px] text-white">13</div>
+              <div className="aspect-square rounded bg-[#9b87f5]/60 flex items-center justify-center text-[10px] text-white">14</div>
             </div>
             
-            {/* Updated legend matching actual mood calendar */}
-            <div className="mt-3 flex items-center justify-center space-x-3">
-              <div className="flex items-center">
-                <div className="h-3 w-3 rounded bg-green-500/80 mr-1"></div>
-                <span className="text-[10px] text-white">
-                  <TranslatableText text="Positive" forceTranslate={true} />
-                </span>
-              </div>
-              <div className="flex items-center">
-                <div className="h-3 w-3 rounded bg-yellow-500/80 mr-1"></div>
-                <span className="text-[10px] text-white">
-                  <TranslatableText text="Neutral" forceTranslate={true} />
-                </span>
-              </div>
-              <div className="flex items-center">
-                <div className="h-3 w-3 rounded bg-red-500/80 mr-1"></div>
-                <span className="text-[10px] text-white">
-                  <TranslatableText text="Negative" forceTranslate={true} />
-                </span>
-              </div>
-              <div className="flex items-center">
-                <div className="h-3 w-3 rounded border border-gray-600/50 mr-1"></div>
-                <span className="text-[10px] text-white">
-                  <TranslatableText text="No Entry" forceTranslate={true} />
-                </span>
-              </div>
+            {/* Legend */}
+            <div className="mt-3 flex items-center justify-center">
+              <div className="h-3 w-3 rounded-full bg-[#9b87f5]/20 mr-1"></div>
+              <span className="text-[10px] text-white mr-2">
+                <TranslatableText text="Low" forceTranslate={true} />
+              </span>
+              <div className="h-3 w-3 rounded-full bg-[#9b87f5]/50 mr-1"></div>
+              <span className="text-[10px] text-white mr-2">
+                <TranslatableText text="Medium" forceTranslate={true} />
+              </span>
+              <div className="h-3 w-3 rounded-full bg-[#9b87f5]/90 mr-1"></div>
+              <span className="text-[10px] text-white">
+                <TranslatableText text="High" forceTranslate={true} />
+              </span>
             </div>
           </div>
         );

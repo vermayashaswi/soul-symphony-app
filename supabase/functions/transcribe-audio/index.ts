@@ -100,7 +100,7 @@ serve(async (req) => {
     console.log("Direct transcription mode:", directTranscription ? "YES" : "NO");
     console.log("High quality mode:", highQuality ? "YES" : "NO");
     console.log("Audio data length:", audio.length);
-    console.log("Using model: gpt-4o-transcribe"); // Changed to requested model name
+    console.log("Using model: gpt-4o-mini-transcribe"); // Updated model name
     
     // Process audio data in a try-catch block to handle any processing errors
     let binaryAudio;
@@ -161,9 +161,9 @@ serve(async (req) => {
     });
     
     try {
-      // Transcribe audio with the requested model name
+      // Transcribe audio with the correct model name
       console.log("Sending audio to OpenAI API for transcription");
-      console.log("Using model: gpt-4o-transcribe"); // Changed to requested model name
+      console.log("Using model: gpt-4o-mini-transcribe"); // Updated model name
       
       // Important: Use 'auto' for language detection
       const { text: transcribedText, detectedLanguages } = await transcribeAudioWithWhisper(

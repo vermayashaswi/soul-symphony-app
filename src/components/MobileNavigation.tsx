@@ -1,8 +1,7 @@
-
 import React, { useEffect, useState } from 'react';
 import { useLocation, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Home, MessageCircle, BookOpen, BarChart2, Settings, Lock } from 'lucide-react';
+import { Home, MessageCircle, BookOpen, BarChart2, Settings } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { isNativeApp, isAppRoute } from '@/routes/RouteHelpers';
 import { useIsMobile } from '@/hooks/use-mobile';
@@ -10,7 +9,6 @@ import { TranslatableText } from '@/components/translation/TranslatableText';
 import { useTutorial } from '@/contexts/TutorialContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTranslation } from '@/contexts/TranslationContext';
-import { useTrialAccess } from '@/hooks/useTrialAccess';
 
 interface MobileNavigationProps {
   onboardingComplete: boolean | null;
@@ -24,7 +22,6 @@ const MobileNavigation: React.FC<MobileNavigationProps> = ({ onboardingComplete 
   const { isActive: isTutorialActive } = useTutorial();
   const { user } = useAuth();
   const { currentLanguage } = useTranslation();
-  const { hasAccess, isTrialExpired, openSubscriptionModal } = useTrialAccess();
   
   // Debug: Force component re-render when language changes
   const [renderKey, setRenderKey] = useState(0);
@@ -117,27 +114,13 @@ const MobileNavigation: React.FC<MobileNavigationProps> = ({ onboardingComplete 
     return null;
   }
   
-  // Check if a route requires premium access
-  const isPremiumRoute = (path: string) => {
-    return path === '/app/smart-chat' || path === '/app/insights';
-  };
-
-  // Handle navigation for premium routes
-  const handleNavigation = (path: string, e: React.MouseEvent) => {
-    if (isPremiumRoute(path) && !hasAccess && isTrialExpired) {
-      e.preventDefault();
-      openSubscriptionModal();
-      return;
-    }
-  };
-  
   // Navigation items with English text for translation
   const navItems = [
-    { path: '/app/home', icon: Home, label: 'Home', requiresPremium: false },
-    { path: '/app/journal', icon: BookOpen, label: 'Journal', requiresPremium: false },
-    { path: '/app/smart-chat', icon: MessageCircle, label: 'Chat', requiresPremium: true },
-    { path: '/app/insights', icon: BarChart2, label: 'Insights', requiresPremium: true },
-    { path: '/app/settings', icon: Settings, label: 'Settings', requiresPremium: false },
+    { path: '/app/home', icon: Home, label: 'Home' },
+    { path: '/app/journal', icon: BookOpen, label: 'Journal' },
+    { path: '/app/smart-chat', icon: MessageCircle, label: 'Chat' },
+    { path: '/app/insights', icon: BarChart2, label: 'Insights' },
+    { path: '/app/settings', icon: Settings, label: 'Settings' },
   ];
 
   const getActiveStatus = (path: string) => {
@@ -166,7 +149,6 @@ const MobileNavigation: React.FC<MobileNavigationProps> = ({ onboardingComplete 
       <div className="flex justify-around items-center">
         {navItems.map((item) => {
           const isActive = getActiveStatus(item.path);
-          const needsUpgrade = item.requiresPremium && !hasAccess && isTrialExpired;
           
           console.log(`MobileNavigation: Rendering nav item "${item.label}" for path ${item.path} with language ${currentLanguage}`);
           
@@ -174,24 +156,16 @@ const MobileNavigation: React.FC<MobileNavigationProps> = ({ onboardingComplete 
             <Link
               key={`${item.path}-${renderKey}`}
               to={item.path}
-              onClick={(e) => handleNavigation(item.path, e)}
               className={cn(
-                "flex flex-col items-center py-1 transition-colors relative",
+                "flex flex-col items-center py-1 transition-colors",
                 isActive 
                   ? "text-primary" 
-                  : needsUpgrade
-                  ? "text-muted-foreground/50"
                   : "text-muted-foreground hover:text-primary"
               )}
             >
               <div className="relative">
                 <item.icon size={22} />
-                {needsUpgrade && (
-                  <div className="absolute -top-1 -right-1 w-4 h-4 bg-amber-500 rounded-full flex items-center justify-center">
-                    <Lock className="w-2.5 h-2.5 text-white" />
-                  </div>
-                )}
-                {isActive && !needsUpgrade && (
+                {isActive && (
                   <motion.div
                     layoutId="mobileNavIndicator"
                     className="absolute -bottom-1 left-1/2 transform -translate-x-1/2 w-1 h-1 bg-primary rounded-full"
@@ -199,10 +173,7 @@ const MobileNavigation: React.FC<MobileNavigationProps> = ({ onboardingComplete 
                   />
                 )}
               </div>
-              <span className={cn(
-                "text-xs mt-0.5",
-                needsUpgrade && "opacity-50"
-              )}>
+              <span className="text-xs mt-0.5">
                 <TranslatableText 
                   key={`${item.label}-${renderKey}-${currentLanguage}`}
                   text={item.label} 

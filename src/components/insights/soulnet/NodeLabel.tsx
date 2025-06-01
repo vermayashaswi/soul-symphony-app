@@ -1,4 +1,3 @@
-
 import React, { useMemo, useRef, useEffect, useState } from 'react';
 import ThreeDimensionalText from './ThreeDimensionalText';
 import { useTheme } from '@/hooks/use-theme';
@@ -79,25 +78,12 @@ export const NodeLabel: React.FC<NodeLabelProps> = ({
   const prevLangRef = useRef<string>(currentLanguage);
   const isNonLatin = useRef<boolean>(false);
   const isDevanagari = useRef<boolean>(false);
-  
-  // Enhanced visibility logic - always show labels when shouldShowLabel is true
-  const isVisible = shouldShowLabel && !!id;
-  
-  // Debug logging for label visibility
-  useEffect(() => {
-    console.log(`[NodeLabel] ${id} visibility check:`, {
-      shouldShowLabel,
-      hasId: !!id,
-      isVisible,
-      position,
-      type,
-      cameraZoom
-    });
-  }, [id, shouldShowLabel, isVisible, position, type, cameraZoom]);
+  const stableVisibilityRef = useRef<boolean>(shouldShowLabel);
+  const translationTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   
   // Handle translation when the label should be displayed
   useEffect(() => {
-    if (!isVisible || currentLanguage === 'en' || !id) {
+    if (!shouldShowLabel || currentLanguage === 'en' || !id) {
       return;
     }
     
@@ -106,13 +92,19 @@ export const NodeLabel: React.FC<NodeLabelProps> = ({
     
     if (cachedTranslation) {
       setTranslatedText(cachedTranslation);
+      // Also analyze and store script info
       isNonLatin.current = containsNonLatinScript(cachedTranslation);
       isDevanagari.current = containsDevanagari(cachedTranslation);
       return;
     }
     
-    // Translate without debouncing for immediate display
-    const translateText = async () => {
+    // Debounce translation requests to avoid overwhelming the translation service
+    // especially when many labels are visible at once
+    if (translationTimeoutRef.current) {
+      clearTimeout(translationTimeoutRef.current);
+    }
+    
+    translationTimeoutRef.current = setTimeout(async () => {
       try {
         setIsTranslating(true);
         const result = await translate(id);
@@ -125,20 +117,28 @@ export const NodeLabel: React.FC<NodeLabelProps> = ({
         isNonLatin.current = containsNonLatinScript(result);
         isDevanagari.current = containsDevanagari(result);
         
-        console.log(`[NodeLabel] Translated "${id}" to "${result}"`);
+        // Debug logging for Hindi text issues
+        if (isDevanagari.current) {
+          console.log(`Hindi text detected in node "${id}": "${result}", applying special rendering`);
+        }
       } catch (error) {
-        console.error(`[NodeLabel] Failed to translate "${id}":`, error);
+        console.error(`Failed to translate node label "${id}":`, error);
       } finally {
         setIsTranslating(false);
       }
-    };
+    }, 100); // Small delay to prevent too many simultaneous requests
     
-    translateText();
-  }, [id, isVisible, currentLanguage, translate]);
+    return () => {
+      if (translationTimeoutRef.current) {
+        clearTimeout(translationTimeoutRef.current);
+      }
+    };
+  }, [id, shouldShowLabel, currentLanguage, translate]);
   
   // Clear translations when language changes
   useEffect(() => {
     if (prevLangRef.current !== currentLanguage) {
+      // Reset to original text when language changes
       setTranslatedText(id);
       prevLangRef.current = currentLanguage;
     }
@@ -146,68 +146,84 @@ export const NodeLabel: React.FC<NodeLabelProps> = ({
   
   // Format entity text for display - always apply for entity type
   const formattedText = useMemo(() => {
+    // Only format entity nodes - this ensures we get two lines for circular nodes
     if (type === 'entity') {
       const textToFormat = translatedText || id;
       return formatEntityText(textToFormat);
     }
+    // For emotion nodes, just use the translated text or id directly
     return translatedText || id;
   }, [id, type, translatedText]);
+  
+  // Stabilize visibility transitions to prevent flickering
+  useEffect(() => {
+    // For Devanagari text, we want to delay visibility changes to prevent flickering
+    if (isDevanagari.current) {
+      if (shouldShowLabel !== stableVisibilityRef.current) {
+        // Only update if going from invisible to visible immediately
+        // For hiding, delay briefly to prevent flickering during transitions
+        if (shouldShowLabel) {
+          stableVisibilityRef.current = true;
+        } else {
+          // Small timeout to prevent flicker during state transitions
+          setTimeout(() => {
+            stableVisibilityRef.current = false;
+          }, 50);
+        }
+      }
+    } else {
+      stableVisibilityRef.current = shouldShowLabel;
+    }
+  }, [shouldShowLabel]);
 
   const dynamicFontSize = useMemo(() => {
     let z = cameraZoom !== undefined ? cameraZoom : 26;
     if (typeof z !== 'number' || Number.isNaN(z)) z = 26;
     
-    // Significantly increased base size for better visibility
-    const baseSize = (0.5 + Math.max(0, (26 - z) * 0.015)) * 1.2;
+    // Base size calculation - decreased by 0.75x and then multiplied by 0.8
+    const baseSize = (0.26 + Math.max(0, (26 - z) * 0.0088)) * 0.75 * 0.8; // Using 0.8 instead of 0.5
     
-    // Adjust size for non-Latin scripts
-    const sizeAdjustment = isDevanagari.current ? 0.1 : 
-                          isNonLatin.current ? 0.06 : 0;
+    // Adjust size for non-Latin scripts - they often need slightly bigger font
+    // Devanagari (Hindi) scripts need even larger adjustment
+    const sizeAdjustment = isDevanagari.current ? 0.06 * 0.75 * 0.8 : // Also using 0.8 instead of 0.5
+                          isNonLatin.current ? 0.03 * 0.75 * 0.8 : 0;
     
-    // Ensure minimum readable size with higher minimum
-    return Math.max(Math.min(baseSize + sizeAdjustment, 0.8), 0.35);
+    // Ensure size stays within reasonable bounds
+    return Math.max(Math.min(baseSize + sizeAdjustment, 0.4), 0.15); // Adjusted bounds for 0.8 scale
   }, [cameraZoom]);
 
-  // Don't render if not visible or no text
-  if (!isVisible || !formattedText) {
-    console.log(`[NodeLabel] Not rendering: visible=${isVisible}, text="${formattedText}", id="${id}"`);
-    return null;
+  // Don't render if not supposed to be shown
+  if (!stableVisibilityRef.current) return null;
+
+  // Adjust vertical positioning for different script types and node types
+  // Increased distance for emotion nodes to 2.2 (was 1.1)
+  let verticalPosition = type === 'entity' ? 2.2 : 2.2; // Both entity and emotion nodes now use 2.2
+  
+  // For Devanagari text, position slightly higher to accommodate taller characters
+  if (isDevanagari.current) {
+    verticalPosition += 0.15 * 0.8; // Adjusted for new scale
+  } else if (isNonLatin.current) {
+    verticalPosition += 0.08 * 0.8; // Adjusted for new scale
   }
+  
+  const labelPosition: [number, number, number] = [0, verticalPosition, 0];
 
-  // Enhanced vertical positioning - closer to nodes and more differentiated
-  const verticalOffset = type === 'entity' ? 2.2 : 2.0;
-  const labelPosition: [number, number, number] = [
-    position[0], // Use exact node X position
-    position[1] + verticalOffset, // Position above the node
-    position[2]  // Use exact node Z position
-  ];
-
-  // Enhanced text color logic with better contrast
+  // Determine text color based on theme for entity nodes
   const textColor = type === 'entity' 
-    ? (theme === 'light' ? '#1a1a1a' : '#ffffff')
+    ? (theme === 'light' ? '#000000' : '#ffffff')  // Black in light mode, white in dark mode
     : themeHex;
 
-  // Enhanced outline for better visibility
-  const outlineWidth = isHighlighted ? 0.012 : 0.008;
-  const outlineColor = theme === 'light' ? '#ffffff' : '#000000';
-
-  console.log(`[NodeLabel] Rendering "${id}" (${type}) at labelPosition:`, labelPosition, 'nodePosition:', position, 'with text:', formattedText);
-
   return (
-    <group position={labelPosition}>
-      <ThreeDimensionalText
-        text={formattedText}
-        position={[0, 0, 0]} // Position relative to group
-        color={textColor}
-        size={dynamicFontSize}
-        bold={isHighlighted}
-        visible={true}
-        skipTranslation={true}
-        outlineWidth={outlineWidth}
-        outlineColor={outlineColor}
-        renderOrder={15} // Higher render order to ensure text appears on top
-      />
-    </group>
+    <ThreeDimensionalText
+      text={formattedText}
+      position={labelPosition}
+      color={textColor}
+      size={dynamicFontSize}
+      bold={isHighlighted}
+      visible={stableVisibilityRef.current}
+      // Set skipTranslation to true since we're handling it directly here
+      skipTranslation={true}
+    />
   );
 };
 
