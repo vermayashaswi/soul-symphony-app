@@ -41,7 +41,6 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
   const [dataError, setDataError] = useState<Error | null>(null);
   const [canvasError, setCanvasError] = useState<Error | null>(null);
   const [retryCount, setRetryCount] = useState(0);
-  const [renderCanvas, setRenderCanvas] = useState(false);
   
   const isMobile = useIsMobile();
   const themeHex = useUserColorThemeHex();
@@ -54,8 +53,7 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
     loading,
     dataError: !!dataError,
     canvasError: !!canvasError,
-    retryCount,
-    renderCanvas
+    retryCount
   });
 
   // Cleanup on unmount
@@ -65,7 +63,7 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
     };
   }, []);
 
-  // Data fetching effect
+  // Simplified data fetching effect
   useEffect(() => {
     if (!userId || !mountedRef.current) return;
 
@@ -76,7 +74,6 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
         setDataError(null);
         setCanvasError(null);
         setRetryCount(0);
-        setRenderCanvas(false);
         
         const startDate = getStartDate(timeRange);
         
@@ -100,14 +97,6 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
           console.log("[SoulNet] Processing entries into graph data");
           const processedData = processEntities(entries);
           setGraphData(processedData);
-          
-          // Enable canvas rendering after data is ready
-          setTimeout(() => {
-            if (mountedRef.current) {
-              console.log("[SoulNet] Enabling canvas render");
-              setRenderCanvas(true);
-            }
-          }, 100);
         }
         
       } catch (error) {
@@ -154,15 +143,7 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
     setCanvasError(null);
     setDataError(null);
     setRetryCount(0);
-    setRenderCanvas(false);
-    
-    // Restart the process
-    setTimeout(() => {
-      if (mountedRef.current && graphData.nodes.length > 0) {
-        setRenderCanvas(true);
-      }
-    }, 100);
-  }, [graphData.nodes.length]);
+  }, []);
 
   // Show loading state
   if (loading) {
@@ -228,7 +209,7 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
     return <TranslatableText text="Drag to rotate • Scroll to zoom • Click a node to highlight connections" forceTranslate={true} />;
   };
 
-  // Main render with simplified conditions
+  // Simplified main render - always show Canvas when we have data
   return (
     <div className={cn(
       "bg-background rounded-xl shadow-sm border w-full relative",
@@ -240,7 +221,6 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
         isFullScreen={isFullScreen}
         toggleFullScreen={toggleFullScreen}
       >
-        {/* Always render the canvas container, but only show Canvas when ready */}
         <div style={{
           width: '100%',
           height: '100%',
@@ -250,77 +230,63 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
           zIndex: 5,
           minHeight: '400px'
         }}>
-          {renderCanvas ? (
-            <RenderingErrorBoundary
-              onError={handleCanvasError}
-              fallback={
-                <div className="flex items-center justify-center p-10 bg-gray-100 dark:bg-gray-800 rounded-lg h-full">
-                  <div className="text-center">
-                    <h3 className="text-lg font-medium">
-                      <TranslatableText text="Visualization Loading" />
-                    </h3>
-                    <p className="text-muted-foreground mt-2">
-                      <TranslatableText text="Preparing the visualization..." />
-                    </p>
-                    <button 
-                      className="mt-4 px-4 py-2 bg-primary text-white rounded-lg"
-                      onClick={handleRetry}
-                    >
-                      <TranslatableText text="Retry" />
-                    </button>
-                  </div>
+          <RenderingErrorBoundary
+            onError={handleCanvasError}
+            fallback={
+              <div className="flex items-center justify-center p-10 bg-gray-100 dark:bg-gray-800 rounded-lg h-full">
+                <div className="text-center">
+                  <h3 className="text-lg font-medium">
+                    <TranslatableText text="Visualization Error" />
+                  </h3>
+                  <p className="text-muted-foreground mt-2">
+                    <TranslatableText text="Unable to render the 3D visualization." />
+                  </p>
+                  <button 
+                    className="mt-4 px-4 py-2 bg-primary text-white rounded-lg"
+                    onClick={handleRetry}
+                  >
+                    <TranslatableText text="Retry" />
+                  </button>
                 </div>
-              }
-            >
-              <Canvas
-                style={{
-                  width: '100%',
-                  height: '100%'
-                }}
-                camera={{ 
-                  position: [0, 0, isFullScreen ? 40 : 45],
-                  near: 1, 
-                  far: 1000,
-                  fov: isFullScreen ? 60 : 50
-                }}
-                onPointerMissed={() => setSelectedNode(null)}
-                gl={{ 
-                  preserveDrawingBuffer: true,
-                  antialias: !isMobile,
-                  powerPreference: 'high-performance',
-                  alpha: true,
-                  depth: true,
-                  stencil: false,
-                  precision: isMobile ? 'mediump' : 'highp'
-                }}
-                onCreated={(state) => {
-                  console.log('[SoulNet] Canvas created successfully');
-                }}
-                onError={handleCanvasError}
-              >
-                <SimplifiedSoulNetVisualization
-                  data={graphData}
-                  selectedNode={selectedNode}
-                  onNodeClick={handleNodeSelect}
-                  themeHex={themeHex}
-                  isFullScreen={isFullScreen}
-                  shouldShowLabels={true}
-                />
-              </Canvas>
-            </RenderingErrorBoundary>
-          ) : (
-            <div className="flex items-center justify-center h-full bg-gray-50 dark:bg-gray-900 rounded-lg">
-              <div className="text-center">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
-                <h3 className="text-lg font-medium">
-                  <TranslatableText text="Initializing Visualization" />
-                </h3>
-                <p className="text-muted-foreground mt-2">
-                  <TranslatableText text="Setting up 3D environment..." />
-                </p>
               </div>
-            </div>
-          )}
+            }
+          >
+            <Canvas
+              style={{
+                width: '100%',
+                height: '100%'
+              }}
+              camera={{ 
+                position: [0, 0, isFullScreen ? 40 : 45],
+                near: 1, 
+                far: 1000,
+                fov: isFullScreen ? 60 : 50
+              }}
+              onPointerMissed={() => setSelectedNode(null)}
+              gl={{ 
+                preserveDrawingBuffer: true,
+                antialias: !isMobile,
+                powerPreference: 'high-performance',
+                alpha: true,
+                depth: true,
+                stencil: false,
+                precision: isMobile ? 'mediump' : 'highp'
+              }}
+              onCreated={(state) => {
+                console.log('[SoulNet] Canvas created successfully');
+              }}
+              onError={handleCanvasError}
+            >
+              <SimplifiedSoulNetVisualization
+                data={graphData}
+                selectedNode={selectedNode}
+                onNodeClick={handleNodeSelect}
+                themeHex={themeHex}
+                isFullScreen={isFullScreen}
+                shouldShowLabels={true}
+              />
+            </Canvas>
+          </RenderingErrorBoundary>
         </div>
       </FullscreenWrapper>
       

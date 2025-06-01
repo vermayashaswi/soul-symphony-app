@@ -79,10 +79,10 @@ export const SimplifiedSoulNetVisualization: React.FC<SimplifiedSoulNetVisualiza
     return new THREE.Vector3(avgX, avgY, 0);
   }, [validData.nodes]);
 
-  // Initialize camera once when data is ready
+  // Simplified camera initialization - no delays
   useEffect(() => {
-    if (validData.nodes.length > 0 && camera && !isInitialized) {
-      console.log("[SimplifiedSoulNetVisualization] Initializing camera");
+    if (validData.nodes.length > 0 && camera) {
+      console.log("[SimplifiedSoulNetVisualization] Initializing camera immediately");
       
       const targetZ = isFullScreen ? 40 : 45;
       camera.position.set(centerPosition.x, centerPosition.y, targetZ);
@@ -94,7 +94,7 @@ export const SimplifiedSoulNetVisualization: React.FC<SimplifiedSoulNetVisualiza
       
       console.log("[SimplifiedSoulNetVisualization] Camera initialized at position:", camera.position);
     }
-  }, [camera, validData.nodes.length, centerPosition, isFullScreen, isInitialized]);
+  }, [camera, validData.nodes.length, centerPosition, isFullScreen]);
 
   // Track camera zoom
   useFrame(() => {
@@ -137,23 +137,21 @@ export const SimplifiedSoulNetVisualization: React.FC<SimplifiedSoulNetVisualiza
     shouldShowLabels: shouldShowLabels && isInitialized
   });
 
-  // Always render something - even with empty data
+  // Always render the 3D scene, even with empty data
   return (
     <>
       <ambientLight intensity={0.5} />
       <pointLight position={[10, 10, 10]} intensity={0.8} />
       
-      {validData.nodes.length > 0 && (
-        <OrbitControls
-          ref={controlsRef}
-          enableDamping
-          dampingFactor={0.05}
-          rotateSpeed={0.5}
-          minDistance={isFullScreen ? 8 : 10}
-          maxDistance={isFullScreen ? 80 : 60}
-          target={centerPosition}
-        />
-      )}
+      <OrbitControls
+        ref={controlsRef}
+        enableDamping
+        dampingFactor={0.05}
+        rotateSpeed={0.5}
+        minDistance={isFullScreen ? 8 : 10}
+        maxDistance={isFullScreen ? 80 : 60}
+        target={centerPosition}
+      />
 
       {/* Render edges */}
       {validData.links.map((link, index) => {
@@ -201,7 +199,7 @@ export const SimplifiedSoulNetVisualization: React.FC<SimplifiedSoulNetVisualiza
         );
       })}
 
-      {/* HTML Text Overlay */}
+      {/* HTML Text Overlay - always render if initialized */}
       {isInitialized && <HtmlTextOverlay textItems={textOverlayItems} />}
     </>
   );
