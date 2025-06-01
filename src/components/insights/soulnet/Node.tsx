@@ -2,7 +2,6 @@
 import React, { useRef, useState, useMemo } from 'react';
 import '@/types/three-reference';
 import { useFrame } from '@react-three/fiber';
-import { Sphere } from '@react-three/drei';
 import * as THREE from 'three';
 
 interface NodeData {
@@ -107,11 +106,14 @@ const Node: React.FC<NodeProps> = ({
     onClick(node.id, event);
   };
 
+  // Create sphere geometry manually since Sphere from drei is not available
+  const sphereGeometry = useMemo(() => new THREE.SphereGeometry(scale, 32, 32), [scale]);
+
   return (
     <group position={[node.position[0], node.position[1], node.position[2]]}>
-      <Sphere
+      <mesh
         ref={meshRef}
-        args={[scale, 32, 32]}
+        geometry={sphereGeometry}
         position={[0, 0, 0]}
         onClick={handleClick}
         onPointerOver={() => setHovered(true)}
@@ -126,12 +128,12 @@ const Node: React.FC<NodeProps> = ({
           roughness={0.3}
           metalness={0.1}
         />
-      </Sphere>
+      </mesh>
       
       {/* Enhanced glow effect for important nodes */}
       {(isSelected || isHighlighted) && (
-        <Sphere
-          args={[scale * 1.3, 16, 16]}
+        <mesh
+          geometry={new THREE.SphereGeometry(scale * 1.3, 16, 16)}
           position={[0, 0, 0]}
         >
           <meshBasicMaterial
@@ -140,7 +142,7 @@ const Node: React.FC<NodeProps> = ({
             opacity={isSelected ? 0.2 : 0.1}
             side={THREE.BackSide}
           />
-        </Sphere>
+        </mesh>
       )}
     </group>
   );
