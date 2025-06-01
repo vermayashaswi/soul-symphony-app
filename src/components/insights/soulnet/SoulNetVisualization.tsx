@@ -1,3 +1,4 @@
+
 import React, { useRef, useEffect, useMemo, useState } from 'react';
 import '@/types/three-reference';
 import { OrbitControls } from '@react-three/drei';
@@ -28,6 +29,7 @@ interface SoulNetVisualizationProps {
   isFullScreen?: boolean;
   shouldShowLabels?: boolean;
   translatedLabels?: Map<string, string>;
+  containerRef?: React.RefObject<HTMLDivElement>;
 }
 
 function getConnectedNodes(nodeId: string, links: LinkData[]): Set<string> {
@@ -120,7 +122,8 @@ export const SoulNetVisualization: React.FC<SoulNetVisualizationProps> = ({
   onNodeClick,
   themeHex,
   isFullScreen = false,
-  shouldShowLabels = false
+  shouldShowLabels = false,
+  containerRef
 }) => {
   const { camera, size } = useThree();
   const controlsRef = useRef<any>(null);
@@ -366,15 +369,13 @@ export const SoulNetVisualization: React.FC<SoulNetVisualizationProps> = ({
         );
       })}
       
-      {/* Display nodes */}
+      {/* Display nodes - labels are now handled by HTML overlay */}
       {validData.nodes.map(node => {
         if (!node || typeof node !== 'object' || !node.id) {
           console.warn("Invalid node:", node);
           return null;
         }
         
-        // Clean label visibility logic - only show when explicitly requested
-        const showLabel = shouldShowLabels || !selectedNode || node.id === selectedNode || highlightedNodes.has(node.id);
         const dimmed = shouldDim && !(selectedNode === node.id || highlightedNodes.has(node.id));
         const isHighlighted = selectedNode === node.id || highlightedNodes.has(node.id);
         
@@ -406,7 +407,7 @@ export const SoulNetVisualization: React.FC<SoulNetVisualizationProps> = ({
             isSelected={selectedNode === node.id}
             onClick={handleNodeClick}
             highlightedNodes={highlightedNodes}
-            showLabel={showLabel}
+            showLabel={false} // Labels are now handled by HTML overlay
             dimmed={dimmed}
             themeHex={themeHex}
             selectedNodeId={selectedNode}
