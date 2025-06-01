@@ -4,6 +4,7 @@ import '@/types/three-reference';
 import * as THREE from 'three';
 import { NodeMesh } from './NodeMesh';
 import { ConnectionPercentage } from './ConnectionPercentage';
+import { ThreeDimensionalText } from './ThreeDimensionalText';
 import { useTheme } from '@/hooks/use-theme';
 
 interface NodeData {
@@ -197,7 +198,17 @@ export const Node: React.FC<NodeProps> = ({
                                isHighlighted && 
                                connectionPercentage > 0 &&
                                !isSelected;
+
+  // Determine when to show labels
+  const shouldShowLabel = showLabel && (forceShowLabels || isSelected || isHighlighted);
   
+  // Calculate label position (slightly above the node)
+  const labelPosition = useMemo(() => {
+    const [x, y, z] = node.position;
+    const offset = node.type === 'entity' ? 2.0 : 1.8;
+    return [x, y + offset, z] as [number, number, number];
+  }, [node.position, node.type]);
+
   return (
     <group position={node.position}>
       <NodeMesh
@@ -214,6 +225,22 @@ export const Node: React.FC<NodeProps> = ({
         onPointerOut={handlePointerOut}
         onPointerLeave={handlePointerOut}
       />
+      
+      {/* 3D Text Label */}
+      {shouldShowLabel && (
+        <ThreeDimensionalText
+          text={node.id}
+          position={labelPosition}
+          color={node.type === 'entity' ? '#ffffff' : themeHex}
+          size={isSelected ? 0.8 : 0.6}
+          bold={isSelected}
+          visible={shouldShowLabel}
+          opacity={dimmed ? 0.6 : 1.0}
+          outlineWidth={0.02}
+          outlineColor={theme === 'dark' ? '#000000' : '#ffffff'}
+          renderOrder={2}
+        />
+      )}
       
       {shouldShowPercentage && (
         <ConnectionPercentage

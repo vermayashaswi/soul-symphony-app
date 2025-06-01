@@ -42,7 +42,7 @@ const SoulNetVisualization: React.FC<SoulNetVisualizationProps> = ({
   isFullScreen,
   shouldShowLabels
 }) => {
-  const { camera, gl } = useThree();
+  const { camera } = useThree();
   const isMobile = useIsMobile();
   const [cameraZoom, setCameraZoom] = useState(isFullScreen ? 40 : 45);
   const lastUpdateRef = useRef<number>(0);
@@ -120,7 +120,7 @@ const SoulNetVisualization: React.FC<SoulNetVisualizationProps> = ({
     }
   }, [selectedNode, validatedData]);
 
-  // Performance monitoring
+  // Performance monitoring with error handling
   useFrame(() => {
     try {
       performanceRef.current.frameCount++;
@@ -128,7 +128,7 @@ const SoulNetVisualization: React.FC<SoulNetVisualizationProps> = ({
       
       if (now - performanceRef.current.lastCheck > 5000) {
         const fps = (performanceRef.current.frameCount * 1000) / (now - performanceRef.current.lastCheck);
-        if (fps < 30) {
+        if (fps < 20) {
           console.warn(`SoulNet performance warning: ${fps.toFixed(1)} FPS`);
         }
         performanceRef.current.frameCount = 0;
