@@ -1,38 +1,56 @@
 
 import React, { useMemo, useRef, useEffect, useState } from 'react';
-import ReliableText from './ReliableText';
+import ThreeDimensionalText from './ThreeDimensionalText';
 import { useTheme } from '@/hooks/use-theme';
 import { useTranslation } from '@/contexts/TranslationContext';
 import { onDemandTranslationCache } from '@/utils/website-translations';
-import { consolidatedFontService } from '@/utils/consolidatedFontService';
 
-// Enhanced adaptive text color with better contrast
-const getAdaptiveTextColor = (nodeColor: string, nodeType: 'entity' | 'emotion', theme: string, isHighlighted: boolean, isSelected: boolean): string => {
-  if (isSelected) {
-    return theme === 'light' ? '#000000' : '#ffffff';
-  }
+// Helper function to detect non-Latin script
+const containsNonLatinScript = (text: string): boolean => {
+  if (!text) return false;
   
-  if (isHighlighted) {
-    if (nodeType === 'emotion') {
-      return theme === 'light' ? '#2563eb' : '#60a5fa';
-    } else {
-      return theme === 'light' ? '#dc2626' : '#f87171';
-    }
-  }
+  // Regex patterns for different script ranges
+  const patterns = {
+    devanagari: /[\u0900-\u097F]/,  // Hindi, Sanskrit, etc.
+    arabic: /[\u0600-\u06FF]/,      // Arabic
+    chinese: /[\u4E00-\u9FFF]/,     // Chinese
+    japanese: /[\u3040-\u309F\u30A0-\u30FF]/,  // Japanese Hiragana and Katakana
+    korean: /[\uAC00-\uD7AF]/,      // Korean Hangul
+    cyrillic: /[\u0400-\u04FF]/     // Russian and other Cyrillic
+  };
   
-  return theme === 'light' ? '#666666' : '#999999';
+  // Check if text contains any non-Latin script
+  return Object.values(patterns).some(pattern => pattern.test(text));
 };
 
-// Enhanced label offset calculation
-const calculateLabelOffset = (nodeType: 'entity' | 'emotion', nodeScale: number): number => {
-  if (nodeType === 'entity') {
-    const sphereRadius = 1.4;
-    return sphereRadius * nodeScale * 1.3;
-  } else {
-    const cubeSize = 2.1;
-    const cornerDistance = Math.sqrt(3) * (cubeSize / 2);
-    return cornerDistance * nodeScale * 1.3;
+// Specifically detect Devanagari script (Hindi)
+const containsDevanagari = (text: string): boolean => {
+  if (!text) return false;
+  const devanagariPattern = /[\u0900-\u097F]/;
+  return devanagariPattern.test(text);
+};
+
+// Format entity node text to display on two lines
+const formatEntityText = (text: string): string => {
+  if (!text || text.length <= 3) return text;
+  
+  // Split text in approximately half to create two lines
+  const halfLength = Math.ceil(text.length / 2);
+  let splitIndex = halfLength;
+  
+  // Look for natural break points like spaces near the middle
+  const spaceIndices = [...text.matchAll(/\s/g)].map(match => match.index as number);
+  if (spaceIndices.length > 0) {
+    // Find the space closest to the middle
+    const nearestSpace = spaceIndices.reduce((closest, current) => {
+      return Math.abs(current - halfLength) < Math.abs(closest - halfLength) ? current : closest;
+    }, spaceIndices[0]);
+    
+    splitIndex = nearestSpace;
   }
+  
+  // Create two-line text with line break
+  return text.substring(0, splitIndex) + '\n' + text.substring(splitIndex).trim();
 };
 
 interface NodeLabelProps {
@@ -40,13 +58,9 @@ interface NodeLabelProps {
   type: 'entity' | 'emotion';
   position: [number, number, number];
   isHighlighted: boolean;
-  isSelected: boolean;
   shouldShowLabel: boolean;
   cameraZoom?: number;
   themeHex: string;
-  forceVisible?: boolean;
-  nodeColor?: string;
-  nodeScale?: number;
 }
 
 export const NodeLabel: React.FC<NodeLabelProps> = ({
@@ -54,201 +68,146 @@ export const NodeLabel: React.FC<NodeLabelProps> = ({
   type,
   position,
   isHighlighted,
-  isSelected,
   shouldShowLabel,
   cameraZoom,
-  themeHex,
-  forceVisible = false,
-  nodeColor = '#ffffff',
-  nodeScale = 1
+  themeHex
 }) => {
   const { theme } = useTheme();
   const { currentLanguage, translate } = useTranslation();
   const [translatedText, setTranslatedText] = useState<string>(id);
-  const [isTranslationReady, setIsTranslationReady] = useState(false);
-  const [fontReady, setFontReady] = useState(false);
-  const translationInProgress = useRef<boolean>(false);
-  const mounted = useRef<boolean>(true);
+  const [isTranslating, setIsTranslating] = useState(false);
+  const prevLangRef = useRef<string>(currentLanguage);
+  const isNonLatin = useRef<boolean>(false);
+  const isDevanagari = useRef<boolean>(false);
   
-  console.log(`[NodeLabel] Processing label for node ${id}, language: ${currentLanguage}, shouldShow: ${shouldShowLabel}`);
+  // Enhanced visibility logic - always show labels when shouldShowLabel is true
+  const isVisible = shouldShowLabel && !!id;
   
-  // Stabilized visibility logic to prevent flickering
-  const isVisible = useMemo(() => {
-    return shouldShowLabel || forceVisible || isSelected || isHighlighted;
-  }, [shouldShowLabel, forceVisible, isSelected, isHighlighted]);
-  
-  // Enhanced font loading detection using the consolidated font service
+  // Debug logging for label visibility
   useEffect(() => {
-    let mounted = true;
-    
-    const initializeFonts = async () => {
-      try {
-        console.log('[NodeLabel] Checking font readiness...');
-        
-        await consolidatedFontService.waitForFonts();
-        
-        if (mounted) {
-          console.log('[NodeLabel] Fonts ready via consolidated font service');
-          setFontReady(true);
-        }
-      } catch (error) {
-        console.warn('[NodeLabel] Font loading check failed:', error);
-        if (mounted) {
-          setFontReady(true); // Assume ready on error to prevent blocking
-        }
-      }
-    };
-    
-    initializeFonts();
-    
-    return () => {
-      mounted = false;
-    };
-  }, []);
+    console.log(`[NodeLabel] ${id} visibility check:`, {
+      shouldShowLabel,
+      hasId: !!id,
+      isVisible,
+      position,
+      type,
+      cameraZoom
+    });
+  }, [id, shouldShowLabel, isVisible, position, type, cameraZoom]);
   
-  // Enhanced translation handling with race condition prevention
+  // Handle translation when the label should be displayed
   useEffect(() => {
-    if (!isVisible || !id || !fontReady) {
+    if (!isVisible || currentLanguage === 'en' || !id) {
       return;
     }
     
-    // Prevent multiple simultaneous translations
-    if (translationInProgress.current) {
+    // Check cache first
+    const cachedTranslation = onDemandTranslationCache.getTranslation(id, currentLanguage);
+    
+    if (cachedTranslation) {
+      setTranslatedText(cachedTranslation);
+      isNonLatin.current = containsNonLatinScript(cachedTranslation);
+      isDevanagari.current = containsDevanagari(cachedTranslation);
       return;
     }
     
-    const performTranslation = async () => {
+    // Translate without debouncing for immediate display
+    const translateText = async () => {
       try {
-        translationInProgress.current = true;
+        setIsTranslating(true);
+        const result = await translate(id);
+        setTranslatedText(result);
         
-        // For English, use original text immediately
-        if (currentLanguage === 'en') {
-          if (mounted.current) {
-            setTranslatedText(id);
-            setIsTranslationReady(true);
-            console.log(`[NodeLabel] Using English text: "${id}"`);
-          }
-          return;
-        }
+        // Cache the result
+        onDemandTranslationCache.setTranslation(id, result, currentLanguage);
         
-        // Check cache first
-        const cachedTranslation = onDemandTranslationCache.getTranslation(id, currentLanguage);
+        // Update script detection
+        isNonLatin.current = containsNonLatinScript(result);
+        isDevanagari.current = containsDevanagari(result);
         
-        if (cachedTranslation && mounted.current) {
-          setTranslatedText(cachedTranslation);
-          setIsTranslationReady(true);
-          console.log(`[NodeLabel] Using cached translation: "${id}" -> "${cachedTranslation}"`);
-          return;
-        }
-        
-        // Translate with validation
-        if (translate && mounted.current) {
-          console.log(`[NodeLabel] Starting translation for: "${id}" to ${currentLanguage}`);
-          
-          const result = await translate(id);
-          
-          if (mounted.current && result && typeof result === 'string') {
-            setTranslatedText(result);
-            setIsTranslationReady(true);
-            onDemandTranslationCache.setTranslation(id, result, currentLanguage);
-            console.log(`[NodeLabel] Translation complete: "${id}" -> "${result}"`);
-          } else if (mounted.current) {
-            // Fallback to original on invalid result
-            setTranslatedText(id);
-            setIsTranslationReady(true);
-            console.warn(`[NodeLabel] Invalid translation result, using original: "${id}"`);
-          }
-        }
+        console.log(`[NodeLabel] Translated "${id}" to "${result}"`);
       } catch (error) {
-        console.error(`[NodeLabel] Translation error for "${id}":`, error);
-        if (mounted.current) {
-          setTranslatedText(id);
-          setIsTranslationReady(true);
-        }
+        console.error(`[NodeLabel] Failed to translate "${id}":`, error);
       } finally {
-        translationInProgress.current = false;
+        setIsTranslating(false);
       }
     };
     
-    // Reset translation state
-    setIsTranslationReady(false);
-    
-    // Small delay to prevent race conditions
-    const translationTimer = setTimeout(() => {
-      performTranslation();
-    }, 50);
-    
-    return () => {
-      clearTimeout(translationTimer);
-    };
-  }, [id, isVisible, currentLanguage, translate, fontReady]);
+    translateText();
+  }, [id, isVisible, currentLanguage, translate]);
   
-  // Cleanup on unmount
+  // Clear translations when language changes
   useEffect(() => {
-    return () => {
-      mounted.current = false;
-    };
-  }, []);
+    if (prevLangRef.current !== currentLanguage) {
+      setTranslatedText(id);
+      prevLangRef.current = currentLanguage;
+    }
+  }, [currentLanguage, id]);
+  
+  // Format entity text for display - always apply for entity type
+  const formattedText = useMemo(() => {
+    if (type === 'entity') {
+      const textToFormat = translatedText || id;
+      return formatEntityText(textToFormat);
+    }
+    return translatedText || id;
+  }, [id, type, translatedText]);
 
-  // Enhanced dynamic font sizing
   const dynamicFontSize = useMemo(() => {
-    let z = cameraZoom !== undefined ? cameraZoom : 45;
-    if (typeof z !== 'number' || Number.isNaN(z)) z = 45;
+    let z = cameraZoom !== undefined ? cameraZoom : 26;
+    if (typeof z !== 'number' || Number.isNaN(z)) z = 26;
     
-    const baseSize = 0.35 + Math.max(0, (45 - z) * 0.007);
-    const minSize = 0.28;
-    const maxSize = 0.65;
+    // Significantly increased base size for better visibility
+    const baseSize = (0.5 + Math.max(0, (26 - z) * 0.015)) * 1.2;
     
-    return Math.max(Math.min(baseSize, maxSize), minSize);
+    // Adjust size for non-Latin scripts
+    const sizeAdjustment = isDevanagari.current ? 0.1 : 
+                          isNonLatin.current ? 0.06 : 0;
+    
+    // Ensure minimum readable size with higher minimum
+    return Math.max(Math.min(baseSize + sizeAdjustment, 0.8), 0.35);
   }, [cameraZoom]);
 
-  // Don't render until both font and translation are ready
-  const shouldRender = isVisible && isTranslationReady && fontReady && translatedText;
-  
-  if (!shouldRender) {
+  // Don't render if not visible or no text
+  if (!isVisible || !formattedText) {
+    console.log(`[NodeLabel] Not rendering: visible=${isVisible}, text="${formattedText}", id="${id}"`);
     return null;
   }
 
-  // Enhanced geometric positioning
-  const geometricOffset = useMemo(() => {
-    return calculateLabelOffset(type, nodeScale);
-  }, [type, nodeScale]);
+  // Enhanced vertical positioning - closer to nodes and more differentiated
+  const verticalOffset = type === 'entity' ? 2.2 : 2.0;
+  const labelPosition: [number, number, number] = [
+    position[0], // Use exact node X position
+    position[1] + verticalOffset, // Position above the node
+    position[2]  // Use exact node Z position
+  ];
 
-  // Enhanced adaptive text color
-  const textColor = useMemo(() => {
-    return getAdaptiveTextColor(nodeColor, type, theme, isHighlighted, isSelected);
-  }, [nodeColor, type, theme, isHighlighted, isSelected]);
+  // Enhanced text color logic with better contrast
+  const textColor = type === 'entity' 
+    ? (theme === 'light' ? '#1a1a1a' : '#ffffff')
+    : themeHex;
 
-  // Enhanced outline configuration
-  const outlineConfig = useMemo(() => {
-    const baseWidth = 0.03;
-    const width = isSelected ? baseWidth * 3 : 
-                  isHighlighted ? baseWidth * 2.2 : baseWidth * 1.8;
-    
-    const outlineColor = (isSelected || isHighlighted) 
-      ? (theme === 'light' ? '#000000' : '#ffffff')
-      : (theme === 'light' ? '#333333' : '#cccccc');
-    
-    return { width, color: outlineColor };
-  }, [isSelected, isHighlighted, theme]);
+  // Enhanced outline for better visibility
+  const outlineWidth = isHighlighted ? 0.012 : 0.008;
+  const outlineColor = theme === 'light' ? '#ffffff' : '#000000';
 
-  const labelPosition: [number, number, number] = [0, geometricOffset, 0];
-  
-  console.log(`[NodeLabel] Rendering stable label "${translatedText}" for ${id}, fontSize: ${dynamicFontSize}`);
+  console.log(`[NodeLabel] Rendering "${id}" (${type}) at labelPosition:`, labelPosition, 'nodePosition:', position, 'with text:', formattedText);
 
   return (
-    <ReliableText
-      text={translatedText}
-      position={labelPosition}
-      color={textColor}
-      size={dynamicFontSize}
-      visible={true}
-      renderOrder={15}
-      bold={isHighlighted || isSelected}
-      outlineWidth={outlineConfig.width}
-      outlineColor={outlineConfig.color}
-      maxWidth={25}
-    />
+    <group position={labelPosition}>
+      <ThreeDimensionalText
+        text={formattedText}
+        position={[0, 0, 0]} // Position relative to group
+        color={textColor}
+        size={dynamicFontSize}
+        bold={isHighlighted}
+        visible={true}
+        skipTranslation={true}
+        outlineWidth={outlineWidth}
+        outlineColor={outlineColor}
+        renderOrder={15} // Higher render order to ensure text appears on top
+      />
+    </group>
   );
 };
 

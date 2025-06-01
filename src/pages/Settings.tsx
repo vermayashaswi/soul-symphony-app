@@ -66,6 +66,7 @@ function SettingsContent() {
   
   const { theme, setTheme, colorTheme, setColorTheme, customColor, setCustomColor, systemTheme } = useTheme();
   const [notificationsEnabled, setNotificationsEnabled] = useState(false);
+  const [notificationFrequency, setNotificationFrequency] = useState<NotificationFrequency>('once');
   const [notificationTimes, setNotificationTimes] = useState<NotificationTime[]>(['evening']);
   const [showNotificationSettings, setShowNotificationSettings] = useState(false);
   const { user, signOut } = useAuth();
@@ -108,6 +109,12 @@ function SettingsContent() {
     { label: 'Afternoon (2:00 PM)', value: 'afternoon' },
     { label: 'Evening (7:00 PM)', value: 'evening' },
     { label: 'Night (10:00 PM)', value: 'night' },
+  ];
+
+  const frequencyOptions: { label: string; value: NotificationFrequency }[] = [
+    { label: 'Once a day', value: 'once' },
+    { label: 'Twice a day', value: 'twice' },
+    { label: 'Three times a day', value: 'thrice' },
   ];
 
   const { resetTutorial } = useTutorial();
@@ -218,10 +225,15 @@ function SettingsContent() {
 
   useEffect(() => {
     const enabled = localStorage.getItem('notification_enabled') === 'true';
+    const frequency = localStorage.getItem('notification_frequency') as NotificationFrequency;
     const times = localStorage.getItem('notification_times');
     
     if (enabled) {
       setNotificationsEnabled(true);
+    }
+    
+    if (frequency && ['once', 'twice', 'thrice'].includes(frequency)) {
+      setNotificationFrequency(frequency);
     }
     
     if (times) {
@@ -238,13 +250,13 @@ function SettingsContent() {
 
   useEffect(() => {
     if (notificationsEnabled) {
-      setupJournalReminder(true, 'once', notificationTimes);
+      setupJournalReminder(true, notificationFrequency, notificationTimes);
       if (typeof window !== 'undefined' && !('Notification' in window) || 
           (window.Notification && window.Notification.permission !== 'granted')) {
         initializeCapacitorNotifications();
       }
     }
-  }, [notificationsEnabled, notificationTimes]);
+  }, [notificationsEnabled, notificationFrequency, notificationTimes]);
 
   const handleContactSupport = () => {
     const subject = encodeURIComponent("Help me, I don't want to be SOuLO right now");
@@ -314,29 +326,17 @@ function SettingsContent() {
     setNameError(null);
   };
   
-  const handleToggleNotifications = async (checked: boolean) => {
+  const handleToggleNotifications = (checked: boolean) => {
     setNotificationsEnabled(checked);
     
     if (checked) {
-      // Request permission first
-      if ('Notification' in window) {
-        const permission = await Notification.requestPermission();
-        if (permission === 'granted') {
-          setShowNotificationSettings(true);
-          toast.success(<TranslatableText text="Notifications enabled! Set your preferences." forceTranslate={true} />);
-        } else {
-          setNotificationsEnabled(false);
-          toast.error(<TranslatableText text="Notification permission denied" forceTranslate={true} />);
-        }
-      } else {
-        // For mobile/capacitor
-        setShowNotificationSettings(true);
-        toast.success(<TranslatableText text="Customize your notification settings" forceTranslate={true} />);
-      }
+      setShowNotificationSettings(true);
+      toast.success(<TranslatableText text="Customize your notification settings" forceTranslate={true} />);
     } else {
       toast.info(<TranslatableText text="Notifications disabled" forceTranslate={true} />);
       if (typeof window !== 'undefined') {
         localStorage.removeItem('notification_enabled');
+        localStorage.removeItem('notification_frequency');
         localStorage.removeItem('notification_times');
       }
     }
@@ -357,41 +357,34 @@ function SettingsContent() {
       return;
     }
     
-    setupJournalReminder(true, 'once', notificationTimes);
-    toast.success(<TranslatableText text="Notification settings saved" forceTranslate={true} />);
-    setShowNotificationSettings(false);
-  };
-
-  const cancelNotificationSettings = () => {
-    // Reset to previous state
-    const enabled = localStorage.getItem('notification_enabled') === 'true';
-    const times = localStorage.getItem('notification_times');
+    let limitedTimes = [...notificationTimes];
+    const maxTimes = notificationFrequency === 'once' ? 1 : 
+                    notificationFrequency === 'twice' ? 2 : 3;
     
-    setNotificationsEnabled(enabled);
-    
-    if (times) {
-      try {
-        const parsedTimes = JSON.parse(times) as NotificationTime[];
-        if (Array.isArray(parsedTimes) && parsedTimes.length > 0) {
-          setNotificationTimes(parsedTimes);
-        }
-      } catch (e) {
-        setNotificationTimes(['evening']);
-      }
-    } else {
-      setNotificationTimes(['evening']);
+    if (limitedTimes.length > maxTimes) {
+      limitedTimes = limitedTimes.slice(0, maxTimes);
+      const message = `Limited to ${maxTimes} time${maxTimes > 1 ? 's' : ''} based on frequency`;
+      toast.info(<TranslatableText text={message} forceTranslate={true} />);
     }
     
+    setupJournalReminder(true, notificationFrequency, limitedTimes);
+    toast.success(<TranslatableText text="Notification settings saved" forceTranslate={true} />);
     setShowNotificationSettings(false);
   };
   
   const getNotificationSummary = () => {
     if (!notificationsEnabled) return <TranslatableText text="Disabled" />;
     
+    const frequencyText = {
+      'once': 'Once',
+      'twice': 'Twice',
+      'thrice': 'Three times'
+    }[notificationFrequency];
+    
     const timeLabels = notificationTimes.map(time => {
       return {
         'morning': 'Morning',
-        'afternoon': 'Afternoon', 
+        'afternoon': 'Afternoon',
         'evening': 'Evening',
         'night': 'Night'
       }[time];
@@ -399,6 +392,9 @@ function SettingsContent() {
     
     return (
       <div className="flex flex-wrap items-center gap-1">
+        <TranslatableText text={frequencyText} />
+        <TranslatableText text="daily" />
+        <span>: </span>
         <TranslatableText text={timeLabels} />
       </div>
     );
@@ -693,7 +689,7 @@ function SettingsContent() {
               <div className="space-y-3 divide-y">
                 <SettingItem
                   icon={Bell}
-                  title="Journal Reminders"
+                  title="Notifications"
                   description={
                     notificationsEnabled 
                       ? ""
@@ -1041,9 +1037,7 @@ function SettingsContent() {
         <Dialog
           open={showNotificationSettings}
           onOpenChange={(open) => {
-            if (!open) {
-              cancelNotificationSettings();
-            }
+            setShowNotificationSettings(open);
           }}
         >
           <DialogContent className="max-w-md">
@@ -1052,15 +1046,46 @@ function SettingsContent() {
                 <TranslatableText text="Notification Settings" />
               </DialogTitle>
               <DialogDescription>
-                <TranslatableText text="Choose when you want to receive journal reminders" />
+                <TranslatableText text="Customize when you want to receive journal reminders" />
               </DialogDescription>
             </DialogHeader>
             
             <div className="space-y-6 py-4">
               <div className="space-y-4">
                 <h3 className="font-medium text-sm">
-                  <TranslatableText text="Reminder Times" />
+                  <TranslatableText text="Frequency" />
                 </h3>
+                <RadioGroup 
+                  value={notificationFrequency} 
+                  onValueChange={(value) => setNotificationFrequency(value as NotificationFrequency)}
+                  className="flex flex-col space-y-2"
+                >
+                  {frequencyOptions.map(option => (
+                    <div key={option.value} className="flex items-center space-x-2">
+                      <RadioGroupItem value={option.value} id={`frequency-${option.value}`} />
+                      <Label htmlFor={`frequency-${option.value}`} className="cursor-pointer">
+                        <TranslatableText text={option.label} />
+                      </Label>
+                    </div>
+                  ))}
+                </RadioGroup>
+              </div>
+              
+              <div className="space-y-4">
+                <div className="flex justify-between items-center">
+                  <h3 className="font-medium text-sm">
+                    <TranslatableText text="Time of Day" />
+                  </h3>
+                  <p className="text-xs text-muted-foreground">
+                    {notificationFrequency === 'once' ? (
+                      <TranslatableText text="Select 1 time" />
+                    ) : notificationFrequency === 'twice' ? (
+                      <TranslatableText text="Select up to 2 times" />
+                    ) : (
+                      <TranslatableText text="Select up to 3 times" />
+                    )}
+                  </p>
+                </div>
                 
                 <div className="grid grid-cols-2 gap-3">
                   {timeOptions.map(option => (
@@ -1094,7 +1119,7 @@ function SettingsContent() {
             <div className="flex justify-end gap-3">
               <Button 
                 variant="outline" 
-                onClick={cancelNotificationSettings}
+                onClick={() => setShowNotificationSettings(false)}
               >
                 <TranslatableText text="Cancel" />
               </Button>
@@ -1102,7 +1127,7 @@ function SettingsContent() {
                 onClick={applyNotificationSettings}
                 disabled={notificationTimes.length === 0}
               >
-                <TranslatableText text="Save Settings" />
+                <TranslatableText text="Apply Settings" />
               </Button>
             </div>
           </DialogContent>

@@ -1,3 +1,4 @@
+
 import React, { useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useTutorial } from '@/contexts/TutorialContext';
@@ -198,10 +199,9 @@ const TutorialOverlay: React.FC = () => {
         console.log('[TutorialOverlay] Step 2: ButtonStateManager will handle arrow button highlighting');
       }
       else if (currentStepData?.id === 3) {
-        // Step 3: Record Entry Tab - Enhanced highlighting WITH glow effect
-        console.log('[TutorialOverlay] Step 3: Applying enhanced highlighting to Record Entry button');
+        // Step 3: Record Entry Tab - ONLY highlight this, never the Past Entries
+        console.log('[TutorialOverlay] Step 3: Applying highlighting ONLY to Record Entry button');
         
-        // Clean up any Past Entries highlighting first
         ENTRIES_TAB_SELECTORS.forEach(selector => {
           try {
             const elements = document.querySelectorAll(selector);
@@ -220,15 +220,25 @@ const TutorialOverlay: React.FC = () => {
         for (const selector of RECORD_ENTRY_SELECTORS) {
           const element = document.querySelector(selector);
           if (element) {
-            // Double-check this is the Record Entry button
+            // Double-check this is NOT the Past Entries button
             const elementText = element.textContent?.toLowerCase().trim();
             const isRecordEntry = elementText?.includes('record') || elementText?.includes('new') || elementText?.includes('entry');
             const isPastEntries = elementText?.includes('past') || elementText?.includes('entries') || elementText?.includes('history');
             
             if (isRecordEntry && !isPastEntries) {
-              element.classList.add('tutorial-target', 'record-entry-tab');
+              element.classList.add('tutorial-target', 'record-entry-tab', 'tutorial-button-highlight');
+              
+              // Apply enhanced styling
+              if (element instanceof HTMLElement) {
+                element.style.boxShadow = "0 0 35px 20px var(--color-theme)";
+                element.style.animation = "button-pulse 1.5s infinite alternate";
+                element.style.border = "2px solid white";
+                element.style.transform = "scale(1.05)";
+                element.style.zIndex = "10000";
+              }
+              
               foundElement = true;
-              console.log(`[TutorialOverlay] Applied enhanced highlighting to Record Entry button using selector: ${selector}, text: "${elementText}"`);
+              console.log(`[TutorialOverlay] Applied highlighting to Record Entry button using selector: ${selector}, text: "${elementText}"`);
               break;
             }
           }
@@ -239,10 +249,9 @@ const TutorialOverlay: React.FC = () => {
         }
       }
       else if (currentStepData?.id === 4) {
-        // Step 4: Past Entries Tab - Minimal styling WITHOUT glow effect
-        console.log('[TutorialOverlay] Step 4: Applying minimal highlighting to Past Entries button (no glow)');
+        // Step 4: Past Entries Tab - Enhanced with identical styling as record entry
+        console.log('[TutorialOverlay] Step 4: Applying highlighting ONLY to Past Entries button');
         
-        // Clean up any Record Entry highlighting first
         RECORD_ENTRY_SELECTORS.forEach(selector => {
           try {
             const elements = document.querySelectorAll(selector);
@@ -261,15 +270,49 @@ const TutorialOverlay: React.FC = () => {
         for (const selector of ENTRIES_TAB_SELECTORS) {
           const element = document.querySelector(selector);
           if (element) {
-            // Double-check this is the Past Entries button
+            // Double-check this is the Past Entries button and NOT Record Entry
             const elementText = element.textContent?.toLowerCase().trim();
             const isPastEntries = elementText?.includes('past') || elementText?.includes('entries') || elementText?.includes('history') || selector.includes('entries');
             const isRecordEntry = elementText?.includes('record') || elementText?.includes('new');
             
             if (isPastEntries && !isRecordEntry) {
-              element.classList.add('tutorial-target', 'entries-tab');
+              element.classList.add('tutorial-target', 'entries-tab', 'tutorial-button-highlight');
+              
+              // Apply identical styling to record entry button
+              if (element instanceof HTMLElement) {
+                element.style.boxShadow = "0 0 35px 20px var(--color-theme)";
+                element.style.animation = "button-pulse 1.5s infinite alternate";
+                element.style.border = "2px solid white";
+                element.style.transform = "scale(1.05)";
+                element.style.zIndex = "10000";
+                
+                // Make sure it's fully visible with high opacity
+                element.style.opacity = "1";
+                element.style.visibility = "visible";
+                element.style.position = "relative";
+                
+                // Explicit white background
+                element.style.backgroundColor = "white";
+                
+                // Fix text color for light mode
+                const isDarkMode = document.body.classList.contains('dark');
+                if (!isDarkMode) {
+                  element.style.color = "#000";
+                  
+                  // Also apply to child elements
+                  const textElements = element.querySelectorAll('span, div');
+                  textElements.forEach(textEl => {
+                    if (textEl instanceof HTMLElement) {
+                      textEl.style.color = "#000";
+                      textEl.style.textShadow = "none";
+                      textEl.style.backgroundColor = "white";
+                    }
+                  });
+                }
+              }
+              
               foundElement = true;
-              console.log(`[TutorialOverlay] Applied minimal highlighting to Past Entries button using selector: ${selector}, text: "${elementText}"`);
+              console.log(`[TutorialOverlay] Applied highlighting to Past Entries button using selector: ${selector}, text: "${elementText}"`);
               break;
             }
           }

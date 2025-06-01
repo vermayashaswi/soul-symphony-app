@@ -62,7 +62,6 @@ declare module '@react-three/fiber' {
 
   export function useFrame(callback: (state: RootState, delta: number) => void, priority?: number): void;
   export function useThree(): RootState;
-  export function useLoader<T>(loader: new () => any, url: string | string[], onProgress?: (event: ProgressEvent) => void): T;
 }
 
 declare module '@react-three/drei' {

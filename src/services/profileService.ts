@@ -313,7 +313,7 @@ export const startUserTrial = async (userId: string): Promise<boolean> => {
       .from('profiles')
       .update({
         subscription_status: 'trial',
-        subscription_tier: 'premium', // Set to premium during trial
+        subscription_tier: 'premium', // Fixed: Set to premium during trial
         is_premium: true,
         trial_ends_at: trialEndDate.toISOString(),
         updated_at: new Date().toISOString()

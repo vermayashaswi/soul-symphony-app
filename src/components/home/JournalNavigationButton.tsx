@@ -1,3 +1,4 @@
+
 import React, { useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
 import { ArrowRight } from 'lucide-react';
@@ -119,7 +120,7 @@ const JournalNavigationButton: React.FC = () => {
         ref={buttonRef}
       >
         <motion.div
-          className="rounded-full bg-primary/30 blur-md z-0"
+          className="absolute inset-0 rounded-full bg-primary/30 blur-md z-0"
           initial={{ scale: 1, opacity: 0.5 }}
           animate={{
             scale: isInArrowTutorialStep ? [1, 1.4, 1] : [1, 1.15, 1],
@@ -131,12 +132,10 @@ const JournalNavigationButton: React.FC = () => {
             ease: "easeInOut"
           }}
           style={{
-            position: 'absolute',
-            top: '50%',
-            left: '50%',
-            transform: 'translate(-50%, -50%)',
             width: "calc(100% + 20px)",
             height: "calc(100% + 20px)",
+            top: "-10px",
+            left: "-10px",
           }}
         />
         <motion.button

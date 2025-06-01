@@ -4,7 +4,7 @@ import { useAuth } from './AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { subscriptionErrorHandler } from '@/services/subscriptionErrorHandler';
 
-export type SubscriptionTier = 'free' | 'premium';
+export type SubscriptionTier = 'free' | 'premium' | 'premium_plus';
 export type SubscriptionStatus = 'active' | 'canceled' | 'expired' | 'trial' | 'free' | 'unknown';
 
 export interface SubscriptionContextType {
@@ -14,6 +14,7 @@ export interface SubscriptionContextType {
   error: string | null;
   refreshSubscription: () => Promise<void>;
   isPremium: boolean;
+  isPremiumPlus: boolean;
   hasActiveSubscription: boolean;
   
   // Additional properties for trial and subscription management
@@ -62,7 +63,7 @@ export const SubscriptionProvider: React.FC<{ children: ReactNode }> = ({ childr
         console.warn('[SubscriptionContext] Cleanup function error:', cleanupError);
       }
       
-      // Use the comprehensive subscription status function
+      // Use the new comprehensive subscription status function
       const { data: statusData, error: statusError } = await supabase
         .rpc('get_user_subscription_status', {
           user_id_param: user.id
@@ -75,8 +76,7 @@ export const SubscriptionProvider: React.FC<{ children: ReactNode }> = ({ childr
       if (statusData && statusData.length > 0) {
         const subscriptionData = statusData[0];
         
-        // Map subscription tier - ensure only 'free' or 'premium'
-        const userTier = (subscriptionData.current_tier === 'premium') ? 'premium' : 'free';
+        const userTier = (subscriptionData.current_tier as SubscriptionTier) || 'free';
         const userStatus = (subscriptionData.current_status as SubscriptionStatus) || 'free';
         const userTrialEndDate = subscriptionData.trial_end_date ? new Date(subscriptionData.trial_end_date) : null;
         const userIsTrialActive = subscriptionData.is_trial_active || false;
@@ -105,8 +105,7 @@ export const SubscriptionProvider: React.FC<{ children: ReactNode }> = ({ childr
         }
 
         if (profileData) {
-          // Map subscription tier - ensure only 'free' or 'premium'
-          const userTier = (profileData.subscription_tier === 'premium') ? 'premium' : 'free';
+          const userTier = (profileData.subscription_tier as SubscriptionTier) || 'free';
           const userStatus = (profileData.subscription_status as SubscriptionStatus) || 'free';
           const userTrialEndDate = profileData.trial_ends_at ? new Date(profileData.trial_ends_at) : null;
           
@@ -182,7 +181,8 @@ export const SubscriptionProvider: React.FC<{ children: ReactNode }> = ({ childr
   }, [user]);
 
   // Computed properties with proper trial logic
-  const isPremium = tier === 'premium';
+  const isPremium = tier === 'premium' || tier === 'premium_plus';
+  const isPremiumPlus = tier === 'premium_plus';
   
   // Check if trial is actually active (not expired) - more robust check
   const isTrialActive = status === 'trial' && trialEndDate && trialEndDate > new Date();
@@ -201,6 +201,7 @@ export const SubscriptionProvider: React.FC<{ children: ReactNode }> = ({ childr
     error,
     refreshSubscription,
     isPremium,
+    isPremiumPlus,
     hasActiveSubscription,
     
     // Additional properties

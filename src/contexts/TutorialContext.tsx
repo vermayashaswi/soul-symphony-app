@@ -59,7 +59,7 @@ const TutorialContext = createContext<TutorialContextType | undefined>(undefined
 const initialTutorialSteps: TutorialStep[] = [
   {
     id: 1,
-    title: 'Welcome to SOuLO',
+    title: 'Welcome to Soul Symphony',
     content: 'Let\'s take a quick tour to help you get started with your journaling journey.',
     targetElement: '.journal-header-container', // Target the journal header
     position: 'center',
@@ -80,7 +80,7 @@ const initialTutorialSteps: TutorialStep[] = [
   {
     id: 3,
     title: 'Multilingual Recording',
-    content: 'Speak in any language you feel comfortable with. Our AI understands and transcribes your entries, no matter which language you speak!',
+    content: 'The New Entry button lets you speak in any language. Our AI understands and transcribes your entries, no matter which language you speak!',
     targetElement: '.tutorial-record-entry-button',
     alternativeSelectors: RECORD_ENTRY_SELECTORS,
     position: 'bottom',
@@ -113,11 +113,11 @@ const initialTutorialSteps: TutorialStep[] = [
     navigateTo: '/app/chat',
     waitForElement: true
   },
-  // Enhanced steps 6-9 with refined content and custom infographics
+  // Enhanced steps 6-9 with custom infographics
   {
     id: 6,
     title: 'Your Emotional Insights',
-    content: 'Here you\'ll find visual representations of your emotional journey and patterns over time.',
+    content: 'Welcome to the Insights page! Here you\'ll find visual representations of your emotional journey and patterns over time.',
     targetElement: '.insights-container h1',
     alternativeSelectors: INSIGHTS_HEADER_SELECTORS,
     position: 'bottom',
@@ -130,7 +130,7 @@ const initialTutorialSteps: TutorialStep[] = [
   {
     id: 7,
     title: 'Emotion Trends',
-    content: 'See which emotions appear most frequently in your journal and how they change over time.',
+    content: 'This chart shows how your emotions trend over time. See which emotions appear most frequently in your journal and how they change.',
     targetElement: '.recharts-responsive-container',
     alternativeSelectors: EMOTION_CHART_SELECTORS,
     position: 'top',
@@ -143,7 +143,7 @@ const initialTutorialSteps: TutorialStep[] = [
   {
     id: 8,
     title: 'Mood Calendar',
-    content: 'Visualize your daily sentiment changes and spot patterns in how your mood fluctuates throughout weeks and months.',
+    content: 'The Mood Calendar visualizes your daily sentiment changes. Spot patterns in how your mood fluctuates throughout weeks and months.',
     targetElement: '[class*="MoodCalendar"]',
     alternativeSelectors: MOOD_CALENDAR_SELECTORS,
     position: 'top',
@@ -156,7 +156,7 @@ const initialTutorialSteps: TutorialStep[] = [
   {
     id: 9,
     title: 'Soul-Net Visualization',
-    content: 'Explore neural connections between life areas and emotions to see how different aspects of your life influence your emotional state.',
+    content: 'This neural visualization shows connections between life areas and emotions. Explore how different aspects of your life influence your emotional state.',
     targetElement: 'canvas',
     alternativeSelectors: SOULNET_SELECTORS,
     position: 'top',

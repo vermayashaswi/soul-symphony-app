@@ -3,7 +3,6 @@ import React, { useRef, useMemo } from 'react';
 import * as THREE from 'three';
 import '@/types/three-reference';  // Fixed import path
 import { useFrame } from '@react-three/fiber';
-import { useTheme } from '@/hooks/use-theme';
 
 interface EdgeProps {
   start: [number, number, number];
@@ -12,27 +11,7 @@ interface EdgeProps {
   isHighlighted: boolean;
   dimmed: boolean;
   maxThickness?: number;
-  startNodeType?: 'entity' | 'emotion';
-  endNodeType?: 'entity' | 'emotion';
-  startNodeScale?: number;
-  endNodeScale?: number;
 }
-
-// Calculate surface connection point for different node types
-const calculateSurfacePoint = (
-  center: THREE.Vector3, 
-  direction: THREE.Vector3, 
-  nodeType: 'entity' | 'emotion', 
-  scale: number = 1
-): THREE.Vector3 => {
-  // Base radius for different node types
-  const baseRadius = nodeType === 'entity' ? 0.7 : 0.55;
-  const actualRadius = baseRadius * scale;
-  
-  // Normalize direction and scale by radius
-  const normalizedDirection = direction.clone().normalize();
-  return center.clone().add(normalizedDirection.multiplyScalar(actualRadius));
-};
 
 export const Edge: React.FC<EdgeProps> = ({ 
   start, 
@@ -40,13 +19,8 @@ export const Edge: React.FC<EdgeProps> = ({
   value, 
   isHighlighted, 
   dimmed,
-  maxThickness = 5,
-  startNodeType = 'entity',
-  endNodeType = 'emotion',
-  startNodeScale = 1,
-  endNodeScale = 1
+  maxThickness = 5
 }) => {
-  const { theme } = useTheme();
   const ref = useRef<THREE.Group>(null);
   // Change the ref type to match what react-three-fiber expects
   const lineRef = useRef<THREE.Mesh>(null);
@@ -55,24 +29,13 @@ export const Edge: React.FC<EdgeProps> = ({
     try {
       const startVec = new THREE.Vector3(...start);
       const endVec = new THREE.Vector3(...end);
-      
-      // Calculate direction vectors for surface connection
-      const startToEnd = endVec.clone().sub(startVec);
-      const endToStart = startVec.clone().sub(endVec);
-      
-      // Get surface connection points instead of center points
-      const startSurface = calculateSurfacePoint(startVec, startToEnd, startNodeType, startNodeScale);
-      const endSurface = calculateSurfacePoint(endVec, endToStart, endNodeType, endNodeScale);
-      
-      // Create control point for smooth curve
-      const midPoint = startSurface.clone().add(endSurface).multiplyScalar(0.5);
+      const midPoint = startVec.clone().add(endVec).multiplyScalar(0.5);
       const midOffset = 0.5;
       midPoint.y += midOffset;
-      
       const curve = new THREE.QuadraticBezierCurve3(
-        startSurface,
+        startVec,
         midPoint,
-        endSurface
+        endVec
       );
       return curve.getPoints(30);
     } catch (error) {
@@ -82,7 +45,7 @@ export const Edge: React.FC<EdgeProps> = ({
         new THREE.Vector3(0, 0.1, 0)
       ];
     }
-  }, [start, end, startNodeType, endNodeType, startNodeScale, endNodeScale]);
+  }, [start, end]);
 
   // Create line geometry once
   const lineGeometry = useMemo(() => {
@@ -90,40 +53,18 @@ export const Edge: React.FC<EdgeProps> = ({
     return geometry;
   }, [points]);
 
-  // Improved color scheme based on theme
-  const getEdgeColor = useMemo(() => {
-    if (isHighlighted) {
-      return '#ffffff';
-    }
-    
-    if (dimmed) {
-      return theme === 'light' ? '#666666' : '#444444';
-    }
-    
-    // Better visibility for non-highlighted edges in light theme
-    return theme === 'light' ? '#555555' : '#888888';
-  }, [isHighlighted, dimmed, theme]);
-
-  const getEdgeOpacity = useMemo(() => {
-    if (isHighlighted) {
-      return 0.9;
-    }
-    
-    if (dimmed) {
-      return theme === 'light' ? 0.15 : 0.03;
-    }
-    
-    // Better visibility for non-highlighted edges
-    return theme === 'light' ? 0.25 : 0.08;
-  }, [isHighlighted, dimmed, theme]);
-
   useFrame(() => {
     try {
       if (!lineRef.current || !lineRef.current.material) return;
       
       if (lineRef.current.material instanceof THREE.LineBasicMaterial) {
-        lineRef.current.material.opacity = getEdgeOpacity;
-        lineRef.current.material.color.set(getEdgeColor);
+        if (isHighlighted) {
+          lineRef.current.material.opacity = 0.9;
+          lineRef.current.material.color.set('#ffffff');
+        } else {
+          lineRef.current.material.opacity = dimmed ? 0.03 : 0.08;
+          lineRef.current.material.color.set(dimmed ? '#444' : "#888");
+        }
       }
     } catch (error) {
       console.error("Error in Edge useFrame:", error);
@@ -137,21 +78,18 @@ export const Edge: React.FC<EdgeProps> = ({
   // Create material with appropriate properties
   const material = useMemo(() => {
     return new THREE.LineBasicMaterial({
-      color: getEdgeColor,
+      color: isHighlighted ? "#ffffff" : (dimmed ? '#444' : "#888"),
       transparent: true,
-      opacity: getEdgeOpacity,
+      opacity: isHighlighted ? 0.9 : (dimmed ? 0.03 : 0.08),
       linewidth: thickness,
-      depthWrite: false, // Prevent z-fighting
-      depthTest: true,   // Maintain proper depth testing
     });
-  }, [getEdgeColor, getEdgeOpacity, thickness]);
+  }, [isHighlighted, dimmed, thickness]);
 
   return (
     <group ref={ref}>
       <primitive 
         object={new THREE.Line(lineGeometry, material)} 
         ref={lineRef}
-        renderOrder={10} // Render edges before nodes
       />
     </group>
   );
