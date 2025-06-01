@@ -15,6 +15,7 @@ import { cn } from '@/lib/utils';
 import { TranslatableText } from '@/components/translation/TranslatableText';
 import { useTranslation } from '@/contexts/TranslationContext';
 import { onDemandTranslationCache } from '@/utils/website-translations';
+import { threejsFontService } from '@/services/threejsFontService';
 
 interface NodeData {
   id: string;
@@ -58,6 +59,12 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
 
   useEffect(() => {
     console.log("[SoulNet] Component mounted with enhanced script support");
+    
+    // Preload fonts for better performance
+    threejsFontService.preloadFonts(['Inter', 'Helvetiker']).catch(error => {
+      console.warn('[SoulNet] Font preloading failed:', error);
+    });
+    
     return () => {
       console.log("[SoulNet] Component unmounted");
     };

@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import ReliableText from './ReliableText';
 import { useTranslation } from '@/contexts/TranslationContext';
-import { simpleFontService } from '@/utils/simpleFontService';
+import { threejsFontService } from '@/services/threejsFontService';
 
 interface DirectNodeLabelProps {
   id: string;
@@ -37,12 +37,11 @@ export const DirectNodeLabel: React.FC<DirectNodeLabelProps> = ({
   useEffect(() => {
     const init = async () => {
       try {
-        // Ensure font service is ready for script detection
-        if (simpleFontService.isReady()) {
+        // Ensure font service is ready
+        if (threejsFontService.isReady()) {
           setIsReady(true);
         } else {
-          simpleFontService.waitForFonts().then(() => setIsReady(true));
-          // Fallback timeout
+          // Wait a bit for font service initialization
           setTimeout(() => setIsReady(true), 100);
         }
       } catch (error) {
@@ -54,7 +53,7 @@ export const DirectNodeLabel: React.FC<DirectNodeLabelProps> = ({
     init();
   }, []);
 
-  // Handle translation with script detection
+  // Handle translation with enhanced script support
   useEffect(() => {
     if (!isReady || !shouldShowLabel) return;
 
@@ -70,9 +69,9 @@ export const DirectNodeLabel: React.FC<DirectNodeLabelProps> = ({
           setDisplayText(translated);
           
           // Log script detection for debugging
-          const scriptType = simpleFontService.detectScriptType(translated);
-          const fontFamily = simpleFontService.getFontFamily(scriptType);
-          console.log(`[DirectNodeLabel] Translation: "${id}" -> "${translated}", Script: ${scriptType}, Font: ${fontFamily}`);
+          const scriptType = threejsFontService.detectScriptType(translated);
+          const fontName = threejsFontService.getFontNameForText(translated);
+          console.log(`[DirectNodeLabel] Translation: "${id}" -> "${translated}", Script: ${scriptType}, Font: ${fontName}`);
         } else {
           setDisplayText(id);
         }

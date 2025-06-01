@@ -1,12 +1,12 @@
 
-import React, { useState, useEffect, useRef, Suspense } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { Text } from '@react-three/drei';
-import { useFrame } from '@react-three/fiber';
+import { useFrame, useLoader } from '@react-three/fiber';
+import { FontLoader } from 'three/examples/jsm/loaders/FontLoader.js';
 import * as THREE from 'three';
 import { threejsFontService } from '@/services/threejsFontService';
-import EnhancedText from './EnhancedText';
 
-interface ReliableTextProps {
+interface EnhancedTextProps {
   text: string;
   position: [number, number, number];
   color?: string;
@@ -19,7 +19,7 @@ interface ReliableTextProps {
   maxWidth?: number;
 }
 
-export const ReliableText: React.FC<ReliableTextProps> = ({
+export const EnhancedText: React.FC<EnhancedTextProps> = ({
   text,
   position,
   color = '#ffffff',
@@ -33,14 +33,15 @@ export const ReliableText: React.FC<ReliableTextProps> = ({
 }) => {
   const [isReady, setIsReady] = useState(false);
   const [displayText, setDisplayText] = useState('');
-  const [useEnhanced, setUseEnhanced] = useState(false);
+  const [fontUrl, setFontUrl] = useState('');
   const [hasError, setHasError] = useState(false);
   const textRef = useRef<THREE.Mesh>(null);
 
-  // Initialize with clean text and script detection
+  // Initialize text and determine font URL
   useEffect(() => {
     if (!text || typeof text !== 'string') {
       setDisplayText('Node');
+      setFontUrl(threejsFontService.getFontUrl('Inter'));
     } else {
       const cleanText = text.trim();
       const limitedText = cleanText.length > 50 ? cleanText.substring(0, 50) + '...' : cleanText;
@@ -48,19 +49,26 @@ export const ReliableText: React.FC<ReliableTextProps> = ({
       
       setDisplayText(finalText);
       
-      // Determine if we need enhanced font loading
-      const scriptType = threejsFontService.detectScriptType(finalText);
-      const needsEnhanced = scriptType !== 'latin';
-      setUseEnhanced(needsEnhanced);
+      // Get appropriate font URL for the text
+      const dynamicFontUrl = threejsFontService.getFontUrlForText(finalText);
+      setFontUrl(dynamicFontUrl);
       
-      console.log(`[ReliableText] Text: "${finalText}", Script: ${scriptType}, Enhanced: ${needsEnhanced}`);
+      const scriptType = threejsFontService.detectScriptType(finalText);
+      const fontName = threejsFontService.getFontNameForText(finalText);
+      
+      console.log(`[EnhancedText] Text: "${finalText}", Script: ${scriptType}, Font: ${fontName}, URL: ${dynamicFontUrl}`);
     }
     setIsReady(true);
   }, [text]);
 
-  // Billboard effect for fallback text
+  // Load font using useLoader hook
+  const font = useLoader(FontLoader, fontUrl, (loader) => {
+    console.log(`[EnhancedText] Loading font from: ${fontUrl}`);
+  });
+
+  // Billboard effect
   useFrame(({ camera }) => {
-    if (textRef.current && visible && isReady && !useEnhanced) {
+    if (textRef.current && visible && isReady && font) {
       try {
         textRef.current.quaternion.copy(camera.quaternion);
         if (textRef.current.material) {
@@ -68,42 +76,23 @@ export const ReliableText: React.FC<ReliableTextProps> = ({
           textRef.current.renderOrder = renderOrder;
         }
       } catch (error) {
-        console.warn('[ReliableText] Billboard error:', error);
+        console.warn('[EnhancedText] Billboard error:', error);
       }
     }
   });
 
+  // Handle font loading errors
   const handleError = (error: any) => {
-    console.error('[ReliableText] Render error, falling back:', error);
+    console.error('[EnhancedText] Render error:', error);
     setHasError(true);
-    setUseEnhanced(false);
   };
 
-  if (!visible || !isReady || !displayText) {
+  if (!visible || !isReady || !font || hasError) {
     return null;
   }
 
-  // Use enhanced text for non-Latin scripts or if specifically needed
-  if (useEnhanced && !hasError) {
-    return (
-      <Suspense fallback={null}>
-        <EnhancedText
-          text={displayText}
-          position={position}
-          color={color}
-          size={size}
-          visible={true}
-          renderOrder={renderOrder}
-          bold={bold}
-          outlineWidth={outlineWidth}
-          outlineColor={outlineColor}
-          maxWidth={maxWidth}
-        />
-      </Suspense>
-    );
-  }
+  console.log(`[EnhancedText] Rendering text: "${displayText}" with font at position`, position);
 
-  // Fallback to basic text for Latin scripts
   return (
     <Text
       ref={textRef}
@@ -114,7 +103,7 @@ export const ReliableText: React.FC<ReliableTextProps> = ({
       anchorY="middle"
       maxWidth={maxWidth}
       textAlign="center"
-      font="Inter, system-ui, sans-serif"
+      font={font}
       fontWeight={bold ? "bold" : "normal"}
       material-transparent={true}
       material-depthTest={false}
@@ -128,4 +117,4 @@ export const ReliableText: React.FC<ReliableTextProps> = ({
   );
 };
 
-export default ReliableText;
+export default EnhancedText;
