@@ -27,7 +27,7 @@ class ThreeJSFontService {
       },
       {
         name: 'Noto Sans Devanagari',
-        url: 'https://threejs.org/examples/fonts/gentilis_regular.typeface.json' // Use Gentilis as fallback
+        url: 'https://cdn.jsdelivr.net/gh/mrdoob/three.js@dev/examples/fonts/noto_sans_devanagari_regular.typeface.json'
       },
       {
         name: 'Helvetiker',
@@ -53,6 +53,7 @@ class ThreeJSFontService {
   detectScriptType(text: string): string {
     if (!text) return 'latin';
     
+    // Enhanced script detection with proper Unicode ranges
     if (/[\u0900-\u097F]/.test(text)) return 'devanagari';
     if (/[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\uFB50-\uFDFF\uFE70-\uFEFF]/.test(text)) return 'arabic';
     if (/[\u4E00-\u9FFF\u3400-\u4DBF]/.test(text)) return 'chinese';
@@ -65,26 +66,28 @@ class ThreeJSFontService {
   getFontNameForScript(scriptType: string): string {
     switch (scriptType) {
       case 'devanagari':
-        return 'Gentilis'; // Use Gentilis for better Unicode support
+        return 'Noto Sans Devanagari'; // Use proper Devanagari font
       case 'arabic':
       case 'chinese':
       case 'japanese':
       case 'korean':
-        return 'Optimer'; // Use Optimer for other scripts
+        return 'Optimer'; // Use Optimer for other scripts (fallback)
       default:
-        return 'Helvetiker';
+        return 'Helvetiker'; // Default Latin font
     }
   }
 
   getFontNameForText(text: string): string {
     const scriptType = this.detectScriptType(text);
-    return this.getFontNameForScript(scriptType);
+    const fontName = this.getFontNameForScript(scriptType);
+    console.log(`[ThreeJSFontService] Text: "${text}" -> Script: ${scriptType} -> Font: ${fontName}`);
+    return fontName;
   }
 
   async loadFont(fontName: string): Promise<Font | null> {
     const fontInfo = this.fonts.get(fontName);
     if (!fontInfo) {
-      console.warn(`[ThreeJSFontService] Font not found: ${fontName}`);
+      console.warn(`[ThreeJSFontService] Font not found: ${fontName}, using fallback`);
       return this.getFallbackFont();
     }
 
@@ -115,7 +118,7 @@ class ThreeJSFontService {
     } catch (error) {
       fontInfo.error = error instanceof Error ? error : new Error('Unknown font loading error');
       delete fontInfo.loading;
-      console.error(`[ThreeJSFontService] Font loading failed: ${fontName}`, error);
+      console.error(`[ThreeJSFontService] Font loading failed: ${fontName}, using fallback`, error);
       return this.getFallbackFont();
     }
   }
@@ -127,9 +130,17 @@ class ThreeJSFontService {
         const loader = new FontLoader();
         loader.load(
           url,
-          (font) => resolve(font),
-          undefined,
-          (error) => reject(error)
+          (font) => {
+            console.log(`[ThreeJSFontService] Successfully loaded font from: ${url}`);
+            resolve(font);
+          },
+          (progress) => {
+            console.log(`[ThreeJSFontService] Loading progress for ${url}:`, progress);
+          },
+          (error) => {
+            console.error(`[ThreeJSFontService] Failed to load font from ${url}:`, error);
+            reject(error);
+          }
         );
       }).catch(reject);
     });
@@ -145,7 +156,7 @@ class ThreeJSFontService {
       this.fallbackFont = await this.loadFontFromUrl(
         'https://threejs.org/examples/fonts/helvetiker_regular.typeface.json'
       );
-      console.log('[ThreeJSFontService] Fallback font loaded');
+      console.log('[ThreeJSFontService] Fallback font (Helvetiker) loaded');
       return this.fallbackFont;
     } catch (error) {
       console.error('[ThreeJSFontService] Fallback font loading failed:', error);
@@ -158,10 +169,20 @@ class ThreeJSFontService {
     return this.loadFont(fontName);
   }
 
-  // Preload commonly used fonts
-  async preloadFonts(fontNames: string[] = ['Helvetiker', 'Gentilis', 'Optimer']): Promise<void> {
+  // Preload commonly used fonts including Devanagari
+  async preloadFonts(fontNames: string[] = ['Helvetiker', 'Noto Sans Devanagari', 'Optimer']): Promise<void> {
+    console.log('[ThreeJSFontService] Starting font preloading:', fontNames);
     const loadPromises = fontNames.map(name => this.loadFont(name));
-    await Promise.allSettled(loadPromises);
+    const results = await Promise.allSettled(loadPromises);
+    
+    results.forEach((result, index) => {
+      if (result.status === 'rejected') {
+        console.warn(`[ThreeJSFontService] Failed to preload font: ${fontNames[index]}`, result.reason);
+      } else {
+        console.log(`[ThreeJSFontService] Successfully preloaded font: ${fontNames[index]}`);
+      }
+    });
+    
     console.log('[ThreeJSFontService] Font preloading completed');
   }
 
@@ -172,12 +193,34 @@ class ThreeJSFontService {
   // Get font URL for useLoader hook
   getFontUrl(fontName: string): string {
     const fontInfo = this.fonts.get(fontName);
-    return fontInfo?.url || 'https://threejs.org/examples/fonts/helvetiker_regular.typeface.json';
+    const url = fontInfo?.url || 'https://threejs.org/examples/fonts/helvetiker_regular.typeface.json';
+    console.log(`[ThreeJSFontService] Getting URL for font ${fontName}: ${url}`);
+    return url;
   }
 
   getFontUrlForText(text: string): string {
     const fontName = this.getFontNameForText(text);
     return this.getFontUrl(fontName);
+  }
+
+  // Test method to verify Devanagari detection and font mapping
+  testDevanagariSupport(text: string): { 
+    scriptType: string; 
+    fontName: string; 
+    fontUrl: string;
+    hasDevanagari: boolean;
+  } {
+    const scriptType = this.detectScriptType(text);
+    const fontName = this.getFontNameForText(text);
+    const fontUrl = this.getFontUrlForText(text);
+    const hasDevanagari = /[\u0900-\u097F]/.test(text);
+    
+    return {
+      scriptType,
+      fontName,
+      fontUrl,
+      hasDevanagari
+    };
   }
 }
 

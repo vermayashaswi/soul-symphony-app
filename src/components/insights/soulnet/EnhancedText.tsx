@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+
+import React, { useState, useEffect, useRef } from 'react';
 import { Text } from '@react-three/drei';
 import { useFrame, useLoader } from '@react-three/fiber';
 import { FontLoader } from 'three/examples/jsm/loaders/FontLoader.js';
@@ -34,13 +35,14 @@ export const EnhancedText: React.FC<EnhancedTextProps> = ({
   const [displayText, setDisplayText] = useState('');
   const [fontUrl, setFontUrl] = useState('');
   const [hasError, setHasError] = useState(false);
+  const [fontInfo, setFontInfo] = useState<any>(null);
   const textRef = useRef<THREE.Mesh>(null);
 
-  // Initialize text and determine font URL
+  // Initialize text and determine font URL with enhanced logging
   useEffect(() => {
     if (!text || typeof text !== 'string') {
       setDisplayText('Node');
-      setFontUrl(threejsFontService.getFontUrl('Inter'));
+      setFontUrl(threejsFontService.getFontUrl('Helvetiker'));
     } else {
       const cleanText = text.trim();
       const limitedText = cleanText.length > 50 ? cleanText.substring(0, 50) + '...' : cleanText;
@@ -48,28 +50,40 @@ export const EnhancedText: React.FC<EnhancedTextProps> = ({
       
       setDisplayText(finalText);
       
+      // Test Devanagari support and get detailed font info
+      const testResult = threejsFontService.testDevanagariSupport(finalText);
+      setFontInfo(testResult);
+      
       // Get appropriate font URL for the text
       const dynamicFontUrl = threejsFontService.getFontUrlForText(finalText);
       setFontUrl(dynamicFontUrl);
       
-      const scriptType = threejsFontService.detectScriptType(finalText);
-      const fontName = threejsFontService.getFontNameForText(finalText);
-      
-      console.log(`[EnhancedText] Text: "${finalText}", Script: ${scriptType}, Font: ${fontName}, URL: ${dynamicFontUrl}`);
+      console.log(`[EnhancedText] Enhanced font analysis:`, {
+        text: finalText,
+        scriptType: testResult.scriptType,
+        fontName: testResult.fontName,
+        fontUrl: dynamicFontUrl,
+        hasDevanagari: testResult.hasDevanagari
+      });
     }
     setIsReady(true);
   }, [text]);
 
-  // Load font using useLoader hook - with proper error handling
+  // Load font using useLoader hook with enhanced error handling
   let font;
   try {
     if (fontUrl) {
       font = useLoader(FontLoader, fontUrl, (loader) => {
         console.log(`[EnhancedText] Loading font from: ${fontUrl}`);
       });
+      
+      if (font && fontInfo?.hasDevanagari) {
+        console.log(`[EnhancedText] Successfully loaded Devanagari font for text: "${displayText}"`);
+      }
     }
   } catch (error) {
     console.warn('[EnhancedText] Font loading error:', error);
+    console.log('[EnhancedText] Font info during error:', fontInfo);
     setHasError(true);
   }
 
@@ -91,6 +105,12 @@ export const EnhancedText: React.FC<EnhancedTextProps> = ({
   // Handle font loading errors
   const handleError = (error: any) => {
     console.error('[EnhancedText] Render error:', error);
+    console.log('[EnhancedText] Error context:', {
+      text: displayText,
+      fontUrl,
+      fontInfo,
+      hasError
+    });
     setHasError(true);
   };
 
@@ -98,7 +118,7 @@ export const EnhancedText: React.FC<EnhancedTextProps> = ({
     return null;
   }
 
-  console.log(`[EnhancedText] Rendering text: "${displayText}" with font at position`, position);
+  console.log(`[EnhancedText] Rendering text: "${displayText}" with font analysis:`, fontInfo);
 
   return (
     <Text

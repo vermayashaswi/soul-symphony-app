@@ -49,7 +49,7 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
   const [error, setError] = useState<Error | null>(null);
   const { currentLanguage } = useTranslation();
 
-  console.log("[SoulNet] Enhanced rendering with staged initialization", { 
+  console.log("[SoulNet] Enhanced rendering with Devanagari font support", { 
     userId, 
     timeRange, 
     currentLanguage,
@@ -58,10 +58,12 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
   });
 
   useEffect(() => {
-    console.log("[SoulNet] Component mounted with enhanced script support");
+    console.log("[SoulNet] Component mounted with enhanced Devanagari script support");
     
-    // Preload fonts for better performance
-    threejsFontService.preloadFonts(['Inter', 'Helvetiker']).catch(error => {
+    // Preload fonts including Devanagari for better performance
+    threejsFontService.preloadFonts(['Helvetiker', 'Noto Sans Devanagari', 'Optimer']).then(() => {
+      console.log('[SoulNet] Font preloading completed successfully');
+    }).catch(error => {
       console.warn('[SoulNet] Font preloading failed:', error);
     });
     
@@ -231,7 +233,7 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
     return <TranslatableText text="Drag to rotate • Scroll to zoom • Click a node to highlight connections" forceTranslate={true} />;
   };
 
-  console.log(`[SoulNet] Rendering with staged approach: ${graphData.nodes.length} nodes, ${graphData.links.length} links, ready: ${renderingReady}`);
+  console.log(`[SoulNet] Rendering with enhanced Devanagari support: ${graphData.nodes.length} nodes, ${graphData.links.length} links, ready: ${renderingReady}`);
 
   return (
     <div className={cn(
