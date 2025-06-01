@@ -34,7 +34,6 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { TranslatableText } from "@/components/translation/TranslatableText";
-import { PremiumFeatureGuard } from "@/components/subscription/PremiumFeatureGuard";
 
 const THREAD_ID_STORAGE_KEY = "lastActiveChatThreadId";
 
@@ -349,7 +348,7 @@ export default function SmartChat() {
   };
 
   const desktopContent = (
-    <PremiumFeatureGuard feature="chat">
+    <>
       <motion.div
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
@@ -431,30 +430,28 @@ export default function SmartChat() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </PremiumFeatureGuard>
+    </>
   );
 
   const mobileContent = (
-    <PremiumFeatureGuard feature="chat">
-      <div className="flex flex-col h-full" ref={chatContainerRef}>
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          className="smart-chat-container flex-1 flex flex-col"
-        >
-          <div className="flex-1 flex flex-col">
-            <MobileChatInterface 
-              currentThreadId={currentThreadId}
-              onSelectThread={handleSelectThread}
-              onCreateNewThread={createNewThread}
-              userId={user?.id}
-              mentalHealthInsights={mentalHealthInsights}
-            />
-          </div>
-        </motion.div>
-      </div>
-    </PremiumFeatureGuard>
+    <div className="flex flex-col h-full" ref={chatContainerRef}>
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        className="smart-chat-container flex-1 flex flex-col"
+      >
+        <div className="flex-1 flex flex-col">
+          <MobileChatInterface 
+            currentThreadId={currentThreadId}
+            onSelectThread={handleSelectThread}
+            onCreateNewThread={createNewThread}
+            userId={user?.id}
+            mentalHealthInsights={mentalHealthInsights}
+          />
+        </div>
+      </motion.div>
+    </div>
   );
   
   const content = shouldRenderMobile ? mobileContent : desktopContent;

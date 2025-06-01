@@ -15,15 +15,13 @@ import {
 import { debugLogger, logInfo, logError, logAuthError, logProfile, logAuth } from '@/components/debug/DebugPanel';
 import { isAppRoute } from '@/routes/RouteHelpers';
 import { useLocation } from 'react-router-dom';
-import { SessionTrackingService } from '@/services/sessionTrackingService';
-import { LocationProvider } from '@/contexts/LocationContext';
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 const MAX_AUTO_PROFILE_ATTEMPTS = 5;
 const BASE_RETRY_DELAY = 500;
 
-function AuthProviderCore({ children }: { children: ReactNode }) {
+export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -34,135 +32,33 @@ function AuthProviderCore({ children }: { children: ReactNode }) {
   const [profileExistsStatus, setProfileExistsStatus] = useState<boolean | null>(null);
   const [profileCreationComplete, setProfileCreationComplete] = useState(false);
   const [autoRetryTimeoutId, setAutoRetryTimeoutId] = useState<NodeJS.Timeout | null>(null);
-  const [sessionCreated, setSessionCreated] = useState(false);
-  const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
   const location = useLocation();
 
-  const detectUserLanguage = (): string => {
-    // Try to get language from various sources in order of preference
-    const browserLanguage = navigator.language || navigator.languages?.[0] || 'en';
-    
-    // Extract the language code (e.g., 'en' from 'en-US')
-    const languageCode = browserLanguage.split('-')[0].toLowerCase();
-    
-    // Map to supported languages or default to 'en'
-    const supportedLanguages = ['en', 'es', 'fr', 'de', 'it', 'pt', 'ru', 'zh', 'ja', 'ko', 'ar', 'hi', 'bn'];
-    
-    return supportedLanguages.includes(languageCode) ? languageCode : 'en';
-  };
-
-  const getReferrer = (): string | null => {
-    // Get referrer, but exclude same-domain referrers
-    const referrer = document.referrer;
-    if (!referrer) return null;
-    
+  const createUserSession = async (userId: string) => {
     try {
-      const referrerUrl = new URL(referrer);
-      const currentUrl = new URL(window.location.href);
-      
-      // Only return external referrers
-      if (referrerUrl.hostname !== currentUrl.hostname) {
-        return referrer;
-      }
-    } catch (error) {
-      console.warn('Error parsing referrer URL:', error);
-    }
-    
-    return null;
-  };
-
-  const createUserSession = async (userId: string): Promise<boolean> => {
-    try {
-      console.log('Creating enhanced user session for user:', userId);
-      
-      // Check if session already exists to prevent duplicates
-      const { data: hasSession, error: checkError } = await supabase
-        .rpc('has_active_session', { p_user_id: userId });
-      
-      if (checkError) {
-        console.error('Error checking for existing session:', checkError);
-        return false;
-      }
-      
-      if (hasSession) {
-        console.log('Active session already exists for user, skipping creation');
-        return true;
-      }
+      console.log('Creating user session record for user:', userId);
       
       const deviceType = /mobile|android|iphone|ipad|ipod/i.test(navigator.userAgent) ? 'mobile' : 'desktop';
-      const userLanguage = detectUserLanguage();
-      const referrer = getReferrer();
-      const utmParams = SessionTrackingService.extractUtmParameters();
       
-      // Detect location asynchronously
-      let locationData = null;
-      try {
-        locationData = await SessionTrackingService.detectLocation();
-        console.log('Location detected:', locationData);
-      } catch (error) {
-        console.warn('Location detection failed:', error);
+      const { data, error } = await supabase
+        .from('user_sessions')
+        .insert({
+          user_id: userId,
+          device_type: deviceType,
+          user_agent: navigator.userAgent,
+          entry_page: window.location.pathname,
+          last_active_page: window.location.pathname,
+          is_active: true
+        });
+      
+      if (error) {
+        console.error('Error creating user session from AuthContext:', error);
+        return;
       }
       
-      const sessionData = {
-        userId,
-        deviceType,
-        userAgent: navigator.userAgent,
-        entryPage: window.location.pathname,
-        lastActivePage: window.location.pathname,
-        language: userLanguage,
-        referrer,
-        countryCode: locationData?.country,
-        currency: locationData?.currency,
-        utmSource: utmParams.utm_source,
-        utmMedium: utmParams.utm_medium,
-        utmCampaign: utmParams.utm_campaign,
-        utmTerm: utmParams.utm_term,
-        utmContent: utmParams.utm_content,
-        gclid: utmParams.gclid,
-        fbclid: utmParams.fbclid,
-        attributionData: {
-          detectedAt: new Date().toISOString(),
-          userAgent: navigator.userAgent.substring(0, 200),
-          screen: {
-            width: window.screen?.width,
-            height: window.screen?.height,
-          },
-          viewport: {
-            width: window.innerWidth,
-            height: window.innerHeight,
-          },
-        },
-      };
-      
-      console.log('Creating session with enhanced tracking data:', {
-        deviceType: sessionData.deviceType,
-        language: sessionData.language,
-        countryCode: sessionData.countryCode,
-        currency: sessionData.currency,
-        utmSource: sessionData.utmSource,
-        hasLocation: !!locationData,
-      });
-      
-      const sessionId = await SessionTrackingService.createUserSession(sessionData);
-      
-      if (sessionId) {
-        setCurrentSessionId(sessionId);
-        console.log('Enhanced user session created successfully with ID:', sessionId);
-        return true;
-      } else {
-        console.error('Failed to create enhanced user session');
-        return false;
-      }
+      console.log('User session created successfully from AuthContext:', data);
     } catch (e) {
-      console.error('Exception creating enhanced user session:', e);
-      return false;
-    }
-  };
-
-  // Track conversion events
-  const trackConversion = async (eventType: string, eventData: Record<string, any> = {}) => {
-    if (currentSessionId) {
-      await SessionTrackingService.trackConversion(currentSessionId, eventType, eventData);
+      console.error('Exception creating user session from AuthContext:', e);
     }
   };
 
@@ -221,13 +117,7 @@ function AuthProviderCore({ children }: { children: ReactNode }) {
         setProfileCreationComplete(true);
         debugLogger.setLastProfileError(null);
         
-        // Only create session once per auth session
-        if (!sessionCreated) {
-          const sessionSuccess = await createUserSession(user.id);
-          if (sessionSuccess) {
-            setSessionCreated(true);
-          }
-        }
+        await createUserSession(user.id);
         
         return true;
       } else {
@@ -287,12 +177,6 @@ function AuthProviderCore({ children }: { children: ReactNode }) {
       if (data.user) {
         setUser(data.user);
         logProfile('User profile updated successfully', 'AuthContext');
-        
-        // Track profile update as conversion event
-        await trackConversion('profile_updated', { 
-          updatedFields: Object.keys(metadata),
-          timestamp: new Date().toISOString(),
-        });
       }
     } else {
       logAuthError('Failed to update user profile', 'AuthContext');
@@ -310,12 +194,6 @@ function AuthProviderCore({ children }: { children: ReactNode }) {
     try {
       await signInWithGoogleService();
       logInfo('Google sign-in initiated', 'AuthContext');
-      
-      // Track sign-in attempt
-      await trackConversion('sign_in_attempt', { 
-        method: 'google',
-        timestamp: new Date().toISOString(),
-      });
     } catch (error: any) {
       logAuthError(`Google sign-in failed: ${error.message}`, 'AuthContext', error);
       setIsLoading(false);
@@ -333,12 +211,6 @@ function AuthProviderCore({ children }: { children: ReactNode }) {
     try {
       await signInWithEmailService(email, password);
       logInfo('Email sign-in initiated', 'AuthContext');
-      
-      // Track sign-in attempt
-      await trackConversion('sign_in_attempt', { 
-        method: 'email',
-        timestamp: new Date().toISOString(),
-      });
     } catch (error: any) {
       logAuthError(`Email sign-in failed: ${error.message}`, 'AuthContext', error);
       setIsLoading(false);
@@ -356,12 +228,6 @@ function AuthProviderCore({ children }: { children: ReactNode }) {
     try {
       await signUpService(email, password);
       logInfo('Sign-up initiated', 'AuthContext');
-      
-      // Track sign-up attempt
-      await trackConversion('sign_up_attempt', { 
-        method: 'email',
-        timestamp: new Date().toISOString(),
-      });
     } catch (error: any) {
       logAuthError(`Sign-up failed: ${error.message}`, 'AuthContext', error);
       setIsLoading(false);
@@ -389,16 +255,10 @@ function AuthProviderCore({ children }: { children: ReactNode }) {
     try {
       console.log('[AuthContext] Attempting to sign out user');
       
-      // Track sign-out event
-      await trackConversion('sign_out', {
-        timestamp: new Date().toISOString(),
-      });
-      
       setSession(null);
       setUser(null);
       setProfileExistsStatus(null);
       setProfileCreationComplete(false);
-      setCurrentSessionId(null);
       
       await signOutService((path: string) => {
         console.log(`[AuthContext] Redirecting to ${path} after signout`);
@@ -454,15 +314,6 @@ function AuthProviderCore({ children }: { children: ReactNode }) {
         setProfileExistsStatus(true);
         setProfileCreationComplete(true);
         debugLogger.setLastProfileError(null);
-        
-        // Only create session once per auth session
-        if (!sessionCreated) {
-          const sessionSuccess = await createUserSession(currentUser.id);
-          if (sessionSuccess) {
-            setSessionCreated(true);
-          }
-        }
-        
         return true;
       } else {
         logAuthError('First attempt to create profile failed, retrying once...', 'AuthContext');
@@ -476,15 +327,6 @@ function AuthProviderCore({ children }: { children: ReactNode }) {
           setProfileExistsStatus(true);
           setProfileCreationComplete(true);
           debugLogger.setLastProfileError(null);
-          
-          // Only create session once per auth session
-          if (!sessionCreated) {
-            const sessionSuccess = await createUserSession(currentUser.id);
-            if (sessionSuccess) {
-              setSessionCreated(true);
-            }
-          }
-          
           return true;
         }
         
@@ -534,10 +376,13 @@ function AuthProviderCore({ children }: { children: ReactNode }) {
         setSession(currentSession);
         setUser(currentSession?.user ?? null);
         
-        // Reset session tracking on new session
-        if (event === 'SIGNED_IN' && currentSession?.user) {
-          setSessionCreated(false);
-          setCurrentSessionId(null);
+        if (currentSession?.user && (event === 'SIGNED_IN' || event === 'USER_UPDATED')) {
+          setTimeout(() => {
+            createUserSession(currentSession.user.id)
+              .catch(error => {
+                console.error('Error creating user session on auth state change:', error);
+              });
+          }, 0);
           
           const initialDelay = isMobileDevice ? 1500 : 1000;
           logProfile(`Scheduling profile creation in ${initialDelay}ms for platform stability`, 'AuthContext');
@@ -548,12 +393,16 @@ function AuthProviderCore({ children }: { children: ReactNode }) {
                 logAuthError(`Error in initial profile creation: ${error.message}`, 'AuthContext', error);
               });
           }, initialDelay);
-
-          // Track successful sign-in
-          await trackConversion('sign_in_success', {
-            method: currentSession.user.app_metadata?.provider || 'unknown',
-            timestamp: new Date().toISOString(),
-          });
+          
+          setTimeout(() => {
+            if (!profileCreationComplete && !profileCreationInProgress) {
+              logProfile('Executing backup profile creation attempt', 'AuthContext');
+              createOrVerifyProfile(currentSession.user)
+                .catch(error => {
+                  logAuthError(`Error in backup profile creation: ${error.message}`, 'AuthContext', error);
+                });
+            }
+          }, initialDelay + 3000);
         }
         
         setIsLoading(false);
@@ -567,8 +416,6 @@ function AuthProviderCore({ children }: { children: ReactNode }) {
           logInfo('User signed out', 'AuthContext');
           setProfileExistsStatus(null);
           setProfileCreationComplete(false);
-          setSessionCreated(false);
-          setCurrentSessionId(null);
           debugLogger.setLastProfileError(null);
           
           if (autoRetryTimeoutId) {
@@ -589,8 +436,12 @@ function AuthProviderCore({ children }: { children: ReactNode }) {
       setUser(currentSession?.user ?? null);
       
       if (currentSession?.user) {
-        setSessionCreated(false);
-        setCurrentSessionId(null);
+        setTimeout(() => {
+          createUserSession(currentSession.user.id)
+            .catch(error => {
+              console.error('Error creating user session on initial session check:', error);
+            });
+        }, 0);
         
         const initialDelay = isMobileDevice ? 1500 : 1000;
         logProfile(`Scheduling initial profile creation in ${initialDelay}ms for platform stability`, 'AuthContext');
@@ -601,6 +452,16 @@ function AuthProviderCore({ children }: { children: ReactNode }) {
               logAuthError(`Error in initial profile creation: ${error.message}`, 'AuthContext', error);
             });
         }, initialDelay);
+        
+        setTimeout(() => {
+          if (!profileCreationComplete && !profileCreationInProgress) {
+            logProfile('Executing backup initial profile creation attempt', 'AuthContext');
+            createOrVerifyProfile(currentSession.user)
+              .catch(error => {
+                logAuthError(`Error in backup initial profile creation: ${error.message}`, 'AuthContext', error);
+              });
+          }
+        }, initialDelay + 3000);
       }
       
       setIsLoading(false);
@@ -629,14 +490,6 @@ function AuthProviderCore({ children }: { children: ReactNode }) {
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
-}
-
-export function AuthProvider({ children }: { children: ReactNode }) {
-  return (
-    <LocationProvider>
-      <AuthProviderCore>{children}</AuthProviderCore>
-    </LocationProvider>
-  );
 }
 
 export function useAuth() {

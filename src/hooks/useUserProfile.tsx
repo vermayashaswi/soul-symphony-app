@@ -2,7 +2,6 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
-import { ensureProfileExists } from '@/services/profileService';
 
 export interface UserProfileData {
   displayName: string | null;
@@ -22,14 +21,6 @@ export const useUserProfile = (): UserProfileData & {
       if (!user) return;
 
       try {
-        // First ensure the profile exists (this will work with our improved trigger)
-        const profileExists = await ensureProfileExists(user);
-        if (!profileExists) {
-          console.error('Failed to ensure profile exists');
-          return;
-        }
-
-        // Check for local storage name first
         const localName = localStorage.getItem('user_display_name');
 
         const { data, error } = await supabase
@@ -43,7 +34,6 @@ export const useUserProfile = (): UserProfileData & {
           return;
         }
 
-        // Handle display name priority: local storage > display_name > full_name
         if (localName && (!data || !data.display_name)) {
           await updateDisplayName(localName);
           setDisplayName(localName);
@@ -57,7 +47,7 @@ export const useUserProfile = (): UserProfileData & {
         // Set timezone from profile data
         if (data && data.timezone) {
           setTimezone(data.timezone);
-        } else {
+        } else if (user) {
           // If profile exists but no timezone, update with browser timezone
           const browserTimezone = getBrowserTimezone();
           if (browserTimezone) {

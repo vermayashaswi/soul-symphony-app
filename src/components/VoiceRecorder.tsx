@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { Loader2, AlertTriangle } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -10,7 +9,6 @@ import { blobToBase64 } from '@/utils/audio/blob-utils';
 import { toast } from 'sonner';
 import { useAuth } from '@/contexts/AuthContext';
 import { useIsMobile } from '@/hooks/use-mobile';
-import { useTutorial } from '@/contexts/TutorialContext';
 import FloatingLanguages from '@/components/voice-recorder/FloatingLanguages';
 import { RecordingButton } from '@/components/voice-recorder/RecordingButton';
 import { RecordingStatus } from '@/components/voice-recorder/RecordingStatus';
@@ -41,7 +39,6 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className, update
   
   const { user } = useAuth();
   const { isMobile } = useIsMobile();
-  const { isInStep } = useTutorial();
   
   const {
     isRecording,
@@ -359,10 +356,6 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className, update
   };
 
   const shouldShowPrompt = !isRecording && !audioBlob;
-  
-  // Determine if we should show the floating languages animation
-  // Hide it only during tutorial steps 3 and 4
-  const shouldShowFloatingLanguages = !isInStep(3) && !isInStep(4);
 
   return (
     <div className={cn("flex flex-col items-center relative z-10 w-full mb-[1rem]", className)}>
@@ -372,7 +365,7 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className, update
         "relative w-full h-full flex flex-col items-center justify-between overflow-hidden rounded-2xl border border-slate-200/20",
         isMobile ? "min-h-[calc(80vh-160px)]" : "min-h-[500px]"
       )}>
-        {showAnimation && shouldShowFloatingLanguages && (
+        {showAnimation && (
           <div className="absolute inset-0 w-full h-full flex items-center justify-center">
             <FloatingLanguages size="md" />
           </div>

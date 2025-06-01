@@ -1,5 +1,5 @@
+
 import { useState, useEffect } from 'react';
-import { useLocation } from '@/contexts/LocationContext';
 
 interface LocationPricing {
   countryCode: string;
@@ -38,33 +38,95 @@ const PRICING_MAP: Record<string, LocationPricing> = {
 };
 
 export const useLocationPricing = () => {
-  const { locationData, isLoading: locationLoading, error: locationError } = useLocation();
   const [pricing, setPricing] = useState<LocationPricing>(PRICING_MAP.DEFAULT);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [attemptCount, setAttemptCount] = useState(0);
+  const maxAttempts = 3;
 
   useEffect(() => {
-    if (locationData && locationData.country) {
-      const countryCode = locationData.country;
-      const selectedPricing = PRICING_MAP[countryCode] || PRICING_MAP.DEFAULT;
-      
-      console.log('[useLocationPricing] Setting pricing based on location:', {
-        countryCode,
-        currency: locationData.currency,
-        selectedPricing
-      });
-      
-      setPricing(selectedPricing);
-    } else if (!locationLoading) {
-      // Only set default if location loading is complete
-      setPricing(PRICING_MAP.DEFAULT);
-    }
-  }, [locationData, locationLoading]);
+    const detectLocation = async () => {
+      try {
+        setIsLoading(true);
+        setError(null);
+        
+        console.log('[useLocationPricing] Detecting location, attempt:', attemptCount + 1);
+
+        // Try IP-based geolocation with timeout protection
+        const controller = new AbortController();
+        const signal = controller.signal;
+        
+        // Set timeout for the fetch
+        const timeoutId = setTimeout(() => {
+          controller.abort();
+          throw new Error('Location detection timed out');
+        }, 5000);
+        
+        try {
+          const response = await fetch('https://ipapi.co/json/', { signal });
+          clearTimeout(timeoutId);
+          
+          if (!response.ok) {
+            throw new Error(`Failed to fetch location: ${response.status}`);
+          }
+
+          const data = await response.json();
+          
+          if (data.error) {
+            throw new Error(data.reason || 'Location detection failed');
+          }
+
+          const countryCode = data.country_code;
+          
+          if (countryCode && PRICING_MAP[countryCode]) {
+            setPricing(PRICING_MAP[countryCode]);
+          } else {
+            setPricing(PRICING_MAP.DEFAULT);
+          }
+
+          console.log('[useLocationPricing] Detected location:', {
+            country: data.country_name,
+            countryCode,
+            pricing: PRICING_MAP[countryCode] || PRICING_MAP.DEFAULT
+          });
+          
+          // Reset attempt count on success
+          setAttemptCount(0);
+        } catch (fetchError) {
+          clearTimeout(timeoutId);
+          throw fetchError;
+        }
+
+      } catch (err) {
+        console.error('[useLocationPricing] Location detection failed:', err);
+        
+        const errorMessage = err instanceof Error ? err.message : 'Location detection failed';
+        setError(errorMessage);
+        
+        // Use default pricing
+        setPricing(PRICING_MAP.DEFAULT);
+        
+        // Implement retry logic if we haven't exceeded max attempts
+        if (attemptCount < maxAttempts - 1) {
+          setAttemptCount(prev => prev + 1);
+          // Will retry on next effect run
+        }
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    detectLocation();
+  }, [attemptCount]);
 
   return {
     pricing,
-    isLoading: locationLoading,
-    error: locationError,
-    refreshLocation: async () => {
-      // Location refresh is handled by the LocationContext
+    isLoading,
+    error,
+    refreshLocation: () => {
+      setIsLoading(true);
+      setError(null);
+      setAttemptCount(0);  // Reset attempt count to trigger a fresh attempt
     }
   };
 };

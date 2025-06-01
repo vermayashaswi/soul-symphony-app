@@ -11,7 +11,9 @@ import { ChatMessage } from '@/types/chat';
 import { debugTimezoneInfo, getCurrentWeekDates } from '@/utils/chat/dateUtils';
 import { format } from 'date-fns';
 import { formatInTimeZone, toZonedTime } from 'date-fns-tz';
-import { PremiumFeatureGuard } from '@/components/subscription/PremiumFeatureGuard';
+import { useTrialAccess } from '@/hooks/useTrialAccess';
+import { TrialExpiredBlocker } from '@/components/subscription/TrialExpiredBlocker';
+import { SubscriptionModal } from '@/components/subscription/SubscriptionModal';
 
 const Chat = () => {
   const { user } = useAuth();
@@ -19,6 +21,16 @@ const Chat = () => {
   const { toast } = useToast();
   const { translate, currentLanguage } = useTranslation();
   const [isInitialized, setIsInitialized] = useState(false);
+  
+  // Trial access management
+  const {
+    hasAccess,
+    isTrialExpired,
+    isLoading: trialLoading,
+    showSubscriptionModal,
+    openSubscriptionModal,
+    closeSubscriptionModal
+  } = useTrialAccess();
 
   // Debug timezone information on load
   useEffect(() => {
@@ -122,6 +134,14 @@ const Chat = () => {
       navigate('/auth');
     }
   }, [user, navigate]);
+
+  // Auto-open subscription modal for expired trial users
+  useEffect(() => {
+    if (user && isTrialExpired && !trialLoading) {
+      console.log('[Chat] Trial expired, opening subscription modal');
+      openSubscriptionModal();
+    }
+  }, [user, isTrialExpired, trialLoading, openSubscriptionModal]);
 
   // Check connection to Supabase
   useEffect(() => {
@@ -341,12 +361,40 @@ const Chat = () => {
     };
   }, []);
 
-  return (
-    <PremiumFeatureGuard feature="chat">
-      <div className="w-full h-full flex flex-col">
-        <SmartChatInterface />
+  // Show loading state while checking trial access
+  if (trialLoading) {
+    return (
+      <div className="w-full h-full flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
       </div>
-    </PremiumFeatureGuard>
+    );
+  }
+
+  // Show trial expired blocker if user doesn't have access
+  if (user && !hasAccess && isTrialExpired) {
+    return (
+      <div className="w-full h-full flex flex-col p-4">
+        <TrialExpiredBlocker 
+          feature="Smart Chat"
+          onUpgrade={openSubscriptionModal}
+          className="flex-1"
+        />
+        <SubscriptionModal 
+          isOpen={showSubscriptionModal}
+          onClose={closeSubscriptionModal}
+        />
+      </div>
+    );
+  }
+
+  return (
+    <div className="w-full h-full flex flex-col">
+      <SmartChatInterface />
+      <SubscriptionModal 
+        isOpen={showSubscriptionModal}
+        onClose={closeSubscriptionModal}
+      />
+    </div>
   );
 };
 

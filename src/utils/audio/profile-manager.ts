@@ -3,46 +3,67 @@
  * Profile management utilities for audio processing
  */
 import { supabase } from '@/integrations/supabase/client';
-import { ensureProfileExists } from '@/services/profileService';
 
 /**
  * Ensures that a user profile exists for the given user ID
- * Uses the improved profile service that works with the database trigger
+ * Creates one if it doesn't exist
  */
 export async function ensureUserProfileExists(userId: string | undefined): Promise<boolean> {
   if (!userId) return false;
   
   try {
-    // Get the current user
-    const { data: userData, error: userError } = await supabase.auth.getUser();
-    if (userError || !userData.user) {
-      console.error('Error getting user data:', userError);
-      return false;
-    }
+    // Check if user profile exists
+    const { data: profile, error: fetchError } = await supabase
+      .from('profiles')
+      .select('id, onboarding_completed')
+      .eq('id', userId)
+      .single();
+      
+    // Check if user has existing journal entries
+    const { data: entries, error: entriesError } = await supabase
+      .from('Journal Entries')
+      .select('id')
+      .eq('user_id', userId)
+      .limit(1);
+      
+    const hasEntries = !entriesError && entries && entries.length > 0;
+    console.log('User has previous entries:', hasEntries);
     
-    // Use the improved profile service
-    const profileExists = await ensureProfileExists(userData.user);
-    
-    if (profileExists) {
-      // Check if user has existing journal entries for state management
-      const { data: entries, error: entriesError } = await supabase
-        .from('Journal Entries')
-        .select('id')
-        .eq('user_id', userId)
-        .limit(1);
+    // Import setHasPreviousEntries from state management
+    import('./processing-state').then(({ setHasPreviousEntries }) => {
+      setHasPreviousEntries(hasEntries);
+    });
+      
+    // If profile doesn't exist, create one
+    if (fetchError || !profile) {
+      console.log('User profile not found, creating one...');
+      
+      // Get user data from auth
+      const { data: userData, error: userError } = await supabase.auth.getUser();
+      if (userError) throw userError;
+      
+      // Create profile
+      const { error: insertError } = await supabase
+        .from('profiles')
+        .insert([{ 
+          id: userId,
+          email: userData.user?.email,
+          full_name: userData.user?.user_metadata?.full_name || '',
+          avatar_url: userData.user?.user_metadata?.avatar_url || '',
+          onboarding_completed: false
+        }]);
         
-      const hasEntries = !entriesError && entries && entries.length > 0;
-      console.log('User has previous entries:', hasEntries);
+      if (insertError) {
+        console.error('Error creating user profile:', insertError);
+        throw insertError;
+      }
       
-      // Import setHasPreviousEntries from state management
-      import('./processing-state').then(({ setHasPreviousEntries }) => {
-        setHasPreviousEntries(hasEntries);
-      });
-      
-      return true;
+      console.log('User profile created successfully');
+    } else {
+      console.log('Profile exists:', profile.id);
     }
     
-    return false;
+    return true;
   } catch (error) {
     console.error('Error ensuring user profile exists:', error);
     return false;
