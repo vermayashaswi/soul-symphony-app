@@ -36,7 +36,13 @@ export const useSimpleTextItems = ({
   shouldShowLabels
 }: SimpleTextServiceProps): TextItem[] => {
   return useMemo(() => {
-    if (!shouldShowLabels || nodes.length === 0) return [];
+    // Only process if we should show labels AND have valid data
+    if (!shouldShowLabels || !nodes || nodes.length === 0) {
+      console.log("[SimpleTextService] Not showing labels:", { shouldShowLabels, nodeCount: nodes?.length || 0 });
+      return [];
+    }
+
+    console.log("[SimpleTextService] Generating text items for", nodes.length, "nodes");
 
     return nodes.map(node => {
       const isHighlighted = selectedNode === node.id || highlightedNodes.has(node.id);
@@ -74,7 +80,7 @@ export const useSimpleTextItems = ({
 
       return {
         id: node.id,
-        text: node.id, // Use node ID directly, no translation
+        text: node.id,
         position: getLabelOffset(),
         color: getTextColor(),
         size: finalSize,

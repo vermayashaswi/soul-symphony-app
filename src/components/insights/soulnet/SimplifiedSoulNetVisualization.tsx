@@ -44,20 +44,14 @@ export const SimplifiedSoulNetVisualization: React.FC<SimplifiedSoulNetVisualiza
   const { theme } = useTheme();
   const controlsRef = useRef<any>(null);
   const [cameraZoom, setCameraZoom] = useState<number>(45);
-  const mountedRef = useRef<boolean>(true);
+  const [isInitialized, setIsInitialized] = useState<boolean>(false);
   
-  console.log("[SimplifiedSoulNetVisualization] Render with data:", data.nodes.length, "nodes");
+  console.log("[SimplifiedSoulNetVisualization] Render with data:", data?.nodes?.length || 0, "nodes");
 
-  // Cleanup on unmount
-  useEffect(() => {
-    return () => {
-      mountedRef.current = false;
-    };
-  }, []);
-
-  // Simple data validation
+  // Validate and clean data immediately
   const validData = useMemo(() => {
     if (!data || !Array.isArray(data.nodes) || !Array.isArray(data.links)) {
+      console.log("[SimplifiedSoulNetVisualization] Invalid data structure");
       return { nodes: [], links: [] };
     }
     
@@ -71,10 +65,11 @@ export const SimplifiedSoulNetVisualization: React.FC<SimplifiedSoulNetVisualiza
       validNodes.some(n => n.id === link.target)
     );
     
+    console.log("[SimplifiedSoulNetVisualization] Valid data:", validNodes.length, "nodes,", validLinks.length, "links");
     return { nodes: validNodes, links: validLinks };
   }, [data]);
 
-  // Simple center calculation
+  // Calculate center position
   const centerPosition = useMemo(() => {
     if (validData.nodes.length === 0) return new THREE.Vector3(0, 0, 0);
     
@@ -84,26 +79,26 @@ export const SimplifiedSoulNetVisualization: React.FC<SimplifiedSoulNetVisualiza
     return new THREE.Vector3(avgX, avgY, 0);
   }, [validData.nodes]);
 
-  // Simple camera initialization
+  // Initialize camera once when data is ready
   useEffect(() => {
-    if (validData.nodes.length === 0 || !camera || !mountedRef.current) return;
-    
-    const timer = setTimeout(() => {
-      if (mountedRef.current && camera) {
-        const targetZ = isFullScreen ? 40 : 45;
-        camera.position.set(centerPosition.x, centerPosition.y, targetZ);
-        camera.lookAt(centerPosition.x, centerPosition.y, 0);
-        camera.updateProjectionMatrix();
-        console.log("[SimplifiedSoulNetVisualization] Camera initialized");
-      }
-    }, 50);
-    
-    return () => clearTimeout(timer);
-  }, [camera, validData.nodes, centerPosition, isFullScreen]);
+    if (validData.nodes.length > 0 && camera && !isInitialized) {
+      console.log("[SimplifiedSoulNetVisualization] Initializing camera");
+      
+      const targetZ = isFullScreen ? 40 : 45;
+      camera.position.set(centerPosition.x, centerPosition.y, targetZ);
+      camera.lookAt(centerPosition.x, centerPosition.y, 0);
+      camera.updateProjectionMatrix();
+      
+      setIsInitialized(true);
+      setCameraZoom(targetZ);
+      
+      console.log("[SimplifiedSoulNetVisualization] Camera initialized at position:", camera.position);
+    }
+  }, [camera, validData.nodes.length, centerPosition, isFullScreen, isInitialized]);
 
-  // Simple camera zoom tracking
+  // Track camera zoom
   useFrame(() => {
-    if (camera && mountedRef.current) {
+    if (camera && isInitialized) {
       const currentZ = camera.position.z;
       if (Math.abs(currentZ - cameraZoom) > 1) {
         setCameraZoom(currentZ);
@@ -111,7 +106,7 @@ export const SimplifiedSoulNetVisualization: React.FC<SimplifiedSoulNetVisualiza
     }
   });
 
-  // Simple highlighted nodes calculation
+  // Calculate highlighted nodes
   const highlightedNodes = useMemo(() => {
     if (!selectedNode || !validData.links) return new Set<string>();
     
@@ -124,46 +119,41 @@ export const SimplifiedSoulNetVisualization: React.FC<SimplifiedSoulNetVisualiza
     return connected;
   }, [selectedNode, validData.links]);
 
-  // Simple node click handler
+  // Handle node clicks
   const handleNodeClick = useCallback((id: string) => {
+    console.log("[SimplifiedSoulNetVisualization] Node clicked:", id);
     if (typeof onNodeClick === 'function') {
       onNodeClick(id);
     }
   }, [onNodeClick]);
 
-  // Use the simplified text service
+  // Get text overlay items
   const textOverlayItems = useSimpleTextItems({
     nodes: validData.nodes,
     selectedNode,
     highlightedNodes,
     theme: theme || 'light',
     cameraZoom,
-    shouldShowLabels: shouldShowLabels
+    shouldShowLabels: shouldShowLabels && isInitialized
   });
 
-  if (validData.nodes.length === 0) {
-    return (
-      <>
-        <ambientLight intensity={0.6} />
-        <pointLight position={[5, 5, 5]} intensity={0.4} />
-      </>
-    );
-  }
-
+  // Always render something - even with empty data
   return (
     <>
       <ambientLight intensity={0.5} />
       <pointLight position={[10, 10, 10]} intensity={0.8} />
       
-      <OrbitControls
-        ref={controlsRef}
-        enableDamping
-        dampingFactor={0.05}
-        rotateSpeed={0.5}
-        minDistance={isFullScreen ? 8 : 10}
-        maxDistance={isFullScreen ? 80 : 60}
-        target={centerPosition}
-      />
+      {validData.nodes.length > 0 && (
+        <OrbitControls
+          ref={controlsRef}
+          enableDamping
+          dampingFactor={0.05}
+          rotateSpeed={0.5}
+          minDistance={isFullScreen ? 8 : 10}
+          maxDistance={isFullScreen ? 80 : 60}
+          target={centerPosition}
+        />
+      )}
 
       {/* Render edges */}
       {validData.links.map((link, index) => {
@@ -211,8 +201,8 @@ export const SimplifiedSoulNetVisualization: React.FC<SimplifiedSoulNetVisualiza
         );
       })}
 
-      {/* Simple HTML Text Overlay */}
-      <HtmlTextOverlay textItems={textOverlayItems} />
+      {/* HTML Text Overlay */}
+      {isInitialized && <HtmlTextOverlay textItems={textOverlayItems} />}
     </>
   );
 };
