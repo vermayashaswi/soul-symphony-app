@@ -224,7 +224,7 @@ const SoulNetVisualization: React.FC<SoulNetVisualizationProps> = ({
               end={targetNode.position}
               strength={Math.max(0.1, Math.min(1, Math.abs(link.value)))}
               isHighlighted={!!isHighlighted}
-              themeHex={themeHex}
+              dimmed={!isHighlighted && selectedNode !== null}
             />
           );
         } catch (error) {
