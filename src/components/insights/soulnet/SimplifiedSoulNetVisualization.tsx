@@ -2,8 +2,12 @@
 import React, { useRef, useEffect, useMemo, useState } from 'react';
 import { OrbitControls } from '@react-three/drei';
 import { useThree, useFrame } from '@react-three/fiber';
-import Node from './Node';
+import SimpleNode from './SimpleNode';
 import Edge from './Edge';
+import HtmlTextOverlay from './HtmlTextOverlay';
+import { useTheme } from '@/hooks/use-theme';
+import { useTranslation } from '@/contexts/TranslationContext';
+import { onDemandTranslationCache } from '@/utils/website-translations';
 import * as THREE from 'three';
 
 interface NodeData {
@@ -38,10 +42,13 @@ export const SimplifiedSoulNetVisualization: React.FC<SimplifiedSoulNetVisualiza
   shouldShowLabels = true
 }) => {
   const { camera } = useThree();
+  const { theme } = useTheme();
+  const { currentLanguage, translate } = useTranslation();
   const controlsRef = useRef<any>(null);
   const [cameraZoom, setCameraZoom] = useState<number>(45);
   const [renderingStage, setRenderingStage] = useState<'initial' | 'basic' | 'enhanced'>('initial');
   const [isInitialized, setIsInitialized] = useState(false);
+  const [translatedTexts, setTranslatedTexts] = useState<Map<string, string>>(new Map());
   const initializationRef = useRef<boolean>(false);
   
   console.log("[SimplifiedSoulNetVisualization] Rendering stage:", renderingStage);
@@ -79,7 +86,43 @@ export const SimplifiedSoulNetVisualization: React.FC<SimplifiedSoulNetVisualiza
     }
   }, [validData.nodes]);
 
-  // Staged initialization with proper timing to prevent flickering
+  // Handle text translations
+  useEffect(() => {
+    if (renderingStage !== 'enhanced' || currentLanguage === 'en') return;
+
+    const translateTexts = async () => {
+      const newTranslations = new Map<string, string>();
+      
+      for (const node of validData.nodes) {
+        try {
+          // Check cache first
+          const cached = onDemandTranslationCache.getTranslation(node.id, currentLanguage);
+          if (cached) {
+            newTranslations.set(node.id, cached);
+            continue;
+          }
+
+          // Translate if not cached
+          if (translate) {
+            const translated = await translate(node.id);
+            newTranslations.set(node.id, translated);
+            onDemandTranslationCache.setTranslation(node.id, translated, currentLanguage);
+          } else {
+            newTranslations.set(node.id, node.id);
+          }
+        } catch (error) {
+          console.error(`Translation error for ${node.id}:`, error);
+          newTranslations.set(node.id, node.id);
+        }
+      }
+      
+      setTranslatedTexts(newTranslations);
+    };
+
+    translateTexts();
+  }, [validData.nodes, currentLanguage, translate, renderingStage]);
+
+  // Staged initialization with proper timing
   useEffect(() => {
     if (validData.nodes.length === 0 || initializationRef.current) return;
     
@@ -109,10 +152,9 @@ export const SimplifiedSoulNetVisualization: React.FC<SimplifiedSoulNetVisualiza
     const enhancedTimer = setTimeout(() => {
       try {
         setRenderingStage('enhanced');
-        console.log('[SimplifiedSoulNetVisualization] Moving to enhanced stage with full text rendering');
+        console.log('[SimplifiedSoulNetVisualization] Moving to enhanced stage with HTML overlay');
       } catch (error) {
         console.error('[SimplifiedSoulNetVisualization] Enhanced stage error:', error);
-        // Stay in basic stage on error
       }
     }, 800);
 
@@ -152,6 +194,57 @@ export const SimplifiedSoulNetVisualization: React.FC<SimplifiedSoulNetVisualiza
       return new Set<string>();
     }
   }, [selectedNode, validData.links, renderingStage]);
+
+  // Prepare text overlay items
+  const textOverlayItems = useMemo(() => {
+    if (renderingStage !== 'enhanced' || !shouldShowLabels) return [];
+
+    return validData.nodes.map(node => {
+      const isHighlighted = selectedNode === node.id || highlightedNodes.has(node.id);
+      const dimmed = !!selectedNode && !isHighlighted;
+      
+      // Enhanced adaptive text color
+      const getTextColor = () => {
+        if (selectedNode === node.id) {
+          return theme === 'light' ? '#000000' : '#ffffff';
+        }
+        
+        if (isHighlighted) {
+          return node.type === 'emotion' 
+            ? (theme === 'light' ? '#2563eb' : '#60a5fa')
+            : (theme === 'light' ? '#dc2626' : '#f87171');
+        }
+        
+        return theme === 'light' ? '#666666' : '#999999';
+      };
+
+      // Get label offset based on node type
+      const getLabelOffset = (): [number, number, number] => {
+        const geometricOffset = node.type === 'entity' 
+          ? 1.4 * 1.3  // sphere radius * scale
+          : Math.sqrt(3) * (2.1 / 2) * 1.3; // cube corner distance * scale
+        
+        return [node.position[0], node.position[1] + geometricOffset, node.position[2]];
+      };
+
+      const displayText = currentLanguage === 'en' 
+        ? node.id 
+        : (translatedTexts.get(node.id) || node.id);
+
+      return {
+        id: node.id,
+        text: displayText,
+        position: getLabelOffset(),
+        color: getTextColor(),
+        size: 0.35 + Math.max(0, (45 - cameraZoom) * 0.007),
+        visible: true,
+        bold: isHighlighted || selectedNode === node.id,
+        isHighlighted,
+        isSelected: selectedNode === node.id,
+        nodeType: node.type
+      };
+    });
+  }, [validData.nodes, renderingStage, shouldShowLabels, selectedNode, highlightedNodes, theme, cameraZoom, translatedTexts, currentLanguage]);
 
   // Render nothing during initial stage to prevent flickering
   if (renderingStage === 'initial' || validData.nodes.length === 0) {
@@ -211,15 +304,14 @@ export const SimplifiedSoulNetVisualization: React.FC<SimplifiedSoulNetVisualiza
           }
         })}
 
-        {/* Render nodes with progressive enhancement */}
+        {/* Render nodes with simplified approach */}
         {validData.nodes.map(node => {
           try {
             const isHighlighted = selectedNode === node.id || highlightedNodes.has(node.id);
             const dimmed = !!selectedNode && !isHighlighted;
-            const showLabels = renderingStage === 'enhanced' && shouldShowLabels;
 
             return (
-              <Node
+              <SimpleNode
                 key={`node-${node.id}`}
                 node={node}
                 isSelected={selectedNode === node.id}
@@ -231,13 +323,9 @@ export const SimplifiedSoulNetVisualization: React.FC<SimplifiedSoulNetVisualiza
                   }
                 }}
                 highlightedNodes={highlightedNodes}
-                showLabel={showLabels}
                 dimmed={dimmed}
                 themeHex={themeHex}
-                selectedNodeId={selectedNode}
-                cameraZoom={cameraZoom}
                 isHighlighted={isHighlighted}
-                forceShowLabels={showLabels}
               />
             );
           } catch (error) {
@@ -245,6 +333,11 @@ export const SimplifiedSoulNetVisualization: React.FC<SimplifiedSoulNetVisualiza
             return null;
           }
         })}
+
+        {/* HTML Text Overlay for perfect text rendering */}
+        {renderingStage === 'enhanced' && (
+          <HtmlTextOverlay textItems={textOverlayItems} />
+        )}
       </>
     );
   } catch (error) {

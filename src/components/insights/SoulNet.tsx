@@ -14,8 +14,6 @@ import { useUserColorThemeHex } from './soulnet/useUserColorThemeHex';
 import { cn } from '@/lib/utils';
 import { TranslatableText } from '@/components/translation/TranslatableText';
 import { useTranslation } from '@/contexts/TranslationContext';
-import { onDemandTranslationCache } from '@/utils/website-translations';
-import { consolidatedFontService } from '@/utils/consolidatedFontService';
 
 interface NodeData {
   id: string;
@@ -43,49 +41,34 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
   const [canvasError, setCanvasError] = useState<Error | null>(null);
   const [retryCount, setRetryCount] = useState(0);
   const [renderingReady, setRenderingReady] = useState(false);
-  const [fontsInitialized, setFontsInitialized] = useState(false);
   const isMobile = useIsMobile();
   const themeHex = useUserColorThemeHex();
   const [selectedEntity, setSelectedEntity] = useState<string | null>(null);
   const [error, setError] = useState<Error | null>(null);
   const { currentLanguage } = useTranslation();
 
-  console.log("[SoulNet] Enhanced rendering with improved Devanagari support", { 
+  console.log("[SoulNet] HTML overlay rendering with perfect text support", { 
     userId, 
     timeRange, 
     currentLanguage,
     retryCount,
-    renderingReady,
-    fontsInitialized
+    renderingReady
   });
 
+  // Enhanced staged rendering initialization
   useEffect(() => {
-    console.log("[SoulNet] Component mounted with enhanced font system");
-    
-    // Enhanced font preloading for better stability
-    const initializeFonts = async () => {
-      try {
-        await consolidatedFontService.preloadFonts(['Helvetiker', 'NotoSansDevanagari', 'Optimer']);
-        console.log('[SoulNet] Font preloading completed successfully');
-        setFontsInitialized(true);
-      } catch (error) {
-        console.warn('[SoulNet] Font preloading failed, proceeding anyway:', error);
-        setFontsInitialized(true); // Don't block on font errors
-      }
-    };
-    
-    initializeFonts();
-    
-    return () => {
-      console.log("[SoulNet] Component unmounted");
-    };
-  }, []);
-
-  // Enhanced translation cache management
-  useEffect(() => {
-    onDemandTranslationCache.clearLanguage(currentLanguage);
-    console.log(`[SoulNet] Cleared translation cache for language: ${currentLanguage}`);
-  }, [currentLanguage]);
+    if (graphData.nodes.length > 0 && !renderingReady) {
+      console.log("[SoulNet] Preparing for HTML overlay rendering");
+      
+      // Minimal delay for initialization
+      const timer = setTimeout(() => {
+        setRenderingReady(true);
+        console.log("[SoulNet] HTML overlay rendering ready");
+      }, 200);
+      
+      return () => clearTimeout(timer);
+    }
+  }, [graphData.nodes.length, renderingReady]);
 
   useEffect(() => {
     if (!userId) return;
@@ -136,21 +119,6 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
     fetchEntityEmotionData();
   }, [userId, timeRange]);
 
-  // Enhanced staged rendering initialization
-  useEffect(() => {
-    if (graphData.nodes.length > 0 && fontsInitialized && !renderingReady) {
-      console.log("[SoulNet] Preparing for staged rendering with fonts ready");
-      
-      // Delay rendering to prevent initialization crashes
-      const timer = setTimeout(() => {
-        setRenderingReady(true);
-        console.log("[SoulNet] Rendering ready with enhanced font support");
-      }, 500);
-      
-      return () => clearTimeout(timer);
-    }
-  }, [graphData.nodes.length, fontsInitialized, renderingReady]);
-
   const handleNodeSelect = useCallback((id: string) => {
     console.log(`[SoulNet] Node selected: ${id}`);
     if (selectedEntity === id) {
@@ -184,11 +152,11 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
     setRenderingReady(false);
     // Re-trigger initialization
     setTimeout(() => {
-      if (graphData.nodes.length > 0 && fontsInitialized) {
+      if (graphData.nodes.length > 0) {
         setRenderingReady(true);
       }
-    }, 300);
-  }, [graphData.nodes.length, fontsInitialized]);
+    }, 200);
+  }, [graphData.nodes.length]);
 
   if (loading) return <LoadingState />;
   
@@ -243,11 +211,11 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
     return <TranslatableText text="Drag to rotate • Scroll to zoom • Click a node to highlight connections" forceTranslate={true} />;
   };
 
-  console.log(`[SoulNet] Rendering with enhanced stability: ${graphData.nodes.length} nodes, ${graphData.links.length} links, ready: ${renderingReady}, fonts: ${fontsInitialized}`);
+  console.log(`[SoulNet] Rendering with HTML overlay: ${graphData.nodes.length} nodes, ${graphData.links.length} links, ready: ${renderingReady}`);
 
   return (
     <div className={cn(
-      "bg-background rounded-xl shadow-sm border w-full",
+      "bg-background rounded-xl shadow-sm border w-full relative",
       isMobile ? "p-0" : "p-6 md:p-8"
     )}>
       {!isFullScreen && <SoulNetDescription />}
@@ -265,7 +233,7 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
                   <TranslatableText text="Visualization Loading" />
                 </h3>
                 <p className="text-muted-foreground mt-2">
-                  <TranslatableText text="Preparing the enhanced visualization..." />
+                  <TranslatableText text="Preparing the visualization..." />
                 </p>
                 <button 
                   className="mt-4 px-4 py-2 bg-primary text-white rounded-lg"
@@ -277,44 +245,46 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
             </div>
           }
         >
-          {renderingReady && fontsInitialized && (
-            <Canvas
-              style={{
-                width: '100%',
-                height: '100%',
-                maxWidth: isFullScreen ? 'none' : '800px',
-                maxHeight: isFullScreen ? 'none' : '500px',
-                position: 'relative',
-                zIndex: 5,
-                transition: 'all 0.3s ease-in-out',
-              }}
-              camera={{ 
-                position: [0, 0, isFullScreen ? 40 : 45],
-                near: 1, 
-                far: 1000,
-                fov: isFullScreen ? 60 : 50
-              }}
-              onPointerMissed={() => setSelectedEntity(null)}
-              gl={{ 
-                preserveDrawingBuffer: true,
-                antialias: !isMobile,
-                powerPreference: 'high-performance',
-                alpha: true,
-                depth: true,
-                stencil: false,
-                precision: isMobile ? 'mediump' : 'highp'
-              }}
-            >
-              <SimplifiedSoulNetVisualization
-                data={graphData}
-                selectedNode={selectedEntity}
-                onNodeClick={handleNodeSelect}
-                themeHex={themeHex}
-                isFullScreen={isFullScreen}
-                shouldShowLabels={true}
-              />
-            </Canvas>
-          )}
+          <div className="relative">
+            {renderingReady && (
+              <Canvas
+                style={{
+                  width: '100%',
+                  height: '100%',
+                  maxWidth: isFullScreen ? 'none' : '800px',
+                  maxHeight: isFullScreen ? 'none' : '500px',
+                  position: 'relative',
+                  zIndex: 5,
+                  transition: 'all 0.3s ease-in-out',
+                }}
+                camera={{ 
+                  position: [0, 0, isFullScreen ? 40 : 45],
+                  near: 1, 
+                  far: 1000,
+                  fov: isFullScreen ? 60 : 50
+                }}
+                onPointerMissed={() => setSelectedEntity(null)}
+                gl={{ 
+                  preserveDrawingBuffer: true,
+                  antialias: !isMobile,
+                  powerPreference: 'high-performance',
+                  alpha: true,
+                  depth: true,
+                  stencil: false,
+                  precision: isMobile ? 'mediump' : 'highp'
+                }}
+              >
+                <SimplifiedSoulNetVisualization
+                  data={graphData}
+                  selectedNode={selectedEntity}
+                  onNodeClick={handleNodeSelect}
+                  themeHex={themeHex}
+                  isFullScreen={isFullScreen}
+                  shouldShowLabels={true}
+                />
+              </Canvas>
+            )}
+          </div>
         </RenderingErrorBoundary>
       </FullscreenWrapper>
       
