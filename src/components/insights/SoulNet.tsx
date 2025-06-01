@@ -40,42 +40,43 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
   const [isFullScreen, setIsFullScreen] = useState(false);
   const [canvasError, setCanvasError] = useState<Error | null>(null);
   const [retryCount, setRetryCount] = useState(0);
-  const [renderingReady, setRenderingReady] = useState(false);
+  const [canvasReady, setCanvasReady] = useState(false);
   const isMobile = useIsMobile();
   const themeHex = useUserColorThemeHex();
   const [selectedEntity, setSelectedEntity] = useState<string | null>(null);
   const [error, setError] = useState<Error | null>(null);
   const { currentLanguage } = useTranslation();
 
-  console.log("[SoulNet] HTML overlay rendering with perfect text support", { 
+  console.log("[SoulNet] Unified state management", { 
     userId, 
     timeRange, 
     currentLanguage,
-    retryCount,
-    renderingReady
+    canvasReady,
+    hasData: graphData.nodes.length > 0
   });
 
-  // Enhanced staged rendering initialization
+  // Simple canvas readiness effect
   useEffect(() => {
-    if (graphData.nodes.length > 0 && !renderingReady) {
-      console.log("[SoulNet] Preparing for HTML overlay rendering");
+    if (graphData.nodes.length > 0 && !canvasReady) {
+      console.log("[SoulNet] Preparing canvas");
       
-      // Minimal delay for initialization
-      const timer = setTimeout(() => {
-        setRenderingReady(true);
-        console.log("[SoulNet] HTML overlay rendering ready");
-      }, 200);
+      const readyTimer = setTimeout(() => {
+        setCanvasReady(true);
+        console.log("[SoulNet] Canvas ready");
+      }, 100);
       
-      return () => clearTimeout(timer);
+      return () => clearTimeout(readyTimer);
     }
-  }, [graphData.nodes.length, renderingReady]);
+  }, [graphData.nodes.length, canvasReady]);
 
+  // Data fetching effect
   useEffect(() => {
     if (!userId) return;
 
     const fetchEntityEmotionData = async () => {
       setLoading(true);
       setError(null);
+      setCanvasError(null);
       
       try {
         const startDate = getStartDate(timeRange);
@@ -143,17 +144,20 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
     console.error('[SoulNet] Canvas error:', error);
     setCanvasError(error);
     setRetryCount(prev => prev + 1);
+    setCanvasReady(false);
   }, []);
 
   const handleRetry = useCallback(() => {
+    console.log('[SoulNet] Manual retry initiated');
     setCanvasError(null);
     setError(null);
     setRetryCount(0);
-    setRenderingReady(false);
-    // Re-trigger initialization
+    setCanvasReady(false);
+    
+    // Reset canvas readiness after a brief delay
     setTimeout(() => {
       if (graphData.nodes.length > 0) {
-        setRenderingReady(true);
+        setCanvasReady(true);
       }
     }, 200);
   }, [graphData.nodes.length]);
@@ -211,7 +215,7 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
     return <TranslatableText text="Drag to rotate • Scroll to zoom • Click a node to highlight connections" forceTranslate={true} />;
   };
 
-  console.log(`[SoulNet] Rendering with HTML overlay: ${graphData.nodes.length} nodes, ${graphData.links.length} links, ready: ${renderingReady}`);
+  console.log(`[SoulNet] Rendering with canvas ready: ${canvasReady}, nodes: ${graphData.nodes.length}, links: ${graphData.links.length}`);
 
   return (
     <div className={cn(
@@ -246,7 +250,7 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
           }
         >
           <div className="relative">
-            {renderingReady && (
+            {canvasReady && (
               <Canvas
                 style={{
                   width: '100%',

@@ -1,5 +1,5 @@
 
-import React, { useRef, useEffect, useMemo, useState } from 'react';
+import React, { useRef, useEffect, useMemo, useState, useCallback } from 'react';
 import { OrbitControls } from '@react-three/drei';
 import { useThree, useFrame } from '@react-three/fiber';
 import SimpleNode from './SimpleNode';
@@ -46,14 +46,13 @@ export const SimplifiedSoulNetVisualization: React.FC<SimplifiedSoulNetVisualiza
   const { currentLanguage, translate } = useTranslation();
   const controlsRef = useRef<any>(null);
   const [cameraZoom, setCameraZoom] = useState<number>(45);
-  const [renderingStage, setRenderingStage] = useState<'initial' | 'basic' | 'enhanced'>('initial');
   const [isInitialized, setIsInitialized] = useState(false);
   const [translatedTexts, setTranslatedTexts] = useState<Map<string, string>>(new Map());
   const initializationRef = useRef<boolean>(false);
   
-  console.log("[SimplifiedSoulNetVisualization] Rendering stage:", renderingStage);
+  console.log("[SimplifiedSoulNetVisualization] Render with unified initialization");
 
-  // Validate data with safer approach
+  // Validate and prepare data - single source of truth
   const validData = useMemo(() => {
     try {
       if (!data || !Array.isArray(data.nodes) || !Array.isArray(data.links)) {
@@ -61,7 +60,13 @@ export const SimplifiedSoulNetVisualization: React.FC<SimplifiedSoulNetVisualiza
         return { nodes: [], links: [] };
       }
       return {
-        nodes: data.nodes.filter(node => node && node.id && Array.isArray(node.position) && node.position.length === 3),
+        nodes: data.nodes.filter(node => 
+          node && 
+          node.id && 
+          Array.isArray(node.position) && 
+          node.position.length === 3 &&
+          !node.position.some(coord => isNaN(coord))
+        ),
         links: data.links.filter(link => link && link.source && link.target)
       };
     } catch (error) {
@@ -70,7 +75,7 @@ export const SimplifiedSoulNetVisualization: React.FC<SimplifiedSoulNetVisualiza
     }
   }, [data]);
 
-  // Calculate center position safely
+  // Calculate center position for camera targeting
   const centerPosition = useMemo(() => {
     try {
       if (validData.nodes.length === 0) return new THREE.Vector3(0, 0, 0);
@@ -86,88 +91,79 @@ export const SimplifiedSoulNetVisualization: React.FC<SimplifiedSoulNetVisualiza
     }
   }, [validData.nodes]);
 
-  // Handle text translations
+  // Single initialization effect with proper cleanup
   useEffect(() => {
-    if (renderingStage !== 'enhanced' || currentLanguage === 'en') return;
+    if (validData.nodes.length === 0 || initializationRef.current) return;
+    
+    console.log('[SimplifiedSoulNetVisualization] Starting unified initialization');
+    initializationRef.current = true;
+
+    // Initialize camera position immediately
+    try {
+      if (camera && validData.nodes.length > 0) {
+        const targetZ = isFullScreen ? 40 : 45;
+        camera.position.set(centerPosition.x, centerPosition.y, targetZ);
+        camera.lookAt(centerPosition.x, centerPosition.y, 0);
+        camera.updateProjectionMatrix();
+        
+        // Single delay for complete initialization
+        const initTimer = setTimeout(() => {
+          setIsInitialized(true);
+          console.log('[SimplifiedSoulNetVisualization] Initialization complete');
+        }, 300);
+
+        return () => {
+          clearTimeout(initTimer);
+        };
+      }
+    } catch (error) {
+      console.error('[SimplifiedSoulNetVisualization] Initialization error:', error);
+      initializationRef.current = false;
+    }
+  }, [camera, validData.nodes, centerPosition, isFullScreen]);
+
+  // Handle text translations separately and safely
+  useEffect(() => {
+    if (!isInitialized || currentLanguage === 'en' || validData.nodes.length === 0) return;
 
     const translateTexts = async () => {
-      const newTranslations = new Map<string, string>();
-      
-      for (const node of validData.nodes) {
-        try {
-          // Check cache first
+      try {
+        const newTranslations = new Map<string, string>();
+        
+        for (const node of validData.nodes) {
           const cached = onDemandTranslationCache.getTranslation(node.id, currentLanguage);
           if (cached) {
             newTranslations.set(node.id, cached);
             continue;
           }
 
-          // Translate if not cached
           if (translate) {
-            const translated = await translate(node.id);
-            newTranslations.set(node.id, translated);
-            onDemandTranslationCache.setTranslation(node.id, translated, currentLanguage);
+            try {
+              const translated = await translate(node.id);
+              newTranslations.set(node.id, translated);
+              onDemandTranslationCache.setTranslation(node.id, translated, currentLanguage);
+            } catch (error) {
+              console.warn(`Translation error for ${node.id}:`, error);
+              newTranslations.set(node.id, node.id);
+            }
           } else {
             newTranslations.set(node.id, node.id);
           }
-        } catch (error) {
-          console.error(`Translation error for ${node.id}:`, error);
-          newTranslations.set(node.id, node.id);
         }
+        
+        setTranslatedTexts(newTranslations);
+      } catch (error) {
+        console.error('[SimplifiedSoulNetVisualization] Translation error:', error);
       }
-      
-      setTranslatedTexts(newTranslations);
     };
 
     translateTexts();
-  }, [validData.nodes, currentLanguage, translate, renderingStage]);
+  }, [validData.nodes, currentLanguage, translate, isInitialized]);
 
-  // Staged initialization with proper timing
-  useEffect(() => {
-    if (validData.nodes.length === 0 || initializationRef.current) return;
-    
-    console.log('[SimplifiedSoulNetVisualization] Starting staged initialization');
-    initializationRef.current = true;
-
-    // Stage 1: Initial render (immediate)
-    setRenderingStage('initial');
-
-    // Stage 2: Basic render with delay
-    const basicTimer = setTimeout(() => {
-      try {
-        if (camera && validData.nodes.length > 0) {
-          camera.position.set(centerPosition.x, centerPosition.y, 45);
-          camera.lookAt(centerPosition.x, centerPosition.y, 0);
-          setIsInitialized(true);
-          setRenderingStage('basic');
-          console.log('[SimplifiedSoulNetVisualization] Camera initialized, moving to basic stage');
-        }
-      } catch (error) {
-        console.error('[SimplifiedSoulNetVisualization] Basic stage error:', error);
-        setRenderingStage('initial');
-      }
-    }, 200);
-
-    // Stage 3: Enhanced render with longer delay
-    const enhancedTimer = setTimeout(() => {
-      try {
-        setRenderingStage('enhanced');
-        console.log('[SimplifiedSoulNetVisualization] Moving to enhanced stage with HTML overlay');
-      } catch (error) {
-        console.error('[SimplifiedSoulNetVisualization] Enhanced stage error:', error);
-      }
-    }, 800);
-
-    return () => {
-      clearTimeout(basicTimer);
-      clearTimeout(enhancedTimer);
-    };
-  }, [camera, validData.nodes, centerPosition]);
-
-  // Safe camera zoom tracking with useFrame
+  // Safe camera zoom tracking
   useFrame(() => {
     try {
-      if (camera && renderingStage !== 'initial') {
+      if (camera && isInitialized) {
         const currentZ = camera.position.z;
         if (Math.abs(currentZ - cameraZoom) > 1) {
           setCameraZoom(currentZ);
@@ -178,10 +174,10 @@ export const SimplifiedSoulNetVisualization: React.FC<SimplifiedSoulNetVisualiza
     }
   });
 
-  // Calculate highlighted nodes with safety checks
+  // Calculate highlighted nodes
   const highlightedNodes = useMemo(() => {
     try {
-      if (!selectedNode || !validData.links || renderingStage === 'initial') return new Set<string>();
+      if (!selectedNode || !validData.links || !isInitialized) return new Set<string>();
       
       const connected = new Set<string>();
       validData.links.forEach(link => {
@@ -193,17 +189,24 @@ export const SimplifiedSoulNetVisualization: React.FC<SimplifiedSoulNetVisualiza
       console.error('[SimplifiedSoulNetVisualization] Highlighted nodes calculation error:', error);
       return new Set<string>();
     }
-  }, [selectedNode, validData.links, renderingStage]);
+  }, [selectedNode, validData.links, isInitialized]);
+
+  // Safe node click handler
+  const handleNodeClick = useCallback((id: string) => {
+    try {
+      onNodeClick(id);
+    } catch (error) {
+      console.error('[SimplifiedSoulNetVisualization] Node click error:', error);
+    }
+  }, [onNodeClick]);
 
   // Prepare text overlay items
   const textOverlayItems = useMemo(() => {
-    if (renderingStage !== 'enhanced' || !shouldShowLabels) return [];
+    if (!isInitialized || !shouldShowLabels) return [];
 
     return validData.nodes.map(node => {
       const isHighlighted = selectedNode === node.id || highlightedNodes.has(node.id);
-      const dimmed = !!selectedNode && !isHighlighted;
       
-      // Enhanced adaptive text color
       const getTextColor = () => {
         if (selectedNode === node.id) {
           return theme === 'light' ? '#000000' : '#ffffff';
@@ -218,11 +221,10 @@ export const SimplifiedSoulNetVisualization: React.FC<SimplifiedSoulNetVisualiza
         return theme === 'light' ? '#666666' : '#999999';
       };
 
-      // Get label offset based on node type
       const getLabelOffset = (): [number, number, number] => {
         const geometricOffset = node.type === 'entity' 
-          ? 1.4 * 1.3  // sphere radius * scale
-          : Math.sqrt(3) * (2.1 / 2) * 1.3; // cube corner distance * scale
+          ? 1.4 * 1.3
+          : Math.sqrt(3) * (2.1 / 2) * 1.3;
         
         return [node.position[0], node.position[1] + geometricOffset, node.position[2]];
       };
@@ -244,10 +246,10 @@ export const SimplifiedSoulNetVisualization: React.FC<SimplifiedSoulNetVisualiza
         nodeType: node.type
       };
     });
-  }, [validData.nodes, renderingStage, shouldShowLabels, selectedNode, highlightedNodes, theme, cameraZoom, translatedTexts, currentLanguage]);
+  }, [validData.nodes, isInitialized, shouldShowLabels, selectedNode, highlightedNodes, theme, cameraZoom, translatedTexts, currentLanguage]);
 
-  // Render nothing during initial stage to prevent flickering
-  if (renderingStage === 'initial' || validData.nodes.length === 0) {
+  // Show loading state during initialization
+  if (!isInitialized || validData.nodes.length === 0) {
     return (
       <>
         <ambientLight intensity={0.6} />
@@ -272,8 +274,8 @@ export const SimplifiedSoulNetVisualization: React.FC<SimplifiedSoulNetVisualiza
           target={centerPosition}
         />
 
-        {/* Render edges only in enhanced stage to reduce initial load */}
-        {renderingStage === 'enhanced' && validData.links.map((link, index) => {
+        {/* Render edges */}
+        {validData.links.map((link, index) => {
           try {
             const sourceNode = validData.nodes.find(n => n.id === link.source);
             const targetNode = validData.nodes.find(n => n.id === link.target);
@@ -304,7 +306,7 @@ export const SimplifiedSoulNetVisualization: React.FC<SimplifiedSoulNetVisualiza
           }
         })}
 
-        {/* Render nodes with simplified approach */}
+        {/* Render nodes */}
         {validData.nodes.map(node => {
           try {
             const isHighlighted = selectedNode === node.id || highlightedNodes.has(node.id);
@@ -315,13 +317,7 @@ export const SimplifiedSoulNetVisualization: React.FC<SimplifiedSoulNetVisualiza
                 key={`node-${node.id}`}
                 node={node}
                 isSelected={selectedNode === node.id}
-                onClick={(id, e) => {
-                  try {
-                    onNodeClick(id);
-                  } catch (error) {
-                    console.error('[SimplifiedSoulNetVisualization] Node click error:', error);
-                  }
-                }}
+                onClick={handleNodeClick}
                 highlightedNodes={highlightedNodes}
                 dimmed={dimmed}
                 themeHex={themeHex}
@@ -334,10 +330,8 @@ export const SimplifiedSoulNetVisualization: React.FC<SimplifiedSoulNetVisualiza
           }
         })}
 
-        {/* HTML Text Overlay for perfect text rendering */}
-        {renderingStage === 'enhanced' && (
-          <HtmlTextOverlay textItems={textOverlayItems} />
-        )}
+        {/* HTML Text Overlay */}
+        <HtmlTextOverlay textItems={textOverlayItems} />
       </>
     );
   } catch (error) {
