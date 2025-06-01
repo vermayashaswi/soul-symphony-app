@@ -1,7 +1,6 @@
-
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { Text, useLoader } from '@react-three/drei';
-import { useFrame } from '@react-three/fiber';
+import { Text } from '@react-three/drei';
+import { useFrame, useLoader } from '@react-three/fiber';
 import { FontLoader } from 'three/examples/jsm/loaders/FontLoader.js';
 import * as THREE from 'three';
 import { threejsFontService } from '@/services/threejsFontService';
