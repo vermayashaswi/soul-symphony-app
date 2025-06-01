@@ -30,7 +30,6 @@ interface SoulNetVisualizationProps {
   themeHex: string;
   isFullScreen?: boolean;
   shouldShowLabels?: boolean;
-  translatedLabels?: Map<string, string>;
 }
 
 // Enhanced script detection utilities
@@ -87,15 +86,12 @@ function getConnectedNodes(nodeId: string, links: LinkData[]): Set<string> {
 
 // Calculate relative connection strength within connected nodes
 function calculateRelativeStrengths(nodeId: string, links: LinkData[]): Map<string, number> {
-  // Safety check for invalid inputs
   if (!nodeId || !links || !Array.isArray(links)) return new Map<string, number>();
   
-  // Get all links associated with this node
   const nodeLinks = links.filter(link => 
     link && typeof link === 'object' && (link.source === nodeId || link.target === nodeId)
   );
   
-  // Find min and max values
   let minValue = Infinity;
   let maxValue = -Infinity;
   
@@ -104,17 +100,14 @@ function calculateRelativeStrengths(nodeId: string, links: LinkData[]): Map<stri
     if (link.value > maxValue) maxValue = link.value;
   });
 
-  // Create normalized strength map
   const strengthMap = new Map<string, number>();
   
-  // If all values are the same, use a default value
   if (maxValue === minValue || maxValue - minValue < 0.001) {
     nodeLinks.forEach(link => {
       const connectedNodeId = link.source === nodeId ? link.target : link.source;
-      strengthMap.set(connectedNodeId, 0.8); // Higher default value for better visibility
+      strengthMap.set(connectedNodeId, 0.8);
     });
   } else {
-    // Normalize values to 0.3-1.0 range for better visibility
     nodeLinks.forEach(link => {
       const connectedNodeId = link.source === nodeId ? link.target : link.source;
       const normalizedValue = 0.3 + (0.7 * (link.value - minValue) / (maxValue - minValue));
@@ -122,27 +115,22 @@ function calculateRelativeStrengths(nodeId: string, links: LinkData[]): Map<stri
     });
   }
   
-  // Log the calculated strengths for debugging
   console.log(`Connection strengths for ${nodeId}:`, Object.fromEntries(strengthMap));
   return strengthMap;
 }
 
 // Calculate percentage distribution of connection strengths
 function calculateConnectionPercentages(nodeId: string, links: LinkData[]): Map<string, number> {
-  // Safety check for invalid inputs
   if (!nodeId || !links || !Array.isArray(links)) return new Map<string, number>();
   
-  // Get all links associated with this node
   const nodeLinks = links.filter(link => 
     link && typeof link === 'object' && (link.source === nodeId || link.target === nodeId)
   );
   
-  // Calculate total value of all connections
   const totalValue = nodeLinks.reduce((sum, link) => sum + link.value, 0);
   
   if (totalValue === 0) return new Map<string, number>();
   
-  // Create percentage map
   const percentageMap = new Map<string, number>();
   
   nodeLinks.forEach(link => {
@@ -151,7 +139,6 @@ function calculateConnectionPercentages(nodeId: string, links: LinkData[]): Map<
     percentageMap.set(connectedNodeId, percentage);
   });
   
-  // Log the calculated percentages for debugging
   console.log(`Connection percentages for ${nodeId}:`, Object.fromEntries(percentageMap));
   return percentageMap;
 }
@@ -162,7 +149,7 @@ export const SoulNetVisualization: React.FC<SoulNetVisualizationProps> = ({
   onNodeClick,
   themeHex,
   isFullScreen = false,
-  shouldShowLabels = false
+  shouldShowLabels = true
 }) => {
   const { camera, size } = useThree();
   const { currentLanguage, translate } = useTranslation();
@@ -170,103 +157,97 @@ export const SoulNetVisualization: React.FC<SoulNetVisualizationProps> = ({
   const [cameraZoom, setCameraZoom] = useState<number>(45);
   const [forceUpdate, setForceUpdate] = useState<number>(0);
   const [isInitialized, setIsInitialized] = useState(false);
-  const [translatedLabels, setTranslatedLabels] = useState<Map<string, string>>(new Map());
-  const [fontLoaded, setFontLoaded] = useState(false);
+  const [translationCache, setTranslationCache] = useState<Map<string, string>>(new Map());
   const [nodeScriptTypes, setNodeScriptTypes] = useState<Map<string, string>>(new Map());
+  const mounted = useRef<boolean>(true);
   
-  console.log("[SoulNetVisualization] Rendering with enhanced script support", {
+  console.log("[SoulNetVisualization] Rendering with enhanced stability", {
     nodeCount: data?.nodes?.length,
     linkCount: data?.links?.length,
     currentLanguage,
-    fontLoaded,
     selectedNode,
     shouldShowLabels
   });
   
   useEffect(() => {
-    console.log("[SoulNetVisualization] Component mounted with enhanced script support");
+    console.log("[SoulNetVisualization] Component mounted with enhanced stability");
     return () => {
       console.log("[SoulNetVisualization] Component unmounted");
+      mounted.current = false;
     };
   }, []);
 
-  // Font loading detection
+  // Enhanced node data processing with script detection and stable caching
   useEffect(() => {
-    const checkFontLoading = async () => {
-      try {
-        console.log('[SoulNetVisualization] Checking font loading status');
-        
-        if (document.fonts) {
-          await document.fonts.ready;
-          console.log('[SoulNetVisualization] Document fonts are ready');
-          setFontLoaded(true);
-        } else {
-          console.log('[SoulNetVisualization] Document.fonts not supported, assuming fonts loaded');
-          setFontLoaded(true);
-        }
-      } catch (error) {
-        console.warn('[SoulNetVisualization] Font loading check failed:', error);
-        setFontLoaded(true);
-      }
-    };
-    
-    checkFontLoading();
-  }, []);
-
-  // Enhanced node data processing with script detection
-  useEffect(() => {
-    if (!data?.nodes) return;
+    if (!data?.nodes || !mounted.current) return;
 
     const processNodeLabels = async () => {
-      console.log('[SoulNetVisualization] Processing node labels with script detection');
+      console.log('[SoulNetVisualization] Processing node labels with enhanced stability');
       
-      const newTranslatedLabels = new Map<string, string>();
+      const newTranslationCache = new Map<string, string>();
       const newScriptTypes = new Map<string, string>();
       
-      // First pass: detect script types for all nodes
+      // Process script types for all nodes
       data.nodes.forEach(node => {
         const scriptType = detectScriptType(node.id);
         newScriptTypes.set(node.id, scriptType);
-        
-        console.log(`[SoulNetVisualization] Node "${node.id}" detected script: ${scriptType}, contains non-latin: ${containsNonLatinScript(node.id)}`);
+        console.log(`[SoulNetVisualization] Node "${node.id}" detected script: ${scriptType}`);
       });
       
-      setNodeScriptTypes(newScriptTypes);
+      if (mounted.current) {
+        setNodeScriptTypes(newScriptTypes);
+      }
       
-      // Second pass: handle translations if needed
-      if (currentLanguage !== 'en') {
+      // Handle translations with enhanced stability
+      if (currentLanguage !== 'en' && mounted.current) {
         for (const node of data.nodes) {
+          if (!mounted.current) break;
+          
           try {
             // Check cache first
             const cachedTranslation = onDemandTranslationCache.getTranslation(node.id, currentLanguage);
             
             if (cachedTranslation) {
-              newTranslatedLabels.set(node.id, cachedTranslation);
+              newTranslationCache.set(node.id, cachedTranslation);
               console.log(`[SoulNetVisualization] Using cached translation for "${node.id}": "${cachedTranslation}"`);
             } else if (translate) {
-              // Translate if not cached
-              const translated = await translate(node.id);
-              newTranslatedLabels.set(node.id, translated);
-              onDemandTranslationCache.setTranslation(node.id, translated, currentLanguage);
-              console.log(`[SoulNetVisualization] Translated "${node.id}" to "${translated}"`);
+              // Translate with timeout and error handling
+              try {
+                const translated = await Promise.race([
+                  translate(node.id),
+                  new Promise<string>((_, reject) => 
+                    setTimeout(() => reject(new Error('Translation timeout')), 5000)
+                  )
+                ]);
+                
+                if (mounted.current && translated && typeof translated === 'string') {
+                  newTranslationCache.set(node.id, translated);
+                  onDemandTranslationCache.setTranslation(node.id, translated, currentLanguage);
+                  console.log(`[SoulNetVisualization] Translated "${node.id}" to "${translated}"`);
+                }
+              } catch (error) {
+                console.warn(`[SoulNetVisualization] Translation failed for "${node.id}":`, error);
+                newTranslationCache.set(node.id, node.id);
+              }
             } else {
-              // Fallback to original
-              newTranslatedLabels.set(node.id, node.id);
+              newTranslationCache.set(node.id, node.id);
             }
           } catch (error) {
-            console.error(`[SoulNetVisualization] Translation failed for "${node.id}":`, error);
-            newTranslatedLabels.set(node.id, node.id);
+            console.error(`[SoulNetVisualization] Translation error for "${node.id}":`, error);
+            newTranslationCache.set(node.id, node.id);
           }
         }
       } else {
         // For English, use original labels
         data.nodes.forEach(node => {
-          newTranslatedLabels.set(node.id, node.id);
+          newTranslationCache.set(node.id, node.id);
         });
       }
       
-      setTranslatedLabels(newTranslatedLabels);
-      console.log('[SoulNetVisualization] Node label processing complete');
+      if (mounted.current) {
+        setTranslationCache(newTranslationCache);
+        console.log('[SoulNetVisualization] Node label processing complete');
+      }
     };
 
     processNodeLabels();
@@ -311,10 +292,8 @@ export const SoulNetVisualization: React.FC<SoulNetVisualizationProps> = ({
   }, [validData.nodes]);
 
   useEffect(() => {
-    // Force a re-render after selection changes to ensure visuals update
     if (selectedNode) {
       console.log(`[SoulNetVisualization] Selected node: ${selectedNode}`);
-      // Force multiple updates to ensure the visual changes apply
       setForceUpdate(prev => prev + 1);
       const timer = setTimeout(() => {
         setForceUpdate(prev => prev + 1);
@@ -324,10 +303,10 @@ export const SoulNetVisualization: React.FC<SoulNetVisualizationProps> = ({
     }
   }, [selectedNode]);
 
-  // Optimized camera initialization with increased distance for complete view
+  // Optimized camera initialization
   useEffect(() => {
     if (camera && validData.nodes?.length > 0 && !isInitialized) {
-      console.log("[SoulNetVisualization] Initializing camera position for complete visualization view");
+      console.log("[SoulNetVisualization] Initializing camera position");
       try {
         const centerX = centerPosition.x;
         const centerY = centerPosition.y;
@@ -340,7 +319,7 @@ export const SoulNetVisualization: React.FC<SoulNetVisualizationProps> = ({
     }
   }, [camera, validData.nodes, centerPosition, isInitialized]);
 
-  // Track camera zoom with throttling to improve performance
+  // Track camera zoom with throttling
   useEffect(() => {
     const updateCameraDistance = () => {
       if (camera) {
@@ -355,25 +334,25 @@ export const SoulNetVisualization: React.FC<SoulNetVisualizationProps> = ({
     return () => clearInterval(intervalId);
   }, [camera, cameraZoom]);
 
-  // Memoize connected nodes to prevent unnecessary recalculations
+  // Memoize connected nodes
   const highlightedNodes = useMemo(() => {
     if (!selectedNode || !validData || !validData.links) return new Set<string>();
     return getConnectedNodes(selectedNode, validData.links);
   }, [selectedNode, validData?.links]);
 
-  // Calculate relative strength of connections for the selected node
+  // Calculate relative strength of connections
   const connectionStrengths = useMemo(() => {
     if (!selectedNode || !validData || !validData.links) return new Map<string, number>();
     return calculateRelativeStrengths(selectedNode, validData.links);
   }, [selectedNode, validData?.links]);
 
-  // Calculate percentage distribution of connections for the selected node
+  // Calculate percentage distribution of connections
   const connectionPercentages = useMemo(() => {
     if (!selectedNode || !validData || !validData.links) return new Map<string, number>();
     return calculateConnectionPercentages(selectedNode, validData.links);
   }, [selectedNode, validData?.links]);
 
-  // Create a map for quick node lookup with geometry info
+  // Create a map for quick node lookup
   const nodeMap = useMemo(() => {
     const map = new Map();
     validData.nodes.forEach(node => {
@@ -396,12 +375,10 @@ export const SoulNetVisualization: React.FC<SoulNetVisualizationProps> = ({
     return map;
   }, [validData.nodes, selectedNode, highlightedNodes, connectionStrengths]);
 
-  // Adjust controls with increased max zoom-out distances for complete view
+  // Adjust controls
   useEffect(() => {
     if (controlsRef.current) {
       controlsRef.current.dampingFactor = isFullScreen ? 0.08 : 0.05;
-      
-      // Increased distance limits to allow complete visualization view
       controlsRef.current.minDistance = isFullScreen ? 8 : 10;
       controlsRef.current.maxDistance = isFullScreen ? 80 : 60;
     }
@@ -409,7 +386,7 @@ export const SoulNetVisualization: React.FC<SoulNetVisualizationProps> = ({
 
   const shouldDim = !!selectedNode;
 
-  // Custom node click handler with debugging
+  // Custom node click handler
   const handleNodeClick = (id: string, e: any) => {
     console.log(`[SoulNetVisualization] Node clicked: ${id}`);
     onNodeClick(id);
@@ -448,7 +425,7 @@ export const SoulNetVisualization: React.FC<SoulNetVisualizationProps> = ({
         }}
       />
       
-      {/* Display edges with proper surface connections */}
+      {/* Display edges */}
       {validData.links.map((link, index) => {
         if (!link || typeof link !== 'object') {
           console.warn(`[SoulNetVisualization] Invalid link at index ${index}`, link);
@@ -466,19 +443,15 @@ export const SoulNetVisualization: React.FC<SoulNetVisualizationProps> = ({
         const isHighlight = selectedNode &&
           (link.source === selectedNode || link.target === selectedNode);
           
-        // Get relative strength for this connection if it's highlighted
-        let relativeStrength = 0.3; // default lower value
+        let relativeStrength = 0.3;
         
         if (isHighlight && selectedNode) {
           const connectedNodeId = link.source === selectedNode ? link.target : link.source;
-          // Use higher base value for highlighted connections
           relativeStrength = connectionStrengths.get(connectedNodeId) || 0.7;
         } else {
-          // Use original link value, but scaled down for non-highlighted links
           relativeStrength = link.value * 0.5;
         }
         
-        // Skip rendering this edge if positions aren't valid
         if (!Array.isArray(sourceNode.position) || !Array.isArray(targetNode.position)) {
           return null;
         }
@@ -500,44 +473,39 @@ export const SoulNetVisualization: React.FC<SoulNetVisualizationProps> = ({
         );
       })}
       
-      {/* Display nodes */}
+      {/* Display nodes with enhanced stability */}
       {validData.nodes.map(node => {
         if (!node || typeof node !== 'object' || !node.id) {
           console.warn("[SoulNetVisualization] Invalid node:", node);
           return null;
         }
         
-        // Enhanced label visibility logic with script-aware handling
-        const showLabel = shouldShowLabels || !selectedNode || node.id === selectedNode || highlightedNodes.has(node.id);
+        // Stable label visibility logic
+        const showLabel = shouldShowLabels;
         const dimmed = shouldDim && !(selectedNode === node.id || highlightedNodes.has(node.id));
         const isHighlighted = selectedNode === node.id || highlightedNodes.has(node.id);
         
-        // Calculate connection strength if this is a connected node
         const connectionStrength = selectedNode && highlightedNodes.has(node.id) 
           ? connectionStrengths.get(node.id) || 0.5
           : 0.5;
           
-        // Get percentage for this connection if node is highlighted but not selected
         const connectionPercentage = selectedNode && highlightedNodes.has(node.id)
           ? connectionPercentages.get(node.id) || 0
           : 0;
           
-        // Determine if we should show the percentage
         const showPercentage = selectedNode !== null && 
                               highlightedNodes.has(node.id) && 
                               node.id !== selectedNode;
         
-        // Skip rendering this node if position isn't valid
         if (!Array.isArray(node.position)) {
           console.warn(`[SoulNetVisualization] Node ${node.id} has invalid position:`, node.position);
           return null;
         }
 
-        // Get script type and translated label
         const scriptType = nodeScriptTypes.get(node.id) || 'latin';
-        const translatedLabel = translatedLabels.get(node.id) || node.id;
+        const translatedLabel = translationCache.get(node.id) || node.id;
         
-        console.log(`[SoulNetVisualization] Rendering node "${node.id}" with script "${scriptType}", translated: "${translatedLabel}", showLabel: ${showLabel}`);
+        console.log(`[SoulNetVisualization] Rendering stable node "${node.id}" with script "${scriptType}", translated: "${translatedLabel}"`);
           
         return (
           <Node
@@ -555,7 +523,7 @@ export const SoulNetVisualization: React.FC<SoulNetVisualizationProps> = ({
             connectionStrength={connectionStrength}
             connectionPercentage={connectionPercentage}
             showPercentage={showPercentage}
-            forceShowLabels={false}
+            forceShowLabels={shouldShowLabels}
           />
         );
       })}

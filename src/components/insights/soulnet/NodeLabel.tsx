@@ -5,7 +5,7 @@ import { useTheme } from '@/hooks/use-theme';
 import { useTranslation } from '@/contexts/TranslationContext';
 import { onDemandTranslationCache } from '@/utils/website-translations';
 
-// Enhanced script detection
+// Enhanced script detection with comprehensive coverage
 const containsNonLatinScript = (text: string): boolean => {
   if (!text) return false;
   
@@ -32,11 +32,9 @@ const containsNonLatinScript = (text: string): boolean => {
 
 const containsDevanagari = (text: string): boolean => {
   if (!text) return false;
-  const devanagariPattern = /[\u0900-\u097F]/;
-  return devanagariPattern.test(text);
+  return /[\u0900-\u097F]/.test(text);
 };
 
-// Detect specific script type
 const detectScriptType = (text: string): string => {
   if (!text) return 'latin';
   
@@ -53,12 +51,10 @@ const detectScriptType = (text: string): string => {
 
 // Enhanced adaptive text color with better contrast
 const getAdaptiveTextColor = (nodeColor: string, nodeType: 'entity' | 'emotion', theme: string, isHighlighted: boolean, isSelected: boolean): string => {
-  // Selected node gets maximum contrast
   if (isSelected) {
     return theme === 'light' ? '#000000' : '#ffffff';
   }
   
-  // Highlighted nodes get distinct accent colors
   if (isHighlighted) {
     if (nodeType === 'emotion') {
       return theme === 'light' ? '#2563eb' : '#60a5fa';
@@ -67,21 +63,18 @@ const getAdaptiveTextColor = (nodeColor: string, nodeType: 'entity' | 'emotion',
     }
   }
   
-  // Non-highlighted nodes use muted colors
   return theme === 'light' ? '#666666' : '#999999';
 };
 
 // Enhanced label offset calculation
 const calculateLabelOffset = (nodeType: 'entity' | 'emotion', nodeScale: number): number => {
   if (nodeType === 'entity') {
-    // For spheres: radius × scale × spacing factor
     const sphereRadius = 1.4;
-    return sphereRadius * nodeScale * 1.3; // Increased spacing factor
+    return sphereRadius * nodeScale * 1.3;
   } else {
-    // For cubes: corner distance × scale × spacing factor
     const cubeSize = 2.1;
     const cornerDistance = Math.sqrt(3) * (cubeSize / 2);
-    return cornerDistance * nodeScale * 1.3; // Increased spacing factor
+    return cornerDistance * nodeScale * 1.3;
   }
 };
 
@@ -95,7 +88,6 @@ const formatEntityText = (text: string): string => {
     const word = words[0];
     if (word.length <= 8) return word;
     
-    // Better word breaking for longer single words
     const midPoint = Math.ceil(word.length / 2);
     return word.substring(0, midPoint) + '\n' + word.substring(midPoint);
   }
@@ -104,7 +96,6 @@ const formatEntityText = (text: string): string => {
     return words.join('\n');
   }
   
-  // Improved multi-word grouping
   const totalLength = text.length;
   const targetFirstLineLength = Math.ceil(totalLength / 2);
   
@@ -150,160 +141,201 @@ export const NodeLabel: React.FC<NodeLabelProps> = ({
   const { theme } = useTheme();
   const { currentLanguage, translate } = useTranslation();
   const [translatedText, setTranslatedText] = useState<string>(id);
-  const [isTranslating, setIsTranslating] = useState(false);
-  const [hasTranslationError, setHasTranslationError] = useState(false);
-  const [fontLoaded, setFontLoaded] = useState(false);
-  const prevLangRef = useRef<string>(currentLanguage);
-  const isNonLatin = useRef<boolean>(false);
-  const isDevanagari = useRef<boolean>(false);
-  const scriptType = useRef<string>('latin');
+  const [isTranslationReady, setIsTranslationReady] = useState(false);
+  const [fontReady, setFontReady] = useState(false);
+  const translationInProgress = useRef<boolean>(false);
+  const mounted = useRef<boolean>(true);
+  const scriptType = useRef<string>(detectScriptType(id));
   
-  console.log(`[NodeLabel] Processing label for node ${id}, shouldShow: ${shouldShowLabel}, forceVisible: ${forceVisible}`);
+  console.log(`[NodeLabel] Processing label for node ${id}, language: ${currentLanguage}, shouldShow: ${shouldShowLabel}`);
   
-  // Simplified visibility logic
-  const isVisible = shouldShowLabel || forceVisible;
+  // Stabilized visibility logic to prevent flickering
+  const isVisible = useMemo(() => {
+    return shouldShowLabel || forceVisible || isSelected || isHighlighted;
+  }, [shouldShowLabel, forceVisible, isSelected, isHighlighted]);
   
-  // Font loading detection
+  // Enhanced font loading detection with retry mechanism
   useEffect(() => {
-    const checkFontLoading = async () => {
+    let mounted = true;
+    
+    const checkFonts = async () => {
       try {
-        console.log('[NodeLabel] Checking font loading status');
+        console.log('[NodeLabel] Checking font readiness...');
         
         if (document.fonts) {
+          // Check if specific fonts are loaded
+          const devanagariFont = new FontFace('Noto Sans Devanagari', 'url(https://fonts.gstatic.com/s/notosansdevanagari/v23/TuGoUUFzXI5FBtUq5a8bjKYTZjtRU6Sgv3NaV_SNmps.woff2)');
+          
+          try {
+            await devanagariFont.load();
+            document.fonts.add(devanagariFont);
+            console.log('[NodeLabel] Devanagari font loaded successfully');
+          } catch (fontError) {
+            console.warn('[NodeLabel] Devanagari font loading failed, using fallback:', fontError);
+          }
+          
           await document.fonts.ready;
-          console.log('[NodeLabel] Document fonts are ready');
-          setFontLoaded(true);
-        } else {
-          console.log('[NodeLabel] Document.fonts not supported, assuming fonts loaded');
-          setFontLoaded(true);
+          console.log('[NodeLabel] All fonts ready');
+        }
+        
+        if (mounted) {
+          setFontReady(true);
         }
       } catch (error) {
         console.warn('[NodeLabel] Font loading check failed:', error);
-        setFontLoaded(true);
+        if (mounted) {
+          setFontReady(true); // Assume ready on error
+        }
       }
     };
     
-    checkFontLoading();
+    checkFonts();
+    
+    return () => {
+      mounted = false;
+    };
   }, []);
   
-  // Enhanced translation handling with error recovery
+  // Enhanced translation handling with race condition prevention
   useEffect(() => {
-    if (!isVisible || currentLanguage === 'en' || !id) {
+    if (!isVisible || !id) {
       setTranslatedText(id);
-      isNonLatin.current = containsNonLatinScript(id);
-      isDevanagari.current = containsDevanagari(id);
-      scriptType.current = detectScriptType(id);
-      console.log(`[NodeLabel] Using original text: "${id}", detected script: ${scriptType.current}`);
+      setIsTranslationReady(true);
       return;
     }
     
-    // Check cache first
-    const cachedTranslation = onDemandTranslationCache.getTranslation(id, currentLanguage);
-    
-    if (cachedTranslation) {
-      setTranslatedText(cachedTranslation);
-      isNonLatin.current = containsNonLatinScript(cachedTranslation);
-      isDevanagari.current = containsDevanagari(cachedTranslation);
-      scriptType.current = detectScriptType(cachedTranslation);
-      setHasTranslationError(false);
-      console.log(`[NodeLabel] Using cached translation for "${id}": "${cachedTranslation}", detected script: ${scriptType.current}`);
+    // Prevent multiple simultaneous translations
+    if (translationInProgress.current) {
+      console.log(`[NodeLabel] Translation already in progress for ${id}`);
       return;
     }
     
-    // Translate with enhanced error handling
-    const translateText = async () => {
+    const performTranslation = async () => {
       try {
-        setIsTranslating(true);
-        setHasTranslationError(false);
+        translationInProgress.current = true;
         
-        const result = await translate(id);
-        
-        // Validate translation result
-        if (!result || typeof result !== 'string' || result.trim().length === 0) {
-          throw new Error('Invalid translation result');
+        // For English, use original text immediately
+        if (currentLanguage === 'en') {
+          if (mounted.current) {
+            setTranslatedText(id);
+            setIsTranslationReady(true);
+            scriptType.current = detectScriptType(id);
+            console.log(`[NodeLabel] Using English text: "${id}", script: ${scriptType.current}`);
+          }
+          return;
         }
         
-        setTranslatedText(result);
-        onDemandTranslationCache.setTranslation(id, result, currentLanguage);
+        // Check cache first with proper key
+        const cacheKey = `${currentLanguage}:${id}`;
+        const cachedTranslation = onDemandTranslationCache.getTranslation(id, currentLanguage);
         
-        isNonLatin.current = containsNonLatinScript(result);
-        isDevanagari.current = containsDevanagari(result);
-        scriptType.current = detectScriptType(result);
+        if (cachedTranslation && mounted.current) {
+          setTranslatedText(cachedTranslation);
+          setIsTranslationReady(true);
+          scriptType.current = detectScriptType(cachedTranslation);
+          console.log(`[NodeLabel] Using cached translation: "${id}" -> "${cachedTranslation}", script: ${scriptType.current}`);
+          return;
+        }
         
-        console.log(`[NodeLabel] Successfully translated "${id}" to "${result}", detected script: ${scriptType.current}`);
+        // Translate with validation
+        if (translate && mounted.current) {
+          console.log(`[NodeLabel] Starting translation for: "${id}" to ${currentLanguage}`);
+          
+          const result = await translate(id);
+          
+          if (mounted.current && result && typeof result === 'string') {
+            setTranslatedText(result);
+            setIsTranslationReady(true);
+            onDemandTranslationCache.setTranslation(id, result, currentLanguage);
+            scriptType.current = detectScriptType(result);
+            console.log(`[NodeLabel] Translation complete: "${id}" -> "${result}", script: ${scriptType.current}`);
+          } else if (mounted.current) {
+            // Fallback to original on invalid result
+            setTranslatedText(id);
+            setIsTranslationReady(true);
+            scriptType.current = detectScriptType(id);
+            console.warn(`[NodeLabel] Invalid translation result, using original: "${id}"`);
+          }
+        }
       } catch (error) {
-        console.error(`[NodeLabel] Translation failed for "${id}":`, error);
-        setHasTranslationError(true);
-        
-        // Use original text as fallback
-        setTranslatedText(id);
-        isNonLatin.current = containsNonLatinScript(id);
-        isDevanagari.current = containsDevanagari(id);
-        scriptType.current = detectScriptType(id);
-        
-        console.log(`[NodeLabel] Using fallback text: "${id}", detected script: ${scriptType.current}`);
+        console.error(`[NodeLabel] Translation error for "${id}":`, error);
+        if (mounted.current) {
+          setTranslatedText(id);
+          setIsTranslationReady(true);
+          scriptType.current = detectScriptType(id);
+        }
       } finally {
-        setIsTranslating(false);
+        translationInProgress.current = false;
       }
     };
     
-    translateText();
+    // Reset translation state
+    setIsTranslationReady(false);
+    
+    // Small delay to prevent race conditions
+    const translationTimer = setTimeout(() => {
+      performTranslation();
+    }, 50);
+    
+    return () => {
+      clearTimeout(translationTimer);
+    };
   }, [id, isVisible, currentLanguage, translate]);
   
-  // Reset translation when language changes
+  // Cleanup on unmount
   useEffect(() => {
-    if (prevLangRef.current !== currentLanguage) {
-      setTranslatedText(id);
-      setHasTranslationError(false);
-      prevLangRef.current = currentLanguage;
-    }
-  }, [currentLanguage, id]);
+    return () => {
+      mounted.current = false;
+    };
+  }, []);
   
   // Enhanced text formatting
   const formattedText = useMemo(() => {
+    if (!translatedText) return id;
+    
     if (type === 'entity') {
-      const textToFormat = translatedText || id;
-      return formatEntityText(textToFormat);
+      return formatEntityText(translatedText);
     }
-    return translatedText || id;
-  }, [id, type, translatedText]);
+    return translatedText;
+  }, [translatedText, type, id]);
 
   // Enhanced dynamic font sizing with script-specific adjustments
   const dynamicFontSize = useMemo(() => {
     let z = cameraZoom !== undefined ? cameraZoom : 45;
     if (typeof z !== 'number' || Number.isNaN(z)) z = 45;
     
-    // Increased base font size for better readability
-    const baseSize = 0.3 + Math.max(0, (45 - z) * 0.00625);
+    const baseSize = 0.35 + Math.max(0, (45 - z) * 0.007);
     
-    // Enhanced script-specific adjustments
     let sizeAdjustment = 0;
     switch (scriptType.current) {
       case 'devanagari':
-        sizeAdjustment = 0.1; // Larger adjustment for Devanagari
+        sizeAdjustment = 0.12;
         break;
       case 'arabic':
       case 'bengali':
       case 'thai':
-        sizeAdjustment = 0.08;
+        sizeAdjustment = 0.09;
         break;
       case 'chinese':
       case 'japanese':
       case 'korean':
-        sizeAdjustment = 0.05;
+        sizeAdjustment = 0.06;
         break;
       default:
         sizeAdjustment = 0;
     }
     
-    const minSize = 0.25; // Increased minimum size
-    const maxSize = 0.6;  // Increased maximum size limit for better visibility
+    const minSize = 0.28;
+    const maxSize = 0.65;
     
     return Math.max(Math.min(baseSize + sizeAdjustment, maxSize), minSize);
   }, [cameraZoom]);
 
-  // Don't render if not visible or invalid text
-  if (!isVisible || !formattedText) {
+  // Don't render until both font and translation are ready, OR if using original text
+  const shouldRender = isVisible && (isTranslationReady || currentLanguage === 'en') && fontReady && formattedText;
+  
+  if (!shouldRender) {
+    console.log(`[NodeLabel] Not rendering: isVisible=${isVisible}, translationReady=${isTranslationReady}, fontReady=${fontReady}, text="${formattedText}"`);
     return null;
   }
 
@@ -319,11 +351,10 @@ export const NodeLabel: React.FC<NodeLabelProps> = ({
 
   // Enhanced outline configuration
   const outlineConfig = useMemo(() => {
-    const baseWidth = 0.025; // Increased base width for better visibility
-    const width = isSelected ? baseWidth * 2.5 : 
-                  isHighlighted ? baseWidth * 2 : baseWidth * 1.5;
+    const baseWidth = 0.03;
+    const width = isSelected ? baseWidth * 3 : 
+                  isHighlighted ? baseWidth * 2.2 : baseWidth * 1.8;
     
-    // Enhanced contrast calculation for outline color
     const outlineColor = (isSelected || isHighlighted) 
       ? (theme === 'light' ? '#000000' : '#ffffff')
       : (theme === 'light' ? '#333333' : '#cccccc');
@@ -333,9 +364,7 @@ export const NodeLabel: React.FC<NodeLabelProps> = ({
 
   const labelPosition: [number, number, number] = [0, geometricOffset, 0];
   
-  console.log(`[NodeLabel] Rendering label "${formattedText}" at offset ${geometricOffset}, 
-    isTranslating: ${isTranslating}, hasError: ${hasTranslationError}, fontLoaded: ${fontLoaded}, 
-    script: ${scriptType.current}, fontSize: ${dynamicFontSize}`);
+  console.log(`[NodeLabel] Rendering stable label "${formattedText}" for ${id}, script: ${scriptType.current}, fontSize: ${dynamicFontSize}`);
 
   return (
     <ThreeDimensionalText
@@ -345,7 +374,7 @@ export const NodeLabel: React.FC<NodeLabelProps> = ({
       size={dynamicFontSize}
       bold={isHighlighted || isSelected}
       visible={true}
-      skipTranslation={true} // Always skip since we handle translation here
+      skipTranslation={true}
       outlineWidth={outlineConfig.width}
       outlineColor={outlineConfig.color}
       renderOrder={15}
