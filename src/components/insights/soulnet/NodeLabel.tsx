@@ -1,10 +1,7 @@
 
-import React, { useMemo, useRef, useEffect, useState } from 'react';
-import ReliableText from './ReliableText';
+import React, { useMemo } from 'react';
 import { useTheme } from '@/hooks/use-theme';
-import { useTranslation } from '@/contexts/TranslationContext';
-import { onDemandTranslationCache } from '@/utils/website-translations';
-import { consolidatedFontService } from '@/utils/consolidatedFontService';
+import { TranslatableText } from '@/components/translation/TranslatableText';
 
 // Enhanced adaptive text color with better contrast
 const getAdaptiveTextColor = (nodeColor: string, nodeType: 'entity' | 'emotion', theme: string, isHighlighted: boolean, isSelected: boolean): string => {
@@ -63,132 +60,13 @@ export const NodeLabel: React.FC<NodeLabelProps> = ({
   nodeScale = 1
 }) => {
   const { theme } = useTheme();
-  const { currentLanguage, translate } = useTranslation();
-  const [translatedText, setTranslatedText] = useState<string>(id);
-  const [isTranslationReady, setIsTranslationReady] = useState(false);
-  const [fontReady, setFontReady] = useState(false);
-  const translationInProgress = useRef<boolean>(false);
-  const mounted = useRef<boolean>(true);
   
-  console.log(`[NodeLabel] Processing label for node ${id}, language: ${currentLanguage}, shouldShow: ${shouldShowLabel}`);
+  console.log(`[NodeLabel] Rendering label for node ${id}, shouldShow: ${shouldShowLabel}`);
   
   // Stabilized visibility logic to prevent flickering
   const isVisible = useMemo(() => {
     return shouldShowLabel || forceVisible || isSelected || isHighlighted;
   }, [shouldShowLabel, forceVisible, isSelected, isHighlighted]);
-  
-  // Enhanced font loading detection using the consolidated font service
-  useEffect(() => {
-    let mounted = true;
-    
-    const initializeFonts = async () => {
-      try {
-        console.log('[NodeLabel] Checking font readiness...');
-        
-        await consolidatedFontService.waitForFonts();
-        
-        if (mounted) {
-          console.log('[NodeLabel] Fonts ready via consolidated font service');
-          setFontReady(true);
-        }
-      } catch (error) {
-        console.warn('[NodeLabel] Font loading check failed:', error);
-        if (mounted) {
-          setFontReady(true); // Assume ready on error to prevent blocking
-        }
-      }
-    };
-    
-    initializeFonts();
-    
-    return () => {
-      mounted = false;
-    };
-  }, []);
-  
-  // Enhanced translation handling with race condition prevention
-  useEffect(() => {
-    if (!isVisible || !id || !fontReady) {
-      return;
-    }
-    
-    // Prevent multiple simultaneous translations
-    if (translationInProgress.current) {
-      return;
-    }
-    
-    const performTranslation = async () => {
-      try {
-        translationInProgress.current = true;
-        
-        // For English, use original text immediately
-        if (currentLanguage === 'en') {
-          if (mounted.current) {
-            setTranslatedText(id);
-            setIsTranslationReady(true);
-            console.log(`[NodeLabel] Using English text: "${id}"`);
-          }
-          return;
-        }
-        
-        // Check cache first
-        const cachedTranslation = onDemandTranslationCache.getTranslation(id, currentLanguage);
-        
-        if (cachedTranslation && mounted.current) {
-          setTranslatedText(cachedTranslation);
-          setIsTranslationReady(true);
-          console.log(`[NodeLabel] Using cached translation: "${id}" -> "${cachedTranslation}"`);
-          return;
-        }
-        
-        // Translate with validation
-        if (translate && mounted.current) {
-          console.log(`[NodeLabel] Starting translation for: "${id}" to ${currentLanguage}`);
-          
-          const result = await translate(id);
-          
-          if (mounted.current && result && typeof result === 'string') {
-            setTranslatedText(result);
-            setIsTranslationReady(true);
-            onDemandTranslationCache.setTranslation(id, result, currentLanguage);
-            console.log(`[NodeLabel] Translation complete: "${id}" -> "${result}"`);
-          } else if (mounted.current) {
-            // Fallback to original on invalid result
-            setTranslatedText(id);
-            setIsTranslationReady(true);
-            console.warn(`[NodeLabel] Invalid translation result, using original: "${id}"`);
-          }
-        }
-      } catch (error) {
-        console.error(`[NodeLabel] Translation error for "${id}":`, error);
-        if (mounted.current) {
-          setTranslatedText(id);
-          setIsTranslationReady(true);
-        }
-      } finally {
-        translationInProgress.current = false;
-      }
-    };
-    
-    // Reset translation state
-    setIsTranslationReady(false);
-    
-    // Small delay to prevent race conditions
-    const translationTimer = setTimeout(() => {
-      performTranslation();
-    }, 50);
-    
-    return () => {
-      clearTimeout(translationTimer);
-    };
-  }, [id, isVisible, currentLanguage, translate, fontReady]);
-  
-  // Cleanup on unmount
-  useEffect(() => {
-    return () => {
-      mounted.current = false;
-    };
-  }, []);
 
   // Enhanced dynamic font sizing
   const dynamicFontSize = useMemo(() => {
@@ -202,10 +80,8 @@ export const NodeLabel: React.FC<NodeLabelProps> = ({
     return Math.max(Math.min(baseSize, maxSize), minSize);
   }, [cameraZoom]);
 
-  // Don't render until both font and translation are ready
-  const shouldRender = isVisible && isTranslationReady && fontReady && translatedText;
-  
-  if (!shouldRender) {
+  // Don't render if not visible
+  if (!isVisible) {
     return null;
   }
 
@@ -219,36 +95,32 @@ export const NodeLabel: React.FC<NodeLabelProps> = ({
     return getAdaptiveTextColor(nodeColor, type, theme, isHighlighted, isSelected);
   }, [nodeColor, type, theme, isHighlighted, isSelected]);
 
-  // Enhanced outline configuration
-  const outlineConfig = useMemo(() => {
-    const baseWidth = 0.03;
-    const width = isSelected ? baseWidth * 3 : 
-                  isHighlighted ? baseWidth * 2.2 : baseWidth * 1.8;
-    
-    const outlineColor = (isSelected || isHighlighted) 
-      ? (theme === 'light' ? '#000000' : '#ffffff')
-      : (theme === 'light' ? '#333333' : '#cccccc');
-    
-    return { width, color: outlineColor };
-  }, [isSelected, isHighlighted, theme]);
-
   const labelPosition: [number, number, number] = [0, geometricOffset, 0];
   
-  console.log(`[NodeLabel] Rendering stable label "${translatedText}" for ${id}, fontSize: ${dynamicFontSize}`);
+  console.log(`[NodeLabel] Rendering TranslatableText for "${id}", fontSize: ${dynamicFontSize}`);
 
   return (
-    <ReliableText
-      text={translatedText}
-      position={labelPosition}
-      color={textColor}
-      size={dynamicFontSize}
-      visible={true}
-      renderOrder={15}
-      bold={isHighlighted || isSelected}
-      outlineWidth={outlineConfig.width}
-      outlineColor={outlineConfig.color}
-      maxWidth={25}
-    />
+    <group position={labelPosition}>
+      <TranslatableText
+        text={id}
+        as="div"
+        forceTranslate={true}
+        style={{
+          color: textColor,
+          fontSize: `${dynamicFontSize}rem`,
+          fontWeight: (isHighlighted || isSelected) ? 'bold' : 'normal',
+          textAlign: 'center',
+          textShadow: isSelected 
+            ? `2px 2px 4px ${theme === 'light' ? '#000000' : '#ffffff'}` 
+            : `1px 1px 2px ${theme === 'light' ? '#333333' : '#cccccc'}`,
+          maxWidth: '25ch',
+          wordWrap: 'break-word',
+          whiteSpace: 'nowrap',
+          overflow: 'hidden',
+          textOverflow: 'ellipsis'
+        }}
+      />
+    </group>
   );
 };
 

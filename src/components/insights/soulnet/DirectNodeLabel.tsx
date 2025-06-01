@@ -1,8 +1,6 @@
 
-import React, { useState, useEffect, useMemo } from 'react';
-import ReliableText from './ReliableText';
-import { useTranslation } from '@/contexts/TranslationContext';
-import { threejsFontService } from '@/services/threejsFontService';
+import React, { useMemo } from 'react';
+import { TranslatableText } from '@/components/translation/TranslatableText';
 
 interface DirectNodeLabelProps {
   id: string;
@@ -27,62 +25,7 @@ export const DirectNodeLabel: React.FC<DirectNodeLabelProps> = ({
   themeHex,
   nodeScale = 1
 }) => {
-  const { currentLanguage, translate } = useTranslation();
-  const [displayText, setDisplayText] = useState<string>(id);
-  const [isReady, setIsReady] = useState(false);
-
-  console.log(`[DirectNodeLabel] Enhanced rendering label for ${id}, visible: ${shouldShowLabel}`);
-
-  // Initialize component with enhanced font support
-  useEffect(() => {
-    const init = async () => {
-      try {
-        // Ensure font service is ready
-        if (threejsFontService.isReady()) {
-          setIsReady(true);
-        } else {
-          // Wait a bit for font service initialization
-          setTimeout(() => setIsReady(true), 100);
-        }
-      } catch (error) {
-        console.warn('[DirectNodeLabel] Font init error:', error);
-        setIsReady(true); // Don't block on font errors
-      }
-    };
-
-    init();
-  }, []);
-
-  // Handle translation with enhanced script support
-  useEffect(() => {
-    if (!isReady || !shouldShowLabel) return;
-
-    const translateText = async () => {
-      try {
-        if (currentLanguage === 'en' || !translate) {
-          setDisplayText(id);
-          return;
-        }
-
-        const translated = await translate(id);
-        if (translated && typeof translated === 'string') {
-          setDisplayText(translated);
-          
-          // Log script detection for debugging
-          const scriptType = threejsFontService.detectScriptType(translated);
-          const fontName = threejsFontService.getFontNameForText(translated);
-          console.log(`[DirectNodeLabel] Translation: "${id}" -> "${translated}", Script: ${scriptType}, Font: ${fontName}`);
-        } else {
-          setDisplayText(id);
-        }
-      } catch (error) {
-        console.warn(`[DirectNodeLabel] Translation failed for ${id}:`, error);
-        setDisplayText(id);
-      }
-    };
-
-    translateText();
-  }, [id, currentLanguage, translate, shouldShowLabel, isReady]);
+  console.log(`[DirectNodeLabel] Rendering label for ${id}, visible: ${shouldShowLabel}`);
 
   // Calculate position offset
   const labelOffset = useMemo(() => {
@@ -111,26 +54,35 @@ export const DirectNodeLabel: React.FC<DirectNodeLabelProps> = ({
     position[2] + labelOffset[2]
   ];
 
-  // Don't render until ready and visible
-  if (!isReady || !shouldShowLabel || !displayText) {
+  // Don't render if not visible
+  if (!shouldShowLabel) {
     return null;
   }
 
-  console.log(`[DirectNodeLabel] Enhanced rendering text "${displayText}" at position`, labelPosition);
+  console.log(`[DirectNodeLabel] Rendering TranslatableText for "${id}" at position`, labelPosition);
 
   return (
-    <ReliableText
-      text={displayText}
-      position={labelPosition}
-      color={textColor}
-      size={textSize}
-      visible={true}
-      renderOrder={15}
-      bold={isHighlighted || isSelected}
-      outlineWidth={isSelected ? 0.04 : 0.02}
-      outlineColor={isSelected ? '#000000' : '#333333'}
-      maxWidth={25}
-    />
+    <group position={labelPosition}>
+      <TranslatableText
+        text={id}
+        as="div"
+        forceTranslate={true}
+        style={{
+          color: textColor,
+          fontSize: `${textSize}rem`,
+          fontWeight: (isHighlighted || isSelected) ? 'bold' : 'normal',
+          textAlign: 'center',
+          textShadow: isSelected 
+            ? '2px 2px 4px #000000' 
+            : '1px 1px 2px #333333',
+          maxWidth: '25ch',
+          wordWrap: 'break-word',
+          whiteSpace: 'nowrap',
+          overflow: 'hidden',
+          textOverflow: 'ellipsis'
+        }}
+      />
+    </group>
   );
 };
 
