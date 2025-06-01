@@ -48,17 +48,17 @@ export const ThreeDimensionalText: React.FC<ThreeDimensionalTextProps> = ({
   position,
   color = 'white',
   size = 1.2,
-  bold = true, // Changed default to true for consistency
+  bold = true,
   backgroundColor,
   opacity = 1,
   visible = true,
   skipTranslation = false,
-  outlineWidth = 0.025, // Increased default outline width proportionally
+  outlineWidth = 0.025,
   outlineColor = '#000000',
   renderOrder = 1,
 }) => {
   const { translate, currentLanguage } = useTranslation();
-  const [translatedText, setTranslatedText] = useState(text);
+  const [displayText, setDisplayText] = useState(text);
   const { camera } = useThree();
   const textRef = useRef<THREE.Mesh>(null);
   const lastCameraPosition = useRef<THREE.Vector3>(new THREE.Vector3());
@@ -86,17 +86,27 @@ export const ThreeDimensionalText: React.FC<ThreeDimensionalTextProps> = ({
   });
 
   useEffect(() => {
+    // If skipTranslation is true, use the text as-is without any translation
+    if (skipTranslation) {
+      setDisplayText(text);
+      isNonLatinScript.current = containsNonLatinScript(text);
+      isDevanagari.current = containsDevanagari(text);
+      console.log(`[ThreeDimensionalText] Skipping translation for: "${text}"`);
+      return;
+    }
+
+    // Only translate if not skipping and language is not English
+    if (currentLanguage === 'en' || !text) {
+      setDisplayText(text);
+      isNonLatinScript.current = containsNonLatinScript(text);
+      isDevanagari.current = containsDevanagari(text);
+      return;
+    }
+    
     const translateText = async () => {
-      if (skipTranslation || currentLanguage === 'en' || !text) {
-        setTranslatedText(text);
-        isNonLatinScript.current = containsNonLatinScript(text);
-        isDevanagari.current = containsDevanagari(text);
-        return;
-      }
-      
       try {
         const result = await translate(text);
-        setTranslatedText(result);
+        setDisplayText(result);
         
         isNonLatinScript.current = containsNonLatinScript(result);
         isDevanagari.current = containsDevanagari(result);
@@ -104,7 +114,9 @@ export const ThreeDimensionalText: React.FC<ThreeDimensionalTextProps> = ({
         console.log(`[ThreeDimensionalText] Translated "${text}" to "${result}"`);
       } catch (e) {
         console.error('[ThreeDimensionalText] Translation error:', e);
-        setTranslatedText(text);
+        setDisplayText(text);
+        isNonLatinScript.current = containsNonLatinScript(text);
+        isDevanagari.current = containsDevanagari(text);
       }
     };
     
@@ -147,7 +159,7 @@ export const ThreeDimensionalText: React.FC<ThreeDimensionalTextProps> = ({
     return 1.4;
   };
 
-  console.log(`[ThreeDimensionalText] Rendering: "${translatedText}" at position:`, position, 'size:', effectiveSize, 'bold:', bold);
+  console.log(`[ThreeDimensionalText] Rendering: "${displayText}" at position:`, position, 'size:', effectiveSize, 'bold:', bold, 'skipTranslation:', skipTranslation);
   
   return (
     <Text
@@ -176,7 +188,7 @@ export const ThreeDimensionalText: React.FC<ThreeDimensionalTextProps> = ({
       material-depthTest={false}
       material-depthWrite={false}
     >
-      {translatedText}
+      {displayText}
     </Text>
   );
 };
