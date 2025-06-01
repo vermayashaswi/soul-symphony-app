@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useCallback } from 'react';
 import '@/types/three-reference';  // Fixed import path
 import { Canvas } from '@react-three/fiber';
@@ -190,10 +191,10 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
     return <TranslatableText text="Drag to rotate • Scroll to zoom • Click a node to highlight connections" forceTranslate={true} />;
   };
 
-  // Enhanced label visibility logic
-  const shouldShowLabels = isFullScreen || selectedEntity !== null;
+  // FIXED: Always show labels by default to enable Devanagari script rendering
+  const shouldShowLabels = true;
 
-  console.log(`[SoulNet] Rendering visualization with ${graphData.nodes.length} nodes, ${graphData.links.length} links`);
+  console.log(`[SoulNet] Rendering visualization with ${graphData.nodes.length} nodes, ${graphData.links.length} links, shouldShowLabels: ${shouldShowLabels}`);
 
   return (
     <div className={cn(
