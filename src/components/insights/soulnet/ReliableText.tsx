@@ -3,7 +3,7 @@ import React, { useState, useEffect, useRef, Suspense } from 'react';
 import { Text } from '@react-three/drei';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
-import { threejsFontService } from '@/services/threejsFontService';
+import { consolidatedFontService } from '@/utils/consolidatedFontService';
 import EnhancedText from './EnhancedText';
 
 interface ReliableTextProps {
@@ -49,7 +49,7 @@ export const ReliableText: React.FC<ReliableTextProps> = ({
       setDisplayText(finalText);
       
       // Determine if we need enhanced font loading
-      const scriptType = threejsFontService.detectScriptType(finalText);
+      const scriptType = consolidatedFontService.detectScriptType(finalText);
       const needsEnhanced = scriptType !== 'latin';
       setUseEnhanced(needsEnhanced);
       
@@ -103,7 +103,37 @@ export const ReliableText: React.FC<ReliableTextProps> = ({
     );
   }
 
-  // Fallback to basic text for Latin scripts
+  // Fallback to basic text for Latin scripts with optimized configuration
+  const getTextConfig = () => {
+    const scriptType = consolidatedFontService.detectScriptType(displayText);
+    
+    switch (scriptType) {
+      case 'devanagari':
+        return {
+          maxWidth: 85,
+          letterSpacing: 0.18,
+          lineHeight: 2.1,
+          fontFamily: 'Noto Sans Devanagari, system-ui, sans-serif'
+        };
+      case 'arabic':
+        return {
+          maxWidth: 75,
+          letterSpacing: 0.12,
+          lineHeight: 2.0,
+          fontFamily: 'Noto Sans Arabic, system-ui, sans-serif'
+        };
+      default:
+        return {
+          maxWidth: maxWidth,
+          letterSpacing: 0.03,
+          lineHeight: 1.5,
+          fontFamily: 'Inter, system-ui, sans-serif'
+        };
+    }
+  };
+
+  const textConfig = getTextConfig();
+
   return (
     <Text
       ref={textRef}
@@ -112,15 +142,17 @@ export const ReliableText: React.FC<ReliableTextProps> = ({
       fontSize={size}
       anchorX="center"
       anchorY="middle"
-      maxWidth={maxWidth}
+      maxWidth={textConfig.maxWidth}
       textAlign="center"
-      font="Inter, system-ui, sans-serif"
+      font={textConfig.fontFamily}
       fontWeight={bold ? "bold" : "normal"}
       material-transparent={true}
       material-depthTest={false}
       renderOrder={renderOrder}
       outlineWidth={outlineWidth}
       outlineColor={outlineColor}
+      letterSpacing={textConfig.letterSpacing}
+      lineHeight={textConfig.lineHeight}
       onError={handleError}
     >
       {displayText}

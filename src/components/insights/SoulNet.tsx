@@ -15,7 +15,7 @@ import { cn } from '@/lib/utils';
 import { TranslatableText } from '@/components/translation/TranslatableText';
 import { useTranslation } from '@/contexts/TranslationContext';
 import { onDemandTranslationCache } from '@/utils/website-translations';
-import { threejsFontService } from '@/services/threejsFontService';
+import { consolidatedFontService } from '@/utils/consolidatedFontService';
 
 interface NodeData {
   id: string;
@@ -60,8 +60,8 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
   useEffect(() => {
     console.log("[SoulNet] Component mounted with enhanced Devanagari script support");
     
-    // Preload fonts including Devanagari for better performance
-    threejsFontService.preloadFonts(['Helvetiker', 'Noto Sans Devanagari', 'Optimer']).then(() => {
+    // Preload fonts including Devanagari for better performance using consolidated service
+    consolidatedFontService.preloadFonts(['Helvetiker', 'NotoSansDevanagari', 'Optimer']).then(() => {
       console.log('[SoulNet] Font preloading completed successfully');
     }).catch(error => {
       console.warn('[SoulNet] Font preloading failed:', error);

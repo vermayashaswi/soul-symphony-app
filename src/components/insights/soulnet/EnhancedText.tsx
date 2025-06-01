@@ -4,7 +4,7 @@ import { Text } from '@react-three/drei';
 import { useFrame, useLoader } from '@react-three/fiber';
 import { FontLoader } from 'three/examples/jsm/loaders/FontLoader.js';
 import * as THREE from 'three';
-import { threejsFontService } from '@/services/threejsFontService';
+import { consolidatedFontService } from '@/utils/consolidatedFontService';
 
 interface EnhancedTextProps {
   text: string;
@@ -42,7 +42,7 @@ export const EnhancedText: React.FC<EnhancedTextProps> = ({
   useEffect(() => {
     if (!text || typeof text !== 'string') {
       setDisplayText('Node');
-      setFontUrl(threejsFontService.getFontUrl('Helvetiker'));
+      setFontUrl(consolidatedFontService.getFontUrl('Helvetiker'));
     } else {
       const cleanText = text.trim();
       const limitedText = cleanText.length > 50 ? cleanText.substring(0, 50) + '...' : cleanText;
@@ -51,11 +51,11 @@ export const EnhancedText: React.FC<EnhancedTextProps> = ({
       setDisplayText(finalText);
       
       // Test Devanagari support and get detailed font info
-      const testResult = threejsFontService.testDevanagariSupport(finalText);
+      const testResult = consolidatedFontService.testDevanagariSupport(finalText);
       setFontInfo(testResult);
       
       // Get appropriate font URL for the text
-      const dynamicFontUrl = threejsFontService.getFontUrlForText(finalText);
+      const dynamicFontUrl = consolidatedFontService.getFontUrlForText(finalText);
       setFontUrl(dynamicFontUrl);
       
       console.log(`[EnhancedText] Enhanced font analysis:`, {
@@ -118,6 +118,67 @@ export const EnhancedText: React.FC<EnhancedTextProps> = ({
     return null;
   }
 
+  // Enhanced configuration based on script type
+  const getTextConfig = () => {
+    const scriptType = fontInfo?.scriptType || 'latin';
+    
+    switch (scriptType) {
+      case 'devanagari':
+        return {
+          maxWidth: 85,
+          letterSpacing: 0.18,
+          lineHeight: 2.1,
+          sdfGlyphSize: 512
+        };
+      case 'arabic':
+        return {
+          maxWidth: 75,
+          letterSpacing: 0.12,
+          lineHeight: 2.0,
+          sdfGlyphSize: 512
+        };
+      case 'chinese':
+      case 'japanese':
+      case 'korean':
+        return {
+          maxWidth: 65,
+          letterSpacing: 0.06,
+          lineHeight: 1.9,
+          sdfGlyphSize: 512
+        };
+      case 'bengali':
+      case 'tamil':
+      case 'telugu':
+      case 'gujarati':
+      case 'kannada':
+      case 'malayalam':
+      case 'oriya':
+      case 'gurmukhi':
+        return {
+          maxWidth: 75,
+          letterSpacing: 0.12,
+          lineHeight: 2.0,
+          sdfGlyphSize: 512
+        };
+      case 'thai':
+        return {
+          maxWidth: 70,
+          letterSpacing: 0.1,
+          lineHeight: 1.95,
+          sdfGlyphSize: 512
+        };
+      default:
+        return {
+          maxWidth: maxWidth,
+          letterSpacing: 0.03,
+          lineHeight: 1.5,
+          sdfGlyphSize: 256
+        };
+    }
+  };
+
+  const textConfig = getTextConfig();
+
   console.log(`[EnhancedText] Rendering text: "${displayText}" with font analysis:`, fontInfo);
 
   return (
@@ -128,7 +189,7 @@ export const EnhancedText: React.FC<EnhancedTextProps> = ({
       fontSize={size}
       anchorX="center"
       anchorY="middle"
-      maxWidth={maxWidth}
+      maxWidth={textConfig.maxWidth}
       textAlign="center"
       font={font}
       fontWeight={bold ? "bold" : "normal"}
@@ -137,6 +198,11 @@ export const EnhancedText: React.FC<EnhancedTextProps> = ({
       renderOrder={renderOrder}
       outlineWidth={outlineWidth}
       outlineColor={outlineColor}
+      letterSpacing={textConfig.letterSpacing}
+      lineHeight={textConfig.lineHeight}
+      sdfGlyphSize={textConfig.sdfGlyphSize}
+      overflowWrap="normal"
+      whiteSpace="normal"
       onError={handleError}
     >
       {displayText}

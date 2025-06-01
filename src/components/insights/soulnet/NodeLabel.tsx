@@ -4,7 +4,7 @@ import ThreeDimensionalText from './ThreeDimensionalText';
 import { useTheme } from '@/hooks/use-theme';
 import { useTranslation } from '@/contexts/TranslationContext';
 import { onDemandTranslationCache } from '@/utils/website-translations';
-import { fontService } from '@/utils/fontService';
+import { consolidatedFontService } from '@/utils/consolidatedFontService';
 
 // Enhanced adaptive text color with better contrast
 const getAdaptiveTextColor = (nodeColor: string, nodeType: 'entity' | 'emotion', theme: string, isHighlighted: boolean, isSelected: boolean): string => {
@@ -35,10 +35,17 @@ const calculateLabelOffset = (nodeType: 'entity' | 'emotion', nodeScale: number)
   }
 };
 
-// Enhanced entity text formatting
-const formatEntityText = (text: string): string => {
+// Simplified entity text formatting - no manual wrapping for non-Latin scripts
+const formatEntityText = (text: string, scriptType: string): string => {
   if (!text || text.length <= 4) return text;
   
+  // For non-Latin scripts (especially Devanagari), don't split manually
+  if (scriptType !== 'latin') {
+    console.log(`[NodeLabel] Preserving ${scriptType} text without manual wrapping: "${text}"`);
+    return text;
+  }
+  
+  // Only apply manual formatting for Latin scripts
   const words = text.trim().split(/\s+/);
   
   if (words.length === 1) {
@@ -111,7 +118,7 @@ export const NodeLabel: React.FC<NodeLabelProps> = ({
     return shouldShowLabel || forceVisible || isSelected || isHighlighted;
   }, [shouldShowLabel, forceVisible, isSelected, isHighlighted]);
   
-  // Enhanced font loading detection using the font service
+  // Enhanced font loading detection using the consolidated font service
   useEffect(() => {
     let mounted = true;
     
@@ -119,11 +126,11 @@ export const NodeLabel: React.FC<NodeLabelProps> = ({
       try {
         console.log('[NodeLabel] Checking font readiness...');
         
-        // Wait for font service to be ready
-        await fontService.waitForFonts();
+        // Wait for consolidated font service to be ready
+        await consolidatedFontService.waitForFonts();
         
         if (mounted) {
-          console.log('[NodeLabel] Fonts ready via font service');
+          console.log('[NodeLabel] Fonts ready via consolidated font service');
           setFontReady(true);
         }
       } catch (error) {
@@ -165,10 +172,10 @@ export const NodeLabel: React.FC<NodeLabelProps> = ({
           if (mounted.current) {
             setTranslatedText(id);
             setIsTranslationReady(true);
-            scriptTypeRef.current = fontService.detectScriptType(id);
+            scriptTypeRef.current = consolidatedFontService.detectScriptType(id);
             
             // Preload fonts for the detected script
-            await fontService.preloadFontsForScript(scriptTypeRef.current);
+            await consolidatedFontService.preloadFontsForScript(scriptTypeRef.current);
             
             console.log(`[NodeLabel] Using English text: "${id}", script: ${scriptTypeRef.current}`);
           }
@@ -181,10 +188,10 @@ export const NodeLabel: React.FC<NodeLabelProps> = ({
         if (cachedTranslation && mounted.current) {
           setTranslatedText(cachedTranslation);
           setIsTranslationReady(true);
-          scriptTypeRef.current = fontService.detectScriptType(cachedTranslation);
+          scriptTypeRef.current = consolidatedFontService.detectScriptType(cachedTranslation);
           
           // Preload fonts for the detected script
-          await fontService.preloadFontsForScript(scriptTypeRef.current);
+          await consolidatedFontService.preloadFontsForScript(scriptTypeRef.current);
           
           console.log(`[NodeLabel] Using cached translation: "${id}" -> "${cachedTranslation}", script: ${scriptTypeRef.current}`);
           return;
@@ -200,20 +207,20 @@ export const NodeLabel: React.FC<NodeLabelProps> = ({
             setTranslatedText(result);
             setIsTranslationReady(true);
             onDemandTranslationCache.setTranslation(id, result, currentLanguage);
-            scriptTypeRef.current = fontService.detectScriptType(result);
+            scriptTypeRef.current = consolidatedFontService.detectScriptType(result);
             
             // Preload fonts for the detected script
-            await fontService.preloadFontsForScript(scriptTypeRef.current);
+            await consolidatedFontService.preloadFontsForScript(scriptTypeRef.current);
             
             console.log(`[NodeLabel] Translation complete: "${id}" -> "${result}", script: ${scriptTypeRef.current}`);
           } else if (mounted.current) {
             // Fallback to original on invalid result
             setTranslatedText(id);
             setIsTranslationReady(true);
-            scriptTypeRef.current = fontService.detectScriptType(id);
+            scriptTypeRef.current = consolidatedFontService.detectScriptType(id);
             
             // Preload fonts for the detected script
-            await fontService.preloadFontsForScript(scriptTypeRef.current);
+            await consolidatedFontService.preloadFontsForScript(scriptTypeRef.current);
             
             console.warn(`[NodeLabel] Invalid translation result, using original: "${id}"`);
           }
@@ -223,10 +230,10 @@ export const NodeLabel: React.FC<NodeLabelProps> = ({
         if (mounted.current) {
           setTranslatedText(id);
           setIsTranslationReady(true);
-          scriptTypeRef.current = fontService.detectScriptType(id);
+          scriptTypeRef.current = consolidatedFontService.detectScriptType(id);
           
           // Preload fonts even for fallback
-          await fontService.preloadFontsForScript(scriptTypeRef.current);
+          await consolidatedFontService.preloadFontsForScript(scriptTypeRef.current);
         }
       } finally {
         translationInProgress.current = false;
@@ -253,12 +260,12 @@ export const NodeLabel: React.FC<NodeLabelProps> = ({
     };
   }, []);
   
-  // Enhanced text formatting
+  // Enhanced text formatting with script-aware processing
   const formattedText = useMemo(() => {
     if (!translatedText) return id;
     
     if (type === 'entity') {
-      return formatEntityText(translatedText);
+      return formatEntityText(translatedText, scriptTypeRef.current);
     }
     return translatedText;
   }, [translatedText, type, id]);
