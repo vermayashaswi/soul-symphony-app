@@ -6,6 +6,14 @@ export interface FontLoadingState {
   fontFamily: string;
 }
 
+// Font URLs for drei Text component - these are actual font files that drei can load
+const FONT_URLS = {
+  'Inter': 'https://fonts.gstatic.com/s/inter/v13/UcCO3FwrK3iLTeHuS_fvQtMwCp50KnMw2boKoduKmMEVuLyfAZ9hiJ-Ek-_EeA.woff2',
+  'Noto Sans Devanagari': 'https://fonts.gstatic.com/s/notosansdevanagari/v26/TuGoUUFzXI5FBtUq5a8bjKYTZjtRU6Sgv3NaV_SNmI0b8IzCQvLEqVJJWlhjAUGRo5j0UdXk0Q.woff2',
+  'Noto Sans Arabic': 'https://fonts.gstatic.com/s/notosansarabic/v18/nwpxtLGrOAZMl5nJ_wfgRg3DrWFZWsnVBJ_sS6tlqHHFlhQ5l-PI.woff2',
+  'Noto Sans CJK': 'https://fonts.gstatic.com/s/notosansjp/v52/-F6jfjtqLzI2JPCgQBnw7HFyzSD-AsregP8VFBEj75vY0rw-oME.woff2'
+};
+
 // Check if a font is loaded and available
 export const checkFontLoaded = (fontFamily: string): Promise<boolean> => {
   return new Promise((resolve) => {
@@ -60,6 +68,14 @@ export const getFontForScript = (text: string): string => {
   return 'Inter';
 };
 
+// Get the font URL for drei Text component
+export const getFontUrlForScript = (text: string): string | undefined => {
+  const fontFamily = getFontForScript(text);
+  const fontUrl = FONT_URLS[fontFamily as keyof typeof FONT_URLS];
+  console.log(`[getFontUrlForScript] For text "${text}" using font "${fontFamily}" with URL: ${fontUrl}`);
+  return fontUrl;
+};
+
 // Preload fonts for better performance
 export const preloadFont = (fontFamily: string): Promise<void> => {
   return new Promise((resolve, reject) => {
@@ -68,7 +84,14 @@ export const preloadFont = (fontFamily: string): Promise<void> => {
       return;
     }
 
-    const fontFace = new FontFace(fontFamily, `url(https://fonts.googleapis.com/css2?family=${fontFamily.replace(' ', '+')}&display=swap)`);
+    const fontUrl = FONT_URLS[fontFamily as keyof typeof FONT_URLS];
+    if (!fontUrl) {
+      console.warn(`No font URL found for ${fontFamily}`);
+      resolve();
+      return;
+    }
+
+    const fontFace = new FontFace(fontFamily, `url(${fontUrl})`);
     
     fontFace.load().then(() => {
       document.fonts.add(fontFace);

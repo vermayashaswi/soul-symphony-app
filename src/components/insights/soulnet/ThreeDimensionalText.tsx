@@ -5,7 +5,7 @@ import { Text } from '@react-three/drei';
 import { useFrame, useThree } from '@react-three/fiber';
 import * as THREE from 'three';
 import { useTranslation } from '@/contexts/TranslationContext';
-import { getFontForScript, checkFontLoaded } from '@/utils/fontLoader';
+import { getFontForScript, checkFontLoaded, getFontUrlForScript } from '@/utils/fontLoader';
 
 interface ThreeDimensionalTextProps {
   text: string;
@@ -62,6 +62,7 @@ export const ThreeDimensionalText: React.FC<ThreeDimensionalTextProps> = ({
   const [translatedText, setTranslatedText] = useState(text);
   const [fontLoaded, setFontLoaded] = useState(false);
   const [currentFont, setCurrentFont] = useState('Inter');
+  const [fontUrl, setFontUrl] = useState<string | undefined>(undefined);
   const { camera } = useThree();
   const textRef = useRef<THREE.Mesh>(null);
   const lastCameraPosition = useRef<THREE.Vector3>(new THREE.Vector3());
@@ -119,23 +120,27 @@ export const ThreeDimensionalText: React.FC<ThreeDimensionalTextProps> = ({
     const loadFont = async () => {
       const textToCheck = translatedText || text;
       const requiredFont = getFontForScript(textToCheck);
+      const requiredFontUrl = getFontUrlForScript(textToCheck);
       
-      console.log(`[ThreeDimensionalText] Loading font for "${textToCheck}": ${requiredFont}`);
+      console.log(`[ThreeDimensionalText] Loading font for "${textToCheck}": ${requiredFont}, URL: ${requiredFontUrl}`);
       
       try {
         const isLoaded = await checkFontLoaded(requiredFont);
-        if (isLoaded) {
+        if (isLoaded || requiredFontUrl) {
           setCurrentFont(requiredFont);
+          setFontUrl(requiredFontUrl);
           setFontLoaded(true);
-          console.log(`[ThreeDimensionalText] Font ${requiredFont} loaded successfully`);
+          console.log(`[ThreeDimensionalText] Font ${requiredFont} loaded successfully with URL: ${requiredFontUrl}`);
         } else {
           console.warn(`[ThreeDimensionalText] Font ${requiredFont} failed to load, using fallback`);
           setCurrentFont('Inter');
+          setFontUrl(getFontUrlForScript('default text')); // Get Inter URL
           setFontLoaded(true);
         }
       } catch (error) {
         console.error(`[ThreeDimensionalText] Error loading font ${requiredFont}:`, error);
         setCurrentFont('Inter');
+        setFontUrl(getFontUrlForScript('default text')); // Get Inter URL
         setFontLoaded(true);
       }
     };
@@ -203,7 +208,7 @@ export const ThreeDimensionalText: React.FC<ThreeDimensionalTextProps> = ({
     return bold ? 700 : 500;
   };
 
-  console.log(`[ThreeDimensionalText] Rendering: "${translatedText}" at position:`, position, 'size:', effectiveSize, 'font:', currentFont, 'isDevanagari:', isDevanagari.current, 'sdfGlyphSize:', getSdfGlyphSize());
+  console.log(`[ThreeDimensionalText] Rendering: "${translatedText}" at position:`, position, 'size:', effectiveSize, 'font:', currentFont, 'fontUrl:', fontUrl, 'isDevanagari:', isDevanagari.current, 'sdfGlyphSize:', getSdfGlyphSize());
   
   return (
     <Text
@@ -231,8 +236,8 @@ export const ThreeDimensionalText: React.FC<ThreeDimensionalTextProps> = ({
       material-side={THREE.DoubleSide}
       material-depthTest={false}
       material-depthWrite={false}
-      // Use the dynamically selected font
-      font={currentFont === 'Noto Sans Devanagari' ? undefined : undefined} // Let drei handle font selection
+      // Use the dynamically selected font URL - this is the key fix
+      font={fontUrl}
       characters={isDevanagari.current ? "अआइईउऊएऐओऔकखगघङचछजझञटठडढणतथदधनपफबभमयरलवशषसह्ािीुूृॄेैोौंःँ़ॐ०१२३४५६७८९।॥" : undefined}
     >
       {translatedText}
