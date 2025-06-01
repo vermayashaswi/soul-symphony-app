@@ -1,12 +1,10 @@
-
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import '@/types/three-reference';  // Fixed import path
 import { Canvas } from '@react-three/fiber';
 import { TimeRange } from '@/hooks/use-insights-data';
 import { supabase } from '@/integrations/supabase/client';
 import { useIsMobile } from '@/hooks/use-mobile';
 import SoulNetVisualization from './soulnet/SoulNetVisualization';
-import HtmlLabelOverlay from './soulnet/HtmlLabelOverlay';
 import { LoadingState } from './soulnet/LoadingState';
 import { EmptyState } from './soulnet/EmptyState';
 import { FullscreenWrapper } from './soulnet/FullscreenWrapper';
@@ -46,7 +44,6 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
   const [selectedEntity, setSelectedEntity] = useState<string | null>(null);
   const [error, setError] = useState<Error | null>(null);
   const { currentLanguage } = useTranslation();
-  const containerRef = useRef<HTMLDivElement>(null);
 
   console.log("Rendering SoulNet component with userId:", userId, "and timeRange:", timeRange);
 
@@ -151,43 +148,8 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
     return <TranslatableText text="Drag to rotate • Scroll to zoom • Click a node to highlight connections" forceTranslate={true} />;
   };
 
-  // Always show labels for better UX
-  const shouldShowLabels = true;
-
-  // Calculate connected nodes for HTML overlay
-  const getConnectedNodes = (nodeId: string | null): Set<string> => {
-    if (!nodeId || !graphData.links) return new Set();
-    const connected = new Set<string>();
-    graphData.links.forEach(link => {
-      if (link.source === nodeId) connected.add(link.target);
-      if (link.target === nodeId) connected.add(link.source);
-    });
-    return connected;
-  };
-
-  // Calculate connection percentages for HTML overlay
-  const getConnectionPercentages = (nodeId: string | null): Map<string, number> => {
-    if (!nodeId || !graphData.links) return new Map();
-    
-    const nodeLinks = graphData.links.filter(link => 
-      link.source === nodeId || link.target === nodeId
-    );
-    
-    const totalValue = nodeLinks.reduce((sum, link) => sum + link.value, 0);
-    if (totalValue === 0) return new Map();
-    
-    const percentageMap = new Map<string, number>();
-    nodeLinks.forEach(link => {
-      const connectedNodeId = link.source === nodeId ? link.target : link.source;
-      const percentage = (link.value / totalValue) * 100;
-      percentageMap.set(connectedNodeId, percentage);
-    });
-    
-    return percentageMap;
-  };
-
-  const highlightedNodes = getConnectedNodes(selectedEntity);
-  const connectionPercentages = getConnectionPercentages(selectedEntity);
+  // Clean shouldShowLabels logic - only show when node is selected or in fullscreen
+  const shouldShowLabels = isFullScreen || selectedEntity !== null;
 
   return (
     <div className={cn(
@@ -200,75 +162,62 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
         isFullScreen={isFullScreen}
         toggleFullScreen={toggleFullScreen}
       >
-        <div ref={containerRef} className="relative w-full h-full">
-          <ErrorBoundary fallback={
-            <div className="flex items-center justify-center p-10 bg-gray-100 dark:bg-gray-800 rounded-lg">
-              <div className="text-center">
-                <h3 className="text-lg font-medium">
-                  <TranslatableText text="Error in Soul-Net Visualization" forceTranslate={true} />
-                </h3>
-                <p className="text-muted-foreground mt-2">
-                  <TranslatableText text="There was a problem rendering the visualization." forceTranslate={true} />
-                </p>
-                <button 
-                  className="mt-4 px-4 py-2 bg-primary text-white rounded-lg"
-                  onClick={() => window.location.reload()}
-                >
-                  <TranslatableText text="Reload" forceTranslate={true} />
-                </button>
-              </div>
+        <ErrorBoundary fallback={
+          <div className="flex items-center justify-center p-10 bg-gray-100 dark:bg-gray-800 rounded-lg">
+            <div className="text-center">
+              <h3 className="text-lg font-medium">
+                <TranslatableText text="Error in Soul-Net Visualization" forceTranslate={true} />
+              </h3>
+              <p className="text-muted-foreground mt-2">
+                <TranslatableText text="There was a problem rendering the visualization." forceTranslate={true} />
+              </p>
+              <button 
+                className="mt-4 px-4 py-2 bg-primary text-white rounded-lg"
+                onClick={() => window.location.reload()}
+              >
+                <TranslatableText text="Reload" forceTranslate={true} />
+              </button>
             </div>
-          }>
-            <Canvas
-              style={{
-                width: '100%',
-                height: '100%',
-                maxWidth: isFullScreen ? 'none' : '800px',
-                maxHeight: isFullScreen ? 'none' : '500px',
-                position: 'relative',
-                zIndex: 5,
-                transition: 'all 0.3s ease-in-out',
-              }}
-              camera={{ 
-                position: [0, 0, isFullScreen ? 40 : 45],
-                near: 1, 
-                far: 1000,
-                fov: isFullScreen ? 60 : 50
-              }}
-              onPointerMissed={() => setSelectedEntity(null)}
-              gl={{ 
-                preserveDrawingBuffer: true,
-                antialias: !isMobile,
-                powerPreference: 'high-performance',
-                alpha: true,
-                depth: true,
-                stencil: false,
-                precision: isMobile ? 'mediump' : 'highp',
-                logarithmicDepthBuffer: true
-              }}
-            >
-              <SoulNetVisualization
-                data={graphData}
-                selectedNode={selectedEntity}
-                onNodeClick={handleNodeSelect}
-                themeHex={themeHex}
-                isFullScreen={isFullScreen}
-                shouldShowLabels={false} // Labels handled by HTML overlay
-                containerRef={containerRef}
-              />
-            </Canvas>
-            
-            {/* HTML Label Overlay */}
-            <HtmlLabelOverlay
-              nodes={graphData.nodes}
+          </div>
+        }>
+          <Canvas
+            style={{
+              width: '100%',
+              height: '100%',
+              maxWidth: isFullScreen ? 'none' : '800px',
+              maxHeight: isFullScreen ? 'none' : '500px',
+              position: 'relative',
+              zIndex: 5,
+              transition: 'all 0.3s ease-in-out',
+            }}
+            camera={{ 
+              position: [0, 0, isFullScreen ? 40 : 45],
+              near: 1, 
+              far: 1000,
+              fov: isFullScreen ? 60 : 50
+            }}
+            onPointerMissed={() => setSelectedEntity(null)}
+            gl={{ 
+              preserveDrawingBuffer: true,
+              antialias: !isMobile,
+              powerPreference: 'high-performance',
+              alpha: true,
+              depth: true,
+              stencil: false,
+              precision: isMobile ? 'mediump' : 'highp',
+              logarithmicDepthBuffer: true
+            }}
+          >
+            <SoulNetVisualization
+              data={graphData}
               selectedNode={selectedEntity}
-              highlightedNodes={highlightedNodes}
+              onNodeClick={handleNodeSelect}
+              themeHex={themeHex}
+              isFullScreen={isFullScreen}
               shouldShowLabels={shouldShowLabels}
-              connectionPercentages={connectionPercentages}
-              containerRef={containerRef}
             />
-          </ErrorBoundary>
-        </div>
+          </Canvas>
+        </ErrorBoundary>
       </FullscreenWrapper>
       
       {!isFullScreen && (

@@ -3,10 +3,16 @@ import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import App from "./App.tsx";
 import "./index.css";
+import { initializeFonts } from "./utils/fontLoader.ts";
 
-// Initialize the app without font loading since we're using HTML overlays
+// Initialize fonts before rendering the app
 const initializeApp = async () => {
-  console.log('Initializing app with HTML overlay system');
+  try {
+    await initializeFonts();
+    console.log('Fonts initialized successfully');
+  } catch (error) {
+    console.warn('Font initialization failed, continuing with fallback fonts:', error);
+  }
   
   const rootElement = document.getElementById("root");
   if (!rootElement) throw new Error("Root element not found");
