@@ -166,29 +166,17 @@ export const SimplifiedSoulNetVisualization: React.FC<SimplifiedSoulNetVisualiza
         {data.nodes.map((node) => (
           <group key={`node-group-${node.id}`} position={node.position}>
             <Node
-              id={node.id}
-              type={node.type}
-              value={node.value}
-              color={node.color}
-              position={[0, 0, 0]}
-              isHighlighted={isNodeHighlighted(node.id)}
+              node={node}
               isSelected={node.id === selectedNode}
-              onClick={() => onNodeClick(node.id)}
+              onClick={(id: string, e: any) => onNodeClick(id)}
+              highlightedNodes={connectedNodes}
+              showLabel={shouldShowNodeLabel(node.id)}
+              dimmed={selectedNode ? !isNodeHighlighted(node.id) && node.id !== selectedNode : false}
               themeHex={themeHex}
-            />
-            
-            {/* Render node label using TranslatableText */}
-            <NodeLabel
-              id={node.id}
-              type={node.type}
-              position={[0, 0, 0]}
-              isHighlighted={isNodeHighlighted(node.id)}
-              isSelected={node.id === selectedNode}
-              shouldShowLabel={shouldShowNodeLabel(node.id)}
+              selectedNodeId={selectedNode}
               cameraZoom={cameraZoom}
-              themeHex={themeHex}
-              nodeScale={node.value}
-              nodeColor={node.color}
+              isHighlighted={isNodeHighlighted(node.id)}
+              forceShowLabels={shouldShowLabels}
             />
           </group>
         ))}
