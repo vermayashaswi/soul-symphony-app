@@ -36,6 +36,21 @@ const containsDevanagari = (text: string): boolean => {
   return devanagariPattern.test(text);
 };
 
+// Detect specific script type
+const detectScriptType = (text: string): string => {
+  if (!text) return 'latin';
+  
+  if (/[\u0900-\u097F]/.test(text)) return 'devanagari';
+  if (/[\u0600-\u06FF]/.test(text)) return 'arabic';
+  if (/[\u4E00-\u9FFF]/.test(text)) return 'chinese';
+  if (/[\u3040-\u309F\u30A0-\u30FF]/.test(text)) return 'japanese';
+  if (/[\uAC00-\uD7AF]/.test(text)) return 'korean';
+  if (/[\u0980-\u09FF]/.test(text)) return 'bengali';
+  if (/[\u0E00-\u0E7F]/.test(text)) return 'thai';
+  
+  return 'latin';
+};
+
 // Enhanced adaptive text color with better contrast
 const getAdaptiveTextColor = (nodeColor: string, nodeType: 'entity' | 'emotion', theme: string, isHighlighted: boolean, isSelected: boolean): string => {
   // Selected node gets maximum contrast
@@ -137,19 +152,48 @@ export const NodeLabel: React.FC<NodeLabelProps> = ({
   const [translatedText, setTranslatedText] = useState<string>(id);
   const [isTranslating, setIsTranslating] = useState(false);
   const [hasTranslationError, setHasTranslationError] = useState(false);
+  const [fontLoaded, setFontLoaded] = useState(false);
   const prevLangRef = useRef<string>(currentLanguage);
   const isNonLatin = useRef<boolean>(false);
   const isDevanagari = useRef<boolean>(false);
+  const scriptType = useRef<string>('latin');
   
   console.log(`[NodeLabel] Processing label for node ${id}, shouldShow: ${shouldShowLabel}, forceVisible: ${forceVisible}`);
   
   // Simplified visibility logic
   const isVisible = shouldShowLabel || forceVisible;
   
+  // Font loading detection
+  useEffect(() => {
+    const checkFontLoading = async () => {
+      try {
+        console.log('[NodeLabel] Checking font loading status');
+        
+        if (document.fonts) {
+          await document.fonts.ready;
+          console.log('[NodeLabel] Document fonts are ready');
+          setFontLoaded(true);
+        } else {
+          console.log('[NodeLabel] Document.fonts not supported, assuming fonts loaded');
+          setFontLoaded(true);
+        }
+      } catch (error) {
+        console.warn('[NodeLabel] Font loading check failed:', error);
+        setFontLoaded(true);
+      }
+    };
+    
+    checkFontLoading();
+  }, []);
+  
   // Enhanced translation handling with error recovery
   useEffect(() => {
     if (!isVisible || currentLanguage === 'en' || !id) {
       setTranslatedText(id);
+      isNonLatin.current = containsNonLatinScript(id);
+      isDevanagari.current = containsDevanagari(id);
+      scriptType.current = detectScriptType(id);
+      console.log(`[NodeLabel] Using original text: "${id}", detected script: ${scriptType.current}`);
       return;
     }
     
@@ -160,8 +204,9 @@ export const NodeLabel: React.FC<NodeLabelProps> = ({
       setTranslatedText(cachedTranslation);
       isNonLatin.current = containsNonLatinScript(cachedTranslation);
       isDevanagari.current = containsDevanagari(cachedTranslation);
+      scriptType.current = detectScriptType(cachedTranslation);
       setHasTranslationError(false);
-      console.log(`[NodeLabel] Using cached translation for "${id}": "${cachedTranslation}"`);
+      console.log(`[NodeLabel] Using cached translation for "${id}": "${cachedTranslation}", detected script: ${scriptType.current}`);
       return;
     }
     
@@ -183,8 +228,9 @@ export const NodeLabel: React.FC<NodeLabelProps> = ({
         
         isNonLatin.current = containsNonLatinScript(result);
         isDevanagari.current = containsDevanagari(result);
+        scriptType.current = detectScriptType(result);
         
-        console.log(`[NodeLabel] Successfully translated "${id}" to "${result}"`);
+        console.log(`[NodeLabel] Successfully translated "${id}" to "${result}", detected script: ${scriptType.current}`);
       } catch (error) {
         console.error(`[NodeLabel] Translation failed for "${id}":`, error);
         setHasTranslationError(true);
@@ -193,6 +239,9 @@ export const NodeLabel: React.FC<NodeLabelProps> = ({
         setTranslatedText(id);
         isNonLatin.current = containsNonLatinScript(id);
         isDevanagari.current = containsDevanagari(id);
+        scriptType.current = detectScriptType(id);
+        
+        console.log(`[NodeLabel] Using fallback text: "${id}", detected script: ${scriptType.current}`);
       } finally {
         setIsTranslating(false);
       }
@@ -219,7 +268,7 @@ export const NodeLabel: React.FC<NodeLabelProps> = ({
     return translatedText || id;
   }, [id, type, translatedText]);
 
-  // Enhanced dynamic font sizing
+  // Enhanced dynamic font sizing with script-specific adjustments
   const dynamicFontSize = useMemo(() => {
     let z = cameraZoom !== undefined ? cameraZoom : 45;
     if (typeof z !== 'number' || Number.isNaN(z)) z = 45;
@@ -228,11 +277,27 @@ export const NodeLabel: React.FC<NodeLabelProps> = ({
     const baseSize = 0.3 + Math.max(0, (45 - z) * 0.00625);
     
     // Enhanced script-specific adjustments
-    const sizeAdjustment = isDevanagari.current ? 0.08 : 
-                          isNonLatin.current ? 0.05 : 0;
+    let sizeAdjustment = 0;
+    switch (scriptType.current) {
+      case 'devanagari':
+        sizeAdjustment = 0.1; // Larger adjustment for Devanagari
+        break;
+      case 'arabic':
+      case 'bengali':
+      case 'thai':
+        sizeAdjustment = 0.08;
+        break;
+      case 'chinese':
+      case 'japanese':
+      case 'korean':
+        sizeAdjustment = 0.05;
+        break;
+      default:
+        sizeAdjustment = 0;
+    }
     
     const minSize = 0.25; // Increased minimum size
-    const maxSize = 0.5;  // Added maximum size limit
+    const maxSize = 0.6;  // Increased maximum size limit for better visibility
     
     return Math.max(Math.min(baseSize + sizeAdjustment, maxSize), minSize);
   }, [cameraZoom]);
@@ -254,9 +319,9 @@ export const NodeLabel: React.FC<NodeLabelProps> = ({
 
   // Enhanced outline configuration
   const outlineConfig = useMemo(() => {
-    const baseWidth = 0.02;
-    const width = isSelected ? baseWidth * 2 : 
-                  isHighlighted ? baseWidth * 1.5 : baseWidth;
+    const baseWidth = 0.025; // Increased base width for better visibility
+    const width = isSelected ? baseWidth * 2.5 : 
+                  isHighlighted ? baseWidth * 2 : baseWidth * 1.5;
     
     // Enhanced contrast calculation for outline color
     const outlineColor = (isSelected || isHighlighted) 
@@ -269,7 +334,8 @@ export const NodeLabel: React.FC<NodeLabelProps> = ({
   const labelPosition: [number, number, number] = [0, geometricOffset, 0];
   
   console.log(`[NodeLabel] Rendering label "${formattedText}" at offset ${geometricOffset}, 
-    isTranslating: ${isTranslating}, hasError: ${hasTranslationError}`);
+    isTranslating: ${isTranslating}, hasError: ${hasTranslationError}, fontLoaded: ${fontLoaded}, 
+    script: ${scriptType.current}, fontSize: ${dynamicFontSize}`);
 
   return (
     <ThreeDimensionalText
