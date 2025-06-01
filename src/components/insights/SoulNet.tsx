@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import '@/types/three-reference';
 import { Canvas } from '@react-three/fiber';
@@ -7,11 +6,13 @@ import { supabase } from '@/integrations/supabase/client';
 import { useIsMobile } from '@/hooks/use-mobile';
 import SimplifiedSoulNetVisualization from './soulnet/SimplifiedSoulNetVisualization';
 import RenderingErrorBoundary from './soulnet/RenderingErrorBoundary';
+import FallbackVisualization from './soulnet/FallbackVisualization';
 import { LoadingState } from './soulnet/LoadingState';
 import { EmptyState } from './soulnet/EmptyState';
 import { FullscreenWrapper } from './soulnet/FullscreenWrapper';
 import SoulNetDescription from './soulnet/SoulNetDescription';
 import { useUserColorThemeHex } from './soulnet/useUserColorThemeHex';
+import { isWebGLCompatible, detectWebGLCapabilities } from '@/utils/webgl-detection';
 import { cn } from '@/lib/utils';
 import { TranslatableText } from '@/components/translation/TranslatableText';
 
@@ -43,6 +44,8 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
   const [canvasError, setCanvasError] = useState<Error | null>(null);
   const [retryCount, setRetryCount] = useState(0);
   const [hasData, setHasData] = useState(false);
+  const [useWebGL, setUseWebGL] = useState(true);
+  const [webglCapabilities, setWebglCapabilities] = useState<any>(null);
   
   const isMobile = useIsMobile();
   const themeHex = useUserColorThemeHex();
@@ -56,8 +59,30 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
     loading,
     dataError: !!dataError,
     canvasError: !!canvasError,
-    retryCount
+    retryCount,
+    useWebGL,
+    webglCapabilities: !!webglCapabilities
   });
+
+  // Check WebGL compatibility on mount
+  useEffect(() => {
+    try {
+      const isCompatible = isWebGLCompatible();
+      const capabilities = detectWebGLCapabilities();
+      
+      console.log("[SoulNet] WebGL compatibility check:", { isCompatible, capabilities });
+      
+      setUseWebGL(isCompatible);
+      setWebglCapabilities(capabilities);
+      
+      if (!isCompatible) {
+        console.warn("[SoulNet] WebGL not compatible, using fallback visualization");
+      }
+    } catch (error) {
+      console.error("[SoulNet] Error checking WebGL compatibility:", error);
+      setUseWebGL(false);
+    }
+  }, []);
 
   // Cleanup on unmount
   useEffect(() => {
@@ -155,13 +180,23 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
     console.error('[SoulNet] Canvas error:', error);
     setCanvasError(error);
     setRetryCount(prev => prev + 1);
-  }, []);
+    
+    // If we get repeated Canvas errors, switch to fallback
+    if (retryCount > 2) {
+      console.log('[SoulNet] Multiple Canvas errors, switching to fallback');
+      setUseWebGL(false);
+    }
+  }, [retryCount]);
 
   const handleRetry = useCallback(() => {
     console.log('[SoulNet] Manual retry');
     setCanvasError(null);
     setDataError(null);
     setRetryCount(0);
+    
+    // Reset WebGL attempt
+    const isCompatible = isWebGLCompatible();
+    setUseWebGL(isCompatible);
   }, []);
 
   // Show loading state only while actively loading
@@ -232,8 +267,9 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
     return <TranslatableText text="Drag to rotate • Scroll to zoom • Click a node to highlight connections" forceTranslate={true} />;
   };
 
-  // Main render - always show Canvas when we have data
-  console.log("[SoulNet] Rendering main visualization with", graphData.nodes.length, "nodes");
+  // Main render with WebGL detection and fallback
+  console.log("[SoulNet] Rendering visualization with", graphData.nodes.length, "nodes, WebGL:", useWebGL);
+  
   return (
     <div className={cn(
       "bg-background rounded-xl shadow-sm border w-full relative",
@@ -254,63 +290,74 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
           zIndex: 5,
           minHeight: '400px'
         }}>
-          <RenderingErrorBoundary
-            onError={handleCanvasError}
-            fallback={
-              <div className="flex items-center justify-center p-10 bg-gray-100 dark:bg-gray-800 rounded-lg h-full">
-                <div className="text-center">
-                  <h3 className="text-lg font-medium">
-                    <TranslatableText text="Visualization Error" />
-                  </h3>
-                  <p className="text-muted-foreground mt-2">
-                    <TranslatableText text="Unable to render the 3D visualization." />
-                  </p>
-                  <button 
-                    className="mt-4 px-4 py-2 bg-primary text-white rounded-lg"
-                    onClick={handleRetry}
-                  >
-                    <TranslatableText text="Retry" />
-                  </button>
-                </div>
-              </div>
-            }
-          >
-            <Canvas
-              style={{
-                width: '100%',
-                height: '100%'
-              }}
-              camera={{ 
-                position: [0, 0, isFullScreen ? 40 : 45],
-                near: 1, 
-                far: 1000,
-                fov: isFullScreen ? 60 : 50
-              }}
-              onPointerMissed={() => setSelectedNode(null)}
-              gl={{ 
-                preserveDrawingBuffer: true,
-                antialias: !isMobile,
-                powerPreference: 'high-performance',
-                alpha: true,
-                depth: true,
-                stencil: false,
-                precision: isMobile ? 'mediump' : 'highp'
-              }}
-              onCreated={(state) => {
-                console.log('[SoulNet] Canvas created successfully');
-              }}
+          {!useWebGL ? (
+            // Fallback visualization for non-WebGL environments
+            <FallbackVisualization
+              data={graphData}
+              selectedNode={selectedNode}
+              onNodeClick={handleNodeSelect}
+              themeHex={themeHex}
+            />
+          ) : (
+            // WebGL Canvas visualization
+            <RenderingErrorBoundary
               onError={handleCanvasError}
+              fallback={
+                <div className="flex items-center justify-center p-10 bg-gray-100 dark:bg-gray-800 rounded-lg h-full">
+                  <div className="text-center">
+                    <h3 className="text-lg font-medium">
+                      <TranslatableText text="Visualization Error" />
+                    </h3>
+                    <p className="text-muted-foreground mt-2">
+                      <TranslatableText text="Switching to alternative view..." />
+                    </p>
+                    <button 
+                      className="mt-4 px-4 py-2 bg-primary text-white rounded-lg"
+                      onClick={() => setUseWebGL(false)}
+                    >
+                      <TranslatableText text="Use Alternative View" />
+                    </button>
+                  </div>
+                </div>
+              }
             >
-              <SimplifiedSoulNetVisualization
-                data={graphData}
-                selectedNode={selectedNode}
-                onNodeClick={handleNodeSelect}
-                themeHex={themeHex}
-                isFullScreen={isFullScreen}
-                shouldShowLabels={true}
-              />
-            </Canvas>
-          </RenderingErrorBoundary>
+              <Canvas
+                style={{
+                  width: '100%',
+                  height: '100%'
+                }}
+                camera={{ 
+                  position: [0, 0, isFullScreen ? 40 : 45],
+                  near: 1, 
+                  far: 1000,
+                  fov: isFullScreen ? 60 : 50
+                }}
+                onPointerMissed={() => setSelectedNode(null)}
+                gl={{ 
+                  preserveDrawingBuffer: true,
+                  antialias: !isMobile,
+                  powerPreference: 'high-performance',
+                  alpha: true,
+                  depth: true,
+                  stencil: false,
+                  precision: isMobile ? 'mediump' : 'highp'
+                }}
+                onCreated={(state) => {
+                  console.log('[SoulNet] Canvas created successfully');
+                }}
+                onError={handleCanvasError}
+              >
+                <SimplifiedSoulNetVisualization
+                  data={graphData}
+                  selectedNode={selectedNode}
+                  onNodeClick={handleNodeSelect}
+                  themeHex={themeHex}
+                  isFullScreen={isFullScreen}
+                  shouldShowLabels={true}
+                />
+              </Canvas>
+            </RenderingErrorBoundary>
+          )}
         </div>
       </FullscreenWrapper>
       
@@ -319,6 +366,11 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
           <p className="text-xs text-muted-foreground">
             {getInstructions()}
           </p>
+          {!useWebGL && (
+            <p className="text-xs text-muted-foreground mt-1">
+              <TranslatableText text="Using compatibility mode" />
+            </p>
+          )}
         </div>
       )}
     </div>

@@ -1,7 +1,8 @@
 
-import React, { useState, useCallback, useEffect, useMemo } from 'react';
-import SimpleNodeMesh from './SimpleNodeMesh';
-import { useTheme } from '@/hooks/use-theme';
+import React, { useRef, useCallback } from 'react';
+import { useFrame } from '@react-three/fiber';
+import { SimpleNodeMesh } from './SimpleNodeMesh';
+import * as THREE from 'three';
 
 interface NodeData {
   id: string;
@@ -14,12 +15,11 @@ interface NodeData {
 interface SimpleNodeProps {
   node: NodeData;
   isSelected: boolean;
-  onClick: (id: string, e: any) => void;
+  onClick: (id: string) => void;
   highlightedNodes: Set<string>;
   dimmed: boolean;
   themeHex: string;
-  isHighlighted?: boolean;
-  connectionStrength?: number;
+  isHighlighted: boolean;
 }
 
 export const SimpleNode: React.FC<SimpleNodeProps> = ({
@@ -29,89 +29,52 @@ export const SimpleNode: React.FC<SimpleNodeProps> = ({
   highlightedNodes,
   dimmed,
   themeHex,
-  isHighlighted = false,
-  connectionStrength = 0.5
+  isHighlighted
 }) => {
-  const { theme } = useTheme();
-  const [isTouching, setIsTouching] = useState(false);
-  const [touchStartTime, setTouchStartTime] = useState<number | null>(null);
-  const [touchStartPosition, setTouchStartPosition] = useState<{x: number, y: number} | null>(null);
-  
-  console.log(`[SimpleNode] Rendering node ${node.id} - highlighted: ${isHighlighted}, selected: ${isSelected}`);
-  
-  // Simplified scale calculation
-  const baseScale = node.type === 'entity' ? 0.7 : 0.55;
-  const scale = isHighlighted 
-    ? baseScale * (1.2 + (isSelected ? 0.3 : connectionStrength * 0.5))
-    : baseScale * (0.8 + node.value * 0.5);
+  const groupRef = useRef<THREE.Group>(null);
 
-  const displayColor = useMemo(() => {
-    if (isHighlighted) {
-      return node.type === 'entity' ? '#ffffff' : themeHex;
-    }
-    return node.type === 'entity'
-      ? (dimmed ? (theme === 'dark' ? '#555' : '#999') : '#ccc') 
-      : (dimmed ? (theme === 'dark' ? '#555' : '#999') : themeHex);
-  }, [node.type, dimmed, theme, themeHex, isHighlighted]);
+  // Simple scale calculation
+  const baseScale = node.type === 'entity' ? 0.8 : 0.6;
+  const scale = isSelected ? baseScale * 1.3 : (isHighlighted ? baseScale * 1.1 : baseScale);
 
-  const handlePointerDown = useCallback((e: any) => {
+  // Simple color calculation
+  const getNodeColor = () => {
+    if (isSelected) return themeHex;
+    if (isHighlighted) return node.type === 'entity' ? '#3b82f6' : '#8b5cf6';
+    return node.type === 'entity' ? '#6b7280' : '#9ca3af';
+  };
+
+  const handleClick = useCallback((e: any) => {
     e.stopPropagation();
-    setIsTouching(true);
-    setTouchStartTime(Date.now());
-    setTouchStartPosition({x: e.clientX, y: e.clientY});
-  }, []);
+    onClick(node.id);
+  }, [node.id, onClick]);
 
-  const handlePointerUp = useCallback((e: any) => {
-    e.stopPropagation();
-    if (touchStartTime && Date.now() - touchStartTime < 300) {
-      if (touchStartPosition) {
-        const deltaX = Math.abs(e.clientX - touchStartPosition.x);
-        const deltaY = Math.abs(e.clientY - touchStartPosition.y);
-        
-        if (deltaX < 10 && deltaY < 10) {
-          onClick(node.id, e);
-          if (navigator.vibrate) {
-            navigator.vibrate(50);
-          }
-        }
-      } else {
-        onClick(node.id, e);
-      }
+  // Simple animation
+  useFrame((state) => {
+    if (groupRef.current && isSelected) {
+      const time = state.clock.getElapsedTime();
+      const pulse = 1 + Math.sin(time * 3) * 0.1;
+      groupRef.current.scale.setScalar(scale * pulse);
+    } else if (groupRef.current) {
+      groupRef.current.scale.setScalar(scale);
     }
-    
-    setIsTouching(false);
-    setTouchStartTime(null);
-    setTouchStartPosition(null);
-  }, [node.id, onClick, touchStartTime, touchStartPosition]);
+  });
 
-  useEffect(() => {
-    if (isTouching && touchStartTime) {
-      const timer = setTimeout(() => {
-        if (isTouching) {
-          setIsTouching(false);
-          setTouchStartTime(null);
-          setTouchStartPosition(null);
-        }
-      }, 1000);
-      
-      return () => clearTimeout(timer);
-    }
-  }, [isTouching, touchStartTime]);
-  
+  if (!Array.isArray(node.position) || node.position.length !== 3) {
+    console.warn(`SimpleNode: Invalid position for node ${node.id}:`, node.position);
+    return null;
+  }
+
   return (
-    <group position={node.position}>
+    <group ref={groupRef} position={node.position}>
       <SimpleNodeMesh
         type={node.type}
         scale={scale}
-        displayColor={displayColor}
+        displayColor={getNodeColor()}
         isHighlighted={isHighlighted}
         dimmed={dimmed}
         isSelected={isSelected}
-        onClick={(e) => onClick(node.id, e)}
-        onPointerDown={handlePointerDown}
-        onPointerUp={handlePointerUp}
-        onPointerOut={() => setIsTouching(false)}
-        onPointerLeave={() => setIsTouching(false)}
+        onClick={handleClick}
       />
     </group>
   );
