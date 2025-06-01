@@ -64,7 +64,7 @@ class ConsolidatedFontService {
     if (/[\u0C80-\u0CFF]/.test(text)) return 'kannada';
     if (/[\u0D00-\u0D7F]/.test(text)) return 'malayalam';
     if (/[\u0B00-\u0B7F]/.test(text)) return 'oriya';
-    if /[\u0A00-\u0A7F]/.test(text)) return 'gurmukhi';
+    if (/[\u0A00-\u0A7F]/.test(text)) return 'gurmukhi';
     if (/[\u0E00-\u0E7F]/.test(text)) return 'thai';
     
     return 'latin';
