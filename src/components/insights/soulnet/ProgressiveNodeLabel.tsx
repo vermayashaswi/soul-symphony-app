@@ -1,7 +1,8 @@
 
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import SimplifiedText from './SimplifiedText';
+import ReliableText from './ReliableText';
 import { useTranslation } from '@/contexts/TranslationContext';
+import { simpleFontService } from '@/utils/simpleFontService';
 
 interface ProgressiveNodeLabelProps {
   id: string;
@@ -33,7 +34,7 @@ export const ProgressiveNodeLabel: React.FC<ProgressiveNodeLabelProps> = ({
   const mounted = useRef<boolean>(true);
   const initializationRef = useRef<boolean>(false);
   
-  console.log(`[ProgressiveNodeLabel] Label for ${id}, stage: ${translationStage}`);
+  console.log(`[ProgressiveNodeLabel] Enhanced label for ${id}, stage: ${translationStage}, visible: ${shouldShowLabel}`);
 
   // Calculate label position offset with safety checks
   const calculateOffset = (): [number, number, number] => {
@@ -47,42 +48,52 @@ export const ProgressiveNodeLabel: React.FC<ProgressiveNodeLabelProps> = ({
     }
   };
 
-  // Staged initialization to prevent render crashes
+  // Enhanced initialization with reliable font service
   useEffect(() => {
     if (!mounted.current || initializationRef.current) return;
     
-    console.log(`[ProgressiveNodeLabel] Starting staged initialization for ${id}`);
+    console.log(`[ProgressiveNodeLabel] Starting enhanced initialization for ${id}`);
     initializationRef.current = true;
 
-    // Stage 1: Initial setup (immediate)
-    setDisplayText(id);
-    setTranslationStage('initial');
+    const init = async () => {
+      try {
+        // Stage 1: Initial setup
+        setDisplayText(id);
+        setTranslationStage('initial');
 
-    // Stage 2: Ready for rendering (delayed)
-    const readyTimer = setTimeout(() => {
-      if (mounted.current) {
+        // Stage 2: Font readiness check (non-blocking)
+        if (simpleFontService.isReady()) {
+          setIsReady(true);
+        } else {
+          simpleFontService.waitForFonts().then(() => {
+            if (mounted.current) setIsReady(true);
+          });
+          // Fallback timeout
+          setTimeout(() => {
+            if (mounted.current) setIsReady(true);
+          }, 100);
+        }
+
+        // Stage 3: Translation processing (delayed)
+        setTimeout(() => {
+          if (mounted.current && shouldShowLabel) {
+            setTranslationStage('processing');
+          }
+        }, 200);
+      } catch (error) {
+        console.error('[ProgressiveNodeLabel] Initialization error:', error);
+        setDisplayText(id);
         setIsReady(true);
-        console.log(`[ProgressiveNodeLabel] ${id} ready for rendering`);
+        setTranslationStage('complete');
       }
-    }, 200);
-
-    // Stage 3: Translation processing (further delayed)
-    const translationTimer = setTimeout(() => {
-      if (mounted.current && shouldShowLabel) {
-        setTranslationStage('processing');
-        console.log(`[ProgressiveNodeLabel] Starting translation for ${id}`);
-      }
-    }, 800);
-
-    return () => {
-      clearTimeout(readyTimer);
-      clearTimeout(translationTimer);
     };
+
+    init();
   }, [id, shouldShowLabel]);
 
-  // Handle translation processing with error safety
+  // Enhanced translation processing
   useEffect(() => {
-    if (!mounted.current || translationStage !== 'processing') return;
+    if (!mounted.current || translationStage !== 'processing' || !isReady) return;
 
     const processTranslation = async () => {
       try {
@@ -101,7 +112,7 @@ export const ProgressiveNodeLabel: React.FC<ProgressiveNodeLabelProps> = ({
           const translated = await Promise.race([
             translate(id),
             new Promise<string>((_, reject) => 
-              setTimeout(() => reject(new Error('Translation timeout')), 3000)
+              setTimeout(() => reject(new Error('Translation timeout')), 2000)
             )
           ]);
 
@@ -110,7 +121,6 @@ export const ProgressiveNodeLabel: React.FC<ProgressiveNodeLabelProps> = ({
             setTranslationStage('complete');
             console.log(`[ProgressiveNodeLabel] Translation success: ${id} -> ${translated}`);
           } else if (mounted.current) {
-            // Fallback to original on invalid result
             setDisplayText(id);
             setTranslationStage('complete');
             console.warn(`[ProgressiveNodeLabel] Invalid translation, using original: ${id}`);
@@ -132,7 +142,7 @@ export const ProgressiveNodeLabel: React.FC<ProgressiveNodeLabelProps> = ({
     };
 
     processTranslation();
-  }, [translationStage, id, currentLanguage, translate]);
+  }, [translationStage, id, currentLanguage, translate, isReady]);
 
   // Cleanup
   useEffect(() => {
@@ -140,11 +150,6 @@ export const ProgressiveNodeLabel: React.FC<ProgressiveNodeLabelProps> = ({
       mounted.current = false;
     };
   }, []);
-
-  // Don't render until ready and visible
-  if (!isReady || !shouldShowLabel || translationStage === 'initial') {
-    return null;
-  }
 
   // Calculate text properties with safety checks
   const textSize = useMemo(() => {
@@ -170,6 +175,12 @@ export const ProgressiveNodeLabel: React.FC<ProgressiveNodeLabelProps> = ({
     }
   }, [isSelected, isHighlighted, type, themeHex]);
 
+  // Don't render until ready and visible
+  if (!isReady || !shouldShowLabel || translationStage === 'initial' || !displayText) {
+    console.log(`[ProgressiveNodeLabel] Not rendering: ready=${isReady}, visible=${shouldShowLabel}, stage=${translationStage}, text="${displayText}"`);
+    return null;
+  }
+
   const labelOffset = calculateOffset();
   const labelPosition: [number, number, number] = [
     position[0] + labelOffset[0],
@@ -177,16 +188,19 @@ export const ProgressiveNodeLabel: React.FC<ProgressiveNodeLabelProps> = ({
     position[2] + labelOffset[2]
   ];
 
-  console.log(`[ProgressiveNodeLabel] Rendering label "${displayText}" for ${id}`);
+  console.log(`[ProgressiveNodeLabel] Rendering enhanced text "${displayText}" for ${id} at`, labelPosition);
 
   return (
-    <SimplifiedText
+    <ReliableText
       text={displayText}
       position={labelPosition}
       color={textColor}
       size={textSize}
       visible={true}
       renderOrder={15}
+      bold={isHighlighted || isSelected}
+      outlineWidth={isSelected ? 0.04 : 0.02}
+      outlineColor={isSelected ? '#000000' : '#333333'}
       maxWidth={25}
     />
   );

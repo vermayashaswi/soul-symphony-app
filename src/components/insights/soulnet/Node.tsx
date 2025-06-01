@@ -1,10 +1,9 @@
 
-import React, { useState, useCallback, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useCallback, useEffect, useMemo } from 'react';
 import '@/types/three-reference';
-import * as THREE from 'three';
 import { NodeMesh } from './NodeMesh';
-import ProgressiveNodeLabel from './ProgressiveNodeLabel';
-import { ConnectionPercentage } from './ConnectionPercentage';
+import DirectNodeLabel from './DirectNodeLabel';
+import FixedConnectionPercentage from './FixedConnectionPercentage';
 import { useTheme } from '@/hooks/use-theme';
 
 interface NodeData {
@@ -53,7 +52,7 @@ export const Node: React.FC<NodeProps> = ({
   const [touchStartTime, setTouchStartTime] = useState<number | null>(null);
   const [touchStartPosition, setTouchStartPosition] = useState<{x: number, y: number} | null>(null);
   
-  console.log(`[Node] Rendering enhanced node ${node.id} with progressive label`);
+  console.log(`[Node] Rendering node ${node.id} with labels - highlighted: ${isHighlighted}, selected: ${isSelected}`);
   
   // Simplified label visibility logic
   const shouldShowLabel = forceShowLabels || showLabel || isHighlighted || isSelected;
@@ -119,6 +118,8 @@ export const Node: React.FC<NodeProps> = ({
 
   const shouldShowPercentage = showPercentage && isHighlighted && connectionPercentage > 0;
   
+  console.log(`[Node] Final render decisions - Label: ${shouldShowLabel}, Percentage: ${shouldShowPercentage} (${connectionPercentage}%)`);
+  
   return (
     <group position={node.position}>
       <NodeMesh
@@ -136,7 +137,7 @@ export const Node: React.FC<NodeProps> = ({
         onPointerLeave={() => setIsTouching(false)}
       />
       
-      <ProgressiveNodeLabel
+      <DirectNodeLabel
         id={node.id}
         type={node.type}
         position={[0, 0, 0]}
@@ -148,11 +149,10 @@ export const Node: React.FC<NodeProps> = ({
         nodeScale={scale}
       />
 
-      <ConnectionPercentage
-        position={node.position}
+      <FixedConnectionPercentage
+        position={[0, 0, 0]}
         percentage={connectionPercentage}
         isVisible={shouldShowPercentage}
-        offsetY={0}
         nodeType={node.type}
       />
     </group>
