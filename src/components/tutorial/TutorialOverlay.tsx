@@ -1,4 +1,3 @@
-
 import React, { useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useTutorial } from '@/contexts/TutorialContext';
@@ -17,6 +16,7 @@ import {
   logPotentialTutorialElements,
   applyTutorialHighlight
 } from '@/utils/tutorial/tutorial-elements-finder';
+import { performComprehensiveCleanup, performStaggeredCleanup } from '@/utils/tutorial/tutorial-cleanup-enhanced';
 
 const TutorialOverlay: React.FC = () => {
   const { 
@@ -33,28 +33,29 @@ const TutorialOverlay: React.FC = () => {
   
   const location = useLocation();
   
-  // Only render tutorial on app routes
+  // Enhanced route checking for tutorial display
   const isAppRouteCurrent = isAppRoute(location.pathname);
-  const shouldShowTutorial = isActive && isAppRouteCurrent && !tutorialCompleted;
+  const shouldShowTutorial = isActive && isAppRouteCurrent && !tutorialCompleted && !navigationState.inProgress;
   
   // Log important state changes
   useEffect(() => {
-    console.log('TutorialOverlay state:', {
+    console.log('[TutorialOverlay] State update:', {
       isActive,
       currentStep,
       currentStepId: steps[currentStep]?.id,
       navigationState,
       shouldShowTutorial,
       pathname: location.pathname,
-      isAppRoute: isAppRouteCurrent
+      isAppRoute: isAppRouteCurrent,
+      tutorialCompleted
     });
-  }, [isActive, currentStep, steps, navigationState, shouldShowTutorial, location.pathname, isAppRouteCurrent]);
+  }, [isActive, currentStep, steps, navigationState, shouldShowTutorial, location.pathname, isAppRouteCurrent, tutorialCompleted]);
   
   // Enhanced scrolling prevention with data attribute for current step
   useEffect(() => {
     if (!shouldShowTutorial) return;
     
-    console.log('Tutorial active, disabling page scrolling');
+    console.log('[TutorialOverlay] Tutorial active, disabling page scrolling');
     
     // Save current scroll position
     const scrollPos = window.scrollY;
@@ -110,7 +111,7 @@ const TutorialOverlay: React.FC = () => {
     
     // Clean up when tutorial is deactivated
     return () => {
-      console.log('Cleaning up tutorial styles');
+      console.log('[TutorialOverlay] Cleaning up tutorial styles');
       
       // Enhanced cleanup for body element
       document.body.classList.remove('tutorial-active');
@@ -123,26 +124,34 @@ const TutorialOverlay: React.FC = () => {
       
       // Restore scroll position
       window.scrollTo(0, scrollPos);
-      console.log('Tutorial inactive, restored page scrolling');
+      console.log('[TutorialOverlay] Tutorial inactive, restored page scrolling');
       
-      // Thorough cleanup of tutorial target elements
-      const tutorialElements = document.querySelectorAll('.tutorial-target, .tutorial-button-highlight, .record-entry-tab, .entries-tab, .chat-question-highlight');
-      tutorialElements.forEach(el => {
-        if (el instanceof HTMLElement) {
-          // Remove classes
-          el.classList.remove('tutorial-target', 'tutorial-button-highlight', 'record-entry-tab', 'entries-tab', 'chat-question-highlight');
-          
-          // Reset inline styles
-          el.style.boxShadow = '';
-          el.style.animation = '';
-          el.style.border = '';
-          el.style.transform = '';
-          el.style.zIndex = '';
-          el.style.position = '';
-          el.style.visibility = '';
-          el.style.opacity = '';
+      // Run enhanced staggered cleanup
+      performStaggeredCleanup();
+      
+      // SPECIAL: Reset the arrow button specifically to ensure it's centered
+      const arrowButton = document.querySelector('.journal-arrow-button');
+      if (arrowButton instanceof HTMLElement) {
+        console.log('[TutorialOverlay] Resetting arrow button position after tutorial cleanup');
+        arrowButton.style.position = 'fixed';
+        arrowButton.style.top = '50%';
+        arrowButton.style.left = '50%';
+        arrowButton.style.transform = 'translate(-50%, -50%)';
+        arrowButton.style.zIndex = '40';
+        arrowButton.style.margin = '0';
+        arrowButton.style.padding = '0';
+        
+        // Also reset the button element inside
+        const buttonElement = arrowButton.querySelector('button');
+        if (buttonElement instanceof HTMLElement) {
+          buttonElement.style.boxShadow = '';
+          buttonElement.style.animation = '';
+          buttonElement.style.border = '';
+          buttonElement.style.transform = '';
+          buttonElement.style.position = '';
+          buttonElement.style.zIndex = '';
         }
-      });
+      }
       
       // Small delay to ensure chat interface re-renders properly
       setTimeout(() => {
@@ -150,156 +159,129 @@ const TutorialOverlay: React.FC = () => {
         
         // Force chat interface to refresh
         if (location.pathname === '/app/chat') {
-          console.log('Triggering chat refresh after tutorial');
+          console.log('[TutorialOverlay] Triggering chat refresh after tutorial');
           window.dispatchEvent(new CustomEvent('chatRefreshNeeded'));
         }
       }, 300);
     };
   }, [shouldShowTutorial, currentStep, steps, location.pathname]);
 
-  // Step-specific element highlighting with chat step improvements
+  // Enhanced step-specific element highlighting with improved cleanup
   useEffect(() => {
-    if (!shouldShowTutorial || navigationState.inProgress) return;
+    if (!shouldShowTutorial) return;
     
     const currentStepData = steps[currentStep];
-    console.log(`Setting up highlighting for step ${currentStepData?.id}`);
+    console.log(`[TutorialOverlay] Setting up highlighting for step ${currentStepData?.id}`);
     
-    // Remove any existing highlight classes first
-    const existingHighlights = document.querySelectorAll(
-      '.tutorial-target, .tutorial-button-highlight, .record-entry-tab, ' +
-      '.entries-tab, .chat-question-highlight, .insights-header-highlight, ' +
-      '.emotion-chart-highlight, .mood-calendar-highlight, .soul-net-highlight'
-    );
+    // Run comprehensive cleanup before applying new highlighting
+    const performEnhancedCleanup = () => {
+      console.log('[TutorialOverlay] Enhanced cleanup before highlighting');
+      performStaggeredCleanup();
+    };
     
-    existingHighlights.forEach(el => {
-      el.classList.remove(
-        'tutorial-target', 'tutorial-button-highlight', 'record-entry-tab',
-        'entries-tab', 'chat-question-highlight', 'insights-header-highlight',
-        'emotion-chart-highlight', 'mood-calendar-highlight', 'soul-net-highlight'
-      );
-      
-      // Clear any inline styles that might have been applied
-      if (el instanceof HTMLElement) {
-        el.style.boxShadow = '';
-        el.style.animation = '';
-        el.style.border = '';
-        el.style.transform = '';
-        el.style.zIndex = '';
-      }
-    });
+    performEnhancedCleanup();
     
-    // Apply the appropriate highlighting based on step ID
+    // Apply highlighting after cleanup with improved timing
     const highlightTimeout = setTimeout(() => {
       if (currentStepData?.id === 1) {
         // Step 1: Journal Header
         const journalHeader = document.querySelector('.journal-header-container');
         if (journalHeader) {
           journalHeader.classList.add('tutorial-target');
-          console.log('Applied highlighting to journal header');
+          console.log('[TutorialOverlay] Applied highlighting to journal header');
         } else {
-          console.warn('Journal header element not found');
+          console.warn('[TutorialOverlay] Journal header element not found');
         }
       } 
       else if (currentStepData?.id === 2) {
-        // Step 2: Arrow Button
-        const arrowButton = document.querySelector('.journal-arrow-button');
-        if (arrowButton) {
-          arrowButton.classList.add('tutorial-target');
-          
-          // Also highlight the button element
-          const buttonElement = arrowButton.querySelector('button');
-          if (buttonElement) {
-            buttonElement.classList.add('tutorial-button-highlight');
-          }
-          
-          console.log('Applied highlighting to arrow button');
-        } else {
-          console.warn('Arrow button not found');
-        }
+        // Step 2: Arrow Button - Let ButtonStateManager handle this
+        console.log('[TutorialOverlay] Step 2: ButtonStateManager will handle arrow button highlighting');
       }
       else if (currentStepData?.id === 3) {
-        // Step 3: Record Entry Tab
+        // Step 3: Record Entry Tab - Enhanced highlighting WITH glow effect
+        console.log('[TutorialOverlay] Step 3: Applying enhanced highlighting to Record Entry button');
+        
+        // Clean up any Past Entries highlighting first
+        ENTRIES_TAB_SELECTORS.forEach(selector => {
+          try {
+            const elements = document.querySelectorAll(selector);
+            elements.forEach(el => {
+              if (el instanceof HTMLElement) {
+                performComprehensiveCleanup();
+              }
+            });
+          } catch (error) {
+            console.warn(`[TutorialOverlay] Error in Past Entries cleanup for selector ${selector}:`, error);
+          }
+        });
+        
         let foundElement = false;
         
         for (const selector of RECORD_ENTRY_SELECTORS) {
           const element = document.querySelector(selector);
           if (element) {
-            element.classList.add('tutorial-target', 'record-entry-tab', 'tutorial-button-highlight');
+            // Double-check this is the Record Entry button
+            const elementText = element.textContent?.toLowerCase().trim();
+            const isRecordEntry = elementText?.includes('record') || elementText?.includes('new') || elementText?.includes('entry');
+            const isPastEntries = elementText?.includes('past') || elementText?.includes('entries') || elementText?.includes('history');
             
-            // Apply enhanced styling
-            if (element instanceof HTMLElement) {
-              element.style.boxShadow = "0 0 35px 20px var(--color-theme)";
-              element.style.animation = "button-pulse 1.5s infinite alternate";
-              element.style.border = "2px solid white";
-              element.style.transform = "scale(1.05)";
-              element.style.zIndex = "10000";
+            if (isRecordEntry && !isPastEntries) {
+              element.classList.add('tutorial-target', 'record-entry-tab');
+              foundElement = true;
+              console.log(`[TutorialOverlay] Applied enhanced highlighting to Record Entry button using selector: ${selector}, text: "${elementText}"`);
+              break;
             }
-            
-            foundElement = true;
-            console.log(`Applied enhanced highlighting to record entry element using selector: ${selector}`);
-            break;
           }
         }
         
         if (!foundElement) {
-          console.warn('Record entry element not found with any selector');
+          console.warn('[TutorialOverlay] Record entry element not found with any selector for step 3');
         }
       }
       else if (currentStepData?.id === 4) {
-        // Step 4: Past Entries Tab - Enhanced with identical styling as record entry
+        // Step 4: Past Entries Tab - Minimal styling WITHOUT glow effect
+        console.log('[TutorialOverlay] Step 4: Applying minimal highlighting to Past Entries button (no glow)');
+        
+        // Clean up any Record Entry highlighting first
+        RECORD_ENTRY_SELECTORS.forEach(selector => {
+          try {
+            const elements = document.querySelectorAll(selector);
+            elements.forEach(el => {
+              if (el instanceof HTMLElement) {
+                performComprehensiveCleanup();
+              }
+            });
+          } catch (error) {
+            console.warn(`[TutorialOverlay] Error in Record Entry cleanup for selector ${selector}:`, error);
+          }
+        });
+        
         let foundElement = false;
         
         for (const selector of ENTRIES_TAB_SELECTORS) {
           const element = document.querySelector(selector);
           if (element) {
-            element.classList.add('tutorial-target', 'entries-tab', 'tutorial-button-highlight');
+            // Double-check this is the Past Entries button
+            const elementText = element.textContent?.toLowerCase().trim();
+            const isPastEntries = elementText?.includes('past') || elementText?.includes('entries') || elementText?.includes('history') || selector.includes('entries');
+            const isRecordEntry = elementText?.includes('record') || elementText?.includes('new');
             
-            // Apply identical styling to record entry button
-            if (element instanceof HTMLElement) {
-              element.style.boxShadow = "0 0 35px 20px var(--color-theme)";
-              element.style.animation = "button-pulse 1.5s infinite alternate";
-              element.style.border = "2px solid white";
-              element.style.transform = "scale(1.05)";
-              element.style.zIndex = "10000";
-              
-              // Make sure it's fully visible with high opacity
-              element.style.opacity = "1";
-              element.style.visibility = "visible";
-              element.style.position = "relative";
-              
-              // Explicit white background
-              element.style.backgroundColor = "white";
-              
-              // Fix text color for light mode
-              const isDarkMode = document.body.classList.contains('dark');
-              if (!isDarkMode) {
-                element.style.color = "#000";
-                
-                // Also apply to child elements
-                const textElements = element.querySelectorAll('span, div');
-                textElements.forEach(textEl => {
-                  if (textEl instanceof HTMLElement) {
-                    textEl.style.color = "#000";
-                    textEl.style.textShadow = "none";
-                    textEl.style.backgroundColor = "white";
-                  }
-                });
-              }
+            if (isPastEntries && !isRecordEntry) {
+              element.classList.add('tutorial-target', 'entries-tab');
+              foundElement = true;
+              console.log(`[TutorialOverlay] Applied minimal highlighting to Past Entries button using selector: ${selector}, text: "${elementText}"`);
+              break;
             }
-            
-            foundElement = true;
-            console.log(`Applied enhanced highlighting to entries tab using selector: ${selector}`);
-            break;
           }
         }
         
         if (!foundElement) {
-          console.warn('Entries tab element not found with any selector');
+          console.warn('[TutorialOverlay] Past Entries tab element not found with any selector for step 4');
         }
       }
-      // Improved Step 5 handling for better visibility with purple background
+      // ... keep existing code (steps 5-9 remain the same)
       else if (currentStepData?.id === 5) {
-        console.log('Setting up highlight for chat question (step 5) with purple background');
+        console.log('[TutorialOverlay] Setting up highlight for chat question (step 5)');
         
         // Set purple background for better visibility with opacity
         const chatContainers = document.querySelectorAll('.smart-chat-container, .mobile-chat-interface, .chat-messages-container');
@@ -329,17 +311,17 @@ const TutorialOverlay: React.FC = () => {
         // First try to highlight existing chat suggestions in EmptyChatState
         const emptyChatSuggestions = document.querySelectorAll('.empty-chat-suggestion, .chat-suggestion-button');
         if (emptyChatSuggestions.length > 0) {
-          console.log(`Found ${emptyChatSuggestions.length} chat suggestions in EmptyChatState`);
+          console.log(`[TutorialOverlay] Found ${emptyChatSuggestions.length} chat suggestions in EmptyChatState`);
           emptyChatSuggestions.forEach((element, index) => {
             if (index === 0) { // Only highlight the first one
               element.classList.add('chat-question-highlight', 'tutorial-target');
               
-              // Apply enhanced visibility
+              // Apply enhanced visibility with LOWER z-index to stay behind modal
               if (element instanceof HTMLElement) {
                 element.style.display = 'block';
                 element.style.visibility = 'visible';
                 element.style.opacity = '1';
-                element.style.zIndex = '20000';
+                element.style.zIndex = '8000'; // Lower than tutorial modal
                 element.style.position = 'relative';
                 element.style.boxShadow = '0 0 40px 25px var(--color-theme)';
                 element.style.animation = 'ultra-strong-pulse 1.5s infinite alternate';
@@ -347,7 +329,7 @@ const TutorialOverlay: React.FC = () => {
                 element.style.transform = 'scale(1.1)';
               }
               
-              console.log('Applied highlighting to first chat suggestion in EmptyChatState');
+              console.log('[TutorialOverlay] Applied highlighting to first chat suggestion in EmptyChatState');
             }
           });
         } else {
@@ -355,12 +337,12 @@ const TutorialOverlay: React.FC = () => {
           const found = findAndHighlightElement(CHAT_QUESTION_SELECTORS, 'chat-question-highlight');
           
           if (!found) {
-            console.warn('Failed to find chat question element with any selector');
+            console.warn('[TutorialOverlay] Failed to find chat question element with any selector');
             
             // Create a fallback chat suggestion if none exists
             const emptyChatState = document.querySelector('.flex.flex-col.items-center.justify-center.p-6.text-center.h-full');
             if (emptyChatState && emptyChatState instanceof HTMLElement) {
-              console.log('Creating fallback chat suggestions');
+              console.log('[TutorialOverlay] Creating fallback chat suggestions');
               
               // Check if suggestions container already exists
               let suggestionsContainer = emptyChatState.querySelector('.mt-8.space-y-3.w-full.max-w-md');
@@ -381,6 +363,7 @@ const TutorialOverlay: React.FC = () => {
                   suggestionButton.style.display = 'block';
                   suggestionButton.style.visibility = 'visible';
                   suggestionButton.style.opacity = '1';
+                  suggestionButton.style.zIndex = '8000'; // Lower than tutorial modal
                   
                   suggestionsContainer.appendChild(suggestionButton);
                   applyTutorialHighlight(suggestionButton, 'chat-question-highlight');
@@ -393,7 +376,7 @@ const TutorialOverlay: React.FC = () => {
                     firstButton.style.display = 'block';
                     firstButton.style.visibility = 'visible';
                     firstButton.style.opacity = '1';
-                    firstButton.style.zIndex = '20000';
+                    firstButton.style.zIndex = '8000'; // Lower than tutorial modal
                     applyTutorialHighlight(firstButton, 'chat-question-highlight');
                   }
                 }
@@ -406,7 +389,7 @@ const TutorialOverlay: React.FC = () => {
         setTimeout(() => {
           const chatSuggestions = document.querySelectorAll('.empty-chat-suggestion, .chat-suggestion-button');
           if (chatSuggestions.length > 0 && currentStepData?.id === 5) {
-            console.log('Found chat suggestions after delay, highlighting first one');
+            console.log('[TutorialOverlay] Found chat suggestions after delay, highlighting first one');
             const firstSuggestion = chatSuggestions[0];
             firstSuggestion.classList.add('chat-question-highlight', 'tutorial-target');
             
@@ -414,53 +397,102 @@ const TutorialOverlay: React.FC = () => {
               firstSuggestion.style.display = 'block';
               firstSuggestion.style.visibility = 'visible';
               firstSuggestion.style.opacity = '1';
+              firstSuggestion.style.zIndex = '8000'; // Lower than tutorial modal
             }
           }
         }, 800);
       }
       // NEW: Step 6 - Insights Header Highlight
       else if (currentStepData?.id === 6) {
-        console.log('Setting up highlight for insights header (step 6)');
+        console.log('[TutorialOverlay] Setting up highlight for insights header (step 6)');
         const found = findAndHighlightElement(INSIGHTS_HEADER_SELECTORS, 'insights-header-highlight');
         
         if (!found) {
-          console.warn('Failed to find insights header with any selector');
+          console.warn('[TutorialOverlay] Failed to find insights header with any selector');
         }
       }
       // NEW: Step 7 - Emotion Chart Highlight
       else if (currentStepData?.id === 7) {
-        console.log('Setting up highlight for emotion chart (step 7)');
+        console.log('[TutorialOverlay] Setting up highlight for emotion chart (step 7)');
         const found = findAndHighlightElement(EMOTION_CHART_SELECTORS, 'emotion-chart-highlight');
         
         if (!found) {
-          console.warn('Failed to find emotion chart with any selector');
+          console.warn('[TutorialOverlay] Failed to find emotion chart with any selector');
         }
       }
       // NEW: Step 8 - Mood Calendar Highlight
       else if (currentStepData?.id === 8) {
-        console.log('Setting up highlight for mood calendar (step 8)');
+        console.log('[TutorialOverlay] Setting up highlight for mood calendar (step 8)');
         const found = findAndHighlightElement(MOOD_CALENDAR_SELECTORS, 'mood-calendar-highlight');
         
         if (!found) {
-          console.warn('Failed to find mood calendar with any selector');
+          console.warn('[TutorialOverlay] Failed to find mood calendar with any selector');
         }
       }
-      // NEW: Step 9 - Soul-Net Highlight
+      // ENHANCED: Step 9 - Soul-Net Highlight with label visibility debugging
       else if (currentStepData?.id === 9) {
-        console.log('Setting up highlight for soul-net visualization (step 9)');
+        console.log('[TutorialOverlay] Setting up highlight for soul-net visualization (step 9)');
+        
+        // First highlight the Soul-Net container
         const found = findAndHighlightElement(SOULNET_SELECTORS, 'soul-net-highlight');
         
         if (!found) {
-          console.warn('Failed to find soul-net visualization with any selector');
+          console.warn('[TutorialOverlay] Failed to find soul-net visualization with any selector');
+        } else {
+          console.log('[TutorialOverlay] Successfully highlighted Soul-Net visualization for step 9');
         }
+        
+        // Add specific debugging for Soul-Net labels after a delay
+        setTimeout(() => {
+          console.log('[TutorialOverlay] Step 9: Debugging Soul-Net label visibility');
+          
+          // Check if Soul-Net canvas is present and visible
+          const soulnetContainer = document.querySelector('[class*="soul-net"], [class*="soulnet"], .bg-background.rounded-xl.shadow-sm.border.w-full');
+          if (soulnetContainer) {
+            console.log('[TutorialOverlay] Found Soul-Net container:', soulnetContainer);
+            
+            // Look for canvas element
+            const canvas = soulnetContainer.querySelector('canvas');
+            if (canvas) {
+              console.log('[TutorialOverlay] Found Soul-Net canvas:', canvas.style);
+              
+              // Force canvas to be visible and properly sized
+              canvas.style.display = 'block';
+              canvas.style.visibility = 'visible';
+              canvas.style.opacity = '1';
+              canvas.style.width = '100%';
+              canvas.style.height = '500px';
+              
+              // Trigger a resize event to ensure proper rendering
+              window.dispatchEvent(new Event('resize'));
+              
+              console.log('[TutorialOverlay] Applied visibility fixes to Soul-Net canvas');
+            } else {
+              console.warn('[TutorialOverlay] No canvas found in Soul-Net container');
+            }
+          } else {
+            console.warn('[TutorialOverlay] No Soul-Net container found for step 9');
+          }
+          
+          // Additional debugging for Three.js text elements
+          console.log('[TutorialOverlay] Checking for Three.js text rendering in Soul-Net');
+          
+          // Dispatch custom event to force Soul-Net to show labels
+          window.dispatchEvent(new CustomEvent('tutorial-soul-net-debug', {
+            detail: { step: 9, forceShowLabels: true }
+          }));
+          
+        }, 1000);
       }
-    }, 300);
+    }, 300); // Increased timeout for better cleanup
     
-    // Clean up highlighting when step changes
+    // Enhanced cleanup when effect unmounts
     return () => {
       clearTimeout(highlightTimeout);
+      console.log('[TutorialOverlay] Effect cleanup - removing highlighting');
+      performStaggeredCleanup();
     };
-  }, [shouldShowTutorial, currentStep, steps, navigationState.inProgress]);
+  }, [shouldShowTutorial, currentStep, steps]);
 
   // If tutorial should not be shown, don't render anything
   if (!shouldShowTutorial) {
@@ -472,7 +504,7 @@ const TutorialOverlay: React.FC = () => {
   const isLastStep = currentStep === totalSteps - 1;
 
   return (
-    <div className="fixed inset-0 z-[9997] pointer-events-auto">
+    <div className="fixed inset-0 z-[50000] pointer-events-auto">
       {/* Semi-transparent overlay */}
       <motion.div
         className="tutorial-overlay absolute inset-0"
@@ -480,12 +512,12 @@ const TutorialOverlay: React.FC = () => {
         animate={{ opacity: 0.75 }}
         exit={{ opacity: 0 }}
         transition={{ duration: 0.3 }}
-        onClick={(e) => e.stopPropagation()} // Prevent clicks from reaching elements behind
+        onClick={(e) => e.stopPropagation()}
       />
 
       {/* Tutorial step */}
       <AnimatePresence mode="wait">
-        {currentTutorialStep && !navigationState.inProgress && (
+        {currentTutorialStep && (
           <TutorialStep
             key={`step-${currentStep}-${currentTutorialStep.id}`}
             step={currentTutorialStep}

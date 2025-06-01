@@ -11,6 +11,7 @@ import { ChatMessage } from '@/types/chat';
 import { debugTimezoneInfo, getCurrentWeekDates } from '@/utils/chat/dateUtils';
 import { format } from 'date-fns';
 import { formatInTimeZone, toZonedTime } from 'date-fns-tz';
+import { PremiumFeatureGuard } from '@/components/subscription/PremiumFeatureGuard';
 
 const Chat = () => {
   const { user } = useAuth();
@@ -341,9 +342,11 @@ const Chat = () => {
   }, []);
 
   return (
-    <div className="w-full h-full flex flex-col">
-      <SmartChatInterface />
-    </div>
+    <PremiumFeatureGuard feature="chat">
+      <div className="w-full h-full flex flex-col">
+        <SmartChatInterface />
+      </div>
+    </PremiumFeatureGuard>
   );
 };
 

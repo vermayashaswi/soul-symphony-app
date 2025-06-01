@@ -224,10 +224,15 @@ export type Database = {
           email: string | null
           full_name: string | null
           id: string
+          is_premium: boolean | null
           journal_focus_areas: string[] | null
           onboarding_completed: boolean | null
           reminder_settings: Json | null
+          revenuecat_entitlements: Json | null
+          subscription_status: string | null
+          subscription_tier: string | null
           timezone: string | null
+          trial_ends_at: string | null
           tutorial_completed: string | null
           tutorial_step: number | null
           updated_at: string
@@ -239,10 +244,15 @@ export type Database = {
           email?: string | null
           full_name?: string | null
           id: string
+          is_premium?: boolean | null
           journal_focus_areas?: string[] | null
           onboarding_completed?: boolean | null
           reminder_settings?: Json | null
+          revenuecat_entitlements?: Json | null
+          subscription_status?: string | null
+          subscription_tier?: string | null
           timezone?: string | null
+          trial_ends_at?: string | null
           tutorial_completed?: string | null
           tutorial_step?: number | null
           updated_at?: string
@@ -254,109 +264,325 @@ export type Database = {
           email?: string | null
           full_name?: string | null
           id?: string
+          is_premium?: boolean | null
           journal_focus_areas?: string[] | null
           onboarding_completed?: boolean | null
           reminder_settings?: Json | null
+          revenuecat_entitlements?: Json | null
+          subscription_status?: string | null
+          subscription_tier?: string | null
           timezone?: string | null
+          trial_ends_at?: string | null
           tutorial_completed?: string | null
           tutorial_step?: number | null
           updated_at?: string
         }
         Relationships: []
       }
-      "Subscription Status": {
+      profiles_backup: {
         Row: {
-          "cancellation date": string | null
-          created_at: string
-          id: number
-          "subscription date": string | null
+          avatar_url: string | null
+          created_at: string | null
+          display_name: string | null
+          email: string | null
+          full_name: string | null
+          id: string | null
+          is_premium: boolean | null
+          journal_focus_areas: string[] | null
+          onboarding_completed: boolean | null
+          reminder_settings: Json | null
+          revenuecat_entitlements: Json | null
+          subscription_status: string | null
+          subscription_tier: string | null
+          timezone: string | null
+          trial_ends_at: string | null
+          tutorial_completed: string | null
+          tutorial_step: number | null
+          updated_at: string | null
         }
         Insert: {
-          "cancellation date"?: string | null
-          created_at?: string
-          id?: number
-          "subscription date"?: string | null
+          avatar_url?: string | null
+          created_at?: string | null
+          display_name?: string | null
+          email?: string | null
+          full_name?: string | null
+          id?: string | null
+          is_premium?: boolean | null
+          journal_focus_areas?: string[] | null
+          onboarding_completed?: boolean | null
+          reminder_settings?: Json | null
+          revenuecat_entitlements?: Json | null
+          subscription_status?: string | null
+          subscription_tier?: string | null
+          timezone?: string | null
+          trial_ends_at?: string | null
+          tutorial_completed?: string | null
+          tutorial_step?: number | null
+          updated_at?: string | null
         }
         Update: {
-          "cancellation date"?: string | null
+          avatar_url?: string | null
+          created_at?: string | null
+          display_name?: string | null
+          email?: string | null
+          full_name?: string | null
+          id?: string | null
+          is_premium?: boolean | null
+          journal_focus_areas?: string[] | null
+          onboarding_completed?: boolean | null
+          reminder_settings?: Json | null
+          revenuecat_entitlements?: Json | null
+          subscription_status?: string | null
+          subscription_tier?: string | null
+          timezone?: string | null
+          trial_ends_at?: string | null
+          tutorial_completed?: string | null
+          tutorial_step?: number | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
+      revenuecat_customers: {
+        Row: {
+          created_at: string
+          id: string
+          revenuecat_app_user_id: string | null
+          revenuecat_user_id: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
           created_at?: string
-          id?: number
-          "subscription date"?: string | null
+          id?: string
+          revenuecat_app_user_id?: string | null
+          revenuecat_user_id: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          revenuecat_app_user_id?: string | null
+          revenuecat_user_id?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "revenuecat_customers_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: true
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      revenuecat_subscriptions: {
+        Row: {
+          auto_renew_status: boolean | null
+          billing_issues_detected_at: string | null
+          created_at: string
+          currency: string | null
+          customer_id: string
+          expires_date: string | null
+          id: string
+          is_sandbox: boolean | null
+          offering_id: string | null
+          original_purchase_date: string | null
+          period_type: string | null
+          price_in_purchased_currency: number | null
+          product_id: string
+          purchase_date: string | null
+          revenuecat_subscription_id: string
+          status: string
+          unsubscribe_detected_at: string | null
+          updated_at: string
+        }
+        Insert: {
+          auto_renew_status?: boolean | null
+          billing_issues_detected_at?: string | null
+          created_at?: string
+          currency?: string | null
+          customer_id: string
+          expires_date?: string | null
+          id?: string
+          is_sandbox?: boolean | null
+          offering_id?: string | null
+          original_purchase_date?: string | null
+          period_type?: string | null
+          price_in_purchased_currency?: number | null
+          product_id: string
+          purchase_date?: string | null
+          revenuecat_subscription_id: string
+          status: string
+          unsubscribe_detected_at?: string | null
+          updated_at?: string
+        }
+        Update: {
+          auto_renew_status?: boolean | null
+          billing_issues_detected_at?: string | null
+          created_at?: string
+          currency?: string | null
+          customer_id?: string
+          expires_date?: string | null
+          id?: string
+          is_sandbox?: boolean | null
+          offering_id?: string | null
+          original_purchase_date?: string | null
+          period_type?: string | null
+          price_in_purchased_currency?: number | null
+          product_id?: string
+          purchase_date?: string | null
+          revenuecat_subscription_id?: string
+          status?: string
+          unsubscribe_detected_at?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "revenuecat_subscriptions_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "revenuecat_customers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      revenuecat_webhook_events: {
+        Row: {
+          app_user_id: string | null
+          created_at: string
+          error_message: string | null
+          event_timestamp: string | null
+          event_type: string
+          id: string
+          processed: boolean | null
+          processed_at: string | null
+          product_id: string | null
+          raw_payload: Json
+          revenuecat_user_id: string | null
+          subscription_id: string | null
+        }
+        Insert: {
+          app_user_id?: string | null
+          created_at?: string
+          error_message?: string | null
+          event_timestamp?: string | null
+          event_type: string
+          id?: string
+          processed?: boolean | null
+          processed_at?: string | null
+          product_id?: string | null
+          raw_payload: Json
+          revenuecat_user_id?: string | null
+          subscription_id?: string | null
+        }
+        Update: {
+          app_user_id?: string | null
+          created_at?: string
+          error_message?: string | null
+          event_timestamp?: string | null
+          event_type?: string
+          id?: string
+          processed?: boolean | null
+          processed_at?: string | null
+          product_id?: string | null
+          raw_payload?: Json
+          revenuecat_user_id?: string | null
+          subscription_id?: string | null
         }
         Relationships: []
       }
       user_sessions: {
         Row: {
+          attribution_data: Json | null
+          conversion_events: Json | null
+          country_code: string | null
           created_at: string
+          currency: string | null
           device_type: string | null
           entry_page: string | null
+          fbclid: string | null
+          gclid: string | null
           id: string
           ip_address: string | null
           is_active: boolean | null
+          language: string | null
           last_active_page: string | null
           last_activity: string | null
           location: string | null
+          page_views: number | null
           referrer: string | null
+          session_duration: unknown | null
           session_end: string | null
           session_start: string
           user_agent: string | null
           user_id: string
+          utm_campaign: string | null
+          utm_content: string | null
+          utm_medium: string | null
+          utm_source: string | null
+          utm_term: string | null
         }
         Insert: {
+          attribution_data?: Json | null
+          conversion_events?: Json | null
+          country_code?: string | null
           created_at?: string
+          currency?: string | null
           device_type?: string | null
           entry_page?: string | null
+          fbclid?: string | null
+          gclid?: string | null
           id?: string
           ip_address?: string | null
           is_active?: boolean | null
+          language?: string | null
           last_active_page?: string | null
           last_activity?: string | null
           location?: string | null
+          page_views?: number | null
           referrer?: string | null
+          session_duration?: unknown | null
           session_end?: string | null
           session_start?: string
           user_agent?: string | null
           user_id: string
+          utm_campaign?: string | null
+          utm_content?: string | null
+          utm_medium?: string | null
+          utm_source?: string | null
+          utm_term?: string | null
         }
         Update: {
+          attribution_data?: Json | null
+          conversion_events?: Json | null
+          country_code?: string | null
           created_at?: string
+          currency?: string | null
           device_type?: string | null
           entry_page?: string | null
+          fbclid?: string | null
+          gclid?: string | null
           id?: string
           ip_address?: string | null
           is_active?: boolean | null
+          language?: string | null
           last_active_page?: string | null
           last_activity?: string | null
           location?: string | null
+          page_views?: number | null
           referrer?: string | null
+          session_duration?: unknown | null
           session_end?: string | null
           session_start?: string
           user_agent?: string | null
           user_id?: string
-        }
-        Relationships: []
-      }
-      user_subscriptions: {
-        Row: {
-          created_at: string | null
-          id: string
-          is_subscribed: boolean | null
-          trial_start_date: string | null
-          user_id: string
-        }
-        Insert: {
-          created_at?: string | null
-          id?: string
-          is_subscribed?: boolean | null
-          trial_start_date?: string | null
-          user_id: string
-        }
-        Update: {
-          created_at?: string | null
-          id?: string
-          is_subscribed?: boolean | null
-          trial_start_date?: string | null
-          user_id?: string
+          utm_campaign?: string | null
+          utm_content?: string | null
+          utm_medium?: string | null
+          utm_source?: string | null
+          utm_term?: string | null
         }
         Relationships: []
       }
@@ -372,9 +598,63 @@ export type Database = {
           data_type: string
         }[]
       }
+      check_trial_expiry: {
+        Args: Record<PropertyKey, never>
+        Returns: undefined
+      }
+      cleanup_expired_trials: {
+        Args: Record<PropertyKey, never>
+        Returns: undefined
+      }
+      enhanced_manage_user_session: {
+        Args:
+          | {
+              p_user_id: string
+              p_device_type: string
+              p_user_agent: string
+              p_entry_page: string
+              p_last_active_page: string
+              p_language?: string
+              p_referrer?: string
+              p_ip_address?: string
+            }
+          | {
+              p_user_id: string
+              p_device_type: string
+              p_user_agent: string
+              p_entry_page: string
+              p_last_active_page: string
+              p_language?: string
+              p_referrer?: string
+              p_ip_address?: string
+              p_country_code?: string
+              p_currency?: string
+              p_utm_source?: string
+              p_utm_medium?: string
+              p_utm_campaign?: string
+              p_utm_term?: string
+              p_utm_content?: string
+              p_gclid?: string
+              p_fbclid?: string
+              p_attribution_data?: Json
+            }
+        Returns: string
+      }
       execute_dynamic_query: {
         Args: { query_text: string; param_values?: string[] }
         Returns: Json
+      }
+      get_attribution_analytics: {
+        Args: { p_start_date?: string; p_end_date?: string }
+        Returns: {
+          utm_source: string
+          utm_medium: string
+          utm_campaign: string
+          sessions_count: number
+          unique_users_count: number
+          conversions_count: number
+          top_countries: Json
+        }[]
       }
       get_entries_by_emotion_term: {
         Args: {
@@ -427,6 +707,35 @@ export type Database = {
           score: number
           sample_entries: Json
         }[]
+      }
+      get_user_subscription_status: {
+        Args: { user_id_param: string }
+        Returns: {
+          current_status: string
+          current_tier: string
+          is_premium_access: boolean
+          trial_end_date: string
+          is_trial_active: boolean
+          days_remaining: number
+        }[]
+      }
+      has_active_session: {
+        Args: { p_user_id: string }
+        Returns: boolean
+      }
+      is_trial_eligible: {
+        Args: { user_id_param: string }
+        Returns: boolean
+      }
+      manage_user_session: {
+        Args: {
+          p_user_id: string
+          p_device_type: string
+          p_user_agent: string
+          p_entry_page: string
+          p_last_active_page: string
+        }
+        Returns: string
       }
       mark_inactive_sessions: {
         Args: Record<PropertyKey, never>
@@ -571,6 +880,18 @@ export type Database = {
       table_exists: {
         Args: { table_name: string }
         Returns: boolean
+      }
+      track_conversion_event: {
+        Args: {
+          p_session_id: string
+          p_event_type: string
+          p_event_data?: Json
+        }
+        Returns: undefined
+      }
+      update_session_activity: {
+        Args: { p_session_id: string; p_page?: string; p_language?: string }
+        Returns: undefined
       }
     }
     Enums: {

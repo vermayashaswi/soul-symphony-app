@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from "react";
 import ChatInput from "./ChatInput";
 import ChatArea from "./ChatArea";
@@ -58,7 +57,6 @@ export interface SmartChatInterfaceProps {
 
 const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({ mentalHealthInsights }) => {
   const [chatHistory, setChatHistory] = useState<ChatMessage[]>([]);
-  const [loading, setLoading] = useState(false);
   const [initialLoading, setInitialLoading] = useState(true);
   const [showSuggestions, setShowSuggestions] = useState(true);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
@@ -73,12 +71,14 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({ mentalHealthIns
   // State for the current thread
   const [currentThreadId, setCurrentThreadId] = useState<string | null>(null);
   
-  // Use our new realtime hook to track processing status
+  // Use our enhanced realtime hook to track processing status
   const {
+    isLoading,
     isProcessing,
     processingStage,
     processingStatus,
-    updateProcessingStage
+    updateProcessingStage,
+    setLocalLoading
   } = useChatRealtime(currentThreadId);
 
   useEffect(() => {
@@ -109,7 +109,7 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({ mentalHealthIns
 
   useEffect(() => {
     scrollToBottom();
-  }, [chatHistory, loading, isProcessing]);
+  }, [chatHistory, isLoading, isProcessing]);
 
   const scrollToBottom = () => {
     setTimeout(() => {
@@ -149,7 +149,7 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({ mentalHealthIns
       }
       
       debugLog.addEvent("Thread Loading", `Thread ${threadId} found, fetching messages`, "success");
-      const messages = await getThreadMessages(threadId);
+      const messages = await getThreadMessages(threadId, user.id);
       
       if (messages && messages.length > 0) {
         debugLog.addEvent("Thread Loading", `Loaded ${messages.length} messages for thread ${threadId}`, "success");
@@ -165,13 +165,6 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({ mentalHealthIns
         setChatHistory(typedMessages);
         setShowSuggestions(false);
         loadedThreadRef.current = threadId;
-        
-        // If the thread is in processing state, update the local state accordingly
-        if (threadData.processing_status === 'processing') {
-          debugLog.addEvent("Thread Loading", `Thread ${threadId} is in processing state`, "info");
-          setLoading(true);
-          updateProcessingStage("Retrieving information...");
-        }
       } else {
         debugLog.addEvent("Thread Loading", `No messages found for thread ${threadId}`, "info");
         console.log(`No messages found for thread ${threadId}`);
@@ -217,6 +210,16 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({ mentalHealthIns
       return;
     }
     
+    // Prevent multiple concurrent requests
+    if (isProcessing || isLoading) {
+      toast({
+        title: "Please wait",
+        description: "Another request is currently being processed.",
+        variant: "default"
+      });
+      return;
+    }
+    
     const tempUserMessage: ChatMessage = {
       id: `temp-${Date.now()}`,
       thread_id: threadId,
@@ -228,8 +231,9 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({ mentalHealthIns
     
     debugLog.addEvent("User Message", `Adding temporary message to UI: ${tempUserMessage.id}`, "info");
     setChatHistory(prev => [...prev, tempUserMessage]);
-    setLoading(true);
-    updateProcessingStage("Analyzing your question...");
+    
+    // Set local loading state for immediate UI feedback
+    setLocalLoading(true, "Analyzing your question...");
     
     try {
       // Update thread processing status to 'processing'
@@ -239,7 +243,7 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({ mentalHealthIns
       let savedUserMessage: ChatMessage | null = null;
       try {
         debugLog.addEvent("Database", `Saving user message to thread ${threadId}`, "info");
-        savedUserMessage = await saveMessage(threadId, message, 'user');
+        savedUserMessage = await saveMessage(threadId, message, 'user', user.id);
         debugLog.addEvent("Database", `User message saved with ID: ${savedUserMessage?.id}`, "success");
         
         if (savedUserMessage) {
@@ -323,7 +327,7 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({ mentalHealthIns
             threadId,
             response.content,
             'assistant',
-            undefined,
+            user.id,
             undefined,
             false,
             true,
@@ -377,8 +381,8 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({ mentalHealthIns
             threadId,
             response.content,
             'assistant',
+            user.id,
             response.references,
-            response.analysis,
             response.hasNumericResult
           );
           
@@ -435,7 +439,8 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({ mentalHealthIns
         const savedErrorMessage = await saveMessage(
           threadId,
           errorContent,
-          'assistant'
+          'assistant',
+          user.id
         );
         
         if (savedErrorMessage) {
@@ -477,7 +482,8 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({ mentalHealthIns
         setChatHistory(prev => [...prev, errorMessage]);
       }
     } finally {
-      setLoading(false);
+      // Clear local loading state - the realtime hook will handle the final state
+      setLocalLoading(false);
       updateProcessingStage(null);
     }
   };
@@ -619,8 +625,8 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({ mentalHealthIns
     }
   };
 
-  // Check if deletion should be disabled
-  const isDeletionDisabled = isProcessing || processingStatus === 'processing' || loading;
+  // Check if deletion should be disabled - use realtime processing state
+  const isDeletionDisabled = isProcessing || processingStatus === 'processing' || isLoading;
 
   return (
     <div className="chat-interface flex flex-col h-full">
@@ -671,7 +677,7 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({ mentalHealthIns
         ) : (
           <ChatArea 
             chatMessages={chatHistory}
-            isLoading={loading || isProcessing}
+            isLoading={isLoading || isProcessing}
             processingStage={processingStage || undefined}
             threadId={currentThreadId}
             onInteractiveOptionClick={handleInteractiveOptionClick}
@@ -684,12 +690,12 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({ mentalHealthIns
           <div className="flex-1">
             <ChatInput 
               onSendMessage={handleSendMessage} 
-              isLoading={loading || isProcessing} 
+              isLoading={isLoading || isProcessing} 
               userId={user?.id}
             />
           </div>
           <VoiceRecordingButton 
-            isLoading={loading || isProcessing}
+            isLoading={isLoading || isProcessing}
             isRecording={false}
             recordingTime={0}
             onStartRecording={() => {}}

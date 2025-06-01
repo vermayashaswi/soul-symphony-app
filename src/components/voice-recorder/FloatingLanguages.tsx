@@ -64,9 +64,9 @@ const FloatingLanguages: React.FC<FloatingLanguagesProps> = ({ size }) => {
       style={{
         width: "100%",
         height: "100%",
-        left: "40.5%", // Shifted left by 12% from the original position (52.5%)
-        top: "65%", // Keeping the vertical position the same
-        transform: "translate(-50%, -50%)",
+        left: "50%", // Center horizontally
+        top: "65%", // Position to match mic button location (mt-40)
+        transform: "translate(-50%, -50%)", // Perfect centering
         opacity: 0.8,
       }}
     >

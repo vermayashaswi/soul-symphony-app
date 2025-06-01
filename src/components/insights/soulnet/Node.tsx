@@ -1,10 +1,9 @@
 
-import React, { useState, useCallback, useEffect, useMemo, useRef } from 'react';
-import '@/types/three-reference';  // Fixed import path
-import * as THREE from 'three';
+import React, { useState, useCallback, useEffect, useMemo } from 'react';
+import '@/types/three-reference';
 import { NodeMesh } from './NodeMesh';
-import { NodeLabel } from './NodeLabel';
-import { ConnectionPercentage } from './ConnectionPercentage';
+import DirectNodeLabel from './DirectNodeLabel';
+import FixedConnectionPercentage from './FixedConnectionPercentage';
 import { useTheme } from '@/hooks/use-theme';
 
 interface NodeData {
@@ -29,6 +28,7 @@ interface NodeProps {
   connectionStrength?: number;
   connectionPercentage?: number;
   showPercentage?: boolean;
+  forceShowLabels?: boolean;
 }
 
 export const Node: React.FC<NodeProps> = ({
@@ -44,59 +44,21 @@ export const Node: React.FC<NodeProps> = ({
   isHighlighted = false,
   connectionStrength = 0.5,
   connectionPercentage = 0,
-  showPercentage = false
+  showPercentage = false,
+  forceShowLabels = false
 }) => {
   const { theme } = useTheme();
   const [isTouching, setIsTouching] = useState(false);
   const [touchStartTime, setTouchStartTime] = useState<number | null>(null);
   const [touchStartPosition, setTouchStartPosition] = useState<{x: number, y: number} | null>(null);
-  const prevHighlightedRef = useRef<boolean>(isHighlighted);
-  const prevSelectedRef = useRef<boolean>(isSelected);
-  const nodeRef = useRef<{ isAnimating: boolean }>({ isAnimating: false });
-  const stableLabelVisibilityRef = useRef<boolean>(showLabel || isHighlighted || isSelected);
   
-  // Stabilize label visibility transitions to prevent flickering
-  useEffect(() => {
-    const newVisibility = showLabel || isHighlighted || isSelected;
-    
-    // Only update if there's a change, with a small delay when hiding to prevent flicker
-    if (newVisibility !== stableLabelVisibilityRef.current) {
-      if (newVisibility) {
-        // Show immediately
-        stableLabelVisibilityRef.current = true;
-      } else {
-        // Hide with delay
-        setTimeout(() => {
-          stableLabelVisibilityRef.current = newVisibility;
-        }, 100);
-      }
-    }
-  }, [showLabel, isHighlighted, isSelected]);
+  console.log(`[Node] Rendering node ${node.id} with labels - highlighted: ${isHighlighted}, selected: ${isSelected}`);
   
-  // Debug log for visibility with more informative details
-  useEffect(() => {
-    if (isHighlighted || isSelected) {
-      console.log(`Node ${node.id}: highlighted=${isHighlighted}, selected=${isSelected}, showPercentage=${showPercentage}, percentage=${connectionPercentage}`);
-    }
-    
-    // Track state changes that might cause flickering
-    if (prevHighlightedRef.current !== isHighlighted || prevSelectedRef.current !== isSelected) {
-      console.log(`Node ${node.id}: State change - highlighted: ${prevHighlightedRef.current} → ${isHighlighted}, selected: ${prevSelectedRef.current} → ${isSelected}`);
-      prevHighlightedRef.current = isHighlighted;
-      prevSelectedRef.current = isSelected;
-      
-      // Mark node as animating to stabilize transitions
-      nodeRef.current.isAnimating = true;
-      
-      // Reset animation flag after transition period
-      setTimeout(() => {
-        nodeRef.current.isAnimating = false;
-      }, 300);
-    }
-  }, [isHighlighted, isSelected, showPercentage, node.id, connectionPercentage]);
+  // Simplified label visibility logic
+  const shouldShowLabel = forceShowLabels || showLabel || isHighlighted || isSelected;
   
-  // Further increase the base scale for all nodes by 1.5x for nodes, as requested
-  const baseScale = node.type === 'entity' ? 0.7 : 0.55; // Adjusted values for smaller nodes
+  // Simplified scale calculation
+  const baseScale = node.type === 'entity' ? 0.7 : 0.55;
   const scale = isHighlighted 
     ? baseScale * (1.2 + (isSelected ? 0.3 : connectionStrength * 0.5))
     : baseScale * (0.8 + node.value * 0.5);
@@ -115,8 +77,7 @@ export const Node: React.FC<NodeProps> = ({
     setIsTouching(true);
     setTouchStartTime(Date.now());
     setTouchStartPosition({x: e.clientX, y: e.clientY});
-    console.log(`Node pointer down: ${node.id}`);
-  }, [node.id]);
+  }, []);
 
   const handlePointerUp = useCallback((e: any) => {
     e.stopPropagation();
@@ -126,15 +87,12 @@ export const Node: React.FC<NodeProps> = ({
         const deltaY = Math.abs(e.clientY - touchStartPosition.y);
         
         if (deltaX < 10 && deltaY < 10) {
-          console.log(`Node clicked: ${node.id}, isHighlighted: ${isHighlighted}`);
           onClick(node.id, e);
-          
           if (navigator.vibrate) {
             navigator.vibrate(50);
           }
         }
       } else {
-        console.log(`Node clicked (no start position): ${node.id}`);
         onClick(node.id, e);
       }
     }
@@ -142,7 +100,7 @@ export const Node: React.FC<NodeProps> = ({
     setIsTouching(false);
     setTouchStartTime(null);
     setTouchStartPosition(null);
-  }, [node.id, onClick, touchStartTime, touchStartPosition, isHighlighted]);
+  }, [node.id, onClick, touchStartTime, touchStartPosition]);
 
   useEffect(() => {
     if (isTouching && touchStartTime) {
@@ -158,18 +116,9 @@ export const Node: React.FC<NodeProps> = ({
     }
   }, [isTouching, touchStartTime]);
 
-  // Ensure label visibility - use explicit visibility for both NodeLabel and ConnectionPercentage
-  const shouldShowLabel = stableLabelVisibilityRef.current;
-  
-  // Show percentages for all highlighted nodes that aren't selected and have a non-zero percentage
   const shouldShowPercentage = showPercentage && isHighlighted && connectionPercentage > 0;
   
-  // Log when percentage should be displayed
-  useEffect(() => {
-    if (shouldShowPercentage) {
-      console.log(`Should show percentage for node ${node.id}: ${connectionPercentage}%`);
-    }
-  }, [shouldShowPercentage, node.id, connectionPercentage]);
+  console.log(`[Node] Final render decisions - Label: ${shouldShowLabel}, Percentage: ${shouldShowPercentage} (${connectionPercentage}%)`);
   
   return (
     <group position={node.position}>
@@ -188,22 +137,22 @@ export const Node: React.FC<NodeProps> = ({
         onPointerLeave={() => setIsTouching(false)}
       />
       
-      <NodeLabel
+      <DirectNodeLabel
         id={node.id}
         type={node.type}
-        position={node.position}
+        position={[0, 0, 0]}
         isHighlighted={isHighlighted}
+        isSelected={isSelected}
         shouldShowLabel={shouldShowLabel}
         cameraZoom={cameraZoom}
         themeHex={themeHex}
+        nodeScale={scale}
       />
 
-      {/* Place the percentage display in front of the node */}
-      <ConnectionPercentage
-        position={node.position}
+      <FixedConnectionPercentage
+        position={[0, 0, 0]}
         percentage={connectionPercentage}
         isVisible={shouldShowPercentage}
-        offsetY={0} // No offset needed since we're using z-positioning
         nodeType={node.type}
       />
     </group>

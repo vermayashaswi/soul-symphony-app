@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useNavigate } from "react-router-dom";
@@ -13,7 +12,7 @@ import { toast } from "sonner";
 import { useSwipeGesture } from "@/hooks/use-swipe-gesture";
 import { useTranslation } from "@/contexts/TranslationContext";
 import { TranslatableText } from "@/components/translation/TranslatableText";
-import { useAuth } from "@/contexts/AuthContext"; // Add import for useAuth
+import { useAuth } from "@/contexts/AuthContext";
 import { 
   Select,
   SelectContent,
@@ -21,6 +20,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { PremiumBadge } from "@/components/onboarding/PremiumBadge";
 
 interface OnboardingScreenProps {
   onComplete?: () => void;
@@ -50,9 +50,7 @@ const createWavePath = (
   return path;
 };
 
-// Add expanded languages array
 const LANGUAGES = [
-  // Currently implemented languages
   { code: 'en', label: 'English', region: 'European' },
   { code: 'es', label: 'Español', region: 'European' },
   { code: 'fr', label: 'Français', region: 'European' },
@@ -63,8 +61,6 @@ const LANGUAGES = [
   { code: 'ru', label: 'Русский', region: 'European' },
   { code: 'ar', label: 'العربية', region: 'Middle Eastern' },
   { code: 'pt', label: 'Português', region: 'European' },
-
-  // Additional Indian regional languages
   { code: 'bn', label: 'বাংলা', region: 'Indian' },
   { code: 'ta', label: 'தமிழ்', region: 'Indian' },
   { code: 'te', label: 'తెలుగు', region: 'Indian' },
@@ -80,8 +76,6 @@ const LANGUAGES = [
   { code: 'ks', label: 'कॉशुर', region: 'Indian' },
   { code: 'kok', label: 'कोंकणी', region: 'Indian' },
   { code: 'mai', label: 'मैथिली', region: 'Indian' },
-
-  // Other major global languages
   { code: 'it', label: 'Italiano', region: 'European' },
   { code: 'ko', label: '한국어', region: 'Asian' },
   { code: 'tr', label: 'Türkçe', region: 'European' },
@@ -105,28 +99,29 @@ interface StepIllustration {
   description: string;
   illustration: React.FC<any>;
   buttonText: string;
+  isPremium?: boolean;
 }
 
 const ONBOARDING_STEPS: StepIllustration[] = [
   {
-    title: "Welcome to SOuLO",
+    title: "Your Voice Journaling Companion",
     subtitle: "",
     description: "Welcome to Voice Journaling - Just speak and we'll do the rest",
     illustration: (props: {}) => (
       <div className="flex flex-col justify-center items-center my-2">
         <motion.div 
-          className="relative w-full h-64"
+          className="relative w-full h-48"
           initial={{ opacity: 0, scale: 0.8 }}
           animate={{ opacity: 1, scale: 1 }}
-          transition={{ duration: 0.5 }}
+          transition={{ duration: 0.5, delay: 0.2 }}
         >
-          <div className="absolute inset-0 flex items-center justify-center z-10 mb-20">
+          <div className="absolute inset-0 flex items-center justify-center z-10 mb-12">
             <div className="relative z-20">
               <SouloLogo size="large" className="scale-[2.2]" useColorTheme={false} textClassName="font-bold text-white" />
             </div>
           </div>
           
-          <div className="absolute inset-0 flex items-center justify-center z-5 mt-20">
+          <div className="absolute inset-0 flex items-center justify-center z-5 mt-12">
             <div className="absolute w-full h-16 flex items-center justify-center overflow-hidden">
               <RecordingVisualizer 
                 isRecording={false} 
@@ -139,16 +134,16 @@ const ONBOARDING_STEPS: StepIllustration[] = [
         </motion.div>
         
         <motion.h1 
-          className="text-2xl font-bold mb-3 mt-8 text-foreground"
+          className="text-2xl font-bold mb-3 mt-8 text-foreground text-center"
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.2 }}
+          transition={{ delay: 0.1 }}
         >
-          <TranslatableText text="Welcome to SOuLO" forceTranslate={true} />
+          <TranslatableText text="Your Voice Journaling Companion" forceTranslate={true} />
         </motion.h1>
         
         <motion.p 
-          className="text-muted-foreground mb-6 max-w-xs font-medium text-theme animate-pulse"
+          className="text-muted-foreground mb-6 max-w-xs font-medium text-theme animate-pulse text-center"
           initial={{ opacity: 0, y: 20 }}
           animate={{ 
             opacity: 1, 
@@ -375,6 +370,7 @@ const ONBOARDING_STEPS: StepIllustration[] = [
     title: "AI Analysis",
     subtitle: "",
     description: "Get insights into your emotional patterns and growth through advanced AI analysis.",
+    isPremium: true,
     illustration: (props: {}) => (
       <div className="flex justify-center items-center my-2">
         <div className="relative w-64 h-64 flex flex-col items-center justify-center overflow-hidden p-4">
@@ -414,7 +410,7 @@ const ONBOARDING_STEPS: StepIllustration[] = [
                   }
                 }}
               >
-                {theme}
+                <TranslatableText text={theme} forceTranslate={true} />
               </motion.div>
             ))}
           </motion.div>
@@ -427,6 +423,7 @@ const ONBOARDING_STEPS: StepIllustration[] = [
     title: "Chat with Your Journal",
     subtitle: "",
     description: "Ask questions about your emotions, patterns, and growth through natural conversation with AI.",
+    isPremium: true,
     illustration: (props: {}) => (
       <div className="flex justify-center items-center my-2 w-full">
         <div className="relative w-full max-w-xs bg-theme-dark/30 dark:bg-theme-dark/30 rounded-xl flex items-center justify-center overflow-hidden p-4">
@@ -447,7 +444,7 @@ const ONBOARDING_STEPS: StepIllustration[] = [
               animate={{ x: 0, opacity: 1 }}
               transition={{ delay: 0.3 }}
             >
-              How have I been feeling lately?
+              <TranslatableText text="How have I been feeling lately?" forceTranslate={true} />
             </motion.div>
             
             <motion.div 
@@ -456,7 +453,7 @@ const ONBOARDING_STEPS: StepIllustration[] = [
               animate={{ x: 0, opacity: 1 }}
               transition={{ delay: 0.9 }}
             >
-              Based on your recent entries, you've been feeling more positive and energetic this week...
+              <TranslatableText text="Based on your recent entries, you've been feeling more positive and energetic this week..." forceTranslate={true} />
             </motion.div>
             
             <motion.div
@@ -477,6 +474,7 @@ const ONBOARDING_STEPS: StepIllustration[] = [
     title: "Track Your Emotional Journey",
     subtitle: "",
     description: "See your emotional patterns and growth over time with beautiful visualizations.",
+    isPremium: true,
     illustration: (props: {}) => (
       <div className="flex justify-center items-center my-2">
         <div className="relative w-64 h-64 flex items-center justify-center overflow-hidden">
@@ -500,7 +498,9 @@ const ONBOARDING_STEPS: StepIllustration[] = [
               transition={{ delay: 0.3 }}
             >
               <div className="flex items-center justify-between mb-2">
-                <div className="text-xs font-medium text-theme">Mood Trends</div>
+                <div className="text-xs font-medium text-theme">
+                  <TranslatableText text="Mood Trends" forceTranslate={true} />
+                </div>
                 <LineChart className="w-4 h-4 text-theme" />
               </div>
               
@@ -554,9 +554,9 @@ const ONBOARDING_STEPS: StepIllustration[] = [
                 animate={{ opacity: 1 }}
                 transition={{ delay: 2.2 }}
               >
-                <span>Jan</span>
-                <span>Mar</span>
-                <span>Now</span>
+                <span><TranslatableText text="Jan" forceTranslate={true} /></span>
+                <span><TranslatableText text="Mar" forceTranslate={true} /></span>
+                <span><TranslatableText text="Now" forceTranslate={true} /></span>
               </motion.div>
             </motion.div>
           </div>
@@ -592,16 +592,13 @@ const ONBOARDING_STEPS: StepIllustration[] = [
             animate={{ opacity: 1 }}
             transition={{ delay: 0.5 }}
           >
-            <Input
-              placeholder="Enter your name"
-              value={props.name}
-              onChange={(e) => props.setName(e.target.value)}
-              className="bg-background/80 border-theme/20 focus:border-theme text-white"
-              autoFocus
+            <NameInput
+              name={props.name}
+              setName={props.setName}
             />
             
             <div className="text-sm text-muted-foreground text-center">
-              This is how SOuLO will address you
+              <TranslatableText text="This is how SOuLO will address you" forceTranslate={true} />
             </div>
           </motion.div>
           
@@ -653,7 +650,7 @@ const ONBOARDING_STEPS: StepIllustration[] = [
             transition={{ delay: 1 }}
           >
             <div className="text-theme text-sm font-medium text-center">
-              Emotional wellness through voice
+              <TranslatableText text="Emotional wellness through voice" forceTranslate={true} />
             </div>
           </motion.div>
         </motion.div>
@@ -662,6 +659,40 @@ const ONBOARDING_STEPS: StepIllustration[] = [
     buttonText: "Sign In"
   }
 ];
+
+// Create a separate component for the name input with proper translation handling
+const NameInput: React.FC<{ name: string; setName: (name: string) => void }> = ({ name, setName }) => {
+  const { translate, currentLanguage } = useTranslation();
+  const [placeholder, setPlaceholder] = useState("Enter your name");
+  
+  useEffect(() => {
+    const translatePlaceholder = async () => {
+      if (currentLanguage !== 'en') {
+        try {
+          const translatedPlaceholder = await translate("Enter your name", "en");
+          setPlaceholder(translatedPlaceholder);
+        } catch (error) {
+          console.error('Failed to translate placeholder:', error);
+          setPlaceholder("Enter your name");
+        }
+      } else {
+        setPlaceholder("Enter your name");
+      }
+    };
+    
+    translatePlaceholder();
+  }, [currentLanguage, translate]);
+  
+  return (
+    <Input
+      placeholder={placeholder}
+      value={name}
+      onChange={(e) => setName(e.target.value)}
+      className="bg-background/80 border-theme/20 focus:border-theme text-white"
+      autoFocus
+    />
+  );
+};
 
 // Enhanced Language Selector component for onboarding - simplified without search
 const LanguageSelector = () => {
@@ -741,7 +772,7 @@ const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ onComplete }) => {
   const navigate = useNavigate();
   const { setColorTheme } = useTheme();
   const contentRef = useRef<HTMLDivElement>(null);
-  const { user } = useAuth(); // Get authentication status
+  const { user } = useAuth();
   
   // Define isNameStep before it's used in useSwipeGesture
   const isFirstStep = currentStep === 0;
@@ -816,7 +847,7 @@ const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ onComplete }) => {
       }
     },
     minDistance: 50,
-    disabled: isNameStep // Disable swipe gestures on the name entry step
+    disabled: isNameStep
   });
 
   const CurrentIllustration = ONBOARDING_STEPS[currentStep].illustration;
@@ -866,9 +897,12 @@ const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ onComplete }) => {
                 <CurrentIllustration />
               ) : isNameStep ? (
                 <>
-                  <h2 className="text-2xl font-bold mb-2 text-theme">
-                    <TranslatableText text={currentStepData.title} forceTranslate={true} />
-                  </h2>
+                  <div className="flex items-center justify-center mb-2">
+                    <h2 className="text-2xl font-bold text-theme">
+                      <TranslatableText text={currentStepData.title} forceTranslate={true} />
+                    </h2>
+                    {currentStepData.isPremium && <PremiumBadge />}
+                  </div>
                   {currentStepData.description && (
                     <p className="mb-8 text-muted-foreground max-w-xs">
                       <TranslatableText text={currentStepData.description} forceTranslate={true} />
@@ -878,9 +912,12 @@ const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ onComplete }) => {
                 </>
               ) : (
                 <>
-                  <h2 className="text-2xl font-bold mb-2 text-theme">
-                    <TranslatableText text={currentStepData.title} forceTranslate={true} />
-                  </h2>
+                  <div className="flex items-center justify-center mb-2">
+                    <h2 className="text-2xl font-bold text-theme">
+                      <TranslatableText text={currentStepData.title} forceTranslate={true} />
+                    </h2>
+                    {currentStepData.isPremium && <PremiumBadge />}
+                  </div>
                   {currentStepData.description && (
                     <p className="mb-8 text-muted-foreground max-w-xs">
                       <TranslatableText text={currentStepData.description} forceTranslate={true} />

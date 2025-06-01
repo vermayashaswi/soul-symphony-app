@@ -1,27 +1,32 @@
 
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import AppRoutes from './routes/AppRoutes';
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as SonnerToaster } from "sonner";
 import { TranslationProvider } from '@/contexts/TranslationContext';
+import { SubscriptionProvider } from '@/contexts/SubscriptionContext';
 import { TranslationLoadingOverlay } from '@/components/translation/TranslationLoadingOverlay';
 import { JournalProcessingInitializer } from './app/journal-processing-init';
 import { TutorialProvider } from './contexts/TutorialContext';
 import TutorialOverlay from './components/tutorial/TutorialOverlay';
+import ErrorBoundary from './components/insights/ErrorBoundary';
 import { preloadCriticalImages } from './utils/imagePreloader';
+import { toast } from 'sonner';
 import './styles/emoji.css';
-import './styles/tutorial.css'; // Ensure tutorial styles are imported
+import './styles/tutorial.css';
 
 const App: React.FC = () => {
+  const [isInitialized, setIsInitialized] = useState(false);
+
   useEffect(() => {
-    console.log('App mounted, current path:', window.location.pathname);
+    console.log('[App] App mounted, current path:', window.location.pathname);
     
     // Clean up any malformed paths
     const currentPath = window.location.pathname;
     
     // Fix incorrectly formatted URLs that have domains or https in the path
     if (currentPath.includes('https://') || currentPath.includes('soulo.online')) {
-      console.log('Fixing malformed URL path:', currentPath);
+      console.log('[App] Fixing malformed URL path:', currentPath);
       window.history.replaceState(null, '', '/');
     }
     
@@ -29,21 +34,57 @@ const App: React.FC = () => {
     document.body.classList.add('app-initialized');
     
     // Preload critical images including the chat avatar
-    preloadCriticalImages();
+    try {
+      preloadCriticalImages();
+      console.log('[App] Critical images preloaded successfully');
+    } catch (error) {
+      console.warn('[App] Failed to preload some images:', error);
+      // Non-critical error, continue app initialization
+    }
+
+    // Mark app as initialized after a brief delay to ensure smooth startup
+    setTimeout(() => {
+      setIsInitialized(true);
+      console.log('[App] App marked as fully initialized');
+    }, 500);
   }, []);
 
+  const handleAppError = (error: Error, errorInfo: any) => {
+    console.error('[App] Application-level error:', error, errorInfo);
+    
+    // Log critical app errors for debugging
+    const errorData = {
+      message: error.message,
+      stack: error.stack,
+      componentStack: errorInfo.componentStack,
+      timestamp: new Date().toISOString(),
+      userAgent: navigator.userAgent,
+      url: window.location.href
+    };
+    
+    console.error('[App] Detailed error info:', errorData);
+
+    // Show user-friendly error notification
+    toast.error('Something went wrong. The app will try to recover automatically.');
+
+    // Allow the app to continue functioning despite errors
+  };
+
   return (
-    <TranslationProvider>
-      <TutorialProvider>
-        <TranslationLoadingOverlay />
-        <JournalProcessingInitializer />
-        <AppRoutes />
-        {/* TutorialOverlay has internal logic to only render on app routes */}
-        <TutorialOverlay />
-        <Toaster />
-        <SonnerToaster position="top-right" />
-      </TutorialProvider>
-    </TranslationProvider>
+    <ErrorBoundary onError={handleAppError}>
+      <TranslationProvider>
+        <SubscriptionProvider>
+          <TutorialProvider>
+            <TranslationLoadingOverlay />
+            <JournalProcessingInitializer />
+            <AppRoutes key={isInitialized ? 'initialized' : 'initializing'} />
+            <TutorialOverlay />
+            <Toaster />
+            <SonnerToaster position="top-right" />
+          </TutorialProvider>
+        </SubscriptionProvider>
+      </TranslationProvider>
+    </ErrorBoundary>
   );
 };
 

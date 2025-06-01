@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { format, isSameDay, isToday, parseISO, startOfDay, startOfMonth, startOfWeek, startOfYear, addDays, addMonths, addWeeks, addYears } from 'date-fns';
 import { cn } from '@/lib/utils';
@@ -267,12 +266,12 @@ const MoodCalendarGrid: React.FC<MoodCalendarGridProps> = ({ sentimentData, time
               <tr>
                 <th className={cn(
                   "text-xs text-muted-foreground sticky top-0 bg-background z-10",
-                  isMobile ? "w-4 px-0" : "w-6 px-0.5"
+                  isMobile ? "w-6 px-1" : "w-8 px-1"
                 )}></th>
                 {months.map((month, index) => (
                   <th key={month} className={cn(
                     "text-xs text-center text-muted-foreground sticky top-0 bg-background z-10",
-                    isMobile ? "px-0 py-1" : "px-0.5 py-1"
+                    isMobile ? "px-1 py-1" : "px-1 py-1"
                   )}>
                     <TranslatableText text={month} forceTranslate={true} />
                   </th>
@@ -284,7 +283,7 @@ const MoodCalendarGrid: React.FC<MoodCalendarGridProps> = ({ sentimentData, time
                 <tr key={`day-${day}`} className={day % 2 === 0 ? "bg-muted/5" : ""}>
                   <td className={cn(
                     "text-xs text-center text-muted-foreground sticky left-0 bg-background",
-                    isMobile ? "px-0" : "px-0.5"
+                    isMobile ? "px-1" : "px-1"
                   )}>{day}</td>
                   {months.map((_, monthIndex) => {
                     // Check if this day exists in this month (e.g., no Feb 30th)
@@ -306,7 +305,7 @@ const MoodCalendarGrid: React.FC<MoodCalendarGridProps> = ({ sentimentData, time
                       )}>
                         <div 
                           className={cn(
-                            isMobile ? "w-1.5 h-1.5" : "w-2 h-2",
+                            isMobile ? "w-3 h-3" : "w-4 h-4",
                             "rounded-full mx-auto",
                             hasMood 
                               ? getSentimentColor(sentiment)

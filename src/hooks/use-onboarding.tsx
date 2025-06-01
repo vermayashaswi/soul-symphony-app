@@ -1,15 +1,13 @@
 
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { useTranslation } from '@/contexts/TranslationContext';
 
 export function useOnboarding() {
   const [onboardingComplete, setOnboardingComplete] = useState<boolean | null>(null);
   const [loading, setLoading] = useState(true);
   const [displayName, setDisplayName] = useState<string | null>(null);
-  const { currentLanguage } = useTranslation();
 
-  useEffect(() => {
+  const checkOnboardingStatus = () => {
     // Check if onboarding is complete
     const isComplete = localStorage.getItem('onboardingComplete') === 'true';
     setOnboardingComplete(isComplete);
@@ -21,6 +19,10 @@ export function useOnboarding() {
     }
     
     setLoading(false);
+  };
+
+  useEffect(() => {
+    checkOnboardingStatus();
   }, []);
 
   const completeOnboarding = () => {
@@ -63,6 +65,7 @@ export function useOnboarding() {
     displayName,
     completeOnboarding,
     resetOnboarding,
-    saveNameToProfile
+    saveNameToProfile,
+    checkOnboardingStatus
   };
 }

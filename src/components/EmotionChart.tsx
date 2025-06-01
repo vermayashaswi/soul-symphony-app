@@ -37,37 +37,37 @@ interface EmotionChartProps {
 }
 
 const EMOTION_COLORS: Record<string, string> = {
-  joy: '#4299E1',           // Blue
-  happiness: '#48BB78',     // Green
-  gratitude: '#0EA5E9',     // Light Blue
-  calm: '#8B5CF6',          // Purple
-  anxiety: '#F56565',       // Red
-  sadness: '#3B82F6',       // Bright Blue
-  anger: '#F97316',         // Orange
-  fear: '#EF4444',          // Bright Red
-  excitement: '#FBBF24',    // Yellow
-  love: '#EC4899',          // Pink
-  stress: '#9333EA',        // Violet
-  surprise: '#F59E0B',      // Amber
-  confusion: '#6366F1',     // Indigo
-  disappointment: '#2563EB', // Blue
-  pride: '#06B6D4',         // Cyan
-  shame: '#DC2626',         // Dark Red
-  guilt: '#B45309',         // Brown
-  hope: '#2DD4BF',          // Teal
-  boredom: '#4B5563',       // Gray
-  disgust: '#65A30D',       // Lime
-  contentment: '#0D9488',   // Dark Teal
-  trust: '#A78BFA',         // Light Purple
-  anticipation: '#FB923C',  // Light Orange
-  pensiveness: '#93C5FD',   // Light Blue
-  serenity: '#A5F3FC',      // Light Cyan
-  annoyance: '#FCD34D',     // Light Yellow
-  vigilance: '#FCA5A5',     // Light Red
-  interest: '#86EFAC',      // Light Green
-  apprehension: '#FDA4AF',  // Light Pink
-  distraction: '#D8B4FE',   // Light Violet
-  admiration: '#C4B5FD'     // Lavender
+  joy: '#FF6B6B',           // Coral Red
+  happiness: '#4ECDC4',     // Teal
+  gratitude: '#45B7D1',     // Sky Blue
+  calm: '#96CEB4',          // Mint Green
+  anxiety: '#FFEAA7',       // Light Yellow
+  sadness: '#DDA0DD',       // Plum
+  anger: '#FF7675',         // Light Red
+  fear: '#FD79A8',          // Pink
+  excitement: '#FDCB6E',    // Orange
+  love: '#E84393',          // Magenta
+  stress: '#A29BFE',        // Lavender
+  surprise: '#F39C12',      // Orange
+  confusion: '#6C5CE7',     // Purple
+  disappointment: '#74B9FF', // Light Blue
+  pride: '#00B894',         // Emerald
+  shame: '#E17055',         // Salmon
+  guilt: '#D63031',         // Dark Red
+  hope: '#00CEC9',          // Turquoise
+  boredom: '#636E72',       // Gray
+  disgust: '#A4B0BE',       // Light Gray
+  contentment: '#55A3FF',   // Bright Blue
+  trust: '#81ECEC',         // Cyan
+  anticipation: '#FAB1A0',  // Peach
+  pensiveness: '#00B894',   // Green
+  serenity: '#74B9FF',      // Periwinkle
+  annoyance: '#FDCB6E',     // Gold
+  vigilance: '#E84393',     // Hot Pink
+  interest: '#6C5CE7',      // Violet
+  apprehension: '#FD79A8',  // Rose
+  distraction: '#A29BFE',   // Lilac
+  admiration: '#FDCB6E'     // Amber
 };
 
 const getEmotionColor = (emotion: string, index: number): string => {
@@ -76,9 +76,28 @@ const getEmotionColor = (emotion: string, index: number): string => {
     return EMOTION_COLORS[normalized];
   }
   
+  // More diverse fallback colors - completely different hues
   const fallbackColors = [
-    '#3B82F6', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6', 
-    '#EC4899', '#6366F1', '#D946EF', '#F97316', '#0EA5E9'
+    '#FF6B6B', // Coral Red
+    '#4ECDC4', // Teal
+    '#45B7D1', // Sky Blue
+    '#96CEB4', // Mint Green
+    '#FFEAA7', // Light Yellow
+    '#DDA0DD', // Plum
+    '#FF7675', // Light Red
+    '#FD79A8', // Pink
+    '#FDCB6E', // Orange
+    '#E84393', // Magenta
+    '#A29BFE', // Lavender
+    '#00B894', // Emerald
+    '#6C5CE7', // Purple
+    '#74B9FF', // Light Blue
+    '#E17055', // Salmon
+    '#00CEC9', // Turquoise
+    '#81ECEC', // Cyan
+    '#FAB1A0', // Peach
+    '#636E72', // Gray
+    '#55A3FF'  // Bright Blue
   ];
   
   return fallbackColors[index % fallbackColors.length];

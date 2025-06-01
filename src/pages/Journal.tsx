@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useJournalEntries } from '@/hooks/use-journal-entries';
 import { processRecording, getEntryIdForProcessingId, removeProcessingEntryById } from '@/utils/audio-processing';
@@ -16,6 +15,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { TranslatableText } from '@/components/translation/TranslatableText';
 import { JournalEntry } from '@/types/journal';
 import JournalSearch from '@/components/journal/JournalSearch';
+import { setProcessingIntent } from '@/utils/journal/processing-intent';
 
 const logInfo = (message: string, source: string) => {
   console.log(`[${source}] ${message}`);
@@ -32,7 +32,6 @@ const Journal = () => {
   const [profileCheckRetryCount, setProfileCheckRetryCount] = useState(0);
   const [lastProfileErrorTime, setLastProfileErrorTime] = useState(0);
   const [showRetryButton, setShowRetryButton] = useState(false);
-  const [toastIds, setToastIds] = useState<{ [key: string]: string }>({});
   const [notifiedEntryIds, setNotifiedEntryIds] = useState<Set<number>>(new Set());
   const [profileCheckTimeoutId, setProfileCheckTimeoutId] = useState<NodeJS.Timeout | null>(null);
   const [entryHasBeenProcessed, setEntryHasBeenProcessed] = useState(false);
@@ -132,16 +131,6 @@ const Journal = () => {
           
           setTimeout(() => {
             setProcessingEntries(prev => prev.filter(id => id !== event.detail.tempId));
-            
-            if (toastIds[event.detail.tempId]) {
-              toast.dismiss(toastIds[event.detail.tempId]);
-              
-              setToastIds(prev => {
-                const newToastIds = { ...prev };
-                delete newToastIds[event.detail.tempId];
-                return newToastIds;
-              });
-            }
           }, 3000);
           
           toast.success('Journal entry analyzed and saved', {
@@ -183,17 +172,13 @@ const Journal = () => {
       
       clearAllToasts();
     };
-  }, [processingEntries, toastIds, fetchEntries, deletedProcessingIds]);
+  }, [processingEntries, fetchEntries, deletedProcessingIds]);
 
   useEffect(() => {
     clearAllToasts();
     
     return () => {
       clearAllToasts();
-      
-      Object.values(toastIds).forEach(id => {
-        if (id) toast.dismiss(id);
-      });
       
       if (profileCheckTimeoutId) {
         clearTimeout(profileCheckTimeoutId);
@@ -258,20 +243,6 @@ const Journal = () => {
           
           if (connectedProcessingEntries.length > 0) {
             setProcessingEntries(prev => prev.filter(id => !connectedProcessingEntries.includes(id)));
-            
-            connectedProcessingEntries.forEach(tempId => {
-              if (toastIds[tempId]) {
-                toast.dismiss(toastIds[tempId]);
-              }
-            });
-            
-            setToastIds(prev => {
-              const newToastIds = { ...prev };
-              connectedProcessingEntries.forEach(tempId => {
-                delete newToastIds[tempId];
-              });
-              return newToastIds;
-            });
           }
           
           const fetchIntervals = [1000, 2000];
@@ -300,19 +271,15 @@ const Journal = () => {
         setEntriesReady(true);
       }
     }
-  }, [entries, processingEntries, toastIds, entriesReady, activeTab, fetchEntries, notifiedEntryIds]);
+  }, [entries, processingEntries, entriesReady, activeTab, fetchEntries, notifiedEntryIds]);
 
   useEffect(() => {
     return () => {
-      Object.values(toastIds).forEach(id => {
-        if (id) toast.dismiss(id);
-      });
-      
       if (profileCheckTimeoutId) {
         clearTimeout(profileCheckTimeoutId);
       }
     };
-  }, [toastIds, profileCheckTimeoutId]);
+  }, [profileCheckTimeoutId]);
 
   useEffect(() => {
     if (user?.id && isCheckingProfile && !profileCheckedOnceRef.current) {
@@ -505,6 +472,10 @@ const Journal = () => {
     }
     
     try {
+      // CRITICAL: Set processing intent IMMEDIATELY before any async operations
+      console.log('[Journal] Setting processing intent immediately');
+      setProcessingIntent(true);
+      
       await new Promise<void>((resolve) => {
         clearAllToasts();
         setTimeout(() => {
@@ -521,25 +492,18 @@ const Journal = () => {
       setSafeToSwitchTab(false);
       setEntriesReady(false);
       
+      // Dispatch immediate processing events for instant UI feedback
+      window.dispatchEvent(new CustomEvent('immediateProcessingStarted', {
+        detail: { 
+          tempId: 'immediate-processing',
+          timestamp: Date.now(),
+          immediate: true 
+        }
+      }));
+      
       setTimeout(() => {
         setActiveTab('entries');
       }, 50);
-      
-      const toastId = toast.loading('Processing your journal entry with AI...', {
-        duration: 15000,
-        closeButton: false,
-        onAutoClose: () => {
-          if (toastId) {
-            const updatedToastIds = { ...toastIds };
-            Object.keys(updatedToastIds).forEach(key => {
-              if (updatedToastIds[key] === String(toastId)) {
-                delete updatedToastIds[key];
-              }
-            });
-            setToastIds(updatedToastIds);
-          }
-        }
-      });
       
       console.log('[Journal] Starting processing for audio file:', audioBlob.size, 'bytes');
       const { success, tempId, error } = await processRecording(audioBlob, user.id);
@@ -547,8 +511,10 @@ const Journal = () => {
       if (success && tempId) {
         console.log('[Journal] Processing started with tempId:', tempId);
         setProcessingEntries(prev => [...prev, tempId]);
-        setToastIds(prev => ({ ...prev, [tempId]: String(toastId) }));
         setLastAction(`Processing Started (${tempId})`);
+        
+        // Clear processing intent as real processing has started
+        setProcessingIntent(false);
         
         // Create a temporary processing entry to be displayed while the real one is being processed
         const tempEntry: JournalEntry = {
@@ -590,20 +556,10 @@ const Journal = () => {
               console.log('[Journal] Maximum processing time reached for tempId:', tempId);
               setLastAction(`Max Processing Time Reached (${tempId})`);
               
-              if (toastIds[tempId]) {
-                toast.dismiss(toastIds[tempId]);
-                
-                toast.success('Journal entry processed', { 
-                  duration: 3000,
-                  closeButton: false
-                });
-                
-                setToastIds(prev => {
-                  const newToastIds = { ...prev };
-                  delete newToastIds[tempId];
-                  return newToastIds;
-                });
-              }
+              toast.success('Journal entry processed', { 
+                duration: 3000,
+                closeButton: false
+              });
               
               // Remove the temporary entry from localEntries if it's still there
               setLocalEntries(prev => prev.filter(entry => !(entry.tempId === tempId)));
@@ -623,7 +579,8 @@ const Journal = () => {
         setProcessingError(error || 'Unknown error occurred');
         setLastAction(`Processing Failed: ${error || 'Unknown'}`);
         
-        toast.dismiss(toastId);
+        // Clear processing intent on failure
+        setProcessingIntent(false);
         
         await new Promise(resolve => setTimeout(resolve, 150));
         
@@ -644,6 +601,9 @@ const Journal = () => {
       console.error('Error processing recording:', error);
       setProcessingError(error?.message || 'Unknown error occurred');
       setLastAction(`Exception: ${error?.message || 'Unknown'}`);
+      
+      // Clear processing intent on exception
+      setProcessingIntent(false);
       
       clearAllToasts();
       
@@ -681,10 +641,6 @@ const Journal = () => {
         const mappedId = getEntryIdForProcessingId(tempId);
         if (mappedId === entryId) {
           tempIdsToDelete.push(tempId);
-          
-          if (toastIds[tempId]) {
-            toast.dismiss(toastIds[tempId]);
-          }
         }
       });
       
@@ -709,14 +665,6 @@ const Journal = () => {
         tempId => !tempIdsToDelete.includes(tempId) && getEntryIdForProcessingId(tempId) !== entryId
       );
       setProcessingEntries(updatedProcessingEntries);
-      
-      const updatedToastIds = { ...toastIds };
-      Object.keys(updatedToastIds).forEach(key => {
-        if (key.includes(String(entryId)) || tempIdsToDelete.includes(key)) {
-          delete updatedToastIds[key];
-        }
-      });
-      setToastIds(updatedToastIds);
       
       setNotifiedEntryIds(prev => {
         const updated = new Set(prev);
@@ -824,7 +772,7 @@ const Journal = () => {
       setIsDeletingEntry(false);
       setDeletingEntryId(null);
     }
-  }, [user?.id, processingEntries, toastIds, fetchEntries, entries, hasLocalChanges, isDeletingEntry]);
+  }, [user?.id, processingEntries, fetchEntries, entries, hasLocalChanges, isDeletingEntry]);
 
   const resetError = useCallback(() => {
     setHasRenderError(false);
@@ -1058,6 +1006,7 @@ const Journal = () => {
                     processedEntryIds={processedEntryIds}
                     onStartRecording={handleStartRecording}
                     onDeleteEntry={handleDeleteEntry}
+                    isSavingRecording={isSavingRecording}
                   />
                 </JournalErrorBoundary>
               </TabsContent>
