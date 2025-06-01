@@ -106,7 +106,6 @@ export const SimpleNode: React.FC<SimpleNodeProps> = ({
         displayColor={displayColor}
         isHighlighted={isHighlighted}
         dimmed={dimmed}
-        connectionStrength={connectionStrength}
         isSelected={isSelected}
         onClick={(e) => onClick(node.id, e)}
         onPointerDown={handlePointerDown}

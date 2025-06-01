@@ -67,7 +67,7 @@ export const SimpleNodeMesh: React.FC<SimpleNodeMeshProps> = ({
       {geometry}
       <meshPhongMaterial
         ref={materialRef}
-        color={displayColor}
+        color={new THREE.Color(displayColor)}
         transparent
         opacity={dimmed ? 0.4 : 1.0}
         shininess={100}
