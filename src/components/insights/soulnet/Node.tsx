@@ -1,10 +1,9 @@
-
 import React, { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import '@/types/three-reference';
 import * as THREE from 'three';
 import { NodeMesh } from './NodeMesh';
+import { NodeLabel } from './NodeLabel';
 import { ConnectionPercentage } from './ConnectionPercentage';
-import { ThreeDimensionalText } from './ThreeDimensionalText';
 import { useTheme } from '@/hooks/use-theme';
 
 interface NodeData {
@@ -56,30 +55,11 @@ export const Node: React.FC<NodeProps> = ({
   const prevSelectedRef = useRef<boolean>(isSelected);
   const nodeRef = useRef<{ isAnimating: boolean }>({ isAnimating: false });
   
-  // Validate node data
-  const isValidNode = useMemo(() => {
-    return node && 
-           typeof node.id === 'string' && 
-           node.id.length > 0 &&
-           (node.type === 'entity' || node.type === 'emotion') &&
-           typeof node.value === 'number' &&
-           Array.isArray(node.position) &&
-           node.position.length === 3 &&
-           node.position.every(coord => typeof coord === 'number' && !isNaN(coord));
-  }, [node]);
-
-  // Early return for invalid nodes
-  if (!isValidNode) {
-    console.warn('Invalid node data:', node);
-    return null;
-  }
+  // Debug logging for node rendering
+  console.log(`[Node] Rendering node ${node.id} at position:`, node.position, 'isHighlighted:', isHighlighted, 'showLabel:', showLabel);
   
-  // Debug logging for node rendering with throttling
-  const logThrottleRef = useRef<number>(0);
-  if (Date.now() - logThrottleRef.current > 1000) {
-    console.log(`[Node] Rendering node ${node.id} at position:`, node.position, 'isHighlighted:', isHighlighted, 'showLabel:', showLabel);
-    logThrottleRef.current = Date.now();
-  }
+  // Clean label visibility logic - only show for selected/highlighted nodes
+  const shouldShowLabel = forceShowLabels || showLabel || isHighlighted || isSelected;
   
   // Track state changes that might cause flickering
   useEffect(() => {
@@ -92,93 +72,61 @@ export const Node: React.FC<NodeProps> = ({
       nodeRef.current.isAnimating = true;
       
       // Reset animation flag after transition period
-      const timeout = setTimeout(() => {
+      setTimeout(() => {
         nodeRef.current.isAnimating = false;
       }, 300);
-      
-      return () => clearTimeout(timeout);
     }
   }, [isHighlighted, isSelected, node.id]);
   
-  // Safe scale calculation with bounds checking
-  const scale = useMemo(() => {
-    const baseScale = node.type === 'entity' ? 0.7 : 0.55;
-    const valueMultiplier = Math.max(0.1, Math.min(1, node.value || 0.5));
-    const strengthMultiplier = Math.max(0, Math.min(1, connectionStrength));
-    
-    if (isHighlighted) {
-      return baseScale * (1.2 + (isSelected ? 0.3 : strengthMultiplier * 0.5));
-    }
-    return baseScale * (0.8 + valueMultiplier * 0.5);
-  }, [node.type, node.value, isHighlighted, isSelected, connectionStrength]);
+  // Restored original scale calculation for better proportions
+  const baseScale = node.type === 'entity' ? 0.7 : 0.55;
+  const scale = isHighlighted 
+    ? baseScale * (1.2 + (isSelected ? 0.3 : connectionStrength * 0.5))
+    : baseScale * (0.8 + node.value * 0.5);
 
-  // Safe color calculation
   const displayColor = useMemo(() => {
-    try {
-      if (isHighlighted) {
-        return node.type === 'entity' ? '#ffffff' : (themeHex || '#3b82f6');
-      }
-      return node.type === 'entity'
-        ? (dimmed ? (theme === 'dark' ? '#555' : '#999') : '#ccc') 
-        : (dimmed ? (theme === 'dark' ? '#555' : '#999') : (themeHex || '#3b82f6'));
-    } catch (error) {
-      console.warn('Color calculation error:', error);
-      return '#ffffff';
+    if (isHighlighted) {
+      return node.type === 'entity' ? '#ffffff' : themeHex;
     }
+    return node.type === 'entity'
+      ? (dimmed ? (theme === 'dark' ? '#555' : '#999') : '#ccc') 
+      : (dimmed ? (theme === 'dark' ? '#555' : '#999') : themeHex);
   }, [node.type, dimmed, theme, themeHex, isHighlighted]);
 
-  // Safe event handlers with error boundaries
   const handlePointerDown = useCallback((e: any) => {
-    try {
-      e?.stopPropagation?.();
-      setIsTouching(true);
-      setTouchStartTime(Date.now());
-      setTouchStartPosition({x: e?.clientX || 0, y: e?.clientY || 0});
-      console.log(`Node pointer down: ${node.id}`);
-    } catch (error) {
-      console.warn('Pointer down error:', error);
-    }
+    e.stopPropagation();
+    setIsTouching(true);
+    setTouchStartTime(Date.now());
+    setTouchStartPosition({x: e.clientX, y: e.clientY});
+    console.log(`Node pointer down: ${node.id}`);
   }, [node.id]);
 
   const handlePointerUp = useCallback((e: any) => {
-    try {
-      e?.stopPropagation?.();
-      if (touchStartTime && Date.now() - touchStartTime < 300) {
-        if (touchStartPosition) {
-          const deltaX = Math.abs((e?.clientX || 0) - touchStartPosition.x);
-          const deltaY = Math.abs((e?.clientY || 0) - touchStartPosition.y);
-          
-          if (deltaX < 10 && deltaY < 10) {
-            console.log(`Node clicked: ${node.id}, isHighlighted: ${isHighlighted}`);
-            onClick(node.id, e);
-            
-            if (navigator.vibrate) {
-              navigator.vibrate(50);
-            }
-          }
-        } else {
-          console.log(`Node clicked (no start position): ${node.id}`);
+    e.stopPropagation();
+    if (touchStartTime && Date.now() - touchStartTime < 300) {
+      if (touchStartPosition) {
+        const deltaX = Math.abs(e.clientX - touchStartPosition.x);
+        const deltaY = Math.abs(e.clientY - touchStartPosition.y);
+        
+        if (deltaX < 10 && deltaY < 10) {
+          console.log(`Node clicked: ${node.id}, isHighlighted: ${isHighlighted}`);
           onClick(node.id, e);
+          
+          if (navigator.vibrate) {
+            navigator.vibrate(50);
+          }
         }
+      } else {
+        console.log(`Node clicked (no start position): ${node.id}`);
+        onClick(node.id, e);
       }
-      
-      setIsTouching(false);
-      setTouchStartTime(null);
-      setTouchStartPosition(null);
-    } catch (error) {
-      console.warn('Pointer up error:', error);
     }
+    
+    setIsTouching(false);
+    setTouchStartTime(null);
+    setTouchStartPosition(null);
   }, [node.id, onClick, touchStartTime, touchStartPosition, isHighlighted]);
 
-  const handlePointerOut = useCallback(() => {
-    try {
-      setIsTouching(false);
-    } catch (error) {
-      console.warn('Pointer out error:', error);
-    }
-  }, []);
-
-  // Touch timeout cleanup
   useEffect(() => {
     if (isTouching && touchStartTime) {
       const timer = setTimeout(() => {
@@ -194,21 +142,8 @@ export const Node: React.FC<NodeProps> = ({
   }, [isTouching, touchStartTime]);
 
   // Show percentages for all highlighted nodes that aren't selected and have a non-zero percentage
-  const shouldShowPercentage = showPercentage && 
-                               isHighlighted && 
-                               connectionPercentage > 0 &&
-                               !isSelected;
-
-  // Determine when to show labels
-  const shouldShowLabel = showLabel && (forceShowLabels || isSelected || isHighlighted);
+  const shouldShowPercentage = showPercentage && isHighlighted && connectionPercentage > 0;
   
-  // Calculate label position (slightly above the node)
-  const labelPosition = useMemo(() => {
-    const [x, y, z] = node.position;
-    const offset = node.type === 'entity' ? 2.0 : 1.8;
-    return [x, y + offset, z] as [number, number, number];
-  }, [node.position, node.type]);
-
   return (
     <group position={node.position}>
       <NodeMesh
@@ -222,35 +157,31 @@ export const Node: React.FC<NodeProps> = ({
         onClick={(e) => onClick(node.id, e)}
         onPointerDown={handlePointerDown}
         onPointerUp={handlePointerUp}
-        onPointerOut={handlePointerOut}
-        onPointerLeave={handlePointerOut}
+        onPointerOut={() => setIsTouching(false)}
+        onPointerLeave={() => setIsTouching(false)}
       />
       
-      {/* 3D Text Label */}
-      {shouldShowLabel && (
-        <ThreeDimensionalText
-          text={node.id}
-          position={labelPosition}
-          color={node.type === 'entity' ? '#ffffff' : themeHex}
-          size={isSelected ? 0.8 : 0.6}
-          bold={isSelected}
-          visible={shouldShowLabel}
-          opacity={dimmed ? 0.6 : 1.0}
-          outlineWidth={0.02}
-          outlineColor={theme === 'dark' ? '#000000' : '#ffffff'}
-          renderOrder={2}
-        />
-      )}
-      
-      {shouldShowPercentage && (
-        <ConnectionPercentage
-          position={node.position}
-          percentage={connectionPercentage}
-          isVisible={shouldShowPercentage}
-          offsetY={0}
-          nodeType={node.type}
-        />
-      )}
+      <NodeLabel
+        id={node.id}
+        type={node.type}
+        position={[0, 0, 0]}
+        isHighlighted={isHighlighted}
+        isSelected={isSelected}
+        shouldShowLabel={shouldShowLabel}
+        cameraZoom={cameraZoom}
+        themeHex={themeHex}
+        forceVisible={forceShowLabels}
+        nodeColor={displayColor}
+        nodeScale={scale}
+      />
+
+      <ConnectionPercentage
+        position={node.position}
+        percentage={connectionPercentage}
+        isVisible={shouldShowPercentage}
+        offsetY={0}
+        nodeType={node.type}
+      />
     </group>
   );
 };

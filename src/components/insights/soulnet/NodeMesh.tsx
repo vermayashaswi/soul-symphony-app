@@ -1,7 +1,7 @@
 
-import React, { useRef, useMemo, useCallback } from 'react';
+import React, { useRef, useMemo } from 'react';
 import * as THREE from 'three';
-import '@/types/three-reference';
+import '@/types/three-reference';  // Fixed import path
 import { useFrame } from '@react-three/fiber';
 
 interface NodeMeshProps {
@@ -34,133 +34,81 @@ export const NodeMesh: React.FC<NodeMeshProps> = ({
   onPointerLeave,
 }) => {
   const meshRef = useRef<THREE.Mesh>(null);
-  const timeRef = useRef(0);
-  const animationStateRef = useRef({
-    lastUpdate: 0,
-    isStable: false
-  });
   
-  // Memoize geometry to prevent recreation
-  const geometry = useMemo(() => {
-    return type === 'entity'
-      ? new THREE.SphereGeometry(1.4, 16, 16)
-      : new THREE.BoxGeometry(2.1, 2.1, 2.1);
-  }, [type]);
+  // Adjusted node sizes to better match reference image proportions
+  const Geometry = useMemo(() => 
+    type === 'entity'
+      ? <sphereGeometry args={[1.4, 32, 32]} /> // Increased from 1.25 to 1.4 for better visibility
+      : <boxGeometry args={[2.1, 2.1, 2.1]} />, // Slightly reduced from 2.3 to 2.1 for better balance
+    [type]
+  );
 
-  // Memoize material to prevent recreation
-  const material = useMemo(() => {
-    return new THREE.MeshStandardMaterial({
-      color: displayColor,
-      transparent: true,
-      opacity: 0.85,
-      emissive: displayColor,
-      emissiveIntensity: 0.1,
-      roughness: 0.3,
-      metalness: 0.4,
-      depthWrite: false,
-    });
-  }, [displayColor]);
-
-  // Safe frame update with error handling
+  // Fix: Use state for animation instead of relying on clock from RootState
   useFrame((state, delta) => {
-    if (!meshRef.current || !meshRef.current.material) return;
-    
     try {
-      // Use safer time tracking
-      timeRef.current += Math.min(delta, 0.1); // Cap delta to prevent jumps
-      const now = performance.now();
-      
-      // Throttle updates for performance
-      if (now - animationStateRef.current.lastUpdate < 16) return; // ~60fps cap
-      animationStateRef.current.lastUpdate = now;
-      
-      const mesh = meshRef.current;
-      const mat = mesh.material as THREE.MeshStandardMaterial;
-      
-      // Calculate opacity based on state
-      const targetOpacity = isHighlighted 
-        ? (isSelected ? 0.9 : 0.7)
-        : (dimmed ? 0.4 : 0.85);
-      
-      // Smooth opacity transition
-      const currentOpacity = mat.opacity;
-      mat.opacity = THREE.MathUtils.lerp(currentOpacity, targetOpacity, 0.1);
-      
-      // Update colors safely
-      mat.color.setStyle(displayColor);
-      mat.emissive.setStyle(displayColor);
+      if (!meshRef.current) return;
       
       if (isHighlighted) {
         const pulseIntensity = isSelected ? 0.25 : (connectionStrength * 0.2);
-        const pulse = Math.sin(timeRef.current * 2.5) * pulseIntensity + 1.0;
-        const targetScale = scale * pulse;
+        // Use time calculation based on delta directly
+        const time = state.clock ? state.clock.getElapsedTime() : performance.now() / 1000;
+        const pulse = Math.sin(time * 2.5) * pulseIntensity + 1.1;
+        meshRef.current.scale.set(scale * pulse, scale * pulse, scale * pulse);
         
-        // Smooth scale transition
-        const currentScale = mesh.scale.x;
-        const newScale = THREE.MathUtils.lerp(currentScale, targetScale, 0.1);
-        mesh.scale.setScalar(newScale);
-        
-        const emissiveIntensity = isSelected 
-          ? 1.0 + Math.sin(timeRef.current * 3) * 0.3
-          : 0.7 + (connectionStrength * 0.3) + Math.sin(timeRef.current * 3) * 0.2;
-        
-        mat.emissiveIntensity = Math.max(0, Math.min(2, emissiveIntensity));
+        if (meshRef.current.material instanceof THREE.MeshStandardMaterial) {
+          const emissiveIntensity = isSelected 
+            ? 1.0 + Math.sin(time * 3) * 0.3
+            : 0.7 + (connectionStrength * 0.3) + Math.sin(time * 3) * 0.2;
+          
+          meshRef.current.material.emissiveIntensity = emissiveIntensity;
+        }
       } else {
         const targetScale = dimmed ? scale * 0.8 : scale;
-        const currentScale = mesh.scale.x;
-        const newScale = THREE.MathUtils.lerp(currentScale, targetScale, 0.1);
-        mesh.scale.setScalar(newScale);
+        meshRef.current.scale.set(targetScale, targetScale, targetScale);
         
-        mat.emissiveIntensity = dimmed ? 0 : 0.1;
+        if (meshRef.current.material instanceof THREE.MeshStandardMaterial) {
+          meshRef.current.material.emissiveIntensity = dimmed ? 0 : 0.1;
+        }
       }
     } catch (error) {
-      console.warn("NodeMesh animation error:", error);
-      // Continue without animation rather than crashing
+      console.error("Error in NodeMesh useFrame:", error);
     }
   });
 
-  // Safe event handlers
-  const handleClick = useCallback((e: any) => {
-    try {
-      e.stopPropagation();
-      onClick(e);
-    } catch (error) {
-      console.warn("NodeMesh click error:", error);
+  // Enhanced opacity settings to match reference image clarity
+  const nodeOpacity = useMemo(() => {
+    if (isHighlighted) {
+      return isSelected ? 0.9 : 0.4; // Increased selected opacity, adjusted highlighted
     }
-  }, [onClick]);
-
-  const handlePointerDown = useCallback((e: any) => {
-    try {
-      e.stopPropagation();
-      onPointerDown(e);
-    } catch (error) {
-      console.warn("NodeMesh pointer down error:", error);
-    }
-  }, [onPointerDown]);
-
-  const handlePointerUp = useCallback((e: any) => {
-    try {
-      e.stopPropagation();
-      onPointerUp(e);
-    } catch (error) {
-      console.warn("NodeMesh pointer up error:", error);
-    }
-  }, [onPointerUp]);
+    return dimmed ? 0.4 : 0.85; // Increased normal opacity for better visibility
+  }, [isHighlighted, isSelected, dimmed]);
 
   return (
     <mesh
       ref={meshRef}
-      geometry={geometry}
-      material={material}
       scale={[scale, scale, scale]}
-      onClick={handleClick}
-      onPointerDown={handlePointerDown}
-      onPointerUp={handlePointerUp}
+      onClick={(e) => {
+        e.stopPropagation();
+        onClick(e);
+      }}
+      onPointerDown={onPointerDown}
+      onPointerUp={onPointerUp}
       onPointerOut={onPointerOut}
       onPointerLeave={onPointerLeave}
-      renderOrder={1}
-      frustumCulled={true}
-    />
+      renderOrder={1} // Set a lower render order for the node mesh
+    >
+      {Geometry}
+      <meshStandardMaterial
+        color={displayColor}
+        transparent={true} // Explicitly enable transparency
+        opacity={nodeOpacity}
+        emissive={displayColor}
+        emissiveIntensity={isHighlighted ? 1.2 : (dimmed ? 0 : 0.1)}
+        roughness={0.3}
+        metalness={0.4}
+        depthWrite={false} // Disable depth writing for proper transparency
+      />
+    </mesh>
   );
 };
 

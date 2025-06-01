@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import '@/types/three-reference';
 import { Text } from '@react-three/drei';
 import { useFrame, useThree } from '@react-three/fiber';
@@ -21,16 +21,39 @@ interface ThreeDimensionalTextProps {
   renderOrder?: number;
 }
 
+// Helper function to detect non-Latin script
+const containsNonLatinScript = (text: string): boolean => {
+  if (!text) return false;
+  
+  const patterns = {
+    devanagari: /[\u0900-\u097F]/,
+    arabic: /[\u0600-\u06FF]/,
+    chinese: /[\u4E00-\u9FFF]/,
+    japanese: /[\u3040-\u309F\u30A0-\u30FF]/,
+    korean: /[\uAC00-\uD7AF]/,
+    cyrillic: /[\u0400-\u04FF]/
+  };
+  
+  return Object.values(patterns).some(pattern => pattern.test(text));
+};
+
+const containsDevanagari = (text: string): boolean => {
+  if (!text) return false;
+  const devanagariPattern = /[\u0900-\u097F]/;
+  return devanagariPattern.test(text);
+};
+
 export const ThreeDimensionalText: React.FC<ThreeDimensionalTextProps> = ({
   text,
   position,
   color = 'white',
   size = 1.2,
-  bold = true,
+  bold = true, // Changed default to true for consistency
+  backgroundColor,
   opacity = 1,
   visible = true,
   skipTranslation = false,
-  outlineWidth = 0.025,
+  outlineWidth = 0.025, // Increased default outline width proportionally
   outlineColor = '#000000',
   renderOrder = 1,
 }) => {
@@ -39,105 +62,123 @@ export const ThreeDimensionalText: React.FC<ThreeDimensionalTextProps> = ({
   const { camera } = useThree();
   const textRef = useRef<THREE.Mesh>(null);
   const lastCameraPosition = useRef<THREE.Vector3>(new THREE.Vector3());
-  const isTranslatingRef = useRef(false);
+  const isNonLatinScript = useRef<boolean>(false);
+  const isDevanagari = useRef<boolean>(false);
   
   // Enhanced billboarding with improved stability and performance
   useFrame(() => {
-    if (!textRef.current || !camera || !visible) return;
-    
-    try {
+    if (textRef.current && camera && visible) {
       const distanceMoved = camera.position.distanceTo(lastCameraPosition.current);
       
-      // Update orientation if camera moved significantly (throttled for performance)
-      if (distanceMoved > 0.1) {
+      // Update orientation if camera moved significantly
+      if (distanceMoved > 0.05) {
         textRef.current.quaternion.copy(camera.quaternion);
         lastCameraPosition.current.copy(camera.position);
       }
       
       // Apply render order consistently
-      if (textRef.current.material) {
-        const material = textRef.current.material as any;
-        material.depthTest = false;
-        material.depthWrite = false;
+      if (textRef.current && textRef.current.material) {
+        (textRef.current.material as any).depthTest = false;
+        (textRef.current.material as any).depthWrite = false;
         textRef.current.renderOrder = renderOrder;
       }
-    } catch (error) {
-      console.warn('Text billboarding error:', error);
     }
   });
 
-  // Safe translation with error handling and throttling
   useEffect(() => {
     const translateText = async () => {
-      if (skipTranslation || currentLanguage === 'en' || !text || isTranslatingRef.current) {
+      if (skipTranslation || currentLanguage === 'en' || !text) {
         setTranslatedText(text);
+        isNonLatinScript.current = containsNonLatinScript(text);
+        isDevanagari.current = containsDevanagari(text);
         return;
       }
       
-      isTranslatingRef.current = true;
-      
       try {
         const result = await translate(text);
-        setTranslatedText(result || text);
-        console.log(`[ThreeDimensionalText] Translated "${text}" to "${result}" for language ${currentLanguage}`);
+        setTranslatedText(result);
+        
+        isNonLatinScript.current = containsNonLatinScript(result);
+        isDevanagari.current = containsDevanagari(result);
+        
+        console.log(`[ThreeDimensionalText] Translated "${text}" to "${result}"`);
       } catch (e) {
         console.error('[ThreeDimensionalText] Translation error:', e);
         setTranslatedText(text);
-      } finally {
-        isTranslatingRef.current = false;
       }
     };
     
-    // Debounce translation requests
-    const timeoutId = setTimeout(translateText, 100);
-    return () => clearTimeout(timeoutId);
+    translateText();
   }, [text, currentLanguage, translate, skipTranslation]);
 
-  // Memoized text properties for performance
-  const textProps = useMemo(() => {
-    const effectiveSize = Math.max(0.4, Math.min(2.0, size * 1.5));
-    
-    return {
-      fontSize: effectiveSize,
-      fontWeight: bold ? 700 : 500,
-      color,
-      outlineWidth,
-      outlineColor,
-      maxWidth: 20,
-      textAlign: 'center' as const,
-      anchorX: 'center' as const,
-      anchorY: 'middle' as const,
-      renderOrder,
-      lineHeight: 1.2,
-    };
-  }, [size, bold, color, outlineWidth, outlineColor, renderOrder]);
-
-  if (!visible || !translatedText) {
+  if (!visible || !text) {
+    console.log(`[ThreeDimensionalText] Not rendering: visible=${visible}, text="${text}"`);
     return null;
   }
 
-  console.log(`[ThreeDimensionalText] Rendering: "${translatedText}" at position:`, position, 'size:', textProps.fontSize);
+  // Increased effective size by 1.25x (from 2.0 to 2.5)
+  const effectiveSize = size * 2.5;
   
-  try {
-    return (
-      <Text
-        ref={textRef}
-        position={position}
-        {...textProps}
-        material-transparent={true}
-        material-opacity={opacity}
-        material-toneMapped={false}
-        material-side={THREE.DoubleSide}
-        material-depthTest={false}
-        material-depthWrite={false}
-      >
-        {translatedText}
-      </Text>
-    );
-  } catch (error) {
-    console.error('ThreeDimensionalText render error:', error);
-    return null;
-  }
+  // Enhanced text configuration for better readability
+  const getMaxWidth = () => {
+    if (isDevanagari.current) {
+      return 80;
+    } else if (isNonLatinScript.current) {
+      return 60;
+    }
+    return 25;
+  };
+
+  const getLetterSpacing = () => {
+    if (isDevanagari.current) {
+      return 0.15;
+    } else if (isNonLatinScript.current) {
+      return 0.08;
+    }
+    return 0.02;
+  };
+
+  const getLineHeight = () => {
+    if (isDevanagari.current) {
+      return 2.0;
+    } else if (isNonLatinScript.current) {
+      return 1.8;
+    }
+    return 1.4;
+  };
+
+  console.log(`[ThreeDimensionalText] Rendering: "${translatedText}" at position:`, position, 'size:', effectiveSize, 'bold:', bold);
+  
+  return (
+    <Text
+      ref={textRef}
+      position={position}
+      color={color}
+      fontSize={effectiveSize}
+      fontWeight={bold ? 700 : 500}
+      anchorX="center"
+      anchorY="middle"
+      outlineWidth={outlineWidth}
+      outlineColor={outlineColor}
+      maxWidth={getMaxWidth()}
+      overflowWrap="normal"
+      whiteSpace="normal"
+      textAlign="center"
+      letterSpacing={getLetterSpacing()}
+      sdfGlyphSize={isDevanagari.current ? 256 : 128}
+      renderOrder={renderOrder}
+      lineHeight={getLineHeight()}
+      // Enhanced material properties for maximum visibility
+      material-transparent={true}
+      material-opacity={opacity}
+      material-toneMapped={false}
+      material-side={THREE.DoubleSide}
+      material-depthTest={false}
+      material-depthWrite={false}
+    >
+      {translatedText}
+    </Text>
+  );
 };
 
 export default ThreeDimensionalText;

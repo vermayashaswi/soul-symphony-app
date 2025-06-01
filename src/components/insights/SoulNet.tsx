@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import '@/types/three-reference';
+import React, { useState, useEffect, useCallback } from 'react';
+import '@/types/three-reference';  // Fixed import path
 import { Canvas } from '@react-three/fiber';
 import { TimeRange } from '@/hooks/use-insights-data';
 import { supabase } from '@/integrations/supabase/client';
@@ -44,7 +44,6 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
   const [selectedEntity, setSelectedEntity] = useState<string | null>(null);
   const [error, setError] = useState<Error | null>(null);
   const { currentLanguage } = useTranslation();
-  const [renderError, setRenderError] = useState<string | null>(null);
 
   console.log("Rendering SoulNet component with userId:", userId, "and timeRange:", timeRange);
 
@@ -57,22 +56,15 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
 
   // Reset translation cache when language changes to avoid stale translations
   useEffect(() => {
-    try {
-      onDemandTranslationCache.clearLanguage(currentLanguage);
-    } catch (error) {
-      console.warn('Translation cache clear error:', error);
-    }
+    onDemandTranslationCache.clearLanguage(currentLanguage);
   }, [currentLanguage]);
 
-  // Data fetching with enhanced error handling
   useEffect(() => {
     if (!userId) return;
 
     const fetchEntityEmotionData = async () => {
       setLoading(true);
       setError(null);
-      setRenderError(null);
-      
       try {
         const startDate = getStartDate(timeRange);
         console.log(`Fetching data from ${startDate.toISOString()} for user ${userId}`);
@@ -99,12 +91,6 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
 
         const processedData = processEntities(entries);
         console.log("Processed graph data:", processedData);
-        
-        // Validate processed data
-        if (!processedData || !Array.isArray(processedData.nodes) || !Array.isArray(processedData.links)) {
-          throw new Error('Invalid processed data structure');
-        }
-        
         setGraphData(processedData);
       } catch (error) {
         console.error('Error processing entity-emotion data:', error);
@@ -118,41 +104,26 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
   }, [userId, timeRange]);
 
   const handleNodeSelect = useCallback((id: string) => {
-    try {
-      console.log(`Node selected: ${id}`);
-      if (selectedEntity === id) {
-        setSelectedEntity(null);
-      } else {
-        setSelectedEntity(id);
-        if (navigator.vibrate) {
-          navigator.vibrate(50);
-        }
+    console.log(`Node selected: ${id}`);
+    if (selectedEntity === id) {
+      setSelectedEntity(null);
+    } else {
+      setSelectedEntity(id);
+      if (navigator.vibrate) {
+        navigator.vibrate(50);
       }
-    } catch (error) {
-      console.error('Node selection error:', error);
     }
   }, [selectedEntity]);
 
   const toggleFullScreen = useCallback(() => {
-    try {
-      setIsFullScreen(prev => {
-        // Force clear selected node when toggling fullscreen to reset view
-        if (!prev) setSelectedEntity(null);
-        return !prev;
-      });
-    } catch (error) {
-      console.error('Fullscreen toggle error:', error);
-    }
-  }, []);
-
-  // Canvas error handler
-  const handleCanvasError = useCallback((error: Error) => {
-    console.error('Canvas rendering error:', error);
-    setRenderError(error.message);
+    setIsFullScreen(prev => {
+      // Force clear selected node when toggling fullscreen to reset view
+      if (!prev) setSelectedEntity(null);
+      return !prev;
+    });
   }, []);
 
   if (loading) return <LoadingState />;
-  
   if (error) return (
     <div className="bg-background rounded-xl shadow-sm border w-full p-6">
       <h2 className="text-xl font-semibold text-red-600 mb-4">
@@ -167,41 +138,18 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
       </button>
     </div>
   );
-
-  if (renderError) return (
-    <div className="bg-background rounded-xl shadow-sm border w-full p-6">
-      <h2 className="text-xl font-semibold text-orange-600 mb-4">
-        <TranslatableText text="Rendering Error" />
-      </h2>
-      <p className="text-muted-foreground mb-4">
-        <TranslatableText text="There was an issue rendering the 3D visualization. This may be due to your device's graphics capabilities." />
-      </p>
-      <div className="space-x-2">
-        <button 
-          className="px-4 py-2 bg-primary text-white rounded-md" 
-          onClick={() => setRenderError(null)}
-        >
-          <TranslatableText text="Try Again" />
-        </button>
-        <button 
-          className="px-4 py-2 bg-gray-500 text-white rounded-md" 
-          onClick={() => window.location.reload()}
-        >
-          <TranslatableText text="Reload Page" />
-        </button>
-      </div>
-    </div>
-  );
-  
   if (graphData.nodes.length === 0) return <EmptyState />;
 
   // Get appropriate instructions based on device type
   const getInstructions = () => {
     if (isMobile) {
-      return <TranslatableText text="Drag to rotate • Pinch to zoom • Tap a node to highlight connections" forceTranslate={true} />;
+      return <TranslatableText text="Drag to rotate  Pinch to zoom • Tap a node to highlight connections" forceTranslate={true} />;
     }
     return <TranslatableText text="Drag to rotate • Scroll to zoom • Click a node to highlight connections" forceTranslate={true} />;
   };
+
+  // Clean shouldShowLabels logic - only show when node is selected or in fullscreen
+  const shouldShowLabels = isFullScreen || selectedEntity !== null;
 
   return (
     <div className={cn(
@@ -214,27 +162,24 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
         isFullScreen={isFullScreen}
         toggleFullScreen={toggleFullScreen}
       >
-        <ErrorBoundary 
-          onError={handleCanvasError}
-          fallback={
-            <div className="flex items-center justify-center p-10 bg-gray-100 dark:bg-gray-800 rounded-lg">
-              <div className="text-center">
-                <h3 className="text-lg font-medium">
-                  <TranslatableText text="Error in Soul-Net Visualization" forceTranslate={true} />
-                </h3>
-                <p className="text-muted-foreground mt-2">
-                  <TranslatableText text="There was a problem rendering the visualization." forceTranslate={true} />
-                </p>
-                <button 
-                  className="mt-4 px-4 py-2 bg-primary text-white rounded-lg"
-                  onClick={() => setRenderError(null)}
-                >
-                  <TranslatableText text="Reload" forceTranslate={true} />
-                </button>
-              </div>
+        <ErrorBoundary fallback={
+          <div className="flex items-center justify-center p-10 bg-gray-100 dark:bg-gray-800 rounded-lg">
+            <div className="text-center">
+              <h3 className="text-lg font-medium">
+                <TranslatableText text="Error in Soul-Net Visualization" forceTranslate={true} />
+              </h3>
+              <p className="text-muted-foreground mt-2">
+                <TranslatableText text="There was a problem rendering the visualization." forceTranslate={true} />
+              </p>
+              <button 
+                className="mt-4 px-4 py-2 bg-primary text-white rounded-lg"
+                onClick={() => window.location.reload()}
+              >
+                <TranslatableText text="Reload" forceTranslate={true} />
+              </button>
             </div>
-          }
-        >
+          </div>
+        }>
           <Canvas
             style={{
               width: '100%',
@@ -255,13 +200,12 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
             gl={{ 
               preserveDrawingBuffer: true,
               antialias: !isMobile,
-              powerPreference: isMobile ? 'low-power' : 'high-performance',
+              powerPreference: 'high-performance',
               alpha: true,
               depth: true,
               stencil: false,
               precision: isMobile ? 'mediump' : 'highp',
-              logarithmicDepthBuffer: false, // Disable for better compatibility
-              failIfMajorPerformanceCaveat: false // Don't fail on slow devices
+              logarithmicDepthBuffer: true
             }}
           >
             <SoulNetVisualization
@@ -270,7 +214,7 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
               onNodeClick={handleNodeSelect}
               themeHex={themeHex}
               isFullScreen={isFullScreen}
-              shouldShowLabels={true}
+              shouldShowLabels={shouldShowLabels}
             />
           </Canvas>
         </ErrorBoundary>
