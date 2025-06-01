@@ -1,7 +1,10 @@
+
 import React, { useRef, useEffect, useMemo, useState } from 'react';
 import '@/types/three-reference';
 import { OrbitControls } from '@react-three/drei';
 import { useThree } from '@react-three/fiber';
+import { useTranslation } from '@/contexts/TranslationContext';
+import { onDemandTranslationCache } from '@/utils/website-translations';
 import Node from './Node';
 import Edge from './Edge';
 import * as THREE from 'three';
@@ -29,6 +32,45 @@ interface SoulNetVisualizationProps {
   shouldShowLabels?: boolean;
   translatedLabels?: Map<string, string>;
 }
+
+// Enhanced script detection utilities
+const containsNonLatinScript = (text: string): boolean => {
+  if (!text) return false;
+  
+  const patterns = {
+    devanagari: /[\u0900-\u097F]/,
+    arabic: /[\u0600-\u06FF]/,
+    chinese: /[\u4E00-\u9FFF]/,
+    japanese: /[\u3040-\u309F\u30A0-\u30FF]/,
+    korean: /[\uAC00-\uD7AF]/,
+    cyrillic: /[\u0400-\u04FF]/,
+    thai: /[\u0E00-\u0E7F]/,
+    bengali: /[\u0980-\u09FF]/,
+    gujarati: /[\u0A80-\u0AFF]/,
+    gurmukhi: /[\u0A00-\u0A7F]/,
+    kannada: /[\u0C80-\u0CFF]/,
+    malayalam: /[\u0D00-\u0D7F]/,
+    oriya: /[\u0B00-\u0B7F]/,
+    tamil: /[\u0B80-\u0BFF]/,
+    telugu: /[\u0C00-\u0C7F]/
+  };
+  
+  return Object.values(patterns).some(pattern => pattern.test(text));
+};
+
+const detectScriptType = (text: string): string => {
+  if (!text) return 'latin';
+  
+  if (/[\u0900-\u097F]/.test(text)) return 'devanagari';
+  if (/[\u0600-\u06FF]/.test(text)) return 'arabic';
+  if (/[\u4E00-\u9FFF]/.test(text)) return 'chinese';
+  if (/[\u3040-\u309F\u30A0-\u30FF]/.test(text)) return 'japanese';
+  if (/[\uAC00-\uD7AF]/.test(text)) return 'korean';
+  if (/[\u0980-\u09FF]/.test(text)) return 'bengali';
+  if (/[\u0E00-\u0E7F]/.test(text)) return 'thai';
+  
+  return 'latin';
+};
 
 function getConnectedNodes(nodeId: string, links: LinkData[]): Set<string> {
   if (!nodeId || !links || !Array.isArray(links)) return new Set<string>();
@@ -123,25 +165,117 @@ export const SoulNetVisualization: React.FC<SoulNetVisualizationProps> = ({
   shouldShowLabels = false
 }) => {
   const { camera, size } = useThree();
+  const { currentLanguage, translate } = useTranslation();
   const controlsRef = useRef<any>(null);
   const [cameraZoom, setCameraZoom] = useState<number>(45);
   const [forceUpdate, setForceUpdate] = useState<number>(0);
   const [isInitialized, setIsInitialized] = useState(false);
+  const [translatedLabels, setTranslatedLabels] = useState<Map<string, string>>(new Map());
+  const [fontLoaded, setFontLoaded] = useState(false);
+  const [nodeScriptTypes, setNodeScriptTypes] = useState<Map<string, string>>(new Map());
   
-  console.log("Rendering SoulNetVisualization component with data:", 
-    data?.nodes?.length, "nodes and", data?.links?.length, "links, fullscreen:", isFullScreen);
+  console.log("[SoulNetVisualization] Rendering with enhanced script support", {
+    nodeCount: data?.nodes?.length,
+    linkCount: data?.links?.length,
+    currentLanguage,
+    fontLoaded,
+    selectedNode,
+    shouldShowLabels
+  });
   
   useEffect(() => {
-    console.log("SoulNetVisualization mounted");
+    console.log("[SoulNetVisualization] Component mounted with enhanced script support");
     return () => {
-      console.log("SoulNetVisualization unmounted");
+      console.log("[SoulNetVisualization] Component unmounted");
     };
   }, []);
+
+  // Font loading detection
+  useEffect(() => {
+    const checkFontLoading = async () => {
+      try {
+        console.log('[SoulNetVisualization] Checking font loading status');
+        
+        if (document.fonts) {
+          await document.fonts.ready;
+          console.log('[SoulNetVisualization] Document fonts are ready');
+          setFontLoaded(true);
+        } else {
+          console.log('[SoulNetVisualization] Document.fonts not supported, assuming fonts loaded');
+          setFontLoaded(true);
+        }
+      } catch (error) {
+        console.warn('[SoulNetVisualization] Font loading check failed:', error);
+        setFontLoaded(true);
+      }
+    };
+    
+    checkFontLoading();
+  }, []);
+
+  // Enhanced node data processing with script detection
+  useEffect(() => {
+    if (!data?.nodes) return;
+
+    const processNodeLabels = async () => {
+      console.log('[SoulNetVisualization] Processing node labels with script detection');
+      
+      const newTranslatedLabels = new Map<string, string>();
+      const newScriptTypes = new Map<string, string>();
+      
+      // First pass: detect script types for all nodes
+      data.nodes.forEach(node => {
+        const scriptType = detectScriptType(node.id);
+        newScriptTypes.set(node.id, scriptType);
+        
+        console.log(`[SoulNetVisualization] Node "${node.id}" detected script: ${scriptType}, contains non-latin: ${containsNonLatinScript(node.id)}`);
+      });
+      
+      setNodeScriptTypes(newScriptTypes);
+      
+      // Second pass: handle translations if needed
+      if (currentLanguage !== 'en') {
+        for (const node of data.nodes) {
+          try {
+            // Check cache first
+            const cachedTranslation = onDemandTranslationCache.getTranslation(node.id, currentLanguage);
+            
+            if (cachedTranslation) {
+              newTranslatedLabels.set(node.id, cachedTranslation);
+              console.log(`[SoulNetVisualization] Using cached translation for "${node.id}": "${cachedTranslation}"`);
+            } else if (translate) {
+              // Translate if not cached
+              const translated = await translate(node.id);
+              newTranslatedLabels.set(node.id, translated);
+              onDemandTranslationCache.setTranslation(node.id, translated, currentLanguage);
+              console.log(`[SoulNetVisualization] Translated "${node.id}" to "${translated}"`);
+            } else {
+              // Fallback to original
+              newTranslatedLabels.set(node.id, node.id);
+            }
+          } catch (error) {
+            console.error(`[SoulNetVisualization] Translation failed for "${node.id}":`, error);
+            newTranslatedLabels.set(node.id, node.id);
+          }
+        }
+      } else {
+        // For English, use original labels
+        data.nodes.forEach(node => {
+          newTranslatedLabels.set(node.id, node.id);
+        });
+      }
+      
+      setTranslatedLabels(newTranslatedLabels);
+      console.log('[SoulNetVisualization] Node label processing complete');
+    };
+
+    processNodeLabels();
+  }, [data?.nodes, currentLanguage, translate]);
   
   // Ensure data is valid
   const validData = useMemo(() => {
     if (!data || !data.nodes || !Array.isArray(data.nodes) || !data.links || !Array.isArray(data.links)) {
-      console.error("Invalid SoulNetVisualization data:", data);
+      console.error("[SoulNetVisualization] Invalid data:", data);
       return {
         nodes: [],
         links: []
@@ -179,7 +313,7 @@ export const SoulNetVisualization: React.FC<SoulNetVisualizationProps> = ({
   useEffect(() => {
     // Force a re-render after selection changes to ensure visuals update
     if (selectedNode) {
-      console.log(`Selected node: ${selectedNode}`);
+      console.log(`[SoulNetVisualization] Selected node: ${selectedNode}`);
       // Force multiple updates to ensure the visual changes apply
       setForceUpdate(prev => prev + 1);
       const timer = setTimeout(() => {
@@ -193,7 +327,7 @@ export const SoulNetVisualization: React.FC<SoulNetVisualizationProps> = ({
   // Optimized camera initialization with increased distance for complete view
   useEffect(() => {
     if (camera && validData.nodes?.length > 0 && !isInitialized) {
-      console.log("Initializing camera position for complete visualization view");
+      console.log("[SoulNetVisualization] Initializing camera position for complete visualization view");
       try {
         const centerX = centerPosition.x;
         const centerY = centerPosition.y;
@@ -277,12 +411,12 @@ export const SoulNetVisualization: React.FC<SoulNetVisualizationProps> = ({
 
   // Custom node click handler with debugging
   const handleNodeClick = (id: string, e: any) => {
-    console.log(`Node clicked in visualization: ${id}`);
+    console.log(`[SoulNetVisualization] Node clicked: ${id}`);
     onNodeClick(id);
   };
 
   if (!validData || !validData.nodes || !validData.links) {
-    console.error("SoulNetVisualization: Data is missing or invalid", validData);
+    console.error("[SoulNetVisualization] Data is missing or invalid", validData);
     return null;
   }
 
@@ -317,7 +451,7 @@ export const SoulNetVisualization: React.FC<SoulNetVisualizationProps> = ({
       {/* Display edges with proper surface connections */}
       {validData.links.map((link, index) => {
         if (!link || typeof link !== 'object') {
-          console.warn(`Invalid link at index ${index}`, link);
+          console.warn(`[SoulNetVisualization] Invalid link at index ${index}`, link);
           return null;
         }
         
@@ -325,7 +459,7 @@ export const SoulNetVisualization: React.FC<SoulNetVisualizationProps> = ({
         const targetNode = nodeMap.get(link.target);
         
         if (!sourceNode || !targetNode) {
-          console.warn(`Missing source or target node for link: ${link.source} -> ${link.target}`);
+          console.warn(`[SoulNetVisualization] Missing source or target node for link: ${link.source} -> ${link.target}`);
           return null;
         }
         
@@ -369,11 +503,11 @@ export const SoulNetVisualization: React.FC<SoulNetVisualizationProps> = ({
       {/* Display nodes */}
       {validData.nodes.map(node => {
         if (!node || typeof node !== 'object' || !node.id) {
-          console.warn("Invalid node:", node);
+          console.warn("[SoulNetVisualization] Invalid node:", node);
           return null;
         }
         
-        // Clean label visibility logic - only show when explicitly requested
+        // Enhanced label visibility logic with script-aware handling
         const showLabel = shouldShowLabels || !selectedNode || node.id === selectedNode || highlightedNodes.has(node.id);
         const dimmed = shouldDim && !(selectedNode === node.id || highlightedNodes.has(node.id));
         const isHighlighted = selectedNode === node.id || highlightedNodes.has(node.id);
@@ -395,9 +529,15 @@ export const SoulNetVisualization: React.FC<SoulNetVisualizationProps> = ({
         
         // Skip rendering this node if position isn't valid
         if (!Array.isArray(node.position)) {
-          console.warn(`Node ${node.id} has invalid position:`, node.position);
+          console.warn(`[SoulNetVisualization] Node ${node.id} has invalid position:`, node.position);
           return null;
         }
+
+        // Get script type and translated label
+        const scriptType = nodeScriptTypes.get(node.id) || 'latin';
+        const translatedLabel = translatedLabels.get(node.id) || node.id;
+        
+        console.log(`[SoulNetVisualization] Rendering node "${node.id}" with script "${scriptType}", translated: "${translatedLabel}", showLabel: ${showLabel}`);
           
         return (
           <Node
