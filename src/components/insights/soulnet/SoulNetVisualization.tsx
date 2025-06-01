@@ -1,10 +1,12 @@
-import React, { useRef, useEffect, useMemo, useState } from 'react';
+
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import '@/types/three-reference';
 import { OrbitControls } from '@react-three/drei';
-import { useThree } from '@react-three/fiber';
+import { useFrame, useThree } from '@react-three/fiber';
+import * as THREE from 'three';
 import Node from './Node';
 import Edge from './Edge';
-import * as THREE from 'three';
+import { useIsMobile } from '@/hooks/use-mobile';
 
 interface NodeData {
   id: string;
@@ -21,405 +23,250 @@ interface LinkData {
 }
 
 interface SoulNetVisualizationProps {
-  data: { nodes: NodeData[]; links: LinkData[] };
+  data: {
+    nodes: NodeData[];
+    links: LinkData[];
+  };
   selectedNode: string | null;
-  onNodeClick: (id: string) => void;
+  onNodeClick: (id: string, e: any) => void;
   themeHex: string;
-  isFullScreen?: boolean;
-  shouldShowLabels?: boolean;
-  translatedLabels?: Map<string, string>;
+  isFullScreen: boolean;
+  shouldShowLabels: boolean;
 }
 
-function getConnectedNodes(nodeId: string, links: LinkData[]): Set<string> {
-  if (!nodeId || !links || !Array.isArray(links)) return new Set<string>();
-  
-  const connected = new Set<string>();
-  links.forEach(link => {
-    if (!link || typeof link !== 'object') return;
-    
-    if (link.source === nodeId) connected.add(link.target);
-    if (link.target === nodeId) connected.add(link.source);
-  });
-  return connected;
-}
-
-// Calculate relative connection strength within connected nodes
-function calculateRelativeStrengths(nodeId: string, links: LinkData[]): Map<string, number> {
-  // Safety check for invalid inputs
-  if (!nodeId || !links || !Array.isArray(links)) return new Map<string, number>();
-  
-  // Get all links associated with this node
-  const nodeLinks = links.filter(link => 
-    link && typeof link === 'object' && (link.source === nodeId || link.target === nodeId)
-  );
-  
-  // Find min and max values
-  let minValue = Infinity;
-  let maxValue = -Infinity;
-  
-  nodeLinks.forEach(link => {
-    if (link.value < minValue) minValue = link.value;
-    if (link.value > maxValue) maxValue = link.value;
-  });
-
-  // Create normalized strength map
-  const strengthMap = new Map<string, number>();
-  
-  // If all values are the same, use a default value
-  if (maxValue === minValue || maxValue - minValue < 0.001) {
-    nodeLinks.forEach(link => {
-      const connectedNodeId = link.source === nodeId ? link.target : link.source;
-      strengthMap.set(connectedNodeId, 0.8); // Higher default value for better visibility
-    });
-  } else {
-    // Normalize values to 0.3-1.0 range for better visibility
-    nodeLinks.forEach(link => {
-      const connectedNodeId = link.source === nodeId ? link.target : link.source;
-      const normalizedValue = 0.3 + (0.7 * (link.value - minValue) / (maxValue - minValue));
-      strengthMap.set(connectedNodeId, normalizedValue);
-    });
-  }
-  
-  // Log the calculated strengths for debugging
-  console.log(`Connection strengths for ${nodeId}:`, Object.fromEntries(strengthMap));
-  return strengthMap;
-}
-
-// Calculate percentage distribution of connection strengths
-function calculateConnectionPercentages(nodeId: string, links: LinkData[]): Map<string, number> {
-  // Safety check for invalid inputs
-  if (!nodeId || !links || !Array.isArray(links)) return new Map<string, number>();
-  
-  // Get all links associated with this node
-  const nodeLinks = links.filter(link => 
-    link && typeof link === 'object' && (link.source === nodeId || link.target === nodeId)
-  );
-  
-  // Calculate total value of all connections
-  const totalValue = nodeLinks.reduce((sum, link) => sum + link.value, 0);
-  
-  if (totalValue === 0) return new Map<string, number>();
-  
-  // Create percentage map
-  const percentageMap = new Map<string, number>();
-  
-  nodeLinks.forEach(link => {
-    const connectedNodeId = link.source === nodeId ? link.target : link.source;
-    const percentage = (link.value / totalValue) * 100;
-    percentageMap.set(connectedNodeId, percentage);
-  });
-  
-  // Log the calculated percentages for debugging
-  console.log(`Connection percentages for ${nodeId}:`, Object.fromEntries(percentageMap));
-  return percentageMap;
-}
-
-export const SoulNetVisualization: React.FC<SoulNetVisualizationProps> = ({
+const SoulNetVisualization: React.FC<SoulNetVisualizationProps> = ({
   data,
   selectedNode,
   onNodeClick,
   themeHex,
-  isFullScreen = false,
-  shouldShowLabels = false
+  isFullScreen,
+  shouldShowLabels
 }) => {
-  const { camera, size } = useThree();
-  const controlsRef = useRef<any>(null);
-  const [cameraZoom, setCameraZoom] = useState<number>(45);
-  const [forceUpdate, setForceUpdate] = useState<number>(0);
-  const [isInitialized, setIsInitialized] = useState(false);
+  const { camera, gl } = useThree();
+  const isMobile = useIsMobile();
+  const [cameraZoom, setCameraZoom] = useState(isFullScreen ? 40 : 45);
+  const lastUpdateRef = useRef<number>(0);
+  const performanceRef = useRef({ frameCount: 0, lastCheck: Date.now() });
   
-  console.log("Rendering SoulNetVisualization component with data:", 
-    data?.nodes?.length, "nodes and", data?.links?.length, "links, fullscreen:", isFullScreen);
-  
-  useEffect(() => {
-    console.log("SoulNetVisualization mounted");
-    return () => {
-      console.log("SoulNetVisualization unmounted");
-    };
-  }, []);
-  
-  // Ensure data is valid
-  const validData = useMemo(() => {
-    if (!data || !data.nodes || !Array.isArray(data.nodes) || !data.links || !Array.isArray(data.links)) {
-      console.error("Invalid SoulNetVisualization data:", data);
-      return {
-        nodes: [],
-        links: []
-      };
-    }
-    return data;
-  }, [data]);
-  
-  // Use memoization to prevent recalculation of center position on every render
-  const centerPosition = useMemo(() => {
-    if (!validData.nodes || validData.nodes.length === 0) {
-      return new THREE.Vector3(0, 0, 0);
-    }
-    
+  // Validate input data
+  const validatedData = useMemo(() => {
     try {
-      const validNodes = validData.nodes.filter(node => 
-        node && node.position && Array.isArray(node.position) && node.position.length === 3
+      const validNodes = (data?.nodes || []).filter(node => 
+        node && 
+        typeof node.id === 'string' && 
+        node.id.length > 0 &&
+        (node.type === 'entity' || node.type === 'emotion') &&
+        Array.isArray(node.position) &&
+        node.position.length === 3 &&
+        node.position.every(coord => typeof coord === 'number' && !isNaN(coord))
       );
       
-      if (validNodes.length === 0) {
-        return new THREE.Vector3(0, 0, 0);
-      }
+      const validLinks = (data?.links || []).filter(link =>
+        link &&
+        typeof link.source === 'string' &&
+        typeof link.target === 'string' &&
+        typeof link.value === 'number' &&
+        !isNaN(link.value) &&
+        validNodes.some(node => node.id === link.source) &&
+        validNodes.some(node => node.id === link.target)
+      );
       
-      const nodePositions = validNodes.map(node => node.position);
-      const centerX = nodePositions.reduce((sum, pos) => sum + pos[0], 0) / Math.max(nodePositions.length, 1);
-      const centerY = nodePositions.reduce((sum, pos) => sum + pos[1], 0) / Math.max(nodePositions.length, 1);
-      const centerZ = 0;
-      return new THREE.Vector3(centerX, centerY, centerZ);
+      return { nodes: validNodes, links: validLinks };
     } catch (error) {
-      console.error("Error calculating center position:", error);
-      return new THREE.Vector3(0, 0, 0);
+      console.error('Data validation error:', error);
+      return { nodes: [], links: [] };
     }
-  }, [validData.nodes]);
+  }, [data]);
 
-  useEffect(() => {
-    // Force a re-render after selection changes to ensure visuals update
-    if (selectedNode) {
-      console.log(`Selected node: ${selectedNode}`);
-      // Force multiple updates to ensure the visual changes apply
-      setForceUpdate(prev => prev + 1);
-      const timer = setTimeout(() => {
-        setForceUpdate(prev => prev + 1);
-      }, 100);
-      
-      return () => clearTimeout(timer);
-    }
-  }, [selectedNode]);
-
-  // Optimized camera initialization with increased distance for complete view
-  useEffect(() => {
-    if (camera && validData.nodes?.length > 0 && !isInitialized) {
-      console.log("Initializing camera position for complete visualization view");
-      try {
-        const centerX = centerPosition.x;
-        const centerY = centerPosition.y;
-        camera.position.set(centerX, centerY, 45);
-        camera.lookAt(centerX, centerY, 0);
-        setIsInitialized(true);
-      } catch (error) {
-        console.error("Error setting camera position:", error);
+  // Memoized calculations for highlighted nodes and connections
+  const { highlightedNodes, connectionData } = useMemo(() => {
+    try {
+      if (!selectedNode || !validatedData.nodes.length) {
+        return { 
+          highlightedNodes: new Set<string>(), 
+          connectionData: new Map<string, { strength: number; percentage: number }>() 
+        };
       }
-    }
-  }, [camera, validData.nodes, centerPosition, isInitialized]);
-
-  // Track camera zoom with throttling to improve performance
-  useEffect(() => {
-    const updateCameraDistance = () => {
-      if (camera) {
-        const currentZ = camera.position.z;
-        if (Math.abs(currentZ - cameraZoom) > 0.5) {
-          setCameraZoom(currentZ);
-        }
-      }
-    };
-
-    const intervalId = setInterval(updateCameraDistance, 200);
-    return () => clearInterval(intervalId);
-  }, [camera, cameraZoom]);
-
-  // Memoize connected nodes to prevent unnecessary recalculations
-  const highlightedNodes = useMemo(() => {
-    if (!selectedNode || !validData || !validData.links) return new Set<string>();
-    return getConnectedNodes(selectedNode, validData.links);
-  }, [selectedNode, validData?.links]);
-
-  // Calculate relative strength of connections for the selected node
-  const connectionStrengths = useMemo(() => {
-    if (!selectedNode || !validData || !validData.links) return new Map<string, number>();
-    return calculateRelativeStrengths(selectedNode, validData.links);
-  }, [selectedNode, validData?.links]);
-
-  // Calculate percentage distribution of connections for the selected node
-  const connectionPercentages = useMemo(() => {
-    if (!selectedNode || !validData || !validData.links) return new Map<string, number>();
-    return calculateConnectionPercentages(selectedNode, validData.links);
-  }, [selectedNode, validData?.links]);
-
-  // Create a map for quick node lookup with geometry info
-  const nodeMap = useMemo(() => {
-    const map = new Map();
-    validData.nodes.forEach(node => {
-      const baseScale = node.type === 'entity' ? 0.7 : 0.55;
-      const isNodeHighlighted = selectedNode === node.id || highlightedNodes.has(node.id);
-      const connectionStrength = selectedNode && highlightedNodes.has(node.id) 
-        ? connectionStrengths.get(node.id) || 0.5
-        : 0.5;
       
-      const scale = isNodeHighlighted 
-        ? baseScale * (1.2 + (selectedNode === node.id ? 0.3 : connectionStrength * 0.5))
-        : baseScale * (0.8 + node.value * 0.5);
+      const highlighted = new Set<string>([selectedNode]);
+      const connections = new Map<string, { strength: number; percentage: number }>();
+      const connectedLinks = validatedData.links.filter(link => 
+        link.source === selectedNode || link.target === selectedNode
+      );
       
-      map.set(node.id, { 
-        ...node, 
-        scale,
-        isHighlighted: isNodeHighlighted
+      // Calculate total connection strength for percentage calculations
+      const totalStrength = connectedLinks.reduce((sum, link) => sum + Math.abs(link.value), 0);
+      
+      connectedLinks.forEach(link => {
+        const connectedNodeId = link.source === selectedNode ? link.target : link.source;
+        highlighted.add(connectedNodeId);
+        
+        const strength = Math.abs(link.value);
+        const percentage = totalStrength > 0 ? (strength / totalStrength) * 100 : 0;
+        
+        connections.set(connectedNodeId, {
+          strength: Math.max(0, Math.min(1, strength)),
+          percentage: Math.round(percentage)
+        });
       });
-    });
-    return map;
-  }, [validData.nodes, selectedNode, highlightedNodes, connectionStrengths]);
-
-  // Adjust controls with increased max zoom-out distances for complete view
-  useEffect(() => {
-    if (controlsRef.current) {
-      controlsRef.current.dampingFactor = isFullScreen ? 0.08 : 0.05;
       
-      // Increased distance limits to allow complete visualization view
-      controlsRef.current.minDistance = isFullScreen ? 8 : 10;
-      controlsRef.current.maxDistance = isFullScreen ? 80 : 60;
+      return { highlightedNodes: highlighted, connectionData: connections };
+    } catch (error) {
+      console.error('Connection calculation error:', error);
+      return { 
+        highlightedNodes: new Set<string>(), 
+        connectionData: new Map<string, { strength: number; percentage: number }>() 
+      };
     }
-  }, [isFullScreen]);
+  }, [selectedNode, validatedData]);
 
-  const shouldDim = !!selectedNode;
+  // Performance monitoring
+  useFrame(() => {
+    try {
+      performanceRef.current.frameCount++;
+      const now = Date.now();
+      
+      if (now - performanceRef.current.lastCheck > 5000) {
+        const fps = (performanceRef.current.frameCount * 1000) / (now - performanceRef.current.lastCheck);
+        if (fps < 30) {
+          console.warn(`SoulNet performance warning: ${fps.toFixed(1)} FPS`);
+        }
+        performanceRef.current.frameCount = 0;
+        performanceRef.current.lastCheck = now;
+      }
+      
+      // Throttled camera zoom updates
+      if (camera && now - lastUpdateRef.current > 100) {
+        const currentZoom = camera.position.length();
+        if (Math.abs(currentZoom - cameraZoom) > 0.5) {
+          setCameraZoom(currentZoom);
+        }
+        lastUpdateRef.current = now;
+      }
+    } catch (error) {
+      console.warn('Frame update error:', error);
+    }
+  });
 
-  // Custom node click handler with debugging
-  const handleNodeClick = (id: string, e: any) => {
-    console.log(`Node clicked in visualization: ${id}`);
-    onNodeClick(id);
-  };
+  // Safe node click handler
+  const handleNodeClick = useCallback((nodeId: string, e: any) => {
+    try {
+      console.log(`SoulNetVisualization: Node clicked: ${nodeId}`);
+      onNodeClick(nodeId, e);
+    } catch (error) {
+      console.error('Node click handler error:', error);
+    }
+  }, [onNodeClick]);
 
-  if (!validData || !validData.nodes || !validData.links) {
-    console.error("SoulNetVisualization: Data is missing or invalid", validData);
-    return null;
+  // Early return for empty data
+  if (!validatedData.nodes.length) {
+    console.log('SoulNetVisualization: No valid nodes to render');
+    return (
+      <group>
+        <ambientLight intensity={0.4} />
+        <directionalLight position={[10, 10, 5]} intensity={0.8} />
+        <OrbitControls
+          enablePan={true}
+          enableZoom={true}
+          enableRotate={true}
+          enableDamping={true}
+          dampingFactor={0.05}
+          minDistance={20}
+          maxDistance={100}
+          maxPolarAngle={Math.PI}
+          minPolarAngle={0}
+        />
+      </group>
+    );
   }
 
+  console.log(`SoulNetVisualization: Rendering ${validatedData.nodes.length} nodes and ${validatedData.links.length} links`);
+
   return (
-    <>
-      <ambientLight intensity={0.5} />
-      <pointLight position={[10, 10, 10]} intensity={0.8} />
-      {isFullScreen && (
-        <>
-          <hemisphereLight intensity={0.3} color="#ffffff" groundColor="#444444" />
-          <pointLight position={[-10, -10, -10]} intensity={0.2} />
-        </>
-      )}
+    <group>
+      {/* Lighting setup */}
+      <ambientLight intensity={0.4} />
+      <directionalLight position={[10, 10, 5]} intensity={0.8} />
+      <pointLight position={[-10, -10, -5]} intensity={0.3} />
+      
+      {/* Camera controls */}
       <OrbitControls
-        ref={controlsRef}
-        enableDamping
-        dampingFactor={isFullScreen ? 0.08 : 0.05}
-        rotateSpeed={0.5}
-        minDistance={isFullScreen ? 8 : 10}
-        maxDistance={isFullScreen ? 80 : 60}
-        target={centerPosition}
-        onChange={() => {
-          if (camera) {
-            const currentZ = camera.position.z;
-            if (Math.abs(currentZ - cameraZoom) > 0.5) {
-              setCameraZoom(currentZ);
-            }
-          }
-        }}
+        enablePan={true}
+        enableZoom={true}
+        enableRotate={true}
+        enableDamping={true}
+        dampingFactor={0.05}
+        minDistance={20}
+        maxDistance={100}
+        maxPolarAngle={Math.PI}
+        minPolarAngle={0}
       />
       
-      {/* Display edges with proper surface connections */}
-      {validData.links.map((link, index) => {
-        if (!link || typeof link !== 'object') {
-          console.warn(`Invalid link at index ${index}`, link);
-          return null;
-        }
-        
-        const sourceNode = nodeMap.get(link.source);
-        const targetNode = nodeMap.get(link.target);
-        
-        if (!sourceNode || !targetNode) {
-          console.warn(`Missing source or target node for link: ${link.source} -> ${link.target}`);
-          return null;
-        }
-        
-        const isHighlight = selectedNode &&
-          (link.source === selectedNode || link.target === selectedNode);
+      {/* Render edges */}
+      {validatedData.links.map((link, index) => {
+        try {
+          const sourceNode = validatedData.nodes.find(n => n.id === link.source);
+          const targetNode = validatedData.nodes.find(n => n.id === link.target);
           
-        // Get relative strength for this connection if it's highlighted
-        let relativeStrength = 0.3; // default lower value
-        
-        if (isHighlight && selectedNode) {
-          const connectedNodeId = link.source === selectedNode ? link.target : link.source;
-          // Use higher base value for highlighted connections
-          relativeStrength = connectionStrengths.get(connectedNodeId) || 0.7;
-        } else {
-          // Use original link value, but scaled down for non-highlighted links
-          relativeStrength = link.value * 0.5;
-        }
-        
-        // Skip rendering this edge if positions aren't valid
-        if (!Array.isArray(sourceNode.position) || !Array.isArray(targetNode.position)) {
+          if (!sourceNode || !targetNode) {
+            console.warn(`Invalid link: ${link.source} -> ${link.target}`);
+            return null;
+          }
+          
+          const isHighlighted = selectedNode && (
+            selectedNode === link.source || 
+            selectedNode === link.target
+          );
+          
+          return (
+            <Edge
+              key={`edge-${link.source}-${link.target}-${index}`}
+              start={sourceNode.position}
+              end={targetNode.position}
+              strength={Math.max(0.1, Math.min(1, Math.abs(link.value)))}
+              isHighlighted={!!isHighlighted}
+              themeHex={themeHex}
+            />
+          );
+        } catch (error) {
+          console.warn(`Edge rendering error for link ${index}:`, error);
           return null;
         }
-          
-        return (
-          <Edge
-            key={`edge-${index}-${forceUpdate}`}
-            start={sourceNode.position}
-            end={targetNode.position}
-            value={relativeStrength}
-            isHighlighted={!!isHighlight}
-            dimmed={shouldDim && !isHighlight}
-            maxThickness={isHighlight ? 10 : 4}
-            startNodeType={sourceNode.type}
-            endNodeType={targetNode.type}
-            startNodeScale={sourceNode.scale}
-            endNodeScale={targetNode.scale}
-          />
-        );
       })}
       
-      {/* Display nodes */}
-      {validData.nodes.map(node => {
-        if (!node || typeof node !== 'object' || !node.id) {
-          console.warn("Invalid node:", node);
+      {/* Render nodes */}
+      {validatedData.nodes.map((node) => {
+        try {
+          const isSelected = selectedNode === node.id;
+          const isHighlighted = highlightedNodes.has(node.id);
+          const isDimmed = selectedNode !== null && !isHighlighted;
+          const connectionInfo = connectionData.get(node.id);
+          
+          return (
+            <Node
+              key={node.id}
+              node={node}
+              isSelected={isSelected}
+              onClick={handleNodeClick}
+              highlightedNodes={highlightedNodes}
+              showLabel={shouldShowLabels}
+              dimmed={isDimmed}
+              themeHex={themeHex}
+              selectedNodeId={selectedNode}
+              cameraZoom={cameraZoom}
+              isHighlighted={isHighlighted}
+              connectionStrength={connectionInfo?.strength || 0.5}
+              connectionPercentage={connectionInfo?.percentage || 0}
+              showPercentage={isHighlighted && !isSelected}
+              forceShowLabels={isFullScreen}
+            />
+          );
+        } catch (error) {
+          console.warn(`Node rendering error for ${node.id}:`, error);
           return null;
         }
-        
-        // Clean label visibility logic - only show when explicitly requested
-        const showLabel = shouldShowLabels || !selectedNode || node.id === selectedNode || highlightedNodes.has(node.id);
-        const dimmed = shouldDim && !(selectedNode === node.id || highlightedNodes.has(node.id));
-        const isHighlighted = selectedNode === node.id || highlightedNodes.has(node.id);
-        
-        // Calculate connection strength if this is a connected node
-        const connectionStrength = selectedNode && highlightedNodes.has(node.id) 
-          ? connectionStrengths.get(node.id) || 0.5
-          : 0.5;
-          
-        // Get percentage for this connection if node is highlighted but not selected
-        const connectionPercentage = selectedNode && highlightedNodes.has(node.id)
-          ? connectionPercentages.get(node.id) || 0
-          : 0;
-          
-        // Determine if we should show the percentage
-        const showPercentage = selectedNode !== null && 
-                              highlightedNodes.has(node.id) && 
-                              node.id !== selectedNode;
-        
-        // Skip rendering this node if position isn't valid
-        if (!Array.isArray(node.position)) {
-          console.warn(`Node ${node.id} has invalid position:`, node.position);
-          return null;
-        }
-          
-        return (
-          <Node
-            key={`node-${node.id}-${forceUpdate}`}
-            node={node}
-            isSelected={selectedNode === node.id}
-            onClick={handleNodeClick}
-            highlightedNodes={highlightedNodes}
-            showLabel={showLabel}
-            dimmed={dimmed}
-            themeHex={themeHex}
-            selectedNodeId={selectedNode}
-            cameraZoom={cameraZoom}
-            isHighlighted={isHighlighted}
-            connectionStrength={connectionStrength}
-            connectionPercentage={connectionPercentage}
-            showPercentage={showPercentage}
-            forceShowLabels={false}
-          />
-        );
       })}
-    </>
+    </group>
   );
 };
 

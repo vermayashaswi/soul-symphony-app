@@ -1,7 +1,7 @@
 
-import React, { useRef, useMemo } from 'react';
+import React, { useRef, useMemo, useCallback } from 'react';
 import * as THREE from 'three';
-import '@/types/three-reference';  // Fixed import path
+import '@/types/three-reference';
 import { useFrame } from '@react-three/fiber';
 
 interface NodeMeshProps {
@@ -34,81 +34,115 @@ export const NodeMesh: React.FC<NodeMeshProps> = ({
   onPointerLeave,
 }) => {
   const meshRef = useRef<THREE.Mesh>(null);
+  const timeRef = useRef(0);
   
-  // Adjusted node sizes to better match reference image proportions
-  const Geometry = useMemo(() => 
-    type === 'entity'
-      ? <sphereGeometry args={[1.4, 32, 32]} /> // Increased from 1.25 to 1.4 for better visibility
-      : <boxGeometry args={[2.1, 2.1, 2.1]} />, // Slightly reduced from 2.3 to 2.1 for better balance
-    [type]
-  );
+  // Memoize geometry to prevent recreation
+  const geometry = useMemo(() => {
+    return type === 'entity'
+      ? new THREE.SphereGeometry(1.4, 16, 16) // Reduced segments for performance
+      : new THREE.BoxGeometry(2.1, 2.1, 2.1);
+  }, [type]);
 
-  // Fix: Use state for animation instead of relying on clock from RootState
+  // Memoize material to prevent recreation
+  const material = useMemo(() => {
+    return new THREE.MeshStandardMaterial({
+      color: displayColor,
+      transparent: true,
+      opacity: 0.85,
+      emissive: displayColor,
+      emissiveIntensity: 0.1,
+      roughness: 0.3,
+      metalness: 0.4,
+      depthWrite: false,
+    });
+  }, [displayColor]);
+
+  // Safe frame update with error handling
   useFrame((state, delta) => {
+    if (!meshRef.current || !meshRef.current.material) return;
+    
     try {
-      if (!meshRef.current) return;
+      // Use our own time reference instead of clock
+      timeRef.current += delta;
+      
+      const mesh = meshRef.current;
+      const mat = mesh.material as THREE.MeshStandardMaterial;
+      
+      // Calculate opacity based on state
+      const nodeOpacity = isHighlighted 
+        ? (isSelected ? 0.9 : 0.7)
+        : (dimmed ? 0.4 : 0.85);
+      
+      // Update material properties safely
+      mat.opacity = nodeOpacity;
+      mat.color.setStyle(displayColor);
+      mat.emissive.setStyle(displayColor);
       
       if (isHighlighted) {
         const pulseIntensity = isSelected ? 0.25 : (connectionStrength * 0.2);
-        // Use time calculation based on delta directly
-        const time = state.clock ? state.clock.getElapsedTime() : performance.now() / 1000;
-        const pulse = Math.sin(time * 2.5) * pulseIntensity + 1.1;
-        meshRef.current.scale.set(scale * pulse, scale * pulse, scale * pulse);
+        const pulse = Math.sin(timeRef.current * 2.5) * pulseIntensity + 1.1;
+        const targetScale = scale * pulse;
         
-        if (meshRef.current.material instanceof THREE.MeshStandardMaterial) {
-          const emissiveIntensity = isSelected 
-            ? 1.0 + Math.sin(time * 3) * 0.3
-            : 0.7 + (connectionStrength * 0.3) + Math.sin(time * 3) * 0.2;
-          
-          meshRef.current.material.emissiveIntensity = emissiveIntensity;
-        }
+        mesh.scale.setScalar(targetScale);
+        
+        const emissiveIntensity = isSelected 
+          ? 1.0 + Math.sin(timeRef.current * 3) * 0.3
+          : 0.7 + (connectionStrength * 0.3) + Math.sin(timeRef.current * 3) * 0.2;
+        
+        mat.emissiveIntensity = Math.max(0, Math.min(2, emissiveIntensity));
       } else {
         const targetScale = dimmed ? scale * 0.8 : scale;
-        meshRef.current.scale.set(targetScale, targetScale, targetScale);
-        
-        if (meshRef.current.material instanceof THREE.MeshStandardMaterial) {
-          meshRef.current.material.emissiveIntensity = dimmed ? 0 : 0.1;
-        }
+        mesh.scale.setScalar(targetScale);
+        mat.emissiveIntensity = dimmed ? 0 : 0.1;
       }
     } catch (error) {
-      console.error("Error in NodeMesh useFrame:", error);
+      console.warn("NodeMesh animation error:", error);
+      // Continue without animation rather than crashing
     }
   });
 
-  // Enhanced opacity settings to match reference image clarity
-  const nodeOpacity = useMemo(() => {
-    if (isHighlighted) {
-      return isSelected ? 0.9 : 0.4; // Increased selected opacity, adjusted highlighted
+  // Safe event handlers
+  const handleClick = useCallback((e: any) => {
+    try {
+      e.stopPropagation();
+      onClick(e);
+    } catch (error) {
+      console.warn("NodeMesh click error:", error);
     }
-    return dimmed ? 0.4 : 0.85; // Increased normal opacity for better visibility
-  }, [isHighlighted, isSelected, dimmed]);
+  }, [onClick]);
+
+  const handlePointerDown = useCallback((e: any) => {
+    try {
+      e.stopPropagation();
+      onPointerDown(e);
+    } catch (error) {
+      console.warn("NodeMesh pointer down error:", error);
+    }
+  }, [onPointerDown]);
+
+  const handlePointerUp = useCallback((e: any) => {
+    try {
+      e.stopPropagation();
+      onPointerUp(e);
+    } catch (error) {
+      console.warn("NodeMesh pointer up error:", error);
+    }
+  }, [onPointerUp]);
 
   return (
     <mesh
       ref={meshRef}
+      geometry={geometry}
+      material={material}
       scale={[scale, scale, scale]}
-      onClick={(e) => {
-        e.stopPropagation();
-        onClick(e);
-      }}
-      onPointerDown={onPointerDown}
-      onPointerUp={onPointerUp}
+      onClick={handleClick}
+      onPointerDown={handlePointerDown}
+      onPointerUp={handlePointerUp}
       onPointerOut={onPointerOut}
       onPointerLeave={onPointerLeave}
-      renderOrder={1} // Set a lower render order for the node mesh
-    >
-      {Geometry}
-      <meshStandardMaterial
-        color={displayColor}
-        transparent={true} // Explicitly enable transparency
-        opacity={nodeOpacity}
-        emissive={displayColor}
-        emissiveIntensity={isHighlighted ? 1.2 : (dimmed ? 0 : 0.1)}
-        roughness={0.3}
-        metalness={0.4}
-        depthWrite={false} // Disable depth writing for proper transparency
-      />
-    </mesh>
+      renderOrder={1}
+      frustumCulled={true}
+    />
   );
 };
 
