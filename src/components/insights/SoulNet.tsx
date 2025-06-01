@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import '@/types/three-reference';
 import { Canvas } from '@react-three/fiber';
@@ -41,6 +42,7 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
   const [dataError, setDataError] = useState<Error | null>(null);
   const [canvasError, setCanvasError] = useState<Error | null>(null);
   const [retryCount, setRetryCount] = useState(0);
+  const [hasData, setHasData] = useState(false);
   
   const isMobile = useIsMobile();
   const themeHex = useUserColorThemeHex();
@@ -49,7 +51,8 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
   console.log("[SoulNet] Render state:", { 
     userId, 
     timeRange, 
-    hasData: graphData.nodes.length > 0,
+    hasData,
+    nodeCount: graphData.nodes.length,
     loading,
     dataError: !!dataError,
     canvasError: !!canvasError,
@@ -63,9 +66,14 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
     };
   }, []);
 
-  // Simplified data fetching effect
+  // Main data fetching effect - simplified and more reliable
   useEffect(() => {
-    if (!userId || !mountedRef.current) return;
+    if (!userId || !mountedRef.current) {
+      console.log("[SoulNet] No userId or component unmounted, skipping fetch");
+      setLoading(false);
+      setHasData(false);
+      return;
+    }
 
     const fetchData = async () => {
       try {
@@ -73,9 +81,9 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
         setLoading(true);
         setDataError(null);
         setCanvasError(null);
-        setRetryCount(0);
         
         const startDate = getStartDate(timeRange);
+        console.log("[SoulNet] Fetching entries from:", startDate.toISOString());
         
         const { data: entries, error } = await supabase
           .from('Journal Entries')
@@ -84,27 +92,38 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
           .gte('created_at', startDate.toISOString())
           .order('created_at', { ascending: false });
 
-        if (!mountedRef.current) return;
+        if (!mountedRef.current) {
+          console.log("[SoulNet] Component unmounted during fetch");
+          return;
+        }
 
-        if (error) throw error;
+        if (error) {
+          console.error("[SoulNet] Database error:", error);
+          throw error;
+        }
 
         console.log(`[SoulNet] Fetched ${entries?.length || 0} entries`);
         
         if (!entries || entries.length === 0) {
-          console.log("[SoulNet] No entries found, setting empty data");
+          console.log("[SoulNet] No entries found");
           setGraphData({ nodes: [], links: [] });
+          setHasData(false);
         } else {
           console.log("[SoulNet] Processing entries into graph data");
           const processedData = processEntities(entries);
+          console.log("[SoulNet] Processed data:", processedData);
           setGraphData(processedData);
+          setHasData(processedData.nodes.length > 0);
         }
         
       } catch (error) {
         if (!mountedRef.current) return;
         console.error('[SoulNet] Data fetch error:', error);
         setDataError(error instanceof Error ? error : new Error('Unknown error'));
+        setHasData(false);
       } finally {
         if (mountedRef.current) {
+          console.log("[SoulNet] Setting loading to false");
           setLoading(false);
         }
       }
@@ -145,8 +164,9 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
     setRetryCount(0);
   }, []);
 
-  // Show loading state
+  // Show loading state only while actively loading
   if (loading) {
+    console.log("[SoulNet] Rendering loading state");
     return (
       <div className="bg-background rounded-xl shadow-sm border w-full p-6">
         <LoadingState />
@@ -156,6 +176,7 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
   
   // Show data error
   if (dataError) {
+    console.log("[SoulNet] Rendering data error state");
     return (
       <div className="bg-background rounded-xl shadow-sm border w-full p-6">
         <h2 className="text-xl font-semibold text-red-600 mb-4">
@@ -172,13 +193,15 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
     );
   }
   
-  // Show empty state
-  if (graphData.nodes.length === 0) {
+  // Show empty state only if we have no data at all
+  if (!hasData) {
+    console.log("[SoulNet] Rendering empty state - no data available");
     return <EmptyState />;
   }
 
   // Show persistent canvas error only after multiple retries
   if (canvasError && retryCount > 3) {
+    console.log("[SoulNet] Rendering canvas error state after", retryCount, "retries");
     return (
       <div className="bg-background rounded-xl shadow-sm border w-full p-6">
         <h2 className="text-xl font-semibold mb-4">
@@ -209,7 +232,8 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
     return <TranslatableText text="Drag to rotate • Scroll to zoom • Click a node to highlight connections" forceTranslate={true} />;
   };
 
-  // Simplified main render - always show Canvas when we have data
+  // Main render - always show Canvas when we have data
+  console.log("[SoulNet] Rendering main visualization with", graphData.nodes.length, "nodes");
   return (
     <div className={cn(
       "bg-background rounded-xl shadow-sm border w-full relative",
@@ -329,27 +353,41 @@ const processEntities = (entries: any[]) => {
   console.log("[SoulNet] Processing entities for", entries.length, "entries");
   
   const entityEmotionMap: Record<string, {emotions: Record<string, number>}> = {};
+  let processedEntries = 0;
   
   entries.forEach(entry => {
-    if (!entry.entityemotion) return;
-    Object.entries(entry.entityemotion).forEach(([category, emotions]) => {
-      if (typeof emotions !== 'object') return;
-      Object.entries(emotions).forEach(([emotion, score]) => {
-        if (typeof score !== 'number') return;
-        if (!entityEmotionMap[category]) {
-          entityEmotionMap[category] = { emotions: {} };
-        }
-        if (entityEmotionMap[category].emotions[emotion]) {
-          entityEmotionMap[category].emotions[emotion] =
-            (entityEmotionMap[category].emotions[emotion] + score) / 2;
-        } else {
-          entityEmotionMap[category].emotions[emotion] = score;
-        }
+    if (!entry.entityemotion) {
+      console.log("[SoulNet] Entry missing entityemotion:", entry.id);
+      return;
+    }
+    
+    try {
+      const entityEmotion = typeof entry.entityemotion === 'string' 
+        ? JSON.parse(entry.entityemotion) 
+        : entry.entityemotion;
+      
+      Object.entries(entityEmotion).forEach(([category, emotions]) => {
+        if (typeof emotions !== 'object') return;
+        Object.entries(emotions).forEach(([emotion, score]) => {
+          if (typeof score !== 'number') return;
+          if (!entityEmotionMap[category]) {
+            entityEmotionMap[category] = { emotions: {} };
+          }
+          if (entityEmotionMap[category].emotions[emotion]) {
+            entityEmotionMap[category].emotions[emotion] =
+              (entityEmotionMap[category].emotions[emotion] + score) / 2;
+          } else {
+            entityEmotionMap[category].emotions[emotion] = score;
+          }
+        });
       });
-    });
+      processedEntries++;
+    } catch (error) {
+      console.error("[SoulNet] Error processing entry entityemotion:", error, entry.id);
+    }
   });
 
-  console.log("[SoulNet] Entity emotion map:", entityEmotionMap);
+  console.log("[SoulNet] Processed", processedEntries, "entries, entity emotion map:", entityEmotionMap);
   return generateGraph(entityEmotionMap);
 };
 
@@ -360,12 +398,17 @@ const generateGraph = (entityEmotionMap: Record<string, {emotions: Record<string
   const emotionNodes = new Set<string>();
 
   const entityList = Object.keys(entityEmotionMap);
+  console.log("[SoulNet] Generating graph with", entityList.length, "entities");
+  
+  if (entityList.length === 0) {
+    console.log("[SoulNet] No entities found, returning empty graph");
+    return { nodes: [], links: [] };
+  }
+
   const EMOTION_LAYER_RADIUS = 11;
   const ENTITY_LAYER_RADIUS = 6;
   const EMOTION_Y_SPAN = 6;
   const ENTITY_Y_SPAN = 3;
-
-  console.log("[SoulNet] Generating graph with", entityList.length, "entities");
   
   entityList.forEach((entity, entityIndex) => {
     entityNodes.add(entity);

@@ -51,7 +51,7 @@ export const SimplifiedSoulNetVisualization: React.FC<SimplifiedSoulNetVisualiza
   // Validate and clean data immediately
   const validData = useMemo(() => {
     if (!data || !Array.isArray(data.nodes) || !Array.isArray(data.links)) {
-      console.log("[SimplifiedSoulNetVisualization] Invalid data structure");
+      console.log("[SimplifiedSoulNetVisualization] Invalid data structure, using empty data");
       return { nodes: [], links: [] };
     }
     
@@ -79,10 +79,10 @@ export const SimplifiedSoulNetVisualization: React.FC<SimplifiedSoulNetVisualiza
     return new THREE.Vector3(avgX, avgY, 0);
   }, [validData.nodes]);
 
-  // Simplified camera initialization - no delays
+  // Initialize camera immediately when data is available
   useEffect(() => {
-    if (validData.nodes.length > 0 && camera) {
-      console.log("[SimplifiedSoulNetVisualization] Initializing camera immediately");
+    if (camera) {
+      console.log("[SimplifiedSoulNetVisualization] Initializing camera");
       
       const targetZ = isFullScreen ? 40 : 45;
       camera.position.set(centerPosition.x, centerPosition.y, targetZ);
@@ -94,7 +94,7 @@ export const SimplifiedSoulNetVisualization: React.FC<SimplifiedSoulNetVisualiza
       
       console.log("[SimplifiedSoulNetVisualization] Camera initialized at position:", camera.position);
     }
-  }, [camera, validData.nodes.length, centerPosition, isFullScreen]);
+  }, [camera, centerPosition, isFullScreen]);
 
   // Track camera zoom
   useFrame(() => {
@@ -138,6 +138,8 @@ export const SimplifiedSoulNetVisualization: React.FC<SimplifiedSoulNetVisualiza
   });
 
   // Always render the 3D scene, even with empty data
+  console.log("[SimplifiedSoulNetVisualization] Rendering 3D scene with", validData.nodes.length, "nodes");
+  
   return (
     <>
       <ambientLight intensity={0.5} />
@@ -199,7 +201,7 @@ export const SimplifiedSoulNetVisualization: React.FC<SimplifiedSoulNetVisualiza
         );
       })}
 
-      {/* HTML Text Overlay - always render if initialized */}
+      {/* HTML Text Overlay - render when initialized */}
       {isInitialized && <HtmlTextOverlay textItems={textOverlayItems} />}
     </>
   );

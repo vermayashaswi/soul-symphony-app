@@ -36,9 +36,15 @@ export const useSimpleTextItems = ({
   shouldShowLabels
 }: SimpleTextServiceProps): TextItem[] => {
   return useMemo(() => {
-    // Only process if we should show labels AND have valid data
-    if (!shouldShowLabels || !nodes || nodes.length === 0) {
-      console.log("[SimpleTextService] Not showing labels:", { shouldShowLabels, nodeCount: nodes?.length || 0 });
+    // Only process if we should show labels
+    if (!shouldShowLabels) {
+      console.log("[SimpleTextService] Labels disabled");
+      return [];
+    }
+
+    // Handle empty nodes gracefully
+    if (!nodes || nodes.length === 0) {
+      console.log("[SimpleTextService] No nodes to process");
       return [];
     }
 
