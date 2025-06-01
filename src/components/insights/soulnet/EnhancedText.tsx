@@ -61,10 +61,16 @@ export const EnhancedText: React.FC<EnhancedTextProps> = ({
     setIsReady(true);
   }, [text]);
 
-  // Load font using useLoader hook
-  const font = useLoader(FontLoader, fontUrl, (loader) => {
-    console.log(`[EnhancedText] Loading font from: ${fontUrl}`);
-  });
+  // Load font using useLoader hook - but handle errors gracefully
+  let font;
+  try {
+    font = useLoader(FontLoader, fontUrl, (loader) => {
+      console.log(`[EnhancedText] Loading font from: ${fontUrl}`);
+    });
+  } catch (error) {
+    console.warn('[EnhancedText] Font loading error:', error);
+    setHasError(true);
+  }
 
   // Billboard effect
   useFrame(({ camera }) => {
