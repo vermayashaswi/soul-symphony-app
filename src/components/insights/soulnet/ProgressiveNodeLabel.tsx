@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import SimplifiedText from './SimplifiedText';
 import { useTranslation } from '@/contexts/TranslationContext';
@@ -28,55 +29,110 @@ export const ProgressiveNodeLabel: React.FC<ProgressiveNodeLabelProps> = ({
   const { currentLanguage, translate } = useTranslation();
   const [displayText, setDisplayText] = useState<string>(id);
   const [isReady, setIsReady] = useState(false);
-  const [useSimplified, setUseSimplified] = useState(false);
+  const [translationStage, setTranslationStage] = useState<'initial' | 'processing' | 'complete'>('initial');
   const mounted = useRef<boolean>(true);
+  const initializationRef = useRef<boolean>(false);
   
-  console.log(`[ProgressiveNodeLabel] Processing label for ${id}`);
+  console.log(`[ProgressiveNodeLabel] Label for ${id}, stage: ${translationStage}`);
 
-  // Calculate label position offset
+  // Calculate label position offset with safety checks
   const calculateOffset = (): [number, number, number] => {
-    const baseOffset = type === 'entity' ? 1.8 : 2.2;
-    const scaledOffset = baseOffset * (nodeScale || 1);
-    return [0, scaledOffset, 0];
+    try {
+      const baseOffset = type === 'entity' ? 1.8 : 2.2;
+      const scaledOffset = baseOffset * Math.max(0.5, Math.min(2, nodeScale || 1));
+      return [0, scaledOffset, 0];
+    } catch (error) {
+      console.warn('[ProgressiveNodeLabel] Offset calculation error:', error);
+      return [0, 2, 0];
+    }
   };
 
-  // Handle text processing with progressive enhancement
+  // Staged initialization to prevent render crashes
   useEffect(() => {
-    if (!mounted.current) return;
+    if (!mounted.current || initializationRef.current) return;
+    
+    console.log(`[ProgressiveNodeLabel] Starting staged initialization for ${id}`);
+    initializationRef.current = true;
 
-    const processText = async () => {
-      try {
-        // Start with original text
-        setDisplayText(id);
+    // Stage 1: Initial setup (immediate)
+    setDisplayText(id);
+    setTranslationStage('initial');
+
+    // Stage 2: Ready for rendering (delayed)
+    const readyTimer = setTimeout(() => {
+      if (mounted.current) {
         setIsReady(true);
+        console.log(`[ProgressiveNodeLabel] ${id} ready for rendering`);
+      }
+    }, 200);
 
-        // If not English, attempt translation
-        if (currentLanguage !== 'en' && translate) {
-          try {
-            const translated = await Promise.race([
-              translate(id),
-              new Promise<string>((_, reject) => 
-                setTimeout(() => reject(new Error('Translation timeout')), 3000)
-              )
-            ]);
+    // Stage 3: Translation processing (further delayed)
+    const translationTimer = setTimeout(() => {
+      if (mounted.current && shouldShowLabel) {
+        setTranslationStage('processing');
+        console.log(`[ProgressiveNodeLabel] Starting translation for ${id}`);
+      }
+    }, 800);
 
-            if (mounted.current && translated && typeof translated === 'string') {
-              setDisplayText(translated);
-              console.log(`[ProgressiveNodeLabel] Translation success: ${id} -> ${translated}`);
-            }
-          } catch (error) {
-            console.warn(`[ProgressiveNodeLabel] Translation failed for ${id}, using original`);
-            // Keep original text on translation failure
+    return () => {
+      clearTimeout(readyTimer);
+      clearTimeout(translationTimer);
+    };
+  }, [id, shouldShowLabel]);
+
+  // Handle translation processing with error safety
+  useEffect(() => {
+    if (!mounted.current || translationStage !== 'processing') return;
+
+    const processTranslation = async () => {
+      try {
+        // For English or no translate function, use original text
+        if (currentLanguage === 'en' || !translate) {
+          if (mounted.current) {
+            setDisplayText(id);
+            setTranslationStage('complete');
+            console.log(`[ProgressiveNodeLabel] Using original text for ${id}`);
+          }
+          return;
+        }
+
+        // Attempt translation with timeout and error handling
+        try {
+          const translated = await Promise.race([
+            translate(id),
+            new Promise<string>((_, reject) => 
+              setTimeout(() => reject(new Error('Translation timeout')), 3000)
+            )
+          ]);
+
+          if (mounted.current && translated && typeof translated === 'string') {
+            setDisplayText(translated);
+            setTranslationStage('complete');
+            console.log(`[ProgressiveNodeLabel] Translation success: ${id} -> ${translated}`);
+          } else if (mounted.current) {
+            // Fallback to original on invalid result
+            setDisplayText(id);
+            setTranslationStage('complete');
+            console.warn(`[ProgressiveNodeLabel] Invalid translation, using original: ${id}`);
+          }
+        } catch (error) {
+          console.warn(`[ProgressiveNodeLabel] Translation failed for ${id}, using original`);
+          if (mounted.current) {
+            setDisplayText(id);
+            setTranslationStage('complete');
           }
         }
       } catch (error) {
         console.error(`[ProgressiveNodeLabel] Processing error for ${id}:`, error);
-        setUseSimplified(true);
+        if (mounted.current) {
+          setDisplayText(id);
+          setTranslationStage('complete');
+        }
       }
     };
 
-    processText();
-  }, [id, currentLanguage, translate]);
+    processTranslation();
+  }, [translationStage, id, currentLanguage, translate]);
 
   // Cleanup
   useEffect(() => {
@@ -85,23 +141,33 @@ export const ProgressiveNodeLabel: React.FC<ProgressiveNodeLabelProps> = ({
     };
   }, []);
 
-  // Don't render if not ready or not visible
-  if (!isReady || !shouldShowLabel) {
+  // Don't render until ready and visible
+  if (!isReady || !shouldShowLabel || translationStage === 'initial') {
     return null;
   }
 
-  // Calculate text properties
+  // Calculate text properties with safety checks
   const textSize = useMemo(() => {
-    const zoom = cameraZoom || 45;
-    const baseSize = 0.4;
-    const zoomFactor = Math.max(0.7, Math.min(1.3, (50 - zoom) * 0.02 + 1));
-    return baseSize * zoomFactor;
+    try {
+      const zoom = cameraZoom || 45;
+      const baseSize = 0.4;
+      const zoomFactor = Math.max(0.7, Math.min(1.3, (50 - zoom) * 0.02 + 1));
+      return Math.max(0.2, Math.min(0.8, baseSize * zoomFactor));
+    } catch (error) {
+      console.warn('[ProgressiveNodeLabel] Text size calculation error:', error);
+      return 0.4;
+    }
   }, [cameraZoom]);
 
   const textColor = useMemo(() => {
-    if (isSelected) return '#ffffff';
-    if (isHighlighted) return type === 'entity' ? '#ffffff' : themeHex;
-    return '#cccccc';
+    try {
+      if (isSelected) return '#ffffff';
+      if (isHighlighted) return type === 'entity' ? '#ffffff' : themeHex;
+      return '#cccccc';
+    } catch (error) {
+      console.warn('[ProgressiveNodeLabel] Text color calculation error:', error);
+      return '#ffffff';
+    }
   }, [isSelected, isHighlighted, type, themeHex]);
 
   const labelOffset = calculateOffset();

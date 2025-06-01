@@ -1,7 +1,7 @@
 
-import React, { useRef, useMemo } from 'react';
+import React, { useRef, useMemo, useState, useEffect } from 'react';
 import * as THREE from 'three';
-import '@/types/three-reference';  // Fixed import path
+import '@/types/three-reference';
 import { useFrame } from '@react-three/fiber';
 
 interface NodeMeshProps {
@@ -34,33 +34,46 @@ export const NodeMesh: React.FC<NodeMeshProps> = ({
   onPointerLeave,
 }) => {
   const meshRef = useRef<THREE.Mesh>(null);
+  const [animationTime, setAnimationTime] = useState(0);
+  const [isReady, setIsReady] = useState(false);
   
-  // Adjusted node sizes to better match reference image proportions
+  // Delayed initialization to prevent clock access issues
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setIsReady(true);
+    }, 100);
+    
+    return () => clearTimeout(timer);
+  }, []);
+  
+  // Simplified geometry creation
   const Geometry = useMemo(() => 
     type === 'entity'
-      ? <sphereGeometry args={[1.4, 32, 32]} /> // Increased from 1.25 to 1.4 for better visibility
-      : <boxGeometry args={[2.1, 2.1, 2.1]} />, // Slightly reduced from 2.3 to 2.1 for better balance
+      ? <sphereGeometry args={[1.2, 16, 16]} />
+      : <boxGeometry args={[2.0, 2.0, 2.0]} />,
     [type]
   );
 
-  // Fix: Use state for animation instead of relying on clock from RootState
+  // Safe animation with manual time tracking
   useFrame((state, delta) => {
+    if (!meshRef.current || !isReady) return;
+    
     try {
-      if (!meshRef.current) return;
+      // Manual time tracking instead of clock access
+      setAnimationTime(prev => prev + delta);
       
       if (isHighlighted) {
         const pulseIntensity = isSelected ? 0.25 : (connectionStrength * 0.2);
-        // Use time calculation based on delta directly
-        const time = state.clock ? state.clock.getElapsedTime() : performance.now() / 1000;
-        const pulse = Math.sin(time * 2.5) * pulseIntensity + 1.1;
+        const pulse = Math.sin(animationTime * 2.5) * pulseIntensity + 1.1;
         meshRef.current.scale.set(scale * pulse, scale * pulse, scale * pulse);
         
+        // Safe material updates
         if (meshRef.current.material instanceof THREE.MeshStandardMaterial) {
           const emissiveIntensity = isSelected 
-            ? 1.0 + Math.sin(time * 3) * 0.3
-            : 0.7 + (connectionStrength * 0.3) + Math.sin(time * 3) * 0.2;
+            ? 1.0 + Math.sin(animationTime * 3) * 0.3
+            : 0.7 + (connectionStrength * 0.3) + Math.sin(animationTime * 3) * 0.2;
           
-          meshRef.current.material.emissiveIntensity = emissiveIntensity;
+          meshRef.current.material.emissiveIntensity = Math.max(0, Math.min(2, emissiveIntensity));
         }
       } else {
         const targetScale = dimmed ? scale * 0.8 : scale;
@@ -71,17 +84,22 @@ export const NodeMesh: React.FC<NodeMeshProps> = ({
         }
       }
     } catch (error) {
-      console.error("Error in NodeMesh useFrame:", error);
+      console.warn("NodeMesh animation error:", error);
     }
   });
 
-  // Enhanced opacity settings to match reference image clarity
+  // Safe opacity calculation
   const nodeOpacity = useMemo(() => {
     if (isHighlighted) {
-      return isSelected ? 0.9 : 0.4; // Increased selected opacity, adjusted highlighted
+      return isSelected ? 0.9 : 0.4;
     }
-    return dimmed ? 0.4 : 0.85; // Increased normal opacity for better visibility
+    return dimmed ? 0.4 : 0.85;
   }, [isHighlighted, isSelected, dimmed]);
+
+  // Don't render until ready
+  if (!isReady) {
+    return null;
+  }
 
   return (
     <mesh
@@ -95,18 +113,18 @@ export const NodeMesh: React.FC<NodeMeshProps> = ({
       onPointerUp={onPointerUp}
       onPointerOut={onPointerOut}
       onPointerLeave={onPointerLeave}
-      renderOrder={1} // Set a lower render order for the node mesh
+      renderOrder={1}
     >
       {Geometry}
       <meshStandardMaterial
         color={displayColor}
-        transparent={true} // Explicitly enable transparency
+        transparent={true}
         opacity={nodeOpacity}
         emissive={displayColor}
         emissiveIntensity={isHighlighted ? 1.2 : (dimmed ? 0 : 0.1)}
         roughness={0.3}
         metalness={0.4}
-        depthWrite={false} // Disable depth writing for proper transparency
+        depthWrite={false}
       />
     </mesh>
   );

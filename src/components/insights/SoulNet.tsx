@@ -41,17 +41,19 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
   const [isFullScreen, setIsFullScreen] = useState(false);
   const [canvasError, setCanvasError] = useState<Error | null>(null);
   const [retryCount, setRetryCount] = useState(0);
+  const [renderingReady, setRenderingReady] = useState(false);
   const isMobile = useIsMobile();
   const themeHex = useUserColorThemeHex();
   const [selectedEntity, setSelectedEntity] = useState<string | null>(null);
   const [error, setError] = useState<Error | null>(null);
   const { currentLanguage } = useTranslation();
 
-  console.log("[SoulNet] Enhanced rendering with simplified components", { 
+  console.log("[SoulNet] Enhanced rendering with staged initialization", { 
     userId, 
     timeRange, 
     currentLanguage,
-    retryCount 
+    retryCount,
+    renderingReady
   });
 
   useEffect(() => {
@@ -115,6 +117,21 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
 
     fetchEntityEmotionData();
   }, [userId, timeRange]);
+
+  // Staged rendering initialization
+  useEffect(() => {
+    if (graphData.nodes.length > 0 && !renderingReady) {
+      console.log("[SoulNet] Preparing for staged rendering");
+      
+      // Delay rendering to prevent initialization crashes
+      const timer = setTimeout(() => {
+        setRenderingReady(true);
+        console.log("[SoulNet] Rendering ready");
+      }, 300);
+      
+      return () => clearTimeout(timer);
+    }
+  }, [graphData.nodes.length, renderingReady]);
 
   const handleNodeSelect = useCallback((id: string) => {
     console.log(`[SoulNet] Node selected: ${id}`);
@@ -207,7 +224,7 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
     return <TranslatableText text="Drag to rotate • Scroll to zoom • Click a node to highlight connections" forceTranslate={true} />;
   };
 
-  console.log(`[SoulNet] Rendering enhanced visualization with ${graphData.nodes.length} nodes, ${graphData.links.length} links`);
+  console.log(`[SoulNet] Rendering with staged approach: ${graphData.nodes.length} nodes, ${graphData.links.length} links, ready: ${renderingReady}`);
 
   return (
     <div className={cn(
@@ -241,42 +258,44 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
             </div>
           }
         >
-          <Canvas
-            style={{
-              width: '100%',
-              height: '100%',
-              maxWidth: isFullScreen ? 'none' : '800px',
-              maxHeight: isFullScreen ? 'none' : '500px',
-              position: 'relative',
-              zIndex: 5,
-              transition: 'all 0.3s ease-in-out',
-            }}
-            camera={{ 
-              position: [0, 0, isFullScreen ? 40 : 45],
-              near: 1, 
-              far: 1000,
-              fov: isFullScreen ? 60 : 50
-            }}
-            onPointerMissed={() => setSelectedEntity(null)}
-            gl={{ 
-              preserveDrawingBuffer: true,
-              antialias: !isMobile,
-              powerPreference: 'high-performance',
-              alpha: true,
-              depth: true,
-              stencil: false,
-              precision: isMobile ? 'mediump' : 'highp'
-            }}
-          >
-            <SimplifiedSoulNetVisualization
-              data={graphData}
-              selectedNode={selectedEntity}
-              onNodeClick={handleNodeSelect}
-              themeHex={themeHex}
-              isFullScreen={isFullScreen}
-              shouldShowLabels={true}
-            />
-          </Canvas>
+          {renderingReady && (
+            <Canvas
+              style={{
+                width: '100%',
+                height: '100%',
+                maxWidth: isFullScreen ? 'none' : '800px',
+                maxHeight: isFullScreen ? 'none' : '500px',
+                position: 'relative',
+                zIndex: 5,
+                transition: 'all 0.3s ease-in-out',
+              }}
+              camera={{ 
+                position: [0, 0, isFullScreen ? 40 : 45],
+                near: 1, 
+                far: 1000,
+                fov: isFullScreen ? 60 : 50
+              }}
+              onPointerMissed={() => setSelectedEntity(null)}
+              gl={{ 
+                preserveDrawingBuffer: true,
+                antialias: !isMobile,
+                powerPreference: 'high-performance',
+                alpha: true,
+                depth: true,
+                stencil: false,
+                precision: isMobile ? 'mediump' : 'highp'
+              }}
+            >
+              <SimplifiedSoulNetVisualization
+                data={graphData}
+                selectedNode={selectedEntity}
+                onNodeClick={handleNodeSelect}
+                themeHex={themeHex}
+                isFullScreen={isFullScreen}
+                shouldShowLabels={true}
+              />
+            </Canvas>
+          )}
         </RenderingErrorBoundary>
       </FullscreenWrapper>
       
