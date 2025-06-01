@@ -4,50 +4,7 @@ import ThreeDimensionalText from './ThreeDimensionalText';
 import { useTheme } from '@/hooks/use-theme';
 import { useTranslation } from '@/contexts/TranslationContext';
 import { onDemandTranslationCache } from '@/utils/website-translations';
-
-// Enhanced script detection with comprehensive coverage
-const containsNonLatinScript = (text: string): boolean => {
-  if (!text) return false;
-  
-  const patterns = {
-    devanagari: /[\u0900-\u097F]/,
-    arabic: /[\u0600-\u06FF]/,
-    chinese: /[\u4E00-\u9FFF]/,
-    japanese: /[\u3040-\u309F\u30A0-\u30FF]/,
-    korean: /[\uAC00-\uD7AF]/,
-    cyrillic: /[\u0400-\u04FF]/,
-    thai: /[\u0E00-\u0E7F]/,
-    bengali: /[\u0980-\u09FF]/,
-    gujarati: /[\u0A80-\u0AFF]/,
-    gurmukhi: /[\u0A00-\u0A7F]/,
-    kannada: /[\u0C80-\u0CFF]/,
-    malayalam: /[\u0D00-\u0D7F]/,
-    oriya: /[\u0B00-\u0B7F]/,
-    tamil: /[\u0B80-\u0BFF]/,
-    telugu: /[\u0C00-\u0C7F]/
-  };
-  
-  return Object.values(patterns).some(pattern => pattern.test(text));
-};
-
-const containsDevanagari = (text: string): boolean => {
-  if (!text) return false;
-  return /[\u0900-\u097F]/.test(text);
-};
-
-const detectScriptType = (text: string): string => {
-  if (!text) return 'latin';
-  
-  if (/[\u0900-\u097F]/.test(text)) return 'devanagari';
-  if (/[\u0600-\u06FF]/.test(text)) return 'arabic';
-  if (/[\u4E00-\u9FFF]/.test(text)) return 'chinese';
-  if (/[\u3040-\u309F\u30A0-\u30FF]/.test(text)) return 'japanese';
-  if (/[\uAC00-\uD7AF]/.test(text)) return 'korean';
-  if (/[\u0980-\u09FF]/.test(text)) return 'bengali';
-  if (/[\u0E00-\u0E7F]/.test(text)) return 'thai';
-  
-  return 'latin';
-};
+import { fontService } from '@/utils/fontService';
 
 // Enhanced adaptive text color with better contrast
 const getAdaptiveTextColor = (nodeColor: string, nodeType: 'entity' | 'emotion', theme: string, isHighlighted: boolean, isSelected: boolean): string => {
@@ -145,7 +102,7 @@ export const NodeLabel: React.FC<NodeLabelProps> = ({
   const [fontReady, setFontReady] = useState(false);
   const translationInProgress = useRef<boolean>(false);
   const mounted = useRef<boolean>(true);
-  const scriptType = useRef<string>(detectScriptType(id));
+  const scriptTypeRef = useRef<string>('latin');
   
   console.log(`[NodeLabel] Processing label for node ${id}, language: ${currentLanguage}, shouldShow: ${shouldShowLabel}`);
   
@@ -154,31 +111,19 @@ export const NodeLabel: React.FC<NodeLabelProps> = ({
     return shouldShowLabel || forceVisible || isSelected || isHighlighted;
   }, [shouldShowLabel, forceVisible, isSelected, isHighlighted]);
   
-  // Enhanced font loading detection with retry mechanism
+  // Enhanced font loading detection using the font service
   useEffect(() => {
     let mounted = true;
     
-    const checkFonts = async () => {
+    const initializeFonts = async () => {
       try {
         console.log('[NodeLabel] Checking font readiness...');
         
-        if (document.fonts) {
-          // Check if specific fonts are loaded
-          const devanagariFont = new FontFace('Noto Sans Devanagari', 'url(https://fonts.gstatic.com/s/notosansdevanagari/v23/TuGoUUFzXI5FBtUq5a8bjKYTZjtRU6Sgv3NaV_SNmps.woff2)');
-          
-          try {
-            await devanagariFont.load();
-            document.fonts.add(devanagariFont);
-            console.log('[NodeLabel] Devanagari font loaded successfully');
-          } catch (fontError) {
-            console.warn('[NodeLabel] Devanagari font loading failed, using fallback:', fontError);
-          }
-          
-          await document.fonts.ready;
-          console.log('[NodeLabel] All fonts ready');
-        }
+        // Wait for font service to be ready
+        await fontService.waitForFonts();
         
         if (mounted) {
+          console.log('[NodeLabel] Fonts ready via font service');
           setFontReady(true);
         }
       } catch (error) {
@@ -189,7 +134,7 @@ export const NodeLabel: React.FC<NodeLabelProps> = ({
       }
     };
     
-    checkFonts();
+    initializeFonts();
     
     return () => {
       mounted = false;
@@ -198,9 +143,10 @@ export const NodeLabel: React.FC<NodeLabelProps> = ({
   
   // Enhanced translation handling with race condition prevention
   useEffect(() => {
-    if (!isVisible || !id) {
-      setTranslatedText(id);
-      setIsTranslationReady(true);
+    if (!isVisible || !id || !fontReady) {
+      if (!fontReady) {
+        console.log(`[NodeLabel] Fonts not ready, waiting...`);
+      }
       return;
     }
     
@@ -219,21 +165,28 @@ export const NodeLabel: React.FC<NodeLabelProps> = ({
           if (mounted.current) {
             setTranslatedText(id);
             setIsTranslationReady(true);
-            scriptType.current = detectScriptType(id);
-            console.log(`[NodeLabel] Using English text: "${id}", script: ${scriptType.current}`);
+            scriptTypeRef.current = fontService.detectScriptType(id);
+            
+            // Preload fonts for the detected script
+            await fontService.preloadFontsForScript(scriptTypeRef.current);
+            
+            console.log(`[NodeLabel] Using English text: "${id}", script: ${scriptTypeRef.current}`);
           }
           return;
         }
         
-        // Check cache first with proper key
-        const cacheKey = `${currentLanguage}:${id}`;
+        // Check cache first
         const cachedTranslation = onDemandTranslationCache.getTranslation(id, currentLanguage);
         
         if (cachedTranslation && mounted.current) {
           setTranslatedText(cachedTranslation);
           setIsTranslationReady(true);
-          scriptType.current = detectScriptType(cachedTranslation);
-          console.log(`[NodeLabel] Using cached translation: "${id}" -> "${cachedTranslation}", script: ${scriptType.current}`);
+          scriptTypeRef.current = fontService.detectScriptType(cachedTranslation);
+          
+          // Preload fonts for the detected script
+          await fontService.preloadFontsForScript(scriptTypeRef.current);
+          
+          console.log(`[NodeLabel] Using cached translation: "${id}" -> "${cachedTranslation}", script: ${scriptTypeRef.current}`);
           return;
         }
         
@@ -247,13 +200,21 @@ export const NodeLabel: React.FC<NodeLabelProps> = ({
             setTranslatedText(result);
             setIsTranslationReady(true);
             onDemandTranslationCache.setTranslation(id, result, currentLanguage);
-            scriptType.current = detectScriptType(result);
-            console.log(`[NodeLabel] Translation complete: "${id}" -> "${result}", script: ${scriptType.current}`);
+            scriptTypeRef.current = fontService.detectScriptType(result);
+            
+            // Preload fonts for the detected script
+            await fontService.preloadFontsForScript(scriptTypeRef.current);
+            
+            console.log(`[NodeLabel] Translation complete: "${id}" -> "${result}", script: ${scriptTypeRef.current}`);
           } else if (mounted.current) {
             // Fallback to original on invalid result
             setTranslatedText(id);
             setIsTranslationReady(true);
-            scriptType.current = detectScriptType(id);
+            scriptTypeRef.current = fontService.detectScriptType(id);
+            
+            // Preload fonts for the detected script
+            await fontService.preloadFontsForScript(scriptTypeRef.current);
+            
             console.warn(`[NodeLabel] Invalid translation result, using original: "${id}"`);
           }
         }
@@ -262,7 +223,10 @@ export const NodeLabel: React.FC<NodeLabelProps> = ({
         if (mounted.current) {
           setTranslatedText(id);
           setIsTranslationReady(true);
-          scriptType.current = detectScriptType(id);
+          scriptTypeRef.current = fontService.detectScriptType(id);
+          
+          // Preload fonts even for fallback
+          await fontService.preloadFontsForScript(scriptTypeRef.current);
         }
       } finally {
         translationInProgress.current = false;
@@ -280,7 +244,7 @@ export const NodeLabel: React.FC<NodeLabelProps> = ({
     return () => {
       clearTimeout(translationTimer);
     };
-  }, [id, isVisible, currentLanguage, translate]);
+  }, [id, isVisible, currentLanguage, translate, fontReady]);
   
   // Cleanup on unmount
   useEffect(() => {
@@ -307,7 +271,7 @@ export const NodeLabel: React.FC<NodeLabelProps> = ({
     const baseSize = 0.35 + Math.max(0, (45 - z) * 0.007);
     
     let sizeAdjustment = 0;
-    switch (scriptType.current) {
+    switch (scriptTypeRef.current) {
       case 'devanagari':
         sizeAdjustment = 0.12;
         break;
@@ -331,8 +295,8 @@ export const NodeLabel: React.FC<NodeLabelProps> = ({
     return Math.max(Math.min(baseSize + sizeAdjustment, maxSize), minSize);
   }, [cameraZoom]);
 
-  // Don't render until both font and translation are ready, OR if using original text
-  const shouldRender = isVisible && (isTranslationReady || currentLanguage === 'en') && fontReady && formattedText;
+  // Don't render until both font and translation are ready
+  const shouldRender = isVisible && isTranslationReady && fontReady && formattedText;
   
   if (!shouldRender) {
     console.log(`[NodeLabel] Not rendering: isVisible=${isVisible}, translationReady=${isTranslationReady}, fontReady=${fontReady}, text="${formattedText}"`);
@@ -364,7 +328,7 @@ export const NodeLabel: React.FC<NodeLabelProps> = ({
 
   const labelPosition: [number, number, number] = [0, geometricOffset, 0];
   
-  console.log(`[NodeLabel] Rendering stable label "${formattedText}" for ${id}, script: ${scriptType.current}, fontSize: ${dynamicFontSize}`);
+  console.log(`[NodeLabel] Rendering stable label "${formattedText}" for ${id}, script: ${scriptTypeRef.current}, fontSize: ${dynamicFontSize}`);
 
   return (
     <ThreeDimensionalText

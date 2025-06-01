@@ -1,10 +1,10 @@
-
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { translationCache } from '@/services/translationCache';
 import { toast } from 'sonner';
 import { staticTranslationService } from '@/services/staticTranslationService';
 import { preloadWebsiteTranslations } from '@/utils/website-translations';
 import { useLocation } from 'react-router-dom';
+import { fontService } from '@/utils/fontService';
 
 // Define the comprehensive language options
 export const languages = [
@@ -245,6 +245,12 @@ export function TranslationProvider({ children }: { children: React.ReactNode })
       
       // Update the service language
       staticTranslationService.setLanguage(lang);
+      
+      // Detect script type and preload fonts
+      if (lang !== 'en') {
+        const scriptType = fontService.detectScriptType('sample text for ' + lang);
+        await fontService.preloadFontsForScript(scriptType);
+      }
       
       // Set new language
       setCurrentLanguage(lang);
