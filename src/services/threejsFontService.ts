@@ -27,11 +27,19 @@ class ThreeJSFontService {
       },
       {
         name: 'Noto Sans Devanagari',
-        url: 'https://threejs.org/examples/fonts/helvetiker_regular.typeface.json' // Fallback for now
+        url: 'https://threejs.org/examples/fonts/gentilis_regular.typeface.json' // Use Gentilis as fallback
       },
       {
         name: 'Helvetiker',
         url: 'https://threejs.org/examples/fonts/helvetiker_regular.typeface.json'
+      },
+      {
+        name: 'Gentilis',
+        url: 'https://threejs.org/examples/fonts/gentilis_regular.typeface.json'
+      },
+      {
+        name: 'Optimer',
+        url: 'https://threejs.org/examples/fonts/optimer_regular.typeface.json'
       }
     ];
 
@@ -57,14 +65,14 @@ class ThreeJSFontService {
   getFontNameForScript(scriptType: string): string {
     switch (scriptType) {
       case 'devanagari':
-        return 'Noto Sans Devanagari';
+        return 'Gentilis'; // Use Gentilis for better Unicode support
       case 'arabic':
       case 'chinese':
       case 'japanese':
       case 'korean':
-        return 'Inter'; // Fallback to Inter for other scripts
+        return 'Optimer'; // Use Optimer for other scripts
       default:
-        return 'Inter';
+        return 'Helvetiker';
     }
   }
 
@@ -151,7 +159,7 @@ class ThreeJSFontService {
   }
 
   // Preload commonly used fonts
-  async preloadFonts(fontNames: string[] = ['Inter', 'Helvetiker']): Promise<void> {
+  async preloadFonts(fontNames: string[] = ['Helvetiker', 'Gentilis', 'Optimer']): Promise<void> {
     const loadPromises = fontNames.map(name => this.loadFont(name));
     await Promise.allSettled(loadPromises);
     console.log('[ThreeJSFontService] Font preloading completed');
