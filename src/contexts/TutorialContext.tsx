@@ -416,7 +416,7 @@ export const TutorialProvider: React.FC<{ children: ReactNode }> = ({ children }
     }
   };
   
-  // Enhanced next step function with improved navigation handling
+  // Enhanced next step function with improved navigation handling and transition protection
   const nextStep = () => {
     if (currentStep < steps.length - 1) {
       const newStep = currentStep + 1;
@@ -424,8 +424,11 @@ export const TutorialProvider: React.FC<{ children: ReactNode }> = ({ children }
       
       console.log(`[TutorialContext] Moving to tutorial step ${newStep} (ID: ${nextStepData.id})`);
       
-      // Perform navigation cleanup before state change
-      performNavigationCleanup();
+      // Start step transition protection immediately
+      navigationManager.startStepTransition(nextStepData.id);
+      
+      // Perform selective cleanup that preserves the target step
+      performNavigationCleanup(nextStepData.id);
       
       // First update the current step in state and database
       setCurrentStep(newStep);
@@ -444,7 +447,13 @@ export const TutorialProvider: React.FC<{ children: ReactNode }> = ({ children }
         if (nextStepData.waitForElement) {
           setTimeout(() => {
             checkForTargetElement(nextStepData);
+            navigationManager.clearStepTransition();
           }, 200);
+        } else {
+          // Clear transition protection after a short delay
+          setTimeout(() => {
+            navigationManager.clearStepTransition();
+          }, 500);
         }
       }
     } else {
@@ -454,7 +463,7 @@ export const TutorialProvider: React.FC<{ children: ReactNode }> = ({ children }
     }
   };
   
-  // Enhanced prev step function with improved navigation handling
+  // Enhanced prev step function with improved navigation handling and transition protection
   const prevStep = () => {
     if (currentStep > 0) {
       const newStep = currentStep - 1;
@@ -462,8 +471,11 @@ export const TutorialProvider: React.FC<{ children: ReactNode }> = ({ children }
       
       console.log(`[TutorialContext] Moving to previous step ${newStep} (ID: ${prevStepData.id})`);
       
-      // Perform navigation cleanup before state change
-      performNavigationCleanup();
+      // Start step transition protection immediately
+      navigationManager.startStepTransition(prevStepData.id);
+      
+      // Perform selective cleanup that preserves the target step
+      performNavigationCleanup(prevStepData.id);
       
       // First update the current step in state and database
       setCurrentStep(newStep);
@@ -482,7 +494,13 @@ export const TutorialProvider: React.FC<{ children: ReactNode }> = ({ children }
         if (prevStepData.waitForElement) {
           setTimeout(() => {
             checkForTargetElement(prevStepData);
+            navigationManager.clearStepTransition();
           }, 200);
+        } else {
+          // Clear transition protection after a short delay
+          setTimeout(() => {
+            navigationManager.clearStepTransition();
+          }, 500);
         }
       }
     }

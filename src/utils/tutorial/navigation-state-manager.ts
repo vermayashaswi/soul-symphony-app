@@ -6,6 +6,7 @@ interface NavigationState {
   targetRoute: string | null;
   currentStep: number;
   timeoutId: number | null;
+  transitionProtection: boolean; // NEW: Protect during step transitions
 }
 
 class NavigationStateManager {
@@ -13,7 +14,8 @@ class NavigationStateManager {
     isNavigating: false,
     targetRoute: null,
     currentStep: 0,
-    timeoutId: null
+    timeoutId: null,
+    transitionProtection: false
   };
 
   private listeners: ((state: NavigationState) => void)[] = [];
@@ -31,12 +33,36 @@ class NavigationStateManager {
       isNavigating: true,
       targetRoute,
       currentStep,
+      transitionProtection: false,
       timeoutId: window.setTimeout(() => {
         console.warn('[NavigationManager] Navigation timeout - forcing completion');
         this.completeNavigation();
       }, 5000) // 5 second timeout to prevent hanging
     };
     
+    this.notifyListeners();
+  }
+
+  // NEW: Start step transition protection
+  startStepTransition(stepId: number) {
+    console.log(`[NavigationManager] Starting step transition protection for step ${stepId}`);
+    this.state.transitionProtection = true;
+    this.state.currentStep = stepId;
+    this.notifyListeners();
+    
+    // Auto-clear transition protection after a short delay
+    setTimeout(() => {
+      if (this.state.transitionProtection) {
+        console.log('[NavigationManager] Auto-clearing step transition protection');
+        this.clearStepTransition();
+      }
+    }, 1000);
+  }
+
+  // NEW: Clear step transition protection
+  clearStepTransition() {
+    console.log('[NavigationManager] Clearing step transition protection');
+    this.state.transitionProtection = false;
     this.notifyListeners();
   }
 
@@ -52,7 +78,8 @@ class NavigationStateManager {
       isNavigating: false,
       targetRoute: null,
       currentStep: 0,
-      timeoutId: null
+      timeoutId: null,
+      transitionProtection: false
     };
     
     this.notifyListeners();
@@ -61,6 +88,11 @@ class NavigationStateManager {
   // Check if navigation is in progress
   isNavigating(): boolean {
     return this.state.isNavigating;
+  }
+
+  // NEW: Check if step transition is protected
+  isStepTransitionProtected(): boolean {
+    return this.state.transitionProtection;
   }
 
   // Get current navigation state
@@ -104,7 +136,8 @@ class NavigationStateManager {
       isNavigating: false,
       targetRoute: null,
       currentStep: 0,
-      timeoutId: null
+      timeoutId: null,
+      transitionProtection: false
     };
     
     this.notifyListeners();

@@ -11,7 +11,8 @@ export const TUTORIAL_CLASSES = [
   'emotion-chart-highlight',
   'mood-calendar-highlight', 
   'soul-net-highlight', 
-  'empty-chat-suggestion'
+  'empty-chat-suggestion',
+  'tutorial-record-entry-button' // Added new class
 ];
 
 export const TUTORIAL_STYLE_PROPERTIES = [
@@ -154,7 +155,8 @@ const cleanupSpecificElements = () => {
       '[data-value="record"]', 
       '[data-value="entries"]',
       '.record-entry-tab',
-      '.entries-tab'
+      '.entries-tab',
+      '.tutorial-record-entry-button' // Added new selector
     ];
     
     tabSelectors.forEach(selector => {
@@ -241,35 +243,94 @@ export const performStaggeredCleanup = () => {
   }, 300);
 };
 
-// NEW: Cleanup function specifically for navigation transitions
-export const performNavigationCleanup = () => {
-  console.log('[TutorialCleanup] Performing navigation-specific cleanup');
+// ENHANCED: Selective cleanup function for navigation transitions that preserves highlighting
+export const performNavigationCleanup = (preserveStep?: number) => {
+  console.log(`[TutorialCleanup] Performing navigation-specific cleanup, preserving step ${preserveStep}`);
   
   try {
-    // Remove tutorial classes that might interfere with navigation
+    // Only remove classes that might interfere with navigation, but preserve step-specific highlights
     const navigationInterferers = document.querySelectorAll(
-      '.tutorial-target, .tutorial-button-highlight, .record-entry-tab, .entries-tab'
+      '.tutorial-target, .tutorial-button-highlight'
     );
     
     navigationInterferers.forEach(el => {
       if (el instanceof HTMLElement) {
-        TUTORIAL_CLASSES.forEach(className => {
-          el.classList.remove(className);
-        });
+        // Check if this element should be preserved based on current step
+        const shouldPreserve = preserveStep && (
+          (preserveStep === 3 && (el.classList.contains('record-entry-tab') || el.classList.contains('tutorial-record-entry-button'))) ||
+          (preserveStep === 4 && el.classList.contains('entries-tab'))
+        );
         
-        // Reset only styles that affect layout/visibility
-        const criticalStyles = ['position', 'zIndex', 'transform', 'opacity', 'visibility'];
-        criticalStyles.forEach(style => {
-          try {
-            el.style[style as any] = '';
-          } catch (error) {
-            // Ignore errors during navigation cleanup
-          }
-        });
+        if (!shouldPreserve) {
+          // Only remove classes from elements that are not part of the current step
+          const classesToRemove = ['tutorial-target', 'tutorial-button-highlight'];
+          classesToRemove.forEach(className => {
+            el.classList.remove(className);
+          });
+          
+          // Reset only critical styles that affect layout/visibility
+          const criticalStyles = ['position', 'zIndex', 'transform', 'opacity', 'visibility'];
+          criticalStyles.forEach(style => {
+            try {
+              el.style[style as any] = '';
+            } catch (error) {
+              // Ignore errors during navigation cleanup
+            }
+          });
+        } else {
+          console.log(`[TutorialCleanup] Preserving highlighting for step ${preserveStep} element`);
+        }
       }
     });
     
   } catch (error) {
     console.error('[TutorialCleanup] Error during navigation cleanup:', error);
+  }
+};
+
+// NEW: Selective cleanup that preserves specific step highlighting
+export const performSelectiveCleanup = (preserveSteps: number[] = []) => {
+  console.log(`[TutorialCleanup] Performing selective cleanup, preserving steps: ${preserveSteps.join(', ')}`);
+  
+  try {
+    const allTutorialElements = document.querySelectorAll(
+      TUTORIAL_CLASSES.map(cls => `.${cls}`).join(', ')
+    );
+    
+    allTutorialElements.forEach(el => {
+      if (el instanceof HTMLElement) {
+        let shouldPreserve = false;
+        
+        // Check if this element should be preserved for any of the specified steps
+        preserveSteps.forEach(step => {
+          if (
+            (step === 3 && (el.classList.contains('record-entry-tab') || el.classList.contains('tutorial-record-entry-button'))) ||
+            (step === 4 && el.classList.contains('entries-tab')) ||
+            (step === 5 && el.classList.contains('chat-question-highlight'))
+          ) {
+            shouldPreserve = true;
+          }
+        });
+        
+        if (!shouldPreserve) {
+          // Remove tutorial classes
+          TUTORIAL_CLASSES.forEach(className => {
+            el.classList.remove(className);
+          });
+          
+          // Reset styles
+          TUTORIAL_STYLE_PROPERTIES.forEach(style => {
+            try {
+              el.style[style as any] = '';
+            } catch (error) {
+              // Silently ignore errors
+            }
+          });
+        }
+      }
+    });
+    
+  } catch (error) {
+    console.error('[TutorialCleanup] Error during selective cleanup:', error);
   }
 };

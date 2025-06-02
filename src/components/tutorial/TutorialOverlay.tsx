@@ -1,4 +1,3 @@
-
 import React, { useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useTutorial } from '@/contexts/TutorialContext';
@@ -17,7 +16,8 @@ import {
   logPotentialTutorialElements,
   applyTutorialHighlight
 } from '@/utils/tutorial/tutorial-elements-finder';
-import { performComprehensiveCleanup, performStaggeredCleanup } from '@/utils/tutorial/tutorial-cleanup-enhanced';
+import { performComprehensiveCleanup, performStaggeredCleanup, performSelectiveCleanup } from '@/utils/tutorial/tutorial-cleanup-enhanced';
+import { navigationManager } from '@/utils/tutorial/navigation-state-manager';
 
 const TutorialOverlay: React.FC = () => {
   const { 
@@ -48,7 +48,8 @@ const TutorialOverlay: React.FC = () => {
       shouldShowTutorial,
       pathname: location.pathname,
       isAppRoute: isAppRouteCurrent,
-      tutorialCompleted
+      tutorialCompleted,
+      transitionProtected: navigationManager.isStepTransitionProtected()
     });
   }, [isActive, currentStep, steps, navigationState, shouldShowTutorial, location.pathname, isAppRouteCurrent, tutorialCompleted]);
   
@@ -119,7 +120,7 @@ const TutorialOverlay: React.FC = () => {
     }
   }, [shouldShowTutorial, currentStep, steps, location.pathname]);
 
-  // Enhanced step-specific element highlighting with improved cleanup and error handling
+  // ENHANCED: Step-specific element highlighting with transition protection
   useEffect(() => {
     if (!shouldShowTutorial) return;
     
@@ -127,8 +128,12 @@ const TutorialOverlay: React.FC = () => {
     console.log(`[TutorialOverlay] Setting up highlighting for step ${currentStepData?.id}`);
     
     try {
-      // Run comprehensive cleanup before applying new highlighting
-      performStaggeredCleanup();
+      // Start step transition protection
+      navigationManager.startStepTransition(currentStepData?.id);
+      
+      // Perform selective cleanup that preserves current step
+      const stepsToPreserve = [currentStepData?.id].filter(Boolean);
+      performSelectiveCleanup(stepsToPreserve);
       
       // Apply highlighting after cleanup with improved timing
       const highlightTimeout = setTimeout(() => {
@@ -137,21 +142,19 @@ const TutorialOverlay: React.FC = () => {
         } catch (error) {
           console.error(`[TutorialOverlay] Error applying highlighting for step ${currentStepData?.id}:`, error);
         }
-      }, 300);
+      }, 100); // Reduced delay for faster highlighting
       
       // Enhanced cleanup when effect unmounts
       return () => {
         clearTimeout(highlightTimeout);
-        console.log('[TutorialOverlay] Effect cleanup - removing highlighting');
-        try {
-          performStaggeredCleanup();
-        } catch (error) {
-          console.error('[TutorialOverlay] Error during effect cleanup:', error);
-        }
+        console.log('[TutorialOverlay] Effect cleanup - clearing step transition protection');
+        navigationManager.clearStepTransition();
       };
     } catch (error) {
       console.error('[TutorialOverlay] Error in highlighting effect setup:', error);
-      return () => {}; // Return empty cleanup function on error
+      return () => {
+        navigationManager.clearStepTransition();
+      };
     }
   }, [shouldShowTutorial, currentStep, steps]);
 
@@ -252,14 +255,14 @@ const TutorialOverlay: React.FC = () => {
         console.log('[TutorialOverlay] Step 2: ButtonStateManager will handle arrow button highlighting');
       }
       else if (currentStepData.id === 3) {
-        // Step 3: Record Entry Tab - Enhanced highlighting WITH glow effect
-        console.log('[TutorialOverlay] Step 3: Applying enhanced highlighting to Record Entry button');
-        applyTabHighlighting(RECORD_ENTRY_SELECTORS, 'record-entry-tab', 'record', 'new', 'entry');
+        // Step 3: Record Entry Tab - Apply consistent highlighting
+        console.log('[TutorialOverlay] Step 3: Applying consistent highlighting to Record Entry button');
+        applyUnifiedTabHighlighting(RECORD_ENTRY_SELECTORS, 'record-entry-tab', 'tutorial-record-entry-button', 'record', 'new', 'entry');
       }
       else if (currentStepData.id === 4) {
-        // Step 4: Past Entries Tab - Consistent strong highlighting
-        console.log('[TutorialOverlay] Step 4: Applying consistent highlighting to Past Entries button');
-        applyTabHighlighting(ENTRIES_TAB_SELECTORS, 'entries-tab', 'past', 'entries', 'history');
+        // Step 4: Past Entries Tab - Apply identical highlighting to step 3
+        console.log('[TutorialOverlay] Step 4: Applying identical highlighting to Past Entries tab');
+        applyUnifiedTabHighlighting(ENTRIES_TAB_SELECTORS, 'entries-tab', '', 'past', 'entries', 'history');
       }
       else if (currentStepData.id === 5) {
         // Step 5: Chat Question
@@ -295,8 +298,8 @@ const TutorialOverlay: React.FC = () => {
     }
   };
 
-  // Helper function for tab highlighting with error handling
-  const applyTabHighlighting = (selectors: string[], className: string, ...keywords: string[]) => {
+  // NEW: Unified tab highlighting function for consistent styling
+  const applyUnifiedTabHighlighting = (selectors: string[], primaryClass: string, secondaryClass: string, ...keywords: string[]) => {
     try {
       let foundElement = false;
       
@@ -307,14 +310,16 @@ const TutorialOverlay: React.FC = () => {
             // Double-check this is the correct button
             const elementText = element.textContent?.toLowerCase().trim() || '';
             const isCorrectTab = keywords.some(keyword => elementText.includes(keyword));
-            const isWrongTab = keywords.some(keyword => 
-              !keywords.includes(keyword) && elementText.includes(keyword)
-            );
             
-            if (isCorrectTab && !isWrongTab) {
-              element.classList.add('tutorial-target', className);
+            if (isCorrectTab) {
+              // Apply both primary and secondary classes for consistent styling
+              element.classList.add('tutorial-target', primaryClass);
+              if (secondaryClass) {
+                element.classList.add(secondaryClass);
+              }
+              
               foundElement = true;
-              console.log(`[TutorialOverlay] Applied highlighting to ${className} using selector: ${selector}, text: "${elementText}"`);
+              console.log(`[TutorialOverlay] Applied unified highlighting to ${primaryClass} using selector: ${selector}, text: "${elementText}"`);
               break;
             }
           }
@@ -324,10 +329,10 @@ const TutorialOverlay: React.FC = () => {
       }
       
       if (!foundElement) {
-        console.warn(`[TutorialOverlay] ${className} element not found with any selector`);
+        console.warn(`[TutorialOverlay] ${primaryClass} element not found with any selector`);
       }
     } catch (error) {
-      console.error(`[TutorialOverlay] Error in applyTabHighlighting for ${className}:`, error);
+      console.error(`[TutorialOverlay] Error in applyUnifiedTabHighlighting for ${primaryClass}:`, error);
     }
   };
 
