@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import ReliableText from './ReliableText';
-import { useTranslation } from '@/contexts/TranslationContext';
+import { useSafeTranslation } from './ContextSafetyWrapper';
 import { threejsFontService } from '@/services/threejsFontService';
 
 interface DirectNodeLabelProps {
@@ -27,31 +27,41 @@ export const DirectNodeLabel: React.FC<DirectNodeLabelProps> = ({
   themeHex,
   nodeScale = 1
 }) => {
-  const { currentLanguage, translate } = useTranslation();
+  const { currentLanguage, translate, isTranslationReady, isFontReady } = useSafeTranslation();
   const [displayText, setDisplayText] = useState<string>(id);
   const [isReady, setIsReady] = useState(false);
 
-  console.log(`[DirectNodeLabel] Enhanced rendering label for ${id}, visible: ${shouldShowLabel}`);
+  console.log(`[DirectNodeLabel] Enhanced rendering with safe context for ${id}:`, {
+    currentLanguage,
+    hasTranslate: !!translate,
+    isTranslationReady,
+    isFontReady,
+    shouldShowLabel
+  });
 
   // Initialize component with enhanced font support
   useEffect(() => {
     const init = async () => {
       try {
-        // Ensure font service is ready
-        if (threejsFontService.isReady()) {
+        // Wait for both translation and font readiness
+        if (isTranslationReady && isFontReady) {
           setIsReady(true);
+          console.log('[DirectNodeLabel] Both translation and fonts ready');
         } else {
-          // Wait a bit for font service initialization
-          setTimeout(() => setIsReady(true), 100);
+          // Wait a bit for services to initialize
+          setTimeout(() => {
+            setIsReady(true);
+            console.log('[DirectNodeLabel] Using fallback ready state');
+          }, 200);
         }
       } catch (error) {
-        console.warn('[DirectNodeLabel] Font init error:', error);
-        setIsReady(true); // Don't block on font errors
+        console.warn('[DirectNodeLabel] Initialization error:', error);
+        setIsReady(true); // Don't block on errors
       }
     };
 
     init();
-  }, []);
+  }, [isTranslationReady, isFontReady]);
 
   // Handle translation with enhanced script support
   useEffect(() => {
