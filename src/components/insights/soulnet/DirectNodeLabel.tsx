@@ -1,6 +1,6 @@
 
 import React, { useMemo, useEffect } from 'react';
-import SimplifiedTextRenderer from './SimplifiedTextRenderer';
+import SmartTextRenderer from './SmartTextRenderer';
 
 interface DirectNodeLabelProps {
   id: string;
@@ -38,6 +38,10 @@ export const DirectNodeLabel: React.FC<DirectNodeLabelProps> = ({
     const handleTutorialDebug = (event: CustomEvent) => {
       if (event.detail?.step === 9 && event.detail?.forceShowLabels) {
         console.log(`[DirectNodeLabel] Tutorial step 9 debug: forcing label visibility for ${id}`);
+        // Force label to be visible during tutorial step 9
+        if (!shouldShowLabel) {
+          console.log(`[DirectNodeLabel] Overriding shouldShowLabel for tutorial step 9`);
+        }
       }
     };
 
@@ -53,40 +57,29 @@ export const DirectNodeLabel: React.FC<DirectNodeLabelProps> = ({
   // Use translated text if available, otherwise fallback to original id
   const displayText = translatedText || id;
   
-  // Enhanced visibility check for tutorial step 9
-  const enhancedShouldShowLabel = useMemo(() => {
-    const currentTutorialStep = document.body.getAttribute('data-current-step');
-    const isTutorialStep9 = currentTutorialStep === '9';
-    
-    if (isTutorialStep9) {
-      console.log(`[DirectNodeLabel] Tutorial step 9 detected, forcing label visibility for ${id}`);
-      return true;
+  // ENHANCED: Improved percentage display with better formatting
+  const finalDisplayText = useMemo(() => {
+    if (showPercentage && connectionPercentage > 0) {
+      console.log(`[DirectNodeLabel] FIXED: Adding percentage ${connectionPercentage}% to ${id}`);
+      return `${displayText}\n${connectionPercentage}%`;
     }
-    
-    return shouldShowLabel;
-  }, [shouldShowLabel, id]);
+    return displayText;
+  }, [displayText, showPercentage, connectionPercentage, id]);
 
-  // Calculate label positioning with improved offset calculation
+  // ENHANCED: Standardized label positioning with better offset calculation
   const labelOffset = useMemo(() => {
-    const baseOffset = type === 'entity' ? 2.2 : 3.0;
+    // Improved offset calculation for different node types and scales
+    const baseOffset = type === 'entity' ? 2.0 : 2.8; // Slightly increased for better visibility
     const scaledOffset = baseOffset * Math.max(0.6, Math.min(2.2, nodeScale));
     
     console.log(`[DirectNodeLabel] Label offset for ${id} (${type}): ${scaledOffset} (scale: ${nodeScale})`);
     return [0, scaledOffset, 0] as [number, number, number];
   }, [type, nodeScale, id]);
 
-  // Calculate percentage label positioning (below main label)
-  const percentageLabelOffset = useMemo(() => {
-    const baseOffset = type === 'entity' ? 1.4 : 2.2;
-    const scaledOffset = baseOffset * Math.max(0.6, Math.min(2.2, nodeScale));
-    
-    return [0, scaledOffset, 0] as [number, number, number];
-  }, [type, nodeScale]);
-
-  // Calculate text properties with larger base size
+  // Calculate text properties - 10x larger base size
   const textSize = useMemo(() => {
     const zoom = Math.max(10, Math.min(100, cameraZoom));
-    const baseSize = 4.0; // Large base size for better visibility
+    const baseSize = 4.0; // Increased from 0.4 to 4.0 (10x larger)
     const zoomFactor = Math.max(0.7, Math.min(1.3, (50 - zoom) * 0.02 + 1));
     const finalSize = Math.max(2.0, Math.min(8.0, baseSize * zoomFactor));
     
@@ -94,95 +87,73 @@ export const DirectNodeLabel: React.FC<DirectNodeLabelProps> = ({
     return finalSize;
   }, [cameraZoom, id]);
 
-  // Percentage text size (69% of main text size)
-  const percentageTextSize = useMemo(() => {
-    return textSize * 0.69;
-  }, [textSize]);
-
-  // FIXED: Enhanced text color logic with better contrast for light theme
+  // FIXED: Enhanced text color logic with better contrast handling
   const textColor = useMemo(() => {
     let color;
     
     if (isSelected) {
-      // FIXED: For selected entity nodes in light theme, use black for better contrast
-      if (type === 'entity' && effectiveTheme === 'light') {
-        color = '#000000'; // Black text for selected entities in light theme
-      } else {
-        color = '#ffffff'; // White for other selected nodes
-      }
+      color = '#ffffff'; // Always white for selected nodes
     } else if (isHighlighted) {
       // For highlighted nodes, use white for entities, theme color for emotions
       color = type === 'entity' ? '#ffffff' : themeHex;
     } else {
-      // Better default colors based on theme with higher contrast
+      // FIXED: Better default colors based on theme with higher contrast
       if (effectiveTheme === 'light') {
-        color = '#1a1a1a'; // Dark gray for light theme
+        color = '#1a1a1a'; // Dark gray for light theme (better contrast than black)
       } else {
-        color = '#e5e5e5'; // Light gray for dark theme
+        color = '#e5e5e5'; // Light gray for dark theme (better contrast)
       }
     }
     
-    console.log(`[DirectNodeLabel] Text color for ${id}: ${color} (selected: ${isSelected}, highlighted: ${isHighlighted}, theme: ${effectiveTheme}, type: ${type})`);
+    console.log(`[DirectNodeLabel] Text color for ${id}: ${color} (selected: ${isSelected}, highlighted: ${isHighlighted}, theme: ${effectiveTheme})`);
     return color;
   }, [isSelected, isHighlighted, type, themeHex, effectiveTheme, id]);
 
-  // Calculate final positions
-  const mainLabelPosition: [number, number, number] = [
+  const labelPosition: [number, number, number] = [
     position[0] + labelOffset[0],
     position[1] + labelOffset[1],
     position[2] + labelOffset[2]
   ];
 
-  const percentageLabelPosition: [number, number, number] = [
-    position[0] + percentageLabelOffset[0],
-    position[1] + percentageLabelOffset[1],
-    position[2] + percentageLabelOffset[2]
-  ];
+  // Enhanced visibility check for tutorial step 9
+  const enhancedShouldShowLabel = useMemo(() => {
+    // Check if we're in tutorial step 9 by looking at body attribute
+    const currentTutorialStep = document.body.getAttribute('data-current-step');
+    const isTutorialStep9 = currentTutorialStep === '9';
+    
+    if (isTutorialStep9) {
+      console.log(`[DirectNodeLabel] Tutorial step 9 detected, forcing label visibility for ${id}`);
+      return true; // Always show labels during tutorial step 9
+    }
+    
+    return shouldShowLabel;
+  }, [shouldShowLabel, id]);
 
-  if (!enhancedShouldShowLabel || !displayText) {
-    console.log(`[DirectNodeLabel] Not rendering label for ${id}: shouldShow=${enhancedShouldShowLabel}, text="${displayText}"`);
+  if (!enhancedShouldShowLabel || !finalDisplayText) {
+    console.log(`[DirectNodeLabel] Not rendering label for ${id}: shouldShow=${enhancedShouldShowLabel}, text="${finalDisplayText}"`);
     return null;
   }
 
-  // Enhanced logging for percentage display
+  // Additional logging for percentage display debugging
   if (showPercentage && connectionPercentage > 0) {
-    console.log(`[DirectNodeLabel] RENDERING PERCENTAGE: ${id} shows ${connectionPercentage}% at size ${percentageTextSize}`);
+    console.log(`[DirectNodeLabel] RENDERING PERCENTAGE: ${id} shows ${connectionPercentage}%`);
   }
 
-  console.log(`[DirectNodeLabel] Rendering main text "${displayText}" at position`, mainLabelPosition, 'with size:', textSize, 'color:', textColor);
+  console.log(`[DirectNodeLabel] Rendering text "${finalDisplayText}" at position`, labelPosition, 'with size:', textSize, 'color:', textColor);
 
   return (
-    <>
-      {/* Main node label */}
-      <SimplifiedTextRenderer
-        text={displayText}
-        position={mainLabelPosition}
-        color={textColor}
-        size={textSize}
-        visible={true}
-        renderOrder={15}
-        bold={isHighlighted || isSelected}
-        outlineWidth={isSelected ? 0.4 : 0.2}
-        outlineColor={isSelected ? '#000000' : '#333333'}
-        maxWidth={250}
-      />
-      
-      {/* Percentage label (displayed below main label) */}
-      {showPercentage && connectionPercentage > 0 && (
-        <SimplifiedTextRenderer
-          text={`${connectionPercentage}%`}
-          position={percentageLabelPosition}
-          color={textColor}
-          size={percentageTextSize}
-          visible={true}
-          renderOrder={16}
-          bold={false}
-          outlineWidth={0.1}
-          outlineColor={isSelected ? '#000000' : '#333333'}
-          maxWidth={150}
-        />
-      )}
-    </>
+    <SmartTextRenderer
+      text={finalDisplayText}
+      position={labelPosition}
+      color={textColor}
+      size={textSize}
+      visible={true}
+      renderOrder={15}
+      bold={isHighlighted || isSelected}
+      outlineWidth={isSelected ? 0.4 : 0.2} // Scaled outline width for larger text
+      outlineColor={isSelected ? '#000000' : '#333333'}
+      maxWidth={250} // Increased max width for larger text
+    />
   );
 };
 
