@@ -1,4 +1,3 @@
-
 import React, { useRef, useEffect, useMemo, useState } from 'react';
 import '@/types/three-reference';
 import { OrbitControls } from '@react-three/drei';
@@ -164,12 +163,13 @@ export const SoulNetVisualization: React.FC<SoulNetVisualizationProps> = ({
   const [nodeScriptTypes, setNodeScriptTypes] = useState<Map<string, string>>(new Map());
   const mounted = useRef<boolean>(true);
   
-  console.log("[SoulNetVisualization] Rendering with enhanced percentage visibility", {
+  console.log("[SoulNetVisualization] Rendering with centralized translation", {
     nodeCount: data?.nodes?.length,
     linkCount: data?.links?.length,
     currentLanguage,
     selectedNode,
-    shouldShowLabels
+    shouldShowLabels,
+    translationCacheSize: translationCache.size
   });
   
   useEffect(() => {
@@ -185,7 +185,7 @@ export const SoulNetVisualization: React.FC<SoulNetVisualizationProps> = ({
     if (!data?.nodes || !mounted.current) return;
 
     const processNodeLabels = async () => {
-      console.log('[SoulNetVisualization] Processing node labels with enhanced stability');
+      console.log('[SoulNetVisualization] Processing node labels with centralized translation');
       
       const newTranslationCache = new Map<string, string>();
       const newScriptTypes = new Map<string, string>();
@@ -207,7 +207,7 @@ export const SoulNetVisualization: React.FC<SoulNetVisualizationProps> = ({
           if (!mounted.current) break;
           
           try {
-            // Check cache first - use correct method name
+            // Check cache first
             const cachedTranslation = onDemandTranslationCache.get(currentLanguage, node.id);
             
             if (cachedTranslation) {
@@ -226,7 +226,9 @@ export const SoulNetVisualization: React.FC<SoulNetVisualizationProps> = ({
                 if (mounted.current && translated && typeof translated === 'string') {
                   newTranslationCache.set(node.id, translated);
                   onDemandTranslationCache.set(currentLanguage, node.id, translated);
-                  console.log(`[SoulNetVisualization] Translated "${node.id}" to "${translated}"`);
+                  console.log(`[SoulNetVisualization] Successfully translated "${node.id}" to "${translated}"`);
+                } else {
+                  newTranslationCache.set(node.id, node.id);
                 }
               } catch (error) {
                 console.warn(`[SoulNetVisualization] Translation failed for "${node.id}":`, error);
@@ -249,7 +251,7 @@ export const SoulNetVisualization: React.FC<SoulNetVisualizationProps> = ({
       
       if (mounted.current) {
         setTranslationCache(newTranslationCache);
-        console.log('[SoulNetVisualization] Node label processing complete');
+        console.log('[SoulNetVisualization] Node label processing complete with cache size:', newTranslationCache.size);
       }
     };
 
@@ -476,7 +478,7 @@ export const SoulNetVisualization: React.FC<SoulNetVisualizationProps> = ({
         );
       })}
       
-      {/* Display nodes with enhanced percentage visibility */}
+      {/* Display nodes with centralized translation */}
       {validData.nodes.map(node => {
         if (!node || typeof node !== 'object' || !node.id) {
           console.warn("[SoulNetVisualization] Invalid node:", node);
@@ -506,7 +508,7 @@ export const SoulNetVisualization: React.FC<SoulNetVisualizationProps> = ({
         const scriptType = nodeScriptTypes.get(node.id) || 'latin';
         const translatedLabel = translationCache.get(node.id) || node.id;
         
-        console.log(`[SoulNetVisualization] Rendering node "${node.id}" - highlighted: ${isHighlighted}, showPercentage: ${showPercentage}, percentage: ${connectionPercentage}%`);
+        console.log(`[SoulNetVisualization] Rendering node "${node.id}" with translated text: "${translatedLabel}"`);
           
         return (
           <Node
@@ -524,6 +526,7 @@ export const SoulNetVisualization: React.FC<SoulNetVisualizationProps> = ({
             connectionPercentage={connectionPercentage}
             showPercentage={showPercentage}
             forceShowLabels={shouldShowLabels}
+            translatedText={translatedLabel}
           />
         );
       })}

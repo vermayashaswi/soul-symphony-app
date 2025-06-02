@@ -26,6 +26,7 @@ interface NodeProps {
   connectionPercentage?: number;
   showPercentage?: boolean;
   forceShowLabels?: boolean;
+  translatedText?: string; // New prop for translated text
 }
 
 const Node: React.FC<NodeProps> = ({
@@ -41,7 +42,8 @@ const Node: React.FC<NodeProps> = ({
   isHighlighted,
   connectionPercentage = 0,
   showPercentage = false,
-  forceShowLabels = false
+  forceShowLabels = false,
+  translatedText
 }) => {
   const meshRef = useRef<THREE.Mesh>(null);
 
@@ -73,7 +75,7 @@ const Node: React.FC<NodeProps> = ({
     return forceShowLabels || showLabel || isSelected || isHighlighted;
   }, [forceShowLabels, showLabel, isSelected, isHighlighted]);
 
-  console.log(`[Node] Simplified rendering node ${node.id}, showLabel: ${shouldShowLabel}, showPercentage: ${showPercentage}, percentage: ${connectionPercentage}%`);
+  console.log(`[Node] Rendering node ${node.id} with translated text: "${translatedText || node.id}"`);
 
   return (
     <group>
@@ -99,6 +101,7 @@ const Node: React.FC<NodeProps> = ({
           nodeScale={1}
           connectionPercentage={connectionPercentage}
           showPercentage={showPercentage}
+          translatedText={translatedText}
         />
       )}
     </group>

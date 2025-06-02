@@ -1,7 +1,6 @@
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useMemo } from 'react';
 import SimpleText from './SimpleText';
-import { useTranslation } from '@/contexts/TranslationContext';
 
 interface DirectNodeLabelProps {
   id: string;
@@ -15,6 +14,7 @@ interface DirectNodeLabelProps {
   nodeScale?: number;
   connectionPercentage?: number;
   showPercentage?: boolean;
+  translatedText?: string; // New prop for translated text
 }
 
 export const DirectNodeLabel: React.FC<DirectNodeLabelProps> = ({
@@ -28,39 +28,13 @@ export const DirectNodeLabel: React.FC<DirectNodeLabelProps> = ({
   themeHex,
   nodeScale = 1,
   connectionPercentage = 0,
-  showPercentage = false
+  showPercentage = false,
+  translatedText
 }) => {
-  const { currentLanguage, translate } = useTranslation();
-  const [displayText, setDisplayText] = useState<string>(id);
+  console.log(`[DirectNodeLabel] Rendering with translated text for ${id}: "${translatedText || id}"`);
 
-  console.log(`[DirectNodeLabel] Simplified rendering for ${id}, visible: ${shouldShowLabel}`);
-
-  // Handle translation
-  useEffect(() => {
-    if (!shouldShowLabel) return;
-
-    const translateText = async () => {
-      try {
-        if (currentLanguage === 'en' || !translate) {
-          setDisplayText(id);
-          return;
-        }
-
-        const translated = await translate(id);
-        if (translated && typeof translated === 'string') {
-          setDisplayText(translated);
-          console.log(`[DirectNodeLabel] Translation: "${id}" -> "${translated}"`);
-        } else {
-          setDisplayText(id);
-        }
-      } catch (error) {
-        console.warn(`[DirectNodeLabel] Translation failed for ${id}:`, error);
-        setDisplayText(id);
-      }
-    };
-
-    translateText();
-  }, [id, currentLanguage, translate, shouldShowLabel]);
+  // Use translated text if available, otherwise fallback to original id
+  const displayText = translatedText || id;
 
   // Calculate position offset
   const labelOffset = useMemo(() => {
@@ -93,7 +67,7 @@ export const DirectNodeLabel: React.FC<DirectNodeLabelProps> = ({
     return null;
   }
 
-  console.log(`[DirectNodeLabel] Simplified rendering text "${displayText}" at position`, labelPosition);
+  console.log(`[DirectNodeLabel] Rendering text "${displayText}" at position`, labelPosition);
 
   return (
     <SimpleText
