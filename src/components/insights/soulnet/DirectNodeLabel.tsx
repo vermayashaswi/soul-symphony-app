@@ -57,14 +57,14 @@ export const DirectNodeLabel: React.FC<DirectNodeLabelProps> = ({
   // Use translated text if available, otherwise fallback to original id
   const displayText = translatedText || id;
   
-  // ENHANCED: Improved connection percentage display logic
+  // ENHANCED: Improved percentage display with better formatting
   const finalDisplayText = useMemo(() => {
-    if (isHighlighted && showPercentage && connectionPercentage > 0) {
-      console.log(`[DirectNodeLabel] Adding percentage to ${id}: ${connectionPercentage}%`);
+    if (showPercentage && connectionPercentage > 0) {
+      console.log(`[DirectNodeLabel] FIXED: Adding percentage ${connectionPercentage}% to ${id}`);
       return `${displayText}\n${connectionPercentage}%`;
     }
     return displayText;
-  }, [displayText, isHighlighted, showPercentage, connectionPercentage, id]);
+  }, [displayText, showPercentage, connectionPercentage, id]);
 
   // ENHANCED: Standardized label positioning with better offset calculation
   const labelOffset = useMemo(() => {
@@ -132,6 +132,11 @@ export const DirectNodeLabel: React.FC<DirectNodeLabelProps> = ({
   if (!enhancedShouldShowLabel || !finalDisplayText) {
     console.log(`[DirectNodeLabel] Not rendering label for ${id}: shouldShow=${enhancedShouldShowLabel}, text="${finalDisplayText}"`);
     return null;
+  }
+
+  // Additional logging for percentage display debugging
+  if (showPercentage && connectionPercentage > 0) {
+    console.log(`[DirectNodeLabel] RENDERING PERCENTAGE: ${id} shows ${connectionPercentage}%`);
   }
 
   console.log(`[DirectNodeLabel] Rendering text "${finalDisplayText}" at position`, labelPosition, 'with size:', textSize, 'color:', textColor);

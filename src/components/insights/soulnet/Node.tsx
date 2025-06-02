@@ -77,6 +77,11 @@ const Node: React.FC<NodeProps> = ({
     return forceShowLabels || showLabel || isSelected || isHighlighted;
   }, [forceShowLabels, showLabel, isSelected, isHighlighted]);
 
+  // ENHANCED: Better logging for percentage tracking
+  if (showPercentage && connectionPercentage > 0) {
+    console.log(`[Node] ${node.id} should display percentage: ${connectionPercentage}%`);
+  }
+
   console.log(`[Node] Rendering ${node.type} node ${node.id} with translated text: "${translatedText || node.id}"`);
 
   // Render different geometries based on node type
