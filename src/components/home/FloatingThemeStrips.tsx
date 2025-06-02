@@ -1,10 +1,8 @@
-
 import React, { useEffect, useState, useRef, useMemo, useCallback } from 'react';
 import { motion } from 'framer-motion';
 import { useTheme } from '@/hooks/use-theme';
 import { TranslatableText } from '@/components/translation/TranslatableText';
 import { useTranslation } from '@/contexts/TranslationContext';
-import { staticTranslationService } from '@/services/staticTranslationService';
 
 interface ThemeData {
   theme: string;
@@ -37,27 +35,19 @@ const FloatingThemeStrips: React.FC<FloatingThemeStripsProps> = ({
   const [translationReady, setTranslationReady] = useState<boolean>(false);
   const [isInitialLoad, setIsInitialLoad] = useState<boolean>(true);
   
-  // Safely access the translation context
-  let translate, currentLanguage;
-  try {
-    const translationContext = useTranslation();
-    translate = translationContext?.translate;
-    currentLanguage = translationContext?.currentLanguage || 'en';
-  } catch (error) {
-    console.error('FloatingThemeStrips: Error accessing translation context', error);
-    currentLanguage = 'en';
-  }
+  // Use translation context
+  const { translate, currentLanguage } = useTranslation();
   
-  // Direct translation function to bypass context issues
+  // Direct translation function using Google Translate only
   const directTranslate = async (text: string): Promise<string> => {
-    console.log(`FloatingThemeStrips: Direct translating "${text}" to ${currentLanguage}`);
+    console.log(`FloatingThemeStrips: GOOGLE TRANSLATE ONLY - Translating "${text}" to ${currentLanguage}`);
     try {
       if (currentLanguage === 'en' || !text) return text || '';
-      const result = await staticTranslationService.translateText(text);
-      console.log(`FloatingThemeStrips: Direct translation result: "${result}"`);
+      const result = await translate(text, 'en');
+      console.log(`FloatingThemeStrips: Google Translate result: "${result}"`);
       return result || text;
     } catch (error) {
-      console.error(`FloatingThemeStrips: Direct translation error for "${text}":`, error);
+      console.error(`FloatingThemeStrips: Google Translate error for "${text}":`, error);
       return text;
     }
   };
@@ -177,7 +167,7 @@ const FloatingThemeStrips: React.FC<FloatingThemeStripsProps> = ({
     }
   }, [processThemeData]);
   
-  // Directly translate all themes with staticTranslationService for maximum reliability
+  // Directly translate all themes with Google Translate only
   const translateAllThemes = useCallback(async (themes: ProcessedThemeData[]) => {
     if (!themes.length) {
       console.log("FloatingThemeStrips: No themes to translate");
@@ -185,7 +175,7 @@ const FloatingThemeStrips: React.FC<FloatingThemeStripsProps> = ({
       return;
     }
     
-    console.log(`FloatingThemeStrips: Translating ${themes.length} themes to ${currentLanguage || 'en'}`);
+    console.log(`FloatingThemeStrips: GOOGLE TRANSLATE ONLY - Translating ${themes.length} themes to ${currentLanguage || 'en'}`);
     
     try {
       // Extract all theme strings
@@ -198,14 +188,14 @@ const FloatingThemeStrips: React.FC<FloatingThemeStripsProps> = ({
         return;
       }
       
-      // Direct translation using static service - FORCE TRANSLATION REGARDLESS OF ROUTE
+      // Use Google Translate service only
       const translations = await Promise.all(themeTexts.map(async (text) => {
         try {
-          const translated = await staticTranslationService.translateText(text);
-          console.log(`FloatingThemeStrips: Translated "${text}" → "${translated}"`);
+          const translated = await translate(text, 'en');
+          console.log(`FloatingThemeStrips: Google Translate: "${text}" → "${translated}"`);
           return { original: text, translated };
         } catch (e) {
-          console.error(`FloatingThemeStrips: Translation error for "${text}"`, e);
+          console.error(`FloatingThemeStrips: Google Translate error for "${text}"`, e);
           return { original: text, translated: text };
         }
       }));
@@ -220,7 +210,7 @@ const FloatingThemeStrips: React.FC<FloatingThemeStripsProps> = ({
         translatedTheme: translationsMap.get(item.theme) || item.theme
       }));
       
-      console.log("FloatingThemeStrips: Translations completed successfully", {
+      console.log("FloatingThemeStrips: Google Translate completed successfully", {
         translatedCount: translated.length,
         samples: translated.slice(0, 2).map(t => ({ 
           original: t.theme,
@@ -234,7 +224,7 @@ const FloatingThemeStrips: React.FC<FloatingThemeStripsProps> = ({
       // Trigger animation refresh after translations are ready
       animationKeyRef.current += 1;
     } catch (error) {
-      console.error('FloatingThemeStrips: Error translating themes:', error);
+      console.error('FloatingThemeStrips: Error with Google Translate:', error);
       
       // Fallback to using original themes in case of error
       setTranslatedThemes(themes);
@@ -243,7 +233,7 @@ const FloatingThemeStrips: React.FC<FloatingThemeStripsProps> = ({
       // Still trigger animation refresh even with fallbacks
       animationKeyRef.current += 1;
     }
-  }, [currentLanguage]);
+  }, [currentLanguage, translate]);
   
   // Handle language changes & uniqueThemes updates
   useEffect(() => {

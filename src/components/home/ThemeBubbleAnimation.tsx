@@ -150,7 +150,7 @@ const ThemeBubbleAnimation: React.FC<ThemeBubbleAnimationProps> = ({
   }>>([]);
   const [themePool, setThemePool] = useState<ThemeData[]>([]);
   const { colorTheme, customColor } = useTheme();
-  const { currentLanguage } = useTranslation();
+  const { currentLanguage, translate } = useTranslation();
   const [translatedThemeData, setTranslatedThemeData] = useState<ThemeData[]>([]);
   
   // Get the theme color based on the current theme
@@ -176,7 +176,7 @@ const ThemeBubbleAnimation: React.FC<ThemeBubbleAnimationProps> = ({
   // Track current animation frame for cleanup
   const animationFrameRef = useRef<number | null>(null);
 
-  // Function to translate all themes at once
+  // Function to translate all themes using Google Translate only
   const translateAllThemes = async (themes: ThemeData[]) => {
     if (currentLanguage === 'en' || themes.length === 0) {
       setTranslatedThemeData(themes);
@@ -184,11 +184,25 @@ const ThemeBubbleAnimation: React.FC<ThemeBubbleAnimationProps> = ({
     }
     
     try {
+      console.log('ThemeBubbleAnimation: GOOGLE TRANSLATE ONLY - Translating themes');
+      
       // Extract all theme strings
       const themeTexts = themes.map(item => item.theme);
       
-      // Pre-translate all at once
-      const translationsMap = await staticTranslationService.preTranslate(themeTexts);
+      // Translate using Google Translate service only
+      const translations = await Promise.all(themeTexts.map(async (text) => {
+        try {
+          const translated = await translate(text, 'en');
+          return { original: text, translated };
+        } catch (error) {
+          console.error(`ThemeBubbleAnimation: Google Translate error for "${text}":`, error);
+          return { original: text, translated: text };
+        }
+      }));
+      
+      // Create translations map
+      const translationsMap = new Map<string, string>();
+      translations.forEach(t => translationsMap.set(t.original, t.translated));
       
       // Apply translations
       const translated = themes.map(item => ({
@@ -199,7 +213,7 @@ const ThemeBubbleAnimation: React.FC<ThemeBubbleAnimationProps> = ({
       setTranslatedThemeData(translated);
       return translated;
     } catch (error) {
-      console.error('Error translating theme bubbles:', error);
+      console.error('ThemeBubbleAnimation: Error with Google Translate:', error);
       setTranslatedThemeData(themes);
       return themes;
     }

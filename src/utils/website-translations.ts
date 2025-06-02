@@ -1,63 +1,23 @@
-
 import { staticTranslationService } from '@/services/staticTranslationService';
 
-// This utility helps preload common website translations
+// This utility helps preload common website translations using Google Translate only
 export const preloadWebsiteTranslations = async (language: string) => {
   if (language === 'en') return; // Skip for English
   
-  console.log(`Preloading website translations for ${language}`);
+  console.log(`GOOGLE TRANSLATE ONLY - Preloading website translations for ${language}`);
   
-  const commonTexts = [
-    // Navigation
-    'Home', 'Features', 'Pricing', 'Blog', 'Download', 'Login', 
-    
-    // Homepage
-    'Your Voice, Your Journey', 
-    'Discover deeper self-awareness through voice journaling',
-    'Start your free trial',
-    'No credit card required',
-    'Learn more',
-    'Download App',
-    
-    // Features
-    'Features', 
-    'Why SOuLO?',
-    'Voice Journaling',
-    'AI Insights',
-    'Mood Tracking',
-    'Private & Secure',
-    
-    // Footer
-    'Download on App Store',
-    'Get it on Google Play',
-    'Contact us at',
-    'Privacy Policy',
-    'Terms of Service',
-    'FAQ',
-    'All rights reserved.',
-    
-    // SoulNet specific terms
-    'family', 'friends', 'work', 'school', 'health',
-    'happy', 'sad', 'anxious', 'excited', 'tired',
-    'angry', 'peaceful', 'stressed', 'relaxed', 'confused'
-  ];
-  
-  try {
-    // Batch translate all common texts
-    const translations = await staticTranslationService.preTranslate(commonTexts);
-    console.log(`Preloaded ${translations.size} website translations`);
-    return translations;
-  } catch (error) {
-    console.error('Failed to preload website translations:', error);
-    return new Map();
-  }
+  // Note: Preloading is handled by the translation context with Google Translate
+  // This is kept for backward compatibility but doesn't perform actual preloading
+  return new Map();
 };
 
 export const translateWebsiteText = async (text: string): Promise<string> => {
   if (!text) return '';
   
   try {
-    return await staticTranslationService.translateText(text, 'en');
+    // This function is deprecated - use the translation context instead
+    console.log(`translateWebsiteText is deprecated - use translation context with Google Translate`);
+    return text;
   } catch (error) {
     console.error(`Failed to translate website text: "${text}"`, error);
     return text;
@@ -71,7 +31,7 @@ class TranslationCache {
   
   constructor() {
     this.loadFromLocalStorage();
-    console.log('[TranslationCache] Initialized cache with size:', this.getCacheSize());
+    console.log('[TranslationCache] GOOGLE TRANSLATE ONLY - Initialized cache with size:', this.getCacheSize());
   }
 
   // Load cached translations from localStorage
