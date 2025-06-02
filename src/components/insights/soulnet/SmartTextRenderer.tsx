@@ -38,8 +38,11 @@ export const SmartTextRenderer: React.FC<SmartTextRendererProps> = ({
       try {
         const isComplex = enhancedFontService.isComplexScript(text);
         
-        if (isComplex) {
-          console.log(`[SmartTextRenderer] Complex script detected for: "${text}", using Canvas renderer`);
+        // For larger text sizes (> 2.0), prefer Canvas renderer for better quality
+        const preferCanvas = size > 2.0;
+        
+        if (isComplex || preferCanvas) {
+          console.log(`[SmartTextRenderer] Using Canvas renderer for: "${text}" (complex: ${isComplex}, large text: ${preferCanvas})`);
           setUseCanvasRenderer(true);
           setFontLoaded(true);
         } else {
@@ -62,7 +65,7 @@ export const SmartTextRenderer: React.FC<SmartTextRendererProps> = ({
     };
 
     initializeRenderer();
-  }, [text]);
+  }, [text, size]);
 
   if (!visible || hasError || !fontLoaded) {
     return null;

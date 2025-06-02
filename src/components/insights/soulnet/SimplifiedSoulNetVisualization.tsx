@@ -1,4 +1,3 @@
-
 import React, { useRef, useEffect, useMemo, useState } from 'react';
 import { OrbitControls } from '@react-three/drei';
 import { useThree, useFrame } from '@react-three/fiber';
@@ -90,6 +89,28 @@ export const SimplifiedSoulNetVisualization: React.FC<SimplifiedSoulNetVisualiza
       return new THREE.Vector3(0, 0, 0);
     }
   }, [validData.nodes]);
+
+  // Calculate connection percentages for selected node
+  const connectionPercentages = useMemo(() => {
+    if (!selectedNode || !validData.links) return new Map<string, number>();
+    
+    const percentages = new Map<string, number>();
+    const selectedConnections = validData.links.filter(
+      link => link.source === selectedNode || link.target === selectedNode
+    );
+    
+    if (selectedConnections.length === 0) return percentages;
+    
+    // Calculate percentage based on connection strength
+    const totalConnections = selectedConnections.length;
+    selectedConnections.forEach(link => {
+      const connectedNodeId = link.source === selectedNode ? link.target : link.source;
+      const percentage = Math.round((link.value || 1) * 100 / totalConnections);
+      percentages.set(connectedNodeId, Math.max(1, Math.min(100, percentage)));
+    });
+    
+    return percentages;
+  }, [selectedNode, validData.links]);
 
   // Google Translate only translation processing
   useEffect(() => {
@@ -284,6 +305,10 @@ export const SimplifiedSoulNetVisualization: React.FC<SimplifiedSoulNetVisualiza
             
             // Get Google Translate translation
             const translatedText = translationCache.get(node.id) || node.id;
+            
+            // Get connection percentage for this node
+            const connectionPercentage = connectionPercentages.get(node.id) || 0;
+            const showPercentage = !!selectedNode && isHighlighted;
 
             return (
               <Node
@@ -304,6 +329,8 @@ export const SimplifiedSoulNetVisualization: React.FC<SimplifiedSoulNetVisualiza
                 selectedNodeId={selectedNode}
                 cameraZoom={cameraZoom}
                 isHighlighted={isHighlighted}
+                connectionPercentage={connectionPercentage}
+                showPercentage={showPercentage}
                 forceShowLabels={showLabels}
                 translatedText={translatedText}
               />

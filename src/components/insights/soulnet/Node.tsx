@@ -1,4 +1,3 @@
-
 import React, { useRef, useMemo } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
@@ -26,7 +25,7 @@ interface NodeProps {
   connectionPercentage?: number;
   showPercentage?: boolean;
   forceShowLabels?: boolean;
-  translatedText?: string; // New prop for translated text
+  translatedText?: string;
 }
 
 const Node: React.FC<NodeProps> = ({
@@ -53,7 +52,7 @@ const Node: React.FC<NodeProps> = ({
     return new THREE.Color(dimmed ? '#666666' : '#cccccc');
   }, [isSelected, isHighlighted, node.type, themeHex, dimmed]);
 
-  const sphereScale = useMemo(() => {
+  const nodeScale = useMemo(() => {
     if (isSelected) return 1.4;
     if (isHighlighted) return 1.2;
     return 1;
@@ -62,7 +61,7 @@ const Node: React.FC<NodeProps> = ({
   useFrame(() => {
     if (meshRef.current) {
       meshRef.current.material.color.lerp(color, 0.1);
-      meshRef.current.scale.lerp(new THREE.Vector3(sphereScale, sphereScale, sphereScale), 0.1);
+      meshRef.current.scale.lerp(new THREE.Vector3(nodeScale, nodeScale, nodeScale), 0.1);
     }
   });
 
@@ -75,7 +74,18 @@ const Node: React.FC<NodeProps> = ({
     return forceShowLabels || showLabel || isSelected || isHighlighted;
   }, [forceShowLabels, showLabel, isSelected, isHighlighted]);
 
-  console.log(`[Node] Rendering node ${node.id} with translated text: "${translatedText || node.id}"`);
+  console.log(`[Node] Rendering ${node.type} node ${node.id} with translated text: "${translatedText || node.id}"`);
+
+  // Render different geometries based on node type
+  const renderGeometry = () => {
+    if (node.type === 'emotion') {
+      // Use cube geometry for emotion nodes
+      return <boxGeometry args={[1.4, 1.4, 1.4]} />;
+    } else {
+      // Keep sphere geometry for entity nodes
+      return <sphereGeometry args={[0.7, 32, 32]} />;
+    }
+  };
 
   return (
     <group>
@@ -84,7 +94,7 @@ const Node: React.FC<NodeProps> = ({
         position={node.position}
         onClick={handleNodeClick}
       >
-        <sphereGeometry args={[0.7, 32, 32]} />
+        {renderGeometry()}
         <meshStandardMaterial color={color} metalness={0.3} roughness={0.8} />
       </mesh>
       
@@ -98,7 +108,7 @@ const Node: React.FC<NodeProps> = ({
           shouldShowLabel={shouldShowLabel}
           cameraZoom={cameraZoom}
           themeHex={themeHex}
-          nodeScale={1}
+          nodeScale={nodeScale}
           connectionPercentage={connectionPercentage}
           showPercentage={showPercentage}
           translatedText={translatedText}
