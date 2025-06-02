@@ -74,6 +74,21 @@
     --delete-btn-bg: 0 62.8% 20%;
     --delete-btn-text: 0 62.8% 80%;
   }
+ 
+  /* Enhanced font loading and rendering */
+  @font-face {
+    font-family: 'Devanagari Fallback';
+    src: local('Devanagari Sangam MN'), local('Mangal'), local('Noto Sans Devanagari');
+    font-display: swap;
+    unicode-range: U+0900-097F;
+  }
+  
+  @font-face {
+    font-family: 'Arabic Fallback';
+    src: local('Arabic Typesetting'), local('Tahoma'), local('Noto Sans Arabic');
+    font-display: swap;
+    unicode-range: U+0600-06FF, U+0750-077F, U+08A0-08FF, U+FB50-FDFF, U+FE70-FEFF;
+  }
 }
 
 @layer base {
@@ -162,6 +177,30 @@
   
   .delete-button-text {
     color: hsl(var(--delete-btn-text)) !important;
+  }
+  
+  /* Enhanced text rendering for multilingual support */
+  .soul-net-label {
+    text-rendering: optimizeLegibility;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    font-feature-settings: "liga" 1, "kern" 1;
+    letter-spacing: 0.01em;
+  }
+  
+  .soul-net-label-selected {
+    font-weight: 600;
+    text-shadow: 
+      2px 2px 4px rgba(0,0,0,0.8),
+      0 0 8px rgba(255,255,255,0.4),
+      0 0 12px rgba(59, 130, 246, 0.3);
+  }
+  
+  .soul-net-label-highlighted {
+    font-weight: 500;
+    text-shadow: 
+      1px 1px 2px rgba(0,0,0,0.6),
+      0 0 6px rgba(255,255,255,0.3);
   }
 }
 
@@ -322,4 +361,81 @@ body {
 
 .onboarding-language-select [data-radix-select-value] {
   color: white;
+}
+
+/* Enhanced Google Translate widget hiding */
+.goog-te-banner-frame,
+.goog-te-gadget-icon,
+.goog-te-menu-value span,
+.goog-te-gadget span,
+.goog-te-combo,
+.goog-te-gadget-simple {
+  display: none !important;
+  visibility: hidden !important;
+  opacity: 0 !important;
+  position: absolute !important;
+  left: -9999px !important;
+}
+
+.goog-te-gadget {
+  color: transparent !important;
+  font-size: 0px !important;
+  line-height: 0 !important;
+  height: 0 !important;
+  width: 0 !important;
+}
+
+/* Remove Google Translate top spacing and iframe */
+body {
+  top: 0 !important;
+}
+
+iframe.goog-te-banner-frame {
+  display: none !important;
+}
+
+/* Prevent Google Translate from affecting body margin */
+body.goog-te-view {
+  margin-top: 0 !important;
+}
+
+/* Performance optimizations for 3D text rendering */
+.soul-net-visualization {
+  transform-style: preserve-3d;
+  backface-visibility: hidden;
+  perspective: 1000px;
+}
+
+.soul-net-visualization * {
+  will-change: transform, opacity;
+}
+
+/* Memory optimization for large datasets */
+@media (max-width: 768px) {
+  .soul-net-label {
+    font-size: 10px !important;
+    max-width: 80px !important;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .soul-net-visualization * {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* Enhanced dark mode support for soul-net labels */
+.dark .soul-net-label {
+  text-shadow: 
+    1px 1px 2px rgba(0,0,0,0.9),
+    0 0 4px rgba(255,255,255,0.2);
+}
+
+.dark .soul-net-label-selected {
+  text-shadow: 
+    2px 2px 4px rgba(0,0,0,0.9),
+    0 0 8px rgba(255,255,255,0.5),
+    0 0 12px rgba(59, 130, 246, 0.4);
 }

@@ -2,6 +2,7 @@
 import React, { useMemo } from 'react';
 import { Html } from '@react-three/drei';
 import { TranslatableHtmlText } from './TranslatableHtmlText';
+import SoulNetErrorBoundary from './SoulNetErrorBoundary';
 import '@/types/three-reference';
 
 interface DirectNodeLabelProps {
@@ -81,33 +82,39 @@ export const DirectNodeLabel: React.FC<DirectNodeLabelProps> = ({
 
   try {
     return (
-      <group position={labelPosition}>
-        <Html
-          center
-          distanceFactor={15}
-          transform
-          sprite
-          style={{
-            pointerEvents: 'none',
-            userSelect: 'none'
-          }}
-        >
-          <TranslatableHtmlText
-            text={id}
-            isSelected={isSelected}
-            isHighlighted={isHighlighted}
-            nodeType={type}
+      <SoulNetErrorBoundary
+        onError={(error) => console.error('[DirectNodeLabel] Error boundary caught:', error)}
+        fallback={null}
+        maxRetries={2}
+      >
+        <group position={labelPosition}>
+          <Html
+            center
+            distanceFactor={15}
+            transform
+            sprite
             style={{
-              fontSize: `${textSize}px`,
-              color: textColor,
-              background: isSelected ? 'rgba(0,0,0,0.3)' : 'transparent',
-              padding: isSelected ? '2px 6px' : '0',
-              borderRadius: isSelected ? '4px' : '0',
-              backdropFilter: isSelected ? 'blur(2px)' : 'none'
+              pointerEvents: 'none',
+              userSelect: 'none'
             }}
-          />
-        </Html>
-      </group>
+          >
+            <TranslatableHtmlText
+              text={id}
+              isSelected={isSelected}
+              isHighlighted={isHighlighted}
+              nodeType={type}
+              style={{
+                fontSize: `${textSize}px`,
+                color: textColor,
+                background: isSelected ? 'rgba(0,0,0,0.3)' : 'transparent',
+                padding: isSelected ? '2px 6px' : '0',
+                borderRadius: isSelected ? '4px' : '0',
+                backdropFilter: isSelected ? 'blur(2px)' : 'none'
+              }}
+            />
+          </Html>
+        </group>
+      </SoulNetErrorBoundary>
     );
   } catch (error) {
     console.error('[DirectNodeLabel] Error rendering Html label:', error);
