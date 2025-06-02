@@ -1,5 +1,5 @@
 
-import React, { useMemo } from 'react';
+import React, { useMemo, useEffect } from 'react';
 import SmartTextRenderer from './SmartTextRenderer';
 
 interface DirectNodeLabelProps {
@@ -33,6 +33,25 @@ export const DirectNodeLabel: React.FC<DirectNodeLabelProps> = ({
   translatedText,
   effectiveTheme = 'light'
 }) => {
+  // Listen for tutorial debugging events
+  useEffect(() => {
+    const handleTutorialDebug = (event: CustomEvent) => {
+      if (event.detail?.step === 9 && event.detail?.forceShowLabels) {
+        console.log(`[DirectNodeLabel] Tutorial step 9 debug: forcing label visibility for ${id}`);
+        // Force label to be visible during tutorial step 9
+        if (!shouldShowLabel) {
+          console.log(`[DirectNodeLabel] Overriding shouldShowLabel for tutorial step 9`);
+        }
+      }
+    };
+
+    window.addEventListener('tutorial-soul-net-debug', handleTutorialDebug as EventListener);
+    
+    return () => {
+      window.removeEventListener('tutorial-soul-net-debug', handleTutorialDebug as EventListener);
+    };
+  }, [id, shouldShowLabel]);
+
   console.log(`[DirectNodeLabel] Rendering with translated text for ${id}: "${translatedText || id}"`);
 
   // Use translated text if available, otherwise fallback to original id
@@ -80,7 +99,21 @@ export const DirectNodeLabel: React.FC<DirectNodeLabelProps> = ({
     position[2] + labelOffset[2]
   ];
 
-  if (!shouldShowLabel || !finalDisplayText) {
+  // Enhanced visibility check for tutorial step 9
+  const enhancedShouldShowLabel = useMemo(() => {
+    // Check if we're in tutorial step 9 by looking at body attribute
+    const currentTutorialStep = document.body.getAttribute('data-current-step');
+    const isTutorialStep9 = currentTutorialStep === '9';
+    
+    if (isTutorialStep9) {
+      console.log(`[DirectNodeLabel] Tutorial step 9 detected, forcing label visibility for ${id}`);
+      return true; // Always show labels during tutorial step 9
+    }
+    
+    return shouldShowLabel;
+  }, [shouldShowLabel, id]);
+
+  if (!enhancedShouldShowLabel || !finalDisplayText) {
     return null;
   }
 

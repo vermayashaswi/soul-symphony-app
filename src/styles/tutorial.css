@@ -41,7 +41,7 @@ body.tutorial-active {
   border: 3px solid var(--color-theme) !important;
   box-shadow: 0 0 30px rgba(0, 0, 0, 0.7) !important;
   pointer-events: auto !important;
-  background-color: rgba(26, 31, 44, 1) !important; /* Fully opaque for all steps on all devices */
+  background-color: rgba(26, 31, 44, 1) !important;
   border-radius: 8px !important;
   padding: 16px !important;
 }
@@ -124,18 +124,9 @@ body.tutorial-active {
   opacity: 1 !important;
 }
 
-/* Common button highlight styling - GLOBAL for all devices */
-.tutorial-button-highlight {
-  box-shadow: 0 0 35px 20px var(--color-theme) !important;
-  animation: button-pulse 1.5s infinite alternate !important;
-  border: 2px solid white !important;
-  transform: scale(1.05) !important;
-  position: relative !important;
-  z-index: 10000 !important;
-}
-
-/* Step 3: Record Entry Tab - Enhanced highlighting with glow */
-.record-entry-tab.tutorial-target {
+/* FIXED: Unified tab highlighting - both tabs now use consistent strong highlighting */
+.record-entry-tab.tutorial-target,
+.entries-tab.tutorial-target {
   z-index: 30000 !important;
   position: relative !important;
   box-shadow: 0 0 50px 30px var(--color-theme) !important;
@@ -149,25 +140,25 @@ body.tutorial-active {
   border-radius: 8px !important;
 }
 
-/* Step 4: Past Entries Tab - Minimal styling WITHOUT glow effect */
-.entries-tab.tutorial-target {
-  z-index: 30000 !important;
-  position: relative !important;
-  opacity: 1 !important;
-  visibility: visible !important;
-  outline: 2px solid white !important;
-  border: 2px solid white !important;
-  background-color: white !important;
-  border-radius: 8px !important;
-  /* Removed: box-shadow, animation, transform scale, backdrop-filter */
-}
-
-/* Ensure Past Entries tab text is readable in light mode */
+/* Ensure both tab types have readable text */
+.record-entry-tab.tutorial-target,
+.record-entry-tab.tutorial-target span,
+.record-entry-tab.tutorial-target div,
 .entries-tab.tutorial-target,
 .entries-tab.tutorial-target span,
 .entries-tab.tutorial-target div {
-  color: #000 !important;
-  text-shadow: none !important;
+  color: white !important;
+  text-shadow: 0 0 4px rgba(0,0,0,0.8) !important;
+}
+
+/* Common button highlight styling - GLOBAL for all devices */
+.tutorial-button-highlight {
+  box-shadow: 0 0 35px 20px var(--color-theme) !important;
+  animation: button-pulse 1.5s infinite alternate !important;
+  border: 2px solid white !important;
+  transform: scale(1.05) !important;
+  position: relative !important;
+  z-index: 10000 !important;
 }
 
 /* Step 5: Chat question highlight styling - GLOBAL enhanced visibility */
