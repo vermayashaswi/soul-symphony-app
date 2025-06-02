@@ -2,6 +2,7 @@
 import React, { useMemo } from 'react';
 import { Html } from '@react-three/drei';
 import { TranslatableHtmlText } from './TranslatableHtmlText';
+import '@/types/three-reference';
 
 interface DirectNodeLabelProps {
   id: string;

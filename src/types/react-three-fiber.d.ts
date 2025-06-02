@@ -72,6 +72,14 @@ declare module '@react-three/drei' {
   
   export function Text(props: any): JSX.Element;
   export function OrbitControls(props: any): JSX.Element;
+  export function Html(props: {
+    center?: boolean;
+    distanceFactor?: number;
+    transform?: boolean;
+    sprite?: boolean;
+    style?: React.CSSProperties;
+    children: ReactNode;
+  }): JSX.Element;
 }
 
 declare namespace JSX {
