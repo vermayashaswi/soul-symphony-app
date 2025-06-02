@@ -19,13 +19,13 @@ export const SmartTextRenderer: React.FC<SmartTextRendererProps> = ({
   text,
   position,
   color = '#ffffff',
-  size = 0.4,
+  size = 1.0, // FIXED: Updated to match SimplifiedTextRenderer default
   visible = true,
   renderOrder = 10,
   bold = false,
-  outlineWidth = 0.02,
+  outlineWidth = 0.05, // FIXED: Updated to match SimplifiedTextRenderer default
   outlineColor = '#000000',
-  maxWidth = 25
+  maxWidth = 40 // FIXED: Updated to match SimplifiedTextRenderer default
 }) => {
   console.log(`[SmartTextRenderer] Simplified mode - rendering: "${text}" with Three.js Text only`);
 

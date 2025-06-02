@@ -23,13 +23,13 @@ export const SimplifiedTextRenderer: React.FC<SimplifiedTextRendererProps> = ({
   text,
   position,
   color = '#ffffff',
-  size = 0.6, // FIXED: Reduced from 4.0 to 0.6 (15% of original)
+  size = 1.0, // FIXED: Increased from 0.6 to 1.0 for better visibility
   visible = true,
   renderOrder = 10,
   bold = false,
-  outlineWidth = 0.02, // FIXED: Proportionally reduced outline width
+  outlineWidth = 0.05, // FIXED: Increased outline width for better definition
   outlineColor = '#000000',
-  maxWidth = 25 // FIXED: Proportionally reduced max width
+  maxWidth = 40 // FIXED: Increased max width proportionally
 }) => {
   const textRef = useRef<THREE.Mesh>(null);
   
@@ -62,7 +62,7 @@ export const SimplifiedTextRenderer: React.FC<SimplifiedTextRendererProps> = ({
     return null;
   }
 
-  console.log(`[SimplifiedTextRenderer] Rendering: "${displayText}" at reduced size ${size} with color ${color}`);
+  console.log(`[SimplifiedTextRenderer] Rendering: "${displayText}" at size ${size} with color ${color}`);
 
   return (
     <Text

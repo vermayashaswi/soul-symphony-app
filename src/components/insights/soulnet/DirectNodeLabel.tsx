@@ -83,12 +83,12 @@ export const DirectNodeLabel: React.FC<DirectNodeLabelProps> = ({
     return [0, scaledOffset, 0] as [number, number, number];
   }, [type, nodeScale]);
 
-  // Calculate text properties with larger base size
+  // Calculate text properties with proper size scaling
   const textSize = useMemo(() => {
     const zoom = Math.max(10, Math.min(100, cameraZoom));
-    const baseSize = 4.0; // Large base size for better visibility
+    const baseSize = 1.2; // FIXED: Reduced base size for better proportions
     const zoomFactor = Math.max(0.7, Math.min(1.3, (50 - zoom) * 0.02 + 1));
-    const finalSize = Math.max(2.0, Math.min(8.0, baseSize * zoomFactor));
+    const finalSize = Math.max(0.8, Math.min(2.0, baseSize * zoomFactor));
     
     console.log(`[DirectNodeLabel] Text size for ${id}: ${finalSize} (zoom: ${zoom})`);
     return finalSize;
@@ -99,30 +99,36 @@ export const DirectNodeLabel: React.FC<DirectNodeLabelProps> = ({
     return textSize * 0.69;
   }, [textSize]);
 
-  // FIXED: Enhanced text color logic with better contrast for light theme
+  // FIXED: Enhanced text color logic with much better contrast for light theme
   const textColor = useMemo(() => {
     let color;
     
     if (isSelected) {
-      // FIXED: For selected entity nodes in light theme, use black for better contrast
-      if (type === 'entity' && effectiveTheme === 'light') {
-        color = '#000000'; // Black text for selected entities in light theme
+      // FIXED: For selected nodes, use high contrast colors based on theme
+      if (effectiveTheme === 'light') {
+        // In light theme, use dark colors for selected nodes for maximum contrast
+        color = type === 'entity' ? '#000000' : '#1a1a1a'; // Black for entities, very dark gray for emotions
       } else {
-        color = '#ffffff'; // White for other selected nodes
+        // In dark theme, use bright white for selected nodes
+        color = '#ffffff';
       }
     } else if (isHighlighted) {
-      // For highlighted nodes, use white for entities, theme color for emotions
-      color = type === 'entity' ? '#ffffff' : themeHex;
-    } else {
-      // Better default colors based on theme with higher contrast
+      // For highlighted nodes, use theme-appropriate colors
       if (effectiveTheme === 'light') {
-        color = '#1a1a1a'; // Dark gray for light theme
+        color = type === 'entity' ? '#2d2d2d' : themeHex; // Dark gray for entities, theme color for emotions
       } else {
-        color = '#e5e5e5'; // Light gray for dark theme
+        color = type === 'entity' ? '#ffffff' : themeHex; // White for entities, theme color for emotions
+      }
+    } else {
+      // FIXED: Much better default colors with higher contrast
+      if (effectiveTheme === 'light') {
+        color = '#0a0a0a'; // Very dark for light theme
+      } else {
+        color = '#f0f0f0'; // Very light for dark theme
       }
     }
     
-    console.log(`[DirectNodeLabel] Text color for ${id}: ${color} (selected: ${isSelected}, highlighted: ${isHighlighted}, theme: ${effectiveTheme}, type: ${type})`);
+    console.log(`[DirectNodeLabel] FIXED text color for ${id}: ${color} (selected: ${isSelected}, highlighted: ${isHighlighted}, theme: ${effectiveTheme}, type: ${type})`);
     return color;
   }, [isSelected, isHighlighted, type, themeHex, effectiveTheme, id]);
 
@@ -162,9 +168,9 @@ export const DirectNodeLabel: React.FC<DirectNodeLabelProps> = ({
         visible={true}
         renderOrder={15}
         bold={isHighlighted || isSelected}
-        outlineWidth={isSelected ? 0.4 : 0.2}
-        outlineColor={isSelected ? '#000000' : '#333333'}
-        maxWidth={250}
+        outlineWidth={isSelected ? 0.1 : 0.05} // FIXED: Reduced outline width for better proportions
+        outlineColor={effectiveTheme === 'light' ? '#ffffff' : '#000000'} // FIXED: Theme-appropriate outline
+        maxWidth={40}
       />
       
       {/* Percentage label (displayed below main label) */}
@@ -177,9 +183,9 @@ export const DirectNodeLabel: React.FC<DirectNodeLabelProps> = ({
           visible={true}
           renderOrder={16}
           bold={false}
-          outlineWidth={0.1}
-          outlineColor={isSelected ? '#000000' : '#333333'}
-          maxWidth={150}
+          outlineWidth={0.03} // FIXED: Smaller outline for percentage text
+          outlineColor={effectiveTheme === 'light' ? '#ffffff' : '#000000'} // FIXED: Theme-appropriate outline
+          maxWidth={20}
         />
       )}
     </>
