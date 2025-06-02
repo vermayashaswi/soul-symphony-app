@@ -52,6 +52,7 @@ interface TutorialContextType {
     inProgress: boolean;
     targetRoute: string | null;
   };
+  isInitialized: boolean; // NEW: Track initialization state
 }
 
 // Create the context with a default undefined value
@@ -185,6 +186,7 @@ export const TutorialProvider: React.FC<{ children: ReactNode }> = ({ children }
   });
   const [tutorialCompleted, setTutorialCompleted] = useState(false);
   const [pendingTutorialStart, setPendingTutorialStart] = useState(false);
+  const [isInitialized, setIsInitialized] = useState(false); // NEW: Track initialization
   
   // Enhanced logging for debugging
   useEffect(() => {
@@ -196,10 +198,26 @@ export const TutorialProvider: React.FC<{ children: ReactNode }> = ({ children }
       navigationState,
       pendingTutorialStart,
       tutorialChecked,
+      isInitialized, // NEW: Log initialization state
       navigationManagerState: navigationManager.getState(),
       highlightingManagerState: highlightingManager.getState()
     });
-  }, [isActive, currentStep, steps, location.pathname, navigationState, pendingTutorialStart, tutorialChecked]);
+  }, [isActive, currentStep, steps, location.pathname, navigationState, pendingTutorialStart, tutorialChecked, isInitialized]);
+  
+  // NEW: Initialize the tutorial system
+  useEffect(() => {
+    console.log('[TutorialContext] Initializing tutorial system');
+    
+    // Mark as initialized after a brief delay to ensure all dependencies are ready
+    const initTimeout = setTimeout(() => {
+      setIsInitialized(true);
+      console.log('[TutorialContext] Tutorial system initialized');
+    }, 100);
+    
+    return () => {
+      clearTimeout(initTimeout);
+    };
+  }, []);
   
   // Subscribe to navigation manager state changes
   useEffect(() => {
@@ -240,6 +258,8 @@ export const TutorialProvider: React.FC<{ children: ReactNode }> = ({ children }
   
   // Enhanced navigation completion handler with timeout protection
   useEffect(() => {
+    if (!isInitialized) return; // NEW: Don't process navigation until initialized
+    
     const navManagerState = navigationManager.getState();
     
     if (navManagerState.isNavigating && navManagerState.targetRoute === location.pathname) {
@@ -264,10 +284,12 @@ export const TutorialProvider: React.FC<{ children: ReactNode }> = ({ children }
         }, 500);
       }
     }
-  }, [location.pathname, pendingTutorialStart, currentStep, steps]);
+  }, [location.pathname, pendingTutorialStart, currentStep, steps, isInitialized]);
   
   // Check if tutorial should be active based on user's profile and current route
   useEffect(() => {
+    if (!isInitialized) return; // NEW: Don't check tutorial until initialized
+    
     const checkTutorialStatus = async () => {
       if (!user || tutorialChecked) return;
       
@@ -325,7 +347,7 @@ export const TutorialProvider: React.FC<{ children: ReactNode }> = ({ children }
     };
     
     checkTutorialStatus();
-  }, [user, location.pathname, tutorialChecked, navigate]);
+  }, [user, location.pathname, tutorialChecked, navigate, isInitialized]);
   
   // ENHANCED: Helper function to check for target elements using new highlighting system
   const checkForTargetElementEnhanced = (stepData: TutorialStep) => {
@@ -590,7 +612,7 @@ export const TutorialProvider: React.FC<{ children: ReactNode }> = ({ children }
     }
   };
   
-  // Provide the context value with the updated navigationState property
+  // Provide the context value with the updated navigationState property and initialization state
   const contextValue: TutorialContextType = {
     isActive,
     currentStep,
@@ -604,7 +626,8 @@ export const TutorialProvider: React.FC<{ children: ReactNode }> = ({ children }
     startTutorial,
     tutorialCompleted,
     isInStep: (stepId: number) => isActive && steps[currentStep]?.id === stepId,
-    navigationState
+    navigationState,
+    isInitialized // NEW: Include initialization state
   };
   
   return (
@@ -614,12 +637,31 @@ export const TutorialProvider: React.FC<{ children: ReactNode }> = ({ children }
   );
 };
 
-// Custom hook to use the tutorial context
+// ENHANCED: Custom hook to use the tutorial context with resilience
 export const useTutorial = () => {
   const context = useContext(TutorialContext);
   
+  // NEW: Handle undefined context gracefully during initialization
   if (context === undefined) {
-    throw new Error('useTutorial must be used within a TutorialProvider');
+    console.warn('[useTutorial] Hook called before TutorialProvider is ready, returning safe defaults');
+    
+    // Return safe default values when context is not yet available
+    return {
+      isActive: false,
+      currentStep: 0,
+      totalSteps: 0,
+      steps: [],
+      nextStep: () => console.warn('[useTutorial] nextStep called before provider ready'),
+      prevStep: () => console.warn('[useTutorial] prevStep called before provider ready'),
+      skipTutorial: () => console.warn('[useTutorial] skipTutorial called before provider ready'),
+      completeTutorial: () => console.warn('[useTutorial] completeTutorial called before provider ready'),
+      resetTutorial: () => console.warn('[useTutorial] resetTutorial called before provider ready'),
+      startTutorial: () => console.warn('[useTutorial] startTutorial called before provider ready'),
+      tutorialCompleted: false,
+      isInStep: () => false,
+      navigationState: { inProgress: false, targetRoute: null },
+      isInitialized: false
+    };
   }
   
   return context;

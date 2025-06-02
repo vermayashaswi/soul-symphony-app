@@ -21,6 +21,14 @@ import { navigationManager } from '@/utils/tutorial/navigation-state-manager';
 import { highlightingManager } from '@/utils/tutorial/tutorial-highlighting-manager';
 
 const TutorialOverlay: React.FC = () => {
+  const tutorialContext = useTutorial();
+  
+  // NEW: Early return if context is not yet initialized to prevent errors
+  if (!tutorialContext.isInitialized) {
+    console.log('[TutorialOverlay] Context not yet initialized, waiting...');
+    return null;
+  }
+  
   const { 
     isActive, 
     currentStep, 
@@ -31,7 +39,7 @@ const TutorialOverlay: React.FC = () => {
     skipTutorial,
     tutorialCompleted,
     navigationState
-  } = useTutorial();
+  } = tutorialContext;
   
   const location = useLocation();
   
@@ -51,9 +59,10 @@ const TutorialOverlay: React.FC = () => {
       isAppRoute: isAppRouteCurrent,
       tutorialCompleted,
       transitionProtected: navigationManager.isStepTransitionProtected(),
-      highlightingState: highlightingManager.getState()
+      highlightingState: highlightingManager.getState(),
+      tutorialInitialized: tutorialContext.isInitialized
     });
-  }, [isActive, currentStep, steps, navigationState, shouldShowTutorial, location.pathname, isAppRouteCurrent, tutorialCompleted]);
+  }, [isActive, currentStep, steps, navigationState, shouldShowTutorial, location.pathname, isAppRouteCurrent, tutorialCompleted, tutorialContext.isInitialized]);
   
   // Enhanced scrolling prevention with data attribute for current step
   useEffect(() => {
