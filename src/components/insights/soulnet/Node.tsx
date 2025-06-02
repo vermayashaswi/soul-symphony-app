@@ -1,3 +1,4 @@
+
 import React, { useRef, useMemo } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
@@ -22,6 +23,8 @@ interface NodeProps {
   selectedNodeId: string | null;
   cameraZoom: number;
   isHighlighted: boolean;
+  connectionPercentage?: number;
+  showPercentage?: boolean;
   forceShowLabels?: boolean;
 }
 
@@ -36,6 +39,8 @@ const Node: React.FC<NodeProps> = ({
   selectedNodeId,
   cameraZoom,
   isHighlighted,
+  connectionPercentage = 0,
+  showPercentage = false,
   forceShowLabels = false
 }) => {
   const meshRef = useRef<THREE.Mesh>(null);
@@ -68,7 +73,7 @@ const Node: React.FC<NodeProps> = ({
     return forceShowLabels || showLabel || isSelected || isHighlighted;
   }, [forceShowLabels, showLabel, isSelected, isHighlighted]);
 
-  console.log(`[Node] Simplified rendering node ${node.id}, showLabel: ${shouldShowLabel}`);
+  console.log(`[Node] Simplified rendering node ${node.id}, showLabel: ${shouldShowLabel}, showPercentage: ${showPercentage}, percentage: ${connectionPercentage}%`);
 
   return (
     <group>
@@ -92,6 +97,8 @@ const Node: React.FC<NodeProps> = ({
           cameraZoom={cameraZoom}
           themeHex={themeHex}
           nodeScale={1}
+          connectionPercentage={connectionPercentage}
+          showPercentage={showPercentage}
         />
       )}
     </group>
