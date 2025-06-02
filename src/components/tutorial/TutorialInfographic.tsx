@@ -30,17 +30,6 @@ const TutorialInfographic: React.FC<TutorialInfographicProps> = ({ type, classNa
     coolGray: "#aaadb0"
   };
   
-  // Get appropriate aspect ratio for each infographic type
-  const getAspectRatio = () => {
-    switch(type) {
-      case 'emotion-trends':
-      case 'mood-calendar':
-        return 4/3; // Taller aspect ratio for steps 7 and 8
-      default:
-        return 16/9; // Standard ratio for other steps
-    }
-  };
-  
   // Render different infographics based on type
   const renderInfographic = () => {
     switch(type) {
@@ -117,23 +106,22 @@ const TutorialInfographic: React.FC<TutorialInfographicProps> = ({ type, classNa
               </h3>
               <ChartLine className="ml-2 text-[#9b87f5]" size={iconSize} />
             </div>
-            <div className="w-full h-[180px] relative px-2">
+            <div className="w-full h-[140px] relative px-2">
               {/* Chart background */}
-              <div className="absolute inset-x-0 bottom-0 h-[150px] border-b border-l border-[#aaadb0]/30">
+              <div className="absolute inset-x-0 bottom-0 h-[120px] border-b border-l border-[#aaadb0]/30">
                 {/* Horizontal grid lines */}
-                <div className="absolute w-full border-t border-[#aaadb0]/20 h-0" style={{ top: '20%' }}></div>
-                <div className="absolute w-full border-t border-[#aaadb0]/20 h-0" style={{ top: '40%' }}></div>
-                <div className="absolute w-full border-t border-[#aaadb0]/20 h-0" style={{ top: '60%' }}></div>
-                <div className="absolute w-full border-t border-[#aaadb0]/20 h-0" style={{ top: '80%' }}></div>
+                <div className="absolute w-full border-t border-[#aaadb0]/20 h-0" style={{ top: '25%' }}></div>
+                <div className="absolute w-full border-t border-[#aaadb0]/20 h-0" style={{ top: '50%' }}></div>
+                <div className="absolute w-full border-t border-[#aaadb0]/20 h-0" style={{ top: '75%' }}></div>
                 
                 {/* Month markers */}
-                <div className="absolute bottom-[-25px] left-[20%] text-[10px] text-[#aaadb0]">
+                <div className="absolute bottom-[-20px] left-[25%] text-[10px] text-[#aaadb0]">
                   <TranslatableText text="Week 1" forceTranslate={true} />
                 </div>
-                <div className="absolute bottom-[-25px] left-[45%] text-[10px] text-[#aaadb0]">
+                <div className="absolute bottom-[-20px] left-[50%] text-[10px] text-[#aaadb0]">
                   <TranslatableText text="Week 2" forceTranslate={true} />
                 </div>
-                <div className="absolute bottom-[-25px] left-[70%] text-[10px] text-[#aaadb0]">
+                <div className="absolute bottom-[-20px] left-[75%] text-[10px] text-[#aaadb0]">
                   <TranslatableText text="Week 3" forceTranslate={true} />
                 </div>
                 
@@ -141,31 +129,31 @@ const TutorialInfographic: React.FC<TutorialInfographicProps> = ({ type, classNa
                 {/* Joy line */}
                 <svg className="absolute inset-0 h-full w-full">
                   <path 
-                    d={`M15,120 Q60,40 120,80 T240,60 T320,30`} 
+                    d={`M10,80 Q50,35 100,70 T200,50 T300,20`} 
                     fill="none" 
                     stroke={colors.primary} 
                     strokeWidth="3"
                     strokeLinecap="round"
                   />
-                  <circle cx="15" cy="120" r="4" fill={colors.primary} />
-                  <circle cx="120" cy="80" r="4" fill={colors.primary} />
-                  <circle cx="240" cy="60" r="4" fill={colors.primary} />
-                  <circle cx="320" cy="30" r="4" fill={colors.primary} />
+                  <circle cx="10" cy="80" r="4" fill={colors.primary} />
+                  <circle cx="100" cy="70" r="4" fill={colors.primary} />
+                  <circle cx="200" cy="50" r="4" fill={colors.primary} />
+                  <circle cx="300" cy="20" r="4" fill={colors.primary} />
                 </svg>
                 
                 {/* Calm line */}
                 <svg className="absolute inset-0 h-full w-full">
                   <path 
-                    d={`M15,130 Q60,90 120,110 T240,95 T320,75`} 
+                    d={`M10,90 Q50,70 100,85 T200,75 T300,60`} 
                     fill="none" 
                     stroke={colors.skyBlue} 
                     strokeWidth="3" 
                     strokeLinecap="round"
                   />
-                  <circle cx="15" cy="130" r="4" fill={colors.skyBlue} />
-                  <circle cx="120" cy="110" r="4" fill={colors.skyBlue} />
-                  <circle cx="240" cy="95" r="4" fill={colors.skyBlue} />
-                  <circle cx="320" cy="75" r="4" fill={colors.skyBlue} />
+                  <circle cx="10" cy="90" r="4" fill={colors.skyBlue} />
+                  <circle cx="100" cy="85" r="4" fill={colors.skyBlue} />
+                  <circle cx="200" cy="75" r="4" fill={colors.skyBlue} />
+                  <circle cx="300" cy="60" r="4" fill={colors.skyBlue} />
                 </svg>
               </div>
               
@@ -193,7 +181,7 @@ const TutorialInfographic: React.FC<TutorialInfographicProps> = ({ type, classNa
               </h3>
               <Calendar className="ml-2 text-[#9b87f5]" size={iconSize} />
             </div>
-            <div className="w-full grid grid-cols-7 gap-1.5">
+            <div className="w-full grid grid-cols-7 gap-1">
               {/* Day labels */}
               {[
                 { short: 'S', full: 'Sunday' },
@@ -204,63 +192,63 @@ const TutorialInfographic: React.FC<TutorialInfographicProps> = ({ type, classNa
                 { short: 'F', full: 'Friday' },
                 { short: 'S', full: 'Saturday' }
               ].map((day, i) => (
-                <div key={i} className="text-[11px] text-center text-[#aaadb0] mb-2 font-medium">
+                <div key={i} className="text-[10px] text-center text-[#aaadb0] mb-1">
                   <TranslatableText text={day.short} forceTranslate={true} />
                 </div>
               ))}
               
-              {/* Calendar cells - realistic mood data pattern with larger size */}
+              {/* Calendar cells - realistic mood data pattern */}
               {/* Week 1 */}
-              <div className="aspect-square rounded bg-green-500/80 flex items-center justify-center text-[11px] text-white font-medium">1</div>
-              <div className="aspect-square rounded bg-yellow-500/80 flex items-center justify-center text-[11px] text-white font-medium">2</div>
-              <div className="aspect-square rounded bg-green-500/80 flex items-center justify-center text-[11px] text-white font-medium">3</div>
-              <div className="aspect-square rounded border border-gray-600/50 flex items-center justify-center text-[11px] text-gray-500">4</div>
-              <div className="aspect-square rounded bg-red-500/80 flex items-center justify-center text-[11px] text-white font-medium">5</div>
-              <div className="aspect-square rounded bg-green-500/80 flex items-center justify-center text-[11px] text-white font-medium">6</div>
-              <div className="aspect-square rounded bg-green-500/80 flex items-center justify-center text-[11px] text-white font-medium">7</div>
+              <div className="aspect-square rounded bg-green-500/80 flex items-center justify-center text-[10px] text-white font-medium">1</div>
+              <div className="aspect-square rounded bg-yellow-500/80 flex items-center justify-center text-[10px] text-white font-medium">2</div>
+              <div className="aspect-square rounded bg-green-500/80 flex items-center justify-center text-[10px] text-white font-medium">3</div>
+              <div className="aspect-square rounded border border-gray-600/50 flex items-center justify-center text-[10px] text-gray-500">4</div>
+              <div className="aspect-square rounded bg-red-500/80 flex items-center justify-center text-[10px] text-white font-medium">5</div>
+              <div className="aspect-square rounded bg-green-500/80 flex items-center justify-center text-[10px] text-white font-medium">6</div>
+              <div className="aspect-square rounded bg-green-500/80 flex items-center justify-center text-[10px] text-white font-medium">7</div>
               
               {/* Week 2 */}
-              <div className="aspect-square rounded bg-yellow-500/80 flex items-center justify-center text-[11px] text-white font-medium">8</div>
-              <div className="aspect-square rounded bg-green-500/80 flex items-center justify-center text-[11px] text-white font-medium">9</div>
-              <div className="aspect-square rounded bg-green-500/80 flex items-center justify-center text-[11px] text-white font-medium">10</div>
-              <div className="aspect-square rounded bg-yellow-500/80 flex items-center justify-center text-[11px] text-white font-medium">11</div>
-              <div className="aspect-square rounded border border-gray-600/50 flex items-center justify-center text-[11px] text-gray-500">12</div>
-              <div className="aspect-square rounded border border-gray-600/50 flex items-center justify-center text-[11px] text-gray-500">13</div>
-              <div className="aspect-square rounded bg-red-500/80 flex items-center justify-center text-[11px] text-white font-medium">14</div>
+              <div className="aspect-square rounded bg-yellow-500/80 flex items-center justify-center text-[10px] text-white font-medium">8</div>
+              <div className="aspect-square rounded bg-green-500/80 flex items-center justify-center text-[10px] text-white font-medium">9</div>
+              <div className="aspect-square rounded bg-green-500/80 flex items-center justify-center text-[10px] text-white font-medium">10</div>
+              <div className="aspect-square rounded bg-yellow-500/80 flex items-center justify-center text-[10px] text-white font-medium">11</div>
+              <div className="aspect-square rounded border border-gray-600/50 flex items-center justify-center text-[10px] text-gray-500">12</div>
+              <div className="aspect-square rounded border border-gray-600/50 flex items-center justify-center text-[10px] text-gray-500">13</div>
+              <div className="aspect-square rounded bg-red-500/80 flex items-center justify-center text-[10px] text-white font-medium">14</div>
               
               {/* Week 3 */}
-              <div className="aspect-square rounded bg-yellow-500/80 flex items-center justify-center text-[11px] text-white font-medium">15</div>
-              <div className="aspect-square rounded bg-green-500/80 flex items-center justify-center text-[11px] text-white font-medium">16</div>
-              <div className="aspect-square rounded bg-green-500/80 flex items-center justify-center text-[11px] text-white font-medium">17</div>
-              <div className="aspect-square rounded bg-yellow-500/80 flex items-center justify-center text-[11px] text-white font-medium">18</div>
-              <div className="aspect-square rounded bg-green-500/80 flex items-center justify-center text-[11px] text-white font-medium">19</div>
-              <div className="aspect-square rounded border border-gray-600/50 flex items-center justify-center text-[11px] text-gray-500">20</div>
-              <div className="aspect-square rounded bg-green-500/80 flex items-center justify-center text-[11px] text-white font-medium">21</div>
+              <div className="aspect-square rounded bg-yellow-500/80 flex items-center justify-center text-[10px] text-white font-medium">15</div>
+              <div className="aspect-square rounded bg-green-500/80 flex items-center justify-center text-[10px] text-white font-medium">16</div>
+              <div className="aspect-square rounded bg-green-500/80 flex items-center justify-center text-[10px] text-white font-medium">17</div>
+              <div className="aspect-square rounded bg-yellow-500/80 flex items-center justify-center text-[10px] text-white font-medium">18</div>
+              <div className="aspect-square rounded bg-green-500/80 flex items-center justify-center text-[10px] text-white font-medium">19</div>
+              <div className="aspect-square rounded border border-gray-600/50 flex items-center justify-center text-[10px] text-gray-500">20</div>
+              <div className="aspect-square rounded bg-green-500/80 flex items-center justify-center text-[10px] text-white font-medium">21</div>
             </div>
             
             {/* Updated legend matching actual mood calendar */}
-            <div className="mt-4 flex items-center justify-center space-x-4">
+            <div className="mt-3 flex items-center justify-center space-x-3">
               <div className="flex items-center">
                 <div className="h-3 w-3 rounded bg-green-500/80 mr-1"></div>
-                <span className="text-[11px] text-white">
+                <span className="text-[10px] text-white">
                   <TranslatableText text="Positive" forceTranslate={true} />
                 </span>
               </div>
               <div className="flex items-center">
                 <div className="h-3 w-3 rounded bg-yellow-500/80 mr-1"></div>
-                <span className="text-[11px] text-white">
+                <span className="text-[10px] text-white">
                   <TranslatableText text="Neutral" forceTranslate={true} />
                 </span>
               </div>
               <div className="flex items-center">
                 <div className="h-3 w-3 rounded bg-red-500/80 mr-1"></div>
-                <span className="text-[11px] text-white">
+                <span className="text-[10px] text-white">
                   <TranslatableText text="Negative" forceTranslate={true} />
                 </span>
               </div>
               <div className="flex items-center">
                 <div className="h-3 w-3 rounded border border-gray-600/50 mr-1"></div>
-                <span className="text-[11px] text-white">
+                <span className="text-[10px] text-white">
                   <TranslatableText text="No Entry" forceTranslate={true} />
                 </span>
               </div>
@@ -340,7 +328,7 @@ const TutorialInfographic: React.FC<TutorialInfographicProps> = ({ type, classNa
   
   return (
     <div className={`${containerStyles} ${className}`}>
-      <AspectRatio ratio={getAspectRatio()} className="bg-[#1A1F2C]/80">
+      <AspectRatio ratio={16/9} className="bg-[#1A1F2C]/80">
         {renderInfographic()}
       </AspectRatio>
     </div>

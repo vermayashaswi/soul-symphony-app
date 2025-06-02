@@ -39,14 +39,14 @@ export const CanvasTextRenderer: React.FC<CanvasTextRendererProps> = ({
     const context = canvas.getContext('2d');
     if (!context) return;
 
-    // Set canvas size - larger for better quality with larger text
-    const canvasSize = Math.max(512, size * 200); // Scale canvas size with text size
+    // Set canvas size
+    const canvasSize = 512;
     canvas.width = canvasSize;
     canvas.height = canvasSize;
 
     // Get appropriate font family
     const fontFamily = enhancedFontService.getFallbackFont(displayText);
-    const fontSize = Math.floor(canvasSize * 0.08 * Math.max(1, size / 4)); // Scale font size appropriately
+    const fontSize = Math.floor(canvasSize * 0.1);
     
     // Configure context
     context.fillStyle = 'transparent';
@@ -57,40 +57,23 @@ export const CanvasTextRenderer: React.FC<CanvasTextRendererProps> = ({
     context.textAlign = 'center';
     context.textBaseline = 'middle';
     
-    // Handle multi-line text (for connection percentages)
-    const lines = displayText.split('\n');
-    const lineHeight = fontSize * 1.2;
-    const startY = canvasSize / 2 - ((lines.length - 1) * lineHeight) / 2;
-    
-    lines.forEach((line, index) => {
-      const y = startY + (index * lineHeight);
-      
-      // FIXED: Better outline color based on text color for improved contrast
-      const strokeWidth = Math.max(2, size * 0.5);
-      
-      // Use contrasting outline color based on text color
-      if (color === '#000000') {
-        context.strokeStyle = '#ffffff'; // White outline for black text
-      } else {
-        context.strokeStyle = '#000000'; // Black outline for other colors
-      }
-      
-      context.lineWidth = strokeWidth;
-      context.strokeText(line, canvasSize / 2, y);
-      context.fillText(line, canvasSize / 2, y);
-    });
+    // Add text stroke for better visibility
+    context.strokeStyle = '#000000';
+    context.lineWidth = 2;
+    context.strokeText(displayText, canvasSize / 2, canvasSize / 2);
+    context.fillText(displayText, canvasSize / 2, canvasSize / 2);
 
     // Create texture
     const newTexture = new THREE.CanvasTexture(canvas);
     newTexture.needsUpdate = true;
     setTexture(newTexture);
 
-    console.log(`[CanvasTextRenderer] Created texture for: "${displayText}" with font: ${fontFamily}, size: ${fontSize}, color: ${color}`);
+    console.log(`[CanvasTextRenderer] Created texture for: "${displayText}" with font: ${fontFamily}`);
 
     return () => {
       newTexture.dispose();
     };
-  }, [displayText, color, bold, size]);
+  }, [displayText, color, bold]);
 
   // Billboard effect
   useFrame(({ camera }) => {
@@ -111,7 +94,6 @@ export const CanvasTextRenderer: React.FC<CanvasTextRendererProps> = ({
     return null;
   }
 
-  // Scale plane size with text size
   const planeSize = size * 2;
 
   return (

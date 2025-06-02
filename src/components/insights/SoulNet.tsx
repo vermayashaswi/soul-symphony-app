@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useCallback } from 'react';
 import '@/types/three-reference';
 import { Canvas } from '@react-three/fiber';
@@ -339,37 +340,32 @@ const getStartDate = (range: TimeRange) => {
 const processEntities = (entries: any[]) => {
   console.log("[SoulNet] Processing entities for", entries.length, "entries");
   
-  // FIXED: Proper accumulation without flawed averaging
-  const entityEmotionMap: Record<string, Record<string, number>> = {};
+  const entityEmotionMap: Record<string, {emotions: Record<string, number>}> = {};
   
   entries.forEach(entry => {
     if (!entry.entityemotion) return;
-    
-    Object.entries(entry.entityemotion).forEach(([entity, emotions]) => {
+    Object.entries(entry.entityemotion).forEach(([category, emotions]) => {
       if (typeof emotions !== 'object') return;
-      
-      if (!entityEmotionMap[entity]) {
-        entityEmotionMap[entity] = {};
-      }
-      
       Object.entries(emotions).forEach(([emotion, score]) => {
         if (typeof score !== 'number') return;
-        
-        // Simple accumulation - sum the scores
-        if (entityEmotionMap[entity][emotion]) {
-          entityEmotionMap[entity][emotion] += score;
+        if (!entityEmotionMap[category]) {
+          entityEmotionMap[category] = { emotions: {} };
+        }
+        if (entityEmotionMap[category].emotions[emotion]) {
+          entityEmotionMap[category].emotions[emotion] =
+            (entityEmotionMap[category].emotions[emotion] + score) / 2;
         } else {
-          entityEmotionMap[entity][emotion] = score;
+          entityEmotionMap[category].emotions[emotion] = score;
         }
       });
     });
   });
 
-  console.log("[SoulNet] Fixed entity emotion map:", entityEmotionMap);
+  console.log("[SoulNet] Entity emotion map:", entityEmotionMap);
   return generateGraph(entityEmotionMap);
 };
 
-const generateGraph = (entityEmotionMap: Record<string, Record<string, number>>) => {
+const generateGraph = (entityEmotionMap: Record<string, {emotions: Record<string, number>}>) => {
   const nodes: NodeData[] = [];
   const links: LinkData[] = [];
   const entityNodes = new Set<string>();
@@ -399,13 +395,12 @@ const generateGraph = (entityEmotionMap: Record<string, Record<string, number>>)
       position: [entityX, entityY, entityZ]
     });
 
-    // Create links with proper values
-    Object.entries(entityEmotionMap[entity]).forEach(([emotion, score]) => {
+    Object.entries(entityEmotionMap[entity].emotions).forEach(([emotion, score]) => {
       emotionNodes.add(emotion);
       links.push({
         source: entity,
         target: emotion,
-        value: score // Use the actual accumulated score
+        value: score
       });
     });
   });
