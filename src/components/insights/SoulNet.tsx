@@ -46,6 +46,7 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
   const [hasData, setHasData] = useState(false);
   const [useWebGL, setUseWebGL] = useState(true);
   const [webglCapabilities, setWebglCapabilities] = useState<any>(null);
+  const [canvasReady, setCanvasReady] = useState(false);
   
   const isMobile = useIsMobile();
   const themeHex = useUserColorThemeHex();
@@ -61,10 +62,11 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
     canvasError: !!canvasError,
     retryCount,
     useWebGL,
-    webglCapabilities: !!webglCapabilities
+    webglCapabilities: !!webglCapabilities,
+    canvasReady
   });
 
-  // Check WebGL compatibility on mount
+  // Check WebGL compatibility on mount with enhanced detection
   useEffect(() => {
     try {
       const isCompatible = isWebGLCompatible();
@@ -91,7 +93,7 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
     };
   }, []);
 
-  // Main data fetching effect - simplified and more reliable
+  // Enhanced data fetching with better error handling
   useEffect(() => {
     if (!userId || !mountedRef.current) {
       console.log("[SoulNet] No userId or component unmounted, skipping fetch");
@@ -102,7 +104,7 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
 
     const fetchData = async () => {
       try {
-        console.log("[SoulNet] Starting data fetch for userId:", userId, "timeRange:", timeRange);
+        console.log("[SoulNet] Starting enhanced data fetch for userId:", userId, "timeRange:", timeRange);
         setLoading(true);
         setDataError(null);
         setCanvasError(null);
@@ -158,28 +160,37 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
   }, [userId, timeRange]);
 
   const handleNodeSelect = useCallback((id: string) => {
-    console.log("[SoulNet] Node selected:", id);
-    if (selectedNode === id) {
-      setSelectedNode(null);
-    } else {
-      setSelectedNode(id);
-      if (navigator.vibrate) {
-        navigator.vibrate(50);
+    try {
+      console.log("[SoulNet] Node selected:", id);
+      if (selectedNode === id) {
+        setSelectedNode(null);
+      } else {
+        setSelectedNode(id);
+        if (navigator.vibrate) {
+          navigator.vibrate(50);
+        }
       }
+    } catch (error) {
+      console.error('[SoulNet] Error handling node selection:', error);
     }
   }, [selectedNode]);
 
   const toggleFullScreen = useCallback(() => {
-    setIsFullScreen(prev => {
-      if (!prev) setSelectedNode(null);
-      return !prev;
-    });
+    try {
+      setIsFullScreen(prev => {
+        if (!prev) setSelectedNode(null);
+        return !prev;
+      });
+    } catch (error) {
+      console.error('[SoulNet] Error toggling fullscreen:', error);
+    }
   }, []);
 
   const handleCanvasError = useCallback((error: Error) => {
     console.error('[SoulNet] Canvas error:', error);
     setCanvasError(error);
     setRetryCount(prev => prev + 1);
+    setCanvasReady(false);
     
     // If we get repeated Canvas errors, switch to fallback
     if (retryCount > 2) {
@@ -193,10 +204,20 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
     setCanvasError(null);
     setDataError(null);
     setRetryCount(0);
+    setCanvasReady(false);
     
     // Reset WebGL attempt
     const isCompatible = isWebGLCompatible();
     setUseWebGL(isCompatible);
+  }, []);
+
+  const handleCanvasCreated = useCallback((state: any) => {
+    try {
+      console.log('[SoulNet] Canvas created successfully', state);
+      setCanvasReady(true);
+    } catch (error) {
+      console.error('[SoulNet] Error in canvas creation handler:', error);
+    }
   }, []);
 
   // Show loading state only while actively loading
@@ -219,7 +240,7 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
         </h2>
         <p className="text-muted-foreground mb-4">{dataError.message}</p>
         <button 
-          className="px-4 py-2 bg-primary text-white rounded-md" 
+          className="px-4 py-2 bg-primary text-white rounded-md hover:bg-primary/90 transition-colors" 
           onClick={handleRetry}
         >
           <TranslatableText text="Retry" />
@@ -250,7 +271,7 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
             <TranslatableText text="The visualization is being optimized for better performance. Your data is safe." />
           </p>
           <button
-            className="px-4 py-2 bg-yellow-600 text-white rounded hover:bg-yellow-700"
+            className="px-4 py-2 bg-yellow-600 text-white rounded hover:bg-yellow-700 transition-colors"
             onClick={handleRetry}
           >
             <TranslatableText text="Try Again" />
@@ -267,8 +288,8 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
     return <TranslatableText text="Drag to rotate • Scroll to zoom • Click a node to highlight connections" forceTranslate={true} />;
   };
 
-  // Main render with WebGL detection and fallback
-  console.log("[SoulNet] Rendering visualization with", graphData.nodes.length, "nodes, WebGL:", useWebGL);
+  // Main render with enhanced WebGL detection and fallback
+  console.log("[SoulNet] Rendering visualization with", graphData.nodes.length, "nodes, WebGL:", useWebGL, "Canvas ready:", canvasReady);
   
   return (
     <div className={cn(
@@ -299,7 +320,7 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
               themeHex={themeHex}
             />
           ) : (
-            // WebGL Canvas visualization
+            // Enhanced WebGL Canvas visualization
             <RenderingErrorBoundary
               onError={handleCanvasError}
               fallback={
@@ -312,7 +333,7 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
                       <TranslatableText text="Switching to alternative view..." />
                     </p>
                     <button 
-                      className="mt-4 px-4 py-2 bg-primary text-white rounded-lg"
+                      className="mt-4 px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors"
                       onClick={() => setUseWebGL(false)}
                     >
                       <TranslatableText text="Use Alternative View" />
@@ -332,7 +353,13 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
                   far: 1000,
                   fov: isFullScreen ? 60 : 50
                 }}
-                onPointerMissed={() => setSelectedNode(null)}
+                onPointerMissed={() => {
+                  try {
+                    setSelectedNode(null);
+                  } catch (error) {
+                    console.warn('[SoulNet] Error clearing selection:', error);
+                  }
+                }}
                 gl={{ 
                   preserveDrawingBuffer: true,
                   antialias: !isMobile,
@@ -342,9 +369,7 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
                   stencil: false,
                   precision: isMobile ? 'mediump' : 'highp'
                 }}
-                onCreated={(state) => {
-                  console.log('[SoulNet] Canvas created successfully');
-                }}
+                onCreated={handleCanvasCreated}
                 onError={handleCanvasError}
               >
                 <SimplifiedSoulNetVisualization
@@ -369,6 +394,11 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
           {!useWebGL && (
             <p className="text-xs text-muted-foreground mt-1">
               <TranslatableText text="Using compatibility mode" />
+            </p>
+          )}
+          {useWebGL && !canvasReady && (
+            <p className="text-xs text-muted-foreground mt-1">
+              <TranslatableText text="Initializing 3D visualization..." />
             </p>
           )}
         </div>

@@ -36,98 +36,181 @@ export const NodeMesh: React.FC<NodeMeshProps> = ({
   const meshRef = useRef<THREE.Mesh>(null);
   const [animationTime, setAnimationTime] = useState(0);
   const [isReady, setIsReady] = useState(false);
+  const [isMounted, setIsMounted] = useState(false);
   
-  // Delayed initialization to prevent clock access issues
+  // Safe component initialization
   useEffect(() => {
-    const timer = setTimeout(() => {
-      setIsReady(true);
-    }, 100);
+    console.log(`[NodeMesh] Initializing ${type} node mesh`);
+    setIsMounted(true);
     
-    return () => clearTimeout(timer);
-  }, []);
+    const timer = setTimeout(() => {
+      if (isMounted) {
+        setIsReady(true);
+        console.log(`[NodeMesh] ${type} node mesh ready`);
+      }
+    }, 50);
+    
+    return () => {
+      console.log(`[NodeMesh] Cleaning up ${type} node mesh`);
+      setIsMounted(false);
+      clearTimeout(timer);
+    };
+  }, [type]);
   
-  // Simplified geometry creation
-  const Geometry = useMemo(() => 
-    type === 'entity'
-      ? <sphereGeometry args={[1.2, 16, 16]} />
-      : <boxGeometry args={[2.0, 2.0, 2.0]} />,
-    [type]
-  );
+  // Memoized geometry creation with error handling
+  const geometry = useMemo(() => {
+    try {
+      if (type === 'entity') {
+        return <sphereGeometry args={[1.2, 16, 16]} />;
+      } else {
+        return <boxGeometry args={[2.0, 2.0, 2.0]} />;
+      }
+    } catch (error) {
+      console.warn('[NodeMesh] Error creating geometry:', error);
+      // Fallback to simple sphere
+      return <sphereGeometry args={[1.0, 8, 8]} />;
+    }
+  }, [type]);
 
-  // Safe animation with manual time tracking
+  // Safe animation with proper error handling and bounds checking
   useFrame((state, delta) => {
-    if (!meshRef.current || !isReady) return;
+    if (!meshRef.current || !isReady || !isMounted) return;
     
     try {
-      // Manual time tracking instead of clock access
-      setAnimationTime(prev => prev + delta);
+      // Validate delta to prevent extreme values
+      const safeDelta = Math.min(Math.max(delta, 0), 0.1);
       
-      if (isHighlighted) {
-        const pulseIntensity = isSelected ? 0.25 : (connectionStrength * 0.2);
+      // Manual time tracking with bounds
+      setAnimationTime(prev => {
+        const newTime = prev + safeDelta;
+        return newTime > 1000 ? 0 : newTime; // Reset after 1000 to prevent overflow
+      });
+      
+      // Safe mesh scaling
+      if (isHighlighted && meshRef.current.scale) {
+        const pulseIntensity = isSelected ? 0.25 : Math.min(connectionStrength * 0.2, 0.2);
         const pulse = Math.sin(animationTime * 2.5) * pulseIntensity + 1.1;
-        meshRef.current.scale.set(scale * pulse, scale * pulse, scale * pulse);
+        const targetScale = Math.min(Math.max(scale * pulse, 0.1), 5); // Bounds checking
         
-        // Safe material updates
-        if (meshRef.current.material instanceof THREE.MeshStandardMaterial) {
-          const emissiveIntensity = isSelected 
-            ? 1.0 + Math.sin(animationTime * 3) * 0.3
-            : 0.7 + (connectionStrength * 0.3) + Math.sin(animationTime * 3) * 0.2;
-          
-          meshRef.current.material.emissiveIntensity = Math.max(0, Math.min(2, emissiveIntensity));
-        }
-      } else {
-        const targetScale = dimmed ? scale * 0.8 : scale;
         meshRef.current.scale.set(targetScale, targetScale, targetScale);
         
-        if (meshRef.current.material instanceof THREE.MeshStandardMaterial) {
+        // Safe material updates with validation
+        if (meshRef.current.material && meshRef.current.material instanceof THREE.MeshStandardMaterial) {
+          const material = meshRef.current.material;
+          const baseIntensity = isSelected ? 1.0 : 0.7;
+          const strengthBonus = Math.min(connectionStrength * 0.3, 0.3);
+          const pulse = Math.sin(animationTime * 3) * 0.3;
+          const emissiveIntensity = Math.min(Math.max(baseIntensity + strengthBonus + pulse, 0), 2);
+          
+          material.emissiveIntensity = emissiveIntensity;
+        }
+      } else if (meshRef.current.scale) {
+        const targetScale = dimmed ? Math.max(scale * 0.8, 0.1) : Math.max(scale, 0.1);
+        meshRef.current.scale.set(targetScale, targetScale, targetScale);
+        
+        // Reset emissive intensity for non-highlighted nodes
+        if (meshRef.current.material && meshRef.current.material instanceof THREE.MeshStandardMaterial) {
           meshRef.current.material.emissiveIntensity = dimmed ? 0 : 0.1;
         }
       }
     } catch (error) {
-      console.warn("NodeMesh animation error:", error);
+      console.warn('[NodeMesh] Animation error:', error);
+      // Fallback to static scale
+      if (meshRef.current && meshRef.current.scale) {
+        const safeScale = Math.max(scale, 0.1);
+        meshRef.current.scale.set(safeScale, safeScale, safeScale);
+      }
     }
   });
 
-  // Safe opacity calculation
+  // Safe opacity calculation with validation
   const nodeOpacity = useMemo(() => {
-    if (isHighlighted) {
-      return isSelected ? 0.9 : 0.4;
+    try {
+      if (isHighlighted) {
+        return isSelected ? 0.9 : Math.min(Math.max(0.4 + connectionStrength * 0.3, 0.4), 0.9);
+      }
+      return dimmed ? 0.4 : 0.85;
+    } catch (error) {
+      console.warn('[NodeMesh] Error calculating opacity:', error);
+      return 0.7; // Safe fallback
     }
-    return dimmed ? 0.4 : 0.85;
-  }, [isHighlighted, isSelected, dimmed]);
+  }, [isHighlighted, isSelected, dimmed, connectionStrength]);
 
-  // Don't render until ready
-  if (!isReady) {
+  // Safe color validation
+  const safeDisplayColor = useMemo(() => {
+    try {
+      // Validate color format
+      if (typeof displayColor === 'string' && displayColor.match(/^#[0-9A-Fa-f]{6}$/)) {
+        return displayColor;
+      }
+      console.warn('[NodeMesh] Invalid color format:', displayColor);
+      return '#ffffff'; // Safe fallback
+    } catch (error) {
+      console.warn('[NodeMesh] Error validating color:', error);
+      return '#ffffff';
+    }
+  }, [displayColor]);
+
+  // Don't render until ready and mounted
+  if (!isReady || !isMounted) {
     return null;
   }
 
-  return (
-    <mesh
-      ref={meshRef}
-      scale={[scale, scale, scale]}
-      onClick={(e) => {
-        e.stopPropagation();
-        onClick(e);
-      }}
-      onPointerDown={onPointerDown}
-      onPointerUp={onPointerUp}
-      onPointerOut={onPointerOut}
-      onPointerLeave={onPointerLeave}
-      renderOrder={1}
-    >
-      {Geometry}
-      <meshStandardMaterial
-        color={displayColor}
-        transparent={true}
-        opacity={nodeOpacity}
-        emissive={displayColor}
-        emissiveIntensity={isHighlighted ? 1.2 : (dimmed ? 0 : 0.1)}
-        roughness={0.3}
-        metalness={0.4}
-        depthWrite={false}
-      />
-    </mesh>
-  );
+  // Safe event handlers with error boundaries
+  const handleClick = (e: any) => {
+    try {
+      e.stopPropagation();
+      onClick(e);
+    } catch (error) {
+      console.warn('[NodeMesh] Click handler error:', error);
+    }
+  };
+
+  const handlePointerDown = (e: any) => {
+    try {
+      onPointerDown(e);
+    } catch (error) {
+      console.warn('[NodeMesh] PointerDown handler error:', error);
+    }
+  };
+
+  const handlePointerUp = (e: any) => {
+    try {
+      onPointerUp(e);
+    } catch (error) {
+      console.warn('[NodeMesh] PointerUp handler error:', error);
+    }
+  };
+
+  try {
+    return (
+      <mesh
+        ref={meshRef}
+        scale={[Math.max(scale, 0.1), Math.max(scale, 0.1), Math.max(scale, 0.1)]}
+        onClick={handleClick}
+        onPointerDown={handlePointerDown}
+        onPointerUp={handlePointerUp}
+        onPointerOut={onPointerOut}
+        onPointerLeave={onPointerLeave}
+        renderOrder={1}
+      >
+        {geometry}
+        <meshStandardMaterial
+          color={safeDisplayColor}
+          transparent={true}
+          opacity={nodeOpacity}
+          emissive={safeDisplayColor}
+          emissiveIntensity={isHighlighted ? 1.2 : (dimmed ? 0 : 0.1)}
+          roughness={0.3}
+          metalness={0.4}
+          depthWrite={false}
+        />
+      </mesh>
+    );
+  } catch (error) {
+    console.error('[NodeMesh] Fatal render error:', error);
+    return null;
+  }
 };
 
 export default NodeMesh;
