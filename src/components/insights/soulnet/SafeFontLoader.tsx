@@ -2,22 +2,19 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useLoader } from '@react-three/fiber';
 import { FontLoader } from 'three/examples/jsm/loaders/FontLoader.js';
-import { localFontService } from '@/services/localFontService';
 
 interface SafeFontLoaderProps {
   fontUrl: string;
   children: (font: any, isLoading: boolean, hasError: boolean) => React.ReactNode;
   fallbackFont?: string;
   retryCount?: number;
-  textToValidate?: string; // Add text for validation
 }
 
 export const SafeFontLoader: React.FC<SafeFontLoaderProps> = ({
   fontUrl,
   children,
   fallbackFont = '/fonts/helvetiker_regular.typeface.json',
-  retryCount = 3,
-  textToValidate
+  retryCount = 3
 }) => {
   const [loadState, setLoadState] = useState<{
     font: any;
@@ -25,14 +22,12 @@ export const SafeFontLoader: React.FC<SafeFontLoaderProps> = ({
     hasError: boolean;
     currentUrl: string;
     retryAttempt: number;
-    validationPassed: boolean;
   }>({
     font: null,
     isLoading: true,
     hasError: false,
     currentUrl: fontUrl,
-    retryAttempt: 0,
-    validationPassed: false
+    retryAttempt: 0
   });
 
   const mountedRef = useRef(true);
@@ -45,30 +40,26 @@ export const SafeFontLoader: React.FC<SafeFontLoaderProps> = ({
     }
   }, []);
 
-  // Enhanced font loading with validation
+  // Font loading effect
   useEffect(() => {
     if (!loaderRef.current || !mountedRef.current) return;
 
-    const loadAndValidateFont = async (url: string, attempt: number = 0) => {
+    const loadFont = async (url: string, attempt: number = 0) => {
       if (!mountedRef.current) return;
 
       try {
-        console.log(`[SafeFontLoader] Loading font from: ${url} (attempt ${attempt + 1})`);
-        
         setLoadState(prev => ({ 
           ...prev, 
           isLoading: true, 
           hasError: false,
           currentUrl: url,
-          retryAttempt: attempt,
-          validationPassed: false
+          retryAttempt: attempt
         }));
 
-        // Load the font
         const font = await new Promise<any>((resolve, reject) => {
           const timeout = setTimeout(() => {
             reject(new Error('Font loading timeout'));
-          }, 8000); // Increased timeout for better reliability
+          }, 5000);
 
           loaderRef.current!.load(
             url,
@@ -84,49 +75,25 @@ export const SafeFontLoader: React.FC<SafeFontLoaderProps> = ({
           );
         });
 
-        if (!mountedRef.current) return;
-
-        console.log(`[SafeFontLoader] Font loaded, validating completeness...`);
-
-        // Validate font completeness
-        const fontName = url.includes('noto_sans_devanagari') ? 'Noto Sans Devanagari' :
-                         url.includes('optimer') ? 'Optimer' : 'Helvetiker';
-        
-        const validationResult = await localFontService.validateFont(font.data, fontName, textToValidate);
-
-        if (!validationResult.isValid) {
-          console.warn(`[SafeFontLoader] Font validation failed for ${url}:`, validationResult.issues);
-          throw new Error(`Font validation failed: ${validationResult.issues.join(', ')}`);
-        }
-
-        if (textToValidate && !validationResult.supportsScript) {
-          console.warn(`[SafeFontLoader] Font does not support required script for text: "${textToValidate}"`);
-          throw new Error('Font does not support required script');
-        }
-
-        console.log(`[SafeFontLoader] Font validation passed for ${url}`);
-
         if (mountedRef.current) {
           setLoadState(prev => ({ 
             ...prev, 
             font, 
             isLoading: false, 
-            hasError: false,
-            validationPassed: true
+            hasError: false 
           }));
-          console.log(`[SafeFontLoader] Successfully loaded and validated font: ${url}`);
+          console.log(`[SafeFontLoader] Successfully loaded font: ${url}`);
         }
       } catch (error) {
-        console.warn(`[SafeFontLoader] Failed to load/validate font ${url} (attempt ${attempt + 1}):`, error);
+        console.warn(`[SafeFontLoader] Failed to load font ${url} (attempt ${attempt + 1}):`, error);
         
         if (!mountedRef.current) return;
 
         // Retry logic
         if (attempt < retryCount && url === fontUrl) {
-          console.log(`[SafeFontLoader] Retrying font load in ${1000 * (attempt + 1)}ms...`);
           setTimeout(() => {
             if (mountedRef.current) {
-              loadAndValidateFont(url, attempt + 1);
+              loadFont(url, attempt + 1);
             }
           }, 1000 * (attempt + 1));
           return;
@@ -135,7 +102,7 @@ export const SafeFontLoader: React.FC<SafeFontLoaderProps> = ({
         // Fallback to default font if all retries failed and we haven't tried fallback yet
         if (url !== fallbackFont) {
           console.log(`[SafeFontLoader] Falling back to: ${fallbackFont}`);
-          loadAndValidateFont(fallbackFont, 0);
+          loadFont(fallbackFont, 0);
           return;
         }
 
@@ -144,20 +111,18 @@ export const SafeFontLoader: React.FC<SafeFontLoaderProps> = ({
           setLoadState(prev => ({ 
             ...prev, 
             isLoading: false, 
-            hasError: true,
-            validationPassed: false
+            hasError: true 
           }));
-          console.error(`[SafeFontLoader] All font loading attempts failed for: ${fontUrl}`);
         }
       }
     };
 
-    loadAndValidateFont(fontUrl);
+    loadFont(fontUrl);
 
     return () => {
       mountedRef.current = false;
     };
-  }, [fontUrl, fallbackFont, retryCount, textToValidate]);
+  }, [fontUrl, fallbackFont, retryCount]);
 
   // Cleanup on unmount
   useEffect(() => {
@@ -166,7 +131,7 @@ export const SafeFontLoader: React.FC<SafeFontLoaderProps> = ({
     };
   }, []);
 
-  return <>{children(loadState.font, loadState.isLoading, loadState.hasError || !loadState.validationPassed)}</>;
+  return <>{children(loadState.font, loadState.isLoading, loadState.hasError)}</>;
 };
 
 export default SafeFontLoader;

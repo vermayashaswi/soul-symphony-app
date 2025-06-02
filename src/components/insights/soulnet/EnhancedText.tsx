@@ -110,7 +110,6 @@ export const EnhancedText: React.FC<EnhancedTextProps> = ({
       fontUrl={fontUrl}
       fallbackFont={fallbackUrl}
       retryCount={2}
-      textToValidate={displayText} // Pass text for validation
     >
       {(font, isLoading, hasError) => {
         if (isLoading || !font) {

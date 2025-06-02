@@ -6,18 +6,9 @@ interface LocalFontConfig {
   scriptSupport: string[];
 }
 
-interface FontValidationResult {
-  isValid: boolean;
-  hasGlyphs: boolean;
-  glyphCount: number;
-  supportsScript: boolean;
-  issues: string[];
-}
-
 class LocalFontService {
   private fonts: Map<string, LocalFontConfig> = new Map();
   private isInitialized = false;
-  private validatedFonts: Map<string, FontValidationResult> = new Map();
 
   constructor() {
     this.initializeFonts();
@@ -116,136 +107,26 @@ class LocalFontService {
     return fontConfig?.fallbackUrl || this.getFontUrl('Helvetiker', false);
   }
 
-  // Enhanced font validation with glyph checking
-  async validateFont(fontData: any, fontName: string, text?: string): Promise<FontValidationResult> {
-    const result: FontValidationResult = {
-      isValid: false,
-      hasGlyphs: false,
-      glyphCount: 0,
-      supportsScript: false,
-      issues: []
-    };
-
-    try {
-      console.log(`[LocalFontService] Validating font: ${fontName}`);
-
-      // Check if font data exists and has basic structure
-      if (!fontData) {
-        result.issues.push('Font data is null or undefined');
-        return result;
-      }
-
-      if (typeof fontData !== 'object') {
-        result.issues.push('Font data is not an object');
-        return result;
-      }
-
-      // Check for required properties
-      if (!fontData.glyphs) {
-        result.issues.push('Font data missing glyphs property');
-        return result;
-      }
-
-      // Check if glyphs is an object and not empty
-      if (typeof fontData.glyphs !== 'object' || fontData.glyphs === null) {
-        result.issues.push('Glyphs property is not an object');
-        return result;
-      }
-
-      const glyphKeys = Object.keys(fontData.glyphs);
-      result.glyphCount = glyphKeys.length;
-      result.hasGlyphs = glyphKeys.length > 0;
-
-      if (!result.hasGlyphs) {
-        result.issues.push('Font has no glyphs defined');
-        return result;
-      }
-
-      console.log(`[LocalFontService] Font ${fontName} has ${result.glyphCount} glyphs`);
-
-      // If text is provided, check script support
-      if (text) {
-        const scriptType = this.detectScriptType(text);
-        result.supportsScript = this.checkScriptSupport(fontData.glyphs, scriptType);
-        
-        if (!result.supportsScript) {
-          result.issues.push(`Font does not support ${scriptType} script`);
-        }
-      } else {
-        result.supportsScript = true; // Assume supported if no text to check
-      }
-
-      // Check for basic font metadata
-      if (!fontData.familyName) {
-        result.issues.push('Missing familyName');
-      }
-
-      // Font is valid if it has glyphs and supports the required script (if specified)
-      result.isValid = result.hasGlyphs && (text ? result.supportsScript : true);
-
-      console.log(`[LocalFontService] Font validation result for ${fontName}:`, result);
-      
-      // Cache the validation result
-      this.validatedFonts.set(fontName, result);
-
-      return result;
-    } catch (error) {
-      console.error(`[LocalFontService] Font validation error for ${fontName}:`, error);
-      result.issues.push(`Validation error: ${error instanceof Error ? error.message : 'Unknown error'}`);
-      return result;
-    }
-  }
-
-  private checkScriptSupport(glyphs: any, scriptType: string): boolean {
-    const glyphKeys = Object.keys(glyphs);
-    
-    switch (scriptType) {
-      case 'devanagari':
-        // Check for common Devanagari characters
-        return glyphKeys.some(key => /[\u0900-\u097F]/.test(key));
-      case 'arabic':
-        return glyphKeys.some(key => /[\u0600-\u06FF]/.test(key));
-      case 'chinese':
-        return glyphKeys.some(key => /[\u4E00-\u9FFF]/.test(key));
-      case 'japanese':
-        return glyphKeys.some(key => /[\u3040-\u309F\u30A0-\u30FF]/.test(key));
-      case 'korean':
-        return glyphKeys.some(key => /[\uAC00-\uD7AF]/.test(key));
-      case 'latin':
-      default:
-        // Check for basic Latin characters
-        return glyphKeys.some(key => /[a-zA-Z]/.test(key));
-    }
-  }
-
-  // Get cached validation result
-  getValidationResult(fontName: string): FontValidationResult | null {
-    return this.validatedFonts.get(fontName) || null;
-  }
-
-  // Test method for Devanagari support with enhanced validation
+  // Test method for Devanagari support
   testDevanagariSupport(text: string): { 
     scriptType: string; 
     fontName: string; 
     localUrl: string;
     fallbackUrl: string;
     hasDevanagari: boolean;
-    validationResult?: FontValidationResult;
   } {
     const scriptType = this.detectScriptType(text);
     const fontName = this.getFontNameForText(text);
     const localUrl = this.getFontUrl(fontName, true);
     const fallbackUrl = this.getFallbackUrl(fontName);
     const hasDevanagari = /[\u0900-\u097F]/.test(text);
-    const validationResult = this.getValidationResult(fontName);
     
     return {
       scriptType,
       fontName,
       localUrl,
       fallbackUrl,
-      hasDevanagari,
-      validationResult
+      hasDevanagari
     };
   }
 
