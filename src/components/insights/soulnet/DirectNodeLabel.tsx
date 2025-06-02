@@ -1,6 +1,7 @@
 
 import React, { useMemo } from 'react';
-import { TranslatableText } from '@/components/translation/TranslatableText';
+import { Html } from '@react-three/drei';
+import { TranslatableHtmlText } from './TranslatableHtmlText';
 
 interface DirectNodeLabelProps {
   id: string;
@@ -49,12 +50,12 @@ export const DirectNodeLabel: React.FC<DirectNodeLabelProps> = ({
   const textSize = useMemo(() => {
     try {
       const zoom = Math.max(10, Math.min(100, cameraZoom || 45));
-      const baseSize = 0.4;
-      const zoomFactor = Math.max(0.7, Math.min(1.3, (50 - zoom) * 0.02 + 1));
-      return Math.max(0.2, Math.min(0.8, baseSize * zoomFactor));
+      const baseSize = 12;
+      const zoomFactor = Math.max(0.8, Math.min(1.4, (60 - zoom) * 0.02 + 1));
+      return Math.max(10, Math.min(18, baseSize * zoomFactor));
     } catch (error) {
       console.warn('[DirectNodeLabel] Error calculating text size:', error);
-      return 0.4;
+      return 12;
     }
   }, [cameraZoom]);
 
@@ -75,35 +76,40 @@ export const DirectNodeLabel: React.FC<DirectNodeLabelProps> = ({
     position[2] + labelOffset[2]
   ];
 
-  console.log(`[DirectNodeLabel] Rendering TranslatableText for "${id}" at position`, labelPosition);
+  console.log(`[DirectNodeLabel] Rendering Html component for "${id}" at position`, labelPosition);
 
   try {
     return (
       <group position={labelPosition}>
-        <TranslatableText
-          text={id || 'Unknown'}
-          as="div"
-          forceTranslate={true}
+        <Html
+          center
+          distanceFactor={15}
+          transform
+          sprite
           style={{
-            color: textColor,
-            fontSize: `${textSize}rem`,
-            fontWeight: (isHighlighted || isSelected) ? 'bold' : 'normal',
-            textAlign: 'center',
-            textShadow: isSelected 
-              ? '2px 2px 4px #000000' 
-              : '1px 1px 2px #333333',
-            maxWidth: '25ch',
-            wordWrap: 'break-word',
-            whiteSpace: 'nowrap',
-            overflow: 'hidden',
-            textOverflow: 'ellipsis',
-            pointerEvents: 'none'
+            pointerEvents: 'none',
+            userSelect: 'none'
           }}
-        />
+        >
+          <TranslatableHtmlText
+            text={id}
+            isSelected={isSelected}
+            isHighlighted={isHighlighted}
+            nodeType={type}
+            style={{
+              fontSize: `${textSize}px`,
+              color: textColor,
+              background: isSelected ? 'rgba(0,0,0,0.3)' : 'transparent',
+              padding: isSelected ? '2px 6px' : '0',
+              borderRadius: isSelected ? '4px' : '0',
+              backdropFilter: isSelected ? 'blur(2px)' : 'none'
+            }}
+          />
+        </Html>
       </group>
     );
   } catch (error) {
-    console.error('[DirectNodeLabel] Error rendering label:', error);
+    console.error('[DirectNodeLabel] Error rendering Html label:', error);
     return null;
   }
 };
