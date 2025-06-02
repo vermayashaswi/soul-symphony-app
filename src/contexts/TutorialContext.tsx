@@ -16,6 +16,7 @@ import {
 } from '@/utils/tutorial/tutorial-elements-finder';
 import { performComprehensiveCleanup, performStaggeredCleanup, performNavigationCleanup } from '@/utils/tutorial/tutorial-cleanup-enhanced';
 import { navigationManager } from '@/utils/tutorial/navigation-state-manager';
+import { highlightingManager } from '@/utils/tutorial/tutorial-highlighting-manager';
 import { InfographicType } from '@/components/tutorial/TutorialInfographic';
 
 // Define the interface for a tutorial step
@@ -51,6 +52,7 @@ interface TutorialContextType {
     inProgress: boolean;
     targetRoute: string | null;
   };
+  isInitialized: boolean; // NEW: Track initialization state
 }
 
 // Create the context with a default undefined value
@@ -184,6 +186,7 @@ export const TutorialProvider: React.FC<{ children: ReactNode }> = ({ children }
   });
   const [tutorialCompleted, setTutorialCompleted] = useState(false);
   const [pendingTutorialStart, setPendingTutorialStart] = useState(false);
+  const [isInitialized, setIsInitialized] = useState(false); // NEW: Track initialization
   
   // Enhanced logging for debugging
   useEffect(() => {
@@ -195,9 +198,26 @@ export const TutorialProvider: React.FC<{ children: ReactNode }> = ({ children }
       navigationState,
       pendingTutorialStart,
       tutorialChecked,
-      navigationManagerState: navigationManager.getState()
+      isInitialized, // NEW: Log initialization state
+      navigationManagerState: navigationManager.getState(),
+      highlightingManagerState: highlightingManager.getState()
     });
-  }, [isActive, currentStep, steps, location.pathname, navigationState, pendingTutorialStart, tutorialChecked]);
+  }, [isActive, currentStep, steps, location.pathname, navigationState, pendingTutorialStart, tutorialChecked, isInitialized]);
+  
+  // NEW: Initialize the tutorial system
+  useEffect(() => {
+    console.log('[TutorialContext] Initializing tutorial system');
+    
+    // Mark as initialized after a brief delay to ensure all dependencies are ready
+    const initTimeout = setTimeout(() => {
+      setIsInitialized(true);
+      console.log('[TutorialContext] Tutorial system initialized');
+    }, 100);
+    
+    return () => {
+      clearTimeout(initTimeout);
+    };
+  }, []);
   
   // Subscribe to navigation manager state changes
   useEffect(() => {
@@ -214,6 +234,9 @@ export const TutorialProvider: React.FC<{ children: ReactNode }> = ({ children }
   // Function to manually start the tutorial with proper navigation
   const startTutorial = () => {
     console.log('[TutorialContext] Starting tutorial manually');
+    
+    // Reset highlighting manager
+    highlightingManager.reset();
     
     // Set the tutorial as pending start until we're on the right route
     setPendingTutorialStart(true);
@@ -235,6 +258,8 @@ export const TutorialProvider: React.FC<{ children: ReactNode }> = ({ children }
   
   // Enhanced navigation completion handler with timeout protection
   useEffect(() => {
+    if (!isInitialized) return; // NEW: Don't process navigation until initialized
+    
     const navManagerState = navigationManager.getState();
     
     if (navManagerState.isNavigating && navManagerState.targetRoute === location.pathname) {
@@ -248,21 +273,23 @@ export const TutorialProvider: React.FC<{ children: ReactNode }> = ({ children }
         setPendingTutorialStart(false);
       }
       
-      // After navigation completes, check for elements that need to be highlighted
+      // After navigation completes, check for elements that need to be highlighted using new system
       const currentStepData = steps[currentStep];
       if (currentStepData && currentStepData.waitForElement) {
         console.log(`[TutorialContext] Step ${currentStepData.id} is waiting for element: ${currentStepData.targetElement}`);
         
-        // Wait for the DOM to be ready after navigation
+        // Wait for the DOM to be ready after navigation, then use highlighting manager
         setTimeout(() => {
-          checkForTargetElement(currentStepData);
+          checkForTargetElementEnhanced(currentStepData);
         }, 500);
       }
     }
-  }, [location.pathname, pendingTutorialStart, currentStep, steps]);
+  }, [location.pathname, pendingTutorialStart, currentStep, steps, isInitialized]);
   
   // Check if tutorial should be active based on user's profile and current route
   useEffect(() => {
+    if (!isInitialized) return; // NEW: Don't check tutorial until initialized
+    
     const checkTutorialStatus = async () => {
       if (!user || tutorialChecked) return;
       
@@ -296,6 +323,9 @@ export const TutorialProvider: React.FC<{ children: ReactNode }> = ({ children }
           console.log('[TutorialContext] Tutorial should be activated at step:', startingStep);
           setCurrentStep(startingStep);
           
+          // Reset highlighting manager for fresh start
+          highlightingManager.reset();
+          
           // Always start tutorial, but handle navigation properly
           if (isAppRoute(location.pathname)) {
             console.log('[TutorialContext] On app route, activating tutorial immediately');
@@ -317,10 +347,10 @@ export const TutorialProvider: React.FC<{ children: ReactNode }> = ({ children }
     };
     
     checkTutorialStatus();
-  }, [user, location.pathname, tutorialChecked, navigate]);
+  }, [user, location.pathname, tutorialChecked, navigate, isInitialized]);
   
-  // Helper function to check for target elements and apply highlighting
-  const checkForTargetElement = (stepData: TutorialStep) => {
+  // ENHANCED: Helper function to check for target elements using new highlighting system
+  const checkForTargetElementEnhanced = (stepData: TutorialStep) => {
     const selectors = [
       stepData.targetElement,
       ...(stepData.alternativeSelectors || [])
@@ -331,20 +361,33 @@ export const TutorialProvider: React.FC<{ children: ReactNode }> = ({ children }
       logPotentialTutorialElements();
     }
     
-    // Attempt to find and highlight the element
-    const found = findAndHighlightElement(
-      selectors, 
-      stepData.id === 3 ? 'record-entry-tab' : 
-      stepData.id === 4 ? 'entries-tab' :
-      stepData.id === 5 ? 'chat-question-highlight' :
-      stepData.id === 6 ? 'insights-header-highlight' :
-      stepData.id === 7 ? 'emotion-chart-highlight' :
-      stepData.id === 8 ? 'mood-calendar-highlight' :
-      stepData.id === 9 ? 'soul-net-highlight' : ''
-    );
-    
-    if (!found) {
-      console.warn(`[TutorialContext] Could not find any target element for step ${stepData.id}`);
+    // Use the new highlighting manager for enhanced highlighting
+    if (stepData.id === 3) {
+      highlightingManager.applyStaggeredHighlighting(
+        selectors,
+        ['tutorial-target', 'record-entry-tab', 'tutorial-record-entry-button'],
+        3
+      );
+    } else if (stepData.id === 4) {
+      highlightingManager.applyStaggeredHighlighting(
+        selectors,
+        ['tutorial-target', 'entries-tab'],
+        4
+      );
+    } else {
+      // For other steps, use the existing system
+      const found = findAndHighlightElement(
+        selectors, 
+        stepData.id === 5 ? 'chat-question-highlight' :
+        stepData.id === 6 ? 'insights-header-highlight' :
+        stepData.id === 7 ? 'emotion-chart-highlight' :
+        stepData.id === 8 ? 'mood-calendar-highlight' :
+        stepData.id === 9 ? 'soul-net-highlight' : ''
+      );
+      
+      if (!found) {
+        console.warn(`[TutorialContext] Could not find any target element for step ${stepData.id}`);
+      }
     }
   };
   
@@ -379,6 +422,7 @@ export const TutorialProvider: React.FC<{ children: ReactNode }> = ({ children }
       setIsActive(false);
       setPendingTutorialStart(false);
       navigationManager.forceReset();
+      highlightingManager.reset();
       
       // Comprehensive cleanup
       performStaggeredCleanup();
@@ -416,7 +460,7 @@ export const TutorialProvider: React.FC<{ children: ReactNode }> = ({ children }
     }
   };
   
-  // Enhanced next step function with improved navigation handling and transition protection
+  // ENHANCED: Next step function with improved navigation handling and enhanced highlighting
   const nextStep = () => {
     if (currentStep < steps.length - 1) {
       const newStep = currentStep + 1;
@@ -424,7 +468,7 @@ export const TutorialProvider: React.FC<{ children: ReactNode }> = ({ children }
       
       console.log(`[TutorialContext] Moving to tutorial step ${newStep} (ID: ${nextStepData.id})`);
       
-      // Start step transition protection immediately
+      // Start step transition protection immediately with extended duration
       navigationManager.startStepTransition(nextStepData.id);
       
       // Perform selective cleanup that preserves the target step
@@ -446,14 +490,9 @@ export const TutorialProvider: React.FC<{ children: ReactNode }> = ({ children }
         // If we're already on the right page, immediately check for elements to highlight
         if (nextStepData.waitForElement) {
           setTimeout(() => {
-            checkForTargetElement(nextStepData);
-            navigationManager.clearStepTransition();
-          }, 200);
-        } else {
-          // Clear transition protection after a short delay
-          setTimeout(() => {
-            navigationManager.clearStepTransition();
-          }, 500);
+            checkForTargetElementEnhanced(nextStepData);
+            // Don't clear transition protection immediately, let it timeout for better persistence
+          }, 300); // Increased delay for better DOM readiness
         }
       }
     } else {
@@ -463,7 +502,7 @@ export const TutorialProvider: React.FC<{ children: ReactNode }> = ({ children }
     }
   };
   
-  // Enhanced prev step function with improved navigation handling and transition protection
+  // ENHANCED: Prev step function with improved navigation handling and enhanced highlighting
   const prevStep = () => {
     if (currentStep > 0) {
       const newStep = currentStep - 1;
@@ -471,7 +510,7 @@ export const TutorialProvider: React.FC<{ children: ReactNode }> = ({ children }
       
       console.log(`[TutorialContext] Moving to previous step ${newStep} (ID: ${prevStepData.id})`);
       
-      // Start step transition protection immediately
+      // Start step transition protection immediately with extended duration
       navigationManager.startStepTransition(prevStepData.id);
       
       // Perform selective cleanup that preserves the target step
@@ -493,14 +532,9 @@ export const TutorialProvider: React.FC<{ children: ReactNode }> = ({ children }
         // If we're already on the right page, immediately check for elements to highlight
         if (prevStepData.waitForElement) {
           setTimeout(() => {
-            checkForTargetElement(prevStepData);
-            navigationManager.clearStepTransition();
-          }, 200);
-        } else {
-          // Clear transition protection after a short delay
-          setTimeout(() => {
-            navigationManager.clearStepTransition();
-          }, 500);
+            checkForTargetElementEnhanced(prevStepData);
+            // Don't clear transition protection immediately, let it timeout for better persistence
+          }, 300); // Increased delay for better DOM readiness
         }
       }
     }
@@ -525,6 +559,7 @@ export const TutorialProvider: React.FC<{ children: ReactNode }> = ({ children }
       setPendingTutorialStart(false);
       setTutorialCompleted(true);
       navigationManager.forceReset();
+      highlightingManager.reset();
       
       // Clean up any lingering tutorial classes
       performStaggeredCleanup();
@@ -560,6 +595,7 @@ export const TutorialProvider: React.FC<{ children: ReactNode }> = ({ children }
       setTutorialCompleted(false);
       setPendingTutorialStart(false);
       navigationManager.forceReset();
+      highlightingManager.reset();
       
       // Only navigate if we're not already on the app home page
       if (location.pathname !== '/app/home') {
@@ -576,7 +612,7 @@ export const TutorialProvider: React.FC<{ children: ReactNode }> = ({ children }
     }
   };
   
-  // Provide the context value with the updated navigationState property
+  // Provide the context value with the updated navigationState property and initialization state
   const contextValue: TutorialContextType = {
     isActive,
     currentStep,
@@ -590,7 +626,8 @@ export const TutorialProvider: React.FC<{ children: ReactNode }> = ({ children }
     startTutorial,
     tutorialCompleted,
     isInStep: (stepId: number) => isActive && steps[currentStep]?.id === stepId,
-    navigationState
+    navigationState,
+    isInitialized // NEW: Include initialization state
   };
   
   return (
@@ -600,12 +637,31 @@ export const TutorialProvider: React.FC<{ children: ReactNode }> = ({ children }
   );
 };
 
-// Custom hook to use the tutorial context
+// ENHANCED: Custom hook to use the tutorial context with resilience
 export const useTutorial = () => {
   const context = useContext(TutorialContext);
   
+  // NEW: Handle undefined context gracefully during initialization
   if (context === undefined) {
-    throw new Error('useTutorial must be used within a TutorialProvider');
+    console.warn('[useTutorial] Hook called before TutorialProvider is ready, returning safe defaults');
+    
+    // Return safe default values when context is not yet available
+    return {
+      isActive: false,
+      currentStep: 0,
+      totalSteps: 0,
+      steps: [],
+      nextStep: () => console.warn('[useTutorial] nextStep called before provider ready'),
+      prevStep: () => console.warn('[useTutorial] prevStep called before provider ready'),
+      skipTutorial: () => console.warn('[useTutorial] skipTutorial called before provider ready'),
+      completeTutorial: () => console.warn('[useTutorial] completeTutorial called before provider ready'),
+      resetTutorial: () => console.warn('[useTutorial] resetTutorial called before provider ready'),
+      startTutorial: () => console.warn('[useTutorial] startTutorial called before provider ready'),
+      tutorialCompleted: false,
+      isInStep: () => false,
+      navigationState: { inProgress: false, targetRoute: null },
+      isInitialized: false
+    };
   }
   
   return context;

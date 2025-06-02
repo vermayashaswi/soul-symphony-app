@@ -18,8 +18,17 @@ import {
 } from '@/utils/tutorial/tutorial-elements-finder';
 import { performComprehensiveCleanup, performStaggeredCleanup, performSelectiveCleanup } from '@/utils/tutorial/tutorial-cleanup-enhanced';
 import { navigationManager } from '@/utils/tutorial/navigation-state-manager';
+import { highlightingManager } from '@/utils/tutorial/tutorial-highlighting-manager';
 
 const TutorialOverlay: React.FC = () => {
+  const tutorialContext = useTutorial();
+  
+  // NEW: Early return if context is not yet initialized to prevent errors
+  if (!tutorialContext.isInitialized) {
+    console.log('[TutorialOverlay] Context not yet initialized, waiting...');
+    return null;
+  }
+  
   const { 
     isActive, 
     currentStep, 
@@ -30,7 +39,7 @@ const TutorialOverlay: React.FC = () => {
     skipTutorial,
     tutorialCompleted,
     navigationState
-  } = useTutorial();
+  } = tutorialContext;
   
   const location = useLocation();
   
@@ -49,9 +58,11 @@ const TutorialOverlay: React.FC = () => {
       pathname: location.pathname,
       isAppRoute: isAppRouteCurrent,
       tutorialCompleted,
-      transitionProtected: navigationManager.isStepTransitionProtected()
+      transitionProtected: navigationManager.isStepTransitionProtected(),
+      highlightingState: highlightingManager.getState(),
+      tutorialInitialized: tutorialContext.isInitialized
     });
-  }, [isActive, currentStep, steps, navigationState, shouldShowTutorial, location.pathname, isAppRouteCurrent, tutorialCompleted]);
+  }, [isActive, currentStep, steps, navigationState, shouldShowTutorial, location.pathname, isAppRouteCurrent, tutorialCompleted, tutorialContext.isInitialized]);
   
   // Enhanced scrolling prevention with data attribute for current step
   useEffect(() => {
@@ -90,6 +101,9 @@ const TutorialOverlay: React.FC = () => {
           document.body.style.height = '';
           document.body.removeAttribute('data-current-step');
           
+          // Reset highlighting manager
+          highlightingManager.reset();
+          
           // Restore scroll position
           window.scrollTo(0, scrollPos);
           console.log('[TutorialOverlay] Tutorial inactive, restored page scrolling');
@@ -120,38 +134,38 @@ const TutorialOverlay: React.FC = () => {
     }
   }, [shouldShowTutorial, currentStep, steps, location.pathname]);
 
-  // ENHANCED: Step-specific element highlighting with transition protection
+  // ENHANCED: Step-specific element highlighting with new highlighting manager
   useEffect(() => {
     if (!shouldShowTutorial) return;
     
     const currentStepData = steps[currentStep];
-    console.log(`[TutorialOverlay] Setting up highlighting for step ${currentStepData?.id}`);
+    console.log(`[TutorialOverlay] Setting up enhanced highlighting for step ${currentStepData?.id}`);
     
     try {
-      // Start step transition protection
+      // Start step transition protection with extended duration
       navigationManager.startStepTransition(currentStepData?.id);
       
       // Perform selective cleanup that preserves current step
       const stepsToPreserve = [currentStepData?.id].filter(Boolean);
       performSelectiveCleanup(stepsToPreserve);
       
-      // Apply highlighting after cleanup with improved timing
+      // Apply highlighting using new manager with longer delay for DOM readiness
       const highlightTimeout = setTimeout(() => {
         try {
-          applyStepHighlighting(currentStepData);
+          applyEnhancedStepHighlighting(currentStepData);
         } catch (error) {
-          console.error(`[TutorialOverlay] Error applying highlighting for step ${currentStepData?.id}:`, error);
+          console.error(`[TutorialOverlay] Error applying enhanced highlighting for step ${currentStepData?.id}:`, error);
         }
-      }, 100); // Reduced delay for faster highlighting
+      }, 250); // Increased delay for better DOM readiness
       
       // Enhanced cleanup when effect unmounts
       return () => {
         clearTimeout(highlightTimeout);
         console.log('[TutorialOverlay] Effect cleanup - clearing step transition protection');
-        navigationManager.clearStepTransition();
+        // Don't immediately clear transition protection, let it timeout naturally for better persistence
       };
     } catch (error) {
-      console.error('[TutorialOverlay] Error in highlighting effect setup:', error);
+      console.error('[TutorialOverlay] Error in enhanced highlighting effect setup:', error);
       return () => {
         navigationManager.clearStepTransition();
       };
@@ -235,11 +249,13 @@ const TutorialOverlay: React.FC = () => {
     }
   };
 
-  // Enhanced step highlighting function with comprehensive error handling
-  const applyStepHighlighting = (currentStepData: any) => {
+  // ENHANCED: Step highlighting function using new highlighting manager
+  const applyEnhancedStepHighlighting = (currentStepData: any) => {
     if (!currentStepData) return;
 
     try {
+      console.log(`[TutorialOverlay] Applying enhanced highlighting for step ${currentStepData.id}`);
+      
       if (currentStepData.id === 1) {
         // Step 1: Journal Header
         const journalHeader = document.querySelector('.journal-header-container');
@@ -255,14 +271,22 @@ const TutorialOverlay: React.FC = () => {
         console.log('[TutorialOverlay] Step 2: ButtonStateManager will handle arrow button highlighting');
       }
       else if (currentStepData.id === 3) {
-        // Step 3: Record Entry Tab - Apply consistent highlighting
-        console.log('[TutorialOverlay] Step 3: Applying consistent highlighting to Record Entry button');
-        applyUnifiedTabHighlighting(RECORD_ENTRY_SELECTORS, 'record-entry-tab', 'tutorial-record-entry-button', 'record', 'new', 'entry');
+        // Step 3: Record Entry Tab - Use new highlighting manager
+        console.log('[TutorialOverlay] Step 3: Using enhanced highlighting manager for Record Entry button');
+        highlightingManager.applyStaggeredHighlighting(
+          RECORD_ENTRY_SELECTORS,
+          ['tutorial-target', 'record-entry-tab', 'tutorial-record-entry-button'],
+          3
+        );
       }
       else if (currentStepData.id === 4) {
-        // Step 4: Past Entries Tab - Apply identical highlighting to step 3
-        console.log('[TutorialOverlay] Step 4: Applying identical highlighting to Past Entries tab');
-        applyUnifiedTabHighlighting(ENTRIES_TAB_SELECTORS, 'entries-tab', '', 'past', 'entries', 'history');
+        // Step 4: Past Entries Tab - Use new highlighting manager
+        console.log('[TutorialOverlay] Step 4: Using enhanced highlighting manager for Past Entries tab');
+        highlightingManager.applyStaggeredHighlighting(
+          ENTRIES_TAB_SELECTORS,
+          ['tutorial-target', 'entries-tab'],
+          4
+        );
       }
       else if (currentStepData.id === 5) {
         // Step 5: Chat Question
@@ -294,45 +318,7 @@ const TutorialOverlay: React.FC = () => {
         applySoulNetHighlighting();
       }
     } catch (error) {
-      console.error(`[TutorialOverlay] Error in applyStepHighlighting for step ${currentStepData.id}:`, error);
-    }
-  };
-
-  // NEW: Unified tab highlighting function for consistent styling
-  const applyUnifiedTabHighlighting = (selectors: string[], primaryClass: string, secondaryClass: string, ...keywords: string[]) => {
-    try {
-      let foundElement = false;
-      
-      for (const selector of selectors) {
-        try {
-          const element = document.querySelector(selector);
-          if (element) {
-            // Double-check this is the correct button
-            const elementText = element.textContent?.toLowerCase().trim() || '';
-            const isCorrectTab = keywords.some(keyword => elementText.includes(keyword));
-            
-            if (isCorrectTab) {
-              // Apply both primary and secondary classes for consistent styling
-              element.classList.add('tutorial-target', primaryClass);
-              if (secondaryClass) {
-                element.classList.add(secondaryClass);
-              }
-              
-              foundElement = true;
-              console.log(`[TutorialOverlay] Applied unified highlighting to ${primaryClass} using selector: ${selector}, text: "${elementText}"`);
-              break;
-            }
-          }
-        } catch (selectorError) {
-          console.warn(`[TutorialOverlay] Error with selector ${selector}:`, selectorError);
-        }
-      }
-      
-      if (!foundElement) {
-        console.warn(`[TutorialOverlay] ${primaryClass} element not found with any selector`);
-      }
-    } catch (error) {
-      console.error(`[TutorialOverlay] Error in applyUnifiedTabHighlighting for ${primaryClass}:`, error);
+      console.error(`[TutorialOverlay] Error in applyEnhancedStepHighlighting for step ${currentStepData.id}:`, error);
     }
   };
 
