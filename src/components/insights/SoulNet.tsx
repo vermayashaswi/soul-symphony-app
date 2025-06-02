@@ -254,6 +254,20 @@ export default function SoulNet({ userId, timeRange }: SoulNetProps) {
     setHighlightedNode(null);
   };
 
+  const handleNodePointerDown = (e: any) => {
+    // Handle pointer down event
+    e.stopPropagation();
+  };
+
+  const handleNodePointerUp = (e: any) => {
+    // Handle pointer up event
+    e.stopPropagation();
+  };
+
+  const handleNodePointerLeave = () => {
+    setHighlightedNode(null);
+  };
+
   const handleVisualizationError = (error: Error, errorInfo: any) => {
     console.error('[SoulNet] Visualization error:', error, errorInfo);
     setError(error.message);
@@ -267,8 +281,8 @@ export default function SoulNet({ userId, timeRange }: SoulNetProps) {
       setCameraZoom(1);
       setIsZoomReset(true);
       toast({
-        title: translate("Zoom Reset"),
-        description: translate("The zoom level has been reset to its initial value."),
+        title: "Zoom Reset",
+        description: "The zoom level has been reset to its initial value.",
       })
     }
   };
@@ -466,9 +480,8 @@ export default function SoulNet({ userId, timeRange }: SoulNetProps) {
             </Button>
           </div>
         </div>
-        <div className="w-full h-[600px] relative">
+        <div className="w-full h-[600px] relative soul-net-visualization">
           <Canvas
-            className="soul-net-visualization"
             camera={{ position: [0, 0, 5] }}
             onCreated={({ gl }) => {
               gl.setClearColor(theme === 'dark' ? '#0F172A' : '#FFFFFF');
@@ -506,7 +519,10 @@ export default function SoulNet({ userId, timeRange }: SoulNetProps) {
                     connectionStrength={connectionStrength}
                     isSelected={isSelected}
                     onClick={() => handleNodeClick(node.id)}
+                    onPointerDown={handleNodePointerDown}
+                    onPointerUp={handleNodePointerUp}
                     onPointerOut={handleNodePointerOut}
+                    onPointerLeave={handleNodePointerLeave}
                   />
                 </group>
               );
