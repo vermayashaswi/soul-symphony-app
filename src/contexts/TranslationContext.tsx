@@ -28,13 +28,27 @@ export const TranslationProvider: React.FC<TranslationProviderProps> = ({ childr
   const [isTranslating, setIsTranslating] = useState<boolean>(false);
   const [translationCache, setTranslationCache] = useState<Record<string, string>>({});
 
+  // Load language from localStorage or browser default
   useEffect(() => {
-    // Initialize with browser language or default to English
+    try {
+      const savedLanguage = localStorage.getItem('soulo-language');
+      if (savedLanguage) {
+        console.log('[TranslationContext] Loading saved language:', savedLanguage);
+        setCurrentLanguage(savedLanguage);
+        staticTranslationService.setLanguage(savedLanguage);
+        return;
+      }
+    } catch (error) {
+      console.error('[TranslationContext] Error loading saved language:', error);
+    }
+
+    // Fallback to browser language
     const browserLanguage = navigator.language.split('-')[0];
     const supportedLanguages = ['en', 'es', 'fr', 'de', 'it', 'pt', 'ru', 'ja', 'ko', 'zh', 'hi', 'ar', 'bn', 'gu', 'kn', 'ml', 'mr', 'or', 'pa', 'ta', 'te'];
     
     if (supportedLanguages.includes(browserLanguage)) {
       setCurrentLanguage(browserLanguage);
+      staticTranslationService.setLanguage(browserLanguage);
     }
     
     console.log('[TranslationContext] Initialized with language:', browserLanguage, 'supported:', supportedLanguages.includes(browserLanguage));
@@ -43,6 +57,15 @@ export const TranslationProvider: React.FC<TranslationProviderProps> = ({ childr
   const handleLanguageChange = useCallback((language: string) => {
     console.log('[TranslationContext] Changing language to:', language);
     setCurrentLanguage(language);
+    
+    // Save to localStorage for persistence
+    try {
+      localStorage.setItem('soulo-language', language);
+      console.log('[TranslationContext] Saved language to localStorage:', language);
+    } catch (error) {
+      console.error('[TranslationContext] Error saving language to localStorage:', error);
+    }
+    
     // Update static translation service language
     staticTranslationService.setLanguage(language);
     
@@ -62,10 +85,11 @@ export const TranslationProvider: React.FC<TranslationProviderProps> = ({ childr
       return text;
     }
 
-    console.log('[TranslationContext] Attempting to translate:', { 
+    console.log('[TranslationContext] FORCE TRANSLATE - Attempting to translate:', { 
       text: text.substring(0, 30) + (text.length > 30 ? '...' : ''), 
       from: sourceLanguage, 
-      to: currentLanguage 
+      to: currentLanguage,
+      entryId
     });
 
     const cacheKey = `${text}_${sourceLanguage}_${currentLanguage}`;
@@ -87,12 +111,12 @@ export const TranslationProvider: React.FC<TranslationProviderProps> = ({ childr
     try {
       setIsTranslating(true);
       
-      // Use static translation service for common UI elements
+      // SIMPLIFIED TRANSLATION LOGIC: Try static service first, then dynamic
+      console.log('[TranslationContext] Trying static translation service first');
       let translatedText = await staticTranslationService.translateText(text, sourceLanguage, entryId);
       
       if (!translatedText || translatedText === text) {
-        // Fall back to dynamic translation service
-        console.log('[TranslationContext] Static translation failed, using dynamic translation service');
+        console.log('[TranslationContext] Static translation failed/same, trying dynamic translation service');
         translatedText = await translationService.translateText(text, currentLanguage, sourceLanguage);
       }
 
@@ -121,7 +145,7 @@ export const TranslationProvider: React.FC<TranslationProviderProps> = ({ childr
     } finally {
       setIsTranslating(false);
     }
-  }, [currentLanguage]);
+  }, [currentLanguage, translationCache]);
 
   const getCachedTranslation = useCallback((text: string): string | null => {
     const cacheKey = `${text}_en_${currentLanguage}`;

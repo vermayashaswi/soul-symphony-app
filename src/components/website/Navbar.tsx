@@ -19,7 +19,6 @@ const Navbar = () => {
   
   // Prefetch translations for navbar items on mount and route change
   useEffect(() => {
-    // Fix: pass route path as string instead of array
     const route = location.pathname;
     
     if (prefetchTranslationsForRoute) {

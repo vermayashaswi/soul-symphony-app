@@ -20,7 +20,7 @@ export function TranslatableText({
   text, 
   className = "",
   as: Component = 'span',
-  sourceLanguage,
+  sourceLanguage = 'en',
   entryId,
   forceTranslate = false,
   onTranslationStart,
@@ -52,25 +52,19 @@ export function TranslatableText({
       return;
     }
 
-    // Enhanced debug logging for force translate
-    console.log(`TranslatableText: Translation check for "${text}" - forceTranslate: ${forceTranslate}, isOnWebsite: ${isOnWebsite}, currentLanguage: ${currentLanguage}`);
-
-    if (isOnWebsite && !forceTranslate) {
-      console.log(`TranslatableText: Skipping translation for "${text}" - on website without force translate`);
+    // Don't translate if already in the target language
+    if (currentLanguage === sourceLanguage) {
+      console.log(`TranslatableText: Text already in ${currentLanguage}, skipping translation`);
       setTranslatedText(text);
       return;
     }
 
-    if (currentLanguage === 'en') {
-      console.log(`TranslatableText: Skipping translation for "${text}" - already in English`);
-      setTranslatedText(text);
-      return;
-    }
-    
-    // Check cache first - fix: use single argument
+    console.log(`TranslatableText: Translation check for "${text.substring(0, 30)}" - forceTranslate: ${forceTranslate}, isOnWebsite: ${isOnWebsite}, currentLanguage: ${currentLanguage}`);
+
+    // Check cache first
     const cachedResult = getCachedTranslation(text);
     if (cachedResult) {
-      console.log(`TranslatableText: Using cached translation for "${text}": "${cachedResult}"`);
+      console.log(`TranslatableText: Using cached translation for "${text.substring(0, 30)}": "${cachedResult.substring(0, 30)}"`);
       setTranslatedText(cachedResult);
       return;
     }
@@ -79,7 +73,7 @@ export function TranslatableText({
     translationAttemptRef.current += 1;
     const attemptNumber = translationAttemptRef.current;
     
-    console.log(`TranslatableText: Starting translation attempt #${attemptNumber} for "${text}" to ${currentLanguage}`);
+    console.log(`TranslatableText: Starting translation attempt #${attemptNumber} for "${text.substring(0, 30)}" to ${currentLanguage}`);
     
     if (!isLoading) {
       setIsLoading(true);
@@ -89,9 +83,8 @@ export function TranslatableText({
     }
       
     try {
-      // Force translation by using staticTranslationService directly
       console.log(`TranslatableText: Calling translate service for "${text.substring(0, 30)}..." to ${currentLanguage}`);
-      const result = await translate(text, "en", entryId);
+      const result = await translate(text, sourceLanguage, entryId);
       
       console.log(`TranslatableText: Translation service returned for "${text.substring(0, 30)}...": "${result?.substring(0, 30) || 'null'}..."`);
       
@@ -144,7 +137,7 @@ export function TranslatableText({
   
   useEffect(() => {
     const handleLanguageChange = () => {
-      console.log(`TranslatableText: Language change event detected for "${text.substring(0, 30)}..." - new language: ${currentLanguage}`);
+      console.log(`TranslatableText: Language change event detected - new language: ${currentLanguage}`);
       prevLangRef.current = currentLanguage;
       textRef.current = text;
       translationAttemptRef.current = 0; // Reset attempt counter
@@ -165,9 +158,6 @@ export function TranslatableText({
       'data-translating': isLoading ? 'true' : 'false',
       'data-translated': translatedText !== text ? 'true' : 'false',
       'data-lang': currentLanguage,
-      'data-force-translate': forceTranslate ? 'true' : 'false',
-      'data-original-text': text,
-      'data-translation-attempts': translationAttemptRef.current,
       style
     }, 
     translatedText || text
