@@ -34,7 +34,12 @@ export const preloadWebsiteTranslations = async (language: string) => {
     'Privacy Policy',
     'Terms of Service',
     'FAQ',
-    'All rights reserved.'
+    'All rights reserved.',
+    
+    // SoulNet specific terms
+    'family', 'friends', 'work', 'school', 'health',
+    'happy', 'sad', 'anxious', 'excited', 'tired',
+    'angry', 'peaceful', 'stressed', 'relaxed', 'confused'
   ];
   
   try {
@@ -62,19 +67,64 @@ export const translateWebsiteText = async (text: string): Promise<string> => {
 // Singleton for caching on-demand translations
 class TranslationCache {
   private cache = new Map<string, Map<string, string>>();
+  private storageKey = 'soulo-translation-cache';
+  
+  constructor() {
+    this.loadFromLocalStorage();
+    console.log('[TranslationCache] Initialized cache with size:', this.getCacheSize());
+  }
+
+  // Load cached translations from localStorage
+  private loadFromLocalStorage(): void {
+    try {
+      const storedCache = localStorage.getItem(this.storageKey);
+      if (storedCache) {
+        const parsedCache = JSON.parse(storedCache);
+        Object.entries(parsedCache).forEach(([language, translations]: [string, any]) => {
+          const langMap = new Map<string, string>();
+          Object.entries(translations).forEach(([key, value]: [string, any]) => {
+            langMap.set(key, value as string);
+          });
+          this.cache.set(language, langMap);
+        });
+        console.log(`[TranslationCache] Loaded ${this.getCacheSize()} translations from local storage`);
+      }
+    } catch (error) {
+      console.error('[TranslationCache] Error loading from localStorage:', error);
+    }
+  }
+
+  // Save current cache to localStorage
+  private saveToLocalStorage(): void {
+    try {
+      const cacheObject: Record<string, Record<string, string>> = {};
+      this.cache.forEach((translations, language) => {
+        cacheObject[language] = Object.fromEntries(translations);
+      });
+      localStorage.setItem(this.storageKey, JSON.stringify(cacheObject));
+    } catch (error) {
+      console.error('[TranslationCache] Error saving to localStorage:', error);
+    }
+  }
   
   get(language: string, text: string): string | null {
-    if (language === 'en') return text;
+    if (!text || language === 'en') return text;
     
     const languageCache = this.cache.get(language);
-    if (languageCache) {
+    if (languageCache && languageCache.has(text)) {
+      console.log(`[TranslationCache] Cache hit for ${language}:"${text.substring(0, 20)}..."`);
       return languageCache.get(text) || null;
     }
+    console.log(`[TranslationCache] Cache miss for ${language}:"${text.substring(0, 20)}..."`);
     return null;
   }
   
   set(language: string, text: string, translatedText: string): void {
-    if (language === 'en' || !text || !translatedText) return;
+    if (language === 'en' || !text || !translatedText || text === translatedText) {
+      return;
+    }
+    
+    console.log(`[TranslationCache] Caching translation for ${language}:"${text.substring(0, 20)}..."`)
     
     let languageCache = this.cache.get(language);
     if (!languageCache) {
@@ -83,16 +133,39 @@ class TranslationCache {
     }
     
     languageCache.set(text, translatedText);
+    this.saveToLocalStorage();
   }
   
   // Clear all translations for a specific language
   clearLanguage(language: string): void {
+    console.log(`[TranslationCache] Clearing cache for language: ${language}`);
     this.cache.delete(language);
+    this.saveToLocalStorage();
   }
   
   // Clear all translations
   clearAll(): void {
+    console.log(`[TranslationCache] Clearing entire cache`);
     this.cache.clear();
+    localStorage.removeItem(this.storageKey);
+  }
+  
+  // Get total number of cached translations
+  getCacheSize(): number {
+    let total = 0;
+    this.cache.forEach(langMap => {
+      total += langMap.size;
+    });
+    return total;
+  }
+  
+  // Debug method to get all translations for a language
+  getAllForLanguage(language: string): Record<string, string> {
+    const languageCache = this.cache.get(language);
+    if (languageCache) {
+      return Object.fromEntries(languageCache);
+    }
+    return {};
   }
 }
 

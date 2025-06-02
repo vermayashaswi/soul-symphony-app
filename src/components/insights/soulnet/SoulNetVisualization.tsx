@@ -1,3 +1,4 @@
+
 import React, { useRef, useEffect, useMemo, useState } from 'react';
 import '@/types/three-reference';
 import { OrbitControls } from '@react-three/drei';
@@ -161,103 +162,27 @@ export const SoulNetVisualization: React.FC<SoulNetVisualizationProps> = ({
   const [isInitialized, setIsInitialized] = useState(false);
   const [translationCache, setTranslationCache] = useState<Map<string, string>>(new Map());
   const [nodeScriptTypes, setNodeScriptTypes] = useState<Map<string, string>>(new Map());
+  const [debugInfo, setDebugInfo] = useState<string>('');
   const mounted = useRef<boolean>(true);
   
-  console.log("[SoulNetVisualization] Rendering with centralized translation", {
+  console.log("[SoulNetVisualization] DEBUGGING - Initial state", {
     nodeCount: data?.nodes?.length,
     linkCount: data?.links?.length,
     currentLanguage,
     selectedNode,
     shouldShowLabels,
-    translationCacheSize: translationCache.size
+    translationCacheSize: translationCache.size,
+    translateFunction: !!translate
   });
   
   useEffect(() => {
-    console.log("[SoulNetVisualization] Component mounted with enhanced stability");
+    console.log("[SoulNetVisualization] Component mounted with enhanced debugging");
     return () => {
       console.log("[SoulNetVisualization] Component unmounted");
       mounted.current = false;
     };
   }, []);
 
-  // Enhanced node data processing with script detection and stable caching
-  useEffect(() => {
-    if (!data?.nodes || !mounted.current) return;
-
-    const processNodeLabels = async () => {
-      console.log('[SoulNetVisualization] Processing node labels with centralized translation');
-      
-      const newTranslationCache = new Map<string, string>();
-      const newScriptTypes = new Map<string, string>();
-      
-      // Process script types for all nodes
-      data.nodes.forEach(node => {
-        const scriptType = detectScriptType(node.id);
-        newScriptTypes.set(node.id, scriptType);
-        console.log(`[SoulNetVisualization] Node "${node.id}" detected script: ${scriptType}`);
-      });
-      
-      if (mounted.current) {
-        setNodeScriptTypes(newScriptTypes);
-      }
-      
-      // Handle translations with enhanced stability
-      if (currentLanguage !== 'en' && mounted.current) {
-        for (const node of data.nodes) {
-          if (!mounted.current) break;
-          
-          try {
-            // Check cache first
-            const cachedTranslation = onDemandTranslationCache.get(currentLanguage, node.id);
-            
-            if (cachedTranslation) {
-              newTranslationCache.set(node.id, cachedTranslation);
-              console.log(`[SoulNetVisualization] Using cached translation for "${node.id}": "${cachedTranslation}"`);
-            } else if (translate) {
-              // Translate with timeout and error handling
-              try {
-                const translated = await Promise.race([
-                  translate(node.id),
-                  new Promise<string>((_, reject) => 
-                    setTimeout(() => reject(new Error('Translation timeout')), 5000)
-                  )
-                ]);
-                
-                if (mounted.current && translated && typeof translated === 'string') {
-                  newTranslationCache.set(node.id, translated);
-                  onDemandTranslationCache.set(currentLanguage, node.id, translated);
-                  console.log(`[SoulNetVisualization] Successfully translated "${node.id}" to "${translated}"`);
-                } else {
-                  newTranslationCache.set(node.id, node.id);
-                }
-              } catch (error) {
-                console.warn(`[SoulNetVisualization] Translation failed for "${node.id}":`, error);
-                newTranslationCache.set(node.id, node.id);
-              }
-            } else {
-              newTranslationCache.set(node.id, node.id);
-            }
-          } catch (error) {
-            console.error(`[SoulNetVisualization] Translation error for "${node.id}":`, error);
-            newTranslationCache.set(node.id, node.id);
-          }
-        }
-      } else {
-        // For English, use original labels
-        data.nodes.forEach(node => {
-          newTranslationCache.set(node.id, node.id);
-        });
-      }
-      
-      if (mounted.current) {
-        setTranslationCache(newTranslationCache);
-        console.log('[SoulNetVisualization] Node label processing complete with cache size:', newTranslationCache.size);
-      }
-    };
-
-    processNodeLabels();
-  }, [data?.nodes, currentLanguage, translate]);
-  
   // Ensure data is valid
   const validData = useMemo(() => {
     if (!data || !data.nodes || !Array.isArray(data.nodes) || !data.links || !Array.isArray(data.links)) {
@@ -269,6 +194,102 @@ export const SoulNetVisualization: React.FC<SoulNetVisualizationProps> = ({
     }
     return data;
   }, [data]);
+  
+  // Enhanced node label processing with comprehensive debugging
+  useEffect(() => {
+    if (!data?.nodes || !mounted.current) return;
+
+    const processNodeLabels = async () => {
+      console.log('[SoulNetVisualization] DEBUGGING - Starting translation process', {
+        currentLanguage,
+        nodeCount: data.nodes.length,
+        translateAvailable: !!translate,
+        mounted: mounted.current
+      });
+      
+      const newTranslationCache = new Map<string, string>();
+      const newScriptTypes = new Map<string, string>();
+      let debugMessages: string[] = [];
+      
+      // Process script types for all nodes
+      data.nodes.forEach(node => {
+        const scriptType = detectScriptType(node.id);
+        newScriptTypes.set(node.id, scriptType);
+        debugMessages.push(`Node "${node.id}" detected script: ${scriptType}`);
+      });
+      
+      if (mounted.current) {
+        setNodeScriptTypes(newScriptTypes);
+      }
+      
+      // CRITICAL FIX: Always attempt translation for non-English languages
+      if (currentLanguage !== 'en' && translate && mounted.current) {
+        debugMessages.push(`Starting translation to ${currentLanguage}`);
+        
+        for (const node of data.nodes) {
+          if (!mounted.current) break;
+          
+          try {
+            debugMessages.push(`Processing node: "${node.id}"`);
+            
+            // Check cache first
+            const cachedTranslation = onDemandTranslationCache.get(currentLanguage, node.id);
+            
+            if (cachedTranslation) {
+              newTranslationCache.set(node.id, cachedTranslation);
+              debugMessages.push(`Using cached translation for "${node.id}": "${cachedTranslation}"`);
+            } else {
+              debugMessages.push(`No cache found for "${node.id}", attempting translation`);
+              
+              try {
+                // FORCE TRANSLATION - always translate from English regardless of context
+                const translated = await Promise.race([
+                  translate(node.id, 'en'), // Force source language to English
+                  new Promise<string>((_, reject) => 
+                    setTimeout(() => reject(new Error('Translation timeout')), 8000)
+                  )
+                ]);
+                
+                if (mounted.current && translated && typeof translated === 'string' && translated !== node.id) {
+                  newTranslationCache.set(node.id, translated);
+                  onDemandTranslationCache.set(currentLanguage, node.id, translated);
+                  debugMessages.push(`Successfully translated "${node.id}" to "${translated}"`);
+                } else {
+                  newTranslationCache.set(node.id, node.id);
+                  debugMessages.push(`Translation returned same text for "${node.id}"`);
+                }
+              } catch (error) {
+                debugMessages.push(`Translation failed for "${node.id}": ${error.message}`);
+                newTranslationCache.set(node.id, node.id);
+              }
+            }
+          } catch (error) {
+            console.error(`[SoulNetVisualization] Translation error for "${node.id}":`, error);
+            debugMessages.push(`Error processing "${node.id}": ${error.message}`);
+            newTranslationCache.set(node.id, node.id);
+          }
+        }
+      } else {
+        // For English, use original labels
+        debugMessages.push(`Language is English or no translate function, using original labels`);
+        data.nodes.forEach(node => {
+          newTranslationCache.set(node.id, node.id);
+        });
+      }
+      
+      if (mounted.current) {
+        setTranslationCache(newTranslationCache);
+        setDebugInfo(debugMessages.join(' | '));
+        console.log('[SoulNetVisualization] DEBUGGING - Translation process complete', {
+          cacheSize: newTranslationCache.size,
+          translations: Object.fromEntries(newTranslationCache),
+          debugMessages: debugMessages.slice(-5) // Last 5 messages
+        });
+      }
+    };
+
+    processNodeLabels();
+  }, [data?.nodes, currentLanguage, translate]);
   
   // Use memoization to prevent recalculation of center position on every render
   const centerPosition = useMemo(() => {
@@ -402,6 +423,13 @@ export const SoulNetVisualization: React.FC<SoulNetVisualizationProps> = ({
     return null;
   }
 
+  console.log("[SoulNetVisualization] FINAL RENDER CHECK", { 
+    translationCacheSize: translationCache.size,
+    currentLanguage,
+    shouldTranslate: currentLanguage !== 'en',
+    nodeCount: validData.nodes.length
+  });
+
   return (
     <>
       <ambientLight intensity={0.5} />
@@ -478,7 +506,7 @@ export const SoulNetVisualization: React.FC<SoulNetVisualizationProps> = ({
         );
       })}
       
-      {/* Display nodes with centralized translation */}
+      {/* Display nodes with translation */}
       {validData.nodes.map(node => {
         if (!node || typeof node !== 'object' || !node.id) {
           console.warn("[SoulNetVisualization] Invalid node:", node);
@@ -505,7 +533,7 @@ export const SoulNetVisualization: React.FC<SoulNetVisualizationProps> = ({
           return null;
         }
 
-        const scriptType = nodeScriptTypes.get(node.id) || 'latin';
+        // Get translated text with fallback to original text
         const translatedLabel = translationCache.get(node.id) || node.id;
         
         console.log(`[SoulNetVisualization] Rendering node "${node.id}" with translated text: "${translatedLabel}"`);
