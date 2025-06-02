@@ -1,8 +1,6 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import ReliableText from './ReliableText';
-import HTMLTextOverlay from './HTMLTextOverlay';
-import DevanagariTextDetector from './DevanagariTextDetector';
 import { useTranslation } from '@/contexts/TranslationContext';
 import { threejsFontService } from '@/services/threejsFontService';
 
@@ -16,7 +14,6 @@ interface DirectNodeLabelProps {
   cameraZoom?: number;
   themeHex: string;
   nodeScale?: number;
-  containerRef?: React.RefObject<HTMLDivElement>;
 }
 
 export const DirectNodeLabel: React.FC<DirectNodeLabelProps> = ({
@@ -28,8 +25,7 @@ export const DirectNodeLabel: React.FC<DirectNodeLabelProps> = ({
   shouldShowLabel,
   cameraZoom = 45,
   themeHex,
-  nodeScale = 1,
-  containerRef
+  nodeScale = 1
 }) => {
   const { currentLanguage, translate } = useTranslation();
   const [displayText, setDisplayText] = useState<string>(id);
@@ -123,42 +119,18 @@ export const DirectNodeLabel: React.FC<DirectNodeLabelProps> = ({
   console.log(`[DirectNodeLabel] Enhanced rendering text "${displayText}" at position`, labelPosition);
 
   return (
-    <DevanagariTextDetector text={displayText}>
-      {(isDevanagari, scriptType) => {
-        console.log(`[DirectNodeLabel] Script detection: "${displayText}" -> ${scriptType}, isDevanagari: ${isDevanagari}`);
-        
-        if (isDevanagari) {
-          // Use HTML overlay for Devanagari text
-          return (
-            <HTMLTextOverlay
-              text={displayText}
-              position={labelPosition}
-              color={textColor}
-              size={textSize}
-              visible={true}
-              bold={isHighlighted || isSelected}
-              containerRef={containerRef}
-            />
-          );
-        } else {
-          // Use Three.js text rendering for all other scripts
-          return (
-            <ReliableText
-              text={displayText}
-              position={labelPosition}
-              color={textColor}
-              size={textSize}
-              visible={true}
-              renderOrder={15}
-              bold={isHighlighted || isSelected}
-              outlineWidth={isSelected ? 0.04 : 0.02}
-              outlineColor={isSelected ? '#000000' : '#333333'}
-              maxWidth={25}
-            />
-          );
-        }
-      }}
-    </DevanagariTextDetector>
+    <ReliableText
+      text={displayText}
+      position={labelPosition}
+      color={textColor}
+      size={textSize}
+      visible={true}
+      renderOrder={15}
+      bold={isHighlighted || isSelected}
+      outlineWidth={isSelected ? 0.04 : 0.02}
+      outlineColor={isSelected ? '#000000' : '#333333'}
+      maxWidth={25}
+    />
   );
 };
 

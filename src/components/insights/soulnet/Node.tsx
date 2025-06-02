@@ -1,4 +1,3 @@
-
 import React, { useState, useCallback, useEffect, useMemo } from 'react';
 import '@/types/three-reference';
 import { NodeMesh } from './NodeMesh';
@@ -29,7 +28,6 @@ interface NodeProps {
   connectionPercentage?: number;
   showPercentage?: boolean;
   forceShowLabels?: boolean;
-  containerRef?: React.RefObject<HTMLDivElement>;
 }
 
 export const Node: React.FC<NodeProps> = ({
@@ -46,8 +44,7 @@ export const Node: React.FC<NodeProps> = ({
   connectionStrength = 0.5,
   connectionPercentage = 0,
   showPercentage = false,
-  forceShowLabels = false,
-  containerRef
+  forceShowLabels = false
 }) => {
   const { theme } = useTheme();
   const [isTouching, setIsTouching] = useState(false);
@@ -73,6 +70,8 @@ export const Node: React.FC<NodeProps> = ({
       ? (dimmed ? (theme === 'dark' ? '#555' : '#999') : '#ccc') 
       : (dimmed ? (theme === 'dark' ? '#555' : '#999') : themeHex);
   }, [node.type, dimmed, theme, themeHex, isHighlighted]);
+
+  // ... keep existing code (touch handlers and effects)
 
   const handlePointerDown = useCallback((e: any) => {
     e.stopPropagation();
@@ -166,7 +165,6 @@ export const Node: React.FC<NodeProps> = ({
         cameraZoom={cameraZoom}
         themeHex={themeHex}
         nodeScale={scale}
-        containerRef={containerRef}
       />
 
       <FixedConnectionPercentage
