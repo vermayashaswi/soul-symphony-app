@@ -1,10 +1,10 @@
+
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { motion } from 'framer-motion';
 import * as THREE from 'three';
 import { Canvas, useThree } from '@react-three/fiber';
 import { OrbitControls } from '@react-three/drei';
-import { useAuth } from '@/contexts/AuthContext';
-import { useTheme } from '@/contexts/ThemeContext';
+import { useTheme } from '@/hooks/use-theme';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { useDebounce } from '@/hooks/use-debounce';
 import { TranslatableText } from '@/components/translation/TranslatableText';
@@ -29,8 +29,6 @@ import { Switch } from "@/components/ui/switch"
 import { Label } from "@/components/ui/label"
 import { cn } from "@/lib/utils";
 import { Slider } from "@/components/ui/slider"
-import { Input } from "@/components/ui/input"
-import { Calendar } from "@/components/ui/calendar"
 import { CalendarIcon } from "lucide-react"
 import { format } from "date-fns"
 import { DatePicker } from "@/components/ui/date-picker"
@@ -64,6 +62,11 @@ interface ProcessedData {
   nodePositions: { [nodeId: string]: [number, number, number] };
 }
 
+interface DateRange {
+  from?: Date;
+  to?: Date;
+}
+
 const LoadingState = () => (
   <div className="flex flex-col items-center justify-center space-y-4">
     <Skeleton className="h-12 w-12 rounded-full" />
@@ -83,6 +86,36 @@ const EmptyState = () => (
   </div>
 );
 
+function CameraController({ 
+  orbitControlsRef, 
+  setCameraZoom 
+}: { 
+  orbitControlsRef: React.MutableRefObject<any>; 
+  setCameraZoom: (zoom: number) => void; 
+}) {
+  const { camera } = useThree();
+
+  useEffect(() => {
+    if (orbitControlsRef.current) {
+      const controls = orbitControlsRef.current;
+
+      const handleZoom = () => {
+        if (camera) {
+          setCameraZoom(camera.zoom);
+        }
+      };
+
+      controls.addEventListener('change', handleZoom);
+
+      return () => {
+        controls.removeEventListener('change', handleZoom);
+      };
+    }
+  }, [camera, orbitControlsRef, setCameraZoom]);
+
+  return null;
+}
+
 export default function SoulNet({ userId, timeRange }: SoulNetProps) {
   const [data, setData] = useState<{ nodes: any[]; edges: any[] } | null>(null);
   const [processedData, setProcessedData] = useState<ProcessedData>({ nodes: [], edges: [], nodePositions: {} });
@@ -95,21 +128,14 @@ export default function SoulNet({ userId, timeRange }: SoulNetProps) {
   const [nodeScaleMultiplier, setNodeScaleMultiplier] = useState(1);
   const [minDate, setMinDate] = useState<Date | undefined>(undefined);
   const [maxDate, setMaxDate] = useState<Date | undefined>(undefined);
-  const [dateRange, setDateRange] = useState<Date | undefined>({
-    from: minDate,
-    to: maxDate,
-  });
-  const [isDateRangeDialogOpen, setIsDateRangeDialogOpen] = useState(false);
-  const [isZoomLocked, setIsZoomLocked] = useState(false);
+  const [dateRange, setDateRange] = useState<DateRange>({});
   const [isZoomReset, setIsZoomReset] = useState(false);
   const { theme } = useTheme();
   const { toast } = useToast()
   const { translate } = useTranslation();
   const isMobile = useIsMobile();
   const debouncedScaleMultiplier = useDebounce(nodeScaleMultiplier, 300);
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const orbitControlsRef = useRef<OrbitControls>(null);
-  const { gl, camera } = useThree();
+  const orbitControlsRef = useRef<any>(null);
   const [initialCameraPosition, setInitialCameraPosition] = useState<THREE.Vector3>(new THREE.Vector3(0, 0, 5));
   const [initialTargetPosition, setInitialTargetPosition] = useState<THREE.Vector3>(new THREE.Vector3(0, 0, 0));
   const [isInitialLoad, setIsInitialLoad] = useState(true);
@@ -234,40 +260,10 @@ export default function SoulNet({ userId, timeRange }: SoulNetProps) {
     setLoading(false);
   };
 
-  useEffect(() => {
-    if (orbitControlsRef.current) {
-      const controls = orbitControlsRef.current;
-
-      const handleZoom = () => {
-        if (camera) {
-          setCameraZoom(camera.zoom);
-        }
-      };
-
-      controls.addEventListener('change', handleZoom);
-
-      return () => {
-        controls.removeEventListener('change', handleZoom);
-      };
-    }
-  }, [camera]);
-
-  const handleZoomChange = (newZoom: number) => {
-    if (orbitControlsRef.current) {
-      const controls = orbitControlsRef.current;
-      controls.zoom = newZoom;
-      controls.update();
-      setCameraZoom(newZoom);
-    }
-  };
-
   const resetZoom = () => {
-    if (orbitControlsRef.current && camera) {
+    if (orbitControlsRef.current) {
       const controls = orbitControlsRef.current;
-      camera.position.copy(initialCameraPosition);
-      controls.target.copy(initialTargetPosition);
-      controls.zoom = 1;
-      controls.update();
+      controls.reset();
       setCameraZoom(1);
       setIsZoomReset(true);
       toast({
@@ -276,14 +272,6 @@ export default function SoulNet({ userId, timeRange }: SoulNetProps) {
       })
     }
   };
-
-  useEffect(() => {
-    if (gl && camera && isInitialLoad) {
-      setInitialCameraPosition(camera.position.clone());
-      setInitialTargetPosition(orbitControlsRef.current ? orbitControlsRef.current.target.clone() : new THREE.Vector3(0, 0, 0));
-      setIsInitialLoad(false);
-    }
-  }, [gl, camera, isInitialLoad]);
 
   if (loading) {
     return (
@@ -480,12 +468,10 @@ export default function SoulNet({ userId, timeRange }: SoulNetProps) {
         </div>
         <div className="w-full h-[600px] relative">
           <Canvas
-            ref={canvasRef}
             className="soul-net-visualization"
-            camera={{ position: initialCameraPosition }}
-            onCreated={({ gl, camera }) => {
+            camera={{ position: [0, 0, 5] }}
+            onCreated={({ gl }) => {
               gl.setClearColor(theme === 'dark' ? '#0F172A' : '#FFFFFF');
-              camera.position.set(0, 0, 5);
             }}
           >
             <ambientLight intensity={0.5} />
@@ -499,6 +485,10 @@ export default function SoulNet({ userId, timeRange }: SoulNetProps) {
               minDistance={1}
               maxDistance={10}
             />
+            <CameraController 
+              orbitControlsRef={orbitControlsRef} 
+              setCameraZoom={setCameraZoom} 
+            />
             {processedData.nodes.map((node) => {
               const isHighlighted = node.id === highlightedNode;
               const isSelected = node.id === selectedNode;
@@ -506,22 +496,19 @@ export default function SoulNet({ userId, timeRange }: SoulNetProps) {
               const connectionStrength = processedData.edges.find(edge => edge.source === node.id || edge.target === node.id)?.strength || 0.5;
 
               return (
-                <NodeMesh
-                  key={node.id}
-                  type={node.type}
-                  scale={node.scale * debouncedScaleMultiplier}
-                  displayColor={node.color}
-                  isHighlighted={isHighlighted}
-                  dimmed={highlightedNode != null && !isHighlighted && !isSelected && !isConnected}
-                  connectionStrength={connectionStrength}
-                  isSelected={isSelected}
-                  onClick={() => handleNodeClick(node.id)}
-                  onPointerOver={() => handleNodePointerOver(node.id)}
-                  onPointerOut={handleNodePointerOut}
-                  onPointerDown={() => canvasRef.current?.classList.add('grabbing')}
-                  onPointerUp={() => canvasRef.current?.classList.remove('grabbing')}
-                  onPointerLeave={() => canvasRef.current?.classList.remove('grabbing')}
-                />
+                <group key={`node-${node.id}`} position={[node.x, node.y, node.z]}>
+                  <NodeMesh
+                    type={node.type}
+                    scale={node.scale * debouncedScaleMultiplier}
+                    displayColor={node.color}
+                    isHighlighted={isHighlighted}
+                    dimmed={highlightedNode != null && !isHighlighted && !isSelected && !isConnected}
+                    connectionStrength={connectionStrength}
+                    isSelected={isSelected}
+                    onClick={() => handleNodeClick(node.id)}
+                    onPointerOut={handleNodePointerOut}
+                  />
+                </group>
               );
             })}
             {processedData.nodes.map((node) => {
@@ -529,7 +516,7 @@ export default function SoulNet({ userId, timeRange }: SoulNetProps) {
               const isSelected = node.id === selectedNode;
               return (
                 <DirectNodeLabel
-                  key={node.id}
+                  key={`label-${node.id}`}
                   id={node.id}
                   type={node.type}
                   position={[node.x, node.y, node.z]}

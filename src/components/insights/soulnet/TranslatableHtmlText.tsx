@@ -98,7 +98,6 @@ export const TranslatableHtmlText: React.FC<TranslatableHtmlTextProps> = ({
       WebkitBackdropFilter: isSelected ? 'blur(2px)' : 'none', // Safari support
       WebkitFontSmoothing: 'antialiased',
       MozOsxFontSmoothing: 'grayscale',
-      textRendering: 'optimizeLegibility',
       ...style
     };
   }, [scriptAwareFontFamily, isSelected, isHighlighted, style]);
