@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { motion } from 'framer-motion';
 import * as THREE from 'three';
@@ -36,6 +35,7 @@ import { format } from "date-fns"
 import { DatePicker } from "@/components/ui/date-picker"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import SoulNetErrorBoundary from './soulnet/SoulNetErrorBoundary';
+import { Json } from '@/integrations/supabase/types';
 
 interface SoulNetProps {
   userId: string | undefined;
@@ -71,11 +71,12 @@ interface DateRange {
   to?: Date;
 }
 
-interface JournalEntry {
+// Updated interface to match Supabase return type
+interface SupabaseJournalEntry {
   id: number;
   created_at: string;
-  emotions?: Record<string, number>;
-  entities?: Array<{ name: string; type: string }>;
+  emotions?: Json;
+  entities?: Json;
   'refined text'?: string;
   'transcription text'?: string;
 }
@@ -246,13 +247,26 @@ export default function SoulNet({ userId, timeRange }: SoulNetProps) {
       // Track entity-emotion co-occurrences for edge creation
       const coOccurrences = new Map<string, number>();
       
-      entries.forEach((entry: JournalEntry, entryIndex: number) => {
-        const emotions = entry.emotions || {};
-        const entities = entry.entities || [];
+      entries.forEach((entry: SupabaseJournalEntry, entryIndex: number) => {
+        // Safely handle emotions Json type
+        let emotions: Record<string, number> = {};
+        if (entry.emotions && typeof entry.emotions === 'object' && entry.emotions !== null) {
+          try {
+            emotions = entry.emotions as Record<string, number>;
+          } catch (e) {
+            console.warn('[SoulNet] Failed to parse emotions for entry:', entry.id);
+          }
+        }
+        
+        // Safely handle entities Json type
+        let entities: Array<{ name: string; type: string }> = [];
+        if (entry.entities && Array.isArray(entry.entities)) {
+          entities = entry.entities as Array<{ name: string; type: string }>;
+        }
         
         // Create emotion nodes
         Object.entries(emotions).forEach(([emotion, score]) => {
-          if (score > 0.3) { // Only include emotions with significant scores
+          if (typeof score === 'number' && score > 0.3) { // Only include emotions with significant scores
             const nodeId = `emotion_${emotion}`;
             if (!nodeMap.has(nodeId)) {
               const coords = generateSphereCoordinates(nodeMap.size, 50, 8);
@@ -294,7 +308,7 @@ export default function SoulNet({ userId, timeRange }: SoulNetProps) {
         
         // Create edges between entities and emotions that co-occur
         Object.entries(emotions).forEach(([emotion, emotionScore]) => {
-          if (emotionScore > 0.3) {
+          if (typeof emotionScore === 'number' && emotionScore > 0.3) {
             entities.forEach((entity) => {
               if (entity.name && entity.name.trim()) {
                 const emotionNodeId = `emotion_${emotion}`;
@@ -723,7 +737,6 @@ export default function SoulNet({ userId, timeRange }: SoulNetProps) {
                     connectionStrength={connectionStrength}
                     isSelected={isSelected}
                     onClick={() => handleNodeClick(node.id)}
-                    onPointerOver={() => handleNodePointerOver(node.id)}
                     onPointerDown={handleNodePointerDown}
                     onPointerUp={handleNodePointerUp}
                     onPointerOut={handleNodePointerOut}
