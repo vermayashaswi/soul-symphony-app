@@ -28,6 +28,7 @@ interface SimplifiedSoulNetVisualizationProps {
   themeHex: string;
   isFullScreen?: boolean;
   shouldShowLabels?: boolean;
+  containerRef?: React.RefObject<HTMLDivElement>;
 }
 
 export const SimplifiedSoulNetVisualization: React.FC<SimplifiedSoulNetVisualizationProps> = ({
@@ -36,7 +37,8 @@ export const SimplifiedSoulNetVisualization: React.FC<SimplifiedSoulNetVisualiza
   onNodeClick,
   themeHex,
   isFullScreen = false,
-  shouldShowLabels = true
+  shouldShowLabels = true,
+  containerRef
 }) => {
   const { camera } = useThree();
   const controlsRef = useRef<any>(null);
@@ -252,6 +254,7 @@ export const SimplifiedSoulNetVisualization: React.FC<SimplifiedSoulNetVisualiza
                 cameraZoom={cameraZoom}
                 isHighlighted={isHighlighted}
                 forceShowLabels={showLabels}
+                containerRef={containerRef}
               />
             );
           } catch (error) {
