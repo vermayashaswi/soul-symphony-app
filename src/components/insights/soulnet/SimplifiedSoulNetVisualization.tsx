@@ -1,10 +1,12 @@
 
 import React, { useRef, useEffect, useMemo, useState, useCallback } from 'react';
-import '@/types/three-reference';
 import { OrbitControls } from '@react-three/drei';
-import { useThree } from '@react-three/fiber';
-import Node from './Node';
+import { useThree, useFrame } from '@react-three/fiber';
+import SimpleNode from './SimpleNode';
 import Edge from './Edge';
+import HtmlTextOverlay from './HtmlTextOverlay';
+import { useTheme } from '@/hooks/use-theme';
+import { useSimpleTextItems } from './SimpleTextService';
 import * as THREE from 'three';
 
 interface NodeData {
@@ -30,19 +32,6 @@ interface SimplifiedSoulNetVisualizationProps {
   shouldShowLabels?: boolean;
 }
 
-function getConnectedNodes(nodeId: string, links: LinkData[]): Set<string> {
-  if (!nodeId || !links || !Array.isArray(links)) return new Set<string>();
-  
-  const connected = new Set<string>();
-  links.forEach(link => {
-    if (!link || typeof link !== 'object') return;
-    
-    if (link.source === nodeId) connected.add(link.target);
-    if (link.target === nodeId) connected.add(link.source);
-  });
-  return connected;
-}
-
 export const SimplifiedSoulNetVisualization: React.FC<SimplifiedSoulNetVisualizationProps> = ({
   data,
   selectedNode,
@@ -51,287 +40,225 @@ export const SimplifiedSoulNetVisualization: React.FC<SimplifiedSoulNetVisualiza
   isFullScreen = false,
   shouldShowLabels = true
 }) => {
+  const { camera } = useThree();
+  const { theme } = useTheme();
   const controlsRef = useRef<any>(null);
-  const groupRef = useRef<THREE.Group>(null);
-  const { camera, size } = useThree();
-  const [cameraZoom, setCameraZoom] = useState(45);
-  const [isInitialized, setIsInitialized] = useState(false);
-  const [mounted, setMounted] = useState(false);
+  const [cameraZoom, setCameraZoom] = useState<number>(45);
+  const [isInitialized, setIsInitialized] = useState<boolean>(false);
+  const mountedRef = useRef<boolean>(true);
+  
+  console.log("[SimplifiedSoulNetVisualization] Render with data:", data?.nodes?.length || 0, "nodes");
 
-  console.log("[SimplifiedSoulNetVisualization] Rendering with data:", {
-    nodeCount: data?.nodes?.length || 0,
-    linkCount: data?.links?.length || 0,
-    selectedNode,
-    shouldShowLabels,
-    themeHex,
-    isInitialized,
-    mounted
-  });
-
-  // Component mounting state
+  // Cleanup on unmount
   useEffect(() => {
-    console.log('[SimplifiedSoulNetVisualization] Component mounting');
-    setMounted(true);
-    
-    // Delayed initialization to prevent race conditions
-    const initTimer = setTimeout(() => {
-      if (data?.nodes?.length > 0) {
-        setIsInitialized(true);
-        console.log('[SimplifiedSoulNetVisualization] Initialization complete');
-      }
-    }, 100);
-
+    mountedRef.current = true;
     return () => {
-      console.log('[SimplifiedSoulNetVisualization] Component unmounting');
-      setMounted(false);
-      clearTimeout(initTimer);
+      mountedRef.current = false;
     };
   }, []);
 
-  // Validate data early with better error handling
-  const validatedData = useMemo(() => {
+  // Validate and clean data with better error handling
+  const validData = useMemo(() => {
     try {
-      if (!data || !data.nodes || !Array.isArray(data.nodes)) {
-        console.warn('[SimplifiedSoulNetVisualization] Invalid or missing nodes data');
+      if (!data || !Array.isArray(data.nodes) || !Array.isArray(data.links)) {
+        console.log("[SimplifiedSoulNetVisualization] Invalid data structure, using empty data");
         return { nodes: [], links: [] };
       }
       
-      if (!data.links || !Array.isArray(data.links)) {
-        console.warn('[SimplifiedSoulNetVisualization] Invalid or missing links data');
-        return { nodes: data.nodes, links: [] };
-      }
-
-      console.log('[SimplifiedSoulNetVisualization] Data validation successful');
-      return data;
+      const validNodes = data.nodes.filter(node => {
+        if (!node || !node.id) return false;
+        if (!Array.isArray(node.position) || node.position.length !== 3) return false;
+        if (!node.type || (node.type !== 'entity' && node.type !== 'emotion')) return false;
+        return true;
+      });
+      
+      const validLinks = data.links.filter(link => {
+        if (!link || !link.source || !link.target) return false;
+        if (!validNodes.some(n => n.id === link.source)) return false;
+        if (!validNodes.some(n => n.id === link.target)) return false;
+        if (typeof link.value !== 'number' || isNaN(link.value)) return false;
+        return true;
+      });
+      
+      console.log("[SimplifiedSoulNetVisualization] Valid data:", validNodes.length, "nodes,", validLinks.length, "links");
+      return { nodes: validNodes, links: validLinks };
     } catch (error) {
-      console.error('[SimplifiedSoulNetVisualization] Data validation error:', error);
+      console.error("[SimplifiedSoulNetVisualization] Error validating data:", error);
       return { nodes: [], links: [] };
     }
   }, [data]);
 
-  // Don't render until component is properly mounted and initialized
-  if (!mounted || !isInitialized || !validatedData.nodes.length) {
-    console.log('[SimplifiedSoulNetVisualization] Not ready to render:', {
-      mounted,
-      isInitialized,
-      nodeCount: validatedData.nodes.length
-    });
-    return null;
-  }
+  // Calculate center position with error handling
+  const centerPosition = useMemo(() => {
+    try {
+      if (validData.nodes.length === 0) return new THREE.Vector3(0, 0, 0);
+      
+      const avgX = validData.nodes.reduce((sum, node) => sum + (node.position[0] || 0), 0) / validData.nodes.length;
+      const avgY = validData.nodes.reduce((sum, node) => sum + (node.position[1] || 0), 0) / validData.nodes.length;
+      
+      return new THREE.Vector3(avgX, avgY, 0);
+    } catch (error) {
+      console.error("[SimplifiedSoulNetVisualization] Error calculating center position:", error);
+      return new THREE.Vector3(0, 0, 0);
+    }
+  }, [validData.nodes]);
 
-  // Track camera zoom for dynamic sizing with error handling
+  // Safe camera initialization
   useEffect(() => {
-    if (!camera || !mounted) return;
+    if (!camera || !mountedRef.current) return;
 
-    const updateZoom = () => {
-      try {
-        if (camera && 'position' in camera) {
-          const distance = camera.position.length();
-          setCameraZoom(distance);
-        }
-      } catch (error) {
-        console.warn('[SimplifiedSoulNetVisualization] Error updating zoom:', error);
-      }
-    };
+    try {
+      console.log("[SimplifiedSoulNetVisualization] Initializing camera");
+      
+      const targetZ = isFullScreen ? 40 : 45;
+      camera.position.set(centerPosition.x, centerPosition.y, targetZ);
+      camera.lookAt(centerPosition.x, centerPosition.y, 0);
+      camera.updateProjectionMatrix();
+      
+      setIsInitialized(true);
+      setCameraZoom(targetZ);
+      
+      console.log("[SimplifiedSoulNetVisualization] Camera initialized at position:", camera.position);
+    } catch (error) {
+      console.error("[SimplifiedSoulNetVisualization] Error initializing camera:", error);
+    }
+  }, [camera, centerPosition, isFullScreen]);
 
-    updateZoom();
-    const interval = setInterval(updateZoom, 200);
-    return () => clearInterval(interval);
-  }, [camera, mounted]);
-
-  // Get connected nodes for highlighting with validation
-  const connectedNodes = useMemo(() => {
-    if (!selectedNode || !mounted) return new Set<string>();
+  // Safe camera zoom tracking
+  useFrame(() => {
+    if (!camera || !isInitialized || !mountedRef.current) return;
     
     try {
-      return getConnectedNodes(selectedNode, validatedData.links || []);
+      const currentZ = camera.position.z;
+      if (Math.abs(currentZ - cameraZoom) > 1) {
+        setCameraZoom(currentZ);
+      }
     } catch (error) {
-      console.warn('[SimplifiedSoulNetVisualization] Error calculating connected nodes:', error);
+      console.warn("[SimplifiedSoulNetVisualization] Error in frame update:", error);
+    }
+  });
+
+  // Calculate highlighted nodes with error handling
+  const highlightedNodes = useMemo(() => {
+    try {
+      if (!selectedNode || !validData.links) return new Set<string>();
+      
+      const connected = new Set<string>();
+      validData.links.forEach(link => {
+        if (!link) return;
+        if (link.source === selectedNode) connected.add(link.target);
+        if (link.target === selectedNode) connected.add(link.source);
+      });
+      
+      return connected;
+    } catch (error) {
+      console.error("[SimplifiedSoulNetVisualization] Error calculating highlighted nodes:", error);
       return new Set<string>();
     }
-  }, [selectedNode, validatedData.links, mounted]);
+  }, [selectedNode, validData.links]);
 
-  // Calculate max edge thickness for proper scaling
-  const maxEdgeThickness = useMemo(() => {
+  // Handle node clicks with error handling
+  const handleNodeClick = useCallback((id: string) => {
     try {
-      if (!validatedData.links || !validatedData.links.length) return 1;
-      return Math.max(...validatedData.links.map(link => link.value || 0));
-    } catch (error) {
-      console.warn('[SimplifiedSoulNetVisualization] Error calculating max edge thickness:', error);
-      return 1;
-    }
-  }, [validatedData.links]);
-
-  const shouldShowNodeLabel = useCallback((nodeId: string) => {
-    if (!mounted) return false;
-    
-    try {
-      if (!shouldShowLabels) return false;
-      if (selectedNode) {
-        return nodeId === selectedNode || connectedNodes.has(nodeId);
+      console.log("[SimplifiedSoulNetVisualization] Node clicked:", id);
+      if (typeof onNodeClick === 'function') {
+        onNodeClick(id);
       }
-      return true;
     } catch (error) {
-      console.warn('[SimplifiedSoulNetVisualization] Error calculating label visibility:', error);
-      return false;
+      console.error("[SimplifiedSoulNetVisualization] Error handling node click:", error);
     }
-  }, [shouldShowLabels, selectedNode, connectedNodes, mounted]);
+  }, [onNodeClick]);
 
-  const isNodeHighlighted = useCallback((nodeId: string) => {
-    if (!mounted) return false;
-    
-    try {
-      if (!selectedNode) return false;
-      return nodeId === selectedNode || connectedNodes.has(nodeId);
-    } catch (error) {
-      console.warn('[SimplifiedSoulNetVisualization] Error calculating node highlight:', error);
-      return false;
-    }
-  }, [selectedNode, connectedNodes, mounted]);
+  // Get text overlay items with error handling
+  const textOverlayItems = useSimpleTextItems({
+    nodes: validData.nodes,
+    selectedNode,
+    highlightedNodes,
+    theme: theme || 'light',
+    cameraZoom,
+    shouldShowLabels: shouldShowLabels && isInitialized
+  });
 
-  const isEdgeHighlighted = useCallback((link: LinkData) => {
-    if (!mounted) return false;
-    
-    try {
-      if (!selectedNode || !link) return false;
-      return link.source === selectedNode || link.target === selectedNode;
-    } catch (error) {
-      console.warn('[SimplifiedSoulNetVisualization] Error calculating edge highlight:', error);
-      return false;
-    }
-  }, [selectedNode, mounted]);
+  // Render with comprehensive error boundaries
+  console.log("[SimplifiedSoulNetVisualization] Rendering 3D scene with", validData.nodes.length, "nodes");
+  
+  return (
+    <>
+      <ambientLight intensity={0.5} />
+      <pointLight position={[10, 10, 10]} intensity={0.8} />
+      
+      <OrbitControls
+        ref={controlsRef}
+        enableDamping
+        dampingFactor={0.05}
+        rotateSpeed={0.5}
+        minDistance={isFullScreen ? 8 : 10}
+        maxDistance={isFullScreen ? 80 : 60}
+        target={centerPosition}
+      />
 
-  const isEdgeDimmed = useCallback((link: LinkData) => {
-    if (!mounted) return false;
-    
-    try {
-      if (!selectedNode || !link) return false;
-      return !isEdgeHighlighted(link);
-    } catch (error) {
-      console.warn('[SimplifiedSoulNetVisualization] Error calculating edge dimming:', error);
-      return false;
-    }
-  }, [selectedNode, isEdgeHighlighted, mounted]);
+      {/* Render edges with error handling */}
+      {validData.links.map((link, index) => {
+        try {
+          const sourceNode = validData.nodes.find(n => n.id === link.source);
+          const targetNode = validData.nodes.find(n => n.id === link.target);
+          
+          if (!sourceNode || !targetNode) return null;
 
-  console.log('[SimplifiedSoulNetVisualization] Rendering visualization with', validatedData.nodes.length, 'nodes');
+          const isHighlight = selectedNode && 
+            (link.source === selectedNode || link.target === selectedNode);
 
-  try {
-    return (
-      <>
-        {/* Enhanced Lighting */}
-        <ambientLight intensity={0.6} />
-        <directionalLight position={[10, 10, 5]} intensity={0.8} />
-        <pointLight position={[-10, -10, -5]} intensity={0.4} />
+          return (
+            <Edge
+              key={`edge-${index}`}
+              start={sourceNode.position}
+              end={targetNode.position}
+              value={link.value}
+              isHighlighted={!!isHighlight}
+              dimmed={!!selectedNode && !isHighlight}
+              maxThickness={4}
+              startNodeType={sourceNode.type}
+              endNodeType={targetNode.type}
+              startNodeScale={1}
+              endNodeScale={1}
+            />
+          );
+        } catch (error) {
+          console.warn("[SimplifiedSoulNetVisualization] Error rendering edge:", error);
+          return null;
+        }
+      })}
 
-        {/* Camera Controls with better configuration */}
-        <OrbitControls
-          ref={controlsRef}
-          enablePan={true}
-          enableZoom={true}
-          enableRotate={true}
-          zoomSpeed={0.6}
-          rotateSpeed={0.4}
-          panSpeed={0.8}
-          minDistance={15}
-          maxDistance={100}
-          minPolarAngle={0}
-          maxPolarAngle={Math.PI}
-          enableDamping={true}
-          dampingFactor={0.05}
-        />
+      {/* Render nodes with error handling */}
+      {validData.nodes.map(node => {
+        try {
+          const isHighlighted = selectedNode === node.id || highlightedNodes.has(node.id);
+          const dimmed = !!selectedNode && !isHighlighted;
 
-        {/* Main visualization group */}
-        <group ref={groupRef}>
-          {/* Render edges with enhanced validation and error handling */}
-          {validatedData.links && validatedData.links.map((link, index) => {
-            if (!link || typeof link !== 'object') {
-              console.warn('[SimplifiedSoulNetVisualization] Invalid link at index:', index);
-              return null;
-            }
-            
-            const sourceNode = validatedData.nodes.find(n => n && n.id === link.source);
-            const targetNode = validatedData.nodes.find(n => n && n.id === link.target);
-            
-            if (!sourceNode || !targetNode) {
-              console.warn('[SimplifiedSoulNetVisualization] Missing nodes for link:', link.source, '->', link.target);
-              return null;
-            }
+          return (
+            <SimpleNode
+              key={`node-${node.id}`}
+              node={node}
+              isSelected={selectedNode === node.id}
+              onClick={handleNodeClick}
+              highlightedNodes={highlightedNodes}
+              dimmed={dimmed}
+              themeHex={themeHex}
+              isHighlighted={isHighlighted}
+            />
+          );
+        } catch (error) {
+          console.warn("[SimplifiedSoulNetVisualization] Error rendering node:", error);
+          return null;
+        }
+      })}
 
-            if (!Array.isArray(sourceNode.position) || !Array.isArray(targetNode.position)) {
-              console.warn('[SimplifiedSoulNetVisualization] Invalid node positions for link');
-              return null;
-            }
-
-            try {
-              return (
-                <Edge
-                  key={`edge-${index}-${link.source}-${link.target}`}
-                  start={sourceNode.position}
-                  end={targetNode.position}
-                  value={link.value || 0}
-                  isHighlighted={isEdgeHighlighted(link)}
-                  dimmed={isEdgeDimmed(link)}
-                  maxThickness={maxEdgeThickness}
-                  startNodeType={sourceNode.type}
-                  endNodeType={targetNode.type}
-                  startNodeScale={sourceNode.value || 0.5}
-                  endNodeScale={targetNode.value || 0.5}
-                />
-              );
-            } catch (error) {
-              console.warn('[SimplifiedSoulNetVisualization] Error rendering edge:', error);
-              return null;
-            }
-          })}
-
-          {/* Render nodes with enhanced validation and error handling */}
-          {validatedData.nodes && validatedData.nodes.map((node) => {
-            if (!node || !node.id || typeof node !== 'object') {
-              console.warn('[SimplifiedSoulNetVisualization] Invalid node:', node);
-              return null;
-            }
-            
-            if (!Array.isArray(node.position) || node.position.length !== 3) {
-              console.warn('[SimplifiedSoulNetVisualization] Invalid position for node:', node.id);
-              return null;
-            }
-            
-            try {
-              return (
-                <group key={`node-group-${node.id}`} position={node.position}>
-                  <Node
-                    node={node}
-                    isSelected={node.id === selectedNode}
-                    onClick={(id: string, e: any) => {
-                      try {
-                        onNodeClick(id);
-                      } catch (error) {
-                        console.error('[SimplifiedSoulNetVisualization] Error in node click handler:', error);
-                      }
-                    }}
-                    highlightedNodes={connectedNodes}
-                    showLabel={shouldShowNodeLabel(node.id)}
-                    dimmed={selectedNode ? !isNodeHighlighted(node.id) && node.id !== selectedNode : false}
-                    themeHex={themeHex || '#3b82f6'}
-                    selectedNodeId={selectedNode}
-                    cameraZoom={cameraZoom}
-                    isHighlighted={isNodeHighlighted(node.id)}
-                    forceShowLabels={shouldShowLabels}
-                  />
-                </group>
-              );
-            } catch (error) {
-              console.warn('[SimplifiedSoulNetVisualization] Error rendering node:', error);
-              return null;
-            }
-          })}
-        </group>
-      </>
-    );
-  } catch (error) {
-    console.error('[SimplifiedSoulNetVisualization] Fatal error in component render:', error);
-    return null;
-  }
+      {/* HTML Text Overlay - render when initialized */}
+      {isInitialized && (
+        <HtmlTextOverlay textItems={textOverlayItems} />
+      )}
+    </>
+  );
 };
 
 export default SimplifiedSoulNetVisualization;

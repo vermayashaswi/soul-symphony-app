@@ -1,34 +1,148 @@
 
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/favicon.ico" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>SOuLO</title>
+    <title>SOULo - Your Mental Wellness Companion</title>
+    <meta name="description" content="SOULo helps you understand your emotions through AI-powered voice journaling." />
+    <meta name="author" content="SOULo" />
+
+    <meta property="og:title" content="SOULo - Mental Wellness Companion" />
+    <meta property="og:description" content="Track your emotions and gain insights with AI-powered voice journaling" />
+    <meta property="og:type" content="website" />
+    <meta property="og:image" content="https://soulo.online/opengraph-image.png" />
+    <meta property="og:url" content="https://soulo.online" />
+
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:site" content="@soulo_online" />
+    <meta name="twitter:image" content="https://soulo.online/opengraph-image.png" />
+    
+    <!-- Enhanced Google Fonts for comprehensive multi-script support -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@100..900&family=Noto+Sans+Devanagari:wght@100..900&family=Noto+Sans+Arabic:wght@100..900&family=Noto+Sans+JP:wght@100..900&family=Noto+Sans+KR:wght@100..900&family=Noto+Sans+SC:wght@100..900&display=swap" rel="stylesheet">
     
-    <!-- Google Translate Script -->
-    <script type="text/javascript">
-      function googleTranslateElementInit() {
-        new google.translate.TranslateElement({
-          pageLanguage: 'en',
-          includedLanguages: 'hi,ar,ja,ko,zh,es,fr,de,pt,ru,bn,gu,kn,ml,mr,or,pa,ta,te',
-          layout: google.translate.TranslateElement.InlineLayout.SIMPLE,
-          autoDisplay: false
-        }, 'google_translate_element');
+    <!-- Primary Latin fonts with font-display swap for better performance -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    
+    <!-- Enhanced Devanagari script support (Hindi, Marathi, Nepali, Sanskrit, etc.) -->
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Devanagari:wght@400;500;600;700&family=Mukti:wght@400;500;600;700&family=Lohit+Devanagari&display=swap" rel="stylesheet">
+    
+    <!-- Arabic script with additional variants -->
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Arabic:wght@400;500;600;700&family=Amiri:wght@400;700&display=swap" rel="stylesheet">
+    
+    <!-- Chinese scripts (Simplified & Traditional) with better coverage -->
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;600;700&family=Noto+Sans+TC:wght@400;500;600;700&display=swap" rel="stylesheet">
+    
+    <!-- Japanese with multiple script support -->
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;600;700&family=M+PLUS+1p:wght@400;500;700&display=swap" rel="stylesheet">
+    
+    <!-- Korean -->
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;600;700&display=swap" rel="stylesheet">
+    
+    <!-- Enhanced Indian regional languages -->
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Bengali:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Tamil:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Telugu:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Gujarati:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Kannada:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Malayalam:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Oriya:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Gurmukhi:wght@400;500;600;700&display=swap" rel="stylesheet">
+    
+    <!-- Thai and other Southeast Asian -->
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Thai:wght@400;500;600;700&display=swap" rel="stylesheet">
+    
+    <!-- Comprehensive multi-script fallback font -->
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+    
+    <!-- Font preloading for critical fonts -->
+    <link rel="preload" href="https://fonts.gstatic.com/s/inter/v13/UcCO3FwrK3iLTeHuS_fvQtMwCp50KnMw2boKoduKmMEVuLyfAZ9hiJ-Ek-_EeA.woff2" as="font" type="font/woff2" crossorigin>
+    <link rel="preload" href="https://fonts.gstatic.com/s/notosansdevanagari/v25/TuGoUUFzXI5FBtUq5a8bjKYTZjtRU6Sgv3NaV_SNmps.woff2" as="font" type="font/woff2" crossorigin>
+    
+    <style>
+      /* Enhanced font fallback system */
+      :root {
+        --font-latin: 'Inter', 'Noto Sans', system-ui, -apple-system, sans-serif;
+        --font-devanagari: 'Noto Sans Devanagari', 'Mukti', 'Lohit Devanagari', 'Inter', system-ui, sans-serif;
+        --font-arabic: 'Noto Sans Arabic', 'Amiri', 'Inter', system-ui, sans-serif;
+        --font-chinese: 'Noto Sans SC', 'Noto Sans TC', 'Inter', system-ui, sans-serif;
+        --font-japanese: 'Noto Sans JP', 'M PLUS 1p', 'Inter', system-ui, sans-serif;
+        --font-korean: 'Noto Sans KR', 'Inter', system-ui, sans-serif;
+        --font-universal: 'Noto Sans', 'Inter', system-ui, -apple-system, sans-serif;
       }
-    </script>
-    <script type="text/javascript" src="//translate.google.com/translate_a/element.js?cb=googleTranslateElementInit"></script>
+      
+      /* Script-specific font assignments */
+      .font-devanagari { font-family: var(--font-devanagari); }
+      .font-arabic { font-family: var(--font-arabic); }
+      .font-chinese { font-family: var(--font-chinese); }
+      .font-japanese { font-family: var(--font-japanese); }
+      .font-korean { font-family: var(--font-korean); }
+      .font-universal { font-family: var(--font-universal); }
+      
+      /* Font loading optimization */
+      body {
+        font-family: var(--font-universal);
+        font-display: swap;
+      }
+      
+      /* Prevent invisible text during font load */
+      .font-loading {
+        visibility: hidden;
+      }
+      
+      .fonts-loaded .font-loading {
+        visibility: visible;
+      }
+    </style>
   </head>
   <body>
-    <!-- Hidden Google Translate Element -->
-    <div id="google_translate_element" style="display: none;"></div>
-    
     <div id="root"></div>
-    <script src="https://cdn.gpteng.co/gptengineer.js" type="module"></script>
+    <div id="google_translate_element" style="position: absolute; top: -9999px; left: -9999px;"></div>
     <script type="module" src="/src/main.tsx"></script>
+    <script type="text/javascript" src="https://translate.google.com/translate_a/element.js?cb=googleTranslateElementInit" async defer></script>
+    <script src="https://cdn.gpteng.co/gptengineer.js" type="module"></script>
+    
+    <script>
+      // Enhanced font loading detection
+      function initializeFontDetection() {
+        let fontsReady = false;
+        
+        // Mark fonts as loaded when ready
+        const markFontsReady = () => {
+          if (!fontsReady) {
+            fontsReady = true;
+            document.body.classList.add('fonts-loaded');
+            console.log('[FontDetection] Fonts marked as ready');
+          }
+        };
+        
+        // Listen for custom font ready event
+        window.addEventListener('fontsReady', markFontsReady);
+        
+        // Fallback timeout
+        setTimeout(markFontsReady, 8000);
+        
+        // Modern browsers with Font Loading API
+        if (document.fonts && document.fonts.ready) {
+          document.fonts.ready.then(markFontsReady);
+        }
+      }
+      
+      // Force reload if the app fails to load within 10 seconds
+      setTimeout(function() {
+        if (document.readyState !== 'complete') {
+          console.log('Application failed to load completely. Reloading...');
+          window.location.reload();
+        }
+      }, 10000);
+      
+      // Initialize font detection when DOM is ready
+      if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', initializeFontDetection);
+      } else {
+        initializeFontDetection();
+      }
+    </script>
   </body>
 </html>

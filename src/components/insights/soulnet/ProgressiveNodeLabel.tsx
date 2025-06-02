@@ -1,6 +1,8 @@
 
-import React, { useMemo } from 'react';
-import { TranslatableText } from '@/components/translation/TranslatableText';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
+import ReliableText from './ReliableText';
+import { useTranslation } from '@/contexts/TranslationContext';
+import { simpleFontService } from '@/utils/simpleFontService';
 
 interface ProgressiveNodeLabelProps {
   id: string;
@@ -25,7 +27,14 @@ export const ProgressiveNodeLabel: React.FC<ProgressiveNodeLabelProps> = ({
   themeHex,
   nodeScale = 1
 }) => {
-  console.log(`[ProgressiveNodeLabel] Rendering label for ${id}, visible: ${shouldShowLabel}`);
+  const { currentLanguage, translate } = useTranslation();
+  const [displayText, setDisplayText] = useState<string>(id);
+  const [isReady, setIsReady] = useState(false);
+  const [translationStage, setTranslationStage] = useState<'initial' | 'processing' | 'complete'>('initial');
+  const mounted = useRef<boolean>(true);
+  const initializationRef = useRef<boolean>(false);
+  
+  console.log(`[ProgressiveNodeLabel] Enhanced label for ${id}, stage: ${translationStage}, visible: ${shouldShowLabel}`);
 
   // Calculate label position offset with safety checks
   const calculateOffset = (): [number, number, number] => {
@@ -38,6 +47,109 @@ export const ProgressiveNodeLabel: React.FC<ProgressiveNodeLabelProps> = ({
       return [0, 2, 0];
     }
   };
+
+  // Enhanced initialization with reliable font service
+  useEffect(() => {
+    if (!mounted.current || initializationRef.current) return;
+    
+    console.log(`[ProgressiveNodeLabel] Starting enhanced initialization for ${id}`);
+    initializationRef.current = true;
+
+    const init = async () => {
+      try {
+        // Stage 1: Initial setup
+        setDisplayText(id);
+        setTranslationStage('initial');
+
+        // Stage 2: Font readiness check (non-blocking)
+        if (simpleFontService.isReady()) {
+          setIsReady(true);
+        } else {
+          simpleFontService.waitForFonts().then(() => {
+            if (mounted.current) setIsReady(true);
+          });
+          // Fallback timeout
+          setTimeout(() => {
+            if (mounted.current) setIsReady(true);
+          }, 100);
+        }
+
+        // Stage 3: Translation processing (delayed)
+        setTimeout(() => {
+          if (mounted.current && shouldShowLabel) {
+            setTranslationStage('processing');
+          }
+        }, 200);
+      } catch (error) {
+        console.error('[ProgressiveNodeLabel] Initialization error:', error);
+        setDisplayText(id);
+        setIsReady(true);
+        setTranslationStage('complete');
+      }
+    };
+
+    init();
+  }, [id, shouldShowLabel]);
+
+  // Enhanced translation processing
+  useEffect(() => {
+    if (!mounted.current || translationStage !== 'processing' || !isReady) return;
+
+    const processTranslation = async () => {
+      try {
+        // For English or no translate function, use original text
+        if (currentLanguage === 'en' || !translate) {
+          if (mounted.current) {
+            setDisplayText(id);
+            setTranslationStage('complete');
+            console.log(`[ProgressiveNodeLabel] Using original text for ${id}`);
+          }
+          return;
+        }
+
+        // Attempt translation with timeout and error handling
+        try {
+          const translated = await Promise.race([
+            translate(id),
+            new Promise<string>((_, reject) => 
+              setTimeout(() => reject(new Error('Translation timeout')), 2000)
+            )
+          ]);
+
+          if (mounted.current && translated && typeof translated === 'string') {
+            setDisplayText(translated);
+            setTranslationStage('complete');
+            console.log(`[ProgressiveNodeLabel] Translation success: ${id} -> ${translated}`);
+          } else if (mounted.current) {
+            setDisplayText(id);
+            setTranslationStage('complete');
+            console.warn(`[ProgressiveNodeLabel] Invalid translation, using original: ${id}`);
+          }
+        } catch (error) {
+          console.warn(`[ProgressiveNodeLabel] Translation failed for ${id}, using original`);
+          if (mounted.current) {
+            setDisplayText(id);
+            setTranslationStage('complete');
+          }
+        }
+      } catch (error) {
+        console.error(`[ProgressiveNodeLabel] Processing error for ${id}:`, error);
+        if (mounted.current) {
+          setDisplayText(id);
+          setTranslationStage('complete');
+        }
+      }
+    };
+
+    processTranslation();
+  }, [translationStage, id, currentLanguage, translate, isReady]);
+
+  // Cleanup
+  useEffect(() => {
+    return () => {
+      mounted.current = false;
+    };
+  }, []);
 
   // Calculate text properties with safety checks
   const textSize = useMemo(() => {
@@ -63,9 +175,9 @@ export const ProgressiveNodeLabel: React.FC<ProgressiveNodeLabelProps> = ({
     }
   }, [isSelected, isHighlighted, type, themeHex]);
 
-  // Don't render if not visible
-  if (!shouldShowLabel) {
-    console.log(`[ProgressiveNodeLabel] Not rendering: visible=${shouldShowLabel}`);
+  // Don't render until ready and visible
+  if (!isReady || !shouldShowLabel || translationStage === 'initial' || !displayText) {
+    console.log(`[ProgressiveNodeLabel] Not rendering: ready=${isReady}, visible=${shouldShowLabel}, stage=${translationStage}, text="${displayText}"`);
     return null;
   }
 
@@ -76,30 +188,21 @@ export const ProgressiveNodeLabel: React.FC<ProgressiveNodeLabelProps> = ({
     position[2] + labelOffset[2]
   ];
 
-  console.log(`[ProgressiveNodeLabel] Rendering TranslatableText for ${id} at`, labelPosition);
+  console.log(`[ProgressiveNodeLabel] Rendering enhanced text "${displayText}" for ${id} at`, labelPosition);
 
   return (
-    <group position={labelPosition}>
-      <TranslatableText
-        text={id}
-        as="div"
-        forceTranslate={true}
-        style={{
-          color: textColor,
-          fontSize: `${textSize}rem`,
-          fontWeight: (isHighlighted || isSelected) ? 'bold' : 'normal',
-          textAlign: 'center',
-          textShadow: isSelected 
-            ? '2px 2px 4px #000000' 
-            : '1px 1px 2px #333333',
-          maxWidth: '25ch',
-          wordWrap: 'break-word',
-          whiteSpace: 'nowrap',
-          overflow: 'hidden',
-          textOverflow: 'ellipsis'
-        }}
-      />
-    </group>
+    <ReliableText
+      text={displayText}
+      position={labelPosition}
+      color={textColor}
+      size={textSize}
+      visible={true}
+      renderOrder={15}
+      bold={isHighlighted || isSelected}
+      outlineWidth={isSelected ? 0.04 : 0.02}
+      outlineColor={isSelected ? '#000000' : '#333333'}
+      maxWidth={25}
+    />
   );
 };
 
