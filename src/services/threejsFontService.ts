@@ -1,6 +1,5 @@
 
 import { Font } from 'three/examples/jsm/loaders/FontLoader.js';
-import { localFontService } from './localFontService';
 
 interface FontInfo {
   name: string;
@@ -8,7 +7,6 @@ interface FontInfo {
   font?: Font;
   loading?: Promise<Font>;
   error?: Error;
-  validated?: boolean;
 }
 
 class ThreeJSFontService {
@@ -29,11 +27,11 @@ class ThreeJSFontService {
       },
       {
         name: 'Noto Sans Devanagari',
-        url: '/fonts/noto_sans_devanagari_regular.typeface.json'
+        url: 'https://cdn.jsdelivr.net/gh/mrdoob/three.js@dev/examples/fonts/noto_sans_devanagari_regular.typeface.json'
       },
       {
         name: 'Helvetiker',
-        url: '/fonts/helvetiker_regular.typeface.json'
+        url: 'https://threejs.org/examples/fonts/helvetiker_regular.typeface.json'
       },
       {
         name: 'Gentilis',
@@ -41,7 +39,7 @@ class ThreeJSFontService {
       },
       {
         name: 'Optimer',
-        url: '/fonts/optimer_regular.typeface.json'
+        url: 'https://threejs.org/examples/fonts/optimer_regular.typeface.json'
       }
     ];
 
@@ -53,16 +51,36 @@ class ThreeJSFontService {
   }
 
   detectScriptType(text: string): string {
-    return localFontService.detectScriptType(text);
+    if (!text) return 'latin';
+    
+    // Enhanced script detection with proper Unicode ranges
+    if (/[\u0900-\u097F]/.test(text)) return 'devanagari';
+    if (/[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\uFB50-\uFDFF\uFE70-\uFEFF]/.test(text)) return 'arabic';
+    if (/[\u4E00-\u9FFF\u3400-\u4DBF]/.test(text)) return 'chinese';
+    if (/[\u3040-\u309F\u30A0-\u30FF\u31F0-\u31FF]/.test(text)) return 'japanese';
+    if (/[\uAC00-\uD7AF\u1100-\u11FF\u3130-\u318F]/.test(text)) return 'korean';
+    
+    return 'latin';
   }
 
   getFontNameForScript(scriptType: string): string {
-    return localFontService.getFontNameForScript(scriptType);
+    switch (scriptType) {
+      case 'devanagari':
+        return 'Noto Sans Devanagari'; // Use proper Devanagari font
+      case 'arabic':
+      case 'chinese':
+      case 'japanese':
+      case 'korean':
+        return 'Optimer'; // Use Optimer for other scripts (fallback)
+      default:
+        return 'Helvetiker'; // Default Latin font
+    }
   }
 
   getFontNameForText(text: string): string {
-    const fontName = localFontService.getFontNameForText(text);
-    console.log(`[ThreeJSFontService] Text: "${text}" -> Font: ${fontName}`);
+    const scriptType = this.detectScriptType(text);
+    const fontName = this.getFontNameForScript(scriptType);
+    console.log(`[ThreeJSFontService] Text: "${text}" -> Script: ${scriptType} -> Font: ${fontName}`);
     return fontName;
   }
 
@@ -73,8 +91,8 @@ class ThreeJSFontService {
       return this.getFallbackFont();
     }
 
-    // Return cached font if available and validated
-    if (fontInfo.font && fontInfo.validated) {
+    // Return cached font if available
+    if (fontInfo.font) {
       return fontInfo.font;
     }
 
@@ -89,14 +107,13 @@ class ThreeJSFontService {
     }
 
     // Start loading the font
-    fontInfo.loading = this.loadAndValidateFont(fontInfo.url, fontName);
+    fontInfo.loading = this.loadFontFromUrl(fontInfo.url);
     
     try {
       const font = await fontInfo.loading;
       fontInfo.font = font;
-      fontInfo.validated = true;
       delete fontInfo.loading;
-      console.log(`[ThreeJSFontService] Font loaded and validated successfully: ${fontName}`);
+      console.log(`[ThreeJSFontService] Font loaded successfully: ${fontName}`);
       return font;
     } catch (error) {
       fontInfo.error = error instanceof Error ? error : new Error('Unknown font loading error');
@@ -106,23 +123,7 @@ class ThreeJSFontService {
     }
   }
 
-  private async loadAndValidateFont(url: string, fontName: string): Promise<Font> {
-    // First load the font data for validation
-    const fontDataResponse = await fetch(url);
-    if (!fontDataResponse.ok) {
-      throw new Error(`Failed to fetch font data from ${url}`);
-    }
-    
-    const fontData = await fontDataResponse.json();
-    
-    // Validate the font data using localFontService
-    const validationResult = await localFontService.validateFont(fontData, fontName);
-    
-    if (!validationResult.isValid) {
-      console.warn(`[ThreeJSFontService] Font validation failed for ${fontName}:`, validationResult.issues);
-      // Still try to load it, but log the issues
-    }
-
+  private async loadFontFromUrl(url: string): Promise<Font> {
     return new Promise((resolve, reject) => {
       // Dynamic import to avoid bundling issues
       import('three/examples/jsm/loaders/FontLoader.js').then(({ FontLoader }) => {
@@ -152,9 +153,8 @@ class ThreeJSFontService {
 
     try {
       // Try to load the default Helvetiker font as fallback
-      this.fallbackFont = await this.loadAndValidateFont(
-        'https://threejs.org/examples/fonts/helvetiker_regular.typeface.json',
-        'Helvetiker'
+      this.fallbackFont = await this.loadFontFromUrl(
+        'https://threejs.org/examples/fonts/helvetiker_regular.typeface.json'
       );
       console.log('[ThreeJSFontService] Fallback font (Helvetiker) loaded');
       return this.fallbackFont;
@@ -190,6 +190,7 @@ class ThreeJSFontService {
     return this.isInitialized;
   }
 
+  // Get font URL for useLoader hook
   getFontUrl(fontName: string): string {
     const fontInfo = this.fonts.get(fontName);
     const url = fontInfo?.url || 'https://threejs.org/examples/fonts/helvetiker_regular.typeface.json';
@@ -202,12 +203,12 @@ class ThreeJSFontService {
     return this.getFontUrl(fontName);
   }
 
+  // Test method to verify Devanagari detection and font mapping
   testDevanagariSupport(text: string): { 
     scriptType: string; 
     fontName: string; 
     fontUrl: string;
     hasDevanagari: boolean;
-    validationSupported: boolean;
   } {
     const scriptType = this.detectScriptType(text);
     const fontName = this.getFontNameForText(text);
@@ -218,8 +219,7 @@ class ThreeJSFontService {
       scriptType,
       fontName,
       fontUrl,
-      hasDevanagari,
-      validationSupported: true
+      hasDevanagari
     };
   }
 }

@@ -3,7 +3,7 @@ import React, { useState, useEffect, useRef, Suspense } from 'react';
 import { Text } from '@react-three/drei';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
-import { fontService } from '@/utils/fontService';
+import { localFontService } from '@/services/localFontService';
 import EnhancedText from './EnhancedText';
 
 interface ReliableTextProps {
@@ -35,62 +35,30 @@ export const ReliableText: React.FC<ReliableTextProps> = ({
   const [displayText, setDisplayText] = useState('');
   const [useEnhanced, setUseEnhanced] = useState(false);
   const [hasError, setHasError] = useState(false);
-  const [fontConfig, setFontConfig] = useState<any>(null);
   const textRef = useRef<THREE.Mesh>(null);
   const mounted = useRef(true);
 
-  // Initialize with enhanced font analysis
+  // Initialize with clean text and script detection
   useEffect(() => {
     if (!mounted.current) return;
 
-    const initializeText = async () => {
-      if (!text || typeof text !== 'string') {
-        setDisplayText('Node');
-        setIsReady(true);
-        return;
-      }
-
+    if (!text || typeof text !== 'string') {
+      setDisplayText('Node');
+    } else {
       const cleanText = text.trim();
       const limitedText = cleanText.length > 50 ? cleanText.substring(0, 50) + '...' : cleanText;
       const finalText = limitedText || 'Node';
       
       setDisplayText(finalText);
       
-      try {
-        // Get enhanced font configuration
-        const config = fontService.getBestFontConfig(finalText);
-        setFontConfig(config);
-        
-        // Determine if we need enhanced font loading
-        const needsEnhanced = config.scriptType !== 'latin' || config.needsValidation;
-        setUseEnhanced(needsEnhanced);
-        
-        console.log(`[ReliableText] Enhanced text analysis:`, {
-          text: finalText,
-          scriptType: config.scriptType,
-          fontName: config.fontName,
-          needsEnhanced,
-          cssFamily: config.cssFamily
-        });
-
-        // Preload fonts for the detected script
-        if (needsEnhanced) {
-          await fontService.preloadFontsForScript(config.scriptType);
-        }
-      } catch (error) {
-        console.warn('[ReliableText] Font analysis failed, using defaults:', error);
-        setFontConfig({
-          scriptType: 'latin',
-          fontName: 'Helvetiker',
-          cssFamily: 'Inter, system-ui, sans-serif',
-          needsValidation: false
-        });
-      }
+      // Determine if we need enhanced font loading
+      const scriptType = localFontService.detectScriptType(finalText);
+      const needsEnhanced = scriptType !== 'latin';
+      setUseEnhanced(needsEnhanced);
       
-      setIsReady(true);
-    };
-
-    initializeText();
+      console.log(`[ReliableText] Text: "${finalText}", Script: ${scriptType}, Enhanced: ${needsEnhanced}`);
+    }
+    setIsReady(true);
   }, [text]);
 
   // Billboard effect for fallback text
@@ -127,8 +95,8 @@ export const ReliableText: React.FC<ReliableTextProps> = ({
     return null;
   }
 
-  // Use enhanced text for non-Latin scripts or if validation is needed
-  if (useEnhanced && !hasError && fontConfig) {
+  // Use enhanced text for non-Latin scripts or if specifically needed
+  if (useEnhanced && !hasError) {
     return (
       <Suspense fallback={null}>
         <EnhancedText
@@ -147,9 +115,7 @@ export const ReliableText: React.FC<ReliableTextProps> = ({
     );
   }
 
-  // Fallback to basic text with enhanced CSS font family
-  const cssFamily = fontConfig?.cssFamily || 'Inter, system-ui, sans-serif';
-  
+  // Fallback to basic text for Latin scripts
   return (
     <Text
       ref={textRef}
@@ -160,7 +126,7 @@ export const ReliableText: React.FC<ReliableTextProps> = ({
       anchorY="middle"
       maxWidth={maxWidth}
       textAlign="center"
-      font={cssFamily}
+      font="Inter, system-ui, sans-serif"
       fontWeight={bold ? "bold" : "normal"}
       material-transparent={true}
       material-depthTest={false}
