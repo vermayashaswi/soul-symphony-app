@@ -6,7 +6,8 @@ interface NavigationState {
   targetRoute: string | null;
   currentStep: number;
   timeoutId: number | null;
-  transitionProtection: boolean; // NEW: Protect during step transitions
+  transitionProtection: boolean;
+  transitionTimeoutId: number | null; // NEW: Separate timeout for transition protection
 }
 
 class NavigationStateManager {
@@ -15,7 +16,8 @@ class NavigationStateManager {
     targetRoute: null,
     currentStep: 0,
     timeoutId: null,
-    transitionProtection: false
+    transitionProtection: false,
+    transitionTimeoutId: null
   };
 
   private listeners: ((state: NavigationState) => void)[] = [];
@@ -24,12 +26,16 @@ class NavigationStateManager {
   startNavigation(targetRoute: string, currentStep: number) {
     console.log(`[NavigationManager] Starting navigation to ${targetRoute} for step ${currentStep}`);
     
-    // Clear any existing timeout
+    // Clear any existing timeouts
     if (this.state.timeoutId) {
       clearTimeout(this.state.timeoutId);
     }
+    if (this.state.transitionTimeoutId) {
+      clearTimeout(this.state.transitionTimeoutId);
+    }
     
     this.state = {
+      ...this.state,
       isNavigating: true,
       targetRoute,
       currentStep,
@@ -37,31 +43,44 @@ class NavigationStateManager {
       timeoutId: window.setTimeout(() => {
         console.warn('[NavigationManager] Navigation timeout - forcing completion');
         this.completeNavigation();
-      }, 5000) // 5 second timeout to prevent hanging
+      }, 5000), // 5 second timeout to prevent hanging
+      transitionTimeoutId: null
     };
     
     this.notifyListeners();
   }
 
-  // NEW: Start step transition protection
+  // ENHANCED: Start step transition protection with longer duration
   startStepTransition(stepId: number) {
     console.log(`[NavigationManager] Starting step transition protection for step ${stepId}`);
+    
+    // Clear existing transition timeout
+    if (this.state.transitionTimeoutId) {
+      clearTimeout(this.state.transitionTimeoutId);
+    }
+    
     this.state.transitionProtection = true;
     this.state.currentStep = stepId;
     this.notifyListeners();
     
-    // Auto-clear transition protection after a short delay
-    setTimeout(() => {
+    // INCREASED: Auto-clear transition protection after 3 seconds instead of 1 second
+    this.state.transitionTimeoutId = window.setTimeout(() => {
       if (this.state.transitionProtection) {
-        console.log('[NavigationManager] Auto-clearing step transition protection');
+        console.log('[NavigationManager] Auto-clearing step transition protection after 3 seconds');
         this.clearStepTransition();
       }
-    }, 1000);
+    }, 3000);
   }
 
-  // NEW: Clear step transition protection
+  // Clear step transition protection
   clearStepTransition() {
     console.log('[NavigationManager] Clearing step transition protection');
+    
+    if (this.state.transitionTimeoutId) {
+      clearTimeout(this.state.transitionTimeoutId);
+      this.state.transitionTimeoutId = null;
+    }
+    
     this.state.transitionProtection = false;
     this.notifyListeners();
   }
@@ -79,7 +98,8 @@ class NavigationStateManager {
       targetRoute: null,
       currentStep: 0,
       timeoutId: null,
-      transitionProtection: false
+      transitionProtection: false,
+      transitionTimeoutId: null
     };
     
     this.notifyListeners();
@@ -90,7 +110,7 @@ class NavigationStateManager {
     return this.state.isNavigating;
   }
 
-  // NEW: Check if step transition is protected
+  // Check if step transition is protected
   isStepTransitionProtected(): boolean {
     return this.state.transitionProtection;
   }
@@ -131,13 +151,17 @@ class NavigationStateManager {
     if (this.state.timeoutId) {
       clearTimeout(this.state.timeoutId);
     }
+    if (this.state.transitionTimeoutId) {
+      clearTimeout(this.state.transitionTimeoutId);
+    }
     
     this.state = {
       isNavigating: false,
       targetRoute: null,
       currentStep: 0,
       timeoutId: null,
-      transitionProtection: false
+      transitionProtection: false,
+      transitionTimeoutId: null
     };
     
     this.notifyListeners();

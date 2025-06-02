@@ -1,197 +1,253 @@
 
-/**
- * Helper functions to find, debug and highlight tutorial elements in the DOM
- */
+// Enhanced tutorial elements finder with improved selectors and highlighting
 
-// All potential selectors for the record entry tab
+import { highlightingManager } from './tutorial-highlighting-manager';
+
+// ENHANCED: More comprehensive selector lists with better targeting
 export const RECORD_ENTRY_SELECTORS = [
-  '[data-value="record"]',
-  '.record-entry-tab',
   '.tutorial-record-entry-button',
   'button[data-tutorial-target="record-entry"]',
-  '#new-entry-button',
+  'button:has(.lucide-plus)',
+  'button[id="new-entry-button"]',
   '.record-entry-button',
-  '[role="tab"][value="record"]'
+  'button:contains("New entry")',
+  'button:contains("Record")',
+  'button:contains("+")',
+  '[data-value="record"] button',
+  'button[role="tab"][data-value="record"]',
+  '.journal-entries-header button'
 ];
 
-// All potential selectors for the entries tab
 export const ENTRIES_TAB_SELECTORS = [
-  '[value="entries"]',
+  'button[role="tab"][data-value="entries"]',
+  '[data-value="entries"]',
+  'button[data-tutorial-tab="entries"]',
   '.entries-tab',
-  'button[data-tutorial-target="past-entries"]',
-  '#past-entries-button',
-  '[role="tab"][value="entries"]'
+  'button:contains("Past entries")',
+  'button:contains("Entries")',
+  'button:contains("History")',
+  '[role="tablist"] button:nth-child(2)',
+  '.journal-tabs button:nth-child(2)'
 ];
 
-// All potential selectors for chat question suggestion elements
 export const CHAT_QUESTION_SELECTORS = [
-  '.chat-suggestion-button:first-child',
-  '.suggestion-button:first-child',
-  '.empty-chat-suggestion:first-child',
-  '[data-tutorial-target="chat-suggestion"]:first-child',
-  '.suggestion-question:first-child',
-  '.chat-example-button:first-child',
-  '.question-button:first-child',
-  '.chat-question-suggestion:first-child',
-  // Generic non-first-child selectors as fallbacks
-  '.chat-suggestion-button',
-  '.suggestion-button',
   '.empty-chat-suggestion',
-  '[data-tutorial-target="chat-suggestion"]',
-  '.suggestion-question',
-  '.chat-example-button',
-  '.question-button',
-  '.chat-question-suggestion'
+  '.chat-suggestion-button',
+  'button:contains("How am I feeling")',
+  'button:contains("What are my")',
+  'button:contains("Tell me about")',
+  '.chat-suggestions button',
+  '.empty-state button',
+  '.chat-questions button'
 ];
 
-// Selectors for Insights page elements
 export const INSIGHTS_HEADER_SELECTORS = [
-  '.insights-page-content h1',
   '.insights-container h1',
-  '.insights-sticky-header'
+  'h1:contains("Insights")',
+  '.insights-header',
+  'main h1',
+  '[class*="insights"] h1'
 ];
 
 export const EMOTION_CHART_SELECTORS = [
-  '.insights-container .recharts-responsive-container',
-  '.bg-background:has(.recharts-responsive-container)',
-  '.insights-container .EmotionChart',
-  'div:has(>.recharts-wrapper)'
+  '.recharts-responsive-container',
+  '.emotion-chart',
+  '.chart-container',
+  '[class*="chart"]',
+  'svg[class*="recharts"]'
 ];
 
 export const MOOD_CALENDAR_SELECTORS = [
-  '.insights-container [class*="MoodCalendar"]',
-  '.insights-container div:has(.mood-calendar-grid)',
-  '.insights-container div:has(.calendar-day)'
+  '[class*="MoodCalendar"]',
+  '.mood-calendar',
+  '.calendar-grid',
+  '[class*="calendar"]',
+  '.mood-visualization'
 ];
 
 export const SOULNET_SELECTORS = [
-  '.insights-container canvas',
-  '.insights-container [class*="SoulNet"]',
-  '.insights-container div:has(canvas)'
+  'canvas',
+  '.soul-net-container',
+  '.soulnet-visualization',
+  '[class*="soul-net"]',
+  '.bg-background.rounded-xl.shadow-sm.border.w-full'
 ];
 
-/**
- * Apply tutorial highlight styling to an HTML element
- * @param element The element to apply highlighting to
- * @param className Additional class name to add
- */
-export const applyTutorialHighlight = (
-  element: HTMLElement, 
-  className: string = 'tutorial-button-highlight'
-): void => {
-  // Add CSS classes
-  element.classList.add('tutorial-target', className);
-  
-  // Apply direct styles for maximum compatibility
-  element.style.boxShadow = "0 0 35px 20px var(--color-theme)";
-  element.style.animation = "button-pulse 1.5s infinite alternate";
-  element.style.border = "2px solid white";
-  element.style.transform = "scale(1.05)";
-  element.style.zIndex = "10000";
-  element.style.position = "relative";
-  element.style.opacity = "1";
-  element.style.visibility = "visible";
-};
-
-/**
- * Find an element using multiple selectors and apply tutorial highlighting
- * @param selectors Array of CSS selectors to try
- * @param className Additional class name to add
- * @returns Whether an element was found and highlighted
- */
+// ENHANCED: Improved highlighting function with new manager
 export const findAndHighlightElement = (
   selectors: string[],
-  className: string
+  highlightClass: string
 ): boolean => {
-  // If this is for chat questions, try to find all elements and select the first one
-  if (className === 'chat-question-highlight') {
-    // Try to find all chat question elements
-    const allElements: HTMLElement[] = [];
-    
-    for (const selector of selectors) {
-      const elements = document.querySelectorAll(selector);
-      if (elements.length > 0) {
-        elements.forEach(el => {
-          if (el instanceof HTMLElement) {
-            allElements.push(el);
-          }
-        });
-      }
-    }
-    
-    // If we found any elements, highlight the first one
-    if (allElements.length > 0) {
-      console.log(`Found ${allElements.length} potential chat questions, highlighting the first one`);
-      const firstElement = allElements[0];
-      applyTutorialHighlight(firstElement, className);
-      console.log(`Applied chat question highlighting to element:`, {
-        text: firstElement.textContent?.trim(),
-        classes: firstElement.className,
-        tag: firstElement.tagName
-      });
-      return true;
-    }
-  }
+  console.log(`[ElementFinder] Finding and highlighting element with class "${highlightClass}"`);
   
-  // Default behavior for other elements
-  for (const selector of selectors) {
-    const element = document.querySelector(selector);
-    if (element instanceof HTMLElement) {
-      applyTutorialHighlight(element, className);
-      console.log(`Applied tutorial highlighting to element using selector: ${selector}`);
-      return true;
-    }
-  }
+  // Determine step ID from highlight class
+  let stepId = 0;
+  if (highlightClass.includes('record-entry')) stepId = 3;
+  else if (highlightClass.includes('entries')) stepId = 4;
+  else if (highlightClass.includes('chat-question')) stepId = 5;
+  else if (highlightClass.includes('insights-header')) stepId = 6;
+  else if (highlightClass.includes('emotion-chart')) stepId = 7;
+  else if (highlightClass.includes('mood-calendar')) stepId = 8;
+  else if (highlightClass.includes('soul-net')) stepId = 9;
   
-  console.warn('No elements found with any of the provided selectors');
-  return false;
+  const classesToApply = ['tutorial-target', highlightClass];
+  
+  // Use the new highlighting manager for staggered application
+  highlightingManager.applyStaggeredHighlighting(selectors, classesToApply, stepId);
+  
+  // Return true to indicate attempt was made (actual success is handled asynchronously)
+  return true;
 };
 
-/**
- * Debug function to log all potential tutorial targets in the DOM
- */
-export const logPotentialTutorialElements = (): void => {
-  console.log('Searching for potential tutorial elements...');
+// ENHANCED: Apply tutorial highlight with comprehensive styling
+export const applyTutorialHighlight = (element: HTMLElement, highlightClass: string): void => {
+  console.log(`[ElementFinder] Applying tutorial highlight with class "${highlightClass}"`);
   
-  // Common elements that might be tutorial targets
-  const selectors = [
-    'button', 
-    '[role="tab"]', 
-    '[data-value]',
-    '.record-entry-tab',
-    '.entries-tab',
-    '#new-entry-button',
-    '#past-entries-button',
-    '.chat-suggestion-button',
-    '.suggestion-button',
-    '.empty-chat-suggestion'
-  ];
-  
-  selectors.forEach(selector => {
-    const elements = document.querySelectorAll(selector);
-    console.log(`Found ${elements.length} elements matching "${selector}":`);
+  try {
+    // Add the highlight class
+    element.classList.add('tutorial-target', highlightClass);
     
-    elements.forEach((el, i) => {
-      console.log(`${i + 1}. Element:`, {
-        tagName: el.tagName,
-        classes: el.className,
-        id: (el as HTMLElement).id,
-        attributes: Array.from(el.attributes)
-          .map(attr => `${attr.name}="${attr.value}"`)
-          .join(', '),
-        text: el.textContent?.trim()
+    // Apply step-specific styling based on highlight class
+    if (highlightClass.includes('record-entry') || highlightClass.includes('entries')) {
+      // Tab-specific styling
+      const tabStyles = {
+        zIndex: '30000',
+        position: 'relative',
+        boxShadow: '0 0 50px 30px var(--color-theme)',
+        animation: 'ultra-bright-pulse 1.5s infinite alternate',
+        outline: '3px solid white',
+        opacity: '1',
+        transform: 'translateZ(0) scale(1.05)',
+        border: '3px solid white',
+        backgroundColor: 'rgba(26, 31, 44, 0.98)',
+        backdropFilter: 'brightness(1.3)',
+        borderRadius: '8px',
+        visibility: 'visible',
+        pointerEvents: 'auto',
+        color: 'white',
+        textShadow: '0 0 4px rgba(0,0,0,0.8)'
+      };
+      
+      Object.entries(tabStyles).forEach(([prop, value]) => {
+        try {
+          element.style[prop as any] = value;
+        } catch (error) {
+          console.warn(`[ElementFinder] Could not set tab style ${prop}:`, error);
+        }
       });
-    });
-  });
+      
+      // Apply text color to child elements
+      const children = element.querySelectorAll('*');
+      children.forEach(child => {
+        if (child instanceof HTMLElement) {
+          child.style.color = 'white';
+          child.style.textShadow = '0 0 4px rgba(0,0,0,0.8)';
+        }
+      });
+    } else if (highlightClass.includes('chat-question')) {
+      // Chat question specific styling
+      const chatStyles = {
+        zIndex: '8000', // Lower than tutorial modal
+        position: 'relative',
+        boxShadow: '0 0 40px 25px var(--color-theme)',
+        animation: 'ultra-strong-pulse 1.5s infinite alternate',
+        outline: '2px solid white',
+        opacity: '1',
+        visibility: 'visible',
+        transform: 'translateZ(0) scale(1.05)',
+        border: '2px solid white',
+        pointerEvents: 'auto',
+        cursor: 'pointer',
+        display: 'block',
+        maxHeight: 'none',
+        overflow: 'visible'
+      };
+      
+      Object.entries(chatStyles).forEach(([prop, value]) => {
+        try {
+          element.style[prop as any] = value;
+        } catch (error) {
+          console.warn(`[ElementFinder] Could not set chat style ${prop}:`, error);
+        }
+      });
+    } else {
+      // General highlighting for other elements
+      const generalStyles = {
+        zIndex: '10000',
+        position: 'relative',
+        boxShadow: '0 0 35px 20px var(--color-theme)',
+        animation: 'strong-tab-pulse 1.5s infinite alternate',
+        outline: '2px solid white',
+        opacity: '1',
+        transform: 'translateZ(0) scale(1.01)',
+        border: '2px solid white',
+        visibility: 'visible'
+      };
+      
+      Object.entries(generalStyles).forEach(([prop, value]) => {
+        try {
+          element.style[prop as any] = value;
+        } catch (error) {
+          console.warn(`[ElementFinder] Could not set general style ${prop}:`, error);
+        }
+      });
+    }
+    
+    console.log(`[ElementFinder] Successfully applied highlight "${highlightClass}" to element`);
+  } catch (error) {
+    console.error(`[ElementFinder] Error applying tutorial highlight:`, error);
+  }
+};
+
+// ENHANCED: Logging function with more detailed DOM information
+export const logPotentialTutorialElements = (): void => {
+  console.group('[ElementFinder] Potential tutorial elements in DOM:');
   
-  // Specifically log chat question elements for debugging
-  console.log('Looking specifically for chat question elements:');
-  document.querySelectorAll('.chat-suggestion-button, .suggestion-button, .empty-chat-suggestion, .question-button').forEach((el, i) => {
-    console.log(`Chat question ${i + 1}:`, {
-      text: el.textContent?.trim(),
-      classes: el.className,
-      visible: el.getBoundingClientRect().height > 0,
-      position: el.getBoundingClientRect()
+  try {
+    // Check for tab elements
+    const tabs = document.querySelectorAll('button[role="tab"], [data-value], .tab');
+    console.log('Tab elements found:', tabs.length);
+    tabs.forEach((tab, index) => {
+      const text = tab.textContent?.trim() || '';
+      const dataValue = tab.getAttribute('data-value') || '';
+      const classes = Array.from(tab.classList);
+      console.log(`Tab ${index + 1}:`, { element: tab, text, dataValue, classes });
     });
-  });
+    
+    // Check for button elements
+    const buttons = document.querySelectorAll('button');
+    console.log('Button elements found:', buttons.length);
+    buttons.forEach((button, index) => {
+      if (index < 10) { // Limit to first 10 to avoid spam
+        const text = button.textContent?.trim() || '';
+        const id = button.id || '';
+        const classes = Array.from(button.classList);
+        console.log(`Button ${index + 1}:`, { element: button, text, id, classes });
+      }
+    });
+    
+    // Check for chat elements
+    const chatElements = document.querySelectorAll('[class*="chat"], [class*="suggestion"], [class*="empty"]');
+    console.log('Chat-related elements found:', chatElements.length);
+    chatElements.forEach((element, index) => {
+      const text = element.textContent?.trim().substring(0, 50) || '';
+      const classes = Array.from(element.classList);
+      console.log(`Chat element ${index + 1}:`, { element, text, classes });
+    });
+    
+    // Check for insights elements
+    const insightsElements = document.querySelectorAll('h1, .recharts-responsive-container, canvas, [class*="calendar"]');
+    console.log('Insights-related elements found:', insightsElements.length);
+    insightsElements.forEach((element, index) => {
+      const tag = element.tagName.toLowerCase();
+      const text = element.textContent?.trim().substring(0, 30) || '';
+      const classes = Array.from(element.classList);
+      console.log(`Insights element ${index + 1}:`, { tag, element, text, classes });
+    });
+    
+  } catch (error) {
+    console.error('[ElementFinder] Error logging potential elements:', error);
+  }
+  
+  console.groupEnd();
 };
