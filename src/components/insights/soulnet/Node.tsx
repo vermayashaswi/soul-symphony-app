@@ -1,4 +1,3 @@
-
 import React, { useRef, useMemo } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
@@ -27,7 +26,6 @@ interface NodeProps {
   showPercentage?: boolean;
   forceShowLabels?: boolean;
   translatedText?: string;
-  effectiveTheme?: 'light' | 'dark';
 }
 
 const Node: React.FC<NodeProps> = ({
@@ -44,39 +42,14 @@ const Node: React.FC<NodeProps> = ({
   connectionPercentage = 0,
   showPercentage = false,
   forceShowLabels = false,
-  translatedText,
-  effectiveTheme = 'light'
+  translatedText
 }) => {
   const meshRef = useRef<THREE.Mesh>(null);
 
-  // FIXED: Improved node color logic
   const color = useMemo(() => {
-    if (isSelected) {
-      // Selected nodes are always bright white for maximum visibility
-      return new THREE.Color('#ffffff');
-    }
-    
-    if (isHighlighted) {
-      // FIXED: Entity nodes should be white when highlighted/connected to selected emotion
-      if (node.type === 'entity') {
-        return new THREE.Color('#ffffff'); // White for entity nodes when highlighted
-      } else {
-        // Emotion nodes use theme color when highlighted
-        return new THREE.Color(themeHex);
-      }
-    }
-    
-    // FIXED: Default colors for non-highlighted nodes
-    if (dimmed) {
-      return new THREE.Color('#666666'); // Dimmed color
-    } else {
-      // Default colors when no selection is active
-      if (node.type === 'entity') {
-        return new THREE.Color('#cccccc'); // Light gray for entities
-      } else {
-        return new THREE.Color('#888888'); // Medium gray for emotions
-      }
-    }
+    if (isSelected) return new THREE.Color('#ffffff');
+    if (isHighlighted) return new THREE.Color(node.type === 'entity' ? '#ffffff' : themeHex);
+    return new THREE.Color(dimmed ? '#666666' : '#cccccc');
   }, [isSelected, isHighlighted, node.type, themeHex, dimmed]);
 
   const nodeScale = useMemo(() => {
@@ -101,12 +74,7 @@ const Node: React.FC<NodeProps> = ({
     return forceShowLabels || showLabel || isSelected || isHighlighted;
   }, [forceShowLabels, showLabel, isSelected, isHighlighted]);
 
-  // ENHANCED: Better logging for percentage tracking
-  if (showPercentage && connectionPercentage > 0) {
-    console.log(`[Node] FIXED: ${node.id} should display percentage: ${connectionPercentage}%`);
-  }
-
-  console.log(`[Node] FIXED: Rendering ${node.type} node ${node.id} with color logic - selected: ${isSelected}, highlighted: ${isHighlighted}, dimmed: ${dimmed}`);
+  console.log(`[Node] Rendering ${node.type} node ${node.id} with translated text: "${translatedText || node.id}"`);
 
   // Render different geometries based on node type
   const renderGeometry = () => {
@@ -144,7 +112,6 @@ const Node: React.FC<NodeProps> = ({
           connectionPercentage={connectionPercentage}
           showPercentage={showPercentage}
           translatedText={translatedText}
-          effectiveTheme={effectiveTheme}
         />
       )}
     </group>

@@ -1,4 +1,3 @@
-
 import * as React from "react"
 import * as TabsPrimitive from "@radix-ui/react-tabs"
 
@@ -24,25 +23,16 @@ TabsList.displayName = TabsPrimitive.List.displayName
 const TabsTrigger = React.forwardRef<
   React.ElementRef<typeof TabsPrimitive.Trigger>,
   React.ComponentPropsWithoutRef<typeof TabsPrimitive.Trigger>
->(({ className, ...props }, ref) => {
-  // Enhanced tutorial support - add data attributes and classes for tutorial targeting
-  const enhancedClassName = cn(
-    "inline-flex items-center justify-center whitespace-nowrap rounded-sm px-3 py-1.5 text-sm font-medium ring-offset-background transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-sm",
-    // Add tutorial-friendly classes based on data-value
-    props.value === 'record' && 'record-entry-tab',
-    props.value === 'entries' && 'entries-tab',
-    className
-  );
-
-  return (
-    <TabsPrimitive.Trigger
-      ref={ref}
-      className={enhancedClassName}
-      data-tutorial-tab={props.value}
-      {...props}
-    />
-  );
-})
+>(({ className, ...props }, ref) => (
+  <TabsPrimitive.Trigger
+    ref={ref}
+    className={cn(
+      "inline-flex items-center justify-center whitespace-nowrap rounded-sm px-3 py-1.5 text-sm font-medium ring-offset-background transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-sm",
+      className
+    )}
+    {...props}
+  />
+))
 TabsTrigger.displayName = TabsPrimitive.Trigger.displayName
 
 const TabsContent = React.forwardRef<

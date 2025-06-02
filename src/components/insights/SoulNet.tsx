@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useCallback } from 'react';
 import '@/types/three-reference';
 import { Canvas } from '@react-three/fiber';
@@ -42,21 +43,23 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
   const [isFullScreen, setIsFullScreen] = useState(false);
   const [canvasError, setCanvasError] = useState<Error | null>(null);
   const [retryCount, setRetryCount] = useState(0);
+  const [renderingReady, setRenderingReady] = useState(false);
   const isMobile = useIsMobile();
   const themeHex = useUserColorThemeHex();
   const [selectedEntity, setSelectedEntity] = useState<string | null>(null);
   const [error, setError] = useState<Error | null>(null);
   const { currentLanguage } = useTranslation();
 
-  console.log("[SoulNet] ENHANCED - Instant rendering without delays", { 
+  console.log("[SoulNet] GOOGLE TRANSLATE ONLY - Simplified rendering", { 
     userId, 
     timeRange, 
     currentLanguage,
-    retryCount
+    retryCount,
+    renderingReady
   });
 
   useEffect(() => {
-    console.log("[SoulNet] Component mounted - Enhanced instant rendering mode");
+    console.log("[SoulNet] Component mounted - Google Translate only mode");
     
     return () => {
       console.log("[SoulNet] Component unmounted");
@@ -117,6 +120,21 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
 
     fetchEntityEmotionData();
   }, [userId, timeRange]);
+
+  // Staged rendering initialization
+  useEffect(() => {
+    if (graphData.nodes.length > 0 && !renderingReady) {
+      console.log("[SoulNet] Preparing for staged rendering");
+      
+      // Delay rendering to prevent initialization crashes
+      const timer = setTimeout(() => {
+        setRenderingReady(true);
+        console.log("[SoulNet] Rendering ready");
+      }, 300);
+      
+      return () => clearTimeout(timer);
+    }
+  }, [graphData.nodes.length, renderingReady]);
 
   const handleNodeSelect = useCallback((id: string) => {
     console.log(`[SoulNet] Node selected: ${id}`);
@@ -209,7 +227,7 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
     return <TranslatableText text="Drag to rotate • Scroll to zoom • Click a node to highlight connections" forceTranslate={true} />;
   };
 
-  console.log(`[SoulNet] ENHANCED - Instant render: ${graphData.nodes.length} nodes, ${graphData.links.length} links`);
+  console.log(`[SoulNet] GOOGLE TRANSLATE ONLY - Final render: ${graphData.nodes.length} nodes, ${graphData.links.length} links, ready: ${renderingReady}`);
 
   return (
     <div className={cn(
@@ -243,8 +261,7 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
             </div>
           }
         >
-          {/* ENHANCED: Instant Canvas rendering with smooth loading placeholder */}
-          <div className="relative">
+          {renderingReady && (
             <Canvas
               style={{
                 width: '100%',
@@ -253,7 +270,7 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
                 maxHeight: isFullScreen ? 'none' : '500px',
                 position: 'relative',
                 zIndex: 5,
-                transition: 'opacity 0.3s ease-in-out',
+                transition: 'all 0.3s ease-in-out',
               }}
               camera={{ 
                 position: [0, 0, isFullScreen ? 40 : 45],
@@ -281,7 +298,7 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
                 shouldShowLabels={true}
               />
             </Canvas>
-          </div>
+          )}
         </RenderingErrorBoundary>
       </FullscreenWrapper>
       
@@ -323,37 +340,32 @@ const getStartDate = (range: TimeRange) => {
 const processEntities = (entries: any[]) => {
   console.log("[SoulNet] Processing entities for", entries.length, "entries");
   
-  // FIXED: Proper accumulation without flawed averaging
-  const entityEmotionMap: Record<string, Record<string, number>> = {};
+  const entityEmotionMap: Record<string, {emotions: Record<string, number>}> = {};
   
   entries.forEach(entry => {
     if (!entry.entityemotion) return;
-    
-    Object.entries(entry.entityemotion).forEach(([entity, emotions]) => {
+    Object.entries(entry.entityemotion).forEach(([category, emotions]) => {
       if (typeof emotions !== 'object') return;
-      
-      if (!entityEmotionMap[entity]) {
-        entityEmotionMap[entity] = {};
-      }
-      
       Object.entries(emotions).forEach(([emotion, score]) => {
         if (typeof score !== 'number') return;
-        
-        // Simple accumulation - sum the scores
-        if (entityEmotionMap[entity][emotion]) {
-          entityEmotionMap[entity][emotion] += score;
+        if (!entityEmotionMap[category]) {
+          entityEmotionMap[category] = { emotions: {} };
+        }
+        if (entityEmotionMap[category].emotions[emotion]) {
+          entityEmotionMap[category].emotions[emotion] =
+            (entityEmotionMap[category].emotions[emotion] + score) / 2;
         } else {
-          entityEmotionMap[entity][emotion] = score;
+          entityEmotionMap[category].emotions[emotion] = score;
         }
       });
     });
   });
 
-  console.log("[SoulNet] Fixed entity emotion map:", entityEmotionMap);
+  console.log("[SoulNet] Entity emotion map:", entityEmotionMap);
   return generateGraph(entityEmotionMap);
 };
 
-const generateGraph = (entityEmotionMap: Record<string, Record<string, number>>) => {
+const generateGraph = (entityEmotionMap: Record<string, {emotions: Record<string, number>}>) => {
   const nodes: NodeData[] = [];
   const links: LinkData[] = [];
   const entityNodes = new Set<string>();
@@ -383,13 +395,12 @@ const generateGraph = (entityEmotionMap: Record<string, Record<string, number>>)
       position: [entityX, entityY, entityZ]
     });
 
-    // Create links with proper values
-    Object.entries(entityEmotionMap[entity]).forEach(([emotion, score]) => {
+    Object.entries(entityEmotionMap[entity].emotions).forEach(([emotion, score]) => {
       emotionNodes.add(emotion);
       links.push({
         source: entity,
         target: emotion,
-        value: score // Use the actual accumulated score
+        value: score
       });
     });
   });
