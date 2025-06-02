@@ -1,8 +1,7 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
-import ReliableText from './ReliableText';
+import SimpleText from './SimpleText';
 import { useTranslation } from '@/contexts/TranslationContext';
-import { threejsFontService } from '@/services/threejsFontService';
 
 interface DirectNodeLabelProps {
   id: string;
@@ -29,33 +28,12 @@ export const DirectNodeLabel: React.FC<DirectNodeLabelProps> = ({
 }) => {
   const { currentLanguage, translate } = useTranslation();
   const [displayText, setDisplayText] = useState<string>(id);
-  const [isReady, setIsReady] = useState(false);
 
-  console.log(`[DirectNodeLabel] Enhanced rendering label for ${id}, visible: ${shouldShowLabel}`);
+  console.log(`[DirectNodeLabel] Simplified rendering for ${id}, visible: ${shouldShowLabel}`);
 
-  // Initialize component with enhanced font support
+  // Handle translation
   useEffect(() => {
-    const init = async () => {
-      try {
-        // Ensure font service is ready
-        if (threejsFontService.isReady()) {
-          setIsReady(true);
-        } else {
-          // Wait a bit for font service initialization
-          setTimeout(() => setIsReady(true), 100);
-        }
-      } catch (error) {
-        console.warn('[DirectNodeLabel] Font init error:', error);
-        setIsReady(true); // Don't block on font errors
-      }
-    };
-
-    init();
-  }, []);
-
-  // Handle translation with enhanced script support
-  useEffect(() => {
-    if (!isReady || !shouldShowLabel) return;
+    if (!shouldShowLabel) return;
 
     const translateText = async () => {
       try {
@@ -67,11 +45,7 @@ export const DirectNodeLabel: React.FC<DirectNodeLabelProps> = ({
         const translated = await translate(id);
         if (translated && typeof translated === 'string') {
           setDisplayText(translated);
-          
-          // Log script detection for debugging
-          const scriptType = threejsFontService.detectScriptType(translated);
-          const fontName = threejsFontService.getFontNameForText(translated);
-          console.log(`[DirectNodeLabel] Translation: "${id}" -> "${translated}", Script: ${scriptType}, Font: ${fontName}`);
+          console.log(`[DirectNodeLabel] Translation: "${id}" -> "${translated}"`);
         } else {
           setDisplayText(id);
         }
@@ -82,7 +56,7 @@ export const DirectNodeLabel: React.FC<DirectNodeLabelProps> = ({
     };
 
     translateText();
-  }, [id, currentLanguage, translate, shouldShowLabel, isReady]);
+  }, [id, currentLanguage, translate, shouldShowLabel]);
 
   // Calculate position offset
   const labelOffset = useMemo(() => {
@@ -111,15 +85,14 @@ export const DirectNodeLabel: React.FC<DirectNodeLabelProps> = ({
     position[2] + labelOffset[2]
   ];
 
-  // Don't render until ready and visible
-  if (!isReady || !shouldShowLabel || !displayText) {
+  if (!shouldShowLabel || !displayText) {
     return null;
   }
 
-  console.log(`[DirectNodeLabel] Enhanced rendering text "${displayText}" at position`, labelPosition);
+  console.log(`[DirectNodeLabel] Simplified rendering text "${displayText}" at position`, labelPosition);
 
   return (
-    <ReliableText
+    <SimpleText
       text={displayText}
       position={labelPosition}
       color={textColor}

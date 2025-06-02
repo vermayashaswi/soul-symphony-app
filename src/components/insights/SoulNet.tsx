@@ -15,7 +15,6 @@ import { cn } from '@/lib/utils';
 import { TranslatableText } from '@/components/translation/TranslatableText';
 import { useTranslation } from '@/contexts/TranslationContext';
 import { onDemandTranslationCache } from '@/utils/website-translations';
-import { threejsFontService } from '@/services/threejsFontService';
 
 interface NodeData {
   id: string;
@@ -49,7 +48,7 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
   const [error, setError] = useState<Error | null>(null);
   const { currentLanguage } = useTranslation();
 
-  console.log("[SoulNet] Enhanced rendering with Devanagari font support", { 
+  console.log("[SoulNet] Simplified rendering with direct font loading", { 
     userId, 
     timeRange, 
     currentLanguage,
@@ -58,14 +57,7 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
   });
 
   useEffect(() => {
-    console.log("[SoulNet] Component mounted with enhanced Devanagari script support");
-    
-    // Preload fonts including Devanagari for better performance
-    threejsFontService.preloadFonts(['Helvetiker', 'Noto Sans Devanagari', 'Optimer']).then(() => {
-      console.log('[SoulNet] Font preloading completed successfully');
-    }).catch(error => {
-      console.warn('[SoulNet] Font preloading failed:', error);
-    });
+    console.log("[SoulNet] Component mounted with simplified font system");
     
     return () => {
       console.log("[SoulNet] Component unmounted");
@@ -233,7 +225,7 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
     return <TranslatableText text="Drag to rotate • Scroll to zoom • Click a node to highlight connections" forceTranslate={true} />;
   };
 
-  console.log(`[SoulNet] Rendering with enhanced Devanagari support: ${graphData.nodes.length} nodes, ${graphData.links.length} links, ready: ${renderingReady}`);
+  console.log(`[SoulNet] Rendering with simplified font system: ${graphData.nodes.length} nodes, ${graphData.links.length} links, ready: ${renderingReady}`);
 
   return (
     <div className={cn(

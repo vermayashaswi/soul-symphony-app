@@ -1,9 +1,7 @@
-import React, { useState, useCallback, useEffect, useMemo } from 'react';
-import '@/types/three-reference';
-import { NodeMesh } from './NodeMesh';
+import React, { useRef, useMemo } from 'react';
+import { useFrame } from '@react-three/fiber';
+import * as THREE from 'three';
 import DirectNodeLabel from './DirectNodeLabel';
-import FixedConnectionPercentage from './FixedConnectionPercentage';
-import { useTheme } from '@/hooks/use-theme';
 
 interface NodeData {
   id: string;
@@ -16,21 +14,18 @@ interface NodeData {
 interface NodeProps {
   node: NodeData;
   isSelected: boolean;
-  onClick: (id: string, e: any) => void;
+  onClick: (id: string, event: any) => void;
   highlightedNodes: Set<string>;
   showLabel: boolean;
   dimmed: boolean;
   themeHex: string;
   selectedNodeId: string | null;
-  cameraZoom?: number;
-  isHighlighted?: boolean;
-  connectionStrength?: number;
-  connectionPercentage?: number;
-  showPercentage?: boolean;
+  cameraZoom: number;
+  isHighlighted: boolean;
   forceShowLabels?: boolean;
 }
 
-export const Node: React.FC<NodeProps> = ({
+const Node: React.FC<NodeProps> = ({
   node,
   isSelected,
   onClick,
@@ -40,139 +35,65 @@ export const Node: React.FC<NodeProps> = ({
   themeHex,
   selectedNodeId,
   cameraZoom,
-  isHighlighted = false,
-  connectionStrength = 0.5,
-  connectionPercentage = 0,
-  showPercentage = false,
+  isHighlighted,
   forceShowLabels = false
 }) => {
-  const { theme } = useTheme();
-  const [isTouching, setIsTouching] = useState(false);
-  const [touchStartTime, setTouchStartTime] = useState<number | null>(null);
-  const [touchStartPosition, setTouchStartPosition] = useState<{x: number, y: number} | null>(null);
-  
-  console.log(`[Node] Rendering node ${node.id} - highlighted: ${isHighlighted}, showPercentage: ${showPercentage}, percentage: ${connectionPercentage}%`);
-  
-  // Simplified label visibility logic
-  const shouldShowLabel = forceShowLabels || showLabel || isHighlighted || isSelected;
-  
-  // Simplified scale calculation
-  const baseScale = node.type === 'entity' ? 0.7 : 0.55;
-  const scale = isHighlighted 
-    ? baseScale * (1.2 + (isSelected ? 0.3 : connectionStrength * 0.5))
-    : baseScale * (0.8 + node.value * 0.5);
+  const meshRef = useRef<THREE.Mesh>(null);
 
-  const displayColor = useMemo(() => {
-    if (isHighlighted) {
-      return node.type === 'entity' ? '#ffffff' : themeHex;
+  const color = useMemo(() => {
+    if (isSelected) return new THREE.Color('#ffffff');
+    if (isHighlighted) return new THREE.Color(node.type === 'entity' ? '#ffffff' : themeHex);
+    return new THREE.Color(dimmed ? '#666666' : '#cccccc');
+  }, [isSelected, isHighlighted, node.type, themeHex, dimmed]);
+
+  const sphereScale = useMemo(() => {
+    if (isSelected) return 1.4;
+    if (isHighlighted) return 1.2;
+    return 1;
+  }, [isSelected, isHighlighted]);
+
+  useFrame(() => {
+    if (meshRef.current) {
+      meshRef.current.material.color.lerp(color, 0.1);
+      meshRef.current.scale.lerp(new THREE.Vector3(sphereScale, sphereScale, sphereScale), 0.1);
     }
-    return node.type === 'entity'
-      ? (dimmed ? (theme === 'dark' ? '#555' : '#999') : '#ccc') 
-      : (dimmed ? (theme === 'dark' ? '#555' : '#999') : themeHex);
-  }, [node.type, dimmed, theme, themeHex, isHighlighted]);
+  });
 
-  // ... keep existing code (touch handlers and effects)
-
-  const handlePointerDown = useCallback((e: any) => {
+  const handleNodeClick = (e: any) => {
     e.stopPropagation();
-    setIsTouching(true);
-    setTouchStartTime(Date.now());
-    setTouchStartPosition({x: e.clientX, y: e.clientY});
-  }, []);
+    onClick(node.id, e);
+  };
 
-  const handlePointerUp = useCallback((e: any) => {
-    e.stopPropagation();
-    if (touchStartTime && Date.now() - touchStartTime < 300) {
-      if (touchStartPosition) {
-        const deltaX = Math.abs(e.clientX - touchStartPosition.x);
-        const deltaY = Math.abs(e.clientY - touchStartPosition.y);
-        
-        if (deltaX < 10 && deltaY < 10) {
-          onClick(node.id, e);
-          if (navigator.vibrate) {
-            navigator.vibrate(50);
-          }
-        }
-      } else {
-        onClick(node.id, e);
-      }
-    }
-    
-    setIsTouching(false);
-    setTouchStartTime(null);
-    setTouchStartPosition(null);
-  }, [node.id, onClick, touchStartTime, touchStartPosition]);
+  const shouldShowLabel = useMemo(() => {
+    return forceShowLabels || showLabel || isSelected || isHighlighted;
+  }, [forceShowLabels, showLabel, isSelected, isHighlighted]);
 
-  useEffect(() => {
-    if (isTouching && touchStartTime) {
-      const timer = setTimeout(() => {
-        if (isTouching) {
-          setIsTouching(false);
-          setTouchStartTime(null);
-          setTouchStartPosition(null);
-        }
-      }, 1000);
-      
-      return () => clearTimeout(timer);
-    }
-  }, [isTouching, touchStartTime]);
+  console.log(`[Node] Simplified rendering node ${node.id}, showLabel: ${shouldShowLabel}`);
 
-  // Enhanced percentage visibility with more detailed logging
-  const shouldShowPercentage = useMemo(() => {
-    const hasValidPercentage = connectionPercentage > 0;
-    const isConnectedNode = isHighlighted && !isSelected; // Connected to selected node, but not the selected node itself
-    const shouldShow = showPercentage && hasValidPercentage && isConnectedNode;
-    
-    console.log(`[Node] Percentage visibility for ${node.id}:`, {
-      showPercentage,
-      hasValidPercentage,
-      isConnectedNode,
-      isHighlighted,
-      isSelected,
-      shouldShow,
-      percentage: connectionPercentage
-    });
-    
-    return shouldShow;
-  }, [showPercentage, connectionPercentage, isHighlighted, isSelected, node.id]);
-  
-  console.log(`[Node] Final render decisions for ${node.id} - Label: ${shouldShowLabel}, Percentage: ${shouldShowPercentage} (${connectionPercentage}%)`);
-  
   return (
-    <group position={node.position}>
-      <NodeMesh
-        type={node.type}
-        scale={scale}
-        displayColor={displayColor}
-        isHighlighted={isHighlighted}
-        dimmed={dimmed}
-        connectionStrength={connectionStrength}
-        isSelected={isSelected}
-        onClick={(e) => onClick(node.id, e)}
-        onPointerDown={handlePointerDown}
-        onPointerUp={handlePointerUp}
-        onPointerOut={() => setIsTouching(false)}
-        onPointerLeave={() => setIsTouching(false)}
-      />
+    <group>
+      <mesh
+        ref={meshRef}
+        position={node.position}
+        onClick={handleNodeClick}
+      >
+        <sphereGeometry args={[0.7, 32, 32]} />
+        <meshStandardMaterial color={color} metalness={0.3} roughness={0.8} />
+      </mesh>
       
-      <DirectNodeLabel
-        id={node.id}
-        type={node.type}
-        position={[0, 0, 0]}
-        isHighlighted={isHighlighted}
-        isSelected={isSelected}
-        shouldShowLabel={shouldShowLabel}
-        cameraZoom={cameraZoom}
-        themeHex={themeHex}
-        nodeScale={scale}
-      />
-
-      <FixedConnectionPercentage
-        position={[0, 0, 0]}
-        percentage={connectionPercentage}
-        isVisible={shouldShowPercentage}
-        nodeType={node.type}
-      />
+      {shouldShowLabel && (
+        <DirectNodeLabel
+          id={node.id}
+          type={node.type}
+          position={node.position}
+          isHighlighted={isHighlighted}
+          isSelected={isSelected}
+          shouldShowLabel={shouldShowLabel}
+          cameraZoom={cameraZoom}
+          themeHex={themeHex}
+          nodeScale={1}
+        />
+      )}
     </group>
   );
 };
