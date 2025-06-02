@@ -63,7 +63,7 @@ export const translateWebsiteText = async (text: string): Promise<string> => {
 class TranslationCache {
   private cache = new Map<string, Map<string, string>>();
   
-  getTranslation(text: string, language: string): string | null {
+  get(language: string, text: string): string | null {
     if (language === 'en') return text;
     
     const languageCache = this.cache.get(language);
@@ -73,7 +73,7 @@ class TranslationCache {
     return null;
   }
   
-  setTranslation(text: string, translatedText: string, language: string): void {
+  set(language: string, text: string, translatedText: string): void {
     if (language === 'en' || !text || !translatedText) return;
     
     let languageCache = this.cache.get(language);

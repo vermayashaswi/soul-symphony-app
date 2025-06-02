@@ -1,3 +1,4 @@
+
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { translationService } from '@/services/translationService';
 import { staticTranslationService } from '@/services/staticTranslationService';
@@ -7,9 +8,13 @@ import { simplifiedFontService } from '@/services/simplifiedFontService';
 interface TranslationContextType {
   currentLanguage: string;
   setCurrentLanguage: (language: string) => void;
-  translate: (text: string, sourceLanguage?: string) => Promise<string | null>;
+  setLanguage: (language: string) => void; // Alias for backwards compatibility
+  translate: (text: string, sourceLanguage?: string, entryId?: number) => Promise<string | null>;
   isTranslating: boolean;
   clearCache: () => void;
+  getCachedTranslation: (text: string) => string | null;
+  translationProgress?: number;
+  prefetchTranslationsForRoute?: (route: string) => Promise<void>;
 }
 
 const TranslationContext = createContext<TranslationContextType | undefined>(undefined);
@@ -33,7 +38,13 @@ export const TranslationProvider: React.FC<TranslationProviderProps> = ({ childr
     }
   }, []);
 
-  const translate = async (text: string, sourceLanguage: string = 'en'): Promise<string | null> => {
+  const handleLanguageChange = (language: string) => {
+    setCurrentLanguage(language);
+    // Update static translation service language
+    staticTranslationService.setLanguage(language);
+  };
+
+  const translate = async (text: string, sourceLanguage: string = 'en', entryId?: number): Promise<string | null> => {
     if (!text || typeof text !== 'string') {
       console.warn('[TranslationContext] Invalid text provided for translation:', text);
       return text || '';
@@ -61,7 +72,7 @@ export const TranslationProvider: React.FC<TranslationProviderProps> = ({ childr
       setIsTranslating(true);
       
       // Use static translation service for common UI elements
-      let translatedText = staticTranslationService.translate(text, currentLanguage);
+      let translatedText = await staticTranslationService.translateText(text, sourceLanguage, entryId);
       
       if (!translatedText || translatedText === text) {
         // Fall back to dynamic translation service
@@ -89,15 +100,29 @@ export const TranslationProvider: React.FC<TranslationProviderProps> = ({ childr
     }
   };
 
+  const getCachedTranslation = (text: string): string | null => {
+    const cacheKey = `${text}_en_${currentLanguage}`;
+    return translationCache[cacheKey] || onDemandTranslationCache.get(currentLanguage, text) || null;
+  };
+
+  const prefetchTranslationsForRoute = async (route: string): Promise<void> => {
+    // Simple implementation - can be expanded later
+    console.log(`[TranslationContext] Prefetching translations for route: ${route}`);
+  };
+
   const value: TranslationContextType = {
     currentLanguage,
-    setCurrentLanguage,
+    setCurrentLanguage: handleLanguageChange,
+    setLanguage: handleLanguageChange, // Alias for backwards compatibility
     translate,
     isTranslating,
     clearCache: () => {
       setTranslationCache({});
       onDemandTranslationCache.clearAll();
-    }
+    },
+    getCachedTranslation,
+    translationProgress: isTranslating ? 50 : 100,
+    prefetchTranslationsForRoute
   };
 
   return (

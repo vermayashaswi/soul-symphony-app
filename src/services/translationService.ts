@@ -19,15 +19,15 @@ export class TranslationService {
   private static readonly BATCH_SIZE = 50;
   private static readonly MAX_RETRIES = 3;
   
-  static async translateText(request: TranslationRequest): Promise<string> {
+  static async translateText(text: string, targetLanguage: string, sourceLanguage: string = 'en'): Promise<string> {
     try {
       // Skip empty or whitespace-only strings
-      if (!request.text || request.text.trim() === '') {
-        return request.text;
+      if (!text || text.trim() === '') {
+        return text;
       }
       
       // Check cache first
-      const cached = await translationCache.getTranslation(request.text, request.targetLanguage);
+      const cached = await translationCache.getTranslation(text, targetLanguage);
       if (cached) {
         return cached.translatedText;
       }
@@ -35,29 +35,28 @@ export class TranslationService {
       // Call the edge function for translation
       const { data, error } = await supabase.functions.invoke('translate-text', {
         body: {
-          text: request.text,
-          sourceLanguage: request.sourceLanguage,
-          targetLanguage: request.targetLanguage,
-          entryId: request.entryId // This is now optional
+          text: text,
+          sourceLanguage: sourceLanguage,
+          targetLanguage: targetLanguage,
         },
       });
 
       if (error) {
         console.error('Translation error:', error);
         toast.error('Translation failed. Falling back to original text.');
-        return request.text;
+        return text;
       }
 
       if (!data || !data.translatedText) {
         console.error('Translation response missing translatedText:', data);
-        return request.text;
+        return text;
       }
 
       // Cache the translation
       await translationCache.setTranslation({
-        originalText: request.text,
+        originalText: text,
         translatedText: data.translatedText,
-        language: request.targetLanguage,
+        language: targetLanguage,
         timestamp: Date.now(),
         version: 1,
       });
@@ -66,7 +65,7 @@ export class TranslationService {
     } catch (error) {
       console.error('Translation service error:', error);
       toast.error('Translation service error. Using original text.');
-      return request.text;
+      return text;
     }
   }
 
@@ -130,3 +129,9 @@ export class TranslationService {
     return results;
   }
 }
+
+// Export a singleton instance for backwards compatibility
+export const translationService = {
+  translateText: TranslationService.translateText,
+  batchTranslate: TranslationService.batchTranslate
+};
