@@ -1,8 +1,6 @@
 
-import React, { useState, useEffect } from 'react';
-import { enhancedFontService } from '@/services/enhancedFontService';
-import CanvasTextRenderer from './CanvasTextRenderer';
-import SimpleText from './SimpleText';
+import React from 'react';
+import SimplifiedTextRenderer from './SimplifiedTextRenderer';
 
 interface SmartTextRendererProps {
   text: string;
@@ -29,65 +27,11 @@ export const SmartTextRenderer: React.FC<SmartTextRendererProps> = ({
   outlineColor = '#000000',
   maxWidth = 25
 }) => {
-  const [useCanvasRenderer, setUseCanvasRenderer] = useState(false);
-  const [fontLoaded, setFontLoaded] = useState(false);
-  const [hasError, setHasError] = useState(false);
+  console.log(`[SmartTextRenderer] Simplified mode - rendering: "${text}" with Three.js Text only`);
 
-  useEffect(() => {
-    const initializeRenderer = async () => {
-      try {
-        const isComplex = enhancedFontService.isComplexScript(text);
-        
-        // For larger text sizes (> 2.0), prefer Canvas renderer for better quality
-        const preferCanvas = size > 2.0;
-        
-        if (isComplex || preferCanvas) {
-          console.log(`[SmartTextRenderer] Using Canvas renderer for: "${text}" (complex: ${isComplex}, large text: ${preferCanvas})`);
-          setUseCanvasRenderer(true);
-          setFontLoaded(true);
-        } else {
-          console.log(`[SmartTextRenderer] Simple script detected for: "${text}", attempting Three.js font loading`);
-          try {
-            await enhancedFontService.loadFont(text);
-            setUseCanvasRenderer(false);
-            setFontLoaded(true);
-            console.log(`[SmartTextRenderer] Three.js font loaded successfully for: "${text}"`);
-          } catch (error) {
-            console.warn(`[SmartTextRenderer] Three.js font loading failed for: "${text}", falling back to Canvas`, error);
-            setUseCanvasRenderer(true);
-            setFontLoaded(true);
-          }
-        }
-      } catch (error) {
-        console.error(`[SmartTextRenderer] Error initializing renderer for: "${text}"`, error);
-        setHasError(true);
-      }
-    };
-
-    initializeRenderer();
-  }, [text, size]);
-
-  if (!visible || hasError || !fontLoaded) {
-    return null;
-  }
-
-  if (useCanvasRenderer) {
-    return (
-      <CanvasTextRenderer
-        text={text}
-        position={position}
-        color={color}
-        size={size}
-        visible={visible}
-        renderOrder={renderOrder}
-        bold={bold}
-        maxWidth={maxWidth}
-      />
-    );
-  }
-
+  // Always use SimplifiedTextRenderer for consistency and reliability
   return (
-    <SimpleText
+    <SimplifiedTextRenderer
       text={text}
       position={position}
       color={color}
