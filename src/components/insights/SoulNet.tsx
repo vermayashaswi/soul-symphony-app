@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useCallback } from 'react';
 import '@/types/three-reference';
 import { Canvas } from '@react-three/fiber';
@@ -6,6 +7,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useIsMobile } from '@/hooks/use-mobile';
 import SimplifiedSoulNetVisualization from './soulnet/SimplifiedSoulNetVisualization';
 import RenderingErrorBoundary from './soulnet/RenderingErrorBoundary';
+import RobustFallbackVisualization from './soulnet/RobustFallbackVisualization';
 import { LoadingState } from './soulnet/LoadingState';
 import { EmptyState } from './soulnet/EmptyState';
 import { FullscreenWrapper } from './soulnet/FullscreenWrapper';

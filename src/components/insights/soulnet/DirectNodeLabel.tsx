@@ -1,6 +1,6 @@
 
 import React, { useMemo } from 'react';
-import SimpleText from './SimpleText';
+import SmartTextRenderer from './SmartTextRenderer';
 
 interface DirectNodeLabelProps {
   id: string;
@@ -14,7 +14,7 @@ interface DirectNodeLabelProps {
   nodeScale?: number;
   connectionPercentage?: number;
   showPercentage?: boolean;
-  translatedText?: string; // New prop for translated text
+  translatedText?: string;
 }
 
 export const DirectNodeLabel: React.FC<DirectNodeLabelProps> = ({
@@ -70,7 +70,7 @@ export const DirectNodeLabel: React.FC<DirectNodeLabelProps> = ({
   console.log(`[DirectNodeLabel] Rendering text "${displayText}" at position`, labelPosition);
 
   return (
-    <SimpleText
+    <SmartTextRenderer
       text={displayText}
       position={labelPosition}
       color={textColor}
