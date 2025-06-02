@@ -1,3 +1,4 @@
+
 import React, { useRef, useEffect, useMemo, useState } from 'react';
 import '@/types/three-reference';
 import { OrbitControls } from '@react-three/drei';
@@ -206,8 +207,8 @@ export const SoulNetVisualization: React.FC<SoulNetVisualizationProps> = ({
           if (!mounted.current) break;
           
           try {
-            // Check cache first
-            const cachedTranslation = onDemandTranslationCache.getTranslation(node.id, currentLanguage);
+            // Check cache first - use correct method name
+            const cachedTranslation = onDemandTranslationCache.get(currentLanguage, node.id);
             
             if (cachedTranslation) {
               newTranslationCache.set(node.id, cachedTranslation);
@@ -224,7 +225,7 @@ export const SoulNetVisualization: React.FC<SoulNetVisualizationProps> = ({
                 
                 if (mounted.current && translated && typeof translated === 'string') {
                   newTranslationCache.set(node.id, translated);
-                  onDemandTranslationCache.setTranslation(node.id, translated, currentLanguage);
+                  onDemandTranslationCache.set(currentLanguage, node.id, translated);
                   console.log(`[SoulNetVisualization] Translated "${node.id}" to "${translated}"`);
                 }
               } catch (error) {
@@ -487,10 +488,6 @@ export const SoulNetVisualization: React.FC<SoulNetVisualizationProps> = ({
         const dimmed = shouldDim && !(selectedNode === node.id || highlightedNodes.has(node.id));
         const isHighlighted = selectedNode === node.id || highlightedNodes.has(node.id);
         
-        const connectionStrength = selectedNode && highlightedNodes.has(node.id) 
-          ? connectionStrengths.get(node.id) || 0.5
-          : 0.5;
-          
         const connectionPercentage = selectedNode && highlightedNodes.has(node.id)
           ? connectionPercentages.get(node.id) || 0
           : 0;
@@ -524,7 +521,6 @@ export const SoulNetVisualization: React.FC<SoulNetVisualizationProps> = ({
             selectedNodeId={selectedNode}
             cameraZoom={cameraZoom}
             isHighlighted={isHighlighted}
-            connectionStrength={connectionStrength}
             connectionPercentage={connectionPercentage}
             showPercentage={showPercentage}
             forceShowLabels={shouldShowLabels}

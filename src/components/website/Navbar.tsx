@@ -19,11 +19,12 @@ const Navbar = () => {
   
   // Prefetch translations for navbar items on mount and route change
   useEffect(() => {
-    const navbarTexts = [
-      'Home', 'Blog', 'FAQ', 'Download on App Store'
-    ];
+    // Fix: pass route path as string instead of array
+    const route = location.pathname;
     
-    prefetchTranslationsForRoute(navbarTexts);
+    if (prefetchTranslationsForRoute) {
+      prefetchTranslationsForRoute(route);
+    }
   }, [location.pathname, prefetchTranslationsForRoute]);
 
   return (

@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef } from 'react';
 import ReactMarkdown from 'react-markdown';
 import { useTranslation } from '@/contexts/TranslationContext';
@@ -49,8 +50,8 @@ export function TranslatableMarkdown({
       return;
     }
     
-    // Check for cached translation first
-    const cachedTranslation = getCachedTranslation(children, currentLanguage);
+    // Check for cached translation first - fix: use single argument
+    const cachedTranslation = getCachedTranslation(children);
     if (cachedTranslation) {
       setTranslatedContent(cachedTranslation);
       return;

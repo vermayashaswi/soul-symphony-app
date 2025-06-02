@@ -67,8 +67,8 @@ export function TranslatableText({
       return;
     }
     
-    // Check cache first
-    const cachedResult = getCachedTranslation(text, currentLanguage);
+    // Check cache first - fix: use single argument
+    const cachedResult = getCachedTranslation(text);
     if (cachedResult) {
       console.log(`TranslatableText: Using cached translation for "${text}": "${cachedResult}"`);
       setTranslatedText(cachedResult);
