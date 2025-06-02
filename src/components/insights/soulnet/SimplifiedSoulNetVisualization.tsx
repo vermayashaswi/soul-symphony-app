@@ -2,6 +2,7 @@ import React, { useRef, useEffect, useMemo, useState } from 'react';
 import { OrbitControls } from '@react-three/drei';
 import { useThree, useFrame } from '@react-three/fiber';
 import { useTranslation } from '@/contexts/TranslationContext';
+import { useTheme } from '@/hooks/use-theme';
 import Node from './Node';
 import Edge from './Edge';
 import FallbackVisualization from './FallbackVisualization';
@@ -40,6 +41,7 @@ export const SimplifiedSoulNetVisualization: React.FC<SimplifiedSoulNetVisualiza
 }) => {
   const { camera } = useThree();
   const { currentLanguage, translate } = useTranslation();
+  const { theme, systemTheme } = useTheme();
   const controlsRef = useRef<any>(null);
   const [cameraZoom, setCameraZoom] = useState<number>(45);
   const [renderingStage, setRenderingStage] = useState<'initial' | 'basic' | 'enhanced'>('initial');
@@ -49,6 +51,14 @@ export const SimplifiedSoulNetVisualization: React.FC<SimplifiedSoulNetVisualiza
   const mounted = useRef<boolean>(true);
   
   console.log("[SimplifiedSoulNetVisualization] GOOGLE TRANSLATE ONLY - Rendering stage:", renderingStage);
+
+  // Get current effective theme for font color calculation
+  const effectiveTheme = useMemo(() => {
+    if (theme === 'system') {
+      return systemTheme;
+    }
+    return theme;
+  }, [theme, systemTheme]);
 
   useEffect(() => {
     console.log("[SimplifiedSoulNetVisualization] Component mounted - Google Translate only mode");
@@ -101,14 +111,17 @@ export const SimplifiedSoulNetVisualization: React.FC<SimplifiedSoulNetVisualiza
     
     if (selectedConnections.length === 0) return percentages;
     
-    // Calculate percentage based on connection strength
-    const totalConnections = selectedConnections.length;
+    // Calculate total connection strength for normalization
+    const totalStrength = selectedConnections.reduce((sum, link) => sum + (link.value || 1), 0);
+    
     selectedConnections.forEach(link => {
       const connectedNodeId = link.source === selectedNode ? link.target : link.source;
-      const percentage = Math.round((link.value || 1) * 100 / totalConnections);
+      // Calculate percentage based on connection strength relative to total
+      const percentage = Math.round(((link.value || 1) / totalStrength) * 100);
       percentages.set(connectedNodeId, Math.max(1, Math.min(100, percentage)));
     });
     
+    console.log('[SimplifiedSoulNetVisualization] Connection percentages calculated:', Object.fromEntries(percentages));
     return percentages;
   }, [selectedNode, validData.links]);
 
@@ -301,14 +314,20 @@ export const SimplifiedSoulNetVisualization: React.FC<SimplifiedSoulNetVisualiza
           try {
             const isHighlighted = selectedNode === node.id || highlightedNodes.has(node.id);
             const dimmed = !!selectedNode && !isHighlighted;
-            const showLabels = renderingStage === 'enhanced' && shouldShowLabels;
+            
+            // FIXED LABEL VISIBILITY LOGIC: Only show labels for selected node and its connections
+            const shouldShowNodeLabel = renderingStage === 'enhanced' && shouldShowLabels && (
+              !selectedNode || // Show all labels when no node is selected
+              selectedNode === node.id || // Always show selected node label
+              highlightedNodes.has(node.id) // Show connected node labels
+            );
             
             // Get Google Translate translation
             const translatedText = translationCache.get(node.id) || node.id;
             
             // Get connection percentage for this node
             const connectionPercentage = connectionPercentages.get(node.id) || 0;
-            const showPercentage = !!selectedNode && isHighlighted;
+            const showPercentage = !!selectedNode && isHighlighted && connectionPercentage > 0;
 
             return (
               <Node
@@ -323,7 +342,7 @@ export const SimplifiedSoulNetVisualization: React.FC<SimplifiedSoulNetVisualiza
                   }
                 }}
                 highlightedNodes={highlightedNodes}
-                showLabel={showLabels}
+                showLabel={shouldShowNodeLabel}
                 dimmed={dimmed}
                 themeHex={themeHex}
                 selectedNodeId={selectedNode}
@@ -331,8 +350,9 @@ export const SimplifiedSoulNetVisualization: React.FC<SimplifiedSoulNetVisualiza
                 isHighlighted={isHighlighted}
                 connectionPercentage={connectionPercentage}
                 showPercentage={showPercentage}
-                forceShowLabels={showLabels}
+                forceShowLabels={shouldShowNodeLabel}
                 translatedText={translatedText}
+                effectiveTheme={effectiveTheme}
               />
             );
           } catch (error) {

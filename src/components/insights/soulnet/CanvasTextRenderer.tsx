@@ -65,9 +65,16 @@ export const CanvasTextRenderer: React.FC<CanvasTextRendererProps> = ({
     lines.forEach((line, index) => {
       const y = startY + (index * lineHeight);
       
-      // Add text stroke for better visibility - scale with text size
+      // FIXED: Better outline color based on text color for improved contrast
       const strokeWidth = Math.max(2, size * 0.5);
-      context.strokeStyle = '#000000';
+      
+      // Use contrasting outline color based on text color
+      if (color === '#000000') {
+        context.strokeStyle = '#ffffff'; // White outline for black text
+      } else {
+        context.strokeStyle = '#000000'; // Black outline for other colors
+      }
+      
       context.lineWidth = strokeWidth;
       context.strokeText(line, canvasSize / 2, y);
       context.fillText(line, canvasSize / 2, y);
@@ -78,7 +85,7 @@ export const CanvasTextRenderer: React.FC<CanvasTextRendererProps> = ({
     newTexture.needsUpdate = true;
     setTexture(newTexture);
 
-    console.log(`[CanvasTextRenderer] Created texture for: "${displayText}" with font: ${fontFamily}, size: ${fontSize}`);
+    console.log(`[CanvasTextRenderer] Created texture for: "${displayText}" with font: ${fontFamily}, size: ${fontSize}, color: ${color}`);
 
     return () => {
       newTexture.dispose();

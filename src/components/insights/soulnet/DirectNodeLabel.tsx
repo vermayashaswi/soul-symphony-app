@@ -15,6 +15,7 @@ interface DirectNodeLabelProps {
   connectionPercentage?: number;
   showPercentage?: boolean;
   translatedText?: string;
+  effectiveTheme?: 'light' | 'dark';
 }
 
 export const DirectNodeLabel: React.FC<DirectNodeLabelProps> = ({
@@ -29,20 +30,21 @@ export const DirectNodeLabel: React.FC<DirectNodeLabelProps> = ({
   nodeScale = 1,
   connectionPercentage = 0,
   showPercentage = false,
-  translatedText
+  translatedText,
+  effectiveTheme = 'light'
 }) => {
   console.log(`[DirectNodeLabel] Rendering with translated text for ${id}: "${translatedText || id}"`);
 
   // Use translated text if available, otherwise fallback to original id
   const displayText = translatedText || id;
   
-  // Add connection percentage to display text when selected and showPercentage is true
+  // FIXED: Add connection percentage to display text when highlighted and showPercentage is true
   const finalDisplayText = useMemo(() => {
-    if (isSelected && showPercentage && connectionPercentage > 0) {
+    if (isHighlighted && showPercentage && connectionPercentage > 0) {
       return `${displayText}\n${connectionPercentage}%`;
     }
     return displayText;
-  }, [displayText, isSelected, showPercentage, connectionPercentage]);
+  }, [displayText, isHighlighted, showPercentage, connectionPercentage]);
 
   // Calculate position offset - adjust for different node types
   const labelOffset = useMemo(() => {
@@ -59,11 +61,18 @@ export const DirectNodeLabel: React.FC<DirectNodeLabelProps> = ({
     return Math.max(2.0, Math.min(8.0, baseSize * zoomFactor)); // Adjusted min/max accordingly
   }, [cameraZoom]);
 
+  // FIXED: Text color logic to handle light theme properly
   const textColor = useMemo(() => {
     if (isSelected) return '#ffffff';
     if (isHighlighted) return type === 'entity' ? '#ffffff' : themeHex;
-    return '#cccccc';
-  }, [isSelected, isHighlighted, type, themeHex]);
+    
+    // Use appropriate default color based on theme
+    if (effectiveTheme === 'light') {
+      return '#000000'; // Black text for light theme
+    } else {
+      return '#cccccc'; // Light gray text for dark theme
+    }
+  }, [isSelected, isHighlighted, type, themeHex, effectiveTheme]);
 
   const labelPosition: [number, number, number] = [
     position[0] + labelOffset[0],
@@ -75,7 +84,7 @@ export const DirectNodeLabel: React.FC<DirectNodeLabelProps> = ({
     return null;
   }
 
-  console.log(`[DirectNodeLabel] Rendering text "${finalDisplayText}" at position`, labelPosition, 'with size:', textSize);
+  console.log(`[DirectNodeLabel] Rendering text "${finalDisplayText}" at position`, labelPosition, 'with size:', textSize, 'color:', textColor);
 
   return (
     <SmartTextRenderer
