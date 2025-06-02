@@ -1,9 +1,7 @@
 
 import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react';
 import { translationService } from '@/services/translationService';
-import { staticTranslationService } from '@/services/staticTranslationService';
 import { onDemandTranslationCache } from '@/utils/website-translations';
-import { simplifiedFontService } from '@/services/simplifiedFontService';
 
 interface TranslationContextType {
   currentLanguage: string;
@@ -35,7 +33,6 @@ export const TranslationProvider: React.FC<TranslationProviderProps> = ({ childr
       if (savedLanguage) {
         console.log('[TranslationContext] Loading saved language:', savedLanguage);
         setCurrentLanguage(savedLanguage);
-        staticTranslationService.setLanguage(savedLanguage);
         return;
       }
     } catch (error) {
@@ -48,7 +45,6 @@ export const TranslationProvider: React.FC<TranslationProviderProps> = ({ childr
     
     if (supportedLanguages.includes(browserLanguage)) {
       setCurrentLanguage(browserLanguage);
-      staticTranslationService.setLanguage(browserLanguage);
     }
     
     console.log('[TranslationContext] Initialized with language:', browserLanguage, 'supported:', supportedLanguages.includes(browserLanguage));
@@ -66,9 +62,6 @@ export const TranslationProvider: React.FC<TranslationProviderProps> = ({ childr
       console.error('[TranslationContext] Error saving language to localStorage:', error);
     }
     
-    // Update static translation service language
-    staticTranslationService.setLanguage(language);
-    
     // Dispatch custom event for components that need to know about language changes
     const event = new CustomEvent('languageChange', { detail: { language } });
     window.dispatchEvent(event);
@@ -85,7 +78,7 @@ export const TranslationProvider: React.FC<TranslationProviderProps> = ({ childr
       return text;
     }
 
-    console.log('[TranslationContext] FORCE TRANSLATE - Attempting to translate:', { 
+    console.log('[TranslationContext] GOOGLE TRANSLATE ONLY - Attempting to translate:', { 
       text: text.substring(0, 30) + (text.length > 30 ? '...' : ''), 
       from: sourceLanguage, 
       to: currentLanguage,
@@ -111,14 +104,9 @@ export const TranslationProvider: React.FC<TranslationProviderProps> = ({ childr
     try {
       setIsTranslating(true);
       
-      // SIMPLIFIED TRANSLATION LOGIC: Try static service first, then dynamic
-      console.log('[TranslationContext] Trying static translation service first');
-      let translatedText = await staticTranslationService.translateText(text, sourceLanguage, entryId);
-      
-      if (!translatedText || translatedText === text) {
-        console.log('[TranslationContext] Static translation failed/same, trying dynamic translation service');
-        translatedText = await translationService.translateText(text, currentLanguage, sourceLanguage);
-      }
+      // ONLY USE GOOGLE TRANSLATE SERVICE
+      console.log('[TranslationContext] Using Google Translate service only');
+      const translatedText = await translationService.translateText(text, currentLanguage, sourceLanguage);
 
       if (translatedText && translatedText !== text) {
         console.log('[TranslationContext] Translation successful:', { 
@@ -129,10 +117,6 @@ export const TranslationProvider: React.FC<TranslationProviderProps> = ({ childr
         // Cache both locally and in on-demand cache
         setTranslationCache(prev => ({ ...prev, [cacheKey]: translatedText }));
         onDemandTranslationCache.set(currentLanguage, text, translatedText);
-        
-        // Pre-load font for the detected script
-        const fontUrl = simplifiedFontService.getFontUrl(translatedText);
-        console.log(`[TranslationContext] Pre-loading font for translated text: ${fontUrl}`);
         
         return translatedText;
       }

@@ -2,6 +2,7 @@
 import React, { useRef, useEffect, useMemo, useState } from 'react';
 import { OrbitControls } from '@react-three/drei';
 import { useThree, useFrame } from '@react-three/fiber';
+import { useTranslation } from '@/contexts/TranslationContext';
 import Node from './Node';
 import Edge from './Edge';
 import FallbackVisualization from './FallbackVisualization';
@@ -39,13 +40,23 @@ export const SimplifiedSoulNetVisualization: React.FC<SimplifiedSoulNetVisualiza
   shouldShowLabels = true
 }) => {
   const { camera } = useThree();
+  const { currentLanguage, translate } = useTranslation();
   const controlsRef = useRef<any>(null);
   const [cameraZoom, setCameraZoom] = useState<number>(45);
   const [renderingStage, setRenderingStage] = useState<'initial' | 'basic' | 'enhanced'>('initial');
   const [isInitialized, setIsInitialized] = useState(false);
+  const [translationCache, setTranslationCache] = useState<Map<string, string>>(new Map());
   const initializationRef = useRef<boolean>(false);
+  const mounted = useRef<boolean>(true);
   
-  console.log("[SimplifiedSoulNetVisualization] Rendering stage:", renderingStage);
+  console.log("[SimplifiedSoulNetVisualization] GOOGLE TRANSLATE ONLY - Rendering stage:", renderingStage);
+
+  useEffect(() => {
+    console.log("[SimplifiedSoulNetVisualization] Component mounted - Google Translate only mode");
+    return () => {
+      mounted.current = false;
+    };
+  }, []);
 
   // Validate data with safer approach
   const validData = useMemo(() => {
@@ -79,6 +90,45 @@ export const SimplifiedSoulNetVisualization: React.FC<SimplifiedSoulNetVisualiza
       return new THREE.Vector3(0, 0, 0);
     }
   }, [validData.nodes]);
+
+  // Google Translate only translation processing
+  useEffect(() => {
+    if (!data?.nodes || !Array.isArray(data.nodes) || data.nodes.length === 0 || !mounted.current) {
+      return;
+    }
+
+    const processTranslations = async () => {
+      if (currentLanguage !== 'en' && translate) {
+        console.log('[SimplifiedSoulNetVisualization] Processing Google Translate translations');
+        const newCache = new Map<string, string>();
+        
+        for (const node of data.nodes) {
+          if (!newCache.has(node.id)) {
+            try {
+              const translated = await translate(node.id, 'en');
+              newCache.set(node.id, translated || node.id);
+            } catch (error) {
+              console.error(`[SimplifiedSoulNetVisualization] Translation error for ${node.id}:`, error);
+              newCache.set(node.id, node.id);
+            }
+          }
+        }
+        
+        if (mounted.current) {
+          setTranslationCache(newCache);
+        }
+      } else {
+        // For English, use original labels
+        const englishCache = new Map<string, string>();
+        data.nodes.forEach(node => {
+          englishCache.set(node.id, node.id);
+        });
+        setTranslationCache(englishCache);
+      }
+    };
+
+    processTranslations();
+  }, [data?.nodes, currentLanguage, translate]);
 
   // Staged initialization with proper timing
   useEffect(() => {
@@ -225,12 +275,15 @@ export const SimplifiedSoulNetVisualization: React.FC<SimplifiedSoulNetVisualiza
           }
         })}
 
-        {/* Render nodes with progressive enhancement */}
+        {/* Render nodes with progressive enhancement and Google Translate */}
         {validData.nodes.map(node => {
           try {
             const isHighlighted = selectedNode === node.id || highlightedNodes.has(node.id);
             const dimmed = !!selectedNode && !isHighlighted;
             const showLabels = renderingStage === 'enhanced' && shouldShowLabels;
+            
+            // Get Google Translate translation
+            const translatedText = translationCache.get(node.id) || node.id;
 
             return (
               <Node
@@ -252,6 +305,7 @@ export const SimplifiedSoulNetVisualization: React.FC<SimplifiedSoulNetVisualiza
                 cameraZoom={cameraZoom}
                 isHighlighted={isHighlighted}
                 forceShowLabels={showLabels}
+                translatedText={translatedText}
               />
             );
           } catch (error) {

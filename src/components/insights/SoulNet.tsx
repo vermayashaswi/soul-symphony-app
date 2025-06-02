@@ -48,7 +48,7 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
   const [error, setError] = useState<Error | null>(null);
   const { currentLanguage } = useTranslation();
 
-  console.log("[SoulNet] Simplified rendering with direct font loading", { 
+  console.log("[SoulNet] GOOGLE TRANSLATE ONLY - Simplified rendering", { 
     userId, 
     timeRange, 
     currentLanguage,
@@ -57,17 +57,17 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
   });
 
   useEffect(() => {
-    console.log("[SoulNet] Component mounted with simplified font system");
+    console.log("[SoulNet] Component mounted - Google Translate only mode");
     
     return () => {
       console.log("[SoulNet] Component unmounted");
     };
   }, []);
 
-  // Enhanced translation cache management
+  // Enhanced translation cache management - clear cache on language change
   useEffect(() => {
     onDemandTranslationCache.clearLanguage(currentLanguage);
-    console.log(`[SoulNet] Cleared translation cache for language: ${currentLanguage}`);
+    console.log(`[SoulNet] Cleared Google Translate cache for language: ${currentLanguage}`);
   }, [currentLanguage]);
 
   useEffect(() => {
@@ -225,7 +225,7 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
     return <TranslatableText text="Drag to rotate • Scroll to zoom • Click a node to highlight connections" forceTranslate={true} />;
   };
 
-  console.log(`[SoulNet] Rendering with simplified font system: ${graphData.nodes.length} nodes, ${graphData.links.length} links, ready: ${renderingReady}`);
+  console.log(`[SoulNet] GOOGLE TRANSLATE ONLY - Final render: ${graphData.nodes.length} nodes, ${graphData.links.length} links, ready: ${renderingReady}`);
 
   return (
     <div className={cn(
