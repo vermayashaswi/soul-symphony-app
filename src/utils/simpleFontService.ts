@@ -86,6 +86,25 @@ class SimpleFontService {
     console.log(`[SimpleFontService] Preloading fonts for ${scriptType}`);
     return Promise.resolve();
   }
+
+  async testFontLoading(fontFamily: string): Promise<boolean> {
+    try {
+      // Simple font availability test using document.fonts API if available
+      if (document.fonts && document.fonts.check) {
+        // Test if the font is available by checking a common character
+        const isAvailable = document.fonts.check('12px ' + fontFamily, 'A');
+        console.log(`[SimpleFontService] Font availability test for "${fontFamily}": ${isAvailable}`);
+        return isAvailable;
+      }
+
+      // Fallback: assume font is available if fonts are ready
+      console.log(`[SimpleFontService] Font API not available, assuming "${fontFamily}" is loaded`);
+      return this.fontsReady;
+    } catch (error) {
+      console.warn(`[SimpleFontService] Font loading test failed for "${fontFamily}":`, error);
+      return false;
+    }
+  }
 }
 
 export const simpleFontService = new SimpleFontService();
