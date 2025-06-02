@@ -16,7 +16,6 @@ import { TranslatableText } from '@/components/translation/TranslatableText';
 import { useTranslation } from '@/contexts/TranslationContext';
 import { onDemandTranslationCache } from '@/utils/website-translations';
 import { threejsFontService } from '@/services/threejsFontService';
-import ProviderBridge from './soulnet/ProviderBridge';
 
 interface NodeData {
   id: string;
@@ -48,18 +47,9 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
   const themeHex = useUserColorThemeHex();
   const [selectedEntity, setSelectedEntity] = useState<string | null>(null);
   const [error, setError] = useState<Error | null>(null);
-  
-  // Safely access translation context
-  let translationContext;
-  try {
-    translationContext = useTranslation();
-  } catch (error) {
-    console.warn('[SoulNet] Translation context not available, using fallback');
-    translationContext = { currentLanguage: 'en' };
-  }
-  const { currentLanguage } = translationContext;
+  const { currentLanguage } = useTranslation();
 
-  console.log("[SoulNet] Enhanced rendering with context safety", { 
+  console.log("[SoulNet] Enhanced rendering with Devanagari font support", { 
     userId, 
     timeRange, 
     currentLanguage,
@@ -243,7 +233,7 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
     return <TranslatableText text="Drag to rotate • Scroll to zoom • Click a node to highlight connections" forceTranslate={true} />;
   };
 
-  console.log(`[SoulNet] Rendering with enhanced context safety: ${graphData.nodes.length} nodes, ${graphData.links.length} links, ready: ${renderingReady}`);
+  console.log(`[SoulNet] Rendering with enhanced Devanagari support: ${graphData.nodes.length} nodes, ${graphData.links.length} links, ready: ${renderingReady}`);
 
   return (
     <div className={cn(
@@ -278,44 +268,42 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
           }
         >
           {renderingReady && (
-            <ProviderBridge fallback={<div>Initializing visualization...</div>}>
-              <Canvas
-                style={{
-                  width: '100%',
-                  height: '100%',
-                  maxWidth: isFullScreen ? 'none' : '800px',
-                  maxHeight: isFullScreen ? 'none' : '500px',
-                  position: 'relative',
-                  zIndex: 5,
-                  transition: 'all 0.3s ease-in-out',
-                }}
-                camera={{ 
-                  position: [0, 0, isFullScreen ? 40 : 45],
-                  near: 1, 
-                  far: 1000,
-                  fov: isFullScreen ? 60 : 50
-                }}
-                onPointerMissed={() => setSelectedEntity(null)}
-                gl={{ 
-                  preserveDrawingBuffer: true,
-                  antialias: !isMobile,
-                  powerPreference: 'high-performance',
-                  alpha: true,
-                  depth: true,
-                  stencil: false,
-                  precision: isMobile ? 'mediump' : 'highp'
-                }}
-              >
-                <SimplifiedSoulNetVisualization
-                  data={graphData}
-                  selectedNode={selectedEntity}
-                  onNodeClick={handleNodeSelect}
-                  themeHex={themeHex}
-                  isFullScreen={isFullScreen}
-                  shouldShowLabels={true}
-                />
-              </Canvas>
-            </ProviderBridge>
+            <Canvas
+              style={{
+                width: '100%',
+                height: '100%',
+                maxWidth: isFullScreen ? 'none' : '800px',
+                maxHeight: isFullScreen ? 'none' : '500px',
+                position: 'relative',
+                zIndex: 5,
+                transition: 'all 0.3s ease-in-out',
+              }}
+              camera={{ 
+                position: [0, 0, isFullScreen ? 40 : 45],
+                near: 1, 
+                far: 1000,
+                fov: isFullScreen ? 60 : 50
+              }}
+              onPointerMissed={() => setSelectedEntity(null)}
+              gl={{ 
+                preserveDrawingBuffer: true,
+                antialias: !isMobile,
+                powerPreference: 'high-performance',
+                alpha: true,
+                depth: true,
+                stencil: false,
+                precision: isMobile ? 'mediump' : 'highp'
+              }}
+            >
+              <SimplifiedSoulNetVisualization
+                data={graphData}
+                selectedNode={selectedEntity}
+                onNodeClick={handleNodeSelect}
+                themeHex={themeHex}
+                isFullScreen={isFullScreen}
+                shouldShowLabels={true}
+              />
+            </Canvas>
           )}
         </RenderingErrorBoundary>
       </FullscreenWrapper>

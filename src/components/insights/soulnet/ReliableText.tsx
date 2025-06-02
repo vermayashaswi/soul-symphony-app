@@ -1,10 +1,10 @@
+
 import React, { useState, useEffect, useRef, Suspense } from 'react';
 import { Text } from '@react-three/drei';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import { fontService } from '@/utils/fontService';
 import EnhancedText from './EnhancedText';
-import { useSafeTranslation } from './ContextSafetyWrapper';
 
 interface ReliableTextProps {
   text: string;
@@ -39,19 +39,9 @@ export const ReliableText: React.FC<ReliableTextProps> = ({
   const textRef = useRef<THREE.Mesh>(null);
   const mounted = useRef(true);
 
-  // Use safe translation context
-  const { currentLanguage, translate, isTranslationReady, isFontReady } = useSafeTranslation();
-
-  console.log('[ReliableText] Using safe context:', {
-    currentLanguage,
-    hasTranslate: !!translate,
-    isTranslationReady,
-    isFontReady
-  });
-
   // Initialize with enhanced font analysis
   useEffect(() => {
-    if (!mounted.current || !isFontReady) return;
+    if (!mounted.current) return;
 
     const initializeText = async () => {
       if (!text || typeof text !== 'string') {
@@ -62,20 +52,7 @@ export const ReliableText: React.FC<ReliableTextProps> = ({
 
       const cleanText = text.trim();
       const limitedText = cleanText.length > 50 ? cleanText.substring(0, 50) + '...' : cleanText;
-      let finalText = limitedText || 'Node';
-      
-      // Handle translation if available
-      if (currentLanguage !== 'en' && translate && isTranslationReady) {
-        try {
-          const translated = await translate(finalText);
-          if (translated && typeof translated === 'string') {
-            finalText = translated;
-            console.log('[ReliableText] Translation successful:', finalText);
-          }
-        } catch (error) {
-          console.warn('[ReliableText] Translation failed:', error);
-        }
-      }
+      const finalText = limitedText || 'Node';
       
       setDisplayText(finalText);
       
@@ -114,7 +91,7 @@ export const ReliableText: React.FC<ReliableTextProps> = ({
     };
 
     initializeText();
-  }, [text, currentLanguage, translate, isTranslationReady, isFontReady]);
+  }, [text]);
 
   // Billboard effect for fallback text
   useFrame(({ camera }) => {
