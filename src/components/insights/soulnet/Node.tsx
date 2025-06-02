@@ -52,7 +52,7 @@ export const Node: React.FC<NodeProps> = ({
   const [touchStartTime, setTouchStartTime] = useState<number | null>(null);
   const [touchStartPosition, setTouchStartPosition] = useState<{x: number, y: number} | null>(null);
   
-  console.log(`[Node] Rendering node ${node.id} with labels - highlighted: ${isHighlighted}, selected: ${isSelected}`);
+  console.log(`[Node] Rendering node ${node.id} - highlighted: ${isHighlighted}, showPercentage: ${showPercentage}, percentage: ${connectionPercentage}%`);
   
   // Simplified label visibility logic
   const shouldShowLabel = forceShowLabels || showLabel || isHighlighted || isSelected;
@@ -116,9 +116,10 @@ export const Node: React.FC<NodeProps> = ({
     }
   }, [isTouching, touchStartTime]);
 
-  const shouldShowPercentage = showPercentage && isHighlighted && connectionPercentage > 0;
+  // Simplified percentage visibility - directly use the showPercentage prop
+  const shouldShowPercentage = showPercentage && connectionPercentage > 0;
   
-  console.log(`[Node] Final render decisions - Label: ${shouldShowLabel}, Percentage: ${shouldShowPercentage} (${connectionPercentage}%)`);
+  console.log(`[Node] Final render decisions for ${node.id} - Label: ${shouldShowLabel}, Percentage: ${shouldShowPercentage} (${connectionPercentage}%)`);
   
   return (
     <group position={node.position}>

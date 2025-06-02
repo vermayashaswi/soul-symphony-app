@@ -15,39 +15,42 @@ export const FixedConnectionPercentage: React.FC<FixedConnectionPercentageProps>
   isVisible,
   nodeType = 'emotion'
 }) => {
-  console.log(`[FixedConnectionPercentage] Enhanced rendering ${percentage}% at`, position, 'visible:', isVisible);
+  console.log(`[FixedConnectionPercentage] Rendering ${percentage}% at`, position, 'visible:', isVisible, 'nodeType:', nodeType);
 
-  // Format percentage
+  // Format percentage with validation
   const formattedPercentage = useMemo(() => {
-    const rounded = Math.round(Math.max(0, Math.min(100, percentage)));
-    return `${rounded}%`;
+    const validPercentage = Math.round(Math.max(0, Math.min(100, percentage || 0)));
+    return `${validPercentage}%`;
   }, [percentage]);
 
-  // Don't render if not visible or percentage is 0
-  if (!isVisible || percentage <= 0) {
+  // Enhanced visibility check
+  if (!isVisible || !percentage || percentage <= 0) {
     console.log(`[FixedConnectionPercentage] Not rendering: visible=${isVisible}, percentage=${percentage}`);
     return null;
   }
 
-  // Position the percentage in front of the node with better Z offset
-  const percentagePosition: [number, number, number] = [
-    position[0],
-    position[1],
-    position[2] + 2.5 // Increased Z offset for better visibility
-  ];
+  // Dynamic positioning based on node type with better Z offset
+  const percentagePosition: [number, number, number] = useMemo(() => {
+    const baseOffset = nodeType === 'entity' ? 3.0 : 2.8; // Slightly different offsets for different node types
+    return [
+      position[0],
+      position[1] + 0.5, // Slight Y offset to position above node
+      position[2] + baseOffset // Enhanced Z offset for better visibility
+    ];
+  }, [position, nodeType]);
 
-  console.log(`[FixedConnectionPercentage] Enhanced final render: "${formattedPercentage}" at`, percentagePosition);
+  console.log(`[FixedConnectionPercentage] Final render: "${formattedPercentage}" at`, percentagePosition, 'for nodeType:', nodeType);
 
   return (
     <ReliableText
       text={formattedPercentage}
       position={percentagePosition}
       color="#ffffff"
-      size={0.35}
+      size={0.4} // Slightly larger for better visibility
       visible={true}
-      renderOrder={20} // Higher than labels
+      renderOrder={25} // Higher render order than labels
       bold={true}
-      outlineWidth={0.06} // Increased outline
+      outlineWidth={0.08} // Enhanced outline for better contrast
       outlineColor="#000000"
       maxWidth={10}
     />

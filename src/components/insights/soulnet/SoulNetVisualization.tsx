@@ -115,7 +115,7 @@ function calculateRelativeStrengths(nodeId: string, links: LinkData[]): Map<stri
     });
   }
   
-  console.log(`Connection strengths for ${nodeId}:`, Object.fromEntries(strengthMap));
+  console.log(`[SoulNetVisualization] Connection strengths for ${nodeId}:`, Object.fromEntries(strengthMap));
   return strengthMap;
 }
 
@@ -139,7 +139,7 @@ function calculateConnectionPercentages(nodeId: string, links: LinkData[]): Map<
     percentageMap.set(connectedNodeId, percentage);
   });
   
-  console.log(`Connection percentages for ${nodeId}:`, Object.fromEntries(percentageMap));
+  console.log(`[SoulNetVisualization] Connection percentages for ${nodeId}:`, Object.fromEntries(percentageMap));
   return percentageMap;
 }
 
@@ -161,7 +161,7 @@ export const SoulNetVisualization: React.FC<SoulNetVisualizationProps> = ({
   const [nodeScriptTypes, setNodeScriptTypes] = useState<Map<string, string>>(new Map());
   const mounted = useRef<boolean>(true);
   
-  console.log("[SoulNetVisualization] Rendering with enhanced stability", {
+  console.log("[SoulNetVisualization] Rendering with enhanced percentage visibility", {
     nodeCount: data?.nodes?.length,
     linkCount: data?.links?.length,
     currentLanguage,
@@ -473,7 +473,7 @@ export const SoulNetVisualization: React.FC<SoulNetVisualizationProps> = ({
         );
       })}
       
-      {/* Display nodes with enhanced stability */}
+      {/* Display nodes with enhanced percentage visibility */}
       {validData.nodes.map(node => {
         if (!node || typeof node !== 'object' || !node.id) {
           console.warn("[SoulNetVisualization] Invalid node:", node);
@@ -493,9 +493,11 @@ export const SoulNetVisualization: React.FC<SoulNetVisualizationProps> = ({
           ? connectionPercentages.get(node.id) || 0
           : 0;
           
+        // Enhanced percentage visibility: show for all highlighted nodes (including connected nodes)
         const showPercentage = selectedNode !== null && 
-                              highlightedNodes.has(node.id) && 
-                              node.id !== selectedNode;
+                              isHighlighted && 
+                              connectionPercentage > 0 &&
+                              node.id !== selectedNode; // Only exclude the selected node itself
         
         if (!Array.isArray(node.position)) {
           console.warn(`[SoulNetVisualization] Node ${node.id} has invalid position:`, node.position);
@@ -505,7 +507,7 @@ export const SoulNetVisualization: React.FC<SoulNetVisualizationProps> = ({
         const scriptType = nodeScriptTypes.get(node.id) || 'latin';
         const translatedLabel = translationCache.get(node.id) || node.id;
         
-        console.log(`[SoulNetVisualization] Rendering stable node "${node.id}" with script "${scriptType}", translated: "${translatedLabel}"`);
+        console.log(`[SoulNetVisualization] Rendering node "${node.id}" - highlighted: ${isHighlighted}, showPercentage: ${showPercentage}, percentage: ${connectionPercentage}%`);
           
         return (
           <Node
