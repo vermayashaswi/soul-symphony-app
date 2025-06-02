@@ -42,23 +42,21 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
   const [isFullScreen, setIsFullScreen] = useState(false);
   const [canvasError, setCanvasError] = useState<Error | null>(null);
   const [retryCount, setRetryCount] = useState(0);
-  const [renderingReady, setRenderingReady] = useState(false);
   const isMobile = useIsMobile();
   const themeHex = useUserColorThemeHex();
   const [selectedEntity, setSelectedEntity] = useState<string | null>(null);
   const [error, setError] = useState<Error | null>(null);
   const { currentLanguage } = useTranslation();
 
-  console.log("[SoulNet] GOOGLE TRANSLATE ONLY - Simplified rendering", { 
+  console.log("[SoulNet] ENHANCED - Instant rendering without delays", { 
     userId, 
     timeRange, 
     currentLanguage,
-    retryCount,
-    renderingReady
+    retryCount
   });
 
   useEffect(() => {
-    console.log("[SoulNet] Component mounted - Google Translate only mode");
+    console.log("[SoulNet] Component mounted - Enhanced instant rendering mode");
     
     return () => {
       console.log("[SoulNet] Component unmounted");
@@ -119,21 +117,6 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
 
     fetchEntityEmotionData();
   }, [userId, timeRange]);
-
-  // Staged rendering initialization
-  useEffect(() => {
-    if (graphData.nodes.length > 0 && !renderingReady) {
-      console.log("[SoulNet] Preparing for staged rendering");
-      
-      // Delay rendering to prevent initialization crashes
-      const timer = setTimeout(() => {
-        setRenderingReady(true);
-        console.log("[SoulNet] Rendering ready");
-      }, 300);
-      
-      return () => clearTimeout(timer);
-    }
-  }, [graphData.nodes.length, renderingReady]);
 
   const handleNodeSelect = useCallback((id: string) => {
     console.log(`[SoulNet] Node selected: ${id}`);
@@ -226,7 +209,7 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
     return <TranslatableText text="Drag to rotate • Scroll to zoom • Click a node to highlight connections" forceTranslate={true} />;
   };
 
-  console.log(`[SoulNet] GOOGLE TRANSLATE ONLY - Final render: ${graphData.nodes.length} nodes, ${graphData.links.length} links, ready: ${renderingReady}`);
+  console.log(`[SoulNet] ENHANCED - Instant render: ${graphData.nodes.length} nodes, ${graphData.links.length} links`);
 
   return (
     <div className={cn(
@@ -260,7 +243,8 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
             </div>
           }
         >
-          {renderingReady && (
+          {/* ENHANCED: Instant Canvas rendering with smooth loading placeholder */}
+          <div className="relative">
             <Canvas
               style={{
                 width: '100%',
@@ -269,7 +253,7 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
                 maxHeight: isFullScreen ? 'none' : '500px',
                 position: 'relative',
                 zIndex: 5,
-                transition: 'all 0.3s ease-in-out',
+                transition: 'opacity 0.3s ease-in-out',
               }}
               camera={{ 
                 position: [0, 0, isFullScreen ? 40 : 45],
@@ -297,7 +281,7 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
                 shouldShowLabels={true}
               />
             </Canvas>
-          )}
+          </div>
         </RenderingErrorBoundary>
       </FullscreenWrapper>
       
