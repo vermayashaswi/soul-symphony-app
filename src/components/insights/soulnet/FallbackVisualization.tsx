@@ -1,6 +1,7 @@
 
 import React from 'react';
-import { TranslatableText } from '@/components/translation/TranslatableText';
+import { OrbitControls } from '@react-three/drei';
+import * as THREE from 'three';
 
 interface NodeData {
   id: string;
@@ -29,117 +30,88 @@ export const FallbackVisualization: React.FC<FallbackVisualizationProps> = ({
   onNodeClick,
   themeHex
 }) => {
-  const entities = data.nodes.filter(node => node.type === 'entity');
-  const emotions = data.nodes.filter(node => node.type === 'emotion');
+  console.log('[FallbackVisualization] Rendering fallback mode');
 
-  const getConnectedNodes = (nodeId: string) => {
-    return data.links
-      .filter(link => link.source === nodeId || link.target === nodeId)
-      .map(link => link.source === nodeId ? link.target : link.source);
-  };
+  if (!data || !data.nodes || data.nodes.length === 0) {
+    return null;
+  }
 
   return (
-    <div className="w-full h-full flex flex-col items-center justify-center p-6 bg-gradient-to-br from-blue-50 to-purple-50 dark:from-gray-800 dark:to-gray-900">
-      <div className="text-center mb-6">
-        <h3 className="text-lg font-semibold mb-2">
-          <TranslatableText text="Soul-Net Connection Map" />
-        </h3>
-        <p className="text-sm text-muted-foreground">
-          <TranslatableText text="Explore connections between entities and emotions" />
-        </p>
-      </div>
+    <>
+      <ambientLight intensity={0.6} />
+      <pointLight position={[10, 10, 10]} intensity={0.8} />
+      
+      <OrbitControls
+        enableDamping
+        dampingFactor={0.05}
+        rotateSpeed={0.5}
+        minDistance={10}
+        maxDistance={60}
+      />
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 w-full max-w-4xl">
-        {/* Entities Section */}
-        <div className="bg-white dark:bg-gray-800 rounded-lg p-4 shadow-sm">
-          <h4 className="font-medium mb-3 text-blue-600 dark:text-blue-400">
-            <TranslatableText text="Life Areas" />
-          </h4>
-          <div className="space-y-2">
-            {entities.map(entity => {
-              const isSelected = selectedNode === entity.id;
-              const connections = getConnectedNodes(entity.id);
-              
-              return (
-                <button
-                  key={entity.id}
-                  onClick={() => onNodeClick(entity.id)}
-                  className={`w-full text-left p-3 rounded-md transition-all ${
-                    isSelected 
-                      ? 'bg-blue-100 dark:bg-blue-900 border-2 border-blue-500' 
-                      : 'bg-gray-50 dark:bg-gray-700 hover:bg-gray-100 dark:hover:bg-gray-600'
-                  }`}
-                >
-                  <div className="font-medium">{entity.id}</div>
-                  <div className="text-xs text-muted-foreground">
-                    {connections.length} connections
-                  </div>
-                </button>
-              );
-            })}
-          </div>
-        </div>
+      {/* Render simple spheres for all nodes */}
+      {data.nodes.map((node) => {
+        if (!node || !Array.isArray(node.position)) {
+          return null;
+        }
 
-        {/* Emotions Section */}
-        <div className="bg-white dark:bg-gray-800 rounded-lg p-4 shadow-sm">
-          <h4 className="font-medium mb-3 text-purple-600 dark:text-purple-400">
-            <TranslatableText text="Emotions" />
-          </h4>
-          <div className="space-y-2">
-            {emotions.map(emotion => {
-              const isSelected = selectedNode === emotion.id;
-              const connections = getConnectedNodes(emotion.id);
-              
-              return (
-                <button
-                  key={emotion.id}
-                  onClick={() => onNodeClick(emotion.id)}
-                  className={`w-full text-left p-3 rounded-md transition-all ${
-                    isSelected 
-                      ? 'bg-purple-100 dark:bg-purple-900 border-2 border-purple-500' 
-                      : 'bg-gray-50 dark:bg-gray-700 hover:bg-gray-100 dark:hover:bg-gray-600'
-                  }`}
-                >
-                  <div className="font-medium">{emotion.id}</div>
-                  <div className="text-xs text-muted-foreground">
-                    {connections.length} connections
-                  </div>
-                </button>
-              );
-            })}
-          </div>
-        </div>
-      </div>
+        const isSelected = selectedNode === node.id;
+        const baseScale = node.type === 'entity' ? 0.8 : 0.6;
+        const scale = isSelected ? baseScale * 1.5 : baseScale;
+        const color = isSelected ? '#ffffff' : themeHex;
 
-      {/* Connection Details */}
-      {selectedNode && (
-        <div className="mt-6 bg-white dark:bg-gray-800 rounded-lg p-4 shadow-sm w-full max-w-2xl">
-          <h4 className="font-medium mb-3">
-            <TranslatableText text={`Connections for "${selectedNode}"`} />
-          </h4>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-            {getConnectedNodes(selectedNode).map(connectedId => {
-              const connectedNode = data.nodes.find(n => n.id === connectedId);
-              if (!connectedNode) return null;
-              
-              return (
-                <button
-                  key={connectedId}
-                  onClick={() => onNodeClick(connectedId)}
-                  className="text-left p-2 rounded bg-gray-50 dark:bg-gray-700 hover:bg-gray-100 dark:hover:bg-gray-600"
-                >
-                  <span className={`text-sm ${
-                    connectedNode.type === 'entity' ? 'text-blue-600' : 'text-purple-600'
-                  }`}>
-                    {connectedId}
-                  </span>
-                </button>
-              );
-            })}
-          </div>
-        </div>
-      )}
-    </div>
+        return (
+          <mesh
+            key={`fallback-${node.id}`}
+            position={node.position}
+            scale={[scale, scale, scale]}
+            onClick={(e) => {
+              e.stopPropagation();
+              onNodeClick(node.id);
+            }}
+          >
+            <sphereGeometry args={[1, 16, 16]} />
+            <meshPhongMaterial 
+              args={[{ 
+                color: color,
+                transparent: true,
+                opacity: 0.8
+              }]}
+            />
+          </mesh>
+        );
+      })}
+
+      {/* Render simple lines for connections */}
+      {data.links.map((link, index) => {
+        const sourceNode = data.nodes.find(n => n.id === link.source);
+        const targetNode = data.nodes.find(n => n.id === link.target);
+        
+        if (!sourceNode || !targetNode) {
+          return null;
+        }
+
+        const points = [
+          new THREE.Vector3(...sourceNode.position),
+          new THREE.Vector3(...targetNode.position)
+        ];
+
+        const geometry = new THREE.BufferGeometry().setFromPoints(points);
+
+        return (
+          <line key={`fallback-line-${index}`}>
+            <bufferGeometry attach="geometry" {...geometry} />
+            <lineBasicMaterial 
+              args={[{
+                color: themeHex,
+                opacity: 0.3,
+                transparent: true
+              }]}
+            />
+          </line>
+        );
+      })}
+    </>
   );
 };
 

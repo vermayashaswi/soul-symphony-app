@@ -1,10 +1,9 @@
-
 import React, { useEffect, useState } from 'react';
 import { useLocation, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Home, MessageCircle, BookOpen, BarChart2, Settings, Crown } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { isNativeApp, isAppRoute } from '@/routes/RouteHelpers.tsx';
+import { isNativeApp, isAppRoute } from '@/routes/RouteHelpers';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { TranslatableText } from '@/components/translation/TranslatableText';
 import { useTutorial } from '@/contexts/TutorialContext';

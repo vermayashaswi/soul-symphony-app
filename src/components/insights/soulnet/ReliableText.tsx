@@ -3,7 +3,8 @@ import React, { useState, useEffect, useRef, Suspense } from 'react';
 import { Text } from '@react-three/drei';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
-import { consolidatedFontService } from '@/utils/consolidatedFontService';
+import { localFontService } from '@/services/localFontService';
+import EnhancedText from './EnhancedText';
 
 interface ReliableTextProps {
   text: string;
@@ -32,13 +33,15 @@ export const ReliableText: React.FC<ReliableTextProps> = ({
 }) => {
   const [isReady, setIsReady] = useState(false);
   const [displayText, setDisplayText] = useState('');
+  const [useEnhanced, setUseEnhanced] = useState(false);
   const [hasError, setHasError] = useState(false);
-  const [retryCount, setRetryCount] = useState(0);
   const textRef = useRef<THREE.Mesh>(null);
-  const mountedRef = useRef(true);
+  const mounted = useRef(true);
 
-  // Initialize with clean text and enhanced error handling
+  // Initialize with clean text and script detection
   useEffect(() => {
+    if (!mounted.current) return;
+
     if (!text || typeof text !== 'string') {
       setDisplayText('Node');
     } else {
@@ -48,21 +51,19 @@ export const ReliableText: React.FC<ReliableTextProps> = ({
       
       setDisplayText(finalText);
       
-      console.log(`[ReliableText] Processing text: "${finalText}"`);
+      // Determine if we need enhanced font loading
+      const scriptType = localFontService.detectScriptType(finalText);
+      const needsEnhanced = scriptType !== 'latin';
+      setUseEnhanced(needsEnhanced);
+      
+      console.log(`[ReliableText] Text: "${finalText}", Script: ${scriptType}, Enhanced: ${needsEnhanced}`);
     }
     setIsReady(true);
   }, [text]);
 
-  // Cleanup on unmount
-  useEffect(() => {
-    return () => {
-      mountedRef.current = false;
-    };
-  }, []);
-
-  // Billboard effect with enhanced stability
+  // Billboard effect for fallback text
   useFrame(({ camera }) => {
-    if (textRef.current && visible && isReady && !hasError) {
+    if (textRef.current && visible && isReady && !useEnhanced && mounted.current) {
       try {
         textRef.current.quaternion.copy(camera.quaternion);
         if (textRef.current.material) {
@@ -76,57 +77,45 @@ export const ReliableText: React.FC<ReliableTextProps> = ({
   });
 
   const handleError = (error: any) => {
-    console.error('[ReliableText] Render error:', error);
-    setHasError(true);
-    
-    // Implement retry logic for transient errors
-    if (retryCount < 3) {
-      setTimeout(() => {
-        if (mountedRef.current) {
-          setHasError(false);
-          setRetryCount(prev => prev + 1);
-          console.log(`[ReliableText] Retrying render, attempt ${retryCount + 1}`);
-        }
-      }, 1000);
+    console.error('[ReliableText] Render error, falling back:', error);
+    if (mounted.current) {
+      setHasError(true);
+      setUseEnhanced(false);
     }
   };
 
-  if (!visible || !isReady || !displayText || hasError) {
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      mounted.current = false;
+    };
+  }, []);
+
+  if (!visible || !isReady || !displayText || !mounted.current) {
     return null;
   }
 
-  // Enhanced text configuration based on script detection
-  const getTextConfig = () => {
-    const scriptType = consolidatedFontService.detectScriptType(displayText);
-    const fontFamily = consolidatedFontService.getOptimalFontFamily(scriptType);
-    
-    switch (scriptType) {
-      case 'devanagari':
-        return {
-          maxWidth: 30,
-          letterSpacing: 0.15,
-          lineHeight: 1.8,
-          fontFamily
-        };
-      case 'arabic':
-        return {
-          maxWidth: 28,
-          letterSpacing: 0.12,
-          lineHeight: 1.7,
-          fontFamily
-        };
-      default:
-        return {
-          maxWidth: maxWidth,
-          letterSpacing: 0.03,
-          lineHeight: 1.4,
-          fontFamily
-        };
-    }
-  };
+  // Use enhanced text for non-Latin scripts or if specifically needed
+  if (useEnhanced && !hasError) {
+    return (
+      <Suspense fallback={null}>
+        <EnhancedText
+          text={displayText}
+          position={position}
+          color={color}
+          size={size}
+          visible={true}
+          renderOrder={renderOrder}
+          bold={bold}
+          outlineWidth={outlineWidth}
+          outlineColor={outlineColor}
+          maxWidth={maxWidth}
+        />
+      </Suspense>
+    );
+  }
 
-  const textConfig = getTextConfig();
-
+  // Fallback to basic text for Latin scripts
   return (
     <Text
       ref={textRef}
@@ -135,17 +124,15 @@ export const ReliableText: React.FC<ReliableTextProps> = ({
       fontSize={size}
       anchorX="center"
       anchorY="middle"
-      maxWidth={textConfig.maxWidth}
+      maxWidth={maxWidth}
       textAlign="center"
-      font={textConfig.fontFamily}
+      font="Inter, system-ui, sans-serif"
       fontWeight={bold ? "bold" : "normal"}
       material-transparent={true}
       material-depthTest={false}
       renderOrder={renderOrder}
       outlineWidth={outlineWidth}
       outlineColor={outlineColor}
-      letterSpacing={textConfig.letterSpacing}
-      lineHeight={textConfig.lineHeight}
       onError={handleError}
     >
       {displayText}

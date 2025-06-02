@@ -58,8 +58,6 @@ declare module '@react-three/fiber' {
     camera?: any;
     onPointerMissed?: (event: any) => void;
     gl?: any;
-    onCreated?: (state: RootState) => void;
-    onError?: (error: Error) => void;
   }): JSX.Element;
 
   export function useFrame(callback: (state: RootState, delta: number) => void, priority?: number): void;

@@ -5,7 +5,7 @@ import { Text } from '@react-three/drei';
 import { useFrame, useThree } from '@react-three/fiber';
 import * as THREE from 'three';
 import { useTranslation } from '@/contexts/TranslationContext';
-import { consolidatedFontService } from '@/utils/consolidatedFontService';
+import { fontService } from '@/utils/fontService';
 
 interface ThreeDimensionalTextProps {
   text: string;
@@ -100,7 +100,7 @@ export const ThreeDimensionalText: React.FC<ThreeDimensionalTextProps> = ({
     }
   });
 
-  // Font loading effect with consolidated font service
+  // Font loading effect
   useEffect(() => {
     let mounted = true;
     
@@ -108,8 +108,8 @@ export const ThreeDimensionalText: React.FC<ThreeDimensionalTextProps> = ({
       try {
         console.log('[ThreeDimensionalText] Initializing fonts...');
         
-        // Wait for consolidated font system to be ready
-        await consolidatedFontService.waitForFonts();
+        // Wait for font system to be ready
+        await fontService.waitForFonts();
         
         if (mounted) {
           console.log('[ThreeDimensionalText] Fonts ready');
@@ -166,7 +166,7 @@ export const ThreeDimensionalText: React.FC<ThreeDimensionalTextProps> = ({
           const fallback = generateFallbackText(text);
           if (mountedRef.current) {
             setDisplayText(fallback);
-            scriptTypeRef.current = consolidatedFontService.detectScriptType(fallback);
+            scriptTypeRef.current = fontService.detectScriptType(fallback);
             setIsReady(true);
           }
           return;
@@ -176,10 +176,10 @@ export const ThreeDimensionalText: React.FC<ThreeDimensionalTextProps> = ({
         if (skipTranslation || currentLanguage === 'en' || !text) {
           if (mountedRef.current) {
             setDisplayText(text);
-            scriptTypeRef.current = consolidatedFontService.detectScriptType(text);
+            scriptTypeRef.current = fontService.detectScriptType(text);
             
             // Preload fonts for detected script
-            await consolidatedFontService.preloadFontsForScript(scriptTypeRef.current);
+            await fontService.preloadFontsForScript(scriptTypeRef.current);
             
             setIsReady(true);
             console.log(`[ThreeDimensionalText] Using direct text: "${text}", detected script: ${scriptTypeRef.current}`);
@@ -196,29 +196,29 @@ export const ThreeDimensionalText: React.FC<ThreeDimensionalTextProps> = ({
             const translatedValidation = validateText(result);
             if (translatedValidation.isValid) {
               setDisplayText(result);
-              scriptTypeRef.current = consolidatedFontService.detectScriptType(result);
+              scriptTypeRef.current = fontService.detectScriptType(result);
               
               // Preload fonts for detected script
-              await consolidatedFontService.preloadFontsForScript(scriptTypeRef.current);
+              await fontService.preloadFontsForScript(scriptTypeRef.current);
               
               console.log(`[ThreeDimensionalText] Successfully translated "${text}" to "${result}", detected script: ${scriptTypeRef.current}`);
             } else {
               console.warn(`[ThreeDimensionalText] Translated text validation failed, using original`);
               setDisplayText(text);
-              scriptTypeRef.current = consolidatedFontService.detectScriptType(text);
+              scriptTypeRef.current = fontService.detectScriptType(text);
               
               // Preload fonts for original text
-              await consolidatedFontService.preloadFontsForScript(scriptTypeRef.current);
+              await fontService.preloadFontsForScript(scriptTypeRef.current);
             }
             setIsReady(true);
           }
         } else if (mountedRef.current) {
           // Fallback if no translate function
           setDisplayText(text);
-          scriptTypeRef.current = consolidatedFontService.detectScriptType(text);
+          scriptTypeRef.current = fontService.detectScriptType(text);
           
           // Preload fonts for detected script
-          await consolidatedFontService.preloadFontsForScript(scriptTypeRef.current);
+          await fontService.preloadFontsForScript(scriptTypeRef.current);
           
           setIsReady(true);
         }
@@ -227,7 +227,7 @@ export const ThreeDimensionalText: React.FC<ThreeDimensionalTextProps> = ({
         if (mountedRef.current) {
           const fallback = generateFallbackText(text);
           setDisplayText(fallback);
-          scriptTypeRef.current = consolidatedFontService.detectScriptType(fallback);
+          scriptTypeRef.current = fontService.detectScriptType(fallback);
           setIsReady(true);
         }
       } finally {
@@ -249,7 +249,7 @@ export const ThreeDimensionalText: React.FC<ThreeDimensionalTextProps> = ({
   
   // Enhanced configuration based on script type
   const getTextConfig = () => {
-    const fontFamily = consolidatedFontService.getOptimalFontFamily(scriptTypeRef.current);
+    const fontFamily = fontService.getOptimalFontFamily(scriptTypeRef.current);
     
     switch (scriptTypeRef.current) {
       case 'devanagari':

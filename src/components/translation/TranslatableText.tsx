@@ -46,45 +46,23 @@ export function TranslatableText({
     return result.replace(languageCodeRegex, '').trim();
   };
   
-  const shouldTranslate = () => {
-    // Always translate if forceTranslate is true
-    if (forceTranslate) {
-      console.log(`TranslatableText: Force translate enabled for "${text.substring(0, 30)}..."`);
-      return true;
-    }
-    
-    // Skip translation if current language is English
-    if (currentLanguage === 'en') {
-      console.log(`TranslatableText: Current language is English, skipping translation for "${text.substring(0, 30)}..."`);
-      return false;
-    }
-    
-    // NEW LOGIC: Allow translation on website routes when language is not English
-    // This is the key fix - we should translate website content when user selects a non-English language
-    if (isOnWebsite && currentLanguage !== 'en') {
-      console.log(`TranslatableText: Website route with non-English language (${currentLanguage}), allowing translation for "${text.substring(0, 30)}..."`);
-      return true;
-    }
-    
-    // For app routes, always allow translation when language is not English
-    if (!isOnWebsite && currentLanguage !== 'en') {
-      console.log(`TranslatableText: App route with non-English language (${currentLanguage}), allowing translation for "${text.substring(0, 30)}..."`);
-      return true;
-    }
-    
-    console.log(`TranslatableText: No translation needed for "${text.substring(0, 30)}..." - isOnWebsite: ${isOnWebsite}, currentLanguage: ${currentLanguage}`);
-    return false;
-  };
-  
   const translateText = async () => {
     if (!text?.trim()) {
       setTranslatedText('');
       return;
     }
 
-    console.log(`TranslatableText: Translation check for "${text.substring(0, 30)}..." - forceTranslate: ${forceTranslate}, isOnWebsite: ${isOnWebsite}, currentLanguage: ${currentLanguage}`);
+    // Enhanced debug logging for force translate
+    console.log(`TranslatableText: Translation check for "${text}" - forceTranslate: ${forceTranslate}, isOnWebsite: ${isOnWebsite}, currentLanguage: ${currentLanguage}`);
 
-    if (!shouldTranslate()) {
+    if (isOnWebsite && !forceTranslate) {
+      console.log(`TranslatableText: Skipping translation for "${text}" - on website without force translate`);
+      setTranslatedText(text);
+      return;
+    }
+
+    if (currentLanguage === 'en') {
+      console.log(`TranslatableText: Skipping translation for "${text}" - already in English`);
       setTranslatedText(text);
       return;
     }
@@ -92,7 +70,7 @@ export function TranslatableText({
     // Check cache first
     const cachedResult = getCachedTranslation(text, currentLanguage);
     if (cachedResult) {
-      console.log(`TranslatableText: Using cached translation for "${text.substring(0, 30)}...": "${cachedResult.substring(0, 30)}..."`);
+      console.log(`TranslatableText: Using cached translation for "${text}": "${cachedResult}"`);
       setTranslatedText(cachedResult);
       return;
     }
@@ -101,7 +79,7 @@ export function TranslatableText({
     translationAttemptRef.current += 1;
     const attemptNumber = translationAttemptRef.current;
     
-    console.log(`TranslatableText: Starting translation attempt #${attemptNumber} for "${text.substring(0, 30)}..." to ${currentLanguage}`);
+    console.log(`TranslatableText: Starting translation attempt #${attemptNumber} for "${text}" to ${currentLanguage}`);
     
     if (!isLoading) {
       setIsLoading(true);
@@ -111,8 +89,9 @@ export function TranslatableText({
     }
       
     try {
+      // Force translation by using staticTranslationService directly
       console.log(`TranslatableText: Calling translate service for "${text.substring(0, 30)}..." to ${currentLanguage}`);
-      const result = await translate(text, sourceLanguage || "en", entryId);
+      const result = await translate(text, "en", entryId);
       
       console.log(`TranslatableText: Translation service returned for "${text.substring(0, 30)}...": "${result?.substring(0, 30) || 'null'}..."`);
       
@@ -189,8 +168,6 @@ export function TranslatableText({
       'data-force-translate': forceTranslate ? 'true' : 'false',
       'data-original-text': text,
       'data-translation-attempts': translationAttemptRef.current,
-      'data-should-translate': shouldTranslate() ? 'true' : 'false',
-      'data-is-website': isOnWebsite ? 'true' : 'false',
       style
     }, 
     translatedText || text

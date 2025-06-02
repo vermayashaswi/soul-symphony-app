@@ -1,4 +1,3 @@
-
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { translationCache } from '@/services/translationCache';
 import { toast } from 'sonner';
@@ -226,12 +225,9 @@ export function TranslationProvider({ children }: { children: React.ReactNode })
   };
 
   const setLanguage = async (lang: string) => {
-    if (lang === currentLanguage) {
-      console.log(`TranslationContext: Language ${lang} is already current, skipping change`);
-      return;
-    }
+    if (lang === currentLanguage) return;
     
-    console.log(`TranslationContext: Changing language from ${currentLanguage} to ${lang}`);
+    console.log(`Changing language from ${currentLanguage} to ${lang}`);
     setIsTranslating(true);
     setTranslationProgress(0);
     
@@ -239,11 +235,10 @@ export function TranslationProvider({ children }: { children: React.ReactNode })
       // Clear memory cache and translation queue when language changes
       memoryCache.clear();
       translationQueue.clear();
-      console.log(`TranslationContext: Cleared translation memory cache and queue`);
+      console.log(`Cleared translation memory cache and queue`);
       
       // Store language preference
       localStorage.setItem('preferredLanguage', lang);
-      console.log(`TranslationContext: Stored language preference: ${lang}`);
       
       // Update the HTML lang attribute
       updateHtmlLang(lang);
@@ -259,7 +254,6 @@ export function TranslationProvider({ children }: { children: React.ReactNode })
       
       // Set new language
       setCurrentLanguage(lang);
-      console.log(`TranslationContext: Current language updated to: ${lang}`);
       
       // Preload common website translations for non-English languages
       if (lang !== 'en') {
@@ -273,15 +267,12 @@ export function TranslationProvider({ children }: { children: React.ReactNode })
       }
       
       // Dispatch language change event
-      const event = new CustomEvent('languageChange', { 
+      window.dispatchEvent(new CustomEvent('languageChange', { 
         detail: { 
           language: lang,
           timestamp: Date.now()
         } 
-      });
-      
-      console.log(`TranslationContext: Dispatching languageChange event for: ${lang}`);
-      window.dispatchEvent(event);
+      }));
       
       const selectedLang = languages.find(l => l.code === lang);
       toast.success(`Language changed to ${selectedLang?.label || lang}`);
@@ -290,10 +281,9 @@ export function TranslationProvider({ children }: { children: React.ReactNode })
       setTimeout(() => {
         setTranslationProgress(100);
         setIsTranslating(false);
-        console.log(`TranslationContext: Language change to ${lang} completed`);
       }, 300);
     } catch (error) {
-      console.error('TranslationContext: Language change error:', error);
+      console.error('Language change error:', error);
       toast.error('Failed to change language');
       setIsTranslating(false);
     }
@@ -302,13 +292,11 @@ export function TranslationProvider({ children }: { children: React.ReactNode })
   // Initialize with stored preference
   useEffect(() => {
     const storedLang = localStorage.getItem('preferredLanguage');
-    if (storedLang && storedLang !== currentLanguage) {
-      console.log(`TranslationContext: Initializing with stored language preference: ${storedLang}`);
+    if (storedLang) {
+      console.log(`Initializing with stored language preference: ${storedLang}`);
       updateHtmlLang(storedLang);
-      setCurrentLanguage(storedLang);
-      staticTranslationService.setLanguage(storedLang);
+      setLanguage(storedLang);
     } else {
-      console.log(`TranslationContext: No stored language preference, using default: en`);
       updateHtmlLang('en');
     }
   }, []);
