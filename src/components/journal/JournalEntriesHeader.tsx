@@ -23,7 +23,7 @@ export const JournalEntriesHeader: React.FC<JournalEntriesHeaderProps> = ({
       <Button 
         onClick={onStartRecording}
         size="sm"
-        className={`flex items-center gap-1 record-entry-button ${shouldAddTutorialClass ? 'tutorial-record-entry-button' : ''}`}
+        className={`flex items-center gap-1 record-entry-button ${shouldAddTutorialClass ? 'tutorial-record-entry-button tutorial-target record-entry-tab' : ''}`}
         data-tutorial-target={shouldAddTutorialClass ? "record-entry" : undefined}
         id="new-entry-button"
       >

@@ -1,3 +1,4 @@
+
 import React, { useRef, useMemo } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
@@ -26,6 +27,7 @@ interface NodeProps {
   showPercentage?: boolean;
   forceShowLabels?: boolean;
   translatedText?: string;
+  effectiveTheme?: 'light' | 'dark';
 }
 
 const Node: React.FC<NodeProps> = ({
@@ -42,7 +44,8 @@ const Node: React.FC<NodeProps> = ({
   connectionPercentage = 0,
   showPercentage = false,
   forceShowLabels = false,
-  translatedText
+  translatedText,
+  effectiveTheme = 'light'
 }) => {
   const meshRef = useRef<THREE.Mesh>(null);
 
@@ -112,6 +115,7 @@ const Node: React.FC<NodeProps> = ({
           connectionPercentage={connectionPercentage}
           showPercentage={showPercentage}
           translatedText={translatedText}
+          effectiveTheme={effectiveTheme}
         />
       )}
     </group>
