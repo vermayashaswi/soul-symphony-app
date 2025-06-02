@@ -93,19 +93,16 @@ export const DirectNodeLabel: React.FC<DirectNodeLabelProps> = ({
     return [0, finalOffset, 0] as [number, number, number];
   }, [type, nodeScale, isHighlighted, isSelected]);
 
-  // ENHANCED: Different font sizes for entity vs emotion nodes
+  // Calculate text properties with proper size scaling
   const textSize = useMemo(() => {
     const zoom = Math.max(10, Math.min(100, cameraZoom));
-    
-    // Different base sizes for entity and emotion nodes
-    const baseSize = type === 'entity' ? 1.4 : 1.0; // Entities are larger (1.4 vs 1.0)
-    
+    const baseSize = 1.2;
     const zoomFactor = Math.max(0.7, Math.min(1.3, (50 - zoom) * 0.02 + 1));
     const finalSize = Math.max(0.8, Math.min(2.0, baseSize * zoomFactor));
     
-    console.log(`[DirectNodeLabel] ENHANCED text size for ${id} (${type}): ${finalSize} (base: ${baseSize}, zoom: ${zoom})`);
+    console.log(`[DirectNodeLabel] Text size for ${id}: ${finalSize} (zoom: ${zoom})`);
     return finalSize;
-  }, [cameraZoom, id, type]);
+  }, [cameraZoom, id]);
 
   // Percentage text size (69% of main text size)
   const percentageTextSize = useMemo(() => {
