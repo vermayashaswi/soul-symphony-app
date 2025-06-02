@@ -50,6 +50,12 @@ class FontService {
     return simpleFontService.getFontFamily(scriptType);
   }
 
+  // Add the missing getOptimalFontFamily method
+  getOptimalFontFamily(scriptType: string): string {
+    // This delegates to the existing getFontFamily method
+    return this.getFontFamily(scriptType);
+  }
+
   getFontFamilyForText(text: string): string {
     const scriptType = this.detectScriptType(text);
     return this.getFontFamily(scriptType);
