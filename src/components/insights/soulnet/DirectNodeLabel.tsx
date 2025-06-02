@@ -57,41 +57,57 @@ export const DirectNodeLabel: React.FC<DirectNodeLabelProps> = ({
   // Use translated text if available, otherwise fallback to original id
   const displayText = translatedText || id;
   
-  // FIXED: Add connection percentage to display text when highlighted and showPercentage is true
+  // ENHANCED: Improved connection percentage display logic
   const finalDisplayText = useMemo(() => {
     if (isHighlighted && showPercentage && connectionPercentage > 0) {
+      console.log(`[DirectNodeLabel] Adding percentage to ${id}: ${connectionPercentage}%`);
       return `${displayText}\n${connectionPercentage}%`;
     }
     return displayText;
-  }, [displayText, isHighlighted, showPercentage, connectionPercentage]);
+  }, [displayText, isHighlighted, showPercentage, connectionPercentage, id]);
 
-  // Calculate position offset - adjust for different node types
+  // ENHANCED: Standardized label positioning with better offset calculation
   const labelOffset = useMemo(() => {
-    const baseOffset = type === 'entity' ? 1.8 : 2.5; // Increased offset for cube emotion nodes
-    const scaledOffset = baseOffset * Math.max(0.5, Math.min(2, nodeScale));
+    // Improved offset calculation for different node types and scales
+    const baseOffset = type === 'entity' ? 2.0 : 2.8; // Slightly increased for better visibility
+    const scaledOffset = baseOffset * Math.max(0.6, Math.min(2.2, nodeScale));
+    
+    console.log(`[DirectNodeLabel] Label offset for ${id} (${type}): ${scaledOffset} (scale: ${nodeScale})`);
     return [0, scaledOffset, 0] as [number, number, number];
-  }, [type, nodeScale]);
+  }, [type, nodeScale, id]);
 
   // Calculate text properties - 10x larger base size
   const textSize = useMemo(() => {
     const zoom = Math.max(10, Math.min(100, cameraZoom));
     const baseSize = 4.0; // Increased from 0.4 to 4.0 (10x larger)
     const zoomFactor = Math.max(0.7, Math.min(1.3, (50 - zoom) * 0.02 + 1));
-    return Math.max(2.0, Math.min(8.0, baseSize * zoomFactor)); // Adjusted min/max accordingly
-  }, [cameraZoom]);
-
-  // FIXED: Text color logic to handle light theme properly
-  const textColor = useMemo(() => {
-    if (isSelected) return '#ffffff';
-    if (isHighlighted) return type === 'entity' ? '#ffffff' : themeHex;
+    const finalSize = Math.max(2.0, Math.min(8.0, baseSize * zoomFactor));
     
-    // Use appropriate default color based on theme
-    if (effectiveTheme === 'light') {
-      return '#000000'; // Black text for light theme
+    console.log(`[DirectNodeLabel] Text size for ${id}: ${finalSize} (zoom: ${zoom})`);
+    return finalSize;
+  }, [cameraZoom, id]);
+
+  // FIXED: Enhanced text color logic with better contrast handling
+  const textColor = useMemo(() => {
+    let color;
+    
+    if (isSelected) {
+      color = '#ffffff'; // Always white for selected nodes
+    } else if (isHighlighted) {
+      // For highlighted nodes, use white for entities, theme color for emotions
+      color = type === 'entity' ? '#ffffff' : themeHex;
     } else {
-      return '#cccccc'; // Light gray text for dark theme
+      // FIXED: Better default colors based on theme with higher contrast
+      if (effectiveTheme === 'light') {
+        color = '#1a1a1a'; // Dark gray for light theme (better contrast than black)
+      } else {
+        color = '#e5e5e5'; // Light gray for dark theme (better contrast)
+      }
     }
-  }, [isSelected, isHighlighted, type, themeHex, effectiveTheme]);
+    
+    console.log(`[DirectNodeLabel] Text color for ${id}: ${color} (selected: ${isSelected}, highlighted: ${isHighlighted}, theme: ${effectiveTheme})`);
+    return color;
+  }, [isSelected, isHighlighted, type, themeHex, effectiveTheme, id]);
 
   const labelPosition: [number, number, number] = [
     position[0] + labelOffset[0],
@@ -114,6 +130,7 @@ export const DirectNodeLabel: React.FC<DirectNodeLabelProps> = ({
   }, [shouldShowLabel, id]);
 
   if (!enhancedShouldShowLabel || !finalDisplayText) {
+    console.log(`[DirectNodeLabel] Not rendering label for ${id}: shouldShow=${enhancedShouldShowLabel}, text="${finalDisplayText}"`);
     return null;
   }
 

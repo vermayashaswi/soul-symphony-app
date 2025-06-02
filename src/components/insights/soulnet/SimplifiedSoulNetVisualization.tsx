@@ -1,3 +1,4 @@
+
 import React, { useRef, useEffect, useMemo, useState } from 'react';
 import { OrbitControls } from '@react-three/drei';
 import { useThree, useFrame } from '@react-three/fiber';
@@ -100,28 +101,48 @@ export const SimplifiedSoulNetVisualization: React.FC<SimplifiedSoulNetVisualiza
     }
   }, [validData.nodes]);
 
-  // Calculate connection percentages for selected node
+  // FIXED: Enhanced connection percentages calculation with proper normalization
   const connectionPercentages = useMemo(() => {
-    if (!selectedNode || !validData.links) return new Map<string, number>();
+    if (!selectedNode || !validData.links) {
+      console.log('[SimplifiedSoulNetVisualization] No selected node or links, clearing percentages');
+      return new Map<string, number>();
+    }
     
     const percentages = new Map<string, number>();
     const selectedConnections = validData.links.filter(
       link => link.source === selectedNode || link.target === selectedNode
     );
     
-    if (selectedConnections.length === 0) return percentages;
+    if (selectedConnections.length === 0) {
+      console.log('[SimplifiedSoulNetVisualization] No connections found for selected node:', selectedNode);
+      return percentages;
+    }
     
-    // Calculate total connection strength for normalization
-    const totalStrength = selectedConnections.reduce((sum, link) => sum + (link.value || 1), 0);
+    console.log(`[SimplifiedSoulNetVisualization] Found ${selectedConnections.length} connections for node:`, selectedNode);
+    
+    // FIXED: Better normalization - use max connection strength as 100%
+    const connectionStrengths = selectedConnections.map(link => link.value || 1);
+    const maxStrength = Math.max(...connectionStrengths);
+    const totalStrength = connectionStrengths.reduce((sum, strength) => sum + strength, 0);
     
     selectedConnections.forEach(link => {
       const connectedNodeId = link.source === selectedNode ? link.target : link.source;
-      // Calculate percentage based on connection strength relative to total
-      const percentage = Math.round(((link.value || 1) / totalStrength) * 100);
-      percentages.set(connectedNodeId, Math.max(1, Math.min(100, percentage)));
+      const connectionStrength = link.value || 1;
+      
+      // Use percentage relative to strongest connection for better visibility
+      const percentageByMax = Math.round((connectionStrength / maxStrength) * 100);
+      // Also calculate relative to total for comparison
+      const percentageByTotal = Math.round((connectionStrength / totalStrength) * 100);
+      
+      // Use the higher of the two for better visibility, minimum 5%
+      const finalPercentage = Math.max(5, Math.max(percentageByMax, percentageByTotal));
+      
+      percentages.set(connectedNodeId, Math.min(100, finalPercentage));
+      
+      console.log(`[SimplifiedSoulNetVisualization] Connection ${selectedNode} -> ${connectedNodeId}: strength=${connectionStrength}, percentage=${finalPercentage}%`);
     });
     
-    console.log('[SimplifiedSoulNetVisualization] Connection percentages calculated:', Object.fromEntries(percentages));
+    console.log('[SimplifiedSoulNetVisualization] Final connection percentages:', Object.fromEntries(percentages));
     return percentages;
   }, [selectedNode, validData.links]);
 
@@ -231,6 +252,8 @@ export const SimplifiedSoulNetVisualization: React.FC<SimplifiedSoulNetVisualiza
         if (link.source === selectedNode) connected.add(link.target);
         if (link.target === selectedNode) connected.add(link.source);
       });
+      
+      console.log(`[SimplifiedSoulNetVisualization] Highlighted nodes for ${selectedNode}:`, Array.from(connected));
       return connected;
     } catch (error) {
       console.error('[SimplifiedSoulNetVisualization] Highlighted nodes calculation error:', error);
@@ -309,31 +332,34 @@ export const SimplifiedSoulNetVisualization: React.FC<SimplifiedSoulNetVisualiza
           }
         })}
 
-        {/* Render nodes with progressive enhancement and Google Translate */}
+        {/* FIXED: Enhanced node rendering with improved label logic */}
         {validData.nodes.map(node => {
           try {
-            const isHighlighted = selectedNode === node.id || highlightedNodes.has(node.id);
+            const isSelected = selectedNode === node.id;
+            const isHighlighted = isSelected || highlightedNodes.has(node.id);
             const dimmed = !!selectedNode && !isHighlighted;
             
-            // FIXED LABEL VISIBILITY LOGIC: Only show labels for selected node and its connections
+            // ENHANCED: More comprehensive label visibility logic
             const shouldShowNodeLabel = renderingStage === 'enhanced' && shouldShowLabels && (
               !selectedNode || // Show all labels when no node is selected
-              selectedNode === node.id || // Always show selected node label
+              isSelected || // Always show selected node label
               highlightedNodes.has(node.id) // Show connected node labels
             );
             
             // Get Google Translate translation
             const translatedText = translationCache.get(node.id) || node.id;
             
-            // Get connection percentage for this node
+            // FIXED: Enhanced connection percentage logic
             const connectionPercentage = connectionPercentages.get(node.id) || 0;
-            const showPercentage = !!selectedNode && isHighlighted && connectionPercentage > 0;
+            const showPercentage = !!selectedNode && isHighlighted && connectionPercentage > 0 && !isSelected;
+
+            console.log(`[SimplifiedSoulNetVisualization] Rendering node ${node.id}: selected=${isSelected}, highlighted=${isHighlighted}, showLabel=${shouldShowNodeLabel}, percentage=${connectionPercentage}%, showPercentage=${showPercentage}`);
 
             return (
               <Node
                 key={`node-${node.id}`}
                 node={node}
-                isSelected={selectedNode === node.id}
+                isSelected={isSelected}
                 onClick={(id, e) => {
                   try {
                     onNodeClick(id);
