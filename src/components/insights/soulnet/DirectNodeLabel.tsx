@@ -13,6 +13,8 @@ interface DirectNodeLabelProps {
   cameraZoom?: number;
   themeHex: string;
   nodeScale?: number;
+  connectionPercentage?: number;
+  showPercentage?: boolean;
 }
 
 export const DirectNodeLabel: React.FC<DirectNodeLabelProps> = ({
@@ -24,7 +26,9 @@ export const DirectNodeLabel: React.FC<DirectNodeLabelProps> = ({
   shouldShowLabel,
   cameraZoom = 45,
   themeHex,
-  nodeScale = 1
+  nodeScale = 1,
+  connectionPercentage = 0,
+  showPercentage = false
 }) => {
   const { currentLanguage, translate } = useTranslation();
   const [displayText, setDisplayText] = useState<string>(id);
