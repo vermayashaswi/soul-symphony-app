@@ -1,4 +1,3 @@
-
 import React, { useState, useCallback, useEffect, useMemo } from 'react';
 import '@/types/three-reference';
 import { NodeMesh } from './NodeMesh';
@@ -72,6 +71,8 @@ export const Node: React.FC<NodeProps> = ({
       : (dimmed ? (theme === 'dark' ? '#555' : '#999') : themeHex);
   }, [node.type, dimmed, theme, themeHex, isHighlighted]);
 
+  // ... keep existing code (touch handlers and effects)
+
   const handlePointerDown = useCallback((e: any) => {
     e.stopPropagation();
     setIsTouching(true);
@@ -116,8 +117,24 @@ export const Node: React.FC<NodeProps> = ({
     }
   }, [isTouching, touchStartTime]);
 
-  // Simplified percentage visibility - directly use the showPercentage prop
-  const shouldShowPercentage = showPercentage && connectionPercentage > 0;
+  // Enhanced percentage visibility with more detailed logging
+  const shouldShowPercentage = useMemo(() => {
+    const hasValidPercentage = connectionPercentage > 0;
+    const isConnectedNode = isHighlighted && !isSelected; // Connected to selected node, but not the selected node itself
+    const shouldShow = showPercentage && hasValidPercentage && isConnectedNode;
+    
+    console.log(`[Node] Percentage visibility for ${node.id}:`, {
+      showPercentage,
+      hasValidPercentage,
+      isConnectedNode,
+      isHighlighted,
+      isSelected,
+      shouldShow,
+      percentage: connectionPercentage
+    });
+    
+    return shouldShow;
+  }, [showPercentage, connectionPercentage, isHighlighted, isSelected, node.id]);
   
   console.log(`[Node] Final render decisions for ${node.id} - Label: ${shouldShowLabel}, Percentage: ${shouldShowPercentage} (${connectionPercentage}%)`);
   

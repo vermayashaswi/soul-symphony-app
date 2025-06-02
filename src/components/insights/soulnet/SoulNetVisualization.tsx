@@ -1,4 +1,3 @@
-
 import React, { useRef, useEffect, useMemo, useState } from 'react';
 import '@/types/three-reference';
 import { OrbitControls } from '@react-three/drei';
@@ -119,7 +118,7 @@ function calculateRelativeStrengths(nodeId: string, links: LinkData[]): Map<stri
   return strengthMap;
 }
 
-// Calculate percentage distribution of connection strengths
+// Enhanced percentage calculation with better logging
 function calculateConnectionPercentages(nodeId: string, links: LinkData[]): Map<string, number> {
   if (!nodeId || !links || !Array.isArray(links)) return new Map<string, number>();
   
@@ -129,13 +128,16 @@ function calculateConnectionPercentages(nodeId: string, links: LinkData[]): Map<
   
   const totalValue = nodeLinks.reduce((sum, link) => sum + link.value, 0);
   
-  if (totalValue === 0) return new Map<string, number>();
+  if (totalValue === 0) {
+    console.log(`[SoulNetVisualization] No total value for ${nodeId}`);
+    return new Map<string, number>();
+  }
   
   const percentageMap = new Map<string, number>();
   
   nodeLinks.forEach(link => {
     const connectedNodeId = link.source === nodeId ? link.target : link.source;
-    const percentage = (link.value / totalValue) * 100;
+    const percentage = Math.round((link.value / totalValue) * 100);
     percentageMap.set(connectedNodeId, percentage);
   });
   

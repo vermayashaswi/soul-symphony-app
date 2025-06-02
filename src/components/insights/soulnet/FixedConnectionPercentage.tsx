@@ -29,13 +29,14 @@ export const FixedConnectionPercentage: React.FC<FixedConnectionPercentageProps>
     return null;
   }
 
-  // Dynamic positioning based on node type with better Z offset
+  // Simplified positioning with better Z offset - much closer to camera
   const percentagePosition: [number, number, number] = useMemo(() => {
-    const baseOffset = nodeType === 'entity' ? 3.0 : 2.8; // Slightly different offsets for different node types
+    const yOffset = nodeType === 'entity' ? 1.2 : 1.0; // Position above node
+    const zOffset = 1.5; // Much closer Z offset for better visibility
     return [
       position[0],
-      position[1] + 0.5, // Slight Y offset to position above node
-      position[2] + baseOffset // Enhanced Z offset for better visibility
+      position[1] + yOffset,
+      position[2] + zOffset
     ];
   }, [position, nodeType]);
 
@@ -45,14 +46,14 @@ export const FixedConnectionPercentage: React.FC<FixedConnectionPercentageProps>
     <ReliableText
       text={formattedPercentage}
       position={percentagePosition}
-      color="#ffffff"
-      size={0.4} // Slightly larger for better visibility
+      color="#ffff00" // Bright yellow for better visibility
+      size={0.6} // Larger size for better visibility
       visible={true}
-      renderOrder={25} // Higher render order than labels
+      renderOrder={50} // Very high render order to ensure it's on top
       bold={true}
-      outlineWidth={0.08} // Enhanced outline for better contrast
+      outlineWidth={0.12} // Thicker outline for better contrast
       outlineColor="#000000"
-      maxWidth={10}
+      maxWidth={15}
     />
   );
 };
