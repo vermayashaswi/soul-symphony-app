@@ -19,7 +19,16 @@ const Index = () => {
   const isMobile = useIsMobile();
   const { onboardingComplete, checkOnboardingStatus } = useOnboarding();
   const networkStatus = useNetworkStatus();
-  const { translate } = useTranslation();
+  
+  // Safe access to translation context with fallback
+  let translate = null;
+  try {
+    const translationContext = useTranslation();
+    translate = translationContext?.translate || null;
+  } catch (error) {
+    console.warn('[Index] Translation context not available yet:', error);
+    translate = null;
+  }
 
   const urlParams = new URLSearchParams(window.location.search);
   const mobileDemo = urlParams.get('mobileDemo') === 'true';
@@ -128,6 +137,8 @@ const Index = () => {
         } catch (error) {
           console.error("[Index] Error pre-translating index page strings:", error);
         }
+      } else {
+        console.log('[Index] Translation service not available yet, skipping pre-translation');
       }
     };
     
