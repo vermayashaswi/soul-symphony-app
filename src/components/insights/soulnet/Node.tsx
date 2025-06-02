@@ -49,10 +49,34 @@ const Node: React.FC<NodeProps> = ({
 }) => {
   const meshRef = useRef<THREE.Mesh>(null);
 
+  // FIXED: Improved node color logic
   const color = useMemo(() => {
-    if (isSelected) return new THREE.Color('#ffffff');
-    if (isHighlighted) return new THREE.Color(node.type === 'entity' ? '#ffffff' : themeHex);
-    return new THREE.Color(dimmed ? '#666666' : '#cccccc');
+    if (isSelected) {
+      // Selected nodes are always bright white for maximum visibility
+      return new THREE.Color('#ffffff');
+    }
+    
+    if (isHighlighted) {
+      // FIXED: Entity nodes should be white when highlighted/connected to selected emotion
+      if (node.type === 'entity') {
+        return new THREE.Color('#ffffff'); // White for entity nodes when highlighted
+      } else {
+        // Emotion nodes use theme color when highlighted
+        return new THREE.Color(themeHex);
+      }
+    }
+    
+    // FIXED: Default colors for non-highlighted nodes
+    if (dimmed) {
+      return new THREE.Color('#666666'); // Dimmed color
+    } else {
+      // Default colors when no selection is active
+      if (node.type === 'entity') {
+        return new THREE.Color('#cccccc'); // Light gray for entities
+      } else {
+        return new THREE.Color('#888888'); // Medium gray for emotions
+      }
+    }
   }, [isSelected, isHighlighted, node.type, themeHex, dimmed]);
 
   const nodeScale = useMemo(() => {
@@ -79,10 +103,10 @@ const Node: React.FC<NodeProps> = ({
 
   // ENHANCED: Better logging for percentage tracking
   if (showPercentage && connectionPercentage > 0) {
-    console.log(`[Node] ${node.id} should display percentage: ${connectionPercentage}%`);
+    console.log(`[Node] FIXED: ${node.id} should display percentage: ${connectionPercentage}%`);
   }
 
-  console.log(`[Node] Rendering ${node.type} node ${node.id} with translated text: "${translatedText || node.id}"`);
+  console.log(`[Node] FIXED: Rendering ${node.type} node ${node.id} with color logic - selected: ${isSelected}, highlighted: ${isHighlighted}, dimmed: ${dimmed}`);
 
   // Render different geometries based on node type
   const renderGeometry = () => {

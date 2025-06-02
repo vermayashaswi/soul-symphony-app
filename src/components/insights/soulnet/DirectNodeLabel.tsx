@@ -66,27 +66,37 @@ export const DirectNodeLabel: React.FC<DirectNodeLabelProps> = ({
     return shouldShowLabel;
   }, [shouldShowLabel, id]);
 
-  // Calculate label positioning with improved offset calculation
+  // FIXED: Improved label positioning with better spacing to prevent overlap
   const labelOffset = useMemo(() => {
-    const baseOffset = type === 'entity' ? 2.2 : 3.0;
-    const scaledOffset = baseOffset * Math.max(0.6, Math.min(2.2, nodeScale));
+    // Increase base offset and add dynamic spacing based on node type and scale
+    const baseOffset = type === 'entity' ? 2.8 : 3.5; // Increased from 2.2/3.0
+    const scaledOffset = baseOffset * Math.max(0.8, Math.min(2.5, nodeScale));
     
-    console.log(`[DirectNodeLabel] Label offset for ${id} (${type}): ${scaledOffset} (scale: ${nodeScale})`);
-    return [0, scaledOffset, 0] as [number, number, number];
-  }, [type, nodeScale, id]);
+    // Add additional spacing for highlighted nodes to prevent overlap
+    const highlightSpacing = (isHighlighted || isSelected) ? 0.5 : 0;
+    const finalOffset = scaledOffset + highlightSpacing;
+    
+    console.log(`[DirectNodeLabel] FIXED label offset for ${id} (${type}): ${finalOffset} (scale: ${nodeScale}, highlighted: ${isHighlighted})`);
+    return [0, finalOffset, 0] as [number, number, number];
+  }, [type, nodeScale, id, isHighlighted, isSelected]);
 
-  // Calculate percentage label positioning (below main label)
+  // FIXED: Better percentage label positioning to avoid main label overlap
   const percentageLabelOffset = useMemo(() => {
-    const baseOffset = type === 'entity' ? 1.4 : 2.2;
-    const scaledOffset = baseOffset * Math.max(0.6, Math.min(2.2, nodeScale));
+    // Position percentage below the main label with sufficient spacing
+    const baseOffset = type === 'entity' ? 1.8 : 2.6; // Increased spacing
+    const scaledOffset = baseOffset * Math.max(0.8, Math.min(2.5, nodeScale));
     
-    return [0, scaledOffset, 0] as [number, number, number];
-  }, [type, nodeScale]);
+    // Add spacing for highlighted nodes
+    const highlightSpacing = (isHighlighted || isSelected) ? 0.3 : 0;
+    const finalOffset = scaledOffset + highlightSpacing;
+    
+    return [0, finalOffset, 0] as [number, number, number];
+  }, [type, nodeScale, isHighlighted, isSelected]);
 
   // Calculate text properties with proper size scaling
   const textSize = useMemo(() => {
     const zoom = Math.max(10, Math.min(100, cameraZoom));
-    const baseSize = 1.2; // FIXED: Reduced base size for better proportions
+    const baseSize = 1.2;
     const zoomFactor = Math.max(0.7, Math.min(1.3, (50 - zoom) * 0.02 + 1));
     const finalSize = Math.max(0.8, Math.min(2.0, baseSize * zoomFactor));
     
@@ -168,12 +178,12 @@ export const DirectNodeLabel: React.FC<DirectNodeLabelProps> = ({
         visible={true}
         renderOrder={15}
         bold={isHighlighted || isSelected}
-        outlineWidth={isSelected ? 0.1 : 0.05} // FIXED: Reduced outline width for better proportions
-        outlineColor={effectiveTheme === 'light' ? '#ffffff' : '#000000'} // FIXED: Theme-appropriate outline
+        outlineWidth={isSelected ? 0.1 : 0.05}
+        outlineColor={effectiveTheme === 'light' ? '#ffffff' : '#000000'}
         maxWidth={40}
       />
       
-      {/* Percentage label (displayed below main label) */}
+      {/* Percentage label (displayed below main label with proper spacing) */}
       {showPercentage && connectionPercentage > 0 && (
         <SimplifiedTextRenderer
           text={`${connectionPercentage}%`}
@@ -183,8 +193,8 @@ export const DirectNodeLabel: React.FC<DirectNodeLabelProps> = ({
           visible={true}
           renderOrder={16}
           bold={false}
-          outlineWidth={0.03} // FIXED: Smaller outline for percentage text
-          outlineColor={effectiveTheme === 'light' ? '#ffffff' : '#000000'} // FIXED: Theme-appropriate outline
+          outlineWidth={0.03}
+          outlineColor={effectiveTheme === 'light' ? '#ffffff' : '#000000'}
           maxWidth={20}
         />
       )}
