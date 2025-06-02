@@ -1,4 +1,3 @@
-import { staticTranslationService } from '@/services/staticTranslationService';
 
 // This utility helps preload common website translations using Google Translate only
 export const preloadWebsiteTranslations = async (language: string) => {
