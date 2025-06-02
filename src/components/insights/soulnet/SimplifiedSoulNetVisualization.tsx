@@ -1,5 +1,4 @@
-
-import React, { useRef, useEffect, useMemo, useState } from 'react';
+import React, { useRef, useEffect, useMemo, useState, useCallback } from 'react';
 import '@/types/three-reference';
 import { OrbitControls } from '@react-three/drei';
 import { useThree } from '@react-three/fiber';
