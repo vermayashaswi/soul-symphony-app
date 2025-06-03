@@ -1,4 +1,3 @@
-
 import React, { useRef, useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import { Button } from '@/components/ui/button';
@@ -35,6 +34,9 @@ const TutorialStep: React.FC<TutorialStepProps> = ({
   const [renderKey] = useState(Date.now());
   const [isInfographicMounted, setIsInfographicMounted] = useState(false);
   const [isStepFullyRendered, setIsStepFullyRendered] = useState(false);
+  
+  // Determine whether to show the infographic and which type - MOVED UP
+  const shouldShowInfographic = !!step.infographicType && step.id >= 6 && step.id <= 9;
   
   // Improved logging for debugging
   useEffect(() => {
@@ -229,9 +231,6 @@ const TutorialStep: React.FC<TutorialStepProps> = ({
       position: 'fixed' as const
     };
   };
-  
-  // Determine whether to show the infographic and which type
-  const shouldShowInfographic = !!step.infographicType && step.id >= 6 && step.id <= 9;
   
   // Determine whether to show premium badge (steps 5-9)
   const shouldShowPremiumBadge = step.id >= 5 && step.id <= 9;

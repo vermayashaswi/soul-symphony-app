@@ -474,7 +474,7 @@ export const TutorialProvider: React.FC<{ children: ReactNode }> = ({ children }
       
       navigationManager.startStepTransition(nextStepData.id, transitionDuration);
       
-      // Perform selective cleanup that preserves the target step
+      // Perform selective cleanup that preserves the target step - FIXED: only pass stepId
       performNavigationCleanup(nextStepData.id);
       
       // First update the current step in state and database
@@ -521,7 +521,7 @@ export const TutorialProvider: React.FC<{ children: ReactNode }> = ({ children }
       
       navigationManager.startStepTransition(prevStepData.id, transitionDuration);
       
-      // Perform selective cleanup that preserves the target step
+      // Perform selective cleanup that preserves the target step - FIXED: only pass stepId
       performNavigationCleanup(prevStepData.id);
       
       // First update the current step in state and database
