@@ -31,25 +31,12 @@ export const SimplifiedTextRenderer: React.FC<SimplifiedTextRendererProps> = ({
 }) => {
   const textRef = useRef<THREE.Mesh>(null);
 
-  // Clean and prepare text with enhanced Unicode support
+  // Clean and prepare text
   const displayText = React.useMemo(() => {
     if (!text || typeof text !== 'string') return 'Node';
     const cleanText = text.trim();
-    // Enhanced text processing for Hindi/Devanagari and other Unicode scripts
     return cleanText.length > 50 ? cleanText.substring(0, 50) + '...' : cleanText || 'Node';
   }, [text]);
-
-  // Detect script and get appropriate font
-  const fontFamily = React.useMemo(() => {
-    // Enhanced Unicode detection and font selection
-    if (/[\u0900-\u097F]/.test(displayText)) {
-      // Devanagari script (Hindi, Marathi, Sanskrit)
-      return 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Noto Sans Devanagari", "Noto Sans Hindi", "Apple Color Emoji", "Segoe UI Emoji", sans-serif';
-    }
-    
-    // Default Latin font stack with good Unicode support
-    return 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji"';
-  }, [displayText]);
 
   // Billboard effect - make text always face camera
   useFrame(({ camera }) => {
@@ -70,7 +57,7 @@ export const SimplifiedTextRenderer: React.FC<SimplifiedTextRendererProps> = ({
     return null;
   }
 
-  console.log(`[SimplifiedTextRenderer] Rendering with Unicode support: "${displayText}" at size ${size} with color ${color} using font: ${fontFamily}`);
+  console.log(`[SimplifiedTextRenderer] Rendering: "${displayText}" at size ${size} with color ${color}`);
 
   return (
     <Text
@@ -82,7 +69,6 @@ export const SimplifiedTextRenderer: React.FC<SimplifiedTextRendererProps> = ({
       anchorY="middle"
       maxWidth={maxWidth}
       textAlign="center"
-      font={fontFamily}
       fontWeight={bold ? "bold" : "normal"}
       material-transparent={true}
       material-depthTest={false}

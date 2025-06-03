@@ -51,7 +51,7 @@ export const DirectNodeLabel: React.FC<DirectNodeLabelProps> = ({
   // Use translated text if available, otherwise fallback to original id
   const displayText = translatedText || id;
   
-  console.log(`[DirectNodeLabel] Rendering Unicode text for ${id}: "${displayText}"`);
+  console.log(`[DirectNodeLabel] Rendering text for ${id}: "${displayText}"`);
   
   // Enhanced visibility check for tutorial step 9
   const enhancedShouldShowLabel = useMemo(() => {
@@ -66,7 +66,7 @@ export const DirectNodeLabel: React.FC<DirectNodeLabelProps> = ({
     return shouldShowLabel;
   }, [shouldShowLabel, id]);
 
-  // FIXED: Improved label positioning with better spacing to prevent overlap
+  // Label positioning with better spacing to prevent overlap
   const labelOffset = useMemo(() => {
     const baseOffset = type === 'entity' ? 2.8 : 3.5;
     const scaledOffset = baseOffset * Math.max(0.8, Math.min(2.5, nodeScale));
@@ -77,7 +77,7 @@ export const DirectNodeLabel: React.FC<DirectNodeLabelProps> = ({
     return [0, finalOffset, 0] as [number, number, number];
   }, [type, nodeScale, id, isHighlighted, isSelected]);
 
-  // FIXED: Better percentage label positioning to avoid main label overlap
+  // Percentage label positioning to avoid main label overlap
   const percentageLabelOffset = useMemo(() => {
     const baseOffset = type === 'entity' ? 1.8 : 2.6;
     const scaledOffset = baseOffset * Math.max(0.8, Math.min(2.5, nodeScale));
@@ -103,7 +103,7 @@ export const DirectNodeLabel: React.FC<DirectNodeLabelProps> = ({
     return textSize * 0.69;
   }, [textSize]);
 
-  // FIXED: Enhanced text color logic with much better contrast for light theme
+  // Enhanced text color logic with better contrast for light theme
   const textColor = useMemo(() => {
     let color;
     
@@ -154,11 +154,11 @@ export const DirectNodeLabel: React.FC<DirectNodeLabelProps> = ({
     console.log(`[DirectNodeLabel] RENDERING PERCENTAGE: ${id} shows ${connectionPercentage}% at size ${percentageTextSize}`);
   }
 
-  console.log(`[DirectNodeLabel] Rendering main Unicode text "${displayText}" at position`, mainLabelPosition, 'with size:', textSize, 'color:', textColor);
+  console.log(`[DirectNodeLabel] Rendering main text "${displayText}" at position`, mainLabelPosition, 'with size:', textSize, 'color:', textColor);
 
   return (
     <>
-      {/* Main node label with Unicode support using SimplifiedTextRenderer */}
+      {/* Main node label using SimplifiedTextRenderer */}
       <SimplifiedTextRenderer
         text={displayText}
         position={mainLabelPosition}

@@ -27,9 +27,9 @@ export const SmartTextRenderer: React.FC<SmartTextRendererProps> = ({
   outlineColor = '#000000',
   maxWidth = 40
 }) => {
-  console.log(`[SmartTextRenderer] Delegating to SimplifiedTextRenderer for Unicode text: "${text}"`);
+  console.log(`[SmartTextRenderer] Delegating to SimplifiedTextRenderer for text: "${text}"`);
 
-  // Always use SimplifiedTextRenderer for all text rendering with Unicode support
+  // Always use SimplifiedTextRenderer for all text rendering
   return (
     <SimplifiedTextRenderer
       text={text}
