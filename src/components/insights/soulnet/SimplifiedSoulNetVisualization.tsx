@@ -1,10 +1,10 @@
+
 import React, { useState, useEffect, useCallback } from 'react';
 import { useFrame } from '@react-three/fiber';
 import { OrbitControls } from '@react-three/drei';
 import * as THREE from 'three';
 import Node from './Node';
 import Edge from './Edge';
-import { useTranslation } from '@/contexts/TranslationContext';
 
 interface NodeData {
   id: string;
@@ -27,8 +27,11 @@ interface SimplifiedSoulNetVisualizationProps {
   themeHex: string;
   isFullScreen: boolean;
   shouldShowLabels: boolean;
-  preloadedTranslations?: Map<string, string>;
-  preloadedPercentages?: Map<string, number>;
+  // NEW: Instant data access functions
+  getInstantConnectionPercentage?: (selectedNode: string, targetNode: string) => number;
+  getInstantTranslation?: (nodeId: string) => string;
+  getInstantNodeConnections?: (nodeId: string) => any;
+  isInstantReady?: boolean;
 }
 
 export const SimplifiedSoulNetVisualization: React.FC<SimplifiedSoulNetVisualizationProps> = ({
@@ -38,16 +41,17 @@ export const SimplifiedSoulNetVisualization: React.FC<SimplifiedSoulNetVisualiza
   themeHex,
   isFullScreen,
   shouldShowLabels,
-  preloadedTranslations = new Map(),
-  preloadedPercentages = new Map()
+  getInstantConnectionPercentage = () => 0,
+  getInstantTranslation = (id: string) => id,
+  getInstantNodeConnections = () => ({ connectedNodes: [], totalStrength: 0, averageStrength: 0 }),
+  isInstantReady = false
 }) => {
-  const { currentLanguage } = useTranslation();
   const [highlightedNodes, setHighlightedNodes] = useState<Set<string>>(new Set());
   const [dimmedNodes, setDimmedNodes] = useState<Set<string>>(new Set());
   const [cameraZoom, setCameraZoom] = useState(45);
   const [effectiveTheme, setEffectiveTheme] = useState<'light' | 'dark'>('light');
 
-  console.log(`[SimplifiedSoulNetVisualization] PRELOADED MODE: Rendering with ${data.nodes.length} nodes, ${preloadedTranslations.size} translations, ${preloadedPercentages.size} percentages`);
+  console.log(`[SimplifiedSoulNetVisualization] INSTANT MODE: Rendering with ${data.nodes.length} nodes, instantReady: ${isInstantReady}`);
 
   // Detect user's theme preference
   useEffect(() => {
@@ -72,18 +76,30 @@ export const SimplifiedSoulNetVisualization: React.FC<SimplifiedSoulNetVisualiza
     }
   });
 
-  // Enhanced highlighting effect when a node is selected
+  // INSTANT highlighting effect when a node is selected
   useEffect(() => {
     if (selectedNode) {
       const connectedNodes = new Set<string>();
       const allOtherNodes = new Set<string>();
       
-      data.links.forEach(link => {
-        if (link.source === selectedNode || link.target === selectedNode) {
-          connectedNodes.add(link.source);
-          connectedNodes.add(link.target);
-        }
-      });
+      // Use instant connection data if available
+      if (isInstantReady) {
+        const connectionData = getInstantNodeConnections(selectedNode);
+        connectionData.connectedNodes.forEach((nodeId: string) => {
+          connectedNodes.add(nodeId);
+        });
+        connectedNodes.add(selectedNode); // Include the selected node itself
+        
+        console.log(`[SimplifiedSoulNetVisualization] INSTANT: Using precomputed connections for ${selectedNode}:`, connectionData.connectedNodes);
+      } else {
+        // Fallback to link traversal
+        data.links.forEach(link => {
+          if (link.source === selectedNode || link.target === selectedNode) {
+            connectedNodes.add(link.source);
+            connectedNodes.add(link.target);
+          }
+        });
+      }
       
       data.nodes.forEach(node => {
         if (!connectedNodes.has(node.id)) {
@@ -94,53 +110,12 @@ export const SimplifiedSoulNetVisualization: React.FC<SimplifiedSoulNetVisualiza
       setHighlightedNodes(connectedNodes);
       setDimmedNodes(allOtherNodes);
       
-      console.log(`[SimplifiedSoulNetVisualization] Selected ${selectedNode}, highlighting ${connectedNodes.size} connected nodes`);
+      console.log(`[SimplifiedSoulNetVisualization] INSTANT: Selected ${selectedNode}, highlighting ${connectedNodes.size} connected nodes`);
     } else {
       setHighlightedNodes(new Set());
       setDimmedNodes(new Set());
     }
-  }, [selectedNode, data.links, data.nodes]);
-
-  // Helper function to get connection percentage for a node
-  const getConnectionPercentage = useCallback((nodeId: string): number => {
-    if (!selectedNode || selectedNode === nodeId) return 0;
-    
-    // Check preloaded percentages first
-    const preloadedKey = `${selectedNode}-${nodeId}`;
-    if (preloadedPercentages.has(preloadedKey)) {
-      return preloadedPercentages.get(preloadedKey)!;
-    }
-    
-    // Fallback calculation if not preloaded
-    const relevantLinks = data.links.filter(link => 
-      (link.source === selectedNode && link.target === nodeId) ||
-      (link.target === selectedNode && link.source === nodeId)
-    );
-    
-    if (relevantLinks.length === 0) return 0;
-    
-    const totalConnectionValue = relevantLinks.reduce((sum, link) => sum + link.value, 0);
-    const selectedNodeTotalConnections = data.links
-      .filter(link => link.source === selectedNode || link.target === selectedNode)
-      .reduce((sum, link) => sum + link.value, 0);
-    
-    return Math.round((totalConnectionValue / selectedNodeTotalConnections) * 100);
-  }, [selectedNode, data.links, preloadedPercentages]);
-
-  // Helper function to get translated text
-  const getTranslatedText = useCallback((nodeId: string): string => {
-    if (currentLanguage === 'en') return nodeId;
-    
-    // Use preloaded translations
-    const translation = preloadedTranslations.get(nodeId);
-    if (translation) {
-      console.log(`[SimplifiedSoulNetVisualization] Using preloaded translation for ${nodeId}: ${translation}`);
-      return translation;
-    }
-    
-    console.log(`[SimplifiedSoulNetVisualization] No preloaded translation for ${nodeId}, using original`);
-    return nodeId;
-  }, [currentLanguage, preloadedTranslations]);
+  }, [selectedNode, data.links, data.nodes, isInstantReady, getInstantNodeConnections]);
 
   // Helper function to find node by id
   const findNodeById = useCallback((nodeId: string): NodeData | undefined => {
@@ -164,9 +139,18 @@ export const SimplifiedSoulNetVisualization: React.FC<SimplifiedSoulNetVisualiza
       {data.nodes.map((node) => {
         const isHighlighted = highlightedNodes.has(node.id);
         const isDimmed = dimmedNodes.has(node.id);
-        const connectionPercentage = getConnectionPercentage(node.id);
+        
+        // INSTANT connection percentage - no loading delay
+        const connectionPercentage = selectedNode && isHighlighted && selectedNode !== node.id
+          ? getInstantConnectionPercentage(selectedNode, node.id)
+          : 0;
+        
         const showPercentage = selectedNode !== null && isHighlighted && selectedNode !== node.id && connectionPercentage > 0;
-        const translatedText = getTranslatedText(node.id);
+        
+        // INSTANT translation - no loading delay
+        const translatedText = getInstantTranslation(node.id);
+        
+        console.log(`[SimplifiedSoulNetVisualization] INSTANT: Node ${node.id} - percentage: ${connectionPercentage}%, translation: "${translatedText}", showPercentage: ${showPercentage}`);
         
         return (
           <Node
@@ -186,6 +170,7 @@ export const SimplifiedSoulNetVisualization: React.FC<SimplifiedSoulNetVisualiza
             forceShowLabels={shouldShowLabels}
             translatedText={translatedText}
             effectiveTheme={effectiveTheme}
+            isInstantMode={isInstantReady}
           />
         );
       })}

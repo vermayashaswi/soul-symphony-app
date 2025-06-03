@@ -28,6 +28,7 @@ interface NodeProps {
   forceShowLabels?: boolean;
   translatedText?: string;
   effectiveTheme?: 'light' | 'dark';
+  isInstantMode?: boolean; // NEW: Flag for instant data mode
 }
 
 const Node: React.FC<NodeProps> = ({
@@ -45,7 +46,8 @@ const Node: React.FC<NodeProps> = ({
   showPercentage = false,
   forceShowLabels = false,
   translatedText,
-  effectiveTheme = 'light'
+  effectiveTheme = 'light',
+  isInstantMode = false
 }) => {
   const meshRef = useRef<THREE.Mesh>(null);
 
@@ -89,12 +91,20 @@ const Node: React.FC<NodeProps> = ({
     return forceShowLabels || showLabel || isSelected || isHighlighted;
   }, [forceShowLabels, showLabel, isSelected, isHighlighted]);
 
-  // ENHANCED: Better logging for percentage tracking with comprehensive debug info
+  // INSTANT MODE: Better logging for percentage tracking with comprehensive debug info
   if (showPercentage && connectionPercentage > 0) {
-    console.log(`[Node] ENHANCED: ${node.id} (${node.type}) should display percentage: ${connectionPercentage}% (isHighlighted: ${isHighlighted}, isSelected: ${isSelected})`);
+    if (isInstantMode) {
+      console.log(`[Node] INSTANT MODE: ${node.id} (${node.type}) displays percentage: ${connectionPercentage}% (isHighlighted: ${isHighlighted}, isSelected: ${isSelected}) - NO LOADING DELAY`);
+    } else {
+      console.log(`[Node] ENHANCED: ${node.id} (${node.type}) should display percentage: ${connectionPercentage}% (isHighlighted: ${isHighlighted}, isSelected: ${isSelected})`);
+    }
   }
 
-  console.log(`[Node] ENHANCED: Rendering ${node.type} node ${node.id} with scale ${nodeScale.toFixed(2)} and translated text: "${translatedText || node.id}" and percentage display: ${showPercentage ? connectionPercentage + '%' : 'none'}`);
+  if (isInstantMode) {
+    console.log(`[Node] INSTANT MODE: Rendering ${node.type} node ${node.id} with scale ${nodeScale.toFixed(2)} and translated text: "${translatedText || node.id}" and percentage display: ${showPercentage ? connectionPercentage + '%' : 'none'} - NO LOADING DELAY`);
+  } else {
+    console.log(`[Node] ENHANCED: Rendering ${node.type} node ${node.id} with scale ${nodeScale.toFixed(2)} and translated text: "${translatedText || node.id}" and percentage display: ${showPercentage ? connectionPercentage + '%' : 'none'}`);
+  }
 
   // ENHANCED: Improved geometry sizes to work with the 15% scale increase
   const renderGeometry = () => {
@@ -133,6 +143,7 @@ const Node: React.FC<NodeProps> = ({
           showPercentage={showPercentage}
           translatedText={translatedText}
           effectiveTheme={effectiveTheme}
+          isInstantMode={isInstantMode}
         />
       )}
     </group>

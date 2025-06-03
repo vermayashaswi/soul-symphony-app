@@ -14,7 +14,7 @@ import { useUserColorThemeHex } from './soulnet/useUserColorThemeHex';
 import { cn } from '@/lib/utils';
 import { TranslatableText } from '@/components/translation/TranslatableText';
 import { useTranslation } from '@/contexts/TranslationContext';
-import { usePreloadedSoulNetData } from '@/hooks/usePreloadedSoulNetData';
+import { useInstantSoulNetData } from '@/hooks/useInstantSoulNetData';
 
 interface SoulNetProps {
   userId: string | undefined;
@@ -31,43 +31,45 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
   const [selectedEntity, setSelectedEntity] = useState<string | null>(null);
   const { currentLanguage } = useTranslation();
 
-  // Use the new preloaded data hook
+  // Use the enhanced instant data hook
   const { 
     graphData, 
-    translations, 
-    connectionPercentages, 
     loading, 
-    error 
-  } = usePreloadedSoulNetData(userId, timeRange);
+    error,
+    isInstantReady,
+    getInstantConnectionPercentage,
+    getInstantTranslation,
+    getInstantNodeConnections
+  } = useInstantSoulNetData(userId, timeRange);
 
-  console.log("[SoulNet] PRELOADED DATA MODE - Using cached translations and percentages", { 
+  console.log("[SoulNet] INSTANT DATA MODE - Zero loading delays", { 
     userId, 
     timeRange, 
     currentLanguage,
     nodesCount: graphData.nodes.length,
-    translationsCount: translations.size,
-    percentagesCount: connectionPercentages.size,
+    isInstantReady,
     loading
   });
 
   useEffect(() => {
-    console.log("[SoulNet] Component mounted - Preloaded data mode");
+    console.log("[SoulNet] Component mounted - Instant data mode enabled");
     
     return () => {
       console.log("[SoulNet] Component unmounted");
     };
   }, []);
 
-  // Optimized rendering initialization - no delay if data is ready
+  // INSTANT rendering initialization - enable immediately if data is ready
   useEffect(() => {
-    if (graphData.nodes.length > 0 && !renderingReady && !loading) {
-      console.log("[SoulNet] Data ready, enabling rendering immediately");
+    if (isInstantReady || (graphData.nodes.length > 0 && !loading)) {
+      console.log("[SoulNet] INSTANT: Data ready, enabling rendering immediately");
       setRenderingReady(true);
     }
-  }, [graphData.nodes.length, renderingReady, loading]);
+  }, [isInstantReady, graphData.nodes.length, loading]);
 
+  // INSTANT node selection with immediate feedback
   const handleNodeSelect = useCallback((id: string) => {
-    console.log(`[SoulNet] Node selected: ${id}`);
+    console.log(`[SoulNet] INSTANT: Node selected: ${id} - no loading delay`);
     if (selectedEntity === id) {
       setSelectedEntity(null);
     } else {
@@ -97,7 +99,8 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
     setRetryCount(0);
   }, []);
 
-  if (loading) return <LoadingState />;
+  // Show loading only if we have no instant data available
+  if (loading && !isInstantReady) return <LoadingState />;
   
   if (error) return (
     <div className="bg-background rounded-xl shadow-sm border w-full p-6">
@@ -156,7 +159,7 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
     return <TranslatableText text="Drag to rotate • Scroll to zoom • Click a node to highlight connections" forceTranslate={true} />;
   };
 
-  console.log(`[SoulNet] PRELOADED DATA MODE - Final render: ${graphData.nodes.length} nodes, ${graphData.links.length} links, ready: ${renderingReady}, translations: ${translations.size}, percentages: ${connectionPercentages.size}`);
+  console.log(`[SoulNet] INSTANT DATA MODE - Final render: ${graphData.nodes.length} nodes, ${graphData.links.length} links, instantReady: ${isInstantReady}, renderingReady: ${renderingReady}`);
 
   return (
     <div className={cn(
@@ -225,8 +228,10 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
                 themeHex={themeHex}
                 isFullScreen={isFullScreen}
                 shouldShowLabels={true}
-                preloadedTranslations={translations}
-                preloadedPercentages={connectionPercentages}
+                getInstantConnectionPercentage={getInstantConnectionPercentage}
+                getInstantTranslation={getInstantTranslation}
+                getInstantNodeConnections={getInstantNodeConnections}
+                isInstantReady={isInstantReady}
               />
             </Canvas>
           )}

@@ -1,3 +1,4 @@
+
 import React, { useMemo, useEffect } from 'react';
 import SmartTextRenderer from './SmartTextRenderer';
 import SimpleText from './SimpleText';
@@ -16,6 +17,7 @@ interface DirectNodeLabelProps {
   showPercentage?: boolean;
   translatedText?: string;
   effectiveTheme?: 'light' | 'dark';
+  isInstantMode?: boolean; // NEW: Flag to indicate instant data mode
 }
 
 export const DirectNodeLabel: React.FC<DirectNodeLabelProps> = ({
@@ -31,7 +33,8 @@ export const DirectNodeLabel: React.FC<DirectNodeLabelProps> = ({
   connectionPercentage = 0,
   showPercentage = false,
   translatedText,
-  effectiveTheme = 'light'
+  effectiveTheme = 'light',
+  isInstantMode = false
 }) => {
   // Listen for tutorial debugging events
   useEffect(() => {
@@ -48,7 +51,12 @@ export const DirectNodeLabel: React.FC<DirectNodeLabelProps> = ({
     };
   }, [id, shouldShowLabel]);
 
-  console.log(`[DirectNodeLabel] ENHANCED POSITIONING: ${id} with translated text: "${translatedText || id}" and percentage: ${showPercentage ? connectionPercentage + '%' : 'none'}`);
+  // INSTANT MODE: Log immediate rendering without delays
+  if (isInstantMode) {
+    console.log(`[DirectNodeLabel] INSTANT MODE: ${id} with translated text: "${translatedText || id}" and percentage: ${showPercentage ? connectionPercentage + '%' : 'none'} - NO LOADING DELAY`);
+  } else {
+    console.log(`[DirectNodeLabel] ENHANCED POSITIONING: ${id} with translated text: "${translatedText || id}" and percentage: ${showPercentage ? connectionPercentage + '%' : 'none'}`);
+  }
 
   // Use translated text if available, otherwise fallback to original id
   const displayText = translatedText || id;
@@ -59,9 +67,13 @@ export const DirectNodeLabel: React.FC<DirectNodeLabelProps> = ({
     const baseOffset = type === 'entity' ? 2.5 : 3.2; // Increased from 2.2/3.0
     const scaledOffset = baseOffset * Math.max(0.8, Math.min(2.5, nodeScale));
     
-    console.log(`[DirectNodeLabel] Enhanced label offset for ${id} (${type}): ${scaledOffset} (scale: ${nodeScale})`);
+    if (isInstantMode) {
+      console.log(`[DirectNodeLabel] INSTANT: Enhanced label offset for ${id} (${type}): ${scaledOffset} (scale: ${nodeScale})`);
+    } else {
+      console.log(`[DirectNodeLabel] Enhanced label offset for ${id} (${type}): ${scaledOffset} (scale: ${nodeScale})`);
+    }
     return [0, scaledOffset, 0] as [number, number, number];
-  }, [type, nodeScale, id]);
+  }, [type, nodeScale, id, isInstantMode]);
 
   // ENHANCED: Better text size calculation for larger nodes
   const textSize = useMemo(() => {
@@ -70,9 +82,13 @@ export const DirectNodeLabel: React.FC<DirectNodeLabelProps> = ({
     const zoomFactor = Math.max(0.8, Math.min(1.5, (50 - zoom) * 0.02 + 1));
     const finalSize = Math.max(3.5, Math.min(14.0, baseSize * zoomFactor));
     
-    console.log(`[DirectNodeLabel] Enhanced text size for ${id}: ${finalSize} (zoom: ${zoom})`);
+    if (isInstantMode) {
+      console.log(`[DirectNodeLabel] INSTANT: Enhanced text size for ${id}: ${finalSize} (zoom: ${zoom})`);
+    } else {
+      console.log(`[DirectNodeLabel] Enhanced text size for ${id}: ${finalSize} (zoom: ${zoom})`);
+    }
     return finalSize;
-  }, [cameraZoom, id]);
+  }, [cameraZoom, id, isInstantMode]);
 
   // UPDATED: Much smaller percentage text size (70% reduction from 0.7 to 0.21)
   const percentageTextSize = useMemo(() => {
@@ -96,9 +112,13 @@ export const DirectNodeLabel: React.FC<DirectNodeLabelProps> = ({
       }
     }
     
-    console.log(`[DirectNodeLabel] Enhanced text color for ${id}: ${color} (selected: ${isSelected}, highlighted: ${isHighlighted}, theme: ${effectiveTheme})`);
+    if (isInstantMode) {
+      console.log(`[DirectNodeLabel] INSTANT: Enhanced text color for ${id}: ${color} (selected: ${isSelected}, highlighted: ${isHighlighted}, theme: ${effectiveTheme})`);
+    } else {
+      console.log(`[DirectNodeLabel] Enhanced text color for ${id}: ${color} (selected: ${isSelected}, highlighted: ${isHighlighted}, theme: ${effectiveTheme})`);
+    }
     return color;
-  }, [isSelected, isHighlighted, type, themeHex, effectiveTheme, id]);
+  }, [isSelected, isHighlighted, type, themeHex, effectiveTheme, id, isInstantMode]);
 
   // Special color for percentage text - bright yellow for better visibility
   const percentageColor = useMemo(() => {
@@ -141,16 +161,28 @@ export const DirectNodeLabel: React.FC<DirectNodeLabelProps> = ({
   }, [shouldShowLabel, id]);
 
   if (!enhancedShouldShowLabel || !displayText) {
-    console.log(`[DirectNodeLabel] Not rendering label for ${id}: shouldShow=${enhancedShouldShowLabel}, text="${displayText}"`);
+    if (isInstantMode) {
+      console.log(`[DirectNodeLabel] INSTANT: Not rendering label for ${id}: shouldShow=${enhancedShouldShowLabel}, text="${displayText}"`);
+    } else {
+      console.log(`[DirectNodeLabel] Not rendering label for ${id}: shouldShow=${enhancedShouldShowLabel}, text="${displayText}"`);
+    }
     return null;
   }
 
-  // ENHANCED: Log percentage display state with new side positioning
+  // INSTANT MODE: Log percentage display state with new side positioning
   if (showPercentage && connectionPercentage > 0) {
-    console.log(`[DirectNodeLabel] ENHANCED SIDE POSITIONING - PERCENTAGE: ${id} (${type}) shows ${connectionPercentage}% on the side at`, percentagePosition);
+    if (isInstantMode) {
+      console.log(`[DirectNodeLabel] INSTANT MODE - SIDE POSITIONING - PERCENTAGE: ${id} (${type}) shows ${connectionPercentage}% on the side at`, percentagePosition, '- NO LOADING DELAY');
+    } else {
+      console.log(`[DirectNodeLabel] ENHANCED SIDE POSITIONING - PERCENTAGE: ${id} (${type}) shows ${connectionPercentage}% on the side at`, percentagePosition);
+    }
   }
 
-  console.log(`[DirectNodeLabel] ENHANCED POSITIONING - MAIN TEXT: "${displayText}" at position`, labelPosition, 'with size:', textSize, 'color:', textColor);
+  if (isInstantMode) {
+    console.log(`[DirectNodeLabel] INSTANT MODE - MAIN TEXT: "${displayText}" at position`, labelPosition, 'with size:', textSize, 'color:', textColor, '- NO LOADING DELAY');
+  } else {
+    console.log(`[DirectNodeLabel] ENHANCED POSITIONING - MAIN TEXT: "${displayText}" at position`, labelPosition, 'with size:', textSize, 'color:', textColor);
+  }
 
   return (
     <>
