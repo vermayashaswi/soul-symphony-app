@@ -51,7 +51,7 @@ const Node: React.FC<NodeProps> = ({
 }) => {
   const meshRef = useRef<THREE.Mesh>(null);
 
-  // ENHANCED: Dramatically improved color logic for strong visual hierarchy
+  // ENHANCED: Improved color logic with 20% lighter colors for dimmed nodes
   const color = useMemo(() => {
     if (isSelected) return new THREE.Color('#ffffff');
     
@@ -64,8 +64,8 @@ const Node: React.FC<NodeProps> = ({
       }
     }
     
-    // ENHANCED: Much darker and less visible for dimmed nodes
-    return new THREE.Color(dimmed ? '#1a1a1a' : '#cccccc');
+    // ENHANCED: 20% lighter colors for dimmed nodes instead of very dark
+    return new THREE.Color(dimmed ? '#3a3a3a' : '#cccccc');
   }, [isSelected, isHighlighted, node.type, themeHex, dimmed]);
 
   // ENHANCED: More dramatic scale differences for better hierarchy
@@ -77,11 +77,11 @@ const Node: React.FC<NodeProps> = ({
     return baseScale;
   }, [isSelected, isHighlighted, dimmed]);
 
-  // ENHANCED: Dramatic opacity changes for visual hierarchy
+  // ENHANCED: Increased opacity for dimmed nodes to 0.05-0.06
   const nodeOpacity = useMemo(() => {
     if (isSelected) return 1.0;
     if (isHighlighted) return 0.9;
-    if (dimmed) return 0.05; // Extremely low opacity for dimmed nodes
+    if (dimmed) return 0.05; // Increased from extremely low to 0.05
     return 0.8;
   }, [isSelected, isHighlighted, dimmed]);
 

@@ -90,30 +90,30 @@ export const Edge: React.FC<EdgeProps> = ({
     return geometry;
   }, [points]);
 
-  // ENHANCED: Dramatically improved color scheme for strong contrast
+  // ENHANCED: Improved color scheme with 20% lighter colors for dimmed edges
   const getEdgeColor = useMemo(() => {
     if (isHighlighted) {
       return '#ffffff'; // Bright white for highlighted connections
     }
     
     if (dimmed) {
-      // ENHANCED: Much darker and less visible for dimmed edges
-      return theme === 'light' ? '#2a2a2a' : '#1a1a1a';
+      // ENHANCED: 20% lighter colors for dimmed edges instead of very dark
+      return theme === 'light' ? '#4a4a4a' : '#3a3a3a';
     }
     
     // Default state - moderately visible
     return theme === 'light' ? '#555555' : '#888888';
   }, [isHighlighted, dimmed, theme]);
 
-  // ENHANCED: Dramatically reduced opacity for dimmed edges
+  // ENHANCED: Increased opacity for dimmed edges to 0.05-0.06
   const getEdgeOpacity = useMemo(() => {
     if (isHighlighted) {
       return 0.95; // Very bright for highlighted
     }
     
     if (dimmed) {
-      // ENHANCED: Extremely low opacity for dimmed edges (90% reduction)
-      return theme === 'light' ? 0.02 : 0.01;
+      // ENHANCED: Increased opacity to 0.05-0.06 range for better visibility
+      return theme === 'light' ? 0.06 : 0.05;
     }
     
     // Default state
