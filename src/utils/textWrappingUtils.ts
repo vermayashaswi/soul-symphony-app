@@ -75,7 +75,8 @@ export const wrapText = (
     actualMaxWidth = Math.max(actualMaxWidth, lineWidth);
   }
 
-  const lineHeight = fontSize * 1.2;
+  // UPDATED: Reduced line height multiplier from 1.2 to 1.1 for tighter spacing
+  const lineHeight = fontSize * 1.1;
   const totalHeight = lines.length * lineHeight;
 
   return {

@@ -97,7 +97,8 @@ export const SimpleText: React.FC<SimpleTextProps> = ({
 
   console.log(`[SimpleText] Rendering wrapped text: "${displayText}" with ${wrappedTextData.lines.length} lines, font size: ${wrappedTextData.responsiveFontSize}`);
 
-  const lineHeight = wrappedTextData.responsiveFontSize * 1.2;
+  // UPDATED: Now uses improved line height from textWrappingUtils (1.1 multiplier)
+  const lineHeight = wrappedTextData.responsiveFontSize * 1.1;
   const totalHeight = wrappedTextData.lines.length * lineHeight;
   const startY = (totalHeight - lineHeight) / 2;
 

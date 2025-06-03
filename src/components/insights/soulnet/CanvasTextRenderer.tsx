@@ -44,9 +44,9 @@ export const CanvasTextRenderer: React.FC<CanvasTextRendererProps> = ({
     const context = canvas.getContext('2d');
     if (!context) return;
 
-    // Calculate responsive dimensions based on zoom
-    const responsiveFontSize = getResponsiveFontSize(size * 50, cameraZoom, 16, 72);
-    const responsiveMaxWidth = getResponsiveMaxWidth(maxWidth * 20, cameraZoom, 150, 600);
+    // UPDATED: Calculate responsive dimensions with smaller base sizes
+    const responsiveFontSize = getResponsiveFontSize(size * 40, cameraZoom, 14, 60); // Reduced multiplier from 50 to 40
+    const responsiveMaxWidth = getResponsiveMaxWidth(maxWidth * 15, cameraZoom, 120, 450); // Reduced multipliers
 
     // Get appropriate font family
     const fontFamily = enhancedFontService.getFallbackFont(displayText);
@@ -56,10 +56,10 @@ export const CanvasTextRenderer: React.FC<CanvasTextRendererProps> = ({
       ? wrapText(displayText, responsiveMaxWidth, responsiveFontSize, fontFamily, bold ? 'bold' : 'normal')
       : { lines: [{ text: displayText, width: responsiveMaxWidth }], totalHeight: responsiveFontSize, maxWidth: responsiveMaxWidth };
 
-    // Set canvas size based on wrapped text dimensions
-    const padding = 20;
-    const canvasWidth = Math.max(300, wrappedResult.maxWidth + padding * 2);
-    const canvasHeight = Math.max(100, wrappedResult.totalHeight + padding * 2);
+    // UPDATED: Set canvas size with reduced padding and dimensions
+    const padding = 15; // Reduced from 20
+    const canvasWidth = Math.max(250, wrappedResult.maxWidth + padding * 2); // Reduced from 300
+    const canvasHeight = Math.max(80, wrappedResult.totalHeight + padding * 2); // Reduced from 100
     
     canvas.width = canvasWidth;
     canvas.height = canvasHeight;
@@ -73,16 +73,16 @@ export const CanvasTextRenderer: React.FC<CanvasTextRendererProps> = ({
     context.textAlign = 'center';
     context.textBaseline = 'middle';
     
-    // Calculate line height and starting position
-    const lineHeight = responsiveFontSize * 1.2;
+    // UPDATED: Calculate line height using improved spacing (1.1 multiplier)
+    const lineHeight = responsiveFontSize * 1.1;
     const startY = (canvasHeight - wrappedResult.totalHeight) / 2 + lineHeight / 2;
     
     // Render each line
     wrappedResult.lines.forEach((line, index) => {
       const y = startY + (index * lineHeight);
       
-      // Enhanced outline for better readability
-      const strokeWidth = Math.max(2, responsiveFontSize * 0.05);
+      // UPDATED: Reduced stroke width for cleaner appearance
+      const strokeWidth = Math.max(1.5, responsiveFontSize * 0.04); // Reduced from 2 and 0.05
       
       // Use contrasting outline color
       if (color === '#000000') {
@@ -127,9 +127,9 @@ export const CanvasTextRenderer: React.FC<CanvasTextRendererProps> = ({
     return null;
   }
 
-  // Scale plane size with text size and zoom
-  const basePlaneSize = size * 2;
-  const zoomScale = Math.max(0.8, Math.min(2.0, (cameraZoom - 20) * 0.02 + 1));
+  // UPDATED: Scale plane size with reduced base size and improved zoom scaling
+  const basePlaneSize = size * 1.6; // Reduced from 2.0
+  const zoomScale = Math.max(0.7, Math.min(1.8, (cameraZoom - 20) * 0.015 + 1)); // Adjusted scaling
   const planeSize = basePlaneSize * zoomScale;
 
   return (
