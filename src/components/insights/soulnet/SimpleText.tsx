@@ -1,3 +1,4 @@
+
 import React, { useState, useRef } from 'react';
 import { Text } from '@react-three/drei';
 import { useLoader } from '@react-three/fiber';
@@ -23,13 +24,13 @@ interface SimpleTextProps {
 export const SimpleText: React.FC<SimpleTextProps> = ({
   text,
   position,
-  color = '#000000', // Default to black
+  color = '#000000',
   size = 0.4,
   visible = true,
   renderOrder = 10,
   bold = false,
   outlineWidth = 0.02,
-  outlineColor = '#f5f5f5', // Light outline for contrast
+  outlineColor = '#f5f5f5',
   maxWidth = 25,
   enableWrapping = false
 }) => {
@@ -37,14 +38,7 @@ export const SimpleText: React.FC<SimpleTextProps> = ({
   const [displayText] = useState(() => {
     if (!text || typeof text !== 'string') return 'Node';
     const cleanText = text.trim();
-    
-    // If wrapping is enabled, don't truncate - let the text component handle wrapping
-    if (enableWrapping) {
-      return cleanText || 'Node';
-    }
-    
-    // Otherwise, truncate long text as before
-    return cleanText.length > 50 ? cleanText.substring(0, 50) + '...' : cleanText || 'Node';
+    return cleanText || 'Node';
   });
 
   // Get font URL based on text content
@@ -72,7 +66,10 @@ export const SimpleText: React.FC<SimpleTextProps> = ({
     return null;
   }
 
-  console.log(`[SimpleText] Rendering: "${displayText}" with font loaded from: ${fontUrl}, wrapping: ${enableWrapping}, color: ${color}`);
+  // Check if text has multiple lines
+  const isMultiLine = displayText.includes('\n');
+  
+  console.log(`[SimpleText] Rendering: "${displayText}" with font loaded from: ${fontUrl}, wrapping: ${enableWrapping}, multiline: ${isMultiLine}, maxWidth: ${maxWidth}, color: ${color}`);
 
   return (
     <Text
@@ -91,7 +88,8 @@ export const SimpleText: React.FC<SimpleTextProps> = ({
       renderOrder={renderOrder}
       outlineWidth={outlineWidth}
       outlineColor={outlineColor}
-      whiteSpace={enableWrapping ? "normal" : "nowrap"}
+      whiteSpace={enableWrapping || isMultiLine ? "normal" : "nowrap"}
+      lineHeight={1.2}
     >
       {displayText}
     </Text>

@@ -160,14 +160,14 @@ export const DirectNodeLabel: React.FC<DirectNodeLabelProps> = ({
   }
 
   if (isInstantMode) {
-    console.log(`[DirectNodeLabel] INSTANT MODE - MAIN TEXT: "${displayText}" at position`, labelPosition, 'with size:', textSize, 'color:', textColor, '- NO LOADING DELAY - UNIFORM POSITIONING');
+    console.log(`[DirectNodeLabel] INSTANT MODE - MAIN TEXT: "${displayText}" at position`, labelPosition, 'with size:', textSize, 'color:', textColor, '- NO LOADING DELAY - INTELLIGENT WRAPPING ENABLED');
   } else {
-    console.log(`[DirectNodeLabel] ENHANCED POSITIONING - MAIN TEXT: "${displayText}" at position`, labelPosition, 'with size:', textSize, 'color:', textColor, '- UNIFORM POSITIONING');
+    console.log(`[DirectNodeLabel] ENHANCED POSITIONING - MAIN TEXT: "${displayText}" at position`, labelPosition, 'with size:', textSize, 'color:', textColor, '- INTELLIGENT WRAPPING ENABLED');
   }
 
   return (
     <>
-      {/* Main translated text using SmartTextRenderer with theme-aware color and text wrapping */}
+      {/* Main translated text using SmartTextRenderer with intelligent wrapping */}
       <SmartTextRenderer
         text={displayText}
         position={labelPosition}
@@ -176,10 +176,12 @@ export const DirectNodeLabel: React.FC<DirectNodeLabelProps> = ({
         visible={true}
         renderOrder={15}
         bold={isHighlighted || isSelected}
-        outlineWidth={isSelected ? 0.3 : 0.1} // Reduced outline for better readability
-        outlineColor={effectiveTheme === 'dark' ? '#000000' : '#ffffff'} // Contrasting outline
-        maxWidth={600} // Increased for better wrapping
+        outlineWidth={isSelected ? 0.3 : 0.1}
+        outlineColor={effectiveTheme === 'dark' ? '#000000' : '#ffffff'}
+        maxWidth={600}
         enableWrapping={true}
+        maxCharsPerLine={18}
+        maxLines={3}
       />
       
       {/* Enhanced side-positioned percentage text with theme-aware color */}
@@ -192,8 +194,8 @@ export const DirectNodeLabel: React.FC<DirectNodeLabelProps> = ({
           visible={true}
           renderOrder={16}
           bold={true}
-          outlineWidth={0.1} // Reduced outline
-          outlineColor={effectiveTheme === 'dark' ? '#000000' : '#ffffff'} // Contrasting outline
+          outlineWidth={0.1}
+          outlineColor={effectiveTheme === 'dark' ? '#000000' : '#ffffff'}
           maxWidth={200}
           enableWrapping={false}
         />

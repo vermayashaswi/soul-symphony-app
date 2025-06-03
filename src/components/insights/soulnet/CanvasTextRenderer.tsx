@@ -32,7 +32,7 @@ export const CanvasTextRenderer: React.FC<CanvasTextRendererProps> = ({
   const [displayText] = useState(() => {
     if (!text || typeof text !== 'string') return 'Node';
     const cleanText = text.trim();
-    return cleanText.length > 50 ? cleanText.substring(0, 50) + '...' : cleanText || 'Node';
+    return cleanText || 'Node';
   });
 
   // Create canvas texture for the text
@@ -41,34 +41,39 @@ export const CanvasTextRenderer: React.FC<CanvasTextRendererProps> = ({
     const context = canvas.getContext('2d');
     if (!context) return;
 
-    // Set canvas size - larger for better quality with larger text
-    const canvasSize = Math.max(512, size * 200); // Scale canvas size with text size
-    canvas.width = canvasSize;
-    canvas.height = canvasSize;
+    // Parse multi-line text
+    const lines = displayText.split('\n').filter(line => line.trim().length > 0);
+    const lineCount = lines.length;
+
+    // Set canvas size - larger for better quality with text wrapping
+    const baseCanvasSize = Math.max(512, size * 200);
+    canvas.width = baseCanvasSize;
+    // Adjust height based on number of lines
+    canvas.height = Math.max(baseCanvasSize, baseCanvasSize * (lineCount / 2));
 
     // Get appropriate font family
     const fontFamily = enhancedFontService.getFallbackFont(displayText);
-    const fontSize = Math.floor(canvasSize * 0.08 * Math.max(1, size / 4)); // Scale font size appropriately
+    const fontSize = Math.floor(baseCanvasSize * 0.08 * Math.max(1, size / 4));
     
     // Configure context
     context.fillStyle = 'transparent';
-    context.fillRect(0, 0, canvasSize, canvasSize);
+    context.fillRect(0, 0, canvas.width, canvas.height);
     
     context.fillStyle = color;
     context.font = `${bold ? 'bold' : 'normal'} ${fontSize}px ${fontFamily}`;
     context.textAlign = 'center';
     context.textBaseline = 'middle';
     
-    // Handle multi-line text (for connection percentages)
-    const lines = displayText.split('\n');
-    const lineHeight = fontSize * 1.2;
-    const startY = canvasSize / 2 - ((lines.length - 1) * lineHeight) / 2;
+    // Enhanced multi-line text rendering
+    const lineHeight = fontSize * 1.3; // Better line spacing
+    const totalTextHeight = lineCount * lineHeight;
+    const startY = (canvas.height / 2) - (totalTextHeight / 2) + (lineHeight / 2);
     
     lines.forEach((line, index) => {
       const y = startY + (index * lineHeight);
       
-      // FIXED: Better outline color based on text color for improved contrast
-      const strokeWidth = Math.max(2, size * 0.5);
+      // Better outline color based on text color for improved contrast
+      const strokeWidth = Math.max(1, size * 0.3);
       
       // Use contrasting outline color based on text color
       if (color === '#000000') {
@@ -78,8 +83,8 @@ export const CanvasTextRenderer: React.FC<CanvasTextRendererProps> = ({
       }
       
       context.lineWidth = strokeWidth;
-      context.strokeText(line, canvasSize / 2, y);
-      context.fillText(line, canvasSize / 2, y);
+      context.strokeText(line, canvas.width / 2, y);
+      context.fillText(line, canvas.width / 2, y);
     });
 
     // Create texture
@@ -87,7 +92,7 @@ export const CanvasTextRenderer: React.FC<CanvasTextRendererProps> = ({
     newTexture.needsUpdate = true;
     setTexture(newTexture);
 
-    console.log(`[CanvasTextRenderer] Created texture for: "${displayText}" with font: ${fontFamily}, size: ${fontSize}, color: ${color}`);
+    console.log(`[CanvasTextRenderer] Created multi-line texture for: "${displayText}" (${lineCount} lines) with font: ${fontFamily}, size: ${fontSize}, color: ${color}`);
 
     return () => {
       newTexture.dispose();
@@ -113,12 +118,15 @@ export const CanvasTextRenderer: React.FC<CanvasTextRendererProps> = ({
     return null;
   }
 
-  // Scale plane size with text size
-  const planeSize = size * 2;
+  // Scale plane size with text size and number of lines
+  const lines = displayText.split('\n');
+  const lineCount = lines.length;
+  const planeWidth = size * 2;
+  const planeHeight = size * 2 * Math.max(1, lineCount * 0.7); // Adjust height for multiple lines
 
   return (
     <mesh ref={meshRef} position={position} renderOrder={renderOrder}>
-      <planeGeometry args={[planeSize, planeSize]} />
+      <planeGeometry args={[planeWidth, planeHeight]} />
       <meshBasicMaterial
         map={texture}
         transparent={true}
