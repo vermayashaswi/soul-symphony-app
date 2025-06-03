@@ -49,9 +49,19 @@ const Node: React.FC<NodeProps> = ({
 }) => {
   const meshRef = useRef<THREE.Mesh>(null);
 
+  // FIXED: Enhanced color logic to apply same rules regardless of which node type is selected
   const color = useMemo(() => {
     if (isSelected) return new THREE.Color('#ffffff');
-    if (isHighlighted) return new THREE.Color(node.type === 'entity' ? '#ffffff' : themeHex);
+    
+    if (isHighlighted) {
+      // When highlighted (connected to selected node), apply color based on THIS node's type
+      if (node.type === 'entity') {
+        return new THREE.Color('#ffffff'); // Entity nodes are white when highlighted
+      } else {
+        return new THREE.Color(themeHex); // Emotion nodes use theme color when highlighted
+      }
+    }
+    
     return new THREE.Color(dimmed ? '#666666' : '#cccccc');
   }, [isSelected, isHighlighted, node.type, themeHex, dimmed]);
 
