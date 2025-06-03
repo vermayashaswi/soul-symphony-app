@@ -1,6 +1,7 @@
 
 import React, { useMemo, useEffect } from 'react';
 import SmartTextRenderer from './SmartTextRenderer';
+import SimpleText from './SimpleText';
 
 interface DirectNodeLabelProps {
   id: string;
@@ -48,53 +49,44 @@ export const DirectNodeLabel: React.FC<DirectNodeLabelProps> = ({
     };
   }, [id, shouldShowLabel]);
 
-  console.log(`[DirectNodeLabel] FIXED: Rendering with translated text for ${id}: "${translatedText || id}"`);
+  console.log(`[DirectNodeLabel] SPLIT RENDERING: ${id} with translated text: "${translatedText || id}" and percentage: ${showPercentage ? connectionPercentage + '%' : 'none'}`);
 
   // Use translated text if available, otherwise fallback to original id
   const displayText = translatedText || id;
   
-  // FIXED: Enhanced percentage display with better formatting and debugging
-  const finalDisplayText = useMemo(() => {
-    if (showPercentage && connectionPercentage > 0) {
-      console.log(`[DirectNodeLabel] FIXED: Adding percentage ${connectionPercentage}% to ${id} (type: ${type})`);
-      return `${displayText}\n${connectionPercentage}%`;
-    }
-    console.log(`[DirectNodeLabel] FIXED: No percentage for ${id}, showPercentage=${showPercentage}, connectionPercentage=${connectionPercentage}`);
-    return displayText;
-  }, [displayText, showPercentage, connectionPercentage, id, type]);
-
   // ENHANCED: Improved label positioning with better offset calculation for different node types
   const labelOffset = useMemo(() => {
     // Better offset calculation for different node types and scales
     const baseOffset = type === 'entity' ? 2.2 : 3.0; // Increased for better visibility
     const scaledOffset = baseOffset * Math.max(0.8, Math.min(2.5, nodeScale));
     
-    console.log(`[DirectNodeLabel] FIXED: Label offset for ${id} (${type}): ${scaledOffset} (scale: ${nodeScale})`);
+    console.log(`[DirectNodeLabel] Label offset for ${id} (${type}): ${scaledOffset} (scale: ${nodeScale})`);
     return [0, scaledOffset, 0] as [number, number, number];
   }, [type, nodeScale, id]);
 
-  // FIXED: Larger text size for better percentage visibility - 15x larger base size
+  // FIXED: Larger text size for better visibility - 15x larger base size
   const textSize = useMemo(() => {
     const zoom = Math.max(10, Math.min(100, cameraZoom));
-    const baseSize = 6.0; // Increased from 0.4 to 6.0 (15x larger)
+    const baseSize = 6.0; // Large size for main text
     const zoomFactor = Math.max(0.8, Math.min(1.5, (50 - zoom) * 0.02 + 1));
     const finalSize = Math.max(3.0, Math.min(12.0, baseSize * zoomFactor));
     
-    console.log(`[DirectNodeLabel] FIXED: Large text size for ${id}: ${finalSize} (zoom: ${zoom})`);
+    console.log(`[DirectNodeLabel] Text size for ${id}: ${finalSize} (zoom: ${zoom})`);
     return finalSize;
   }, [cameraZoom, id]);
 
-  // FIXED: Enhanced text color logic with better contrast and percentage-specific colors
+  // Percentage text size - slightly smaller than main text
+  const percentageTextSize = useMemo(() => {
+    return textSize * 0.8; // 80% of main text size
+  }, [textSize]);
+
+  // FIXED: Enhanced text color logic with better contrast
   const textColor = useMemo(() => {
     let color;
     
     if (isSelected) {
       color = '#ffffff'; // Always white for selected nodes
-    } else if (isHighlighted && showPercentage) {
-      // Special color for percentage display - more vibrant
-      color = type === 'entity' ? '#ffffff' : '#ffff00'; // Yellow for emotion percentages
     } else if (isHighlighted) {
-      // For highlighted nodes without percentages
       color = type === 'entity' ? '#ffffff' : themeHex;
     } else {
       // Default colors based on theme with higher contrast
@@ -105,15 +97,33 @@ export const DirectNodeLabel: React.FC<DirectNodeLabelProps> = ({
       }
     }
     
-    console.log(`[DirectNodeLabel] FIXED: Text color for ${id}: ${color} (selected: ${isSelected}, highlighted: ${isHighlighted}, showPercentage: ${showPercentage}, theme: ${effectiveTheme})`);
+    console.log(`[DirectNodeLabel] Text color for ${id}: ${color} (selected: ${isSelected}, highlighted: ${isHighlighted}, theme: ${effectiveTheme})`);
     return color;
-  }, [isSelected, isHighlighted, type, themeHex, effectiveTheme, showPercentage, id]);
+  }, [isSelected, isHighlighted, type, themeHex, effectiveTheme, id]);
+
+  // Special color for percentage text - bright yellow for better visibility
+  const percentageColor = useMemo(() => {
+    if (type === 'emotion') {
+      return '#ffff00'; // Bright yellow for emotion percentages
+    }
+    return '#ffffff'; // White for entity percentages
+  }, [type]);
 
   const labelPosition: [number, number, number] = [
     position[0] + labelOffset[0],
     position[1] + labelOffset[1],
     position[2] + labelOffset[2]
   ];
+
+  // Position for percentage text - slightly below the main label
+  const percentagePosition: [number, number, number] = useMemo(() => {
+    const percentageOffset = textSize * 0.15; // Offset based on text size
+    return [
+      position[0] + labelOffset[0],
+      position[1] + labelOffset[1] - percentageOffset,
+      position[2] + labelOffset[2]
+    ];
+  }, [position, labelOffset, textSize]);
 
   // Enhanced visibility check for tutorial step 9
   const enhancedShouldShowLabel = useMemo(() => {
@@ -129,31 +139,50 @@ export const DirectNodeLabel: React.FC<DirectNodeLabelProps> = ({
     return shouldShowLabel;
   }, [shouldShowLabel, id]);
 
-  if (!enhancedShouldShowLabel || !finalDisplayText) {
-    console.log(`[DirectNodeLabel] FIXED: Not rendering label for ${id}: shouldShow=${enhancedShouldShowLabel}, text="${finalDisplayText}"`);
+  if (!enhancedShouldShowLabel || !displayText) {
+    console.log(`[DirectNodeLabel] Not rendering label for ${id}: shouldShow=${enhancedShouldShowLabel}, text="${displayText}"`);
     return null;
   }
 
-  // ENHANCED: Additional logging for percentage display debugging
+  // ENHANCED: Log percentage display state
   if (showPercentage && connectionPercentage > 0) {
-    console.log(`[DirectNodeLabel] FIXED: RENDERING PERCENTAGE: ${id} (${type}) shows ${connectionPercentage}% with text: "${finalDisplayText}"`);
+    console.log(`[DirectNodeLabel] SPLIT RENDERING - PERCENTAGE: ${id} (${type}) shows ${connectionPercentage}% separately`);
   }
 
-  console.log(`[DirectNodeLabel] FIXED: Rendering large text "${finalDisplayText}" at position`, labelPosition, 'with size:', textSize, 'color:', textColor);
+  console.log(`[DirectNodeLabel] SPLIT RENDERING - MAIN TEXT: "${displayText}" at position`, labelPosition, 'with size:', textSize, 'color:', textColor);
 
   return (
-    <SmartTextRenderer
-      text={finalDisplayText}
-      position={labelPosition}
-      color={textColor}
-      size={textSize}
-      visible={true}
-      renderOrder={15}
-      bold={isHighlighted || isSelected || showPercentage} // Make percentage text bold
-      outlineWidth={isSelected ? 0.6 : (showPercentage ? 0.4 : 0.3)} // Stronger outline for percentages
-      outlineColor={showPercentage ? '#000000' : (isSelected ? '#000000' : '#333333')}
-      maxWidth={400} // Increased max width for larger text and percentages
-    />
+    <>
+      {/* Main translated text using SmartTextRenderer */}
+      <SmartTextRenderer
+        text={displayText}
+        position={labelPosition}
+        color={textColor}
+        size={textSize}
+        visible={true}
+        renderOrder={15}
+        bold={isHighlighted || isSelected}
+        outlineWidth={isSelected ? 0.6 : 0.3}
+        outlineColor={isSelected ? '#000000' : '#333333'}
+        maxWidth={400}
+      />
+      
+      {/* Separate percentage text using SimpleText for guaranteed visibility */}
+      {showPercentage && connectionPercentage > 0 && (
+        <SimpleText
+          text={`${connectionPercentage}%`}
+          position={percentagePosition}
+          color={percentageColor}
+          size={percentageTextSize}
+          visible={true}
+          renderOrder={16}
+          bold={true}
+          outlineWidth={0.4}
+          outlineColor="#000000"
+          maxWidth={200}
+        />
+      )}
+    </>
   );
 };
 
