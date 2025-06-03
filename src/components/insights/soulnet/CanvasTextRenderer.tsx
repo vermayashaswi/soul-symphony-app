@@ -19,7 +19,7 @@ interface CanvasTextRendererProps {
 export const CanvasTextRenderer: React.FC<CanvasTextRendererProps> = ({
   text,
   position,
-  color = '#000000', // FIXED: Default to black instead of white
+  color = '#000000',
   size = 0.4,
   visible = true,
   renderOrder = 10,
@@ -45,21 +45,21 @@ export const CanvasTextRenderer: React.FC<CanvasTextRendererProps> = ({
     const lines = displayText.split('\n').filter(line => line.trim().length > 0);
     const lineCount = lines.length;
 
-    // FIXED: Consistent canvas size calculation - no inflation based on line count
-    const baseCanvasSize = 512; // Fixed base size for consistency
+    // Consistent canvas size calculation
+    const baseCanvasSize = 512;
     canvas.width = baseCanvasSize;
-    canvas.height = baseCanvasSize; // Keep square canvas for consistent rendering
+    canvas.height = baseCanvasSize;
 
     // Get appropriate font family
     const fontFamily = enhancedFontService.getFallbackFont(displayText);
     
-    // FIXED: Consistent font size calculation - matches Three.js Text component scaling
-    const fontSize = Math.floor(baseCanvasSize * 0.12); // Simplified, consistent calculation
+    // Consistent font size calculation
+    const fontSize = Math.floor(baseCanvasSize * 0.12);
     
-    console.log(`[CanvasTextRenderer] FIXED FONT SIZE: Using consistent fontSize: ${fontSize}px for size prop: ${size}, lines: ${lineCount}`);
+    console.log(`[CanvasTextRenderer] PLAN IMPLEMENTATION: Using fontSize: ${fontSize}px for size prop: ${size}, lines: ${lineCount}`);
     
-    // Configure context
-    context.fillStyle = 'transparent';
+    // PLAN IMPLEMENTATION: Configure context with proper background for crisp text
+    context.fillStyle = 'rgba(255, 255, 255, 0)'; // Transparent background
     context.fillRect(0, 0, canvas.width, canvas.height);
     
     context.fillStyle = color;
@@ -67,40 +67,40 @@ export const CanvasTextRenderer: React.FC<CanvasTextRendererProps> = ({
     context.textAlign = 'center';
     context.textBaseline = 'middle';
     
-    // FIXED: Consistent line spacing regardless of line count
-    const lineHeight = fontSize * 1.2; // Standard line height ratio
+    // PLAN IMPLEMENTATION: Better anti-aliasing for crisp text
+    context.imageSmoothingEnabled = true;
+    context.imageSmoothingQuality = 'high';
+    
+    // Consistent line spacing
+    const lineHeight = fontSize * 1.2;
     const totalTextHeight = lineCount * lineHeight;
     const startY = (canvas.height / 2) - (totalTextHeight / 2) + (lineHeight / 2);
     
     lines.forEach((line, index) => {
       const y = startY + (index * lineHeight);
       
-      // FIXED: Minimal stroke for light theme, more for dark theme
-      const strokeWidth = color === '#000000' ? 0.5 : Math.max(1, size * 0.8); // Minimal stroke for black text
-      
-      // FIXED: Use contrasting outline color only when needed
-      if (color === '#000000') {
-        // Light theme: minimal white outline for readability
-        context.strokeStyle = '#ffffff';
-        context.lineWidth = strokeWidth;
-        context.strokeText(line, canvas.width / 2, y);
-      } else {
-        // Dark theme: black outline for white text
+      // PLAN IMPLEMENTATION: NO stroke for black text, minimal for others
+      if (color !== '#000000') {
+        // Only add stroke for non-black text (dark theme)
         context.strokeStyle = '#000000';
-        context.lineWidth = strokeWidth;
+        context.lineWidth = Math.max(1, size * 0.8);
         context.strokeText(line, canvas.width / 2, y);
       }
       
-      // Always draw the main text on top
+      // Always draw the main text on top - this ensures solid color
       context.fillText(line, canvas.width / 2, y);
     });
 
-    // Create texture
+    // PLAN IMPLEMENTATION: Create texture with proper settings for crisp rendering
     const newTexture = new THREE.CanvasTexture(canvas);
     newTexture.needsUpdate = true;
+    newTexture.generateMipmaps = false;
+    newTexture.minFilter = THREE.LinearFilter;
+    newTexture.magFilter = THREE.LinearFilter;
+    newTexture.format = THREE.RGBAFormat;
     setTexture(newTexture);
 
-    console.log(`[CanvasTextRenderer] FIXED TEXT COLOR: Created texture for: "${displayText}" (${lineCount} lines) with color: ${color}, minimal stroke`);
+    console.log(`[CanvasTextRenderer] PLAN IMPLEMENTATION: Created crisp texture for: "${displayText}" (${lineCount} lines) with color: ${color}, NO stroke for black text`);
 
     return () => {
       newTexture.dispose();
@@ -126,12 +126,11 @@ export const CanvasTextRenderer: React.FC<CanvasTextRendererProps> = ({
     return null;
   }
 
-  // FIXED: Consistent plane size - no inflation based on line count
-  // Scale directly with size prop for consistent visual appearance
+  // Consistent plane size
   const planeWidth = size * 2;
-  const planeHeight = size * 2; // Keep consistent with single-line text
+  const planeHeight = size * 2;
 
-  console.log(`[CanvasTextRenderer] FIXED PLANE SIZE: Using consistent plane dimensions: ${planeWidth} x ${planeHeight} for size prop: ${size}`);
+  console.log(`[CanvasTextRenderer] PLAN IMPLEMENTATION: Using consistent plane dimensions: ${planeWidth} x ${planeHeight} for size prop: ${size}`);
 
   return (
     <mesh ref={meshRef} position={position} renderOrder={renderOrder}>
@@ -141,6 +140,8 @@ export const CanvasTextRenderer: React.FC<CanvasTextRendererProps> = ({
         transparent={true}
         alphaTest={0.1}
         depthTest={false}
+        opacity={1.0}
+        premultipliedAlpha={false}
       />
     </mesh>
   );

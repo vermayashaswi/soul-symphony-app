@@ -61,9 +61,9 @@ export const DirectNodeLabel: React.FC<DirectNodeLabelProps> = ({
   // Use translated text if available, otherwise fallback to original id
   const displayText = translatedText || id;
   
-  // UPDATED: Same base offset (1.4) for both entity and emotion nodes
+  // Same base offset for both entity and emotion nodes
   const labelOffset = useMemo(() => {
-    const baseOffset = 1.4; // Same distance for both node types
+    const baseOffset = 1.4;
     const scaledOffset = baseOffset * Math.max(0.8, Math.min(2.5, nodeScale));
     
     if (isInstantMode) {
@@ -74,10 +74,10 @@ export const DirectNodeLabel: React.FC<DirectNodeLabelProps> = ({
     return [0, scaledOffset, 0] as [number, number, number];
   }, [type, nodeScale, id, isInstantMode]);
 
-  // ENHANCED: Better text size calculation for enhanced visibility
+  // Better text size calculation for enhanced visibility
   const textSize = useMemo(() => {
     const zoom = Math.max(10, Math.min(100, cameraZoom));
-    const baseSize = isSelected ? 6.0 : (isHighlighted ? 5.2 : 4.8); // Larger text for selected/highlighted
+    const baseSize = isSelected ? 6.0 : (isHighlighted ? 5.2 : 4.8);
     const zoomFactor = Math.max(0.8, Math.min(1.5, (50 - zoom) * 0.02 + 1));
     const finalSize = Math.max(3.5, Math.min(16.0, baseSize * zoomFactor));
     
@@ -94,22 +94,22 @@ export const DirectNodeLabel: React.FC<DirectNodeLabelProps> = ({
     return textSize * 0.21;
   }, [textSize]);
 
-  // FIXED: Ensure solid black text for light theme, white for dark theme
+  // PLAN IMPLEMENTATION: Ensure solid black text for light theme, white for dark theme
   const textColor = useMemo(() => {
     const color = effectiveTheme === 'dark' ? '#ffffff' : '#000000';
     
     if (isInstantMode) {
-      console.log(`[DirectNodeLabel] INSTANT: FIXED TEXT COLOR for ${id}: ${color} (theme: ${effectiveTheme})`);
+      console.log(`[DirectNodeLabel] INSTANT: PLAN IMPLEMENTATION - SOLID TEXT COLOR for ${id}: ${color} (theme: ${effectiveTheme})`);
     } else {
-      console.log(`[DirectNodeLabel] FIXED TEXT COLOR for ${id}: ${color} (theme: ${effectiveTheme})`);
+      console.log(`[DirectNodeLabel] PLAN IMPLEMENTATION - SOLID TEXT COLOR for ${id}: ${color} (theme: ${effectiveTheme})`);
     }
     return color;
   }, [effectiveTheme, id, isInstantMode]);
 
-  // FIXED: Percentage text also uses theme-aware colors
+  // Percentage text also uses theme-aware colors
   const percentageColor = useMemo(() => {
     const color = effectiveTheme === 'dark' ? '#ffffff' : '#000000';
-    console.log(`[DirectNodeLabel] FIXED PERCENTAGE COLOR for ${id}: ${color} (theme: ${effectiveTheme})`);
+    console.log(`[DirectNodeLabel] PLAN IMPLEMENTATION - SOLID PERCENTAGE COLOR for ${id}: ${color} (theme: ${effectiveTheme})`);
     return color;
   }, [effectiveTheme, id]);
 
@@ -152,7 +152,7 @@ export const DirectNodeLabel: React.FC<DirectNodeLabelProps> = ({
     return null;
   }
 
-  // INSTANT MODE: Log percentage display state with new side positioning
+  // Log percentage display state with side positioning
   if (showPercentage && connectionPercentage > 0) {
     if (isInstantMode) {
       console.log(`[DirectNodeLabel] INSTANT MODE - SIDE POSITIONING - PERCENTAGE: ${id} (${type}) shows ${connectionPercentage}% on the side at`, percentagePosition, '- NO LOADING DELAY');
@@ -178,8 +178,8 @@ export const DirectNodeLabel: React.FC<DirectNodeLabelProps> = ({
         visible={true}
         renderOrder={15}
         bold={isHighlighted || isSelected}
-        outlineWidth={effectiveTheme === 'dark' ? 0.3 : 0.1} // Minimal outline for light theme
-        outlineColor={effectiveTheme === 'dark' ? '#000000' : '#ffffff'}
+        outlineWidth={0} // PLAN IMPLEMENTATION: No outline for crisp text
+        outlineColor={undefined} // PLAN IMPLEMENTATION: No outline color needed
         maxWidth={600}
         enableWrapping={true}
         maxCharsPerLine={18}
@@ -196,8 +196,8 @@ export const DirectNodeLabel: React.FC<DirectNodeLabelProps> = ({
           visible={true}
           renderOrder={16}
           bold={true}
-          outlineWidth={effectiveTheme === 'dark' ? 0.1 : 0.05} // Minimal outline for light theme
-          outlineColor={effectiveTheme === 'dark' ? '#000000' : '#ffffff'}
+          outlineWidth={0} // PLAN IMPLEMENTATION: No outline for crisp text
+          outlineColor={undefined} // PLAN IMPLEMENTATION: No outline color needed
           maxWidth={200}
           enableWrapping={false}
         />

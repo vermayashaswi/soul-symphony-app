@@ -24,7 +24,7 @@ interface SimpleTextProps {
 export const SimpleText: React.FC<SimpleTextProps> = ({
   text,
   position,
-  color = '#000000', // FIXED: Default to black instead of grey
+  color = '#000000',
   size = 0.4,
   visible = true,
   renderOrder = 10,
@@ -68,13 +68,13 @@ export const SimpleText: React.FC<SimpleTextProps> = ({
 
   // Check if text has multiple lines
   const isMultiLine = displayText.includes('\n');
-  const lineCount = displayText.split('\n').length;
   
-  // FIXED: Determine outline based on text color for better visibility
-  const effectiveOutlineWidth = color === '#000000' ? Math.min(outlineWidth, 0.01) : outlineWidth; // Minimal outline for black text
-  const effectiveOutlineColor = color === '#000000' ? '#ffffff' : outlineColor; // White outline for black text
+  // PLAN IMPLEMENTATION: Remove ALL outlines for black text in light theme
+  const shouldUseOutline = color !== '#000000'; // No outline for black text
+  const effectiveOutlineWidth = shouldUseOutline ? outlineWidth : 0;
+  const effectiveOutlineColor = shouldUseOutline ? (color === '#ffffff' ? '#000000' : outlineColor) : undefined;
   
-  console.log(`[SimpleText] FIXED OUTLINE: Rendering: "${displayText}" with fontSize: ${size}, color: ${color}, outlineWidth: ${effectiveOutlineWidth}, outlineColor: ${effectiveOutlineColor}`);
+  console.log(`[SimpleText] PLAN IMPLEMENTATION: Rendering: "${displayText}" with fontSize: ${size}, color: ${color}, NO OUTLINE for black text: ${!shouldUseOutline}`);
 
   return (
     <Text
@@ -90,6 +90,7 @@ export const SimpleText: React.FC<SimpleTextProps> = ({
       fontWeight={bold ? "bold" : "normal"}
       material-transparent={true}
       material-depthTest={false}
+      material-opacity={1.0}
       renderOrder={renderOrder}
       outlineWidth={effectiveOutlineWidth}
       outlineColor={effectiveOutlineColor}
