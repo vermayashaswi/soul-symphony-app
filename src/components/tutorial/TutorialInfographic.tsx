@@ -1,5 +1,5 @@
 
-import React from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { AspectRatio } from '@/components/ui/aspect-ratio';
 import { Book, ChartLine, Calendar, GridIcon } from 'lucide-react';
 import { TranslatableText } from '@/components/translation/TranslatableText';
@@ -13,6 +13,63 @@ interface TutorialInfographicProps {
 }
 
 const TutorialInfographic: React.FC<TutorialInfographicProps> = ({ type, className = '' }) => {
+  const [isContentReady, setIsContentReady] = useState(false);
+  const [forceRenderKey, setForceRenderKey] = useState(0);
+  const containerRef = useRef<HTMLDivElement>(null);
+  
+  // Enhanced mounting and stability logic
+  useEffect(() => {
+    console.log(`TutorialInfographic mounting for type: ${type}`);
+    
+    // Progressive content readiness with multiple stability checks
+    const readinessTimeout = setTimeout(() => {
+      setIsContentReady(true);
+      console.log(`TutorialInfographic content marked as ready for type: ${type}`);
+      
+      // Force a re-render to ensure proper AspectRatio calculation
+      setTimeout(() => {
+        setForceRenderKey(prev => prev + 1);
+        console.log(`TutorialInfographic forced re-render for type: ${type}`);
+        
+        // Ensure container dimensions are properly calculated
+        if (containerRef.current) {
+          const rect = containerRef.current.getBoundingClientRect();
+          console.log(`TutorialInfographic container dimensions for ${type}:`, {
+            width: rect.width,
+            height: rect.height,
+            top: rect.top,
+            left: rect.left
+          });
+          
+          // Trigger browser layout recalculation
+          containerRef.current.style.transform = 'translateZ(0)';
+          requestAnimationFrame(() => {
+            if (containerRef.current) {
+              containerRef.current.style.transform = '';
+            }
+          });
+        }
+      }, 100);
+    }, 200);
+    
+    // Cleanup function
+    return () => {
+      clearTimeout(readinessTimeout);
+      console.log(`TutorialInfographic unmounting for type: ${type}`);
+    };
+  }, [type]);
+  
+  // Force recalculation when window resizes
+  useEffect(() => {
+    const handleResize = () => {
+      console.log(`TutorialInfographic handling resize for type: ${type}`);
+      setForceRenderKey(prev => prev + 1);
+    };
+    
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, [type]);
+  
   // Shared styles for all infographics
   const containerStyles = "w-full rounded-md overflow-hidden border border-white/30 bg-[#1A1F2C]/80";
   const iconSize = 24;
@@ -32,6 +89,16 @@ const TutorialInfographic: React.FC<TutorialInfographicProps> = ({ type, classNa
   
   // Render different infographics based on type
   const renderInfographic = () => {
+    if (!isContentReady) {
+      return (
+        <div className="p-4 flex items-center justify-center h-full">
+          <div className="text-white/60 text-sm">
+            <TranslatableText text="Loading..." forceTranslate={true} />
+          </div>
+        </div>
+      );
+    }
+    
     switch(type) {
       case 'insights-overview':
         return (
@@ -327,8 +394,21 @@ const TutorialInfographic: React.FC<TutorialInfographicProps> = ({ type, classNa
   };
   
   return (
-    <div className={`${containerStyles} ${className}`}>
-      <AspectRatio ratio={16/9} className="bg-[#1A1F2C]/80">
+    <div 
+      ref={containerRef}
+      className={`${containerStyles} ${className}`}
+      key={`infographic-${type}-${forceRenderKey}`}
+      style={{
+        transform: 'translateZ(0)', // Force hardware acceleration
+        willChange: 'transform', // Optimize for changes
+        minHeight: '140px' // Ensure consistent height
+      }}
+    >
+      <AspectRatio 
+        ratio={16/9} 
+        className="bg-[#1A1F2C]/80"
+        key={`aspect-ratio-${type}-${forceRenderKey}`}
+      >
         {renderInfographic()}
       </AspectRatio>
     </div>

@@ -1,3 +1,4 @@
+
 import React, { useRef, useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import { Button } from '@/components/ui/button';
@@ -32,15 +33,59 @@ const TutorialStep: React.FC<TutorialStepProps> = ({
   const stepRef = useRef<HTMLDivElement>(null);
   const nextButtonRef = useRef<HTMLButtonElement>(null);
   const [renderKey] = useState(Date.now());
+  const [isInfographicMounted, setIsInfographicMounted] = useState(false);
+  const [isStepFullyRendered, setIsStepFullyRendered] = useState(false);
   
   // Improved logging for debugging
   useEffect(() => {
     console.log(`TutorialStep mounted for step ${step.id}, renderKey: ${renderKey}`);
     
+    // Mark step as fully rendered after a brief delay
+    const renderTimeout = setTimeout(() => {
+      setIsStepFullyRendered(true);
+      console.log(`Step ${step.id} marked as fully rendered`);
+    }, 100);
+    
     return () => {
       console.log(`TutorialStep unmounted for step ${step.id}`);
+      clearTimeout(renderTimeout);
     };
   }, [step.id, renderKey]);
+  
+  // Enhanced infographic mounting logic with proper delays
+  useEffect(() => {
+    if (shouldShowInfographic && isStepFullyRendered) {
+      console.log(`Starting infographic mount sequence for step ${step.id}`);
+      
+      // Progressive mounting with increasing delays for better stability
+      const baseDelay = step.id >= 6 && step.id <= 9 ? 600 : 400;
+      const additionalDelay = (step.id - 6) * 100; // Stagger based on step
+      const totalDelay = baseDelay + additionalDelay;
+      
+      const mountTimeout = setTimeout(() => {
+        console.log(`Mounting infographic for step ${step.id} after ${totalDelay}ms delay`);
+        setIsInfographicMounted(true);
+        
+        // Force a layout recalculation after mounting
+        setTimeout(() => {
+          if (stepRef.current) {
+            console.log(`Forcing layout recalculation for step ${step.id}`);
+            stepRef.current.style.transform = stepRef.current.style.transform;
+            
+            // Trigger a resize event to ensure proper rendering
+            window.dispatchEvent(new Event('resize'));
+          }
+        }, 50);
+      }, totalDelay);
+      
+      return () => {
+        clearTimeout(mountTimeout);
+      };
+    } else if (!shouldShowInfographic) {
+      // Reset for non-infographic steps
+      setIsInfographicMounted(false);
+    }
+  }, [shouldShowInfographic, isStepFullyRendered, step.id]);
   
   // Simplified button click handlers with improved event handling
   const handleNext = (e: React.MouseEvent) => {
@@ -207,7 +252,11 @@ const TutorialStep: React.FC<TutorialStepProps> = ({
       initial={{ opacity: 0, scale: 0.8 }}
       animate={{ opacity: 1, scale: 1 }}
       exit={{ opacity: 0, scale: 0.8 }}
-      transition={{ duration: 0.3 }}
+      transition={{ 
+        duration: 0.4,
+        delay: shouldShowInfographic ? 0.1 : 0, // Slight delay for infographic steps
+        ease: "easeOut"
+      }}
       onClick={(e) => e.stopPropagation()} // Prevent clicks from reaching elements behind
       data-step={step.id} // Add data attribute for easier CSS targeting
       key={`step-${step.id}-${renderKey}`} // Add render key for stability
@@ -256,10 +305,23 @@ const TutorialStep: React.FC<TutorialStepProps> = ({
         />
       </p>
       
-      {/* Custom Infographic - only show for steps that include infographics */}
-      {shouldShowInfographic && step.infographicType && (
-        <div className="mb-4">
-          <TutorialInfographic type={step.infographicType} />
+      {/* Enhanced Infographic with proper mounting and stability */}
+      {shouldShowInfographic && step.infographicType && isInfographicMounted && (
+        <div className="mb-4 tutorial-infographic-container" style={{ minHeight: '160px' }}>
+          <TutorialInfographic 
+            type={step.infographicType} 
+            key={`infographic-${step.id}-${renderKey}`}
+            className="tutorial-infographic-content"
+          />
+        </div>
+      )}
+      
+      {/* Show loading placeholder for infographics that haven't mounted yet */}
+      {shouldShowInfographic && !isInfographicMounted && (
+        <div className="mb-4 flex items-center justify-center bg-gray-800/50 rounded-lg" style={{ minHeight: '160px' }}>
+          <div className="text-white/60 text-sm">
+            <TranslatableText text="Loading visualization..." forceTranslate={true} />
+          </div>
         </div>
       )}
       
