@@ -64,8 +64,8 @@ export const SmartTextRenderer: React.FC<SmartTextRendererProps> = ({
         const isMultiLine = finalText.includes('\n');
         
         // PLAN IMPLEMENTATION: Prefer Three.js renderer for consistent font sizing
-        // Only use Canvas for complex scripts that Three.js can't handle
-        const preferCanvas = isComplex && !enhancedFontService.canHandleScript(finalText);
+        // Only use Canvas for complex scripts that Three.js can't handle well
+        const preferCanvas = isComplex;
         
         if (preferCanvas) {
           console.log(`[SmartTextRenderer] PLAN IMPLEMENTATION: Using Canvas renderer for complex script: "${finalText}"`);
