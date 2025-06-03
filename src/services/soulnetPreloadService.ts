@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 import { translationService } from '@/services/translationService';
 import { onDemandTranslationCache } from '@/utils/website-translations';
@@ -120,10 +119,11 @@ export class SoulNetPreloadService {
     }
   }
 
-  private static getCachedData(cacheKey: string): CachedSoulNetData | null {
+  static getCachedDataSync(cacheKey: string): ProcessedSoulNetData | null {
     const cached = this.cache.get(cacheKey);
     if (cached && (Date.now() - cached.timestamp) < this.CACHE_DURATION) {
-      return cached;
+      console.log(`[SoulNetPreloadService] Found valid cache for ${cacheKey}`);
+      return cached.data;
     }
     
     // Try localStorage as fallback
@@ -136,13 +136,23 @@ export class SoulNetPreloadService {
           parsed.data.translations = new Map(Object.entries(parsed.data.translations || {}));
           parsed.data.connectionPercentages = new Map(Object.entries(parsed.data.connectionPercentages || {}));
           this.cache.set(cacheKey, parsed);
-          return parsed;
+          console.log(`[SoulNetPreloadService] Found valid localStorage cache for ${cacheKey}`);
+          return parsed.data;
         }
       }
     } catch (error) {
       console.error('[SoulNetPreloadService] Error loading from localStorage:', error);
     }
     
+    console.log(`[SoulNetPreloadService] No valid cache found for ${cacheKey}`);
+    return null;
+  }
+
+  private static getCachedData(cacheKey: string): CachedSoulNetData | null {
+    const syncResult = this.getCachedDataSync(cacheKey);
+    if (syncResult) {
+      return this.cache.get(cacheKey) || null;
+    }
     return null;
   }
 

@@ -58,18 +58,11 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
     };
   }, []);
 
-  // Staged rendering initialization
+  // Optimized rendering initialization - no delay if data is ready
   useEffect(() => {
     if (graphData.nodes.length > 0 && !renderingReady && !loading) {
-      console.log("[SoulNet] Preparing for staged rendering with preloaded data");
-      
-      // Delay rendering to prevent initialization crashes
-      const timer = setTimeout(() => {
-        setRenderingReady(true);
-        console.log("[SoulNet] Rendering ready with preloaded data");
-      }, 100); // Reduced delay since data is already processed
-      
-      return () => clearTimeout(timer);
+      console.log("[SoulNet] Data ready, enabling rendering immediately");
+      setRenderingReady(true);
     }
   }, [graphData.nodes.length, renderingReady, loading]);
 
