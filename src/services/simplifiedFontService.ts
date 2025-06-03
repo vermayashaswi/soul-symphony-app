@@ -1,21 +1,21 @@
 
 interface FontConfig {
   name: string;
-  url: string;
   scripts: string[];
+  cssFont: string;
 }
 
 class SimplifiedFontService {
   private fonts: FontConfig[] = [
     {
-      name: 'Helvetiker',
-      url: 'https://threejs.org/examples/fonts/helvetiker_regular.typeface.json',
-      scripts: ['latin']
+      name: 'System Default',
+      scripts: ['latin'],
+      cssFont: 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif'
     },
     {
-      name: 'Noto Sans Devanagari',
-      url: 'https://cdn.jsdelivr.net/gh/mrdoob/three.js@dev/examples/fonts/noto_sans_devanagari_regular.typeface.json',
-      scripts: ['devanagari']
+      name: 'Devanagari Support',
+      scripts: ['devanagari'],
+      cssFont: 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Noto Sans Devanagari", "Noto Sans Hindi", Arial, sans-serif'
     }
   ];
 
@@ -28,16 +28,21 @@ class SimplifiedFontService {
     return 'latin';
   }
 
-  getFontUrl(text: string): string {
+  getCSSFont(text: string): string {
     const script = this.detectScript(text);
     
     const font = this.fonts.find(f => f.scripts.includes(script));
     const fallbackFont = this.fonts.find(f => f.scripts.includes('latin'));
     
-    const url = font?.url || fallbackFont?.url || this.fonts[0].url;
+    const cssFont = font?.cssFont || fallbackFont?.cssFont || this.fonts[0].cssFont;
     
-    console.log(`[SimplifiedFontService] Text: "${text}" -> Script: ${script} -> URL: ${url}`);
-    return url;
+    console.log(`[SimplifiedFontService] Text: "${text}" -> Script: ${script} -> CSS Font: ${cssFont}`);
+    return cssFont;
+  }
+
+  // Legacy method for compatibility - now returns CSS font instead of URL
+  getFontUrl(text: string): string {
+    return this.getCSSFont(text);
   }
 }
 

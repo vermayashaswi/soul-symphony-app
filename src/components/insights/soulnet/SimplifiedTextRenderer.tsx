@@ -39,6 +39,18 @@ export const SimplifiedTextRenderer: React.FC<SimplifiedTextRendererProps> = ({
     return cleanText.length > 50 ? cleanText.substring(0, 50) + '...' : cleanText || 'Node';
   }, [text]);
 
+  // Detect script and get appropriate font
+  const fontFamily = React.useMemo(() => {
+    // Enhanced Unicode detection and font selection
+    if (/[\u0900-\u097F]/.test(displayText)) {
+      // Devanagari script (Hindi, Marathi, Sanskrit)
+      return 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Noto Sans Devanagari", "Noto Sans Hindi", "Apple Color Emoji", "Segoe UI Emoji", sans-serif';
+    }
+    
+    // Default Latin font stack with good Unicode support
+    return 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji"';
+  }, [displayText]);
+
   // Billboard effect - make text always face camera
   useFrame(({ camera }) => {
     if (textRef.current && visible) {
@@ -58,7 +70,7 @@ export const SimplifiedTextRenderer: React.FC<SimplifiedTextRendererProps> = ({
     return null;
   }
 
-  console.log(`[SimplifiedTextRenderer] Rendering with Unicode support: "${displayText}" at size ${size} with color ${color}`);
+  console.log(`[SimplifiedTextRenderer] Rendering with Unicode support: "${displayText}" at size ${size} with color ${color} using font: ${fontFamily}`);
 
   return (
     <Text
@@ -70,7 +82,7 @@ export const SimplifiedTextRenderer: React.FC<SimplifiedTextRendererProps> = ({
       anchorY="middle"
       maxWidth={maxWidth}
       textAlign="center"
-      font="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, 'Noto Sans', sans-serif, 'Noto Sans Devanagari', 'Noto Sans Hindi', 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol', 'Noto Color Emoji'"
+      font={fontFamily}
       fontWeight={bold ? "bold" : "normal"}
       material-transparent={true}
       material-depthTest={false}
