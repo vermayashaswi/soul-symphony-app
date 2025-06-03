@@ -1,3 +1,4 @@
+
 import React, { useMemo, useEffect } from 'react';
 import SmartTextRenderer from './SmartTextRenderer';
 import SimpleText from './SimpleText';
@@ -60,16 +61,15 @@ export const DirectNodeLabel: React.FC<DirectNodeLabelProps> = ({
   // Use translated text if available, otherwise fallback to original id
   const displayText = translatedText || id;
   
-  // ENHANCED: Improved label positioning with CLOSER positioning for emotion nodes
+  // UPDATED: Same base offset (1.4) for both entity and emotion nodes
   const labelOffset = useMemo(() => {
-    // UPDATED: Reduced emotion node baseOffset from 3.5 to 1.4 (0.41x distance)
-    const baseOffset = type === 'entity' ? 2.8 : 1.4; // Emotion nodes now much closer
+    const baseOffset = 1.4; // Same distance for both node types
     const scaledOffset = baseOffset * Math.max(0.8, Math.min(2.5, nodeScale));
     
     if (isInstantMode) {
-      console.log(`[DirectNodeLabel] INSTANT: Enhanced label offset for ${id} (${type}): ${scaledOffset} (scale: ${nodeScale}) - CLOSER POSITIONING`);
+      console.log(`[DirectNodeLabel] INSTANT: Enhanced label offset for ${id} (${type}): ${scaledOffset} (scale: ${nodeScale}) - UNIFORM POSITIONING`);
     } else {
-      console.log(`[DirectNodeLabel] Enhanced label offset for ${id} (${type}): ${scaledOffset} (scale: ${nodeScale}) - CLOSER POSITIONING`);
+      console.log(`[DirectNodeLabel] Enhanced label offset for ${id} (${type}): ${scaledOffset} (scale: ${nodeScale}) - UNIFORM POSITIONING`);
     }
     return [0, scaledOffset, 0] as [number, number, number];
   }, [type, nodeScale, id, isInstantMode]);
@@ -160,9 +160,9 @@ export const DirectNodeLabel: React.FC<DirectNodeLabelProps> = ({
   }
 
   if (isInstantMode) {
-    console.log(`[DirectNodeLabel] INSTANT MODE - MAIN TEXT: "${displayText}" at position`, labelPosition, 'with size:', textSize, 'color:', textColor, '- NO LOADING DELAY - CLOSER POSITIONING');
+    console.log(`[DirectNodeLabel] INSTANT MODE - MAIN TEXT: "${displayText}" at position`, labelPosition, 'with size:', textSize, 'color:', textColor, '- NO LOADING DELAY - UNIFORM POSITIONING');
   } else {
-    console.log(`[DirectNodeLabel] ENHANCED POSITIONING - MAIN TEXT: "${displayText}" at position`, labelPosition, 'with size:', textSize, 'color:', textColor, '- CLOSER POSITIONING');
+    console.log(`[DirectNodeLabel] ENHANCED POSITIONING - MAIN TEXT: "${displayText}" at position`, labelPosition, 'with size:', textSize, 'color:', textColor, '- UNIFORM POSITIONING');
   }
 
   return (
