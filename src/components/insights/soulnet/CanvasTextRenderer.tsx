@@ -3,7 +3,6 @@ import React, { useRef, useEffect, useState } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import { enhancedFontService } from '@/services/enhancedFontService';
-import { wrapText, getResponsiveFontSize, getResponsiveMaxWidth } from '@/utils/textWrappingUtils';
 
 interface CanvasTextRendererProps {
   text: string;
@@ -14,8 +13,6 @@ interface CanvasTextRendererProps {
   renderOrder?: number;
   bold?: boolean;
   maxWidth?: number;
-  cameraZoom?: number;
-  enableWrapping?: boolean;
 }
 
 export const CanvasTextRenderer: React.FC<CanvasTextRendererProps> = ({
@@ -26,74 +23,61 @@ export const CanvasTextRenderer: React.FC<CanvasTextRendererProps> = ({
   visible = true,
   renderOrder = 10,
   bold = false,
-  maxWidth = 25,
-  cameraZoom = 45,
-  enableWrapping = true
+  maxWidth = 25
 }) => {
   const meshRef = useRef<THREE.Mesh>(null);
   const [texture, setTexture] = useState<THREE.Texture | null>(null);
   const [displayText] = useState(() => {
     if (!text || typeof text !== 'string') return 'Node';
     const cleanText = text.trim();
-    return cleanText.length > 100 ? cleanText.substring(0, 100) + '...' : cleanText || 'Node';
+    return cleanText.length > 50 ? cleanText.substring(0, 50) + '...' : cleanText || 'Node';
   });
 
-  // Create canvas texture for the text with wrapping support
+  // Create canvas texture for the text
   useEffect(() => {
     const canvas = document.createElement('canvas');
     const context = canvas.getContext('2d');
     if (!context) return;
 
-    // UPDATED: Calculate responsive dimensions with smaller base sizes
-    const responsiveFontSize = getResponsiveFontSize(size * 40, cameraZoom, 14, 60); // Reduced multiplier from 50 to 40
-    const responsiveMaxWidth = getResponsiveMaxWidth(maxWidth * 15, cameraZoom, 120, 450); // Reduced multipliers
+    // Set canvas size - larger for better quality with larger text
+    const canvasSize = Math.max(512, size * 200); // Scale canvas size with text size
+    canvas.width = canvasSize;
+    canvas.height = canvasSize;
 
     // Get appropriate font family
     const fontFamily = enhancedFontService.getFallbackFont(displayText);
+    const fontSize = Math.floor(canvasSize * 0.08 * Math.max(1, size / 4)); // Scale font size appropriately
     
-    // Wrap text if enabled
-    const wrappedResult = enableWrapping 
-      ? wrapText(displayText, responsiveMaxWidth, responsiveFontSize, fontFamily, bold ? 'bold' : 'normal')
-      : { lines: [{ text: displayText, width: responsiveMaxWidth }], totalHeight: responsiveFontSize, maxWidth: responsiveMaxWidth };
-
-    // UPDATED: Set canvas size with reduced padding and dimensions
-    const padding = 15; // Reduced from 20
-    const canvasWidth = Math.max(250, wrappedResult.maxWidth + padding * 2); // Reduced from 300
-    const canvasHeight = Math.max(80, wrappedResult.totalHeight + padding * 2); // Reduced from 100
-    
-    canvas.width = canvasWidth;
-    canvas.height = canvasHeight;
-
     // Configure context
     context.fillStyle = 'transparent';
-    context.fillRect(0, 0, canvasWidth, canvasHeight);
+    context.fillRect(0, 0, canvasSize, canvasSize);
     
     context.fillStyle = color;
-    context.font = `${bold ? 'bold' : 'normal'} ${responsiveFontSize}px ${fontFamily}`;
+    context.font = `${bold ? 'bold' : 'normal'} ${fontSize}px ${fontFamily}`;
     context.textAlign = 'center';
     context.textBaseline = 'middle';
     
-    // UPDATED: Calculate line height using improved spacing (1.1 multiplier)
-    const lineHeight = responsiveFontSize * 1.1;
-    const startY = (canvasHeight - wrappedResult.totalHeight) / 2 + lineHeight / 2;
+    // Handle multi-line text (for connection percentages)
+    const lines = displayText.split('\n');
+    const lineHeight = fontSize * 1.2;
+    const startY = canvasSize / 2 - ((lines.length - 1) * lineHeight) / 2;
     
-    // Render each line
-    wrappedResult.lines.forEach((line, index) => {
+    lines.forEach((line, index) => {
       const y = startY + (index * lineHeight);
       
-      // UPDATED: Reduced stroke width for cleaner appearance
-      const strokeWidth = Math.max(1.5, responsiveFontSize * 0.04); // Reduced from 2 and 0.05
+      // FIXED: Better outline color based on text color for improved contrast
+      const strokeWidth = Math.max(2, size * 0.5);
       
-      // Use contrasting outline color
+      // Use contrasting outline color based on text color
       if (color === '#000000') {
-        context.strokeStyle = '#ffffff';
+        context.strokeStyle = '#ffffff'; // White outline for black text
       } else {
-        context.strokeStyle = '#000000';
+        context.strokeStyle = '#000000'; // Black outline for other colors
       }
       
       context.lineWidth = strokeWidth;
-      context.strokeText(line.text, canvasWidth / 2, y);
-      context.fillText(line.text, canvasWidth / 2, y);
+      context.strokeText(line, canvasSize / 2, y);
+      context.fillText(line, canvasSize / 2, y);
     });
 
     // Create texture
@@ -101,12 +85,12 @@ export const CanvasTextRenderer: React.FC<CanvasTextRendererProps> = ({
     newTexture.needsUpdate = true;
     setTexture(newTexture);
 
-    console.log(`[CanvasTextRenderer] Created wrapped texture for: "${displayText}" with ${wrappedResult.lines.length} lines, font: ${fontFamily}, size: ${responsiveFontSize}`);
+    console.log(`[CanvasTextRenderer] Created texture for: "${displayText}" with font: ${fontFamily}, size: ${fontSize}, color: ${color}`);
 
     return () => {
       newTexture.dispose();
     };
-  }, [displayText, color, bold, size, maxWidth, cameraZoom, enableWrapping]);
+  }, [displayText, color, bold, size]);
 
   // Billboard effect
   useFrame(({ camera }) => {
@@ -127,10 +111,8 @@ export const CanvasTextRenderer: React.FC<CanvasTextRendererProps> = ({
     return null;
   }
 
-  // UPDATED: Scale plane size with reduced base size and improved zoom scaling
-  const basePlaneSize = size * 1.6; // Reduced from 2.0
-  const zoomScale = Math.max(0.7, Math.min(1.8, (cameraZoom - 20) * 0.015 + 1)); // Adjusted scaling
-  const planeSize = basePlaneSize * zoomScale;
+  // Scale plane size with text size
+  const planeSize = size * 2;
 
   return (
     <mesh ref={meshRef} position={position} renderOrder={renderOrder}>
