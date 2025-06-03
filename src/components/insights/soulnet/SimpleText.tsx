@@ -1,4 +1,3 @@
-
 import React, { useState, useRef } from 'react';
 import { Text } from '@react-three/drei';
 import { useLoader } from '@react-three/fiber';
@@ -73,7 +72,7 @@ export const SimpleText: React.FC<SimpleTextProps> = ({
     return null;
   }
 
-  console.log(`[SimpleText] Rendering: "${displayText}" with font loaded from: ${fontUrl}, wrapping: ${enableWrapping}, color: ${color}, maxWidth: ${maxWidth}`);
+  console.log(`[SimpleText] Rendering: "${displayText}" with font loaded from: ${fontUrl}, wrapping: ${enableWrapping}, color: ${color}`);
 
   return (
     <Text
@@ -93,7 +92,6 @@ export const SimpleText: React.FC<SimpleTextProps> = ({
       outlineWidth={outlineWidth}
       outlineColor={outlineColor}
       whiteSpace={enableWrapping ? "normal" : "nowrap"}
-      overflowWrap={enableWrapping ? "break-word" : "normal"}
     >
       {displayText}
     </Text>

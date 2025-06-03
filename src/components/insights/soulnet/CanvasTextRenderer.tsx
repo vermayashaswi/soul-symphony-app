@@ -32,7 +32,7 @@ export const CanvasTextRenderer: React.FC<CanvasTextRendererProps> = ({
   const [displayText] = useState(() => {
     if (!text || typeof text !== 'string') return 'Node';
     const cleanText = text.trim();
-    return cleanText.length > 100 ? cleanText.substring(0, 100) + '...' : cleanText || 'Node';
+    return cleanText.length > 50 ? cleanText.substring(0, 50) + '...' : cleanText || 'Node';
   });
 
   // Create canvas texture for the text
@@ -42,7 +42,7 @@ export const CanvasTextRenderer: React.FC<CanvasTextRendererProps> = ({
     if (!context) return;
 
     // Set canvas size - larger for better quality with larger text
-    const canvasSize = Math.max(512, size * 300); // Increased multiplier for better quality
+    const canvasSize = Math.max(512, size * 200); // Scale canvas size with text size
     canvas.width = canvasSize;
     canvas.height = canvasSize;
 
@@ -59,17 +59,16 @@ export const CanvasTextRenderer: React.FC<CanvasTextRendererProps> = ({
     context.textAlign = 'center';
     context.textBaseline = 'middle';
     
-    // ENHANCED: Handle multi-line text with better spacing and positioning
+    // Handle multi-line text (for connection percentages)
     const lines = displayText.split('\n');
-    const lineHeight = fontSize * 1.3; // Slightly increased line height for better readability
-    const totalTextHeight = lines.length * lineHeight;
-    const startY = (canvasSize / 2) - ((lines.length - 1) * lineHeight) / 2;
-    
-    // ENHANCED: Better outline for improved contrast
-    const strokeWidth = Math.max(3, size * 1.2); // Increased stroke width
+    const lineHeight = fontSize * 1.2;
+    const startY = canvasSize / 2 - ((lines.length - 1) * lineHeight) / 2;
     
     lines.forEach((line, index) => {
       const y = startY + (index * lineHeight);
+      
+      // FIXED: Better outline color based on text color for improved contrast
+      const strokeWidth = Math.max(2, size * 0.5);
       
       // Use contrasting outline color based on text color
       if (color === '#000000') {
@@ -83,15 +82,12 @@ export const CanvasTextRenderer: React.FC<CanvasTextRendererProps> = ({
       context.fillText(line, canvasSize / 2, y);
     });
 
-    // Create texture with better quality settings
+    // Create texture
     const newTexture = new THREE.CanvasTexture(canvas);
     newTexture.needsUpdate = true;
-    newTexture.generateMipmaps = false;
-    newTexture.minFilter = THREE.LinearFilter;
-    newTexture.magFilter = THREE.LinearFilter;
     setTexture(newTexture);
 
-    console.log(`[CanvasTextRenderer] Created texture for: "${displayText}" with font: ${fontFamily}, size: ${fontSize}, color: ${color}, lines: ${lines.length}`);
+    console.log(`[CanvasTextRenderer] Created texture for: "${displayText}" with font: ${fontFamily}, size: ${fontSize}, color: ${color}`);
 
     return () => {
       newTexture.dispose();
@@ -117,14 +113,12 @@ export const CanvasTextRenderer: React.FC<CanvasTextRendererProps> = ({
     return null;
   }
 
-  // ENHANCED: Better plane size calculation for multi-line text
-  const lines = displayText.split('\n');
-  const planeWidth = size * 2.5; // Slightly wider for better text display
-  const planeHeight = size * (1.5 + (lines.length - 1) * 0.8); // Dynamic height based on line count
+  // Scale plane size with text size
+  const planeSize = size * 2;
 
   return (
     <mesh ref={meshRef} position={position} renderOrder={renderOrder}>
-      <planeGeometry args={[planeWidth, planeHeight]} />
+      <planeGeometry args={[planeSize, planeSize]} />
       <meshBasicMaterial
         map={texture}
         transparent={true}
