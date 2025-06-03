@@ -13,6 +13,7 @@ interface CanvasTextRendererProps {
   renderOrder?: number;
   bold?: boolean;
   maxWidth?: number;
+  enableWrapping?: boolean;
 }
 
 export const CanvasTextRenderer: React.FC<CanvasTextRendererProps> = ({
@@ -23,7 +24,8 @@ export const CanvasTextRenderer: React.FC<CanvasTextRendererProps> = ({
   visible = true,
   renderOrder = 10,
   bold = false,
-  maxWidth = 25
+  maxWidth = 25,
+  enableWrapping = false
 }) => {
   const meshRef = useRef<THREE.Mesh>(null);
   const [texture, setTexture] = useState<THREE.Texture | null>(null);
