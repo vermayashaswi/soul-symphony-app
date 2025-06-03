@@ -120,7 +120,7 @@ export const SimplifiedSoulNetVisualization: React.FC<SimplifiedSoulNetVisualiza
     
     console.log(`[SimplifiedSoulNetVisualization] Found ${selectedConnections.length} connections for node:`, selectedNode);
     
-    // FIXED: Better normalization - use max connection strength as 100%
+    // ENHANCED: Better normalization - use max connection strength as 100%
     const connectionStrengths = selectedConnections.map(link => link.value || 1);
     const maxStrength = Math.max(...connectionStrengths);
     const totalStrength = connectionStrengths.reduce((sum, strength) => sum + strength, 0);
@@ -332,7 +332,7 @@ export const SimplifiedSoulNetVisualization: React.FC<SimplifiedSoulNetVisualiza
           }
         })}
 
-        {/* FIXED: Enhanced node rendering with improved label logic */}
+        {/* FIXED: Enhanced node rendering with corrected percentage logic */}
         {validData.nodes.map(node => {
           try {
             const isSelected = selectedNode === node.id;
@@ -349,11 +349,21 @@ export const SimplifiedSoulNetVisualization: React.FC<SimplifiedSoulNetVisualiza
             // Get Google Translate translation
             const translatedText = translationCache.get(node.id) || node.id;
             
-            // FIXED: Enhanced connection percentage logic
+            // FIXED: Corrected percentage logic - show for connected nodes (not the selected node itself)
             const connectionPercentage = connectionPercentages.get(node.id) || 0;
-            const showPercentage = !!selectedNode && isHighlighted && connectionPercentage > 0 && !isSelected;
+            const showPercentage = !!selectedNode && isHighlighted && connectionPercentage > 0 && selectedNode !== node.id;
 
-            console.log(`[SimplifiedSoulNetVisualization] Rendering node ${node.id}: selected=${isSelected}, highlighted=${isHighlighted}, showLabel=${shouldShowNodeLabel}, percentage=${connectionPercentage}%, showPercentage=${showPercentage}`);
+            // Enhanced debugging for percentage display
+            if (selectedNode && node.type === 'emotion') {
+              console.log(`[SimplifiedSoulNetVisualization] PERCENTAGE DEBUG for ${node.id}:`, {
+                selectedNode,
+                isHighlighted,
+                connectionPercentage,
+                showPercentage,
+                isSelected,
+                condition: `selectedNode=${!!selectedNode} && isHighlighted=${isHighlighted} && connectionPercentage=${connectionPercentage} > 0 && selectedNode !== node.id=${selectedNode !== node.id}`
+              });
+            }
 
             return (
               <Node
