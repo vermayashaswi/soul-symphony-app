@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useCallback } from 'react';
 import { useFrame } from '@react-three/fiber';
 import { OrbitControls } from '@react-three/drei';
@@ -142,6 +143,11 @@ export const SimplifiedSoulNetVisualization: React.FC<SimplifiedSoulNetVisualiza
     return nodeId;
   }, [currentLanguage, preloadedTranslations]);
 
+  // Helper function to find node by id
+  const findNodeById = useCallback((nodeId: string): NodeData | undefined => {
+    return data.nodes.find(node => node.id === nodeId);
+  }, [data.nodes]);
+
   return (
     <>
       <ambientLight intensity={0.6} />
@@ -185,23 +191,35 @@ export const SimplifiedSoulNetVisualization: React.FC<SimplifiedSoulNetVisualiza
         );
       })}
       
-      {data.links.map((link, index) => (
-        <Edge
-          key={`${link.source}-${link.target}-${index}`}
-          link={link}
-          nodes={data.nodes}
-          isHighlighted={
-            selectedNode !== null && 
-            (highlightedNodes.has(link.source) || highlightedNodes.has(link.target))
-          }
-          isDimmed={
-            selectedNode !== null && 
-            !highlightedNodes.has(link.source) && 
-            !highlightedNodes.has(link.target)
-          }
-          themeHex={themeHex}
-        />
-      ))}
+      {data.links.map((link, index) => {
+        const sourceNode = findNodeById(link.source);
+        const targetNode = findNodeById(link.target);
+        
+        if (!sourceNode || !targetNode) {
+          console.warn(`[SimplifiedSoulNetVisualization] Missing node for link: ${link.source} -> ${link.target}`);
+          return null;
+        }
+        
+        return (
+          <Edge
+            key={`${link.source}-${link.target}-${index}`}
+            start={sourceNode.position}
+            end={targetNode.position}
+            value={link.value}
+            isHighlighted={
+              selectedNode !== null && 
+              (highlightedNodes.has(link.source) || highlightedNodes.has(link.target))
+            }
+            dimmed={
+              selectedNode !== null && 
+              !highlightedNodes.has(link.source) && 
+              !highlightedNodes.has(link.target)
+            }
+            startNodeType={sourceNode.type}
+            endNodeType={targetNode.type}
+          />
+        );
+      })}
     </>
   );
 };
