@@ -17,7 +17,6 @@ import './styles/tutorial.css';
 
 const App: React.FC = () => {
   const [isInitialized, setIsInitialized] = useState(false);
-  const [hasError, setHasError] = useState(false);
 
   useEffect(() => {
     console.log('[App] App mounted, current path:', window.location.pathname);
@@ -34,7 +33,7 @@ const App: React.FC = () => {
     // Apply a CSS class to the document body for theme-specific overrides
     document.body.classList.add('app-initialized');
     
-    // Preload critical images with error handling
+    // Preload critical images including the chat avatar
     try {
       preloadCriticalImages();
       console.log('[App] Critical images preloaded successfully');
@@ -43,9 +42,11 @@ const App: React.FC = () => {
       // Non-critical error, continue app initialization
     }
 
-    // Mark app as initialized immediately to prevent hanging
-    setIsInitialized(true);
-    console.log('[App] App marked as fully initialized');
+    // Mark app as initialized after a brief delay to ensure smooth startup
+    setTimeout(() => {
+      setIsInitialized(true);
+      console.log('[App] App marked as fully initialized');
+    }, 500);
   }, []);
 
   const handleAppError = (error: Error, errorInfo: any) => {
@@ -66,29 +67,8 @@ const App: React.FC = () => {
     // Show user-friendly error notification
     toast.error('Something went wrong. The app will try to recover automatically.');
 
-    // Set error state but don't crash the app
-    setHasError(true);
-
     // Allow the app to continue functioning despite errors
   };
-
-  // If there's a critical error, show fallback UI
-  if (hasError) {
-    return (
-      <div className="min-h-screen flex items-center justify-center p-4">
-        <div className="text-center">
-          <h1 className="text-2xl font-bold mb-4">Something went wrong</h1>
-          <p className="text-gray-600 mb-4">The app encountered an error. Please try refreshing the page.</p>
-          <button 
-            onClick={() => window.location.reload()} 
-            className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
-          >
-            Refresh Page
-          </button>
-        </div>
-      </div>
-    );
-  }
 
   return (
     <ErrorBoundary onError={handleAppError}>

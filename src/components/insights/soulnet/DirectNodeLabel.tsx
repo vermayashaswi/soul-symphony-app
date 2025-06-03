@@ -48,10 +48,10 @@ export const DirectNodeLabel: React.FC<DirectNodeLabelProps> = ({
     };
   }, [id, shouldShowLabel]);
 
+  console.log(`[DirectNodeLabel] Rendering with translated text for ${id}: "${translatedText || id}"`);
+
   // Use translated text if available, otherwise fallback to original id
   const displayText = translatedText || id;
-  
-  console.log(`[DirectNodeLabel] Rendering text for ${id}: "${displayText}"`);
   
   // Enhanced visibility check for tutorial step 9
   const enhancedShouldShowLabel = useMemo(() => {
@@ -66,21 +66,27 @@ export const DirectNodeLabel: React.FC<DirectNodeLabelProps> = ({
     return shouldShowLabel;
   }, [shouldShowLabel, id]);
 
-  // Label positioning with better spacing to prevent overlap
+  // FIXED: Improved label positioning with better spacing to prevent overlap
   const labelOffset = useMemo(() => {
-    const baseOffset = type === 'entity' ? 2.8 : 3.5;
+    // Increase base offset and add dynamic spacing based on node type and scale
+    const baseOffset = type === 'entity' ? 2.8 : 3.5; // Increased from 2.2/3.0
     const scaledOffset = baseOffset * Math.max(0.8, Math.min(2.5, nodeScale));
+    
+    // Add additional spacing for highlighted nodes to prevent overlap
     const highlightSpacing = (isHighlighted || isSelected) ? 0.5 : 0;
     const finalOffset = scaledOffset + highlightSpacing;
     
-    console.log(`[DirectNodeLabel] Label offset for ${id} (${type}): ${finalOffset} (scale: ${nodeScale}, highlighted: ${isHighlighted})`);
+    console.log(`[DirectNodeLabel] FIXED label offset for ${id} (${type}): ${finalOffset} (scale: ${nodeScale}, highlighted: ${isHighlighted})`);
     return [0, finalOffset, 0] as [number, number, number];
   }, [type, nodeScale, id, isHighlighted, isSelected]);
 
-  // Percentage label positioning to avoid main label overlap
+  // FIXED: Better percentage label positioning to avoid main label overlap
   const percentageLabelOffset = useMemo(() => {
-    const baseOffset = type === 'entity' ? 1.8 : 2.6;
+    // Position percentage below the main label with sufficient spacing
+    const baseOffset = type === 'entity' ? 1.8 : 2.6; // Increased spacing
     const scaledOffset = baseOffset * Math.max(0.8, Math.min(2.5, nodeScale));
+    
+    // Add spacing for highlighted nodes
     const highlightSpacing = (isHighlighted || isSelected) ? 0.3 : 0;
     const finalOffset = scaledOffset + highlightSpacing;
     
@@ -103,31 +109,36 @@ export const DirectNodeLabel: React.FC<DirectNodeLabelProps> = ({
     return textSize * 0.69;
   }, [textSize]);
 
-  // Enhanced text color logic with better contrast for light theme
+  // FIXED: Enhanced text color logic with much better contrast for light theme
   const textColor = useMemo(() => {
     let color;
     
     if (isSelected) {
+      // FIXED: For selected nodes, use high contrast colors based on theme
       if (effectiveTheme === 'light') {
-        color = type === 'entity' ? '#000000' : '#1a1a1a';
+        // In light theme, use dark colors for selected nodes for maximum contrast
+        color = type === 'entity' ? '#000000' : '#1a1a1a'; // Black for entities, very dark gray for emotions
       } else {
+        // In dark theme, use bright white for selected nodes
         color = '#ffffff';
       }
     } else if (isHighlighted) {
+      // For highlighted nodes, use theme-appropriate colors
       if (effectiveTheme === 'light') {
-        color = type === 'entity' ? '#2d2d2d' : themeHex;
+        color = type === 'entity' ? '#2d2d2d' : themeHex; // Dark gray for entities, theme color for emotions
       } else {
-        color = type === 'entity' ? '#ffffff' : themeHex;
+        color = type === 'entity' ? '#ffffff' : themeHex; // White for entities, theme color for emotions
       }
     } else {
+      // FIXED: Much better default colors with higher contrast
       if (effectiveTheme === 'light') {
-        color = '#0a0a0a';
+        color = '#0a0a0a'; // Very dark for light theme
       } else {
-        color = '#f0f0f0';
+        color = '#f0f0f0'; // Very light for dark theme
       }
     }
     
-    console.log(`[DirectNodeLabel] Text color for ${id}: ${color} (selected: ${isSelected}, highlighted: ${isHighlighted}, theme: ${effectiveTheme}, type: ${type})`);
+    console.log(`[DirectNodeLabel] FIXED text color for ${id}: ${color} (selected: ${isSelected}, highlighted: ${isHighlighted}, theme: ${effectiveTheme}, type: ${type})`);
     return color;
   }, [isSelected, isHighlighted, type, themeHex, effectiveTheme, id]);
 
@@ -158,13 +169,14 @@ export const DirectNodeLabel: React.FC<DirectNodeLabelProps> = ({
 
   return (
     <>
-      {/* Main node label using SimplifiedTextRenderer */}
+      {/* Main node label */}
       <SimplifiedTextRenderer
         text={displayText}
         position={mainLabelPosition}
         color={textColor}
         size={textSize}
         visible={true}
+        renderOrder={15}
         bold={isHighlighted || isSelected}
         outlineWidth={isSelected ? 0.1 : 0.05}
         outlineColor={effectiveTheme === 'light' ? '#ffffff' : '#000000'}
@@ -179,6 +191,7 @@ export const DirectNodeLabel: React.FC<DirectNodeLabelProps> = ({
           color={textColor}
           size={percentageTextSize}
           visible={true}
+          renderOrder={16}
           bold={false}
           outlineWidth={0.03}
           outlineColor={effectiveTheme === 'light' ? '#ffffff' : '#000000'}

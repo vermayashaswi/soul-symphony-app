@@ -1,3 +1,4 @@
+
 import React, { useRef, useEffect, useMemo, useState } from 'react';
 import { OrbitControls } from '@react-three/drei';
 import { useThree, useFrame } from '@react-three/fiber';
@@ -50,7 +51,7 @@ export const SimplifiedSoulNetVisualization: React.FC<SimplifiedSoulNetVisualiza
   const initializationRef = useRef<boolean>(false);
   const mounted = useRef<boolean>(true);
   
-  console.log("[SimplifiedSoulNetVisualization] UNICODE TEXT RENDERING - Current stage:", renderingStage, "Language:", currentLanguage);
+  console.log("[SimplifiedSoulNetVisualization] GOOGLE TRANSLATE ONLY - Rendering stage:", renderingStage);
 
   // Get current effective theme for font color calculation
   const effectiveTheme = useMemo(() => {
@@ -61,7 +62,7 @@ export const SimplifiedSoulNetVisualization: React.FC<SimplifiedSoulNetVisualiza
   }, [theme, systemTheme]);
 
   useEffect(() => {
-    console.log("[SimplifiedSoulNetVisualization] Component mounted - Unicode text rendering enabled");
+    console.log("[SimplifiedSoulNetVisualization] Component mounted - Google Translate only mode");
     return () => {
       mounted.current = false;
     };
@@ -145,7 +146,7 @@ export const SimplifiedSoulNetVisualization: React.FC<SimplifiedSoulNetVisualiza
     return percentages;
   }, [selectedNode, validData.links]);
 
-  // Enhanced Google Translate processing with Unicode awareness
+  // Google Translate only translation processing
   useEffect(() => {
     if (!data?.nodes || !Array.isArray(data.nodes) || data.nodes.length === 0 || !mounted.current) {
       return;
@@ -153,7 +154,7 @@ export const SimplifiedSoulNetVisualization: React.FC<SimplifiedSoulNetVisualiza
 
     const processTranslations = async () => {
       if (currentLanguage !== 'en' && translate) {
-        console.log('[SimplifiedSoulNetVisualization] Processing Unicode-aware Google Translate translations for language:', currentLanguage);
+        console.log('[SimplifiedSoulNetVisualization] Processing Google Translate translations');
         const newCache = new Map<string, string>();
         
         for (const node of data.nodes) {
@@ -161,7 +162,6 @@ export const SimplifiedSoulNetVisualization: React.FC<SimplifiedSoulNetVisualiza
             try {
               const translated = await translate(node.id, 'en');
               newCache.set(node.id, translated || node.id);
-              console.log(`[SimplifiedSoulNetVisualization] Translated "${node.id}" to "${translated}" in ${currentLanguage}`);
             } catch (error) {
               console.error(`[SimplifiedSoulNetVisualization] Translation error for ${node.id}:`, error);
               newCache.set(node.id, node.id);
@@ -171,7 +171,6 @@ export const SimplifiedSoulNetVisualization: React.FC<SimplifiedSoulNetVisualiza
         
         if (mounted.current) {
           setTranslationCache(newCache);
-          console.log('[SimplifiedSoulNetVisualization] Translation cache updated with Unicode support');
         }
       } else {
         // For English, use original labels
@@ -180,7 +179,6 @@ export const SimplifiedSoulNetVisualization: React.FC<SimplifiedSoulNetVisualiza
           englishCache.set(node.id, node.id);
         });
         setTranslationCache(englishCache);
-        console.log('[SimplifiedSoulNetVisualization] Using English labels (no translation needed)');
       }
     };
 
@@ -334,7 +332,7 @@ export const SimplifiedSoulNetVisualization: React.FC<SimplifiedSoulNetVisualiza
           }
         })}
 
-        {/* ENHANCED: Unicode-aware node rendering with improved label logic */}
+        {/* FIXED: Enhanced node rendering with improved label logic */}
         {validData.nodes.map(node => {
           try {
             const isSelected = selectedNode === node.id;
@@ -348,14 +346,14 @@ export const SimplifiedSoulNetVisualization: React.FC<SimplifiedSoulNetVisualiza
               highlightedNodes.has(node.id) // Show connected node labels
             );
             
-            // Get Unicode-aware translation
+            // Get Google Translate translation
             const translatedText = translationCache.get(node.id) || node.id;
             
             // FIXED: Enhanced connection percentage logic
             const connectionPercentage = connectionPercentages.get(node.id) || 0;
             const showPercentage = !!selectedNode && isHighlighted && connectionPercentage > 0 && !isSelected;
 
-            console.log(`[SimplifiedSoulNetVisualization] Rendering Unicode node ${node.id}: selected=${isSelected}, highlighted=${isHighlighted}, showLabel=${shouldShowNodeLabel}, translatedText="${translatedText}", percentage=${connectionPercentage}%, showPercentage=${showPercentage}`);
+            console.log(`[SimplifiedSoulNetVisualization] Rendering node ${node.id}: selected=${isSelected}, highlighted=${isHighlighted}, showLabel=${shouldShowNodeLabel}, percentage=${connectionPercentage}%, showPercentage=${showPercentage}`);
 
             return (
               <Node

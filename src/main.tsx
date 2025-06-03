@@ -10,6 +10,91 @@ import { ThemeProvider } from './hooks/use-theme'
 import { BrowserRouter } from 'react-router-dom'
 import { TranslationProvider } from './contexts/TranslationContext'
 
+// Enhanced Font Loading System
+const initializeFontSystem = async () => {
+  console.log('[FontSystem] Starting font initialization...');
+  
+  // Core fonts that must be loaded
+  const coreFonts = [
+    'Inter',
+    'Noto Sans',
+    'Noto Sans Devanagari',
+    'Noto Sans Arabic',
+    'Noto Sans SC',
+    'Noto Sans JP',
+    'Noto Sans KR',
+    'Noto Sans Bengali',
+    'Noto Sans Thai'
+  ];
+  
+  // Font loading with timeout and retry
+  const loadFontWithRetry = async (fontFamily: string, retries = 3): Promise<boolean> => {
+    for (let i = 0; i < retries; i++) {
+      try {
+        if (document.fonts && document.fonts.check) {
+          const isLoaded = document.fonts.check(`12px "${fontFamily}"`);
+          if (isLoaded) {
+            console.log(`[FontSystem] ${fontFamily} already loaded`);
+            return true;
+          }
+          
+          // Wait for font to load with timeout
+          const fontFace = new FontFace(fontFamily, `local("${fontFamily}")`);
+          await Promise.race([
+            fontFace.load(),
+            new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout')), 3000))
+          ]);
+          
+          console.log(`[FontSystem] ${fontFamily} loaded successfully`);
+          return true;
+        }
+      } catch (error) {
+        console.warn(`[FontSystem] Attempt ${i + 1} failed for ${fontFamily}:`, error);
+        if (i < retries - 1) {
+          await new Promise(resolve => setTimeout(resolve, 500));
+        }
+      }
+    }
+    
+    console.error(`[FontSystem] Failed to load ${fontFamily} after ${retries} attempts`);
+    return false;
+  };
+  
+  // Load core fonts
+  const fontPromises = coreFonts.map(font => loadFontWithRetry(font));
+  
+  try {
+    // Wait for document fonts ready with timeout
+    await Promise.race([
+      document.fonts ? document.fonts.ready : Promise.resolve(),
+      new Promise(resolve => setTimeout(resolve, 5000))
+    ]);
+    
+    const results = await Promise.allSettled(fontPromises);
+    const loadedCount = results.filter(result => result.status === 'fulfilled' && result.value).length;
+    
+    console.log(`[FontSystem] Font loading complete: ${loadedCount}/${coreFonts.length} fonts loaded`);
+    
+    // Set global font ready flag
+    (window as any).__SOULO_FONTS_READY__ = true;
+    
+    // Dispatch font ready event
+    window.dispatchEvent(new CustomEvent('fontsReady', { 
+      detail: { 
+        loadedCount, 
+        totalCount: coreFonts.length,
+        timestamp: Date.now()
+      } 
+    }));
+    
+  } catch (error) {
+    console.error('[FontSystem] Font initialization error:', error);
+    // Set ready flag anyway to prevent hanging
+    (window as any).__SOULO_FONTS_READY__ = true;
+    window.dispatchEvent(new CustomEvent('fontsReady', { detail: { error } }));
+  }
+};
+
 // iOS Viewport Height Fix - addresses the iOS Safari issue with viewport height
 const fixViewportHeight = () => {
   // Set CSS variable for viewport height that updates on resize
@@ -55,6 +140,9 @@ const fixViewportHeight = () => {
 
 // Initialize systems
 const initializeApp = async () => {
+  // Initialize font system first
+  await initializeFontSystem();
+  
   // Initialize viewport fix
   fixViewportHeight();
   
@@ -63,18 +151,6 @@ const initializeApp = async () => {
       (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)) {
     document.documentElement.classList.add('ios-device');
   }
-  
-  // Set global font ready flag immediately
-  (window as any).__SOULO_FONTS_READY__ = true;
-  
-  // Dispatch font ready event
-  window.dispatchEvent(new CustomEvent('fontsReady', { 
-    detail: { 
-      loadedCount: 0, 
-      totalCount: 0,
-      timestamp: Date.now()
-    } 
-  }));
   
   console.log('[App] Initialization complete');
 };

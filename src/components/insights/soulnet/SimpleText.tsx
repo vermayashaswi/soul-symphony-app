@@ -1,12 +1,13 @@
 
-import React, { useRef } from 'react';
+import React, { useState, useRef } from 'react';
 import { Text } from '@react-three/drei';
+import { useLoader } from '@react-three/fiber';
+import { FontLoader } from 'three/examples/jsm/loaders/FontLoader.js';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
-import { FontLoader } from 'three/examples/jsm/loaders/FontLoader.js';
-import { useLoader } from '@react-three/fiber';
+import { simplifiedFontService } from '@/services/simplifiedFontService';
 
-interface SimplifiedTextRendererProps {
+interface SimpleTextProps {
   text: string;
   position: [number, number, number];
   color?: string;
@@ -19,31 +20,32 @@ interface SimplifiedTextRendererProps {
   maxWidth?: number;
 }
 
-export const SimplifiedTextRenderer: React.FC<SimplifiedTextRendererProps> = ({
+export const SimpleText: React.FC<SimpleTextProps> = ({
   text,
   position,
   color = '#ffffff',
-  size = 1.0, // FIXED: Increased from 0.6 to 1.0 for better visibility
+  size = 0.4,
   visible = true,
   renderOrder = 10,
   bold = false,
-  outlineWidth = 0.05, // FIXED: Increased outline width for better definition
+  outlineWidth = 0.02,
   outlineColor = '#000000',
-  maxWidth = 40 // FIXED: Increased max width proportionally
+  maxWidth = 25
 }) => {
   const textRef = useRef<THREE.Mesh>(null);
-  
-  // Use default font for better reliability
-  const font = useLoader(FontLoader, '/fonts/helvetiker_regular.typeface.json');
-
-  // Clean and prepare text
-  const displayText = React.useMemo(() => {
+  const [displayText] = useState(() => {
     if (!text || typeof text !== 'string') return 'Node';
     const cleanText = text.trim();
     return cleanText.length > 50 ? cleanText.substring(0, 50) + '...' : cleanText || 'Node';
-  }, [text]);
+  });
 
-  // Billboard effect - make text always face camera
+  // Get font URL based on text content
+  const fontUrl = simplifiedFontService.getFontUrl(displayText);
+  
+  // Load font using React Three Fiber's useLoader
+  const font = useLoader(FontLoader, fontUrl);
+
+  // Billboard effect
   useFrame(({ camera }) => {
     if (textRef.current && visible) {
       try {
@@ -53,7 +55,7 @@ export const SimplifiedTextRenderer: React.FC<SimplifiedTextRendererProps> = ({
           textRef.current.renderOrder = renderOrder;
         }
       } catch (error) {
-        console.warn('[SimplifiedTextRenderer] Billboard error:', error);
+        console.warn('[SimpleText] Billboard error:', error);
       }
     }
   });
@@ -62,7 +64,7 @@ export const SimplifiedTextRenderer: React.FC<SimplifiedTextRendererProps> = ({
     return null;
   }
 
-  console.log(`[SimplifiedTextRenderer] Rendering: "${displayText}" at size ${size} with color ${color}`);
+  console.log(`[SimpleText] Rendering: "${displayText}" with font loaded from: ${fontUrl}`);
 
   return (
     <Text
@@ -87,4 +89,4 @@ export const SimplifiedTextRenderer: React.FC<SimplifiedTextRendererProps> = ({
   );
 };
 
-export default SimplifiedTextRenderer;
+export default SimpleText;
