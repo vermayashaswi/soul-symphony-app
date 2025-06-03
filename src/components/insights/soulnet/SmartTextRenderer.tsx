@@ -15,6 +15,8 @@ interface SmartTextRendererProps {
   outlineWidth?: number;
   outlineColor?: string;
   maxWidth?: number;
+  cameraZoom?: number;
+  enableWrapping?: boolean;
 }
 
 export const SmartTextRenderer: React.FC<SmartTextRendererProps> = ({
@@ -27,7 +29,9 @@ export const SmartTextRenderer: React.FC<SmartTextRendererProps> = ({
   bold = false,
   outlineWidth = 0.02,
   outlineColor = '#000000',
-  maxWidth = 25
+  maxWidth = 25,
+  cameraZoom = 45,
+  enableWrapping = true
 }) => {
   const [useCanvasRenderer, setUseCanvasRenderer] = useState(false);
   const [fontLoaded, setFontLoaded] = useState(false);
@@ -41,8 +45,11 @@ export const SmartTextRenderer: React.FC<SmartTextRendererProps> = ({
         // For larger text sizes (> 2.0), prefer Canvas renderer for better quality
         const preferCanvas = size > 2.0;
         
-        if (isComplex || preferCanvas) {
-          console.log(`[SmartTextRenderer] Using Canvas renderer for: "${text}" (complex: ${isComplex}, large text: ${preferCanvas})`);
+        // For wrapped text, prefer Canvas renderer for better control
+        const needsWrapping = enableWrapping && text && text.length > 20;
+        
+        if (isComplex || preferCanvas || needsWrapping) {
+          console.log(`[SmartTextRenderer] Using Canvas renderer for: "${text}" (complex: ${isComplex}, large text: ${preferCanvas}, needs wrapping: ${needsWrapping})`);
           setUseCanvasRenderer(true);
           setFontLoaded(true);
         } else {
@@ -65,7 +72,7 @@ export const SmartTextRenderer: React.FC<SmartTextRendererProps> = ({
     };
 
     initializeRenderer();
-  }, [text, size]);
+  }, [text, size, enableWrapping]);
 
   if (!visible || hasError || !fontLoaded) {
     return null;
@@ -82,6 +89,8 @@ export const SmartTextRenderer: React.FC<SmartTextRendererProps> = ({
         renderOrder={renderOrder}
         bold={bold}
         maxWidth={maxWidth}
+        cameraZoom={cameraZoom}
+        enableWrapping={enableWrapping}
       />
     );
   }
@@ -98,6 +107,8 @@ export const SmartTextRenderer: React.FC<SmartTextRendererProps> = ({
       outlineWidth={outlineWidth}
       outlineColor={outlineColor}
       maxWidth={maxWidth}
+      cameraZoom={cameraZoom}
+      enableWrapping={enableWrapping}
     />
   );
 };
