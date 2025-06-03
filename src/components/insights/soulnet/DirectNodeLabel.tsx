@@ -1,6 +1,6 @@
 
 import React, { useMemo, useEffect } from 'react';
-import SmartTextRenderer from './SmartTextRenderer';
+import IntelligentTextRenderer from './IntelligentTextRenderer';
 import SimpleText from './SimpleText';
 
 interface DirectNodeLabelProps {
@@ -177,15 +177,15 @@ export const DirectNodeLabel: React.FC<DirectNodeLabelProps> = ({
   }
 
   if (isInstantMode) {
-    console.log(`[DirectNodeLabel] INSTANT MODE - MAIN TEXT: "${displayText}" at position`, labelPosition, 'with size:', textSize, 'color:', textColor, '- NO LOADING DELAY');
+    console.log(`[DirectNodeLabel] INSTANT MODE - INTELLIGENT TEXT: "${displayText}" at position`, labelPosition, 'with size:', textSize, 'color:', textColor, '- 18-CHAR WRAPPING - NO LOADING DELAY');
   } else {
-    console.log(`[DirectNodeLabel] ENHANCED POSITIONING - MAIN TEXT: "${displayText}" at position`, labelPosition, 'with size:', textSize, 'color:', textColor);
+    console.log(`[DirectNodeLabel] ENHANCED POSITIONING - INTELLIGENT TEXT: "${displayText}" at position`, labelPosition, 'with size:', textSize, 'color:', textColor, '- 18-CHAR WRAPPING');
   }
 
   return (
     <>
-      {/* Main translated text using SmartTextRenderer with enhanced visibility */}
-      <SmartTextRenderer
+      {/* Main translated text using IntelligentTextRenderer with 18-character wrapping */}
+      <IntelligentTextRenderer
         text={displayText}
         position={labelPosition}
         color={textColor}
@@ -196,6 +196,8 @@ export const DirectNodeLabel: React.FC<DirectNodeLabelProps> = ({
         outlineWidth={isSelected ? 1.0 : 0.6} // Stronger outline for better visibility
         outlineColor={isSelected ? '#000000' : '#222222'}
         maxWidth={400}
+        maxCharsPerLine={18}
+        maxLines={2}
       />
       
       {/* Enhanced side-positioned percentage text with better visibility */}
