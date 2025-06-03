@@ -17,18 +17,24 @@ interface LinkData {
   value: number;
 }
 
+interface NodeConnectionData {
+  connectedNodes: string[];
+  totalStrength: number;
+  averageStrength: number;
+}
+
 interface InstantSoulNetData {
   graphData: { nodes: NodeData[], links: LinkData[] };
   translations: Map<string, string>;
   connectionPercentages: Map<string, number>;
-  nodeConnectionData: Map<string, {
-    connectedNodes: string[];
-    totalStrength: number;
-    averageStrength: number;
-  }>;
+  nodeConnectionData: Map<string, NodeConnectionData>;
   loading: boolean;
   error: Error | null;
   isInstantReady: boolean;
+  // Add the getter methods to the interface
+  getInstantConnectionPercentage: (selectedNode: string, targetNode: string) => number;
+  getInstantTranslation: (nodeId: string) => string;
+  getInstantNodeConnections: (nodeId: string) => NodeConnectionData;
 }
 
 export const useInstantSoulNetData = (
@@ -64,7 +70,7 @@ export const useInstantSoulNetData = (
     return instantCached ? instantCached.data.connectionPercentages : new Map();
   });
 
-  const [nodeConnectionData, setNodeConnectionData] = useState<Map<string, any>>(() => {
+  const [nodeConnectionData, setNodeConnectionData] = useState<Map<string, NodeConnectionData>>(() => {
     return instantCached ? instantCached.data.nodeConnectionData : new Map();
   });
 
@@ -101,7 +107,7 @@ export const useInstantSoulNetData = (
     return nodeId;
   }, [currentLanguage, translations]);
 
-  const getInstantNodeConnections = useCallback((nodeId: string) => {
+  const getInstantNodeConnections = useCallback((nodeId: string): NodeConnectionData => {
     return nodeConnectionData.get(nodeId) || {
       connectedNodes: [],
       totalStrength: 0,
@@ -175,13 +181,8 @@ export const useInstantSoulNetData = (
     loading,
     error,
     isInstantReady,
-    // Add instant access methods
     getInstantConnectionPercentage,
     getInstantTranslation,
     getInstantNodeConnections
-  } as InstantSoulNetData & {
-    getInstantConnectionPercentage: (selectedNode: string, targetNode: string) => number;
-    getInstantTranslation: (nodeId: string) => string;
-    getInstantNodeConnections: (nodeId: string) => any;
   };
 };

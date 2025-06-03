@@ -15,16 +15,18 @@ interface LinkData {
   value: number;
 }
 
+interface NodeConnectionData {
+  connectedNodes: string[];
+  totalStrength: number;
+  averageStrength: number;
+}
+
 interface InstantSoulNetData {
   nodes: NodeData[];
   links: LinkData[];
   translations: Map<string, string>;
   connectionPercentages: Map<string, number>;
-  nodeConnectionData: Map<string, {
-    connectedNodes: string[];
-    totalStrength: number;
-    averageStrength: number;
-  }>;
+  nodeConnectionData: Map<string, NodeConnectionData>;
 }
 
 interface CachedInstantData {
@@ -256,8 +258,8 @@ export class EnhancedSoulNetPreloadService {
   private static calculateNodeConnectionData(
     nodes: NodeData[],
     links: LinkData[]
-  ): Map<string, { connectedNodes: string[]; totalStrength: number; averageStrength: number; }> {
-    const nodeData = new Map();
+  ): Map<string, NodeConnectionData> {
+    const nodeData = new Map<string, NodeConnectionData>();
     
     nodes.forEach(node => {
       const connectedNodes: string[] = [];
