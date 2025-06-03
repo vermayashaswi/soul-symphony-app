@@ -66,7 +66,7 @@ function calculateRelativeStrengths(nodeId: string, links: LinkData[]): Map<stri
   return strengthMap;
 }
 
-// FIXED: Corrected percentage calculation logic
+// Calculate relative connection strength within connected nodes
 function calculateConnectionPercentages(nodeId: string, links: LinkData[]): Map<string, number> {
   if (!nodeId || !links || !Array.isArray(links)) {
     console.log(`[SoulNetVisualization] Invalid input for percentage calculation`);
@@ -82,8 +82,8 @@ function calculateConnectionPercentages(nodeId: string, links: LinkData[]): Map<
     return new Map<string, number>();
   }
   
-  // FIXED: Calculate total value for percentage calculation
-  const totalValue = nodeLinks.reduce((sum, link) => sum + Math.abs(link.value), 0);
+  // Calculate total value for percentage calculation
+  const totalValue = nodeLinks.reduce((sum, link) => sum + link.value, 0);
   
   if (totalValue === 0) {
     console.log(`[SoulNetVisualization] Total value is 0 for ${nodeId}`);
@@ -91,25 +91,26 @@ function calculateConnectionPercentages(nodeId: string, links: LinkData[]): Map<
   }
   
   const percentageMap = new Map<string, number>();
+  let runningSum = 0;
   
-  // FIXED: Calculate accurate percentages based on actual connection values
-  nodeLinks.forEach((link) => {
+  // Calculate percentages ensuring they sum to 100%
+  nodeLinks.forEach((link, index) => {
     const connectedNodeId = link.source === nodeId ? link.target : link.source;
     
-    // Calculate percentage based on the link's value relative to total
-    const percentage = Math.round((Math.abs(link.value) / totalValue) * 100);
-    
-    // Ensure minimum 1% for visible connections
-    const finalPercentage = Math.max(1, percentage);
-    
-    percentageMap.set(connectedNodeId, finalPercentage);
-    
-    console.log(`[SoulNetVisualization] FIXED percentage calculation: ${connectedNodeId} = ${finalPercentage}% (value: ${link.value}, total: ${totalValue})`);
+    if (index === nodeLinks.length - 1) {
+      // For the last item, use remainder to ensure exact 100% sum
+      const percentage = 100 - runningSum;
+      percentageMap.set(connectedNodeId, Math.max(1, percentage)); // Minimum 1%
+    } else {
+      const percentage = Math.round((link.value / totalValue) * 100);
+      percentageMap.set(connectedNodeId, Math.max(1, percentage)); // Minimum 1%
+      runningSum += percentage;
+    }
   });
   
-  // Verify the sum and log for debugging
+  // Verify the sum is 100% (with logging for debugging)
   const totalPercentage = Array.from(percentageMap.values()).reduce((sum, val) => sum + val, 0);
-  console.log(`[SoulNetVisualization] FIXED Connection percentages for ${nodeId}:`, 
+  console.log(`[SoulNetVisualization] Connection percentages for ${nodeId}:`, 
     Object.fromEntries(percentageMap), `Total: ${totalPercentage}%`);
     
   return percentageMap;
@@ -278,7 +279,7 @@ export const SoulNetVisualization: React.FC<SoulNetVisualizationProps> = ({
       translationInProgressRef.current = false;
     };
   }, [data?.nodes, currentLanguage, translate]);
-
+  
   // Use memoization to prevent recalculation of center position on every render
   const centerPosition = useMemo(() => {
     if (!validData.nodes || validData.nodes.length === 0) {
@@ -360,7 +361,7 @@ export const SoulNetVisualization: React.FC<SoulNetVisualizationProps> = ({
     return calculateRelativeStrengths(selectedNode, validData.links);
   }, [selectedNode, validData?.links]);
 
-  // FIXED: Use corrected percentage calculation
+  // Calculate percentage distribution of connections
   const connectionPercentages = useMemo(() => {
     if (!selectedNode || !validData || !validData.links) return new Map<string, number>();
     const percentages = calculateConnectionPercentages(selectedNode, validData.links);
@@ -368,7 +369,7 @@ export const SoulNetVisualization: React.FC<SoulNetVisualizationProps> = ({
     // Additional verification logging
     if (percentages.size > 0) {
       const total = Array.from(percentages.values()).reduce((sum, val) => sum + val, 0);
-      console.log(`[SoulNetVisualization] FIXED percentage verification for ${selectedNode}: ${total}% total`);
+      console.log(`[SoulNetVisualization] Percentage verification for ${selectedNode}: ${total}% total`);
     }
     
     return percentages;
@@ -536,7 +537,7 @@ export const SoulNetVisualization: React.FC<SoulNetVisualizationProps> = ({
         
         // Enhanced logging for percentage display
         if (showPercentage) {
-          console.log(`[SoulNetVisualization] FIXED: Showing ${connectionPercentage}% for ${node.id} connected to ${selectedNode}`);
+          console.log(`[SoulNetVisualization] Showing ${connectionPercentage}% for ${node.id} connected to ${selectedNode}`);
         }
         
         return (

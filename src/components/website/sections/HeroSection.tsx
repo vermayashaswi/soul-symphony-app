@@ -79,7 +79,7 @@ const HeroSection: React.FC<HeroSectionProps> = ({ openAppStore, openPlayStore }
               </div>
               <div className="flex items-center gap-1">
                 <Check className="h-4 w-4 text-primary" />
-                <TranslatableText text="7-Day Free Trial" />
+                <TranslatableText text="14-Day Free Trial" />
               </div>
             </div>
           </motion.div>
