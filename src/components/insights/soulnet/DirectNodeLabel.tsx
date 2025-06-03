@@ -1,6 +1,6 @@
 
 import React, { useMemo, useEffect } from 'react';
-import SimplifiedTextRenderer from './SimplifiedTextRenderer';
+import SimpleText from './SimpleText';
 
 interface DirectNodeLabelProps {
   id: string;
@@ -158,14 +158,13 @@ export const DirectNodeLabel: React.FC<DirectNodeLabelProps> = ({
 
   return (
     <>
-      {/* Main node label with Unicode support */}
-      <SimplifiedTextRenderer
+      {/* Main node label with Unicode support using SimpleText */}
+      <SimpleText
         text={displayText}
         position={mainLabelPosition}
         color={textColor}
         size={textSize}
         visible={true}
-        renderOrder={15}
         bold={isHighlighted || isSelected}
         outlineWidth={isSelected ? 0.1 : 0.05}
         outlineColor={effectiveTheme === 'light' ? '#ffffff' : '#000000'}
@@ -174,13 +173,12 @@ export const DirectNodeLabel: React.FC<DirectNodeLabelProps> = ({
       
       {/* Percentage label (displayed below main label with proper spacing) */}
       {showPercentage && connectionPercentage > 0 && (
-        <SimplifiedTextRenderer
+        <SimpleText
           text={`${connectionPercentage}%`}
           position={percentageLabelPosition}
           color={textColor}
           size={percentageTextSize}
           visible={true}
-          renderOrder={16}
           bold={false}
           outlineWidth={0.03}
           outlineColor={effectiveTheme === 'light' ? '#ffffff' : '#000000'}
