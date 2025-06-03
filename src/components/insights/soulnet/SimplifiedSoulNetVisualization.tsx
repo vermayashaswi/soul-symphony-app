@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useCallback } from 'react';
 import { useFrame } from '@react-three/fiber';
 import { OrbitControls } from '@react-three/drei';
@@ -208,12 +207,11 @@ export const SimplifiedSoulNetVisualization: React.FC<SimplifiedSoulNetVisualiza
             value={link.value}
             isHighlighted={
               selectedNode !== null && 
-              (highlightedNodes.has(link.source) || highlightedNodes.has(link.target))
+              (highlightedNodes.has(link.source) && highlightedNodes.has(link.target))
             }
             dimmed={
               selectedNode !== null && 
-              !highlightedNodes.has(link.source) && 
-              !highlightedNodes.has(link.target)
+              (!highlightedNodes.has(link.source) || !highlightedNodes.has(link.target))
             }
             startNodeType={sourceNode.type}
             endNodeType={targetNode.type}
