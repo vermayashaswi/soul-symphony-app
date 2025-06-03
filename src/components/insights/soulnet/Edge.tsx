@@ -90,30 +90,33 @@ export const Edge: React.FC<EdgeProps> = ({
     return geometry;
   }, [points]);
 
-  // Improved color scheme based on theme
+  // ENHANCED: Dramatically improved color scheme for strong contrast
   const getEdgeColor = useMemo(() => {
     if (isHighlighted) {
-      return '#ffffff';
+      return '#ffffff'; // Bright white for highlighted connections
     }
     
     if (dimmed) {
-      return theme === 'light' ? '#666666' : '#444444';
+      // ENHANCED: Much darker and less visible for dimmed edges
+      return theme === 'light' ? '#2a2a2a' : '#1a1a1a';
     }
     
-    // Better visibility for non-highlighted edges in light theme
+    // Default state - moderately visible
     return theme === 'light' ? '#555555' : '#888888';
   }, [isHighlighted, dimmed, theme]);
 
+  // ENHANCED: Dramatically reduced opacity for dimmed edges
   const getEdgeOpacity = useMemo(() => {
     if (isHighlighted) {
-      return 0.9;
+      return 0.95; // Very bright for highlighted
     }
     
     if (dimmed) {
-      return theme === 'light' ? 0.15 : 0.03;
+      // ENHANCED: Extremely low opacity for dimmed edges (90% reduction)
+      return theme === 'light' ? 0.02 : 0.01;
     }
     
-    // Better visibility for non-highlighted edges
+    // Default state
     return theme === 'light' ? 0.25 : 0.08;
   }, [isHighlighted, dimmed, theme]);
 
@@ -130,9 +133,9 @@ export const Edge: React.FC<EdgeProps> = ({
     }
   });
 
-  // Reduce non-highlighted lines thickness by 3x
-  const baseThickness = isHighlighted ? 1 : 1; // Adjust non-highlighted base thickness
-  const thickness = baseThickness + (value * (isHighlighted ? maxThickness * 2/3 : maxThickness / 3));
+  // ENHANCED: Much more dramatic thickness difference
+  const baseThickness = isHighlighted ? 2.5 : 0.3; // Highlighted much thicker, dimmed much thinner
+  const thickness = baseThickness + (value * (isHighlighted ? maxThickness * 1.5 : maxThickness * 0.1));
   
   // Create material with appropriate properties
   const material = useMemo(() => {

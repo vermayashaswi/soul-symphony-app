@@ -28,7 +28,7 @@ interface NodeProps {
   forceShowLabels?: boolean;
   translatedText?: string;
   effectiveTheme?: 'light' | 'dark';
-  isInstantMode?: boolean; // NEW: Flag for instant data mode
+  isInstantMode?: boolean;
 }
 
 const Node: React.FC<NodeProps> = ({
@@ -51,7 +51,7 @@ const Node: React.FC<NodeProps> = ({
 }) => {
   const meshRef = useRef<THREE.Mesh>(null);
 
-  // FIXED: Enhanced color logic to apply same rules regardless of which node type is selected
+  // ENHANCED: Dramatically improved color logic for strong visual hierarchy
   const color = useMemo(() => {
     if (isSelected) return new THREE.Color('#ffffff');
     
@@ -64,21 +64,36 @@ const Node: React.FC<NodeProps> = ({
       }
     }
     
-    return new THREE.Color(dimmed ? '#666666' : '#cccccc');
+    // ENHANCED: Much darker and less visible for dimmed nodes
+    return new THREE.Color(dimmed ? '#1a1a1a' : '#cccccc');
   }, [isSelected, isHighlighted, node.type, themeHex, dimmed]);
 
-  // ENHANCED: Increased base node scale by 15% and improved scaling logic
+  // ENHANCED: More dramatic scale differences for better hierarchy
   const nodeScale = useMemo(() => {
-    const baseScale = 1.15; // 15% increase from original size of 1.0
-    if (isSelected) return baseScale * 1.4;
-    if (isHighlighted) return baseScale * 1.2;
+    const baseScale = 1.15;
+    if (isSelected) return baseScale * 1.6; // Even larger for selected
+    if (isHighlighted) return baseScale * 1.3; // Larger for highlighted
+    if (dimmed) return baseScale * 0.6; // Much smaller for dimmed
     return baseScale;
-  }, [isSelected, isHighlighted]);
+  }, [isSelected, isHighlighted, dimmed]);
+
+  // ENHANCED: Dramatic opacity changes for visual hierarchy
+  const nodeOpacity = useMemo(() => {
+    if (isSelected) return 1.0;
+    if (isHighlighted) return 0.9;
+    if (dimmed) return 0.05; // Extremely low opacity for dimmed nodes
+    return 0.8;
+  }, [isSelected, isHighlighted, dimmed]);
 
   useFrame(() => {
     if (meshRef.current) {
       meshRef.current.material.color.lerp(color, 0.1);
       meshRef.current.scale.lerp(new THREE.Vector3(nodeScale, nodeScale, nodeScale), 0.1);
+      
+      // Update opacity
+      if (meshRef.current.material instanceof THREE.MeshStandardMaterial) {
+        meshRef.current.material.opacity = nodeOpacity;
+      }
     }
   });
 
@@ -87,9 +102,11 @@ const Node: React.FC<NodeProps> = ({
     onClick(node.id, e);
   };
 
+  // ENHANCED: Only show labels for highlighted/selected nodes or when forced
   const shouldShowLabel = useMemo(() => {
+    if (dimmed) return false; // Never show labels for dimmed nodes
     return forceShowLabels || showLabel || isSelected || isHighlighted;
-  }, [forceShowLabels, showLabel, isSelected, isHighlighted]);
+  }, [forceShowLabels, showLabel, isSelected, isHighlighted, dimmed]);
 
   // INSTANT MODE: Better logging for percentage tracking with comprehensive debug info
   if (showPercentage && connectionPercentage > 0) {
@@ -106,13 +123,13 @@ const Node: React.FC<NodeProps> = ({
     console.log(`[Node] ENHANCED: Rendering ${node.type} node ${node.id} with scale ${nodeScale.toFixed(2)} and translated text: "${translatedText || node.id}" and percentage display: ${showPercentage ? connectionPercentage + '%' : 'none'}`);
   }
 
-  // ENHANCED: Improved geometry sizes to work with the 15% scale increase
+  // ENHANCED: Improved geometry sizes to work with the enhanced scale differences
   const renderGeometry = () => {
     if (node.type === 'emotion') {
-      // Increased cube size for emotion nodes (15% larger than previous 1.4)
+      // Cube for emotion nodes
       return <boxGeometry args={[1.6, 1.6, 1.6]} />;
     } else {
-      // Increased sphere radius for entity nodes (15% larger than previous 0.7)
+      // Sphere for entity nodes
       return <sphereGeometry args={[0.8, 32, 32]} />;
     }
   };
@@ -125,7 +142,13 @@ const Node: React.FC<NodeProps> = ({
         onClick={handleNodeClick}
       >
         {renderGeometry()}
-        <meshStandardMaterial color={color} metalness={0.3} roughness={0.8} />
+        <meshStandardMaterial 
+          color={color} 
+          metalness={0.3} 
+          roughness={0.8}
+          transparent={true}
+          opacity={nodeOpacity}
+        />
       </mesh>
       
       {shouldShowLabel && (

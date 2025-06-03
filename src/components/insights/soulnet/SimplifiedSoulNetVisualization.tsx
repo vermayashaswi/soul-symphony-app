@@ -76,7 +76,7 @@ export const SimplifiedSoulNetVisualization: React.FC<SimplifiedSoulNetVisualiza
     }
   });
 
-  // INSTANT highlighting effect when a node is selected
+  // ENHANCED: Instant highlighting effect with stronger visual hierarchy
   useEffect(() => {
     if (selectedNode) {
       const connectedNodes = new Set<string>();
@@ -101,6 +101,7 @@ export const SimplifiedSoulNetVisualization: React.FC<SimplifiedSoulNetVisualiza
         });
       }
       
+      // ENHANCED: All nodes that are NOT connected become dimmed
       data.nodes.forEach(node => {
         if (!connectedNodes.has(node.id)) {
           allOtherNodes.add(node.id);
@@ -110,8 +111,9 @@ export const SimplifiedSoulNetVisualization: React.FC<SimplifiedSoulNetVisualiza
       setHighlightedNodes(connectedNodes);
       setDimmedNodes(allOtherNodes);
       
-      console.log(`[SimplifiedSoulNetVisualization] INSTANT: Selected ${selectedNode}, highlighting ${connectedNodes.size} connected nodes`);
+      console.log(`[SimplifiedSoulNetVisualization] ENHANCED HIERARCHY: Selected ${selectedNode}, highlighting ${connectedNodes.size} nodes, dimming ${allOtherNodes.size} nodes`);
     } else {
+      // ENHANCED: When no node is selected, show all nodes normally (no dimming)
       setHighlightedNodes(new Set());
       setDimmedNodes(new Set());
     }
@@ -124,8 +126,9 @@ export const SimplifiedSoulNetVisualization: React.FC<SimplifiedSoulNetVisualiza
 
   return (
     <>
-      <ambientLight intensity={0.6} />
-      <directionalLight position={[10, 10, 5]} intensity={0.8} />
+      {/* ENHANCED: Brighter ambient lighting for better visibility of highlighted elements */}
+      <ambientLight intensity={0.8} />
+      <directionalLight position={[10, 10, 5]} intensity={1.2} />
       <OrbitControls 
         enablePan={true} 
         enableZoom={true} 
@@ -150,7 +153,7 @@ export const SimplifiedSoulNetVisualization: React.FC<SimplifiedSoulNetVisualiza
         // INSTANT translation - no loading delay
         const translatedText = getInstantTranslation(node.id);
         
-        console.log(`[SimplifiedSoulNetVisualization] INSTANT: Node ${node.id} - percentage: ${connectionPercentage}%, translation: "${translatedText}", showPercentage: ${showPercentage}`);
+        console.log(`[SimplifiedSoulNetVisualization] ENHANCED HIERARCHY: Node ${node.id} - highlighted: ${isHighlighted}, dimmed: ${isDimmed}, percentage: ${connectionPercentage}%, translation: "${translatedText}"`);
         
         return (
           <Node
@@ -159,7 +162,7 @@ export const SimplifiedSoulNetVisualization: React.FC<SimplifiedSoulNetVisualiza
             isSelected={selectedNode === node.id}
             onClick={onNodeClick}
             highlightedNodes={highlightedNodes}
-            showLabel={shouldShowLabels}
+            showLabel={shouldShowLabels && !isDimmed} // Don't show labels for dimmed nodes
             dimmed={isDimmed}
             themeHex={themeHex}
             selectedNodeId={selectedNode}
@@ -167,7 +170,7 @@ export const SimplifiedSoulNetVisualization: React.FC<SimplifiedSoulNetVisualiza
             isHighlighted={isHighlighted}
             connectionPercentage={connectionPercentage}
             showPercentage={showPercentage}
-            forceShowLabels={shouldShowLabels}
+            forceShowLabels={false} // Let the dimming logic control this
             translatedText={translatedText}
             effectiveTheme={effectiveTheme}
             isInstantMode={isInstantReady}
@@ -184,20 +187,22 @@ export const SimplifiedSoulNetVisualization: React.FC<SimplifiedSoulNetVisualiza
           return null;
         }
         
+        // ENHANCED: Edge is highlighted only if BOTH nodes are highlighted
+        const isHighlighted = selectedNode !== null && 
+          (highlightedNodes.has(link.source) && highlightedNodes.has(link.target));
+        
+        // ENHANCED: Edge is dimmed if EITHER node is dimmed
+        const isDimmed = selectedNode !== null && 
+          (dimmedNodes.has(link.source) || dimmedNodes.has(link.target));
+        
         return (
           <Edge
             key={`${link.source}-${link.target}-${index}`}
             start={sourceNode.position}
             end={targetNode.position}
             value={link.value}
-            isHighlighted={
-              selectedNode !== null && 
-              (highlightedNodes.has(link.source) && highlightedNodes.has(link.target))
-            }
-            dimmed={
-              selectedNode !== null && 
-              (!highlightedNodes.has(link.source) || !highlightedNodes.has(link.target))
-            }
+            isHighlighted={isHighlighted}
+            dimmed={isDimmed}
             startNodeType={sourceNode.type}
             endNodeType={targetNode.type}
           />
