@@ -172,9 +172,9 @@ export const DirectNodeLabel: React.FC<DirectNodeLabelProps> = ({
   }
 
   if (isInstantMode) {
-    console.log(`[DirectNodeLabel] INSTANT MODE - MAIN TEXT: "${displayText}" at position`, labelPosition, 'with size:', textSize, 'color:', textColor, 'maxWidth:', maxWidth, '- NO LOADING DELAY - UNIFORM POSITIONING`);
+    console.log(`[DirectNodeLabel] INSTANT MODE - MAIN TEXT: "${displayText}" at position`, labelPosition, `with size: ${textSize}, color: ${textColor}, maxWidth: ${maxWidth} - NO LOADING DELAY - UNIFORM POSITIONING`);
   } else {
-    console.log(`[DirectNodeLabel] ENHANCED POSITIONING - MAIN TEXT: "${displayText}" at position`, labelPosition, 'with size:', textSize, 'color:', textColor, 'maxWidth:', maxWidth, '- UNIFORM POSITIONING`);
+    console.log(`[DirectNodeLabel] ENHANCED POSITIONING - MAIN TEXT: "${displayText}" at position`, labelPosition, `with size: ${textSize}, color: ${textColor}, maxWidth: ${maxWidth} - UNIFORM POSITIONING`);
   }
 
   return (
