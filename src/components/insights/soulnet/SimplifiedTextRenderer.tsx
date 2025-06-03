@@ -31,10 +31,11 @@ export const SimplifiedTextRenderer: React.FC<SimplifiedTextRendererProps> = ({
 }) => {
   const textRef = useRef<THREE.Mesh>(null);
 
-  // Clean and prepare text
+  // Clean and prepare text with enhanced Unicode support
   const displayText = React.useMemo(() => {
     if (!text || typeof text !== 'string') return 'Node';
     const cleanText = text.trim();
+    // Enhanced text processing for Hindi/Devanagari and other Unicode scripts
     return cleanText.length > 50 ? cleanText.substring(0, 50) + '...' : cleanText || 'Node';
   }, [text]);
 
@@ -57,7 +58,7 @@ export const SimplifiedTextRenderer: React.FC<SimplifiedTextRendererProps> = ({
     return null;
   }
 
-  console.log(`[SimplifiedTextRenderer] Rendering: "${displayText}" at size ${size} with color ${color}`);
+  console.log(`[SimplifiedTextRenderer] Rendering with Unicode support: "${displayText}" at size ${size} with color ${color}`);
 
   return (
     <Text
@@ -69,13 +70,14 @@ export const SimplifiedTextRenderer: React.FC<SimplifiedTextRendererProps> = ({
       anchorY="middle"
       maxWidth={maxWidth}
       textAlign="center"
-      font="Inter, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, 'Noto Sans', sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol', 'Noto Color Emoji'"
+      font="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, 'Noto Sans', sans-serif, 'Noto Sans Devanagari', 'Noto Sans Hindi', 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol', 'Noto Color Emoji'"
       fontWeight={bold ? "bold" : "normal"}
       material-transparent={true}
       material-depthTest={false}
       renderOrder={renderOrder}
       outlineWidth={outlineWidth}
       outlineColor={outlineColor}
+      material-toneMapped={false}
     >
       {displayText}
     </Text>

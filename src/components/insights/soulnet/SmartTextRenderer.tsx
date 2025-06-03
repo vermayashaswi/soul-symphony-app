@@ -19,17 +19,17 @@ export const SmartTextRenderer: React.FC<SmartTextRendererProps> = ({
   text,
   position,
   color = '#ffffff',
-  size = 1.0, // FIXED: Updated to match SimplifiedTextRenderer default
+  size = 1.0,
   visible = true,
   renderOrder = 10,
   bold = false,
-  outlineWidth = 0.05, // FIXED: Updated to match SimplifiedTextRenderer default
+  outlineWidth = 0.05,
   outlineColor = '#000000',
-  maxWidth = 40 // FIXED: Updated to match SimplifiedTextRenderer default
+  maxWidth = 40
 }) => {
-  console.log(`[SmartTextRenderer] Simplified mode - rendering: "${text}" with Three.js Text only`);
+  console.log(`[SmartTextRenderer] Delegating to SimplifiedTextRenderer for Unicode text: "${text}"`);
 
-  // Always use SimplifiedTextRenderer for consistency and reliability
+  // Always use SimplifiedTextRenderer for all text rendering with Unicode support
   return (
     <SimplifiedTextRenderer
       text={text}
