@@ -89,6 +89,18 @@ export const DirectNodeLabel: React.FC<DirectNodeLabelProps> = ({
     return finalSize;
   }, [cameraZoom, id, isSelected, isHighlighted, isInstantMode]);
 
+  // FIXED: Improved maxWidth calculation based on text size and camera zoom
+  const maxWidth = useMemo(() => {
+    const zoom = Math.max(10, Math.min(100, cameraZoom));
+    // Base width that scales with text size and zoom level
+    const baseWidth = textSize * 15; // Reduced multiplier for tighter wrapping
+    const zoomAdjustment = Math.max(0.6, Math.min(1.2, (zoom - 30) * 0.02 + 1));
+    const finalWidth = Math.max(60, Math.min(200, baseWidth * zoomAdjustment));
+    
+    console.log(`[DirectNodeLabel] Calculated maxWidth for ${id}: ${finalWidth} (textSize: ${textSize}, zoom: ${zoom})`);
+    return finalWidth;
+  }, [textSize, cameraZoom, id]);
+
   // Much smaller percentage text size
   const percentageTextSize = useMemo(() => {
     return textSize * 0.21;
@@ -160,14 +172,14 @@ export const DirectNodeLabel: React.FC<DirectNodeLabelProps> = ({
   }
 
   if (isInstantMode) {
-    console.log(`[DirectNodeLabel] INSTANT MODE - MAIN TEXT: "${displayText}" at position`, labelPosition, 'with size:', textSize, 'color:', textColor, '- NO LOADING DELAY - UNIFORM POSITIONING');
+    console.log(`[DirectNodeLabel] INSTANT MODE - MAIN TEXT: "${displayText}" at position`, labelPosition, 'with size:', textSize, 'color:', textColor, 'maxWidth:', maxWidth, '- NO LOADING DELAY - UNIFORM POSITIONING`);
   } else {
-    console.log(`[DirectNodeLabel] ENHANCED POSITIONING - MAIN TEXT: "${displayText}" at position`, labelPosition, 'with size:', textSize, 'color:', textColor, '- UNIFORM POSITIONING');
+    console.log(`[DirectNodeLabel] ENHANCED POSITIONING - MAIN TEXT: "${displayText}" at position`, labelPosition, 'with size:', textSize, 'color:', textColor, 'maxWidth:', maxWidth, '- UNIFORM POSITIONING`);
   }
 
   return (
     <>
-      {/* Main translated text using SmartTextRenderer with theme-aware color and text wrapping */}
+      {/* Main translated text using SmartTextRenderer with theme-aware color and improved text wrapping */}
       <SmartTextRenderer
         text={displayText}
         position={labelPosition}
@@ -178,7 +190,7 @@ export const DirectNodeLabel: React.FC<DirectNodeLabelProps> = ({
         bold={isHighlighted || isSelected}
         outlineWidth={isSelected ? 0.3 : 0.1} // Reduced outline for better readability
         outlineColor={effectiveTheme === 'dark' ? '#000000' : '#ffffff'} // Contrasting outline
-        maxWidth={600} // Increased for better wrapping
+        maxWidth={maxWidth}
         enableWrapping={true}
       />
       

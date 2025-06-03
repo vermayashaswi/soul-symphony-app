@@ -18,6 +18,50 @@ interface SmartTextRendererProps {
   enableWrapping?: boolean;
 }
 
+// ENHANCED: Intelligent text splitting function
+const intelligentTextSplit = (text: string, maxCharsPerLine: number = 12): string => {
+  if (!text || text.length <= maxCharsPerLine) {
+    return text;
+  }
+
+  const words = text.split(/[\s&]+/); // Split on spaces and ampersands
+  const lines: string[] = [];
+  let currentLine = '';
+
+  for (const word of words) {
+    // If adding this word would exceed the limit
+    if (currentLine.length > 0 && (currentLine + ' ' + word).length > maxCharsPerLine) {
+      lines.push(currentLine.trim());
+      currentLine = word;
+    } else {
+      currentLine = currentLine.length > 0 ? currentLine + ' ' + word : word;
+    }
+  }
+
+  // Add the last line if it has content
+  if (currentLine.trim().length > 0) {
+    lines.push(currentLine.trim());
+  }
+
+  // Join with newlines, but limit to 3 lines max to prevent excessive height
+  const result = lines.slice(0, 3).join('\n');
+  
+  // If we had to truncate, add ellipsis to the last line
+  if (lines.length > 3) {
+    const truncatedLines = lines.slice(0, 2);
+    const lastLine = lines[2];
+    if (lastLine.length > maxCharsPerLine - 3) {
+      truncatedLines.push(lastLine.substring(0, maxCharsPerLine - 3) + '...');
+    } else {
+      truncatedLines.push(lastLine + '...');
+    }
+    return truncatedLines.join('\n');
+  }
+
+  console.log(`[SmartTextRenderer] Intelligent split: "${text}" -> "${result}"`);
+  return result;
+};
+
 export const SmartTextRenderer: React.FC<SmartTextRendererProps> = ({
   text,
   position,
@@ -34,40 +78,54 @@ export const SmartTextRenderer: React.FC<SmartTextRendererProps> = ({
   const [useCanvasRenderer, setUseCanvasRenderer] = useState(false);
   const [fontLoaded, setFontLoaded] = useState(false);
   const [hasError, setHasError] = useState(false);
+  const [processedText, setProcessedText] = useState(text);
+
+  // ENHANCED: Process text for better wrapping
+  useEffect(() => {
+    if (enableWrapping && text) {
+      // Calculate optimal characters per line based on size and maxWidth
+      const baseCharsPerLine = Math.max(8, Math.min(15, Math.floor(maxWidth / (size * 8))));
+      const wrappedText = intelligentTextSplit(text, baseCharsPerLine);
+      setProcessedText(wrappedText);
+      console.log(`[SmartTextRenderer] Text processing: "${text}" -> "${wrappedText}" (charsPerLine: ${baseCharsPerLine})`);
+    } else {
+      setProcessedText(text);
+    }
+  }, [text, enableWrapping, size, maxWidth]);
 
   useEffect(() => {
     const initializeRenderer = async () => {
       try {
-        const isComplex = enhancedFontService.isComplexScript(text);
+        const isComplex = enhancedFontService.isComplexScript(processedText);
         
         // For larger text sizes (> 2.0) or when wrapping is needed, prefer Canvas renderer for better quality
         const preferCanvas = size > 2.0 || enableWrapping;
         
         if (isComplex || preferCanvas) {
-          console.log(`[SmartTextRenderer] Using Canvas renderer for: "${text}" (complex: ${isComplex}, large text: ${preferCanvas}, wrapping: ${enableWrapping})`);
+          console.log(`[SmartTextRenderer] Using Canvas renderer for: "${processedText}" (complex: ${isComplex}, large text: ${preferCanvas}, wrapping: ${enableWrapping})`);
           setUseCanvasRenderer(true);
           setFontLoaded(true);
         } else {
-          console.log(`[SmartTextRenderer] Simple script detected for: "${text}", attempting Three.js font loading`);
+          console.log(`[SmartTextRenderer] Simple script detected for: "${processedText}", attempting Three.js font loading`);
           try {
-            await enhancedFontService.loadFont(text);
+            await enhancedFontService.loadFont(processedText);
             setUseCanvasRenderer(false);
             setFontLoaded(true);
-            console.log(`[SmartTextRenderer] Three.js font loaded successfully for: "${text}"`);
+            console.log(`[SmartTextRenderer] Three.js font loaded successfully for: "${processedText}"`);
           } catch (error) {
-            console.warn(`[SmartTextRenderer] Three.js font loading failed for: "${text}", falling back to Canvas`, error);
+            console.warn(`[SmartTextRenderer] Three.js font loading failed for: "${processedText}", falling back to Canvas`, error);
             setUseCanvasRenderer(true);
             setFontLoaded(true);
           }
         }
       } catch (error) {
-        console.error(`[SmartTextRenderer] Error initializing renderer for: "${text}"`, error);
+        console.error(`[SmartTextRenderer] Error initializing renderer for: "${processedText}"`, error);
         setHasError(true);
       }
     };
 
     initializeRenderer();
-  }, [text, size, enableWrapping]);
+  }, [processedText, size, enableWrapping]);
 
   if (!visible || hasError || !fontLoaded) {
     return null;
@@ -76,7 +134,7 @@ export const SmartTextRenderer: React.FC<SmartTextRendererProps> = ({
   if (useCanvasRenderer) {
     return (
       <CanvasTextRenderer
-        text={text}
+        text={processedText}
         position={position}
         color={color}
         size={size}
@@ -91,7 +149,7 @@ export const SmartTextRenderer: React.FC<SmartTextRendererProps> = ({
 
   return (
     <SimpleText
-      text={text}
+      text={processedText}
       position={position}
       color={color}
       size={size}
