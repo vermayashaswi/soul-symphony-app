@@ -1,3 +1,4 @@
+
 import { supabase } from '@/integrations/supabase/client';
 import { translationService } from '@/services/translationService';
 
@@ -198,7 +199,9 @@ export class EnhancedSoulNetPreloadService {
       const handleMessage = (e: MessageEvent) => {
         if (e.data.type === 'PERCENTAGES_CALCULATED') {
           this.worker!.removeEventListener('message', handleMessage);
-          const percentagesMap = new Map(Object.entries(e.data.payload.percentages));
+          // FIXED: Properly type the percentages object as Record<string, number>
+          const percentagesObj = e.data.payload.percentages as Record<string, number>;
+          const percentagesMap = new Map(Object.entries(percentagesObj));
           resolve(percentagesMap);
         } else if (e.data.type === 'ERROR') {
           this.worker!.removeEventListener('message', handleMessage);
