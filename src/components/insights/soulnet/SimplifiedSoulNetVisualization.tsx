@@ -51,7 +51,7 @@ export const SimplifiedSoulNetVisualization: React.FC<SimplifiedSoulNetVisualiza
   const initializationRef = useRef<boolean>(false);
   const mounted = useRef<boolean>(true);
   
-  console.log("[SimplifiedSoulNetVisualization] GOOGLE TRANSLATE ONLY - Rendering stage:", renderingStage);
+  console.log("[SimplifiedSoulNetVisualization] FIXED VERSION - Rendering stage:", renderingStage);
 
   // Get current effective theme for font color calculation
   const effectiveTheme = useMemo(() => {
@@ -62,7 +62,7 @@ export const SimplifiedSoulNetVisualization: React.FC<SimplifiedSoulNetVisualiza
   }, [theme, systemTheme]);
 
   useEffect(() => {
-    console.log("[SimplifiedSoulNetVisualization] Component mounted - Google Translate only mode");
+    console.log("[SimplifiedSoulNetVisualization] Component mounted - Enhanced percentage display mode");
     return () => {
       mounted.current = false;
     };
@@ -101,7 +101,7 @@ export const SimplifiedSoulNetVisualization: React.FC<SimplifiedSoulNetVisualiza
     }
   }, [validData.nodes]);
 
-  // FIXED: Enhanced connection percentages calculation with proper normalization
+  // FIXED: Enhanced and corrected connection percentages calculation
   const connectionPercentages = useMemo(() => {
     if (!selectedNode || !validData.links) {
       console.log('[SimplifiedSoulNetVisualization] No selected node or links, clearing percentages');
@@ -118,31 +118,40 @@ export const SimplifiedSoulNetVisualization: React.FC<SimplifiedSoulNetVisualiza
       return percentages;
     }
     
-    console.log(`[SimplifiedSoulNetVisualization] Found ${selectedConnections.length} connections for node:`, selectedNode);
+    console.log(`[SimplifiedSoulNetVisualization] FIXED: Found ${selectedConnections.length} connections for node:`, selectedNode);
     
-    // ENHANCED: Better normalization - use max connection strength as 100%
-    const connectionStrengths = selectedConnections.map(link => link.value || 1);
-    const maxStrength = Math.max(...connectionStrengths);
-    const totalStrength = connectionStrengths.reduce((sum, strength) => sum + strength, 0);
+    // Calculate total value for accurate percentage distribution
+    const totalValue = selectedConnections.reduce((sum, link) => sum + (link.value || 1), 0);
     
-    selectedConnections.forEach(link => {
+    if (totalValue <= 0) {
+      console.warn('[SimplifiedSoulNetVisualization] Total connection value is zero or negative');
+      return percentages;
+    }
+    
+    // Calculate percentages that sum to 100%
+    let runningSum = 0;
+    selectedConnections.forEach((link, index) => {
       const connectedNodeId = link.source === selectedNode ? link.target : link.source;
-      const connectionStrength = link.value || 1;
+      const connectionValue = link.value || 1;
       
-      // Use percentage relative to strongest connection for better visibility
-      const percentageByMax = Math.round((connectionStrength / maxStrength) * 100);
-      // Also calculate relative to total for comparison
-      const percentageByTotal = Math.round((connectionStrength / totalStrength) * 100);
+      if (index === selectedConnections.length - 1) {
+        // Last item gets the remainder to ensure exact 100% sum
+        const finalPercentage = Math.max(1, 100 - runningSum);
+        percentages.set(connectedNodeId, finalPercentage);
+      } else {
+        const percentage = Math.max(1, Math.round((connectionValue / totalValue) * 100));
+        percentages.set(connectedNodeId, percentage);
+        runningSum += percentage;
+      }
       
-      // Use the higher of the two for better visibility, minimum 5%
-      const finalPercentage = Math.max(5, Math.max(percentageByMax, percentageByTotal));
-      
-      percentages.set(connectedNodeId, Math.min(100, finalPercentage));
-      
-      console.log(`[SimplifiedSoulNetVisualization] Connection ${selectedNode} -> ${connectedNodeId}: strength=${connectionStrength}, percentage=${finalPercentage}%`);
+      console.log(`[SimplifiedSoulNetVisualization] FIXED: Connection ${selectedNode} -> ${connectedNodeId}: value=${connectionValue}, percentage=${percentages.get(connectedNodeId)}%`);
     });
     
-    console.log('[SimplifiedSoulNetVisualization] Final connection percentages:', Object.fromEntries(percentages));
+    // Verify total percentage
+    const totalPercentage = Array.from(percentages.values()).reduce((sum, val) => sum + val, 0);
+    console.log('[SimplifiedSoulNetVisualization] FIXED: Final connection percentages total:', totalPercentage, '%');
+    console.log('[SimplifiedSoulNetVisualization] FIXED: Percentage breakdown:', Object.fromEntries(percentages));
+    
     return percentages;
   }, [selectedNode, validData.links]);
 
@@ -185,17 +194,17 @@ export const SimplifiedSoulNetVisualization: React.FC<SimplifiedSoulNetVisualiza
     processTranslations();
   }, [data?.nodes, currentLanguage, translate]);
 
-  // Staged initialization with proper timing
+  // FIXED: Enhanced staged initialization with proper timing
   useEffect(() => {
     if (validData.nodes.length === 0 || initializationRef.current) return;
     
-    console.log('[SimplifiedSoulNetVisualization] Starting staged initialization');
+    console.log('[SimplifiedSoulNetVisualization] Starting enhanced staged initialization');
     initializationRef.current = true;
 
     // Stage 1: Initial render (immediate)
     setRenderingStage('initial');
 
-    // Stage 2: Basic render with delay
+    // Stage 2: Basic render with delay for camera setup
     const basicTimer = setTimeout(() => {
       try {
         if (camera && validData.nodes.length > 0) {
@@ -209,18 +218,18 @@ export const SimplifiedSoulNetVisualization: React.FC<SimplifiedSoulNetVisualiza
         console.error('[SimplifiedSoulNetVisualization] Basic stage error:', error);
         setRenderingStage('initial');
       }
-    }, 100);
+    }, 150); // Slightly longer delay for stability
 
-    // Stage 3: Enhanced render with longer delay
+    // Stage 3: Enhanced render with even longer delay for percentage display
     const enhancedTimer = setTimeout(() => {
       try {
         setRenderingStage('enhanced');
-        console.log('[SimplifiedSoulNetVisualization] Moving to enhanced stage');
+        console.log('[SimplifiedSoulNetVisualization] Moving to enhanced stage - percentage display ready');
       } catch (error) {
         console.error('[SimplifiedSoulNetVisualization] Enhanced stage error:', error);
         // Stay in basic stage on error
       }
-    }, 500);
+    }, 800); // Longer delay to ensure proper initialization
 
     return () => {
       clearTimeout(basicTimer);
@@ -332,14 +341,14 @@ export const SimplifiedSoulNetVisualization: React.FC<SimplifiedSoulNetVisualiza
           }
         })}
 
-        {/* FIXED: Enhanced node rendering with corrected percentage logic */}
+        {/* FIXED: Enhanced node rendering with corrected percentage logic and better debugging */}
         {validData.nodes.map(node => {
           try {
             const isSelected = selectedNode === node.id;
             const isHighlighted = isSelected || highlightedNodes.has(node.id);
             const dimmed = !!selectedNode && !isHighlighted;
             
-            // ENHANCED: More comprehensive label visibility logic
+            // ENHANCED: Improved label visibility logic for better UX
             const shouldShowNodeLabel = renderingStage === 'enhanced' && shouldShowLabels && (
               !selectedNode || // Show all labels when no node is selected
               isSelected || // Always show selected node label
@@ -349,19 +358,33 @@ export const SimplifiedSoulNetVisualization: React.FC<SimplifiedSoulNetVisualiza
             // Get Google Translate translation
             const translatedText = translationCache.get(node.id) || node.id;
             
-            // FIXED: Corrected percentage logic - show for connected nodes (not the selected node itself)
+            // FIXED: Corrected percentage logic with comprehensive debugging
             const connectionPercentage = connectionPercentages.get(node.id) || 0;
-            const showPercentage = !!selectedNode && isHighlighted && connectionPercentage > 0 && selectedNode !== node.id;
+            const showPercentage = !!selectedNode && 
+                                  isHighlighted && 
+                                  connectionPercentage > 0 && 
+                                  selectedNode !== node.id && // Don't show on selected node itself
+                                  renderingStage === 'enhanced'; // Only show in enhanced stage
 
-            // Enhanced debugging for percentage display
-            if (selectedNode && node.type === 'emotion') {
-              console.log(`[SimplifiedSoulNetVisualization] PERCENTAGE DEBUG for ${node.id}:`, {
+            // ENHANCED: Comprehensive debugging for percentage display
+            if (selectedNode) {
+              console.log(`[SimplifiedSoulNetVisualization] COMPREHENSIVE DEBUG for ${node.id}:`, {
+                nodeType: node.type,
                 selectedNode,
+                isSelected,
                 isHighlighted,
                 connectionPercentage,
                 showPercentage,
-                isSelected,
-                condition: `selectedNode=${!!selectedNode} && isHighlighted=${isHighlighted} && connectionPercentage=${connectionPercentage} > 0 && selectedNode !== node.id=${selectedNode !== node.id}`
+                renderingStage,
+                translatedText,
+                hasConnection: connectionPercentages.has(node.id),
+                allConditions: {
+                  hasSelectedNode: !!selectedNode,
+                  isHighlighted,
+                  hasPercentage: connectionPercentage > 0,
+                  isNotSelf: selectedNode !== node.id,
+                  isEnhancedStage: renderingStage === 'enhanced'
+                }
               });
             }
 
