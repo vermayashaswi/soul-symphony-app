@@ -3,6 +3,7 @@ import React, { useRef, useMemo } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import DirectNodeLabel from './DirectNodeLabel';
+import { useUserColorThemeHex } from './useUserColorThemeHex';
 
 interface NodeData {
   id: string;
@@ -50,23 +51,20 @@ const Node: React.FC<NodeProps> = ({
   isInstantMode = false
 }) => {
   const meshRef = useRef<THREE.Mesh>(null);
+  const userColorThemeHex = useUserColorThemeHex();
 
-  // ENHANCED: Improved color logic with 20% lighter colors for dimmed nodes
+  // UPDATED: Use app color theme for both node types in both light and dark themes
   const color = useMemo(() => {
     if (isSelected) return new THREE.Color('#ffffff');
     
     if (isHighlighted) {
-      // When highlighted (connected to selected node), apply color based on THIS node's type
-      if (node.type === 'entity') {
-        return new THREE.Color('#ffffff'); // Entity nodes are white when highlighted
-      } else {
-        return new THREE.Color(themeHex); // Emotion nodes use theme color when highlighted
-      }
+      // Both entity and emotion nodes use the app color theme when highlighted
+      return new THREE.Color(userColorThemeHex);
     }
     
     // ENHANCED: 20% lighter colors for dimmed nodes instead of very dark
     return new THREE.Color(dimmed ? '#3a3a3a' : '#cccccc');
-  }, [isSelected, isHighlighted, node.type, themeHex, dimmed]);
+  }, [isSelected, isHighlighted, userColorThemeHex, dimmed]);
 
   // ENHANCED: More dramatic scale differences for better hierarchy
   const nodeScale = useMemo(() => {
@@ -118,9 +116,9 @@ const Node: React.FC<NodeProps> = ({
   }
 
   if (isInstantMode) {
-    console.log(`[Node] INSTANT MODE: Rendering ${node.type} node ${node.id} with scale ${nodeScale.toFixed(2)} and translated text: "${translatedText || node.id}" and percentage display: ${showPercentage ? connectionPercentage + '%' : 'none'} - NO LOADING DELAY`);
+    console.log(`[Node] INSTANT MODE: Rendering ${node.type} node ${node.id} with app theme color ${userColorThemeHex}, scale ${nodeScale.toFixed(2)} and translated text: "${translatedText || node.id}" and percentage display: ${showPercentage ? connectionPercentage + '%' : 'none'} - NO LOADING DELAY`);
   } else {
-    console.log(`[Node] ENHANCED: Rendering ${node.type} node ${node.id} with scale ${nodeScale.toFixed(2)} and translated text: "${translatedText || node.id}" and percentage display: ${showPercentage ? connectionPercentage + '%' : 'none'}`);
+    console.log(`[Node] ENHANCED: Rendering ${node.type} node ${node.id} with app theme color ${userColorThemeHex}, scale ${nodeScale.toFixed(2)} and translated text: "${translatedText || node.id}" and percentage display: ${showPercentage ? connectionPercentage + '%' : 'none'}`);
   }
 
   // ENHANCED: Improved geometry sizes to work with the enhanced scale differences

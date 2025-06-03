@@ -15,19 +15,21 @@ interface SmartTextRendererProps {
   outlineWidth?: number;
   outlineColor?: string;
   maxWidth?: number;
+  enableWrapping?: boolean;
 }
 
 export const SmartTextRenderer: React.FC<SmartTextRendererProps> = ({
   text,
   position,
-  color = '#ffffff',
+  color = '#000000', // Default to black
   size = 0.4,
   visible = true,
   renderOrder = 10,
   bold = false,
   outlineWidth = 0.02,
-  outlineColor = '#000000',
-  maxWidth = 25
+  outlineColor = '#f5f5f5', // Light outline for contrast
+  maxWidth = 25,
+  enableWrapping = false
 }) => {
   const [useCanvasRenderer, setUseCanvasRenderer] = useState(false);
   const [fontLoaded, setFontLoaded] = useState(false);
@@ -38,11 +40,11 @@ export const SmartTextRenderer: React.FC<SmartTextRendererProps> = ({
       try {
         const isComplex = enhancedFontService.isComplexScript(text);
         
-        // For larger text sizes (> 2.0), prefer Canvas renderer for better quality
-        const preferCanvas = size > 2.0;
+        // For larger text sizes (> 2.0) or when wrapping is needed, prefer Canvas renderer for better quality
+        const preferCanvas = size > 2.0 || enableWrapping;
         
         if (isComplex || preferCanvas) {
-          console.log(`[SmartTextRenderer] Using Canvas renderer for: "${text}" (complex: ${isComplex}, large text: ${preferCanvas})`);
+          console.log(`[SmartTextRenderer] Using Canvas renderer for: "${text}" (complex: ${isComplex}, large text: ${preferCanvas}, wrapping: ${enableWrapping})`);
           setUseCanvasRenderer(true);
           setFontLoaded(true);
         } else {
@@ -65,7 +67,7 @@ export const SmartTextRenderer: React.FC<SmartTextRendererProps> = ({
     };
 
     initializeRenderer();
-  }, [text, size]);
+  }, [text, size, enableWrapping]);
 
   if (!visible || hasError || !fontLoaded) {
     return null;
@@ -82,6 +84,7 @@ export const SmartTextRenderer: React.FC<SmartTextRendererProps> = ({
         renderOrder={renderOrder}
         bold={bold}
         maxWidth={maxWidth}
+        enableWrapping={enableWrapping}
       />
     );
   }
@@ -98,6 +101,7 @@ export const SmartTextRenderer: React.FC<SmartTextRendererProps> = ({
       outlineWidth={outlineWidth}
       outlineColor={outlineColor}
       maxWidth={maxWidth}
+      enableWrapping={enableWrapping}
     />
   );
 };
