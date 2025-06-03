@@ -1,4 +1,3 @@
-
 import React, { useMemo, useEffect } from 'react';
 import SmartTextRenderer from './SmartTextRenderer';
 import SimpleText from './SimpleText';
@@ -75,9 +74,9 @@ export const DirectNodeLabel: React.FC<DirectNodeLabelProps> = ({
     return finalSize;
   }, [cameraZoom, id]);
 
-  // ENHANCED: Side positioning for percentage text to avoid overlap
+  // UPDATED: Much smaller percentage text size (70% reduction from 0.7 to 0.21)
   const percentageTextSize = useMemo(() => {
-    return textSize * 0.7; // Slightly larger percentage text
+    return textSize * 0.21; // Reduced from 0.7 to 0.21 (70% smaller)
   }, [textSize]);
 
   // ENHANCED: Text color logic with better contrast
@@ -169,7 +168,7 @@ export const DirectNodeLabel: React.FC<DirectNodeLabelProps> = ({
         maxWidth={400}
       />
       
-      {/* ENHANCED: Side-positioned percentage text using SimpleText */}
+      {/* ENHANCED: Side-positioned percentage text using SimpleText with reduced size */}
       {showPercentage && connectionPercentage > 0 && (
         <SimpleText
           text={`${connectionPercentage}%`}
