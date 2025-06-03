@@ -19,7 +19,7 @@ interface CanvasTextRendererProps {
 export const CanvasTextRenderer: React.FC<CanvasTextRendererProps> = ({
   text,
   position,
-  color = '#ffffff',
+  color = '#000000', // FIXED: Default to black instead of white
   size = 0.4,
   visible = true,
   renderOrder = 10,
@@ -75,18 +75,23 @@ export const CanvasTextRenderer: React.FC<CanvasTextRendererProps> = ({
     lines.forEach((line, index) => {
       const y = startY + (index * lineHeight);
       
-      // Consistent outline based on size prop, not font size
-      const strokeWidth = Math.max(1, size * 0.8); // Scale with size prop
+      // FIXED: Minimal stroke for light theme, more for dark theme
+      const strokeWidth = color === '#000000' ? 0.5 : Math.max(1, size * 0.8); // Minimal stroke for black text
       
-      // Use contrasting outline color based on text color
+      // FIXED: Use contrasting outline color only when needed
       if (color === '#000000') {
-        context.strokeStyle = '#ffffff'; // White outline for black text
+        // Light theme: minimal white outline for readability
+        context.strokeStyle = '#ffffff';
+        context.lineWidth = strokeWidth;
+        context.strokeText(line, canvas.width / 2, y);
       } else {
-        context.strokeStyle = '#000000'; // Black outline for other colors
+        // Dark theme: black outline for white text
+        context.strokeStyle = '#000000';
+        context.lineWidth = strokeWidth;
+        context.strokeText(line, canvas.width / 2, y);
       }
       
-      context.lineWidth = strokeWidth;
-      context.strokeText(line, canvas.width / 2, y);
+      // Always draw the main text on top
       context.fillText(line, canvas.width / 2, y);
     });
 
@@ -95,7 +100,7 @@ export const CanvasTextRenderer: React.FC<CanvasTextRendererProps> = ({
     newTexture.needsUpdate = true;
     setTexture(newTexture);
 
-    console.log(`[CanvasTextRenderer] FIXED SCALING: Created texture for: "${displayText}" (${lineCount} lines) with consistent fontSize: ${fontSize}px, color: ${color}`);
+    console.log(`[CanvasTextRenderer] FIXED TEXT COLOR: Created texture for: "${displayText}" (${lineCount} lines) with color: ${color}, minimal stroke`);
 
     return () => {
       newTexture.dispose();

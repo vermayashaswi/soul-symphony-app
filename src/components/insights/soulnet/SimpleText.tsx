@@ -24,7 +24,7 @@ interface SimpleTextProps {
 export const SimpleText: React.FC<SimpleTextProps> = ({
   text,
   position,
-  color = '#000000',
+  color = '#000000', // FIXED: Default to black instead of grey
   size = 0.4,
   visible = true,
   renderOrder = 10,
@@ -70,7 +70,11 @@ export const SimpleText: React.FC<SimpleTextProps> = ({
   const isMultiLine = displayText.includes('\n');
   const lineCount = displayText.split('\n').length;
   
-  console.log(`[SimpleText] FONT SIZE CONSISTENCY: Rendering: "${displayText}" with fontSize: ${size}, wrapping: ${enableWrapping}, multiline: ${isMultiLine}, lines: ${lineCount}, maxWidth: ${maxWidth}, color: ${color}`);
+  // FIXED: Determine outline based on text color for better visibility
+  const effectiveOutlineWidth = color === '#000000' ? Math.min(outlineWidth, 0.01) : outlineWidth; // Minimal outline for black text
+  const effectiveOutlineColor = color === '#000000' ? '#ffffff' : outlineColor; // White outline for black text
+  
+  console.log(`[SimpleText] FIXED OUTLINE: Rendering: "${displayText}" with fontSize: ${size}, color: ${color}, outlineWidth: ${effectiveOutlineWidth}, outlineColor: ${effectiveOutlineColor}`);
 
   return (
     <Text
@@ -87,8 +91,8 @@ export const SimpleText: React.FC<SimpleTextProps> = ({
       material-transparent={true}
       material-depthTest={false}
       renderOrder={renderOrder}
-      outlineWidth={outlineWidth}
-      outlineColor={outlineColor}
+      outlineWidth={effectiveOutlineWidth}
+      outlineColor={effectiveOutlineColor}
       whiteSpace={enableWrapping || isMultiLine ? "normal" : "nowrap"}
       lineHeight={1.2}
     >

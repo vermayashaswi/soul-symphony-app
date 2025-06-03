@@ -94,22 +94,24 @@ export const DirectNodeLabel: React.FC<DirectNodeLabelProps> = ({
     return textSize * 0.21;
   }, [textSize]);
 
-  // FIXED: White text for dark theme, black text for light theme
+  // FIXED: Ensure solid black text for light theme, white for dark theme
   const textColor = useMemo(() => {
     const color = effectiveTheme === 'dark' ? '#ffffff' : '#000000';
     
     if (isInstantMode) {
-      console.log(`[DirectNodeLabel] INSTANT: Text color for ${id}: ${color} (theme: ${effectiveTheme}, selected: ${isSelected}, highlighted: ${isHighlighted})`);
+      console.log(`[DirectNodeLabel] INSTANT: FIXED TEXT COLOR for ${id}: ${color} (theme: ${effectiveTheme})`);
     } else {
-      console.log(`[DirectNodeLabel] Text color for ${id}: ${color} (theme: ${effectiveTheme}, selected: ${isSelected}, highlighted: ${isHighlighted})`);
+      console.log(`[DirectNodeLabel] FIXED TEXT COLOR for ${id}: ${color} (theme: ${effectiveTheme})`);
     }
     return color;
-  }, [effectiveTheme, isSelected, isHighlighted, id, isInstantMode]);
+  }, [effectiveTheme, id, isInstantMode]);
 
-  // Updated colors for percentage text - also theme-aware
+  // FIXED: Percentage text also uses theme-aware colors
   const percentageColor = useMemo(() => {
-    return effectiveTheme === 'dark' ? '#ffffff' : '#000000';
-  }, [effectiveTheme]);
+    const color = effectiveTheme === 'dark' ? '#ffffff' : '#000000';
+    console.log(`[DirectNodeLabel] FIXED PERCENTAGE COLOR for ${id}: ${color} (theme: ${effectiveTheme})`);
+    return color;
+  }, [effectiveTheme, id]);
 
   const labelPosition: [number, number, number] = [
     position[0] + labelOffset[0],
@@ -176,7 +178,7 @@ export const DirectNodeLabel: React.FC<DirectNodeLabelProps> = ({
         visible={true}
         renderOrder={15}
         bold={isHighlighted || isSelected}
-        outlineWidth={isSelected ? 0.3 : 0.1}
+        outlineWidth={effectiveTheme === 'dark' ? 0.3 : 0.1} // Minimal outline for light theme
         outlineColor={effectiveTheme === 'dark' ? '#000000' : '#ffffff'}
         maxWidth={600}
         enableWrapping={true}
@@ -194,7 +196,7 @@ export const DirectNodeLabel: React.FC<DirectNodeLabelProps> = ({
           visible={true}
           renderOrder={16}
           bold={true}
-          outlineWidth={0.1}
+          outlineWidth={effectiveTheme === 'dark' ? 0.1 : 0.05} // Minimal outline for light theme
           outlineColor={effectiveTheme === 'dark' ? '#000000' : '#ffffff'}
           maxWidth={200}
           enableWrapping={false}
