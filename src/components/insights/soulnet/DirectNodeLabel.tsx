@@ -1,3 +1,4 @@
+
 import React, { useMemo, useEffect } from 'react';
 import SmartTextRenderer from './SmartTextRenderer';
 import SimpleText from './SimpleText';
@@ -48,38 +49,38 @@ export const DirectNodeLabel: React.FC<DirectNodeLabelProps> = ({
     };
   }, [id, shouldShowLabel]);
 
-  console.log(`[DirectNodeLabel] SPLIT RENDERING: ${id} with translated text: "${translatedText || id}" and percentage: ${showPercentage ? connectionPercentage + '%' : 'none'}`);
+  console.log(`[DirectNodeLabel] ENHANCED POSITIONING: ${id} with translated text: "${translatedText || id}" and percentage: ${showPercentage ? connectionPercentage + '%' : 'none'}`);
 
   // Use translated text if available, otherwise fallback to original id
   const displayText = translatedText || id;
   
-  // ENHANCED: Improved label positioning with better offset calculation for different node types
+  // ENHANCED: Improved label positioning with better offset calculation for larger nodes
   const labelOffset = useMemo(() => {
-    // Better offset calculation for different node types and scales
-    const baseOffset = type === 'entity' ? 2.2 : 3.0; // Increased for better visibility
+    // Adjusted for 15% larger nodes - increased base offset
+    const baseOffset = type === 'entity' ? 2.5 : 3.2; // Increased from 2.2/3.0
     const scaledOffset = baseOffset * Math.max(0.8, Math.min(2.5, nodeScale));
     
-    console.log(`[DirectNodeLabel] Label offset for ${id} (${type}): ${scaledOffset} (scale: ${nodeScale})`);
+    console.log(`[DirectNodeLabel] Enhanced label offset for ${id} (${type}): ${scaledOffset} (scale: ${nodeScale})`);
     return [0, scaledOffset, 0] as [number, number, number];
   }, [type, nodeScale, id]);
 
-  // FIXED: Larger text size for better visibility - 15x larger base size
+  // ENHANCED: Better text size calculation for larger nodes
   const textSize = useMemo(() => {
     const zoom = Math.max(10, Math.min(100, cameraZoom));
-    const baseSize = 4.2; // Reduced from 6.0 to 4.2 (70%)
+    const baseSize = 4.8; // Increased from 4.2 to accommodate larger nodes
     const zoomFactor = Math.max(0.8, Math.min(1.5, (50 - zoom) * 0.02 + 1));
-    const finalSize = Math.max(3.0, Math.min(12.0, baseSize * zoomFactor));
+    const finalSize = Math.max(3.5, Math.min(14.0, baseSize * zoomFactor));
     
-    console.log(`[DirectNodeLabel] Text size for ${id}: ${finalSize} (zoom: ${zoom})`);
+    console.log(`[DirectNodeLabel] Enhanced text size for ${id}: ${finalSize} (zoom: ${zoom})`);
     return finalSize;
   }, [cameraZoom, id]);
 
-  // Percentage text size - slightly smaller than main text
+  // ENHANCED: Side positioning for percentage text to avoid overlap
   const percentageTextSize = useMemo(() => {
-    return textSize * (1/7); // Reduced from 0.8 to 1/7 ≈ 0.143
+    return textSize * 0.7; // Slightly larger percentage text
   }, [textSize]);
 
-  // FIXED: Enhanced text color logic with better contrast
+  // ENHANCED: Text color logic with better contrast
   const textColor = useMemo(() => {
     let color;
     
@@ -96,7 +97,7 @@ export const DirectNodeLabel: React.FC<DirectNodeLabelProps> = ({
       }
     }
     
-    console.log(`[DirectNodeLabel] Text color for ${id}: ${color} (selected: ${isSelected}, highlighted: ${isHighlighted}, theme: ${effectiveTheme})`);
+    console.log(`[DirectNodeLabel] Enhanced text color for ${id}: ${color} (selected: ${isSelected}, highlighted: ${isHighlighted}, theme: ${effectiveTheme})`);
     return color;
   }, [isSelected, isHighlighted, type, themeHex, effectiveTheme, id]);
 
@@ -114,15 +115,17 @@ export const DirectNodeLabel: React.FC<DirectNodeLabelProps> = ({
     position[2] + labelOffset[2]
   ];
 
-  // Position for percentage text - slightly below the main label
+  // ENHANCED: Side positioning for percentage - positioned to the right of the node
   const percentagePosition: [number, number, number] = useMemo(() => {
-    const percentageOffset = textSize * 0.15; // Offset based on text size
+    // Position percentage to the side (right) of the node instead of below the label
+    const sideOffset = (type === 'entity' ? 2.0 : 2.5) * nodeScale; // Horizontal offset to the right
+    const verticalOffset = 0; // Same height as node center
     return [
-      position[0] + labelOffset[0],
-      position[1] + labelOffset[1] - percentageOffset,
-      position[2] + labelOffset[2]
+      position[0] + sideOffset,
+      position[1] + verticalOffset,
+      position[2] + 0.5 // Slightly forward for better visibility
     ];
-  }, [position, labelOffset, textSize]);
+  }, [position, type, nodeScale]);
 
   // Enhanced visibility check for tutorial step 9
   const enhancedShouldShowLabel = useMemo(() => {
@@ -143,12 +146,12 @@ export const DirectNodeLabel: React.FC<DirectNodeLabelProps> = ({
     return null;
   }
 
-  // ENHANCED: Log percentage display state
+  // ENHANCED: Log percentage display state with new side positioning
   if (showPercentage && connectionPercentage > 0) {
-    console.log(`[DirectNodeLabel] SPLIT RENDERING - PERCENTAGE: ${id} (${type}) shows ${connectionPercentage}% separately`);
+    console.log(`[DirectNodeLabel] ENHANCED SIDE POSITIONING - PERCENTAGE: ${id} (${type}) shows ${connectionPercentage}% on the side at`, percentagePosition);
   }
 
-  console.log(`[DirectNodeLabel] SPLIT RENDERING - MAIN TEXT: "${displayText}" at position`, labelPosition, 'with size:', textSize, 'color:', textColor);
+  console.log(`[DirectNodeLabel] ENHANCED POSITIONING - MAIN TEXT: "${displayText}" at position`, labelPosition, 'with size:', textSize, 'color:', textColor);
 
   return (
     <>
@@ -166,7 +169,7 @@ export const DirectNodeLabel: React.FC<DirectNodeLabelProps> = ({
         maxWidth={400}
       />
       
-      {/* Separate percentage text using SimpleText for guaranteed visibility */}
+      {/* ENHANCED: Side-positioned percentage text using SimpleText */}
       {showPercentage && connectionPercentage > 0 && (
         <SimpleText
           text={`${connectionPercentage}%`}

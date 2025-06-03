@@ -65,10 +65,12 @@ const Node: React.FC<NodeProps> = ({
     return new THREE.Color(dimmed ? '#666666' : '#cccccc');
   }, [isSelected, isHighlighted, node.type, themeHex, dimmed]);
 
+  // ENHANCED: Increased base node scale by 15% and improved scaling logic
   const nodeScale = useMemo(() => {
-    if (isSelected) return 1.4;
-    if (isHighlighted) return 1.2;
-    return 1;
+    const baseScale = 1.15; // 15% increase from original size of 1.0
+    if (isSelected) return baseScale * 1.4;
+    if (isHighlighted) return baseScale * 1.2;
+    return baseScale;
   }, [isSelected, isHighlighted]);
 
   useFrame(() => {
@@ -89,19 +91,19 @@ const Node: React.FC<NodeProps> = ({
 
   // ENHANCED: Better logging for percentage tracking with comprehensive debug info
   if (showPercentage && connectionPercentage > 0) {
-    console.log(`[Node] FIXED: ${node.id} (${node.type}) should display percentage: ${connectionPercentage}% (isHighlighted: ${isHighlighted}, isSelected: ${isSelected})`);
+    console.log(`[Node] ENHANCED: ${node.id} (${node.type}) should display percentage: ${connectionPercentage}% (isHighlighted: ${isHighlighted}, isSelected: ${isSelected})`);
   }
 
-  console.log(`[Node] FIXED: Rendering ${node.type} node ${node.id} with translated text: "${translatedText || node.id}" and percentage display: ${showPercentage ? connectionPercentage + '%' : 'none'}`);
+  console.log(`[Node] ENHANCED: Rendering ${node.type} node ${node.id} with scale ${nodeScale.toFixed(2)} and translated text: "${translatedText || node.id}" and percentage display: ${showPercentage ? connectionPercentage + '%' : 'none'}`);
 
-  // Render different geometries based on node type
+  // ENHANCED: Improved geometry sizes to work with the 15% scale increase
   const renderGeometry = () => {
     if (node.type === 'emotion') {
-      // Use cube geometry for emotion nodes
-      return <boxGeometry args={[1.4, 1.4, 1.4]} />;
+      // Increased cube size for emotion nodes (15% larger than previous 1.4)
+      return <boxGeometry args={[1.6, 1.6, 1.6]} />;
     } else {
-      // Keep sphere geometry for entity nodes
-      return <sphereGeometry args={[0.7, 32, 32]} />;
+      // Increased sphere radius for entity nodes (15% larger than previous 0.7)
+      return <sphereGeometry args={[0.8, 32, 32]} />;
     }
   };
 

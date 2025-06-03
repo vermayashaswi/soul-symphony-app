@@ -46,11 +46,11 @@ export const NodeMesh: React.FC<NodeMeshProps> = ({
     return () => clearTimeout(timer);
   }, []);
   
-  // Simplified geometry creation
+  // ENHANCED: Updated geometry creation for 15% larger nodes
   const Geometry = useMemo(() => 
     type === 'entity'
-      ? <sphereGeometry args={[1.2, 16, 16]} />
-      : <boxGeometry args={[2.0, 2.0, 2.0]} />,
+      ? <sphereGeometry args={[1.38, 16, 16]} /> // Increased from 1.2 by 15%
+      : <boxGeometry args={[2.3, 2.3, 2.3]} />, // Increased from 2.0 by 15%
     [type]
   );
 
@@ -100,6 +100,8 @@ export const NodeMesh: React.FC<NodeMeshProps> = ({
   if (!isReady) {
     return null;
   }
+
+  console.log(`[NodeMesh] ENHANCED: Rendering ${type} mesh with enhanced scale ${scale.toFixed(2)}`);
 
   return (
     <mesh
