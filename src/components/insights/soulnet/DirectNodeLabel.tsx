@@ -1,4 +1,3 @@
-
 import React, { useMemo, useEffect } from 'react';
 import SmartTextRenderer from './SmartTextRenderer';
 import SimpleText from './SimpleText';
@@ -95,23 +94,22 @@ export const DirectNodeLabel: React.FC<DirectNodeLabelProps> = ({
     return textSize * 0.21;
   }, [textSize]);
 
-  // UPDATED: Black text color for both light and dark themes
+  // FIXED: White text for dark theme, black text for light theme
   const textColor = useMemo(() => {
-    // Always use black text for all node labels regardless of theme or state
-    const color = '#000000';
+    const color = effectiveTheme === 'dark' ? '#ffffff' : '#000000';
     
     if (isInstantMode) {
-      console.log(`[DirectNodeLabel] INSTANT: Black text color for ${id}: ${color} (selected: ${isSelected}, highlighted: ${isHighlighted}, theme: ${effectiveTheme})`);
+      console.log(`[DirectNodeLabel] INSTANT: Text color for ${id}: ${color} (theme: ${effectiveTheme}, selected: ${isSelected}, highlighted: ${isHighlighted})`);
     } else {
-      console.log(`[DirectNodeLabel] Black text color for ${id}: ${color} (selected: ${isSelected}, highlighted: ${isHighlighted}, theme: ${effectiveTheme})`);
+      console.log(`[DirectNodeLabel] Text color for ${id}: ${color} (theme: ${effectiveTheme}, selected: ${isSelected}, highlighted: ${isHighlighted})`);
     }
     return color;
-  }, [isSelected, isHighlighted, type, themeHex, effectiveTheme, id, isInstantMode]);
+  }, [effectiveTheme, isSelected, isHighlighted, id, isInstantMode]);
 
-  // Updated colors for percentage text - also using black
+  // Updated colors for percentage text - also theme-aware
   const percentageColor = useMemo(() => {
-    return '#000000'; // Black for all percentage text
-  }, []);
+    return effectiveTheme === 'dark' ? '#ffffff' : '#000000';
+  }, [effectiveTheme]);
 
   const labelPosition: [number, number, number] = [
     position[0] + labelOffset[0],
@@ -169,7 +167,7 @@ export const DirectNodeLabel: React.FC<DirectNodeLabelProps> = ({
 
   return (
     <>
-      {/* Main translated text using SmartTextRenderer with black color and text wrapping */}
+      {/* Main translated text using SmartTextRenderer with theme-aware color and text wrapping */}
       <SmartTextRenderer
         text={displayText}
         position={labelPosition}
@@ -178,13 +176,13 @@ export const DirectNodeLabel: React.FC<DirectNodeLabelProps> = ({
         visible={true}
         renderOrder={15}
         bold={isHighlighted || isSelected}
-        outlineWidth={isSelected ? 0.3 : 0.1} // Reduced outline for better readability with black text
-        outlineColor={isSelected ? '#ffffff' : '#f5f5f5'} // Light outline to help with contrast
+        outlineWidth={isSelected ? 0.3 : 0.1} // Reduced outline for better readability
+        outlineColor={effectiveTheme === 'dark' ? '#000000' : '#ffffff'} // Contrasting outline
         maxWidth={600} // Increased for better wrapping
         enableWrapping={true}
       />
       
-      {/* Enhanced side-positioned percentage text with black color */}
+      {/* Enhanced side-positioned percentage text with theme-aware color */}
       {showPercentage && connectionPercentage > 0 && (
         <SimpleText
           text={`${connectionPercentage}%`}
@@ -195,7 +193,7 @@ export const DirectNodeLabel: React.FC<DirectNodeLabelProps> = ({
           renderOrder={16}
           bold={true}
           outlineWidth={0.1} // Reduced outline
-          outlineColor="#f5f5f5" // Light outline
+          outlineColor={effectiveTheme === 'dark' ? '#000000' : '#ffffff'} // Contrasting outline
           maxWidth={200}
           enableWrapping={false}
         />
