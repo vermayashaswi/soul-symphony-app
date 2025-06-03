@@ -1,4 +1,3 @@
-
 import React, { useMemo, useEffect } from 'react';
 import SmartTextRenderer from './SmartTextRenderer';
 import SimpleText from './SimpleText';
@@ -67,7 +66,7 @@ export const DirectNodeLabel: React.FC<DirectNodeLabelProps> = ({
   // FIXED: Larger text size for better visibility - 15x larger base size
   const textSize = useMemo(() => {
     const zoom = Math.max(10, Math.min(100, cameraZoom));
-    const baseSize = 6.0; // Large size for main text
+    const baseSize = 4.2; // Reduced from 6.0 to 4.2 (70%)
     const zoomFactor = Math.max(0.8, Math.min(1.5, (50 - zoom) * 0.02 + 1));
     const finalSize = Math.max(3.0, Math.min(12.0, baseSize * zoomFactor));
     
@@ -77,7 +76,7 @@ export const DirectNodeLabel: React.FC<DirectNodeLabelProps> = ({
 
   // Percentage text size - slightly smaller than main text
   const percentageTextSize = useMemo(() => {
-    return textSize * 0.8; // 80% of main text size
+    return textSize * (1/7); // Reduced from 0.8 to 1/7 ≈ 0.143
   }, [textSize]);
 
   // FIXED: Enhanced text color logic with better contrast

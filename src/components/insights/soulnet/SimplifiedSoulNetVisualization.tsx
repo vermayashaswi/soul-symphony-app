@@ -1,4 +1,3 @@
-
 import React, { useRef, useEffect, useMemo, useState } from 'react';
 import { OrbitControls } from '@react-three/drei';
 import { useThree, useFrame } from '@react-three/fiber';
@@ -302,8 +301,13 @@ export const SimplifiedSoulNetVisualization: React.FC<SimplifiedSoulNetVisualiza
         <OrbitControls
           ref={controlsRef}
           enableDamping
-          dampingFactor={0.05}
-          rotateSpeed={0.5}
+          dampingFactor={0.08}
+          rotateSpeed={0.3}
+          enablePan={false}
+          maxPolarAngle={Math.PI}
+          minPolarAngle={0}
+          screenSpacePanning={false}
+          enableZoom={true}
           minDistance={isFullScreen ? 8 : 10}
           maxDistance={isFullScreen ? 80 : 60}
           target={centerPosition}
