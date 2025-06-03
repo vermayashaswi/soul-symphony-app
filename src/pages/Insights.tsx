@@ -19,7 +19,7 @@ export default function Insights() {
   console.log("Rendering Insights page");
   
   const { user } = useAuth();
-  const { translate } = useTranslation();
+  const { translate, prefetchTranslationsForRoute } = useTranslation();
   const [timeRange, setTimeRange] = useState<TimeRange>('week');
   const [isSticky, setIsSticky] = useState(false);
   const [selectedEmotion, setSelectedEmotion] = useState<string | null>(null);
@@ -35,6 +35,19 @@ export default function Insights() {
     { value: 'month', label: 'Month' },
     { value: 'year', label: 'Year' },
   ];
+
+  useEffect(() => {
+    console.log("Insights page mounted");
+    
+    // Prefetch translations for the insights route
+    if (prefetchTranslationsForRoute) {
+      prefetchTranslationsForRoute('/insights').catch(console.error);
+    }
+    
+    return () => {
+      console.log("Insights page unmounted");
+    };
+  }, [prefetchTranslationsForRoute]);
 
   useEffect(() => {
     console.log("Insights page mounted");

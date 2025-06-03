@@ -1,12 +1,11 @@
+
 import React, { useState, useEffect, useCallback } from 'react';
 import '@/types/three-reference';
 import { Canvas } from '@react-three/fiber';
 import { TimeRange } from '@/hooks/use-insights-data';
-import { supabase } from '@/integrations/supabase/client';
 import { useIsMobile } from '@/hooks/use-mobile';
 import SimplifiedSoulNetVisualization from './soulnet/SimplifiedSoulNetVisualization';
 import RenderingErrorBoundary from './soulnet/RenderingErrorBoundary';
-import RobustFallbackVisualization from './soulnet/RobustFallbackVisualization';
 import { LoadingState } from './soulnet/LoadingState';
 import { EmptyState } from './soulnet/EmptyState';
 import { FullscreenWrapper } from './soulnet/FullscreenWrapper';
@@ -15,21 +14,7 @@ import { useUserColorThemeHex } from './soulnet/useUserColorThemeHex';
 import { cn } from '@/lib/utils';
 import { TranslatableText } from '@/components/translation/TranslatableText';
 import { useTranslation } from '@/contexts/TranslationContext';
-import { onDemandTranslationCache } from '@/utils/website-translations';
-
-interface NodeData {
-  id: string;
-  type: 'entity' | 'emotion';
-  value: number;
-  color: string;
-  position: [number, number, number];
-}
-
-interface LinkData {
-  source: string;
-  target: string;
-  value: number;
-}
+import { usePreloadedSoulNetData } from '@/hooks/usePreloadedSoulNetData';
 
 interface SoulNetProps {
   userId: string | undefined;
@@ -37,8 +22,6 @@ interface SoulNetProps {
 }
 
 const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
-  const [graphData, setGraphData] = useState<{nodes: NodeData[], links: LinkData[]}>({ nodes: [], links: [] });
-  const [loading, setLoading] = useState(true);
   const [isFullScreen, setIsFullScreen] = useState(false);
   const [canvasError, setCanvasError] = useState<Error | null>(null);
   const [retryCount, setRetryCount] = useState(0);
@@ -46,94 +29,49 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
   const isMobile = useIsMobile();
   const themeHex = useUserColorThemeHex();
   const [selectedEntity, setSelectedEntity] = useState<string | null>(null);
-  const [error, setError] = useState<Error | null>(null);
   const { currentLanguage } = useTranslation();
 
-  console.log("[SoulNet] GOOGLE TRANSLATE ONLY - Simplified rendering", { 
+  // Use the new preloaded data hook
+  const { 
+    graphData, 
+    translations, 
+    connectionPercentages, 
+    loading, 
+    error 
+  } = usePreloadedSoulNetData(userId, timeRange);
+
+  console.log("[SoulNet] PRELOADED DATA MODE - Using cached translations and percentages", { 
     userId, 
     timeRange, 
     currentLanguage,
-    retryCount,
-    renderingReady
+    nodesCount: graphData.nodes.length,
+    translationsCount: translations.size,
+    percentagesCount: connectionPercentages.size,
+    loading
   });
 
   useEffect(() => {
-    console.log("[SoulNet] Component mounted - Google Translate only mode");
+    console.log("[SoulNet] Component mounted - Preloaded data mode");
     
     return () => {
       console.log("[SoulNet] Component unmounted");
     };
   }, []);
 
-  // Enhanced translation cache management - clear cache on language change
-  useEffect(() => {
-    onDemandTranslationCache.clearLanguage(currentLanguage);
-    console.log(`[SoulNet] Cleared Google Translate cache for language: ${currentLanguage}`);
-  }, [currentLanguage]);
-
-  useEffect(() => {
-    if (!userId) return;
-
-    const fetchEntityEmotionData = async () => {
-      setLoading(true);
-      setError(null);
-      
-      try {
-        const startDate = getStartDate(timeRange);
-        console.log(`[SoulNet] Fetching data from ${startDate.toISOString()} for user ${userId}`);
-        
-        const { data: entries, error } = await supabase
-          .from('Journal Entries')
-          .select('id, entityemotion, "refined text", "transcription text"')
-          .eq('user_id', userId)
-          .gte('created_at', startDate.toISOString())
-          .order('created_at', { ascending: false });
-
-        if (error) {
-          console.error('[SoulNet] Error fetching journal entries:', error);
-          throw error;
-        }
-
-        console.log(`[SoulNet] Fetched ${entries?.length || 0} entries`);
-        
-        if (!entries || entries.length === 0) {
-          setLoading(false);
-          setGraphData({ nodes: [], links: [] });
-          return;
-        }
-
-        const processedData = processEntities(entries);
-        console.log("[SoulNet] Data processing completed", {
-          nodes: processedData.nodes.length,
-          links: processedData.links.length
-        });
-        
-        setGraphData(processedData);
-      } catch (error) {
-        console.error('[SoulNet] Error processing entity-emotion data:', error);
-        setError(error instanceof Error ? error : new Error('Unknown error occurred'));
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchEntityEmotionData();
-  }, [userId, timeRange]);
-
   // Staged rendering initialization
   useEffect(() => {
-    if (graphData.nodes.length > 0 && !renderingReady) {
-      console.log("[SoulNet] Preparing for staged rendering");
+    if (graphData.nodes.length > 0 && !renderingReady && !loading) {
+      console.log("[SoulNet] Preparing for staged rendering with preloaded data");
       
       // Delay rendering to prevent initialization crashes
       const timer = setTimeout(() => {
         setRenderingReady(true);
-        console.log("[SoulNet] Rendering ready");
-      }, 300);
+        console.log("[SoulNet] Rendering ready with preloaded data");
+      }, 100); // Reduced delay since data is already processed
       
       return () => clearTimeout(timer);
     }
-  }, [graphData.nodes.length, renderingReady]);
+  }, [graphData.nodes.length, renderingReady, loading]);
 
   const handleNodeSelect = useCallback((id: string) => {
     console.log(`[SoulNet] Node selected: ${id}`);
@@ -163,7 +101,6 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
 
   const handleRetry = useCallback(() => {
     setCanvasError(null);
-    setError(null);
     setRetryCount(0);
   }, []);
 
@@ -226,7 +163,7 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
     return <TranslatableText text="Drag to rotate • Scroll to zoom • Click a node to highlight connections" forceTranslate={true} />;
   };
 
-  console.log(`[SoulNet] GOOGLE TRANSLATE ONLY - Final render: ${graphData.nodes.length} nodes, ${graphData.links.length} links, ready: ${renderingReady}`);
+  console.log(`[SoulNet] PRELOADED DATA MODE - Final render: ${graphData.nodes.length} nodes, ${graphData.links.length} links, ready: ${renderingReady}, translations: ${translations.size}, percentages: ${connectionPercentages.size}`);
 
   return (
     <div className={cn(
@@ -295,6 +232,8 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
                 themeHex={themeHex}
                 isFullScreen={isFullScreen}
                 shouldShowLabels={true}
+                preloadedTranslations={translations}
+                preloadedPercentages={connectionPercentages}
               />
             </Canvas>
           )}
@@ -310,124 +249,6 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
       )}
     </div>
   );
-};
-
-const getStartDate = (range: TimeRange) => {
-  const now = new Date();
-  switch (range) {
-    case 'today':
-      return new Date(now.setHours(0, 0, 0, 0));
-    case 'week':
-      const weekStart = new Date(now);
-      weekStart.setDate(weekStart.getDate() - 7);
-      return weekStart;
-    case 'month':
-      const monthStart = new Date(now);
-      monthStart.setMonth(monthStart.getMonth() - 1);
-      return monthStart;
-    case 'year':
-      const yearStart = new Date(now);
-      yearStart.setFullYear(yearStart.getFullYear() - 1);
-      return yearStart;
-    default:
-      const defaultStart = new Date(now);
-      defaultStart.setDate(defaultStart.getDate() - 7);
-      return defaultStart;
-  }
-};
-
-const processEntities = (entries: any[]) => {
-  console.log("[SoulNet] Processing entities for", entries.length, "entries");
-  
-  // FIXED: Proper accumulation without flawed averaging
-  const entityEmotionMap: Record<string, Record<string, number>> = {};
-  
-  entries.forEach(entry => {
-    if (!entry.entityemotion) return;
-    
-    Object.entries(entry.entityemotion).forEach(([entity, emotions]) => {
-      if (typeof emotions !== 'object') return;
-      
-      if (!entityEmotionMap[entity]) {
-        entityEmotionMap[entity] = {};
-      }
-      
-      Object.entries(emotions).forEach(([emotion, score]) => {
-        if (typeof score !== 'number') return;
-        
-        // Simple accumulation - sum the scores
-        if (entityEmotionMap[entity][emotion]) {
-          entityEmotionMap[entity][emotion] += score;
-        } else {
-          entityEmotionMap[entity][emotion] = score;
-        }
-      });
-    });
-  });
-
-  console.log("[SoulNet] Fixed entity emotion map:", entityEmotionMap);
-  return generateGraph(entityEmotionMap);
-};
-
-const generateGraph = (entityEmotionMap: Record<string, Record<string, number>>) => {
-  const nodes: NodeData[] = [];
-  const links: LinkData[] = [];
-  const entityNodes = new Set<string>();
-  const emotionNodes = new Set<string>();
-
-  const entityList = Object.keys(entityEmotionMap);
-  const EMOTION_LAYER_RADIUS = 11;
-  const ENTITY_LAYER_RADIUS = 6;
-  const EMOTION_Y_SPAN = 6;
-  const ENTITY_Y_SPAN = 3;
-
-  console.log("[SoulNet] Generating graph with", entityList.length, "entities");
-  
-  entityList.forEach((entity, entityIndex) => {
-    entityNodes.add(entity);
-    const entityAngle = (entityIndex / entityList.length) * Math.PI * 2;
-    const entityRadius = ENTITY_LAYER_RADIUS;
-    const entityX = Math.cos(entityAngle) * entityRadius;
-    const entityY = ((entityIndex % 2) === 0 ? -1 : 1) * 0.7 * (Math.random() - 0.5) * ENTITY_Y_SPAN;
-    const entityZ = Math.sin(entityAngle) * entityRadius;
-    
-    nodes.push({
-      id: entity,
-      type: 'entity',
-      value: 1,
-      color: '#fff',
-      position: [entityX, entityY, entityZ]
-    });
-
-    // Create links with proper values
-    Object.entries(entityEmotionMap[entity]).forEach(([emotion, score]) => {
-      emotionNodes.add(emotion);
-      links.push({
-        source: entity,
-        target: emotion,
-        value: score // Use the actual accumulated score
-      });
-    });
-  });
-
-  Array.from(emotionNodes).forEach((emotion, emotionIndex) => {
-    const emotionAngle = (emotionIndex / emotionNodes.size) * Math.PI * 2;
-    const emotionRadius = EMOTION_LAYER_RADIUS;
-    const emotionX = Math.cos(emotionAngle) * emotionRadius;
-    const emotionY = ((emotionIndex % 2) === 0 ? -1 : 1) * 0.7 * (Math.random() - 0.5) * EMOTION_Y_SPAN;
-    const emotionZ = Math.sin(emotionAngle) * emotionRadius;
-    
-    nodes.push({
-      id: emotion,
-      type: 'emotion',
-      value: 0.8,
-      color: '#fff',
-      position: [emotionX, emotionY, emotionZ]
-    });
-  });
-
-  console.log("[SoulNet] Generated graph with", nodes.length, "nodes and", links.length, "links");
-  return { nodes, links };
 };
 
 export default SoulNet;

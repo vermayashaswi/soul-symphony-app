@@ -1,12 +1,10 @@
-import React, { useRef, useEffect, useMemo, useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
+import { useFrame } from '@react-three/fiber';
 import { OrbitControls } from '@react-three/drei';
-import { useThree, useFrame } from '@react-three/fiber';
-import { useTranslation } from '@/contexts/TranslationContext';
-import { useTheme } from '@/hooks/use-theme';
+import * as THREE from 'three';
 import Node from './Node';
 import Edge from './Edge';
-import FallbackVisualization from './FallbackVisualization';
-import * as THREE from 'three';
+import { useTranslation } from '@/contexts/TranslationContext';
 
 interface NodeData {
   id: string;
@@ -23,12 +21,14 @@ interface LinkData {
 }
 
 interface SimplifiedSoulNetVisualizationProps {
-  data: { nodes: NodeData[]; links: LinkData[] };
+  data: { nodes: NodeData[], links: LinkData[] };
   selectedNode: string | null;
   onNodeClick: (id: string) => void;
   themeHex: string;
-  isFullScreen?: boolean;
-  shouldShowLabels?: boolean;
+  isFullScreen: boolean;
+  shouldShowLabels: boolean;
+  preloadedTranslations?: Map<string, string>;
+  preloadedPercentages?: Map<string, number>;
 }
 
 export const SimplifiedSoulNetVisualization: React.FC<SimplifiedSoulNetVisualizationProps> = ({
@@ -36,406 +36,174 @@ export const SimplifiedSoulNetVisualization: React.FC<SimplifiedSoulNetVisualiza
   selectedNode,
   onNodeClick,
   themeHex,
-  isFullScreen = false,
-  shouldShowLabels = true
+  isFullScreen,
+  shouldShowLabels,
+  preloadedTranslations = new Map(),
+  preloadedPercentages = new Map()
 }) => {
-  const { camera } = useThree();
-  const { currentLanguage, translate } = useTranslation();
-  const { theme, systemTheme } = useTheme();
-  const controlsRef = useRef<any>(null);
-  const [cameraZoom, setCameraZoom] = useState<number>(45);
-  const [renderingStage, setRenderingStage] = useState<'initial' | 'basic' | 'enhanced'>('initial');
-  const [isInitialized, setIsInitialized] = useState(false);
-  const [translationCache, setTranslationCache] = useState<Map<string, string>>(new Map());
-  const initializationRef = useRef<boolean>(false);
-  const mounted = useRef<boolean>(true);
-  
-  console.log("[SimplifiedSoulNetVisualization] FIXED VERSION - Rendering stage:", renderingStage);
+  const { currentLanguage } = useTranslation();
+  const [highlightedNodes, setHighlightedNodes] = useState<Set<string>>(new Set());
+  const [dimmedNodes, setDimmedNodes] = useState<Set<string>>(new Set());
+  const [cameraZoom, setCameraZoom] = useState(45);
+  const [effectiveTheme, setEffectiveTheme] = useState<'light' | 'dark'>('light');
 
-  // Get current effective theme for font color calculation
-  const effectiveTheme = useMemo(() => {
-    if (theme === 'system') {
-      return systemTheme;
-    }
-    return theme;
-  }, [theme, systemTheme]);
+  console.log(`[SimplifiedSoulNetVisualization] PRELOADED MODE: Rendering with ${data.nodes.length} nodes, ${preloadedTranslations.size} translations, ${preloadedPercentages.size} percentages`);
 
+  // Detect user's theme preference
   useEffect(() => {
-    console.log("[SimplifiedSoulNetVisualization] Component mounted - Enhanced percentage display mode");
+    const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+    const handleChange = (event: MediaQueryListEvent) => {
+      setEffectiveTheme(event.matches ? 'dark' : 'light');
+    };
+
+    setEffectiveTheme(mediaQuery.matches ? 'dark' : 'light');
+    mediaQuery.addEventListener('change', handleChange);
+
     return () => {
-      mounted.current = false;
+      mediaQuery.removeEventListener('change', handleChange);
     };
   }, []);
 
-  // Validate data with safer approach
-  const validData = useMemo(() => {
-    try {
-      if (!data || !Array.isArray(data.nodes) || !Array.isArray(data.links)) {
-        console.warn('[SimplifiedSoulNetVisualization] Invalid data structure');
-        return { nodes: [], links: [] };
-      }
-      return {
-        nodes: data.nodes.filter(node => node && node.id && Array.isArray(node.position) && node.position.length === 3),
-        links: data.links.filter(link => link && link.source && link.target)
-      };
-    } catch (error) {
-      console.error('[SimplifiedSoulNetVisualization] Data validation error:', error);
-      return { nodes: [], links: [] };
-    }
-  }, [data]);
-
-  // Calculate center position safely
-  const centerPosition = useMemo(() => {
-    try {
-      if (validData.nodes.length === 0) return new THREE.Vector3(0, 0, 0);
-      
-      const positions = validData.nodes.map(node => node.position);
-      const centerX = positions.reduce((sum, pos) => sum + (pos[0] || 0), 0) / positions.length;
-      const centerY = positions.reduce((sum, pos) => sum + (pos[1] || 0), 0) / positions.length;
-      
-      return new THREE.Vector3(centerX, centerY, 0);
-    } catch (error) {
-      console.error('[SimplifiedSoulNetVisualization] Center calculation error:', error);
-      return new THREE.Vector3(0, 0, 0);
-    }
-  }, [validData.nodes]);
-
-  // FIXED: Enhanced and corrected connection percentages calculation
-  const connectionPercentages = useMemo(() => {
-    if (!selectedNode || !validData.links) {
-      console.log('[SimplifiedSoulNetVisualization] No selected node or links, clearing percentages');
-      return new Map<string, number>();
-    }
-    
-    const percentages = new Map<string, number>();
-    const selectedConnections = validData.links.filter(
-      link => link.source === selectedNode || link.target === selectedNode
-    );
-    
-    if (selectedConnections.length === 0) {
-      console.log('[SimplifiedSoulNetVisualization] No connections found for selected node:', selectedNode);
-      return percentages;
-    }
-    
-    console.log(`[SimplifiedSoulNetVisualization] FIXED: Found ${selectedConnections.length} connections for node:`, selectedNode);
-    
-    // Calculate total value for accurate percentage distribution
-    const totalValue = selectedConnections.reduce((sum, link) => sum + (link.value || 1), 0);
-    
-    if (totalValue <= 0) {
-      console.warn('[SimplifiedSoulNetVisualization] Total connection value is zero or negative');
-      return percentages;
-    }
-    
-    // Calculate percentages that sum to 100%
-    let runningSum = 0;
-    selectedConnections.forEach((link, index) => {
-      const connectedNodeId = link.source === selectedNode ? link.target : link.source;
-      const connectionValue = link.value || 1;
-      
-      if (index === selectedConnections.length - 1) {
-        // Last item gets the remainder to ensure exact 100% sum
-        const finalPercentage = Math.max(1, 100 - runningSum);
-        percentages.set(connectedNodeId, finalPercentage);
-      } else {
-        const percentage = Math.max(1, Math.round((connectionValue / totalValue) * 100));
-        percentages.set(connectedNodeId, percentage);
-        runningSum += percentage;
-      }
-      
-      console.log(`[SimplifiedSoulNetVisualization] FIXED: Connection ${selectedNode} -> ${connectedNodeId}: value=${connectionValue}, percentage=${percentages.get(connectedNodeId)}%`);
-    });
-    
-    // Verify total percentage
-    const totalPercentage = Array.from(percentages.values()).reduce((sum, val) => sum + val, 0);
-    console.log('[SimplifiedSoulNetVisualization] FIXED: Final connection percentages total:', totalPercentage, '%');
-    console.log('[SimplifiedSoulNetVisualization] FIXED: Percentage breakdown:', Object.fromEntries(percentages));
-    
-    return percentages;
-  }, [selectedNode, validData.links]);
-
-  // Google Translate only translation processing
-  useEffect(() => {
-    if (!data?.nodes || !Array.isArray(data.nodes) || data.nodes.length === 0 || !mounted.current) {
-      return;
-    }
-
-    const processTranslations = async () => {
-      if (currentLanguage !== 'en' && translate) {
-        console.log('[SimplifiedSoulNetVisualization] Processing Google Translate translations');
-        const newCache = new Map<string, string>();
-        
-        for (const node of data.nodes) {
-          if (!newCache.has(node.id)) {
-            try {
-              const translated = await translate(node.id, 'en');
-              newCache.set(node.id, translated || node.id);
-            } catch (error) {
-              console.error(`[SimplifiedSoulNetVisualization] Translation error for ${node.id}:`, error);
-              newCache.set(node.id, node.id);
-            }
-          }
-        }
-        
-        if (mounted.current) {
-          setTranslationCache(newCache);
-        }
-      } else {
-        // For English, use original labels
-        const englishCache = new Map<string, string>();
-        data.nodes.forEach(node => {
-          englishCache.set(node.id, node.id);
-        });
-        setTranslationCache(englishCache);
-      }
-    };
-
-    processTranslations();
-  }, [data?.nodes, currentLanguage, translate]);
-
-  // FIXED: Enhanced staged initialization with proper timing
-  useEffect(() => {
-    if (validData.nodes.length === 0 || initializationRef.current) return;
-    
-    console.log('[SimplifiedSoulNetVisualization] Starting enhanced staged initialization');
-    initializationRef.current = true;
-
-    // Stage 1: Initial render (immediate)
-    setRenderingStage('initial');
-
-    // Stage 2: Basic render with delay for camera setup
-    const basicTimer = setTimeout(() => {
-      try {
-        if (camera && validData.nodes.length > 0) {
-          camera.position.set(centerPosition.x, centerPosition.y, 45);
-          camera.lookAt(centerPosition.x, centerPosition.y, 0);
-          setIsInitialized(true);
-          setRenderingStage('basic');
-          console.log('[SimplifiedSoulNetVisualization] Camera initialized, moving to basic stage');
-        }
-      } catch (error) {
-        console.error('[SimplifiedSoulNetVisualization] Basic stage error:', error);
-        setRenderingStage('initial');
-      }
-    }, 150); // Slightly longer delay for stability
-
-    // Stage 3: Enhanced render with even longer delay for percentage display
-    const enhancedTimer = setTimeout(() => {
-      try {
-        setRenderingStage('enhanced');
-        console.log('[SimplifiedSoulNetVisualization] Moving to enhanced stage - percentage display ready');
-      } catch (error) {
-        console.error('[SimplifiedSoulNetVisualization] Enhanced stage error:', error);
-        // Stay in basic stage on error
-      }
-    }, 800); // Longer delay to ensure proper initialization
-
-    return () => {
-      clearTimeout(basicTimer);
-      clearTimeout(enhancedTimer);
-    };
-  }, [camera, validData.nodes, centerPosition]);
-
-  // Safe camera zoom tracking with useFrame
-  useFrame(() => {
-    try {
-      if (camera && renderingStage !== 'initial') {
-        const currentZ = camera.position.z;
-        if (Math.abs(currentZ - cameraZoom) > 1) {
-          setCameraZoom(currentZ);
-        }
-      }
-    } catch (error) {
-      console.warn('[SimplifiedSoulNetVisualization] Camera tracking error:', error);
+  // Use Three.js controls for camera
+  useFrame(({ camera }) => {
+    const newZoom = camera.position.length();
+    if (Math.abs(newZoom - cameraZoom) > 0.1) {
+      setCameraZoom(newZoom);
     }
   });
 
-  // Calculate highlighted nodes with safety checks
-  const highlightedNodes = useMemo(() => {
-    try {
-      if (!selectedNode || !validData.links || renderingStage === 'initial') return new Set<string>();
+  // Enhanced highlighting effect when a node is selected
+  useEffect(() => {
+    if (selectedNode) {
+      const connectedNodes = new Set<string>();
+      const allOtherNodes = new Set<string>();
       
-      const connected = new Set<string>();
-      validData.links.forEach(link => {
-        if (link.source === selectedNode) connected.add(link.target);
-        if (link.target === selectedNode) connected.add(link.source);
+      data.links.forEach(link => {
+        if (link.source === selectedNode || link.target === selectedNode) {
+          connectedNodes.add(link.source);
+          connectedNodes.add(link.target);
+        }
       });
       
-      console.log(`[SimplifiedSoulNetVisualization] Highlighted nodes for ${selectedNode}:`, Array.from(connected));
-      return connected;
-    } catch (error) {
-      console.error('[SimplifiedSoulNetVisualization] Highlighted nodes calculation error:', error);
-      return new Set<string>();
+      data.nodes.forEach(node => {
+        if (!connectedNodes.has(node.id)) {
+          allOtherNodes.add(node.id);
+        }
+      });
+      
+      setHighlightedNodes(connectedNodes);
+      setDimmedNodes(allOtherNodes);
+      
+      console.log(`[SimplifiedSoulNetVisualization] Selected ${selectedNode}, highlighting ${connectedNodes.size} connected nodes`);
+    } else {
+      setHighlightedNodes(new Set());
+      setDimmedNodes(new Set());
     }
-  }, [selectedNode, validData.links, renderingStage]);
+  }, [selectedNode, data.links, data.nodes]);
 
-  // Render nothing during initial stage
-  if (renderingStage === 'initial' || validData.nodes.length === 0) {
-    return (
-      <>
-        <ambientLight intensity={0.6} />
-        <pointLight position={[5, 5, 5]} intensity={0.4} />
-      </>
+  // Helper function to get connection percentage for a node
+  const getConnectionPercentage = useCallback((nodeId: string): number => {
+    if (!selectedNode || selectedNode === nodeId) return 0;
+    
+    // Check preloaded percentages first
+    const preloadedKey = `${selectedNode}-${nodeId}`;
+    if (preloadedPercentages.has(preloadedKey)) {
+      return preloadedPercentages.get(preloadedKey)!;
+    }
+    
+    // Fallback calculation if not preloaded
+    const relevantLinks = data.links.filter(link => 
+      (link.source === selectedNode && link.target === nodeId) ||
+      (link.target === selectedNode && link.source === nodeId)
     );
-  }
+    
+    if (relevantLinks.length === 0) return 0;
+    
+    const totalConnectionValue = relevantLinks.reduce((sum, link) => sum + link.value, 0);
+    const selectedNodeTotalConnections = data.links
+      .filter(link => link.source === selectedNode || link.target === selectedNode)
+      .reduce((sum, link) => sum + link.value, 0);
+    
+    return Math.round((totalConnectionValue / selectedNodeTotalConnections) * 100);
+  }, [selectedNode, data.links, preloadedPercentages]);
 
-  // Fallback for persistent errors
-  if (renderingStage === 'basic' && !isInitialized) {
-    console.log('[SimplifiedSoulNetVisualization] Using fallback visualization');
-    return (
-      <FallbackVisualization
-        data={validData}
-        selectedNode={selectedNode}
-        onNodeClick={onNodeClick}
-        themeHex={themeHex}
+  // Helper function to get translated text
+  const getTranslatedText = useCallback((nodeId: string): string => {
+    if (currentLanguage === 'en') return nodeId;
+    
+    // Use preloaded translations
+    const translation = preloadedTranslations.get(nodeId);
+    if (translation) {
+      console.log(`[SimplifiedSoulNetVisualization] Using preloaded translation for ${nodeId}: ${translation}`);
+      return translation;
+    }
+    
+    console.log(`[SimplifiedSoulNetVisualization] No preloaded translation for ${nodeId}, using original`);
+    return nodeId;
+  }, [currentLanguage, preloadedTranslations]);
+
+  return (
+    <>
+      <ambientLight intensity={0.6} />
+      <directionalLight position={[10, 10, 5]} intensity={0.8} />
+      <OrbitControls 
+        enablePan={true} 
+        enableZoom={true} 
+        enableRotate={true}
+        minDistance={15}
+        maxDistance={120}
+        enableDamping={true}
+        dampingFactor={0.05}
       />
-    );
-  }
-
-  try {
-    return (
-      <>
-        <ambientLight intensity={0.5} />
-        <pointLight position={[10, 10, 10]} intensity={0.8} />
+      
+      {data.nodes.map((node) => {
+        const isHighlighted = highlightedNodes.has(node.id);
+        const isDimmed = dimmedNodes.has(node.id);
+        const connectionPercentage = getConnectionPercentage(node.id);
+        const showPercentage = selectedNode !== null && isHighlighted && selectedNode !== node.id && connectionPercentage > 0;
+        const translatedText = getTranslatedText(node.id);
         
-        <OrbitControls
-          ref={controlsRef}
-          enableDamping
-          dampingFactor={0.08}
-          rotateSpeed={0.3}
-          enablePan={false}
-          maxPolarAngle={Math.PI}
-          minPolarAngle={0}
-          screenSpacePanning={false}
-          enableZoom={true}
-          minDistance={isFullScreen ? 8 : 10}
-          maxDistance={isFullScreen ? 80 : 60}
-          target={centerPosition}
+        return (
+          <Node
+            key={node.id}
+            node={node}
+            isSelected={selectedNode === node.id}
+            onClick={onNodeClick}
+            highlightedNodes={highlightedNodes}
+            showLabel={shouldShowLabels}
+            dimmed={isDimmed}
+            themeHex={themeHex}
+            selectedNodeId={selectedNode}
+            cameraZoom={cameraZoom}
+            isHighlighted={isHighlighted}
+            connectionPercentage={connectionPercentage}
+            showPercentage={showPercentage}
+            forceShowLabels={shouldShowLabels}
+            translatedText={translatedText}
+            effectiveTheme={effectiveTheme}
+          />
+        );
+      })}
+      
+      {data.links.map((link, index) => (
+        <Edge
+          key={`${link.source}-${link.target}-${index}`}
+          link={link}
+          nodes={data.nodes}
+          isHighlighted={
+            selectedNode !== null && 
+            (highlightedNodes.has(link.source) || highlightedNodes.has(link.target))
+          }
+          isDimmed={
+            selectedNode !== null && 
+            !highlightedNodes.has(link.source) && 
+            !highlightedNodes.has(link.target)
+          }
+          themeHex={themeHex}
         />
-
-        {/* Render edges only in enhanced stage */}
-        {renderingStage === 'enhanced' && validData.links.map((link, index) => {
-          try {
-            const sourceNode = validData.nodes.find(n => n.id === link.source);
-            const targetNode = validData.nodes.find(n => n.id === link.target);
-            
-            if (!sourceNode || !targetNode) return null;
-
-            const isHighlight = selectedNode && 
-              (link.source === selectedNode || link.target === selectedNode);
-
-            return (
-              <Edge
-                key={`edge-${index}`}
-                start={sourceNode.position}
-                end={targetNode.position}
-                value={link.value}
-                isHighlighted={!!isHighlight}
-                dimmed={!!selectedNode && !isHighlight}
-                maxThickness={4}
-                startNodeType={sourceNode.type}
-                endNodeType={targetNode.type}
-                startNodeScale={1}
-                endNodeScale={1}
-              />
-            );
-          } catch (error) {
-            console.warn(`[SimplifiedSoulNetVisualization] Edge render error for index ${index}:`, error);
-            return null;
-          }
-        })}
-
-        {/* FIXED: Enhanced node rendering with corrected percentage logic and better debugging */}
-        {validData.nodes.map(node => {
-          try {
-            const isSelected = selectedNode === node.id;
-            const isHighlighted = isSelected || highlightedNodes.has(node.id);
-            const dimmed = !!selectedNode && !isHighlighted;
-            
-            // ENHANCED: Improved label visibility logic for better UX
-            const shouldShowNodeLabel = renderingStage === 'enhanced' && shouldShowLabels && (
-              !selectedNode || // Show all labels when no node is selected
-              isSelected || // Always show selected node label
-              highlightedNodes.has(node.id) // Show connected node labels
-            );
-            
-            // Get Google Translate translation
-            const translatedText = translationCache.get(node.id) || node.id;
-            
-            // FIXED: Corrected percentage logic with comprehensive debugging
-            const connectionPercentage = connectionPercentages.get(node.id) || 0;
-            const showPercentage = !!selectedNode && 
-                                  isHighlighted && 
-                                  connectionPercentage > 0 && 
-                                  selectedNode !== node.id && // Don't show on selected node itself
-                                  renderingStage === 'enhanced'; // Only show in enhanced stage
-
-            // ENHANCED: Comprehensive debugging for percentage display
-            if (selectedNode) {
-              console.log(`[SimplifiedSoulNetVisualization] COMPREHENSIVE DEBUG for ${node.id}:`, {
-                nodeType: node.type,
-                selectedNode,
-                isSelected,
-                isHighlighted,
-                connectionPercentage,
-                showPercentage,
-                renderingStage,
-                translatedText,
-                hasConnection: connectionPercentages.has(node.id),
-                allConditions: {
-                  hasSelectedNode: !!selectedNode,
-                  isHighlighted,
-                  hasPercentage: connectionPercentage > 0,
-                  isNotSelf: selectedNode !== node.id,
-                  isEnhancedStage: renderingStage === 'enhanced'
-                }
-              });
-            }
-
-            return (
-              <Node
-                key={`node-${node.id}`}
-                node={node}
-                isSelected={isSelected}
-                onClick={(id, e) => {
-                  try {
-                    onNodeClick(id);
-                  } catch (error) {
-                    console.error('[SimplifiedSoulNetVisualization] Node click error:', error);
-                  }
-                }}
-                highlightedNodes={highlightedNodes}
-                showLabel={shouldShowNodeLabel}
-                dimmed={dimmed}
-                themeHex={themeHex}
-                selectedNodeId={selectedNode}
-                cameraZoom={cameraZoom}
-                isHighlighted={isHighlighted}
-                connectionPercentage={connectionPercentage}
-                showPercentage={showPercentage}
-                forceShowLabels={shouldShowNodeLabel}
-                translatedText={translatedText}
-                effectiveTheme={effectiveTheme}
-              />
-            );
-          } catch (error) {
-            console.warn(`[SimplifiedSoulNetVisualization] Node render error for ${node.id}:`, error);
-            return null;
-          }
-        })}
-      </>
-    );
-  } catch (error) {
-    console.error('[SimplifiedSoulNetVisualization] Main render error:', error);
-    return (
-      <FallbackVisualization
-        data={validData}
-        selectedNode={selectedNode}
-        onNodeClick={onNodeClick}
-        themeHex={themeHex}
-      />
-    );
-  }
+      ))}
+    </>
+  );
 };
 
 export default SimplifiedSoulNetVisualization;
