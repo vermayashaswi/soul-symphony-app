@@ -61,21 +61,24 @@ export const SmartTextRenderer: React.FC<SmartTextRendererProps> = ({
         setOptimalMaxWidth(calculatedMaxWidth);
 
         const isComplex = enhancedFontService.isComplexScript(finalText);
+        const isMultiLine = finalText.includes('\n');
         
-        // For larger text sizes (> 2.0) or when wrapping is needed, prefer Canvas renderer for better quality
-        const preferCanvas = size > 2.0 || enableWrapping || finalText.includes('\n');
+        // UPDATED: More selective Canvas renderer usage to maintain font size consistency
+        // Only use Canvas for complex scripts OR very large text (> 8.0)
+        // This allows Three.js Text to handle multi-line text with consistent sizing
+        const preferCanvas = isComplex || size > 8.0;
         
-        if (isComplex || preferCanvas) {
-          console.log(`[SmartTextRenderer] Using Canvas renderer for: "${finalText}" (complex: ${isComplex}, large text: ${size > 2.0}, wrapping: ${enableWrapping}, multiline: ${finalText.includes('\n')})`);
+        if (preferCanvas) {
+          console.log(`[SmartTextRenderer] FONT SIZE CONSISTENCY: Using Canvas renderer for: "${finalText}" (complex: ${isComplex}, very large text: ${size > 8.0})`);
           setUseCanvasRenderer(true);
           setFontLoaded(true);
         } else {
-          console.log(`[SmartTextRenderer] Simple script detected for: "${finalText}", attempting Three.js font loading`);
+          console.log(`[SmartTextRenderer] FONT SIZE CONSISTENCY: Using Three.js renderer for: "${finalText}" (multiline: ${isMultiLine}, size: ${size}) - CONSISTENT SIZING`);
           try {
             await enhancedFontService.loadFont(finalText);
             setUseCanvasRenderer(false);
             setFontLoaded(true);
-            console.log(`[SmartTextRenderer] Three.js font loaded successfully for: "${finalText}"`);
+            console.log(`[SmartTextRenderer] Three.js font loaded successfully for: "${finalText}" with consistent sizing`);
           } catch (error) {
             console.warn(`[SmartTextRenderer] Three.js font loading failed for: "${finalText}", falling back to Canvas`, error);
             setUseCanvasRenderer(true);
@@ -94,6 +97,8 @@ export const SmartTextRenderer: React.FC<SmartTextRendererProps> = ({
   if (!visible || hasError || !fontLoaded) {
     return null;
   }
+
+  console.log(`[SmartTextRenderer] RENDERER SELECTION: Using ${useCanvasRenderer ? 'Canvas' : 'Three.js'} renderer for text: "${processedText}" with size: ${size}`);
 
   if (useCanvasRenderer) {
     return (

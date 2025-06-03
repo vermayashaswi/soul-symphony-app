@@ -45,15 +45,18 @@ export const CanvasTextRenderer: React.FC<CanvasTextRendererProps> = ({
     const lines = displayText.split('\n').filter(line => line.trim().length > 0);
     const lineCount = lines.length;
 
-    // Set canvas size - larger for better quality with text wrapping
-    const baseCanvasSize = Math.max(512, size * 200);
+    // FIXED: Consistent canvas size calculation - no inflation based on line count
+    const baseCanvasSize = 512; // Fixed base size for consistency
     canvas.width = baseCanvasSize;
-    // Adjust height based on number of lines
-    canvas.height = Math.max(baseCanvasSize, baseCanvasSize * (lineCount / 2));
+    canvas.height = baseCanvasSize; // Keep square canvas for consistent rendering
 
     // Get appropriate font family
     const fontFamily = enhancedFontService.getFallbackFont(displayText);
-    const fontSize = Math.floor(baseCanvasSize * 0.08 * Math.max(1, size / 4));
+    
+    // FIXED: Consistent font size calculation - matches Three.js Text component scaling
+    const fontSize = Math.floor(baseCanvasSize * 0.12); // Simplified, consistent calculation
+    
+    console.log(`[CanvasTextRenderer] FIXED FONT SIZE: Using consistent fontSize: ${fontSize}px for size prop: ${size}, lines: ${lineCount}`);
     
     // Configure context
     context.fillStyle = 'transparent';
@@ -64,16 +67,16 @@ export const CanvasTextRenderer: React.FC<CanvasTextRendererProps> = ({
     context.textAlign = 'center';
     context.textBaseline = 'middle';
     
-    // Enhanced multi-line text rendering
-    const lineHeight = fontSize * 1.3; // Better line spacing
+    // FIXED: Consistent line spacing regardless of line count
+    const lineHeight = fontSize * 1.2; // Standard line height ratio
     const totalTextHeight = lineCount * lineHeight;
     const startY = (canvas.height / 2) - (totalTextHeight / 2) + (lineHeight / 2);
     
     lines.forEach((line, index) => {
       const y = startY + (index * lineHeight);
       
-      // Better outline color based on text color for improved contrast
-      const strokeWidth = Math.max(1, size * 0.3);
+      // Consistent outline based on size prop, not font size
+      const strokeWidth = Math.max(1, size * 0.8); // Scale with size prop
       
       // Use contrasting outline color based on text color
       if (color === '#000000') {
@@ -92,7 +95,7 @@ export const CanvasTextRenderer: React.FC<CanvasTextRendererProps> = ({
     newTexture.needsUpdate = true;
     setTexture(newTexture);
 
-    console.log(`[CanvasTextRenderer] Created multi-line texture for: "${displayText}" (${lineCount} lines) with font: ${fontFamily}, size: ${fontSize}, color: ${color}`);
+    console.log(`[CanvasTextRenderer] FIXED SCALING: Created texture for: "${displayText}" (${lineCount} lines) with consistent fontSize: ${fontSize}px, color: ${color}`);
 
     return () => {
       newTexture.dispose();
@@ -118,11 +121,12 @@ export const CanvasTextRenderer: React.FC<CanvasTextRendererProps> = ({
     return null;
   }
 
-  // Scale plane size with text size and number of lines
-  const lines = displayText.split('\n');
-  const lineCount = lines.length;
+  // FIXED: Consistent plane size - no inflation based on line count
+  // Scale directly with size prop for consistent visual appearance
   const planeWidth = size * 2;
-  const planeHeight = size * 2 * Math.max(1, lineCount * 0.7); // Adjust height for multiple lines
+  const planeHeight = size * 2; // Keep consistent with single-line text
+
+  console.log(`[CanvasTextRenderer] FIXED PLANE SIZE: Using consistent plane dimensions: ${planeWidth} x ${planeHeight} for size prop: ${size}`);
 
   return (
     <mesh ref={meshRef} position={position} renderOrder={renderOrder}>

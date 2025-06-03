@@ -68,8 +68,9 @@ export const SimpleText: React.FC<SimpleTextProps> = ({
 
   // Check if text has multiple lines
   const isMultiLine = displayText.includes('\n');
+  const lineCount = displayText.split('\n').length;
   
-  console.log(`[SimpleText] Rendering: "${displayText}" with font loaded from: ${fontUrl}, wrapping: ${enableWrapping}, multiline: ${isMultiLine}, maxWidth: ${maxWidth}, color: ${color}`);
+  console.log(`[SimpleText] FONT SIZE CONSISTENCY: Rendering: "${displayText}" with fontSize: ${size}, wrapping: ${enableWrapping}, multiline: ${isMultiLine}, lines: ${lineCount}, maxWidth: ${maxWidth}, color: ${color}`);
 
   return (
     <Text
