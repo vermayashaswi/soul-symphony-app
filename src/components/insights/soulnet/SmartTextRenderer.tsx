@@ -1,9 +1,8 @@
 
 import React, { useState, useEffect } from 'react';
 import { enhancedFontService } from '@/services/enhancedFontService';
-import { shouldUseMultiLineRendering } from '@/utils/textWrappingUtils';
 import CanvasTextRenderer from './CanvasTextRenderer';
-import IntelligentTextRenderer from './IntelligentTextRenderer';
+import SimpleText from './SimpleText';
 
 interface SmartTextRendererProps {
   text: string;
@@ -38,7 +37,6 @@ export const SmartTextRenderer: React.FC<SmartTextRendererProps> = ({
     const initializeRenderer = async () => {
       try {
         const isComplex = enhancedFontService.isComplexScript(text);
-        const needsMultiLine = shouldUseMultiLineRendering(text, 18);
         
         // For larger text sizes (> 2.0), prefer Canvas renderer for better quality
         const preferCanvas = size > 2.0;
@@ -46,10 +44,6 @@ export const SmartTextRenderer: React.FC<SmartTextRendererProps> = ({
         if (isComplex || preferCanvas) {
           console.log(`[SmartTextRenderer] Using Canvas renderer for: "${text}" (complex: ${isComplex}, large text: ${preferCanvas})`);
           setUseCanvasRenderer(true);
-          setFontLoaded(true);
-        } else if (needsMultiLine) {
-          console.log(`[SmartTextRenderer] Using Intelligent renderer for multi-line text: "${text}"`);
-          setUseCanvasRenderer(false);
           setFontLoaded(true);
         } else {
           console.log(`[SmartTextRenderer] Simple script detected for: "${text}", attempting Three.js font loading`);
@@ -59,8 +53,8 @@ export const SmartTextRenderer: React.FC<SmartTextRendererProps> = ({
             setFontLoaded(true);
             console.log(`[SmartTextRenderer] Three.js font loaded successfully for: "${text}"`);
           } catch (error) {
-            console.warn(`[SmartTextRenderer] Three.js font loading failed for: "${text}", falling back to Intelligent renderer`, error);
-            setUseCanvasRenderer(false);
+            console.warn(`[SmartTextRenderer] Three.js font loading failed for: "${text}", falling back to Canvas`, error);
+            setUseCanvasRenderer(true);
             setFontLoaded(true);
           }
         }
@@ -92,9 +86,8 @@ export const SmartTextRenderer: React.FC<SmartTextRendererProps> = ({
     );
   }
 
-  // Use IntelligentTextRenderer for consistent 18-character wrapping
   return (
-    <IntelligentTextRenderer
+    <SimpleText
       text={text}
       position={position}
       color={color}
@@ -105,8 +98,6 @@ export const SmartTextRenderer: React.FC<SmartTextRendererProps> = ({
       outlineWidth={outlineWidth}
       outlineColor={outlineColor}
       maxWidth={maxWidth}
-      maxCharsPerLine={18}
-      maxLines={2}
     />
   );
 };
