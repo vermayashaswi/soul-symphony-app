@@ -116,19 +116,33 @@ const TutorialStep: React.FC<TutorialStepProps> = ({
     };
   };
   
-  // Adjust container width if it has an image
-  const getContainerWidth = () => {
-    // Make steps with images wider
+  // Adjust container width and height for infographic steps
+  const getContainerDimensions = () => {
+    // Make steps 7 and 8 much taller to accommodate full infographics
+    if (step.id === 7 || step.id === 8) {
+      return {
+        maxWidth: '380px', // Wider for better visibility
+        width: 'calc(100% - 20px)', // Less padding on sides
+        maxHeight: '85vh', // Much taller to show full infographic
+        height: 'auto'
+      };
+    }
+    
+    // Make other infographic steps wider but not as tall
     if (step.infographicType && (step.id >= 6 && step.id <= 9)) {
       return {
         maxWidth: '350px', // Wider for steps with images
-        width: 'calc(100% - 40px)'
+        width: 'calc(100% - 40px)',
+        maxHeight: '75vh',
+        height: 'auto'
       };
     }
     
     return {
       maxWidth: '320px',
-      width: 'calc(100% - 40px)'
+      width: 'calc(100% - 40px)',
+      maxHeight: '70vh',
+      height: 'auto'
     };
   };
   
@@ -194,11 +208,11 @@ const TutorialStep: React.FC<TutorialStepProps> = ({
   return (
     <motion.div
       ref={stepRef}
-      className="tutorial-step-container rounded-xl p-4"
+      className="tutorial-step-container rounded-xl p-4 overflow-y-auto"
       style={{
         ...getPositionStyle(),
         ...getBackgroundStyle(),
-        ...getContainerWidth(),
+        ...getContainerDimensions(),
         border: '3px solid var(--color-theme)',
         boxShadow: '0 0 30px rgba(0, 0, 0, 0.7)',
         zIndex: 30000, // Consistently high z-index for all steps
@@ -258,7 +272,7 @@ const TutorialStep: React.FC<TutorialStepProps> = ({
       
       {/* Custom Infographic - only show for steps that include infographics */}
       {shouldShowInfographic && step.infographicType && (
-        <div className="mb-4">
+        <div className="mb-4 w-full">
           <TutorialInfographic type={step.infographicType} />
         </div>
       )}

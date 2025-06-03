@@ -1,6 +1,6 @@
 
 import React, { useMemo, useEffect } from 'react';
-import SmartTextRenderer from './SmartTextRenderer';
+import SimplifiedTextRenderer from './SimplifiedTextRenderer';
 
 interface DirectNodeLabelProps {
   id: string;
@@ -38,10 +38,6 @@ export const DirectNodeLabel: React.FC<DirectNodeLabelProps> = ({
     const handleTutorialDebug = (event: CustomEvent) => {
       if (event.detail?.step === 9 && event.detail?.forceShowLabels) {
         console.log(`[DirectNodeLabel] Tutorial step 9 debug: forcing label visibility for ${id}`);
-        // Force label to be visible during tutorial step 9
-        if (!shouldShowLabel) {
-          console.log(`[DirectNodeLabel] Overriding shouldShowLabel for tutorial step 9`);
-        }
       }
     };
 
@@ -57,103 +53,155 @@ export const DirectNodeLabel: React.FC<DirectNodeLabelProps> = ({
   // Use translated text if available, otherwise fallback to original id
   const displayText = translatedText || id;
   
-  // ENHANCED: Improved percentage display with better formatting
-  const finalDisplayText = useMemo(() => {
-    if (showPercentage && connectionPercentage > 0) {
-      console.log(`[DirectNodeLabel] FIXED: Adding percentage ${connectionPercentage}% to ${id}`);
-      return `${displayText}\n${connectionPercentage}%`;
-    }
-    return displayText;
-  }, [displayText, showPercentage, connectionPercentage, id]);
-
-  // ENHANCED: Standardized label positioning with better offset calculation
-  const labelOffset = useMemo(() => {
-    // Improved offset calculation for different node types and scales
-    const baseOffset = type === 'entity' ? 2.0 : 2.8; // Slightly increased for better visibility
-    const scaledOffset = baseOffset * Math.max(0.6, Math.min(2.2, nodeScale));
-    
-    console.log(`[DirectNodeLabel] Label offset for ${id} (${type}): ${scaledOffset} (scale: ${nodeScale})`);
-    return [0, scaledOffset, 0] as [number, number, number];
-  }, [type, nodeScale, id]);
-
-  // Calculate text properties - 10x larger base size
-  const textSize = useMemo(() => {
-    const zoom = Math.max(10, Math.min(100, cameraZoom));
-    const baseSize = 4.0; // Increased from 0.4 to 4.0 (10x larger)
-    const zoomFactor = Math.max(0.7, Math.min(1.3, (50 - zoom) * 0.02 + 1));
-    const finalSize = Math.max(2.0, Math.min(8.0, baseSize * zoomFactor));
-    
-    console.log(`[DirectNodeLabel] Text size for ${id}: ${finalSize} (zoom: ${zoom})`);
-    return finalSize;
-  }, [cameraZoom, id]);
-
-  // FIXED: Enhanced text color logic with better contrast handling
-  const textColor = useMemo(() => {
-    let color;
-    
-    if (isSelected) {
-      color = '#ffffff'; // Always white for selected nodes
-    } else if (isHighlighted) {
-      // For highlighted nodes, use white for entities, theme color for emotions
-      color = type === 'entity' ? '#ffffff' : themeHex;
-    } else {
-      // FIXED: Better default colors based on theme with higher contrast
-      if (effectiveTheme === 'light') {
-        color = '#1a1a1a'; // Dark gray for light theme (better contrast than black)
-      } else {
-        color = '#e5e5e5'; // Light gray for dark theme (better contrast)
-      }
-    }
-    
-    console.log(`[DirectNodeLabel] Text color for ${id}: ${color} (selected: ${isSelected}, highlighted: ${isHighlighted}, theme: ${effectiveTheme})`);
-    return color;
-  }, [isSelected, isHighlighted, type, themeHex, effectiveTheme, id]);
-
-  const labelPosition: [number, number, number] = [
-    position[0] + labelOffset[0],
-    position[1] + labelOffset[1],
-    position[2] + labelOffset[2]
-  ];
-
   // Enhanced visibility check for tutorial step 9
   const enhancedShouldShowLabel = useMemo(() => {
-    // Check if we're in tutorial step 9 by looking at body attribute
     const currentTutorialStep = document.body.getAttribute('data-current-step');
     const isTutorialStep9 = currentTutorialStep === '9';
     
     if (isTutorialStep9) {
       console.log(`[DirectNodeLabel] Tutorial step 9 detected, forcing label visibility for ${id}`);
-      return true; // Always show labels during tutorial step 9
+      return true;
     }
     
     return shouldShowLabel;
   }, [shouldShowLabel, id]);
 
-  if (!enhancedShouldShowLabel || !finalDisplayText) {
-    console.log(`[DirectNodeLabel] Not rendering label for ${id}: shouldShow=${enhancedShouldShowLabel}, text="${finalDisplayText}"`);
+  // FIXED: Improved label positioning with better spacing to prevent overlap
+  const labelOffset = useMemo(() => {
+    // Increase base offset and add dynamic spacing based on node type and scale
+    const baseOffset = type === 'entity' ? 2.8 : 3.5; // Increased from 2.2/3.0
+    const scaledOffset = baseOffset * Math.max(0.8, Math.min(2.5, nodeScale));
+    
+    // Add additional spacing for highlighted nodes to prevent overlap
+    const highlightSpacing = (isHighlighted || isSelected) ? 0.5 : 0;
+    const finalOffset = scaledOffset + highlightSpacing;
+    
+    console.log(`[DirectNodeLabel] FIXED label offset for ${id} (${type}): ${finalOffset} (scale: ${nodeScale}, highlighted: ${isHighlighted})`);
+    return [0, finalOffset, 0] as [number, number, number];
+  }, [type, nodeScale, id, isHighlighted, isSelected]);
+
+  // FIXED: Better percentage label positioning to avoid main label overlap
+  const percentageLabelOffset = useMemo(() => {
+    // Position percentage below the main label with sufficient spacing
+    const baseOffset = type === 'entity' ? 1.8 : 2.6; // Increased spacing
+    const scaledOffset = baseOffset * Math.max(0.8, Math.min(2.5, nodeScale));
+    
+    // Add spacing for highlighted nodes
+    const highlightSpacing = (isHighlighted || isSelected) ? 0.3 : 0;
+    const finalOffset = scaledOffset + highlightSpacing;
+    
+    return [0, finalOffset, 0] as [number, number, number];
+  }, [type, nodeScale, isHighlighted, isSelected]);
+
+  // ENHANCED: Different font sizes for entity vs emotion nodes
+  const textSize = useMemo(() => {
+    const zoom = Math.max(10, Math.min(100, cameraZoom));
+    
+    // Different base sizes for entity and emotion nodes
+    const baseSize = type === 'entity' ? 1.4 : 1.0; // Entities are larger (1.4 vs 1.0)
+    
+    const zoomFactor = Math.max(0.7, Math.min(1.3, (50 - zoom) * 0.02 + 1));
+    const finalSize = Math.max(0.8, Math.min(2.0, baseSize * zoomFactor));
+    
+    console.log(`[DirectNodeLabel] ENHANCED text size for ${id} (${type}): ${finalSize} (base: ${baseSize}, zoom: ${zoom})`);
+    return finalSize;
+  }, [cameraZoom, id, type]);
+
+  // Percentage text size (69% of main text size)
+  const percentageTextSize = useMemo(() => {
+    return textSize * 0.69;
+  }, [textSize]);
+
+  // FIXED: Enhanced text color logic with much better contrast for light theme
+  const textColor = useMemo(() => {
+    let color;
+    
+    if (isSelected) {
+      // FIXED: For selected nodes, use high contrast colors based on theme
+      if (effectiveTheme === 'light') {
+        // In light theme, use dark colors for selected nodes for maximum contrast
+        color = type === 'entity' ? '#000000' : '#1a1a1a'; // Black for entities, very dark gray for emotions
+      } else {
+        // In dark theme, use bright white for selected nodes
+        color = '#ffffff';
+      }
+    } else if (isHighlighted) {
+      // For highlighted nodes, use theme-appropriate colors
+      if (effectiveTheme === 'light') {
+        color = type === 'entity' ? '#2d2d2d' : themeHex; // Dark gray for entities, theme color for emotions
+      } else {
+        color = type === 'entity' ? '#ffffff' : themeHex; // White for entities, theme color for emotions
+      }
+    } else {
+      // FIXED: Much better default colors with higher contrast
+      if (effectiveTheme === 'light') {
+        color = '#0a0a0a'; // Very dark for light theme
+      } else {
+        color = '#f0f0f0'; // Very light for dark theme
+      }
+    }
+    
+    console.log(`[DirectNodeLabel] FIXED text color for ${id}: ${color} (selected: ${isSelected}, highlighted: ${isHighlighted}, theme: ${effectiveTheme}, type: ${type})`);
+    return color;
+  }, [isSelected, isHighlighted, type, themeHex, effectiveTheme, id]);
+
+  // Calculate final positions
+  const mainLabelPosition: [number, number, number] = [
+    position[0] + labelOffset[0],
+    position[1] + labelOffset[1],
+    position[2] + labelOffset[2]
+  ];
+
+  const percentageLabelPosition: [number, number, number] = [
+    position[0] + percentageLabelOffset[0],
+    position[1] + percentageLabelOffset[1],
+    position[2] + percentageLabelOffset[2]
+  ];
+
+  if (!enhancedShouldShowLabel || !displayText) {
+    console.log(`[DirectNodeLabel] Not rendering label for ${id}: shouldShow=${enhancedShouldShowLabel}, text="${displayText}"`);
     return null;
   }
 
-  // Additional logging for percentage display debugging
+  // Enhanced logging for percentage display
   if (showPercentage && connectionPercentage > 0) {
-    console.log(`[DirectNodeLabel] RENDERING PERCENTAGE: ${id} shows ${connectionPercentage}%`);
+    console.log(`[DirectNodeLabel] RENDERING PERCENTAGE: ${id} shows ${connectionPercentage}% at size ${percentageTextSize}`);
   }
 
-  console.log(`[DirectNodeLabel] Rendering text "${finalDisplayText}" at position`, labelPosition, 'with size:', textSize, 'color:', textColor);
+  console.log(`[DirectNodeLabel] Rendering main text "${displayText}" at position`, mainLabelPosition, 'with size:', textSize, 'color:', textColor);
 
   return (
-    <SmartTextRenderer
-      text={finalDisplayText}
-      position={labelPosition}
-      color={textColor}
-      size={textSize}
-      visible={true}
-      renderOrder={15}
-      bold={isHighlighted || isSelected}
-      outlineWidth={isSelected ? 0.4 : 0.2} // Scaled outline width for larger text
-      outlineColor={isSelected ? '#000000' : '#333333'}
-      maxWidth={250} // Increased max width for larger text
-    />
+    <>
+      {/* Main node label */}
+      <SimplifiedTextRenderer
+        text={displayText}
+        position={mainLabelPosition}
+        color={textColor}
+        size={textSize}
+        visible={true}
+        renderOrder={15}
+        bold={isHighlighted || isSelected}
+        outlineWidth={isSelected ? 0.1 : 0.05}
+        outlineColor={effectiveTheme === 'light' ? '#ffffff' : '#000000'}
+        maxWidth={40}
+      />
+      
+      {/* Percentage label (displayed below main label with proper spacing) */}
+      {showPercentage && connectionPercentage > 0 && (
+        <SimplifiedTextRenderer
+          text={`${connectionPercentage}%`}
+          position={percentageLabelPosition}
+          color={textColor}
+          size={percentageTextSize}
+          visible={true}
+          renderOrder={16}
+          bold={false}
+          outlineWidth={0.03}
+          outlineColor={effectiveTheme === 'light' ? '#ffffff' : '#000000'}
+          maxWidth={20}
+        />
+      )}
+    </>
   );
 };
 
