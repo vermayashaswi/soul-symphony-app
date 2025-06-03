@@ -57,45 +57,6 @@ body.tutorial-active {
   text-shadow: 0 0 4px rgba(0,0,0,0.8) !important;
 }
 
-/* Enhanced infographic container styling - GLOBAL with improved positioning */
-.tutorial-infographic-container {
-  position: relative !important;
-  z-index: 1 !important;
-  margin-bottom: 16px !important;
-  min-height: 160px !important;
-  transform: translateZ(0) !important;
-  will-change: transform !important;
-  backface-visibility: hidden !important;
-}
-
-.tutorial-infographic-content {
-  position: relative !important;
-  z-index: 1 !important;
-  transform: translateZ(0) !important;
-  backface-visibility: hidden !important;
-  overflow: hidden !important;
-  border-radius: 6px !important;
-  box-shadow: 0 0 10px rgba(0, 0, 0, 0.3) !important;
-}
-
-/* Enhanced aspect ratio handling for infographics - GLOBAL */
-.tutorial-infographic-container [data-radix-aspect-ratio-wrapper] {
-  position: relative !important;
-  width: 100% !important;
-  min-height: 140px !important;
-  transform: translateZ(0) !important;
-  overflow: hidden !important;
-}
-
-.tutorial-infographic-container [data-radix-aspect-ratio-wrapper] > div {
-  position: absolute !important;
-  top: 0 !important;
-  left: 0 !important;
-  width: 100% !important;
-  height: 100% !important;
-  transform: translateZ(0) !important;
-}
-
 /* GLOBAL positioning for steps - applies to all screen sizes */
 .tutorial-step-container[data-step="1"] {
   top: 50% !important;
@@ -122,7 +83,7 @@ body.tutorial-active {
   transform: translate(-50%, 0) !important;
 }
 
-/* Enhanced insights steps: GLOBAL positioning and sizing for steps 6-9 with infographics */
+/* Insights steps: GLOBAL positioning and sizing for steps 6-9 with infographics */
 .tutorial-step-container[data-step="6"],
 .tutorial-step-container[data-step="7"],
 .tutorial-step-container[data-step="8"],
@@ -131,35 +92,16 @@ body.tutorial-active {
   top: 50% !important;
   left: 50% !important;
   transform: translate(-50%, -50%) !important;
-  min-height: 280px !important;
-  padding: 20px !important;
 }
 
-/* Enhanced infographic positioning and sizing for steps 6-9 - GLOBAL */
-.tutorial-step-container[data-step="6"] .tutorial-infographic-container,
-.tutorial-step-container[data-step="7"] .tutorial-infographic-container,
-.tutorial-step-container[data-step="8"] .tutorial-infographic-container,
-.tutorial-step-container[data-step="9"] .tutorial-infographic-container {
-  border-radius: 6px !important;
-  overflow: hidden !important;
-  box-shadow: 0 0 10px rgba(0, 0, 0, 0.3) !important;
-  position: relative !important;
-  min-height: 160px !important;
-  margin-bottom: 16px !important;
-  transform: translateZ(0) !important;
-  backface-visibility: hidden !important;
-}
-
-/* Ensure infographic content is properly contained - GLOBAL */
+/* Ensure infographic containers are properly displayed - GLOBAL */
 .tutorial-step-container[data-step="6"] .tutorial-infographic,
 .tutorial-step-container[data-step="7"] .tutorial-infographic,
 .tutorial-step-container[data-step="8"] .tutorial-infographic,
 .tutorial-step-container[data-step="9"] .tutorial-infographic {
-  width: 100% !important;
-  height: 100% !important;
-  position: relative !important;
+  border-radius: 6px !important;
   overflow: hidden !important;
-  transform: translateZ(0) !important;
+  box-shadow: 0 0 10px rgba(0, 0, 0, 0.3) !important;
 }
 
 /* Step 1: Journal header styling - GLOBAL */
@@ -446,12 +388,6 @@ body.tutorial-active[data-current-step="5"] .p-2.border-t.border-border {
     max-width: 300px !important;
     width: 90% !important;
     padding: 10px !important;
-    min-height: 250px !important;
-  }
-  
-  /* Mobile infographic adjustments */
-  .tutorial-infographic-container {
-    min-height: 140px !important;
   }
 }
 
@@ -481,11 +417,5 @@ body.tutorial-active[data-current-step="5"] .p-2.border-t.border-border {
   .tutorial-step-container[data-step="8"],
   .tutorial-step-container[data-step="9"] {
     padding: 8px !important;
-    min-height: 220px !important;
-  }
-  
-  /* Smaller infographic containers on very small screens */
-  .tutorial-infographic-container {
-    min-height: 120px !important;
   }
 }

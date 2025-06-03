@@ -468,13 +468,10 @@ export const TutorialProvider: React.FC<{ children: ReactNode }> = ({ children }
       
       console.log(`[TutorialContext] Moving to tutorial step ${newStep} (ID: ${nextStepData.id})`);
       
-      // Enhanced step transition protection with extended duration for infographic steps
-      const hasInfographic = nextStepData.infographicType && (nextStepData.id >= 6 && nextStepData.id <= 9);
-      const transitionDuration = hasInfographic ? 3000 : 2000; // Longer for infographic steps
+      // Start step transition protection immediately with extended duration
+      navigationManager.startStepTransition(nextStepData.id);
       
-      navigationManager.startStepTransition(nextStepData.id, transitionDuration);
-      
-      // Perform selective cleanup that preserves the target step - FIXED: only pass stepId
+      // Perform selective cleanup that preserves the target step
       performNavigationCleanup(nextStepData.id);
       
       // First update the current step in state and database
@@ -492,12 +489,10 @@ export const TutorialProvider: React.FC<{ children: ReactNode }> = ({ children }
       } else {
         // If we're already on the right page, immediately check for elements to highlight
         if (nextStepData.waitForElement) {
-          const delay = hasInfographic ? 800 : 300; // Extra delay for infographic steps
-          
           setTimeout(() => {
             checkForTargetElementEnhanced(nextStepData);
-            // Let transition protection timeout naturally for better persistence
-          }, delay);
+            // Don't clear transition protection immediately, let it timeout for better persistence
+          }, 300); // Increased delay for better DOM readiness
         }
       }
     } else {
@@ -515,13 +510,10 @@ export const TutorialProvider: React.FC<{ children: ReactNode }> = ({ children }
       
       console.log(`[TutorialContext] Moving to previous step ${newStep} (ID: ${prevStepData.id})`);
       
-      // Enhanced step transition protection with extended duration for infographic steps
-      const hasInfographic = prevStepData.infographicType && (prevStepData.id >= 6 && prevStepData.id <= 9);
-      const transitionDuration = hasInfographic ? 3000 : 2000; // Longer for infographic steps
+      // Start step transition protection immediately with extended duration
+      navigationManager.startStepTransition(prevStepData.id);
       
-      navigationManager.startStepTransition(prevStepData.id, transitionDuration);
-      
-      // Perform selective cleanup that preserves the target step - FIXED: only pass stepId
+      // Perform selective cleanup that preserves the target step
       performNavigationCleanup(prevStepData.id);
       
       // First update the current step in state and database
@@ -539,12 +531,10 @@ export const TutorialProvider: React.FC<{ children: ReactNode }> = ({ children }
       } else {
         // If we're already on the right page, immediately check for elements to highlight
         if (prevStepData.waitForElement) {
-          const delay = hasInfographic ? 800 : 300; // Extra delay for infographic steps
-          
           setTimeout(() => {
             checkForTargetElementEnhanced(prevStepData);
-            // Let transition protection timeout naturally for better persistence
-          }, delay);
+            // Don't clear transition protection immediately, let it timeout for better persistence
+          }, 300); // Increased delay for better DOM readiness
         }
       }
     }
