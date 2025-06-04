@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useTheme } from '@/hooks/use-theme';
 import { TimeRange } from '@/hooks/use-insights-data';
 import { useIsMobile } from '@/hooks/use-mobile';
-import { TranslatableText } from '@/components/translation/TranslatableText';
+import { EnhancedTranslatableText } from '@/components/translation/EnhancedTranslatableText';
 import { useTranslation } from '@/contexts/TranslationContext';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { LineChart, Calendar, ChevronLeft, ChevronRight } from 'lucide-react';
@@ -45,13 +45,13 @@ const CustomDot = (props: CustomDotProps) => {
   const { cx, cy, payload } = props;
   const sentiment = payload.sentiment;
   
-  let color = '#3b82f6'; // default blue
+  let color = '#3b82f6';
   if (sentiment >= 0.2) {
-    color = '#4ade80'; // green for positive
+    color = '#4ade80';
   } else if (sentiment <= -0.2) {
-    color = '#ea384c'; // red for negative
+    color = '#ea384c';
   } else {
-    color = '#facc15'; // yellow for neutral
+    color = '#facc15';
   }
   
   return (
@@ -77,11 +77,12 @@ const CustomTooltip = ({ active, payload, label }: any) => {
       <div className="custom-tooltip bg-background p-2 border rounded-md shadow-md">
         <p className="date">{label}</p>
         <p className="sentiment" style={{ color: moodColor }}>
-          <TranslatableText 
+          <EnhancedTranslatableText 
             text={moodText} 
             forceTranslate={true}
             enableFontScaling={true}
             scalingContext="compact"
+            usePageTranslation={true}
           />
         </p>
       </div>
@@ -250,11 +251,12 @@ const MoodCalendar: React.FC<MoodCalendarProps> = ({ sentimentData, timeRange })
       return (
         <div className="flex items-center justify-center h-full">
           <p className="text-muted-foreground">
-            <TranslatableText 
+            <EnhancedTranslatableText 
               text="No data available for this timeframe" 
               forceTranslate={true}
               enableFontScaling={true}
               scalingContext="general"
+              usePageTranslation={true}
             />
           </p>
         </div>
@@ -323,29 +325,32 @@ const MoodCalendar: React.FC<MoodCalendarProps> = ({ sentimentData, timeRange })
         <div className="flex justify-center gap-4 text-xs text-muted-foreground mt-4">
           <div className="flex items-center gap-1">
             <div className="w-3 h-3 rounded-full" style={{ background: "#4ade80" }} />
-            <TranslatableText 
+            <EnhancedTranslatableText 
               text="Positive" 
               forceTranslate={true}
               enableFontScaling={true}
               scalingContext="compact"
+              usePageTranslation={true}
             />
           </div>
           <div className="flex items-center gap-1">
             <div className="w-3 h-3 rounded-full" style={{ background: "#facc15" }} />
-            <TranslatableText 
+            <EnhancedTranslatableText 
               text="Neutral" 
               forceTranslate={true}
               enableFontScaling={true}
               scalingContext="compact"
+              usePageTranslation={true}
             />
           </div>
           <div className="flex items-center gap-1">
             <div className="w-3 h-3 rounded-full" style={{ background: "#ea384c" }} />
-            <TranslatableText 
+            <EnhancedTranslatableText 
               text="Negative" 
               forceTranslate={true}
               enableFontScaling={true}
               scalingContext="compact"
+              usePageTranslation={true}
             />
           </div>
         </div>
@@ -363,19 +368,21 @@ const MoodCalendar: React.FC<MoodCalendarProps> = ({ sentimentData, timeRange })
     <div className="bg-background rounded-xl shadow-sm border w-full p-6 md:p-8">
       <div className="text-center mb-4">
         <h2 className="text-lg font-semibold mb-1">
-          <TranslatableText 
+          <EnhancedTranslatableText 
             text="Mood Trends" 
             forceTranslate={true}
             enableFontScaling={true}
             scalingContext="general"
+            usePageTranslation={true}
           />
         </h2>
         <p className="text-sm text-muted-foreground">
-          <TranslatableText 
+          <EnhancedTranslatableText 
             text="Your sentiment changes over time" 
             forceTranslate={true}
             enableFontScaling={true}
             scalingContext="compact"
+            usePageTranslation={true}
           />
         </p>
       </div>
@@ -392,11 +399,12 @@ const MoodCalendar: React.FC<MoodCalendarProps> = ({ sentimentData, timeRange })
         </Button>
         
         <div className="text-center font-medium">
-          <TranslatableText 
+          <EnhancedTranslatableText 
             text={getPeriodLabel()} 
             forceTranslate={true}
             enableFontScaling={true}
             scalingContext="compact"
+            usePageTranslation={true}
           />
         </div>
         

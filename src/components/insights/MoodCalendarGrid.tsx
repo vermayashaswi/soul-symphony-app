@@ -4,7 +4,7 @@ import { cn } from '@/lib/utils';
 import { useTheme } from '@/hooks/use-theme';
 import { TimeRange } from '@/hooks/use-insights-data';
 import { useIsMobile } from '@/hooks/use-mobile';
-import { TranslatableText } from '@/components/translation/TranslatableText';
+import { EnhancedTranslatableText } from '@/components/translation/EnhancedTranslatableText';
 import { useTranslation } from '@/contexts/TranslationContext';
 import { formatDateForTimeRange } from '@/utils/date-formatter';
 
@@ -41,11 +41,12 @@ const MoodCalendarGrid: React.FC<MoodCalendarGridProps> = ({ sentimentData, time
     return (
       <div className="flex items-center justify-center h-full">
         <p className="text-muted-foreground">
-          <TranslatableText 
+          <EnhancedTranslatableText 
             text="No data available for this timeframe" 
             forceTranslate={true}
             enableFontScaling={true}
             scalingContext="general"
+            usePageTranslation={true}
           />
         </p>
       </div>
@@ -212,11 +213,12 @@ const MoodCalendarGrid: React.FC<MoodCalendarGridProps> = ({ sentimentData, time
         {/* Weekday headers */}
         {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
           <div key={day} className="text-xs text-center text-muted-foreground">
-            <TranslatableText 
+            <EnhancedTranslatableText 
               text={day} 
               forceTranslate={true}
               enableFontScaling={true}
               scalingContext="compact"
+              usePageTranslation={true}
             />
           </div>
         ))}
@@ -283,11 +285,12 @@ const MoodCalendarGrid: React.FC<MoodCalendarGridProps> = ({ sentimentData, time
                     "text-xs text-center text-muted-foreground sticky top-0 bg-background z-10",
                     isMobile ? "px-1 py-1" : "px-1 py-1"
                   )}>
-                    <TranslatableText 
+                    <EnhancedTranslatableText 
                       text={month} 
                       forceTranslate={true}
                       enableFontScaling={true}
                       scalingContext="compact"
+                      usePageTranslation={true}
                     />
                   </th>
                 ))}
@@ -347,29 +350,32 @@ const MoodCalendarGrid: React.FC<MoodCalendarGridProps> = ({ sentimentData, time
       <div className="flex justify-center gap-4 text-xs text-muted-foreground mt-4">
         <div className="flex items-center gap-1">
           <div className="w-3 h-3 rounded-full bg-green-500" />
-          <TranslatableText 
+          <EnhancedTranslatableText 
             text="Positive" 
             forceTranslate={true}
             enableFontScaling={true}
             scalingContext="compact"
+            usePageTranslation={true}
           />
         </div>
         <div className="flex items-center gap-1">
           <div className="w-3 h-3 rounded-full bg-yellow-400" />
-          <TranslatableText 
+          <EnhancedTranslatableText 
             text="Neutral" 
             forceTranslate={true}
             enableFontScaling={true}
             scalingContext="compact"
+            usePageTranslation={true}
           />
         </div>
         <div className="flex items-center gap-1">
           <div className="w-3 h-3 rounded-full bg-red-500" />
-          <TranslatableText 
+          <EnhancedTranslatableText 
             text="Negative" 
             forceTranslate={true}
             enableFontScaling={true}
             scalingContext="compact"
+            usePageTranslation={true}
           />
         </div>
       </div>
