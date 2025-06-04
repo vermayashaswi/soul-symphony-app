@@ -127,14 +127,24 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
   if (error) return (
     <div className="bg-background rounded-xl shadow-sm border w-full p-6">
       <h2 className="text-xl font-semibold text-red-600 mb-4">
-        <TranslatableText text="Error Loading Soul-Net" />
+        <TranslatableText 
+          text="Error Loading Soul-Net" 
+          forceTranslate={true}
+          enableFontScaling={true}
+          scalingContext="general"
+        />
       </h2>
       <p className="text-muted-foreground mb-4">{error.message}</p>
       <button 
         className="px-4 py-2 bg-primary text-white rounded-md" 
         onClick={() => window.location.reload()}
       >
-        <TranslatableText text="Retry" />
+        <TranslatableText 
+          text="Retry" 
+          forceTranslate={true}
+          enableFontScaling={true}
+          scalingContext="general"
+        />
       </button>
     </div>
   );
@@ -146,27 +156,52 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
     return (
       <div className="bg-background rounded-xl shadow-sm border w-full p-6">
         <h2 className="text-xl font-semibold mb-4">
-          <TranslatableText text="Soul-Net Visualization" />
+          <TranslatableText 
+            text="Soul-Net Visualization" 
+            forceTranslate={true}
+            enableFontScaling={true}
+            scalingContext="general"
+          />
         </h2>
         <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-4">
           <h3 className="font-medium text-yellow-800 dark:text-yellow-300 mb-2">
-            <TranslatableText text="3D Visualization Unavailable" />
+            <TranslatableText 
+              text="3D Visualization Unavailable" 
+              forceTranslate={true}
+              enableFontScaling={true}
+              scalingContext="general"
+            />
           </h3>
           <p className="text-yellow-700 dark:text-yellow-400 mb-3">
-            <TranslatableText text="The 3D visualization is experiencing technical difficulties. Your data is safe and you can try again." />
+            <TranslatableText 
+              text="The 3D visualization is experiencing technical difficulties. Your data is safe and you can try again." 
+              forceTranslate={true}
+              enableFontScaling={true}
+              scalingContext="general"
+            />
           </p>
           <div className="space-x-2">
             <button
               className="px-4 py-2 bg-yellow-600 text-white rounded hover:bg-yellow-700"
               onClick={handleRetry}
             >
-              <TranslatableText text="Try Again" />
+              <TranslatableText 
+                text="Try Again" 
+                forceTranslate={true}
+                enableFontScaling={true}
+                scalingContext="general"
+              />
             </button>
             <button
               className="px-4 py-2 bg-gray-600 text-white rounded hover:bg-gray-700"
               onClick={() => window.location.reload()}
             >
-              <TranslatableText text="Reload Page" />
+              <TranslatableText 
+                text="Reload Page" 
+                forceTranslate={true}
+                enableFontScaling={true}
+                scalingContext="general"
+              />
             </button>
           </div>
         </div>
@@ -176,9 +211,23 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
 
   const getInstructions = () => {
     if (isMobile) {
-      return <TranslatableText text="Drag to rotate • Pinch to zoom • Tap a node to highlight connections" forceTranslate={true} />;
+      return (
+        <TranslatableText 
+          text="Drag to rotate • Pinch to zoom • Tap a node to highlight connections" 
+          forceTranslate={true}
+          enableFontScaling={true}
+          scalingContext="general"
+        />
+      );
     }
-    return <TranslatableText text="Drag to rotate • Scroll to zoom • Click a node to highlight connections" forceTranslate={true} />;
+    return (
+      <TranslatableText 
+        text="Drag to rotate • Scroll to zoom • Click a node to highlight connections" 
+        forceTranslate={true}
+        enableFontScaling={true}
+        scalingContext="general"
+      />
+    );
   };
 
   console.log(`[SoulNet] STABILIZED RENDER: ${graphData.nodes.length} nodes, ${graphData.links.length} links, renderingReady: ${renderingReady}, initialized: ${renderingInitialized.current}`);
@@ -200,16 +249,31 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
             <div className="flex items-center justify-center p-10 bg-gray-100 dark:bg-gray-800 rounded-lg">
               <div className="text-center">
                 <h3 className="text-lg font-medium">
-                  <TranslatableText text="Visualization Error" />
+                  <TranslatableText 
+                    text="Visualization Error" 
+                    forceTranslate={true}
+                    enableFontScaling={true}
+                    scalingContext="general"
+                  />
                 </h3>
                 <p className="text-muted-foreground mt-2">
-                  <TranslatableText text="The 3D visualization encountered an error." />
+                  <TranslatableText 
+                    text="The 3D visualization encountered an error." 
+                    forceTranslate={true}
+                    enableFontScaling={true}
+                    scalingContext="general"
+                  />
                 </p>
                 <button 
                   className="mt-4 px-4 py-2 bg-primary text-white rounded-lg"
                   onClick={handleRetry}
                 >
-                  <TranslatableText text="Retry" />
+                  <TranslatableText 
+                    text="Retry" 
+                    forceTranslate={true}
+                    enableFontScaling={true}
+                    scalingContext="general"
+                  />
                 </button>
               </div>
             </div>

@@ -3,9 +3,10 @@ import React from 'react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Card, CardContent } from '@/components/ui/card';
 import { User } from 'lucide-react';
-import ReactMarkdown from 'react-markdown';
 import { AnalysisMetadataCard } from './AnalysisMetadataCard';
 import ParticleAvatar from './ParticleAvatar';
+import { TranslatableMarkdown } from '@/components/translation/TranslatableMarkdown';
+import { TranslatableText } from '@/components/translation/TranslatableText';
 
 interface ChatMessageProps {
   message: {
@@ -75,15 +76,23 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({ message }) => {
         }`}>
           <CardContent className="p-3">
             {isUser ? (
-              <p className="text-sm">{message.content}</p>
+              <TranslatableText 
+                text={message.content} 
+                className="text-sm"
+                forceTranslate={true}
+                enableFontScaling={true}
+                scalingContext="general"
+              />
             ) : (
               <div className="prose prose-sm max-w-none dark:prose-invert">
-                <ReactMarkdown 
-                  components={customRenderers}
+                <TranslatableMarkdown 
                   className="text-sm leading-relaxed"
+                  forceTranslate={true}
+                  enableFontScaling={true}
+                  scalingContext="general"
                 >
                   {message.content}
-                </ReactMarkdown>
+                </TranslatableMarkdown>
               </div>
             )}
           </CardContent>

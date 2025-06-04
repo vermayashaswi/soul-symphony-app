@@ -13,8 +13,8 @@ interface TranslatableMarkdownProps {
   forceTranslate?: boolean;
   onTranslationStart?: () => void;
   onTranslationEnd?: () => void;
-  enableFontScaling?: boolean; // New prop to enable language-aware font scaling
-  scalingContext?: 'mobile-nav' | 'general' | 'compact'; // Context for different scaling strategies
+  enableFontScaling?: boolean;
+  scalingContext?: 'mobile-nav' | 'general' | 'compact';
 }
 
 export function TranslatableMarkdown({ 

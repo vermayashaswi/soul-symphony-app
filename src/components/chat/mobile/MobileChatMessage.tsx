@@ -76,11 +76,22 @@ const MobileChatMessage: React.FC<MobileChatMessageProps> = ({ message, showAnal
         )}
       >
         {displayRole === 'assistant' ? (
-          <TranslatableMarkdown className="prose dark:prose-invert prose-sm max-w-none break-words" forceTranslate={true}>
+          <TranslatableMarkdown 
+            className="prose dark:prose-invert prose-sm max-w-none break-words" 
+            forceTranslate={true}
+            enableFontScaling={true}
+            scalingContext="compact"
+          >
             {formattedContent}
           </TranslatableMarkdown>
         ) : (
-          <TranslatableText text={message.content} forceTranslate={true} className="break-words" />
+          <TranslatableText 
+            text={message.content} 
+            forceTranslate={true} 
+            className="break-words"
+            enableFontScaling={true}
+            scalingContext="compact"
+          />
         )}
         
         {showAnalysis && displayRole === 'assistant' && message.analysis && (
@@ -117,6 +128,8 @@ const MobileChatMessage: React.FC<MobileChatMessageProps> = ({ message, showAnal
               <TranslatableText 
                 text={`${message.references!.length} journal entries`}
                 forceTranslate={true}
+                enableFontScaling={true}
+                scalingContext="compact"
               />
               {showReferences ? (
                 <ChevronUp className="h-3 w-3 ml-1" />
@@ -145,10 +158,17 @@ const MobileChatMessage: React.FC<MobileChatMessageProps> = ({ message, showAnal
                           <TranslatableText 
                             text={formattedDate.text} 
                             forceTranslate={formattedDate.type === 'translatable'}
+                            enableFontScaling={true}
+                            scalingContext="compact"
                           />
                         </div>
                         <div className="text-muted-foreground dark:text-white/70">
-                          <TranslatableText text={ref.snippet} forceTranslate={true} />
+                          <TranslatableText 
+                            text={ref.snippet} 
+                            forceTranslate={true}
+                            enableFontScaling={true}
+                            scalingContext="compact"
+                          />
                         </div>
                       </div>
                     );
@@ -158,6 +178,8 @@ const MobileChatMessage: React.FC<MobileChatMessageProps> = ({ message, showAnal
                       <TranslatableText 
                         text={`+${message.references!.length - 2} more entries`}
                         forceTranslate={true}
+                        enableFontScaling={true}
+                        scalingContext="compact"
                       />
                     </div>
                   )}
