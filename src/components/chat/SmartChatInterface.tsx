@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -10,6 +9,7 @@ import { sendMessage, getThreadMessages } from '@/services/chat/messageService';
 import { ServiceChatMessage } from '@/services/chat/types';
 import { TranslatableText } from "@/components/translation/TranslatableText";
 import { useChatRealtime } from "@/hooks/use-chat-realtime";
+import ReferencesDisplay from "./ReferencesDisplay";
 
 interface SmartChatInterfaceProps {
   mentalHealthInsights?: any;
@@ -184,6 +184,14 @@ export function SmartChatInterface({ mentalHealthInsights }: SmartChatInterfaceP
                       <div className="mt-2 text-xs opacity-70">
                         <TranslatableText text="Powered by Intelligent RAG Pipeline" />
                       </div>
+                    )}
+                    
+                    {/* Add References Display for assistant messages */}
+                    {message.sender === 'assistant' && message.analysis_data?.references && (
+                      <ReferencesDisplay 
+                        references={message.analysis_data.references}
+                        threadId={currentThreadId}
+                      />
                     )}
                   </div>
                 </div>

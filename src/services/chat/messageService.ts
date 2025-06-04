@@ -151,7 +151,7 @@ export const sendMessage = async (
         response = generalData.response;
       }
 
-      // Store AI response
+      // Store AI response with references in reference_entries field
       const { data: aiMessage, error: aiMessageError } = await supabase
         .from('chat_messages')
         .insert({
@@ -160,6 +160,7 @@ export const sendMessage = async (
           sender: 'assistant',
           role: 'assistant',
           analysis_data: analysisData,
+          reference_entries: analysisData.references || [],
           created_at: new Date().toISOString()
         })
         .select()
