@@ -37,9 +37,20 @@ export const createJournalEntry = async (entryData: Partial<JournalEntry>, userI
 
 export const updateJournalEntry = async (entryId: number, entryData: Partial<JournalEntry>, userId: string): Promise<JournalEntry | null> => {
   try {
+    // Prepare update data with proper field mapping
+    const updateData: any = { ...entryData };
+    
+    // If content is being updated, map it to the appropriate database fields
+    if (entryData.content) {
+      updateData['refined text'] = entryData.content;
+      updateData['transcription text'] = entryData.content;
+      // Remove the content field as it's not a database column
+      delete updateData.content;
+    }
+
     const { data, error } = await supabase
       .from('Journal Entries')
-      .update(entryData)
+      .update(updateData)
       .eq('id', entryId)
       .eq('user_id', userId) // Ensure user can only update their own entries
       .select()

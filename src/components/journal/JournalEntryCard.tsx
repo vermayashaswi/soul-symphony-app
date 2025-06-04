@@ -296,7 +296,7 @@ export function JournalEntryCard({
                            (!safeEntry.themes || safeEntry.themes.length === 0) && 
                            (!safeEntry.master_themes || safeEntry.master_themes.length === 0);
 
-  const handleEntryUpdate = (newContent: string) => {
+  const handleEntryUpdate = (newContent: string, isProcessing?: boolean) => {
     console.log(`[JournalEntryCard] Updating entry ${entry.id} with new content: "${newContent.substring(0, 30)}..."`);
     
     if (setEntries) {
@@ -306,126 +306,23 @@ export function JournalEntryCard({
             return {
               ...e,
               content: newContent,
+              'refined text': newContent,
+              'transcription text': newContent,
               Edit_Status: 1,
-              sentiment: null,
-              emotions: null,
-              master_themes: [],
-              entities: []
+              // Clear analysis data if processing
+              sentiment: isProcessing ? null : e.sentiment,
+              emotions: isProcessing ? null : e.emotions,
+              master_themes: isProcessing ? [] : e.master_themes,
+              entities: isProcessing ? [] : e.entities
             };
           }
           return e;
         });
       });
-      
-      setTimeout(() => {
-        console.log('[JournalEntryCard] Triggering re-fetch for updated analysis data');
-        
-        window.dispatchEvent(new CustomEvent('journalEntryUpdated', {
-          detail: { entryId: entry.id }
-        }));
-        
-        const checkForUpdatedThemes = async () => {
-          try {
-            const { data, error } = await supabase
-              .from('Journal Entries')
-              .select('master_themes, emotions, sentiment, entities')
-              .eq('id', entry.id)
-              .single();
-              
-            if (error) {
-              console.error('[JournalEntryCard] Error fetching updated entry data:', error);
-              return false;
-            }
-            
-            if (data) {
-              if ((data.master_themes && data.master_themes.length > 0) || 
-                  (data.emotions && Object.keys(data.emotions).length > 0)) {
-                
-                console.log('[JournalEntryCard] Found updated data for entry:', data);
-                
-                if (setEntries) {
-                  setEntries(prevEntries => {
-                    return prevEntries.map(e => {
-                      if (e.id === entry.id) {
-                        let parsedEntities: Array<{type: string, name: string, text?: string}> = [];
-                        
-                        if (data.entities) {
-                          try {
-                            if (Array.isArray(data.entities)) {
-                              parsedEntities = data.entities.map((entity: any) => ({
-                                type: entity.type || 'other',
-                                name: entity.name || '',
-                                text: entity.text
-                              }));
-                            }
-                            else if (typeof data.entities === 'string') {
-                              const parsed = JSON.parse(data.entities);
-                              if (Array.isArray(parsed)) {
-                                parsedEntities = parsed.map((entity: any) => ({
-                                  type: entity.type || 'other',
-                                  name: entity.name || '',
-                                  text: entity.text
-                                }));
-                              }
-                            }
-                            else if (data.entities && typeof data.entities === 'object') {
-                              // Handle case where data.entities is already a JSON object
-                              const entities = Array.isArray(data.entities) ? data.entities : [data.entities];
-                              parsedEntities = entities.map((entity: any) => ({
-                                type: entity.type || 'other',
-                                name: entity.name || '',
-                                text: entity.text
-                              }));
-                            }
-                          } catch (err) {
-                            console.error('[JournalEntryCard] Error parsing entities:', err);
-                            parsedEntities = [];
-                          }
-                        }
-                        
-                        return {
-                          ...e,
-                          master_themes: data.master_themes || [],
-                          themes: data.master_themes || [],
-                          sentiment: data.sentiment,
-                          emotions: data.emotions,
-                          entities: parsedEntities
-                        };
-                      }
-                      return e;
-                    });
-                  });
-                }
-                
-                return true;
-              }
-            }
-            
-            return false;
-          } catch (err) {
-            console.error('[JournalEntryCard] Error in checkForUpdatedThemes:', err);
-            return false;
-          }
-        };
-        
-        let pollingAttempts = 0;
-        const maxPollingAttempts = 10;
-        
-        const pollingInterval = setInterval(async () => {
-          pollingAttempts++;
-          
-          const updated = await checkForUpdatedThemes();
-          
-          if (updated || pollingAttempts >= maxPollingAttempts) {
-            clearInterval(pollingInterval);
-            
-            if (pollingAttempts >= maxPollingAttempts && !updated) {
-              console.warn('[JournalEntryCard] Stopped polling for updated data after max attempts');
-            }
-          }
-        }, 3000);
-      }, 3000);
     }
+    
+    // Don't do additional polling here since the EditEntryButton now triggers proper refresh events
+    console.log('[JournalEntryCard] Entry update completed, refresh events will handle the rest');
   };
 
   const handleContentOverflow = (overflow: boolean) => {

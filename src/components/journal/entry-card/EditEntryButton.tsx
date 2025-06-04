@@ -137,6 +137,17 @@ export function EditEntryButton({ entryId, content, onEntryUpdated }: EditEntryB
       // Set updated flag and keep dialog open briefly
       setUpdatedInBackground(true);
       
+      // Trigger immediate entry refresh with updated content
+      console.log('[EditEntryButton] Triggering entry update event');
+      window.dispatchEvent(new CustomEvent('journalEntryUpdated', {
+        detail: { 
+          entryId: entryId,
+          newContent: currentLanguage === 'en' ? editedContent : content,
+          displayContent: editedContent,
+          isProcessing: true
+        }
+      }));
+      
       try {
         // Only reprocess if we actually changed the English content
         if (currentLanguage === 'en' && editedContent !== content) {
@@ -155,6 +166,16 @@ export function EditEntryButton({ entryId, content, onEntryUpdated }: EditEntryB
         // Ensure minimum processing time for UX consistency
         const minProcessingTime = 1000;
         await new Promise(resolve => setTimeout(resolve, minProcessingTime));
+        
+        // Trigger final refresh to get updated analysis data
+        console.log('[EditEntryButton] Triggering final refresh for updated entry');
+        window.dispatchEvent(new CustomEvent('journalEntriesNeedRefresh', {
+          detail: { 
+            action: 'update',
+            entryId: entryId,
+            force: true
+          }
+        }));
         
         // Close dialog and update UI
         setIsDialogOpen(false);

@@ -22,13 +22,15 @@ const globalEntriesCache: {
   cacheExpiryTime: number;
   lastDeletedEntryId?: number | null;
   deletedEntryIds: Set<number>; // Track all deleted entry IDs
+  lastUpdatedEntryId?: number | null; // Track last updated entry for immediate refresh
 } = {
   entries: [],
   lastFetchTime: null,
   entryIds: new Set(),
   cacheExpiryTime: 0, // Timestamp when cache should be considered expired
   lastDeletedEntryId: null, // Track the last deleted entry for better cache invalidation
-  deletedEntryIds: new Set() // Store all deleted entry IDs
+  deletedEntryIds: new Set(), // Store all deleted entry IDs
+  lastUpdatedEntryId: null // Track last updated entry
 };
 
 export function useJournalEntries(
@@ -74,6 +76,7 @@ export function useJournalEntries(
   const deletedEntryIdRef = useRef<number | null>(null);
   const deletedEntryIdsRef = useRef<Set<number>>(new Set()); // Define a single instance of this ref
   const lastDeletedEntryIdRef = useRef<number | null>(null); // Define a single instance of this ref
+  const updatedEntryIdRef = useRef<number | null>(null); // Track updated entries
 
   useEffect(() => {
     entriesRef.current = entries;
@@ -147,11 +150,65 @@ export function useJournalEntries(
         );
       }
     };
+
+    // New handler for entry updates
+    const handleEntryUpdated = (event: CustomEvent) => {
+      if (event.detail && event.detail.entryId) {
+        const updatedId = Number(event.detail.entryId);
+        const newContent = event.detail.newContent;
+        const displayContent = event.detail.displayContent;
+        const isProcessing = event.detail.isProcessing;
+        
+        console.log(`[useJournalEntries] Detected entry updated event: ${updatedId}`, {
+          newContent: newContent?.substring(0, 50) + '...',
+          displayContent: displayContent?.substring(0, 50) + '...',
+          isProcessing
+        });
+        
+        // Track the updated entry
+        updatedEntryIdRef.current = updatedId;
+        globalEntriesCache.lastUpdatedEntryId = updatedId;
+        
+        // Update the entry immediately in local state with display content
+        setEntries(currentEntries => 
+          currentEntries.map(entry => {
+            if (entry.id === updatedId) {
+              return {
+                ...entry,
+                content: displayContent || newContent || entry.content,
+                'refined text': newContent || entry['refined text'],
+                'transcription text': newContent || entry['transcription text'],
+                Edit_Status: 1,
+                // Reset analysis data as it will be reprocessed
+                sentiment: isProcessing ? null : entry.sentiment,
+                emotions: isProcessing ? null : entry.emotions,
+                master_themes: isProcessing ? [] : entry.master_themes,
+                entities: isProcessing ? [] : entry.entities
+              };
+            }
+            return entry;
+          })
+        );
+        
+        // Invalidate cache to force fresh fetch for updated analysis
+        globalEntriesCache.cacheExpiryTime = 0;
+        
+        // Schedule a refresh to get updated analysis data
+        setTimeout(() => {
+          if (!isFetchingRef.current) {
+            console.log(`[useJournalEntries] Fetching updated analysis for entry: ${updatedId}`);
+            fetchEntries();
+          }
+        }, 2000);
+      }
+    };
     
     window.addEventListener('journalEntryDeleted', handleEntryDeleted as EventListener);
+    window.addEventListener('journalEntryUpdated', handleEntryUpdated as EventListener);
     
     return () => {
       window.removeEventListener('journalEntryDeleted', handleEntryDeleted as EventListener);
+      window.removeEventListener('journalEntryUpdated', handleEntryUpdated as EventListener);
     };
   }, []);
 
@@ -191,13 +248,15 @@ export function useJournalEntries(
                 'cached entries:', globalEntriesCache.entries.length,
                 'refreshKey:', refreshKey);
     
-    // Check if there was a recently deleted entry ID
+    // Check if there was a recently deleted or updated entry ID
     const hasRecentDeletion = globalEntriesCache.lastDeletedEntryId !== null || 
                              lastDeletedEntryIdRef.current !== null;
+    const hasRecentUpdate = globalEntriesCache.lastUpdatedEntryId !== null ||
+                           updatedEntryIdRef.current !== null;
     
-    // Cache invalidation logic - always invalidate cache if there was a deletion
-    if (hasRecentDeletion) {
-      console.log('[useJournalEntries] Cache invalidated due to deletion');
+    // Cache invalidation logic - always invalidate cache if there was a deletion or update
+    if (hasRecentDeletion || hasRecentUpdate) {
+      console.log('[useJournalEntries] Cache invalidated due to deletion or update');
       globalEntriesCache.cacheExpiryTime = 0;
     }
     
@@ -210,7 +269,8 @@ export function useJournalEntries(
       globalEntriesCache.entries.length > 0 &&
       globalEntriesCache.lastRefreshKey === refreshKey &&
       Date.now() < globalEntriesCache.cacheExpiryTime &&
-      !hasRecentDeletion;
+      !hasRecentDeletion &&
+      !hasRecentUpdate;
     
     if (isDuplicateFetch) {
       console.log('[useJournalEntries] Skipping duplicate fetch with same parameters');
@@ -265,7 +325,8 @@ export function useJournalEntries(
       // Only show loading if we have no cached data
       if (globalEntriesCache.entries.length === 0 || 
           globalEntriesCache.userId !== userId || 
-          hasRecentDeletion) {
+          hasRecentDeletion ||
+          hasRecentUpdate) {
         setLoading(true);
       }
       
@@ -346,6 +407,38 @@ export function useJournalEntries(
           console.log(`[useJournalEntries] Confirmed entry ${deletedId} is no longer in results`);
           deletedEntryIdRef.current = null;
           globalEntriesCache.lastDeletedEntryId = null;
+        }
+      }
+      
+      // Special handling for updated entries - merge with fresh data
+      if (updatedEntryIdRef.current) {
+        const updatedId = updatedEntryIdRef.current;
+        console.log(`[useJournalEntries] Post-update refresh for ID: ${updatedId}`);
+        
+        // Find the updated entry in fresh data
+        const updatedEntry = journalEntries.find(entry => entry.id === updatedId);
+        
+        if (updatedEntry) {
+          console.log(`[useJournalEntries] Found updated entry ${updatedId} with fresh analysis data`);
+          
+          // Update the entry in our current entries with fresh analysis
+          setEntries(currentEntries => 
+            currentEntries.map(entry => {
+              if (entry.id === updatedId) {
+                return {
+                  ...entry,
+                  ...updatedEntry,
+                  // Preserve display content if it was translated
+                  content: entry.content // Keep the display content user is currently seeing
+                };
+              }
+              return entry;
+            })
+          );
+          
+          // Clear the ref to avoid re-processing
+          updatedEntryIdRef.current = null;
+          globalEntriesCache.lastUpdatedEntryId = null;
         }
       }
       
