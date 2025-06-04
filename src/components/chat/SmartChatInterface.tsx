@@ -32,8 +32,7 @@ import { ChatMessage } from "@/types/chat";
 import { getThreadMessages, saveMessage } from "@/services/chat";
 import { useDebugLog } from "@/utils/debug/DebugContext";
 import { TranslatableText } from "@/components/translation/TranslatableText";
-import { analyzeQueryTypes } from "@/utils/chat/queryAnalyzer";
-import { processChatMessage } from "@/services/chatService";
+import { useChatMessageClassification, QueryCategory } from "@/hooks/use-chat-message-classification";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -70,6 +69,9 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({ mentalHealthIns
   
   // State for the current thread
   const [currentThreadId, setCurrentThreadId] = useState<string | null>(null);
+  
+  // Use the GPT-based message classification hook
+  const { classifyMessage, classification } = useChatMessageClassification();
   
   // Use our enhanced realtime hook to track processing status
   const {
@@ -275,35 +277,107 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({ mentalHealthIns
         debugLog.addEvent("Database", `Created processing message with ID: ${processingMessageId}`, "success");
       }
       
-      debugLog.addEvent("Query Analysis", `Analyzing query: "${message.substring(0, 30)}${message.length > 30 ? '...' : ''}"`, "info");
-      updateProcessingStage("Analyzing patterns in your journal...");
-      const queryTypes = analyzeQueryTypes(message);
+      // Use GPT-based query classification with conversation context
+      debugLog.addEvent("Query Classification", `Classifying query: "${message.substring(0, 30)}${message.length > 30 ? '...' : ''}"`, "info");
+      updateProcessingStage("Analyzing your question...");
       
-      const analysisDetails = {
-        isEmotionFocused: queryTypes.isEmotionFocused,
-        isQuantitative: queryTypes.isQuantitative,
-        isWhyQuestion: queryTypes.isWhyQuestion,
-        isTemporalQuery: queryTypes.isTemporalQuery,
-        isPersonalInsightQuery: queryTypes.isPersonalInsightQuery,
-        isMentalHealthQuery: queryTypes.isMentalHealthQuery,
-        timeRange: queryTypes.timeRange.periodName,
-        emotion: queryTypes.emotion || 'none detected'
-      };
+      // Get conversation context for better classification
+      const conversationContext = chatHistory.slice(-5).map(msg => ({
+        role: msg.role,
+        content: msg.content
+      }));
       
-      debugLog.addEvent("Query Analysis", `Analysis result: ${JSON.stringify(analysisDetails)}`, "success");
+      const queryClassification = await classifyMessage(message, conversationContext);
+      
+      debugLog.addEvent("Query Classification", `Classification result: ${JSON.stringify({
+        category: queryClassification.category,
+        confidence: queryClassification.confidence,
+        shouldUseJournal: queryClassification.shouldUseJournal,
+        useAllEntries: queryClassification.useAllEntries,
+        reasoning: queryClassification.reasoning
+      })}`, "success");
       
       updateProcessingStage("Generating response...");
-      debugLog.addEvent("Chat Processing", "Using new chatService for message processing", "info");
       
-      // Use the new chatService which handles routing properly
-      const response = await processChatMessage(
-        message, 
-        user.id, 
-        queryTypes, 
-        threadId,
-        false,
-        parameters
-      );
+      let response;
+      
+      // Route to appropriate edge function based on classification
+      if (queryClassification.category === QueryCategory.JOURNAL_SPECIFIC) {
+        debugLog.addEvent("Routing", "Using chat-with-rag for journal-specific query", "info");
+        
+        // Call chat-with-rag edge function
+        const { data, error } = await supabase.functions.invoke('chat-with-rag', {
+          body: {
+            message,
+            userId: user.id,
+            threadId,
+            conversationContext,
+            useAllEntries: queryClassification.useAllEntries || false,
+            hasPersonalPronouns: message.toLowerCase().includes('i ') || message.toLowerCase().includes('my '),
+            hasExplicitTimeReference: /\b(last week|yesterday|this week|last month|today|recently|lately)\b/i.test(message),
+            threadMetadata: {}
+          }
+        });
+        
+        if (error) {
+          throw new Error(`Journal analysis error: ${error.message}`);
+        }
+        
+        response = {
+          content: data.response,
+          references: data.references || [],
+          analysis: data.analysis || {},
+          hasNumericResult: false,
+          role: 'assistant' as const
+        };
+        
+      } else if (queryClassification.category === QueryCategory.GENERAL_MENTAL_HEALTH) {
+        debugLog.addEvent("Routing", "Using general-mental-health-chat for mental health query", "info");
+        
+        // Call general-mental-health-chat edge function
+        const { data, error } = await supabase.functions.invoke('general-mental-health-chat', {
+          body: {
+            message,
+            conversationContext,
+            userInsights: mentalHealthInsights
+          }
+        });
+        
+        if (error) {
+          throw new Error(`Mental health chat error: ${error.message}`);
+        }
+        
+        response = {
+          content: data.response,
+          references: [],
+          analysis: {},
+          hasNumericResult: false,
+          role: 'assistant' as const
+        };
+        
+      } else {
+        // CONVERSATIONAL - use smart-chat for general conversation
+        debugLog.addEvent("Routing", "Using smart-chat for conversational query", "info");
+        
+        const { data, error } = await supabase.functions.invoke('smart-chat', {
+          body: {
+            message,
+            conversationContext
+          }
+        });
+        
+        if (error) {
+          throw new Error(`Smart chat error: ${error.message}`);
+        }
+        
+        response = {
+          content: data.response,
+          references: [],
+          analysis: {},
+          hasNumericResult: false,
+          role: 'assistant' as const
+        };
+      }
       
       // Update or delete the processing message
       if (processingMessageId) {
