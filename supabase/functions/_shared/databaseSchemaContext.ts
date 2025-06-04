@@ -1,3 +1,4 @@
+
 /**
  * Database Schema Context Helper
  * Provides comprehensive schema information for GPT-intelligent RAG operations
@@ -284,3 +285,4 @@ export function getLanguageAnalysisGuidelines(): string {
    - Support cross-language sentiment and emotion analysis
    - Enable language-specific insights and recommendations
 `;
+}
