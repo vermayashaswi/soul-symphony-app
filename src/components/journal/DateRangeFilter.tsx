@@ -6,7 +6,7 @@ import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { cn } from '@/lib/utils';
 import { format, isValid, endOfDay, startOfDay, isAfter, isBefore, isEqual, isSameDay, isWithinInterval } from 'date-fns';
-import { JournalEntry } from './JournalEntryCard';
+import { JournalEntry } from '@/types/journal';
 import { Badge } from '@/components/ui/badge';
 import { DayPickerSingleProps } from 'react-day-picker';
 
