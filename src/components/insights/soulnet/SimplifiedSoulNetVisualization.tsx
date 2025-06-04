@@ -3,6 +3,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useFrame } from '@react-three/fiber';
 import { OrbitControls } from '@react-three/drei';
 import * as THREE from 'three';
+import { useTheme } from '@/hooks/use-theme';
 import Node from './Node';
 import Edge from './Edge';
 
@@ -49,24 +50,13 @@ export const SimplifiedSoulNetVisualization: React.FC<SimplifiedSoulNetVisualiza
   const [highlightedNodes, setHighlightedNodes] = useState<Set<string>>(new Set());
   const [dimmedNodes, setDimmedNodes] = useState<Set<string>>(new Set());
   const [cameraZoom, setCameraZoom] = useState(45);
-  const [effectiveTheme, setEffectiveTheme] = useState<'light' | 'dark'>('light');
+  
+  // UPDATED: Use app's theme context instead of system theme detection
+  const { theme, systemTheme } = useTheme();
+  const effectiveTheme = theme === 'system' ? systemTheme : theme;
 
+  console.log(`[SimplifiedSoulNetVisualization] FIXED THEME: Using app theme context - theme: ${theme}, systemTheme: ${systemTheme}, effective: ${effectiveTheme}`);
   console.log(`[SimplifiedSoulNetVisualization] INSTANT MODE: Rendering with ${data.nodes.length} nodes, instantReady: ${isInstantReady}`);
-
-  // Detect user's theme preference
-  useEffect(() => {
-    const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
-    const handleChange = (event: MediaQueryListEvent) => {
-      setEffectiveTheme(event.matches ? 'dark' : 'light');
-    };
-
-    setEffectiveTheme(mediaQuery.matches ? 'dark' : 'light');
-    mediaQuery.addEventListener('change', handleChange);
-
-    return () => {
-      mediaQuery.removeEventListener('change', handleChange);
-    };
-  }, []);
 
   // Use Three.js controls for camera
   useFrame(({ camera }) => {
