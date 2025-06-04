@@ -43,6 +43,18 @@ port = 54328
 port = 54326
 serve_port = 54327
 
-# New function configuration
+# Enhanced intelligent edge functions
 [functions.chat-query-classifier]
+verify_jwt = true
+
+[functions.intelligent-query-planner]
+verify_jwt = true
+
+[functions.gpt-search-orchestrator]
+verify_jwt = true
+
+[functions.intelligent-response-generator]
+verify_jwt = true
+
+[functions.gpt-master-orchestrator]
 verify_jwt = true
