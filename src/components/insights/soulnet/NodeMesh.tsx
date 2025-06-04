@@ -1,4 +1,3 @@
-
 import React, { useRef, useMemo, useState, useEffect } from 'react';
 import * as THREE from 'three';
 import '@/types/three-reference';
@@ -13,6 +12,7 @@ interface NodeMeshProps {
   dimmed: boolean;
   connectionStrength?: number;
   isSelected: boolean;
+  themeHex: string; // Added missing themeHex prop
   onClick: (e: any) => void;
   onPointerDown: (e: any) => void;
   onPointerUp: (e: any) => void;
@@ -29,6 +29,7 @@ export const NodeMesh: React.FC<NodeMeshProps> = ({
   dimmed,
   connectionStrength = 0.5,
   isSelected,
+  themeHex, // Accept the themeHex prop
   onClick,
   onPointerDown,
   onPointerUp,
