@@ -385,7 +385,12 @@ export function EmotionChart({
           <div className="flex items-center gap-2">
             <div className="w-2 h-2 rounded-full" style={{ backgroundColor: payload[0].stroke }}></div>
             <p className="text-sm">
-              <TranslatableText text={emotionName} forceTranslate={true} />: {value?.toFixed(1) || 'N/A'}
+              <TranslatableText 
+                text={emotionName} 
+                forceTranslate={true}
+                enableFontScaling={true}
+                scalingContext="compact"
+              />: {value?.toFixed(1) || 'N/A'}
             </p>
           </div>
         </div>
@@ -400,7 +405,12 @@ export function EmotionChart({
       return (
         <div className="flex items-center justify-center h-full">
           <p className="text-muted-foreground">
-            <TranslatableText text="No data available for this timeframe" forceTranslate={true} />
+            <TranslatableText 
+              text="No data available for this timeframe" 
+              forceTranslate={true}
+              enableFontScaling={true}
+              scalingContext="general"
+            />
           </p>
         </div>
       );
@@ -414,7 +424,12 @@ export function EmotionChart({
       return (
         <div className="flex items-center justify-center h-full">
           <p className="text-muted-foreground">
-            <TranslatableText text="No emotional data found" forceTranslate={true} />
+            <TranslatableText 
+              text="No emotional data found" 
+              forceTranslate={true}
+              enableFontScaling={true}
+              scalingContext="general"
+            />
           </p>
         </div>
       );
@@ -491,6 +506,8 @@ export function EmotionChart({
                   <TranslatableText 
                     text={emotion.charAt(0).toUpperCase() + emotion.slice(1)} 
                     forceTranslate={true}
+                    enableFontScaling={true}
+                    scalingContext="compact"
                   />
                 </span>
               </div>
@@ -499,7 +516,12 @@ export function EmotionChart({
         </div>
         
         <div className="flex justify-center flex-wrap gap-4 mt-4 text-xs text-muted-foreground">
-          <TranslatableText text="* Click on a legend item to focus on that emotion" forceTranslate={true} />
+          <TranslatableText 
+            text="* Click on a legend item to focus on that emotion" 
+            forceTranslate={true}
+            enableFontScaling={true}
+            scalingContext="compact"
+          />
         </div>
       </div>
     );
@@ -513,7 +535,12 @@ export function EmotionChart({
     <div className={cn("w-full", className)}>
       <div className="flex flex-wrap justify-between items-center mb-4">
         <h3 className="text-xl font-semibold">
-          <TranslatableText text="TOP" forceTranslate={true} />
+          <TranslatableText 
+            text="TOP" 
+            forceTranslate={true}
+            enableFontScaling={true}
+            scalingContext="general"
+          />
         </h3>
         <div className="flex gap-2">
           {chartTypes.map((type) => (
@@ -527,7 +554,12 @@ export function EmotionChart({
                   : "bg-secondary text-muted-foreground hover:text-foreground"
               )}
             >
-              <TranslatableText text={type.label} forceTranslate={true} />
+              <TranslatableText 
+                text={type.label} 
+                forceTranslate={true}
+                enableFontScaling={true}
+                scalingContext="compact"
+              />
             </button>
           ))}
         </div>
@@ -539,7 +571,12 @@ export function EmotionChart({
           <div className="w-full">
             {topRightPercentage && (
               <div className="absolute top-2 right-2 bg-background/90 py-1 px-3 rounded-lg shadow-lg text-primary font-medium z-20">
-                <TranslatableText text={topRightPercentage.emotion} forceTranslate={true} />: {topRightPercentage.percentage}
+                <TranslatableText 
+                  text={topRightPercentage.emotion} 
+                  forceTranslate={true}
+                  enableFontScaling={true}
+                  scalingContext="compact"
+                />: {topRightPercentage.percentage}
               </div>
             )}
             

@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from 'react';
 import { useTheme } from '@/hooks/use-theme';
 import { TimeRange } from '@/hooks/use-insights-data';
@@ -78,7 +77,12 @@ const CustomTooltip = ({ active, payload, label }: any) => {
       <div className="custom-tooltip bg-background p-2 border rounded-md shadow-md">
         <p className="date">{label}</p>
         <p className="sentiment" style={{ color: moodColor }}>
-          <TranslatableText text={moodText} forceTranslate={true} />
+          <TranslatableText 
+            text={moodText} 
+            forceTranslate={true}
+            enableFontScaling={true}
+            scalingContext="compact"
+          />
         </p>
       </div>
     );
@@ -246,7 +250,12 @@ const MoodCalendar: React.FC<MoodCalendarProps> = ({ sentimentData, timeRange })
       return (
         <div className="flex items-center justify-center h-full">
           <p className="text-muted-foreground">
-            <TranslatableText text="No data available for this timeframe" forceTranslate={true} />
+            <TranslatableText 
+              text="No data available for this timeframe" 
+              forceTranslate={true}
+              enableFontScaling={true}
+              scalingContext="general"
+            />
           </p>
         </div>
       );
@@ -314,15 +323,30 @@ const MoodCalendar: React.FC<MoodCalendarProps> = ({ sentimentData, timeRange })
         <div className="flex justify-center gap-4 text-xs text-muted-foreground mt-4">
           <div className="flex items-center gap-1">
             <div className="w-3 h-3 rounded-full" style={{ background: "#4ade80" }} />
-            <TranslatableText text="Positive" forceTranslate={true} />
+            <TranslatableText 
+              text="Positive" 
+              forceTranslate={true}
+              enableFontScaling={true}
+              scalingContext="compact"
+            />
           </div>
           <div className="flex items-center gap-1">
             <div className="w-3 h-3 rounded-full" style={{ background: "#facc15" }} />
-            <TranslatableText text="Neutral" forceTranslate={true} />
+            <TranslatableText 
+              text="Neutral" 
+              forceTranslate={true}
+              enableFontScaling={true}
+              scalingContext="compact"
+            />
           </div>
           <div className="flex items-center gap-1">
             <div className="w-3 h-3 rounded-full" style={{ background: "#ea384c" }} />
-            <TranslatableText text="Negative" forceTranslate={true} />
+            <TranslatableText 
+              text="Negative" 
+              forceTranslate={true}
+              enableFontScaling={true}
+              scalingContext="compact"
+            />
           </div>
         </div>
       </div>
@@ -339,10 +363,20 @@ const MoodCalendar: React.FC<MoodCalendarProps> = ({ sentimentData, timeRange })
     <div className="bg-background rounded-xl shadow-sm border w-full p-6 md:p-8">
       <div className="text-center mb-4">
         <h2 className="text-lg font-semibold mb-1">
-          <TranslatableText text="Mood Trends" forceTranslate={true} />
+          <TranslatableText 
+            text="Mood Trends" 
+            forceTranslate={true}
+            enableFontScaling={true}
+            scalingContext="general"
+          />
         </h2>
         <p className="text-sm text-muted-foreground">
-          <TranslatableText text="Your sentiment changes over time" forceTranslate={true} />
+          <TranslatableText 
+            text="Your sentiment changes over time" 
+            forceTranslate={true}
+            enableFontScaling={true}
+            scalingContext="compact"
+          />
         </p>
       </div>
       
@@ -358,7 +392,12 @@ const MoodCalendar: React.FC<MoodCalendarProps> = ({ sentimentData, timeRange })
         </Button>
         
         <div className="text-center font-medium">
-          <TranslatableText text={getPeriodLabel()} forceTranslate={true} />
+          <TranslatableText 
+            text={getPeriodLabel()} 
+            forceTranslate={true}
+            enableFontScaling={true}
+            scalingContext="compact"
+          />
         </div>
         
         <Button 

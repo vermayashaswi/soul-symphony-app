@@ -41,7 +41,12 @@ const MoodCalendarGrid: React.FC<MoodCalendarGridProps> = ({ sentimentData, time
     return (
       <div className="flex items-center justify-center h-full">
         <p className="text-muted-foreground">
-          <TranslatableText text="No data available for this timeframe" forceTranslate={true} />
+          <TranslatableText 
+            text="No data available for this timeframe" 
+            forceTranslate={true}
+            enableFontScaling={true}
+            scalingContext="general"
+          />
         </p>
       </div>
     );
@@ -207,7 +212,12 @@ const MoodCalendarGrid: React.FC<MoodCalendarGridProps> = ({ sentimentData, time
         {/* Weekday headers */}
         {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
           <div key={day} className="text-xs text-center text-muted-foreground">
-            <TranslatableText text={day} forceTranslate={true} />
+            <TranslatableText 
+              text={day} 
+              forceTranslate={true}
+              enableFontScaling={true}
+              scalingContext="compact"
+            />
           </div>
         ))}
         
@@ -273,7 +283,12 @@ const MoodCalendarGrid: React.FC<MoodCalendarGridProps> = ({ sentimentData, time
                     "text-xs text-center text-muted-foreground sticky top-0 bg-background z-10",
                     isMobile ? "px-1 py-1" : "px-1 py-1"
                   )}>
-                    <TranslatableText text={month} forceTranslate={true} />
+                    <TranslatableText 
+                      text={month} 
+                      forceTranslate={true}
+                      enableFontScaling={true}
+                      scalingContext="compact"
+                    />
                   </th>
                 ))}
               </tr>
@@ -332,15 +347,30 @@ const MoodCalendarGrid: React.FC<MoodCalendarGridProps> = ({ sentimentData, time
       <div className="flex justify-center gap-4 text-xs text-muted-foreground mt-4">
         <div className="flex items-center gap-1">
           <div className="w-3 h-3 rounded-full bg-green-500" />
-          <TranslatableText text="Positive" forceTranslate={true} />
+          <TranslatableText 
+            text="Positive" 
+            forceTranslate={true}
+            enableFontScaling={true}
+            scalingContext="compact"
+          />
         </div>
         <div className="flex items-center gap-1">
           <div className="w-3 h-3 rounded-full bg-yellow-400" />
-          <TranslatableText text="Neutral" forceTranslate={true} />
+          <TranslatableText 
+            text="Neutral" 
+            forceTranslate={true}
+            enableFontScaling={true}
+            scalingContext="compact"
+          />
         </div>
         <div className="flex items-center gap-1">
           <div className="w-3 h-3 rounded-full bg-red-500" />
-          <TranslatableText text="Negative" forceTranslate={true} />
+          <TranslatableText 
+            text="Negative" 
+            forceTranslate={true}
+            enableFontScaling={true}
+            scalingContext="compact"
+          />
         </div>
       </div>
     </div>
