@@ -24,6 +24,24 @@ class EnhancedFontService {
 
   private fontCache = new Map<string, any>();
   private loadingPromises = new Map<string, Promise<any>>();
+  private isThreeJsAvailable = false;
+
+  constructor() {
+    // Check if THREE.js is available safely
+    this.checkThreeJsAvailability();
+  }
+
+  private checkThreeJsAvailability(): void {
+    try {
+      this.isThreeJsAvailable = typeof window !== 'undefined' && 
+                               window.THREE !== undefined && 
+                               window.THREE.FontLoader !== undefined;
+      console.log(`[EnhancedFontService] THREE.js availability:`, this.isThreeJsAvailable);
+    } catch (error) {
+      console.warn('[EnhancedFontService] Error checking THREE.js availability:', error);
+      this.isThreeJsAvailable = false;
+    }
+  }
 
   detectScript(text: string): string {
     if (!text) return 'latin';
@@ -44,20 +62,28 @@ class EnhancedFontService {
   }
 
   async loadFont(text: string): Promise<any> {
+    // If THREE.js is not available, reject immediately to force Canvas fallback
+    if (!this.isThreeJsAvailable) {
+      console.log('[EnhancedFontService] THREE.js not available, forcing Canvas fallback');
+      throw new Error('THREE.js FontLoader not available');
+    }
+
     const config = this.getFontConfig(text);
     
     // Check cache first
     if (this.fontCache.has(config.url)) {
+      console.log(`[EnhancedFontService] Font found in cache: ${config.name}`);
       return this.fontCache.get(config.url);
     }
 
     // Check if already loading
     if (this.loadingPromises.has(config.url)) {
+      console.log(`[EnhancedFontService] Font already loading: ${config.name}`);
       return this.loadingPromises.get(config.url);
     }
 
-    // Start loading
-    const loadingPromise = this.loadFontFromUrl(config.url);
+    // Start loading with timeout
+    const loadingPromise = this.loadFontFromUrlWithTimeout(config.url, 5000);
     this.loadingPromises.set(config.url, loadingPromise);
 
     try {
@@ -73,15 +99,36 @@ class EnhancedFontService {
     }
   }
 
-  private async loadFontFromUrl(url: string): Promise<any> {
+  private async loadFontFromUrlWithTimeout(url: string, timeoutMs: number): Promise<any> {
     return new Promise((resolve, reject) => {
-      const loader = new (window as any).THREE.FontLoader();
-      loader.load(
-        url,
-        (font: any) => resolve(font),
-        undefined,
-        (error: any) => reject(error)
-      );
+      const timeout = setTimeout(() => {
+        reject(new Error(`Font loading timeout after ${timeoutMs}ms`));
+      }, timeoutMs);
+
+      try {
+        if (!window.THREE || !window.THREE.FontLoader) {
+          clearTimeout(timeout);
+          reject(new Error('THREE.FontLoader not available'));
+          return;
+        }
+
+        const loader = new window.THREE.FontLoader();
+        loader.load(
+          url,
+          (font: any) => {
+            clearTimeout(timeout);
+            resolve(font);
+          },
+          undefined,
+          (error: any) => {
+            clearTimeout(timeout);
+            reject(error);
+          }
+        );
+      } catch (error) {
+        clearTimeout(timeout);
+        reject(error);
+      }
     });
   }
 
@@ -93,6 +140,11 @@ class EnhancedFontService {
   isComplexScript(text: string): boolean {
     const script = this.detectScript(text);
     return script !== 'latin';
+  }
+
+  // Safe method to check if font loading is possible
+  canLoadFonts(): boolean {
+    return this.isThreeJsAvailable;
   }
 }
 

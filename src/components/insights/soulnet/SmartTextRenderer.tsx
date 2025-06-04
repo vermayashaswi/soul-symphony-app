@@ -29,7 +29,7 @@ export const SmartTextRenderer: React.FC<SmartTextRendererProps> = ({
   visible = true,
   renderOrder = 10,
   bold = false,
-  outlineWidth = 0, // PLAN IMPLEMENTATION: Default to no outline
+  outlineWidth = 0,
   outlineColor,
   maxWidth = 25,
   enableWrapping = false,
@@ -37,7 +37,7 @@ export const SmartTextRenderer: React.FC<SmartTextRendererProps> = ({
   maxLines = 3
 }) => {
   const [useCanvasRenderer, setUseCanvasRenderer] = useState(false);
-  const [fontLoaded, setFontLoaded] = useState(false);
+  const [isReady, setIsReady] = useState(false);
   const [hasError, setHasError] = useState(false);
   const [processedText, setProcessedText] = useState('');
   const [optimalMaxWidth, setOptimalMaxWidth] = useState(maxWidth);
@@ -45,6 +45,9 @@ export const SmartTextRenderer: React.FC<SmartTextRendererProps> = ({
   useEffect(() => {
     const initializeRenderer = async () => {
       try {
+        setHasError(false);
+        setIsReady(false);
+
         // Process text wrapping first
         let finalText = text;
         let calculatedMaxWidth = maxWidth;
@@ -61,48 +64,90 @@ export const SmartTextRenderer: React.FC<SmartTextRendererProps> = ({
         setOptimalMaxWidth(calculatedMaxWidth);
 
         const isComplex = enhancedFontService.isComplexScript(finalText);
-        const isMultiLine = finalText.includes('\n');
+        const canLoadFonts = enhancedFontService.canLoadFonts();
         
-        // PLAN IMPLEMENTATION: Prefer Three.js renderer for consistent font sizing
-        // Only use Canvas for complex scripts that Three.js can't handle well
-        const preferCanvas = isComplex;
-        
-        if (preferCanvas) {
-          console.log(`[SmartTextRenderer] PLAN IMPLEMENTATION: Using Canvas renderer for complex script: "${finalText}"`);
+        // Always prefer Canvas for complex scripts or if THREE.js font loading is not available
+        if (isComplex || !canLoadFonts) {
+          console.log(`[SmartTextRenderer] Using Canvas renderer - Complex: ${isComplex}, CanLoadFonts: ${canLoadFonts}`);
           setUseCanvasRenderer(true);
-          setFontLoaded(true);
-        } else {
-          console.log(`[SmartTextRenderer] PLAN IMPLEMENTATION: Using Three.js renderer for: "${finalText}" (multiline: ${isMultiLine}, size: ${size}) - CRISP FONT RENDERING`);
-          try {
-            await enhancedFontService.loadFont(finalText);
-            setUseCanvasRenderer(false);
-            setFontLoaded(true);
-            console.log(`[SmartTextRenderer] Three.js font loaded successfully for: "${finalText}" with crisp rendering`);
-          } catch (error) {
-            console.warn(`[SmartTextRenderer] Three.js font loading failed for: "${finalText}", falling back to Canvas`, error);
-            setUseCanvasRenderer(true);
-            setFontLoaded(true);
-          }
+          setIsReady(true);
+          return;
+        }
+
+        // Try Three.js renderer for simple scripts
+        console.log(`[SmartTextRenderer] Attempting Three.js renderer for: "${finalText}"`);
+        try {
+          await enhancedFontService.loadFont(finalText);
+          console.log(`[SmartTextRenderer] Three.js font loaded successfully for: "${finalText}"`);
+          setUseCanvasRenderer(false);
+          setIsReady(true);
+        } catch (fontError) {
+          console.warn(`[SmartTextRenderer] Three.js font loading failed, using Canvas fallback:`, fontError);
+          setUseCanvasRenderer(true);
+          setIsReady(true);
         }
       } catch (error) {
-        console.error(`[SmartTextRenderer] Error initializing renderer for: "${text}"`, error);
-        setHasError(true);
+        console.error(`[SmartTextRenderer] Critical error during initialization:`, error);
+        // Fallback to Canvas renderer on any error
+        setUseCanvasRenderer(true);
+        setHasError(false); // Don't show as error, just use fallback
+        setIsReady(true);
       }
     };
 
     initializeRenderer();
   }, [text, size, enableWrapping, maxCharsPerLine, maxLines, maxWidth]);
 
-  if (!visible || hasError || !fontLoaded) {
+  // Don't render anything if not visible or not ready
+  if (!visible || !isReady) {
     return null;
   }
 
-  console.log(`[SmartTextRenderer] PLAN IMPLEMENTATION: Using ${useCanvasRenderer ? 'Canvas' : 'Three.js'} renderer for CRISP text: "${processedText}" with size: ${size}, color: ${color}`);
+  // Always show something, even if there was an error
+  const safeText = processedText || text || 'Node';
 
-  if (useCanvasRenderer) {
+  console.log(`[SmartTextRenderer] Rendering with ${useCanvasRenderer ? 'Canvas' : 'Three.js'}: "${safeText}"`);
+
+  // Wrap in error boundary-like try-catch
+  try {
+    if (useCanvasRenderer) {
+      return (
+        <CanvasTextRenderer
+          text={safeText}
+          position={position}
+          color={color}
+          size={size}
+          visible={visible}
+          renderOrder={renderOrder}
+          bold={bold}
+          maxWidth={optimalMaxWidth}
+          enableWrapping={enableWrapping}
+        />
+      );
+    }
+
+    return (
+      <SimpleText
+        text={safeText}
+        position={position}
+        color={color}
+        size={size}
+        visible={visible}
+        renderOrder={renderOrder}
+        bold={bold}
+        outlineWidth={outlineWidth}
+        outlineColor={outlineColor}
+        maxWidth={optimalMaxWidth}
+        enableWrapping={enableWrapping}
+      />
+    );
+  } catch (renderError) {
+    console.error('[SmartTextRenderer] Render error, falling back to Canvas:', renderError);
+    
+    // Emergency fallback to Canvas renderer
     return (
       <CanvasTextRenderer
-        text={processedText}
+        text={safeText}
         position={position}
         color={color}
         size={size}
@@ -114,22 +159,6 @@ export const SmartTextRenderer: React.FC<SmartTextRendererProps> = ({
       />
     );
   }
-
-  return (
-    <SimpleText
-      text={processedText}
-      position={position}
-      color={color}
-      size={size}
-      visible={visible}
-      renderOrder={renderOrder}
-      bold={bold}
-      outlineWidth={outlineWidth} // PLAN IMPLEMENTATION: Pass through (should be 0 for black text)
-      outlineColor={outlineColor}
-      maxWidth={optimalMaxWidth}
-      enableWrapping={enableWrapping}
-    />
-  );
 };
 
 export default SmartTextRenderer;
