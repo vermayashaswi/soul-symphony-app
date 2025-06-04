@@ -235,7 +235,7 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({ mentalHealthIns
     setChatHistory(prev => [...prev, tempUserMessage]);
     
     // Set local loading state for immediate UI feedback
-    setLocalLoading(true, "Planning intelligent analysis...");
+    setLocalLoading(true, "Initializing enhanced GPT-intelligent analysis...");
     
     try {
       // Update thread processing status to 'processing'
@@ -268,63 +268,86 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({ mentalHealthIns
       }
       
       // Create a processing message placeholder
-      const processingMessageId = await createProcessingMessage(threadId, "Planning intelligent analysis...");
+      const processingMessageId = await createProcessingMessage(threadId, "Initializing enhanced GPT-intelligent analysis...");
       
       if (processingMessageId) {
         debugLog.addEvent("Database", `Created processing message with ID: ${processingMessageId}`, "success");
       }
       
-      // STEP 1: Use GPT-based intelligent query planning
-      debugLog.addEvent("GPT Intelligence", `Starting intelligent query planning for: "${message.substring(0, 30)}${message.length > 30 ? '...' : ''}"`, "info");
-      updateProcessingStage("Creating intelligent query plan...");
+      // ENHANCED STEP 1: GPT-Intelligent Query Planning with Full Context
+      debugLog.addEvent("Enhanced GPT Intelligence", `Starting comprehensive intelligent query planning for: "${message.substring(0, 30)}${message.length > 30 ? '...' : ''}"`, "info");
+      updateProcessingStage("Creating comprehensive intelligent query plan with user context...");
       
-      // Get conversation context for better planning
-      const conversationContext = chatHistory.slice(-5).map(msg => ({
+      // Get enhanced conversation context for better planning
+      const conversationContext = chatHistory.slice(-8).map(msg => ({
         role: msg.role,
-        content: msg.content
+        content: msg.content,
+        timestamp: msg.created_at,
+        analysis: msg.analysis_data
       }));
+
+      // Get user profile data for enhanced context
+      let userProfile = null;
+      try {
+        const { data: profileData } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', user.id)
+          .single();
+        userProfile = profileData;
+      } catch (error) {
+        console.error("Error fetching user profile:", error);
+      }
       
       const { data: planningData, error: planningError } = await supabase.functions.invoke('intelligent-query-planner', {
         body: {
           message,
           userId: user.id,
           conversationContext,
-          userMetadata: mentalHealthInsights
+          userMetadata: mentalHealthInsights,
+          threadId,
+          messageId: savedUserMessage?.id
         }
       });
 
       if (planningError) {
-        throw new Error(`Query planning error: ${planningError.message}`);
+        throw new Error(`Enhanced query planning error: ${planningError.message}`);
       }
 
       const queryPlan = planningData.queryPlan;
-      debugLog.addEvent("GPT Intelligence", `Query plan generated: ${JSON.stringify({
+      const userContext = planningData.userContext;
+      
+      debugLog.addEvent("Enhanced GPT Intelligence", `Comprehensive query plan generated: ${JSON.stringify({
         type: queryPlan.queryType,
         strategy: queryPlan.strategy,
-        confidence: queryPlan.confidence
+        confidence: queryPlan.confidence,
+        contextIntegration: queryPlan.searchPlan?.contextIntegration,
+        conversationState: !!queryPlan.conversationState
       })}`, "success");
 
-      // STEP 2: Execute GPT-orchestrated search
-      updateProcessingStage("Executing intelligent search...");
-      debugLog.addEvent("GPT Intelligence", "Starting GPT-orchestrated search execution", "info");
+      // ENHANCED STEP 2: Execute GPT-Orchestrated Search with Full Context Integration
+      updateProcessingStage("Executing enhanced intelligent search with contextual awareness...");
+      debugLog.addEvent("Enhanced GPT Intelligence", "Starting enhanced GPT-orchestrated search execution with user context", "info");
 
       const { data: searchData, error: searchError } = await supabase.functions.invoke('gpt-search-orchestrator', {
         body: {
           queryPlan,
           originalQuery: message,
-          userId: user.id
+          userId: user.id,
+          userContext,
+          conversationContext
         }
       });
 
       if (searchError) {
-        throw new Error(`Search orchestration error: ${searchError.message}`);
+        throw new Error(`Enhanced search orchestration error: ${searchError.message}`);
       }
 
-      debugLog.addEvent("GPT Intelligence", `Search completed: ${searchData.totalResults} results, strategy: ${searchData.strategy}`, "success");
+      debugLog.addEvent("Enhanced GPT Intelligence", `Enhanced search completed: ${searchData.totalResults} results, strategy: ${searchData.strategy}, enhanced features: ${JSON.stringify(searchData.enhancedFeatures)}`, "success");
 
-      // STEP 3: Synthesize GPT response
-      updateProcessingStage("Synthesizing intelligent response...");
-      debugLog.addEvent("GPT Intelligence", "Starting GPT response synthesis", "info");
+      // ENHANCED STEP 3: Synthesize GPT Response with Comprehensive Personalization
+      updateProcessingStage("Synthesizing enhanced intelligent response with personalization...");
+      debugLog.addEvent("Enhanced GPT Intelligence", "Starting enhanced GPT response synthesis with comprehensive context", "info");
 
       const { data: responseData, error: responseError } = await supabase.functions.invoke('gpt-response-synthesizer', {
         body: {
@@ -332,23 +355,27 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({ mentalHealthIns
           searchResults: searchData.results,
           aggregations: searchData.aggregations,
           queryPlan,
-          conversationContext
+          conversationContext,
+          userContext,
+          contextualInsights: searchData.contextualInsights
         }
       });
 
       if (responseError) {
-        throw new Error(`Response synthesis error: ${responseError.message}`);
+        throw new Error(`Enhanced response synthesis error: ${responseError.message}`);
       }
 
       const response = {
         content: responseData.response,
         references: responseData.references || [],
-        analysis: responseData.queryInsights || {},
+        analysis: responseData.enhancedInsights || {},
         hasNumericResult: false,
-        role: 'assistant' as const
+        role: 'assistant' as const,
+        conversationState: responseData.conversationState,
+        enhancedFeatures: responseData.enhancedFeatures
       };
 
-      debugLog.addEvent("GPT Intelligence", `Response synthesized successfully (${responseData.totalResultsUsed} results used)`, "success");
+      debugLog.addEvent("Enhanced GPT Intelligence", `Enhanced response synthesized successfully (${responseData.totalResultsUsed} results used) with features: ${JSON.stringify(response.enhancedFeatures)}`, "success");
 
       // Update or delete the processing message
       if (processingMessageId) {
@@ -364,9 +391,9 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({ mentalHealthIns
       // Update thread processing status to 'idle'
       await updateThreadProcessingStatus(threadId, 'idle');
       
-      // Save the assistant response
+      // Save the enhanced assistant response
       try {
-        debugLog.addEvent("Database", "Saving GPT-synthesized response to database", "info");
+        debugLog.addEvent("Database", "Saving enhanced GPT-synthesized response to database", "info");
         const savedResponse = await saveMessage(
           threadId,
           response.content,
@@ -376,10 +403,10 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({ mentalHealthIns
           response.hasNumericResult
         );
         
-        debugLog.addEvent("Database", `GPT response saved with ID: ${savedResponse?.id}`, "success");
+        debugLog.addEvent("Database", `Enhanced GPT response saved with ID: ${savedResponse?.id}`, "success");
         
         if (savedResponse) {
-          debugLog.addEvent("UI Update", "Adding GPT response to chat history", "info");
+          debugLog.addEvent("UI Update", "Adding enhanced GPT response to chat history", "info");
           const typedSavedResponse: ChatMessage = {
             ...savedResponse,
             sender: savedResponse.sender as 'user' | 'assistant' | 'error',
@@ -387,10 +414,10 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({ mentalHealthIns
           };
           setChatHistory(prev => [...prev, typedSavedResponse]);
         } else {
-          throw new Error("Failed to save GPT response");
+          throw new Error("Failed to save enhanced GPT response");
         }
       } catch (saveError: any) {
-        debugLog.addEvent("Database", `Error saving GPT response: ${saveError.message || "Unknown error"}`, "error");
+        debugLog.addEvent("Database", `Error saving enhanced GPT response: ${saveError.message || "Unknown error"}`, "error");
         const assistantMessage: ChatMessage = {
           id: `temp-response-${Date.now()}`,
           thread_id: threadId,
@@ -403,25 +430,25 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({ mentalHealthIns
           has_numeric_result: response.hasNumericResult
         };
         
-        debugLog.addEvent("UI Update", "Adding fallback GPT response to chat history", "warning");
+        debugLog.addEvent("UI Update", "Adding fallback enhanced GPT response to chat history", "warning");
         setChatHistory(prev => [...prev, assistantMessage]);
         
         toast({
           title: "Warning",
-          description: "Response displayed but couldn't be saved to your conversation history",
+          description: "Enhanced response displayed but couldn't be saved to your conversation history",
           variant: "default"
         });
       }
 
     } catch (error: any) {
-      debugLog.addEvent("Error", `Error in GPT-intelligent pipeline: ${error?.message || "Unknown error"}`, "error");
+      debugLog.addEvent("Error", `Error in enhanced GPT-intelligent pipeline: ${error?.message || "Unknown error"}`, "error");
       
       // Update thread status to failed
       if (threadId) {
         await updateThreadProcessingStatus(threadId, 'failed');
       }
       
-      const errorContent = "I'm having trouble processing your request with my intelligent analysis system. Please try again later. " + 
+      const errorContent = "I'm having trouble processing your request with my enhanced intelligent analysis system. Please try again later. " + 
                (error?.message ? `Error: ${error.message}` : "");
       
       try {
