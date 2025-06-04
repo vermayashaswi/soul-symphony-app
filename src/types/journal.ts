@@ -24,6 +24,7 @@ export interface JournalEntry {
   content: string; // Changed from optional to required
   original_language?: string; // Keep as optional
   translation_text?: string; // Keep as optional
+  languages?: string[]; // Array of detected language codes
   tempId?: string; // Temporary ID for tracking processing entries
 }
 

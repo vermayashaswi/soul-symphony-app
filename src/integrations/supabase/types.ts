@@ -130,6 +130,7 @@ export type Database = {
           entityemotion: Json | null
           "foreign key": string | null
           id: number
+          languages: Json | null
           master_themes: string[] | null
           "refined text": string | null
           sentiment: string | null
@@ -148,6 +149,7 @@ export type Database = {
           entityemotion?: Json | null
           "foreign key"?: string | null
           id?: number
+          languages?: Json | null
           master_themes?: string[] | null
           "refined text"?: string | null
           sentiment?: string | null
@@ -166,6 +168,7 @@ export type Database = {
           entityemotion?: Json | null
           "foreign key"?: string | null
           id?: number
+          languages?: Json | null
           master_themes?: string[] | null
           "refined text"?: string | null
           sentiment?: string | null

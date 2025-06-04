@@ -26,7 +26,7 @@ serve(async (req) => {
     console.log('Starting translation with provided API key');
     
     // Parse request body
-    const { text, sourceLanguage, targetLanguage = 'hi', entryId, cleanResult = true } = await req.json();
+    const { text, sourceLanguage, targetLanguage = 'hi', entryId, cleanResult = true, useDetectedLanguages = true } = await req.json();
 
     if (!text) {
       throw new Error('Missing required parameter: text is required');
@@ -34,9 +34,45 @@ serve(async (req) => {
 
     console.log(`Translating text: "${text.substring(0, 50)}..." from ${sourceLanguage || 'auto-detect'} to ${targetLanguage}${entryId ? ` for entry ${entryId}` : ''}`);
 
-    // First detect the language if sourceLanguage is not provided
-    let detectedLanguage = sourceLanguage;
-    if (!sourceLanguage) {
+    // Initialize Supabase if entryId is provided to fetch detected languages
+    let detectedLanguagesFromDB = [];
+    let finalSourceLanguage = sourceLanguage;
+
+    if (entryId && useDetectedLanguages) {
+      try {
+        const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+        const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+        const supabase = createClient(supabaseUrl, supabaseKey);
+
+        console.log(`[translate-text] Fetching detected languages for entry ${entryId}`);
+        
+        const { data: entryData, error: fetchError } = await supabase
+          .from('Journal Entries')
+          .select('languages')
+          .eq('id', entryId)
+          .single();
+
+        if (!fetchError && entryData && entryData.languages) {
+          detectedLanguagesFromDB = Array.isArray(entryData.languages) ? entryData.languages : [];
+          console.log(`[translate-text] Found detected languages: ${JSON.stringify(detectedLanguagesFromDB)}`);
+          
+          // Use the primary detected language if no source language was specified
+          if (!sourceLanguage && detectedLanguagesFromDB.length > 0) {
+            finalSourceLanguage = detectedLanguagesFromDB[0];
+            console.log(`[translate-text] Using primary detected language: ${finalSourceLanguage}`);
+          }
+        } else {
+          console.log(`[translate-text] No detected languages found for entry ${entryId}`);
+        }
+      } catch (dbError) {
+        console.error(`[translate-text] Error fetching detected languages:`, dbError);
+        // Continue with original flow if database lookup fails
+      }
+    }
+
+    // Language detection (if needed)
+    let detectedLanguage = finalSourceLanguage;
+    if (!detectedLanguage) {
       const detectUrl = `https://translation.googleapis.com/language/translate/v2/detect?key=${GOOGLE_API_KEY}`;
       console.log(`Detecting language with URL: ${detectUrl}`);
       
@@ -61,10 +97,63 @@ serve(async (req) => {
       }
       
       detectedLanguage = detectData.data.detections[0][0].language;
-      console.log(`Detected language: ${detectedLanguage}`);
+      console.log(`Detected language via Google API: ${detectedLanguage}`);
     }
 
-    // Then translate the text
+    // Validate detected language against database languages for consistency
+    if (detectedLanguagesFromDB.length > 0 && !detectedLanguagesFromDB.includes(detectedLanguage)) {
+      console.log(`[translate-text] Warning: Detected language ${detectedLanguage} not in stored languages ${JSON.stringify(detectedLanguagesFromDB)}`);
+      console.log(`[translate-text] Using stored primary language: ${detectedLanguagesFromDB[0]}`);
+      detectedLanguage = detectedLanguagesFromDB[0];
+    }
+
+    // Check if translation is needed
+    if (detectedLanguage === targetLanguage) {
+      console.log(`[translate-text] Source and target languages are the same (${targetLanguage}), skipping translation`);
+      
+      // Still update the database with language information if entryId is provided
+      if (entryId) {
+        try {
+          const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+          const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+          const supabase = createClient(supabaseUrl, supabaseKey);
+          
+          const updateFields = {
+            "original_language": detectedLanguage,
+            "translation_text": text // Use original text as "translation"
+          };
+          
+          const { error: updateError } = await supabase
+            .from('Journal Entries')
+            .update(updateFields)
+            .eq('id', entryId);
+            
+          if (updateError) {
+            console.error(`[translate-text] Database update error:`, updateError);
+          } else {
+            console.log(`[translate-text] Updated entry ${entryId} with same-language info`);
+          }
+        } catch (dbError) {
+          console.error(`[translate-text] Database operation error:`, dbError);
+        }
+      }
+      
+      return new Response(
+        JSON.stringify({
+          translatedText: text,
+          detectedLanguage: detectedLanguage,
+          success: true,
+          skippedTranslation: true,
+          detectedLanguagesFromDB: detectedLanguagesFromDB
+        }),
+        {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 200,
+        }
+      );
+    }
+
+    // Perform translation
     const translateUrl = `https://translation.googleapis.com/language/translate/v2?key=${GOOGLE_API_KEY}`;
     console.log(`Sending translation request to: ${translateUrl}`);
     console.log(`Request parameters: from ${detectedLanguage} to ${targetLanguage}`);
@@ -106,7 +195,7 @@ serve(async (req) => {
       console.log(`Cleaned translated text: "${translatedText.substring(0, 50)}..."`);
     }
 
-    // Update the database with the translation only if entryId is provided
+    // Update the database with the translation and language information
     if (entryId) {
       try {
         const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
@@ -182,7 +271,9 @@ serve(async (req) => {
       JSON.stringify({
         translatedText,
         detectedLanguage,
-        success: true
+        success: true,
+        detectedLanguagesFromDB: detectedLanguagesFromDB,
+        usedDetectedLanguages: useDetectedLanguages && detectedLanguagesFromDB.length > 0
       }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },

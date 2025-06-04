@@ -1,3 +1,4 @@
+
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.7.1';
@@ -197,15 +198,97 @@ serve(async (req) => {
     console.log(`Transcription successful: ${transcribedText ? 'yes' : 'no'}`);
 
     // Detect language
-    let detectedLanguage = transcriptionResult.language || 'en';
-    console.log(`Detected language: ${detectedLanguage}`);
+    let primaryLanguage = transcriptionResult.language || 'en';
+    console.log(`Primary detected language: ${primaryLanguage}`);
+
+    // Enhanced language detection using Google API for additional languages
+    let detectedLanguages = [primaryLanguage];
+    
+    const googleApiKey = Deno.env.get('GOOGLE_API');
+    if (googleApiKey && transcribedText.length > 10) {
+      try {
+        console.log('Performing enhanced language detection with Google API...');
+        const detectResponse = await fetch(`https://translation.googleapis.com/language/translate/v2/detect?key=${googleApiKey}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ q: transcribedText })
+        });
+
+        if (detectResponse.ok) {
+          const detectData = await detectResponse.json();
+          if (detectData.data && detectData.data.detections && detectData.data.detections[0]) {
+            const googleDetected = detectData.data.detections[0][0].language;
+            const confidence = detectData.data.detections[0][0].confidence || 0;
+            
+            console.log(`Google detected language: ${googleDetected} (confidence: ${confidence})`);
+            
+            // Add Google's detection if it's different and has reasonable confidence
+            if (googleDetected !== primaryLanguage && confidence > 0.5) {
+              detectedLanguages.push(googleDetected);
+            }
+          }
+        }
+      } catch (error) {
+        console.error('Error with Google language detection:', error);
+      }
+    }
+
+    // Additional language detection for mixed-language content
+    if (transcribedText.length > 100) {
+      try {
+        console.log('Analyzing for mixed-language content...');
+        const analysisResponse = await fetch('https://api.openai.com/v1/chat/completions', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${openaiApiKey}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            model: 'gpt-4o',
+            messages: [
+              {
+                role: 'system',
+                content: 'You are a language detection expert. Analyze the text and identify all languages present. Return ONLY a JSON array of ISO 639-1 language codes (e.g., ["en", "es", "hi"]). Be conservative - only include languages that are clearly present with substantial content.'
+              },
+              {
+                role: 'user',
+                content: `Analyze this text for multiple languages: "${transcribedText}"`
+              }
+            ],
+            temperature: 0.1,
+            response_format: { type: "json_object" },
+            max_tokens: 200
+          }),
+        });
+
+        if (analysisResponse.ok) {
+          const analysisResult = await analysisResponse.json();
+          try {
+            const languageAnalysis = JSON.parse(analysisResult.choices[0].message.content);
+            if (languageAnalysis.languages && Array.isArray(languageAnalysis.languages)) {
+              // Merge with existing detected languages, removing duplicates
+              const allLanguages = [...new Set([...detectedLanguages, ...languageAnalysis.languages])];
+              detectedLanguages = allLanguages;
+              console.log(`Enhanced language detection result: ${JSON.stringify(detectedLanguages)}`);
+            }
+          } catch (parseError) {
+            console.error('Error parsing language analysis:', parseError);
+          }
+        }
+      } catch (error) {
+        console.error('Error with enhanced language detection:', error);
+      }
+    }
+
+    console.log(`Final detected languages: ${JSON.stringify(detectedLanguages)}`);
 
     // If direct transcription mode, return the result immediately
     if (directTranscription) {
       console.log('Direct transcription mode, returning result immediately');
       return new Response(JSON.stringify({
         transcription: transcribedText,
-        language: detectedLanguage,
+        language: primaryLanguage,
+        languages: detectedLanguages,
         success: true
       }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -272,7 +355,7 @@ serve(async (req) => {
       console.warn('Google NL API key not found, skipping sentiment analysis');
     }
 
-    // Store in database
+    // Store in database with detected languages
     console.log('Storing journal entry in database...');
     
     const { data: journalEntry, error: insertError } = await supabase
@@ -284,6 +367,7 @@ serve(async (req) => {
           "refined text": refinedText,
           audio_url: audioUrl,
           sentiment: sentimentResult.sentiment,
+          languages: detectedLanguages, // Store the detected languages
           duration: null // Will be updated later if available
         }
       ])
@@ -296,6 +380,7 @@ serve(async (req) => {
     }
 
     console.log(`Journal entry stored successfully with ID: ${journalEntry.id}`);
+    console.log(`Stored languages: ${JSON.stringify(detectedLanguages)}`);
 
     // Analyze emotions and themes with GPT-4
     console.log('Analyzing emotions and themes with GPT-4...');
@@ -418,7 +503,8 @@ serve(async (req) => {
       emotions: analysis.emotions,
       themes: analysis.master_themes,
       sentiment: sentimentResult.sentiment,
-      language: detectedLanguage,
+      language: primaryLanguage,
+      languages: detectedLanguages,
       success: true
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },

@@ -1,4 +1,3 @@
-
 /**
  * Database Schema Context Helper
  * Provides comprehensive schema information for GPT-intelligent RAG operations
@@ -84,6 +83,24 @@ export const JOURNAL_ENTRY_SCHEMA: JournalEntrySchema = {
         "GPE": ["New York", "California"]
       }
     },
+    languages: {
+      type: "jsonb",
+      description: "Array of detected language codes from comprehensive language detection (ISO 639-1 format)",
+      nullable: true,
+      example: ["en", "hi", "es"]
+    },
+    original_language: {
+      type: "text",
+      description: "Primary detected language code before translation",
+      nullable: true,
+      example: "hi"
+    },
+    translation_text: {
+      type: "text",
+      description: "Translated version of the content when original language differs from target",
+      nullable: true,
+      example: "Today I felt anxious about the meeting..."
+    },
     duration: {
       type: "numeric",
       description: "Duration of the voice recording in seconds",
@@ -99,7 +116,8 @@ export const JOURNAL_ENTRY_SCHEMA: JournalEntrySchema = {
   relationships: [
     "journal_embeddings table contains vector embeddings for semantic search",
     "User profile information available in profiles table",
-    "Emotion analysis results are pre-calculated and stored in emotions column"
+    "Emotion analysis results are pre-calculated and stored in emotions column",
+    "Language detection results are stored in languages array for multi-language support"
   ],
   searchCapabilities: [
     "Vector similarity search using embeddings",
@@ -108,7 +126,9 @@ export const JOURNAL_ENTRY_SCHEMA: JournalEntrySchema = {
     "Date range filtering and temporal analysis",
     "Content text search in both transcription and refined text",
     "Entity-based search for people, places, organizations",
-    "Sentiment-based filtering using Google NL API scores"
+    "Sentiment-based filtering using Google NL API scores",
+    "Multi-language content filtering using detected languages array",
+    "Language-specific content retrieval and analysis"
   ]
 };
 
@@ -122,6 +142,13 @@ Table: "${JOURNAL_ENTRY_SCHEMA.table}"
 ${Object.entries(JOURNAL_ENTRY_SCHEMA.columns).map(([column, info]) => 
   `• ${column} (${info.type}): ${info.description}${info.example ? `\n  Example: ${JSON.stringify(info.example)}` : ''}`
 ).join('\n')}
+
+**LANGUAGE DETECTION SYSTEM:**
+- Languages are detected during transcription using multiple detection methods
+- Stored as JSON array of ISO 639-1 language codes (e.g., ["en", "hi", "es"])
+- Primary language is stored in original_language field
+- Supports multi-language content analysis and filtering
+- Translation results are stored in translation_text field
 
 **EMOTION SCORING SYSTEM:**
 - Emotions are PRE-CALCULATED using advanced AI analysis
@@ -155,6 +182,8 @@ ${JOURNAL_ENTRY_SCHEMA.relationships.map(rel => `• ${rel}`).join('\n')}
 - Vector embeddings enable semantic similarity search
 - Date filtering supports temporal pattern analysis
 - Sentiment analysis uses Google NL API for accurate sentiment scoring
+- Language detection supports multi-language journaling and content analysis
+- Translation capabilities preserve original language context while enabling cross-language analysis
 `;
 }
 
@@ -233,3 +262,25 @@ export function getSentimentAnalysisGuidelines(): string {
    - Reference specific scores when discussing sentiment patterns
 `;
 }
+
+export function getLanguageAnalysisGuidelines(): string {
+  return `
+**LANGUAGE ANALYSIS GUIDELINES:**
+
+1. **Multi-Language Detection System**
+   - Languages are detected using OpenAI transcription and Google language detection
+   - Stored as JSON array of ISO 639-1 language codes in languages column
+   - Primary language stored in original_language field
+   - Supports analysis of mixed-language content
+
+2. **Language Data Structure**
+   - languages: ["en", "hi", "es"] - All detected languages in order of prominence
+   - original_language: "hi" - Primary detected language
+   - translation_text: Translated content when needed
+
+3. **Language-Based Analysis**
+   - Filter content by specific languages
+   - Analyze multilingual patterns in user journaling
+   - Support cross-language sentiment and emotion analysis
+   - Enable language-specific insights and recommendations
+`;
