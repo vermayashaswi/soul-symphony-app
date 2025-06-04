@@ -1,8 +1,8 @@
 
-import React, { useMemo } from 'react';
-import TranslatableText3D from './TranslatableText3D';
+import React, { useState, useEffect, useMemo } from 'react';
+import ReliableText from './ReliableText';
 import { useTranslation } from '@/contexts/TranslationContext';
-import { universalFontService } from '@/services/universalFontService';
+import { simplifiedFontService } from '@/services/simplifiedFontService';
 
 interface ProgressiveNodeLabelProps {
   id: string;
@@ -27,9 +27,37 @@ export const ProgressiveNodeLabel: React.FC<ProgressiveNodeLabelProps> = ({
   themeHex,
   nodeScale = 1
 }) => {
-  const { currentLanguage } = useTranslation();
+  const { currentLanguage, translate } = useTranslation();
+  const [displayText, setDisplayText] = useState<string>(id);
 
-  console.log(`[ProgressiveNodeLabel] GOOGLE TRANSLATE MODE: Rendering for ${id} (${currentLanguage}), visible: ${shouldShowLabel}`);
+  console.log(`[ProgressiveNodeLabel] Rendering for ${id}, visible: ${shouldShowLabel}`);
+
+  // Handle translation
+  useEffect(() => {
+    if (!shouldShowLabel) return;
+
+    const translateText = async () => {
+      try {
+        if (currentLanguage === 'en' || !translate) {
+          setDisplayText(id);
+          return;
+        }
+
+        const translated = await translate(id);
+        if (translated && typeof translated === 'string') {
+          setDisplayText(translated);
+          console.log(`[ProgressiveNodeLabel] Translation: "${id}" -> "${translated}"`);
+        } else {
+          setDisplayText(id);
+        }
+      } catch (error) {
+        console.warn(`[ProgressiveNodeLabel] Translation failed for ${id}:`, error);
+        setDisplayText(id);
+      }
+    };
+
+    translateText();
+  }, [id, currentLanguage, translate, shouldShowLabel]);
 
   // Calculate position offset
   const labelOffset = useMemo(() => {
@@ -52,42 +80,30 @@ export const ProgressiveNodeLabel: React.FC<ProgressiveNodeLabelProps> = ({
     return '#cccccc';
   }, [isSelected, isHighlighted, type, themeHex]);
 
-  // Enhanced outline configuration for multi-language support
-  const outlineConfig = useMemo(() => {
-    const isComplex = universalFontService.isComplexScript(id);
-    const needsOutline = isSelected || isComplex || textColor === '#ffffff';
-    
-    return {
-      width: needsOutline ? (isSelected ? 0.04 : 0.02) : 0,
-      color: isSelected ? '#000000' : '#333333'
-    };
-  }, [isSelected, id, textColor]);
-
   const labelPosition: [number, number, number] = [
     position[0] + labelOffset[0],
     position[1] + labelOffset[1],
     position[2] + labelOffset[2]
   ];
 
-  if (!shouldShowLabel || !id) {
+  if (!shouldShowLabel || !displayText) {
     return null;
   }
 
-  console.log(`[ProgressiveNodeLabel] GOOGLE TRANSLATE: "${id}" (${currentLanguage}) at position`, labelPosition);
+  console.log(`[ProgressiveNodeLabel] Final render: "${displayText}" at position`, labelPosition);
 
   return (
-    <TranslatableText3D
-      text={id}
+    <ReliableText
+      text={displayText}
       position={labelPosition}
       color={textColor}
       size={textSize}
       visible={true}
       renderOrder={15}
       bold={isHighlighted || isSelected}
-      outlineWidth={outlineConfig.width}
-      outlineColor={outlineConfig.color}
+      outlineWidth={isSelected ? 0.04 : 0.02}
+      outlineColor={isSelected ? '#000000' : '#333333'}
       maxWidth={25}
-      sourceLanguage="en"
     />
   );
 };

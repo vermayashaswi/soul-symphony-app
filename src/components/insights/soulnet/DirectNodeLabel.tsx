@@ -1,6 +1,7 @@
 
 import React, { useMemo, useEffect } from 'react';
-import TranslatableText3D from './TranslatableText3D';
+import SmartTextRenderer from './SmartTextRenderer';
+import SimpleText from './SimpleText';
 
 interface DirectNodeLabelProps {
   id: string;
@@ -50,47 +51,65 @@ export const DirectNodeLabel: React.FC<DirectNodeLabelProps> = ({
     };
   }, [id, shouldShowLabel]);
 
-  console.log(`[DirectNodeLabel] GOOGLE TRANSLATE MODE: ${id} - using TranslatableText3D for real translation`);
+  // INSTANT MODE: Log immediate rendering without delays
+  if (isInstantMode) {
+    console.log(`[DirectNodeLabel] INSTANT MODE: ${id} with translated text: "${translatedText || id}" and percentage: ${showPercentage ? connectionPercentage + '%' : 'none'} - NO LOADING DELAY`);
+  } else {
+    console.log(`[DirectNodeLabel] ENHANCED POSITIONING: ${id} with translated text: "${translatedText || id}" and percentage: ${showPercentage ? connectionPercentage + '%' : 'none'}`);
+  }
 
-  // Use original id for translation (ignore translatedText prop as we'll handle translation internally)
-  const displayText = id;
+  // Use translated text if available, otherwise fallback to original id
+  const displayText = translatedText || id;
   
   // Same base offset for both entity and emotion nodes
   const labelOffset = useMemo(() => {
     const baseOffset = 1.4;
     const scaledOffset = baseOffset * Math.max(0.8, Math.min(2.5, nodeScale));
     
-    console.log(`[DirectNodeLabel] Enhanced label offset for ${id} (${type}): ${scaledOffset} (scale: ${nodeScale})`);
+    if (isInstantMode) {
+      console.log(`[DirectNodeLabel] INSTANT: Enhanced label offset for ${id} (${type}): ${scaledOffset} (scale: ${nodeScale}) - UNIFORM POSITIONING`);
+    } else {
+      console.log(`[DirectNodeLabel] Enhanced label offset for ${id} (${type}): ${scaledOffset} (scale: ${nodeScale}) - UNIFORM POSITIONING`);
+    }
     return [0, scaledOffset, 0] as [number, number, number];
-  }, [type, nodeScale, id]);
+  }, [type, nodeScale, id, isInstantMode]);
 
   // Better text size calculation for enhanced visibility
   const textSize = useMemo(() => {
     const zoom = Math.max(10, Math.min(100, cameraZoom));
-    const baseSize = isSelected ? 0.6 : (isHighlighted ? 0.52 : 0.48);
+    const baseSize = isSelected ? 6.0 : (isHighlighted ? 5.2 : 4.8);
     const zoomFactor = Math.max(0.8, Math.min(1.5, (50 - zoom) * 0.02 + 1));
-    const finalSize = Math.max(0.35, Math.min(1.6, baseSize * zoomFactor));
+    const finalSize = Math.max(3.5, Math.min(16.0, baseSize * zoomFactor));
     
-    console.log(`[DirectNodeLabel] Enhanced text size for ${id}: ${finalSize} (zoom: ${zoom})`);
+    if (isInstantMode) {
+      console.log(`[DirectNodeLabel] INSTANT: Enhanced text size for ${id}: ${finalSize} (zoom: ${zoom})`);
+    } else {
+      console.log(`[DirectNodeLabel] Enhanced text size for ${id}: ${finalSize} (zoom: ${zoom})`);
+    }
     return finalSize;
-  }, [cameraZoom, id, isSelected, isHighlighted]);
+  }, [cameraZoom, id, isSelected, isHighlighted, isInstantMode]);
 
   // Much smaller percentage text size
   const percentageTextSize = useMemo(() => {
     return textSize * 0.21;
   }, [textSize]);
 
-  // Solid text colors based on theme
+  // PLAN IMPLEMENTATION: Ensure solid black text for light theme, white for dark theme
   const textColor = useMemo(() => {
     const color = effectiveTheme === 'dark' ? '#ffffff' : '#000000';
-    console.log(`[DirectNodeLabel] GOOGLE TRANSLATE - TEXT COLOR for ${id}: ${color} (theme: ${effectiveTheme})`);
+    
+    if (isInstantMode) {
+      console.log(`[DirectNodeLabel] INSTANT: PLAN IMPLEMENTATION - SOLID TEXT COLOR for ${id}: ${color} (theme: ${effectiveTheme})`);
+    } else {
+      console.log(`[DirectNodeLabel] PLAN IMPLEMENTATION - SOLID TEXT COLOR for ${id}: ${color} (theme: ${effectiveTheme})`);
+    }
     return color;
-  }, [effectiveTheme, id]);
+  }, [effectiveTheme, id, isInstantMode]);
 
   // Percentage text also uses theme-aware colors
   const percentageColor = useMemo(() => {
     const color = effectiveTheme === 'dark' ? '#ffffff' : '#000000';
-    console.log(`[DirectNodeLabel] GOOGLE TRANSLATE - PERCENTAGE COLOR for ${id}: ${color} (theme: ${effectiveTheme})`);
+    console.log(`[DirectNodeLabel] PLAN IMPLEMENTATION - SOLID PERCENTAGE COLOR for ${id}: ${color} (theme: ${effectiveTheme})`);
     return color;
   }, [effectiveTheme, id]);
 
@@ -125,21 +144,33 @@ export const DirectNodeLabel: React.FC<DirectNodeLabelProps> = ({
   }, [shouldShowLabel, id]);
 
   if (!enhancedShouldShowLabel || !displayText) {
-    console.log(`[DirectNodeLabel] Not rendering label for ${id}: shouldShow=${enhancedShouldShowLabel}, text="${displayText}"`);
+    if (isInstantMode) {
+      console.log(`[DirectNodeLabel] INSTANT: Not rendering label for ${id}: shouldShow=${enhancedShouldShowLabel}, text="${displayText}"`);
+    } else {
+      console.log(`[DirectNodeLabel] Not rendering label for ${id}: shouldShow=${enhancedShouldShowLabel}, text="${displayText}"`);
+    }
     return null;
   }
 
   // Log percentage display state with side positioning
   if (showPercentage && connectionPercentage > 0) {
-    console.log(`[DirectNodeLabel] GOOGLE TRANSLATE - PERCENTAGE: ${id} (${type}) shows ${connectionPercentage}% on the side at`, percentagePosition);
+    if (isInstantMode) {
+      console.log(`[DirectNodeLabel] INSTANT MODE - SIDE POSITIONING - PERCENTAGE: ${id} (${type}) shows ${connectionPercentage}% on the side at`, percentagePosition, '- NO LOADING DELAY');
+    } else {
+      console.log(`[DirectNodeLabel] ENHANCED SIDE POSITIONING - PERCENTAGE: ${id} (${type}) shows ${connectionPercentage}% on the side at`, percentagePosition);
+    }
   }
 
-  console.log(`[DirectNodeLabel] GOOGLE TRANSLATE - MAIN TEXT: "${displayText}" at position`, labelPosition, 'with size:', textSize, 'color:', textColor);
+  if (isInstantMode) {
+    console.log(`[DirectNodeLabel] INSTANT MODE - MAIN TEXT: "${displayText}" at position`, labelPosition, 'with size:', textSize, 'color:', textColor, '- NO LOADING DELAY - INTELLIGENT WRAPPING ENABLED');
+  } else {
+    console.log(`[DirectNodeLabel] ENHANCED POSITIONING - MAIN TEXT: "${displayText}" at position`, labelPosition, 'with size:', textSize, 'color:', textColor, '- INTELLIGENT WRAPPING ENABLED');
+  }
 
   return (
     <>
-      {/* Main translated text using TranslatableText3D with Google Web Translate */}
-      <TranslatableText3D
+      {/* Main translated text using SmartTextRenderer with intelligent wrapping */}
+      <SmartTextRenderer
         text={displayText}
         position={labelPosition}
         color={textColor}
@@ -147,16 +178,17 @@ export const DirectNodeLabel: React.FC<DirectNodeLabelProps> = ({
         visible={true}
         renderOrder={15}
         bold={isHighlighted || isSelected}
-        outlineWidth={0}
-        outlineColor={undefined}
-        maxWidth={25}
-        enableWrapping={false}
-        sourceLanguage="en"
+        outlineWidth={0} // PLAN IMPLEMENTATION: No outline for crisp text
+        outlineColor={undefined} // PLAN IMPLEMENTATION: No outline color needed
+        maxWidth={600}
+        enableWrapping={true}
+        maxCharsPerLine={18}
+        maxLines={3}
       />
       
-      {/* Enhanced side-positioned percentage text */}
+      {/* Enhanced side-positioned percentage text with theme-aware color */}
       {showPercentage && connectionPercentage > 0 && (
-        <TranslatableText3D
+        <SimpleText
           text={`${connectionPercentage}%`}
           position={percentagePosition}
           color={percentageColor}
@@ -164,11 +196,10 @@ export const DirectNodeLabel: React.FC<DirectNodeLabelProps> = ({
           visible={true}
           renderOrder={16}
           bold={true}
-          outlineWidth={0}
-          outlineColor={undefined}
-          maxWidth={10}
+          outlineWidth={0} // PLAN IMPLEMENTATION: No outline for crisp text
+          outlineColor={undefined} // PLAN IMPLEMENTATION: No outline color needed
+          maxWidth={200}
           enableWrapping={false}
-          sourceLanguage="en"
         />
       )}
     </>

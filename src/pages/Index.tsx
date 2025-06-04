@@ -11,7 +11,6 @@ import HomePage from '@/pages/website/HomePage';
 import { TranslatableText } from '@/components/translation/TranslatableText';
 import { useTranslation } from '@/contexts/TranslationContext';
 import { supabase } from '@/integrations/supabase/client';
-import { isNativeApp } from '@/routes/RouteHelpers';
 
 const Index = () => {
   const navigate = useNavigate();
@@ -27,43 +26,8 @@ const Index = () => {
   
   const shouldRenderMobile = isMobile.isMobile || mobileDemo;
 
-  // Native app redirect logic - this should run first and take priority
+  // Enhanced tutorial status checking for proper navigation flow
   useEffect(() => {
-    const handleNativeAppRedirect = async () => {
-      if (isNativeApp()) {
-        console.log('[Index] Native app detected, redirecting to app routes...');
-        
-        if (user) {
-          console.log('[Index] User is authenticated in native app');
-          
-          // Check onboarding status for authenticated users
-          await checkOnboardingStatus();
-          
-          if (onboardingComplete) {
-            console.log('[Index] Native app: User completed onboarding, redirecting to /app/home');
-            navigate('/app/home', { replace: true });
-          } else {
-            console.log('[Index] Native app: User needs onboarding, redirecting to /app/onboarding');
-            navigate('/app/onboarding', { replace: true });
-          }
-        } else {
-          console.log('[Index] Native app: User not authenticated, redirecting to /app/onboarding');
-          navigate('/app/onboarding', { replace: true });
-        }
-        
-        return; // Exit early, don't run other effects
-      }
-    };
-    
-    handleNativeAppRedirect();
-  }, [user, navigate, checkOnboardingStatus, onboardingComplete]);
-
-  // Enhanced tutorial status checking for proper navigation flow (only for web)
-  useEffect(() => {
-    if (isNativeApp()) {
-      return; // Skip this effect for native apps
-    }
-    
     const handleTutorialNavigation = async () => {
       if (!user) return;
       
@@ -125,12 +89,8 @@ const Index = () => {
     handleTutorialNavigation();
   }, [user, checkOnboardingStatus, onboardingComplete]);
 
-  // Handle explicit app redirects only (only for web)
+  // Handle explicit app redirects only
   useEffect(() => {
-    if (isNativeApp()) {
-      return; // Skip this effect for native apps
-    }
-    
     // Only redirect to app if explicitly requested with a URL parameter
     if (urlParams.has('app')) {
       console.log('[Index] User explicitly requested app with ?app parameter');
@@ -154,11 +114,7 @@ const Index = () => {
   }, [user, navigate, urlParams, onboardingComplete]);
 
   useEffect(() => {
-    // Pre-translate common strings used on the index page (only for web)
-    if (isNativeApp()) {
-      return; // Skip for native apps since they redirect immediately
-    }
-    
+    // Pre-translate common strings used on the index page
     const preTranslateCommonStrings = async () => {
       if (translate) {
         try {
@@ -184,23 +140,10 @@ const Index = () => {
   
   console.log('[Index] Rendering Index.tsx component, path:', window.location.pathname, {
     hasUser: !!user,
-    onboardingComplete,
-    isNative: isNativeApp()
+    onboardingComplete
   });
 
-  // For native apps, show loading state while redirecting
-  if (isNativeApp()) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
-        <div className="flex flex-col items-center space-y-4">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
-          <p className="text-muted-foreground">Loading Soul Symphony...</p>
-        </div>
-      </div>
-    );
-  }
-
-  // Always render the website homepage component when at root URL for web browsers
+  // Always render the website homepage component when at root URL
   return (
     <>
       <NetworkAwareContent

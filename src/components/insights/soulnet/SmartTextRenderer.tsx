@@ -1,10 +1,9 @@
 
 import React, { useState, useEffect } from 'react';
-import { universalFontService } from '@/services/universalFontService';
+import { enhancedFontService } from '@/services/enhancedFontService';
 import CanvasTextRenderer from './CanvasTextRenderer';
-import TranslatableText3D from './TranslatableText3D';
+import SimpleText from './SimpleText';
 import { wrapTextIntelligently, calculateOptimalMaxWidth } from '@/utils/textWrappingUtils';
-import { useTranslation } from '@/contexts/TranslationContext';
 
 interface SmartTextRendererProps {
   text: string;
@@ -30,14 +29,13 @@ export const SmartTextRenderer: React.FC<SmartTextRendererProps> = ({
   visible = true,
   renderOrder = 10,
   bold = false,
-  outlineWidth = 0,
+  outlineWidth = 0, // PLAN IMPLEMENTATION: Default to no outline
   outlineColor,
   maxWidth = 25,
   enableWrapping = false,
   maxCharsPerLine = 18,
   maxLines = 3
 }) => {
-  const { currentLanguage } = useTranslation();
   const [useCanvasRenderer, setUseCanvasRenderer] = useState(false);
   const [fontLoaded, setFontLoaded] = useState(false);
   const [hasError, setHasError] = useState(false);
@@ -62,44 +60,44 @@ export const SmartTextRenderer: React.FC<SmartTextRendererProps> = ({
         setProcessedText(finalText);
         setOptimalMaxWidth(calculatedMaxWidth);
 
-        const isComplex = universalFontService.isComplexScript(finalText);
+        const isComplex = enhancedFontService.isComplexScript(finalText);
         const isMultiLine = finalText.includes('\n');
         
-        // Enhanced renderer selection logic
-        // Use Canvas for very complex scripts or when Three.js fonts might not be available
-        const preferCanvas = isComplex && ['ar', 'zh', 'ja', 'ko'].includes(currentLanguage);
+        // PLAN IMPLEMENTATION: Prefer Three.js renderer for consistent font sizing
+        // Only use Canvas for complex scripts that Three.js can't handle well
+        const preferCanvas = isComplex;
         
         if (preferCanvas) {
-          console.log(`[SmartTextRenderer] Using Canvas renderer for complex script: "${finalText}" (${currentLanguage})`);
+          console.log(`[SmartTextRenderer] PLAN IMPLEMENTATION: Using Canvas renderer for complex script: "${finalText}"`);
           setUseCanvasRenderer(true);
           setFontLoaded(true);
         } else {
-          console.log(`[SmartTextRenderer] Using TranslatableText3D renderer for: "${finalText}" (${currentLanguage}, multiline: ${isMultiLine}, size: ${size})`);
+          console.log(`[SmartTextRenderer] PLAN IMPLEMENTATION: Using Three.js renderer for: "${finalText}" (multiline: ${isMultiLine}, size: ${size}) - CRISP FONT RENDERING`);
           try {
-            await universalFontService.loadFont(finalText, currentLanguage);
+            await enhancedFontService.loadFont(finalText);
             setUseCanvasRenderer(false);
             setFontLoaded(true);
-            console.log(`[SmartTextRenderer] Three.js font loaded successfully for: "${finalText}" (${currentLanguage})`);
+            console.log(`[SmartTextRenderer] Three.js font loaded successfully for: "${finalText}" with crisp rendering`);
           } catch (error) {
-            console.warn(`[SmartTextRenderer] Three.js font loading failed for: "${finalText}" (${currentLanguage}), falling back to Canvas`, error);
+            console.warn(`[SmartTextRenderer] Three.js font loading failed for: "${finalText}", falling back to Canvas`, error);
             setUseCanvasRenderer(true);
             setFontLoaded(true);
           }
         }
       } catch (error) {
-        console.error(`[SmartTextRenderer] Error initializing renderer for: "${text}" (${currentLanguage})`, error);
+        console.error(`[SmartTextRenderer] Error initializing renderer for: "${text}"`, error);
         setHasError(true);
       }
     };
 
     initializeRenderer();
-  }, [text, size, enableWrapping, maxCharsPerLine, maxLines, maxWidth, currentLanguage]);
+  }, [text, size, enableWrapping, maxCharsPerLine, maxLines, maxWidth]);
 
   if (!visible || hasError || !fontLoaded) {
     return null;
   }
 
-  console.log(`[SmartTextRenderer] Using ${useCanvasRenderer ? 'Canvas' : 'TranslatableText3D'} renderer for text: "${processedText}" (${currentLanguage}) with size: ${size}, color: ${color}`);
+  console.log(`[SmartTextRenderer] PLAN IMPLEMENTATION: Using ${useCanvasRenderer ? 'Canvas' : 'Three.js'} renderer for CRISP text: "${processedText}" with size: ${size}, color: ${color}`);
 
   if (useCanvasRenderer) {
     return (
@@ -118,7 +116,7 @@ export const SmartTextRenderer: React.FC<SmartTextRendererProps> = ({
   }
 
   return (
-    <TranslatableText3D
+    <SimpleText
       text={processedText}
       position={position}
       color={color}
@@ -126,11 +124,10 @@ export const SmartTextRenderer: React.FC<SmartTextRendererProps> = ({
       visible={visible}
       renderOrder={renderOrder}
       bold={bold}
-      outlineWidth={outlineWidth}
+      outlineWidth={outlineWidth} // PLAN IMPLEMENTATION: Pass through (should be 0 for black text)
       outlineColor={outlineColor}
       maxWidth={optimalMaxWidth}
       enableWrapping={enableWrapping}
-      sourceLanguage="en"
     />
   );
 };

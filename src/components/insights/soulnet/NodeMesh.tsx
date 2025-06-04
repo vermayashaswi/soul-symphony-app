@@ -1,17 +1,17 @@
+
 import React, { useRef, useMemo, useState, useEffect } from 'react';
 import * as THREE from 'three';
 import '@/types/three-reference';
 import { useFrame } from '@react-three/fiber';
 
 interface NodeMeshProps {
-  nodeType: 'entity' | 'emotion';
+  type: 'entity' | 'emotion';
   scale: number;
   displayColor: string;
   isHighlighted: boolean;
   dimmed: boolean;
   connectionStrength?: number;
   isSelected: boolean;
-  themeHex: string;
   onClick: (e: any) => void;
   onPointerDown: (e: any) => void;
   onPointerUp: (e: any) => void;
@@ -20,14 +20,13 @@ interface NodeMeshProps {
 }
 
 export const NodeMesh: React.FC<NodeMeshProps> = ({
-  nodeType,
+  type,
   scale,
   displayColor,
   isHighlighted,
   dimmed,
   connectionStrength = 0.5,
   isSelected,
-  themeHex,
   onClick,
   onPointerDown,
   onPointerUp,
@@ -48,12 +47,11 @@ export const NodeMesh: React.FC<NodeMeshProps> = ({
   }, []);
   
   // ENHANCED: Updated geometry creation for 15% larger nodes
-  // Use nodeType for consistency
   const Geometry = useMemo(() => 
-    nodeType === 'entity'
+    type === 'entity'
       ? <sphereGeometry args={[1.38, 16, 16]} /> // Increased from 1.2 by 15%
       : <boxGeometry args={[2.3, 2.3, 2.3]} />, // Increased from 2.0 by 15%
-    [nodeType]
+    [type]
   );
 
   // Safe animation with manual time tracking
@@ -103,7 +101,7 @@ export const NodeMesh: React.FC<NodeMeshProps> = ({
     return null;
   }
 
-  console.log(`[NodeMesh] ENHANCED: Rendering ${nodeType} mesh with enhanced scale ${scale.toFixed(2)}`);
+  console.log(`[NodeMesh] ENHANCED: Rendering ${type} mesh with enhanced scale ${scale.toFixed(2)}`);
 
   return (
     <mesh

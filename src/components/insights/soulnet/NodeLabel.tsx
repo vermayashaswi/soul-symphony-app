@@ -3,9 +3,8 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { Text } from '@react-three/drei';
 import { useLoader } from '@react-three/fiber';
 import { FontLoader } from 'three/examples/jsm/loaders/FontLoader.js';
-import { universalFontService } from '@/services/universalFontService';
+import { simplifiedFontService } from '@/services/simplifiedFontService';
 import { useTranslation } from '@/contexts/TranslationContext';
-import { onDemandTranslationCache } from '@/utils/website-translations';
 
 interface NodeLabelProps {
   id: string;
@@ -30,71 +29,40 @@ export const NodeLabel: React.FC<NodeLabelProps> = ({
   themeHex,
   nodeScale = 1
 }) => {
-  const { currentLanguage, translate, getCachedTranslation } = useTranslation();
+  const { currentLanguage, translate } = useTranslation();
   const [displayText, setDisplayText] = useState<string>(id);
 
-  // Enhanced translation lookup with multiple sources
+  // Handle translation
   useEffect(() => {
-    if (!shouldShowLabel || !id) return;
+    if (!shouldShowLabel) return;
 
-    const getTranslation = async () => {
-      if (currentLanguage === 'en') {
-        setDisplayText(id);
-        return;
-      }
-
-      console.log(`[NodeLabel] Getting translation for "${id}" (${currentLanguage})`);
-
-      // 1. Check translation context cache
-      const contextCached = getCachedTranslation ? getCachedTranslation(id) : null;
-      if (contextCached) {
-        console.log(`[NodeLabel] Using context cache: "${id}" -> "${contextCached}"`);
-        setDisplayText(contextCached);
-        return;
-      }
-
-      // 2. Check on-demand cache
-      const onDemandCached = onDemandTranslationCache.get(currentLanguage, id);
-      if (onDemandCached) {
-        console.log(`[NodeLabel] Using on-demand cache: "${id}" -> "${onDemandCached}"`);
-        setDisplayText(onDemandCached);
-        return;
-      }
-
-      // 3. Try real-time translation
-      if (translate) {
-        try {
-          const translated = await translate(id, 'en');
-          if (translated && translated !== id) {
-            console.log(`[NodeLabel] Real-time translation: "${id}" -> "${translated}"`);
-            setDisplayText(translated);
-            return;
-          }
-        } catch (error) {
-          console.warn(`[NodeLabel] Real-time translation failed for ${id}:`, error);
+    const translateText = async () => {
+      try {
+        if (currentLanguage === 'en' || !translate) {
+          setDisplayText(id);
+          return;
         }
-      }
 
-      // 4. Fallback to original
-      console.log(`[NodeLabel] Using fallback: "${id}"`);
-      setDisplayText(id);
+        const translated = await translate(id);
+        if (translated && typeof translated === 'string') {
+          setDisplayText(translated);
+        } else {
+          setDisplayText(id);
+        }
+      } catch (error) {
+        console.warn(`[NodeLabel] Translation failed for ${id}:`, error);
+        setDisplayText(id);
+      }
     };
 
-    getTranslation();
-  }, [id, currentLanguage, translate, getCachedTranslation, shouldShowLabel]);
+    translateText();
+  }, [id, currentLanguage, translate, shouldShowLabel]);
 
-  // Get font URL based on display text and current language
-  const fontUrl = universalFontService.getFontUrl(displayText, currentLanguage);
+  // Get font URL based on text content
+  const fontUrl = simplifiedFontService.getFontUrl(displayText);
   
-  // Load font using React Three Fiber's useLoader with error handling
-  let font;
-  try {
-    font = useLoader(FontLoader, fontUrl);
-  } catch (error) {
-    console.warn(`[NodeLabel] Failed to load font for ${currentLanguage}, falling back to Latin`, error);
-    // Fallback to Latin font
-    font = useLoader(FontLoader, universalFontService.getFontUrl('fallback', 'en'));
-  }
+  // Load font using React Three Fiber's useLoader
+  const font = useLoader(FontLoader, fontUrl);
 
   // Calculate position offset
   const labelOffset = useMemo(() => {
@@ -117,17 +85,6 @@ export const NodeLabel: React.FC<NodeLabelProps> = ({
     return '#cccccc';
   }, [isSelected, isHighlighted, type, themeHex]);
 
-  // Enhanced outline logic for better multi-language readability
-  const outlineConfig = useMemo(() => {
-    const isComplex = universalFontService.isComplexScript(displayText);
-    const needsOutline = isSelected || isComplex || textColor === '#ffffff';
-    
-    return {
-      width: needsOutline ? (isSelected ? 0.04 : 0.02) : 0,
-      color: isSelected ? '#000000' : '#333333'
-    };
-  }, [isSelected, displayText, textColor]);
-
   const labelPosition: [number, number, number] = [
     position[0] + labelOffset[0],
     position[1] + labelOffset[1],
@@ -137,8 +94,6 @@ export const NodeLabel: React.FC<NodeLabelProps> = ({
   if (!shouldShowLabel || !displayText || !font) {
     return null;
   }
-
-  console.log(`[NodeLabel] Rendering: "${displayText}" (${currentLanguage}) with font support for script: ${universalFontService.detectScript(displayText)}`);
 
   return (
     <Text
@@ -154,8 +109,8 @@ export const NodeLabel: React.FC<NodeLabelProps> = ({
       material-transparent={true}
       material-depthTest={false}
       renderOrder={15}
-      outlineWidth={outlineConfig.width}
-      outlineColor={outlineConfig.color}
+      outlineWidth={isSelected ? 0.04 : 0.02}
+      outlineColor={isSelected ? '#000000' : '#333333'}
     >
       {displayText}
     </Text>
