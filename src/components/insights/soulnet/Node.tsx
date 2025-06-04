@@ -1,5 +1,5 @@
 
-import React, { useRef, useMemo } from 'react';
+import React, { useRef, useMemo, useState, useEffect } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import DirectNodeLabel from './DirectNodeLabel';
@@ -50,6 +50,19 @@ const Node: React.FC<NodeProps> = ({
 }) => {
   const meshRef = useRef<THREE.Mesh>(null);
   const userColorThemeHex = useUserColorThemeHex();
+  
+  // ANIMATION: Manual time tracking for pulsing effects
+  const [animationTime, setAnimationTime] = useState(0);
+  const [isReady, setIsReady] = useState(false);
+  
+  // Delayed initialization to prevent clock access issues
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setIsReady(true);
+    }, 100);
+    
+    return () => clearTimeout(timer);
+  }, []);
 
   // UPDATED: Use app color theme for both node types in both light and dark themes
   const color = useMemo(() => {
@@ -65,7 +78,7 @@ const Node: React.FC<NodeProps> = ({
   }, [isSelected, isHighlighted, userColorThemeHex, dimmed]);
 
   // ENHANCED: More dramatic scale differences for better hierarchy
-  const nodeScale = useMemo(() => {
+  const baseNodeScale = useMemo(() => {
     const baseScale = 1.15;
     if (isSelected) return baseScale * 1.6; // Even larger for selected
     if (isHighlighted) return baseScale * 1.3; // Larger for highlighted
@@ -81,15 +94,48 @@ const Node: React.FC<NodeProps> = ({
     return 0.8;
   }, [isSelected, isHighlighted, dimmed]);
 
-  useFrame(() => {
-    if (meshRef.current) {
-      meshRef.current.material.color.lerp(color, 0.1);
-      meshRef.current.scale.lerp(new THREE.Vector3(nodeScale, nodeScale, nodeScale), 0.1);
+  // PULSATING ANIMATION: Enhanced frame animation with pulsing effects
+  useFrame((state, delta) => {
+    if (!meshRef.current || !isReady) return;
+    
+    try {
+      // Manual time tracking instead of clock access
+      setAnimationTime(prev => prev + delta);
       
-      // Update opacity
+      if (isHighlighted) {
+        // PULSATING: Different pulse intensities based on connection state
+        const pulseIntensity = isSelected ? 0.25 : (connectionPercentage > 0 ? connectionPercentage * 0.003 : 0.15);
+        const pulse = Math.sin(animationTime * 2.5) * pulseIntensity + 1.0;
+        const targetScale = baseNodeScale * pulse;
+        
+        // Apply pulsing scale
+        meshRef.current.scale.lerp(new THREE.Vector3(targetScale, targetScale, targetScale), 0.1);
+        
+        // PULSATING: Emissive glow breathing effect
+        if (meshRef.current.material instanceof THREE.MeshStandardMaterial) {
+          const emissiveIntensity = isSelected 
+            ? 1.0 + Math.sin(animationTime * 3) * 0.3
+            : 0.7 + (connectionPercentage > 0 ? connectionPercentage * 0.005 : 0.2) + Math.sin(animationTime * 3) * 0.2;
+          
+          meshRef.current.material.emissiveIntensity = Math.max(0, Math.min(2, emissiveIntensity));
+        }
+      } else {
+        // Static scale for non-highlighted nodes
+        const targetScale = dimmed ? baseNodeScale * 0.8 : baseNodeScale;
+        meshRef.current.scale.lerp(new THREE.Vector3(targetScale, targetScale, targetScale), 0.1);
+        
+        if (meshRef.current.material instanceof THREE.MeshStandardMaterial) {
+          meshRef.current.material.emissiveIntensity = dimmed ? 0 : 0.1;
+        }
+      }
+      
+      // Update material color and opacity
+      meshRef.current.material.color.lerp(color, 0.1);
       if (meshRef.current.material instanceof THREE.MeshStandardMaterial) {
         meshRef.current.material.opacity = nodeOpacity;
       }
+    } catch (error) {
+      console.warn("Node pulsing animation error:", error);
     }
   });
 
@@ -107,16 +153,16 @@ const Node: React.FC<NodeProps> = ({
   // INSTANT MODE: Better logging for percentage tracking with comprehensive debug info
   if (showPercentage && connectionPercentage > 0) {
     if (isInstantMode) {
-      console.log(`[Node] INSTANT MODE: ${node.id} (${node.type}) displays percentage: ${connectionPercentage}% (isHighlighted: ${isHighlighted}, isSelected: ${isSelected}) - NO LOADING DELAY`);
+      console.log(`[Node] PULSATING INSTANT MODE: ${node.id} (${node.type}) displays percentage: ${connectionPercentage}% with pulse intensity based on connection strength - NO LOADING DELAY`);
     } else {
-      console.log(`[Node] ENHANCED: ${node.id} (${node.type}) should display percentage: ${connectionPercentage}% (isHighlighted: ${isHighlighted}, isSelected: ${isSelected})`);
+      console.log(`[Node] PULSATING ENHANCED: ${node.id} (${node.type}) should display percentage: ${connectionPercentage}% with pulse intensity based on connection strength`);
     }
   }
 
   if (isInstantMode) {
-    console.log(`[Node] INSTANT MODE: Rendering ${node.type} node ${node.id} with app theme color ${userColorThemeHex}, scale ${nodeScale.toFixed(2)} with Google Translate integration - NO LOADING DELAY`);
+    console.log(`[Node] PULSATING INSTANT MODE: Rendering ${node.type} node ${node.id} with pulsing animation, app theme color ${userColorThemeHex}, base scale ${baseNodeScale.toFixed(2)} - NO LOADING DELAY`);
   } else {
-    console.log(`[Node] ENHANCED: Rendering ${node.type} node ${node.id} with app theme color ${userColorThemeHex}, scale ${nodeScale.toFixed(2)} with Google Translate integration`);
+    console.log(`[Node] PULSATING ENHANCED: Rendering ${node.type} node ${node.id} with pulsing animation, app theme color ${userColorThemeHex}, base scale ${baseNodeScale.toFixed(2)}`);
   }
 
   // ENHANCED: Improved geometry sizes to work with the enhanced scale differences
@@ -130,12 +176,18 @@ const Node: React.FC<NodeProps> = ({
     }
   };
 
+  // Don't render until ready
+  if (!isReady) {
+    return null;
+  }
+
   return (
     <group>
       <mesh
         ref={meshRef}
         position={node.position}
         onClick={handleNodeClick}
+        scale={[baseNodeScale, baseNodeScale, baseNodeScale]}
       >
         {renderGeometry()}
         <meshStandardMaterial 
@@ -144,6 +196,8 @@ const Node: React.FC<NodeProps> = ({
           roughness={0.8}
           transparent={true}
           opacity={nodeOpacity}
+          emissive={color}
+          emissiveIntensity={isHighlighted ? 1.2 : (dimmed ? 0 : 0.1)}
         />
       </mesh>
       
@@ -157,7 +211,7 @@ const Node: React.FC<NodeProps> = ({
           shouldShowLabel={shouldShowLabel}
           cameraZoom={cameraZoom}
           themeHex={themeHex}
-          nodeScale={nodeScale}
+          nodeScale={baseNodeScale}
           connectionPercentage={connectionPercentage}
           showPercentage={showPercentage}
           effectiveTheme={effectiveTheme}
