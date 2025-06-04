@@ -4,23 +4,29 @@ import ReactMarkdown from 'react-markdown';
 import { useTranslation } from '@/contexts/TranslationContext';
 import { useLocation } from 'react-router-dom';
 import { isWebsiteRoute } from '@/routes/RouteHelpers';
+import { useLanguageFontConfig } from '@/utils/languageFontScaling';
+import { createLanguageAwareStyle, getLanguageAwareClasses } from '@/utils/languageAwareCSS';
 
 interface TranslatableMarkdownProps {
   children: string;
   className?: string;
-  forceTranslate?: boolean; // Added forceTranslate prop for consistency
+  forceTranslate?: boolean;
   onTranslationStart?: () => void;
   onTranslationEnd?: () => void;
+  enableFontScaling?: boolean; // New prop to enable language-aware font scaling
+  scalingContext?: 'mobile-nav' | 'general' | 'compact'; // Context for different scaling strategies
 }
 
 export function TranslatableMarkdown({ 
   children, 
   className = "",
-  forceTranslate = true, // Default to true to fix chat messages
+  forceTranslate = true,
   onTranslationStart,
-  onTranslationEnd
+  onTranslationEnd,
+  enableFontScaling = false,
+  scalingContext = 'general'
 }: TranslatableMarkdownProps) {
-  const [translatedContent, setTranslatedContent] = useState<string>(children); // Initialize with source content
+  const [translatedContent, setTranslatedContent] = useState<string>(children);
   const [isLoading, setIsLoading] = useState(false);
   const { translate, currentLanguage, getCachedTranslation } = useTranslation();
   const prevLangRef = useRef<string>(currentLanguage);
@@ -29,6 +35,9 @@ export function TranslatableMarkdown({
   const location = useLocation();
   const isOnWebsite = isWebsiteRoute(location.pathname);
   const mountedRef = useRef<boolean>(true);
+  
+  // Language font scaling configuration
+  const fontConfig = useLanguageFontConfig(currentLanguage);
   
   // Function to translate markdown content with improved error handling
   const translateMarkdown = async () => {
@@ -142,6 +151,30 @@ export function TranslatableMarkdown({
     };
   }, [children, currentLanguage, forceTranslate]);
 
+  // Generate language-aware styling
+  const languageAwareClassName = enableFontScaling
+    ? getLanguageAwareClasses(currentLanguage, className)
+    : className;
+
+  const languageAwareStyle = enableFontScaling
+    ? createLanguageAwareStyle(currentLanguage, {})
+    : {};
+
+  // Add context-specific adjustments
+  let contextualStyles: React.CSSProperties = {};
+  if (enableFontScaling && scalingContext === 'compact') {
+    contextualStyles = {
+      ...contextualStyles,
+      overflow: 'hidden',
+      textOverflow: 'ellipsis',
+    };
+  }
+
+  const finalStyle = {
+    ...languageAwareStyle,
+    ...contextualStyles,
+  };
+
   // Ensure we're passing a string to ReactMarkdown (fix for the TypeScript error)
   const contentToRender = translatedContent || children;
   
@@ -152,8 +185,11 @@ export function TranslatableMarkdown({
       data-translated={translatedContent !== children ? 'true' : 'false'}
       data-lang={currentLanguage}
       data-force-translate={forceTranslate ? 'true' : 'false'}
+      data-font-scaled={enableFontScaling ? 'true' : 'false'}
+      data-scaling-context={scalingContext}
+      style={finalStyle}
     >
-      <ReactMarkdown className={className}>
+      <ReactMarkdown className={languageAwareClassName}>
         {contentToRender}
       </ReactMarkdown>
     </div>

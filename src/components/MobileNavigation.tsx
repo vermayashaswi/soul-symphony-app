@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from 'react';
 import { useLocation, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
@@ -187,13 +188,16 @@ const MobileNavigation: React.FC<MobileNavigationProps> = ({ onboardingComplete 
                 )}
               </div>
               <span className={cn(
-                "text-xs mt-0.5",
+                "text-xs mt-0.5 min-w-0 max-w-full",
                 isLocked && "opacity-60"
               )}>
                 <TranslatableText 
                   key={`${item.label}-${renderKey}-${currentLanguage}`}
                   text={item.label} 
                   forceTranslate={true}
+                  enableFontScaling={true}
+                  scalingContext="mobile-nav"
+                  className="block"
                   onTranslationStart={() => console.log(`MobileNavigation: Translation started for "${item.label}" to ${currentLanguage}`)}
                   onTranslationEnd={() => console.log(`MobileNavigation: Translation completed for "${item.label}" to ${currentLanguage}`)}
                 />

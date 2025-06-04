@@ -3,6 +3,8 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useTranslation } from '@/contexts/TranslationContext';
 import { useLocation } from 'react-router-dom';
 import { isWebsiteRoute } from '@/routes/RouteHelpers';
+import { useLanguageFontConfig } from '@/utils/languageFontScaling';
+import { createLanguageAwareStyle, getLanguageAwareClasses } from '@/utils/languageAwareCSS';
 
 interface TranslatableTextProps {
   text: string;
@@ -14,6 +16,8 @@ interface TranslatableTextProps {
   onTranslationStart?: () => void;
   onTranslationEnd?: () => void;
   style?: React.CSSProperties;
+  enableFontScaling?: boolean; // New prop to enable language-aware font scaling
+  scalingContext?: 'mobile-nav' | 'general' | 'compact'; // Context for different scaling strategies
 }
 
 export function TranslatableText({ 
@@ -25,7 +29,9 @@ export function TranslatableText({
   forceTranslate = false,
   onTranslationStart,
   onTranslationEnd,
-  style
+  style,
+  enableFontScaling = false,
+  scalingContext = 'general'
 }: TranslatableTextProps) {
   const [translatedText, setTranslatedText] = useState<string>(text);
   const [isLoading, setIsLoading] = useState(false);
@@ -36,6 +42,9 @@ export function TranslatableText({
   const textRef = useRef<string>(text);
   const mountedRef = useRef<boolean>(true);
   const translationAttemptRef = useRef<number>(0);
+  
+  // Language font scaling configuration
+  const fontConfig = useLanguageFontConfig(currentLanguage);
   
   const pathname = location.pathname;
   const isOnWebsite = isWebsiteRoute(pathname);
@@ -151,14 +160,44 @@ export function TranslatableText({
     };
   }, [text, sourceLanguage, entryId, currentLanguage, forceTranslate]);
 
+  // Generate language-aware styling
+  const languageAwareClassName = enableFontScaling
+    ? getLanguageAwareClasses(currentLanguage, className)
+    : className;
+
+  const languageAwareStyle = enableFontScaling
+    ? createLanguageAwareStyle(currentLanguage, style)
+    : style;
+
+  // Add context-specific adjustments
+  let contextualStyles: React.CSSProperties = {};
+  if (enableFontScaling && scalingContext === 'mobile-nav') {
+    contextualStyles = {
+      ...contextualStyles,
+      overflow: 'hidden',
+      textOverflow: 'ellipsis',
+      whiteSpace: 'nowrap',
+      maxWidth: '100%',
+    };
+  }
+
+  const finalStyle = {
+    ...languageAwareStyle,
+    ...contextualStyles,
+  };
+
+  const finalClassName = `${languageAwareClassName} ${isLoading ? 'opacity-70' : ''}`.trim();
+
   return React.createElement(
     Component, 
     { 
-      className: `${className} ${isLoading ? 'opacity-70' : ''}`.trim(),
+      className: finalClassName,
       'data-translating': isLoading ? 'true' : 'false',
       'data-translated': translatedText !== text ? 'true' : 'false',
       'data-lang': currentLanguage,
-      style
+      'data-font-scaled': enableFontScaling ? 'true' : 'false',
+      'data-scaling-context': scalingContext,
+      style: finalStyle
     }, 
     translatedText || text
   );
