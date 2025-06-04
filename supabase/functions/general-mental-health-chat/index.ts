@@ -1,5 +1,6 @@
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.7.1';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -12,7 +13,57 @@ if (!apiKey) {
   Deno.exit(1);
 }
 
-const GENERAL_MENTAL_HEALTH_PROMPT = `You are SOULo, an AI mental health therapist assistant trained in CBT, DBT, and mindfulness approaches. You are part of a voice journaling app called "SOULo" that helps users with their mental health journey.
+// Dynamic allowed categories from generate-themes function
+const allowedCategories = [
+  'work', 'relationships', 'family', 'health', 'goals', 'travel', 'creativity', 
+  'learning', 'challenges', 'growth', 'personal development', 'spirituality', 
+  'finances', 'hobbies', 'social life', 'career', 'education', 'fitness', 
+  'mental health', 'self-care', 'adventure', 'reflection'
+];
+
+/**
+ * Get dynamic emotions from the database
+ */
+async function getDynamicEmotions(): Promise<string[]> {
+  try {
+    const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
+    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
+    const supabase = createClient(supabaseUrl, supabaseServiceKey);
+    
+    const { data: emotions, error } = await supabase
+      .from('emotions')
+      .select('name')
+      .order('name');
+
+    if (error) {
+      console.error('Error fetching emotions:', error);
+      // Fallback to a comprehensive set
+      return [
+        'happy', 'sad', 'anxious', 'excited', 'calm', 'stressed', 'angry', 'peaceful',
+        'grateful', 'frustrated', 'hopeful', 'lonely', 'confident', 'worried', 'proud',
+        'disappointed', 'content', 'overwhelmed', 'curious', 'inspired'
+      ];
+    }
+
+    return emotions.map(emotion => emotion.name);
+  } catch (error) {
+    console.error('Error in getDynamicEmotions:', error);
+    return [
+      'happy', 'sad', 'anxious', 'excited', 'calm', 'stressed', 'angry', 'peaceful',
+      'grateful', 'frustrated', 'hopeful', 'lonely', 'confident', 'worried', 'proud',
+      'disappointed', 'content', 'overwhelmed', 'curious', 'inspired'
+    ];
+  }
+}
+
+/**
+ * Generate dynamic general mental health prompt
+ */
+async function generateGeneralMentalHealthPrompt(): Promise<string> {
+  const dynamicEmotions = await getDynamicEmotions();
+  const dynamicThemes = allowedCategories;
+
+  return `You are SOULo, an AI mental health therapist assistant trained in CBT, DBT, and mindfulness approaches. You are part of a voice journaling app called "SOULo" that helps users with their mental health journey.
 
 SCOPE AND BOUNDARIES:
 - You ONLY provide guidance on mental health, emotional wellbeing, mindfulness, therapy techniques, and related psychological topics
@@ -25,6 +76,14 @@ RESPONSE GUIDELINES FOR OFF-TOPIC QUESTIONS:
 
 - If the question is ambiguous or unclear, respond with:
   "I'd love to help, but I'm not quite sure what you're looking for. As your mental health companion, I'm here to support you with emotional wellbeing, stress management, mindfulness practices, or personal growth. Could you share what's on your mind regarding your mental health or emotional state?"
+
+AVAILABLE EMOTIONAL VOCABULARY:
+When discussing emotions, you can reference these ${dynamicEmotions.length} emotions that are tracked in the SOULo system:
+${dynamicEmotions.join(', ')}
+
+AVAILABLE THEME AREAS:
+When discussing life areas and personal growth topics, you can reference these ${dynamicThemes.length} theme areas:
+${dynamicThemes.join(', ')}
 
 STRUCTURED RESPONSE FORMAT:
 Use this structured format for all mental health responses:
@@ -68,7 +127,8 @@ SAFETY:
 - Never provide medical advice or diagnose conditions
 - Maintain professional therapeutic boundaries while being approachable
 
-Remember: Stay focused on mental health and emotional wellbeing. Politely but firmly redirect any off-topic questions back to your core purpose.`;
+Remember: Stay focused on mental health and emotional wellbeing. Politely but firmly redirect any off-topic questions back to your core purpose while using the available emotional vocabulary and theme areas when relevant.`;
+}
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -78,13 +138,16 @@ serve(async (req) => {
   try {
     const { message, conversationContext = [] } = await req.json();
 
-    console.log(`[General Mental Health] Processing: "${message}" with ${conversationContext.length} context messages`);
+    console.log(`[General Mental Health] Processing with dynamic schema: "${message}" with ${conversationContext.length} context messages`);
+
+    // Generate dynamic prompt with current emotions and themes
+    const dynamicPrompt = await generateGeneralMentalHealthPrompt();
 
     // Prepare the messages array with system prompt and conversation context
     const messages = [];
     
     // Add system prompt
-    messages.push({ role: 'system', content: GENERAL_MENTAL_HEALTH_PROMPT });
+    messages.push({ role: 'system', content: dynamicPrompt });
     
     // Add conversation context if available (limit to last 5 messages for context)
     if (conversationContext.length > 0) {
@@ -118,7 +181,7 @@ serve(async (req) => {
     const completionData = await completionResponse.json();
     const response = completionData.choices[0]?.message?.content || 'I apologize, but I was unable to generate a response. Please try again.';
     
-    console.log('[General Mental Health] Generated response with conversation context');
+    console.log('[General Mental Health] Generated response with dynamic schema and conversation context');
 
     return new Response(JSON.stringify({ response }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },

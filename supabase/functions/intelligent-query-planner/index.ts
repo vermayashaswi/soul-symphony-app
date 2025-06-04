@@ -8,6 +8,55 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+// Dynamic allowed categories from generate-themes function
+const allowedCategories = [
+  'work', 'relationships', 'family', 'health', 'goals', 'travel', 'creativity', 
+  'learning', 'challenges', 'growth', 'personal development', 'spirituality', 
+  'finances', 'hobbies', 'social life', 'career', 'education', 'fitness', 
+  'mental health', 'self-care', 'adventure', 'reflection'
+];
+
+/**
+ * Get dynamic emotions from the database
+ */
+async function getDynamicEmotions(supabaseClient: any): Promise<string[]> {
+  try {
+    const { data: emotions, error } = await supabaseClient
+      .from('emotions')
+      .select('name')
+      .order('name');
+
+    if (error) {
+      console.error('Error fetching emotions:', error);
+      // Fallback to a basic set
+      return ['happy', 'sad', 'anxious', 'excited', 'calm', 'stressed', 'angry', 'peaceful'];
+    }
+
+    return emotions.map(emotion => emotion.name);
+  } catch (error) {
+    console.error('Error in getDynamicEmotions:', error);
+    return ['happy', 'sad', 'anxious', 'excited', 'calm', 'stressed', 'angry', 'peaceful'];
+  }
+}
+
+/**
+ * Generate dynamic database schema context
+ */
+async function generateDatabaseSchemaContext(supabaseClient: any): Promise<string> {
+  const dynamicEmotions = await getDynamicEmotions(supabaseClient);
+  const dynamicThemes = allowedCategories;
+
+  return `
+Available Analysis Capabilities:
+1. Vector similarity search (semantic matching with adjustable thresholds)
+2. Emotion-based filtering with ${dynamicEmotions.length} emotions: ${dynamicEmotions.join(', ')}
+3. Theme-based analysis with ${dynamicThemes.length} themes: ${dynamicThemes.join(', ')}
+4. Temporal analysis with smart date processing
+5. Statistical aggregation and pattern analysis
+6. Cross-reference analysis for complex queries
+`;
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -38,7 +87,7 @@ serve(async (req) => {
       messageId
     } = await req.json();
 
-    console.log(`[Enhanced Query Planner] Planning query: "${message}"`);
+    console.log(`[Enhanced Query Planner] Planning query with dynamic schema: "${message}"`);
 
     // Enhanced database schema integration - get user's data patterns
     const [entryCountResult, recentEntriesResult, userProfileResult, threadContextResult] = await Promise.allSettled([
@@ -117,7 +166,10 @@ serve(async (req) => {
       mental_health_insights: userMetadata
     };
 
-    // Enhanced prompt engineering with comprehensive context
+    // Get dynamic database schema context
+    const dynamicSchemaContext = await generateDatabaseSchemaContext(supabaseClient);
+
+    // Enhanced prompt engineering with comprehensive context and dynamic schema
     const systemPrompt = `You are an advanced intelligent query planner for SOULo, a voice journaling app. Your role is to create sophisticated execution plans for analyzing user queries against their personal journal data.
 
 COMPREHENSIVE USER CONTEXT:
@@ -146,13 +198,7 @@ JOURNALING PATTERNS:
 
 CURRENT QUERY: "${message}"
 
-Available Analysis Capabilities:
-1. Vector similarity search (semantic matching with adjustable thresholds)
-2. Emotion-based filtering with 20+ emotions (happy, sad, anxious, excited, calm, stressed, angry, peaceful, grateful, frustrated, hopeful, lonely, confident, worried, proud, disappointed, content, overwhelmed, curious, inspired)
-3. Theme-based analysis (work, relationships, family, health, goals, travel, creativity, learning, challenges, growth, personal development, spirituality, finances, hobbies)
-4. Temporal analysis with smart date processing
-5. Statistical aggregation and pattern analysis
-6. Cross-reference analysis for complex queries
+${dynamicSchemaContext}
 
 Intelligence Rules:
 1. Personal pronouns (I, me, my) + no explicit time = search ALL entries for comprehensive analysis
@@ -259,7 +305,7 @@ Return ONLY a valid JSON object with this structure:
       }
     }
 
-    console.log('[Enhanced Query Planner] Generated comprehensive plan with user context integration');
+    console.log('[Enhanced Query Planner] Generated comprehensive plan with dynamic schema integration');
 
     return new Response(JSON.stringify({
       queryPlan,
@@ -279,7 +325,8 @@ Return ONLY a valid JSON object with this structure:
         contextIntegration: true,
         conversationState: true,
         personalizedAnalysis: true,
-        schemaAware: true
+        schemaAware: true,
+        dynamicSchema: true
       }
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -378,9 +425,9 @@ function createEnhancedFallback(message: string, userContext: any, conversationH
         personalityFactors: hasPersonalPronouns ? ['self_reflection', 'personal_growth'] : []
       }
     },
-    expectedOutcome: `Enhanced ${isError ? 'error ' : ''}fallback analysis with user context integration`,
+    expectedOutcome: `Enhanced ${isError ? 'error ' : ''}fallback analysis with dynamic schema integration`,
     fallbackStrategy: 'comprehensive_search_with_context',
-    processingNotes: [`Generated enhanced fallback plan using pattern detection and user context`],
+    processingNotes: [`Generated enhanced fallback plan using pattern detection and dynamic schema`],
     conversationState: {
       followUpSuggestions: [
         "Tell me more about this pattern",

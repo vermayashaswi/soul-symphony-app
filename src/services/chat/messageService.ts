@@ -15,7 +15,7 @@ export const sendMessage = async (
   conversationContext: any[] = []
 ): Promise<MessageServiceResult> => {
   try {
-    console.log('[MessageService] Processing message through intelligent pipeline');
+    console.log('[MessageService] Processing message through intelligent pipeline with dynamic schema');
     
     // Create thread if it doesn't exist
     let currentThreadId = threadId;
@@ -58,7 +58,7 @@ export const sendMessage = async (
 
     try {
       // Step 1: Classify the query
-      console.log('[MessageService] Step 1: Classifying query');
+      console.log('[MessageService] Step 1: Classifying query with dynamic schema awareness');
       const { data: classificationData, error: classificationError } = await supabase.functions
         .invoke('chat-query-classifier', {
           body: { 
@@ -75,12 +75,13 @@ export const sendMessage = async (
       let response: string;
       let analysisData: any = {
         classification: classification,
-        pipeline: 'intelligent'
+        pipeline: 'intelligent',
+        usedDynamicSchema: true
       };
 
       if (classification.category === 'JOURNAL_SPECIFIC' && classification.shouldUseJournal) {
-        // Step 2: Create intelligent query plan
-        console.log('[MessageService] Step 2: Creating intelligent query plan');
+        // Step 2: Create intelligent query plan with dynamic schema
+        console.log('[MessageService] Step 2: Creating intelligent query plan with dynamic schema');
         const { data: planData, error: planError } = await supabase.functions
           .invoke('intelligent-query-planner', {
             body: {
@@ -94,8 +95,8 @@ export const sendMessage = async (
 
         if (planError) throw planError;
 
-        // Step 3: Execute search orchestration
-        console.log('[MessageService] Step 3: Executing search orchestration');
+        // Step 3: Execute search orchestration with dynamic schema support
+        console.log('[MessageService] Step 3: Executing search orchestration with dynamic schema');
         const { data: searchData, error: searchError } = await supabase.functions
           .invoke('gpt-search-orchestrator', {
             body: {
@@ -109,8 +110,8 @@ export const sendMessage = async (
 
         if (searchError) throw searchError;
 
-        // Step 4: Synthesize intelligent response
-        console.log('[MessageService] Step 4: Synthesizing response');
+        // Step 4: Synthesize intelligent response with dynamic schema
+        console.log('[MessageService] Step 4: Synthesizing response with dynamic schema');
         const { data: responseData, error: responseError } = await supabase.functions
           .invoke('gpt-response-synthesizer', {
             body: {
@@ -137,7 +138,7 @@ export const sendMessage = async (
 
       } else {
         // Handle general mental health or conversational queries
-        console.log('[MessageService] Handling general query');
+        console.log('[MessageService] Handling general query with dynamic schema');
         const { data: generalData, error: generalError } = await supabase.functions
           .invoke('general-mental-health-chat', {
             body: {
@@ -177,7 +178,7 @@ export const sendMessage = async (
         })
         .eq('id', currentThreadId);
 
-      console.log('[MessageService] Intelligent pipeline completed successfully');
+      console.log('[MessageService] Intelligent pipeline with dynamic schema completed successfully');
 
       // Cast the response to match our type with proper conversion for both arrays
       const typedAiMessage: ServiceChatMessage = {

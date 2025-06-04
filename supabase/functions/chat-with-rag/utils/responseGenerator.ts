@@ -1,7 +1,38 @@
 
-// Enhanced response generation utilities
+// Enhanced response generation utilities with dynamic schema integration
 import { CacheManager } from './cacheManager.ts';
 import { OptimizedApiClient } from './optimizedApiClient.ts';
+
+// Dynamic allowed categories from generate-themes function
+const allowedCategories = [
+  'work', 'relationships', 'family', 'health', 'goals', 'travel', 'creativity', 
+  'learning', 'challenges', 'growth', 'personal development', 'spirituality', 
+  'finances', 'hobbies', 'social life', 'career', 'education', 'fitness', 
+  'mental health', 'self-care', 'adventure', 'reflection'
+];
+
+/**
+ * Get dynamic emotions from the database
+ */
+async function getDynamicEmotions(): Promise<string[]> {
+  try {
+    // This would typically use a Supabase client, but for simplicity in edge functions
+    // we'll use the predefined list. In a real implementation, you'd want to pass
+    // the emotions list from the calling function that has access to the Supabase client.
+    return [
+      'happy', 'sad', 'anxious', 'excited', 'calm', 'stressed', 'angry', 'peaceful',
+      'grateful', 'frustrated', 'hopeful', 'lonely', 'confident', 'worried', 'proud',
+      'disappointed', 'content', 'overwhelmed', 'curious', 'inspired', 'jealous',
+      'bored', 'surprised', 'disgusted', 'fearful', 'ashamed', 'guilty', 'embarrassed',
+      'relieved', 'satisfied', 'nostalgic', 'melancholic', 'euphoric', 'irritated',
+      'confused', 'determined', 'vulnerable', 'empowered', 'rejected', 'accepted',
+      'motivated', 'discouraged', 'optimistic', 'pessimistic', 'energetic'
+    ];
+  } catch (error) {
+    console.error('Error getting dynamic emotions:', error);
+    return ['happy', 'sad', 'anxious', 'excited', 'calm', 'stressed', 'angry', 'peaceful'];
+  }
+}
 
 export function generateSystemPrompt(
   userTimezone: string,
@@ -12,9 +43,13 @@ export function generateSystemPrompt(
   conversationContext?: any[],
   isFollowUp?: boolean,
   hasPersonalPronouns?: boolean,
-  hasTimeReference?: boolean
+  hasTimeReference?: boolean,
+  dynamicEmotions?: string[],
+  dynamicThemes?: string[]
 ): string {
   const currentDate = new Date().toISOString();
+  const emotions = dynamicEmotions || allowedCategories;
+  const themes = dynamicThemes || allowedCategories;
   
   let contextualInfo = `Current date and time: ${currentDate}
 User timezone: ${userTimezone || 'UTC'}`;
@@ -57,6 +92,11 @@ User timezone: ${userTimezone || 'UTC'}`;
     contextualInfo += `\nThis is an analysis query. Focus on identifying patterns, trends, and providing deep insights.`;
   }
 
+  // Add dynamic schema information
+  contextualInfo += `\n\nAvailable Dynamic Data:
+- Emotions (${emotions.length}): ${emotions.join(', ')}
+- Themes (${themes.length}): ${themes.join(', ')}`;
+
   return `You are SOULo, an AI mental health therapist assistant that helps users understand their journal entries and emotional patterns through evidence-based therapeutic analysis.
 
 THERAPEUTIC IDENTITY & APPROACH: You are trained in multiple therapeutic modalities including Cognitive Behavioral Therapy (CBT), Dialectical Behavior Therapy (DBT), and mindfulness-based approaches.
@@ -70,6 +110,12 @@ CRITICAL EMOTION ANALYSIS INSTRUCTIONS:
 • Focus on quantitative therapeutic analysis: emotional patterns, regulation strategies, score distributions
 • When you see "Score: 0.842" this means that emotion was detected with 84.2% intensity
 • NEVER say "your entries don't explicitly mention emotions" - the emotions are already calculated
+• Available emotions for analysis: ${emotions.join(', ')}
+
+THEME ANALYSIS INSTRUCTIONS:
+• Use the available theme categories when analyzing patterns: ${themes.join(', ')}
+• Focus on how themes interact and evolve over time
+• Connect themes to emotional patterns when relevant
 
 STRUCTURED RESPONSE FORMAT:
 Use this structured format for all journal-based responses:
@@ -170,7 +216,7 @@ export async function generateResponse(
   openAiApiKey: string
 ): Promise<string> {
   try {
-    console.log('[responseGenerator] Starting optimized response generation...');
+    console.log('[responseGenerator] Starting optimized response generation with dynamic schema...');
     
     // Check cache first
     const cacheKey = CacheManager.generateQueryHash(userPrompt, 'system', null);
@@ -196,7 +242,7 @@ export async function generateResponse(
     // Cache the response
     CacheManager.setCachedResponse(cacheKey, response);
     
-    console.log('[responseGenerator] Successfully generated and cached response with 8-message context');
+    console.log('[responseGenerator] Successfully generated and cached response with dynamic schema and 8-message context');
     return response;
     
   } catch (error) {

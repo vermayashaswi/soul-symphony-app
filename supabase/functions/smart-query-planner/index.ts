@@ -16,8 +16,45 @@ const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
 const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-// Database schema context for GPT
-const DATABASE_SCHEMA_CONTEXT = `
+// Dynamic allowed categories from generate-themes function
+const allowedCategories = [
+  'work', 'relationships', 'family', 'health', 'goals', 'travel', 'creativity', 
+  'learning', 'challenges', 'growth', 'personal development', 'spirituality', 
+  'finances', 'hobbies', 'social life', 'career', 'education', 'fitness', 
+  'mental health', 'self-care', 'adventure', 'reflection'
+];
+
+/**
+ * Get dynamic emotions from the database
+ */
+async function getDynamicEmotions(): Promise<string[]> {
+  try {
+    const { data: emotions, error } = await supabase
+      .from('emotions')
+      .select('name')
+      .order('name');
+
+    if (error) {
+      console.error('Error fetching emotions:', error);
+      // Fallback to a basic set
+      return ['happy', 'sad', 'anxious', 'excited', 'calm', 'stressed', 'angry', 'peaceful'];
+    }
+
+    return emotions.map(emotion => emotion.name);
+  } catch (error) {
+    console.error('Error in getDynamicEmotions:', error);
+    return ['happy', 'sad', 'anxious', 'excited', 'calm', 'stressed', 'angry', 'peaceful'];
+  }
+}
+
+/**
+ * Generate dynamic database schema context
+ */
+async function generateDatabaseSchemaContext(): Promise<string> {
+  const dynamicEmotions = await getDynamicEmotions();
+  const dynamicThemes = allowedCategories;
+
+  return `
 Available PostgreSQL Functions:
 1. get_top_emotions_with_entries(user_id, start_date, end_date, limit_count) - Returns top emotions with sample entries
 2. match_journal_entries_by_emotion(emotion_name, user_id, min_score, start_date, end_date, limit_count) - Find entries by specific emotion
@@ -29,9 +66,10 @@ Table Structure:
 - Emotions: Stored as jsonb with emotion names as keys and scores (0-1) as values
 - Master Themes: Array of theme strings extracted from entries
 
-Common Emotions: happy, sad, anxious, excited, calm, stressed, angry, peaceful, grateful, frustrated, hopeful, lonely
-Common Themes: work, relationships, family, health, goals, travel, creativity, learning, challenges, growth
+Available Emotions: ${dynamicEmotions.join(', ')}
+Available Themes: ${dynamicThemes.join(', ')}
 `;
+}
 
 /**
  * FIXED: Extract date ranges from natural language temporal references using current year
@@ -291,9 +329,12 @@ async function analyzeQueryWithSubQuestions(message: string, conversationContext
     
     console.log(`[Query Analysis] Personal pronouns: ${hasPersonalPronouns}, Explicit time ref: ${hasExplicitTimeReference}`);
 
+    // Get dynamic database schema context
+    const databaseSchemaContext = await generateDatabaseSchemaContext();
+
     const prompt = `You are an intelligent query planner for a voice journaling app called SOULo. Your task is to break down user queries into executable sub-questions with detailed search plans.
 
-${DATABASE_SCHEMA_CONTEXT}
+${databaseSchemaContext}
 
 User query: "${message}"
 User has ${userEntryCount} journal entries.${contextString}${dateContext}
@@ -645,7 +686,7 @@ serve(async (req) => {
   try {
     const { message, userId, conversationContext = [], isFollowUp = false } = await req.json();
 
-    console.log(`[Smart Query Planner] ENHANCED ANALYSIS with fixed date calculations: "${message}"`);
+    console.log(`[Smart Query Planner] ENHANCED ANALYSIS with dynamic themes/emotions: "${message}"`);
 
     // Get user's journal entry count with timeout
     let entryCount = 0;
@@ -712,7 +753,7 @@ serve(async (req) => {
                    analysisResult.isEmotionQuery ? "emotional_analysis" : "general_insights"
     };
 
-    console.log("ENHANCED Query Plan with Fixed Date Calculations:", JSON.stringify(enhancedPlan, null, 2));
+    console.log("ENHANCED Query Plan with Dynamic Schema:", JSON.stringify(enhancedPlan, null, 2));
 
     return new Response(JSON.stringify({
       queryPlan: enhancedPlan,
