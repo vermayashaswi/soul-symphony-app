@@ -1,10 +1,10 @@
 import { useState, useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
 import { Calendar, Filter, TrendingUp, ArrowUp, ArrowDown, Activity, Award } from 'lucide-react';
-import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import EmotionChart from '@/components/EmotionChart';
 import MoodCalendar from '@/components/insights/MoodCalendar';
 import SoulNet from '@/components/insights/SoulNet';
+import { SmartTimeToggle } from '@/components/insights/SmartTimeToggle';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { useInsightsData, TimeRange } from '@/hooks/use-insights-data';
@@ -35,6 +35,23 @@ function InsightsContent() {
     { value: 'month', label: 'Month' },
     { value: 'year', label: 'Year' },
   ];
+
+  const handleEmotionClick = (emotion: string) => {
+    setSelectedEmotion(emotion);
+  };
+
+  const handleTimeRangeChange = (value: string) => {
+    if (value) {
+      const currentScrollPosition = window.scrollY;
+      scrollPositionRef.current = currentScrollPosition;
+      
+      setTimeRange(value as TimeRange);
+      
+      setTimeout(() => {
+        window.scrollTo({ top: currentScrollPosition });
+      }, 10);
+    }
+  };
 
   useEffect(() => {
     console.log("Insights page mounted");
@@ -67,65 +84,6 @@ function InsightsContent() {
     return () => window.removeEventListener('scroll', handleScroll);
   }, [isMobile, isSticky]); 
 
-  const handleEmotionClick = (emotion: string) => {
-    setSelectedEmotion(emotion);
-  };
-
-  const handleTimeRangeChange = (value: string) => {
-    if (value) {
-      const currentScrollPosition = window.scrollY;
-      scrollPositionRef.current = currentScrollPosition;
-      
-      setTimeRange(value as TimeRange);
-      
-      setTimeout(() => {
-        window.scrollTo({ top: currentScrollPosition });
-      }, 10);
-    }
-  };
-
-  const renderTimeToggle = () => (
-    <div className="insights-time-toggle flex items-center gap-3">
-      <span className="text-sm text-muted-foreground">
-        <EnhancedTranslatableText 
-          text="View:" 
-          forceTranslate={true}
-          enableFontScaling={true}
-          scalingContext="compact"
-          usePageTranslation={true}
-        />
-      </span>
-      <ToggleGroup 
-        type="single" 
-        value={timeRange}
-        onValueChange={handleTimeRangeChange}
-        variant="outline"
-        className="bg-secondary rounded-full p-1"
-      >
-        {timeRanges.map((range) => (
-          <ToggleGroupItem
-            key={range.value}
-            value={range.value}
-            className={cn(
-              "px-4 py-1.5 rounded-full text-sm font-medium transition-all",
-              timeRange === range.value
-                ? "bg-background text-primary shadow-sm"
-                : "text-muted-foreground hover:text-foreground bg-transparent"
-            )}
-          >
-            <EnhancedTranslatableText 
-              text={range.label} 
-              forceTranslate={true}
-              enableFontScaling={true}
-              scalingContext="compact"
-              usePageTranslation={true}
-            />
-          </ToggleGroupItem>
-        ))}
-      </ToggleGroup>
-    </div>
-  );
-
   useEffect(() => {
     if (!loading) {
       setTimeout(() => {
@@ -157,7 +115,11 @@ function InsightsContent() {
             "w-full flex justify-end",
             isMobile ? "max-w-full px-1" : "max-w-5xl"
           )}>
-            {renderTimeToggle()}
+            <SmartTimeToggle
+              value={timeRange}
+              onValueChange={handleTimeRangeChange}
+              timeRanges={timeRanges}
+            />
           </div>
         </div>
       )}
@@ -194,7 +156,11 @@ function InsightsContent() {
             "mt-4 md:mt-0",
             isSticky ? "opacity-0 h-0 overflow-hidden" : "opacity-100"
           )} ref={timeToggleRef}>
-            {renderTimeToggle()}
+            <SmartTimeToggle
+              value={timeRange}
+              onValueChange={handleTimeRangeChange}
+              timeRanges={timeRanges}
+            />
           </div>
         </div>
         
