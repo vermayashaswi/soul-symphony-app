@@ -43,6 +43,24 @@ port = 54328
 port = 54326
 serve_port = 54327
 
-# New function configuration
+# Intelligent RAG Pipeline Functions
 [functions.chat-query-classifier]
+verify_jwt = true
+
+[functions.intelligent-query-planner]
+verify_jwt = true
+
+[functions.gpt-search-orchestrator]
+verify_jwt = true
+
+[functions.gpt-response-synthesizer]
+verify_jwt = true
+
+[functions.general-mental-health-chat]
+verify_jwt = true
+
+[functions.segment-complex-query]
+verify_jwt = true
+
+[functions.combine-segment-responses]
 verify_jwt = true
