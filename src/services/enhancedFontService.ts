@@ -6,13 +6,6 @@ interface FontConfig {
   fallback?: string;
 }
 
-// Extend window interface to include THREE
-declare global {
-  interface Window {
-    THREE?: any;
-  }
-}
-
 class EnhancedFontService {
   private fonts: FontConfig[] = [
     {
@@ -50,6 +43,48 @@ class EnhancedFontService {
     return font || fallbackFont || this.fonts[0];
   }
 
+  async loadFont(text: string): Promise<any> {
+    const config = this.getFontConfig(text);
+    
+    // Check cache first
+    if (this.fontCache.has(config.url)) {
+      return this.fontCache.get(config.url);
+    }
+
+    // Check if already loading
+    if (this.loadingPromises.has(config.url)) {
+      return this.loadingPromises.get(config.url);
+    }
+
+    // Start loading
+    const loadingPromise = this.loadFontFromUrl(config.url);
+    this.loadingPromises.set(config.url, loadingPromise);
+
+    try {
+      const font = await loadingPromise;
+      this.fontCache.set(config.url, font);
+      this.loadingPromises.delete(config.url);
+      console.log(`[EnhancedFontService] Successfully loaded font: ${config.name}`);
+      return font;
+    } catch (error) {
+      this.loadingPromises.delete(config.url);
+      console.error(`[EnhancedFontService] Failed to load font: ${config.name}`, error);
+      throw error;
+    }
+  }
+
+  private async loadFontFromUrl(url: string): Promise<any> {
+    return new Promise((resolve, reject) => {
+      const loader = new (window as any).THREE.FontLoader();
+      loader.load(
+        url,
+        (font: any) => resolve(font),
+        undefined,
+        (error: any) => reject(error)
+      );
+    });
+  }
+
   getFallbackFont(text: string): string {
     const config = this.getFontConfig(text);
     return config.fallback || 'Arial, sans-serif';
@@ -58,17 +93,6 @@ class EnhancedFontService {
   isComplexScript(text: string): boolean {
     const script = this.detectScript(text);
     return script !== 'latin';
-  }
-
-  // Always return false to force Canvas rendering
-  canLoadFonts(): boolean {
-    return false;
-  }
-
-  // Simplified method that always throws to force Canvas fallback
-  async loadFont(text: string): Promise<any> {
-    console.log('[EnhancedFontService] Forcing Canvas renderer for all text');
-    throw new Error('Canvas renderer preferred');
   }
 }
 
