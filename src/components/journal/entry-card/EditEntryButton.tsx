@@ -37,7 +37,7 @@ export function EditEntryButton({ entryId, content, onEntryUpdated }: EditEntryB
       return originalContent;
     }
 
-    // Check if we have a cached translation first - fix: use single argument
+    // Check if we have a cached translation first
     const cachedTranslation = getCachedTranslation(originalContent);
     if (cachedTranslation) {
       console.log('[EditEntryButton] Using cached translation for editing');
@@ -107,8 +107,8 @@ export function EditEntryButton({ entryId, content, onEntryUpdated }: EditEntryB
         });
       }
       
-      // Update UI immediately with the edited content
-      onEntryUpdated(currentLanguage === 'en' ? editedContent : content, true);
+      // Always update UI immediately with the edited content (what the user sees)
+      onEntryUpdated(editedContent, true);
       setIsProcessing(true);
       
       // Update the database with the appropriate content
@@ -204,7 +204,7 @@ export function EditEntryButton({ entryId, content, onEntryUpdated }: EditEntryB
     if (currentLanguage === 'en') {
       return editedContent !== content;
     } else {
-      // For non-English, check if the translation has changed from cached version - fix: use single argument
+      // For non-English, check if the translation has changed from cached version
       const cachedTranslation = getCachedTranslation(content);
       return editedContent !== (cachedTranslation || content);
     }
