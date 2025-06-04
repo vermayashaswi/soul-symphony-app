@@ -15,9 +15,9 @@ export async function analyzeWithGoogleNL(text: string, googleNLApiKey: string) 
       return { sentiment: "0" };
     }
     
-    // Validate API key format to detect obvious errors
-    if (googleNLApiKey.length < 20 || !googleNLApiKey.includes('-')) {
-      console.error('Google NL API key appears to be invalid:', googleNLApiKey.substring(0, 5) + '...');
+    // Improved API key validation - check for basic format but be less restrictive
+    if (googleNLApiKey.length < 10) {
+      console.error('Google NL API key appears to be too short:', googleNLApiKey.substring(0, 5) + '...');
       return { sentiment: "0" };
     }
     
@@ -49,6 +49,8 @@ export async function analyzeWithGoogleNL(text: string, googleNLApiKey: string) 
           console.error('Invalid argument error - check text format and encoding');
         } else if (errorJson.error && errorJson.error.status === 'PERMISSION_DENIED') {
           console.error('Permission denied - check API key and ensure it has Natural Language API permissions');
+        } else if (errorJson.error && errorJson.error.status === 'UNAUTHENTICATED') {
+          console.error('Unauthenticated - API key may be invalid or expired');
         }
       } catch (e) {
         console.error('Error parsing Google NL API error response:', e);

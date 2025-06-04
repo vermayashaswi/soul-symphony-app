@@ -36,7 +36,7 @@ serve(async (req) => {
       
       console.log(`Google API key from env: ${googleNlApiConfigured ? 'Found' : 'Not found'}`);
       if (googleNlApiKey) {
-        console.log(`API key format check: ${googleNlApiKey.length > 20 && googleNlApiKey.includes('-') ? 'Passed' : 'Failed'}`);
+        console.log(`API key length: ${googleNlApiKey.length}, starts with: ${googleNlApiKey.substring(0, 5)}...`);
       }
       
       // Check for OpenAI API key
@@ -85,13 +85,14 @@ serve(async (req) => {
       throw new Error("Google API key is not configured");
     }
     
-    // Enhanced API key validation
-    if (apiKey.length < 20 || !apiKey.includes('-')) {
-      console.error('Google NL API key appears invalid (format check failed)');
+    // Improved API key validation - less restrictive
+    if (apiKey.length < 10) {
+      console.error('Google NL API key appears invalid (too short)');
       throw new Error("Google API key appears to be invalid");
     }
     
     console.log('Analyzing sentiment using Google NL API with UTF-8 encoding...');
+    console.log(`API key configured: ${apiKey.length} characters, starts with: ${apiKey.substring(0, 5)}...`);
     
     // Call the Google Natural Language API specifically for sentiment analysis
     const response = await fetch(`https://language.googleapis.com/v1/documents:analyzeSentiment?key=${apiKey}`, {
@@ -124,6 +125,9 @@ serve(async (req) => {
         } else if (errorJson.error && errorJson.error.status === 'PERMISSION_DENIED') {
           console.error('Permission denied - check API key permissions');
           throw new Error(`Google API error: Permission denied - check API key permissions`);
+        } else if (errorJson.error && errorJson.error.status === 'UNAUTHENTICATED') {
+          console.error('Unauthenticated - API key may be invalid');
+          throw new Error(`Google API error: Authentication failed - check API key`);
         } else if (errorJson.error && errorJson.error.message) {
           throw new Error(`Google API error: ${errorJson.error.message}`);
         }

@@ -70,9 +70,9 @@ export const JOURNAL_ENTRY_SCHEMA: JournalEntrySchema = {
     },
     sentiment: {
       type: "text",
-      description: "Overall sentiment classification",
+      description: "Overall sentiment score from Google NL API (-1.0 to 1.0 scale stored as text)",
       nullable: true,
-      example: "negative"
+      example: "0.75"
     },
     entities: {
       type: "jsonb",
@@ -107,7 +107,8 @@ export const JOURNAL_ENTRY_SCHEMA: JournalEntrySchema = {
     "Theme-based search and clustering",
     "Date range filtering and temporal analysis",
     "Content text search in both transcription and refined text",
-    "Entity-based search for people, places, organizations"
+    "Entity-based search for people, places, organizations",
+    "Sentiment-based filtering using Google NL API scores"
   ]
 };
 
@@ -128,6 +129,14 @@ ${Object.entries(JOURNAL_ENTRY_SCHEMA.columns).map(([column, info]) =>
 - Typical threshold for significance: 0.3+
 - DO NOT attempt to infer emotions from text - use the provided scores
 
+**SENTIMENT ANALYSIS:**
+- Sentiment scores are calculated using Google Natural Language API
+- Scores range from -1.0 (very negative) to 1.0 (very positive)
+- Stored as text in the sentiment column
+- Scores >= 0.3 are considered positive
+- Scores >= -0.1 and < 0.3 are considered neutral
+- Scores < -0.1 are considered negative
+
 **MASTER THEMES:**
 - AI-extracted main topics and themes from journal entries
 - Useful for categorical analysis and pattern recognition
@@ -145,6 +154,7 @@ ${JOURNAL_ENTRY_SCHEMA.relationships.map(rel => `• ${rel}`).join('\n')}
 - Master themes provide categorical context for grouping and analysis
 - Vector embeddings enable semantic similarity search
 - Date filtering supports temporal pattern analysis
+- Sentiment analysis uses Google NL API for accurate sentiment scoring
 `;
 }
 
@@ -199,5 +209,27 @@ export function getThemeAnalysisGuidelines(): string {
    - Identify dominant life areas and concerns
    - Track theme evolution over time
    - Correlate themes with emotional patterns
+`;
+}
+
+export function getSentimentAnalysisGuidelines(): string {
+  return `
+**SENTIMENT ANALYSIS GUIDELINES:**
+
+1. **Google NL API Sentiment Scoring**
+   - Sentiment scores are calculated using Google Natural Language API
+   - Scores range from -1.0 (very negative) to 1.0 (very positive)
+   - Stored as text strings in the sentiment column
+
+2. **Sentiment Categories**
+   - Positive: >= 0.3
+   - Neutral: >= -0.1 and < 0.3
+   - Negative: < -0.1
+
+3. **Analysis Approach**
+   - Use numerical sentiment scores for quantitative analysis
+   - Track sentiment trends over time
+   - Correlate sentiment with emotions and themes
+   - Reference specific scores when discussing sentiment patterns
 `;
 }
