@@ -6,6 +6,7 @@ import { useFrame } from '@react-three/fiber';
 
 interface NodeMeshProps {
   type: 'entity' | 'emotion';
+  nodeType: 'entity' | 'emotion'; // Added missing nodeType prop
   scale: number;
   displayColor: string;
   isHighlighted: boolean;
@@ -21,6 +22,7 @@ interface NodeMeshProps {
 
 export const NodeMesh: React.FC<NodeMeshProps> = ({
   type,
+  nodeType, // Accept the nodeType prop
   scale,
   displayColor,
   isHighlighted,
@@ -47,11 +49,12 @@ export const NodeMesh: React.FC<NodeMeshProps> = ({
   }, []);
   
   // ENHANCED: Updated geometry creation for 15% larger nodes
+  // Use nodeType instead of type for consistency
   const Geometry = useMemo(() => 
-    type === 'entity'
+    nodeType === 'entity'
       ? <sphereGeometry args={[1.38, 16, 16]} /> // Increased from 1.2 by 15%
       : <boxGeometry args={[2.3, 2.3, 2.3]} />, // Increased from 2.0 by 15%
-    [type]
+    [nodeType]
   );
 
   // Safe animation with manual time tracking
@@ -101,7 +104,7 @@ export const NodeMesh: React.FC<NodeMeshProps> = ({
     return null;
   }
 
-  console.log(`[NodeMesh] ENHANCED: Rendering ${type} mesh with enhanced scale ${scale.toFixed(2)}`);
+  console.log(`[NodeMesh] ENHANCED: Rendering ${nodeType} mesh with enhanced scale ${scale.toFixed(2)}`);
 
   return (
     <mesh
