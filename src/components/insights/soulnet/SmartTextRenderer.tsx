@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { universalFontService } from '@/services/universalFontService';
 import CanvasTextRenderer from './CanvasTextRenderer';
-import SimpleText from './SimpleText';
+import ReliableText from './ReliableText';
 import { wrapTextIntelligently, calculateOptimalMaxWidth } from '@/utils/textWrappingUtils';
 import { useTranslation } from '@/contexts/TranslationContext';
 
@@ -74,7 +74,7 @@ export const SmartTextRenderer: React.FC<SmartTextRendererProps> = ({
           setUseCanvasRenderer(true);
           setFontLoaded(true);
         } else {
-          console.log(`[SmartTextRenderer] Using Three.js renderer for: "${finalText}" (${currentLanguage}, multiline: ${isMultiLine}, size: ${size})`);
+          console.log(`[SmartTextRenderer] Using ReliableText renderer for: "${finalText}" (${currentLanguage}, multiline: ${isMultiLine}, size: ${size})`);
           try {
             await universalFontService.loadFont(finalText, currentLanguage);
             setUseCanvasRenderer(false);
@@ -99,7 +99,7 @@ export const SmartTextRenderer: React.FC<SmartTextRendererProps> = ({
     return null;
   }
 
-  console.log(`[SmartTextRenderer] Using ${useCanvasRenderer ? 'Canvas' : 'Three.js'} renderer for text: "${processedText}" (${currentLanguage}) with size: ${size}, color: ${color}`);
+  console.log(`[SmartTextRenderer] Using ${useCanvasRenderer ? 'Canvas' : 'ReliableText'} renderer for text: "${processedText}" (${currentLanguage}) with size: ${size}, color: ${color}`);
 
   if (useCanvasRenderer) {
     return (
@@ -118,7 +118,7 @@ export const SmartTextRenderer: React.FC<SmartTextRendererProps> = ({
   }
 
   return (
-    <SimpleText
+    <ReliableText
       text={processedText}
       position={position}
       color={color}

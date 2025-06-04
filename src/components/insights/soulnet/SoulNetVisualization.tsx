@@ -1,3 +1,4 @@
+
 import React, { useRef, useEffect, useMemo, useState } from 'react';
 import '@/types/three-reference';
 import { OrbitControls } from '@react-three/drei';
@@ -129,6 +130,39 @@ function getConnectedNodes(nodeId: string, links: LinkData[]): Set<string> {
   return connected;
 }
 
+// Enhanced translation lookup that checks multiple sources
+const getNodeTranslation = (
+  nodeId: string, 
+  currentLanguage: string, 
+  getCachedTranslation?: (text: string) => string | null
+): string => {
+  if (currentLanguage === 'en' || !nodeId) {
+    return nodeId;
+  }
+
+  console.log(`[SoulNetVisualization] Getting translation for "${nodeId}" (${currentLanguage})`);
+
+  // 1. Check translation context cache
+  if (getCachedTranslation) {
+    const contextCached = getCachedTranslation(nodeId);
+    if (contextCached) {
+      console.log(`[SoulNetVisualization] Using context cache: "${nodeId}" -> "${contextCached}"`);
+      return contextCached;
+    }
+  }
+
+  // 2. Check on-demand cache
+  const onDemandCached = onDemandTranslationCache.get(currentLanguage, nodeId);
+  if (onDemandCached) {
+    console.log(`[SoulNetVisualization] Using on-demand cache: "${nodeId}" -> "${onDemandCached}"`);
+    return onDemandCached;
+  }
+
+  // 3. Fallback to original
+  console.log(`[SoulNetVisualization] Using fallback for: "${nodeId}"`);
+  return nodeId;
+};
+
 export const SoulNetVisualization: React.FC<SoulNetVisualizationProps> = ({
   data,
   selectedNode,
@@ -138,32 +172,20 @@ export const SoulNetVisualization: React.FC<SoulNetVisualizationProps> = ({
   shouldShowLabels = true
 }) => {
   const { camera, size } = useThree();
-  const { currentLanguage, translate } = useTranslation();
+  const { currentLanguage, getCachedTranslation } = useTranslation();
   const controlsRef = useRef<any>(null);
   const [cameraZoom, setCameraZoom] = useState<number>(45);
   const [forceUpdate, setForceUpdate] = useState<number>(0);
   const [isInitialized, setIsInitialized] = useState(false);
-  const [translationCache, setTranslationCache] = useState<Map<string, string>>(new Map());
-  const mounted = useRef<boolean>(true);
-  const translationInProgressRef = useRef<boolean>(false);
   
-  console.log("[SoulNetVisualization] GOOGLE TRANSLATE ONLY - Initial state", {
+  console.log("[SoulNetVisualization] ENHANCED TRANSLATION MODE - Initial state", {
     nodeCount: data?.nodes?.length,
     linkCount: data?.links?.length,
     currentLanguage,
     selectedNode,
     shouldShowLabels,
-    translationCacheSize: translationCache.size,
-    translateFunction: !!translate
+    getCachedFunction: !!getCachedTranslation
   });
-  
-  useEffect(() => {
-    console.log("[SoulNetVisualization] Component mounted - Google Translate only mode");
-    return () => {
-      console.log("[SoulNetVisualization] Component unmounted");
-      mounted.current = false;
-    };
-  }, []);
 
   // Ensure data is valid
   const validData = useMemo(() => {
@@ -176,109 +198,6 @@ export const SoulNetVisualization: React.FC<SoulNetVisualizationProps> = ({
     }
     return data;
   }, [data]);
-  
-  // Simplified node label translation using ONLY Google Translate
-  useEffect(() => {
-    if (!data?.nodes || !Array.isArray(data.nodes) || data.nodes.length === 0 || !mounted.current) {
-      console.log("[SoulNetVisualization] Skipping translation - invalid nodes or unmounted component");
-      return;
-    }
-
-    console.log(`[SoulNetVisualization] GOOGLE TRANSLATE ONLY - Translation effect triggered. Language: ${currentLanguage}, Nodes: ${data.nodes.length}`);
-
-    // Skip if a translation is already in progress
-    if (translationInProgressRef.current) {
-      console.log("[SoulNetVisualization] Translation already in progress, skipping");
-      return;
-    }
-
-    translationInProgressRef.current = true;
-
-    const processNodeLabels = async () => {
-      console.log('[SoulNetVisualization] Starting Google Translate only process', {
-        currentLanguage,
-        nodeCount: data.nodes.length,
-        translateAvailable: !!translate,
-      });
-      
-      const newTranslationCache = new Map<string, string>(translationCache);
-      
-      // Only translate if not English and translate function available
-      if (currentLanguage !== 'en' && translate && mounted.current) {
-        console.log(`[SoulNetVisualization] Starting Google Translate batch to ${currentLanguage}`);
-        
-        try {
-          // Collect all node IDs that need translation
-          const textsToTranslate = data.nodes
-            .filter(node => !newTranslationCache.has(node.id))
-            .map(node => node.id);
-            
-          console.log(`[SoulNetVisualization] Need to translate ${textsToTranslate.length} node labels via Google Translate`);
-          
-          if (textsToTranslate.length > 0) {
-            // Process in smaller batches to avoid timeouts
-            const batchSize = 3;
-            for (let i = 0; i < textsToTranslate.length; i += batchSize) {
-              if (!mounted.current) break;
-              
-              const batch = textsToTranslate.slice(i, i + batchSize);
-              console.log(`[SoulNetVisualization] Processing Google Translate batch ${i/batchSize + 1}: ${batch.join(', ')}`);
-              
-              // Process each item in the batch
-              await Promise.all(batch.map(async (text) => {
-                try {
-                  // Force translation from English source using Google Translate
-                  const translatedText = await translate(text, 'en');
-                  
-                  if (translatedText && translatedText !== text) {
-                    console.log(`[SoulNetVisualization] Google Translate success: "${text}" -> "${translatedText}"`);
-                    newTranslationCache.set(text, translatedText);
-                    
-                    // Also save to global cache
-                    onDemandTranslationCache.set(currentLanguage, text, translatedText);
-                  } else {
-                    console.log(`[SoulNetVisualization] Google Translate returned same text for "${text}"`);
-                    newTranslationCache.set(text, text);
-                  }
-                } catch (error) {
-                  console.error(`[SoulNetVisualization] Google Translate error for "${text}":`, error);
-                  newTranslationCache.set(text, text);
-                }
-              }));
-              
-              // Brief pause between batches
-              await new Promise(resolve => setTimeout(resolve, 200));
-            }
-          }
-        } catch (error) {
-          console.error('[SoulNetVisualization] Google Translate batch error:', error);
-        }
-      } else {
-        // For English, use original labels
-        data.nodes.forEach(node => {
-          newTranslationCache.set(node.id, node.id);
-        });
-      }
-      
-      if (mounted.current) {
-        console.log('[SoulNetVisualization] Setting Google Translate cache with:', 
-          Array.from(newTranslationCache.entries()).slice(0, 5));
-        setTranslationCache(newTranslationCache);
-        
-        // Force re-render after translation
-        setForceUpdate(prev => prev + 1);
-      }
-      
-      translationInProgressRef.current = false;
-    };
-
-    processNodeLabels();
-    
-    return () => {
-      // Ensure we flag that any in-progress translation should stop
-      translationInProgressRef.current = false;
-    };
-  }, [data?.nodes, currentLanguage, translate]);
   
   // Use memoization to prevent recalculation of center position on every render
   const centerPosition = useMemo(() => {
@@ -420,12 +339,11 @@ export const SoulNetVisualization: React.FC<SoulNetVisualizationProps> = ({
     return null;
   }
 
-  console.log("[SoulNetVisualization] GOOGLE TRANSLATE FINAL RENDER", { 
-    translationCacheSize: translationCache.size,
+  console.log("[SoulNetVisualization] ENHANCED TRANSLATION FINAL RENDER", { 
     currentLanguage,
     shouldTranslate: currentLanguage !== 'en',
     nodeCount: validData.nodes.length,
-    translatedNodes: Array.from(translationCache.entries()).slice(0, 3)
+    hasCachedFunction: !!getCachedTranslation
   });
 
   return (
@@ -504,7 +422,7 @@ export const SoulNetVisualization: React.FC<SoulNetVisualizationProps> = ({
         );
       })}
       
-      {/* Display nodes with FIXED percentage display */}
+      {/* Display nodes with enhanced translation lookup */}
       {validData.nodes.map(node => {
         if (!node || typeof node !== 'object' || !node.id) {
           console.warn("[SoulNetVisualization] Invalid node:", node);
@@ -532,8 +450,8 @@ export const SoulNetVisualization: React.FC<SoulNetVisualizationProps> = ({
           return null;
         }
 
-        // Get translated text from Google Translate cache with fallback to original text
-        const translatedLabel = translationCache.get(node.id) || node.id;
+        // Get translated text using enhanced lookup mechanism
+        const translatedLabel = getNodeTranslation(node.id, currentLanguage, getCachedTranslation);
         
         // Enhanced logging for percentage display
         if (showPercentage) {

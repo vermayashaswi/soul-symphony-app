@@ -5,6 +5,7 @@ import { useLoader } from '@react-three/fiber';
 import { FontLoader } from 'three/examples/jsm/loaders/FontLoader.js';
 import { universalFontService } from '@/services/universalFontService';
 import { useTranslation } from '@/contexts/TranslationContext';
+import { onDemandTranslationCache } from '@/utils/website-translations';
 
 interface NodeLabelProps {
   id: string;
@@ -29,37 +30,60 @@ export const NodeLabel: React.FC<NodeLabelProps> = ({
   themeHex,
   nodeScale = 1
 }) => {
-  const { currentLanguage, translate } = useTranslation();
+  const { currentLanguage, translate, getCachedTranslation } = useTranslation();
   const [displayText, setDisplayText] = useState<string>(id);
 
-  // Handle translation
+  // Enhanced translation lookup with multiple sources
   useEffect(() => {
-    if (!shouldShowLabel) return;
+    if (!shouldShowLabel || !id) return;
 
-    const translateText = async () => {
-      try {
-        if (currentLanguage === 'en' || !translate) {
-          setDisplayText(id);
-          return;
-        }
-
-        const translated = await translate(id);
-        if (translated && typeof translated === 'string') {
-          setDisplayText(translated);
-          console.log(`[NodeLabel] Translation (${currentLanguage}): "${id}" -> "${translated}"`);
-        } else {
-          setDisplayText(id);
-        }
-      } catch (error) {
-        console.warn(`[NodeLabel] Translation failed for ${id} (${currentLanguage}):`, error);
+    const getTranslation = async () => {
+      if (currentLanguage === 'en') {
         setDisplayText(id);
+        return;
       }
+
+      console.log(`[NodeLabel] Getting translation for "${id}" (${currentLanguage})`);
+
+      // 1. Check translation context cache
+      const contextCached = getCachedTranslation ? getCachedTranslation(id) : null;
+      if (contextCached) {
+        console.log(`[NodeLabel] Using context cache: "${id}" -> "${contextCached}"`);
+        setDisplayText(contextCached);
+        return;
+      }
+
+      // 2. Check on-demand cache
+      const onDemandCached = onDemandTranslationCache.get(currentLanguage, id);
+      if (onDemandCached) {
+        console.log(`[NodeLabel] Using on-demand cache: "${id}" -> "${onDemandCached}"`);
+        setDisplayText(onDemandCached);
+        return;
+      }
+
+      // 3. Try real-time translation
+      if (translate) {
+        try {
+          const translated = await translate(id, 'en');
+          if (translated && translated !== id) {
+            console.log(`[NodeLabel] Real-time translation: "${id}" -> "${translated}"`);
+            setDisplayText(translated);
+            return;
+          }
+        } catch (error) {
+          console.warn(`[NodeLabel] Real-time translation failed for ${id}:`, error);
+        }
+      }
+
+      // 4. Fallback to original
+      console.log(`[NodeLabel] Using fallback: "${id}"`);
+      setDisplayText(id);
     };
 
-    translateText();
-  }, [id, currentLanguage, translate, shouldShowLabel]);
+    getTranslation();
+  }, [id, currentLanguage, translate, getCachedTranslation, shouldShowLabel]);
 
-  // Get font URL based on text content and current language
+  // Get font URL based on display text and current language
   const fontUrl = universalFontService.getFontUrl(displayText, currentLanguage);
   
   // Load font using React Three Fiber's useLoader with error handling

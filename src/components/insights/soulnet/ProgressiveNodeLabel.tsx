@@ -27,37 +27,9 @@ export const ProgressiveNodeLabel: React.FC<ProgressiveNodeLabelProps> = ({
   themeHex,
   nodeScale = 1
 }) => {
-  const { currentLanguage, translate } = useTranslation();
-  const [displayText, setDisplayText] = useState<string>(id);
+  const { currentLanguage } = useTranslation();
 
   console.log(`[ProgressiveNodeLabel] Rendering for ${id} (${currentLanguage}), visible: ${shouldShowLabel}`);
-
-  // Handle translation with enhanced language support
-  useEffect(() => {
-    if (!shouldShowLabel) return;
-
-    const translateText = async () => {
-      try {
-        if (currentLanguage === 'en' || !translate) {
-          setDisplayText(id);
-          return;
-        }
-
-        const translated = await translate(id);
-        if (translated && typeof translated === 'string') {
-          setDisplayText(translated);
-          console.log(`[ProgressiveNodeLabel] Translation (${currentLanguage}): "${id}" -> "${translated}"`);
-        } else {
-          setDisplayText(id);
-        }
-      } catch (error) {
-        console.warn(`[ProgressiveNodeLabel] Translation failed for ${id} (${currentLanguage}):`, error);
-        setDisplayText(id);
-      }
-    };
-
-    translateText();
-  }, [id, currentLanguage, translate, shouldShowLabel]);
 
   // Calculate position offset
   const labelOffset = useMemo(() => {
@@ -82,14 +54,14 @@ export const ProgressiveNodeLabel: React.FC<ProgressiveNodeLabelProps> = ({
 
   // Enhanced outline configuration for multi-language support
   const outlineConfig = useMemo(() => {
-    const isComplex = universalFontService.isComplexScript(displayText);
+    const isComplex = universalFontService.isComplexScript(id);
     const needsOutline = isSelected || isComplex || textColor === '#ffffff';
     
     return {
       width: needsOutline ? (isSelected ? 0.04 : 0.02) : 0,
       color: isSelected ? '#000000' : '#333333'
     };
-  }, [isSelected, displayText, textColor]);
+  }, [isSelected, id, textColor]);
 
   const labelPosition: [number, number, number] = [
     position[0] + labelOffset[0],
@@ -97,15 +69,15 @@ export const ProgressiveNodeLabel: React.FC<ProgressiveNodeLabelProps> = ({
     position[2] + labelOffset[2]
   ];
 
-  if (!shouldShowLabel || !displayText) {
+  if (!shouldShowLabel || !id) {
     return null;
   }
 
-  console.log(`[ProgressiveNodeLabel] Final render: "${displayText}" (${currentLanguage}) at position`, labelPosition, `script: ${universalFontService.detectScript(displayText)}`);
+  console.log(`[ProgressiveNodeLabel] Final render: "${id}" (${currentLanguage}) at position`, labelPosition, `script: ${universalFontService.detectScript(id)}`);
 
   return (
     <ReliableText
-      text={displayText}
+      text={id}
       position={labelPosition}
       color={textColor}
       size={textSize}
