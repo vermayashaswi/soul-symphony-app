@@ -2,6 +2,7 @@
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.7.1';
+import { generateDatabaseSchemaContext } from '../_shared/databaseSchemaContext.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -32,9 +33,9 @@ serve(async (req) => {
       userProfile = {}
     } = await req.json();
 
-    console.log('[GPT Master Orchestrator] Processing intelligent query:', message);
+    console.log('[GPT Master Orchestrator] Processing intelligent query with database schema awareness:', message);
 
-    // Step 1: Generate intelligent query plan
+    // Step 1: Generate intelligent query plan with database context
     const { data: queryPlanResponse } = await supabaseClient.functions.invoke(
       'intelligent-query-planner',
       {
@@ -51,10 +52,10 @@ serve(async (req) => {
       throw new Error('Failed to generate query plan');
     }
 
-    const { queryPlan, userPatterns } = queryPlanResponse;
-    console.log('[Master Orchestrator] Query plan generated:', queryPlan.strategy);
+    const { queryPlan, userPatterns, databaseContext } = queryPlanResponse;
+    console.log('[Master Orchestrator] Schema-aware query plan generated:', queryPlan.strategy);
 
-    // Step 2: Execute intelligent search orchestration
+    // Step 2: Execute intelligent search orchestration with schema awareness
     const { data: searchResponse } = await supabaseClient.functions.invoke(
       'gpt-search-orchestrator',
       {
@@ -71,9 +72,9 @@ serve(async (req) => {
     }
 
     const { searchResults, combinedResults, executionSummary } = searchResponse;
-    console.log('[Master Orchestrator] Search completed:', executionSummary);
+    console.log('[Master Orchestrator] Schema-aware search completed:', executionSummary);
 
-    // Step 3: Generate intelligent response
+    // Step 3: Generate intelligent response with database schema context
     const { data: responseData } = await supabaseClient.functions.invoke(
       'intelligent-response-generator',
       {
@@ -92,9 +93,9 @@ serve(async (req) => {
       throw new Error('Failed to generate intelligent response');
     }
 
-    console.log('[Master Orchestrator] Intelligent response generated successfully');
+    console.log('[Master Orchestrator] Schema-aware intelligent response generated successfully');
 
-    // Return comprehensive result
+    // Return comprehensive result with database schema awareness
     return new Response(JSON.stringify({
       response: responseData.response,
       metadata: {
@@ -103,15 +104,26 @@ serve(async (req) => {
         totalResults: combinedResults.length,
         confidence: queryPlan.confidence,
         userPatterns,
-        executionSummary
+        executionSummary,
+        databaseSchemaAware: true,
+        schemaUtilization: searchResults.map(r => r.schemaUtilization).filter(Boolean)
       },
       analysis: {
-        queryType: 'intelligent_orchestration',
+        queryType: 'intelligent_orchestration_with_schema',
         reasoning: queryPlan.reasoning,
         searchMethods: queryPlan.searchMethods,
-        filtersApplied: queryPlan.filters
+        filtersApplied: queryPlan.filters,
+        databaseContext: queryPlan.databaseContext
       },
-      references: combinedResults.slice(0, 3)
+      references: combinedResults.slice(0, 3).map(result => ({
+        ...result,
+        schemaFields: {
+          hasEmotions: !!result.emotions,
+          hasThemes: !!(result.master_themes || result.themes),
+          hasSentiment: !!result.sentiment,
+          contentSource: result["refined text"] ? "refined" : "transcription"
+        }
+      }))
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
@@ -127,7 +139,8 @@ serve(async (req) => {
         queryStrategy: 'fallback',
         searchMethodsUsed: ['error_recovery'],
         totalResults: 0,
-        confidence: 0.3
+        confidence: 0.3,
+        databaseSchemaAware: false
       }
     }), {
       status: 500,

@@ -1,7 +1,7 @@
-
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.7.1';
+import { generateDatabaseSchemaContext } from '../_shared/databaseSchemaContext.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -13,6 +13,7 @@ interface SearchResult {
   results: any[];
   confidence: number;
   reasoning: string;
+  schemaUtilization: string;
 }
 
 serve(async (req) => {
@@ -38,7 +39,7 @@ serve(async (req) => {
 
     const { queryPlan, originalQuery, userId } = await req.json();
 
-    console.log('[GPT Search Orchestrator] Executing plan:', queryPlan.strategy);
+    console.log('[GPT Search Orchestrator] Executing plan with database schema awareness:', queryPlan.strategy);
 
     // Execute search methods based on the intelligent plan
     const searchResults: SearchResult[] = [];
@@ -60,12 +61,13 @@ serve(async (req) => {
           method,
           results: [],
           confidence: 0,
-          reasoning: `Error: ${error.message}`
+          reasoning: `Error: ${error.message}`,
+          schemaUtilization: "Failed to utilize schema due to error"
         });
       }
     }
 
-    // Intelligently combine and rank results
+    // Intelligently combine and rank results with schema awareness
     const combinedResults = await intelligentResultCombination(
       searchResults,
       queryPlan,
@@ -79,7 +81,8 @@ serve(async (req) => {
       executionSummary: {
         methodsUsed: queryPlan.searchMethods,
         totalResults: combinedResults.length,
-        confidence: queryPlan.confidence
+        confidence: queryPlan.confidence,
+        schemaAware: true
       }
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -106,7 +109,7 @@ async function executeSearchMethod(
   supabase: any,
   openaiApiKey: string
 ): Promise<SearchResult> {
-  console.log(`[Search Orchestrator] Executing ${method}`);
+  console.log(`[Search Orchestrator] Executing ${method} with schema awareness`);
 
   switch (method) {
     case 'vector_search':
@@ -153,11 +156,21 @@ async function executeVectorSearch(
 
   if (error) throw error;
 
+  // Ensure we're getting the right content fields
+  const processedResults = (data || []).map((result: any) => ({
+    ...result,
+    content: result.content || result["refined text"] || result["transcription text"] || "",
+    emotions: result.emotions || {},
+    master_themes: result.themes || result.master_themes || [],
+    created_at: result.created_at
+  }));
+
   return {
     method: 'vector_search',
-    results: data || [],
+    results: processedResults,
     confidence: 0.8,
-    reasoning: 'Semantic similarity search based on query embedding'
+    reasoning: 'Semantic similarity search based on query embedding with schema-aware content prioritization',
+    schemaUtilization: 'Used refined text, transcription text, emotions, and master_themes columns'
   };
 }
 
@@ -167,19 +180,22 @@ async function executeEmotionSearch(
   userId: string,
   supabase: any
 ): Promise<SearchResult> {
-  if (!queryPlan.emotionFocus) {
+  if (!queryPlan.emotionFocus && !queryPlan.filters?.emotionFocus) {
     return {
       method: 'emotion_analysis',
       results: [],
       confidence: 0,
-      reasoning: 'No specific emotion detected in query'
+      reasoning: 'No specific emotion detected in query',
+      schemaUtilization: 'Attempted to analyze emotions column but no target emotion specified'
     };
   }
+
+  const emotionTarget = queryPlan.emotionFocus || queryPlan.filters?.emotionFocus;
 
   const { data, error } = await supabase.rpc(
     'match_journal_entries_by_emotion_strength',
     {
-      emotion_name: queryPlan.emotionFocus,
+      emotion_name: emotionTarget,
       user_id_filter: userId,
       match_count: 10,
       start_date: queryPlan.filters?.timeRange?.startDate || null,
@@ -189,11 +205,21 @@ async function executeEmotionSearch(
 
   if (error) throw error;
 
+  const processedResults = (data || []).map((result: any) => ({
+    ...result,
+    content: result.content || result["refined text"] || result["transcription text"] || "",
+    emotions: result.emotions || {},
+    master_themes: result.themes || result.master_themes || [],
+    emotion_score: result.emotion_score,
+    created_at: result.created_at
+  }));
+
   return {
     method: 'emotion_analysis',
-    results: data || [],
+    results: processedResults,
     confidence: 0.9,
-    reasoning: `Focused search for ${queryPlan.emotionFocus} emotion patterns`
+    reasoning: `Focused search for ${emotionTarget} emotion patterns using pre-calculated scores`,
+    schemaUtilization: `Utilized emotions JSONB column with numerical scores for ${emotionTarget}`
   };
 }
 
@@ -209,7 +235,8 @@ async function executeTemporalSearch(
       method: 'temporal_search',
       results: [],
       confidence: 0,
-      reasoning: 'No specific time range identified'
+      reasoning: 'No specific time range identified',
+      schemaUtilization: 'Attempted to use created_at column but no time range specified'
     };
   }
 
@@ -230,11 +257,20 @@ async function executeTemporalSearch(
 
   if (error) throw error;
 
+  const processedResults = (data || []).map((result: any) => ({
+    ...result,
+    content: result.content || result["refined text"] || result["transcription text"] || "",
+    emotions: result.emotions || {},
+    master_themes: result.themes || result.master_themes || [],
+    created_at: result.created_at
+  }));
+
   return {
     method: 'temporal_search',
-    results: data || [],
+    results: processedResults,
     confidence: 0.85,
-    reasoning: `Time-constrained search for period: ${queryPlan.filters.timeRange.startDate} to ${queryPlan.filters.timeRange.endDate}`
+    reasoning: `Time-constrained search for period: ${queryPlan.filters.timeRange.startDate} to ${queryPlan.filters.timeRange.endDate}`,
+    schemaUtilization: 'Used created_at column for temporal filtering with semantic search'
   };
 }
 
@@ -250,7 +286,8 @@ async function executeThemeSearch(
       method: 'theme_search',
       results: [],
       confidence: 0,
-      reasoning: 'No specific themes identified'
+      reasoning: 'No specific themes identified',
+      schemaUtilization: 'Attempted to use master_themes array but no target themes specified'
     };
   }
 
@@ -270,11 +307,21 @@ async function executeThemeSearch(
 
   if (error) throw error;
 
+  const processedResults = (data || []).map((result: any) => ({
+    ...result,
+    content: result.content || result["refined text"] || result["transcription text"] || "",
+    emotions: result.emotions || {},
+    master_themes: result.themes || result.master_themes || [],
+    created_at: result.created_at,
+    similarity: result.similarity
+  }));
+
   return {
     method: 'theme_search',
-    results: data || [],
+    results: processedResults,
     confidence: 0.75,
-    reasoning: `Theme-based search focusing on: ${theme}`
+    reasoning: `Theme-based search focusing on: ${theme}`,
+    schemaUtilization: `Utilized master_themes array column for categorization matching`
   };
 }
 
@@ -301,7 +348,8 @@ async function executeAggregationSearch(
     method: 'aggregation_search',
     results: data || [],
     confidence: 0.9,
-    reasoning: 'Statistical analysis of emotional patterns and top emotions'
+    reasoning: 'Statistical analysis of emotional patterns and top emotions using aggregated data',
+    schemaUtilization: 'Used emotions JSONB column for statistical aggregation with sample entries'
   };
 }
 
@@ -321,12 +369,14 @@ async function intelligentResultCombination(
         allResults.set(key, {
           ...item,
           searchMethods: [result.method],
-          combinedConfidence: result.confidence
+          combinedConfidence: result.confidence,
+          schemaUtilization: [result.schemaUtilization]
         });
       } else {
         const existing = allResults.get(key);
         existing.searchMethods.push(result.method);
         existing.combinedConfidence = Math.max(existing.combinedConfidence, result.confidence);
+        existing.schemaUtilization.push(result.schemaUtilization);
       }
     });
   });

@@ -43,7 +43,7 @@ port = 54328
 port = 54326
 serve_port = 54327
 
-# Enhanced intelligent edge functions
+# Enhanced intelligent edge functions with database schema awareness
 [functions.chat-query-classifier]
 verify_jwt = true
 

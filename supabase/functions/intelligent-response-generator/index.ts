@@ -1,6 +1,10 @@
-
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { 
+  generateDatabaseSchemaContext, 
+  getEmotionAnalysisGuidelines, 
+  getThemeAnalysisGuidelines 
+} from '../_shared/databaseSchemaContext.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -27,19 +31,19 @@ serve(async (req) => {
       userProfile = {}
     } = await req.json();
 
-    console.log('[Intelligent Response Generator] Generating response for:', originalQuery);
+    console.log('[Intelligent Response Generator] Generating response with database schema context for:', originalQuery);
 
-    // Generate context-aware system prompt
+    // Generate context-aware system prompt with database schema knowledge
     const systemPrompt = generateIntelligentSystemPrompt(
       queryPlan,
       searchResults,
       userProfile
     );
 
-    // Format the combined results for analysis
+    // Format the combined results for analysis with schema awareness
     const formattedContext = formatResultsForAnalysis(combinedResults, searchResults);
 
-    // Generate the response using GPT
+    // Generate the response using GPT with full schema context
     const response = await generateIntelligentResponse(
       systemPrompt,
       originalQuery,
@@ -54,7 +58,8 @@ serve(async (req) => {
         queryStrategy: queryPlan.strategy,
         searchMethodsUsed: queryPlan.searchMethods,
         resultsCount: combinedResults.length,
-        confidence: queryPlan.confidence
+        confidence: queryPlan.confidence,
+        databaseSchemaUsed: true
       }
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -78,6 +83,9 @@ function generateIntelligentSystemPrompt(
   userProfile: any
 ): string {
   const currentDate = new Date().toISOString();
+  const databaseContext = generateDatabaseSchemaContext();
+  const emotionGuidelines = getEmotionAnalysisGuidelines();
+  const themeGuidelines = getThemeAnalysisGuidelines();
   
   let contextualInfo = `Current date and time: ${currentDate}
 User timezone: ${userProfile.timezone || 'UTC'}
@@ -90,7 +98,13 @@ Search methods employed: ${queryPlan.searchMethods.join(', ')}`;
     contextualInfo += `\nTime range analyzed: ${startStr} to ${endStr}`;
   }
 
-  return `You are SOULo, an advanced AI mental health companion that provides personalized therapeutic insights through intelligent journal analysis.
+  return `You are SOULo, an advanced AI mental health companion with COMPLETE DATABASE SCHEMA AWARENESS that provides personalized therapeutic insights through intelligent journal analysis.
+
+${databaseContext}
+
+${emotionGuidelines}
+
+${themeGuidelines}
 
 THERAPEUTIC IDENTITY & APPROACH:
 You are trained in multiple therapeutic modalities including Cognitive Behavioral Therapy (CBT), Dialectical Behavior Therapy (DBT), and mindfulness-based approaches.
@@ -103,25 +117,27 @@ ${searchResults.map(result =>
   `- ${result.method}: ${result.results.length} results (confidence: ${result.confidence}) - ${result.reasoning}`
 ).join('\n')}
 
-CRITICAL ANALYSIS INSTRUCTIONS:
+CRITICAL DATABASE-AWARE ANALYSIS INSTRUCTIONS:
 • You have access to INTELLIGENTLY SELECTED journal data based on advanced query planning
-• NEVER say "your entries don't mention" - the data has been specifically chosen for relevance
-• Use the pre-calculated emotion scores (0.0 to 1.0 scale) and metadata provided
-• Focus on evidence-based therapeutic insights using the curated data
-• Reference specific patterns, emotions, and themes found in the analysis
+• ALL emotion data is PRE-CALCULATED with confidence scores (0.0-1.0 scale)
+• NEVER infer emotions from text - use ONLY the provided numerical scores
+• Master themes are AI-extracted topic categorizations - leverage them for pattern analysis
+• Use both "refined text" and "transcription text" as available
+• Focus on quantitative therapeutic insights using the schema-structured data
+• Reference specific emotional scores, themes, and temporal patterns
 
 RESPONSE GUIDELINES:
 - Be conversational, supportive, and therapeutically insightful
 - Use natural language that feels like talking to a caring mental health professional
-- Provide actionable, personalized recommendations based on the data
+- Provide actionable, personalized recommendations based on the structured data
 - Keep responses under 300 words for simple queries, longer for complex therapeutic assessments
 - Use markdown formatting naturally (**bold** for emphasis, ## for headers when needed)
-- Reference specific emotional patterns and scores when relevant
+- Reference specific emotional patterns, scores, and themes when relevant
 - Maintain professional therapeutic boundaries while being warm and approachable
 
 EXPECTED RESPONSE TYPE: ${queryPlan.expectedResponseType}
 
-Remember: You're an intelligent AI therapist providing personalized insights based on sophisticated analysis of the user's journal data.`;
+Remember: You're an intelligent AI therapist with complete understanding of the database schema, providing personalized insights based on sophisticated analysis of structured journal data.`;
 }
 
 function formatResultsForAnalysis(combinedResults: any[], searchResults: any[]): string {
@@ -129,7 +145,7 @@ function formatResultsForAnalysis(combinedResults: any[], searchResults: any[]):
     return "No relevant journal data found for this specific query.";
   }
 
-  let context = "**INTELLIGENTLY CURATED JOURNAL ANALYSIS:**\n\n";
+  let context = "**INTELLIGENTLY CURATED JOURNAL ANALYSIS WITH DATABASE SCHEMA AWARENESS:**\n\n";
 
   // Group results by search method for better context
   const methodGroups: { [key: string]: any[] } = {};
@@ -141,17 +157,24 @@ function formatResultsForAnalysis(combinedResults: any[], searchResults: any[]):
     });
   });
 
-  // Format each method's results
+  // Format each method's results with schema awareness
   Object.entries(methodGroups).forEach(([method, results]) => {
-    context += `**${method.toUpperCase()} RESULTS:**\n`;
+    context += `**${method.toUpperCase()} RESULTS (Using Database Schema):**\n`;
     
     results.slice(0, 5).forEach(result => {
       const date = result.created_at ? new Date(result.created_at).toLocaleDateString() : 'Unknown date';
-      const content = result.content?.substring(0, 200) + (result.content?.length > 200 ? '...' : '');
       
-      context += `Entry from ${date} (confidence: ${result.combinedConfidence?.toFixed(2)}): ${content}\n`;
+      // Prioritize refined text over transcription text
+      const content = result.content || 
+                     result["refined text"] || 
+                     result["transcription text"] || 
+                     "No content available";
       
-      // Add emotion data if available
+      const contentPreview = content.substring(0, 200) + (content.length > 200 ? '...' : '');
+      
+      context += `Entry from ${date} (confidence: ${result.combinedConfidence?.toFixed(2)}): ${contentPreview}\n`;
+      
+      // Add PRE-CALCULATED emotion data with schema awareness
       if (result.emotions && typeof result.emotions === 'object') {
         const topEmotions = Object.entries(result.emotions)
           .filter(([_, score]) => typeof score === 'number' && score > 0.3)
@@ -161,13 +184,20 @@ function formatResultsForAnalysis(combinedResults: any[], searchResults: any[]):
           .join(', ');
         
         if (topEmotions) {
-          context += `Emotions: ${topEmotions}\n`;
+          context += `**Pre-calculated Emotions:** ${topEmotions}\n`;
         }
       }
 
-      // Add themes if available
-      if (result.themes && Array.isArray(result.themes)) {
-        context += `Themes: ${result.themes.slice(0, 3).join(', ')}\n`;
+      // Add master themes with schema awareness
+      if (result.master_themes && Array.isArray(result.master_themes)) {
+        context += `**Master Themes:** ${result.master_themes.slice(0, 3).join(', ')}\n`;
+      } else if (result.themes && Array.isArray(result.themes)) {
+        context += `**Themes:** ${result.themes.slice(0, 3).join(', ')}\n`;
+      }
+
+      // Add sentiment if available
+      if (result.sentiment) {
+        context += `**Sentiment:** ${result.sentiment}\n`;
       }
       
       context += '\n';
@@ -186,13 +216,13 @@ async function generateIntelligentResponse(
   conversationContext: any[],
   openaiApiKey: string
 ): Promise<string> {
-  const userPrompt = `Based on this intelligently curated journal analysis:
+  const userPrompt = `Based on this intelligently curated journal analysis with full database schema awareness:
 
 ${formattedContext}
 
 User question: ${userQuery}
 
-Please provide a thoughtful, therapeutically informed response based on the curated data patterns and insights.`;
+Please provide a thoughtful, therapeutically informed response based on the curated data patterns and insights from the structured database.`;
 
   // Include conversation context
   const messages = [
