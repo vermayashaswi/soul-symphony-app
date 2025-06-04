@@ -1,7 +1,7 @@
 
 import React, { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { ChevronDown, ChevronUp } from "lucide-react";
+import { ChevronDown, ChevronUp, ExternalLink } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { TranslatableText } from "@/components/translation/TranslatableText";
 
@@ -43,9 +43,7 @@ const ReferencesDisplay: React.FC<ReferencesDisplayProps> = ({
               <div className="font-medium">
                 {ref.date ? new Date(ref.date).toLocaleDateString() : "Unknown date"}
               </div>
-              <p className="text-muted-foreground">
-                {ref.content || ref.snippet || "No content available"}
-              </p>
+              <p className="text-muted-foreground">{ref.snippet}</p>
             </Card>
           ))}
           {references.length > 3 && (

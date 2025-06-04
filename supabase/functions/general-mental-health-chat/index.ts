@@ -1,134 +1,9 @@
-
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.7.1';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
-
-const apiKey = Deno.env.get('OPENAI_API_KEY');
-if (!apiKey) {
-  console.error('OPENAI_API_KEY is not set');
-  Deno.exit(1);
-}
-
-// Dynamic allowed categories from generate-themes function
-const allowedCategories = [
-  'work', 'relationships', 'family', 'health', 'goals', 'travel', 'creativity', 
-  'learning', 'challenges', 'growth', 'personal development', 'spirituality', 
-  'finances', 'hobbies', 'social life', 'career', 'education', 'fitness', 
-  'mental health', 'self-care', 'adventure', 'reflection'
-];
-
-/**
- * Get dynamic emotions from the database
- */
-async function getDynamicEmotions(): Promise<string[]> {
-  try {
-    const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
-    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
-    const supabase = createClient(supabaseUrl, supabaseServiceKey);
-    
-    const { data: emotions, error } = await supabase
-      .from('emotions')
-      .select('name')
-      .order('name');
-
-    if (error) {
-      console.error('Error fetching emotions:', error);
-      // Fallback to a comprehensive set
-      return [
-        'happy', 'sad', 'anxious', 'excited', 'calm', 'stressed', 'angry', 'peaceful',
-        'grateful', 'frustrated', 'hopeful', 'lonely', 'confident', 'worried', 'proud',
-        'disappointed', 'content', 'overwhelmed', 'curious', 'inspired'
-      ];
-    }
-
-    return emotions.map(emotion => emotion.name);
-  } catch (error) {
-    console.error('Error in getDynamicEmotions:', error);
-    return [
-      'happy', 'sad', 'anxious', 'excited', 'calm', 'stressed', 'angry', 'peaceful',
-      'grateful', 'frustrated', 'hopeful', 'lonely', 'confident', 'worried', 'proud',
-      'disappointed', 'content', 'overwhelmed', 'curious', 'inspired'
-    ];
-  }
-}
-
-/**
- * Generate dynamic general mental health prompt
- */
-async function generateGeneralMentalHealthPrompt(): Promise<string> {
-  const dynamicEmotions = await getDynamicEmotions();
-  const dynamicThemes = allowedCategories;
-
-  return `You are SOULo, an AI mental health therapist assistant trained in CBT, DBT, and mindfulness approaches. You are part of a voice journaling app called "SOULo" that helps users with their mental health journey.
-
-SCOPE AND BOUNDARIES:
-- You ONLY provide guidance on mental health, emotional wellbeing, mindfulness, therapy techniques, and related psychological topics
-- You are NOT a general knowledge assistant and should politely decline questions outside mental health scope
-- For questions about politics, current events, factual information, celebrity gossip, or unrelated topics, politely redirect to your mental health focus
-
-RESPONSE GUIDELINES FOR OFF-TOPIC QUESTIONS:
-- If asked about non-mental health topics (politics, current events, general knowledge, etc.), respond with:
-  "I'm SOULo, your mental health companion focused on emotional wellbeing and therapy. I'm here to help with questions about mental health, emotions, stress management, mindfulness, and personal growth. For other topics, I'd encourage you to explore other resources. Is there anything related to your emotional wellbeing I can help you with today?"
-
-- If the question is ambiguous or unclear, respond with:
-  "I'd love to help, but I'm not quite sure what you're looking for. As your mental health companion, I'm here to support you with emotional wellbeing, stress management, mindfulness practices, or personal growth. Could you share what's on your mind regarding your mental health or emotional state?"
-
-AVAILABLE EMOTIONAL VOCABULARY:
-When discussing emotions, you can reference these ${dynamicEmotions.length} emotions that are tracked in the SOULo system:
-${dynamicEmotions.join(', ')}
-
-AVAILABLE THEME AREAS:
-When discussing life areas and personal growth topics, you can reference these ${dynamicThemes.length} theme areas:
-${dynamicThemes.join(', ')}
-
-STRUCTURED RESPONSE FORMAT:
-Use this structured format for all mental health responses:
-
-**## [Main Topic/Theme]**
-
-**Understanding Your Situation:**
-- [Acknowledgment of their concern/question]
-- [Validation of their experience]
-
-**Key Insights:**
-- [Primary insight or understanding]
-- [Secondary insight if relevant]
-- [Connection to therapeutic principles]
-
-**Practical Steps:**
-- [Actionable suggestion 1]
-- [Actionable suggestion 2]
-- [Mindfulness or coping technique]
-
-**Moving Forward:**
-- [Encouragement or next steps]
-- [Invitation for further exploration]
-
-FORMATTING RULES:
-- Use **bold** for all headers and sub-headers
-- Use bullet points (-) for lists
-- Keep paragraphs concise (2-3 sentences max)
-- Use natural, conversational language within the structure
-- Maintain therapeutic warmth while being organized
-
-FOR MENTAL HEALTH QUESTIONS:
-- Provide supportive, evidence-based guidance using CBT, DBT, and mindfulness principles
-- Be conversational and warm, like a caring counselor
-- Keep responses concise but helpful within the structured format
-- Suggest journaling when appropriate since you're part of a journaling app
-- If the question involves personal journal analysis, mention that you could provide better insights if they shared specific journal entries
-
-SAFETY:
-- For crisis situations, always recommend immediate professional help
-- Never provide medical advice or diagnose conditions
-- Maintain professional therapeutic boundaries while being approachable
-
-Remember: Stay focused on mental health and emotional wellbeing. Politely but firmly redirect any off-topic questions back to your core purpose while using the available emotional vocabulary and theme areas when relevant.`;
-}
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -138,64 +13,84 @@ serve(async (req) => {
   try {
     const { message, conversationContext = [] } = await req.json();
 
-    console.log(`[General Mental Health] Processing with dynamic schema: "${message}" with ${conversationContext.length} context messages`);
-
-    // Generate dynamic prompt with current emotions and themes
-    const dynamicPrompt = await generateGeneralMentalHealthPrompt();
-
-    // Prepare the messages array with system prompt and conversation context
-    const messages = [];
-    
-    // Add system prompt
-    messages.push({ role: 'system', content: dynamicPrompt });
-    
-    // Add conversation context if available (limit to last 5 messages for context)
-    if (conversationContext.length > 0) {
-      const limitedContext = conversationContext.slice(-5);
-      messages.push(...limitedContext);
+    if (!message) {
+      return new Response(
+        JSON.stringify({ error: 'Message is required' }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
+      );
     }
-    
-    // Add current message
+
+    const openAiApiKey = Deno.env.get('OPENAI_API_KEY');
+    if (!openAiApiKey) {
+      return new Response(
+        JSON.stringify({ error: 'OpenAI API key not configured' }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 500 }
+      );
+    }
+
+    console.log(`[General Mental Health] Processing: "${message}" with ${conversationContext.length} context messages`);
+
+    // Build messages array with conversation context
+    const messages = [
+      {
+        role: 'system',
+        content: `You are a mental health assistant for SOULo, a voice journaling app. Provide helpful, supportive general mental health guidance.
+
+Guidelines:
+- Be empathetic and supportive
+- Provide evidence-based mental health information
+- Suggest practical coping strategies
+- Encourage professional help when appropriate
+- Keep responses concise and actionable
+- For personalized insights, suggest the user ask about their journal entries specifically
+
+If the question is about the user's personal patterns or experiences, gently suggest they ask something like "How am I doing?" to get personalized insights from their journal entries.`
+      }
+    ];
+
+    // Add conversation context (last 5 messages to keep context manageable)
+    if (conversationContext.length > 0) {
+      messages.push(...conversationContext.slice(-5));
+    }
+
+    // Add current user message
     messages.push({ role: 'user', content: message });
 
-    const completionResponse = await fetch('https://api.openai.com/v1/chat/completions', {
+    const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${apiKey}`,
+        'Authorization': `Bearer ${openAiApiKey}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
         model: 'gpt-4o-mini',
         messages: messages,
-        max_tokens: 500,
+        max_tokens: 800,
         temperature: 0.7,
       }),
     });
 
-    if (!completionResponse.ok) {
-      const error = await completionResponse.text();
-      console.error('Failed to get completion:', error);
-      throw new Error('Failed to generate response');
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('[General Mental Health] OpenAI API error:', errorText);
+      throw new Error(`OpenAI API error: ${response.status}`);
     }
 
-    const completionData = await completionResponse.json();
-    const response = completionData.choices[0]?.message?.content || 'I apologize, but I was unable to generate a response. Please try again.';
-    
-    console.log('[General Mental Health] Generated response with dynamic schema and conversation context');
+    const data = await response.json();
+    const responseContent = data.choices[0]?.message?.content || 'I apologize, but I was unable to generate a helpful response. Please try rephrasing your question.';
 
-    return new Response(JSON.stringify({ response }), {
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
+    console.log(`[General Mental Health] Generated response with conversation context`);
+
+    return new Response(
+      JSON.stringify({ response: responseContent }),
+      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    );
 
   } catch (error) {
-    console.error("Error in general-mental-health-chat:", error);
-    
-    return new Response(JSON.stringify({ 
-      error: error.message,
-      response: "I'm experiencing some technical difficulties. Please try again in a moment. If you're in crisis, please contact emergency services or a mental health professional immediately."
-    }), {
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-      status: 500
-    });
+    console.error('[General Mental Health] Error:', error);
+    return new Response(
+      JSON.stringify({ error: 'Failed to generate response' }),
+      { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 500 }
+    );
   }
 });
