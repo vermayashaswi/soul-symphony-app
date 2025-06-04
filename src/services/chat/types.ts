@@ -1,3 +1,4 @@
+
 // Chat thread type definition
 export interface ChatThread {
   id: string;
@@ -34,7 +35,7 @@ export interface SubQueryResponse {
   references?: any[];
 }
 
-// Chat message type definition
+// Chat message type definition - this is the main ServiceChatMessage export
 export interface ChatMessage {
   id: string;
   thread_id: string;
@@ -55,6 +56,9 @@ export interface ChatMessage {
   is_processing?: boolean;
   time_pattern_analysis?: any; // Add this field for time pattern analysis results
 }
+
+// Export ServiceChatMessage as an alias for ChatMessage
+export type ServiceChatMessage = ChatMessage;
 
 // Type guard to check if an object has thread metadata
 export function isThreadMetadata(obj: any): obj is ChatThread['metadata'] {

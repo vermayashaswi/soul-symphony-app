@@ -244,3 +244,6 @@ export function SmartChatInterface({ mentalHealthInsights }: SmartChatInterfaceP
     </div>
   );
 }
+
+// Add default export
+export default SmartChatInterface;

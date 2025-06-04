@@ -33,7 +33,7 @@ export const createChatThread = async (userId: string, title: string = "New Conv
   }
 };
 
-export const updateChatThread = async (threadId: string, updates: Partial<ChatThread>): Promise<boolean> => {
+export const updateChatThread = async (threadId: string, updates: Partial<ChatThread>, userId?: string): Promise<boolean> => {
   try {
     const { error } = await supabase
       .from('chat_threads')

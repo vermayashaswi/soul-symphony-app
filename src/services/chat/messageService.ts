@@ -231,9 +231,88 @@ export const getUserThreads = async (userId: string): Promise<ChatThread[]> => {
       .order('updated_at', { ascending: false });
 
     if (error) throw error;
-    return data || [];
+    // Cast the processing_status to match our type
+    return (data || []).map(thread => ({
+      ...thread,
+      processing_status: thread.processing_status as 'idle' | 'processing' | 'failed'
+    }));
   } catch (error) {
     console.error('[MessageService] Error fetching threads:', error);
     return [];
   }
 };
+
+// Legacy function aliases for backward compatibility
+export const getUserChatThreads = getUserThreads;
+export const getChatMessages = getThreadMessages;
+
+// Additional missing functions for compatibility
+export const createThread = async (userId: string, title: string = "New Conversation"): Promise<string | null> => {
+  try {
+    const { data, error } = await supabase
+      .from('chat_threads')
+      .insert({
+        user_id: userId,
+        title,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+        processing_status: 'idle'
+      })
+      .select()
+      .single();
+
+    if (error) throw error;
+    return data.id;
+  } catch (error) {
+    console.error('Error creating thread:', error);
+    return null;
+  }
+};
+
+export const createChatMessage = async (
+  threadId: string, 
+  content: string, 
+  sender: 'user' | 'assistant' | 'error',
+  userId: string
+): Promise<ServiceChatMessage | null> => {
+  try {
+    const { data, error } = await supabase
+      .from('chat_messages')
+      .insert({
+        thread_id: threadId,
+        content,
+        sender,
+        role: sender,
+        created_at: new Date().toISOString()
+      })
+      .select()
+      .single();
+
+    if (error) throw error;
+    return data;
+  } catch (error) {
+    console.error('Error creating message:', error);
+    return null;
+  }
+};
+
+export const updateThreadTitle = async (threadId: string, title: string): Promise<boolean> => {
+  try {
+    const { error } = await supabase
+      .from('chat_threads')
+      .update({
+        title,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', threadId);
+
+    if (error) throw error;
+    return true;
+  } catch (error) {
+    console.error('Error updating thread title:', error);
+    return false;
+  }
+};
+
+// Legacy function alias
+export const saveMessage = sendMessage;
