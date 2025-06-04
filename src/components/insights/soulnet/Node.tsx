@@ -9,8 +9,8 @@ interface NodeProps {
     id: string;
     type: 'entity' | 'emotion';
     position: [number, number, number];
-    scale: number;
-    isHighlighted: boolean;
+    value: number;
+    color: string;
   };
   isSelected: boolean;
   onClick: (id: string, event: any) => void;
@@ -50,6 +50,12 @@ const Node = ({
   const meshRef = useRef<THREE.Mesh>(null);
   const nodeID = node.id;
   
+  // Calculate scale based on node properties
+  const baseScale = node.type === 'entity' ? 0.7 : 0.55;
+  const scale = isHighlighted 
+    ? baseScale * (1.2 + (isSelected ? 0.3 : 0.5))
+    : baseScale * (0.8 + node.value * 0.5);
+  
   // Determine if the label should be shown
   const shouldShowLabel = forceShowLabels || showLabel || isSelected || isHighlighted;
   
@@ -64,15 +70,20 @@ const Node = ({
     <group>
       {/* Node Mesh */}
       <NodeMesh
-        ref={meshRef}
         position={node.position}
-        scale={node.scale}
+        scale={scale}
         nodeType={node.type}
         onClick={handleClick}
         isHighlighted={isHighlighted}
         isSelected={isSelected}
         dimmed={dimmed}
         themeHex={themeHex}
+        displayColor={node.color}
+        connectionStrength={0.5}
+        onPointerDown={() => {}}
+        onPointerUp={() => {}}
+        onPointerOut={() => {}}
+        onPointerLeave={() => {}}
       />
       
       {/* Node Label using DirectNodeLabel with Google Translation integration */}
@@ -85,7 +96,7 @@ const Node = ({
         shouldShowLabel={shouldShowLabel}
         cameraZoom={cameraZoom}
         themeHex={themeHex}
-        nodeScale={node.scale}
+        nodeScale={scale}
         connectionPercentage={connectionPercentage}
         showPercentage={showPercentage}
         effectiveTheme={effectiveTheme}
