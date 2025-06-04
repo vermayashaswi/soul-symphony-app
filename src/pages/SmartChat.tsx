@@ -5,12 +5,11 @@ import { motion } from "framer-motion";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useJournalEntries } from "@/hooks/use-journal-entries";
 import { useMentalHealthInsights } from "@/hooks/use-mental-health-insights";
-import { Trash2, Plus } from "lucide-react";
-import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import MobilePreviewFrame from "@/components/MobilePreviewFrame";
 import { ChatThreadList } from "@/components/chat/ChatThreadList";
+import ChatHeader from "@/components/chat/ChatHeader";
 import { v4 as uuidv4 } from 'uuid';
 import { supabase } from "@/integrations/supabase/client";
 import { generateThreadTitle } from "@/utils/chat/threadUtils";
@@ -365,41 +364,20 @@ export default function SmartChat() {
           />
         </div>
         
-        <div className="flex-1 p-4 relative">
-          {currentThreadId && (
-            <div className="absolute top-4 right-4 z-10">
-              <TooltipProvider>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className={`${
-                        isDeletionDisabled 
-                          ? 'text-muted-foreground/50 cursor-not-allowed' 
-                          : 'text-muted-foreground hover:text-destructive hover:bg-destructive/10 dark:hover:bg-destructive/20'
-                      }`}
-                      onClick={() => !isDeletionDisabled && setShowDeleteDialog(true)}
-                      disabled={isDeletionDisabled}
-                      aria-label="Delete conversation"
-                    >
-                      <Trash2 className="h-5 w-5" />
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent>
-                    {isDeletionDisabled ? (
-                      <TranslatableText text="Cannot delete while processing" />
-                    ) : (
-                      <TranslatableText text="Delete conversation" />
-                    )}
-                  </TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
-            </div>
-          )}
-          <SmartChatInterface 
-            mentalHealthInsights={mentalHealthInsights} 
+        <div className="flex-1 flex flex-col">
+          <ChatHeader
+            onNewChat={createNewThread}
+            onDeleteChat={() => setShowDeleteDialog(true)}
+            canDelete={!!currentThreadId}
+            isDeletionDisabled={isDeletionDisabled}
           />
+          <div className="flex-1">
+            <SmartChatInterface 
+              mentalHealthInsights={mentalHealthInsights}
+              currentThreadId={currentThreadId}
+              onNewThread={createNewThread}
+            />
+          </div>
         </div>
       </motion.div>
       

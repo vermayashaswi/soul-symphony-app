@@ -1,38 +1,23 @@
 
-import React, { forwardRef } from 'react';
+import React from 'react';
 import { Button } from '@/components/ui/button';
-import { cn } from '@/lib/utils';
+import { TranslatableText } from '@/components/translation/TranslatableText';
 
-interface ChatSuggestionButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
-  children: React.ReactNode;
-  large?: boolean;
-  first?: boolean;
+interface ChatSuggestionButtonProps {
+  suggestion: string;
+  onClick: () => void;
 }
 
-// This component ensures that chat suggestion buttons have consistent classes for tutorial targeting
-const ChatSuggestionButton = forwardRef<HTMLButtonElement, ChatSuggestionButtonProps>(
-  ({ children, className, large, first, ...props }, ref) => {
-    return (
-      <Button
-        ref={ref}
-        variant="outline"
-        className={cn(
-          "w-full text-left justify-start whitespace-normal h-auto py-2 px-3 text-sm border-muted shadow-sm",
-          "hover:bg-primary/5 hover:text-primary focus-visible:ring-primary",
-          "chat-suggestion-button",
-          large && "text-base py-3 px-4",
-          first && "first-suggestion",
-          className
-        )}
-        data-tutorial-target="chat-suggestion"
-        {...props}
-      >
-        {children}
-      </Button>
-    );
-  }
-);
-
-ChatSuggestionButton.displayName = "ChatSuggestionButton";
+const ChatSuggestionButton: React.FC<ChatSuggestionButtonProps> = ({ suggestion, onClick }) => {
+  return (
+    <Button
+      variant="outline"
+      className="p-4 h-auto text-left justify-start whitespace-normal border-2 border-border/50 hover:border-primary/50 hover:bg-primary/5 transition-all duration-200 chat-suggestion-button"
+      onClick={onClick}
+    >
+      <TranslatableText text={suggestion} className="text-sm" />
+    </Button>
+  );
+};
 
 export default ChatSuggestionButton;

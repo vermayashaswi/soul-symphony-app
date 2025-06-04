@@ -1,15 +1,18 @@
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { Button } from "@/components/ui/button";
-import { Textarea } from "@/components/ui/textarea";
+import { Bot, User, Menu, Plus } from "lucide-react";
 import { Card } from "@/components/ui/card";
-import { Send, Loader2, Bot, User, Menu, Plus } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { sendMessage, getThreadMessages } from '@/services/chat/messageService';
 import { ServiceChatMessage } from '@/services/chat/types';
 import { ChatThreadList } from "@/components/chat/ChatThreadList";
 import { TranslatableText } from "@/components/translation/TranslatableText";
 import { useChatRealtime } from "@/hooks/use-chat-realtime";
+import ChatWelcomeSection from "../ChatWelcomeSection";
+import ChatHeader from "../ChatHeader";
+import ChatInputArea from "../ChatInputArea";
+import { Button } from "@/components/ui/button";
+import { Loader2 } from "lucide-react";
 import {
   Sheet,
   SheetContent,
@@ -32,11 +35,9 @@ const MobileChatInterface: React.FC<MobileChatInterfaceProps> = ({
   mentalHealthInsights
 }) => {
   const [messages, setMessages] = useState<ServiceChatMessage[]>([]);
-  const [inputMessage, setInputMessage] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
   const { toast } = useToast();
 
   // Use realtime hook for processing status
@@ -81,11 +82,9 @@ const MobileChatInterface: React.FC<MobileChatInterfaceProps> = ({
     }));
   }, [messages]);
 
-  const handleSendMessage = async () => {
-    if (!inputMessage.trim() || !userId || isLoading || isProcessing) return;
+  const handleSendMessage = async (messageText: string) => {
+    if (!userId || isLoading || isProcessing) return;
 
-    const messageText = inputMessage.trim();
-    setInputMessage('');
     setIsLoading(true);
 
     try {
@@ -128,11 +127,8 @@ const MobileChatInterface: React.FC<MobileChatInterfaceProps> = ({
     }
   };
 
-  const handleKeyPress = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault();
-      handleSendMessage();
-    }
+  const handleSuggestionClick = (suggestion: string) => {
+    handleSendMessage(suggestion);
   };
 
   const formatMessage = (content: string) => {
@@ -187,103 +183,77 @@ const MobileChatInterface: React.FC<MobileChatInterfaceProps> = ({
           <TranslatableText text="SOULo Chat" />
         </h1>
         
-        <div className="w-10" /> {/* Spacer for balance */}
+        <div className="w-10" />
       </div>
 
       {/* Messages Area */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-4">
+      <div className="flex-1 overflow-y-auto">
         {messages.length === 0 ? (
-          <div className="text-center text-muted-foreground mt-8">
-            <Bot className="h-12 w-12 mx-auto mb-4 text-primary" />
-            <h3 className="text-lg font-semibold mb-2">
-              <TranslatableText text="Start a conversation with SOULo" />
-            </h3>
-            <p className="text-sm">
-              <TranslatableText text="Ask me about your journal entries, emotions, or get mental health insights!" />
-            </p>
+          <div className="h-full px-4 pt-8">
+            <ChatWelcomeSection onSuggestionClick={handleSuggestionClick} />
           </div>
         ) : (
-          messages.map((message) => (
-            <div
-              key={message.id}
-              className={`flex ${message.sender === 'user' ? 'justify-end' : 'justify-start'}`}
-            >
-              <Card className={`max-w-[85%] p-3 ${
-                message.sender === 'user' 
-                  ? 'bg-primary text-primary-foreground' 
-                  : 'bg-muted'
-              }`}>
-                <div className="flex items-start gap-2">
-                  {message.sender === 'assistant' && (
-                    <Bot className="h-4 w-4 mt-1 flex-shrink-0" />
-                  )}
-                  {message.sender === 'user' && (
-                    <User className="h-4 w-4 mt-1 flex-shrink-0" />
-                  )}
-                  <div className="flex-1">
-                    <div className="text-sm">
-                      {formatMessage(message.content)}
-                    </div>
-                    {message.analysis_data?.pipeline === 'intelligent' && (
-                      <div className="mt-1 text-xs opacity-70">
-                        <TranslatableText text="Intelligent RAG" />
-                      </div>
+          <div className="p-4 space-y-4">
+            {messages.map((message) => (
+              <div
+                key={message.id}
+                className={`flex ${message.sender === 'user' ? 'justify-end' : 'justify-start'}`}
+              >
+                <Card className={`max-w-[85%] p-3 ${
+                  message.sender === 'user' 
+                    ? 'bg-primary text-primary-foreground' 
+                    : 'bg-muted'
+                }`}>
+                  <div className="flex items-start gap-2">
+                    {message.sender === 'assistant' && (
+                      <Bot className="h-4 w-4 mt-1 flex-shrink-0" />
                     )}
+                    {message.sender === 'user' && (
+                      <User className="h-4 w-4 mt-1 flex-shrink-0" />
+                    )}
+                    <div className="flex-1">
+                      <div className="text-sm">
+                        {formatMessage(message.content)}
+                      </div>
+                      {message.analysis_data?.pipeline === 'intelligent' && (
+                        <div className="mt-1 text-xs opacity-70">
+                          <TranslatableText text="Intelligent RAG" />
+                        </div>
+                      )}
+                    </div>
                   </div>
-                </div>
-              </Card>
-            </div>
-          ))
-        )}
-        
-        {(isLoading || isProcessing) && (
-          <div className="flex justify-start">
-            <Card className="max-w-[85%] p-3 bg-muted">
-              <div className="flex items-center gap-2">
-                <Bot className="h-4 w-4" />
-                <div className="flex items-center gap-2">
-                  <Loader2 className="h-3 w-3 animate-spin" />
-                  <span className="text-sm">
-                    <TranslatableText text="SOULo is thinking..." />
-                  </span>
-                </div>
+                </Card>
               </div>
-            </Card>
+            ))}
+            
+            {(isLoading || isProcessing) && (
+              <div className="flex justify-start">
+                <Card className="max-w-[85%] p-3 bg-muted">
+                  <div className="flex items-center gap-2">
+                    <Bot className="h-4 w-4" />
+                    <div className="flex items-center gap-2">
+                      <Loader2 className="h-3 w-3 animate-spin" />
+                      <span className="text-sm">
+                        <TranslatableText text="SOULo is thinking..." />
+                      </span>
+                    </div>
+                  </div>
+                </Card>
+              </div>
+            )}
+            
+            <div ref={messagesEndRef} />
           </div>
         )}
-        
-        <div ref={messagesEndRef} />
       </div>
 
       {/* Input Area */}
-      <div className="border-t p-4 bg-background">
-        <div className="flex gap-2">
-          <Textarea
-            ref={textareaRef}
-            value={inputMessage}
-            onChange={(e) => setInputMessage(e.target.value)}
-            onKeyPress={handleKeyPress}
-            placeholder="Ask me about your journal entries..."
-            className="min-h-[50px] resize-none text-sm"
-            disabled={isLoading || isProcessing}
-          />
-          <Button
-            onClick={handleSendMessage}
-            disabled={!inputMessage.trim() || isLoading || isProcessing}
-            size="sm"
-          >
-            {isLoading || isProcessing ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : (
-              <Send className="h-4 w-4" />
-            )}
-          </Button>
-        </div>
-        
-        <div className="mt-2 text-xs text-muted-foreground text-center">
-          <TranslatableText text="Personalized insights from your journal" />
-        </div>
-      </div>
+      <ChatInputArea
+        onSendMessage={handleSendMessage}
+        isLoading={isLoading}
+        isProcessing={isProcessing}
+        placeholder="Ask me about your journal entries..."
+      />
     </div>
   );
 };

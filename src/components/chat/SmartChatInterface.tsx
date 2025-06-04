@@ -1,8 +1,7 @@
+
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { Button } from "@/components/ui/button";
-import { Textarea } from "@/components/ui/textarea";
+import { Bot, User } from "lucide-react";
 import { Card } from "@/components/ui/card";
-import { Send, Loader2, Bot, User } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
 import { sendMessage, getThreadMessages } from '@/services/chat/messageService';
@@ -10,23 +9,30 @@ import { ServiceChatMessage } from '@/services/chat/types';
 import { TranslatableText } from "@/components/translation/TranslatableText";
 import { useChatRealtime } from "@/hooks/use-chat-realtime";
 import ReferencesDisplay from "./ReferencesDisplay";
+import ChatWelcomeSection from "./ChatWelcomeSection";
+import ChatInputArea from "./ChatInputArea";
+import { Loader2 } from "lucide-react";
 
 interface SmartChatInterfaceProps {
   mentalHealthInsights?: any;
+  currentThreadId?: string | null;
+  onNewThread?: () => Promise<string | null>;
 }
 
-export function SmartChatInterface({ mentalHealthInsights }: SmartChatInterfaceProps) {
+export function SmartChatInterface({ 
+  mentalHealthInsights, 
+  currentThreadId,
+  onNewThread 
+}: SmartChatInterfaceProps) {
   const [messages, setMessages] = useState<ServiceChatMessage[]>([]);
-  const [inputMessage, setInputMessage] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [currentThreadId, setCurrentThreadId] = useState<string | null>(null);
+  const [threadId, setThreadId] = useState<string | null>(currentThreadId || null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
   const { user } = useAuth();
   const { toast } = useToast();
 
   // Use realtime hook for processing status
-  const { isProcessing } = useChatRealtime(currentThreadId);
+  const { isProcessing } = useChatRealtime(threadId);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -37,10 +43,17 @@ export function SmartChatInterface({ mentalHealthInsights }: SmartChatInterfaceP
   }, [messages]);
 
   useEffect(() => {
+    if (currentThreadId) {
+      setThreadId(currentThreadId);
+      loadMessages(currentThreadId);
+    }
+  }, [currentThreadId]);
+
+  useEffect(() => {
     const handleThreadSelected = (event: CustomEvent) => {
-      const { threadId } = event.detail;
-      setCurrentThreadId(threadId);
-      loadMessages(threadId);
+      const { threadId: selectedThreadId } = event.detail;
+      setThreadId(selectedThreadId);
+      loadMessages(selectedThreadId);
     };
 
     window.addEventListener('threadSelected' as any, handleThreadSelected);
@@ -70,11 +83,9 @@ export function SmartChatInterface({ mentalHealthInsights }: SmartChatInterfaceP
     }));
   }, [messages]);
 
-  const handleSendMessage = async () => {
-    if (!inputMessage.trim() || !user?.id || isLoading || isProcessing) return;
+  const handleSendMessage = async (messageText: string) => {
+    if (!user?.id || isLoading || isProcessing) return;
 
-    const messageText = inputMessage.trim();
-    setInputMessage('');
     setIsLoading(true);
 
     try {
@@ -82,27 +93,30 @@ export function SmartChatInterface({ mentalHealthInsights }: SmartChatInterfaceP
       
       const result = await sendMessage(
         messageText,
-        currentThreadId,
+        threadId,
         user.id,
         conversationContext
       );
 
       if (result.success && result.message) {
         // Update current thread ID if a new thread was created
-        if (result.threadId && result.threadId !== currentThreadId) {
-          setCurrentThreadId(result.threadId);
+        if (result.threadId && result.threadId !== threadId) {
+          setThreadId(result.threadId);
+          if (onNewThread) {
+            onNewThread();
+          }
         }
 
         // Reload messages to get the latest conversation
-        if (currentThreadId || result.threadId) {
-          await loadMessages(result.threadId || currentThreadId!);
+        if (threadId || result.threadId) {
+          await loadMessages(result.threadId || threadId!);
         }
 
         // Dispatch events for thread management
         window.dispatchEvent(
           new CustomEvent('messageCreated', {
             detail: {
-              threadId: result.threadId || currentThreadId,
+              threadId: result.threadId || threadId,
               messageId: result.message.id,
               isFirstMessage: messages.length === 0
             }
@@ -128,11 +142,8 @@ export function SmartChatInterface({ mentalHealthInsights }: SmartChatInterfaceP
     }
   };
 
-  const handleKeyPress = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault();
-      handleSendMessage();
-    }
+  const handleSuggestionClick = (suggestion: string) => {
+    handleSendMessage(suggestion);
   };
 
   const formatMessage = (content: string) => {
@@ -145,113 +156,81 @@ export function SmartChatInterface({ mentalHealthInsights }: SmartChatInterfaceP
   };
 
   return (
-    <div className="flex flex-col h-[calc(100vh-200px)] max-w-4xl mx-auto">
+    <div className="flex flex-col h-full">
       {/* Messages Area */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-4">
+      <div className="flex-1 overflow-y-auto">
         {messages.length === 0 ? (
-          <div className="text-center text-muted-foreground mt-8">
-            <Bot className="h-12 w-12 mx-auto mb-4 text-primary" />
-            <h3 className="text-lg font-semibold mb-2">
-              <TranslatableText text="Start a conversation with SOULo" />
-            </h3>
-            <p>
-              <TranslatableText text="Ask me about your journal entries, emotions, or get mental health insights!" />
-            </p>
-          </div>
+          <ChatWelcomeSection onSuggestionClick={handleSuggestionClick} />
         ) : (
-          messages.map((message) => (
-            <div
-              key={message.id}
-              className={`flex ${message.sender === 'user' ? 'justify-end' : 'justify-start'}`}
-            >
-              <Card className={`max-w-[80%] p-4 ${
-                message.sender === 'user' 
-                  ? 'bg-primary text-primary-foreground' 
-                  : 'bg-muted'
-              }`}>
-                <div className="flex items-start gap-3">
-                  {message.sender === 'assistant' && (
-                    <Bot className="h-5 w-5 mt-1 flex-shrink-0" />
-                  )}
-                  {message.sender === 'user' && (
-                    <User className="h-5 w-5 mt-1 flex-shrink-0" />
-                  )}
-                  <div className="flex-1">
-                    <div className="prose prose-sm max-w-none">
-                      {formatMessage(message.content)}
-                    </div>
-                    {message.analysis_data?.pipeline === 'intelligent' && (
-                      <div className="mt-2 text-xs opacity-70">
-                        <TranslatableText text="Powered by Intelligent RAG Pipeline" />
+          <div className="p-4 space-y-4 max-w-4xl mx-auto">
+            {messages.map((message) => (
+              <div
+                key={message.id}
+                className={`flex ${message.sender === 'user' ? 'justify-end' : 'justify-start'}`}
+              >
+                <Card className={`max-w-[80%] p-4 ${
+                  message.sender === 'user' 
+                    ? 'bg-primary text-primary-foreground' 
+                    : 'bg-muted'
+                }`}>
+                  <div className="flex items-start gap-3">
+                    {message.sender === 'assistant' && (
+                      <Bot className="h-5 w-5 mt-1 flex-shrink-0" />
+                    )}
+                    {message.sender === 'user' && (
+                      <User className="h-5 w-5 mt-1 flex-shrink-0" />
+                    )}
+                    <div className="flex-1">
+                      <div className="prose prose-sm max-w-none">
+                        {formatMessage(message.content)}
                       </div>
-                    )}
-                    
-                    {/* Add References Display for assistant messages */}
-                    {message.sender === 'assistant' && message.analysis_data?.references && (
-                      <ReferencesDisplay 
-                        references={message.analysis_data.references}
-                        threadId={currentThreadId}
-                      />
-                    )}
+                      {message.analysis_data?.pipeline === 'intelligent' && (
+                        <div className="mt-2 text-xs opacity-70">
+                          <TranslatableText text="Powered by Intelligent RAG Pipeline" />
+                        </div>
+                      )}
+                      
+                      {message.sender === 'assistant' && message.analysis_data?.references && (
+                        <ReferencesDisplay 
+                          references={message.analysis_data.references}
+                          threadId={threadId}
+                        />
+                      )}
+                    </div>
                   </div>
-                </div>
-              </Card>
-            </div>
-          ))
-        )}
-        
-        {(isLoading || isProcessing) && (
-          <div className="flex justify-start">
-            <Card className="max-w-[80%] p-4 bg-muted">
-              <div className="flex items-center gap-3">
-                <Bot className="h-5 w-5" />
-                <div className="flex items-center gap-2">
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                  <span className="text-sm">
-                    <TranslatableText text="SOULo is thinking..." />
-                  </span>
-                </div>
+                </Card>
               </div>
-            </Card>
+            ))}
+            
+            {(isLoading || isProcessing) && (
+              <div className="flex justify-start">
+                <Card className="max-w-[80%] p-4 bg-muted">
+                  <div className="flex items-center gap-3">
+                    <Bot className="h-5 w-5" />
+                    <div className="flex items-center gap-2">
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      <span className="text-sm">
+                        <TranslatableText text="SOULo is thinking..." />
+                      </span>
+                    </div>
+                  </div>
+                </Card>
+              </div>
+            )}
+            
+            <div ref={messagesEndRef} />
           </div>
         )}
-        
-        <div ref={messagesEndRef} />
       </div>
 
       {/* Input Area */}
-      <div className="border-t p-4 bg-background">
-        <div className="flex gap-2">
-          <Textarea
-            ref={textareaRef}
-            value={inputMessage}
-            onChange={(e) => setInputMessage(e.target.value)}
-            onKeyPress={handleKeyPress}
-            placeholder="Ask me about your journal entries or mental health..."
-            className="min-h-[60px] resize-none"
-            disabled={isLoading || isProcessing}
-          />
-          <Button
-            onClick={handleSendMessage}
-            disabled={!inputMessage.trim() || isLoading || isProcessing}
-            size="lg"
-            className="px-6"
-          >
-            {isLoading || isProcessing ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : (
-              <Send className="h-4 w-4" />
-            )}
-          </Button>
-        </div>
-        
-        <div className="mt-2 text-xs text-muted-foreground text-center">
-          <TranslatableText text="SOULo uses your journal entries to provide personalized insights" />
-        </div>
-      </div>
+      <ChatInputArea
+        onSendMessage={handleSendMessage}
+        isLoading={isLoading}
+        isProcessing={isProcessing}
+      />
     </div>
   );
 }
 
-// Add default export
 export default SmartChatInterface;
