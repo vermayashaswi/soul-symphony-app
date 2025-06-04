@@ -5,9 +5,11 @@ import { supabase } from '@/integrations/supabase/client';
 import { JournalEntry } from '@/types/journal';
 import JournalEntriesList from '@/components/journal/JournalEntriesList';
 import JournalHeader from '@/components/journal/JournalHeader';
+import JournalSearchAndFilters from '@/components/journal/JournalSearchAndFilters';
 import { DateRange } from 'react-day-picker';
 import { subDays } from 'date-fns';
 import { useTranslation } from '@/contexts/TranslationContext';
+import { useAuth } from '@/contexts/AuthContext';
 
 const Journal: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState('');
@@ -15,26 +17,34 @@ const Journal: React.FC = () => {
     from: subDays(new Date(), 30),
     to: new Date(),
   });
+  const [refreshKey, setRefreshKey] = useState(0);
   
   const { currentLanguage } = useTranslation();
+  const { user } = useAuth();
   
   const {
     entries,
     loading,
-    error,
-    refetch,
-    processingEntries,
-    processedEntryIds,
-    isSavingRecording
-  } = useJournalEntries(dateRange, searchQuery);
+    fetchEntries,
+    error
+  } = useJournalEntries(user?.id, refreshKey, true);
 
   // Local state for immediate UI updates
   const [localEntries, setLocalEntries] = useState<JournalEntry[]>([]);
+  const [processingEntries, setProcessingEntries] = useState<string[]>([]);
+  const [processedEntryIds, setProcessedEntryIds] = useState<number[]>([]);
+  const [isSavingRecording, setIsSavingRecording] = useState(false);
 
   // Update local entries when entries change
   useEffect(() => {
     setLocalEntries(entries);
   }, [entries]);
+
+  // Handle refetch functionality
+  const refetch = useCallback(() => {
+    setRefreshKey(prev => prev + 1);
+    fetchEntries();
+  }, [fetchEntries]);
 
   // Handle entry updates for immediate UI feedback
   const handleUpdateEntry = useCallback((entryId: number, newContent: string, isProcessing?: boolean) => {
@@ -86,6 +96,8 @@ const Journal: React.FC = () => {
 
   const handleStartRecording = () => {
     console.log('[Journal] Starting voice recording');
+    setIsSavingRecording(true);
+    // Add any additional recording logic here
   };
 
   // Filter entries based on search query and date range
@@ -125,15 +137,9 @@ const Journal: React.FC = () => {
     return (
       <div className="min-h-screen bg-background p-4">
         <div className="max-w-4xl mx-auto">
-          <JournalHeader 
-            searchQuery={searchQuery}
-            onSearchChange={setSearchQuery}
-            dateRange={dateRange}
-            onDateRangeChange={setDateRange}
-            onStartRecording={handleStartRecording}
-          />
+          <JournalHeader />
           <div className="mt-8 text-center">
-            <p className="text-red-500">Error loading journal entries: {error.message}</p>
+            <p className="text-red-500">Error loading journal entries: {error}</p>
             <button 
               onClick={() => refetch()} 
               className="mt-4 px-4 py-2 bg-primary text-primary-foreground rounded-md"
@@ -149,12 +155,13 @@ const Journal: React.FC = () => {
   return (
     <div className="min-h-screen bg-background">
       <div className="max-w-4xl mx-auto p-4">
-        <JournalHeader 
+        <JournalHeader />
+        
+        <JournalSearchAndFilters
           searchQuery={searchQuery}
           onSearchChange={setSearchQuery}
           dateRange={dateRange}
           onDateRangeChange={setDateRange}
-          onStartRecording={handleStartRecording}
         />
         
         <div className="mt-6">
