@@ -11,6 +11,8 @@ import { useTranslation } from '@/contexts/TranslationContext';
 import { showTranslatedToast } from '@/services/notificationService';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { TranslatableText } from '@/components/translation/TranslatableText';
+import { EnhancedTranslatableText } from '@/components/translation/EnhancedTranslatableText';
+import { cn } from '@/lib/utils';
 
 interface EditEntryButtonProps {
   entryId: number;
@@ -222,76 +224,136 @@ export function EditEntryButton({ entryId, content, onEntryUpdated }: EditEntryB
       </Button>
       
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogContent className="w-[90%] max-w-lg mx-auto">
-          <DialogHeader>
-            <DialogTitle>
-              <TranslatableText 
+        <DialogContent className={cn(
+          // Mobile-first responsive width constraints
+          "w-[95vw] max-w-[95vw] sm:max-w-sm md:max-w-lg mx-auto",
+          // Better mobile positioning and spacing
+          "max-h-[90vh] overflow-y-auto p-4 sm:p-6",
+          // Ensure proper text wrapping
+          "break-words"
+        )}>
+          <DialogHeader className="space-y-2">
+            <DialogTitle className={cn(
+              // Responsive text sizing with language awareness
+              "text-base sm:text-lg font-semibold leading-tight",
+              // Ensure proper text wrapping
+              "whitespace-normal break-words hyphens-auto",
+              // Language-aware responsive sizing
+              currentLanguage !== 'en' && "text-sm sm:text-base"
+            )}>
+              <EnhancedTranslatableText 
                 text="Edit Journal Entry" 
                 forceTranslate={true}
+                enableFontScaling={true}
+                scalingContext="compact"
               />
             </DialogTitle>
           </DialogHeader>
           
           {isLoadingTranslation ? (
-            <div className="flex items-center justify-center min-h-[200px]">
-              <Loader2 className="h-6 w-6 animate-spin" />
-              <span className="ml-2">
-                <TranslatableText 
-                  text="Loading translation..." 
-                  forceTranslate={true}
-                />
-              </span>
+            <div className="flex items-center justify-center min-h-[200px] py-8">
+              <div className="flex flex-col items-center space-y-3">
+                <Loader2 className="h-6 w-6 animate-spin" />
+                <span className={cn(
+                  "text-sm text-center",
+                  currentLanguage !== 'en' && "text-xs"
+                )}>
+                  <EnhancedTranslatableText 
+                    text="Loading translation..." 
+                    forceTranslate={true}
+                    enableFontScaling={true}
+                    scalingContext="compact"
+                  />
+                </span>
+              </div>
             </div>
           ) : (
             <Textarea
               value={editedContent}
               onChange={(e) => setEditedContent(e.target.value)}
-              className="min-h-[200px] mt-2"
+              className={cn(
+                "min-h-[180px] sm:min-h-[200px] mt-2 resize-none",
+                // Language-aware text sizing
+                currentLanguage !== 'en' && "text-sm leading-relaxed"
+              )}
               placeholder={currentLanguage === 'en' ? "Edit your journal entry..." : undefined}
               disabled={isSubmitting}
             />
           )}
           
-          <DialogFooter className="flex flex-row justify-end space-x-2 mt-4">
+          <DialogFooter className={cn(
+            // Responsive layout: stack on mobile, row on larger screens
+            "flex flex-col space-y-2 sm:flex-row sm:space-y-0 sm:space-x-2 sm:justify-end mt-4",
+            // Ensure buttons don't overflow
+            "w-full"
+          )}>
             <Button 
               variant="outline" 
               onClick={handleCloseDialog}
               disabled={isSubmitting}
-              className="rounded-full"
+              className={cn(
+                "rounded-full w-full sm:w-auto",
+                // Mobile-optimized button sizing
+                "h-10 px-4 text-sm",
+                // Language-aware text sizing
+                currentLanguage !== 'en' && "text-xs sm:text-sm px-3"
+              )}
             >
-              <TranslatableText 
-                text="Cancel" 
-                forceTranslate={true}
-              />
+              <span className="truncate">
+                <EnhancedTranslatableText 
+                  text="Cancel" 
+                  forceTranslate={true}
+                  enableFontScaling={true}
+                  scalingContext="compact"
+                />
+              </span>
             </Button>
             {isSubmitting ? (
               <Button 
                 disabled
-                className="rounded-full"
-              >
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                {updatedInBackground ? (
-                  <TranslatableText 
-                    text="Processing..." 
-                    forceTranslate={true}
-                  />
-                ) : (
-                  <TranslatableText 
-                    text="Saving..." 
-                    forceTranslate={true}
-                  />
+                className={cn(
+                  "rounded-full w-full sm:w-auto",
+                  "h-10 px-4 text-sm",
+                  currentLanguage !== 'en' && "text-xs sm:text-sm px-3"
                 )}
+              >
+                <Loader2 className="mr-2 h-4 w-4 animate-spin flex-shrink-0" />
+                <span className="truncate">
+                  {updatedInBackground ? (
+                    <EnhancedTranslatableText 
+                      text="Processing..." 
+                      forceTranslate={true}
+                      enableFontScaling={true}
+                      scalingContext="compact"
+                    />
+                  ) : (
+                    <EnhancedTranslatableText 
+                      text="Saving..." 
+                      forceTranslate={true}
+                      enableFontScaling={true}
+                      scalingContext="compact"
+                    />
+                  )}
+                </span>
               </Button>
             ) : (
               <Button 
                 onClick={handleSaveChanges}
                 disabled={!editedContent.trim() || !hasContentChanged || isLoadingTranslation}
-                className="rounded-full"
+                className={cn(
+                  "rounded-full w-full sm:w-auto",
+                  "h-10 px-4 text-sm",
+                  currentLanguage !== 'en' && "text-xs sm:text-sm px-3"
+                )}
               >
-                <TranslatableText 
-                  text="Save Changes" 
-                  forceTranslate={true}
-                />
+                <span className="truncate">
+                  <EnhancedTranslatableText 
+                    text="Save Changes" 
+                    forceTranslate={true}
+                    enableFontScaling={true}
+                    scalingContext="compact"
+                  />
+                </span>
               </Button>
             )}
           </DialogFooter>

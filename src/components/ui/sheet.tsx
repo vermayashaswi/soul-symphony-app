@@ -60,7 +60,13 @@ const SheetContent = React.forwardRef<
     <SheetOverlay />
     <SheetPrimitive.Content
       ref={ref}
-      className={cn(sheetVariants({ side }), "max-h-screen overflow-y-auto", className)}
+      className={cn(
+        sheetVariants({ side }), 
+        "max-h-screen overflow-y-auto",
+        // Ensure proper word wrapping for sheet content
+        "break-words overflow-wrap-anywhere",
+        className
+      )}
       {...props}
     >
       {children}
@@ -80,6 +86,8 @@ const SheetHeader = ({
   <div
     className={cn(
       "flex flex-col space-y-2 text-center sm:text-left",
+      // Ensure proper text wrapping in headers
+      "break-words overflow-wrap-anywhere",
       className
     )}
     {...props}
@@ -93,7 +101,10 @@ const SheetFooter = ({
 }: React.HTMLAttributes<HTMLDivElement>) => (
   <div
     className={cn(
-      "flex flex-row sm:flex-row sm:justify-end sm:space-x-2 space-x-2",
+      // More responsive footer layout
+      "flex flex-col space-y-2 sm:flex-row sm:space-y-0 sm:justify-end sm:space-x-2",
+      // Ensure buttons don't overflow
+      "w-full overflow-hidden",
       className
     )}
     {...props}
@@ -107,7 +118,12 @@ const SheetTitle = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <SheetPrimitive.Title
     ref={ref}
-    className={cn("text-lg font-semibold text-foreground", className)}
+    className={cn(
+      "text-lg font-semibold text-foreground",
+      // Better text wrapping for long titles
+      "break-words overflow-wrap-anywhere hyphens-auto",
+      className
+    )}
     {...props}
   />
 ))
@@ -119,7 +135,12 @@ const SheetDescription = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <SheetPrimitive.Description
     ref={ref}
-    className={cn("text-sm text-muted-foreground", className)}
+    className={cn(
+      "text-sm text-muted-foreground",
+      // Better text wrapping for descriptions
+      "break-words overflow-wrap-anywhere",
+      className
+    )}
     {...props}
   />
 ))

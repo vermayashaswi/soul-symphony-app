@@ -40,6 +40,10 @@ const DialogContent = React.forwardRef<
         "fixed z-50 grid w-full max-w-lg gap-4 border bg-background p-6 shadow-lg duration-200 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[state=closed]:slide-out-to-left-1/2 data-[state=closed]:slide-out-to-top-[48%] data-[state=open]:slide-in-from-left-1/2 data-[state=open]:slide-in-from-top-[48%] sm:rounded-lg md:w-full",
         "max-h-[85vh] overflow-y-auto rounded-lg",
         "left-[50%] top-[50%] translate-x-[-50%] translate-y-[-50%]",
+        // Better mobile constraints to prevent overflow
+        "mx-2 sm:mx-auto",
+        // Ensure proper word wrapping for all content
+        "break-words overflow-wrap-anywhere",
         className
       )}
       {...props}
@@ -49,7 +53,7 @@ const DialogContent = React.forwardRef<
         <X className="h-4 w-4" />
         <span className="sr-only">Close</span>
       </DialogPrimitive.Close>
-    </DialogPrimitive.Content>
+    </DialogContent>
   </DialogPortal>
 ))
 DialogContent.displayName = DialogPrimitive.Content.displayName
@@ -61,6 +65,8 @@ const DialogHeader = ({
   <div
     className={cn(
       "flex flex-col space-y-1.5 text-center sm:text-left",
+      // Ensure proper text wrapping in headers
+      "break-words overflow-wrap-anywhere",
       className
     )}
     {...props}
@@ -74,7 +80,10 @@ const DialogFooter = ({
 }: React.HTMLAttributes<HTMLDivElement>) => (
   <div
     className={cn(
-      "flex flex-row sm:flex-row justify-end sm:space-x-2 space-x-2",
+      // More responsive footer layout
+      "flex flex-col space-y-2 sm:flex-row sm:space-y-0 sm:justify-end sm:space-x-2",
+      // Ensure buttons don't overflow
+      "w-full overflow-hidden",
       className
     )}
     {...props}
@@ -90,6 +99,8 @@ const DialogTitle = React.forwardRef<
     ref={ref}
     className={cn(
       "text-lg font-semibold leading-none tracking-tight",
+      // Better text wrapping for long titles
+      "break-words overflow-wrap-anywhere hyphens-auto",
       className
     )}
     {...props}
@@ -103,7 +114,12 @@ const DialogDescription = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <DialogPrimitive.Description
     ref={ref}
-    className={cn("text-sm text-muted-foreground", className)}
+    className={cn(
+      "text-sm text-muted-foreground",
+      // Better text wrapping for descriptions
+      "break-words overflow-wrap-anywhere",
+      className
+    )}
     {...props}
   />
 ))
