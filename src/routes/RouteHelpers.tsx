@@ -1,11 +1,30 @@
-
 import React, { useEffect } from 'react';
 import { Navigate, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 
-// Instead of checking subdomain, now we check path prefix
+// Enhanced native app detection - checks for both webtonative and Capacitor environments
 export const isNativeApp = (): boolean => {
-  return /native/i.test(window.navigator.userAgent);
+  // Check for webtonative user agent
+  if (/native/i.test(window.navigator.userAgent)) {
+    return true;
+  }
+  
+  // Check for Capacitor environment
+  if (window.Capacitor) {
+    return true;
+  }
+  
+  // Check for mobile app context indicators
+  if (window.location.search.includes('nativeapp=true')) {
+    return true;
+  }
+  
+  // Additional check for standalone mode (PWA installed as app)
+  if (window.matchMedia('(display-mode: standalone)').matches) {
+    return true;
+  }
+  
+  return false;
 };
 
 // Update the path-based check to be more strict about app routes
@@ -23,14 +42,15 @@ export const isWebsiteRoute = (pathname: string): boolean => {
     return false;
   }
   
-  // For root URL (/), consider it as a website route
+  // For root URL (/), consider it as a website route ONLY if not in native app
   if (pathname === '/') {
-    console.log(`${pathname} is root, treating as website route`);
-    return true;
+    const isWebsite = !isNativeApp();
+    console.log(`${pathname} is root, treating as website route: ${isWebsite} (native: ${isNativeApp()})`);
+    return isWebsite;
   }
   
   // Explicitly define website routes
-  const websitePrefixes = ['/', '/about', '/pricing', '/terms', '/privacy', '/blog', '/contact', '/faq', '/download'];
+  const websitePrefixes = ['/about', '/pricing', '/terms', '/privacy', '/blog', '/contact', '/faq', '/download'];
   
   // Check for specific website routes
   const isWebsite = websitePrefixes.some(prefix => 

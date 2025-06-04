@@ -20,17 +20,21 @@ import BlogPostPage from '@/pages/website/BlogPostPage';
 import OnboardingScreen from '@/components/onboarding/OnboardingScreen';
 import { useAuth } from '@/contexts/AuthContext';
 import { useOnboarding } from '@/hooks/use-onboarding';
+import { isNativeApp } from '@/routes/RouteHelpers';
 
 const AppRoutes = () => {
   console.log('Rendering AppRoutes component');
   const { user } = useAuth();
   const { onboardingComplete } = useOnboarding();
   
-  // This will be used for conditional rendering of the /app route
+  // Enhanced app root redirect with native app detection
   const AppRootRedirect = () => {
+    const isNative = isNativeApp();
+    
     console.log('AppRootRedirect - Auth status:', { 
       user: !!user, 
-      onboardingComplete 
+      onboardingComplete,
+      isNative
     });
     
     if (user) {
@@ -44,9 +48,16 @@ const AppRoutes = () => {
         return <Navigate to="/app/onboarding" replace />;
       }
     } else {
-      // If user is not logged in, go to onboarding
-      console.log('User not logged in, redirecting to /app/onboarding');
-      return <Navigate to="/app/onboarding" replace />;
+      // If user is not logged in, behavior depends on whether it's native or web
+      if (isNative) {
+        // For native apps, always go to onboarding when not authenticated
+        console.log('Native app - User not logged in, redirecting to /app/onboarding');
+        return <Navigate to="/app/onboarding" replace />;
+      } else {
+        // For web, go to onboarding (maintaining existing behavior)
+        console.log('Web app - User not logged in, redirecting to /app/onboarding');
+        return <Navigate to="/app/onboarding" replace />;
+      }
     }
   };
   
@@ -54,7 +65,7 @@ const AppRoutes = () => {
     <Routes>
       {/* Wrap all routes that need ViewportManager in a parent Route */}
       <Route element={<ViewportManager />}>
-        {/* Website Routes - Now properly wrapped in translation context */}
+        {/* Website Routes - Only accessible in web browsers, not native apps */}
         <Route path="/" element={<Index />} />
         <Route path="/privacy-policy" element={<PrivacyPolicyPage />} />
         <Route path="/faq" element={<FAQPage />} />
