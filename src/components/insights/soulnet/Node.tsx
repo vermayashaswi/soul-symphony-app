@@ -67,10 +67,9 @@ const Node = ({
   };
 
   return (
-    <group>
+    <group position={node.position}>
       {/* Node Mesh */}
       <NodeMesh
-        position={node.position}
         scale={scale}
         nodeType={node.type}
         onClick={handleClick}
@@ -90,7 +89,7 @@ const Node = ({
       <DirectNodeLabel
         id={nodeID}
         type={node.type}
-        position={node.position}
+        position={[0, 0, 0]}
         isHighlighted={isHighlighted}
         isSelected={isSelected}
         shouldShowLabel={shouldShowLabel}
