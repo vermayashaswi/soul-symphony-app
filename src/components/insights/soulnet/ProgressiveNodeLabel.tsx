@@ -1,6 +1,6 @@
 
-import React, { useState, useEffect, useMemo } from 'react';
-import ReliableText from './ReliableText';
+import React, { useMemo } from 'react';
+import TranslatableText3D from './TranslatableText3D';
 import { useTranslation } from '@/contexts/TranslationContext';
 import { universalFontService } from '@/services/universalFontService';
 
@@ -29,7 +29,7 @@ export const ProgressiveNodeLabel: React.FC<ProgressiveNodeLabelProps> = ({
 }) => {
   const { currentLanguage } = useTranslation();
 
-  console.log(`[ProgressiveNodeLabel] Rendering for ${id} (${currentLanguage}), visible: ${shouldShowLabel}`);
+  console.log(`[ProgressiveNodeLabel] GOOGLE TRANSLATE MODE: Rendering for ${id} (${currentLanguage}), visible: ${shouldShowLabel}`);
 
   // Calculate position offset
   const labelOffset = useMemo(() => {
@@ -73,10 +73,10 @@ export const ProgressiveNodeLabel: React.FC<ProgressiveNodeLabelProps> = ({
     return null;
   }
 
-  console.log(`[ProgressiveNodeLabel] Final render: "${id}" (${currentLanguage}) at position`, labelPosition, `script: ${universalFontService.detectScript(id)}`);
+  console.log(`[ProgressiveNodeLabel] GOOGLE TRANSLATE: "${id}" (${currentLanguage}) at position`, labelPosition);
 
   return (
-    <ReliableText
+    <TranslatableText3D
       text={id}
       position={labelPosition}
       color={textColor}
@@ -87,6 +87,7 @@ export const ProgressiveNodeLabel: React.FC<ProgressiveNodeLabelProps> = ({
       outlineWidth={outlineConfig.width}
       outlineColor={outlineConfig.color}
       maxWidth={25}
+      sourceLanguage="en"
     />
   );
 };

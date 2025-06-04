@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { universalFontService } from '@/services/universalFontService';
 import CanvasTextRenderer from './CanvasTextRenderer';
-import ReliableText from './ReliableText';
+import TranslatableText3D from './TranslatableText3D';
 import { wrapTextIntelligently, calculateOptimalMaxWidth } from '@/utils/textWrappingUtils';
 import { useTranslation } from '@/contexts/TranslationContext';
 
@@ -74,7 +74,7 @@ export const SmartTextRenderer: React.FC<SmartTextRendererProps> = ({
           setUseCanvasRenderer(true);
           setFontLoaded(true);
         } else {
-          console.log(`[SmartTextRenderer] Using ReliableText renderer for: "${finalText}" (${currentLanguage}, multiline: ${isMultiLine}, size: ${size})`);
+          console.log(`[SmartTextRenderer] Using TranslatableText3D renderer for: "${finalText}" (${currentLanguage}, multiline: ${isMultiLine}, size: ${size})`);
           try {
             await universalFontService.loadFont(finalText, currentLanguage);
             setUseCanvasRenderer(false);
@@ -99,7 +99,7 @@ export const SmartTextRenderer: React.FC<SmartTextRendererProps> = ({
     return null;
   }
 
-  console.log(`[SmartTextRenderer] Using ${useCanvasRenderer ? 'Canvas' : 'ReliableText'} renderer for text: "${processedText}" (${currentLanguage}) with size: ${size}, color: ${color}`);
+  console.log(`[SmartTextRenderer] Using ${useCanvasRenderer ? 'Canvas' : 'TranslatableText3D'} renderer for text: "${processedText}" (${currentLanguage}) with size: ${size}, color: ${color}`);
 
   if (useCanvasRenderer) {
     return (
@@ -118,7 +118,7 @@ export const SmartTextRenderer: React.FC<SmartTextRendererProps> = ({
   }
 
   return (
-    <ReliableText
+    <TranslatableText3D
       text={processedText}
       position={position}
       color={color}
@@ -130,6 +130,7 @@ export const SmartTextRenderer: React.FC<SmartTextRendererProps> = ({
       outlineColor={outlineColor}
       maxWidth={optimalMaxWidth}
       enableWrapping={enableWrapping}
+      sourceLanguage="en"
     />
   );
 };
