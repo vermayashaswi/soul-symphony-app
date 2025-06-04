@@ -235,7 +235,7 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({ mentalHealthIns
     setChatHistory(prev => [...prev, tempUserMessage]);
     
     // Set local loading state for immediate UI feedback
-    setLocalLoading(true, "Analyzing your question...");
+    setLocalLoading(true, "Planning intelligent analysis...");
     
     try {
       // Update thread processing status to 'processing'
@@ -257,9 +257,6 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({ mentalHealthIns
               role: savedUserMessage!.role as 'user' | 'assistant' | 'error'
             } : msg
           ));
-        } else {
-          debugLog.addEvent("Database", "Failed to save user message - null response", "error");
-          throw new Error("Failed to save message");
         }
       } catch (saveError: any) {
         debugLog.addEvent("Database", `Error saving user message: ${saveError.message || "Unknown error"}`, "error");
@@ -271,114 +268,88 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({ mentalHealthIns
       }
       
       // Create a processing message placeholder
-      const processingMessageId = await createProcessingMessage(threadId, "Processing your request...");
+      const processingMessageId = await createProcessingMessage(threadId, "Planning intelligent analysis...");
       
       if (processingMessageId) {
         debugLog.addEvent("Database", `Created processing message with ID: ${processingMessageId}`, "success");
       }
       
-      // Use GPT-based query classification with conversation context
-      debugLog.addEvent("Query Classification", `Classifying query: "${message.substring(0, 30)}${message.length > 30 ? '...' : ''}"`, "info");
-      updateProcessingStage("Analyzing your question...");
+      // STEP 1: Use GPT-based intelligent query planning
+      debugLog.addEvent("GPT Intelligence", `Starting intelligent query planning for: "${message.substring(0, 30)}${message.length > 30 ? '...' : ''}"`, "info");
+      updateProcessingStage("Creating intelligent query plan...");
       
-      // Get conversation context for better classification
+      // Get conversation context for better planning
       const conversationContext = chatHistory.slice(-5).map(msg => ({
         role: msg.role,
         content: msg.content
       }));
       
-      const queryClassification = await classifyMessage(message, conversationContext);
-      
-      debugLog.addEvent("Query Classification", `Classification result: ${JSON.stringify({
-        category: queryClassification.category,
-        confidence: queryClassification.confidence,
-        shouldUseJournal: queryClassification.shouldUseJournal,
-        useAllEntries: queryClassification.useAllEntries,
-        reasoning: queryClassification.reasoning
-      })}`, "success");
-      
-      updateProcessingStage("Generating response...");
-      
-      let response;
-      
-      // Route to appropriate edge function based on classification
-      if (queryClassification.category === QueryCategory.JOURNAL_SPECIFIC) {
-        debugLog.addEvent("Routing", "Using chat-with-rag for journal-specific query", "info");
-        
-        // Call chat-with-rag edge function
-        const { data, error } = await supabase.functions.invoke('chat-with-rag', {
-          body: {
-            message,
-            userId: user.id,
-            threadId,
-            conversationContext,
-            useAllEntries: queryClassification.useAllEntries || false,
-            hasPersonalPronouns: message.toLowerCase().includes('i ') || message.toLowerCase().includes('my '),
-            hasExplicitTimeReference: /\b(last week|yesterday|this week|last month|today|recently|lately)\b/i.test(message),
-            threadMetadata: {}
-          }
-        });
-        
-        if (error) {
-          throw new Error(`Journal analysis error: ${error.message}`);
+      const { data: planningData, error: planningError } = await supabase.functions.invoke('intelligent-query-planner', {
+        body: {
+          message,
+          userId: user.id,
+          conversationContext,
+          userMetadata: mentalHealthInsights
         }
-        
-        response = {
-          content: data.response,
-          references: data.references || [],
-          analysis: data.analysis || {},
-          hasNumericResult: false,
-          role: 'assistant' as const
-        };
-        
-      } else if (queryClassification.category === QueryCategory.GENERAL_MENTAL_HEALTH) {
-        debugLog.addEvent("Routing", "Using general-mental-health-chat for mental health query", "info");
-        
-        // Call general-mental-health-chat edge function
-        const { data, error } = await supabase.functions.invoke('general-mental-health-chat', {
-          body: {
-            message,
-            conversationContext,
-            userInsights: mentalHealthInsights
-          }
-        });
-        
-        if (error) {
-          throw new Error(`Mental health chat error: ${error.message}`);
-        }
-        
-        response = {
-          content: data.response,
-          references: [],
-          analysis: {},
-          hasNumericResult: false,
-          role: 'assistant' as const
-        };
-        
-      } else {
-        // CONVERSATIONAL - use smart-chat for general conversation
-        debugLog.addEvent("Routing", "Using smart-chat for conversational query", "info");
-        
-        const { data, error } = await supabase.functions.invoke('smart-chat', {
-          body: {
-            message,
-            conversationContext
-          }
-        });
-        
-        if (error) {
-          throw new Error(`Smart chat error: ${error.message}`);
-        }
-        
-        response = {
-          content: data.response,
-          references: [],
-          analysis: {},
-          hasNumericResult: false,
-          role: 'assistant' as const
-        };
+      });
+
+      if (planningError) {
+        throw new Error(`Query planning error: ${planningError.message}`);
       }
-      
+
+      const queryPlan = planningData.queryPlan;
+      debugLog.addEvent("GPT Intelligence", `Query plan generated: ${JSON.stringify({
+        type: queryPlan.queryType,
+        strategy: queryPlan.strategy,
+        confidence: queryPlan.confidence
+      })}`, "success");
+
+      // STEP 2: Execute GPT-orchestrated search
+      updateProcessingStage("Executing intelligent search...");
+      debugLog.addEvent("GPT Intelligence", "Starting GPT-orchestrated search execution", "info");
+
+      const { data: searchData, error: searchError } = await supabase.functions.invoke('gpt-search-orchestrator', {
+        body: {
+          queryPlan,
+          originalQuery: message,
+          userId: user.id
+        }
+      });
+
+      if (searchError) {
+        throw new Error(`Search orchestration error: ${searchError.message}`);
+      }
+
+      debugLog.addEvent("GPT Intelligence", `Search completed: ${searchData.totalResults} results, strategy: ${searchData.strategy}`, "success");
+
+      // STEP 3: Synthesize GPT response
+      updateProcessingStage("Synthesizing intelligent response...");
+      debugLog.addEvent("GPT Intelligence", "Starting GPT response synthesis", "info");
+
+      const { data: responseData, error: responseError } = await supabase.functions.invoke('gpt-response-synthesizer', {
+        body: {
+          originalQuery: message,
+          searchResults: searchData.results,
+          aggregations: searchData.aggregations,
+          queryPlan,
+          conversationContext
+        }
+      });
+
+      if (responseError) {
+        throw new Error(`Response synthesis error: ${responseError.message}`);
+      }
+
+      const response = {
+        content: responseData.response,
+        references: responseData.references || [],
+        analysis: responseData.queryInsights || {},
+        hasNumericResult: false,
+        role: 'assistant' as const
+      };
+
+      debugLog.addEvent("GPT Intelligence", `Response synthesized successfully (${responseData.totalResultsUsed} results used)`, "success");
+
       // Update or delete the processing message
       if (processingMessageId) {
         await updateProcessingMessage(
@@ -393,119 +364,64 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({ mentalHealthIns
       // Update thread processing status to 'idle'
       await updateThreadProcessingStatus(threadId, 'idle');
       
-      // Handle interactive clarification messages
-      if (response.isInteractive && response.interactiveOptions) {
-        debugLog.addEvent("AI Processing", "Received interactive clarification message", "info");
-        try {
-          const savedResponse = await saveMessage(
-            threadId,
-            response.content,
-            'assistant',
-            user.id,
-            undefined,
-            false,
-            true,
-            response.interactiveOptions
-          );
-          
-          if (savedResponse) {
-            debugLog.addEvent("Database", `Interactive message saved with ID: ${savedResponse.id}`, "success");
-            const typedSavedResponse: ChatMessage = {
-              ...savedResponse,
-              sender: savedResponse.sender as 'user' | 'assistant' | 'error',
-              role: savedResponse.role as 'user' | 'assistant' | 'error',
-              isInteractive: true,
-              interactiveOptions: response.interactiveOptions
-            };
-            setChatHistory(prev => [...prev, typedSavedResponse]);
-          } else {
-            throw new Error("Failed to save interactive message");
-          }
-        } catch (saveError: any) {
-          debugLog.addEvent("Database", `Error saving interactive message: ${saveError.message}`, "error");
-          
-          const interactiveMessage: ChatMessage = {
-            id: `temp-interactive-${Date.now()}`,
-            thread_id: threadId,
-            content: response.content,
-            sender: 'assistant',
-            role: 'assistant',
-            created_at: new Date().toISOString(),
-            isInteractive: true,
-            interactiveOptions: response.interactiveOptions
+      // Save the assistant response
+      try {
+        debugLog.addEvent("Database", "Saving GPT-synthesized response to database", "info");
+        const savedResponse = await saveMessage(
+          threadId,
+          response.content,
+          'assistant',
+          user.id,
+          response.references,
+          response.hasNumericResult
+        );
+        
+        debugLog.addEvent("Database", `GPT response saved with ID: ${savedResponse?.id}`, "success");
+        
+        if (savedResponse) {
+          debugLog.addEvent("UI Update", "Adding GPT response to chat history", "info");
+          const typedSavedResponse: ChatMessage = {
+            ...savedResponse,
+            sender: savedResponse.sender as 'user' | 'assistant' | 'error',
+            role: savedResponse.role as 'user' | 'assistant' | 'error'
           };
-          
-          setChatHistory(prev => [...prev, interactiveMessage]);
+          setChatHistory(prev => [...prev, typedSavedResponse]);
+        } else {
+          throw new Error("Failed to save GPT response");
         }
-      } else {
-        const responseInfo = {
-          role: response.role,
-          hasReferences: !!response.references?.length,
-          refCount: response.references?.length || 0,
-          hasAnalysis: !!response.analysis,
-          hasNumericResult: response.hasNumericResult,
-          errorState: response.role === 'error'
+      } catch (saveError: any) {
+        debugLog.addEvent("Database", `Error saving GPT response: ${saveError.message || "Unknown error"}`, "error");
+        const assistantMessage: ChatMessage = {
+          id: `temp-response-${Date.now()}`,
+          thread_id: threadId,
+          content: response.content,
+          sender: 'assistant',
+          role: 'assistant',
+          created_at: new Date().toISOString(),
+          reference_entries: response.references,
+          analysis_data: response.analysis,
+          has_numeric_result: response.hasNumericResult
         };
         
-        debugLog.addEvent("AI Processing", `Response received: ${JSON.stringify(responseInfo)}`, "success");
+        debugLog.addEvent("UI Update", "Adding fallback GPT response to chat history", "warning");
+        setChatHistory(prev => [...prev, assistantMessage]);
         
-        try {
-          debugLog.addEvent("Database", "Saving assistant response to database", "info");
-          const savedResponse = await saveMessage(
-            threadId,
-            response.content,
-            'assistant',
-            user.id,
-            response.references,
-            response.hasNumericResult
-          );
-          
-          debugLog.addEvent("Database", `Assistant response saved with ID: ${savedResponse?.id}`, "success");
-          
-          if (savedResponse) {
-            debugLog.addEvent("UI Update", "Adding assistant response to chat history", "info");
-            const typedSavedResponse: ChatMessage = {
-              ...savedResponse,
-              sender: savedResponse.sender as 'user' | 'assistant' | 'error',
-              role: savedResponse.role as 'user' | 'assistant' | 'error'
-            };
-            setChatHistory(prev => [...prev, typedSavedResponse]);
-          } else {
-            throw new Error("Failed to save assistant response");
-          }
-        } catch (saveError: any) {
-          debugLog.addEvent("Database", `Error saving assistant response: ${saveError.message || "Unknown error"}`, "error");
-          const assistantMessage: ChatMessage = {
-            id: `temp-response-${Date.now()}`,
-            thread_id: threadId,
-            content: response.content,
-            sender: 'assistant',
-            role: 'assistant',
-            created_at: new Date().toISOString(),
-            reference_entries: response.references,
-            analysis_data: response.analysis,
-            has_numeric_result: response.hasNumericResult
-          };
-          
-          debugLog.addEvent("UI Update", "Adding fallback temporary assistant response to chat history", "warning");
-          setChatHistory(prev => [...prev, assistantMessage]);
-          
-          toast({
-            title: "Warning",
-            description: "Response displayed but couldn't be saved to your conversation history",
-            variant: "default"
-          });
-        }
+        toast({
+          title: "Warning",
+          description: "Response displayed but couldn't be saved to your conversation history",
+          variant: "default"
+        });
       }
+
     } catch (error: any) {
-      debugLog.addEvent("Error", `Error in message handling: ${error?.message || "Unknown error"}`, "error");
+      debugLog.addEvent("Error", `Error in GPT-intelligent pipeline: ${error?.message || "Unknown error"}`, "error");
       
       // Update thread status to failed
       if (threadId) {
         await updateThreadProcessingStatus(threadId, 'failed');
       }
       
-      const errorContent = "I'm having trouble processing your request. Please try again later. " + 
+      const errorContent = "I'm having trouble processing your request with my intelligent analysis system. Please try again later. " + 
                (error?.message ? `Error: ${error.message}` : "");
       
       try {
