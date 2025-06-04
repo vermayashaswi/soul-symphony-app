@@ -179,11 +179,14 @@ export const sendMessage = async (
 
       console.log('[MessageService] Intelligent pipeline completed successfully');
 
-      // Cast the response to match our type
+      // Cast the response to match our type with proper reference_entries conversion
       const typedAiMessage: ServiceChatMessage = {
         ...aiMessage,
         sender: aiMessage.sender as 'user' | 'assistant' | 'error',
-        role: aiMessage.role as 'user' | 'assistant' | 'error'
+        role: aiMessage.role as 'user' | 'assistant' | 'error',
+        reference_entries: Array.isArray(aiMessage.reference_entries) 
+          ? aiMessage.reference_entries 
+          : (aiMessage.reference_entries ? [aiMessage.reference_entries] : [])
       };
 
       return {
@@ -223,11 +226,14 @@ export const getThreadMessages = async (threadId: string): Promise<ServiceChatMe
 
     if (error) throw error;
     
-    // Cast the data to match our types
+    // Cast the data to match our types with proper reference_entries conversion
     return (data || []).map(msg => ({
       ...msg,
       sender: msg.sender as 'user' | 'assistant' | 'error',
-      role: msg.role as 'user' | 'assistant' | 'error'
+      role: msg.role as 'user' | 'assistant' | 'error',
+      reference_entries: Array.isArray(msg.reference_entries) 
+        ? msg.reference_entries 
+        : (msg.reference_entries ? [msg.reference_entries] : [])
     }));
   } catch (error) {
     console.error('[MessageService] Error fetching messages:', error);
@@ -305,11 +311,14 @@ export const createChatMessage = async (
 
     if (error) throw error;
     
-    // Cast the response to match our type
+    // Cast the response to match our type with proper reference_entries conversion
     return {
       ...data,
       sender: data.sender as 'user' | 'assistant' | 'error',
-      role: data.role as 'user' | 'assistant' | 'error'
+      role: data.role as 'user' | 'assistant' | 'error',
+      reference_entries: Array.isArray(data.reference_entries) 
+        ? data.reference_entries 
+        : (data.reference_entries ? [data.reference_entries] : [])
     };
   } catch (error) {
     console.error('Error creating message:', error);
