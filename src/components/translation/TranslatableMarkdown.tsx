@@ -4,7 +4,6 @@ import ReactMarkdown from 'react-markdown';
 import { useTranslation } from '@/contexts/TranslationContext';
 import { useLocation } from 'react-router-dom';
 import { isWebsiteRoute } from '@/routes/RouteHelpers';
-import { getLanguageFontScale, applyLanguageFontScale } from '@/utils/languageFontScaling';
 
 interface TranslatableMarkdownProps {
   children: string;
@@ -12,8 +11,6 @@ interface TranslatableMarkdownProps {
   forceTranslate?: boolean; // Added forceTranslate prop for consistency
   onTranslationStart?: () => void;
   onTranslationEnd?: () => void;
-  disableFontScaling?: boolean; // New prop to disable automatic scaling
-  style?: React.CSSProperties;
 }
 
 export function TranslatableMarkdown({ 
@@ -21,9 +18,7 @@ export function TranslatableMarkdown({
   className = "",
   forceTranslate = true, // Default to true to fix chat messages
   onTranslationStart,
-  onTranslationEnd,
-  disableFontScaling = false,
-  style
+  onTranslationEnd
 }: TranslatableMarkdownProps) {
   const [translatedContent, setTranslatedContent] = useState<string>(children); // Initialize with source content
   const [isLoading, setIsLoading] = useState(false);
@@ -34,27 +29,6 @@ export function TranslatableMarkdown({
   const location = useLocation();
   const isOnWebsite = isWebsiteRoute(location.pathname);
   const mountedRef = useRef<boolean>(true);
-  
-  // Calculate dynamic font scaling based on current language
-  const dynamicStyle = React.useMemo(() => {
-    if (disableFontScaling || currentLanguage === 'en') {
-      return style;
-    }
-    
-    const scale = getLanguageFontScale(currentLanguage);
-    if (scale === 1.0) {
-      return style;
-    }
-    
-    // Apply scaling to fontSize if present in style
-    const scaledStyle = { ...style };
-    if (style?.fontSize) {
-      scaledStyle.fontSize = applyLanguageFontScale(style.fontSize, currentLanguage);
-      console.log(`[TranslatableMarkdown] Applied font scaling for ${currentLanguage}: ${style.fontSize} -> ${scaledStyle.fontSize}`);
-    }
-    
-    return scaledStyle;
-  }, [style, currentLanguage, disableFontScaling]);
   
   // Function to translate markdown content with improved error handling
   const translateMarkdown = async () => {
@@ -178,8 +152,6 @@ export function TranslatableMarkdown({
       data-translated={translatedContent !== children ? 'true' : 'false'}
       data-lang={currentLanguage}
       data-force-translate={forceTranslate ? 'true' : 'false'}
-      data-font-scaled={!disableFontScaling && currentLanguage !== 'en' ? 'true' : 'false'}
-      style={dynamicStyle}
     >
       <ReactMarkdown className={className}>
         {contentToRender}

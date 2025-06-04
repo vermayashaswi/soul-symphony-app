@@ -3,7 +3,6 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useTranslation } from '@/contexts/TranslationContext';
 import { useLocation } from 'react-router-dom';
 import { isWebsiteRoute } from '@/routes/RouteHelpers';
-import { getLanguageFontScale, applyLanguageFontScale } from '@/utils/languageFontScaling';
 
 interface TranslatableTextProps {
   text: string;
@@ -15,7 +14,6 @@ interface TranslatableTextProps {
   onTranslationStart?: () => void;
   onTranslationEnd?: () => void;
   style?: React.CSSProperties;
-  disableFontScaling?: boolean; // New prop to disable automatic scaling
 }
 
 export function TranslatableText({ 
@@ -27,8 +25,7 @@ export function TranslatableText({
   forceTranslate = false,
   onTranslationStart,
   onTranslationEnd,
-  style,
-  disableFontScaling = false
+  style
 }: TranslatableTextProps) {
   const [translatedText, setTranslatedText] = useState<string>(text);
   const [isLoading, setIsLoading] = useState(false);
@@ -42,27 +39,6 @@ export function TranslatableText({
   
   const pathname = location.pathname;
   const isOnWebsite = isWebsiteRoute(pathname);
-  
-  // Calculate dynamic font scaling based on current language
-  const dynamicStyle = React.useMemo(() => {
-    if (disableFontScaling || currentLanguage === 'en') {
-      return style;
-    }
-    
-    const scale = getLanguageFontScale(currentLanguage);
-    if (scale === 1.0) {
-      return style;
-    }
-    
-    // Apply scaling to fontSize if present in style
-    const scaledStyle = { ...style };
-    if (style?.fontSize) {
-      scaledStyle.fontSize = applyLanguageFontScale(style.fontSize, currentLanguage);
-      console.log(`[TranslatableText] Applied font scaling for ${currentLanguage}: ${style.fontSize} -> ${scaledStyle.fontSize}`);
-    }
-    
-    return scaledStyle;
-  }, [style, currentLanguage, disableFontScaling]);
   
   const cleanTranslationResult = (result: string): string => {
     if (!result) return '';
@@ -182,8 +158,7 @@ export function TranslatableText({
       'data-translating': isLoading ? 'true' : 'false',
       'data-translated': translatedText !== text ? 'true' : 'false',
       'data-lang': currentLanguage,
-      'data-font-scaled': !disableFontScaling && currentLanguage !== 'en' ? 'true' : 'false',
-      style: dynamicStyle
+      style
     }, 
     translatedText || text
   );
