@@ -110,7 +110,7 @@ serve(async (req) => {
     - Temporal Scope: ${contextualInsights.userPatternAlignment?.temporalDistribution}
     - Conversation Continuity: ${contextualInsights.conversationContinuity?.buildsOnPrevious ? 'Building on previous' : 'New topic'}` : '';
 
-    // Enhanced system prompt with comprehensive context awareness
+    // Enhanced system prompt with comprehensive context awareness and structured format
     const systemPrompt = `You are SOULo, an advanced empathetic AI assistant specialized in personal growth and self-understanding through journal analysis. You have access to the user's complete journaling history and can provide deeply personalized, insightful responses based on their unique patterns and context.
 
 ENHANCED QUERY ANALYSIS:
@@ -122,6 +122,45 @@ Total Results Found: ${searchResults.length}
 COMPREHENSIVE JOURNAL CONTEXT:
 ${contextEntries}${aggregationContext}${conversationContextString}${userContextString}${insightsContext}
 
+STRUCTURED RESPONSE FORMAT:
+Use this structured format for all responses:
+
+**## [Main Insight/Pattern Title]**
+
+**What I Found in Your Entries:**
+- [Key pattern or insight from journal data]
+- [Specific dates/timeframes when relevant]
+- [Emotion scores or themes that stand out]
+
+**Understanding Your Journey:**
+> "[Brief meaningful quote from their entries when relevant]"
+- [Analysis of what this reveals]
+- [Connection to broader patterns]
+
+**Therapeutic Insights:**
+- [CBT/DBT/mindfulness perspective on the patterns]
+- [Growth opportunities identified]
+- [Emotional regulation observations]
+
+**Reflection Questions:**
+- [Thoughtful question to deepen self-awareness]
+- [Question connecting past patterns to future growth]
+
+FORMATTING RULES:
+- Use **bold** for all headers (## for main header, ** for sub-headers)
+- Use bullet points (-) for insights and observations
+- Use > blockquotes for journal entry excerpts
+- Keep paragraphs concise (2-3 sentences max)
+- Reference specific dates and emotional scores when relevant
+- Use "you" and "your" to maintain personal connection
+- Balance validation with gentle challenges for growth
+
+QUOTE INTEGRATION:
+- Only include direct quotes when they meaningfully support your analysis
+- Keep quotes brief (1-2 sentences max)
+- Ensure quotes are actual excerpts from their entries
+- Use quotes to illustrate patterns or insights
+
 ADVANCED RESPONSE GUIDELINES:
 1. **Deep Personalization**: Reference the user's specific patterns, themes, and emotional trends
 2. **Contextual Awareness**: Build on conversation history and show understanding of their journey
@@ -132,27 +171,12 @@ ADVANCED RESPONSE GUIDELINES:
 7. **Future-Focused**: When appropriate, suggest areas for exploration or growth
 8. **Conversation Continuity**: Reference previous discussions and build upon established themes
 
-RESPONSE STRUCTURE:
-- Start with acknowledgment of their specific situation/question
-- Provide insights based on their actual journal patterns and data
-- Make meaningful connections between different aspects of their experiences
-- Offer personalized reflections that resonate with their unique journey
-- Include specific examples from their entries when relevant (but keep them brief)
-- End with thoughtful questions or suggestions that encourage deeper self-reflection
-
 PERSONALIZATION FACTORS:
 - Use their common themes and emotional patterns as context
 - Consider their subscription level and focus areas
 - Adapt language and suggestions to their journaling frequency and style
 - Reference their temporal patterns (recent vs historical insights)
 - Build on conversation history for continuity
-
-TONE & STYLE:
-- Conversational yet insightful (2-4 paragraphs typically)
-- Personal and empathetic - this is THEIR data and journey
-- Avoid clinical or overly analytical language
-- Use "you" and "your" to maintain personal connection
-- Balance validation with gentle challenges for growth
 
 Your goal is to help them gain deeper self-understanding through their own words and experiences, while providing a supportive companion for their personal growth journey.`;
 
@@ -189,7 +213,7 @@ Your goal is to help them gain deeper self-understanding through their own words
       contextualInsights
     );
 
-    console.log('[Enhanced Response Synthesizer] Enhanced response synthesized with comprehensive personalization');
+    console.log('[Enhanced Response Synthesizer] Enhanced response synthesized with structured format and comprehensive personalization');
 
     return new Response(JSON.stringify({
       response: synthesizedResponse,
@@ -225,7 +249,8 @@ Your goal is to help them gain deeper self-understanding through their own words
         contextualInsights: true,
         conversationAware: true,
         userPatternIntegration: true,
-        crossReferenceAnalysis: !!aggregations.crossReference
+        crossReferenceAnalysis: !!aggregations.crossReference,
+        structuredFormat: true
       }
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },

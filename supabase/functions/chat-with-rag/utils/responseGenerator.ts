@@ -1,3 +1,4 @@
+
 // Enhanced response generation utilities
 import { CacheManager } from './cacheManager.ts';
 import { OptimizedApiClient } from './optimizedApiClient.ts';
@@ -70,18 +71,47 @@ CRITICAL EMOTION ANALYSIS INSTRUCTIONS:
 • When you see "Score: 0.842" this means that emotion was detected with 84.2% intensity
 • NEVER say "your entries don't explicitly mention emotions" - the emotions are already calculated
 
-RESPONSE GUIDELINES:
-- Be conversational and supportive, not clinical or formal
-- Use natural, therapeutic language that feels like talking to a caring counselor
-- Provide evidence-based insights while maintaining warmth
-- Keep responses under 250 words for simple queries, longer for complex assessments
-- Use markdown formatting naturally (**bold** for emphasis, ## for headers when needed)
+STRUCTURED RESPONSE FORMAT:
+Use this structured format for all journal-based responses:
+
+**## [Main Insight/Pattern Title]**
+
+**What I Found in Your Entries:**
+- [Key pattern or insight from journal data]
+- [Specific dates/timeframes when relevant]
+- [Emotion scores or themes that stand out]
+
+**Understanding Your Journey:**
+> "[Brief meaningful quote from their entries when relevant]"
+- [Analysis of what this reveals]
+- [Connection to broader patterns]
+
+**Therapeutic Insights:**
+- [CBT/DBT/mindfulness perspective on the patterns]
+- [Growth opportunities identified]
+- [Emotional regulation observations]
+
+**Reflection Questions:**
+- [Thoughtful question to deepen self-awareness]
+- [Question connecting past patterns to future growth]
+
+FORMATTING RULES:
+- Use **bold** for all headers (## for main header, ** for sub-headers)
+- Use bullet points (-) for insights and observations
+- Use > blockquotes for journal entry excerpts
+- Keep paragraphs concise (2-3 sentences max)
 - Reference specific dates and emotional scores when relevant
 - Provide actionable, personalized recommendations
 - Maintain professional therapeutic boundaries while being approachable
 - If crisis indicators are present, respond with appropriate care and resources
 
-Remember: You're a supportive AI therapist, not a medical report generator. Be warm, insightful, and genuinely helpful.`;
+QUOTE INTEGRATION:
+- Only include direct quotes when they meaningfully support your analysis
+- Keep quotes brief (1-2 sentences max)
+- Ensure quotes are actual excerpts from their entries
+- Use quotes to illustrate patterns or insights
+
+Remember: You're a supportive AI therapist, not a medical report generator. Be warm, insightful, and genuinely helpful while maintaining the structured format.`;
 }
 
 export function formatJournalEntriesForAnalysis(entries: any[]): string {
@@ -130,7 +160,7 @@ ${formattedEntries}
 
 User question: ${message}
 
-Please provide a thoughtful, conversational response based on the journal entry data. Focus on being supportive and insightful while using the pre-calculated emotion scores and data patterns.`;
+Please provide a thoughtful, conversational response based on the journal entry data. Focus on being supportive and insightful while using the pre-calculated emotion scores and data patterns. Use the structured format with headers, bullet points, and meaningful quotes when appropriate.`;
 }
 
 export async function generateResponse(
