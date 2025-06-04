@@ -150,10 +150,7 @@ export const SimplifiedSoulNetVisualization: React.FC<SimplifiedSoulNetVisualiza
         
         const showPercentage = selectedNode !== null && isHighlighted && selectedNode !== node.id && connectionPercentage > 0;
         
-        // INSTANT translation - no loading delay
-        const translatedText = getInstantTranslation(node.id);
-        
-        console.log(`[SimplifiedSoulNetVisualization] ENHANCED HIERARCHY: Node ${node.id} - highlighted: ${isHighlighted}, dimmed: ${isDimmed}, percentage: ${connectionPercentage}%, translation: "${translatedText}"`);
+        console.log(`[SimplifiedSoulNetVisualization] ENHANCED HIERARCHY: Node ${node.id} - highlighted: ${isHighlighted}, dimmed: ${isDimmed}, percentage: ${connectionPercentage}%`);
         
         return (
           <Node
@@ -171,7 +168,6 @@ export const SimplifiedSoulNetVisualization: React.FC<SimplifiedSoulNetVisualiza
             connectionPercentage={connectionPercentage}
             showPercentage={showPercentage}
             forceShowLabels={false} // Let the dimming logic control this
-            translatedText={translatedText}
             effectiveTheme={effectiveTheme}
             isInstantMode={isInstantReady}
           />
