@@ -1,6 +1,5 @@
-
 import { supabase } from '@/integrations/supabase/client';
-import { ServiceChatMessage, ChatThread } from './types';
+import { ServiceChatMessage, ChatThread, SubQueryResponse, jsonToSubQueryResponse } from './types';
 
 export interface MessageServiceResult {
   success: boolean;
@@ -179,14 +178,15 @@ export const sendMessage = async (
 
       console.log('[MessageService] Intelligent pipeline completed successfully');
 
-      // Cast the response to match our type with proper reference_entries conversion
+      // Cast the response to match our type with proper conversion for both arrays
       const typedAiMessage: ServiceChatMessage = {
         ...aiMessage,
         sender: aiMessage.sender as 'user' | 'assistant' | 'error',
         role: aiMessage.role as 'user' | 'assistant' | 'error',
         reference_entries: Array.isArray(aiMessage.reference_entries) 
           ? aiMessage.reference_entries 
-          : (aiMessage.reference_entries ? [aiMessage.reference_entries] : [])
+          : (aiMessage.reference_entries ? [aiMessage.reference_entries] : []),
+        sub_query_responses: jsonToSubQueryResponse(aiMessage.sub_query_responses)
       };
 
       return {
@@ -226,14 +226,15 @@ export const getThreadMessages = async (threadId: string): Promise<ServiceChatMe
 
     if (error) throw error;
     
-    // Cast the data to match our types with proper reference_entries conversion
+    // Cast the data to match our types with proper conversion for both arrays
     return (data || []).map(msg => ({
       ...msg,
       sender: msg.sender as 'user' | 'assistant' | 'error',
       role: msg.role as 'user' | 'assistant' | 'error',
       reference_entries: Array.isArray(msg.reference_entries) 
         ? msg.reference_entries 
-        : (msg.reference_entries ? [msg.reference_entries] : [])
+        : (msg.reference_entries ? [msg.reference_entries] : []),
+      sub_query_responses: jsonToSubQueryResponse(msg.sub_query_responses)
     }));
   } catch (error) {
     console.error('[MessageService] Error fetching messages:', error);
@@ -311,14 +312,15 @@ export const createChatMessage = async (
 
     if (error) throw error;
     
-    // Cast the response to match our type with proper reference_entries conversion
+    // Cast the response to match our type with proper conversion for both arrays
     return {
       ...data,
       sender: data.sender as 'user' | 'assistant' | 'error',
       role: data.role as 'user' | 'assistant' | 'error',
       reference_entries: Array.isArray(data.reference_entries) 
         ? data.reference_entries 
-        : (data.reference_entries ? [data.reference_entries] : [])
+        : (data.reference_entries ? [data.reference_entries] : []),
+      sub_query_responses: jsonToSubQueryResponse(data.sub_query_responses)
     };
   } catch (error) {
     console.error('Error creating message:', error);
