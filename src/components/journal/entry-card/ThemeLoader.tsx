@@ -103,7 +103,7 @@ export function ThemeLoader({ entryId, initialThemes = [], content, isProcessing
       {!loading && !error && themes.length === 0 && (
         <p className="text-xs text-muted-foreground">
           <TranslatableText 
-            text="No themes detected" 
+            text={isProcessing || isNew ? "Analyzing themes..." : "No themes detected"} 
             sourceLanguage={entryLanguage || "en"}
             entryId={entryId}
           />
