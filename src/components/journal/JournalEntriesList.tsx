@@ -18,6 +18,7 @@ interface JournalEntriesListProps {
   processedEntryIds: number[];
   onStartRecording: () => void;
   onDeleteEntry: (entryId: number) => void;
+  onUpdateEntry?: (entryId: number, newContent: string, isProcessing?: boolean) => void;
   isSavingRecording?: boolean;
 }
 
@@ -28,6 +29,7 @@ const JournalEntriesList: React.FC<JournalEntriesListProps> = ({
   processedEntryIds,
   onStartRecording,
   onDeleteEntry,
+  onUpdateEntry,
   isSavingRecording = false,
 }) => {
   const { 
@@ -227,6 +229,23 @@ const JournalEntriesList: React.FC<JournalEntriesListProps> = ({
       return Promise.reject(error);
     }
   };
+
+  // Create a setEntries function to pass to JournalEntryCard
+  const setEntries = onUpdateEntry ? (updateFn: React.SetStateAction<any[]>) => {
+    if (typeof updateFn === 'function') {
+      // Handle the functional update case
+      const currentEntries = entries;
+      const updatedEntries = updateFn(currentEntries);
+      
+      // Find the changed entry and call onUpdateEntry
+      updatedEntries.forEach((updatedEntry: any) => {
+        const originalEntry = currentEntries.find(e => e.id === updatedEntry.id);
+        if (originalEntry && originalEntry.content !== updatedEntry.content) {
+          onUpdateEntry(updatedEntry.id, updatedEntry.content);
+        }
+      });
+    }
+  } : null;
   
   // Filter entries to remove deleted ones
   const filteredEntries = entries.filter(entry => !deletedEntryIdsRef.current.has(entry.id));
@@ -317,7 +336,7 @@ const JournalEntriesList: React.FC<JournalEntriesListProps> = ({
                 processing={entryIsProcessing}
                 processed={processedEntryIds.includes(entry.id)}
                 onDelete={handleDeleteEntry}
-                setEntries={null}
+                setEntries={setEntries}
               />
             );
           })}
@@ -338,7 +357,7 @@ const JournalEntriesList: React.FC<JournalEntriesListProps> = ({
                 processing={entryIsProcessing}
                 processed={processedEntryIds.includes(entry.id)}
                 onDelete={handleDeleteEntry}
-                setEntries={null}
+                setEntries={setEntries}
               />
             );
           })}
