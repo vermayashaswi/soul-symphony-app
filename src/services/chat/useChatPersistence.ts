@@ -1,10 +1,9 @@
-
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { 
   createThread, 
   getUserChatThreads, 
-  getThreadMessages,
+  getChatMessages,
   createChatMessage,
   updateThreadTitle
 } from "@/services/chat/messageService";
@@ -82,8 +81,7 @@ export const useChatPersistence = (userId: string | undefined) => {
       
       setLoading(true);
       try {
-        // Fix: Use only threadId parameter as the function signature expects
-        const threadMessages = await getThreadMessages(activeThread);
+        const threadMessages = await getChatMessages(activeThread, userId);
         if (threadMessages) {
           // Convert ChatMessage to ChatMessagePersistence
           const persistenceMessages: ChatMessagePersistence[] = threadMessages.map(msg => ({
