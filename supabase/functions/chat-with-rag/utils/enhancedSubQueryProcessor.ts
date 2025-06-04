@@ -1,8 +1,10 @@
 
 import { detectEmotionalQuery, getEmotionAnalysisForQuery, generateEmotionContext } from './emotionQueryHandler.ts';
+import { validateEntriesInDateRange, isTemporalQuery, generateNoEntriesResponse } from './dateRangeValidator.ts';
 
 /**
  * Enhanced sub-query processor that handles emotional queries properly with conversation context
+ * and validates date ranges before processing
  */
 export async function processSubQueryWithEmotionSupport(
   subQuestion: string | any,
@@ -10,7 +12,8 @@ export async function processSubQueryWithEmotionSupport(
   userId: string,
   dateRange: any = null,
   openaiApiKey: string,
-  conversationContext: any[] = [] // New parameter for conversation context
+  conversationContext: any[] = [],
+  originalQuery: string = '' // Add original query for better context
 ): Promise<{
   subQuestion: string;
   context: string;
@@ -19,6 +22,8 @@ export async function processSubQueryWithEmotionSupport(
   totalResults: number;
   hasEntriesInDateRange: boolean;
   reasoning: string;
+  shouldStopProcessing?: boolean; // New flag to indicate when to stop processing
+  noEntriesResponse?: string; // Response for when no entries exist in date range
 }> {
   // Type validation and conversion for sub-question
   let processedSubQuestion: string;
@@ -26,7 +31,6 @@ export async function processSubQueryWithEmotionSupport(
   if (typeof subQuestion === 'string') {
     processedSubQuestion = subQuestion;
   } else if (typeof subQuestion === 'object' && subQuestion !== null) {
-    // Extract question from object if it exists
     processedSubQuestion = subQuestion.question || JSON.stringify(subQuestion);
     console.log(`[enhancedSubQueryProcessor] Converted object to string: "${processedSubQuestion}"`);
   } else {
@@ -35,6 +39,49 @@ export async function processSubQueryWithEmotionSupport(
   }
   
   console.log(`[enhancedSubQueryProcessor] Processing: "${processedSubQuestion}" with ${conversationContext.length} context messages`);
+  
+  // CRITICAL: Validate date range FIRST for temporal queries
+  if (dateRange && isTemporalQuery(originalQuery || processedSubQuestion)) {
+    console.log(`[enhancedSubQueryProcessor] Detected temporal query, validating date range first`);
+    
+    const validation = await validateEntriesInDateRange(supabase, userId, dateRange);
+    
+    if (!validation.hasEntries) {
+      console.log(`[enhancedSubQueryProcessor] No entries found in requested date range, stopping processing`);
+      
+      // Determine time range description from the original query
+      let timeRangeDescription = 'that time period';
+      if (originalQuery.toLowerCase().includes('last week')) {
+        timeRangeDescription = 'last week';
+      } else if (originalQuery.toLowerCase().includes('this week')) {
+        timeRangeDescription = 'this week';
+      } else if (originalQuery.toLowerCase().includes('yesterday')) {
+        timeRangeDescription = 'yesterday';
+      } else if (originalQuery.toLowerCase().includes('last month')) {
+        timeRangeDescription = 'last month';
+      }
+      
+      const noEntriesResponse = generateNoEntriesResponse(
+        originalQuery || processedSubQuestion,
+        dateRange,
+        timeRangeDescription
+      );
+      
+      return {
+        subQuestion: processedSubQuestion,
+        context: '',
+        emotionResults: [],
+        vectorResults: [],
+        totalResults: 0,
+        hasEntriesInDateRange: false,
+        reasoning: `No journal entries found in the requested time range (${dateRange.startDate} to ${dateRange.endDate})`,
+        shouldStopProcessing: true,
+        noEntriesResponse
+      };
+    }
+    
+    console.log(`[enhancedSubQueryProcessor] Found ${validation.entryCount} entries in date range, proceeding with analysis`);
+  }
   
   // Enhanced emotion detection using conversation context
   const emotionDetection = detectEmotionalQuery(processedSubQuestion, conversationContext);
@@ -56,7 +103,7 @@ export async function processSubQueryWithEmotionSupport(
         userId,
         emotionDetection.emotionType,
         dateRange,
-        conversationContext // Pass context to emotion analysis
+        conversationContext
       );
       
       emotionResults = emotionAnalysis.emotions;
@@ -68,7 +115,7 @@ export async function processSubQueryWithEmotionSupport(
           entries,
           emotionDetection.emotionType,
           processedSubQuestion,
-          conversationContext // Pass context for correlation analysis
+          conversationContext
         );
         hasEntriesInDateRange = true;
         reasoning = `Analyzed emotions and sentiment patterns from ${entries.length} journal entries with conversation context. Found ${emotionResults.length} distinct emotions.`;
@@ -89,11 +136,9 @@ export async function processSubQueryWithEmotionSupport(
     console.log(`[enhancedSubQueryProcessor] Falling back to vector search for: "${processedSubQuestion}" with context enhancement`);
     
     try {
-      // Enhanced query embedding that considers conversation context
       const enhancedQuery = enhanceQueryWithContext(processedSubQuestion, conversationContext);
       const queryEmbedding = await generateEmbedding(enhancedQuery, openaiApiKey);
       
-      // Perform vector search using the correct function name
       const { data: vectorData, error: vectorError } = await supabase.rpc(
         'match_journal_entries_with_date',
         {
@@ -119,7 +164,6 @@ export async function processSubQueryWithEmotionSupport(
           const content = entry.content?.substring(0, 200) + '...';
           context += `Entry from ${date} (similarity: ${entry.similarity?.toFixed(3)}): ${content}\n\n`;
           
-          // Add emotion information if available
           if (entry.emotions && typeof entry.emotions === 'object') {
             const topEmotions = Object.entries(entry.emotions)
               .filter(([_, score]) => typeof score === 'number' && score > 0.3)
@@ -144,93 +188,8 @@ export async function processSubQueryWithEmotionSupport(
     }
   }
   
-  // If still no results, try emotion-based search for specific emotion terms
-  if (!hasEntriesInDateRange && emotionDetection.emotionType) {
-    console.log(`[enhancedSubQueryProcessor] Trying emotion-specific search for: ${emotionDetection.emotionType}`);
-    
-    try {
-      const { data: emotionEntries, error: emotionError } = await supabase.rpc(
-        'get_entries_by_emotion_term',
-        {
-          emotion_term: emotionDetection.emotionType,
-          user_id_filter: userId,
-          start_date: dateRange?.startDate || null,
-          end_date: dateRange?.endDate || null,
-          limit_count: 5
-        }
-      );
-      
-      if (emotionError) {
-        console.error('[enhancedSubQueryProcessor] Emotion term search error:', emotionError);
-      } else if (emotionEntries && emotionEntries.length > 0) {
-        vectorResults = emotionEntries;
-        hasEntriesInDateRange = true;
-        
-        context += `**ENTRIES RELATED TO "${emotionDetection.emotionType.toUpperCase()}":**\n`;
-        emotionEntries.forEach((entry: any) => {
-          const date = new Date(entry.created_at).toLocaleDateString();
-          const content = entry.content?.substring(0, 200) + '...';
-          context += `Entry from ${date}: ${content}\n\n`;
-        });
-        
-        reasoning = `Found ${emotionEntries.length} entries containing "${emotionDetection.emotionType}" through emotion term search.`;
-      }
-      
-    } catch (error) {
-      console.error('[enhancedSubQueryProcessor] Emotion term search error:', error);
-    }
-  }
-  
-  // If still no results, try a broader search for recent entries
-  if (!hasEntriesInDateRange) {
-    console.log(`[enhancedSubQueryProcessor] Trying broader search for recent entries`);
-    
-    try {
-      const { data: recentEntries, error: recentError } = await supabase
-        .from('Journal Entries')
-        .select('id, "transcription text", emotions, sentiment, created_at')
-        .eq('user_id', userId)
-        .not('"transcription text"', 'is', null)
-        .not('"transcription text"', 'eq', '')
-        .order('created_at', { ascending: false })
-        .limit(5);
-      
-      if (recentError) {
-        console.error('[enhancedSubQueryProcessor] Recent entries error:', recentError);
-      } else if (recentEntries && recentEntries.length > 0) {
-        vectorResults = recentEntries;
-        hasEntriesInDateRange = true;
-        
-        context += '**RECENT JOURNAL ENTRIES:**\n';
-        recentEntries.forEach((entry: any) => {
-          const date = new Date(entry.created_at).toLocaleDateString();
-          const content = entry['transcription text']?.substring(0, 200) + '...';
-          context += `Entry from ${date}: ${content}\n\n`;
-          
-          // Add emotion information if available
-          if (entry.emotions && typeof entry.emotions === 'object') {
-            const topEmotions = Object.entries(entry.emotions)
-              .filter(([_, score]) => typeof score === 'number' && score > 0.3)
-              .sort(([_, a], [__, b]) => (b as number) - (a as number))
-              .slice(0, 3)
-              .map(([emotion, score]) => `${emotion}: ${(score as number).toFixed(2)}`)
-              .join(', ');
-            
-            if (topEmotions) {
-              context += `Emotions: ${topEmotions}\n`;
-            }
-          }
-          
-          context += '\n';
-        });
-        
-        reasoning = `Using ${recentEntries.length} recent journal entries as no specific matches were found.`;
-      }
-      
-    } catch (error) {
-      console.error('[enhancedSubQueryProcessor] Recent entries error:', error);
-    }
-  }
+  // REMOVED: Fallback searches that ignore date constraints for temporal queries
+  // This was causing the incorrect behavior of analyzing entries from wrong time periods
   
   const totalResults = emotionResults.length + vectorResults.length;
   
@@ -260,19 +219,16 @@ function enhanceQueryWithContext(query: string, conversationContext: any[]): str
     return query;
   }
   
-  // Extract key terms from recent conversation
-  const recentMessages = conversationContext.slice(-3); // Use last 3 messages for context
+  const recentMessages = conversationContext.slice(-3);
   const contextTerms: string[] = [];
   
   recentMessages.forEach(msg => {
     if (msg.content) {
-      // Extract emotion-related terms
       const emotionMatches = msg.content.match(/\b(happy|sad|excited|anxious|content|joy|anger|fear|surprise)\b/gi);
       if (emotionMatches) {
         contextTerms.push(...emotionMatches);
       }
       
-      // Extract other relevant terms
       const relevantMatches = msg.content.match(/\b(work|relationship|family|stress|sleep|health)\b/gi);
       if (relevantMatches) {
         contextTerms.push(...relevantMatches);
@@ -280,7 +236,6 @@ function enhanceQueryWithContext(query: string, conversationContext: any[]): str
     }
   });
   
-  // Remove duplicates and enhance query
   const uniqueTerms = [...new Set(contextTerms.map(term => term.toLowerCase()))];
   
   if (uniqueTerms.length > 0) {
