@@ -4,15 +4,14 @@ import '@/types/three-reference';
 import { useFrame } from '@react-three/fiber';
 
 interface NodeMeshProps {
-  type: 'entity' | 'emotion';
-  nodeType: 'entity' | 'emotion'; // Added missing nodeType prop
+  nodeType: 'entity' | 'emotion';
   scale: number;
   displayColor: string;
   isHighlighted: boolean;
   dimmed: boolean;
   connectionStrength?: number;
   isSelected: boolean;
-  themeHex: string; // Added missing themeHex prop
+  themeHex: string;
   onClick: (e: any) => void;
   onPointerDown: (e: any) => void;
   onPointerUp: (e: any) => void;
@@ -21,15 +20,14 @@ interface NodeMeshProps {
 }
 
 export const NodeMesh: React.FC<NodeMeshProps> = ({
-  type,
-  nodeType, // Accept the nodeType prop
+  nodeType,
   scale,
   displayColor,
   isHighlighted,
   dimmed,
   connectionStrength = 0.5,
   isSelected,
-  themeHex, // Accept the themeHex prop
+  themeHex,
   onClick,
   onPointerDown,
   onPointerUp,
@@ -50,7 +48,7 @@ export const NodeMesh: React.FC<NodeMeshProps> = ({
   }, []);
   
   // ENHANCED: Updated geometry creation for 15% larger nodes
-  // Use nodeType instead of type for consistency
+  // Use nodeType for consistency
   const Geometry = useMemo(() => 
     nodeType === 'entity'
       ? <sphereGeometry args={[1.38, 16, 16]} /> // Increased from 1.2 by 15%
