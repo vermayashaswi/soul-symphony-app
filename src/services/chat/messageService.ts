@@ -179,9 +179,16 @@ export const sendMessage = async (
 
       console.log('[MessageService] Intelligent pipeline completed successfully');
 
+      // Cast the response to match our type
+      const typedAiMessage: ServiceChatMessage = {
+        ...aiMessage,
+        sender: aiMessage.sender as 'user' | 'assistant' | 'error',
+        role: aiMessage.role as 'user' | 'assistant' | 'error'
+      };
+
       return {
         success: true,
-        message: aiMessage,
+        message: typedAiMessage,
         threadId: currentThreadId
       };
 
@@ -215,7 +222,13 @@ export const getThreadMessages = async (threadId: string): Promise<ServiceChatMe
       .order('created_at', { ascending: true });
 
     if (error) throw error;
-    return data || [];
+    
+    // Cast the data to match our types
+    return (data || []).map(msg => ({
+      ...msg,
+      sender: msg.sender as 'user' | 'assistant' | 'error',
+      role: msg.role as 'user' | 'assistant' | 'error'
+    }));
   } catch (error) {
     console.error('[MessageService] Error fetching messages:', error);
     return [];
@@ -231,10 +244,12 @@ export const getUserThreads = async (userId: string): Promise<ChatThread[]> => {
       .order('updated_at', { ascending: false });
 
     if (error) throw error;
-    // Cast the processing_status to match our type
+    
+    // Cast the data to match our types
     return (data || []).map(thread => ({
       ...thread,
-      processing_status: thread.processing_status as 'idle' | 'processing' | 'failed'
+      processing_status: thread.processing_status as 'idle' | 'processing' | 'failed',
+      metadata: thread.metadata as ChatThread['metadata']
     }));
   } catch (error) {
     console.error('[MessageService] Error fetching threads:', error);
@@ -289,7 +304,13 @@ export const createChatMessage = async (
       .single();
 
     if (error) throw error;
-    return data;
+    
+    // Cast the response to match our type
+    return {
+      ...data,
+      sender: data.sender as 'user' | 'assistant' | 'error',
+      role: data.role as 'user' | 'assistant' | 'error'
+    };
   } catch (error) {
     console.error('Error creating message:', error);
     return null;
