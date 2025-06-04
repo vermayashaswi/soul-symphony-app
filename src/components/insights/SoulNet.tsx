@@ -4,7 +4,7 @@ import '@/types/three-reference';
 import { Canvas } from '@react-three/fiber';
 import { TimeRange } from '@/hooks/use-insights-data';
 import { useIsMobile } from '@/hooks/use-mobile';
-import SimplifiedSoulNetVisualization from './soulnet/SimplifiedSoulNetVisualization';
+import OptimizedSoulNetVisualization from './soulnet/OptimizedSoulNetVisualization';
 import RenderingErrorBoundary from './soulnet/RenderingErrorBoundary';
 import { LoadingState } from './soulnet/LoadingState';
 import { EmptyState } from './soulnet/EmptyState';
@@ -25,64 +25,38 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
   const [isFullScreen, setIsFullScreen] = useState(false);
   const [canvasError, setCanvasError] = useState<Error | null>(null);
   const [retryCount, setRetryCount] = useState(0);
-  const [renderingReady, setRenderingReady] = useState(false);
+  const [effectiveTheme, setEffectiveTheme] = useState<'light' | 'dark'>('light');
   const isMobile = useIsMobile();
   const themeHex = useUserColorThemeHex();
-  const [selectedEntity, setSelectedEntity] = useState<string | null>(null);
   const { currentLanguage } = useTranslation();
 
-  // Use the enhanced instant data hook
-  const { 
-    graphData, 
-    loading, 
-    error,
-    isInstantReady,
-    getInstantConnectionPercentage,
-    getInstantTranslation,
-    getInstantNodeConnections
-  } = useInstantSoulNetData(userId, timeRange);
+  // Quick data check for empty state
+  const { graphData, loading, error } = useInstantSoulNetData(userId, timeRange);
 
-  console.log("[SoulNet] INSTANT DATA MODE - Zero loading delays", { 
+  console.log("[SoulNet] OPTIMIZED ZERO-DELAY MODE", { 
     userId, 
     timeRange, 
     currentLanguage,
-    nodesCount: graphData.nodes.length,
-    isInstantReady,
-    loading
+    nodesCount: graphData.nodes.length
   });
 
+  // Detect user's theme preference
   useEffect(() => {
-    console.log("[SoulNet] Component mounted - Instant data mode enabled");
-    
+    const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+    const handleChange = (event: MediaQueryListEvent) => {
+      setEffectiveTheme(event.matches ? 'dark' : 'light');
+    };
+
+    setEffectiveTheme(mediaQuery.matches ? 'dark' : 'light');
+    mediaQuery.addEventListener('change', handleChange);
+
     return () => {
-      console.log("[SoulNet] Component unmounted");
+      mediaQuery.removeEventListener('change', handleChange);
     };
   }, []);
 
-  // INSTANT rendering initialization - enable immediately if data is ready
-  useEffect(() => {
-    if (isInstantReady || (graphData.nodes.length > 0 && !loading)) {
-      console.log("[SoulNet] INSTANT: Data ready, enabling rendering immediately");
-      setRenderingReady(true);
-    }
-  }, [isInstantReady, graphData.nodes.length, loading]);
-
-  // INSTANT node selection with immediate feedback
-  const handleNodeSelect = useCallback((id: string) => {
-    console.log(`[SoulNet] INSTANT: Node selected: ${id} - no loading delay`);
-    if (selectedEntity === id) {
-      setSelectedEntity(null);
-    } else {
-      setSelectedEntity(id);
-      if (navigator.vibrate) {
-        navigator.vibrate(50);
-      }
-    }
-  }, [selectedEntity]);
-
   const toggleFullScreen = useCallback(() => {
     setIsFullScreen(prev => {
-      if (!prev) setSelectedEntity(null);
       console.log(`[SoulNet] Toggling fullscreen: ${!prev}`);
       return !prev;
     });
@@ -99,8 +73,8 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
     setRetryCount(0);
   }, []);
 
-  // Show loading only if we have no instant data available
-  if (loading && !isInstantReady) return <LoadingState />;
+  // Show loading only briefly if needed
+  if (loading && graphData.nodes.length === 0) return <LoadingState />;
   
   if (error) return (
     <div className="bg-background rounded-xl shadow-sm border w-full p-6">
@@ -159,7 +133,7 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
     return <TranslatableText text="Drag to rotate • Scroll to zoom • Click a node to highlight connections" forceTranslate={true} />;
   };
 
-  console.log(`[SoulNet] INSTANT DATA MODE - Final render: ${graphData.nodes.length} nodes, ${graphData.links.length} links, instantReady: ${isInstantReady}, renderingReady: ${renderingReady}`);
+  console.log(`[SoulNet] OPTIMIZED FINAL RENDER: Zero-delay node selection enabled`);
 
   return (
     <div className={cn(
@@ -193,48 +167,40 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
             </div>
           }
         >
-          {renderingReady && (
-            <Canvas
-              style={{
-                width: '100%',
-                height: '100%',
-                maxWidth: isFullScreen ? 'none' : '800px',
-                maxHeight: isFullScreen ? 'none' : '500px',
-                position: 'relative',
-                zIndex: 5,
-                transition: 'all 0.3s ease-in-out',
-              }}
-              camera={{ 
-                position: [0, 0, isFullScreen ? 40 : 45],
-                near: 1, 
-                far: 1000,
-                fov: isFullScreen ? 60 : 50
-              }}
-              onPointerMissed={() => setSelectedEntity(null)}
-              gl={{ 
-                preserveDrawingBuffer: true,
-                antialias: !isMobile,
-                powerPreference: 'high-performance',
-                alpha: true,
-                depth: true,
-                stencil: false,
-                precision: isMobile ? 'mediump' : 'highp'
-              }}
-            >
-              <SimplifiedSoulNetVisualization
-                data={graphData}
-                selectedNode={selectedEntity}
-                onNodeClick={handleNodeSelect}
-                themeHex={themeHex}
-                isFullScreen={isFullScreen}
-                shouldShowLabels={true}
-                getInstantConnectionPercentage={getInstantConnectionPercentage}
-                getInstantTranslation={getInstantTranslation}
-                getInstantNodeConnections={getInstantNodeConnections}
-                isInstantReady={isInstantReady}
-              />
-            </Canvas>
-          )}
+          <Canvas
+            style={{
+              width: '100%',
+              height: '100%',
+              maxWidth: isFullScreen ? 'none' : '800px',
+              maxHeight: isFullScreen ? 'none' : '500px',
+              position: 'relative',
+              zIndex: 5,
+              transition: 'all 0.3s ease-in-out',
+            }}
+            camera={{ 
+              position: [0, 0, isFullScreen ? 40 : 45],
+              near: 1, 
+              far: 1000,
+              fov: isFullScreen ? 60 : 50
+            }}
+            gl={{ 
+              preserveDrawingBuffer: true,
+              antialias: !isMobile,
+              powerPreference: 'high-performance',
+              alpha: true,
+              depth: true,
+              stencil: false,
+              precision: isMobile ? 'mediump' : 'highp'
+            }}
+          >
+            <OptimizedSoulNetVisualization
+              userId={userId}
+              timeRange={timeRange}
+              themeHex={themeHex}
+              isFullScreen={isFullScreen}
+              effectiveTheme={effectiveTheme}
+            />
+          </Canvas>
         </RenderingErrorBoundary>
       </FullscreenWrapper>
       
