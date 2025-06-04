@@ -1,8 +1,8 @@
 
 import React from 'react';
 import { DateRange } from 'react-day-picker';
-import JournalSearch from './JournalSearch';
-import DateRangeFilter from './DateRangeFilter';
+import SimpleJournalSearch from './SimpleJournalSearch';
+import SimpleDateRangeFilter from './SimpleDateRangeFilter';
 
 interface JournalSearchAndFiltersProps {
   searchQuery: string;
@@ -20,13 +20,13 @@ const JournalSearchAndFilters: React.FC<JournalSearchAndFiltersProps> = ({
   return (
     <div className="flex flex-col sm:flex-row gap-4 mb-6">
       <div className="flex-1">
-        <JournalSearch 
+        <SimpleJournalSearch 
           searchQuery={searchQuery}
           onSearchChange={onSearchChange}
         />
       </div>
       <div className="flex-shrink-0">
-        <DateRangeFilter
+        <SimpleDateRangeFilter
           dateRange={dateRange}
           onDateRangeChange={onDateRangeChange}
         />
