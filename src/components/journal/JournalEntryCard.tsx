@@ -14,35 +14,9 @@ import {
 import { EditEntryButton } from './entry-card/EditEntryButton';
 import { JournalErrorBoundary } from './ErrorBoundary';
 import { ThumbsUp, ThumbsDown } from 'lucide-react';
-import { JournalEntry as JournalEntryType } from '@/types/journal';
+import { JournalEntry } from '@/types/journal';
 import { TranslatableText } from '@/components/translation/TranslatableText';
 import { textWillOverflow } from '@/utils/textUtils';
-
-export interface JournalEntry {
-  id: number;
-  content: string;
-  created_at: string;
-  audio_url?: string;
-  sentiment?: string | null;
-  themes?: string[] | null;
-  master_themes?: string[];
-  entities?: Array<{
-    type: string;
-    name: string;
-    text?: string;
-  }>;
-  foreignKey?: string;
-  predictedLanguages?: {
-    [key: string]: number;
-  } | null;
-  Edit_Status?: number | null;
-  user_feedback?: string | null;
-  "transcription text"?: string;
-  "refined text"?: string;
-  translation_text?: string;
-  original_language?: string;
-  tempId?: string;
-}
 
 interface JournalEntryCardProps {
   entry: JournalEntry;
@@ -74,7 +48,8 @@ export function JournalEntryCard({
     user_feedback: entry?.user_feedback || null,
     translation_text: entry?.translation_text,
     original_language: entry?.original_language,
-    tempId: entry?.tempId
+    tempId: entry?.tempId,
+    emotions: entry?.emotions || null
   };
 
   const [isExpanded, setIsExpanded] = useState(true); // Always expanded now
