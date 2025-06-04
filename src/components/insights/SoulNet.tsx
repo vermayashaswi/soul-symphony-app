@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import '@/types/three-reference';
 import { Canvas } from '@react-three/fiber';
 import { TimeRange } from '@/hooks/use-insights-data';
@@ -30,6 +30,9 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
   const themeHex = useUserColorThemeHex();
   const [selectedEntity, setSelectedEntity] = useState<string | null>(null);
   const { currentLanguage } = useTranslation();
+  
+  // STABILIZATION: Use ref to track if rendering has been initialized to prevent unnecessary resets
+  const renderingInitialized = useRef(false);
 
   // Use the enhanced instant data hook
   const { 
@@ -48,7 +51,9 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
     currentLanguage,
     nodesCount: graphData.nodes.length,
     isInstantReady,
-    loading
+    loading,
+    renderingReady,
+    renderingInitialized: renderingInitialized.current
   });
 
   useEffect(() => {
@@ -59,17 +64,26 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
     };
   }, []);
 
-  // INSTANT rendering initialization - enable immediately if data is ready
+  // STABILIZED: Enhanced rendering initialization that doesn't reset once established
   useEffect(() => {
-    if (isInstantReady || (graphData.nodes.length > 0 && !loading)) {
-      console.log("[SoulNet] INSTANT: Data ready, enabling rendering immediately");
+    // Only initialize rendering if we have data and haven't already initialized
+    if ((isInstantReady || (graphData.nodes.length > 0 && !loading)) && !renderingInitialized.current) {
+      console.log("[SoulNet] STABILIZED: Initializing rendering for the first time");
       setRenderingReady(true);
+      renderingInitialized.current = true;
     }
-  }, [isInstantReady, graphData.nodes.length, loading]);
+    
+    // DEFENSIVE: Only reset rendering if there's an actual error or complete data loss
+    if (error || (graphData.nodes.length === 0 && !loading && renderingInitialized.current)) {
+      console.log("[SoulNet] DEFENSIVE: Resetting rendering due to error or data loss", { error: !!error, nodesCount: graphData.nodes.length });
+      setRenderingReady(false);
+      renderingInitialized.current = false;
+    }
+  }, [isInstantReady, graphData.nodes.length, loading, error]);
 
-  // INSTANT node selection with immediate feedback
+  // OPTIMIZED: Node selection with stable state management
   const handleNodeSelect = useCallback((id: string) => {
-    console.log(`[SoulNet] INSTANT: Node selected: ${id} - no loading delay`);
+    console.log(`[SoulNet] STABLE: Node selected: ${id} - no re-render triggers`);
     if (selectedEntity === id) {
       setSelectedEntity(null);
     } else {
@@ -92,15 +106,23 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
     console.error('[SoulNet] Canvas error:', error);
     setCanvasError(error);
     setRetryCount(prev => prev + 1);
+    // DEFENSIVE: Reset rendering state on canvas errors
+    setRenderingReady(false);
+    renderingInitialized.current = false;
   }, []);
 
   const handleRetry = useCallback(() => {
     setCanvasError(null);
     setRetryCount(0);
+    // Allow re-initialization after retry
+    renderingInitialized.current = false;
   }, []);
 
-  // Show loading only if we have no instant data available
-  if (loading && !isInstantReady) return <LoadingState />;
+  // ENHANCED: Only show loading if we truly have no data and are still loading
+  if (loading && !isInstantReady && graphData.nodes.length === 0) {
+    console.log("[SoulNet] ENHANCED: Showing loading state - no instant data available");
+    return <LoadingState />;
+  }
   
   if (error) return (
     <div className="bg-background rounded-xl shadow-sm border w-full p-6">
@@ -159,7 +181,7 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
     return <TranslatableText text="Drag to rotate • Scroll to zoom • Click a node to highlight connections" forceTranslate={true} />;
   };
 
-  console.log(`[SoulNet] INSTANT DATA MODE - Final render: ${graphData.nodes.length} nodes, ${graphData.links.length} links, instantReady: ${isInstantReady}, renderingReady: ${renderingReady}`);
+  console.log(`[SoulNet] STABILIZED RENDER: ${graphData.nodes.length} nodes, ${graphData.links.length} links, renderingReady: ${renderingReady}, initialized: ${renderingInitialized.current}`);
 
   return (
     <div className={cn(
@@ -193,6 +215,7 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
             </div>
           }
         >
+          {/* STABILIZED: Canvas only renders when truly ready and stays mounted during interactions */}
           {renderingReady && (
             <Canvas
               style={{
