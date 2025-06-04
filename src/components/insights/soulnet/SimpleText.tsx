@@ -5,7 +5,8 @@ import { useLoader } from '@react-three/fiber';
 import { FontLoader } from 'three/examples/jsm/loaders/FontLoader.js';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
-import { simplifiedFontService } from '@/services/simplifiedFontService';
+import { universalFontService } from '@/services/universalFontService';
+import { useTranslation } from '@/contexts/TranslationContext';
 
 interface SimpleTextProps {
   text: string;
@@ -35,17 +36,25 @@ export const SimpleText: React.FC<SimpleTextProps> = ({
   enableWrapping = false
 }) => {
   const textRef = useRef<THREE.Mesh>(null);
+  const { currentLanguage } = useTranslation();
   const [displayText] = useState(() => {
     if (!text || typeof text !== 'string') return 'Node';
     const cleanText = text.trim();
     return cleanText || 'Node';
   });
 
-  // Get font URL based on text content
-  const fontUrl = simplifiedFontService.getFontUrl(displayText);
+  // Get font URL based on text content and current language
+  const fontUrl = universalFontService.getFontUrl(displayText, currentLanguage);
   
-  // Load font using React Three Fiber's useLoader
-  const font = useLoader(FontLoader, fontUrl);
+  // Load font using React Three Fiber's useLoader with error handling
+  let font;
+  try {
+    font = useLoader(FontLoader, fontUrl);
+  } catch (error) {
+    console.warn(`[SimpleText] Failed to load font for ${currentLanguage}, falling back to Latin`, error);
+    // Fallback to Latin font
+    font = useLoader(FontLoader, universalFontService.getFontUrl('fallback', 'en'));
+  }
 
   // Billboard effect
   useFrame(({ camera }) => {
@@ -69,12 +78,12 @@ export const SimpleText: React.FC<SimpleTextProps> = ({
   // Check if text has multiple lines
   const isMultiLine = displayText.includes('\n');
   
-  // PLAN IMPLEMENTATION: Remove ALL outlines for black text in light theme
-  const shouldUseOutline = color !== '#000000'; // No outline for black text
+  // Enhanced outline logic for better readability across languages
+  const shouldUseOutline = color !== '#000000' || universalFontService.isComplexScript(displayText);
   const effectiveOutlineWidth = shouldUseOutline ? outlineWidth : 0;
   const effectiveOutlineColor = shouldUseOutline ? (color === '#ffffff' ? '#000000' : outlineColor) : undefined;
   
-  console.log(`[SimpleText] PLAN IMPLEMENTATION: Rendering: "${displayText}" with fontSize: ${size}, color: ${color}, NO OUTLINE for black text: ${!shouldUseOutline}`);
+  console.log(`[SimpleText] Rendering: "${displayText}" (${currentLanguage}) with fontSize: ${size}, color: ${color}, outline: ${shouldUseOutline}`);
 
   return (
     <Text

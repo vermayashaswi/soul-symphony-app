@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import ReliableText from './ReliableText';
 import { useTranslation } from '@/contexts/TranslationContext';
-import { simplifiedFontService } from '@/services/simplifiedFontService';
+import { universalFontService } from '@/services/universalFontService';
 
 interface ProgressiveNodeLabelProps {
   id: string;
@@ -30,9 +30,9 @@ export const ProgressiveNodeLabel: React.FC<ProgressiveNodeLabelProps> = ({
   const { currentLanguage, translate } = useTranslation();
   const [displayText, setDisplayText] = useState<string>(id);
 
-  console.log(`[ProgressiveNodeLabel] Rendering for ${id}, visible: ${shouldShowLabel}`);
+  console.log(`[ProgressiveNodeLabel] Rendering for ${id} (${currentLanguage}), visible: ${shouldShowLabel}`);
 
-  // Handle translation
+  // Handle translation with enhanced language support
   useEffect(() => {
     if (!shouldShowLabel) return;
 
@@ -46,12 +46,12 @@ export const ProgressiveNodeLabel: React.FC<ProgressiveNodeLabelProps> = ({
         const translated = await translate(id);
         if (translated && typeof translated === 'string') {
           setDisplayText(translated);
-          console.log(`[ProgressiveNodeLabel] Translation: "${id}" -> "${translated}"`);
+          console.log(`[ProgressiveNodeLabel] Translation (${currentLanguage}): "${id}" -> "${translated}"`);
         } else {
           setDisplayText(id);
         }
       } catch (error) {
-        console.warn(`[ProgressiveNodeLabel] Translation failed for ${id}:`, error);
+        console.warn(`[ProgressiveNodeLabel] Translation failed for ${id} (${currentLanguage}):`, error);
         setDisplayText(id);
       }
     };
@@ -80,6 +80,17 @@ export const ProgressiveNodeLabel: React.FC<ProgressiveNodeLabelProps> = ({
     return '#cccccc';
   }, [isSelected, isHighlighted, type, themeHex]);
 
+  // Enhanced outline configuration for multi-language support
+  const outlineConfig = useMemo(() => {
+    const isComplex = universalFontService.isComplexScript(displayText);
+    const needsOutline = isSelected || isComplex || textColor === '#ffffff';
+    
+    return {
+      width: needsOutline ? (isSelected ? 0.04 : 0.02) : 0,
+      color: isSelected ? '#000000' : '#333333'
+    };
+  }, [isSelected, displayText, textColor]);
+
   const labelPosition: [number, number, number] = [
     position[0] + labelOffset[0],
     position[1] + labelOffset[1],
@@ -90,7 +101,7 @@ export const ProgressiveNodeLabel: React.FC<ProgressiveNodeLabelProps> = ({
     return null;
   }
 
-  console.log(`[ProgressiveNodeLabel] Final render: "${displayText}" at position`, labelPosition);
+  console.log(`[ProgressiveNodeLabel] Final render: "${displayText}" (${currentLanguage}) at position`, labelPosition, `script: ${universalFontService.detectScript(displayText)}`);
 
   return (
     <ReliableText
@@ -101,8 +112,8 @@ export const ProgressiveNodeLabel: React.FC<ProgressiveNodeLabelProps> = ({
       visible={true}
       renderOrder={15}
       bold={isHighlighted || isSelected}
-      outlineWidth={isSelected ? 0.04 : 0.02}
-      outlineColor={isSelected ? '#000000' : '#333333'}
+      outlineWidth={outlineConfig.width}
+      outlineColor={outlineConfig.color}
       maxWidth={25}
     />
   );

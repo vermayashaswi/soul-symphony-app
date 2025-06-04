@@ -3,7 +3,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { Text } from '@react-three/drei';
 import { useLoader } from '@react-three/fiber';
 import { FontLoader } from 'three/examples/jsm/loaders/FontLoader.js';
-import { simplifiedFontService } from '@/services/simplifiedFontService';
+import { universalFontService } from '@/services/universalFontService';
 import { useTranslation } from '@/contexts/TranslationContext';
 
 interface NodeLabelProps {
@@ -46,11 +46,12 @@ export const NodeLabel: React.FC<NodeLabelProps> = ({
         const translated = await translate(id);
         if (translated && typeof translated === 'string') {
           setDisplayText(translated);
+          console.log(`[NodeLabel] Translation (${currentLanguage}): "${id}" -> "${translated}"`);
         } else {
           setDisplayText(id);
         }
       } catch (error) {
-        console.warn(`[NodeLabel] Translation failed for ${id}:`, error);
+        console.warn(`[NodeLabel] Translation failed for ${id} (${currentLanguage}):`, error);
         setDisplayText(id);
       }
     };
@@ -58,11 +59,18 @@ export const NodeLabel: React.FC<NodeLabelProps> = ({
     translateText();
   }, [id, currentLanguage, translate, shouldShowLabel]);
 
-  // Get font URL based on text content
-  const fontUrl = simplifiedFontService.getFontUrl(displayText);
+  // Get font URL based on text content and current language
+  const fontUrl = universalFontService.getFontUrl(displayText, currentLanguage);
   
-  // Load font using React Three Fiber's useLoader
-  const font = useLoader(FontLoader, fontUrl);
+  // Load font using React Three Fiber's useLoader with error handling
+  let font;
+  try {
+    font = useLoader(FontLoader, fontUrl);
+  } catch (error) {
+    console.warn(`[NodeLabel] Failed to load font for ${currentLanguage}, falling back to Latin`, error);
+    // Fallback to Latin font
+    font = useLoader(FontLoader, universalFontService.getFontUrl('fallback', 'en'));
+  }
 
   // Calculate position offset
   const labelOffset = useMemo(() => {
@@ -85,6 +93,17 @@ export const NodeLabel: React.FC<NodeLabelProps> = ({
     return '#cccccc';
   }, [isSelected, isHighlighted, type, themeHex]);
 
+  // Enhanced outline logic for better multi-language readability
+  const outlineConfig = useMemo(() => {
+    const isComplex = universalFontService.isComplexScript(displayText);
+    const needsOutline = isSelected || isComplex || textColor === '#ffffff';
+    
+    return {
+      width: needsOutline ? (isSelected ? 0.04 : 0.02) : 0,
+      color: isSelected ? '#000000' : '#333333'
+    };
+  }, [isSelected, displayText, textColor]);
+
   const labelPosition: [number, number, number] = [
     position[0] + labelOffset[0],
     position[1] + labelOffset[1],
@@ -94,6 +113,8 @@ export const NodeLabel: React.FC<NodeLabelProps> = ({
   if (!shouldShowLabel || !displayText || !font) {
     return null;
   }
+
+  console.log(`[NodeLabel] Rendering: "${displayText}" (${currentLanguage}) with font support for script: ${universalFontService.detectScript(displayText)}`);
 
   return (
     <Text
@@ -109,8 +130,8 @@ export const NodeLabel: React.FC<NodeLabelProps> = ({
       material-transparent={true}
       material-depthTest={false}
       renderOrder={15}
-      outlineWidth={isSelected ? 0.04 : 0.02}
-      outlineColor={isSelected ? '#000000' : '#333333'}
+      outlineWidth={outlineConfig.width}
+      outlineColor={outlineConfig.color}
     >
       {displayText}
     </Text>

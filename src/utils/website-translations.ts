@@ -1,4 +1,3 @@
-
 // This utility helps preload common website translations using Google Translate only
 export const preloadWebsiteTranslations = async (language: string) => {
   if (language === 'en') return; // Skip for English
@@ -23,17 +22,18 @@ export const translateWebsiteText = async (text: string): Promise<string> => {
   }
 };
 
-// Singleton for caching on-demand translations
-class TranslationCache {
+// Enhanced singleton for caching multi-language translations
+class EnhancedTranslationCache {
   private cache = new Map<string, Map<string, string>>();
-  private storageKey = 'soulo-translation-cache';
+  private storageKey = 'soulo-translation-cache-v2';
+  private maxCacheSize = 10000; // Increased for multi-language support
   
   constructor() {
     this.loadFromLocalStorage();
-    console.log('[TranslationCache] GOOGLE TRANSLATE ONLY - Initialized cache with size:', this.getCacheSize());
+    console.log('[EnhancedTranslationCache] MULTI-LANGUAGE SUPPORT - Initialized cache with size:', this.getCacheSize());
   }
 
-  // Load cached translations from localStorage
+  // Load cached translations from localStorage with migration support
   private loadFromLocalStorage(): void {
     try {
       const storedCache = localStorage.getItem(this.storageKey);
@@ -46,24 +46,57 @@ class TranslationCache {
           });
           this.cache.set(language, langMap);
         });
-        console.log(`[TranslationCache] Loaded ${this.getCacheSize()} translations from local storage`);
+        console.log(`[EnhancedTranslationCache] Loaded ${this.getCacheSize()} translations from local storage`);
+      }
+      
+      // Clean up old cache format
+      const oldCache = localStorage.getItem('soulo-translation-cache');
+      if (oldCache) {
+        console.log('[EnhancedTranslationCache] Migrating old cache format');
+        localStorage.removeItem('soulo-translation-cache');
       }
     } catch (error) {
-      console.error('[TranslationCache] Error loading from localStorage:', error);
+      console.error('[EnhancedTranslationCache] Error loading from localStorage:', error);
+      this.clearAll(); // Clear corrupted cache
     }
   }
 
-  // Save current cache to localStorage
+  // Save current cache to localStorage with size management
   private saveToLocalStorage(): void {
     try {
+      // Check cache size and clean if necessary
+      if (this.getCacheSize() > this.maxCacheSize) {
+        this.cleanupCache();
+      }
+      
       const cacheObject: Record<string, Record<string, string>> = {};
       this.cache.forEach((translations, language) => {
         cacheObject[language] = Object.fromEntries(translations);
       });
       localStorage.setItem(this.storageKey, JSON.stringify(cacheObject));
+      console.log(`[EnhancedTranslationCache] Saved ${this.getCacheSize()} translations to localStorage`);
     } catch (error) {
-      console.error('[TranslationCache] Error saving to localStorage:', error);
+      console.error('[EnhancedTranslationCache] Error saving to localStorage:', error);
+      if (error.name === 'QuotaExceededError') {
+        console.log('[EnhancedTranslationCache] Storage quota exceeded, clearing cache');
+        this.clearAll();
+      }
     }
+  }
+
+  // Clean up old cache entries to manage size
+  private cleanupCache(): void {
+    console.log('[EnhancedTranslationCache] Cleaning up cache due to size limit');
+    
+    // Keep only the most recently used languages (last 5)
+    const languagesBySize = Array.from(this.cache.entries())
+      .sort(([,a], [,b]) => b.size - a.size)
+      .slice(0, 5);
+    
+    this.cache.clear();
+    languagesBySize.forEach(([language, translations]) => {
+      this.cache.set(language, translations);
+    });
   }
   
   get(language: string, text: string): string | null {
@@ -71,10 +104,10 @@ class TranslationCache {
     
     const languageCache = this.cache.get(language);
     if (languageCache && languageCache.has(text)) {
-      console.log(`[TranslationCache] Cache hit for ${language}:"${text.substring(0, 20)}..."`);
+      console.log(`[EnhancedTranslationCache] Cache hit for ${language}:"${text.substring(0, 20)}..."`);
       return languageCache.get(text) || null;
     }
-    console.log(`[TranslationCache] Cache miss for ${language}:"${text.substring(0, 20)}..."`);
+    console.log(`[EnhancedTranslationCache] Cache miss for ${language}:"${text.substring(0, 20)}..."`);
     return null;
   }
   
@@ -83,7 +116,7 @@ class TranslationCache {
       return;
     }
     
-    console.log(`[TranslationCache] Caching translation for ${language}:"${text.substring(0, 20)}..."`)
+    console.log(`[EnhancedTranslationCache] Caching translation for ${language}:"${text.substring(0, 20)}..." -> "${translatedText.substring(0, 20)}..."`)
     
     let languageCache = this.cache.get(language);
     if (!languageCache) {
@@ -92,19 +125,23 @@ class TranslationCache {
     }
     
     languageCache.set(text, translatedText);
-    this.saveToLocalStorage();
+    
+    // Save to localStorage periodically
+    if (languageCache.size % 10 === 0) {
+      this.saveToLocalStorage();
+    }
   }
   
   // Clear all translations for a specific language
   clearLanguage(language: string): void {
-    console.log(`[TranslationCache] Clearing cache for language: ${language}`);
+    console.log(`[EnhancedTranslationCache] Clearing cache for language: ${language}`);
     this.cache.delete(language);
     this.saveToLocalStorage();
   }
   
   // Clear all translations
   clearAll(): void {
-    console.log(`[TranslationCache] Clearing entire cache`);
+    console.log(`[EnhancedTranslationCache] Clearing entire cache`);
     this.cache.clear();
     localStorage.removeItem(this.storageKey);
   }
@@ -126,6 +163,20 @@ class TranslationCache {
     }
     return {};
   }
+
+  // Get cache statistics
+  getStats(): { languages: number, totalTranslations: number, languageBreakdown: Record<string, number> } {
+    const languageBreakdown: Record<string, number> = {};
+    this.cache.forEach((translations, language) => {
+      languageBreakdown[language] = translations.size;
+    });
+    
+    return {
+      languages: this.cache.size,
+      totalTranslations: this.getCacheSize(),
+      languageBreakdown
+    };
+  }
 }
 
-export const onDemandTranslationCache = new TranslationCache();
+export const onDemandTranslationCache = new EnhancedTranslationCache();
