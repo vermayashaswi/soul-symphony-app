@@ -4,6 +4,10 @@
 interface Window {
   scrollY: number;
   scrollTo: (options: { top: number }) => void;
+  Capacitor?: {
+    isNativePlatform: () => boolean;
+    getPlatform: () => string;
+  };
 }
 
 // Ensure vite is properly typed
