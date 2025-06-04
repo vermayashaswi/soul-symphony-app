@@ -1,4 +1,3 @@
-
 import React, { useMemo, useEffect } from 'react';
 import TranslatableText3D from './TranslatableText3D';
 import SimpleText from './SimpleText';
@@ -89,22 +88,22 @@ export const DirectNodeLabel: React.FC<DirectNodeLabelProps> = ({
     return textSize * 0.21;
   }, [textSize]);
 
-  // PLAN IMPLEMENTATION: Ensure solid black text for light theme, white for dark theme
+  // UPDATED: Solid white text for dark theme, solid black text for light theme
   const textColor = useMemo(() => {
     const color = effectiveTheme === 'dark' ? '#ffffff' : '#000000';
     
     if (isInstantMode) {
-      console.log(`[DirectNodeLabel] INSTANT: PLAN IMPLEMENTATION - SOLID TEXT COLOR for ${id}: ${color} (theme: ${effectiveTheme})`);
+      console.log(`[DirectNodeLabel] INSTANT: SOLID WHITE TEXT COLOR for ${id}: ${color} (theme: ${effectiveTheme})`);
     } else {
-      console.log(`[DirectNodeLabel] PLAN IMPLEMENTATION - SOLID TEXT COLOR for ${id}: ${color} (theme: ${effectiveTheme})`);
+      console.log(`[DirectNodeLabel] SOLID WHITE TEXT COLOR for ${id}: ${color} (theme: ${effectiveTheme})`);
     }
     return color;
   }, [effectiveTheme, id, isInstantMode]);
 
-  // Percentage text also uses theme-aware colors
+  // UPDATED: Percentage text also uses solid white for dark theme
   const percentageColor = useMemo(() => {
     const color = effectiveTheme === 'dark' ? '#ffffff' : '#000000';
-    console.log(`[DirectNodeLabel] PLAN IMPLEMENTATION - SOLID PERCENTAGE COLOR for ${id}: ${color} (theme: ${effectiveTheme})`);
+    console.log(`[DirectNodeLabel] SOLID WHITE PERCENTAGE COLOR for ${id}: ${color} (theme: ${effectiveTheme})`);
     return color;
   }, [effectiveTheme, id]);
 
