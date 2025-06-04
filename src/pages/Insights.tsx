@@ -1,10 +1,10 @@
 import { useState, useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
 import { Calendar, Filter, TrendingUp, ArrowUp, ArrowDown, Activity, Award } from 'lucide-react';
+import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import EmotionChart from '@/components/EmotionChart';
 import MoodCalendar from '@/components/insights/MoodCalendar';
 import SoulNet from '@/components/insights/SoulNet';
-import SmartTimeToggle from '@/components/insights/SmartTimeToggle';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { useInsightsData, TimeRange } from '@/hooks/use-insights-data';
@@ -28,6 +28,13 @@ function InsightsContent() {
   const isMobile = useIsMobile();
   
   const { insightsData, loading } = useInsightsData(user?.id, timeRange);
+  
+  const timeRanges = [
+    { value: 'today', label: 'Day' },
+    { value: 'week', label: 'Week' },
+    { value: 'month', label: 'Month' },
+    { value: 'year', label: 'Year' },
+  ];
 
   useEffect(() => {
     console.log("Insights page mounted");
@@ -78,10 +85,45 @@ function InsightsContent() {
   };
 
   const renderTimeToggle = () => (
-    <SmartTimeToggle 
-      timeRange={timeRange}
-      onTimeRangeChange={handleTimeRangeChange}
-    />
+    <div className="insights-time-toggle flex items-center gap-3">
+      <span className="text-sm text-muted-foreground">
+        <EnhancedTranslatableText 
+          text="View:" 
+          forceTranslate={true}
+          enableFontScaling={true}
+          scalingContext="compact"
+          usePageTranslation={true}
+        />
+      </span>
+      <ToggleGroup 
+        type="single" 
+        value={timeRange}
+        onValueChange={handleTimeRangeChange}
+        variant="outline"
+        className="bg-secondary rounded-full p-1"
+      >
+        {timeRanges.map((range) => (
+          <ToggleGroupItem
+            key={range.value}
+            value={range.value}
+            className={cn(
+              "px-4 py-1.5 rounded-full text-sm font-medium transition-all",
+              timeRange === range.value
+                ? "bg-background text-primary shadow-sm"
+                : "text-muted-foreground hover:text-foreground bg-transparent"
+            )}
+          >
+            <EnhancedTranslatableText 
+              text={range.label} 
+              forceTranslate={true}
+              enableFontScaling={true}
+              scalingContext="compact"
+              usePageTranslation={true}
+            />
+          </ToggleGroupItem>
+        ))}
+      </ToggleGroup>
+    </div>
   );
 
   useEffect(() => {
