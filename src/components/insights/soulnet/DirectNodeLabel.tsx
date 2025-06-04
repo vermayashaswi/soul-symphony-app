@@ -1,6 +1,6 @@
 
 import React, { useMemo, useEffect } from 'react';
-import SmartTextRenderer from './SmartTextRenderer';
+import TranslatableText3D from './TranslatableText3D';
 import SimpleText from './SimpleText';
 
 interface DirectNodeLabelProps {
@@ -15,7 +15,6 @@ interface DirectNodeLabelProps {
   nodeScale?: number;
   connectionPercentage?: number;
   showPercentage?: boolean;
-  translatedText?: string;
   effectiveTheme?: 'light' | 'dark';
   isInstantMode?: boolean;
 }
@@ -32,7 +31,6 @@ export const DirectNodeLabel: React.FC<DirectNodeLabelProps> = ({
   nodeScale = 1,
   connectionPercentage = 0,
   showPercentage = false,
-  translatedText,
   effectiveTheme = 'light',
   isInstantMode = false
 }) => {
@@ -51,16 +49,13 @@ export const DirectNodeLabel: React.FC<DirectNodeLabelProps> = ({
     };
   }, [id, shouldShowLabel]);
 
-  // INSTANT MODE: Log immediate rendering without delays
+  // Log rendering mode
   if (isInstantMode) {
-    console.log(`[DirectNodeLabel] INSTANT MODE: ${id} with translated text: "${translatedText || id}" and percentage: ${showPercentage ? connectionPercentage + '%' : 'none'} - NO LOADING DELAY`);
+    console.log(`[DirectNodeLabel] INSTANT MODE: ${id} with TranslatableText3D integration - NO LOADING DELAY`);
   } else {
-    console.log(`[DirectNodeLabel] ENHANCED POSITIONING: ${id} with translated text: "${translatedText || id}" and percentage: ${showPercentage ? connectionPercentage + '%' : 'none'}`);
+    console.log(`[DirectNodeLabel] ENHANCED POSITIONING: ${id} with TranslatableText3D integration`);
   }
 
-  // Use translated text if available, otherwise fallback to original id
-  const displayText = translatedText || id;
-  
   // Same base offset for both entity and emotion nodes
   const labelOffset = useMemo(() => {
     const baseOffset = 1.4;
@@ -143,11 +138,11 @@ export const DirectNodeLabel: React.FC<DirectNodeLabelProps> = ({
     return shouldShowLabel;
   }, [shouldShowLabel, id]);
 
-  if (!enhancedShouldShowLabel || !displayText) {
+  if (!enhancedShouldShowLabel || !id) {
     if (isInstantMode) {
-      console.log(`[DirectNodeLabel] INSTANT: Not rendering label for ${id}: shouldShow=${enhancedShouldShowLabel}, text="${displayText}"`);
+      console.log(`[DirectNodeLabel] INSTANT: Not rendering label for ${id}: shouldShow=${enhancedShouldShowLabel}, text="${id}"`);
     } else {
-      console.log(`[DirectNodeLabel] Not rendering label for ${id}: shouldShow=${enhancedShouldShowLabel}, text="${displayText}"`);
+      console.log(`[DirectNodeLabel] Not rendering label for ${id}: shouldShow=${enhancedShouldShowLabel}, text="${id}"`);
     }
     return null;
   }
@@ -162,16 +157,16 @@ export const DirectNodeLabel: React.FC<DirectNodeLabelProps> = ({
   }
 
   if (isInstantMode) {
-    console.log(`[DirectNodeLabel] INSTANT MODE - MAIN TEXT: "${displayText}" at position`, labelPosition, 'with size:', textSize, 'color:', textColor, '- NO LOADING DELAY - INTELLIGENT WRAPPING ENABLED');
+    console.log(`[DirectNodeLabel] INSTANT MODE - MAIN TEXT: "${id}" at position`, labelPosition, 'with size:', textSize, 'color:', textColor, '- NO LOADING DELAY - GOOGLE TRANSLATE INTEGRATION');
   } else {
-    console.log(`[DirectNodeLabel] ENHANCED POSITIONING - MAIN TEXT: "${displayText}" at position`, labelPosition, 'with size:', textSize, 'color:', textColor, '- INTELLIGENT WRAPPING ENABLED');
+    console.log(`[DirectNodeLabel] ENHANCED POSITIONING - MAIN TEXT: "${id}" at position`, labelPosition, 'with size:', textSize, 'color:', textColor, '- GOOGLE TRANSLATE INTEGRATION');
   }
 
   return (
     <>
-      {/* Main translated text using SmartTextRenderer with intelligent wrapping */}
-      <SmartTextRenderer
-        text={displayText}
+      {/* Main text using TranslatableText3D with Google Translate integration */}
+      <TranslatableText3D
+        text={id}
         position={labelPosition}
         color={textColor}
         size={textSize}
@@ -184,6 +179,7 @@ export const DirectNodeLabel: React.FC<DirectNodeLabelProps> = ({
         enableWrapping={true}
         maxCharsPerLine={18}
         maxLines={3}
+        sourceLanguage="en"
       />
       
       {/* Enhanced side-positioned percentage text with theme-aware color */}

@@ -27,7 +27,6 @@ interface NodeProps {
   connectionPercentage?: number;
   showPercentage?: boolean;
   forceShowLabels?: boolean;
-  translatedText?: string;
   effectiveTheme?: 'light' | 'dark';
   isInstantMode?: boolean;
 }
@@ -46,7 +45,6 @@ const Node: React.FC<NodeProps> = ({
   connectionPercentage = 0,
   showPercentage = false,
   forceShowLabels = false,
-  translatedText,
   effectiveTheme = 'light',
   isInstantMode = false
 }) => {
@@ -116,9 +114,9 @@ const Node: React.FC<NodeProps> = ({
   }
 
   if (isInstantMode) {
-    console.log(`[Node] INSTANT MODE: Rendering ${node.type} node ${node.id} with app theme color ${userColorThemeHex}, scale ${nodeScale.toFixed(2)} and translated text: "${translatedText || node.id}" and percentage display: ${showPercentage ? connectionPercentage + '%' : 'none'} - NO LOADING DELAY`);
+    console.log(`[Node] INSTANT MODE: Rendering ${node.type} node ${node.id} with app theme color ${userColorThemeHex}, scale ${nodeScale.toFixed(2)} with Google Translate integration - NO LOADING DELAY`);
   } else {
-    console.log(`[Node] ENHANCED: Rendering ${node.type} node ${node.id} with app theme color ${userColorThemeHex}, scale ${nodeScale.toFixed(2)} and translated text: "${translatedText || node.id}" and percentage display: ${showPercentage ? connectionPercentage + '%' : 'none'}`);
+    console.log(`[Node] ENHANCED: Rendering ${node.type} node ${node.id} with app theme color ${userColorThemeHex}, scale ${nodeScale.toFixed(2)} with Google Translate integration`);
   }
 
   // ENHANCED: Improved geometry sizes to work with the enhanced scale differences
@@ -162,7 +160,6 @@ const Node: React.FC<NodeProps> = ({
           nodeScale={nodeScale}
           connectionPercentage={connectionPercentage}
           showPercentage={showPercentage}
-          translatedText={translatedText}
           effectiveTheme={effectiveTheme}
           isInstantMode={isInstantMode}
         />
