@@ -54,19 +54,40 @@ export class EmbeddingGenerationService {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return 0;
 
-      // Count entries without embeddings
-      const { data: entriesWithoutEmbeddings, error } = await supabase
+      // First get all journal entries for the user
+      const { data: allEntries, error: entriesError } = await supabase
         .from('Journal Entries')
         .select('id')
-        .eq('user_id', user.id)
-        .not('id', 'in', `(SELECT journal_entry_id FROM journal_embeddings)`);
+        .eq('user_id', user.id);
 
-      if (error) {
-        console.error('[EmbeddingGenerationService] Error checking missing embeddings:', error);
+      if (entriesError) {
+        console.error('[EmbeddingGenerationService] Error fetching entries:', entriesError);
         return 0;
       }
 
-      return entriesWithoutEmbeddings?.length || 0;
+      if (!allEntries || allEntries.length === 0) {
+        return 0;
+      }
+
+      // Get entries that have embeddings
+      const { data: entriesWithEmbeddings, error: embeddingsError } = await supabase
+        .from('journal_embeddings')
+        .select('journal_entry_id')
+        .in('journal_entry_id', allEntries.map(entry => entry.id));
+
+      if (embeddingsError) {
+        console.error('[EmbeddingGenerationService] Error fetching embeddings:', embeddingsError);
+        return 0;
+      }
+
+      const entriesWithEmbeddingIds = new Set(
+        (entriesWithEmbeddings || []).map(item => item.journal_entry_id)
+      );
+
+      const missingCount = allEntries.filter(entry => !entriesWithEmbeddingIds.has(entry.id)).length;
+      
+      console.log(`[EmbeddingGenerationService] Found ${missingCount} entries without embeddings`);
+      return missingCount;
       
     } catch (error) {
       console.error('[EmbeddingGenerationService] Error checking missing embeddings:', error);
