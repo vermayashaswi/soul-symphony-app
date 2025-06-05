@@ -27,6 +27,11 @@ export async function sendAudioForTranscription(
       throw new Error('No audio data provided');
     }
 
+    if (!userId) {
+      console.error('[TranscriptionService] No user ID provided');
+      throw new Error('User authentication required');
+    }
+
     console.log(`[TranscriptionService] Sending audio for ${directTranscription ? 'direct' : 'full'} transcription processing`);
     console.log(`[TranscriptionService] Audio data size: ${base64Audio.length} characters`);
     console.log('[TranscriptionService] User ID provided:', userId ? 'Yes' : 'No');
@@ -34,11 +39,6 @@ export async function sendAudioForTranscription(
     // Check if base64Audio is valid
     if (typeof base64Audio !== 'string' || base64Audio.length < 50) {
       throw new Error('Invalid audio data format');
-    }
-
-    // Guard against empty or invalid user ID which could cause server-side errors
-    if (userId === '') {
-      userId = undefined;
     }
 
     // Calculate estimated recording time based on audio data size
@@ -54,13 +54,13 @@ export async function sendAudioForTranscription(
       estimatedDuration: estimatedDuration * 1000
     });
 
-    // Invoke the edge function
+    // Invoke the edge function with corrected parameter names
     console.log('[TranscriptionService] Calling transcribe-audio edge function...');
     const startTime = Date.now();
     
     const { data, error } = await supabase.functions.invoke('transcribe-audio', {
       body: {
-        audio: base64Audio,
+        audio: base64Audio, // Use 'audio' parameter name to match edge function
         userId,
         directTranscription,
         highQuality: processSentiment,

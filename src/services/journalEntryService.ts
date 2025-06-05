@@ -4,18 +4,27 @@ import { JournalEntry } from '@/types/journal';
 
 export const createJournalEntry = async (entryData: Partial<JournalEntry>, userId: string): Promise<JournalEntry | null> => {
   try {
+    // Ensure user_id is set for RLS compliance
+    const insertData = {
+      ...entryData,
+      user_id: userId, // This is critical for RLS policies
+      created_at: new Date().toISOString(),
+    };
+
+    console.log('[JournalEntryService] Creating entry with user_id:', userId);
+
     const { data, error } = await supabase
       .from('Journal Entries')
-      .insert({
-        ...entryData,
-        user_id: userId, // Ensure user_id is set for RLS
-        created_at: new Date().toISOString(),
-      })
+      .insert(insertData)
       .select()
       .single();
 
     if (error) {
       console.error('Error creating journal entry:', error);
+      // Provide more helpful error messages
+      if (error.message.includes('row-level security')) {
+        console.error('RLS policy violation - ensure user is authenticated and user_id is set correctly');
+      }
       return null;
     }
 
@@ -52,7 +61,7 @@ export const updateJournalEntry = async (entryId: number, entryData: Partial<Jou
       .from('Journal Entries')
       .update(updateData)
       .eq('id', entryId)
-      .eq('user_id', userId) // Ensure user can only update their own entries
+      .eq('user_id', userId) // Ensure user can only update their own entries - RLS will handle this but explicit for clarity
       .select()
       .single();
 
@@ -83,7 +92,7 @@ export const deleteJournalEntry = async (entryId: number, userId: string): Promi
       .from('Journal Entries')
       .delete()
       .eq('id', entryId)
-      .eq('user_id', userId); // Ensure user can only delete their own entries
+      .eq('user_id', userId); // Ensure user can only delete their own entries - RLS will handle this but explicit for clarity
 
     if (error) {
       console.error('Error deleting journal entry:', error);
@@ -99,6 +108,8 @@ export const deleteJournalEntry = async (entryId: number, userId: string): Promi
 
 export const getJournalEntries = async (userId: string, limit?: number, offset?: number): Promise<JournalEntry[]> => {
   try {
+    console.log('[JournalEntryService] Fetching entries for user:', userId);
+
     let query = supabase
       .from('Journal Entries')
       .select('*')
@@ -117,8 +128,14 @@ export const getJournalEntries = async (userId: string, limit?: number, offset?:
 
     if (error) {
       console.error('Error fetching journal entries:', error);
+      // Provide more helpful error messages
+      if (error.message.includes('row-level security')) {
+        console.error('RLS policy issue - ensure user is authenticated');
+      }
       return [];
     }
+
+    console.log(`[JournalEntryService] Successfully fetched ${data?.length || 0} entries`);
 
     // Map the database results to match JournalEntry interface
     return (data || []).map(entry => ({

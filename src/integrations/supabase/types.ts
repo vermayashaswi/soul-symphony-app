@@ -137,7 +137,7 @@ export type Database = {
           "transcription text": string | null
           translation_status: string | null
           user_feedback: string | null
-          user_id: string | null
+          user_id: string
         }
         Insert: {
           audio_url?: string | null
@@ -156,7 +156,7 @@ export type Database = {
           "transcription text"?: string | null
           translation_status?: string | null
           user_feedback?: string | null
-          user_id?: string | null
+          user_id: string
         }
         Update: {
           audio_url?: string | null
@@ -175,7 +175,7 @@ export type Database = {
           "transcription text"?: string | null
           translation_status?: string | null
           user_feedback?: string | null
-          user_id?: string | null
+          user_id?: string
         }
         Relationships: [
           {

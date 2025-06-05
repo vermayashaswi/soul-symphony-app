@@ -22,7 +22,7 @@ serve(async (req) => {
     console.log(`  hasGoogleNLApiKey: ${!!Deno.env.get('GOOGLE_API')}`);
     console.log("}");
 
-    // Initialize Supabase client
+    // Initialize Supabase client with service role key for admin operations
     const supabaseUrl = Deno.env.get('SUPABASE_URL');
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
     
@@ -30,23 +30,44 @@ serve(async (req) => {
       throw new Error('Supabase configuration missing');
     }
 
-    const supabase = createClient(supabaseUrl, supabaseServiceKey);
-    console.log("Supabase client initialized successfully");
+    // Create admin client for database operations
+    const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
+    
+    // Create client with user's auth for RLS compliance
+    const supabaseClient = createClient(supabaseUrl, Deno.env.get('SUPABASE_ANON_KEY') ?? '', {
+      global: {
+        headers: { Authorization: req.headers.get('Authorization')! },
+      },
+    });
 
-    const { audioData, userId, highQuality = true, directTranscription = false } = await req.json();
+    console.log("Supabase clients initialized successfully");
+
+    // Fix parameter mapping - use correct parameter names
+    const { audio, audioData, userId, highQuality = true, directTranscription = false } = await req.json();
+    
+    // Handle both parameter names for backward compatibility
+    const actualAudioData = audio || audioData;
     
     console.log("Received audio data, processing...");
     console.log(`User ID: ${userId}`);
     console.log(`Direct transcription mode: ${directTranscription ? 'YES' : 'NO'}`);
     console.log(`High quality mode: ${highQuality ? 'YES' : 'NO'}`);
-    console.log(`Audio data length: ${audioData.length}`);
+    console.log(`Audio data length: ${actualAudioData?.length || 0}`);
+    
+    if (!actualAudioData) {
+      throw new Error('No audio data received');
+    }
+
+    if (!userId) {
+      throw new Error('User ID is required for authentication');
+    }
     
     // Always use the correct transcription model
-    const model = "gpt-4o-transcribe"; // Explicitly set the correct model
+    const model = "whisper-1"; // Use the correct Whisper model name
     console.log(`Using model: ${model}`);
 
-    // Check if user profile exists
-    const { data: profileData, error: profileError } = await supabase
+    // Verify user authentication by checking if user profile exists
+    const { data: profileData, error: profileError } = await supabaseClient
       .from('profiles')
       .select('id')
       .eq('id', userId)
@@ -54,6 +75,7 @@ serve(async (req) => {
 
     if (profileError && profileError.code !== 'PGRST116') {
       console.error('Error checking user profile:', profileError);
+      throw new Error(`Authentication error: ${profileError.message}`);
     }
 
     const profileExists = !!profileData;
@@ -61,7 +83,7 @@ serve(async (req) => {
 
     if (!profileExists && !directTranscription) {
       console.log('Creating user profile...');
-      const { error: insertError } = await supabase
+      const { error: insertError } = await supabaseAdmin
         .from('profiles')
         .insert([{ id: userId }]);
 
@@ -73,7 +95,7 @@ serve(async (req) => {
     }
 
     // Convert base64 to binary
-    const binaryString = atob(audioData);
+    const binaryString = atob(actualAudioData);
     const bytes = new Uint8Array(binaryString.length);
     for (let i = 0; i < binaryString.length; i++) {
       bytes[i] = binaryString.charCodeAt(i);
@@ -81,26 +103,6 @@ serve(async (req) => {
     
     console.log(`Processed ${Math.ceil(binaryString.length / 8)} chunks into a ${bytes.length} byte array`);
     console.log(`Processed binary audio size: ${bytes.length}`);
-
-    // Check if user profile exists again (in case it was just created)
-    if (!directTranscription) {
-      const { data: checkProfileData, error: checkProfileError } = await supabase
-        .from('profiles')
-        .select('id')
-        .eq('id', userId)
-        .single();
-
-      if (checkProfileError && checkProfileError.code !== 'PGRST116') {
-        console.error('Error checking user profile after creation:', checkProfileError);
-      }
-
-      const profileNowExists = !!checkProfileData;
-      console.log(`User profile now exists: ${profileNowExists ? 'YES' : 'NO'}`);
-
-      if (!profileNowExists) {
-        console.warn('User profile still does not exist after creation attempt');
-      }
-    }
 
     // File type detection
     let detectedFileType = 'wav';
@@ -119,13 +121,13 @@ serve(async (req) => {
     
     console.log(`Detected file type: ${detectedFileType}`);
 
-    // Store audio file
+    // Store audio file using admin client
     const timestamp = Date.now();
     const fileName = `journal-entry-${userId}-${timestamp}.${detectedFileType}`;
     
     console.log(`Storing audio file ${fileName} with size ${bytes.length} bytes`);
     
-    const { data: uploadData, error: uploadError } = await supabase.storage
+    const { data: uploadData, error: uploadError } = await supabaseAdmin.storage
       .from('journal-audio')
       .upload(fileName, bytes, {
         contentType: `audio/${detectedFileType}`,
@@ -148,11 +150,11 @@ serve(async (req) => {
 
     // Send to OpenAI API for transcription
     console.log("Sending audio to OpenAI API for transcription");
-    console.log(`Using model: ${model}`); // Log the model being used
+    console.log(`Using model: ${model}`);
 
     const formData = new FormData();
     formData.append('file', audioBlob, `audio.${detectedFileType}`);
-    formData.append('model', model); // Use the verified model
+    formData.append('model', model);
     
     console.log(`[Transcription] Using filename: audio.${detectedFileType}`);
     console.log(`[Transcription] Preparing audio for OpenAI: { blobSize: ${audioBlob.size}, blobType: "${audioBlob.type}", fileExtension: "${detectedFileType}" }`);
@@ -233,53 +235,6 @@ serve(async (req) => {
       }
     }
 
-    // Additional language detection for mixed-language content
-    if (transcribedText.length > 100) {
-      try {
-        console.log('Analyzing for mixed-language content...');
-        const analysisResponse = await fetch('https://api.openai.com/v1/chat/completions', {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${openaiApiKey}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            model: 'gpt-4o',
-            messages: [
-              {
-                role: 'system',
-                content: 'You are a language detection expert. Analyze the text and identify all languages present. Return ONLY a JSON array of ISO 639-1 language codes (e.g., ["en", "es", "hi"]). Be conservative - only include languages that are clearly present with substantial content.'
-              },
-              {
-                role: 'user',
-                content: `Analyze this text for multiple languages: "${transcribedText}"`
-              }
-            ],
-            temperature: 0.1,
-            response_format: { type: "json_object" },
-            max_tokens: 200
-          }),
-        });
-
-        if (analysisResponse.ok) {
-          const analysisResult = await analysisResponse.json();
-          try {
-            const languageAnalysis = JSON.parse(analysisResult.choices[0].message.content);
-            if (languageAnalysis.languages && Array.isArray(languageAnalysis.languages)) {
-              // Merge with existing detected languages, removing duplicates
-              const allLanguages = [...new Set([...detectedLanguages, ...languageAnalysis.languages])];
-              detectedLanguages = allLanguages;
-              console.log(`Enhanced language detection result: ${JSON.stringify(detectedLanguages)}`);
-            }
-          } catch (parseError) {
-            console.error('Error parsing language analysis:', parseError);
-          }
-        }
-      } catch (error) {
-        console.error('Error with enhanced language detection:', error);
-      }
-    }
-
     console.log(`Final detected languages: ${JSON.stringify(detectedLanguages)}`);
 
     // If direct transcription mode, return the result immediately
@@ -355,14 +310,14 @@ serve(async (req) => {
       console.warn('Google NL API key not found, skipping sentiment analysis');
     }
 
-    // Store in database with detected languages
+    // Store in database using admin client to bypass RLS for initial insert
     console.log('Storing journal entry in database...');
     
-    const { data: journalEntry, error: insertError } = await supabase
+    const { data: journalEntry, error: insertError } = await supabaseAdmin
       .from('Journal Entries')
       .insert([
         {
-          user_id: userId,
+          user_id: userId, // Explicitly set user_id for RLS compliance
           "transcription text": transcribedText,
           "refined text": refinedText,
           audio_url: audioUrl,
@@ -436,10 +391,10 @@ serve(async (req) => {
       analysis = { emotions: {}, master_themes: [] };
     }
 
-    // Update journal entry with emotions and themes
+    // Update journal entry with emotions and themes using admin client
     console.log('Updating journal entry with emotions and themes...');
     
-    const { error: updateError } = await supabase
+    const { error: updateError } = await supabaseAdmin
       .from('Journal Entries')
       .update({
         emotions: analysis.emotions || {},
@@ -479,10 +434,10 @@ serve(async (req) => {
 
     console.log(`Embedding generated successfully with ${embedding.length} dimensions`);
 
-    // Store embeddings
+    // Store embeddings using admin client
     console.log('Storing embeddings...');
     
-    const { error: embeddingError } = await supabase.rpc('upsert_journal_embedding', {
+    const { error: embeddingError } = await supabaseAdmin.rpc('upsert_journal_embedding', {
       entry_id: journalEntry.id,
       embedding_vector: embedding
     });
@@ -498,6 +453,7 @@ serve(async (req) => {
     
     return new Response(JSON.stringify({
       id: journalEntry.id,
+      entryId: journalEntry.id, // Add entryId for compatibility
       transcription: transcribedText,
       refined: refinedText,
       emotions: analysis.emotions,
