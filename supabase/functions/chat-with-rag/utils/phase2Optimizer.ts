@@ -141,7 +141,7 @@ export class Phase2Optimizer {
     console.log(`[Phase2Optimizer] Recorded metric: ${operation} (${timeMs}ms, route: ${context.route})`);
   }
   
-  // Optimize memory usage
+  // Optimize memory usage - Deno compatible version
   static optimizeMemoryUsage(): { 
     memoryFreed: number; 
     optimizationsApplied: string[];
@@ -149,24 +149,27 @@ export class Phase2Optimizer {
     const optimizationsApplied = [];
     let memoryFreed = 0;
     
-    // Clear old performance metrics
-    const beforeSize = this.performanceMetrics.size;
-    this.cleanupOldMetrics();
-    const afterSize = this.performanceMetrics.size;
-    
-    if (beforeSize > afterSize) {
-      memoryFreed += (beforeSize - afterSize) * 100; // Estimate
-      optimizationsApplied.push('metrics_cleanup');
+    try {
+      // Clear old performance metrics
+      const beforeSize = this.performanceMetrics.size;
+      this.cleanupOldMetrics();
+      const afterSize = this.performanceMetrics.size;
+      
+      if (beforeSize > afterSize) {
+        memoryFreed += (beforeSize - afterSize) * 100; // Estimate
+        optimizationsApplied.push('metrics_cleanup');
+      }
+      
+      // Note: Manual garbage collection is not available in Deno Edge Runtime
+      // The runtime handles memory management automatically
+      optimizationsApplied.push('automatic_memory_management');
+      
+      console.log(`[Phase2Optimizer] Memory optimization completed - freed ~${memoryFreed}bytes`);
+      
+    } catch (error) {
+      console.warn(`[Phase2Optimizer] Memory optimization warning:`, error);
+      optimizationsApplied.push('optimization_skipped');
     }
-    
-    // Trigger garbage collection hint (if available)
-    if (global.gc) {
-      global.gc();
-      optimizationsApplied.push('garbage_collection');
-      memoryFreed += 500; // Estimate
-    }
-    
-    console.log(`[Phase2Optimizer] Memory optimization freed ~${memoryFreed}bytes`);
     
     return { memoryFreed, optimizationsApplied };
   }
