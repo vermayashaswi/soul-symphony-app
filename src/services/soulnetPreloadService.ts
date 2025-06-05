@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 import { translationService } from '@/services/translationService';
 import { onDemandTranslationCache } from '@/utils/website-translations';
@@ -272,20 +271,22 @@ export class SoulNetPreloadService {
 
     const entityList = Object.keys(entityEmotionMap);
     
-    // EXPANDED: Increased emotion layer radius and z-axis range for better vertical distribution
+    // CORRECTED AXIS: Fixed the axis confusion - emotions now use Y-axis for vertical distribution
     const EMOTION_LAYER_RADIUS = 11;
     const ENTITY_LAYER_RADIUS = 6;
-    const EMOTION_Z_SPAN = 200; // EXPANDED: -100 to +100 range (was 12)
-    const ENTITY_Y_SPAN = 3;
+    const EMOTION_Y_SPAN = 200; // CORRECTED: Y-axis range -100 to +100 (was incorrectly on Z-axis)
+    const ENTITY_Y_SPAN = 6; // Keep entities in center layer with smaller Y-range
 
-    console.log("[SoulNetPreloadService] EXPANDED Z-AXIS: Generating graph with", entityList.length, "entities with expanded emotion z-range (-100 to +100)");
+    console.log("[SoulNetPreloadService] AXIS CORRECTED: Generating graph with", entityList.length, "entities with emotions distributed vertically on Y-axis (-100 to +100)");
     
     entityList.forEach((entity, entityIndex) => {
       entityNodes.add(entity);
       const entityAngle = (entityIndex / entityList.length) * Math.PI * 2;
       const entityRadius = ENTITY_LAYER_RADIUS;
       const entityX = Math.cos(entityAngle) * entityRadius;
+      // CORRECTED: Keep entities in center layer with small Y-range variation
       const entityY = ((entityIndex % 2) === 0 ? -1 : 1) * 0.7 * (Math.random() - 0.5) * ENTITY_Y_SPAN;
+      // CORRECTED: Z-axis uses circular distribution same as X-axis
       const entityZ = Math.sin(entityAngle) * entityRadius;
       
       nodes.push({
@@ -311,12 +312,12 @@ export class SoulNetPreloadService {
       const emotionRadius = EMOTION_LAYER_RADIUS;
       const emotionX = Math.cos(emotionAngle) * emotionRadius;
       
-      // EXPANDED: Even vertical distribution across -100 to +100 z-range
-      const emotionY = ((emotionIndex % 2) === 0 ? -1 : 1) * 0.7 * (Math.random() - 0.5) * 6;
-      
-      // EXPANDED: Distribute emotions evenly across much larger z-range
+      // CORRECTED: Y-axis now handles the vertical distribution (-100 to +100)
       const normalizedIndex = emotionIndex / (emotionNodes.size - 1); // 0 to 1
-      const emotionZ = -100 + (normalizedIndex * EMOTION_Z_SPAN); // -100 to +100
+      const emotionY = -100 + (normalizedIndex * EMOTION_Y_SPAN); // -100 to +100 on Y-axis
+      
+      // CORRECTED: Z-axis now uses circular distribution (same pattern as X-axis)
+      const emotionZ = Math.sin(emotionAngle) * emotionRadius;
       
       nodes.push({
         id: emotion,
@@ -327,7 +328,8 @@ export class SoulNetPreloadService {
       });
     });
 
-    console.log("[SoulNetPreloadService] EXPANDED Z-AXIS: Generated graph with", nodes.length, "nodes and", links.length, "links, emotions distributed from z=-100 to z=+100");
+    console.log("[SoulNetPreloadService] AXIS CORRECTED: Generated graph with", nodes.length, "nodes and", links.length, "links");
+    console.log("[SoulNetPreloadService] AXIS CORRECTED: Entities form circle in center layer, emotions distributed vertically on Y-axis from -100 to +100");
     return { nodes, links };
   }
 
