@@ -98,21 +98,22 @@ serve(async (req) => {
       }
     );
 
-    const advancedCacheResult = AdvancedCacheManager.getCachedQueryResults(
+    // Check for cached response (string response from orchestrator)
+    const advancedResponseCache = AdvancedCacheManager.getCachedResponse(
       advancedCacheKey,
       { maxAge: routing.primaryRoute === 'fast_track' ? 15 * 60 * 1000 : 10 * 60 * 1000 }
     );
 
-    if (advancedCacheResult.cacheHit) {
-      console.log('[Chat-with-RAG] Advanced cache hit - returning optimized response');
+    if (advancedResponseCache.cacheHit) {
+      console.log('[Chat-with-RAG] Advanced response cache hit - returning cached response');
       Phase2Optimizer.recordPerformanceMetric('cache_hit', Date.now() - startTime);
       
       return new Response(JSON.stringify({
-        response: advancedCacheResult.results,
+        response: advancedResponseCache.response,
         analysis: {
           queryType: 'advanced_cached_response',
           cacheHit: true,
-          cacheAge: advancedCacheResult.ageMs,
+          cacheAge: advancedResponseCache.ageMs,
           timestamp: new Date().toISOString(),
           optimizationsApplied: ['phase2_advanced_caching', 'smart_routing'],
           routeUsed: routing.primaryRoute
@@ -182,15 +183,28 @@ serve(async (req) => {
 
     const { result: orchestratorResponse, routeUsed, performanceMs, adaptationsApplied } = executionResult;
 
-    // PHASE 2: Advanced Response Caching with Compression
-    AdvancedCacheManager.setCachedQueryResults(
-      advancedCacheKey,
-      orchestratorResponse.response,
-      { 
-        compressionLevel: queryComplexity === 'simple' ? 2 : 1,
-        priority: routeUsed === 'fast_track' ? 'high' : 'normal'
-      }
-    );
+    // PHASE 2: Advanced Response Caching - Cache the string response appropriately
+    if (typeof orchestratorResponse.response === 'string') {
+      AdvancedCacheManager.setCachedResponse(
+        advancedCacheKey,
+        orchestratorResponse.response,
+        { 
+          priority: routeUsed === 'fast_track' ? 'high' : 'normal'
+        }
+      );
+    } else if (Array.isArray(orchestratorResponse.response)) {
+      // If the response is an array, use the query results cache
+      AdvancedCacheManager.setCachedQueryResults(
+        advancedCacheKey,
+        orchestratorResponse.response,
+        { 
+          compressionLevel: queryComplexity === 'simple' ? 2 : 1,
+          priority: routeUsed === 'fast_track' ? 'high' : 'normal'
+        }
+      );
+    } else {
+      console.warn('[Chat-with-RAG] Unexpected response type for caching:', typeof orchestratorResponse.response);
+    }
 
     // PHASE 2: Memory Optimization
     const memoryOptimization = Phase2Optimizer.optimizeMemoryUsage();

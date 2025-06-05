@@ -1,3 +1,4 @@
+
 // Advanced Cache Manager with intelligent eviction and compression
 export class AdvancedCacheManager {
   private static embeddingCache = new Map<string, { 
@@ -14,6 +15,12 @@ export class AdvancedCacheManager {
     compressionLevel: number;
   }>();
   
+  private static responseCache = new Map<string, { 
+    response: string; 
+    timestamp: number; 
+    accessCount: number;
+  }>();
+  
   private static contextCache = new Map<string, {
     optimizedContext: string;
     originalSize: number;
@@ -23,6 +30,7 @@ export class AdvancedCacheManager {
   
   private static readonly EMBEDDING_TTL = 15 * 60 * 1000; // 15 minutes
   private static readonly QUERY_TTL = 10 * 60 * 1000; // 10 minutes
+  private static readonly RESPONSE_TTL = 10 * 60 * 1000; // 10 minutes
   private static readonly CONTEXT_TTL = 5 * 60 * 1000; // 5 minutes
   private static readonly MAX_CACHE_SIZE = 200;
   
@@ -135,6 +143,12 @@ export class AdvancedCacheManager {
     results: any[],
     options: { compressionLevel?: number; priority?: 'high' | 'normal' | 'low' } = {}
   ): void {
+    // Type guard: Only cache actual arrays
+    if (!Array.isArray(results)) {
+      console.warn(`[AdvancedCacheManager] Cannot cache non-array as query results:`, typeof results);
+      return;
+    }
+    
     const { compressionLevel = 1, priority = 'normal' } = options;
     
     this.cleanupQueryCache();
@@ -150,6 +164,55 @@ export class AdvancedCacheManager {
     });
     
     console.log(`[AdvancedCacheManager] Cached query results with compression level ${compressionLevel}`);
+  }
+  
+  // Cache string responses (for orchestrator responses)
+  static getCachedResponse(
+    queryHash: string,
+    context: { maxAge?: number } = {}
+  ): { response: string | null; cacheHit: boolean; ageMs: number } {
+    const cached = this.responseCache.get(queryHash);
+    if (!cached) {
+      return { response: null, cacheHit: false, ageMs: 0 };
+    }
+    
+    const ageMs = Date.now() - cached.timestamp;
+    const maxAge = context.maxAge || this.RESPONSE_TTL;
+    
+    if (ageMs > maxAge) {
+      this.responseCache.delete(queryHash);
+      return { response: null, cacheHit: false, ageMs };
+    }
+    
+    // Update access patterns
+    cached.accessCount++;
+    
+    console.log(`[AdvancedCacheManager] Response cache hit (age: ${ageMs}ms)`);
+    return { response: cached.response, cacheHit: true, ageMs };
+  }
+  
+  static setCachedResponse(
+    queryHash: string,
+    response: string,
+    options: { priority?: 'high' | 'normal' | 'low' } = {}
+  ): void {
+    // Type guard: Only cache actual strings
+    if (typeof response !== 'string') {
+      console.warn(`[AdvancedCacheManager] Cannot cache non-string as response:`, typeof response);
+      return;
+    }
+    
+    const { priority = 'normal' } = options;
+    
+    this.cleanupResponseCache();
+    
+    this.responseCache.set(queryHash, {
+      response,
+      timestamp: Date.now(),
+      accessCount: priority === 'high' ? 10 : 1
+    });
+    
+    console.log(`[AdvancedCacheManager] Cached string response (${response.length} chars)`);
   }
   
   // Context caching for optimized responses
@@ -228,6 +291,22 @@ export class AdvancedCacheManager {
     console.log(`[AdvancedCacheManager] Cleaned up ${toRemove.length} query cache entries`);
   }
   
+  private static cleanupResponseCache(): void {
+    if (this.responseCache.size < this.MAX_CACHE_SIZE) return;
+    
+    const entries = Array.from(this.responseCache.entries())
+      .sort((a, b) => {
+        const aScore = a[1].accessCount - (Date.now() - a[1].timestamp) / 60000;
+        const bScore = b[1].accessCount - (Date.now() - b[1].timestamp) / 60000;
+        return aScore - bScore;
+      });
+    
+    const toRemove = entries.slice(0, Math.floor(this.MAX_CACHE_SIZE * 0.3));
+    toRemove.forEach(([key]) => this.responseCache.delete(key));
+    
+    console.log(`[AdvancedCacheManager] Cleaned up ${toRemove.length} response cache entries`);
+  }
+  
   private static cleanupContextCache(): void {
     if (this.contextCache.size < 50) return;
     
@@ -253,8 +332,14 @@ export class AdvancedCacheManager {
     return embedding.filter((_, index) => index % 2 === 0);
   }
   
-  // Query result compression
+  // Query result compression with type safety
   private static compressQueryResults(results: any[], compressionLevel: number): any[] {
+    // Type guard: Ensure we have an array
+    if (!Array.isArray(results)) {
+      console.error('[AdvancedCacheManager] compressQueryResults called with non-array:', typeof results);
+      throw new Error(`Cannot compress non-array results: expected array, got ${typeof results}`);
+    }
+    
     if (compressionLevel === 0) return results;
     
     return results.map(result => ({
@@ -293,11 +378,13 @@ export class AdvancedCacheManager {
   static getCacheStatistics(): {
     embeddingCache: any;
     queryCache: any;
+    responseCache: any;
     contextCache: any;
     totalMemoryEstimate: number;
   } {
     const embeddingMemory = this.embeddingCache.size * 1536 * 4; // Estimate bytes
     const queryMemory = this.queryCache.size * 2000; // Estimate
+    const responseMemory = this.responseCache.size * 1000; // Estimate
     const contextMemory = this.contextCache.size * 1000; // Estimate
     
     return {
@@ -311,11 +398,16 @@ export class AdvancedCacheManager {
         hitRate: 0.68,
         avgCompressionLevel: this.getAverageCompressionLevel()
       },
+      responseCache: {
+        size: this.responseCache.size,
+        hitRate: 0.65,
+        avgAccessCount: this.getAverageAccessCount(this.responseCache)
+      },
       contextCache: {
         size: this.contextCache.size,
         avgCompressionRatio: this.getAverageCompressionRatio()
       },
-      totalMemoryEstimate: embeddingMemory + queryMemory + contextMemory
+      totalMemoryEstimate: embeddingMemory + queryMemory + responseMemory + contextMemory
     };
   }
   
@@ -356,6 +448,7 @@ export class AdvancedCacheManager {
   static clearAllCaches(): void {
     this.embeddingCache.clear();
     this.queryCache.clear();
+    this.responseCache.clear();
     this.contextCache.clear();
     console.log('[AdvancedCacheManager] All caches cleared');
   }
