@@ -249,8 +249,8 @@ export async function planQuery(message: string, threadId: string, userId: strin
     let strategy = complexityAnalysis.recommendedStrategy;
     
     if (isEntityEmotionQuery) {
-      strategy = 'intelligent_sub_query';
-      console.log("[Query Planner] Using intelligent sub-query strategy for entity-emotion analysis");
+      strategy = 'comprehensive'; // Use comprehensive instead of intelligent_sub_query
+      console.log("[Query Planner] Using comprehensive strategy for entity-emotion analysis");
     }
     
     // Return enhanced plan with performance optimizations
@@ -292,7 +292,7 @@ export async function planQuery(message: string, threadId: string, userId: strin
   } catch (error) {
     console.error("[Query Planner] Error planning query:", error);
     return {
-      strategy: 'intelligent_sub_query',
+      strategy: 'comprehensive', // Use comprehensive instead of intelligent_sub_query
       originalQuery: message,
       enhancedQuery: message,
       useAllEntries: true,
