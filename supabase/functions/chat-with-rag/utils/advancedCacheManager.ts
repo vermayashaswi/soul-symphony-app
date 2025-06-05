@@ -26,6 +26,28 @@ export class AdvancedCacheManager {
   private static readonly CONTEXT_TTL = 5 * 60 * 1000; // 5 minutes
   private static readonly MAX_CACHE_SIZE = 200;
   
+  // Generate cache key for queries - matching EnhancedCacheManager interface
+  static generateQueryHash(
+    message: string, 
+    userId: string, 
+    context: {
+      queryPlan?: string;
+      useAllEntries?: boolean;
+      hasPersonalPronouns?: boolean;
+      timeRange?: any;
+      complexity?: string;
+      route?: string;
+    } = {}
+  ): string {
+    const normalized = message.toLowerCase().trim();
+    // Include advanced cache context in hash
+    const contextStr = JSON.stringify({
+      ...context,
+      advanced: true // Mark as advanced cache entry
+    });
+    return this.hashString(`advanced_${normalized}_${userId}_${contextStr}`);
+  }
+  
   // Advanced embedding caching with context awareness
   static async getCachedEmbedding(
     text: string, 
