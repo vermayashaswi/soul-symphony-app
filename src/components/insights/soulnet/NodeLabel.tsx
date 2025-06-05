@@ -71,27 +71,26 @@ export const NodeLabel: React.FC<NodeLabelProps> = ({
     return [0, scaledOffset, 0] as [number, number, number];
   }, [type, nodeScale]);
 
-  // IMPROVED: Enhanced text size calculation with restricted maximum and better scaling
+  // RESTRICTED: Enhanced text size calculation with maximum font size limited to 0.5
   const textSize = useMemo(() => {
     // Clamp camera zoom to reasonable range
     const clampedZoom = Math.max(15, Math.min(80, cameraZoom));
     
-    // Improved zoom factor calculation - inverted relationship with smoother curve
-    // When zoomed in (low zoom value), font should be smaller
-    // When zoomed out (high zoom value), font should be larger
+    // IMPROVED: Less aggressive zoom factor calculation for better readability
+    // Create a smoother curve that doesn't scale as dramatically
     const normalizedZoom = (clampedZoom - 15) / (80 - 15); // 0 to 1
-    const zoomFactor = 0.7 + (normalizedZoom * 0.3); // 0.7 to 1.0 range
+    const zoomFactor = 0.8 + (normalizedZoom * 0.2); // 0.8 to 1.0 range (much smaller range)
     
     // Base size with type differentiation
     const baseSize = type === 'entity' ? 0.35 : 0.32;
     
-    // Calculate final size with restricted maximum
+    // Calculate final size with improved scaling
     const calculatedSize = baseSize * zoomFactor;
     
-    // RESTRICTED: Maximum font size limited to 0.5, minimum to 0.25
+    // RESTRICTED: Maximum font size strictly limited to 0.5, minimum to 0.25
     const finalSize = Math.max(0.25, Math.min(0.5, calculatedSize));
     
-    console.log(`[NodeLabel] Font size calculation for ${id}: zoom=${cameraZoom}, normalized=${normalizedZoom.toFixed(2)}, factor=${zoomFactor.toFixed(2)}, final=${finalSize.toFixed(2)}`);
+    console.log(`[NodeLabel] RESTRICTED font size for ${id}: zoom=${cameraZoom}, normalized=${normalizedZoom.toFixed(2)}, factor=${zoomFactor.toFixed(2)}, final=${finalSize.toFixed(2)} (max: 0.5)`);
     
     return finalSize;
   }, [cameraZoom, type, id]);
@@ -103,12 +102,13 @@ export const NodeLabel: React.FC<NodeLabelProps> = ({
     return '#cccccc';
   }, [isSelected, isHighlighted, type, themeHex]);
 
-  // ENHANCED: Dynamic outline width based on text size
+  // ENHANCED: Dynamic outline width based on text size but also restricted
   const outlineWidth = useMemo(() => {
     const baseOutline = isSelected ? 0.04 : 0.02;
     // Scale outline with text size to maintain readability
     const scaleFactor = textSize / 0.4; // Normalize to base size
-    return Math.max(0.01, Math.min(0.06, baseOutline * scaleFactor));
+    // Restrict outline width to prevent it from becoming too thick
+    return Math.max(0.01, Math.min(0.05, baseOutline * scaleFactor));
   }, [isSelected, textSize]);
 
   const labelPosition: [number, number, number] = [
