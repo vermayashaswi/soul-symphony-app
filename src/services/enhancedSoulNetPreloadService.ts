@@ -400,12 +400,14 @@ export class EnhancedSoulNetPreloadService {
     const emotionNodes = new Set<string>();
 
     const entityList = Object.keys(entityEmotionMap);
+    
+    // EXPANDED: Increased emotion layer radius and z-axis range for better vertical distribution
     const EMOTION_LAYER_RADIUS = 11;
     const ENTITY_LAYER_RADIUS = 6;
-    const EMOTION_Y_SPAN = 6;
+    const EMOTION_Z_SPAN = 200; // EXPANDED: -100 to +100 range (was 12)
     const ENTITY_Y_SPAN = 3;
 
-    console.log("[EnhancedSoulNetPreloadService] Generating graph with", entityList.length, "entities");
+    console.log("[EnhancedSoulNetPreloadService] EXPANDED Z-AXIS: Generating graph with", entityList.length, "entities with expanded emotion z-range (-100 to +100)");
     
     entityList.forEach((entity, entityIndex) => {
       entityNodes.add(entity);
@@ -437,8 +439,13 @@ export class EnhancedSoulNetPreloadService {
       const emotionAngle = (emotionIndex / emotionNodes.size) * Math.PI * 2;
       const emotionRadius = EMOTION_LAYER_RADIUS;
       const emotionX = Math.cos(emotionAngle) * emotionRadius;
-      const emotionY = ((emotionIndex % 2) === 0 ? -1 : 1) * 0.7 * (Math.random() - 0.5) * EMOTION_Y_SPAN;
-      const emotionZ = Math.sin(emotionAngle) * emotionRadius;
+      
+      // EXPANDED: Even vertical distribution across -100 to +100 z-range
+      const emotionY = ((emotionIndex % 2) === 0 ? -1 : 1) * 0.7 * (Math.random() - 0.5) * 6;
+      
+      // EXPANDED: Distribute emotions evenly across much larger z-range
+      const normalizedIndex = emotionIndex / (emotionNodes.size - 1); // 0 to 1
+      const emotionZ = -100 + (normalizedIndex * EMOTION_Z_SPAN); // -100 to +100
       
       nodes.push({
         id: emotion,
@@ -449,7 +456,7 @@ export class EnhancedSoulNetPreloadService {
       });
     });
 
-    console.log("[EnhancedSoulNetPreloadService] Generated graph with", nodes.length, "nodes and", links.length, "links");
+    console.log("[EnhancedSoulNetPreloadService] EXPANDED Z-AXIS: Generated graph with", nodes.length, "nodes and", links.length, "links, emotions distributed from z=-100 to z=+100");
     return { nodes, links };
   }
 

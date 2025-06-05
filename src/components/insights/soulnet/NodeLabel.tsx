@@ -70,7 +70,7 @@ export const NodeLabel: React.FC<NodeLabelProps> = ({
     return [0, scaledOffset, 0] as [number, number, number];
   }, [type, nodeScale]);
 
-  // IMPLEMENTED: Restricted font sizing with maximum size strictly limited to 0.5
+  // RESTRICTED: Font sizing limited to 0.2-0.4 range as requested
   const textSize = useMemo(() => {
     // Clamp camera zoom to reasonable range for better control
     const clampedZoom = Math.max(15, Math.min(80, cameraZoom));
@@ -78,19 +78,19 @@ export const NodeLabel: React.FC<NodeLabelProps> = ({
     // IMPROVED: More controlled zoom factor calculation with reduced scaling impact
     const normalizedZoom = (clampedZoom - 15) / (80 - 15); // 0 to 1
     
-    // RESTRICTED: Much smaller scaling range to prevent dramatic size changes
+    // RESTRICTED: Smaller scaling range to prevent dramatic size changes
     const zoomFactor = 0.85 + (normalizedZoom * 0.15); // 0.85 to 1.0 range (only 17% variation)
     
-    // Base size differentiation between types
-    const baseSize = type === 'entity' ? 0.38 : 0.35;
+    // UPDATED: Reduced base sizes to fit within 0.2-0.4 range
+    const baseSize = type === 'entity' ? 0.35 : 0.32;
     
     // Calculate size with controlled scaling
     const calculatedSize = baseSize * zoomFactor;
     
-    // STRICTLY ENFORCED: Maximum font size limited to 0.5, minimum to 0.3
-    const finalSize = Math.max(0.3, Math.min(0.5, calculatedSize));
+    // RESTRICTED: Font size limited to 0.2-0.4 range as requested
+    const finalSize = Math.max(0.2, Math.min(0.4, calculatedSize));
     
-    console.log(`[NodeLabel] RESTRICTED sizing for ${id}: zoom=${cameraZoom}, normalized=${normalizedZoom.toFixed(2)}, factor=${zoomFactor.toFixed(2)}, final=${finalSize.toFixed(2)} (max: 0.5, min: 0.3)`);
+    console.log(`[NodeLabel] RESTRICTED sizing for ${id}: zoom=${cameraZoom}, normalized=${normalizedZoom.toFixed(2)}, factor=${zoomFactor.toFixed(2)}, final=${finalSize.toFixed(2)} (range: 0.2-0.4)`);
     
     return finalSize;
   }, [cameraZoom, type, id]);
