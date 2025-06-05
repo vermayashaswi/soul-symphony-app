@@ -400,13 +400,12 @@ export class EnhancedSoulNetPreloadService {
 
     const entityList = Object.keys(entityEmotionMap);
     
-    // UPDATED Y-AXIS RANGE: Emotions now distributed vertically on Y-axis from -40 to +40
+    // IMPROVED POSITIONING: Increased entity radius and fixed emotion Y positions
     const EMOTION_LAYER_RADIUS = 11;
-    const ENTITY_LAYER_RADIUS = 6;
-    const EMOTION_Y_SPAN = 80; // UPDATED: Y-axis range -40 to +40 (was 200 for -100 to +100)
+    const ENTITY_LAYER_RADIUS = 9; // INCREASED: from 6 to 9 (1.5x increase)
     const ENTITY_Y_SPAN = 6; // Keep entities in center layer with smaller Y-range
 
-    console.log("[EnhancedSoulNetPreloadService] UPDATED Y-AXIS: Generating graph with", entityList.length, "entities with emotions distributed vertically on Y-axis (-40 to +40)");
+    console.log("[EnhancedSoulNetPreloadService] IMPROVED POSITIONING: Generating graph with", entityList.length, "entities with increased radius (9) and fixed emotion positions (+30/-30)");
     
     entityList.forEach((entity, entityIndex) => {
       entityNodes.add(entity);
@@ -441,9 +440,8 @@ export class EnhancedSoulNetPreloadService {
       const emotionRadius = EMOTION_LAYER_RADIUS;
       const emotionX = Math.cos(emotionAngle) * emotionRadius;
       
-      // UPDATED: Y-axis now handles the vertical distribution (-40 to +40)
-      const normalizedIndex = emotionIndex / (emotionNodes.size - 1); // 0 to 1
-      const emotionY = -40 + (normalizedIndex * EMOTION_Y_SPAN); // -40 to +40 on Y-axis
+      // FIXED: Emotions now positioned at alternating fixed Y positions (+30 and -30)
+      const emotionY = (emotionIndex % 2 === 0) ? 30 : -30;
       
       // Z-axis uses circular distribution (same pattern as X-axis)
       const emotionZ = Math.sin(emotionAngle) * emotionRadius;
@@ -457,8 +455,8 @@ export class EnhancedSoulNetPreloadService {
       });
     });
 
-    console.log("[EnhancedSoulNetPreloadService] UPDATED Y-AXIS: Generated graph with", nodes.length, "nodes and", links.length, "links");
-    console.log("[EnhancedSoulNetPreloadService] UPDATED Y-AXIS: Entities form circle in center layer, emotions distributed vertically on Y-axis from -40 to +40");
+    console.log("[EnhancedSoulNetPreloadService] IMPROVED POSITIONING: Generated graph with", nodes.length, "nodes and", links.length, "links");
+    console.log("[EnhancedSoulNetPreloadService] IMPROVED POSITIONING: Entities form circle with radius 9, emotions at fixed Y positions (+30/-30)");
     return { nodes, links };
   }
 
