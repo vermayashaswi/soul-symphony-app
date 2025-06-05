@@ -71,19 +71,45 @@ export const NodeLabel: React.FC<NodeLabelProps> = ({
     return [0, scaledOffset, 0] as [number, number, number];
   }, [type, nodeScale]);
 
-  // Calculate text properties
+  // IMPROVED: Enhanced text size calculation with restricted maximum and better scaling
   const textSize = useMemo(() => {
-    const zoom = Math.max(10, Math.min(100, cameraZoom));
-    const baseSize = 0.4;
-    const zoomFactor = Math.max(0.7, Math.min(1.3, (50 - zoom) * 0.02 + 1));
-    return Math.max(0.2, Math.min(0.8, baseSize * zoomFactor));
-  }, [cameraZoom]);
+    // Clamp camera zoom to reasonable range
+    const clampedZoom = Math.max(15, Math.min(80, cameraZoom));
+    
+    // Improved zoom factor calculation - inverted relationship with smoother curve
+    // When zoomed in (low zoom value), font should be smaller
+    // When zoomed out (high zoom value), font should be larger
+    const normalizedZoom = (clampedZoom - 15) / (80 - 15); // 0 to 1
+    const zoomFactor = 0.7 + (normalizedZoom * 0.3); // 0.7 to 1.0 range
+    
+    // Base size with type differentiation
+    const baseSize = type === 'entity' ? 0.35 : 0.32;
+    
+    // Calculate final size with restricted maximum
+    const calculatedSize = baseSize * zoomFactor;
+    
+    // RESTRICTED: Maximum font size limited to 0.5, minimum to 0.25
+    const finalSize = Math.max(0.25, Math.min(0.5, calculatedSize));
+    
+    console.log(`[NodeLabel] Font size calculation for ${id}: zoom=${cameraZoom}, normalized=${normalizedZoom.toFixed(2)}, factor=${zoomFactor.toFixed(2)}, final=${finalSize.toFixed(2)}`);
+    
+    return finalSize;
+  }, [cameraZoom, type, id]);
 
+  // Enhanced text color with better contrast
   const textColor = useMemo(() => {
     if (isSelected) return '#ffffff';
     if (isHighlighted) return type === 'entity' ? '#ffffff' : themeHex;
     return '#cccccc';
   }, [isSelected, isHighlighted, type, themeHex]);
+
+  // ENHANCED: Dynamic outline width based on text size
+  const outlineWidth = useMemo(() => {
+    const baseOutline = isSelected ? 0.04 : 0.02;
+    // Scale outline with text size to maintain readability
+    const scaleFactor = textSize / 0.4; // Normalize to base size
+    return Math.max(0.01, Math.min(0.06, baseOutline * scaleFactor));
+  }, [isSelected, textSize]);
 
   const labelPosition: [number, number, number] = [
     position[0] + labelOffset[0],
@@ -109,7 +135,7 @@ export const NodeLabel: React.FC<NodeLabelProps> = ({
       material-transparent={true}
       material-depthTest={false}
       renderOrder={15}
-      outlineWidth={isSelected ? 0.04 : 0.02}
+      outlineWidth={outlineWidth}
       outlineColor={isSelected ? '#000000' : '#333333'}
     >
       {displayText}
