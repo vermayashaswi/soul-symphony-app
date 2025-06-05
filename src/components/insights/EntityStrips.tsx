@@ -6,7 +6,6 @@ import { useIsMobile } from '@/hooks/use-mobile';
 import { supabase } from '@/integrations/supabase/client';
 import { TimeRange } from '@/hooks/use-insights-data';
 import { toast } from 'sonner';
-import { Json } from '@/types/journal';
 import { TranslatableText } from '@/components/translation/TranslatableText';
 
 type Entity = {
@@ -79,18 +78,7 @@ const EntityStrips: React.FC<EntityStripsProps> = ({
     return '#22c55e'; // Bright green for 1.0
   };
   
-  // Type guard to check if entity is a string or has name property
-  const isValidEntity = (entity: Json): entity is string | { name: string; type?: string } => {
-    if (typeof entity === 'string') {
-      return true;
-    }
-    if (typeof entity === 'object' && entity !== null && 'name' in entity && typeof entity.name === 'string') {
-      return true;
-    }
-    return false;
-  };
-  
-  // Fetch entities and their sentiments
+  // Fetch themes and their sentiments
   useEffect(() => {
     const fetchEntities = async () => {
       if (!userId) {
@@ -101,101 +89,62 @@ const EntityStrips: React.FC<EntityStripsProps> = ({
       
       setLoading(true);
       try {
-        console.log(`Fetching entities for timeRange: ${timeRange}, userId: ${userId}`);
+        console.log(`Fetching themes for timeRange: ${timeRange}, userId: ${userId}`);
         const { startDate, endDate } = getDateRange();
         
         // Query journal entries within the time range
         const { data: entries, error } = await supabase
           .from('Journal Entries')
-          .select('entities, sentiment')
+          .select('master_themes, sentiment')
           .eq('user_id', userId)
           .gte('created_at', startDate)
-          .lte('created_at', endDate);
+          .lte('created_at', endDate)
+          .not('master_themes', 'is', null);
         
         if (error) {
           console.error('Error fetching entries:', error);
           throw error;
         }
         
-        console.log(`Found ${entries?.length || 0} entries`);
+        console.log(`Found ${entries?.length || 0} entries with themes`);
         
-        // Process entries to extract entities and calculate sentiments
-        const entityMap = new Map<string, { count: number, totalSentiment: number }>();
+        // Process entries to extract themes and calculate sentiments
+        const themeMap = new Map<string, { count: number, totalSentiment: number }>();
         
         entries?.forEach(entry => {
-          if (!entry.entities || !entry.sentiment) return;
+          if (!entry.master_themes || !Array.isArray(entry.master_themes)) return;
           
           // Convert sentiment to number if it's a string
-          const sentimentScore = typeof entry.sentiment === 'string' 
-            ? parseFloat(entry.sentiment) 
-            : Number(entry.sentiment);
-            
-          if (isNaN(sentimentScore)) return;
-          
-          let entitiesArray: Array<Json> = [];
-          
-          // Handle different formats of entities data
-          if (typeof entry.entities === 'string') {
-            try {
-              const parsed = JSON.parse(entry.entities);
-              if (Array.isArray(parsed)) {
-                entitiesArray = parsed;
-              }
-            } catch (e) {
-              console.error('Failed to parse entities JSON:', e);
+          let sentimentScore = 0;
+          if (entry.sentiment) {
+            if (typeof entry.sentiment === 'string') {
+              if (entry.sentiment === 'positive') sentimentScore = 0.7;
+              else if (entry.sentiment === 'negative') sentimentScore = -0.7;
+              else if (entry.sentiment === 'neutral') sentimentScore = 0;
+              else sentimentScore = parseFloat(entry.sentiment) || 0;
+            } else {
+              sentimentScore = Number(entry.sentiment) || 0;
             }
-          } 
-          else if (Array.isArray(entry.entities)) {
-            entitiesArray = entry.entities;
-          } 
-          else if (typeof entry.entities === 'object' && entry.entities !== null) {
-            entitiesArray = Object.entries(entry.entities).map(([key, value]) => {
-              if (typeof value === 'object' && value !== null) {
-                return {
-                  name: 'name' in value ? String((value as any).name) : key,
-                  type: 'type' in value ? String((value as any).type) : 'unknown'
-                };
-              }
-              return { name: key, type: 'unknown' };
-            });
           }
           
-          // Process each entity, handling both object and string formats
-          entitiesArray.forEach(entity => {
-            // Skip invalid entities
-            if (!isValidEntity(entity)) {
-              return;
-            }
-            
-            let entityName = '';
-            let entityType = 'unknown';
-            
-            // Handle entity based on its format
-            if (typeof entity === 'string') {
-              entityName = entity.toLowerCase();
-            } else if (typeof entity === 'object' && entity !== null) {
-              entityName = entity.name.toLowerCase();
+          // Process each theme
+          entry.master_themes.forEach(theme => {
+            if (typeof theme === 'string' && theme.trim()) {
+              const themeName = theme.toLowerCase().trim();
               
-              if ('type' in entity && typeof entity.type === 'string') {
-                entityType = entity.type;
-              }
-            }
-            
-            // Add entity to map if it's valid and not of type 'others'
-            if (entityName && entityType !== 'others') {
-              if (!entityMap.has(entityName)) {
-                entityMap.set(entityName, { count: 0, totalSentiment: 0 });
+              if (!themeMap.has(themeName)) {
+                themeMap.set(themeName, { count: 0, totalSentiment: 0 });
               }
               
-              const entityData = entityMap.get(entityName)!;
-              entityData.count += 1;
-              entityData.totalSentiment += sentimentScore;
+              const themeData = themeMap.get(themeName)!;
+              themeData.count += 1;
+              themeData.totalSentiment += sentimentScore;
             }
           });
         });
         
         // Convert map to array and calculate average sentiment
-        const entitiesArray = Array.from(entityMap.entries()).map(([name, data]) => ({
+        const entitiesArray = Array.from(themeMap.entries()).map(([name, data]) => ({
           name: name.charAt(0).toUpperCase() + name.slice(1),
           count: data.count,
           sentiment: data.totalSentiment / data.count
@@ -206,10 +155,10 @@ const EntityStrips: React.FC<EntityStripsProps> = ({
           .sort((a, b) => b.count - a.count)
           .slice(0, 7);
         
-        console.log('Top entities:', topEntities);
+        console.log('Top themes:', topEntities);
         setEntities(topEntities);
       } catch (error) {
-        console.error('Error fetching entity data:', error);
+        console.error('Error fetching theme data:', error);
         toast.error('Failed to load life areas');
       } finally {
         setLoading(false);
