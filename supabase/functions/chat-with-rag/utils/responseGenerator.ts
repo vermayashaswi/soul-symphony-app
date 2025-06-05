@@ -1,5 +1,5 @@
 
-// Enhanced response generation utilities
+// Enhanced response generation utilities with structured formatting
 import { CacheManager } from './cacheManager.ts';
 import { OptimizedApiClient } from './optimizedApiClient.ts';
 
@@ -12,7 +12,8 @@ export function generateSystemPrompt(
   conversationContext?: any[],
   isFollowUp?: boolean,
   hasPersonalPronouns?: boolean,
-  hasTimeReference?: boolean
+  hasTimeReference?: boolean,
+  searchMethod?: string
 ): string {
   const currentDate = new Date().toISOString();
   
@@ -33,31 +34,16 @@ User timezone: ${userTimezone || 'UTC'}`;
     contextualInfo += `\nQuery timeframe: ${startStr} to ${endStr}`;
   }
   
-  if (conversationContext && conversationContext.length > 0) {
-    contextualInfo += `\nThis is part of an ongoing conversation with ${conversationContext.length} previous messages`;
-  }
-  
-  if (isFollowUp) {
-    contextualInfo += `\nThis is a follow-up question expanding on a previous analysis`;
-  }
-  
-  if (hasPersonalPronouns) {
-    contextualInfo += `\nThis is a personal therapeutic assessment using personal pronouns`;
-  } else {
-    contextualInfo += `\nThis is general mental health guidance`;
-  }
-  
-  if (hasTimeReference) {
-    contextualInfo += `\nSpecific time reference detected in the query`;
-  }
-  
-  if (queryType === 'aggregated') {
-    contextualInfo += `\nThis is an aggregation query. Focus on providing statistical insights, patterns, and quantitative analysis.`;
-  } else if (queryType === 'analysis') {
-    contextualInfo += `\nThis is an analysis query. Focus on identifying patterns, trends, and providing deep insights.`;
+  if (searchMethod) {
+    contextualInfo += `\nSearch method used: ${searchMethod} (dual vector + SQL search)`;
   }
 
-  return `You are SOULo, an AI mental health therapist assistant that helps users understand their journal entries and emotional patterns through evidence-based therapeutic analysis.
+  // Detect if this requires analytical formatting
+  const isAnalyticalQuery = queryType === 'analysis' || 
+    queryType === 'aggregated' ||
+    /\b(pattern|trend|when do|what time|how often|frequency|usually|typically|statistics|insights|breakdown|analysis)\b/i.test(analysisScope || '');
+
+  let systemPrompt = `You are SOULo, an AI mental health therapist assistant that helps users understand their journal entries and emotional patterns through evidence-based therapeutic analysis.
 
 THERAPEUTIC IDENTITY & APPROACH: You are trained in multiple therapeutic modalities including Cognitive Behavioral Therapy (CBT), Dialectical Behavior Therapy (DBT), and mindfulness-based approaches.
 
@@ -69,31 +55,74 @@ CRITICAL EMOTION ANALYSIS INSTRUCTIONS:
 • DO NOT attempt to infer emotions from the text snippets - use ONLY the provided scores
 • Focus on quantitative therapeutic analysis: emotional patterns, regulation strategies, score distributions
 • When you see "Score: 0.842" this means that emotion was detected with 84.2% intensity
-• NEVER say "your entries don't explicitly mention emotions" - the emotions are already calculated
+• NEVER say "your entries don't explicitly mention emotions" - the emotions are already calculated`;
+
+  if (isAnalyticalQuery) {
+    systemPrompt += `
+
+CRITICAL FORMATTING REQUIREMENTS FOR ANALYTICAL RESPONSES:
+• Use clear headers with ## markdown formatting for major sections
+• Structure information with bullet points using - for lists
+• Use **bold text** for key insights, data points, and important findings
+• Create logical sections: Key Insights, Patterns Identified, Recommendations
+• Include specific data points, times, frequencies, and statistics when available
+• Make responses scannable and well-organized with clear visual hierarchy
+• Use numbered lists for step-by-step insights or rankings
+• Always start with a brief overview, then provide detailed analysis
+
+REQUIRED RESPONSE STRUCTURE FOR ANALYTICAL QUERIES:
+## Key Insights
+- **Primary finding**: [main insight with specific data]
+- **Supporting evidence**: [specific evidence from entries]
+
+## Patterns Identified  
+- **Pattern 1**: [description with frequency/timing data]
+- **Pattern 2**: [description with specific examples]
+
+## Recommendations
+- [Actionable therapeutic suggestion based on analysis]
+
+FORMATTING EXAMPLES:
+✅ "**Peak journaling time**: 9-11 PM (appeared in 73% of entries)"
+✅ "**Emotional pattern**: Anxiety levels highest on **Mondays** (avg score 0.72)"
+✅ "**Theme frequency**: Work stress mentioned in **8 out of 12** recent entries"`;
+  }
+
+  systemPrompt += `
 
 RESPONSE GUIDELINES:
 - Be conversational and supportive, not clinical or formal
 - Use natural, therapeutic language that feels like talking to a caring counselor
 - Provide evidence-based insights while maintaining warmth
-- Keep responses under 250 words for simple queries, longer for complex assessments
-- Use markdown formatting naturally (**bold** for emphasis, ## for headers when needed)
+- Keep responses under 300 words for simple queries, longer for complex assessments
 - Reference specific dates and emotional scores when relevant
 - Provide actionable, personalized recommendations
 - Maintain professional therapeutic boundaries while being approachable
 - If crisis indicators are present, respond with appropriate care and resources
 
 Remember: You're a supportive AI therapist, not a medical report generator. Be warm, insightful, and genuinely helpful.`;
+
+  return systemPrompt;
 }
 
-export function formatJournalEntriesForAnalysis(entries: any[]): string {
+export function formatJournalEntriesForAnalysis(entries: any[], searchMethod?: string): string {
   // Limit entries for performance while maintaining quality
-  const limitedEntries = entries.slice(0, 15);
+  const limitedEntries = entries.slice(0, 20);
   
-  return limitedEntries.map(entry => {
+  let formattedContent = '';
+  
+  if (searchMethod === 'dual') {
+    formattedContent += `Search Results (Combined Vector + SQL Analysis):\n\n`;
+  }
+  
+  formattedContent += limitedEntries.map(entry => {
     const date = new Date(entry.created_at).toLocaleDateString('en-US', {
+      weekday: 'short',
       month: 'short',
       day: 'numeric',
-      year: 'numeric'
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
     });
     
     let emotionInfo = '';
@@ -101,12 +130,12 @@ export function formatJournalEntriesForAnalysis(entries: any[]): string {
       const emotions = Object.entries(entry.emotions)
         .filter(([_, score]) => typeof score === 'number' && score > 0.3)
         .sort(([_, a], [__, b]) => (b as number) - (a as number))
-        .slice(0, 3)
+        .slice(0, 4)
         .map(([emotion, score]) => `${emotion}: ${(score as number).toFixed(2)}`)
         .join(', ');
       
       if (emotions) {
-        emotionInfo = `\nEmotions: ${emotions}`;
+        emotionInfo = `\nEmotion Scores: ${emotions}`;
       }
     }
     
@@ -114,37 +143,45 @@ export function formatJournalEntriesForAnalysis(entries: any[]): string {
     if (entry.master_themes && Array.isArray(entry.master_themes)) {
       themeInfo = `\nThemes: ${entry.master_themes.slice(0, 3).join(', ')}`;
     }
+
+    let searchInfo = '';
+    if (entry.searchMethod) {
+      searchInfo = `\nFound via: ${entry.searchMethod} search`;
+    }
     
     // Limit content length for performance
-    const content = entry.content.substring(0, 300) + (entry.content.length > 300 ? '...' : '');
+    const content = entry.content.substring(0, 350) + (entry.content.length > 350 ? '...' : '');
     
-    return `Entry from ${date}: ${content}${emotionInfo}${themeInfo}`;
+    return `Entry from ${date}: ${content}${emotionInfo}${themeInfo}${searchInfo}`;
   }).join('\n\n');
+
+  return formattedContent;
 }
 
-export function generateUserPrompt(message: string, entries: any[]): string {
-  const formattedEntries = formatJournalEntriesForAnalysis(entries);
+export function generateUserPrompt(message: string, entries: any[], searchMethod?: string): string {
+  const formattedEntries = formatJournalEntriesForAnalysis(entries, searchMethod);
   
-  return `Based on these journal entries: 
+  return `Based on these journal entries found using ${searchMethod || 'advanced'} search: 
 
 ${formattedEntries}
 
 User question: ${message}
 
-Please provide a thoughtful, conversational response based on the journal entry data. Focus on being supportive and insightful while using the pre-calculated emotion scores and data patterns.`;
+Please provide a thoughtful, well-structured response based on the journal entry data. Use the pre-calculated emotion scores and data patterns to provide insights. If this is an analytical query, use proper formatting with headers, bullet points, and bold text for key findings.`;
 }
 
 export async function generateResponse(
   systemPrompt: string,
   userPrompt: string,
   conversationContext: any[] = [],
-  openAiApiKey: string
+  openAiApiKey: string,
+  isAnalyticalQuery: boolean = false
 ): Promise<string> {
   try {
-    console.log('[responseGenerator] Starting optimized response generation...');
+    console.log('[responseGenerator] Starting enhanced response generation with dual search formatting...');
     
     // Check cache first
-    const cacheKey = CacheManager.generateQueryHash(userPrompt, 'system', null);
+    const cacheKey = CacheManager.generateQueryHash(userPrompt, 'system', { analytical: isAnalyticalQuery });
     const cachedResponse = CacheManager.getCachedResponse(cacheKey);
     
     if (cachedResponse) {
@@ -152,22 +189,23 @@ export async function generateResponse(
       return cachedResponse;
     }
     
-    // Use last 8 messages for context instead of 5
+    // Use last 8 messages for context
     const contextMessages = Array.isArray(conversationContext) ? conversationContext.slice(-8) : [];
     console.log(`[responseGenerator] Using ${contextMessages.length} conversation messages for context`);
     
-    // Use optimized API client with 8 message context
+    // Use optimized API client with analytical formatting detection
     const response = await OptimizedApiClient.generateResponseOptimized(
       systemPrompt,
       userPrompt,
-      contextMessages, // Pass 8 messages instead of limited context
-      openAiApiKey
+      contextMessages,
+      openAiApiKey,
+      isAnalyticalQuery
     );
     
     // Cache the response
     CacheManager.setCachedResponse(cacheKey, response);
     
-    console.log('[responseGenerator] Successfully generated and cached response with 8-message context');
+    console.log('[responseGenerator] Successfully generated and cached enhanced response');
     return response;
     
   } catch (error) {

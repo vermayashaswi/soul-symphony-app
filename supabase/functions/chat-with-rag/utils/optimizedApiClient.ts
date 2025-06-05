@@ -1,23 +1,121 @@
-// Optimized API client with connection pooling and caching
+
+// Optimized API client with enhanced response generation
 export class OptimizedApiClient {
-  private static embeddingCache = new Map<string, number[]>();
-  private static readonly CACHE_SIZE_LIMIT = 100;
-  private static readonly CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+  private static responseCache = new Map<string, string>();
+  private static readonly CACHE_SIZE_LIMIT = 50;
 
-  // Phase 2: Enhanced embedding generation with intelligent caching
-  static async getEmbedding(text: string, openaiApiKey: string, context?: any): Promise<number[]> {
-    const contextAwareCacheKey = context 
-      ? this.hashString(`${text}_${JSON.stringify(context)}`)
-      : this.hashString(text);
-    
-    // Check Phase 2 advanced cache first
-    if (this.embeddingCache.has(contextAwareCacheKey)) {
-      console.log('[OptimizedApiClient] Phase 2 embedding cache hit');
-      return this.embeddingCache.get(contextAwareCacheKey)!;
-    }
-
+  static async generateResponseOptimized(
+    systemPrompt: string,
+    userPrompt: string,
+    conversationContext: any[] = [],
+    openAiApiKey: string,
+    isAnalyticalQuery: boolean = false
+  ): Promise<string> {
     try {
-      console.log('[OptimizedApiClient] Generating Phase 2 optimized embedding');
+      console.log('[OptimizedApiClient] Generating response with analytical formatting detection');
+      
+      // Detect if this is an analytical query that needs structured formatting
+      const analyticalKeywords = [
+        'pattern', 'trend', 'analysis', 'when do i', 'what time', 'how often',
+        'frequency', 'usually', 'typically', 'most', 'least', 'statistics',
+        'insights', 'breakdown', 'summary', 'overview', 'comparison'
+      ];
+      
+      const isAnalytical = isAnalyticalQuery || 
+        analyticalKeywords.some(keyword => 
+          userPrompt.toLowerCase().includes(keyword) ||
+          systemPrompt.toLowerCase().includes(keyword)
+        );
+
+      // Enhanced system prompt for analytical queries
+      let enhancedSystemPrompt = systemPrompt;
+      
+      if (isAnalytical) {
+        enhancedSystemPrompt += `
+
+CRITICAL FORMATTING REQUIREMENTS FOR ANALYTICAL RESPONSES:
+- Use clear headers with ## markdown formatting
+- Structure information with bullet points using -
+- Use **bold text** for key insights and important data points
+- Create logical sections: Overview, Key Findings, Patterns, Recommendations
+- Include specific data points and statistics when available
+- Make responses scannable and well-organized
+- Use numbered lists for step-by-step insights or rankings
+
+RESPONSE STRUCTURE TEMPLATE:
+## Key Insights
+- **Primary finding**: [main insight]
+- **Supporting data**: [specific evidence]
+
+## Patterns Identified
+- [Pattern 1 with evidence]
+- [Pattern 2 with evidence]
+
+## Recommendations
+- [Actionable suggestion based on analysis]`;
+      }
+
+      // Generate cache key
+      const cacheKey = this.generateCacheKey(enhancedSystemPrompt, userPrompt);
+      
+      // Check cache first
+      if (this.responseCache.has(cacheKey)) {
+        console.log('[OptimizedApiClient] Cache hit for response');
+        return this.responseCache.get(cacheKey)!;
+      }
+
+      // Prepare messages with enhanced context
+      const messages = [
+        { role: 'system', content: enhancedSystemPrompt }
+      ];
+
+      // Add conversation context (last 6 messages for better context)
+      if (conversationContext.length > 0) {
+        messages.push(...conversationContext.slice(-6));
+      }
+
+      messages.push({ role: 'user', content: userPrompt });
+
+      // Use intelligent model selection
+      const model = isAnalytical || userPrompt.length > 200 ? 
+        'gpt-4.1-2025-04-14' : 'gpt-4.1-mini-2025-04-14';
+      
+      const maxTokens = isAnalytical ? 1000 : 600;
+
+      const response = await fetch('https://api.openai.com/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${openAiApiKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model,
+          messages,
+          temperature: 0.7,
+          max_tokens: maxTokens
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`OpenAI API error: ${response.status}`);
+      }
+
+      const data = await response.json();
+      const result = data.choices[0].message.content;
+
+      // Cache the response
+      this.setCachedResponse(cacheKey, result);
+      
+      console.log(`[OptimizedApiClient] Generated ${isAnalytical ? 'analytical' : 'standard'} response using ${model}`);
+      return result;
+    } catch (error) {
+      console.error('[OptimizedApiClient] Error generating response:', error);
+      throw error;
+    }
+  }
+
+  static async getEmbedding(text: string, openaiApiKey: string): Promise<number[]> {
+    try {
       const response = await fetch('https://api.openai.com/v1/embeddings', {
         method: 'POST',
         headers: {
@@ -25,10 +123,9 @@ export class OptimizedApiClient {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          model: 'text-embedding-3-small', // Optimized model choice
-          input: text.substring(0, 8000), // Optimized input length
-          encoding_format: 'float',
-          dimensions: 1536 // Explicit dimension specification for consistency
+          model: 'text-embedding-3-small',
+          input: text.substring(0, 8000),
+          encoding_format: 'float'
         }),
       });
 
@@ -37,190 +134,29 @@ export class OptimizedApiClient {
       }
 
       const result = await response.json();
-      const embedding = result.data[0].embedding;
-
-      // Phase 2: Intelligent caching with context awareness
-      this.cacheEmbedding(contextAwareCacheKey, embedding);
-      
-      return embedding;
+      return result.data[0].embedding;
     } catch (error) {
       console.error('[OptimizedApiClient] Embedding generation failed:', error);
       throw error;
     }
   }
 
-  // Phase 2: Enhanced chat completion with adaptive model selection
-  static async getChatCompletion(
-    messages: any[], 
-    openaiApiKey: string,
-    options: {
-      maxTokens?: number;
-      temperature?: number;
-      useGPT4?: boolean;
-      route?: string;
-      complexity?: string;
-    } = {}
-  ): Promise<string> {
-    const { 
-      maxTokens = 800, 
-      temperature = 0.7, 
-      useGPT4 = false,
-      route = 'standard',
-      complexity = 'moderate'
-    } = options;
-    
-    // Phase 2: Intelligent model selection based on route and complexity
-    let model = 'gpt-4o-mini'; // Default efficient model
-    
-    if (route === 'comprehensive' || complexity === 'complex') {
-      model = 'gpt-4o';
-    } else if (route === 'fast_track') {
-      model = 'gpt-4o-mini';
-    } else if (useGPT4) {
-      model = 'gpt-4o';
-    }
-    
-    // Phase 2: Adaptive token allocation based on route
-    const adaptiveMaxTokens = route === 'fast_track' ? 
-      Math.min(maxTokens, 600) : 
-      route === 'comprehensive' ? 
-      Math.min(maxTokens, 1200) : 
-      maxTokens;
-    
-    try {
-      console.log(`[OptimizedApiClient] Phase 2 using model: ${model} (route: ${route})`);
-      const response = await fetch('https://api.openai.com/v1/chat/completions', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${openaiApiKey}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          model,
-          messages: this.optimizeMessages(messages, route),
-          temperature,
-          max_tokens: adaptiveMaxTokens,
-          stream: false
-        }),
-      });
-
-      if (!response.ok) {
-        throw new Error(`Chat completion error: ${response.status}`);
-      }
-
-      const result = await response.json();
-      return result.choices[0].message.content;
-    } catch (error) {
-      console.error('[OptimizedApiClient] Chat completion failed:', error);
-      throw error;
-    }
-  }
-
-  // Cache management
-  private static cacheEmbedding(key: string, embedding: number[]): void {
-    // Implement LRU cache behavior
-    if (this.embeddingCache.size >= this.CACHE_SIZE_LIMIT) {
-      const firstKey = this.embeddingCache.keys().next().value;
-      this.embeddingCache.delete(firstKey);
-    }
-    
-    this.embeddingCache.set(key, embedding);
-  }
-
-  // Simple hash function for cache keys
-  private static hashString(str: string): string {
+  private static generateCacheKey(systemPrompt: string, userPrompt: string): string {
+    const combined = systemPrompt + userPrompt;
     let hash = 0;
-    for (let i = 0; i < str.length; i++) {
-      const char = str.charCodeAt(i);
+    for (let i = 0; i < combined.length; i++) {
+      const char = combined.charCodeAt(i);
       hash = ((hash << 5) - hash) + char;
-      hash = hash & hash; // Convert to 32-bit integer
+      hash = hash & hash;
     }
     return hash.toString();
   }
 
-  // Phase 2: Enhanced message optimization based on route
-  private static optimizeMessages(messages: any[], route: string = 'standard'): any[] {
-    const maxContentLength = route === 'fast_track' ? 2000 : 
-                            route === 'comprehensive' ? 6000 : 4000;
-    
-    return messages.map(msg => ({
-      ...msg,
-      content: typeof msg.content === 'string' 
-        ? msg.content.substring(0, maxContentLength) 
-        : msg.content
-    }));
-  }
-
-  // Batch embedding generation for multiple texts
-  static async getBatchEmbeddings(texts: string[], openaiApiKey: string): Promise<number[][]> {
-    const embeddings: number[][] = [];
-    const uncachedTexts: { text: string; index: number }[] = [];
-
-    // Check cache for each text
-    texts.forEach((text, index) => {
-      const cacheKey = this.hashString(text);
-      if (this.embeddingCache.has(cacheKey)) {
-        embeddings[index] = this.embeddingCache.get(cacheKey)!;
-      } else {
-        uncachedTexts.push({ text, index });
-      }
-    });
-
-    // Generate embeddings for uncached texts in batch
-    if (uncachedTexts.length > 0) {
-      try {
-        const response = await fetch('https://api.openai.com/v1/embeddings', {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${openaiApiKey}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            model: 'text-embedding-3-small',
-            input: uncachedTexts.map(item => item.text.substring(0, 8000)),
-            encoding_format: 'float'
-          }),
-        });
-
-        if (!response.ok) {
-          throw new Error(`Batch embedding API error: ${response.status}`);
-        }
-
-        const result = await response.json();
-        
-        // Cache and assign results
-        uncachedTexts.forEach((item, batchIndex) => {
-          const embedding = result.data[batchIndex].embedding;
-          const cacheKey = this.hashString(item.text);
-          this.cacheEmbedding(cacheKey, embedding);
-          embeddings[item.index] = embedding;
-        });
-      } catch (error) {
-        console.error('[OptimizedApiClient] Batch embedding generation failed:', error);
-        throw error;
-      }
+  private static setCachedResponse(key: string, response: string): void {
+    if (this.responseCache.size >= this.CACHE_SIZE_LIMIT) {
+      const firstKey = this.responseCache.keys().next().value;
+      this.responseCache.delete(firstKey);
     }
-
-    return embeddings;
-  }
-
-  // Phase 2: Performance monitoring for API calls
-  static getApiPerformanceStats(): {
-    embeddingCacheHitRate: number;
-    avgEmbeddingTime: number;
-    avgCompletionTime: number;
-    phase2Optimizations: string[];
-  } {
-    return {
-      embeddingCacheHitRate: 0.75, // Would track actual metrics
-      avgEmbeddingTime: 450, // ms
-      avgCompletionTime: 1200, // ms
-      phase2Optimizations: [
-        'context_aware_caching',
-        'adaptive_model_selection',
-        'intelligent_token_allocation',
-        'route_based_optimization'
-      ]
-    };
+    this.responseCache.set(key, response);
   }
 }

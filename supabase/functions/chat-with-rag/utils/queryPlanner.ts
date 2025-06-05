@@ -1,12 +1,14 @@
 
-// Enhanced query planning for chat-with-rag function
+// Enhanced query planning for chat-with-rag function with dual search support
 export interface QueryPlan {
   strategy: string;
   complexity: 'simple' | 'complex' | 'multi_part';
   requiresTimeFilter: boolean;
   requiresAggregation: boolean;
-  searchStrategy: 'vector' | 'hybrid' | 'comprehensive';
+  searchStrategy: 'dual_vector_sql' | 'dual_parallel' | 'dual_sequential';
   expectedResponseType: 'direct' | 'analysis' | 'aggregated' | 'narrative';
+  dualSearchEnabled: boolean;
+  executionMode: 'parallel' | 'sequential';
 }
 
 export function planQuery(message: string, timeRange?: any): QueryPlan {
@@ -21,7 +23,7 @@ export function planQuery(message: string, timeRange?: any): QueryPlan {
   
   if (questionMarkers > 1 || (andMarkers > 0 && (questionMarkers > 0 || alsoMarkers > 0))) {
     complexity = 'multi_part';
-  } else if (/\b(pattern|trend|analysis|compare|correlation|top\s+\d+|most\s+(common|frequent))\b/i.test(lowerMessage)) {
+  } else if (/\b(pattern|trend|analysis|compare|correlation|top\s+\d+|most\s+(common|frequent)|when do|what time|how often|frequency|usually|typically)\b/i.test(lowerMessage)) {
     complexity = 'complex';
   }
   
@@ -29,15 +31,19 @@ export function planQuery(message: string, timeRange?: any): QueryPlan {
   const requiresTimeFilter = !!(timeRange || /\b(last|this|current|recent|past)\s+(week|month|year|day)\b/i.test(lowerMessage));
   
   // Determine if aggregation is required
-  const requiresAggregation = /\b(top\s+\d+|most\s+(common|frequent)|average|total|sum|count|how\s+many|how\s+often)\b/i.test(lowerMessage);
+  const requiresAggregation = /\b(top\s+\d+|most\s+(common|frequent)|average|total|sum|count|how\s+many|how\s+often|when do|what time|frequency|usually|typically|pattern|trend)\b/i.test(lowerMessage);
   
-  // Determine search strategy
-  let searchStrategy: 'vector' | 'hybrid' | 'comprehensive' = 'vector';
+  // Always use dual search strategy - this is the key change
+  let searchStrategy: 'dual_vector_sql' | 'dual_parallel' | 'dual_sequential' = 'dual_vector_sql';
+  let executionMode: 'parallel' | 'sequential' = 'parallel';
   
-  if (complexity === 'complex' || requiresAggregation) {
-    searchStrategy = 'comprehensive';
+  // Determine execution mode based on complexity and requirements
+  if (complexity === 'complex' || requiresAggregation || complexity === 'multi_part') {
+    searchStrategy = 'dual_parallel';
+    executionMode = 'parallel';
   } else if (requiresTimeFilter) {
-    searchStrategy = 'hybrid';
+    searchStrategy = 'dual_sequential';
+    executionMode = 'sequential';
   }
   
   // Determine expected response type
@@ -45,23 +51,23 @@ export function planQuery(message: string, timeRange?: any): QueryPlan {
   
   if (/^(what\s+are\s+the\s+dates?|when\s+(is|was))\b/i.test(lowerMessage)) {
     expectedResponseType = 'direct';
-  } else if (requiresAggregation || /\btop\s+\d+\b/i.test(lowerMessage)) {
+  } else if (requiresAggregation || /\btop\s+\d+\b/i.test(lowerMessage) || /\b(when do|what time|how often|frequency|usually|typically)\b/i.test(lowerMessage)) {
     expectedResponseType = 'aggregated';
   } else if (/\b(analyze|analysis|insight|pattern|trend)\b/i.test(lowerMessage)) {
     expectedResponseType = 'analysis';
   }
   
-  // Determine strategy
-  let strategy = 'default';
+  // Determine strategy - always include dual search
+  let strategy = 'dual_search_default';
   
   if (complexity === 'multi_part') {
-    strategy = 'segmented_processing';
+    strategy = 'dual_search_segmented_processing';
   } else if (expectedResponseType === 'aggregated') {
-    strategy = 'data_aggregation';
+    strategy = 'dual_search_data_aggregation';
   } else if (expectedResponseType === 'analysis') {
-    strategy = 'pattern_analysis';
+    strategy = 'dual_search_pattern_analysis';
   } else if (requiresTimeFilter) {
-    strategy = 'time_filtered_search';
+    strategy = 'dual_search_time_filtered';
   }
   
   return {
@@ -70,22 +76,37 @@ export function planQuery(message: string, timeRange?: any): QueryPlan {
     requiresTimeFilter,
     requiresAggregation,
     searchStrategy,
-    expectedResponseType
+    expectedResponseType,
+    dualSearchEnabled: true, // Always enabled
+    executionMode
   };
 }
 
 export function shouldUseComprehensiveSearch(plan: QueryPlan): boolean {
-  return plan.searchStrategy === 'comprehensive' || 
-         plan.requiresAggregation || 
-         plan.complexity === 'complex';
+  // With dual search, we're always comprehensive
+  return plan.dualSearchEnabled;
 }
 
 export function getMaxEntries(plan: QueryPlan): number {
-  if (plan.searchStrategy === 'comprehensive') {
+  // Adjust entry limits for dual search
+  if (plan.searchStrategy === 'dual_parallel') {
     return 100;
   } else if (plan.complexity === 'complex') {
     return 50;
   } else {
-    return 10;
+    return 20;
   }
+}
+
+export function shouldUseAnalyticalFormatting(plan: QueryPlan, message: string): boolean {
+  // Detect queries that need structured formatting
+  const analyticalKeywords = [
+    'pattern', 'trend', 'analysis', 'when do', 'what time', 'how often',
+    'frequency', 'usually', 'typically', 'most', 'least', 'statistics',
+    'insights', 'breakdown', 'summary', 'overview', 'comparison'
+  ];
+  
+  return plan.expectedResponseType === 'analysis' ||
+         plan.expectedResponseType === 'aggregated' ||
+         analyticalKeywords.some(keyword => message.toLowerCase().includes(keyword));
 }

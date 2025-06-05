@@ -1,104 +1,86 @@
 
-// Cache manager for embedding and response caching
+// Enhanced cache manager for dual search operations
 export class CacheManager {
+  private static queryCache = new Map<string, any>();
   private static embeddingCache = new Map<string, number[]>();
-  private static responseCache = new Map<string, { response: string; timestamp: number }>();
-  private static CACHE_TTL = 30 * 60 * 1000; // 30 minutes
-  private static MAX_CACHE_SIZE = 1000;
+  private static responseCache = new Map<string, string>();
+  private static readonly CACHE_SIZE_LIMIT = 100;
 
-  // Cache embeddings to avoid redundant OpenAI calls
-  static getCachedEmbedding(text: string): number[] | null {
-    const normalizedText = text.toLowerCase().trim();
-    return this.embeddingCache.get(normalizedText) || null;
+  static generateQueryHash(query: string, searchType: string, filters: any): string {
+    const hashInput = JSON.stringify({ query, searchType, filters });
+    let hash = 0;
+    for (let i = 0; i < hashInput.length; i++) {
+      const char = hashInput.charCodeAt(i);
+      hash = ((hash << 5) - hash) + char;
+      hash = hash & hash;
+    }
+    return hash.toString();
   }
 
-  static setCachedEmbedding(text: string, embedding: number[]): void {
-    const normalizedText = text.toLowerCase().trim();
-    
-    // Implement simple LRU by clearing oldest entries when cache is full
-    if (this.embeddingCache.size >= this.MAX_CACHE_SIZE) {
-      const firstKey = this.embeddingCache.keys().next().value;
-      this.embeddingCache.delete(firstKey);
+  static getCachedQuery(key: string): any | null {
+    if (this.queryCache.has(key)) {
+      console.log('[CacheManager] Query cache hit');
+      return this.queryCache.get(key);
     }
-    
-    this.embeddingCache.set(normalizedText, embedding);
-  }
-
-  // Cache responses for identical queries
-  static getCachedResponse(queryHash: string): string | null {
-    const cached = this.responseCache.get(queryHash);
-    
-    if (cached && Date.now() - cached.timestamp < this.CACHE_TTL) {
-      return cached.response;
-    }
-    
-    if (cached) {
-      this.responseCache.delete(queryHash);
-    }
-    
     return null;
   }
 
-  static setCachedResponse(queryHash: string, response: string): void {
-    // Clean expired entries
-    this.cleanExpiredEntries();
-    
-    this.responseCache.set(queryHash, {
-      response,
-      timestamp: Date.now()
-    });
-  }
-
-  static generateQueryHash(message: string, userId: string, dateFilter?: any): string {
-    const hashInput = `${message}:${userId}:${JSON.stringify(dateFilter || {})}`;
-    
-    try {
-      // Use UTF-8 safe encoding instead of btoa()
-      const encoder = new TextEncoder();
-      const data = encoder.encode(hashInput);
-      
-      // Convert to base64 manually for UTF-8 safety
-      const base64 = this.arrayBufferToBase64(data);
-      return base64.replace(/[^a-zA-Z0-9]/g, '').substring(0, 32);
-    } catch (error) {
-      console.error('[CacheManager] Error generating hash:', error);
-      // Fallback to simple hash if encoding fails
-      return this.simpleHash(hashInput).substring(0, 32);
+  static setCachedQuery(key: string, result: any): void {
+    if (this.queryCache.size >= this.CACHE_SIZE_LIMIT) {
+      const firstKey = this.queryCache.keys().next().value;
+      this.queryCache.delete(firstKey);
     }
+    this.queryCache.set(key, result);
   }
 
-  private static arrayBufferToBase64(buffer: Uint8Array): string {
-    let binary = '';
-    const bytes = new Uint8Array(buffer);
-    const len = bytes.byteLength;
-    for (let i = 0; i < len; i++) {
-      binary += String.fromCharCode(bytes[i]);
+  static getCachedEmbedding(text: string): number[] | null {
+    const key = this.generateTextHash(text);
+    if (this.embeddingCache.has(key)) {
+      console.log('[CacheManager] Embedding cache hit');
+      return this.embeddingCache.get(key)!;
     }
-    return btoa(binary);
+    return null;
   }
 
-  private static simpleHash(str: string): string {
+  static setCachedEmbedding(text: string, embedding: number[]): void {
+    const key = this.generateTextHash(text);
+    if (this.embeddingCache.size >= this.CACHE_SIZE_LIMIT) {
+      const firstKey = this.embeddingCache.keys().next().value;
+      this.embeddingCache.delete(firstKey);
+    }
+    this.embeddingCache.set(key, embedding);
+  }
+
+  static getCachedResponse(key: string): string | null {
+    if (this.responseCache.has(key)) {
+      console.log('[CacheManager] Response cache hit');
+      return this.responseCache.get(key);
+    }
+    return null;
+  }
+
+  static setCachedResponse(key: string, response: string): void {
+    if (this.responseCache.size >= this.CACHE_SIZE_LIMIT) {
+      const firstKey = this.responseCache.keys().next().value;
+      this.responseCache.delete(firstKey);
+    }
+    this.responseCache.set(key, response);
+  }
+
+  private static generateTextHash(text: string): string {
     let hash = 0;
-    for (let i = 0; i < str.length; i++) {
-      const char = str.charCodeAt(i);
+    for (let i = 0; i < text.length; i++) {
+      const char = text.charCodeAt(i);
       hash = ((hash << 5) - hash) + char;
-      hash = hash & hash; // Convert to 32bit integer
+      hash = hash & hash;
     }
-    return Math.abs(hash).toString(36);
+    return hash.toString();
   }
 
-  private static cleanExpiredEntries(): void {
-    const now = Date.now();
-    for (const [key, value] of this.responseCache.entries()) {
-      if (now - value.timestamp > this.CACHE_TTL) {
-        this.responseCache.delete(key);
-      }
-    }
-  }
-
-  // Clear all caches
-  static clearAll(): void {
+  static clearAllCaches(): void {
+    this.queryCache.clear();
     this.embeddingCache.clear();
     this.responseCache.clear();
+    console.log('[CacheManager] All caches cleared');
   }
 }
