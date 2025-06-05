@@ -1,3 +1,4 @@
+
 import React, { useMemo, useEffect } from 'react';
 import TranslatableText3D from './TranslatableText3D';
 import SimpleText from './SimpleText';
@@ -50,9 +51,9 @@ export const DirectNodeLabel: React.FC<DirectNodeLabelProps> = ({
 
   // Log rendering mode
   if (isInstantMode) {
-    console.log(`[DirectNodeLabel] INSTANT MODE: ${id} with TranslatableText3D integration - NO LOADING DELAY`);
+    console.log(`[DirectNodeLabel] INSTANT MODE: ${id} with FIXED PERCENTAGE POSITIONING - NO LOADING DELAY`);
   } else {
-    console.log(`[DirectNodeLabel] ENHANCED POSITIONING: ${id} with TranslatableText3D integration`);
+    console.log(`[DirectNodeLabel] FIXED PERCENTAGE POSITIONING: ${id} with enhanced visibility`);
   }
 
   // Same base offset for both entity and emotion nodes
@@ -83,27 +84,31 @@ export const DirectNodeLabel: React.FC<DirectNodeLabelProps> = ({
     return finalSize;
   }, [cameraZoom, id, isSelected, isHighlighted, isInstantMode]);
 
-  // Much smaller percentage text size
+  // FIXED: Larger percentage text size for better visibility
   const percentageTextSize = useMemo(() => {
-    return textSize * 0.21;
-  }, [textSize]);
+    const basePercentageSize = textSize * 0.35; // Increased from 0.21 to 0.35
+    const minSize = Math.max(2.0, basePercentageSize); // Ensure minimum readable size
+    console.log(`[DirectNodeLabel] FIXED PERCENTAGE SIZE for ${id}: ${minSize} (base: ${basePercentageSize})`);
+    return minSize;
+  }, [textSize, id]);
 
-  // UPDATED: Solid white text for dark theme, solid black text for light theme
+  // UPDATED: High contrast colors for better visibility
   const textColor = useMemo(() => {
     const color = effectiveTheme === 'dark' ? '#ffffff' : '#000000';
     
     if (isInstantMode) {
-      console.log(`[DirectNodeLabel] INSTANT: SOLID WHITE TEXT COLOR for ${id}: ${color} (theme: ${effectiveTheme})`);
+      console.log(`[DirectNodeLabel] INSTANT: HIGH CONTRAST TEXT COLOR for ${id}: ${color} (theme: ${effectiveTheme})`);
     } else {
-      console.log(`[DirectNodeLabel] SOLID WHITE TEXT COLOR for ${id}: ${color} (theme: ${effectiveTheme})`);
+      console.log(`[DirectNodeLabel] HIGH CONTRAST TEXT COLOR for ${id}: ${color} (theme: ${effectiveTheme})`);
     }
     return color;
   }, [effectiveTheme, id, isInstantMode]);
 
-  // UPDATED: Percentage text also uses solid white for dark theme
+  // FIXED: Bright, high-contrast percentage color
   const percentageColor = useMemo(() => {
-    const color = effectiveTheme === 'dark' ? '#ffffff' : '#000000';
-    console.log(`[DirectNodeLabel] SOLID WHITE PERCENTAGE COLOR for ${id}: ${color} (theme: ${effectiveTheme})`);
+    // Use bright colors for maximum visibility
+    const color = effectiveTheme === 'dark' ? '#00ff00' : '#ff0000'; // Bright green for dark, bright red for light
+    console.log(`[DirectNodeLabel] FIXED HIGH CONTRAST PERCENTAGE COLOR for ${id}: ${color} (theme: ${effectiveTheme})`);
     return color;
   }, [effectiveTheme, id]);
 
@@ -113,16 +118,34 @@ export const DirectNodeLabel: React.FC<DirectNodeLabelProps> = ({
     position[2] + labelOffset[2]
   ];
 
-  // Side positioning for percentage
+  // FIXED: Enhanced side positioning for percentage with better spacing and Z-offset
   const percentagePosition: [number, number, number] = useMemo(() => {
-    const sideOffset = (type === 'entity' ? 2.0 : 2.5) * nodeScale;
-    const verticalOffset = 0;
-    return [
+    // INCREASED: Much larger side offset for better separation
+    const baseSideOffset = type === 'entity' ? 3.5 : 4.0; // Increased from 2.0/2.5 to 3.5/4.0
+    const sideOffset = baseSideOffset * Math.max(1.0, nodeScale);
+    
+    // IMPROVED: Better vertical positioning based on node type and new Y positions
+    let verticalOffset = 0;
+    if (type === 'emotion') {
+      // Emotions are now at Y +10/-10, so adjust percentage positioning accordingly
+      verticalOffset = position[1] > 0 ? -2.0 : 2.0; // Offset away from emotion clusters
+    } else {
+      // Entities are in center layer, use small vertical offset
+      verticalOffset = -1.0;
+    }
+    
+    // ENHANCED: Better Z-offset to bring percentages forward
+    const zOffset = 2.0; // Increased from 0.5 to 2.0 for better visibility
+    
+    const finalPosition: [number, number, number] = [
       position[0] + sideOffset,
       position[1] + verticalOffset,
-      position[2] + 0.5
+      position[2] + zOffset
     ];
-  }, [position, type, nodeScale]);
+    
+    console.log(`[DirectNodeLabel] FIXED PERCENTAGE POSITIONING for ${id} (${type}): sideOffset=${sideOffset}, verticalOffset=${verticalOffset}, zOffset=${zOffset}, final=`, finalPosition);
+    return finalPosition;
+  }, [position, type, nodeScale, id]);
 
   // Enhanced visibility check for tutorial step 9
   const enhancedShouldShowLabel = useMemo(() => {
@@ -146,19 +169,19 @@ export const DirectNodeLabel: React.FC<DirectNodeLabelProps> = ({
     return null;
   }
 
-  // Log percentage display state with side positioning
+  // FIXED: Enhanced percentage display logging
   if (showPercentage && connectionPercentage > 0) {
     if (isInstantMode) {
-      console.log(`[DirectNodeLabel] INSTANT MODE - SIDE POSITIONING - PERCENTAGE: ${id} (${type}) shows ${connectionPercentage}% on the side at`, percentagePosition, '- NO LOADING DELAY');
+      console.log(`[DirectNodeLabel] INSTANT MODE - FIXED PERCENTAGE DISPLAY: ${id} (${type}) shows ${connectionPercentage}% at`, percentagePosition, `size: ${percentageTextSize}, color: ${percentageColor} - ENHANCED VISIBILITY`);
     } else {
-      console.log(`[DirectNodeLabel] ENHANCED SIDE POSITIONING - PERCENTAGE: ${id} (${type}) shows ${connectionPercentage}% on the side at`, percentagePosition);
+      console.log(`[DirectNodeLabel] FIXED PERCENTAGE DISPLAY: ${id} (${type}) shows ${connectionPercentage}% at`, percentagePosition, `size: ${percentageTextSize}, color: ${percentageColor} - ENHANCED VISIBILITY`);
     }
   }
 
   if (isInstantMode) {
-    console.log(`[DirectNodeLabel] INSTANT MODE - MAIN TEXT: "${id}" at position`, labelPosition, 'with size:', textSize, 'color:', textColor, '- NO LOADING DELAY - GOOGLE TRANSLATE INTEGRATION');
+    console.log(`[DirectNodeLabel] INSTANT MODE - MAIN TEXT: "${id}" at position`, labelPosition, 'with size:', textSize, 'color:', textColor, '- NO LOADING DELAY - GOOGLE TRANSLATE INTEGRATION`);
   } else {
-    console.log(`[DirectNodeLabel] ENHANCED POSITIONING - MAIN TEXT: "${id}" at position`, labelPosition, 'with size:', textSize, 'color:', textColor, '- GOOGLE TRANSLATE INTEGRATION');
+    console.log(`[DirectNodeLabel] ENHANCED POSITIONING - MAIN TEXT: "${id}" at position`, labelPosition, 'with size:', textSize, 'color:', textColor, '- GOOGLE TRANSLATE INTEGRATION`);
   }
 
   return (
@@ -172,8 +195,8 @@ export const DirectNodeLabel: React.FC<DirectNodeLabelProps> = ({
         visible={true}
         renderOrder={15}
         bold={isHighlighted || isSelected}
-        outlineWidth={0} // PLAN IMPLEMENTATION: No outline for crisp text
-        outlineColor={undefined} // PLAN IMPLEMENTATION: No outline color needed
+        outlineWidth={0}
+        outlineColor={undefined}
         maxWidth={600}
         enableWrapping={true}
         maxCharsPerLine={18}
@@ -181,7 +204,7 @@ export const DirectNodeLabel: React.FC<DirectNodeLabelProps> = ({
         sourceLanguage="en"
       />
       
-      {/* Enhanced side-positioned percentage text with theme-aware color */}
+      {/* FIXED: Enhanced percentage text with improved visibility and positioning */}
       {showPercentage && connectionPercentage > 0 && (
         <SimpleText
           text={`${connectionPercentage}%`}
@@ -189,11 +212,11 @@ export const DirectNodeLabel: React.FC<DirectNodeLabelProps> = ({
           color={percentageColor}
           size={percentageTextSize}
           visible={true}
-          renderOrder={16}
+          renderOrder={20} // INCREASED: Higher render order for better visibility (was 16, now 20)
           bold={true}
-          outlineWidth={0} // PLAN IMPLEMENTATION: No outline for crisp text
-          outlineColor={undefined} // PLAN IMPLEMENTATION: No outline color needed
-          maxWidth={200}
+          outlineWidth={0.05} // ADDED: Small outline for better contrast
+          outlineColor={effectiveTheme === 'dark' ? '#000000' : '#ffffff'} // ADDED: Contrasting outline
+          maxWidth={300} // INCREASED: Larger max width (was 200, now 300)
           enableWrapping={false}
         />
       )}
