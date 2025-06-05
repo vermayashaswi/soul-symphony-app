@@ -40,7 +40,7 @@ serve(async (req) => {
       throw new Error('User ID is required');
     }
 
-    // Find journal entries without embeddings
+    // Find journal entries without embeddings using LEFT JOIN approach
     console.log('[Generate-Missing-Embeddings] Finding entries without embeddings for user:', userId);
     
     const { data: entriesWithoutEmbeddings, error: fetchError } = await supabaseClient
@@ -49,14 +49,11 @@ serve(async (req) => {
         id,
         "refined text",
         "transcription text",
-        created_at
+        created_at,
+        journal_embeddings!left(journal_entry_id)
       `)
       .eq('user_id', userId)
-      .not('id', 'in', `(
-        SELECT journal_entry_id 
-        FROM journal_embeddings 
-        WHERE journal_entry_id IS NOT NULL
-      )`);
+      .is('journal_embeddings.journal_entry_id', null);
 
     if (fetchError) {
       console.error('[Generate-Missing-Embeddings] Error fetching entries:', fetchError);
