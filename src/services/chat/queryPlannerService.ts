@@ -1,3 +1,4 @@
+
 import { analyzeQueryTypes } from '@/utils/chat/queryAnalyzer';
 import { supabase } from '@/integrations/supabase/client';
 import { 
@@ -142,16 +143,16 @@ export async function planQuery(message: string, threadId: string, userId: strin
       }
     }
     
-    // NEW: Enhanced entity detection
+    // NEW: Enhanced entity detection with relationship patterns
     const entityPatterns = [
       // People patterns
-      /\b(mom|dad|mother|father|parent|brother|sister|friend|colleague|boss|manager|doctor|teacher)\b/i,
+      /\b(mom|dad|mother|father|parent|brother|sister|friend|colleague|boss|manager|doctor|teacher|partner|spouse|wife|husband)\b/i,
       // Place patterns  
-      /\b(home|office|gym|restaurant|hospital|school|university|park|beach|store|mall)\b/i,
+      /\b(home|office|gym|restaurant|hospital|school|university|park|beach|store|mall|workplace|clinic)\b/i,
       // Organization patterns
       /\b(company|workplace|team|department|organization|clinic|hospital|school)\b/i,
       // Event patterns
-      /\b(meeting|appointment|party|wedding|conference|interview|vacation|trip)\b/i
+      /\b(meeting|appointment|party|wedding|conference|interview|vacation|trip|date|presentation)\b/i
     ];
     
     const detectedEntities = [];
@@ -164,16 +165,16 @@ export async function planQuery(message: string, threadId: string, userId: strin
     
     // NEW: Enhanced emotion detection for entity-emotion relationships
     const emotionPatterns = [
-      /\b(happy|happiness|joy|excited|elated|cheerful|delighted)\b/i,
-      /\b(sad|sadness|depressed|down|melancholy|grief|sorrow)\b/i,
-      /\b(angry|anger|mad|furious|irritated|annoyed|frustrated)\b/i,
-      /\b(anxious|anxiety|worried|nervous|stressed|panic|fear)\b/i,
-      /\b(love|loving|affection|caring|tender|devoted)\b/i,
-      /\b(proud|pride|accomplished|confident|satisfied)\b/i,
-      /\b(grateful|thankful|appreciation|blessed)\b/i,
-      /\b(disappointed|letdown|discouraged|dejected)\b/i,
-      /\b(confused|uncertainty|bewildered|puzzled)\b/i,
-      /\b(calm|peaceful|relaxed|serene|tranquil)\b/i
+      /\b(happy|happiness|joy|excited|elated|cheerful|delighted|joyful)\b/i,
+      /\b(sad|sadness|depressed|down|melancholy|grief|sorrow|upset)\b/i,
+      /\b(angry|anger|mad|furious|irritated|annoyed|frustrated|rage)\b/i,
+      /\b(anxious|anxiety|worried|nervous|stressed|panic|fear|fearful)\b/i,
+      /\b(love|loving|affection|caring|tender|devoted|adore)\b/i,
+      /\b(proud|pride|accomplished|confident|satisfied|achievement)\b/i,
+      /\b(grateful|thankful|appreciation|blessed|appreciative)\b/i,
+      /\b(disappointed|letdown|discouraged|dejected|frustrated)\b/i,
+      /\b(confused|uncertainty|bewildered|puzzled|uncertain)\b/i,
+      /\b(calm|peaceful|relaxed|serene|tranquil|content)\b/i
     ];
     
     const detectedEmotions = [];
@@ -185,11 +186,17 @@ export async function planQuery(message: string, threadId: string, userId: strin
     }
     
     // NEW: Detect entity-emotion relationship queries
+    const relationshipPatterns = [
+      /\b(feel about|feelings toward|emotional connection|relationship with|how.*makes me feel)\b/i,
+      /\b(when.*with|around.*feel|being with.*makes)\b/i,
+      /\b(my relationship|how i feel about|what.*means to me)\b/i
+    ];
+    
     const isEntityEmotionQuery = (
       detectedEntities.length > 0 && 
       detectedEmotions.length > 0
     ) || 
-    /\b(feel about|feelings toward|emotional connection|relationship with|how.*makes me feel)\b/i.test(message.toLowerCase());
+    relationshipPatterns.some(pattern => pattern.test(message.toLowerCase()));
     
     console.log("[Query Planner] Enhanced analysis with entity-emotion detection:", {
       hasPersonalPronouns,

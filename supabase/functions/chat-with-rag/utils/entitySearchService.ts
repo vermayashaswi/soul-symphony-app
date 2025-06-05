@@ -1,3 +1,4 @@
+
 /**
  * Entity search service for enhanced RAG pipeline with entity filtering
  */
@@ -260,6 +261,42 @@ export async function getEntityEmotionAnalytics(
     
   } catch (error) {
     console.error('[entitySearchService] Error getting entity-emotion analytics:', error);
+    throw error;
+  }
+}
+
+/**
+ * NEW: Get top entity-emotion relationships using database function
+ */
+export async function getTopEntityEmotionRelationships(
+  supabase: any,
+  userId: string,
+  timeRange?: { startDate?: string; endDate?: string },
+  limitCount: number = 10
+) {
+  try {
+    const userIdString = typeof userId === 'string' ? userId : String(userId);
+    console.log(`[entitySearchService] Getting top entity-emotion relationships for userId: ${userIdString}`);
+    
+    const { data, error } = await supabase.rpc(
+      'get_top_entity_emotion_relationships',
+      {
+        user_id_filter: userIdString,
+        start_date: timeRange?.startDate || null,
+        end_date: timeRange?.endDate || null,
+        limit_count: limitCount
+      }
+    );
+    
+    if (error) {
+      console.error(`[entitySearchService] Error getting top entity-emotion relationships: ${error.message}`);
+      throw error;
+    }
+    
+    console.log(`[entitySearchService] Found ${data?.length || 0} top entity-emotion relationships`);
+    return data || [];
+  } catch (error) {
+    console.error('[entitySearchService] Error getting top entity-emotion relationships:', error);
     throw error;
   }
 }

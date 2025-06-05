@@ -659,6 +659,24 @@ export type Database = {
           top_countries: Json
         }[]
       }
+      get_entity_emotion_statistics: {
+        Args: {
+          user_id_filter: string
+          start_date?: string
+          end_date?: string
+          limit_count?: number
+        }
+        Returns: {
+          entity_name: string
+          entity_type: string
+          emotion_name: string
+          relationship_count: number
+          avg_strength: number
+          max_strength: number
+          first_occurrence: string
+          last_occurrence: string
+        }[]
+      }
       get_entity_statistics: {
         Args: {
           user_id_filter: string
@@ -754,6 +772,22 @@ export type Database = {
           entity_name: string
           entry_count: number
           avg_sentiment: number
+          sample_entries: Json
+        }[]
+      }
+      get_top_entity_emotion_relationships: {
+        Args: {
+          user_id_filter: string
+          start_date?: string
+          end_date?: string
+          limit_count?: number
+        }
+        Returns: {
+          entity_name: string
+          entity_type: string
+          emotion_name: string
+          relationship_strength: number
+          entry_count: number
           sample_entries: Json
         }[]
       }

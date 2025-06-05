@@ -1,4 +1,5 @@
 
+
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.7.1';
@@ -49,17 +50,17 @@ serve(async (req) => {
 
     const { message, userId, conversationContext = [], userProfile = {} } = await req.json();
 
-    console.log('[Intelligent Query Planner] Analyzing query with enhanced theme and entity detection:', message);
+    console.log('[Intelligent Query Planner] Analyzing query with enhanced entity-emotion relationship detection:', message);
 
     // Get user's recent journaling patterns
     const { data: recentEntries } = await supabaseClient
       .from('Journal Entries')
-      .select('created_at, emotions, master_themes, entities, sentiment')
+      .select('created_at, emotions, master_themes, entities, sentiment, entityemotion')
       .eq('user_id', userId)
       .order('created_at', { ascending: false })
       .limit(20);
 
-    // Analyze user's journaling patterns including theme and entity statistics
+    // Analyze user's journaling patterns including entity-emotion relationships
     const userPatterns = await analyzeUserPatterns(recentEntries || [], supabaseClient, userId);
 
     // Generate database schema context
@@ -67,7 +68,7 @@ serve(async (req) => {
     const emotionGuidelines = getEmotionAnalysisGuidelines();
     const themeGuidelines = getThemeAnalysisGuidelines();
 
-    // Generate intelligent query plan using GPT with enhanced theme and entity awareness
+    // Generate intelligent query plan using GPT with enhanced entity-emotion awareness
     const queryPlan = await generateIntelligentQueryPlan(
       message,
       conversationContext,
@@ -79,7 +80,7 @@ serve(async (req) => {
       openaiApiKey
     );
 
-    console.log('[Intelligent Query Planner] Generated plan with enhanced theme and entity filtering:', queryPlan);
+    console.log('[Intelligent Query Planner] Generated plan with enhanced entity-emotion relationship filtering:', queryPlan);
 
     return new Response(JSON.stringify({
       queryPlan,
@@ -87,6 +88,7 @@ serve(async (req) => {
       databaseContext,
       enhancedThemeFiltering: true,
       enhancedEntityFiltering: true,
+      entityEmotionRelationshipAnalysis: true,
       timestamp: new Date().toISOString()
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -114,7 +116,7 @@ async function generateIntelligentQueryPlan(
   themeGuidelines: string,
   openaiApiKey: string
 ): Promise<QueryPlan> {
-  const systemPrompt = `You are an intelligent query planning system for a personal journal analysis AI with ENHANCED ENTITY-EMOTION RELATIONSHIP ANALYSIS CAPABILITIES.
+  const systemPrompt = `You are an intelligent query planning system for a personal journal analysis AI with ADVANCED ENTITY-EMOTION RELATIONSHIP ANALYSIS CAPABILITIES.
 
 ${databaseContext}
 
@@ -137,18 +139,21 @@ ENHANCED ENTITY FILTERING CAPABILITIES:
 - Enhanced entity search with match_journal_entries_by_entities function
 - Entity overlap operations for multi-entity queries
 
-NEW ENTITY-EMOTION RELATIONSHIP ANALYSIS:
-- Advanced entity-emotion relationship detection and analysis
+ADVANCED ENTITY-EMOTION RELATIONSHIP ANALYSIS:
 - Specialized database function: match_journal_entries_by_entity_emotion
+- Top entity-emotion relationships: get_top_entity_emotion_relationships  
+- Entity-emotion statistics: get_entity_emotion_statistics
 - Relationship strength calculation and ranking
 - Cross-analysis of how users feel about specific entities over time
 - Emotional pattern recognition related to people, places, events
 - Supports complex queries like "How do I feel about work?" or "My relationship with mom"
+- Temporal analysis of relationship evolution
 
 USER CONTEXT:
 - Recent journaling patterns: ${JSON.stringify(userPatterns)}
 - User's common themes: ${userPatterns.commonThemes?.join(', ') || 'None identified'}
 - User's common entities: ${userPatterns.commonEntities?.join(', ') || 'None identified'}
+- Entity-emotion relationships: ${userPatterns.entityEmotionRelationships?.length || 0} detected
 - Theme frequency statistics: ${JSON.stringify(userPatterns.themeStats || {})}
 - Entity frequency statistics: ${JSON.stringify(userPatterns.entityStats || {})}
 - Conversation history: ${conversationContext.slice(-3).map(c => c.content).join('; ')}
@@ -160,9 +165,10 @@ AVAILABLE SEARCH METHODS (ENHANCED):
 3. temporal_search - Time-based search with date ranges
 4. theme_search - ENHANCED array-based theme search with PostgreSQL operators
 5. entity_search - Array-based entity search with JSONB operators
-6. entity_emotion_search - NEW: Advanced entity-emotion relationship analysis
-7. hybrid_search - Combine multiple methods intelligently
-8. aggregation_search - Statistical analysis across entries for patterns
+6. entity_emotion_search - ADVANCED: Entity-emotion relationship analysis
+7. entity_emotion_statistics - NEW: Statistical analysis of entity-emotion patterns
+8. hybrid_search - Combine multiple methods intelligently
+9. aggregation_search - Statistical analysis across entries for patterns
 
 ENTITY-EMOTION QUERY DETECTION:
 - Look for relationship queries: "How do I feel about X?", "My feelings toward Y"
@@ -170,10 +176,11 @@ ENTITY-EMOTION QUERY DETECTION:
 - Identify place-emotion associations: "how work makes me feel", "emotions at home"
 - Recognize event-emotion patterns: "stress from meetings", "anxiety about presentations"
 - Consider temporal emotional changes: "my feelings about X over time"
+- Pattern analysis: "What emotions do I associate with family?"
 
 QUERY TO ANALYZE: "${message}"
 
-Generate a comprehensive query execution plan with enhanced entity-emotion relationship analysis:
+Generate a comprehensive query execution plan with advanced entity-emotion relationship analysis:
 
 {
   "strategy": "primary_strategy_name",
@@ -189,14 +196,16 @@ Generate a comprehensive query execution plan with enhanced entity-emotion relat
     "themeMatchType": "exact" or "partial" or "semantic",
     "entityMatchType": "exact" or "partial" or "semantic",
     "entityEmotionAnalysis": boolean,
-    "relationshipAnalysis": boolean
+    "relationshipAnalysis": boolean,
+    "relationshipStrengthThreshold": 0.3,
+    "useEntityEmotionStatistics": boolean
   },
   "emotionFocus": "emotion_name" or null,
   "subQueries": ["sub_query1", "sub_query2"] or null,
-  "expectedResponseType": "narrative|analysis|data|direct_answer|relationship_analysis",
+  "expectedResponseType": "narrative|analysis|data|direct_answer|relationship_analysis|statistical_summary",
   "confidence": 0.85,
-  "reasoning": "Detailed explanation leveraging enhanced entity-emotion relationship analysis capabilities",
-  "databaseContext": "How this plan uses the enhanced database schema including entity-emotion relationship operations"
+  "reasoning": "Detailed explanation leveraging advanced entity-emotion relationship analysis capabilities",
+  "databaseContext": "How this plan uses the enhanced database schema including entity-emotion relationship operations and statistics"
 }
 
 ENHANCED ANALYSIS GUIDELINES:
@@ -206,7 +215,9 @@ ENHANCED ANALYSIS GUIDELINES:
 - Leverage user's historical entity-emotion patterns for better relevance
 - Utilize specialized entity-emotion database functions for optimal performance
 - Apply semantic fallback only when relationship analysis doesn't yield sufficient results
-- Combine entity, emotion, and relationship searches when all are relevant to the query`;
+- Combine entity, emotion, and relationship searches when all are relevant to the query
+- Use statistical functions for pattern recognition and trend analysis
+- Consider temporal aspects of relationship evolution`;
 
   const response = await fetch('https://api.openai.com/v1/chat/completions', {
     method: 'POST',
@@ -238,10 +249,11 @@ ENHANCED ANALYSIS GUIDELINES:
     if (jsonMatch) {
       const plan = JSON.parse(jsonMatch[0]);
       // Ensure enhanced database context is included
-      plan.databaseContext = plan.databaseContext || "Query plan generated with enhanced entity-emotion relationship analysis using specialized database functions";
+      plan.databaseContext = plan.databaseContext || "Query plan generated with advanced entity-emotion relationship analysis using specialized database functions and statistics";
       plan.enhancedThemeFiltering = true;
       plan.enhancedEntityFiltering = true;
-      plan.entityEmotionAnalysis = true; // NEW
+      plan.entityEmotionAnalysis = true;
+      plan.entityEmotionStatistics = true; // NEW
       return plan;
     }
   } catch (parseError) {
@@ -257,8 +269,10 @@ async function analyzeUserPatterns(entries: any[], supabaseClient: any, userId: 
     commonEmotions: [] as string[],
     commonThemes: [] as string[],
     commonEntities: [] as string[],
+    entityEmotionRelationships: [] as any[], // NEW
     themeStats: {} as any,
     entityStats: {} as any,
+    entityEmotionStats: {} as any, // NEW
     typicalEntryLength: 0,
     emotionalVariability: 0,
     lastEntryDate: null as string | null,
@@ -322,7 +336,7 @@ async function analyzeUserPatterns(entries: any[], supabaseClient: any, userId: 
     .slice(0, 5)
     .map(([theme]) => theme);
 
-  // NEW: Analyze entities with enhanced statistics
+  // Analyze entities with enhanced statistics
   const entityCounts = new Map<string, number>();
   entries.forEach(entry => {
     if (entry.entities) {
@@ -340,6 +354,26 @@ async function analyzeUserPatterns(entries: any[], supabaseClient: any, userId: 
     .sort(([,a], [,b]) => b - a)
     .slice(0, 5)
     .map(([entity]) => entity);
+
+  // NEW: Analyze entity-emotion relationships
+  const entityEmotionRelationships: any[] = [];
+  entries.forEach(entry => {
+    if (entry.entityemotion) {
+      Object.entries(entry.entityemotion).forEach(([entity, emotions]: [string, any]) => {
+        Object.entries(emotions).forEach(([emotion, strength]: [string, any]) => {
+          entityEmotionRelationships.push({
+            entity,
+            emotion,
+            strength: typeof strength === 'number' ? strength : parseFloat(strength) || 0,
+            entryId: entry.id,
+            date: entry.created_at
+          });
+        });
+      });
+    }
+  });
+
+  patterns.entityEmotionRelationships = entityEmotionRelationships;
 
   // Get enhanced theme statistics from the database
   try {
@@ -366,7 +400,7 @@ async function analyzeUserPatterns(entries: any[], supabaseClient: any, userId: 
     console.log('[Query Planner] Could not fetch theme statistics:', error);
   }
 
-  // NEW: Get enhanced entity statistics from the database
+  // Get enhanced entity statistics from the database
   try {
     const { data: entityStats } = await supabaseClient.rpc(
       'get_entity_statistics',
@@ -390,6 +424,34 @@ async function analyzeUserPatterns(entries: any[], supabaseClient: any, userId: 
     }
   } catch (error) {
     console.log('[Query Planner] Could not fetch entity statistics:', error);
+  }
+
+  // NEW: Get entity-emotion statistics from the database
+  try {
+    const { data: entityEmotionStats } = await supabaseClient.rpc(
+      'get_entity_emotion_statistics',
+      {
+        user_id_filter: userId,
+        limit_count: 15
+      }
+    );
+
+    if (entityEmotionStats) {
+      patterns.entityEmotionStats = entityEmotionStats.reduce((acc: any, stat: any) => {
+        const key = `${stat.entity_name}|${stat.emotion_name}`;
+        acc[key] = {
+          entityType: stat.entity_type,
+          relationshipCount: stat.relationship_count,
+          avgStrength: stat.avg_strength,
+          maxStrength: stat.max_strength,
+          firstOccurrence: stat.first_occurrence,
+          lastOccurrence: stat.last_occurrence
+        };
+        return acc;
+      }, {});
+    }
+  } catch (error) {
+    console.log('[Query Planner] Could not fetch entity-emotion statistics:', error);
   }
 
   // Analyze sentiment patterns
@@ -419,19 +481,22 @@ function generateFallbackPlan(): QueryPlan {
       emotionThreshold: 0.3,
       themes: null,
       entities: null,
-      emotions: null, // NEW
+      emotions: null,
       requirePersonalPronouns: false,
       themeMatchType: "semantic",
       entityMatchType: "semantic",
-      entityEmotionAnalysis: false, // NEW
-      relationshipAnalysis: false // NEW
+      entityEmotionAnalysis: false,
+      relationshipAnalysis: false,
+      relationshipStrengthThreshold: 0.3,
+      useEntityEmotionStatistics: false
     },
     expectedResponseType: "narrative",
     confidence: 0.5,
-    reasoning: "Fallback plan using hybrid search approach with enhanced database schema awareness including entity-emotion relationship analysis",
-    databaseContext: "Using vector search and emotion analysis as safe fallback methods with array optimization, JSONB entity support, and entity-emotion relationship capabilities",
+    reasoning: "Fallback plan using hybrid search approach with enhanced database schema awareness including advanced entity-emotion relationship analysis",
+    databaseContext: "Using vector search and emotion analysis as safe fallback methods with array optimization, JSONB entity support, and advanced entity-emotion relationship capabilities including statistics",
     enhancedThemeFiltering: true,
     enhancedEntityFiltering: true,
-    entityEmotionAnalysis: true // NEW
+    entityEmotionAnalysis: true,
+    entityEmotionStatistics: true // NEW
   };
 }
