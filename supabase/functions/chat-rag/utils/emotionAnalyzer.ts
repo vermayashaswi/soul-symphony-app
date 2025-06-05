@@ -1,20 +1,18 @@
 
 /**
- * Analyze emotions from journal entries
+ * Analyze emotions from journal entries using RLS-compliant functions
  */
 export async function analyzeEmotions(
   supabase: any,
-  userId: string,
-  timeRange: { startDate?: string; endDate?: string } = null
+  timeRange: { startDate?: string; endDate?: string } = {}
 ) {
   try {
-    console.log(`Analyzing emotions for user ${userId}`);
+    console.log('Analyzing emotions with RLS-compliant function');
     
-    // Use the get_top_emotions database function
+    // Use the RLS-compliant get_top_emotions_with_entries function
     const { data, error } = await supabase.rpc(
       'get_top_emotions_with_entries',
       {
-        user_id_param: userId,
         start_date: timeRange?.startDate || null,
         end_date: timeRange?.endDate || null,
         limit_count: 5
@@ -35,23 +33,21 @@ export async function analyzeEmotions(
 }
 
 /**
- * Get entries with specific emotions
+ * Get entries with specific emotions using RLS-compliant functions
  */
 export async function getEntriesByEmotion(
   supabase: any,
-  userId: string,
   emotion: string,
-  timeRange: { startDate?: string; endDate?: string } = null
+  timeRange: { startDate?: string; endDate?: string } = {}
 ) {
   try {
-    console.log(`Getting entries with emotion "${emotion}" for user ${userId}`);
+    console.log(`Getting entries with emotion "${emotion}" using RLS-compliant function`);
     
-    // Use the match_journal_entries_by_emotion database function
+    // Use the RLS-compliant match_journal_entries_by_emotion function
     const { data, error } = await supabase.rpc(
       'match_journal_entries_by_emotion',
       {
         emotion_name: emotion,
-        user_id_filter: userId,
         min_score: 0.3,
         start_date: timeRange?.startDate || null,
         end_date: timeRange?.endDate || null,

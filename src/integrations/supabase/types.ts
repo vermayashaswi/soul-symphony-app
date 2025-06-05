@@ -723,12 +723,14 @@ export type Database = {
         }[]
       }
       get_top_emotions: {
-        Args: {
-          user_id_param: string
-          start_date?: string
-          end_date?: string
-          limit_count?: number
-        }
+        Args:
+          | { start_date?: string; end_date?: string; limit_count?: number }
+          | {
+              user_id_param: string
+              start_date?: string
+              end_date?: string
+              limit_count?: number
+            }
         Returns: {
           emotion: string
           score: number
@@ -748,12 +750,14 @@ export type Database = {
         }[]
       }
       get_top_emotions_with_entries: {
-        Args: {
-          user_id_param: string
-          start_date?: string
-          end_date?: string
-          limit_count?: number
-        }
+        Args:
+          | { start_date?: string; end_date?: string; limit_count?: number }
+          | {
+              user_id_param: string
+              start_date?: string
+              end_date?: string
+              limit_count?: number
+            }
         Returns: {
           emotion: string
           score: number
@@ -860,6 +864,11 @@ export type Database = {
               query_embedding: string
               match_threshold: number
               match_count: number
+            }
+          | {
+              query_embedding: string
+              match_threshold: number
+              match_count: number
               user_id_filter: string
             }
         Returns: {
@@ -873,14 +882,22 @@ export type Database = {
         }[]
       }
       match_journal_entries_by_emotion: {
-        Args: {
-          emotion_name: string
-          user_id_filter: string
-          min_score?: number
-          start_date?: string
-          end_date?: string
-          limit_count?: number
-        }
+        Args:
+          | {
+              emotion_name: string
+              min_score?: number
+              start_date?: string
+              end_date?: string
+              limit_count?: number
+            }
+          | {
+              emotion_name: string
+              user_id_filter: string
+              min_score?: number
+              start_date?: string
+              end_date?: string
+              limit_count?: number
+            }
         Returns: {
           id: number
           content: string
@@ -946,14 +963,22 @@ export type Database = {
         }[]
       }
       match_journal_entries_by_theme: {
-        Args: {
-          theme_query: string
-          user_id_filter: string
-          match_threshold?: number
-          match_count?: number
-          start_date?: string
-          end_date?: string
-        }
+        Args:
+          | {
+              theme_query: string
+              match_threshold?: number
+              match_count?: number
+              start_date?: string
+              end_date?: string
+            }
+          | {
+              theme_query: string
+              user_id_filter: string
+              match_threshold?: number
+              match_count?: number
+              start_date?: string
+              end_date?: string
+            }
         Returns: {
           id: number
           content: string
@@ -996,14 +1021,22 @@ export type Database = {
         }[]
       }
       match_journal_entries_with_date: {
-        Args: {
-          query_embedding: string
-          match_threshold: number
-          match_count: number
-          user_id_filter: string
-          start_date?: string
-          end_date?: string
-        }
+        Args:
+          | {
+              query_embedding: string
+              match_threshold: number
+              match_count: number
+              start_date?: string
+              end_date?: string
+            }
+          | {
+              query_embedding: string
+              match_threshold: number
+              match_count: number
+              user_id_filter: string
+              start_date?: string
+              end_date?: string
+            }
         Returns: {
           id: number
           content: string
