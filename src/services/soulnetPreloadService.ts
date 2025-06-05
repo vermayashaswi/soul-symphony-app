@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 import { translationService } from '@/services/translationService';
 import { onDemandTranslationCache } from '@/utils/website-translations';
@@ -272,12 +271,12 @@ export class SoulNetPreloadService {
 
     const entityList = Object.keys(entityEmotionMap);
     
-    // UPDATED POSITIONING: Emotions now at Y positions +10 and -10 (closer to center)
+    // UPDATED POSITIONING: New Y-axis pattern for emotions and reduced entity radius
     const EMOTION_LAYER_RADIUS = 11;
-    const ENTITY_LAYER_RADIUS = 9; // INCREASED: from 6 to 9 (1.5x increase)
+    const ENTITY_LAYER_RADIUS = 6.75; // REDUCED: 75% of previous 9 (9 * 0.75 = 6.75)
     const ENTITY_Y_SPAN = 6; // Keep entities in center layer with smaller Y-range
 
-    console.log("[SoulNetPreloadService] UPDATED POSITIONING: Generating graph with", entityList.length, "entities with increased radius (9) and emotions at Y positions (+10/-10)");
+    console.log("[SoulNetPreloadService] NEW POSITIONING: Generating graph with", entityList.length, "entities with reduced radius (6.75) and emotions with new Y-pattern (+4,+6,+8,+10 / -4,-6,-8,-10)");
     
     entityList.forEach((entity, entityIndex) => {
       entityNodes.add(entity);
@@ -312,11 +311,18 @@ export class SoulNetPreloadService {
       const emotionRadius = EMOTION_LAYER_RADIUS;
       const emotionX = Math.cos(emotionAngle) * emotionRadius;
       
-      // UPDATED: Emotions now positioned at Y positions +10 and -10 (closer to center)
-      const emotionY = (emotionIndex % 2 === 0) ? 10 : -10;
+      // NEW: Y-axis pattern implementation
+      // Positive Y-axis: +4, +6, +8, +10, +4, +6, +8, +10, ...
+      // Negative Y-axis: -4, -6, -8, -10, -4, -6, -8, -10, ...
+      const yPatternValues = [4, 6, 8, 10];
+      const patternIndex = emotionIndex % yPatternValues.length;
+      const baseY = yPatternValues[patternIndex];
+      const emotionY = (emotionIndex % 2 === 0) ? baseY : -baseY;
       
       // Z-axis uses circular distribution (same pattern as X-axis)
       const emotionZ = Math.sin(emotionAngle) * emotionRadius;
+      
+      console.log(`[SoulNetPreloadService] NEW Y-PATTERN: Emotion ${emotion} (index ${emotionIndex}) positioned at Y=${emotionY} (pattern: ${baseY}, sign: ${emotionIndex % 2 === 0 ? '+' : '-'})`);
       
       nodes.push({
         id: emotion,
@@ -327,8 +333,9 @@ export class SoulNetPreloadService {
       });
     });
 
-    console.log("[SoulNetPreloadService] UPDATED POSITIONING: Generated graph with", nodes.length, "nodes and", links.length, "links");
-    console.log("[SoulNetPreloadService] UPDATED POSITIONING: Entities form circle with radius 9, emotions at Y positions (+10/-10)");
+    console.log("[SoulNetPreloadService] NEW POSITIONING COMPLETE: Generated graph with", nodes.length, "nodes and", links.length, "links");
+    console.log("[SoulNetPreloadService] ENTITY RADIUS REDUCED: From 9 to 6.75 (75% reduction)");
+    console.log("[SoulNetPreloadService] EMOTION Y-PATTERN: Repeating +4,+6,+8,+10 / -4,-6,-8,-10");
     return { nodes, links };
   }
 
