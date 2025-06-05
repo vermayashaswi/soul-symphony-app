@@ -889,6 +889,28 @@ export type Database = {
           entity_matches: Json
         }[]
       }
+      match_journal_entries_by_entity_emotion: {
+        Args: {
+          entity_queries: string[]
+          emotion_queries: string[]
+          user_id_filter: string
+          match_threshold?: number
+          match_count?: number
+          start_date?: string
+          end_date?: string
+        }
+        Returns: {
+          id: number
+          content: string
+          created_at: string
+          entities: Json
+          emotions: Json
+          entityemotion: Json
+          similarity: number
+          entity_emotion_matches: Json
+          relationship_strength: number
+        }[]
+      }
       match_journal_entries_by_theme: {
         Args: {
           theme_query: string

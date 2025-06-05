@@ -1,4 +1,3 @@
-
 // Enhanced search service with optimized array-based theme filtering and entity filtering
 export async function searchEntriesWithVector(
   supabase: any,
@@ -234,6 +233,61 @@ export async function searchEntriesByEntities(
 }
 
 /**
+ * NEW: Enhanced entity-emotion search using specialized operations
+ */
+export async function searchEntriesByEntityEmotion(
+  supabase: any,
+  userId: string,
+  entities: string[],
+  emotions: string[],
+  timeRange?: { startDate?: string; endDate?: string }
+) {
+  try {
+    const userIdString = typeof userId === 'string' ? userId : String(userId);
+    console.log(`[chat-with-rag/searchService] Entity-emotion relationship search for userId: ${userIdString}`);
+    console.log(`[chat-with-rag/searchService] Entities: ${entities.join(', ')}, Emotions: ${emotions.join(', ')}`);
+    
+    // Use the new entity-emotion relationship search function
+    const { data, error } = await supabase.rpc(
+      'match_journal_entries_by_entity_emotion',
+      {
+        entity_queries: entities,
+        emotion_queries: emotions,
+        user_id_filter: userIdString,
+        match_threshold: 0.3,
+        match_count: 15,
+        start_date: timeRange?.startDate || null,
+        end_date: timeRange?.endDate || null
+      }
+    );
+    
+    if (error) {
+      console.error(`[chat-with-rag/searchService] Error in entity-emotion search: ${error.message}`);
+      throw error;
+    }
+    
+    console.log(`[chat-with-rag/searchService] Entity-emotion search found ${data?.length || 0} entries`);
+    
+    // Log relationship analysis details
+    if (data && data.length > 0) {
+      const relationshipDetails = data.map((entry: any) => ({
+        id: entry.id,
+        date: new Date(entry.created_at).toLocaleDateString(),
+        entity_emotion_matches: entry.entity_emotion_matches,
+        relationship_strength: entry.relationship_strength,
+        similarity: entry.similarity
+      }));
+      console.log("[chat-with-rag/searchService] Entity-emotion relationship analysis:", relationshipDetails);
+    }
+    
+    return data || [];
+  } catch (error) {
+    console.error('[chat-with-rag/searchService] Error in entity-emotion search:', error);
+    throw error;
+  }
+}
+
+/**
  * Search entries by specific month name
  */
 export async function searchEntriesByMonth(
@@ -328,10 +382,11 @@ export async function searchWithStrategy(
   supabase: any,
   userId: string,
   queryEmbedding: number[],
-  strategy: 'vector' | 'hybrid' | 'comprehensive' | 'theme_focused' | 'entity_focused',
+  strategy: 'vector' | 'hybrid' | 'comprehensive' | 'theme_focused' | 'entity_focused' | 'entity_emotion_analysis',
   timeRange?: { startDate?: string; endDate?: string },
   themes?: string[],
   entities?: string[],
+  emotions?: string[],
   maxEntries: number = 10
 ) {
   // Ensure userId is a string
@@ -342,8 +397,21 @@ export async function searchWithStrategy(
     let entries = [];
     
     switch (strategy) {
+      case 'entity_emotion_analysis':
+        // NEW: Entity-emotion relationship analysis
+        if (entities && entities.length > 0 && emotions && emotions.length > 0) {
+          entries = await searchEntriesByEntityEmotion(supabase, userIdString, entities, emotions, timeRange);
+        } else if (entities && entities.length > 0) {
+          // Fallback to entity search
+          entries = await searchEntriesByEntities(supabase, userIdString, entities, timeRange);
+        } else {
+          // Fallback to vector search
+          entries = await searchEntriesWithVector(supabase, userIdString, queryEmbedding);
+        }
+        break;
+        
       case 'entity_focused':
-        // NEW: Entity-focused searches
+        // Entity-focused searches
         if (entities && entities.length > 0) {
           entries = await searchEntriesByEntities(supabase, userIdString, entities, timeRange);
         } else {

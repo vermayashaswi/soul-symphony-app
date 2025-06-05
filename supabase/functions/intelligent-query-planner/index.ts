@@ -114,7 +114,7 @@ async function generateIntelligentQueryPlan(
   themeGuidelines: string,
   openaiApiKey: string
 ): Promise<QueryPlan> {
-  const systemPrompt = `You are an intelligent query planning system for a personal journal analysis AI with ENHANCED THEME AND ENTITY FILTERING CAPABILITIES.
+  const systemPrompt = `You are an intelligent query planning system for a personal journal analysis AI with ENHANCED ENTITY-EMOTION RELATIONSHIP ANALYSIS CAPABILITIES.
 
 ${databaseContext}
 
@@ -129,13 +129,21 @@ ENHANCED THEME FILTERING CAPABILITIES:
 - Theme statistics and analytics with get_theme_statistics function
 - Enhanced theme search with match_journal_entries_by_theme_array function
 
-NEW ENHANCED ENTITY FILTERING CAPABILITIES:
+ENHANCED ENTITY FILTERING CAPABILITIES:
 - JSONB-based entity filtering with optimized JSONB operations
 - Entity search across multiple entity types (people, places, organizations, events, etc.)
 - Exact entity matching using JSONB array operations
 - Entity statistics and analytics with get_entity_statistics function
 - Enhanced entity search with match_journal_entries_by_entities function
 - Entity overlap operations for multi-entity queries
+
+NEW ENTITY-EMOTION RELATIONSHIP ANALYSIS:
+- Advanced entity-emotion relationship detection and analysis
+- Specialized database function: match_journal_entries_by_entity_emotion
+- Relationship strength calculation and ranking
+- Cross-analysis of how users feel about specific entities over time
+- Emotional pattern recognition related to people, places, events
+- Supports complex queries like "How do I feel about work?" or "My relationship with mom"
 
 USER CONTEXT:
 - Recent journaling patterns: ${JSON.stringify(userPatterns)}
@@ -151,27 +159,21 @@ AVAILABLE SEARCH METHODS (ENHANCED):
 2. emotion_analysis - Search by PRE-CALCULATED emotion scores (0.0-1.0 scale)
 3. temporal_search - Time-based search with date ranges
 4. theme_search - ENHANCED array-based theme search with PostgreSQL operators
-5. entity_search - NEW array-based entity search with JSONB operators
-6. hybrid_search - Combine multiple methods intelligently
-7. aggregation_search - Statistical analysis across entries for patterns
+5. entity_search - Array-based entity search with JSONB operators
+6. entity_emotion_search - NEW: Advanced entity-emotion relationship analysis
+7. hybrid_search - Combine multiple methods intelligently
+8. aggregation_search - Statistical analysis across entries for patterns
 
-THEME QUERY DETECTION:
-- Look for topic/category-related keywords (work, relationships, health, etc.)
-- Detect abstract concepts (stress, growth, challenges, etc.)
-- Identify activity-based themes (exercise, meditation, travel, etc.)
-- Recognize emotional themes (anxiety, joy, frustration, etc.)
-- Consider user's historical themes for better matching
-
-NEW ENTITY QUERY DETECTION:
-- Look for specific people mentioned (names, relationships like "mom", "boss", etc.)
-- Detect places (cities, countries, specific locations like "office", "gym", etc.)
-- Identify organizations (companies, schools, clubs, etc.)
-- Recognize events (meetings, parties, appointments, etc.)
-- Consider user's historical entities for better matching
+ENTITY-EMOTION QUERY DETECTION:
+- Look for relationship queries: "How do I feel about X?", "My feelings toward Y"
+- Detect emotional connections to people: "relationship with mom", "feelings about boss"
+- Identify place-emotion associations: "how work makes me feel", "emotions at home"
+- Recognize event-emotion patterns: "stress from meetings", "anxiety about presentations"
+- Consider temporal emotional changes: "my feelings about X over time"
 
 QUERY TO ANALYZE: "${message}"
 
-Generate a comprehensive query execution plan with enhanced theme and entity filtering:
+Generate a comprehensive query execution plan with enhanced entity-emotion relationship analysis:
 
 {
   "strategy": "primary_strategy_name",
@@ -181,27 +183,30 @@ Generate a comprehensive query execution plan with enhanced theme and entity fil
     "emotionThreshold": 0.3,
     "themes": ["theme1", "theme2"] or null,
     "entities": ["entity1", "entity2"] or null,
+    "emotions": ["emotion1", "emotion2"] or null,
     "requirePersonalPronouns": boolean,
     "emotionFocus": "specific_emotion" or null,
     "themeMatchType": "exact" or "partial" or "semantic",
-    "entityMatchType": "exact" or "partial" or "semantic"
+    "entityMatchType": "exact" or "partial" or "semantic",
+    "entityEmotionAnalysis": boolean,
+    "relationshipAnalysis": boolean
   },
   "emotionFocus": "emotion_name" or null,
   "subQueries": ["sub_query1", "sub_query2"] or null,
-  "expectedResponseType": "narrative|analysis|data|direct_answer",
+  "expectedResponseType": "narrative|analysis|data|direct_answer|relationship_analysis",
   "confidence": 0.85,
-  "reasoning": "Detailed explanation leveraging enhanced theme and entity filtering capabilities",
-  "databaseContext": "How this plan uses the enhanced database schema including array and JSONB operations"
+  "reasoning": "Detailed explanation leveraging enhanced entity-emotion relationship analysis capabilities",
+  "databaseContext": "How this plan uses the enhanced database schema including entity-emotion relationship operations"
 }
 
 ENHANCED ANALYSIS GUIDELINES:
-- Prioritize array-based theme filtering and JSONB entity filtering for better performance
-- Use exact matching when themes/entities are clearly specified
-- Consider theme and entity combinations and intersections
-- Leverage user's historical theme and entity patterns for better relevance
-- Utilize the GIN index for optimized array operations and JSONB index for entity operations
-- Apply semantic fallback only when array/JSONB operations don't yield sufficient results
-- Combine theme and entity searches when both are relevant to the query`;
+- Prioritize entity-emotion relationship analysis for queries about feelings toward people, places, or things
+- Use exact matching when entities and emotions are clearly specified
+- Consider entity-emotion combinations and relationship strength patterns
+- Leverage user's historical entity-emotion patterns for better relevance
+- Utilize specialized entity-emotion database functions for optimal performance
+- Apply semantic fallback only when relationship analysis doesn't yield sufficient results
+- Combine entity, emotion, and relationship searches when all are relevant to the query`;
 
   const response = await fetch('https://api.openai.com/v1/chat/completions', {
     method: 'POST',
@@ -233,9 +238,10 @@ ENHANCED ANALYSIS GUIDELINES:
     if (jsonMatch) {
       const plan = JSON.parse(jsonMatch[0]);
       // Ensure enhanced database context is included
-      plan.databaseContext = plan.databaseContext || "Query plan generated with enhanced theme and entity filtering using array and JSONB operations";
+      plan.databaseContext = plan.databaseContext || "Query plan generated with enhanced entity-emotion relationship analysis using specialized database functions";
       plan.enhancedThemeFiltering = true;
       plan.enhancedEntityFiltering = true;
+      plan.entityEmotionAnalysis = true; // NEW
       return plan;
     }
   } catch (parseError) {
@@ -413,15 +419,19 @@ function generateFallbackPlan(): QueryPlan {
       emotionThreshold: 0.3,
       themes: null,
       entities: null,
+      emotions: null, // NEW
       requirePersonalPronouns: false,
       themeMatchType: "semantic",
-      entityMatchType: "semantic"
+      entityMatchType: "semantic",
+      entityEmotionAnalysis: false, // NEW
+      relationshipAnalysis: false // NEW
     },
     expectedResponseType: "narrative",
     confidence: 0.5,
-    reasoning: "Fallback plan using hybrid search approach with enhanced database schema awareness including entity filtering",
-    databaseContext: "Using vector search and emotion analysis as safe fallback methods with array optimization and JSONB entity support",
+    reasoning: "Fallback plan using hybrid search approach with enhanced database schema awareness including entity-emotion relationship analysis",
+    databaseContext: "Using vector search and emotion analysis as safe fallback methods with array optimization, JSONB entity support, and entity-emotion relationship capabilities",
     enhancedThemeFiltering: true,
-    enhancedEntityFiltering: true
+    enhancedEntityFiltering: true,
+    entityEmotionAnalysis: true // NEW
   };
 }

@@ -1,4 +1,3 @@
-
 /**
  * Entity search service for enhanced RAG pipeline with entity filtering
  */
@@ -48,6 +47,61 @@ export async function searchEntriesByEntities(
     return data || [];
   } catch (error) {
     console.error('[entitySearchService] Error in entity search:', error);
+    throw error;
+  }
+}
+
+/**
+ * NEW: Search entries by entity-emotion relationships
+ */
+export async function searchEntriesByEntityEmotion(
+  supabase: any,
+  userId: string,
+  entities: string[],
+  emotions: string[],
+  timeRange?: { startDate?: string; endDate?: string }
+) {
+  try {
+    const userIdString = typeof userId === 'string' ? userId : String(userId);
+    console.log(`[entitySearchService] Entity-emotion relationship search for userId: ${userIdString}`);
+    console.log(`[entitySearchService] Entities: ${entities.join(', ')}`);
+    console.log(`[entitySearchService] Emotions: ${emotions.join(', ')}`);
+    
+    const { data, error } = await supabase.rpc(
+      'match_journal_entries_by_entity_emotion',
+      {
+        entity_queries: entities,
+        emotion_queries: emotions,
+        user_id_filter: userIdString,
+        match_threshold: 0.3,
+        match_count: 15,
+        start_date: timeRange?.startDate || null,
+        end_date: timeRange?.endDate || null
+      }
+    );
+    
+    if (error) {
+      console.error(`[entitySearchService] Error in entity-emotion search: ${error.message}`);
+      throw error;
+    }
+    
+    console.log(`[entitySearchService] Entity-emotion search found ${data?.length || 0} entries`);
+    
+    // Log relationship analysis details
+    if (data && data.length > 0) {
+      const relationshipDetails = data.map((entry: any) => ({
+        id: entry.id,
+        date: new Date(entry.created_at).toLocaleDateString(),
+        entity_emotion_matches: entry.entity_emotion_matches,
+        relationship_strength: entry.relationship_strength,
+        similarity: entry.similarity
+      }));
+      console.log("[entitySearchService] Entity-emotion relationships:", relationshipDetails);
+    }
+    
+    return data || [];
+  } catch (error) {
+    console.error('[entitySearchService] Error in entity-emotion search:', error);
     throw error;
   }
 }
@@ -125,24 +179,121 @@ export async function getTopEntitiesWithEntries(
 }
 
 /**
+ * NEW: Get entity-emotion relationship analytics
+ */
+export async function getEntityEmotionAnalytics(
+  supabase: any,
+  userId: string,
+  timeRange?: { startDate?: string; endDate?: string },
+  limitCount: number = 10
+) {
+  try {
+    const userIdString = typeof userId === 'string' ? userId : String(userId);
+    console.log(`[entitySearchService] Getting entity-emotion analytics for userId: ${userIdString}`);
+    
+    // Get entries with entity-emotion relationships
+    const { data, error } = await supabase
+      .from('Journal Entries')
+      .select('id, created_at, entities, emotions, entityemotion, sentiment')
+      .eq('user_id', userIdString)
+      .not('entityemotion', 'is', null)
+      .gte('created_at', timeRange?.startDate || '1900-01-01')
+      .lte('created_at', timeRange?.endDate || '2100-12-31')
+      .order('created_at', { ascending: false })
+      .limit(100);
+    
+    if (error) {
+      console.error(`[entitySearchService] Error getting entity-emotion analytics: ${error.message}`);
+      throw error;
+    }
+    
+    // Process entity-emotion relationships
+    const analytics = {
+      totalRelationships: 0,
+      entityEmotionPairs: new Map(),
+      strongestRelationships: [],
+      emotionalPatterns: new Map(),
+      timePatterns: []
+    };
+    
+    data?.forEach((entry: any) => {
+      if (entry.entityemotion) {
+        Object.entries(entry.entityemotion).forEach(([entity, emotions]: [string, any]) => {
+          Object.entries(emotions).forEach(([emotion, strength]: [string, any]) => {
+            const strengthValue = typeof strength === 'number' ? strength : parseFloat(strength) || 0;
+            const pairKey = `${entity}|${emotion}`;
+            
+            if (!analytics.entityEmotionPairs.has(pairKey)) {
+              analytics.entityEmotionPairs.set(pairKey, {
+                entity,
+                emotion,
+                occurrences: 0,
+                avgStrength: 0,
+                totalStrength: 0,
+                entries: []
+              });
+            }
+            
+            const pair = analytics.entityEmotionPairs.get(pairKey);
+            pair.occurrences++;
+            pair.totalStrength += strengthValue;
+            pair.avgStrength = pair.totalStrength / pair.occurrences;
+            pair.entries.push({
+              id: entry.id,
+              date: entry.created_at,
+              strength: strengthValue
+            });
+            
+            analytics.totalRelationships++;
+          });
+        });
+      }
+    });
+    
+    // Convert to arrays and sort
+    analytics.strongestRelationships = Array.from(analytics.entityEmotionPairs.values())
+      .sort((a, b) => b.avgStrength - a.avgStrength)
+      .slice(0, limitCount);
+    
+    console.log(`[entitySearchService] Found ${analytics.totalRelationships} entity-emotion relationships`);
+    return analytics;
+    
+  } catch (error) {
+    console.error('[entitySearchService] Error getting entity-emotion analytics:', error);
+    throw error;
+  }
+}
+
+/**
  * Enhanced search orchestrator with entity filtering
  */
 export async function searchWithEntityStrategy(
   supabase: any,
   userId: string,
   queryEmbedding: number[],
-  strategy: 'entity_focused' | 'entity_comprehensive',
+  strategy: 'entity_focused' | 'entity_comprehensive' | 'entity_emotion_analysis',
   entities: string[],
+  emotions?: string[],
   timeRange?: { startDate?: string; endDate?: string },
   maxEntries: number = 10
 ) {
   const userIdString = typeof userId === 'string' ? userId : String(userId);
-  console.log(`[entitySearchService] Using entity search strategy: ${strategy} for user: ${userIdString}`);
+  console.log(`[entitySearchService] Using enhanced entity search strategy: ${strategy} for user: ${userIdString}`);
   
   try {
     let entries = [];
     
     switch (strategy) {
+      case 'entity_emotion_analysis':
+        // NEW: Entity-emotion relationship analysis
+        if (emotions && emotions.length > 0) {
+          entries = await searchEntriesByEntityEmotion(supabase, userIdString, entities, emotions, timeRange);
+        } else {
+          // Fallback to regular entity search
+          entries = await searchEntriesByEntities(supabase, userIdString, entities, timeRange);
+        }
+        break;
+        
       case 'entity_focused':
         // Pure entity-based search
         entries = await searchEntriesByEntities(supabase, userIdString, entities, timeRange);

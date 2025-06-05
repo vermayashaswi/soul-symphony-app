@@ -1,4 +1,3 @@
-
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.7.1';
@@ -116,7 +115,7 @@ async function executeSearchMethod(
   supabase: any,
   openaiApiKey: string
 ): Promise<SearchResult> {
-  console.log(`[Search Orchestrator] Executing ${method} with enhanced array-based filtering`);
+  console.log(`[Search Orchestrator] Executing ${method} with enhanced array-based filtering and entity-emotion analysis`);
 
   switch (method) {
     case 'vector_search':
@@ -133,6 +132,9 @@ async function executeSearchMethod(
     
     case 'entity_search':
       return await executeEnhancedEntitySearch(query, queryPlan, userId, supabase, openaiApiKey);
+    
+    case 'entity_emotion_search':
+      return await executeEntityEmotionSearch(query, queryPlan, userId, supabase, openaiApiKey);
     
     case 'aggregation_search':
       return await executeAggregationSearch(query, queryPlan, userId, supabase);
@@ -405,6 +407,70 @@ async function executeEnhancedEntitySearch(
   };
 }
 
+async function executeEntityEmotionSearch(
+  query: string,
+  queryPlan: any,
+  userId: string,
+  supabase: any,
+  openaiApiKey: string
+): Promise<SearchResult> {
+  if (!queryPlan.filters?.entities || queryPlan.filters.entities.length === 0 ||
+      !queryPlan.filters?.emotions || queryPlan.filters.emotions.length === 0) {
+    return {
+      method: 'entity_emotion_search',
+      results: [],
+      confidence: 0,
+      reasoning: 'No specific entities or emotions identified for relationship analysis',
+      schemaUtilization: 'Attempted to use entity-emotion relationships but insufficient parameters'
+    };
+  }
+
+  console.log('[Entity-Emotion Search] Analyzing relationships for entities:', queryPlan.filters.entities);
+  console.log('[Entity-Emotion Search] Analyzing relationships for emotions:', queryPlan.filters.emotions);
+
+  // Use the new entity-emotion relationship search function
+  const { data, error } = await supabase.rpc(
+    'match_journal_entries_by_entity_emotion',
+    {
+      entity_queries: queryPlan.filters.entities,
+      emotion_queries: queryPlan.filters.emotions,
+      user_id_filter: userId,
+      match_threshold: 0.3,
+      match_count: 15,
+      start_date: queryPlan.filters?.timeRange?.startDate || null,
+      end_date: queryPlan.filters?.timeRange?.endDate || null
+    }
+  );
+
+  if (error) {
+    console.error('[Entity-Emotion Search] Error:', error);
+    throw error;
+  }
+
+  const processedResults = (data || []).map((result: any) => ({
+    ...result,
+    content: result.content || result["refined text"] || result["transcription text"] || "",
+    emotions: result.emotions || {},
+    master_themes: result.themes || result.master_themes || [],
+    entities: result.entities || {},
+    entityemotion: result.entityemotion || {},
+    created_at: result.created_at,
+    similarity: result.similarity,
+    entity_emotion_matches: result.entity_emotion_matches || {},
+    relationship_strength: result.relationship_strength || 0
+  }));
+
+  console.log(`[Entity-Emotion Search] Found ${processedResults.length} entries with entity-emotion relationships`);
+
+  return {
+    method: 'entity_emotion_search',
+    results: processedResults,
+    confidence: 0.95,
+    reasoning: `Advanced entity-emotion relationship analysis for entities: ${queryPlan.filters.entities.join(', ')} and emotions: ${queryPlan.filters.emotions.join(', ')}`,
+    schemaUtilization: `Utilized entities, emotions, and entityemotion JSONB columns with specialized relationship analysis algorithms`
+  };
+}
+
 async function executeAggregationSearch(
   query: string,
   queryPlan: any,
@@ -475,9 +541,14 @@ async function intelligentResultCombination(
       item.combinedConfidence *= 1.3;
     }
     
-    // NEW: Extra boost for entity matches in enhanced entity search
+    // Extra boost for entity matches in enhanced entity search
     if (item.entity_matches && Object.keys(item.entity_matches).length > 0) {
       item.combinedConfidence *= 1.3;
+    }
+    
+    // NEW: Highest boost for entity-emotion relationships
+    if (item.entity_emotion_matches && item.relationship_strength > 0) {
+      item.combinedConfidence *= 1.5;
     }
   });
 

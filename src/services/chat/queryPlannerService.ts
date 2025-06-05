@@ -1,4 +1,3 @@
-
 import { analyzeQueryTypes } from '@/utils/chat/queryAnalyzer';
 import { supabase } from '@/integrations/supabase/client';
 import { 
@@ -11,11 +10,11 @@ import {
 } from '@/services/dateService';
 
 /**
- * Enhanced query planning service with prioritized personal pronoun support, theme detection, and entity filtering
+ * Enhanced query planning service with entity-emotion relationship analysis
  */
 export async function planQuery(message: string, threadId: string, userId: string) {
   try {
-    console.log("[Query Planner] Enhanced planning with theme and entity detection for:", message);
+    console.log("[Query Planner] Enhanced planning with entity-emotion relationship detection for:", message);
     console.log(`[Query Planner] Current time: ${new Date().toISOString()}`);
     
     // For debugging timezone issues
@@ -163,12 +162,43 @@ export async function planQuery(message: string, threadId: string, userId: strin
       }
     }
     
-    console.log("[Query Planner] Enhanced analysis:", {
+    // NEW: Enhanced emotion detection for entity-emotion relationships
+    const emotionPatterns = [
+      /\b(happy|happiness|joy|excited|elated|cheerful|delighted)\b/i,
+      /\b(sad|sadness|depressed|down|melancholy|grief|sorrow)\b/i,
+      /\b(angry|anger|mad|furious|irritated|annoyed|frustrated)\b/i,
+      /\b(anxious|anxiety|worried|nervous|stressed|panic|fear)\b/i,
+      /\b(love|loving|affection|caring|tender|devoted)\b/i,
+      /\b(proud|pride|accomplished|confident|satisfied)\b/i,
+      /\b(grateful|thankful|appreciation|blessed)\b/i,
+      /\b(disappointed|letdown|discouraged|dejected)\b/i,
+      /\b(confused|uncertainty|bewildered|puzzled)\b/i,
+      /\b(calm|peaceful|relaxed|serene|tranquil)\b/i
+    ];
+    
+    const detectedEmotions = [];
+    for (const pattern of emotionPatterns) {
+      const match = message.match(pattern);
+      if (match) {
+        detectedEmotions.push(match[0].toLowerCase());
+      }
+    }
+    
+    // NEW: Detect entity-emotion relationship queries
+    const isEntityEmotionQuery = (
+      detectedEntities.length > 0 && 
+      detectedEmotions.length > 0
+    ) || 
+    /\b(feel about|feelings toward|emotional connection|relationship with|how.*makes me feel)\b/i.test(message.toLowerCase());
+    
+    console.log("[Query Planner] Enhanced analysis with entity-emotion detection:", {
       hasPersonalPronouns,
       hasExplicitTimeReference,
       isPersonalityQuery,
       detectedThemes,
       detectedEntities,
+      detectedEmotions,
+      isEntityEmotionQuery,
       originalQueryTypes: queryTypes
     });
     
@@ -245,6 +275,10 @@ export async function planQuery(message: string, threadId: string, userId: strin
     if (queryTypes.needsMoreContext) {
       strategy = 'request_clarification';
     } 
+    else if (isEntityEmotionQuery) {
+      strategy = 'intelligent_sub_query';
+      console.log("[Query Planner] Using intelligent sub-query strategy for entity-emotion relationship analysis");
+    }
     else if (isTimePatternQuery) {
       strategy = 'intelligent_sub_query';
       console.log("[Query Planner] Using intelligent sub-query strategy for time pattern analysis");
@@ -284,15 +318,20 @@ export async function planQuery(message: string, threadId: string, userId: strin
       isPersonalityQuery: isPersonalityQuery,
       hasPersonalPronouns, // Flag for personal pronoun detection
       hasExplicitTimeReference, // Flag for explicit time references
-      detectedThemes, // NEW: Detected themes for enhanced filtering
-      detectedEntities, // NEW: Detected entities for enhanced filtering
+      detectedThemes, // Detected themes for enhanced filtering
+      detectedEntities, // Detected entities for enhanced filtering
+      detectedEmotions, // NEW: Detected emotions for relationship analysis
+      isEntityEmotionQuery, // NEW: Flag for entity-emotion relationship queries
       emergencyFixPriority: isPersonalityQuery ? 'high' : queryTypes.isEmotionFocused ? 'medium' : 'low',
       optimizedForSpeed: true,
       enhancedFiltering: {
         themes: detectedThemes.length > 0 ? detectedThemes : null,
         entities: detectedEntities.length > 0 ? detectedEntities : null,
+        emotions: detectedEmotions.length > 0 ? detectedEmotions : null, // NEW
+        entityEmotionAnalysis: isEntityEmotionQuery, // NEW
         supportsArrayOperations: true,
-        supportsJsonbOperations: true
+        supportsJsonbOperations: true,
+        supportsEntityEmotionRelationships: true // NEW
       }
     };
   } catch (error) {
@@ -313,8 +352,11 @@ export async function planQuery(message: string, threadId: string, userId: strin
       enhancedFiltering: {
         themes: null,
         entities: null,
+        emotions: null, // NEW
+        entityEmotionAnalysis: false, // NEW
         supportsArrayOperations: true,
-        supportsJsonbOperations: true
+        supportsJsonbOperations: true,
+        supportsEntityEmotionRelationships: true // NEW
       }
     };
   }
