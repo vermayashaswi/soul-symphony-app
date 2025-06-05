@@ -594,12 +594,20 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      check_journal_entry_ownership: {
+        Args: { entry_id_param: number }
+        Returns: boolean
+      }
       check_table_columns: {
         Args: { table_name: string }
         Returns: {
           column_name: string
           data_type: string
         }[]
+      }
+      check_thread_ownership: {
+        Args: { thread_id_param: string }
+        Returns: boolean
       }
       check_trial_expiry: {
         Args: Record<PropertyKey, never>

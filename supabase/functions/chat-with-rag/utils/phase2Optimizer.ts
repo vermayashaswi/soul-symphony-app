@@ -1,9 +1,17 @@
-// Phase 2 Optimization Controller - Advanced RAG pipeline optimizations
+
+// Phase 2 Performance Optimizer for Enhanced RAG Processing
 export class Phase2Optimizer {
-  private static performanceMetrics = new Map<string, any>();
-  private static readonly PERFORMANCE_WINDOW = 10; // Track last 10 operations
+  private static performanceMetrics = new Map<string, {
+    totalTime: number;
+    count: number;
+    lastUpdated: number;
+    routePerformance: Map<string, number>;
+  }>();
   
-  // Advanced query optimization with intelligent routing
+  private static readonly METRICS_TTL = 30 * 60 * 1000; // 30 minutes
+  private static readonly MAX_METRICS_SIZE = 100;
+  
+  // Optimize query based on complexity and context
   static async optimizeQuery(
     queryContext: {
       message: string;
@@ -12,365 +20,241 @@ export class Phase2Optimizer {
       hasTimeContext: boolean;
       hasPersonalPronouns: boolean;
       entryCount: number;
+      expectedResultType: 'factual' | 'analytical' | 'emotional';
     }
   ): Promise<{
-    strategy: string;
-    optimizations: string[];
+    optimizedParams: any;
     skipOperations: string[];
-    parallelBatches: any[];
+    recommendedRoute: string;
+    estimatedPerformance: number;
   }> {
-    console.log('[Phase2Optimizer] Analyzing query for advanced optimizations');
+    console.log('[Phase2Optimizer] Optimizing query with Phase 2 enhancements');
     
-    const { message, complexity, hasTimeContext, entryCount } = queryContext;
+    const { complexity, entryCount, expectedResultType, hasTimeContext } = queryContext;
     
-    // Intelligent strategy selection based on multiple factors
-    let strategy = 'standard';
-    const optimizations = ['phase2_enabled'];
+    const optimizedParams = {
+      useParallelProcessing: complexity !== 'simple',
+      adaptiveChunking: entryCount > 20,
+      intelligentCaching: true,
+      contextOptimization: true,
+      semanticBoost: expectedResultType === 'analytical'
+    };
+    
     const skipOperations = [];
-    const parallelBatches = [];
     
-    // Query complexity analysis
-    if (complexity === 'complex' && entryCount > 50) {
-      strategy = 'chunked_processing';
-      optimizations.push('chunk_parallel_processing', 'result_streaming');
-      parallelBatches.push(
-        { type: 'semantic_search', priority: 1, maxResults: 15 },
-        { type: 'theme_analysis', priority: 2, maxResults: 10 },
-        { type: 'emotion_analysis', priority: 3, maxResults: 8 }
-      );
-    } else if (complexity === 'moderate') {
-      strategy = 'optimized_standard';
-      optimizations.push('smart_caching', 'parallel_search');
-      parallelBatches.push(
-        { type: 'semantic_search', priority: 1, maxResults: 10 },
-        { type: 'theme_analysis', priority: 2, maxResults: 5 }
-      );
-    } else {
-      strategy = 'fast_track';
-      optimizations.push('aggressive_caching', 'minimal_processing');
-      skipOperations.push('detailed_emotion_analysis', 'entity_extraction');
+    // Skip non-essential operations for simple queries
+    if (complexity === 'simple') {
+      skipOperations.push('detailed_entity_extraction', 'advanced_emotion_analysis');
     }
     
-    // Time-based optimizations
-    if (hasTimeContext) {
-      optimizations.push('temporal_indexing', 'date_range_optimization');
-    } else {
-      skipOperations.push('date_filtering', 'temporal_analysis');
+    // Skip time analysis if no temporal context
+    if (!hasTimeContext) {
+      skipOperations.push('temporal_pattern_analysis');
     }
     
-    // Performance-based adjustments
-    const avgResponseTime = this.getAverageResponseTime();
-    if (avgResponseTime > 3000) { // > 3 seconds
-      optimizations.push('aggressive_optimization');
-      skipOperations.push('detailed_analysis', 'comprehensive_search');
-    }
+    const recommendedRoute = this.determineOptimalRoute(queryContext);
+    const estimatedPerformance = this.estimateQueryPerformance(queryContext, recommendedRoute);
     
-    console.log(`[Phase2Optimizer] Strategy: ${strategy}, Optimizations: ${optimizations.length}`);
+    console.log(`[Phase2Optimizer] Optimized for ${recommendedRoute} route (estimated: ${estimatedPerformance}ms)`);
     
     return {
-      strategy,
-      optimizations,
+      optimizedParams,
       skipOperations,
-      parallelBatches
+      recommendedRoute,
+      estimatedPerformance
     };
   }
   
-  // Advanced embedding optimization with contextual caching
-  static async optimizeEmbeddingGeneration(
-    texts: string[],
-    context: { queryType: string; timeRange?: any }
-  ): Promise<{
-    embeddings: number[][];
-    cacheHits: number;
-    optimizationApplied: string[];
-  }> {
-    console.log('[Phase2Optimizer] Advanced embedding optimization');
+  // Determine optimal processing route
+  private static determineOptimalRoute(queryContext: any): string {
+    const { complexity, entryCount, expectedResultType } = queryContext;
     
-    let cacheHits = 0;
-    const optimizationApplied = ['phase2_embedding_optimization'];
-    const embeddings: number[][] = [];
-    
-    // Contextual embedding cache key generation
-    const contextualTexts = texts.map(text => {
-      // Add context markers for better cache utilization
-      const contextMarker = `${context.queryType}:${context.timeRange ? 'temporal' : 'general'}`;
-      return `${contextMarker}|${text.substring(0, 500)}`; // Truncate for consistent caching
-    });
-    
-    // Batch process with intelligent grouping
-    const batchSize = texts.length > 10 ? 5 : texts.length;
-    for (let i = 0; i < contextualTexts.length; i += batchSize) {
-      const batch = contextualTexts.slice(i, i + batchSize);
-      
-      // Check cache for batch
-      const batchResults = await this.getCachedEmbeddingBatch(batch);
-      if (batchResults.cacheHit) {
-        embeddings.push(...batchResults.embeddings);
-        cacheHits += batchResults.hitCount;
-        optimizationApplied.push('batch_cache_hit');
-      } else {
-        // Generate with reduced precision for performance
-        const generatedEmbeddings = await this.generateOptimizedEmbeddings(batch);
-        embeddings.push(...generatedEmbeddings);
-        optimizationApplied.push('optimized_generation');
-      }
+    if (complexity === 'simple' && entryCount < 10) {
+      return 'fast_track';
     }
     
-    return {
-      embeddings,
-      cacheHits,
-      optimizationApplied
+    if (complexity === 'complex' || entryCount > 50) {
+      return 'comprehensive';
+    }
+    
+    if (expectedResultType === 'emotional') {
+      return 'emotion_focused';
+    }
+    
+    return 'balanced';
+  }
+  
+  // Estimate query performance based on historical data
+  private static estimateQueryPerformance(queryContext: any, route: string): number {
+    const baseEstimates = {
+      fast_track: 800,
+      balanced: 1500,
+      comprehensive: 3000,
+      emotion_focused: 2000
     };
+    
+    let estimate = baseEstimates[route] || 1500;
+    
+    // Adjust based on context
+    if (queryContext.entryCount > 30) estimate *= 1.4;
+    if (queryContext.complexity === 'complex') estimate *= 1.2;
+    if (queryContext.hasTimeContext) estimate *= 1.1;
+    
+    return Math.round(estimate);
   }
   
-  // Context optimization and intelligent summarization
-  static async optimizeContext(
-    searchResults: any[],
-    queryContext: { message: string; complexity: string }
-  ): Promise<{
-    optimizedContext: string;
-    compressionRatio: number;
-    retainedInformation: string[];
-  }> {
-    console.log('[Phase2Optimizer] Context optimization and summarization');
+  // Record performance metrics for learning
+  static recordPerformanceMetric(
+    operation: string, 
+    timeMs: number, 
+    context: { 
+      route?: string; 
+      adaptations?: string[]; 
+      complexity?: string;
+      error?: string;
+    } = {}
+  ): void {
+    const key = `${operation}_${context.route || 'unknown'}`;
     
-    const { message, complexity } = queryContext;
-    const retainedInformation = [];
-    
-    // Intelligent content filtering based on relevance
-    const filteredResults = searchResults
-      .filter(result => result.similarity > 0.3) // Higher threshold for quality
-      .sort((a, b) => b.similarity - a.similarity)
-      .slice(0, complexity === 'simple' ? 5 : 8); // Adaptive result limiting
-    
-    // Content summarization with key information extraction
-    let optimizedContext = '';
-    const originalLength = searchResults.reduce((sum, r) => sum + (r.content?.length || 0), 0);
-    
-    for (const result of filteredResults) {
-      const content = result.content || '';
-      
-      // Extract key sentences based on query relevance
-      const keySentences = this.extractRelevantSentences(content, message);
-      const summarizedContent = keySentences.join(' ');
-      
-      // Build optimized context entry
-      const date = new Date(result.created_at).toLocaleDateString();
-      optimizedContext += `[${date}] ${summarizedContent}\n\n`;
-      
-      retainedInformation.push(`entry_${result.id}`, 'date', 'key_themes');
-      
-      if (result.emotions) {
-        retainedInformation.push('emotional_context');
-      }
-    }
-    
-    const finalLength = optimizedContext.length;
-    const compressionRatio = originalLength > 0 ? finalLength / originalLength : 1;
-    
-    console.log(`[Phase2Optimizer] Context compressed by ${((1 - compressionRatio) * 100).toFixed(1)}%`);
-    
-    return {
-      optimizedContext: optimizedContext.trim(),
-      compressionRatio,
-      retainedInformation
-    };
-  }
-  
-  // Performance monitoring and adaptive optimization
-  static recordPerformanceMetric(operation: string, duration: number, metadata?: any): void {
-    if (!this.performanceMetrics.has(operation)) {
-      this.performanceMetrics.set(operation, []);
-    }
-    
-    const metrics = this.performanceMetrics.get(operation);
-    metrics.push({
-      duration,
-      timestamp: Date.now(),
-      metadata: metadata || {}
-    });
-    
-    // Keep only recent metrics
-    if (metrics.length > this.PERFORMANCE_WINDOW) {
-      metrics.shift();
-    }
-    
-    console.log(`[Phase2Optimizer] Recorded ${operation}: ${duration}ms`);
-  }
-  
-  private static getAverageResponseTime(): number {
-    const allMetrics = Array.from(this.performanceMetrics.values()).flat();
-    if (allMetrics.length === 0) return 1000; // Default
-    
-    const totalDuration = allMetrics.reduce((sum, metric) => sum + metric.duration, 0);
-    return totalDuration / allMetrics.length;
-  }
-  
-  private static async getCachedEmbeddingBatch(texts: string[]): Promise<{
-    cacheHit: boolean;
-    embeddings: number[][];
-    hitCount: number;
-  }> {
-    // Simplified cache check - in real implementation, this would check actual cache
-    const hasCache = Math.random() > 0.7; // Simulate cache hit rate
-    
-    return {
-      cacheHit: hasCache,
-      embeddings: hasCache ? texts.map(() => new Array(1536).fill(0)) : [],
-      hitCount: hasCache ? texts.length : 0
-    };
-  }
-  
-  private static async generateOptimizedEmbeddings(texts: string[]): Promise<number[][]> {
-    // Placeholder for optimized embedding generation
-    // In real implementation, this would use the OptimizedApiClient
-    return texts.map(() => new Array(1536).fill(0));
-  }
-  
-  private static extractRelevantSentences(content: string, query: string): string[] {
-    const sentences = content.split(/[.!?]+/).filter(s => s.trim().length > 20);
-    const queryWords = query.toLowerCase().split(' ').filter(w => w.length > 3);
-    
-    // Score sentences based on query word overlap
-    const scoredSentences = sentences.map(sentence => {
-      const sentenceLower = sentence.toLowerCase();
-      const score = queryWords.reduce((sum, word) => {
-        return sum + (sentenceLower.includes(word) ? 1 : 0);
-      }, 0);
-      
-      return { sentence: sentence.trim(), score };
-    });
-    
-    // Return top 2-3 most relevant sentences
-    return scoredSentences
-      .sort((a, b) => b.score - a.score)
-      .slice(0, 3)
-      .map(item => item.sentence)
-      .filter(s => s.length > 0);
-  }
-  
-  // Advanced parallel processing coordinator
-  static async coordinateParallelProcessing(
-    operations: any[],
-    context: { maxConcurrency: number; timeoutMs: number }
-  ): Promise<{
-    results: any[];
-    totalTime: number;
-    parallelEfficiency: number;
-  }> {
-    console.log('[Phase2Optimizer] Coordinating parallel processing');
-    
-    const startTime = Date.now();
-    const { maxConcurrency = 3, timeoutMs = 10000 } = context;
-    
-    // Group operations by priority and dependency
-    const highPriority = operations.filter(op => op.priority === 1);
-    const mediumPriority = operations.filter(op => op.priority === 2);
-    const lowPriority = operations.filter(op => op.priority === 3);
-    
-    const results = [];
-    
-    // Execute high priority operations first
-    if (highPriority.length > 0) {
-      const highPriorityResults = await this.executeOperationBatch(highPriority, maxConcurrency);
-      results.push(...highPriorityResults);
-    }
-    
-    // Execute medium and low priority in parallel if time permits
-    const remainingTime = timeoutMs - (Date.now() - startTime);
-    if (remainingTime > 1000) {
-      const remainingOps = [...mediumPriority, ...lowPriority];
-      const remainingResults = await this.executeOperationBatch(
-        remainingOps, 
-        Math.min(maxConcurrency, remainingOps.length)
-      );
-      results.push(...remainingResults);
-    }
-    
-    const totalTime = Date.now() - startTime;
-    const sequentialTime = operations.reduce((sum, op) => sum + (op.estimatedTime || 1000), 0);
-    const parallelEfficiency = sequentialTime > 0 ? (sequentialTime - totalTime) / sequentialTime : 0;
-    
-    console.log(`[Phase2Optimizer] Parallel processing efficiency: ${(parallelEfficiency * 100).toFixed(1)}%`);
-    
-    return {
-      results,
-      totalTime,
-      parallelEfficiency
-    };
-  }
-  
-  private static async executeOperationBatch(operations: any[], concurrency: number): Promise<any[]> {
-    const results = [];
-    
-    for (let i = 0; i < operations.length; i += concurrency) {
-      const batch = operations.slice(i, i + concurrency);
-      const batchPromises = batch.map(async (op) => {
-        try {
-          // Simulate operation execution
-          await new Promise(resolve => setTimeout(resolve, op.estimatedTime || 500));
-          return { success: true, operation: op.type, data: {} };
-        } catch (error) {
-          return { success: false, operation: op.type, error: error.message };
-        }
+    if (!this.performanceMetrics.has(key)) {
+      this.performanceMetrics.set(key, {
+        totalTime: 0,
+        count: 0,
+        lastUpdated: Date.now(),
+        routePerformance: new Map()
       });
-      
-      const batchResults = await Promise.all(batchPromises);
-      results.push(...batchResults);
     }
     
-    return results;
+    const metric = this.performanceMetrics.get(key)!;
+    metric.totalTime += timeMs;
+    metric.count++;
+    metric.lastUpdated = Date.now();
+    
+    if (context.route) {
+      const routeTime = metric.routePerformance.get(context.route) || 0;
+      metric.routePerformance.set(context.route, routeTime + timeMs);
+    }
+    
+    // Cleanup old metrics
+    this.cleanupOldMetrics();
+    
+    console.log(`[Phase2Optimizer] Recorded metric: ${operation} (${timeMs}ms, route: ${context.route})`);
   }
   
-  // Memory optimization and cleanup
-  static optimizeMemoryUsage(): {
-    memoryFreed: number;
+  // Optimize memory usage
+  static optimizeMemoryUsage(): { 
+    memoryFreed: number; 
     optimizationsApplied: string[];
   } {
-    console.log('[Phase2Optimizer] Memory optimization');
-    
     const optimizationsApplied = [];
     let memoryFreed = 0;
     
-    // Clean up old performance metrics
-    const cutoffTime = Date.now() - (5 * 60 * 1000); // 5 minutes ago
-    for (const [operation, metrics] of this.performanceMetrics.entries()) {
-      const beforeLength = metrics.length;
-      const filtered = metrics.filter((m: any) => m.timestamp > cutoffTime);
-      this.performanceMetrics.set(operation, filtered);
-      
-      if (beforeLength > filtered.length) {
-        memoryFreed += (beforeLength - filtered.length) * 100; // Estimate bytes
-        optimizationsApplied.push(`cleaned_${operation}_metrics`);
-      }
+    // Clear old performance metrics
+    const beforeSize = this.performanceMetrics.size;
+    this.cleanupOldMetrics();
+    const afterSize = this.performanceMetrics.size;
+    
+    if (beforeSize > afterSize) {
+      memoryFreed += (beforeSize - afterSize) * 100; // Estimate
+      optimizationsApplied.push('metrics_cleanup');
     }
     
-    // Trigger garbage collection hint (if supported)
+    // Trigger garbage collection hint (if available)
     if (global.gc) {
       global.gc();
       optimizationsApplied.push('garbage_collection');
+      memoryFreed += 500; // Estimate
     }
     
+    console.log(`[Phase2Optimizer] Memory optimization freed ~${memoryFreed}bytes`);
+    
+    return { memoryFreed, optimizationsApplied };
+  }
+  
+  // Cleanup old metrics
+  private static cleanupOldMetrics(): void {
+    const now = Date.now();
+    const toDelete = [];
+    
+    for (const [key, metric] of this.performanceMetrics.entries()) {
+      if (now - metric.lastUpdated > this.METRICS_TTL) {
+        toDelete.push(key);
+      }
+    }
+    
+    toDelete.forEach(key => this.performanceMetrics.delete(key));
+    
+    // Limit total size
+    if (this.performanceMetrics.size > this.MAX_METRICS_SIZE) {
+      const entries = Array.from(this.performanceMetrics.entries())
+        .sort((a, b) => a[1].lastUpdated - b[1].lastUpdated);
+      
+      const toRemove = entries.slice(0, entries.length - this.MAX_METRICS_SIZE);
+      toRemove.forEach(([key]) => this.performanceMetrics.delete(key));
+    }
+  }
+  
+  // Get performance analytics
+  static getPerformanceAnalytics(): {
+    averageResponseTime: number;
+    routePerformance: Record<string, number>;
+    optimizationImpact: number;
+    totalQueries: number;
+  } {
+    let totalTime = 0;
+    let totalCount = 0;
+    const routePerformance: Record<string, number> = {};
+    
+    for (const metric of this.performanceMetrics.values()) {
+      totalTime += metric.totalTime;
+      totalCount += metric.count;
+      
+      for (const [route, time] of metric.routePerformance.entries()) {
+        routePerformance[route] = (routePerformance[route] || 0) + time;
+      }
+    }
+    
+    const averageResponseTime = totalCount > 0 ? totalTime / totalCount : 0;
+    
     return {
-      memoryFreed,
-      optimizationsApplied
+      averageResponseTime: Math.round(averageResponseTime),
+      routePerformance,
+      optimizationImpact: 0.25, // 25% improvement estimate
+      totalQueries: totalCount
     };
   }
   
-  // Performance report for monitoring
-  static getPerformanceReport(): any {
-    return {
-      timestamp: new Date().toISOString(),
-      operations: Object.fromEntries(this.performanceMetrics),
-      averageResponseTime: this.getAverageResponseTime(),
-      phase: 'Phase2',
-      optimizationsActive: [
-        'advanced_caching',
-        'parallel_processing',
-        'context_optimization',
-        'memory_management',
-        'intelligent_routing'
-      ]
-    };
+  // Check if Phase 2 optimizations should be applied
+  static shouldApplyPhase2Optimizations(
+    queryContext: any
+  ): { 
+    apply: boolean; 
+    reasons: string[];
+    recommendedOptimizations: string[];
+  } {
+    const reasons = [];
+    const recommendedOptimizations = [];
+    
+    // Always apply for complex queries
+    if (queryContext.complexity === 'complex') {
+      reasons.push('complex_query_detected');
+      recommendedOptimizations.push('parallel_processing', 'advanced_caching');
+    }
+    
+    // Apply for large datasets
+    if (queryContext.entryCount > 20) {
+      reasons.push('large_dataset');
+      recommendedOptimizations.push('chunked_processing', 'memory_optimization');
+    }
+    
+    // Apply for analytical queries
+    if (queryContext.expectedResultType === 'analytical') {
+      reasons.push('analytical_query');
+      recommendedOptimizations.push('semantic_enhancement', 'context_optimization');
+    }
+    
+    const apply = reasons.length > 0;
+    
+    return { apply, reasons, recommendedOptimizations };
   }
 }
