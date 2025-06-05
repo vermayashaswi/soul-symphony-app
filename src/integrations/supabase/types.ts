@@ -673,6 +673,21 @@ export type Database = {
           created_at: string
         }[]
       }
+      get_theme_statistics: {
+        Args: {
+          user_id_filter: string
+          start_date?: string
+          end_date?: string
+          limit_count?: number
+        }
+        Returns: {
+          theme: string
+          entry_count: number
+          avg_sentiment_score: number
+          first_occurrence: string
+          last_occurrence: string
+        }[]
+      }
       get_top_emotions: {
         Args: {
           user_id_param: string
@@ -725,6 +740,13 @@ export type Database = {
       has_active_session: {
         Args: { p_user_id: string }
         Returns: boolean
+      }
+      insert_sample_journal_entries: {
+        Args: { target_user_id: string }
+        Returns: {
+          inserted_id: number
+          inserted_created_at: string
+        }[]
       }
       is_trial_eligible: {
         Args: { user_id_param: string }
@@ -833,6 +855,24 @@ export type Database = {
           created_at: string
           themes: string[]
           similarity: number
+        }[]
+      }
+      match_journal_entries_by_theme_array: {
+        Args: {
+          theme_queries: string[]
+          user_id_filter: string
+          match_threshold?: number
+          match_count?: number
+          start_date?: string
+          end_date?: string
+        }
+        Returns: {
+          id: number
+          content: string
+          created_at: string
+          themes: string[]
+          similarity: number
+          theme_matches: string[]
         }[]
       }
       match_journal_entries_fixed: {

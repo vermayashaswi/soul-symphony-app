@@ -1,4 +1,5 @@
-// Standard vector search without time filtering
+
+// Enhanced search service with optimized array-based theme filtering
 export async function searchEntriesWithVector(
   supabase: any,
   userId: string, 
@@ -127,6 +128,59 @@ export async function searchEntriesWithTimeRange(
 }
 
 /**
+ * Enhanced theme search using optimized array operations
+ */
+export async function searchEntriesByThemes(
+  supabase: any,
+  userId: string,
+  themes: string[],
+  timeRange?: { startDate?: string; endDate?: string }
+) {
+  try {
+    const userIdString = typeof userId === 'string' ? userId : String(userId);
+    console.log(`[chat-with-rag/searchService] Enhanced theme search for userId: ${userIdString}`);
+    console.log(`[chat-with-rag/searchService] Themes: ${themes.join(', ')}`);
+    
+    // Use the new enhanced array-based theme search function
+    const { data, error } = await supabase.rpc(
+      'match_journal_entries_by_theme_array',
+      {
+        theme_queries: themes,
+        user_id_filter: userIdString,
+        match_threshold: 0.3,
+        match_count: 15,
+        start_date: timeRange?.startDate || null,
+        end_date: timeRange?.endDate || null
+      }
+    );
+    
+    if (error) {
+      console.error(`[chat-with-rag/searchService] Error in enhanced theme search: ${error.message}`);
+      throw error;
+    }
+    
+    console.log(`[chat-with-rag/searchService] Enhanced theme search found ${data?.length || 0} entries`);
+    
+    // Log theme matching details
+    if (data && data.length > 0) {
+      const themeDetails = data.map((entry: any) => ({
+        id: entry.id,
+        date: new Date(entry.created_at).toLocaleDateString(),
+        themes: entry.themes,
+        theme_matches: entry.theme_matches,
+        similarity: entry.similarity
+      }));
+      console.log("[chat-with-rag/searchService] Enhanced theme search - Theme matching details:", themeDetails);
+    }
+    
+    return data || [];
+  } catch (error) {
+    console.error('[chat-with-rag/searchService] Error in enhanced theme search:', error);
+    throw error;
+  }
+}
+
+/**
  * Search entries by specific month name
  */
 export async function searchEntriesByMonth(
@@ -215,24 +269,35 @@ export async function searchEntriesByMonth(
 }
 
 /**
- * Enhanced search orchestrator that determines the best search strategy
+ * Enhanced search orchestrator with improved theme filtering
  */
 export async function searchWithStrategy(
   supabase: any,
   userId: string,
   queryEmbedding: number[],
-  strategy: 'vector' | 'hybrid' | 'comprehensive',
+  strategy: 'vector' | 'hybrid' | 'comprehensive' | 'theme_focused',
   timeRange?: { startDate?: string; endDate?: string },
+  themes?: string[],
   maxEntries: number = 10
 ) {
   // Ensure userId is a string
   const userIdString = typeof userId === 'string' ? userId : String(userId);
-  console.log(`[searchService] Using search strategy: ${strategy} for user: ${userIdString}`);
+  console.log(`[searchService] Using enhanced search strategy: ${strategy} for user: ${userIdString}`);
   
   try {
     let entries = [];
     
     switch (strategy) {
+      case 'theme_focused':
+        // New strategy for theme-focused searches
+        if (themes && themes.length > 0) {
+          entries = await searchEntriesByThemes(supabase, userIdString, themes, timeRange);
+        } else {
+          // Fallback to vector search if no themes specified
+          entries = await searchEntriesWithVector(supabase, userIdString, queryEmbedding);
+        }
+        break;
+        
       case 'comprehensive':
         // Use larger limits for comprehensive searches
         if (timeRange && (timeRange.startDate || timeRange.endDate)) {

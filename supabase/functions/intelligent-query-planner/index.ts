@@ -1,3 +1,4 @@
+
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.7.1';
@@ -48,7 +49,7 @@ serve(async (req) => {
 
     const { message, userId, conversationContext = [], userProfile = {} } = await req.json();
 
-    console.log('[Intelligent Query Planner] Analyzing query with database context:', message);
+    console.log('[Intelligent Query Planner] Analyzing query with enhanced theme detection:', message);
 
     // Get user's recent journaling patterns
     const { data: recentEntries } = await supabaseClient
@@ -58,15 +59,15 @@ serve(async (req) => {
       .order('created_at', { ascending: false })
       .limit(20);
 
-    // Analyze user's journaling patterns
-    const userPatterns = analyzeUserPatterns(recentEntries || []);
+    // Analyze user's journaling patterns including theme statistics
+    const userPatterns = await analyzeUserPatterns(recentEntries || [], supabaseClient, userId);
 
     // Generate database schema context
     const databaseContext = generateDatabaseSchemaContext();
     const emotionGuidelines = getEmotionAnalysisGuidelines();
     const themeGuidelines = getThemeAnalysisGuidelines();
 
-    // Generate intelligent query plan using GPT with full database context
+    // Generate intelligent query plan using GPT with enhanced theme awareness
     const queryPlan = await generateIntelligentQueryPlan(
       message,
       conversationContext,
@@ -78,12 +79,13 @@ serve(async (req) => {
       openaiApiKey
     );
 
-    console.log('[Intelligent Query Planner] Generated plan with database context:', queryPlan);
+    console.log('[Intelligent Query Planner] Generated plan with enhanced theme filtering:', queryPlan);
 
     return new Response(JSON.stringify({
       queryPlan,
       userPatterns,
       databaseContext,
+      enhancedThemeFiltering: true,
       timestamp: new Date().toISOString()
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -111,7 +113,7 @@ async function generateIntelligentQueryPlan(
   themeGuidelines: string,
   openaiApiKey: string
 ): Promise<QueryPlan> {
-  const systemPrompt = `You are an intelligent query planning system for a personal journal analysis AI with FULL DATABASE SCHEMA AWARENESS.
+  const systemPrompt = `You are an intelligent query planning system for a personal journal analysis AI with ENHANCED THEME FILTERING CAPABILITIES.
 
 ${databaseContext}
 
@@ -119,22 +121,38 @@ ${emotionGuidelines}
 
 ${themeGuidelines}
 
+ENHANCED THEME FILTERING CAPABILITIES:
+- NEW: PostgreSQL array-based theme filtering with GIN index optimization
+- NEW: Array overlap operations (&&) for efficient multi-theme queries
+- NEW: Exact theme matching using ANY(array) operations
+- NEW: Theme statistics and analytics with get_theme_statistics function
+- NEW: Enhanced theme search with match_journal_entries_by_theme_array function
+
 USER CONTEXT:
 - Recent journaling patterns: ${JSON.stringify(userPatterns)}
+- User's common themes: ${userPatterns.commonThemes?.join(', ') || 'None identified'}
+- Theme frequency statistics: ${JSON.stringify(userPatterns.themeStats || {})}
 - Conversation history: ${conversationContext.slice(-3).map(c => c.content).join('; ')}
 - User timezone: ${userProfile.timezone || 'UTC'}
 
-AVAILABLE SEARCH METHODS:
+AVAILABLE SEARCH METHODS (ENHANCED):
 1. vector_search - Semantic similarity search using embeddings
 2. emotion_analysis - Search by PRE-CALCULATED emotion scores (0.0-1.0 scale)
 3. temporal_search - Time-based search with date ranges
-4. theme_search - Search by master_themes array
+4. theme_search - ENHANCED array-based theme search with PostgreSQL operators
 5. hybrid_search - Combine multiple methods intelligently
 6. aggregation_search - Statistical analysis across entries for patterns
 
+THEME QUERY DETECTION:
+- Look for topic/category-related keywords (work, relationships, health, etc.)
+- Detect abstract concepts (stress, growth, challenges, etc.)
+- Identify activity-based themes (exercise, meditation, travel, etc.)
+- Recognize emotional themes (anxiety, joy, frustration, etc.)
+- Consider user's historical themes for better matching
+
 QUERY TO ANALYZE: "${message}"
 
-Generate a comprehensive query execution plan that leverages the database schema knowledge:
+Generate a comprehensive query execution plan with enhanced theme filtering:
 
 {
   "strategy": "primary_strategy_name",
@@ -144,23 +162,24 @@ Generate a comprehensive query execution plan that leverages the database schema
     "emotionThreshold": 0.3,
     "themes": ["theme1", "theme2"] or null,
     "requirePersonalPronouns": boolean,
-    "emotionFocus": "specific_emotion" or null
+    "emotionFocus": "specific_emotion" or null,
+    "themeMatchType": "exact" or "partial" or "semantic"
   },
   "emotionFocus": "emotion_name" or null,
   "subQueries": ["sub_query1", "sub_query2"] or null,
   "expectedResponseType": "narrative|analysis|data|direct_answer",
   "confidence": 0.85,
-  "reasoning": "Detailed explanation leveraging database schema knowledge",
-  "databaseContext": "How this plan uses the database schema effectively"
+  "reasoning": "Detailed explanation leveraging enhanced theme filtering capabilities",
+  "databaseContext": "How this plan uses the enhanced database schema and array operations"
 }
 
-CRITICAL ANALYSIS GUIDELINES:
-- Personal pronouns (I, me, my) suggest comprehensive analysis across ALL entries
-- Emotion queries should focus on PRE-CALCULATED emotion scores, not text inference
-- Theme queries should leverage the master_themes array for categorization
-- Time references require temporal search with accurate date ranges
-- Statistical queries need aggregation methods with emotion score analysis
-- Always consider both refined text and transcription text for content analysis`;
+ENHANCED THEME ANALYSIS GUIDELINES:
+- Prioritize array-based theme filtering for better performance
+- Use exact matching when themes are clearly specified
+- Consider theme combinations and intersections
+- Leverage user's historical theme patterns for better relevance
+- Utilize the GIN index for optimized array operations
+- Apply semantic fallback only when array operations don't yield sufficient results`;
 
   const response = await fetch('https://api.openai.com/v1/chat/completions', {
     method: 'POST',
@@ -191,8 +210,9 @@ CRITICAL ANALYSIS GUIDELINES:
     const jsonMatch = planText.match(/\{[\s\S]*\}/);
     if (jsonMatch) {
       const plan = JSON.parse(jsonMatch[0]);
-      // Ensure database context is included
-      plan.databaseContext = plan.databaseContext || "Query plan generated with full database schema awareness";
+      // Ensure enhanced database context is included
+      plan.databaseContext = plan.databaseContext || "Query plan generated with enhanced theme filtering and array operations";
+      plan.enhancedThemeFiltering = true;
       return plan;
     }
   } catch (parseError) {
@@ -202,11 +222,12 @@ CRITICAL ANALYSIS GUIDELINES:
   return generateFallbackPlan();
 }
 
-function analyzeUserPatterns(entries: any[]) {
+async function analyzeUserPatterns(entries: any[], supabaseClient: any, userId: string) {
   const patterns = {
     avgEntriesPerWeek: 0,
     commonEmotions: [] as string[],
     commonThemes: [] as string[],
+    themeStats: {} as any,
     typicalEntryLength: 0,
     emotionalVariability: 0,
     lastEntryDate: null as string | null,
@@ -255,7 +276,7 @@ function analyzeUserPatterns(entries: any[]) {
     };
   });
 
-  // Analyze themes
+  // Analyze themes with enhanced statistics
   const themeCounts = new Map<string, number>();
   entries.forEach(entry => {
     if (entry.master_themes) {
@@ -269,6 +290,31 @@ function analyzeUserPatterns(entries: any[]) {
     .sort(([,a], [,b]) => b - a)
     .slice(0, 5)
     .map(([theme]) => theme);
+
+  // Get enhanced theme statistics from the database
+  try {
+    const { data: themeStats } = await supabaseClient.rpc(
+      'get_theme_statistics',
+      {
+        user_id_filter: userId,
+        limit_count: 10
+      }
+    );
+
+    if (themeStats) {
+      patterns.themeStats = themeStats.reduce((acc: any, stat: any) => {
+        acc[stat.theme] = {
+          entryCount: stat.entry_count,
+          avgSentiment: stat.avg_sentiment_score,
+          firstOccurrence: stat.first_occurrence,
+          lastOccurrence: stat.last_occurrence
+        };
+        return acc;
+      }, {});
+    }
+  } catch (error) {
+    console.log('[Query Planner] Could not fetch theme statistics:', error);
+  }
 
   // Analyze sentiment patterns
   const sentimentCounts = new Map<string, number>();
@@ -296,11 +342,13 @@ function generateFallbackPlan(): QueryPlan {
       timeRange: null,
       emotionThreshold: 0.3,
       themes: null,
-      requirePersonalPronouns: false
+      requirePersonalPronouns: false,
+      themeMatchType: "semantic"
     },
     expectedResponseType: "narrative",
     confidence: 0.5,
-    reasoning: "Fallback plan using hybrid search approach with database schema awareness",
-    databaseContext: "Using vector search and emotion analysis as safe fallback methods"
+    reasoning: "Fallback plan using hybrid search approach with enhanced database schema awareness",
+    databaseContext: "Using vector search and emotion analysis as safe fallback methods with array optimization support",
+    enhancedThemeFiltering: true
   };
 }

@@ -1,7 +1,12 @@
+
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.7.1';
-import { generateDatabaseSchemaContext } from '../_shared/databaseSchemaContext.ts';
+import { 
+  generateDatabaseSchemaContext, 
+  getEmotionAnalysisGuidelines, 
+  getThemeAnalysisGuidelines 
+} from '../_shared/databaseSchemaContext.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -39,7 +44,7 @@ serve(async (req) => {
 
     const { queryPlan, originalQuery, userId } = await req.json();
 
-    console.log('[GPT Search Orchestrator] Executing plan with database schema awareness:', queryPlan.strategy);
+    console.log('[GPT Search Orchestrator] Executing plan with enhanced theme filtering:', queryPlan.strategy);
 
     // Execute search methods based on the intelligent plan
     const searchResults: SearchResult[] = [];
@@ -82,7 +87,8 @@ serve(async (req) => {
         methodsUsed: queryPlan.searchMethods,
         totalResults: combinedResults.length,
         confidence: queryPlan.confidence,
-        schemaAware: true
+        schemaAware: true,
+        enhancedThemeFiltering: true
       }
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -109,7 +115,7 @@ async function executeSearchMethod(
   supabase: any,
   openaiApiKey: string
 ): Promise<SearchResult> {
-  console.log(`[Search Orchestrator] Executing ${method} with schema awareness`);
+  console.log(`[Search Orchestrator] Executing ${method} with enhanced array-based filtering`);
 
   switch (method) {
     case 'vector_search':
@@ -122,7 +128,7 @@ async function executeSearchMethod(
       return await executeTemporalSearch(query, queryPlan, userId, supabase, openaiApiKey);
     
     case 'theme_search':
-      return await executeThemeSearch(query, queryPlan, userId, supabase, openaiApiKey);
+      return await executeEnhancedThemeSearch(query, queryPlan, userId, supabase, openaiApiKey);
     
     case 'aggregation_search':
       return await executeAggregationSearch(query, queryPlan, userId, supabase);
@@ -274,7 +280,7 @@ async function executeTemporalSearch(
   };
 }
 
-async function executeThemeSearch(
+async function executeEnhancedThemeSearch(
   query: string,
   queryPlan: any,
   userId: string,
@@ -291,21 +297,25 @@ async function executeThemeSearch(
     };
   }
 
-  // Use theme-based search function
-  const theme = queryPlan.filters.themes[0]; // Use first theme
+  console.log('[Enhanced Theme Search] Using array-based filtering for themes:', queryPlan.filters.themes);
+
+  // Use the new enhanced array-based theme search function
   const { data, error } = await supabase.rpc(
-    'match_journal_entries_by_theme',
+    'match_journal_entries_by_theme_array',
     {
-      theme_query: theme,
+      theme_queries: queryPlan.filters.themes,
       user_id_filter: userId,
       match_threshold: 0.3,
-      match_count: 10,
+      match_count: 15,
       start_date: queryPlan.filters?.timeRange?.startDate || null,
       end_date: queryPlan.filters?.timeRange?.endDate || null
     }
   );
 
-  if (error) throw error;
+  if (error) {
+    console.error('[Enhanced Theme Search] Error:', error);
+    throw error;
+  }
 
   const processedResults = (data || []).map((result: any) => ({
     ...result,
@@ -313,15 +323,18 @@ async function executeThemeSearch(
     emotions: result.emotions || {},
     master_themes: result.themes || result.master_themes || [],
     created_at: result.created_at,
-    similarity: result.similarity
+    similarity: result.similarity,
+    theme_matches: result.theme_matches || []
   }));
+
+  console.log(`[Enhanced Theme Search] Found ${processedResults.length} entries with array-based filtering`);
 
   return {
     method: 'theme_search',
     results: processedResults,
-    confidence: 0.75,
-    reasoning: `Theme-based search focusing on: ${theme}`,
-    schemaUtilization: `Utilized master_themes array column for categorization matching`
+    confidence: 0.9,
+    reasoning: `Enhanced array-based theme search with PostgreSQL operators for themes: ${queryPlan.filters.themes.join(', ')}`,
+    schemaUtilization: `Utilized master_themes array column with GIN index for optimized array operations and exact matching`
   };
 }
 
@@ -388,6 +401,11 @@ async function intelligentResultCombination(
   combinedArray.forEach(item => {
     if (item.searchMethods.length > 1) {
       item.combinedConfidence *= 1.2;
+    }
+    
+    // Extra boost for theme matches in enhanced theme search
+    if (item.theme_matches && item.theme_matches.length > 0) {
+      item.combinedConfidence *= 1.3;
     }
   });
 
