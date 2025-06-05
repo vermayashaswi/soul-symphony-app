@@ -52,17 +52,24 @@ const EmbeddingGenerationButton: React.FC = () => {
     <Button
       onClick={generateMissingEmbeddings}
       disabled={isGenerating}
-      className="fixed bottom-4 right-4 z-50 bg-primary hover:bg-primary/90 text-primary-foreground shadow-lg"
-      size="sm"
+      className="fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 translate-y-20 z-[10001] bg-orange-500 hover:bg-orange-600 text-white shadow-2xl border-2 border-orange-300 backdrop-blur-sm"
+      size="lg"
+      style={{
+        position: 'fixed',
+        zIndex: 10001,
+        pointerEvents: 'auto',
+        minWidth: '140px',
+        minHeight: '48px'
+      }}
     >
       {isGenerating ? (
         <>
-          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+          <Loader2 className="h-5 w-5 mr-2 animate-spin" />
           Generating...
         </>
       ) : (
         <>
-          <Zap className="h-4 w-4 mr-2" />
+          <Zap className="h-5 w-5 mr-2" />
           Fix RAG
         </>
       )}
