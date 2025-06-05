@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useMemo } from 'react';
 import { Text } from '@react-three/drei';
 import { useLoader } from '@react-three/fiber';
@@ -71,45 +70,56 @@ export const NodeLabel: React.FC<NodeLabelProps> = ({
     return [0, scaledOffset, 0] as [number, number, number];
   }, [type, nodeScale]);
 
-  // RESTRICTED: Enhanced text size calculation with maximum font size limited to 0.5
+  // IMPLEMENTED: Restricted font sizing with maximum size strictly limited to 0.5
   const textSize = useMemo(() => {
-    // Clamp camera zoom to reasonable range
+    // Clamp camera zoom to reasonable range for better control
     const clampedZoom = Math.max(15, Math.min(80, cameraZoom));
     
-    // IMPROVED: Less aggressive zoom factor calculation for better readability
-    // Create a smoother curve that doesn't scale as dramatically
+    // IMPROVED: More controlled zoom factor calculation with reduced scaling impact
     const normalizedZoom = (clampedZoom - 15) / (80 - 15); // 0 to 1
-    const zoomFactor = 0.8 + (normalizedZoom * 0.2); // 0.8 to 1.0 range (much smaller range)
     
-    // Base size with type differentiation
-    const baseSize = type === 'entity' ? 0.35 : 0.32;
+    // RESTRICTED: Much smaller scaling range to prevent dramatic size changes
+    const zoomFactor = 0.85 + (normalizedZoom * 0.15); // 0.85 to 1.0 range (only 17% variation)
     
-    // Calculate final size with improved scaling
+    // Base size differentiation between types
+    const baseSize = type === 'entity' ? 0.38 : 0.35;
+    
+    // Calculate size with controlled scaling
     const calculatedSize = baseSize * zoomFactor;
     
-    // RESTRICTED: Maximum font size strictly limited to 0.5, minimum to 0.25
-    const finalSize = Math.max(0.25, Math.min(0.5, calculatedSize));
+    // STRICTLY ENFORCED: Maximum font size limited to 0.5, minimum to 0.3
+    const finalSize = Math.max(0.3, Math.min(0.5, calculatedSize));
     
-    console.log(`[NodeLabel] RESTRICTED font size for ${id}: zoom=${cameraZoom}, normalized=${normalizedZoom.toFixed(2)}, factor=${zoomFactor.toFixed(2)}, final=${finalSize.toFixed(2)} (max: 0.5)`);
+    console.log(`[NodeLabel] RESTRICTED sizing for ${id}: zoom=${cameraZoom}, normalized=${normalizedZoom.toFixed(2)}, factor=${zoomFactor.toFixed(2)}, final=${finalSize.toFixed(2)} (max: 0.5, min: 0.3)`);
     
     return finalSize;
   }, [cameraZoom, type, id]);
 
-  // Enhanced text color with better contrast
+  // Enhanced text color with better contrast and readability
   const textColor = useMemo(() => {
     if (isSelected) return '#ffffff';
     if (isHighlighted) return type === 'entity' ? '#ffffff' : themeHex;
     return '#cccccc';
   }, [isSelected, isHighlighted, type, themeHex]);
 
-  // ENHANCED: Dynamic outline width based on text size but also restricted
+  // ENHANCED: Proportional outline width that scales with text size but remains controlled
   const outlineWidth = useMemo(() => {
     const baseOutline = isSelected ? 0.04 : 0.02;
-    // Scale outline with text size to maintain readability
-    const scaleFactor = textSize / 0.4; // Normalize to base size
-    // Restrict outline width to prevent it from becoming too thick
-    return Math.max(0.01, Math.min(0.05, baseOutline * scaleFactor));
+    // Scale outline proportionally but keep it reasonable
+    const scaleFactor = Math.min(1.2, textSize / 0.35); // Cap scaling at 1.2x
+    const calculatedOutline = baseOutline * scaleFactor;
+    
+    // Restrict outline width to prevent excessive thickness
+    return Math.max(0.015, Math.min(0.05, calculatedOutline));
   }, [isSelected, textSize]);
+
+  // IMPROVED: Better text wrapping based on actual text size
+  const maxWidth = useMemo(() => {
+    // Dynamic max width based on text size for better text wrapping
+    const baseWidth = 25;
+    const sizeRatio = textSize / 0.4;
+    return Math.max(20, Math.min(35, baseWidth / sizeRatio));
+  }, [textSize]);
 
   const labelPosition: [number, number, number] = [
     position[0] + labelOffset[0],
@@ -128,7 +138,7 @@ export const NodeLabel: React.FC<NodeLabelProps> = ({
       fontSize={textSize}
       anchorX="center"
       anchorY="middle"
-      maxWidth={25}
+      maxWidth={maxWidth}
       textAlign="center"
       font={font}
       fontWeight={isHighlighted || isSelected ? "bold" : "normal"}
