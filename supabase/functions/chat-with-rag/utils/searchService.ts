@@ -1,3 +1,4 @@
+
 // Enhanced search service with optimized array-based theme filtering and entity filtering
 export async function searchEntriesWithVector(
   supabase: any,
@@ -13,7 +14,7 @@ export async function searchEntriesWithVector(
       'match_journal_entries_fixed',
       {
         query_embedding: queryEmbedding,
-        match_threshold: 0.5,
+        match_threshold: 0.3, // Lowered threshold for better recall
         match_count: 10,
         user_id_filter: userIdString
       }

@@ -5,6 +5,7 @@ import JournalHeader from '@/components/home/JournalHeader';
 import JournalNavigationButton from '@/components/home/JournalNavigationButton';
 import JournalContent from '@/components/home/JournalContent';
 import BackgroundElements from '@/components/home/BackgroundElements';
+import EmbeddingGenerationButton from '@/components/home/EmbeddingGenerationButton';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 
@@ -138,6 +139,9 @@ const Home = () => {
       <div className={`relative ${isInWelcomeTutorialStep ? 'z-[9999]' : 'z-20'} flex flex-col`}>
         <JournalHeader />
       </div>
+
+      {/* Embedding generation button - temporary for fixing RAG pipeline */}
+      <EmbeddingGenerationButton />
     </div>
   );
 };

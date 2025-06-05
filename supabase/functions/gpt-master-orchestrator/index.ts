@@ -69,6 +69,145 @@ class OptimizedApiClient {
   }
 }
 
+// Enhanced fallback search strategies
+class FallbackSearchStrategy {
+  static async executeSemanticSearch(
+    supabaseClient: any,
+    userId: string,
+    queryEmbedding: number[],
+    queryPlan: any
+  ): Promise<any[]> {
+    console.log('[GPT-Master-Orchestrator] Executing semantic search');
+    
+    try {
+      const { data, error } = await supabaseClient.rpc(
+        'match_journal_entries_fixed',
+        {
+          query_embedding: queryEmbedding,
+          match_threshold: 0.3,
+          match_count: 10,
+          user_id_filter: userId
+        }
+      );
+
+      if (error) {
+        console.error('[GPT-Master-Orchestrator] Semantic search error:', error);
+        throw error;
+      }
+
+      console.log(`[GPT-Master-Orchestrator] Semantic search found ${data?.length || 0} results`);
+      return data || [];
+    } catch (error) {
+      console.error('[GPT-Master-Orchestrator] Semantic search failed:', error);
+      throw error;
+    }
+  }
+
+  static async executeKeywordSearch(
+    supabaseClient: any,
+    userId: string,
+    message: string,
+    queryPlan: any
+  ): Promise<any[]> {
+    console.log('[GPT-Master-Orchestrator] Executing keyword search fallback');
+    
+    try {
+      // Extract key terms from the message
+      const keywords = message.toLowerCase()
+        .split(/\s+/)
+        .filter(word => word.length > 3)
+        .slice(0, 5);
+
+      if (keywords.length === 0) {
+        return [];
+      }
+
+      const keywordQuery = keywords.join(' | ');
+      
+      const { data, error } = await supabaseClient
+        .from('Journal Entries')
+        .select(`
+          id,
+          created_at,
+          "refined text",
+          "transcription text",
+          master_themes,
+          emotions
+        `)
+        .eq('user_id', userId)
+        .or(`"refined text".ilike.%${keywords[0]}%,"transcription text".ilike.%${keywords[0]}%`)
+        .order('created_at', { ascending: false })
+        .limit(10);
+
+      if (error) {
+        console.error('[GPT-Master-Orchestrator] Keyword search error:', error);
+        throw error;
+      }
+
+      const results = (data || []).map(entry => ({
+        id: entry.id,
+        content: entry["refined text"] || entry["transcription text"] || '',
+        created_at: entry.created_at,
+        themes: entry.master_themes || [],
+        emotions: entry.emotions || {},
+        similarity: 0.5, // Default similarity for keyword matches
+        searchType: 'keyword'
+      }));
+
+      console.log(`[GPT-Master-Orchestrator] Keyword search found ${results.length} results`);
+      return results;
+    } catch (error) {
+      console.error('[GPT-Master-Orchestrator] Keyword search failed:', error);
+      throw error;
+    }
+  }
+
+  static async executeRecentEntriesSearch(
+    supabaseClient: any,
+    userId: string,
+    queryPlan: any
+  ): Promise<any[]> {
+    console.log('[GPT-Master-Orchestrator] Executing recent entries fallback');
+    
+    try {
+      const { data, error } = await supabaseClient
+        .from('Journal Entries')
+        .select(`
+          id,
+          created_at,
+          "refined text",
+          "transcription text",
+          master_themes,
+          emotions
+        `)
+        .eq('user_id', userId)
+        .order('created_at', { ascending: false })
+        .limit(5);
+
+      if (error) {
+        console.error('[GPT-Master-Orchestrator] Recent entries search error:', error);
+        throw error;
+      }
+
+      const results = (data || []).map(entry => ({
+        id: entry.id,
+        content: entry["refined text"] || entry["transcription text"] || '',
+        created_at: entry.created_at,
+        themes: entry.master_themes || [],
+        emotions: entry.emotions || {},
+        similarity: 0.3, // Default similarity for recent entries
+        searchType: 'recent'
+      }));
+
+      console.log(`[GPT-Master-Orchestrator] Recent entries search found ${results.length} results`);
+      return results;
+    } catch (error) {
+      console.error('[GPT-Master-Orchestrator] Recent entries search failed:', error);
+      throw error;
+    }
+  }
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -109,14 +248,15 @@ serve(async (req) => {
       throw new Error('OpenAI API key not configured');
     }
 
-    // Phase 1 Optimization: Intelligent search strategy with parallel execution
+    // Phase 1: Enhanced search with comprehensive fallback strategy
     let searchResults = [];
     let analysisMetadata = {
       searchMethod: 'none',
       queryComplexity: 'simple',
       resultsCount: 0,
       timestamp: new Date().toISOString(),
-      processingTime: 0
+      processingTime: 0,
+      fallbacksUsed: []
     };
 
     const searchStartTime = Date.now();
@@ -128,135 +268,109 @@ serve(async (req) => {
     const hasTimeContext = queryPlan.timeRange || 
                           /\b(last|this|current|recent|past|today|yesterday|week|month|year)\b/i.test(message);
 
-    // Phase 1: Parallel search execution
-    const searchPromises = [];
-
-    // Semantic search (always run this)
-    if (queryPlan.strategy === 'semantic' || queryPlan.strategy === 'hybrid' || !queryPlan.strategy) {
-      console.log('[GPT-Master-Orchestrator] Starting semantic search');
+    // Phase 1: Primary semantic search with comprehensive fallback
+    try {
+      console.log('[GPT-Master-Orchestrator] Starting primary semantic search');
+      const queryEmbedding = await OptimizedApiClient.getEmbedding(message, openaiApiKey);
       
-      const semanticSearchPromise = async () => {
-        try {
-          const queryEmbedding = await OptimizedApiClient.getEmbedding(message, openaiApiKey);
+      searchResults = await FallbackSearchStrategy.executeSemanticSearch(
+        supabaseClient,
+        userId,
+        queryEmbedding,
+        queryPlan
+      );
 
-          const searchParams = {
-            query_embedding: queryEmbedding,
-            match_threshold: isComplexQuery ? 0.2 : 0.3, // Lower threshold for complex queries
-            match_count: isComplexQuery ? 15 : 8, // More results for complex queries
-            start_date: queryPlan.timeRange?.startDate || null,
-            end_date: queryPlan.timeRange?.endDate || null
-          };
-
-          const functionName = hasTimeContext ? 'match_journal_entries_with_date' : 'match_journal_entries_fixed';
-          const { data, error } = await supabaseClient.rpc(functionName, searchParams);
-
-          if (error) {
-            console.error('Semantic search error:', error);
-            return [];
-          }
-
-          console.log(`[GPT-Master-Orchestrator] Semantic search found ${data?.length || 0} results`);
-          return data || [];
-        } catch (error) {
-          console.error('Error in semantic search:', error);
-          return [];
-        }
-      };
-
-      searchPromises.push({ type: 'semantic', promise: semanticSearchPromise() });
-    }
-
-    // Theme-based search (parallel execution)
-    if (queryPlan.strategy === 'theme' || (queryPlan.strategy === 'hybrid' && queryPlan.extractedThemes?.length > 0)) {
-      console.log('[GPT-Master-Orchestrator] Starting theme search');
+      analysisMetadata.searchMethod = 'semantic';
       
-      const themeSearchPromise = async () => {
+      // If semantic search returns no results, execute fallback strategies
+      if (searchResults.length === 0) {
+        console.log('[GPT-Master-Orchestrator] Semantic search returned no results, trying fallback strategies');
+        
+        // Fallback 1: Keyword search
         try {
-          const { data, error } = await supabaseClient.rpc(
-            'match_journal_entries_by_theme',
-            {
-              theme_query: queryPlan.extractedThemes?.[0] || message,
-              match_threshold: 0.3,
-              match_count: 5,
-              start_date: queryPlan.timeRange?.startDate || null,
-              end_date: queryPlan.timeRange?.endDate || null
-            }
+          const keywordResults = await FallbackSearchStrategy.executeKeywordSearch(
+            supabaseClient,
+            userId,
+            message,
+            queryPlan
           );
-
-          if (error) {
-            console.error('Theme search error:', error);
-            return [];
+          
+          if (keywordResults.length > 0) {
+            searchResults = keywordResults;
+            analysisMetadata.searchMethod = 'keyword_fallback';
+            analysisMetadata.fallbacksUsed.push('keyword');
+            console.log('[GPT-Master-Orchestrator] Keyword fallback successful');
           }
-
-          console.log(`[GPT-Master-Orchestrator] Theme search found ${data?.length || 0} results`);
-          return data || [];
-        } catch (error) {
-          console.error('Error in theme search:', error);
-          return [];
+        } catch (keywordError) {
+          console.error('[GPT-Master-Orchestrator] Keyword fallback failed:', keywordError);
+          analysisMetadata.fallbacksUsed.push('keyword_failed');
         }
-      };
 
-      searchPromises.push({ type: 'theme', promise: themeSearchPromise() });
-    }
-
-    // Emotion-based search (parallel execution)
-    if (queryPlan.strategy === 'emotion' && queryPlan.extractedEmotions?.length > 0) {
-      console.log('[GPT-Master-Orchestrator] Starting emotion search');
-      
-      const emotionSearchPromise = async () => {
-        try {
-          const { data, error } = await supabaseClient.rpc(
-            'match_journal_entries_by_emotion',
-            {
-              emotion_name: queryPlan.extractedEmotions[0],
-              min_score: 0.3,
-              start_date: queryPlan.timeRange?.startDate || null,
-              end_date: queryPlan.timeRange?.endDate || null,
-              limit_count: 5
+        // Fallback 2: Recent entries search (if keyword search also failed)
+        if (searchResults.length === 0) {
+          try {
+            const recentResults = await FallbackSearchStrategy.executeRecentEntriesSearch(
+              supabaseClient,
+              userId,
+              queryPlan
+            );
+            
+            if (recentResults.length > 0) {
+              searchResults = recentResults;
+              analysisMetadata.searchMethod = 'recent_fallback';
+              analysisMetadata.fallbacksUsed.push('recent_entries');
+              console.log('[GPT-Master-Orchestrator] Recent entries fallback successful');
             }
-          );
-
-          if (error) {
-            console.error('Emotion search error:', error);
-            return [];
+          } catch (recentError) {
+            console.error('[GPT-Master-Orchestrator] Recent entries fallback failed:', recentError);
+            analysisMetadata.fallbacksUsed.push('recent_failed');
           }
-
-          console.log(`[GPT-Master-Orchestrator] Emotion search found ${data?.length || 0} results`);
-          return data || [];
-        } catch (error) {
-          console.error('Error in emotion search:', error);
-          return [];
         }
-      };
+      }
 
-      searchPromises.push({ type: 'emotion', promise: emotionSearchPromise() });
+    } catch (semanticError) {
+      console.error('[GPT-Master-Orchestrator] Primary semantic search failed:', semanticError);
+      analysisMetadata.fallbacksUsed.push('semantic_failed');
+      
+      // If semantic search completely fails, try fallback strategies
+      try {
+        const keywordResults = await FallbackSearchStrategy.executeKeywordSearch(
+          supabaseClient,
+          userId,
+          message,
+          queryPlan
+        );
+        
+        if (keywordResults.length > 0) {
+          searchResults = keywordResults;
+          analysisMetadata.searchMethod = 'keyword_emergency_fallback';
+          analysisMetadata.fallbacksUsed.push('keyword_emergency');
+        } else {
+          // Final fallback to recent entries
+          const recentResults = await FallbackSearchStrategy.executeRecentEntriesSearch(
+            supabaseClient,
+            userId,
+            queryPlan
+          );
+          searchResults = recentResults;
+          analysisMetadata.searchMethod = 'recent_emergency_fallback';
+          analysisMetadata.fallbacksUsed.push('recent_emergency');
+        }
+      } catch (fallbackError) {
+        console.error('[GPT-Master-Orchestrator] All fallback strategies failed:', fallbackError);
+        analysisMetadata.searchMethod = 'all_failed';
+        analysisMetadata.fallbacksUsed.push('all_failed');
+      }
     }
 
-    // Execute all searches in parallel
-    const searchResults_parallel = await Promise.all(searchPromises.map(s => s.promise));
-    
-    // Merge and deduplicate results
-    const allResults = new Map();
-    searchResults_parallel.forEach((results, index) => {
-      const searchType = searchPromises[index].type;
-      results.forEach((result: any) => {
-        if (!allResults.has(result.id)) {
-          allResults.set(result.id, { ...result, searchType });
-        }
-      });
-    });
-
-    searchResults = Array.from(allResults.values());
-    
     // Update metadata
-    analysisMetadata.searchMethod = searchPromises.map(s => s.type).join('+');
     analysisMetadata.resultsCount = searchResults.length;
     analysisMetadata.queryComplexity = isComplexQuery ? 'complex' : 'simple';
 
     const searchTime = Date.now() - searchStartTime;
-    console.log(`[GPT-Master-Orchestrator] Parallel search completed in ${searchTime}ms`);
+    console.log(`[GPT-Master-Orchestrator] Search completed in ${searchTime}ms using method: ${analysisMetadata.searchMethod}`);
 
-    // Phase 1: Statistical analysis (only for complex queries to save time)
+    // Phase 2: Statistical analysis (only for complex queries to save time)
     let statisticalAnalysis = null;
     if (queryPlan.requiresStatistics && isComplexQuery && searchResults.length > 0) {
       console.log('[GPT-Master-Orchestrator] Performing statistical analysis');
@@ -265,6 +379,7 @@ serve(async (req) => {
         const { data: topEmotions, error: emotionsError } = await supabaseClient.rpc(
           'get_top_emotions_with_entries',
           {
+            user_id_param: userId,
             start_date: queryPlan.timeRange?.startDate || null,
             end_date: queryPlan.timeRange?.endDate || null,
             limit_count: 5
@@ -284,7 +399,7 @@ serve(async (req) => {
       }
     }
 
-    // Phase 1: Optimized AI response generation
+    // Phase 3: Optimized AI response generation
     console.log('[GPT-Master-Orchestrator] Generating AI response');
     
     // Optimize context building for better performance
@@ -300,11 +415,11 @@ serve(async (req) => {
 
     // Intelligent model selection based on query complexity
     const useGPT4 = isComplexQuery && (searchResults.length > 5 || statisticalAnalysis);
-    const model = useGPT4 ? 'gpt-4o' : 'gpt-4o-mini';
+    const model = useGPT4 ? 'gpt-4.1-2025-04-14' : 'gpt-4.1-mini-2025-04-14';
     const maxTokens = isComplexQuery ? 1200 : 800;
 
     // Optimized system prompt for better performance
-    const systemPrompt = `You are an empathetic AI journal analyst. Analyze the user's question based on their journal entries and provide helpful insights.
+    let systemPrompt = `You are an empathetic AI journal analyst. Analyze the user's question based on their journal entries and provide helpful insights.
 
 User Profile: ${JSON.stringify(userProfile)}
 Query Context: ${JSON.stringify(queryPlan)}
@@ -317,8 +432,20 @@ ${statisticalAnalysis ? `Statistical Analysis: ${JSON.stringify(statisticalAnaly
 Guidelines:
 - Be empathetic and supportive
 - Provide specific insights based on the journal entries
-- Reference specific entries when relevant
-- If no relevant entries are found, acknowledge this and offer general guidance
+- Reference specific entries when relevant`;
+
+    // Add context about search method if fallbacks were used
+    if (analysisMetadata.fallbacksUsed.length > 0) {
+      systemPrompt += `
+- Note: I used ${analysisMetadata.searchMethod} to find relevant entries`;
+    }
+
+    if (searchResults.length === 0) {
+      systemPrompt += `
+- No specific journal entries were found for this query, so provide general guidance and encourage the user to write more entries`;
+    }
+
+    systemPrompt += `
 - Keep responses conversational and helpful
 - Focus on patterns, growth, and positive insights`;
 
@@ -359,7 +486,7 @@ Guidelines:
         hasStatistics: !!statisticalAnalysis,
         queryPlan: queryPlan,
         modelUsed: model,
-        optimizationsApplied: ['parallel_search', 'intelligent_model_selection', 'optimized_context']
+        optimizationsApplied: ['parallel_search', 'intelligent_model_selection', 'optimized_context', 'comprehensive_fallback']
       },
       referenceEntries: searchResults.slice(0, 5).map(entry => ({
         id: entry.id,
@@ -367,7 +494,7 @@ Guidelines:
         created_at: entry.created_at,
         themes: entry.themes || [],
         emotions: entry.emotions || {},
-        searchType: entry.searchType
+        searchType: entry.searchType || 'semantic'
       })),
       statisticalData: statisticalAnalysis
     }), {
