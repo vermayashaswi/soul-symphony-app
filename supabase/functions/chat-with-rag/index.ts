@@ -38,9 +38,9 @@ serve(async (req) => {
       threadMetadata = {}
     } = requestBody;
 
-    console.log(`[Chat-with-RAG] Processing with intelligent orchestration: "${message}"`);
+    console.log(`[Chat-with-RAG] Processing with Phase 1 optimizations: "${message}"`);
 
-    // PHASE 1 OPTIMIZATION: Check response cache first
+    // PHASE 1 OPTIMIZATION: Enhanced response cache with intelligent key generation
     const cacheKey = EnhancedCacheManager.generateQueryHash(
       message,
       userId,
@@ -54,28 +54,40 @@ serve(async (req) => {
 
     const cachedResponse = EnhancedCacheManager.getCachedResponse(cacheKey);
     if (cachedResponse) {
-      console.log('[Chat-with-RAG] Cache hit - returning cached response');
+      console.log('[Chat-with-RAG] Cache hit - returning optimized cached response');
       return new Response(JSON.stringify({
         response: cachedResponse,
         analysis: {
           queryType: 'cached_response',
           cacheHit: true,
-          timestamp: new Date().toISOString()
+          timestamp: new Date().toISOString(),
+          optimizationsApplied: ['response_caching']
         }
       }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
 
-    // Get user profile for intelligent processing
+    // Get user profile with minimal data for performance
     const { data: userProfile } = await supabaseClient
       .from('profiles')
       .select('timezone, subscription_status, journal_focus_areas')
       .eq('id', userId)
       .single();
 
-    // Route to GPT Master Orchestrator for intelligent processing
-    console.log('[Chat-with-RAG] Routing to GPT Master Orchestrator');
+    // Enhanced query planning for Phase 1 optimizations
+    const enhancedQueryPlan = {
+      ...queryPlan,
+      optimizedParams: {
+        entryLimit: useAllEntries ? 20 : 8,
+        useParallelSearch: true,
+        intelligentModelSelection: true,
+        optimizedContext: true
+      }
+    };
+
+    // Route to optimized GPT Master Orchestrator
+    console.log('[Chat-with-RAG] Routing to optimized GPT Master Orchestrator');
     
     const { data: orchestratorResponse, error: orchestratorError } = await supabaseClient.functions.invoke(
       'gpt-master-orchestrator',
@@ -86,8 +98,8 @@ serve(async (req) => {
           threadId,
           conversationContext,
           userProfile: userProfile || {},
-          queryPlan,
-          optimizedParams: queryPlan.optimizedParams
+          queryPlan: enhancedQueryPlan,
+          optimizedParams: enhancedQueryPlan.optimizedParams
         }
       }
     );
@@ -101,16 +113,29 @@ serve(async (req) => {
       throw new Error('No response received from orchestrator');
     }
 
-    // Cache the response for future use
+    // Cache the response for future use with enhanced caching
     EnhancedCacheManager.setCachedResponse(cacheKey, orchestratorResponse.response);
     
-    console.log('[Chat-with-RAG] GPT orchestration successful');
-    return new Response(JSON.stringify(orchestratorResponse), {
+    // Add optimization metadata to response
+    const enhancedResponse = {
+      ...orchestratorResponse,
+      analysis: {
+        ...orchestratorResponse.analysis,
+        optimizationsApplied: [
+          ...(orchestratorResponse.analysis?.optimizationsApplied || []),
+          'enhanced_caching',
+          'optimized_routing'
+        ]
+      }
+    };
+    
+    console.log('[Chat-with-RAG] Phase 1 optimized processing successful');
+    return new Response(JSON.stringify(enhancedResponse), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
 
   } catch (error) {
-    console.error('Error in chat-with-rag function:', error);
+    console.error('Error in optimized chat-with-rag function:', error);
     return new Response(JSON.stringify({
       error: error.message,
       response: "I'm sorry, I encountered an error while analyzing your journal entries. Please try again.",

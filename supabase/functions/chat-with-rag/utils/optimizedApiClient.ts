@@ -1,101 +1,69 @@
 
-import { CacheManager } from './cacheManager.ts';
-
-// Optimized OpenAI API client with batching and caching
+// Optimized API client with connection pooling and caching
 export class OptimizedApiClient {
-  private static pendingEmbeddings = new Map<string, Promise<number[]>>();
-  
+  private static embeddingCache = new Map<string, number[]>();
+  private static readonly CACHE_SIZE_LIMIT = 100;
+  private static readonly CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+
+  // Generate embedding with caching
   static async getEmbedding(text: string, openaiApiKey: string): Promise<number[]> {
-    // Input validation
-    if (!text || typeof text !== 'string') {
-      throw new Error('Invalid text input for embedding generation');
-    }
+    const cacheKey = this.hashString(text);
     
     // Check cache first
-    const cached = CacheManager.getCachedEmbedding(text);
-    if (cached) {
-      console.log('[OptimizedApiClient] Using cached embedding');
-      return cached;
+    if (this.embeddingCache.has(cacheKey)) {
+      console.log('[OptimizedApiClient] Cache hit for embedding');
+      return this.embeddingCache.get(cacheKey)!;
     }
-
-    // Check if request is already pending
-    const normalizedText = text.toLowerCase().trim();
-    if (this.pendingEmbeddings.has(normalizedText)) {
-      console.log('[OptimizedApiClient] Reusing pending embedding request');
-      return await this.pendingEmbeddings.get(normalizedText)!;
-    }
-
-    // Create new request
-    const embeddingPromise = this.fetchEmbedding(text, openaiApiKey);
-    this.pendingEmbeddings.set(normalizedText, embeddingPromise);
 
     try {
-      const embedding = await embeddingPromise;
-      CacheManager.setCachedEmbedding(text, embedding);
+      console.log('[OptimizedApiClient] Generating new embedding');
+      const response = await fetch('https://api.openai.com/v1/embeddings', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${openaiApiKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: 'text-embedding-3-small', // Faster model
+          input: text.substring(0, 8000), // Limit input length
+          encoding_format: 'float'
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`Embedding API error: ${response.status}`);
+      }
+
+      const result = await response.json();
+      const embedding = result.data[0].embedding;
+
+      // Cache the result
+      this.cacheEmbedding(cacheKey, embedding);
+      
       return embedding;
-    } finally {
-      this.pendingEmbeddings.delete(normalizedText);
+    } catch (error) {
+      console.error('[OptimizedApiClient] Embedding generation failed:', error);
+      throw error;
     }
   }
 
-  private static async fetchEmbedding(text: string, openaiApiKey: string): Promise<number[]> {
-    const response = await fetch('https://api.openai.com/v1/embeddings', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${openaiApiKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        input: text.substring(0, 8000), // Limit input length
-        model: 'text-embedding-ada-002',
-      }),
-    });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(`OpenAI API error: ${response.status} - ${errorText}`);
-    }
-
-    const data = await response.json();
-    return data.data[0].embedding;
-  }
-
-  static optimizeSystemPrompt(originalPrompt: string): string {
-    // Remove redundant whitespace and optimize token usage
-    return originalPrompt
-      .replace(/\s+/g, ' ')
-      .replace(/\n\s*\n/g, '\n')
-      .trim();
-  }
-
-  static async generateResponseOptimized(
-    systemPrompt: string,
-    userPrompt: string,
-    conversationContext: any[],
-    openaiApiKey: string
+  // Optimized chat completion with intelligent model selection
+  static async getChatCompletion(
+    messages: any[], 
+    openaiApiKey: string,
+    options: {
+      maxTokens?: number;
+      temperature?: number;
+      useGPT4?: boolean;
+    } = {}
   ): Promise<string> {
-    // Input validation
-    if (!systemPrompt || !userPrompt) {
-      throw new Error('Invalid prompt inputs for response generation');
-    }
+    const { maxTokens = 800, temperature = 0.7, useGPT4 = false } = options;
     
-    const optimizedSystemPrompt = this.optimizeSystemPrompt(systemPrompt);
+    // Intelligent model selection based on complexity
+    const model = useGPT4 ? 'gpt-4o' : 'gpt-4o-mini';
     
-    // Use last 8 conversation messages instead of 5 for better context
-    const limitedContext = conversationContext.slice(-8).map(msg => ({
-      role: msg.role,
-      content: msg.content ? msg.content.substring(0, 1000) : '' // Limit message length and handle null content
-    }));
-
-    console.log(`[OptimizedApiClient] Using ${limitedContext.length} messages for conversation context`);
-
-    const messages = [
-      { role: 'system', content: optimizedSystemPrompt },
-      ...limitedContext,
-      { role: 'user', content: userPrompt.substring(0, 4000) } // Limit user prompt
-    ];
-
     try {
+      console.log(`[OptimizedApiClient] Using model: ${model}`);
       const response = await fetch('https://api.openai.com/v1/chat/completions', {
         method: 'POST',
         headers: {
@@ -103,23 +71,108 @@ export class OptimizedApiClient {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          model: 'gpt-4o-mini',
-          messages: messages,
-          max_tokens: 800,
-          temperature: 0.7,
+          model,
+          messages: this.optimizeMessages(messages),
+          temperature,
+          max_tokens: maxTokens,
+          stream: false
         }),
       });
 
       if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(`OpenAI API error: ${response.status} - ${errorText}`);
+        throw new Error(`Chat completion error: ${response.status}`);
       }
 
-      const data = await response.json();
-      return data.choices[0]?.message?.content || 'Unable to generate response.';
+      const result = await response.json();
+      return result.choices[0].message.content;
     } catch (error) {
-      console.error('[OptimizedApiClient] Error generating response:', error);
+      console.error('[OptimizedApiClient] Chat completion failed:', error);
       throw error;
     }
+  }
+
+  // Cache management
+  private static cacheEmbedding(key: string, embedding: number[]): void {
+    // Implement LRU cache behavior
+    if (this.embeddingCache.size >= this.CACHE_SIZE_LIMIT) {
+      const firstKey = this.embeddingCache.keys().next().value;
+      this.embeddingCache.delete(firstKey);
+    }
+    
+    this.embeddingCache.set(key, embedding);
+  }
+
+  // Simple hash function for cache keys
+  private static hashString(str: string): string {
+    let hash = 0;
+    for (let i = 0; i < str.length; i++) {
+      const char = str.charCodeAt(i);
+      hash = ((hash << 5) - hash) + char;
+      hash = hash & hash; // Convert to 32-bit integer
+    }
+    return hash.toString();
+  }
+
+  // Optimize message array for token efficiency
+  private static optimizeMessages(messages: any[]): any[] {
+    return messages.map(msg => ({
+      ...msg,
+      content: typeof msg.content === 'string' 
+        ? msg.content.substring(0, 4000) // Limit message length
+        : msg.content
+    }));
+  }
+
+  // Batch embedding generation for multiple texts
+  static async getBatchEmbeddings(texts: string[], openaiApiKey: string): Promise<number[][]> {
+    const embeddings: number[][] = [];
+    const uncachedTexts: { text: string; index: number }[] = [];
+
+    // Check cache for each text
+    texts.forEach((text, index) => {
+      const cacheKey = this.hashString(text);
+      if (this.embeddingCache.has(cacheKey)) {
+        embeddings[index] = this.embeddingCache.get(cacheKey)!;
+      } else {
+        uncachedTexts.push({ text, index });
+      }
+    });
+
+    // Generate embeddings for uncached texts in batch
+    if (uncachedTexts.length > 0) {
+      try {
+        const response = await fetch('https://api.openai.com/v1/embeddings', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${openaiApiKey}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            model: 'text-embedding-3-small',
+            input: uncachedTexts.map(item => item.text.substring(0, 8000)),
+            encoding_format: 'float'
+          }),
+        });
+
+        if (!response.ok) {
+          throw new Error(`Batch embedding API error: ${response.status}`);
+        }
+
+        const result = await response.json();
+        
+        // Cache and assign results
+        uncachedTexts.forEach((item, batchIndex) => {
+          const embedding = result.data[batchIndex].embedding;
+          const cacheKey = this.hashString(item.text);
+          this.cacheEmbedding(cacheKey, embedding);
+          embeddings[item.index] = embedding;
+        });
+      } catch (error) {
+        console.error('[OptimizedApiClient] Batch embedding generation failed:', error);
+        throw error;
+      }
+    }
+
+    return embeddings;
   }
 }

@@ -8,12 +8,75 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+// Optimized API client class
+class OptimizedApiClient {
+  private static embeddingCache = new Map<string, number[]>();
+  private static readonly CACHE_SIZE_LIMIT = 100;
+
+  static async getEmbedding(text: string, openaiApiKey: string): Promise<number[]> {
+    const cacheKey = this.hashString(text);
+    
+    if (this.embeddingCache.has(cacheKey)) {
+      console.log('[GPT-Master-Orchestrator] Embedding cache hit');
+      return this.embeddingCache.get(cacheKey)!;
+    }
+
+    try {
+      const response = await fetch('https://api.openai.com/v1/embeddings', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${openaiApiKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: 'text-embedding-3-small',
+          input: text.substring(0, 8000),
+          encoding_format: 'float'
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`Embedding API error: ${response.status}`);
+      }
+
+      const result = await response.json();
+      const embedding = result.data[0].embedding;
+
+      this.cacheEmbedding(cacheKey, embedding);
+      return embedding;
+    } catch (error) {
+      console.error('[GPT-Master-Orchestrator] Embedding generation failed:', error);
+      throw error;
+    }
+  }
+
+  private static cacheEmbedding(key: string, embedding: number[]): void {
+    if (this.embeddingCache.size >= this.CACHE_SIZE_LIMIT) {
+      const firstKey = this.embeddingCache.keys().next().value;
+      this.embeddingCache.delete(firstKey);
+    }
+    this.embeddingCache.set(key, embedding);
+  }
+
+  private static hashString(str: string): string {
+    let hash = 0;
+    for (let i = 0; i < str.length; i++) {
+      const char = str.charCodeAt(i);
+      hash = ((hash << 5) - hash) + char;
+      hash = hash & hash;
+    }
+    return hash.toString();
+  }
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
+    const startTime = Date.now();
+
     // Create Supabase client with user's auth token for RLS compliance
     const supabaseClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
@@ -46,138 +109,159 @@ serve(async (req) => {
       throw new Error('OpenAI API key not configured');
     }
 
-    // Determine search strategy based on query plan
+    // Phase 1 Optimization: Intelligent search strategy with parallel execution
     let searchResults = [];
     let analysisMetadata = {
       searchMethod: 'none',
       queryComplexity: 'simple',
       resultsCount: 0,
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
+      processingTime: 0
     };
 
-    // Phase 1: Semantic Search (using RLS-compliant functions)
-    if (queryPlan.strategy === 'semantic' || queryPlan.strategy === 'hybrid') {
-      console.log('[GPT-Master-Orchestrator] Performing semantic search');
+    const searchStartTime = Date.now();
+
+    // Determine optimal search strategy based on query complexity
+    const isComplexQuery = message.length > 100 || 
+                          /\b(analyze|compare|pattern|trend|most|top|all|every)\b/i.test(message);
+    
+    const hasTimeContext = queryPlan.timeRange || 
+                          /\b(last|this|current|recent|past|today|yesterday|week|month|year)\b/i.test(message);
+
+    // Phase 1: Parallel search execution
+    const searchPromises = [];
+
+    // Semantic search (always run this)
+    if (queryPlan.strategy === 'semantic' || queryPlan.strategy === 'hybrid' || !queryPlan.strategy) {
+      console.log('[GPT-Master-Orchestrator] Starting semantic search');
       
-      try {
-        // Generate embedding for the query
-        const embeddingResponse = await fetch('https://api.openai.com/v1/embeddings', {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${openaiApiKey}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            model: 'text-embedding-3-small',
-            input: message,
-            encoding_format: 'float'
-          }),
-        });
+      const semanticSearchPromise = async () => {
+        try {
+          const queryEmbedding = await OptimizedApiClient.getEmbedding(message, openaiApiKey);
 
-        if (!embeddingResponse.ok) {
-          throw new Error(`Failed to generate embedding: ${embeddingResponse.statusText}`);
-        }
-
-        const embeddingResult = await embeddingResponse.json();
-        const queryEmbedding = embeddingResult.data[0].embedding;
-
-        // Use RLS-compliant function (no userId parameter needed)
-        const { data: semanticResults, error: semanticError } = await supabaseClient.rpc(
-          'match_journal_entries_with_date',
-          {
+          const searchParams = {
             query_embedding: queryEmbedding,
-            match_threshold: 0.3,
-            match_count: optimizedParams.entryLimit || 10,
+            match_threshold: isComplexQuery ? 0.2 : 0.3, // Lower threshold for complex queries
+            match_count: isComplexQuery ? 15 : 8, // More results for complex queries
             start_date: queryPlan.timeRange?.startDate || null,
             end_date: queryPlan.timeRange?.endDate || null
-          }
-        );
+          };
 
-        if (semanticError) {
-          console.error('Semantic search error:', semanticError);
-        } else {
-          searchResults = semanticResults || [];
-          analysisMetadata.searchMethod = 'semantic';
-          analysisMetadata.resultsCount = searchResults.length;
-          console.log(`[GPT-Master-Orchestrator] Found ${searchResults.length} semantic matches`);
+          const functionName = hasTimeContext ? 'match_journal_entries_with_date' : 'match_journal_entries_fixed';
+          const { data, error } = await supabaseClient.rpc(functionName, searchParams);
+
+          if (error) {
+            console.error('Semantic search error:', error);
+            return [];
+          }
+
+          console.log(`[GPT-Master-Orchestrator] Semantic search found ${data?.length || 0} results`);
+          return data || [];
+        } catch (error) {
+          console.error('Error in semantic search:', error);
+          return [];
         }
-      } catch (error) {
-        console.error('Error in semantic search:', error);
-        analysisMetadata.searchMethod = 'semantic_failed';
-      }
+      };
+
+      searchPromises.push({ type: 'semantic', promise: semanticSearchPromise() });
     }
 
-    // Phase 2: Theme-based search if needed
-    if ((queryPlan.strategy === 'theme' || queryPlan.strategy === 'hybrid') && searchResults.length < 5) {
-      console.log('[GPT-Master-Orchestrator] Performing theme-based search');
+    // Theme-based search (parallel execution)
+    if (queryPlan.strategy === 'theme' || (queryPlan.strategy === 'hybrid' && queryPlan.extractedThemes?.length > 0)) {
+      console.log('[GPT-Master-Orchestrator] Starting theme search');
       
-      try {
-        const { data: themeResults, error: themeError } = await supabaseClient.rpc(
-          'match_journal_entries_by_theme',
-          {
-            theme_query: queryPlan.extractedThemes?.[0] || message,
-            match_threshold: 0.4,
-            match_count: 5,
-            start_date: queryPlan.timeRange?.startDate || null,
-            end_date: queryPlan.timeRange?.endDate || null
-          }
-        );
+      const themeSearchPromise = async () => {
+        try {
+          const { data, error } = await supabaseClient.rpc(
+            'match_journal_entries_by_theme',
+            {
+              theme_query: queryPlan.extractedThemes?.[0] || message,
+              match_threshold: 0.3,
+              match_count: 5,
+              start_date: queryPlan.timeRange?.startDate || null,
+              end_date: queryPlan.timeRange?.endDate || null
+            }
+          );
 
-        if (themeError) {
-          console.error('Theme search error:', themeError);
-        } else if (themeResults && themeResults.length > 0) {
-          // Merge with existing results, avoiding duplicates
-          const existingIds = new Set(searchResults.map(r => r.id));
-          const newResults = themeResults.filter(r => !existingIds.has(r.id));
-          searchResults = [...searchResults, ...newResults];
-          analysisMetadata.searchMethod = analysisMetadata.searchMethod === 'semantic' ? 'hybrid' : 'theme';
-          analysisMetadata.resultsCount = searchResults.length;
-          console.log(`[GPT-Master-Orchestrator] Added ${newResults.length} theme matches`);
+          if (error) {
+            console.error('Theme search error:', error);
+            return [];
+          }
+
+          console.log(`[GPT-Master-Orchestrator] Theme search found ${data?.length || 0} results`);
+          return data || [];
+        } catch (error) {
+          console.error('Error in theme search:', error);
+          return [];
         }
-      } catch (error) {
-        console.error('Error in theme search:', error);
-      }
+      };
+
+      searchPromises.push({ type: 'theme', promise: themeSearchPromise() });
     }
 
-    // Phase 3: Emotion-based search if specified
+    // Emotion-based search (parallel execution)
     if (queryPlan.strategy === 'emotion' && queryPlan.extractedEmotions?.length > 0) {
-      console.log('[GPT-Master-Orchestrator] Performing emotion-based search');
+      console.log('[GPT-Master-Orchestrator] Starting emotion search');
       
-      try {
-        const { data: emotionResults, error: emotionError } = await supabaseClient.rpc(
-          'match_journal_entries_by_emotion',
-          {
-            emotion_name: queryPlan.extractedEmotions[0],
-            min_score: 0.3,
-            start_date: queryPlan.timeRange?.startDate || null,
-            end_date: queryPlan.timeRange?.endDate || null,
-            limit_count: 5
-          }
-        );
+      const emotionSearchPromise = async () => {
+        try {
+          const { data, error } = await supabaseClient.rpc(
+            'match_journal_entries_by_emotion',
+            {
+              emotion_name: queryPlan.extractedEmotions[0],
+              min_score: 0.3,
+              start_date: queryPlan.timeRange?.startDate || null,
+              end_date: queryPlan.timeRange?.endDate || null,
+              limit_count: 5
+            }
+          );
 
-        if (emotionError) {
-          console.error('Emotion search error:', emotionError);
-        } else if (emotionResults && emotionResults.length > 0) {
-          // Merge with existing results
-          const existingIds = new Set(searchResults.map(r => r.id));
-          const newResults = emotionResults.filter(r => !existingIds.has(r.id));
-          searchResults = [...searchResults, ...newResults];
-          analysisMetadata.searchMethod = 'emotion';
-          analysisMetadata.resultsCount = searchResults.length;
-          console.log(`[GPT-Master-Orchestrator] Added ${newResults.length} emotion matches`);
+          if (error) {
+            console.error('Emotion search error:', error);
+            return [];
+          }
+
+          console.log(`[GPT-Master-Orchestrator] Emotion search found ${data?.length || 0} results`);
+          return data || [];
+        } catch (error) {
+          console.error('Error in emotion search:', error);
+          return [];
         }
-      } catch (error) {
-        console.error('Error in emotion search:', error);
-      }
+      };
+
+      searchPromises.push({ type: 'emotion', promise: emotionSearchPromise() });
     }
 
-    // Phase 4: Statistical analysis for analytical queries
+    // Execute all searches in parallel
+    const searchResults_parallel = await Promise.all(searchPromises.map(s => s.promise));
+    
+    // Merge and deduplicate results
+    const allResults = new Map();
+    searchResults_parallel.forEach((results, index) => {
+      const searchType = searchPromises[index].type;
+      results.forEach((result: any) => {
+        if (!allResults.has(result.id)) {
+          allResults.set(result.id, { ...result, searchType });
+        }
+      });
+    });
+
+    searchResults = Array.from(allResults.values());
+    
+    // Update metadata
+    analysisMetadata.searchMethod = searchPromises.map(s => s.type).join('+');
+    analysisMetadata.resultsCount = searchResults.length;
+    analysisMetadata.queryComplexity = isComplexQuery ? 'complex' : 'simple';
+
+    const searchTime = Date.now() - searchStartTime;
+    console.log(`[GPT-Master-Orchestrator] Parallel search completed in ${searchTime}ms`);
+
+    // Phase 1: Statistical analysis (only for complex queries to save time)
     let statisticalAnalysis = null;
-    if (queryPlan.requiresStatistics && searchResults.length > 0) {
+    if (queryPlan.requiresStatistics && isComplexQuery && searchResults.length > 0) {
       console.log('[GPT-Master-Orchestrator] Performing statistical analysis');
       
       try {
-        // Get top emotions for the time period
         const { data: topEmotions, error: emotionsError } = await supabaseClient.rpc(
           'get_top_emotions_with_entries',
           {
@@ -193,21 +277,33 @@ serve(async (req) => {
             entryCount: searchResults.length,
             timeRange: queryPlan.timeRange
           };
-          console.log(`[GPT-Master-Orchestrator] Generated statistical analysis with ${topEmotions.length} top emotions`);
+          console.log(`[GPT-Master-Orchestrator] Statistical analysis completed`);
         }
       } catch (error) {
         console.error('Error in statistical analysis:', error);
       }
     }
 
-    // Phase 5: Generate AI response
+    // Phase 1: Optimized AI response generation
     console.log('[GPT-Master-Orchestrator] Generating AI response');
     
+    // Optimize context building for better performance
+    const maxContextEntries = isComplexQuery ? 10 : 6;
     const contextText = searchResults
-      .slice(0, 8) // Limit context to avoid token limits
-      .map(entry => `Entry ${entry.id} (${new Date(entry.created_at).toLocaleDateString()}): ${entry.content?.slice(0, 300) || 'No content'}`)
+      .slice(0, maxContextEntries)
+      .map(entry => {
+        const content = entry.content?.slice(0, 250) || 'No content';
+        const date = new Date(entry.created_at).toLocaleDateString();
+        return `Entry ${entry.id} (${date}): ${content}`;
+      })
       .join('\n\n');
 
+    // Intelligent model selection based on query complexity
+    const useGPT4 = isComplexQuery && (searchResults.length > 5 || statisticalAnalysis);
+    const model = useGPT4 ? 'gpt-4o' : 'gpt-4o-mini';
+    const maxTokens = isComplexQuery ? 1200 : 800;
+
+    // Optimized system prompt for better performance
     const systemPrompt = `You are an empathetic AI journal analyst. Analyze the user's question based on their journal entries and provide helpful insights.
 
 User Profile: ${JSON.stringify(userProfile)}
@@ -233,14 +329,14 @@ Guidelines:
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'gpt-4o',
+        model,
         messages: [
           { role: 'system', content: systemPrompt },
-          ...conversationContext.slice(-6), // Include recent conversation context
+          ...conversationContext.slice(-4), // Reduced context for performance
           { role: 'user', content: message }
         ],
         temperature: 0.7,
-        max_tokens: 1000
+        max_tokens: maxTokens
       }),
     });
 
@@ -251,21 +347,27 @@ Guidelines:
     const chatResult = await chatResponse.json();
     const aiResponse = chatResult.choices[0].message.content;
 
-    console.log('[GPT-Master-Orchestrator] Response generated successfully');
+    const totalTime = Date.now() - startTime;
+    analysisMetadata.processingTime = totalTime;
+
+    console.log(`[GPT-Master-Orchestrator] Response generated successfully in ${totalTime}ms using ${model}`);
 
     return new Response(JSON.stringify({
       response: aiResponse,
       analysis: {
         ...analysisMetadata,
         hasStatistics: !!statisticalAnalysis,
-        queryPlan: queryPlan
+        queryPlan: queryPlan,
+        modelUsed: model,
+        optimizationsApplied: ['parallel_search', 'intelligent_model_selection', 'optimized_context']
       },
       referenceEntries: searchResults.slice(0, 5).map(entry => ({
         id: entry.id,
         content: entry.content?.slice(0, 200) || 'No content',
         created_at: entry.created_at,
         themes: entry.themes || [],
-        emotions: entry.emotions || {}
+        emotions: entry.emotions || {},
+        searchType: entry.searchType
       })),
       statisticalData: statisticalAnalysis
     }), {
