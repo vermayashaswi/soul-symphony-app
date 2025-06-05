@@ -659,6 +659,22 @@ export type Database = {
           top_countries: Json
         }[]
       }
+      get_entity_statistics: {
+        Args: {
+          user_id_filter: string
+          start_date?: string
+          end_date?: string
+          limit_count?: number
+        }
+        Returns: {
+          entity_type: string
+          entity_name: string
+          entry_count: number
+          avg_sentiment_score: number
+          first_occurrence: string
+          last_occurrence: string
+        }[]
+      }
       get_entries_by_emotion_term: {
         Args: {
           emotion_term: string
@@ -723,6 +739,21 @@ export type Database = {
         Returns: {
           emotion: string
           score: number
+          sample_entries: Json
+        }[]
+      }
+      get_top_entities_with_entries: {
+        Args: {
+          user_id_param: string
+          start_date?: string
+          end_date?: string
+          limit_count?: number
+        }
+        Returns: {
+          entity_type: string
+          entity_name: string
+          entry_count: number
+          avg_sentiment: number
           sample_entries: Json
         }[]
       }
@@ -838,6 +869,24 @@ export type Database = {
           created_at: string
           emotion_score: number
           embedding: string
+        }[]
+      }
+      match_journal_entries_by_entities: {
+        Args: {
+          entity_queries: string[]
+          user_id_filter: string
+          match_threshold?: number
+          match_count?: number
+          start_date?: string
+          end_date?: string
+        }
+        Returns: {
+          id: number
+          content: string
+          created_at: string
+          entities: Json
+          similarity: number
+          entity_matches: Json
         }[]
       }
       match_journal_entries_by_theme: {

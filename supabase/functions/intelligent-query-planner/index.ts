@@ -49,17 +49,17 @@ serve(async (req) => {
 
     const { message, userId, conversationContext = [], userProfile = {} } = await req.json();
 
-    console.log('[Intelligent Query Planner] Analyzing query with enhanced theme detection:', message);
+    console.log('[Intelligent Query Planner] Analyzing query with enhanced theme and entity detection:', message);
 
     // Get user's recent journaling patterns
     const { data: recentEntries } = await supabaseClient
       .from('Journal Entries')
-      .select('created_at, emotions, master_themes, sentiment')
+      .select('created_at, emotions, master_themes, entities, sentiment')
       .eq('user_id', userId)
       .order('created_at', { ascending: false })
       .limit(20);
 
-    // Analyze user's journaling patterns including theme statistics
+    // Analyze user's journaling patterns including theme and entity statistics
     const userPatterns = await analyzeUserPatterns(recentEntries || [], supabaseClient, userId);
 
     // Generate database schema context
@@ -67,7 +67,7 @@ serve(async (req) => {
     const emotionGuidelines = getEmotionAnalysisGuidelines();
     const themeGuidelines = getThemeAnalysisGuidelines();
 
-    // Generate intelligent query plan using GPT with enhanced theme awareness
+    // Generate intelligent query plan using GPT with enhanced theme and entity awareness
     const queryPlan = await generateIntelligentQueryPlan(
       message,
       conversationContext,
@@ -79,13 +79,14 @@ serve(async (req) => {
       openaiApiKey
     );
 
-    console.log('[Intelligent Query Planner] Generated plan with enhanced theme filtering:', queryPlan);
+    console.log('[Intelligent Query Planner] Generated plan with enhanced theme and entity filtering:', queryPlan);
 
     return new Response(JSON.stringify({
       queryPlan,
       userPatterns,
       databaseContext,
       enhancedThemeFiltering: true,
+      enhancedEntityFiltering: true,
       timestamp: new Date().toISOString()
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -113,7 +114,7 @@ async function generateIntelligentQueryPlan(
   themeGuidelines: string,
   openaiApiKey: string
 ): Promise<QueryPlan> {
-  const systemPrompt = `You are an intelligent query planning system for a personal journal analysis AI with ENHANCED THEME FILTERING CAPABILITIES.
+  const systemPrompt = `You are an intelligent query planning system for a personal journal analysis AI with ENHANCED THEME AND ENTITY FILTERING CAPABILITIES.
 
 ${databaseContext}
 
@@ -122,16 +123,26 @@ ${emotionGuidelines}
 ${themeGuidelines}
 
 ENHANCED THEME FILTERING CAPABILITIES:
-- NEW: PostgreSQL array-based theme filtering with GIN index optimization
-- NEW: Array overlap operations (&&) for efficient multi-theme queries
-- NEW: Exact theme matching using ANY(array) operations
-- NEW: Theme statistics and analytics with get_theme_statistics function
-- NEW: Enhanced theme search with match_journal_entries_by_theme_array function
+- PostgreSQL array-based theme filtering with GIN index optimization
+- Array overlap operations (&&) for efficient multi-theme queries
+- Exact theme matching using ANY(array) operations
+- Theme statistics and analytics with get_theme_statistics function
+- Enhanced theme search with match_journal_entries_by_theme_array function
+
+NEW ENHANCED ENTITY FILTERING CAPABILITIES:
+- JSONB-based entity filtering with optimized JSONB operations
+- Entity search across multiple entity types (people, places, organizations, events, etc.)
+- Exact entity matching using JSONB array operations
+- Entity statistics and analytics with get_entity_statistics function
+- Enhanced entity search with match_journal_entries_by_entities function
+- Entity overlap operations for multi-entity queries
 
 USER CONTEXT:
 - Recent journaling patterns: ${JSON.stringify(userPatterns)}
 - User's common themes: ${userPatterns.commonThemes?.join(', ') || 'None identified'}
+- User's common entities: ${userPatterns.commonEntities?.join(', ') || 'None identified'}
 - Theme frequency statistics: ${JSON.stringify(userPatterns.themeStats || {})}
+- Entity frequency statistics: ${JSON.stringify(userPatterns.entityStats || {})}
 - Conversation history: ${conversationContext.slice(-3).map(c => c.content).join('; ')}
 - User timezone: ${userProfile.timezone || 'UTC'}
 
@@ -140,8 +151,9 @@ AVAILABLE SEARCH METHODS (ENHANCED):
 2. emotion_analysis - Search by PRE-CALCULATED emotion scores (0.0-1.0 scale)
 3. temporal_search - Time-based search with date ranges
 4. theme_search - ENHANCED array-based theme search with PostgreSQL operators
-5. hybrid_search - Combine multiple methods intelligently
-6. aggregation_search - Statistical analysis across entries for patterns
+5. entity_search - NEW array-based entity search with JSONB operators
+6. hybrid_search - Combine multiple methods intelligently
+7. aggregation_search - Statistical analysis across entries for patterns
 
 THEME QUERY DETECTION:
 - Look for topic/category-related keywords (work, relationships, health, etc.)
@@ -150,9 +162,16 @@ THEME QUERY DETECTION:
 - Recognize emotional themes (anxiety, joy, frustration, etc.)
 - Consider user's historical themes for better matching
 
+NEW ENTITY QUERY DETECTION:
+- Look for specific people mentioned (names, relationships like "mom", "boss", etc.)
+- Detect places (cities, countries, specific locations like "office", "gym", etc.)
+- Identify organizations (companies, schools, clubs, etc.)
+- Recognize events (meetings, parties, appointments, etc.)
+- Consider user's historical entities for better matching
+
 QUERY TO ANALYZE: "${message}"
 
-Generate a comprehensive query execution plan with enhanced theme filtering:
+Generate a comprehensive query execution plan with enhanced theme and entity filtering:
 
 {
   "strategy": "primary_strategy_name",
@@ -161,25 +180,28 @@ Generate a comprehensive query execution plan with enhanced theme filtering:
     "timeRange": null or {"startDate": "ISO_DATE", "endDate": "ISO_DATE"},
     "emotionThreshold": 0.3,
     "themes": ["theme1", "theme2"] or null,
+    "entities": ["entity1", "entity2"] or null,
     "requirePersonalPronouns": boolean,
     "emotionFocus": "specific_emotion" or null,
-    "themeMatchType": "exact" or "partial" or "semantic"
+    "themeMatchType": "exact" or "partial" or "semantic",
+    "entityMatchType": "exact" or "partial" or "semantic"
   },
   "emotionFocus": "emotion_name" or null,
   "subQueries": ["sub_query1", "sub_query2"] or null,
   "expectedResponseType": "narrative|analysis|data|direct_answer",
   "confidence": 0.85,
-  "reasoning": "Detailed explanation leveraging enhanced theme filtering capabilities",
-  "databaseContext": "How this plan uses the enhanced database schema and array operations"
+  "reasoning": "Detailed explanation leveraging enhanced theme and entity filtering capabilities",
+  "databaseContext": "How this plan uses the enhanced database schema including array and JSONB operations"
 }
 
-ENHANCED THEME ANALYSIS GUIDELINES:
-- Prioritize array-based theme filtering for better performance
-- Use exact matching when themes are clearly specified
-- Consider theme combinations and intersections
-- Leverage user's historical theme patterns for better relevance
-- Utilize the GIN index for optimized array operations
-- Apply semantic fallback only when array operations don't yield sufficient results`;
+ENHANCED ANALYSIS GUIDELINES:
+- Prioritize array-based theme filtering and JSONB entity filtering for better performance
+- Use exact matching when themes/entities are clearly specified
+- Consider theme and entity combinations and intersections
+- Leverage user's historical theme and entity patterns for better relevance
+- Utilize the GIN index for optimized array operations and JSONB index for entity operations
+- Apply semantic fallback only when array/JSONB operations don't yield sufficient results
+- Combine theme and entity searches when both are relevant to the query`;
 
   const response = await fetch('https://api.openai.com/v1/chat/completions', {
     method: 'POST',
@@ -211,8 +233,9 @@ ENHANCED THEME ANALYSIS GUIDELINES:
     if (jsonMatch) {
       const plan = JSON.parse(jsonMatch[0]);
       // Ensure enhanced database context is included
-      plan.databaseContext = plan.databaseContext || "Query plan generated with enhanced theme filtering and array operations";
+      plan.databaseContext = plan.databaseContext || "Query plan generated with enhanced theme and entity filtering using array and JSONB operations";
       plan.enhancedThemeFiltering = true;
+      plan.enhancedEntityFiltering = true;
       return plan;
     }
   } catch (parseError) {
@@ -227,7 +250,9 @@ async function analyzeUserPatterns(entries: any[], supabaseClient: any, userId: 
     avgEntriesPerWeek: 0,
     commonEmotions: [] as string[],
     commonThemes: [] as string[],
+    commonEntities: [] as string[],
     themeStats: {} as any,
+    entityStats: {} as any,
     typicalEntryLength: 0,
     emotionalVariability: 0,
     lastEntryDate: null as string | null,
@@ -291,6 +316,25 @@ async function analyzeUserPatterns(entries: any[], supabaseClient: any, userId: 
     .slice(0, 5)
     .map(([theme]) => theme);
 
+  // NEW: Analyze entities with enhanced statistics
+  const entityCounts = new Map<string, number>();
+  entries.forEach(entry => {
+    if (entry.entities) {
+      Object.values(entry.entities).forEach((entityArray: any) => {
+        if (Array.isArray(entityArray)) {
+          entityArray.forEach((entity: string) => {
+            entityCounts.set(entity, (entityCounts.get(entity) || 0) + 1);
+          });
+        }
+      });
+    }
+  });
+
+  patterns.commonEntities = Array.from(entityCounts.entries())
+    .sort(([,a], [,b]) => b - a)
+    .slice(0, 5)
+    .map(([entity]) => entity);
+
   // Get enhanced theme statistics from the database
   try {
     const { data: themeStats } = await supabaseClient.rpc(
@@ -314,6 +358,32 @@ async function analyzeUserPatterns(entries: any[], supabaseClient: any, userId: 
     }
   } catch (error) {
     console.log('[Query Planner] Could not fetch theme statistics:', error);
+  }
+
+  // NEW: Get enhanced entity statistics from the database
+  try {
+    const { data: entityStats } = await supabaseClient.rpc(
+      'get_entity_statistics',
+      {
+        user_id_filter: userId,
+        limit_count: 10
+      }
+    );
+
+    if (entityStats) {
+      patterns.entityStats = entityStats.reduce((acc: any, stat: any) => {
+        acc[stat.entity_name] = {
+          entityType: stat.entity_type,
+          entryCount: stat.entry_count,
+          avgSentiment: stat.avg_sentiment_score,
+          firstOccurrence: stat.first_occurrence,
+          lastOccurrence: stat.last_occurrence
+        };
+        return acc;
+      }, {});
+    }
+  } catch (error) {
+    console.log('[Query Planner] Could not fetch entity statistics:', error);
   }
 
   // Analyze sentiment patterns
@@ -342,13 +412,16 @@ function generateFallbackPlan(): QueryPlan {
       timeRange: null,
       emotionThreshold: 0.3,
       themes: null,
+      entities: null,
       requirePersonalPronouns: false,
-      themeMatchType: "semantic"
+      themeMatchType: "semantic",
+      entityMatchType: "semantic"
     },
     expectedResponseType: "narrative",
     confidence: 0.5,
-    reasoning: "Fallback plan using hybrid search approach with enhanced database schema awareness",
-    databaseContext: "Using vector search and emotion analysis as safe fallback methods with array optimization support",
-    enhancedThemeFiltering: true
+    reasoning: "Fallback plan using hybrid search approach with enhanced database schema awareness including entity filtering",
+    databaseContext: "Using vector search and emotion analysis as safe fallback methods with array optimization and JSONB entity support",
+    enhancedThemeFiltering: true,
+    enhancedEntityFiltering: true
   };
 }

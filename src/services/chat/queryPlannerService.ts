@@ -11,11 +11,11 @@ import {
 } from '@/services/dateService';
 
 /**
- * Enhanced query planning service with prioritized personal pronoun support and fixed date calculations
+ * Enhanced query planning service with prioritized personal pronoun support, theme detection, and entity filtering
  */
 export async function planQuery(message: string, threadId: string, userId: string) {
   try {
-    console.log("[Query Planner] Enhanced planning with prioritized personal pronoun detection for:", message);
+    console.log("[Query Planner] Enhanced planning with theme and entity detection for:", message);
     console.log(`[Query Planner] Current time: ${new Date().toISOString()}`);
     
     // For debugging timezone issues
@@ -123,10 +123,52 @@ export async function planQuery(message: string, threadId: string, userId: strin
     // Enhanced detection for personality queries requiring all entries
     const isPersonalityQuery = /trait|personality|character|behavior|habit|am i|do i|my personality|negative|positive|improve|rate|worst|best/.test(message.toLowerCase());
     
+    // NEW: Enhanced theme detection
+    const themePatterns = [
+      /\b(work|job|career|office|meeting|project|colleague|boss)\b/i,
+      /\b(family|relationship|friend|partner|spouse|love|marriage)\b/i,
+      /\b(health|exercise|fitness|workout|diet|medical|doctor)\b/i,
+      /\b(stress|anxiety|depression|worry|fear|panic|mental health)\b/i,
+      /\b(travel|vacation|trip|journey|adventure|explore)\b/i,
+      /\b(goal|achievement|success|failure|challenge|growth)\b/i,
+      /\b(money|finance|budget|expense|income|financial)\b/i,
+      /\b(hobby|interest|passion|creative|art|music|reading)\b/i
+    ];
+    
+    const detectedThemes = [];
+    for (const pattern of themePatterns) {
+      const match = message.match(pattern);
+      if (match) {
+        detectedThemes.push(match[0].toLowerCase());
+      }
+    }
+    
+    // NEW: Enhanced entity detection
+    const entityPatterns = [
+      // People patterns
+      /\b(mom|dad|mother|father|parent|brother|sister|friend|colleague|boss|manager|doctor|teacher)\b/i,
+      // Place patterns  
+      /\b(home|office|gym|restaurant|hospital|school|university|park|beach|store|mall)\b/i,
+      // Organization patterns
+      /\b(company|workplace|team|department|organization|clinic|hospital|school)\b/i,
+      // Event patterns
+      /\b(meeting|appointment|party|wedding|conference|interview|vacation|trip)\b/i
+    ];
+    
+    const detectedEntities = [];
+    for (const pattern of entityPatterns) {
+      const match = message.match(pattern);
+      if (match) {
+        detectedEntities.push(match[0].toLowerCase());
+      }
+    }
+    
     console.log("[Query Planner] Enhanced analysis:", {
       hasPersonalPronouns,
       hasExplicitTimeReference,
       isPersonalityQuery,
+      detectedThemes,
+      detectedEntities,
       originalQueryTypes: queryTypes
     });
     
@@ -220,7 +262,7 @@ export async function planQuery(message: string, threadId: string, userId: strin
       console.log("[Query Planner] Using intelligent sub-query strategy for causal analysis");
     }
     
-    // Return enhanced plan with prioritized personal pronoun support
+    // Return enhanced plan with prioritized personal pronoun support and entity filtering
     return {
       strategy,
       timeRange: queryTypes.timeRange,
@@ -240,10 +282,18 @@ export async function planQuery(message: string, threadId: string, userId: strin
                       queryTypes.isEmotionFocused || isPersonalityQuery ? 'medium' : 'standard',
       needsEmergencyFixes: queryTypes.needsEmergencyFixes,
       isPersonalityQuery: isPersonalityQuery,
-      hasPersonalPronouns, // NEW: Flag for personal pronoun detection
-      hasExplicitTimeReference, // NEW: Flag for explicit time references
+      hasPersonalPronouns, // Flag for personal pronoun detection
+      hasExplicitTimeReference, // Flag for explicit time references
+      detectedThemes, // NEW: Detected themes for enhanced filtering
+      detectedEntities, // NEW: Detected entities for enhanced filtering
       emergencyFixPriority: isPersonalityQuery ? 'high' : queryTypes.isEmotionFocused ? 'medium' : 'low',
-      optimizedForSpeed: true
+      optimizedForSpeed: true,
+      enhancedFiltering: {
+        themes: detectedThemes.length > 0 ? detectedThemes : null,
+        entities: detectedEntities.length > 0 ? detectedEntities : null,
+        supportsArrayOperations: true,
+        supportsJsonbOperations: true
+      }
     };
   } catch (error) {
     console.error("[Query Planner] Error planning query:", error);
@@ -259,7 +309,13 @@ export async function planQuery(message: string, threadId: string, userId: strin
       needsEmergencyFixes: true,
       emergencyFixPriority: 'high',
       optimizedForSpeed: true,
-      fallbackMode: true
+      fallbackMode: true,
+      enhancedFiltering: {
+        themes: null,
+        entities: null,
+        supportsArrayOperations: true,
+        supportsJsonbOperations: true
+      }
     };
   }
 }

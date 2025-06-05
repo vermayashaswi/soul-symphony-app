@@ -44,7 +44,7 @@ serve(async (req) => {
 
     const { queryPlan, originalQuery, userId } = await req.json();
 
-    console.log('[GPT Search Orchestrator] Executing plan with enhanced theme filtering:', queryPlan.strategy);
+    console.log('[GPT Search Orchestrator] Executing plan with enhanced theme and entity filtering:', queryPlan.strategy);
 
     // Execute search methods based on the intelligent plan
     const searchResults: SearchResult[] = [];
@@ -88,7 +88,8 @@ serve(async (req) => {
         totalResults: combinedResults.length,
         confidence: queryPlan.confidence,
         schemaAware: true,
-        enhancedThemeFiltering: true
+        enhancedThemeFiltering: true,
+        enhancedEntityFiltering: true
       }
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -130,6 +131,9 @@ async function executeSearchMethod(
     case 'theme_search':
       return await executeEnhancedThemeSearch(query, queryPlan, userId, supabase, openaiApiKey);
     
+    case 'entity_search':
+      return await executeEnhancedEntitySearch(query, queryPlan, userId, supabase, openaiApiKey);
+    
     case 'aggregation_search':
       return await executeAggregationSearch(query, queryPlan, userId, supabase);
     
@@ -168,6 +172,7 @@ async function executeVectorSearch(
     content: result.content || result["refined text"] || result["transcription text"] || "",
     emotions: result.emotions || {},
     master_themes: result.themes || result.master_themes || [],
+    entities: result.entities || {},
     created_at: result.created_at
   }));
 
@@ -176,7 +181,7 @@ async function executeVectorSearch(
     results: processedResults,
     confidence: 0.8,
     reasoning: 'Semantic similarity search based on query embedding with schema-aware content prioritization',
-    schemaUtilization: 'Used refined text, transcription text, emotions, and master_themes columns'
+    schemaUtilization: 'Used refined text, transcription text, emotions, master_themes, and entities columns'
   };
 }
 
@@ -216,6 +221,7 @@ async function executeEmotionSearch(
     content: result.content || result["refined text"] || result["transcription text"] || "",
     emotions: result.emotions || {},
     master_themes: result.themes || result.master_themes || [],
+    entities: result.entities || {},
     emotion_score: result.emotion_score,
     created_at: result.created_at
   }));
@@ -268,6 +274,7 @@ async function executeTemporalSearch(
     content: result.content || result["refined text"] || result["transcription text"] || "",
     emotions: result.emotions || {},
     master_themes: result.themes || result.master_themes || [],
+    entities: result.entities || {},
     created_at: result.created_at
   }));
 
@@ -322,6 +329,7 @@ async function executeEnhancedThemeSearch(
     content: result.content || result["refined text"] || result["transcription text"] || "",
     emotions: result.emotions || {},
     master_themes: result.themes || result.master_themes || [],
+    entities: result.entities || {},
     created_at: result.created_at,
     similarity: result.similarity,
     theme_matches: result.theme_matches || []
@@ -335,6 +343,65 @@ async function executeEnhancedThemeSearch(
     confidence: 0.9,
     reasoning: `Enhanced array-based theme search with PostgreSQL operators for themes: ${queryPlan.filters.themes.join(', ')}`,
     schemaUtilization: `Utilized master_themes array column with GIN index for optimized array operations and exact matching`
+  };
+}
+
+async function executeEnhancedEntitySearch(
+  query: string,
+  queryPlan: any,
+  userId: string,
+  supabase: any,
+  openaiApiKey: string
+): Promise<SearchResult> {
+  if (!queryPlan.filters?.entities || queryPlan.filters.entities.length === 0) {
+    return {
+      method: 'entity_search',
+      results: [],
+      confidence: 0,
+      reasoning: 'No specific entities identified',
+      schemaUtilization: 'Attempted to use entities JSONB but no target entities specified'
+    };
+  }
+
+  console.log('[Enhanced Entity Search] Using array-based filtering for entities:', queryPlan.filters.entities);
+
+  // Use the new enhanced array-based entity search function
+  const { data, error } = await supabase.rpc(
+    'match_journal_entries_by_entities',
+    {
+      entity_queries: queryPlan.filters.entities,
+      user_id_filter: userId,
+      match_threshold: 0.3,
+      match_count: 15,
+      start_date: queryPlan.filters?.timeRange?.startDate || null,
+      end_date: queryPlan.filters?.timeRange?.endDate || null
+    }
+  );
+
+  if (error) {
+    console.error('[Enhanced Entity Search] Error:', error);
+    throw error;
+  }
+
+  const processedResults = (data || []).map((result: any) => ({
+    ...result,
+    content: result.content || result["refined text"] || result["transcription text"] || "",
+    emotions: result.emotions || {},
+    master_themes: result.themes || result.master_themes || [],
+    entities: result.entities || {},
+    created_at: result.created_at,
+    similarity: result.similarity,
+    entity_matches: result.entity_matches || {}
+  }));
+
+  console.log(`[Enhanced Entity Search] Found ${processedResults.length} entries with array-based entity filtering`);
+
+  return {
+    method: 'entity_search',
+    results: processedResults,
+    confidence: 0.9,
+    reasoning: `Enhanced array-based entity search with PostgreSQL JSONB operators for entities: ${queryPlan.filters.entities.join(', ')}`,
+    schemaUtilization: `Utilized entities JSONB column with optimized JSONB operations for exact entity matching`
   };
 }
 
@@ -405,6 +472,11 @@ async function intelligentResultCombination(
     
     // Extra boost for theme matches in enhanced theme search
     if (item.theme_matches && item.theme_matches.length > 0) {
+      item.combinedConfidence *= 1.3;
+    }
+    
+    // NEW: Extra boost for entity matches in enhanced entity search
+    if (item.entity_matches && Object.keys(item.entity_matches).length > 0) {
       item.combinedConfidence *= 1.3;
     }
   });

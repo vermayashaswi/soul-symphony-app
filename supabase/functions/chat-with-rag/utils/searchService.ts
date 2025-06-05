@@ -1,5 +1,5 @@
 
-// Enhanced search service with optimized array-based theme filtering
+// Enhanced search service with optimized array-based theme filtering and entity filtering
 export async function searchEntriesWithVector(
   supabase: any,
   userId: string, 
@@ -181,6 +181,59 @@ export async function searchEntriesByThemes(
 }
 
 /**
+ * NEW: Enhanced entity search using array operations
+ */
+export async function searchEntriesByEntities(
+  supabase: any,
+  userId: string,
+  entities: string[],
+  timeRange?: { startDate?: string; endDate?: string }
+) {
+  try {
+    const userIdString = typeof userId === 'string' ? userId : String(userId);
+    console.log(`[chat-with-rag/searchService] Enhanced entity search for userId: ${userIdString}`);
+    console.log(`[chat-with-rag/searchService] Entities: ${entities.join(', ')}`);
+    
+    // Use the new enhanced array-based entity search function
+    const { data, error } = await supabase.rpc(
+      'match_journal_entries_by_entities',
+      {
+        entity_queries: entities,
+        user_id_filter: userIdString,
+        match_threshold: 0.3,
+        match_count: 15,
+        start_date: timeRange?.startDate || null,
+        end_date: timeRange?.endDate || null
+      }
+    );
+    
+    if (error) {
+      console.error(`[chat-with-rag/searchService] Error in enhanced entity search: ${error.message}`);
+      throw error;
+    }
+    
+    console.log(`[chat-with-rag/searchService] Enhanced entity search found ${data?.length || 0} entries`);
+    
+    // Log entity matching details
+    if (data && data.length > 0) {
+      const entityDetails = data.map((entry: any) => ({
+        id: entry.id,
+        date: new Date(entry.created_at).toLocaleDateString(),
+        entities: entry.entities,
+        entity_matches: entry.entity_matches,
+        similarity: entry.similarity
+      }));
+      console.log("[chat-with-rag/searchService] Enhanced entity search - Entity matching details:", entityDetails);
+    }
+    
+    return data || [];
+  } catch (error) {
+    console.error('[chat-with-rag/searchService] Error in enhanced entity search:', error);
+    throw error;
+  }
+}
+
+/**
  * Search entries by specific month name
  */
 export async function searchEntriesByMonth(
@@ -269,15 +322,16 @@ export async function searchEntriesByMonth(
 }
 
 /**
- * Enhanced search orchestrator with improved theme filtering
+ * Enhanced search orchestrator with improved theme and entity filtering
  */
 export async function searchWithStrategy(
   supabase: any,
   userId: string,
   queryEmbedding: number[],
-  strategy: 'vector' | 'hybrid' | 'comprehensive' | 'theme_focused',
+  strategy: 'vector' | 'hybrid' | 'comprehensive' | 'theme_focused' | 'entity_focused',
   timeRange?: { startDate?: string; endDate?: string },
   themes?: string[],
+  entities?: string[],
   maxEntries: number = 10
 ) {
   // Ensure userId is a string
@@ -288,8 +342,18 @@ export async function searchWithStrategy(
     let entries = [];
     
     switch (strategy) {
+      case 'entity_focused':
+        // NEW: Entity-focused searches
+        if (entities && entities.length > 0) {
+          entries = await searchEntriesByEntities(supabase, userIdString, entities, timeRange);
+        } else {
+          // Fallback to vector search if no entities specified
+          entries = await searchEntriesWithVector(supabase, userIdString, queryEmbedding);
+        }
+        break;
+        
       case 'theme_focused':
-        // New strategy for theme-focused searches
+        // Theme-focused searches
         if (themes && themes.length > 0) {
           entries = await searchEntriesByThemes(supabase, userIdString, themes, timeRange);
         } else {
