@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
-import { useUser } from '@supabase/auth-helpers-react';
-import { useRouter } from 'next/router';
+
+import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { ProfileSection } from '@/components/settings/ProfileSection';
@@ -8,9 +8,17 @@ import { SubscriptionManagement } from '@/components/settings/SubscriptionManage
 import { EmbeddingGenerationSection } from '@/components/settings/EmbeddingGenerationSection';
 
 const Settings = () => {
-  const user = useUser();
-  const router = useRouter();
+  const navigate = useNavigate();
   const [isLoading, setIsLoading] = useState(false);
+  const [user, setUser] = useState<any>(null);
+
+  useEffect(() => {
+    const getUser = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      setUser(user);
+    };
+    getUser();
+  }, []);
 
   const handleSignOut = async () => {
     setIsLoading(true);
@@ -19,7 +27,7 @@ const Settings = () => {
     if (error) {
       toast.error('Failed to sign out. Please try again.');
     } else {
-      router.push('/');
+      navigate('/');
     }
 
     setIsLoading(false);
