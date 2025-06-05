@@ -1,4 +1,3 @@
-
 /**
  * Entity search service for enhanced RAG pipeline with entity filtering
  */
@@ -6,12 +5,30 @@ export async function searchEntriesByEntities(
   supabase: any,
   userId: string,
   entities: string[],
-  timeRange?: { startDate?: string; endDate?: string }
+  timeRange?: { startDate?: string; endDate?: string },
+  optimizedParams?: any
 ) {
   try {
     const userIdString = typeof userId === 'string' ? userId : String(userId);
-    console.log(`[entitySearchService] Entity search for userId: ${userIdString}`);
+    console.log(`[entitySearchService] Optimized entity search for userId: ${userIdString}`);
     console.log(`[entitySearchService] Entities: ${entities.join(', ')}`);
+    
+    // PHASE 1 OPTIMIZATION: Check cache first
+    const cacheKey = EnhancedCacheManager.generateQueryHash(
+      `entities:${entities.join(',')}`,
+      userIdString,
+      { timeRange, type: 'entity_search' }
+    );
+    
+    const cachedResults = EnhancedCacheManager.getCachedSearchResults(cacheKey);
+    if (cachedResults) {
+      console.log(`[entitySearchService] Cache hit for entity search`);
+      return cachedResults;
+    }
+    
+    // Apply optimized parameters
+    const maxResults = optimizedParams?.maxEntries || 15;
+    const matchThreshold = optimizedParams?.skipEntitySearch ? 0.5 : 0.3;
     
     // Use the new enhanced array-based entity search function
     const { data, error } = await supabase.rpc(
@@ -19,8 +36,8 @@ export async function searchEntriesByEntities(
       {
         entity_queries: entities,
         user_id_filter: userIdString,
-        match_threshold: 0.3,
-        match_count: 15,
+        match_threshold: matchThreshold,
+        match_count: maxResults,
         start_date: timeRange?.startDate || null,
         end_date: timeRange?.endDate || null
       }
@@ -31,21 +48,25 @@ export async function searchEntriesByEntities(
       throw error;
     }
     
-    console.log(`[entitySearchService] Entity search found ${data?.length || 0} entries`);
+    const results = data || [];
+    console.log(`[entitySearchService] Entity search found ${results.length} entries`);
+    
+    // Cache the results
+    EnhancedCacheManager.setCachedSearchResults(cacheKey, results);
     
     // Log entity matching details
-    if (data && data.length > 0) {
-      const entityDetails = data.map((entry: any) => ({
+    if (results.length > 0) {
+      const entityDetails = results.slice(0, 3).map((entry: any) => ({
         id: entry.id,
         date: new Date(entry.created_at).toLocaleDateString(),
         entities: entry.entities,
         entity_matches: entry.entity_matches,
         similarity: entry.similarity
       }));
-      console.log("[entitySearchService] Entity search - Matching details:", entityDetails);
+      console.log("[entitySearchService] Entity search - Sample matching details:", entityDetails);
     }
     
-    return data || [];
+    return results;
   } catch (error) {
     console.error('[entitySearchService] Error in entity search:', error);
     throw error;
@@ -60,13 +81,30 @@ export async function searchEntriesByEntityEmotion(
   userId: string,
   entities: string[],
   emotions: string[],
-  timeRange?: { startDate?: string; endDate?: string }
+  timeRange?: { startDate?: string; endDate?: string },
+  optimizedParams?: any
 ) {
   try {
     const userIdString = typeof userId === 'string' ? userId : String(userId);
-    console.log(`[entitySearchService] Entity-emotion relationship search for userId: ${userIdString}`);
+    console.log(`[entitySearchService] Optimized entity-emotion search for userId: ${userIdString}`);
     console.log(`[entitySearchService] Entities: ${entities.join(', ')}`);
     console.log(`[entitySearchService] Emotions: ${emotions.join(', ')}`);
+    
+    // Check cache first
+    const cacheKey = EnhancedCacheManager.generateQueryHash(
+      `entity_emotion:${entities.join(',')}:${emotions.join(',')}`,
+      userIdString,
+      { timeRange, type: 'entity_emotion_search' }
+    );
+    
+    const cachedResults = EnhancedCacheManager.getCachedSearchResults(cacheKey);
+    if (cachedResults) {
+      console.log(`[entitySearchService] Cache hit for entity-emotion search`);
+      return cachedResults;
+    }
+    
+    const maxResults = optimizedParams?.maxEntries || 15;
+    const matchThreshold = optimizedParams?.skipEntitySearch ? 0.5 : 0.3;
     
     const { data, error } = await supabase.rpc(
       'match_journal_entries_by_entity_emotion',
@@ -74,8 +112,8 @@ export async function searchEntriesByEntityEmotion(
         entity_queries: entities,
         emotion_queries: emotions,
         user_id_filter: userIdString,
-        match_threshold: 0.3,
-        match_count: 15,
+        match_threshold: matchThreshold,
+        match_count: maxResults,
         start_date: timeRange?.startDate || null,
         end_date: timeRange?.endDate || null
       }
@@ -86,11 +124,15 @@ export async function searchEntriesByEntityEmotion(
       throw error;
     }
     
-    console.log(`[entitySearchService] Entity-emotion search found ${data?.length || 0} entries`);
+    const results = data || [];
+    console.log(`[entitySearchService] Entity-emotion search found ${results.length} entries`);
+    
+    // Cache the results
+    EnhancedCacheManager.setCachedSearchResults(cacheKey, results);
     
     // Log relationship analysis details
-    if (data && data.length > 0) {
-      const relationshipDetails = data.map((entry: any) => ({
+    if (results.length > 0) {
+      const relationshipDetails = results.slice(0, 3).map((entry: any) => ({
         id: entry.id,
         date: new Date(entry.created_at).toLocaleDateString(),
         entity_emotion_matches: entry.entity_emotion_matches,
@@ -100,7 +142,7 @@ export async function searchEntriesByEntityEmotion(
       console.log("[entitySearchService] Entity-emotion relationships:", relationshipDetails);
     }
     
-    return data || [];
+    return results;
   } catch (error) {
     console.error('[entitySearchService] Error in entity-emotion search:', error);
     throw error;
@@ -312,40 +354,61 @@ export async function searchWithEntityStrategy(
   entities: string[],
   emotions?: string[],
   timeRange?: { startDate?: string; endDate?: string },
-  maxEntries: number = 10
+  maxEntries: number = 10,
+  optimizedParams?: any
 ) {
   const userIdString = typeof userId === 'string' ? userId : String(userId);
-  console.log(`[entitySearchService] Using enhanced entity search strategy: ${strategy} for user: ${userIdString}`);
+  console.log(`[entitySearchService] Using optimized entity search strategy: ${strategy} for user: ${userIdString}`);
   
   try {
     let entries = [];
     
     switch (strategy) {
       case 'entity_emotion_analysis':
-        // NEW: Entity-emotion relationship analysis
         if (emotions && emotions.length > 0) {
-          entries = await searchEntriesByEntityEmotion(supabase, userIdString, entities, emotions, timeRange);
+          entries = await searchEntriesByEntityEmotion(
+            supabase, 
+            userIdString, 
+            entities, 
+            emotions, 
+            timeRange,
+            optimizedParams
+          );
         } else {
-          // Fallback to regular entity search
-          entries = await searchEntriesByEntities(supabase, userIdString, entities, timeRange);
+          entries = await searchEntriesByEntities(
+            supabase, 
+            userIdString, 
+            entities, 
+            timeRange,
+            optimizedParams
+          );
         }
         break;
         
       case 'entity_focused':
-        // Pure entity-based search
-        entries = await searchEntriesByEntities(supabase, userIdString, entities, timeRange);
+        entries = await searchEntriesByEntities(
+          supabase, 
+          userIdString, 
+          entities, 
+          timeRange,
+          optimizedParams
+        );
         break;
         
       case 'entity_comprehensive':
-        // Combine entity search with semantic search for broader coverage
-        const entityResults = await searchEntriesByEntities(supabase, userIdString, entities, timeRange);
+        const entityResults = await searchEntriesByEntities(
+          supabase, 
+          userIdString, 
+          entities, 
+          timeRange,
+          optimizedParams
+        );
         
-        // If we don't get enough results from entity search, supplement with semantic search
-        if (entityResults.length < maxEntries) {
+        // Only supplement with semantic search if needed and not skipped for performance
+        if (entityResults.length < maxEntries && !optimizedParams?.useVectorOnly) {
           const { searchEntriesWithVector } = await import('./searchService.ts');
           const semanticResults = await searchEntriesWithVector(supabase, userIdString, queryEmbedding);
           
-          // Combine and deduplicate results
           const combinedResults = [...entityResults];
           const existingIds = new Set(entityResults.map((entry: any) => entry.id));
           
@@ -362,18 +425,24 @@ export async function searchWithEntityStrategy(
         break;
         
       default:
-        entries = await searchEntriesByEntities(supabase, userIdString, entities, timeRange);
+        entries = await searchEntriesByEntities(
+          supabase, 
+          userIdString, 
+          entities, 
+          timeRange,
+          optimizedParams
+        );
         break;
     }
     
     // Apply max entries limit
     const limitedEntries = entries ? entries.slice(0, maxEntries) : [];
-    console.log(`[entitySearchService] Retrieved ${limitedEntries.length} entries using ${strategy} strategy`);
+    console.log(`[entitySearchService] Retrieved ${limitedEntries.length} entries using optimized ${strategy} strategy`);
     
     return limitedEntries;
     
   } catch (error) {
-    console.error(`[entitySearchService] Error in ${strategy} search:`, error);
+    console.error(`[entitySearchService] Error in optimized ${strategy} search:`, error);
     throw error;
   }
 }

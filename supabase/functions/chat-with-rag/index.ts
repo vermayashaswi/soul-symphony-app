@@ -1,6 +1,8 @@
+
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.7.1';
+import { EnhancedCacheManager } from './utils/enhancedCacheManager.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -35,7 +37,34 @@ serve(async (req) => {
       threadMetadata = {}
     } = await req.json();
 
-    console.log(`[Chat-with-RAG] Processing with GPT Intelligence: "${message}"`);
+    console.log(`[Chat-with-RAG] Processing with enhanced performance optimizations: "${message}"`);
+
+    // PHASE 1 OPTIMIZATION: Check response cache first
+    const cacheKey = EnhancedCacheManager.generateQueryHash(
+      message,
+      userId,
+      {
+        queryPlan: queryPlan.strategy || 'standard',
+        useAllEntries,
+        hasPersonalPronouns,
+        timeRange: queryPlan.timeRange
+      }
+    );
+
+    const cachedResponse = EnhancedCacheManager.getCachedResponse(cacheKey);
+    if (cachedResponse) {
+      console.log('[Chat-with-RAG] Cache hit - returning cached response');
+      return new Response(JSON.stringify({
+        response: cachedResponse,
+        analysis: {
+          queryType: 'cached_response',
+          cacheHit: true,
+          timestamp: new Date().toISOString()
+        }
+      }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
 
     // Get user profile for intelligent processing
     const { data: userProfile } = await supabaseClient
@@ -44,13 +73,12 @@ serve(async (req) => {
       .eq('id', userId)
       .single();
 
-    // Check if this should use the new intelligent orchestration
-    const shouldUseIntelligentOrchestration = shouldUseGPTOrchestration(message, conversationContext);
+    // Check complexity and route accordingly
+    const shouldUseIntelligentOrchestration = shouldUseGPTOrchestration(message, conversationContext, queryPlan);
 
     if (shouldUseIntelligentOrchestration) {
       console.log('[Chat-with-RAG] Routing to GPT Master Orchestrator');
       
-      // Route to the new intelligent orchestration system
       const { data: orchestratorResponse, error: orchestratorError } = await supabaseClient.functions.invoke(
         'gpt-master-orchestrator',
         {
@@ -59,18 +87,22 @@ serve(async (req) => {
             userId,
             threadId,
             conversationContext,
-            userProfile: userProfile || {}
+            userProfile: userProfile || {},
+            queryPlan,
+            optimizedParams: queryPlan.optimizedParams
           }
         }
       );
 
       if (orchestratorError) {
         console.error('[Chat-with-RAG] Orchestrator error:', orchestratorError);
-        // Fall back to legacy processing
         return await legacyProcessing(req, supabaseClient);
       }
 
-      if (orchestratorResponse) {
+      if (orchestratorResponse && orchestratorResponse.response) {
+        // Cache the response
+        EnhancedCacheManager.setCachedResponse(cacheKey, orchestratorResponse.response);
+        
         console.log('[Chat-with-RAG] GPT orchestration successful');
         return new Response(JSON.stringify(orchestratorResponse), {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -80,7 +112,17 @@ serve(async (req) => {
 
     // For simple queries or fallback, use enhanced legacy processing
     console.log('[Chat-with-RAG] Using enhanced legacy processing');
-    return await legacyProcessing(req, supabaseClient);
+    const response = await legacyProcessing(req, supabaseClient);
+    
+    // Cache successful responses
+    const responseData = await response.json();
+    if (responseData.response && !responseData.error) {
+      EnhancedCacheManager.setCachedResponse(cacheKey, responseData.response);
+    }
+    
+    return new Response(JSON.stringify(responseData), {
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    });
 
   } catch (error) {
     console.error('Error in chat-with-rag function:', error);
@@ -94,10 +136,16 @@ serve(async (req) => {
   }
 });
 
-function shouldUseGPTOrchestration(message: string, conversationContext: any[]): boolean {
+function shouldUseGPTOrchestration(message: string, conversationContext: any[], queryPlan: any = {}): boolean {
   const lowerMessage = message.toLowerCase();
   
-  // Use GPT orchestration for complex queries
+  // Use complexity analysis if available
+  if (queryPlan.complexityAnalysis) {
+    return queryPlan.complexityAnalysis.complexityLevel === 'complex' || 
+           queryPlan.complexityAnalysis.complexityLevel === 'very_complex';
+  }
+  
+  // Fallback to pattern-based detection
   const complexPatterns = [
     /\b(analyze|analysis|pattern|trend|insight)\b/i,
     /\bhow (am|do) i\b/i,
@@ -109,12 +157,10 @@ function shouldUseGPTOrchestration(message: string, conversationContext: any[]):
     /\b(over time|lately|recently|pattern)\b/i
   ];
 
-  // Use for personal insight queries
   const personalPatterns = [
     /\b(i|me|my|myself)\b/i
   ];
 
-  // Use for emotional queries
   const emotionalPatterns = [
     /\b(feel|feeling|felt|emotion|mood|anxiety|depression|stress|happy|sad|angry)\b/i
   ];
@@ -123,12 +169,10 @@ function shouldUseGPTOrchestration(message: string, conversationContext: any[]):
   const isPersonal = personalPatterns.some(pattern => pattern.test(lowerMessage));
   const isEmotional = emotionalPatterns.some(pattern => pattern.test(lowerMessage));
   
-  // Use GPT orchestration for complex, personal, or emotional queries
   return isComplex || (isPersonal && isEmotional) || message.length > 50;
 }
 
 async function legacyProcessing(req: Request, supabaseClient: any) {
-  // Keep existing legacy processing logic as fallback
   const { processSubQueryWithEmotionSupport } = await import('./utils/enhancedSubQueryProcessor.ts');
   
   const body = await req.json();
@@ -147,18 +191,17 @@ async function legacyProcessing(req: Request, supabaseClient: any) {
   // Handle direct date queries
   if (queryPlan.isDirectDateQuery) {
     console.log('[Chat-with-RAG] Handling direct date query');
-    return new Response(JSON.stringify({
+    return {
       response: queryPlan.dateResponse,
       analysis: {
         queryType: 'direct_date',
-        timeRange: queryPlan.timeRange
+        timeRange: queryPlan.timeRange,
+        cached: false
       }
-    }), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    });
+    };
   }
 
-  // Determine date range for analysis
+  // Determine date range for analysis with optimizations
   let dateRange = null;
   if (queryPlan.timeRange && !body.useAllEntries) {
     dateRange = {
@@ -167,7 +210,7 @@ async function legacyProcessing(req: Request, supabaseClient: any) {
     };
   }
 
-  // Process the query with enhanced validation
+  // Process with enhanced optimizations
   const subQueryResult = await processSubQueryWithEmotionSupport(
     message,
     supabaseClient,
@@ -175,34 +218,33 @@ async function legacyProcessing(req: Request, supabaseClient: any) {
     dateRange,
     openaiApiKey,
     conversationContext,
-    message
+    message,
+    queryPlan.optimizedParams // Pass optimization parameters
   );
 
   if (subQueryResult.shouldStopProcessing && subQueryResult.noEntriesResponse) {
-    return new Response(JSON.stringify({
+    return {
       response: subQueryResult.noEntriesResponse,
       analysis: {
         queryType: 'temporal_no_entries',
         dateRange: dateRange,
         reasoning: subQueryResult.reasoning,
-        totalResults: 0
+        totalResults: 0,
+        cached: false
       }
-    }), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    });
+    };
   }
 
   if (subQueryResult.totalResults === 0) {
-    return new Response(JSON.stringify({
+    return {
       response: "I don't have enough information in your journal entries to answer that question. Could you provide more details or try asking about something you've written about recently?",
       analysis: {
         queryType: 'insufficient_data',
         reasoning: subQueryResult.reasoning,
-        totalResults: 0
+        totalResults: 0,
+        cached: false
       }
-    }), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    });
+    };
   }
 
   // Generate AI response using the found context
@@ -248,18 +290,18 @@ Guidelines:
   const aiData = await aiResponse.json();
   const response = aiData.choices[0].message.content;
 
-  return new Response(JSON.stringify({
+  return {
     response,
     analysis: {
-      queryType: 'legacy_processing',
+      queryType: 'legacy_processing_optimized',
       totalResults: subQueryResult.totalResults,
       emotionResults: subQueryResult.emotionResults.length,
       vectorResults: subQueryResult.vectorResults.length,
       reasoning: subQueryResult.reasoning,
-      dateRange: dateRange
+      dateRange: dateRange,
+      cached: false,
+      optimizations: queryPlan.optimizedParams || {}
     },
     references: subQueryResult.vectorResults.slice(0, 3)
-  }), {
-    headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-  });
+  };
 }

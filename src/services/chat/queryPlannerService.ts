@@ -1,5 +1,6 @@
 
 import { analyzeQueryTypes } from '@/utils/chat/queryAnalyzer';
+import { analyzeQueryComplexity, getOptimizedSearchParams } from '@/services/chat/queryComplexityAnalyzer';
 import { supabase } from '@/integrations/supabase/client';
 import { 
   isDirectDateQuery, 
@@ -11,17 +12,28 @@ import {
 } from '@/services/dateService';
 
 /**
- * Enhanced query planning service with entity-emotion relationship analysis
+ * Enhanced query planning service with performance optimizations
  */
 export async function planQuery(message: string, threadId: string, userId: string) {
   try {
-    console.log("[Query Planner] Enhanced planning with entity-emotion relationship detection for:", message);
+    console.log("[Query Planner] Enhanced planning with performance optimizations for:", message);
     console.log(`[Query Planner] Current time: ${new Date().toISOString()}`);
     
     // For debugging timezone issues
     if (message.toLowerCase().includes('debug timezone')) {
       debugTimezoneInfo();
     }
+    
+    // PHASE 1 OPTIMIZATION: Query Complexity Assessment
+    const complexityAnalysis = analyzeQueryComplexity(message);
+    const optimizedParams = getOptimizedSearchParams(complexityAnalysis);
+    
+    console.log("[Query Planner] Complexity analysis:", {
+      level: complexityAnalysis.complexityLevel,
+      score: complexityAnalysis.complexityScore,
+      strategy: complexityAnalysis.recommendedStrategy,
+      optimizedParams
+    });
     
     // Get client's device time information for accurate date calculations
     const clientInfo: ClientTimeInfo = getClientTimeInfo();
@@ -31,7 +43,7 @@ export async function planQuery(message: string, threadId: string, userId: strin
     let userTimezone = clientInfo.timezoneName;
     try {
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 5000);
+      const timeoutId = setTimeout(() => controller.abort(), 3000); // Reduced from 5000ms
       
       const { data: profileData } = await supabase
         .from('profiles')
@@ -92,14 +104,16 @@ export async function planQuery(message: string, threadId: string, userId: strin
         clientTimezone: clientInfo.timezoneName,
         clientTimezoneOffset: clientInfo.timezoneOffset,
         userTimezone: userTimezone,
-        dateResponse: dateResponse
+        dateResponse: dateResponse,
+        complexityAnalysis,
+        optimizedParams
       };
     }
     
     // Analyze the query types for intelligent sub-query planning
     const queryTypes = analyzeQueryTypes(message);
     
-    // ENHANCED: Check for personal pronouns for all-entries analysis - HIGHEST PRIORITY
+    // Enhanced detection logic with complexity awareness
     const personalPronounPatterns = [
       /\b(i|me|my|mine|myself)\b/i,
       /\bam i\b/i,
@@ -123,39 +137,15 @@ export async function planQuery(message: string, threadId: string, userId: strin
     // Enhanced detection for personality queries requiring all entries
     const isPersonalityQuery = /trait|personality|character|behavior|habit|am i|do i|my personality|negative|positive|improve|rate|worst|best/.test(message.toLowerCase());
     
-    // NEW: Enhanced theme detection
-    const themePatterns = [
-      /\b(work|job|career|office|meeting|project|colleague|boss)\b/i,
-      /\b(family|relationship|friend|partner|spouse|love|marriage)\b/i,
-      /\b(health|exercise|fitness|workout|diet|medical|doctor)\b/i,
-      /\b(stress|anxiety|depression|worry|fear|panic|mental health)\b/i,
-      /\b(travel|vacation|trip|journey|adventure|explore)\b/i,
-      /\b(goal|achievement|success|failure|challenge|growth)\b/i,
-      /\b(money|finance|budget|expense|income|financial)\b/i,
-      /\b(hobby|interest|passion|creative|art|music|reading)\b/i
-    ];
-    
-    const detectedThemes = [];
-    for (const pattern of themePatterns) {
-      const match = message.match(pattern);
-      if (match) {
-        detectedThemes.push(match[0].toLowerCase());
-      }
-    }
-    
-    // NEW: Enhanced entity detection with relationship patterns
+    // Entity detection from complexity analysis
+    const detectedEntities = [];
     const entityPatterns = [
-      // People patterns
       /\b(mom|dad|mother|father|parent|brother|sister|friend|colleague|boss|manager|doctor|teacher|partner|spouse|wife|husband)\b/i,
-      // Place patterns  
       /\b(home|office|gym|restaurant|hospital|school|university|park|beach|store|mall|workplace|clinic)\b/i,
-      // Organization patterns
       /\b(company|workplace|team|department|organization|clinic|hospital|school)\b/i,
-      // Event patterns
       /\b(meeting|appointment|party|wedding|conference|interview|vacation|trip|date|presentation)\b/i
     ];
     
-    const detectedEntities = [];
     for (const pattern of entityPatterns) {
       const match = message.match(pattern);
       if (match) {
@@ -163,7 +153,8 @@ export async function planQuery(message: string, threadId: string, userId: strin
       }
     }
     
-    // NEW: Enhanced emotion detection for entity-emotion relationships
+    // Emotion detection from complexity analysis
+    const detectedEmotions = [];
     const emotionPatterns = [
       /\b(happy|happiness|joy|excited|elated|cheerful|delighted|joyful)\b/i,
       /\b(sad|sadness|depressed|down|melancholy|grief|sorrow|upset)\b/i,
@@ -177,7 +168,6 @@ export async function planQuery(message: string, threadId: string, userId: strin
       /\b(calm|peaceful|relaxed|serene|tranquil|content)\b/i
     ];
     
-    const detectedEmotions = [];
     for (const pattern of emotionPatterns) {
       const match = message.match(pattern);
       if (match) {
@@ -185,7 +175,7 @@ export async function planQuery(message: string, threadId: string, userId: strin
       }
     }
     
-    // NEW: Detect entity-emotion relationship queries
+    // Entity-emotion relationship detection
     const relationshipPatterns = [
       /\b(feel about|feelings toward|emotional connection|relationship with|how.*makes me feel)\b/i,
       /\b(when.*with|around.*feel|being with.*makes)\b/i,
@@ -198,63 +188,42 @@ export async function planQuery(message: string, threadId: string, userId: strin
     ) || 
     relationshipPatterns.some(pattern => pattern.test(message.toLowerCase()));
     
-    console.log("[Query Planner] Enhanced analysis with entity-emotion detection:", {
+    console.log("[Query Planner] Enhanced analysis:", {
       hasPersonalPronouns,
       hasExplicitTimeReference,
       isPersonalityQuery,
-      detectedThemes,
       detectedEntities,
       detectedEmotions,
       isEntityEmotionQuery,
-      originalQueryTypes: queryTypes
+      complexityLevel: complexityAnalysis.complexityLevel,
+      recommendedStrategy: complexityAnalysis.recommendedStrategy
     });
     
-    // CRITICAL: Override time range logic for personal pronoun queries - HIGHEST PRIORITY
+    // Strategy selection based on complexity analysis
     let useAllEntries = false;
     let usePersonalContext = true;
     
     if (hasPersonalPronouns) {
-      // If personal pronouns detected without explicit time reference, use all entries
       useAllEntries = !hasExplicitTimeReference;
-      console.log(`[Query Planner] PERSONAL PRONOUNS DETECTED - Use all entries: ${useAllEntries} (explicit time ref: ${hasExplicitTimeReference})`);
+      console.log(`[Query Planner] PERSONAL PRONOUNS DETECTED - Use all entries: ${useAllEntries}`);
     } else if (isPersonalityQuery) {
-      // Personality queries should also use all entries
       useAllEntries = true;
       console.log("[Query Planner] Personality query detected - using all entries");
     }
     
-    // Add properties needed for intelligent planning
-    queryTypes.needsDataAggregation = queryTypes.isQuantitative || 
-                                     queryTypes.isStatisticalQuery || 
-                                     message.toLowerCase().includes('how many times');
-                                     
-    queryTypes.needsMoreContext = message.length < 10 || 
-                               message.split(' ').length < 3 || 
-                               /^(tell me|show)( more| about)?/i.test(message);
-    
-    queryTypes.needsEmergencyFixes = isPersonalityQuery || queryTypes.isEmotionFocused;
-    
-    // Check if this is a time pattern analysis query
-    const isTimePatternQuery = queryTypes.isTemporalQuery && 
-                             (message.toLowerCase().includes('pattern') || 
-                              message.toLowerCase().includes('when do i') || 
-                              message.toLowerCase().includes('what time') || 
-                              message.toLowerCase().includes('how often') || 
-                              message.toLowerCase().includes('frequency'));
-    
-    // Enhance query with thread context only for complex queries
+    // Enhanced query context (only for complex queries to avoid overhead)
     let enhancedQuery = message;
-    if (queryTypes.needsMoreContext || isPersonalityQuery) {
+    if (complexityAnalysis.complexityLevel === 'complex' || complexityAnalysis.complexityLevel === 'very_complex') {
       try {
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 3000);
+        const timeoutId = setTimeout(() => controller.abort(), 2000); // Reduced timeout
         
         const { data: messages, error } = await supabase
           .from('chat_messages')
           .select('content, sender')
           .eq('thread_id', threadId)
           .order('created_at', { ascending: false })
-          .limit(3)
+          .limit(2) // Reduced from 3
           .abortSignal(controller.signal);
 
         clearTimeout(timeoutId);
@@ -263,7 +232,7 @@ export async function planQuery(message: string, threadId: string, userId: strin
           const context = messages
             .filter(msg => msg.sender === 'user')
             .map(msg => msg.content)
-            .slice(0, 2)
+            .slice(0, 1) // Reduced context
             .join('\n');
 
           if (context.length > 10) {
@@ -276,40 +245,21 @@ export async function planQuery(message: string, threadId: string, userId: strin
       }
     }
     
-    // Define intelligent sub-query strategy
-    let strategy = 'intelligent_sub_query';
+    // Strategy determination with complexity awareness
+    let strategy = complexityAnalysis.recommendedStrategy;
     
-    if (queryTypes.needsMoreContext) {
-      strategy = 'request_clarification';
-    } 
-    else if (isEntityEmotionQuery) {
+    if (isEntityEmotionQuery) {
       strategy = 'intelligent_sub_query';
-      console.log("[Query Planner] Using intelligent sub-query strategy for entity-emotion relationship analysis");
-    }
-    else if (isTimePatternQuery) {
-      strategy = 'intelligent_sub_query';
-      console.log("[Query Planner] Using intelligent sub-query strategy for time pattern analysis");
-    }
-    else if (queryTypes.needsDataAggregation) {
-      strategy = 'intelligent_sub_query';
-      console.log("[Query Planner] Using intelligent sub-query strategy for data aggregation");
-    }
-    else if (queryTypes.isEmotionFocused || isPersonalityQuery) {
-      strategy = 'intelligent_sub_query';
-      console.log("[Query Planner] Using intelligent sub-query strategy for personality/emotion analysis");
-    }
-    else if (queryTypes.isWhyQuestion) {
-      strategy = 'intelligent_sub_query';
-      console.log("[Query Planner] Using intelligent sub-query strategy for causal analysis");
+      console.log("[Query Planner] Using intelligent sub-query strategy for entity-emotion analysis");
     }
     
-    // Return enhanced plan with prioritized personal pronoun support and entity filtering
+    // Return enhanced plan with performance optimizations
     return {
       strategy,
       timeRange: queryTypes.timeRange,
       useHistoricalData: false,
       usePersonalContext,
-      useAllEntries, // CRITICAL: This will override time constraints when personal pronouns are detected
+      useAllEntries,
       filterByEmotion: queryTypes.emotion || null,
       enhancedQuery,
       originalQuery: message,
@@ -319,26 +269,24 @@ export async function planQuery(message: string, threadId: string, userId: strin
       clientTimezoneOffset: clientInfo.timezoneOffset,
       userTimezone: userTimezone,
       requiresIntelligentPlanning: true,
-      queryComplexity: queryTypes.needsDataAggregation ? 'high' : 
-                      queryTypes.isEmotionFocused || isPersonalityQuery ? 'medium' : 'standard',
-      needsEmergencyFixes: queryTypes.needsEmergencyFixes,
-      isPersonalityQuery: isPersonalityQuery,
-      hasPersonalPronouns, // Flag for personal pronoun detection
-      hasExplicitTimeReference, // Flag for explicit time references
-      detectedThemes, // Detected themes for enhanced filtering
-      detectedEntities, // Detected entities for enhanced filtering
-      detectedEmotions, // NEW: Detected emotions for relationship analysis
-      isEntityEmotionQuery, // NEW: Flag for entity-emotion relationship queries
+      queryComplexity: complexityAnalysis.complexityLevel,
+      complexityAnalysis,
+      optimizedParams,
+      hasPersonalPronouns,
+      hasExplicitTimeReference,
+      detectedEntities,
+      detectedEmotions,
+      isEntityEmotionQuery,
       emergencyFixPriority: isPersonalityQuery ? 'high' : queryTypes.isEmotionFocused ? 'medium' : 'low',
       optimizedForSpeed: true,
       enhancedFiltering: {
-        themes: detectedThemes.length > 0 ? detectedThemes : null,
+        themes: null,
         entities: detectedEntities.length > 0 ? detectedEntities : null,
-        emotions: detectedEmotions.length > 0 ? detectedEmotions : null, // NEW
-        entityEmotionAnalysis: isEntityEmotionQuery, // NEW
+        emotions: detectedEmotions.length > 0 ? detectedEmotions : null,
+        entityEmotionAnalysis: isEntityEmotionQuery,
         supportsArrayOperations: true,
         supportsJsonbOperations: true,
-        supportsEntityEmotionRelationships: true // NEW
+        supportsEntityEmotionRelationships: true
       }
     };
   } catch (error) {
@@ -347,23 +295,24 @@ export async function planQuery(message: string, threadId: string, userId: strin
       strategy: 'intelligent_sub_query',
       originalQuery: message,
       enhancedQuery: message,
-      useAllEntries: true, // Default to all entries on error for personal questions
+      useAllEntries: true,
       usePersonalContext: true,
       errorState: true,
       timestamp: new Date().toISOString(),
       requiresIntelligentPlanning: true,
-      needsEmergencyFixes: true,
       emergencyFixPriority: 'high',
       optimizedForSpeed: true,
       fallbackMode: true,
+      complexityAnalysis: { complexityLevel: 'moderate', recommendedStrategy: 'standard' },
+      optimizedParams: { maxEntries: 10, searchTimeout: 5000 },
       enhancedFiltering: {
         themes: null,
         entities: null,
-        emotions: null, // NEW
-        entityEmotionAnalysis: false, // NEW
+        emotions: null,
+        entityEmotionAnalysis: false,
         supportsArrayOperations: true,
         supportsJsonbOperations: true,
-        supportsEntityEmotionRelationships: true // NEW
+        supportsEntityEmotionRelationships: true
       }
     };
   }
