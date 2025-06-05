@@ -1,102 +1,100 @@
 
-import React, { Suspense, lazy } from 'react';
-import { Apple, Play, Shield, Check } from 'lucide-react';
+import React from 'react';
 import { Button } from '@/components/ui/button';
+import { Mic, Brain, TrendingUp, Shield } from 'lucide-react';
 import SouloLogo from '@/components/SouloLogo';
-import { motion } from 'framer-motion';
-import { useIsMobile } from '@/hooks/use-mobile';
-import { PhoneVoiceAnimation } from '@/components/website/PhoneVoiceAnimation';
-import { TranslatableText } from '@/components/translation/TranslatableText';
-import { AspectRatio } from '@/components/ui/aspect-ratio';
 
-// Lazy load the 3D background to improve initial load performance
-const ThreeDBackground = lazy(() => import('@/components/website/3DBackground'));
-
-interface HeroSectionProps {
-  openAppStore: () => void;
-  openPlayStore: () => void;
-}
-
-const HeroSection: React.FC<HeroSectionProps> = ({ openAppStore, openPlayStore }) => {
-  const isMobile = useIsMobile();
-  const urlParams = new URLSearchParams(window.location.search);
-  const mobileDemo = urlParams.get('mobileDemo') === 'true';
-  const shouldRenderMobile = isMobile.isMobile || mobileDemo;
-
+const HeroSection = () => {
   return (
-    <div className="relative w-full bg-gradient-to-br from-blue-50 to-purple-50 pt-24 md:pt-32 pb-16 md:pb-24 overflow-hidden">
-      {/* Background image */}
-      <div 
-        className="absolute inset-0 z-0 bg-cover bg-center opacity-20"
-        style={{ backgroundImage: "url('/lovable-uploads/32abc730-009c-4901-912c-a16e7c2c1ec6.png')" }}
-      ></div>
-      
-      {/* 3D Background animation - Removed the bubble animation by commenting it out */}
-      {/* <Suspense fallback={null}>
-        <div className="absolute inset-0 z-0 opacity-30">
-          <ThreeDBackground />
+    <section className="relative min-h-screen flex items-center justify-center px-4 pt-20 pb-16">
+      {/* Background Elements */}
+      <div className="absolute inset-0 overflow-hidden">
+        <div className="absolute -top-40 -right-40 w-80 h-80 bg-gradient-to-br from-blue-400/20 to-purple-600/20 rounded-full blur-3xl"></div>
+        <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-gradient-to-tr from-purple-400/20 to-pink-600/20 rounded-full blur-3xl"></div>
+      </div>
+
+      <div className="relative max-w-6xl mx-auto text-center">
+        {/* Logo and Tagline */}
+        <div className="flex flex-col items-center mb-8">
+          <SouloLogo size="large" useColorTheme={true} />
+          <h1 className="text-5xl md:text-7xl font-bold bg-gradient-to-r from-blue-600 via-purple-600 to-pink-600 bg-clip-text text-transparent mb-6">
+            Your Voice, Your Journey
+          </h1>
+          <p className="text-xl md:text-2xl text-gray-600 mb-8 max-w-3xl">
+            Express your thoughts through voice, reflect on your emotions with AI insights, and grow through personalized guidance.
+          </p>
         </div>
-      </Suspense> */}
-      
-      <div className="container mx-auto px-4 relative z-10">
-        <div className="flex flex-col lg:flex-row items-center gap-8 lg:gap-12">
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.8 }}
-            className="w-full lg:w-1/2 text-center lg:text-left"
-          >
-            <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold mb-6 text-primary">
-              <TranslatableText text="Express. Reflect. Grow." />
-            </h1>
-            <p className="text-xl md:text-2xl text-gray-700 mb-8 max-w-2xl mx-auto lg:mx-0">
-              <TranslatableText text="Journaling should be as simple as talking. Use voice and leave the rest to us." />
+
+        {/* CTA Section */}
+        <div className="flex flex-col sm:flex-row gap-4 justify-center items-center mb-16">
+          <Button size="lg" className="text-lg px-8 py-4" asChild>
+            <a href="https://apps.apple.com/app/soulo" target="_blank" rel="noopener noreferrer">
+              Download on App Store
+            </a>
+          </Button>
+          <Button variant="outline" size="lg" className="text-lg px-8 py-4" asChild>
+            <a href="https://play.google.com/store/apps/details?id=com.soulo" target="_blank" rel="noopener noreferrer">
+              Get it on Google Play
+            </a>
+          </Button>
+        </div>
+
+        {/* Features Grid */}
+        <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-8 max-w-5xl mx-auto">
+          <div className="bg-white/70 backdrop-blur-sm rounded-2xl p-6 border border-gray-200/50 hover:shadow-lg transition-all duration-300">
+            <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center mb-4">
+              <Mic className="h-6 w-6 text-blue-600" />
+            </div>
+            <h3 className="text-lg font-semibold mb-2">Voice Journaling</h3>
+            <p className="text-gray-600 text-sm">
+              Capture your thoughts naturally through voice recording in multiple languages.
             </p>
-            
-            <div className="flex flex-col sm:flex-row gap-4 justify-center lg:justify-start mb-8">
-              <Button 
-                size="lg" 
-                className="gap-2 bg-black text-white hover:bg-gray-800" 
-                onClick={openAppStore}
-              >
-                <Apple className="h-5 w-5" />
-                <TranslatableText text="App Store" />
-              </Button>
-              <Button 
-                size="lg" 
-                className="gap-2 bg-primary hover:bg-primary/90" 
-                onClick={openPlayStore}
-              >
-                <Play className="h-5 w-5" />
-                <TranslatableText text="Google Play" />
-              </Button>
+          </div>
+
+          <div className="bg-white/70 backdrop-blur-sm rounded-2xl p-6 border border-gray-200/50 hover:shadow-lg transition-all duration-300">
+            <div className="w-12 h-12 bg-purple-100 rounded-full flex items-center justify-center mb-4">
+              <Brain className="h-6 w-6 text-purple-600" />
             </div>
-            
-            <div className="flex items-center justify-center lg:justify-start gap-8 text-sm text-gray-500">
-              <div className="flex items-center gap-1">
-                <Shield className="h-4 w-4 text-primary" />
-                <TranslatableText text="Privacy-Focused" />
-              </div>
-              <div className="flex items-center gap-1">
-                <Check className="h-4 w-4 text-primary" />
-                <TranslatableText text="14-Day Free Trial" />
-              </div>
+            <h3 className="text-lg font-semibold mb-2">AI Insights</h3>
+            <p className="text-gray-600 text-sm">
+              Get personalized emotional insights and patterns from your journal entries.
+            </p>
+          </div>
+
+          <div className="bg-white/70 backdrop-blur-sm rounded-2xl p-6 border border-gray-200/50 hover:shadow-lg transition-all duration-300">
+            <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center mb-4">
+              <TrendingUp className="h-6 w-6 text-green-600" />
             </div>
-          </motion.div>
-          
-          <motion.div
-            initial={{ opacity: 0, scale: 0.9 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ duration: 1, delay: 0.3 }}
-            className="w-full lg:w-1/2 flex items-center justify-center"
-          >
-            <AspectRatio ratio={9/16} className="w-full max-w-sm">
-              <PhoneVoiceAnimation />
-            </AspectRatio>
-          </motion.div>
+            <h3 className="text-lg font-semibold mb-2">Growth Tracking</h3>
+            <p className="text-gray-600 text-sm">
+              Monitor your emotional journey and personal development over time.
+            </p>
+          </div>
+
+          <div className="bg-white/70 backdrop-blur-sm rounded-2xl p-6 border border-gray-200/50 hover:shadow-lg transition-all duration-300">
+            <div className="w-12 h-12 bg-pink-100 rounded-full flex items-center justify-center mb-4">
+              <Shield className="h-6 w-6 text-pink-600" />
+            </div>
+            <h3 className="text-lg font-semibold mb-2">Privacy First</h3>
+            <p className="text-gray-600 text-sm">
+              Your thoughts are encrypted and secure. Only you have access to your journal.
+            </p>
+          </div>
+        </div>
+
+        {/* Additional CTA */}
+        <div className="mt-16 text-center">
+          <p className="text-gray-600 mb-4">
+            Start your journey of self-discovery today
+          </p>
+          <Button variant="outline" size="lg" asChild>
+            <a href="#features">
+              Learn More
+            </a>
+          </Button>
         </div>
       </div>
-    </div>
+    </section>
   );
 };
 
