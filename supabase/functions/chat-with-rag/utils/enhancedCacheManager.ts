@@ -1,4 +1,3 @@
-
 // Enhanced cache manager for responses and intermediate results
 export class EnhancedCacheManager {
   private static responseCache = new Map<string, { response: string; timestamp: number }>();
@@ -16,11 +15,17 @@ export class EnhancedCacheManager {
       useAllEntries?: boolean;
       hasPersonalPronouns?: boolean;
       timeRange?: any;
+      complexity?: string;
+      route?: string;
     } = {}
   ): string {
     const normalized = message.toLowerCase().trim();
-    const contextStr = JSON.stringify(context);
-    return this.hashString(`${normalized}_${userId}_${contextStr}`);
+    // Include Phase 2 optimization context in hash
+    const contextStr = JSON.stringify({
+      ...context,
+      phase2: true // Mark as Phase 2 cache entry
+    });
+    return this.hashString(`phase2_${normalized}_${userId}_${contextStr}`);
   }
 
   // Cache response
@@ -52,8 +57,8 @@ export class EnhancedCacheManager {
     return cached.response;
   }
 
-  // Cache query results
-  static setCachedQueryResults(key: string, results: any[]): void {
+  // Cache query results with Phase 2 optimizations
+  static setCachedSearchResults(key: string, results: any[]): void {
     this.cleanupExpiredCache(this.queryCache, this.QUERY_CACHE_TTL);
     
     if (this.queryCache.size >= this.MAX_CACHE_SIZE) {
@@ -65,6 +70,8 @@ export class EnhancedCacheManager {
       results,
       timestamp: Date.now()
     });
+    
+    console.log(`[EnhancedCacheManager] Cached ${results.length} search results with Phase 2 optimization`);
   }
 
   // Get cached query results
@@ -126,16 +133,23 @@ export class EnhancedCacheManager {
     this.queryCache.clear();
   }
 
-  // Get cache statistics
+  // Enhanced cache statistics with Phase 2 metrics
   static getCacheStats(): {
     responseCacheSize: number;
     queryCacheSize: number;
     responseCacheHitRate: number;
+    phase2Enabled: boolean;
+    totalMemoryEstimate: number;
   } {
+    const responseMemory = this.responseCache.size * 2000; // Estimate
+    const queryMemory = this.queryCache.size * 5000; // Estimate
+    
     return {
       responseCacheSize: this.responseCache.size,
       queryCacheSize: this.queryCache.size,
-      responseCacheHitRate: 0 // Would need hit tracking for accurate rate
+      responseCacheHitRate: 0, // Would need hit tracking for accurate rate
+      phase2Enabled: true,
+      totalMemoryEstimate: responseMemory + queryMemory
     };
   }
 }
