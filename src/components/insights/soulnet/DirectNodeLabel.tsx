@@ -179,9 +179,9 @@ export const DirectNodeLabel: React.FC<DirectNodeLabelProps> = ({
   }
 
   if (isInstantMode) {
-    console.log(`[DirectNodeLabel] INSTANT MODE - MAIN TEXT: "${id}" at position`, labelPosition, 'with size:', textSize, 'color:', textColor, '- NO LOADING DELAY - GOOGLE TRANSLATE INTEGRATION`);
+    console.log(`[DirectNodeLabel] INSTANT MODE - MAIN TEXT: "${id}" at position`, labelPosition, 'with size:', textSize, 'color:', textColor, '- NO LOADING DELAY - GOOGLE TRANSLATE INTEGRATION');
   } else {
-    console.log(`[DirectNodeLabel] ENHANCED POSITIONING - MAIN TEXT: "${id}" at position`, labelPosition, 'with size:', textSize, 'color:', textColor, '- GOOGLE TRANSLATE INTEGRATION`);
+    console.log(`[DirectNodeLabel] ENHANCED POSITIONING - MAIN TEXT: "${id}" at position`, labelPosition, 'with size:', textSize, 'color:', textColor, '- GOOGLE TRANSLATE INTEGRATION');
   }
 
   return (
