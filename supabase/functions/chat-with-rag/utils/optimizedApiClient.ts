@@ -1,4 +1,5 @@
 
+
 // Optimized API client with enhanced response generation
 export class OptimizedApiClient {
   private static responseCache = new Map<string, string>();
@@ -76,10 +77,8 @@ RESPONSE STRUCTURE TEMPLATE:
 
       messages.push({ role: 'user', content: userPrompt });
 
-      // Use intelligent model selection
-      const model = isAnalytical || userPrompt.length > 200 ? 
-        'gpt-4.1-2025-04-14' : 'gpt-4.1-mini-2025-04-14';
-      
+      // Use gpt-4o-mini for all responses in RAG pipeline
+      const model = 'gpt-4o-mini';
       const maxTokens = isAnalytical ? 1000 : 600;
 
       const response = await fetch('https://api.openai.com/v1/chat/completions', {
@@ -160,3 +159,4 @@ RESPONSE STRUCTURE TEMPLATE:
     this.responseCache.set(key, response);
   }
 }
+
