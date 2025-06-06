@@ -1,4 +1,3 @@
-
 import React, { useRef, useState, useCallback, useMemo } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
@@ -69,8 +68,10 @@ const Node: React.FC<NodeProps> = ({
     }
     
     if (node.type === 'entity') {
-      return isSelected ? '#4CAF50' : (isHighlighted ? '#81C784' : '#2E7D32');
+      // UPDATED: Much lighter green colors for entity nodes (circular nodes)
+      return isSelected ? '#90EE90' : (isHighlighted ? '#B3F0B3' : '#98FB98');
     } else {
+      // Keep existing orange colors for emotion nodes (square nodes)
       return isSelected ? '#FF9800' : (isHighlighted ? '#FFB74D' : '#F57C00');
     }
   }, [node.type, isSelected, isHighlighted, dimmed]);
@@ -105,7 +106,7 @@ const Node: React.FC<NodeProps> = ({
     }
   });
 
-  console.log(`[Node] FLICKER-FREE RENDERING: ${node.id} (${node.type}) - scale: ${nodeScale}, color: ${nodeColor}, stable labels: ${stableLabelVisibility}`);
+  console.log(`[Node] UPDATED COLORS: ${node.id} (${node.type}) - scale: ${nodeScale}, color: ${nodeColor}, stable labels: ${stableLabelVisibility}`);
 
   return (
     <group position={node.position}>

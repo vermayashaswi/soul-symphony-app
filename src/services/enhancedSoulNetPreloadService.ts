@@ -1,3 +1,4 @@
+
 import { supabase } from '@/integrations/supabase/client';
 import { translationService } from '@/services/translationService';
 
@@ -400,14 +401,14 @@ export class EnhancedSoulNetPreloadService {
 
     const entityList = Object.keys(entityEmotionMap);
     
-    // POSITIONING: Emotion Y-pattern and entity radius settings
+    // POSITIONING: Updated emotion Y-pattern and entity radius settings
     const EMOTION_LAYER_RADIUS = 11;
     const ENTITY_LAYER_RADIUS = 6.75; // 75% of previous 9
 
-    // NEW ENTITY Y-PATTERN: +1, -2, +2, -1 repeating
+    // ENTITY Y-PATTERN: +1, -2, +2, -1 repeating
     const ENTITY_Y_PATTERN = [1, -2, 2, -1];
 
-    console.log("[EnhancedSoulNetPreloadService] NEW ENTITY Y-PATTERN: Implementing +1, -2, +2, -1 repeating pattern for", entityList.length, "entities");
+    console.log("[EnhancedSoulNetPreloadService] ENTITY Y-PATTERN: Implementing +1, -2, +2, -1 repeating pattern for", entityList.length, "entities");
     
     entityList.forEach((entity, entityIndex) => {
       entityNodes.add(entity);
@@ -415,14 +416,14 @@ export class EnhancedSoulNetPreloadService {
       const entityRadius = ENTITY_LAYER_RADIUS;
       const entityX = Math.cos(entityAngle) * entityRadius;
       
-      // NEW: Apply the repeating Y-pattern for entities
+      // Apply the repeating Y-pattern for entities
       const patternIndex = entityIndex % ENTITY_Y_PATTERN.length;
       const entityY = ENTITY_Y_PATTERN[patternIndex];
       
       // Z-axis uses circular distribution same as X-axis
       const entityZ = Math.sin(entityAngle) * entityRadius;
       
-      console.log(`[EnhancedSoulNetPreloadService] NEW ENTITY Y-PATTERN: Entity ${entity} (index ${entityIndex}) positioned at Y=${entityY} (pattern index: ${patternIndex}, value: ${ENTITY_Y_PATTERN[patternIndex]})`);
+      console.log(`[EnhancedSoulNetPreloadService] ENTITY Y-PATTERN: Entity ${entity} (index ${entityIndex}) positioned at Y=${entityY} (pattern index: ${patternIndex}, value: ${ENTITY_Y_PATTERN[patternIndex]})`);
       
       nodes.push({
         id: entity,
@@ -447,16 +448,16 @@ export class EnhancedSoulNetPreloadService {
       const emotionRadius = EMOTION_LAYER_RADIUS;
       const emotionX = Math.cos(emotionAngle) * emotionRadius;
       
-      // EXISTING: Y-axis pattern implementation for emotions
-      // Positive Y-axis: +4, +6, +8, +10, +4, +6, +8, +10, ...
-      // Negative Y-axis: -4, -6, -8, -10, -4, -6, -8, -10, ...
-      const yPatternValues = [4, 6, 8, 10];
+      // UPDATED: New Y-axis pattern for emotions: +2, +3, +4, +5 / -2, -3, -4, -5
+      const yPatternValues = [2, 3, 4, 5];
       const patternIndex = emotionIndex % yPatternValues.length;
       const baseY = yPatternValues[patternIndex];
       const emotionY = (emotionIndex % 2 === 0) ? baseY : -baseY;
       
       // Z-axis uses circular distribution (same pattern as X-axis)
       const emotionZ = Math.sin(emotionAngle) * emotionRadius;
+      
+      console.log(`[EnhancedSoulNetPreloadService] UPDATED EMOTION Y-PATTERN: Emotion ${emotion} (index ${emotionIndex}) positioned at Y=${emotionY} (pattern: ${baseY}, positive: ${emotionIndex % 2 === 0})`);
       
       nodes.push({
         id: emotion,
@@ -467,9 +468,9 @@ export class EnhancedSoulNetPreloadService {
       });
     });
 
-    console.log("[EnhancedSoulNetPreloadService] NEW ENTITY Y-PATTERN COMPLETE: Generated graph with", nodes.length, "nodes and", links.length, "links");
+    console.log("[EnhancedSoulNetPreloadService] UPDATED POSITIONING COMPLETE: Generated graph with", nodes.length, "nodes and", links.length, "links");
     console.log("[EnhancedSoulNetPreloadService] ENTITY Y-PATTERN: Repeating +1, -2, +2, -1");
-    console.log("[EnhancedSoulNetPreloadService] EMOTION Y-PATTERN: Repeating +4,+6,+8,+10 / -4,-6,-8,-10");
+    console.log("[EnhancedSoulNetPreloadService] EMOTION Y-PATTERN: Updated to +2,+3,+4,+5 / -2,-3,-4,-5");
     return { nodes, links };
   }
 
