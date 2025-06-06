@@ -26,7 +26,7 @@ export const DirectNodeLabel: React.FC<DirectNodeLabelProps> = ({
   isHighlighted,
   isSelected,
   shouldShowLabel,
-  cameraZoom = 62.5, // Default to middle of new range
+  cameraZoom = 62.5,
   themeHex,
   nodeScale = 1,
   connectionPercentage = 0,
@@ -50,7 +50,7 @@ export const DirectNodeLabel: React.FC<DirectNodeLabelProps> = ({
   }, [id, shouldShowLabel]);
 
   // PLAN IMPLEMENTATION: Static text size of 2 (reduced from 8)
-  console.log(`[DirectNodeLabel] PLAN IMPLEMENTATION: FIXED STATIC TEXT SIZE 2: ${id} - Reduced from 8 for better scaling`);
+  console.log(`[DirectNodeLabel] PLAN IMPLEMENTATION: STATIC TEXT SIZE 2: ${id} - Reduced from 8 for better scaling`);
 
   // Same base offset for both entity and emotion nodes
   const labelOffset = useMemo(() => {
@@ -64,7 +64,7 @@ export const DirectNodeLabel: React.FC<DirectNodeLabelProps> = ({
   // PLAN IMPLEMENTATION: Static text size of 2 (reduced from 8)
   const textSize = useMemo(() => {
     const staticSize = 2.0; // Reduced from 8 to 2
-    console.log(`[DirectNodeLabel] PLAN IMPLEMENTATION: FIXED STATIC TEXT SIZE for ${id}: ${staticSize} (reduced from 8, zoom ignored: ${cameraZoom})`);
+    console.log(`[DirectNodeLabel] PLAN IMPLEMENTATION: STATIC TEXT SIZE for ${id}: ${staticSize} (reduced from 8, zoom ignored: ${cameraZoom})`);
     return staticSize;
   }, [id, cameraZoom]);
 
