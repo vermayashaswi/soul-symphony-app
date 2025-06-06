@@ -2,7 +2,7 @@
 import React, { useRef, useState, useCallback, useMemo } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
-import DirectNodeLabel from './DirectNodeLabel';
+import UnifiedNodeLabel from './UnifiedNodeLabel';
 
 interface NodeData {
   id: string;
@@ -56,7 +56,7 @@ const Node: React.FC<NodeProps> = ({
   const meshRef = useRef<THREE.Mesh>(null);
   const [hovered, setHovered] = useState(false);
 
-  // ENHANCED: Stable node properties with improved colors
+  // Stable node properties with improved colors
   const nodeScale = useMemo(() => {
     const baseScale = node.type === 'entity' ? 0.7 : 0.55;
     const connectionScale = isHighlighted ? (1.2 + (isSelected ? 0.3 : 0.4)) : (0.8 + node.value * 0.5);
@@ -69,10 +69,8 @@ const Node: React.FC<NodeProps> = ({
     }
     
     if (node.type === 'entity') {
-      // ENHANCED: Brighter, more vibrant green colors for entity nodes
       return isSelected ? '#32CD32' : (isHighlighted ? '#7CFC00' : '#90EE90');
     } else {
-      // Keep existing orange colors for emotion nodes (square nodes)
       return isSelected ? '#FF9800' : (isHighlighted ? '#FFB74D' : '#F57C00');
     }
   }, [node.type, isSelected, isHighlighted, dimmed]);
@@ -94,7 +92,7 @@ const Node: React.FC<NodeProps> = ({
     onClick(node.id, event);
   }, [onClick, node.id]);
 
-  // ENHANCED: Always show labels when requested - no conditional hiding
+  // Always show labels when requested
   const stableLabelVisibility = useMemo(() => {
     return forceShowLabels || showLabel;
   }, [forceShowLabels, showLabel]);
@@ -107,7 +105,7 @@ const Node: React.FC<NodeProps> = ({
     }
   });
 
-  console.log(`[Node] ENHANCED RENDERING: ${node.id} (${node.type}) - scale: ${nodeScale}, color: ${nodeColor}, labels: ${stableLabelVisibility}`);
+  console.log(`[Node] Rendering: ${node.id} (${node.type}) - scale: ${nodeScale}, color: ${nodeColor}, labels: ${stableLabelVisibility}`);
 
   return (
     <group position={node.position}>
@@ -128,8 +126,7 @@ const Node: React.FC<NodeProps> = ({
         />
       </mesh>
       
-      {/* ENHANCED: DirectNodeLabel with improved error recovery */}
-      <DirectNodeLabel
+      <UnifiedNodeLabel
         id={node.id}
         type={node.type}
         position={[0, 0, 0]}
@@ -142,7 +139,6 @@ const Node: React.FC<NodeProps> = ({
         connectionPercentage={connectionPercentage}
         showPercentage={showPercentage}
         effectiveTheme={effectiveTheme}
-        isInstantMode={isInstantMode}
         userId={userId}
         timeRange={timeRange}
       />

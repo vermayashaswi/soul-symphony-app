@@ -15,7 +15,7 @@ interface BatchTranslationRequest {
   targetLanguage: string;
 }
 
-// ENHANCED: Text validation utilities
+// Simplified text validation
 function isValidTranslationText(text: string): boolean {
   return typeof text === 'string' && text.trim().length > 0;
 }
@@ -30,7 +30,6 @@ export class TranslationService {
   
   static async translateText(text: string, targetLanguage: string, sourceLanguage: string = 'en'): Promise<string> {
     try {
-      // ENHANCED: Strict text validation
       if (!isValidTranslationText(text)) {
         console.warn(`[TranslationService] Invalid text provided: "${text}"`);
         return text;
@@ -44,10 +43,9 @@ export class TranslationService {
 
       console.log(`[TranslationService] Translating: "${text.substring(0, 50)}..." to ${targetLanguage}`);
 
-      // Call the edge function for translation
       const { data, error } = await supabase.functions.invoke('translate-text', {
         body: {
-          text: text.trim(), // Ensure trimmed text
+          text: text.trim(),
           sourceLanguage: sourceLanguage,
           targetLanguage: targetLanguage,
         },
@@ -85,7 +83,6 @@ export class TranslationService {
   static async batchTranslate(request: BatchTranslationRequest): Promise<Map<string, string>> {
     const results = new Map<string, string>();
 
-    // ENHANCED: Filter out invalid texts before processing
     const validTexts = filterValidTexts(request.texts);
     
     if (validTexts.length === 0) {
@@ -135,7 +132,6 @@ export class TranslationService {
         }
 
         if (data && data.translationMap) {
-          // Use translation map for better mapping
           Object.entries(data.translationMap).forEach(([originalText, translatedText]) => {
             results.set(originalText, translatedText as string);
             translationCache.setTranslation({
@@ -148,7 +144,6 @@ export class TranslationService {
           });
           console.log(`[TranslationService] Batch ${Math.floor(i / this.BATCH_SIZE) + 1} completed successfully`);
         } else if (data && data.translatedTexts && Array.isArray(data.translatedTexts)) {
-          // Fallback to array mapping
           batch.forEach((text, index) => {
             const translatedText = data.translatedTexts[index] || text;
             results.set(text, translatedText);

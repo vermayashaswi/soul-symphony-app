@@ -9,56 +9,19 @@ interface SoulNetTranslationData {
   language: string;
 }
 
-// ENHANCED: Comprehensive text validation utilities
+// Simplified text validation
 function isValidNodeText(text: string): boolean {
-  if (typeof text !== 'string') {
-    console.warn(`[SoulNetTranslationPreloader] Non-string text:`, typeof text, text);
-    return false;
-  }
-  
+  if (typeof text !== 'string') return false;
   const trimmed = text.trim();
-  
-  // Check for empty or whitespace-only strings
-  if (trimmed.length === 0) {
-    console.warn(`[SoulNetTranslationPreloader] Empty text after trim:`, text);
-    return false;
-  }
-  
-  // Check for invalid placeholder values
+  if (trimmed.length < 2) return false;
+  if (/^\d+$/.test(trimmed)) return false;
   const invalidValues = ['undefined', 'null', 'NaN', '[object Object]', 'true', 'false'];
-  if (invalidValues.includes(trimmed.toLowerCase())) {
-    console.warn(`[SoulNetTranslationPreloader] Invalid text value:`, trimmed);
-    return false;
-  }
-  
-  // Check for numeric-only strings (often invalid)
-  if (/^\d+$/.test(trimmed)) {
-    console.warn(`[SoulNetTranslationPreloader] Numeric-only text:`, trimmed);
-    return false;
-  }
-  
-  // Check minimum meaningful length
-  if (trimmed.length < 2) {
-    console.warn(`[SoulNetTranslationPreloader] Text too short:`, trimmed);
-    return false;
-  }
-  
-  console.log(`[SoulNetTranslationPreloader] Valid text:`, trimmed);
-  return true;
+  return !invalidValues.includes(trimmed.toLowerCase());
 }
 
 function filterValidNodeTexts(nodeTexts: string[]): string[] {
-  console.log(`[SoulNetTranslationPreloader] Validating ${nodeTexts.length} node texts`);
-  
-  const validTexts = nodeTexts.filter(text => {
-    const isValid = isValidNodeText(text);
-    if (!isValid) {
-      console.warn(`[SoulNetTranslationPreloader] Filtering out invalid text:`, text);
-    }
-    return isValid;
-  });
-  
-  console.log(`[SoulNetTranslationPreloader] Validation complete: ${validTexts.length}/${nodeTexts.length} texts are valid`);
+  const validTexts = nodeTexts.filter(isValidNodeText);
+  console.log(`[SoulNetTranslationPreloader] Filtered: ${validTexts.length}/${nodeTexts.length} valid texts`);
   return validTexts;
 }
 
@@ -75,7 +38,6 @@ export class SoulNetTranslationPreloader {
     nodeTexts?: string[]
   ): Promise<SoulNetTranslationData | null> {
     if (language === 'en') {
-      // For English, create a pass-through translation map
       const englishData: SoulNetTranslationData = {
         nodeTranslations: new Map(),
         loadedAt: Date.now(),
@@ -112,12 +74,10 @@ export class SoulNetTranslationPreloader {
       const nodeTranslations = new Map<string, string>();
       
       if (nodeTexts && nodeTexts.length > 0) {
-        // ENHANCED: Filter valid texts before translation with detailed logging
-        console.log(`[SoulNetTranslationPreloader] Original texts:`, nodeTexts);
         const validNodeTexts = filterValidNodeTexts(nodeTexts);
         
         if (validNodeTexts.length === 0) {
-          console.warn(`[SoulNetTranslationPreloader] No valid node texts to translate after filtering`);
+          console.warn(`[SoulNetTranslationPreloader] No valid node texts to translate`);
           const emptyData: SoulNetTranslationData = {
             nodeTranslations: new Map(),
             loadedAt: Date.now(),
@@ -128,25 +88,18 @@ export class SoulNetTranslationPreloader {
           return emptyData;
         }
 
-        console.log(`[SoulNetTranslationPreloader] Batch translating ${validNodeTexts.length} valid node texts to ${language}`);
-        console.log(`[SoulNetTranslationPreloader] Valid texts to translate:`, validNodeTexts);
+        console.log(`[SoulNetTranslationPreloader] Batch translating ${validNodeTexts.length} texts to ${language}`);
         
-        // Batch translate all valid node texts
         const batchResults = await translationService.batchTranslate({
           texts: validNodeTexts,
           targetLanguage: language
         });
         
-        console.log(`[SoulNetTranslationPreloader] Batch translation completed, processing ${batchResults.size} results`);
-        
         batchResults.forEach((translatedText, originalText) => {
           if (translatedText && isValidNodeText(translatedText) && translatedText !== originalText) {
             nodeTranslations.set(originalText, translatedText);
-            // Also cache in on-demand cache
             onDemandTranslationCache.set(language, originalText, translatedText);
             console.log(`[SoulNetTranslationPreloader] Translation stored: "${originalText}" -> "${translatedText}"`);
-          } else {
-            console.warn(`[SoulNetTranslationPreloader] Invalid or unchanged translation for "${originalText}":`, translatedText);
           }
         });
 
@@ -161,7 +114,6 @@ export class SoulNetTranslationPreloader {
         language
       };
 
-      // Cache the results
       this.setCachedTranslations(cacheKey, translationData);
       
       console.log(`[SoulNetTranslationPreloader] Preloaded ${nodeTranslations.size} translations for ${cacheKey}`);
@@ -171,7 +123,6 @@ export class SoulNetTranslationPreloader {
       
       if (retryCount < this.MAX_RETRIES) {
         console.log(`[SoulNetTranslationPreloader] Retrying translation (${retryCount + 1}/${this.MAX_RETRIES})`);
-        // Wait before retry
         await new Promise(resolve => setTimeout(resolve, 1000 * (retryCount + 1)));
         return this.performTranslationWithRetry(cacheKey, userId, timeRange, language, nodeTexts, retryCount + 1);
       }
@@ -191,10 +142,9 @@ export class SoulNetTranslationPreloader {
       return text;
     }
 
-    // ENHANCED: Validate text before lookup with detailed logging
     if (!isValidNodeText(text)) {
       console.warn(`[SoulNetTranslationPreloader] Invalid text for sync lookup: "${text}"`);
-      return text; // Return original for invalid texts
+      return text;
     }
 
     const cacheKey = `${userId}-${timeRange}-${language}`;
@@ -205,8 +155,6 @@ export class SoulNetTranslationPreloader {
       if (translation && isValidNodeText(translation)) {
         console.log(`[SoulNetTranslationPreloader] Cache hit: "${text}" -> "${translation}"`);
         return translation;
-      } else {
-        console.warn(`[SoulNetTranslationPreloader] Invalid cached translation for "${text}":`, translation);
       }
     }
 
@@ -227,13 +175,11 @@ export class SoulNetTranslationPreloader {
       return cached;
     }
     
-    // Try localStorage
     try {
       const stored = localStorage.getItem(`${this.CACHE_KEY}-${cacheKey}`);
       if (stored) {
         const parsed = JSON.parse(stored);
         if ((Date.now() - parsed.loadedAt) < this.CACHE_DURATION) {
-          // Convert object back to Map
           parsed.nodeTranslations = new Map(Object.entries(parsed.nodeTranslations || {}));
           this.cache.set(cacheKey, parsed);
           return parsed;
@@ -249,7 +195,6 @@ export class SoulNetTranslationPreloader {
   private static setCachedTranslations(cacheKey: string, data: SoulNetTranslationData): void {
     this.cache.set(cacheKey, data);
     
-    // Store in localStorage
     try {
       const storableData = {
         ...data,

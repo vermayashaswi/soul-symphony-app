@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import '@/types/three-reference';
 import { Canvas } from '@react-three/fiber';
@@ -33,7 +32,6 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
   const [selectedEntity, setSelectedEntity] = useState<string | null>(null);
   const { currentLanguage } = useTranslation();
   
-  // Use ref to track stable rendering state
   const stableRenderingRef = useRef(false);
   const maxRetryCount = 3;
 
@@ -51,7 +49,7 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
     getInstantNodeConnections
   } = useFlickerFreeSoulNetData(userId, timeRange);
 
-  console.log("[SoulNet] RENDER STATE:", { 
+  console.log("[SoulNet] UNIFIED STATE:", { 
     userId, 
     timeRange, 
     currentLanguage,
@@ -71,7 +69,7 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
     const translationsActuallyReady = currentLanguage === 'en' || (isTranslationsReady && translationProgress === 100);
     
     if (isReady && translationsActuallyReady && graphData.nodes.length > 0 && !stableRenderingRef.current && !canvasError) {
-      console.log("[SoulNet] INITIALIZING STABLE RENDERING", {
+      console.log("[SoulNet] INITIALIZING unified rendering", {
         isReady,
         translationsActuallyReady,
         translationProgress,
@@ -82,7 +80,6 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
       stableRenderingRef.current = true;
     }
     
-    // Reset if there's an error or complete data loss
     if (error || (graphData.nodes.length === 0 && !loading && stableRenderingRef.current)) {
       console.log("[SoulNet] RESETTING due to error or data loss", { 
         error: !!error, 
@@ -130,7 +127,6 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
     stableRenderingRef.current = false;
     setRenderingReady(false);
     
-    // Add a small delay for UI feedback
     setTimeout(() => {
       setIsRetrying(false);
     }, 1000);
@@ -220,7 +216,7 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
     );
   };
 
-  console.log(`[SoulNet] RENDERING CANVAS: ${graphData.nodes.length} nodes, ${graphData.links.length} links, ready: ${renderingReady}`);
+  console.log(`[SoulNet] UNIFIED RENDERING: ${graphData.nodes.length} nodes, ${graphData.links.length} links, ready: ${renderingReady}`);
 
   return (
     <div className={cn(
