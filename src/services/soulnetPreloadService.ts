@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 import { translationService } from '@/services/translationService';
 import { onDemandTranslationCache } from '@/utils/website-translations';
@@ -32,21 +31,66 @@ interface CachedSoulNetData {
   language: string;
 }
 
-// ENHANCED: Node validation utilities
+// ENHANCED: Comprehensive node validation utilities
 function isValidNodeName(name: string): boolean {
-  return typeof name === 'string' && 
-         name.trim().length > 0 && 
-         name.trim() !== 'undefined' && 
-         name.trim() !== 'null' &&
-         name.trim() !== 'NaN';
+  if (typeof name !== 'string') {
+    console.warn(`[SoulNetPreloadService] Non-string node name:`, typeof name, name);
+    return false;
+  }
+  
+  const trimmed = name.trim();
+  
+  // Check for empty or whitespace-only strings
+  if (trimmed.length === 0) {
+    console.warn(`[SoulNetPreloadService] Empty node name after trim:`, name);
+    return false;
+  }
+  
+  // Check for invalid placeholder values
+  const invalidValues = ['undefined', 'null', 'NaN', '[object Object]', 'true', 'false'];
+  if (invalidValues.includes(trimmed.toLowerCase())) {
+    console.warn(`[SoulNetPreloadService] Invalid node name value:`, trimmed);
+    return false;
+  }
+  
+  // Check for numeric-only strings (often invalid entities)
+  if (/^\d+$/.test(trimmed)) {
+    console.warn(`[SoulNetPreloadService] Numeric-only node name:`, trimmed);
+    return false;
+  }
+  
+  // Check minimum meaningful length
+  if (trimmed.length < 2) {
+    console.warn(`[SoulNetPreloadService] Node name too short:`, trimmed);
+    return false;
+  }
+  
+  console.log(`[SoulNetPreloadService] Valid node name:`, trimmed);
+  return true;
 }
 
 function sanitizeNodeName(name: string): string {
   if (!isValidNodeName(name)) {
-    console.warn(`[SoulNetPreloadService] Invalid node name: "${name}"`);
-    return `Node_${Date.now()}`; // Generate fallback name
+    const fallback = `Node_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    console.warn(`[SoulNetPreloadService] Invalid node name "${name}", using fallback:`, fallback);
+    return fallback;
   }
   return name.trim();
+}
+
+function validateAndFilterNodes(nodeNames: string[]): string[] {
+  console.log(`[SoulNetPreloadService] Validating ${nodeNames.length} node names`);
+  
+  const validNodes = nodeNames.filter(name => {
+    const isValid = isValidNodeName(name);
+    if (!isValid) {
+      console.warn(`[SoulNetPreloadService] Filtering out invalid node:`, name);
+    }
+    return isValid;
+  });
+  
+  console.log(`[SoulNetPreloadService] Validation complete: ${validNodes.length}/${nodeNames.length} nodes are valid`);
+  return validNodes;
 }
 
 export class SoulNetPreloadService {
@@ -97,26 +141,35 @@ export class SoulNetPreloadService {
       const connectionPercentages = new Map<string, number>();
       
       if (language !== 'en') {
-        // ENHANCED: Filter valid node names before translation
-        const validNodeNames = graphData.nodes
-          .map(node => node.id)
-          .filter(id => isValidNodeName(id));
-          
+        // ENHANCED: Get all valid node names and filter them before translation
+        const allNodeNames = graphData.nodes.map(node => node.id);
+        const validNodeNames = validateAndFilterNodes(allNodeNames);
+        
         if (validNodeNames.length > 0) {
-          console.log(`[SoulNetPreloadService] Pre-translating ${validNodeNames.length} valid node names`);
+          console.log(`[SoulNetPreloadService] Pre-translating ${validNodeNames.length} valid node names to ${language}`);
           
-          const batchResults = await translationService.batchTranslate({
-            texts: validNodeNames,
-            targetLanguage: language
-          });
-          
-          batchResults.forEach((translatedText, originalText) => {
-            if (translatedText && isValidNodeName(translatedText)) {
-              translations.set(originalText, translatedText);
-            }
-          });
-          
-          console.log(`[SoulNetPreloadService] Successfully translated ${translations.size} node names`);
+          try {
+            const batchResults = await translationService.batchTranslate({
+              texts: validNodeNames,
+              targetLanguage: language
+            });
+            
+            batchResults.forEach((translatedText, originalText) => {
+              if (translatedText && isValidNodeName(translatedText)) {
+                translations.set(originalText, translatedText);
+                console.log(`[SoulNetPreloadService] Translation cached: "${originalText}" -> "${translatedText}"`);
+              } else {
+                console.warn(`[SoulNetPreloadService] Invalid translation result for "${originalText}":`, translatedText);
+              }
+            });
+            
+            console.log(`[SoulNetPreloadService] Successfully translated ${translations.size} node names`);
+          } catch (translationError) {
+            console.error('[SoulNetPreloadService] Translation error:', translationError);
+            // Continue without translations rather than failing completely
+          }
+        } else {
+          console.warn('[SoulNetPreloadService] No valid node names to translate');
         }
       }
 
@@ -139,7 +192,7 @@ export class SoulNetPreloadService {
         language
       });
 
-      console.log(`[SoulNetPreloadService] Successfully preloaded and cached data for ${cacheKey}`);
+      console.log(`[SoulNetPreloadService] Successfully preloaded and cached data for ${cacheKey} with ${translations.size} translations`);
       return processedData;
     } catch (error) {
       console.error('[SoulNetPreloadService] Error preloading data:', error);
@@ -265,14 +318,28 @@ export class SoulNetPreloadService {
     console.log("[SoulNetPreloadService] Processing entities for", entries.length, "entries");
     
     const entityEmotionMap: Record<string, Record<string, number>> = {};
+    let invalidEntitiesCount = 0;
+    let invalidEmotionsCount = 0;
     
-    entries.forEach(entry => {
-      if (!entry.entityemotion) return;
+    entries.forEach((entry, entryIndex) => {
+      if (!entry.entityemotion) {
+        console.log(`[SoulNetPreloadService] Entry ${entryIndex} has no entityemotion data`);
+        return;
+      }
       
       Object.entries(entry.entityemotion).forEach(([entity, emotions]) => {
-        if (typeof emotions !== 'object') return;
+        if (typeof emotions !== 'object') {
+          console.warn(`[SoulNetPreloadService] Entry ${entryIndex}: emotions not an object for entity "${entity}"`);
+          return;
+        }
         
         // ENHANCED: Validate and sanitize entity name
+        if (!isValidNodeName(entity)) {
+          invalidEntitiesCount++;
+          console.warn(`[SoulNetPreloadService] Entry ${entryIndex}: Invalid entity name "${entity}" - skipping`);
+          return;
+        }
+        
         const sanitizedEntity = sanitizeNodeName(entity);
         
         if (!entityEmotionMap[sanitizedEntity]) {
@@ -280,9 +347,18 @@ export class SoulNetPreloadService {
         }
         
         Object.entries(emotions).forEach(([emotion, score]) => {
-          if (typeof score !== 'number') return;
+          if (typeof score !== 'number') {
+            console.warn(`[SoulNetPreloadService] Entry ${entryIndex}: Invalid score for emotion "${emotion}" of entity "${sanitizedEntity}"`);
+            return;
+          }
           
           // ENHANCED: Validate and sanitize emotion name
+          if (!isValidNodeName(emotion)) {
+            invalidEmotionsCount++;
+            console.warn(`[SoulNetPreloadService] Entry ${entryIndex}: Invalid emotion name "${emotion}" for entity "${sanitizedEntity}" - skipping`);
+            return;
+          }
+          
           const sanitizedEmotion = sanitizeNodeName(emotion);
           
           if (entityEmotionMap[sanitizedEntity][sanitizedEmotion]) {
@@ -294,6 +370,7 @@ export class SoulNetPreloadService {
       });
     });
 
+    console.log(`[SoulNetPreloadService] Entity processing complete. Filtered out ${invalidEntitiesCount} invalid entities and ${invalidEmotionsCount} invalid emotions`);
     return this.generateGraph(entityEmotionMap);
   }
 
@@ -303,7 +380,14 @@ export class SoulNetPreloadService {
     const entityNodes = new Set<string>();
     const emotionNodes = new Set<string>();
 
-    const entityList = Object.keys(entityEmotionMap).filter(entity => isValidNodeName(entity));
+    // ENHANCED: Double-check entity names before processing
+    const entityList = Object.keys(entityEmotionMap).filter(entity => {
+      const isValid = isValidNodeName(entity);
+      if (!isValid) {
+        console.warn(`[SoulNetPreloadService] Filtering invalid entity from graph generation:`, entity);
+      }
+      return isValid;
+    });
     
     // POSITIONING: Updated emotion Y-pattern and entity radius settings
     const EMOTION_LAYER_RADIUS = 11;
@@ -338,6 +422,7 @@ export class SoulNetPreloadService {
       });
 
       Object.entries(entityEmotionMap[entity]).forEach(([emotion, score]) => {
+        // ENHANCED: Double-check emotion names
         if (isValidNodeName(emotion)) {
           emotionNodes.add(emotion);
           links.push({
@@ -345,11 +430,20 @@ export class SoulNetPreloadService {
             target: emotion,
             value: score
           });
+        } else {
+          console.warn(`[SoulNetPreloadService] Skipping invalid emotion in graph generation:`, emotion);
         }
       });
     });
 
-    const validEmotions = Array.from(emotionNodes).filter(emotion => isValidNodeName(emotion));
+    // ENHANCED: Filter valid emotions before processing
+    const validEmotions = Array.from(emotionNodes).filter(emotion => {
+      const isValid = isValidNodeName(emotion);
+      if (!isValid) {
+        console.warn(`[SoulNetPreloadService] Filtering invalid emotion from graph generation:`, emotion);
+      }
+      return isValid;
+    });
     
     validEmotions.forEach((emotion, emotionIndex) => {
       const emotionAngle = (emotionIndex / validEmotions.length) * Math.PI * 2;

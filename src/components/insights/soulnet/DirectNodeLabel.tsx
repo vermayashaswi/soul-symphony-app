@@ -22,13 +22,42 @@ interface DirectNodeLabelProps {
   timeRange?: string;
 }
 
-// ENHANCED: Text validation for node labels
+// ENHANCED: Comprehensive text validation for node labels
 function isValidNodeId(id: string): boolean {
-  return typeof id === 'string' && 
-         id.trim().length > 0 && 
-         id.trim() !== 'undefined' && 
-         id.trim() !== 'null' &&
-         id.trim() !== 'NaN';
+  if (typeof id !== 'string') {
+    console.warn(`[DirectNodeLabel] Non-string node ID:`, typeof id, id);
+    return false;
+  }
+  
+  const trimmed = id.trim();
+  
+  // Check for empty or whitespace-only strings
+  if (trimmed.length === 0) {
+    console.warn(`[DirectNodeLabel] Empty node ID after trim:`, id);
+    return false;
+  }
+  
+  // Check for invalid placeholder values
+  const invalidValues = ['undefined', 'null', 'NaN', '[object Object]', 'true', 'false'];
+  if (invalidValues.includes(trimmed.toLowerCase())) {
+    console.warn(`[DirectNodeLabel] Invalid node ID value:`, trimmed);
+    return false;
+  }
+  
+  // Check for numeric-only strings (often invalid entities)
+  if (/^\d+$/.test(trimmed)) {
+    console.warn(`[DirectNodeLabel] Numeric-only node ID:`, trimmed);
+    return false;
+  }
+  
+  // Check minimum meaningful length
+  if (trimmed.length < 2) {
+    console.warn(`[DirectNodeLabel] Node ID too short:`, trimmed);
+    return false;
+  }
+  
+  console.log(`[DirectNodeLabel] Valid node ID:`, trimmed);
+  return true;
 }
 
 export const DirectNodeLabel: React.FC<DirectNodeLabelProps> = ({
@@ -47,30 +76,45 @@ export const DirectNodeLabel: React.FC<DirectNodeLabelProps> = ({
 }) => {
   const { currentLanguage } = useTranslation();
   const [translationReady, setTranslationReady] = useState<boolean>(false);
+  const [displayMode, setDisplayMode] = useState<'loading' | 'ready' | 'fallback'>('loading');
 
   // ENHANCED: Validate node ID before processing
   const validNodeId = useMemo(() => {
     if (!isValidNodeId(id)) {
-      console.warn(`[DirectNodeLabel] Invalid node ID: "${id}"`);
+      console.warn(`[DirectNodeLabel] Invalid node ID: "${id}", entering fallback mode`);
+      setDisplayMode('fallback');
       return null;
     }
     return id.trim();
   }, [id]);
 
-  // ENHANCED: Always ready for English, optimistic for other languages
+  // ENHANCED: Smart readiness detection with fallback handling
   useEffect(() => {
-    if (currentLanguage === 'en' || !validNodeId) {
+    if (!validNodeId) {
+      setDisplayMode('fallback');
+      setTranslationReady(false);
+      return;
+    }
+
+    if (currentLanguage === 'en') {
+      console.log(`[DirectNodeLabel] English language, marking ready for ${validNodeId}`);
       setTranslationReady(true);
+      setDisplayMode('ready');
     } else {
-      // Start optimistic, will be corrected by translation completion
+      // Start optimistic for non-English, will be corrected by translation completion
+      console.log(`[DirectNodeLabel] Non-English language (${currentLanguage}), starting optimistic for ${validNodeId}`);
       setTranslationReady(true);
+      setDisplayMode('ready');
     }
   }, [currentLanguage, validNodeId]);
 
   // Handle translation completion
   const handleTranslationComplete = useCallback((translatedText: string) => {
-    setTranslationReady(true);
-    console.log(`[DirectNodeLabel] Translation confirmed for ${validNodeId}: "${translatedText}"`);
+    if (validNodeId) {
+      setTranslationReady(true);
+      setDisplayMode('ready');
+      console.log(`[DirectNodeLabel] Translation confirmed for ${validNodeId}: "${translatedText}"`);
+    }
   }, [validNodeId]);
 
   // Calculate positions and styling
@@ -104,18 +148,21 @@ export const DirectNodeLabel: React.FC<DirectNodeLabelProps> = ({
   }, [shouldShowLabel]);
 
   // ENHANCED: Always show labels if we should - don't wait for translations, but validate node ID
-  const finalShouldShowLabel = enhancedShouldShowLabel && validNodeId;
+  const finalShouldShowLabel = enhancedShouldShowLabel && (validNodeId !== null);
 
   if (!finalShouldShowLabel) {
     return null;
   }
 
-  console.log(`[DirectNodeLabel] RENDERING LABEL: ${validNodeId} (ready: ${translationReady}, lang: ${currentLanguage}, valid: ${!!validNodeId})`);
+  // Use fallback display for invalid node IDs
+  const displayText = validNodeId || `Invalid_${Date.now()}`;
+
+  console.log(`[DirectNodeLabel] RENDERING LABEL: ${displayText} (ready: ${translationReady}, lang: ${currentLanguage}, valid: ${!!validNodeId}, mode: ${displayMode})`);
 
   return (
     <>
       <FlickerFreeTranslatableText3D
-        text={validNodeId}
+        text={displayText}
         position={labelPosition}
         color={textColor}
         size={textSize}
