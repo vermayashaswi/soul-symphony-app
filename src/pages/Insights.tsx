@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useRef, useMemo } from 'react';
 import { motion } from 'framer-motion';
 import { Calendar, Filter, TrendingUp, ArrowUp, ArrowDown, Activity, Award } from 'lucide-react';
@@ -31,8 +32,11 @@ function InsightsContent() {
   
   // Extract node labels from insights data for translation provider
   const nodeLabels = useMemo(() => {
-    // Extract from existing data structures instead of non-existent topEntities/topEmotions
-    const emotionLabels = (insightsData.aggregatedEmotionData || []).map(emotion => emotion.emotion);
+    // Safely extract emotion labels with proper type checking
+    const emotionLabels = Array.isArray(insightsData.aggregatedEmotionData) 
+      ? insightsData.aggregatedEmotionData.map(emotion => emotion.emotion).filter(Boolean)
+      : [];
+    
     const dominantMoodLabel = insightsData.dominantMood?.emotion ? [insightsData.dominantMood.emotion] : [];
     const improvementLabel = insightsData.biggestImprovement?.emotion ? [insightsData.biggestImprovement.emotion] : [];
     
