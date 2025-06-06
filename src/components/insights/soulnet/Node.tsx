@@ -64,18 +64,22 @@ const Node: React.FC<NodeProps> = ({
     return () => clearTimeout(timer);
   }, []);
 
-  // UPDATED: Use app color theme for both node types in both light and dark themes
+  // UPDATED: Use specific colors for each node type
   const color = useMemo(() => {
     if (isSelected) return new THREE.Color('#ffffff');
     
     if (isHighlighted) {
-      // Both entity and emotion nodes use the app color theme when highlighted
-      return new THREE.Color(userColorThemeHex);
+      // Use specific colors based on node type
+      if (node.type === 'entity') {
+        return new THREE.Color('#90EE90'); // Medium light green for circular nodes (entities)
+      } else {
+        return new THREE.Color('#FFD700'); // Golden for square nodes (emotions)
+      }
     }
     
     // ENHANCED: 20% lighter colors for dimmed nodes instead of very dark
     return new THREE.Color(dimmed ? '#3a3a3a' : '#cccccc');
-  }, [isSelected, isHighlighted, userColorThemeHex, dimmed]);
+  }, [isSelected, isHighlighted, node.type, dimmed]);
 
   // ENHANCED: More dramatic scale differences for better hierarchy
   const baseNodeScale = useMemo(() => {
@@ -160,9 +164,9 @@ const Node: React.FC<NodeProps> = ({
   }
 
   if (isInstantMode) {
-    console.log(`[Node] PULSATING INSTANT MODE: Rendering ${node.type} node ${node.id} with pulsing animation, app theme color ${userColorThemeHex}, base scale ${baseNodeScale.toFixed(2)} - NO LOADING DELAY`);
+    console.log(`[Node] PULSATING INSTANT MODE: Rendering ${node.type} node ${node.id} with pulsing animation, specific color (${node.type === 'entity' ? 'medium light green' : 'golden'}), base scale ${baseNodeScale.toFixed(2)} - NO LOADING DELAY`);
   } else {
-    console.log(`[Node] PULSATING ENHANCED: Rendering ${node.type} node ${node.id} with pulsing animation, app theme color ${userColorThemeHex}, base scale ${baseNodeScale.toFixed(2)}`);
+    console.log(`[Node] PULSATING ENHANCED: Rendering ${node.type} node ${node.id} with pulsing animation, specific color (${node.type === 'entity' ? 'medium light green' : 'golden'}), base scale ${baseNodeScale.toFixed(2)}`);
   }
 
   // ENHANCED: Improved geometry sizes to work with the enhanced scale differences
