@@ -216,7 +216,7 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
     );
   };
 
-  console.log(`[SoulNet] UNIFIED RENDERING: ${graphData.nodes.length} nodes, ${graphData.links.length} links, ready: ${renderingReady}`);
+  console.log(`[SoulNet] UNIFIED RENDERING: ${graphData.nodes.length} nodes, ${graphData.links.length} links, ready: ${renderingReady}, userId: ${userId}, timeRange: ${timeRange}`);
 
   return (
     <div className={cn(

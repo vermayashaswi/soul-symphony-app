@@ -27,6 +27,8 @@ interface SoulNetVisualizationProps {
   themeHex: string;
   isFullScreen?: boolean;
   shouldShowLabels?: boolean;
+  userId?: string;
+  timeRange?: string;
 }
 
 // Calculate relative connection strength within connected nodes
@@ -133,7 +135,9 @@ export const SoulNetVisualization: React.FC<SoulNetVisualizationProps> = ({
   onNodeClick,
   themeHex,
   isFullScreen = false,
-  shouldShowLabels = true
+  shouldShowLabels = true,
+  userId,
+  timeRange
 }) => {
   const { camera, size } = useThree();
   const controlsRef = useRef<any>(null);
@@ -148,7 +152,9 @@ export const SoulNetVisualization: React.FC<SoulNetVisualizationProps> = ({
     linkCount: data?.links?.length,
     selectedNode,
     shouldShowLabels,
-    cameraZoom
+    cameraZoom,
+    userId,
+    timeRange
   });
   
   useEffect(() => {
@@ -319,7 +325,9 @@ export const SoulNetVisualization: React.FC<SoulNetVisualizationProps> = ({
   console.log("[SoulNetVisualization] FIXED ZOOM RANGE FINAL RENDER - Zoom: 25-100, Static text size 8", { 
     nodeCount: validData.nodes.length,
     shouldShowLabels,
-    currentZoom: cameraZoom
+    currentZoom: cameraZoom,
+    userId,
+    timeRange
   });
 
   return (
@@ -401,7 +409,7 @@ export const SoulNetVisualization: React.FC<SoulNetVisualizationProps> = ({
         );
       })}
       
-      {/* FIXED: Display nodes with static text size 8 */}
+      {/* FIXED: Display nodes with userId and timeRange props */}
       {validData.nodes.map(node => {
         if (!node || typeof node !== 'object' || !node.id) {
           console.warn("[SoulNetVisualization] Invalid node:", node);
@@ -453,6 +461,8 @@ export const SoulNetVisualization: React.FC<SoulNetVisualizationProps> = ({
             forceShowLabels={shouldShowLabels}
             effectiveTheme="light"
             isInstantMode={true}
+            userId={userId}
+            timeRange={timeRange}
           />
         );
       })}

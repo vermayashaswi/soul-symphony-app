@@ -27,7 +27,7 @@ interface SimplifiedSoulNetVisualizationProps {
   themeHex: string;
   isFullScreen?: boolean;
   shouldShowLabels?: boolean;
-  getInstantConnectionPercentage?: (nodeId: string, connectedNodeId: string) => number;
+  getInstantConnectionPercentage?: (nodeId: string) => number;
   getInstantTranslation?: (text: string) => string;
   getInstantNodeConnections?: (nodeId: string) => Set<string>;
   isInstantReady?: boolean;
@@ -154,12 +154,11 @@ export const SimplifiedSoulNetVisualization: React.FC<SimplifiedSoulNetVisualiza
   const [isInitialized, setIsInitialized] = useState(false);
   const mounted = useRef<boolean>(true);
   
-  console.log("[SimplifiedSoulNetVisualization] FLICKER-FREE RENDERING", {
+  console.log("[SimplifiedSoulNetVisualization] Rendering with translation props", {
     nodeCount: data?.nodes?.length,
     linkCount: data?.links?.length,
     selectedNode,
     shouldShowLabels,
-    cameraZoom,
     isInstantReady,
     userId,
     timeRange
@@ -422,11 +421,12 @@ export const SimplifiedSoulNetVisualization: React.FC<SimplifiedSoulNetVisualiza
         const dimmed = shouldDim && !(selectedNode === node.id || highlightedNodes.has(node.id));
         const isHighlighted = selectedNode === node.id || highlightedNodes.has(node.id);
         
-        // FLICKER-FREE: Use instant connection percentage lookup
-        const connectionPercentage = selectedNode && highlightedNodes.has(node.id) && getInstantConnectionPercentage
-          ? getInstantConnectionPercentage(selectedNode, node.id)
-          : 0;
-          
+        const connectionPercentage = getInstantConnectionPercentage 
+          ? getInstantConnectionPercentage(node.id)
+          : (selectedNode && highlightedNodes.has(node.id) 
+              ? connectionPercentages.get(node.id) || 0 
+              : 0);
+              
         const showPercentage = selectedNode !== null && 
                               isHighlighted && 
                               connectionPercentage > 0 &&
@@ -437,6 +437,10 @@ export const SimplifiedSoulNetVisualization: React.FC<SimplifiedSoulNetVisualiza
           return null;
         }
 
+        if (showPercentage) {
+          console.log(`[SimplifiedSoulNetVisualization] Enhanced: Showing ${connectionPercentage}% for ${node.id} connected to ${selectedNode}`);
+        }
+        
         return (
           <Node
             key={`node-${node.id}-${forceUpdate}`}
