@@ -15,13 +15,23 @@ interface BatchTranslationRequest {
   targetLanguage: string;
 }
 
-// Simplified text validation
+// Relaxed text validation - allow valid text with special characters
 function isValidTranslationText(text: string): boolean {
-  return typeof text === 'string' && text.trim().length > 0;
+  if (typeof text !== 'string') return false;
+  const trimmed = text.trim();
+  if (trimmed.length < 1) return false; // Allow single characters
+  // Only reject obvious invalid values, not special characters like &, spaces, etc.
+  const invalidValues = ['undefined', 'null', 'NaN', '[object Object]'];
+  return !invalidValues.includes(trimmed.toLowerCase());
 }
 
 function filterValidTexts(texts: string[]): string[] {
-  return texts.filter(text => isValidTranslationText(text));
+  const validTexts = texts.filter(text => isValidTranslationText(text));
+  if (validTexts.length !== texts.length) {
+    const invalidTexts = texts.filter(text => !isValidTranslationText(text));
+    console.log(`[TranslationService] Invalid texts filtered out:`, invalidTexts);
+  }
+  return validTexts;
 }
 
 export class TranslationService {

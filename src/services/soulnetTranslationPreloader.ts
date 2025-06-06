@@ -9,19 +9,23 @@ interface SoulNetTranslationData {
   language: string;
 }
 
-// Simplified text validation
+// Relaxed text validation - allow valid node names with special characters
 function isValidNodeText(text: string): boolean {
   if (typeof text !== 'string') return false;
   const trimmed = text.trim();
-  if (trimmed.length < 2) return false;
-  if (/^\d+$/.test(trimmed)) return false;
-  const invalidValues = ['undefined', 'null', 'NaN', '[object Object]', 'true', 'false'];
+  if (trimmed.length < 1) return false; // Allow single characters
+  // Only reject obvious invalid values, not special characters like &, spaces, etc.
+  const invalidValues = ['undefined', 'null', 'NaN', '[object Object]'];
   return !invalidValues.includes(trimmed.toLowerCase());
 }
 
 function filterValidNodeTexts(nodeTexts: string[]): string[] {
   const validTexts = nodeTexts.filter(isValidNodeText);
   console.log(`[SoulNetTranslationPreloader] Filtered: ${validTexts.length}/${nodeTexts.length} valid texts`);
+  if (validTexts.length !== nodeTexts.length) {
+    const invalidTexts = nodeTexts.filter(text => !isValidNodeText(text));
+    console.log(`[SoulNetTranslationPreloader] Invalid texts rejected:`, invalidTexts);
+  }
   return validTexts;
 }
 

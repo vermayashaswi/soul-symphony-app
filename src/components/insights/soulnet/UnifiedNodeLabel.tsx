@@ -21,7 +21,7 @@ interface UnifiedNodeLabelProps {
   timeRange?: string;
 }
 
-// Comprehensive text validation utilities
+// Relaxed text validation utilities - allow valid node names with special characters
 function isValidNodeText(text: string): boolean {
   if (typeof text !== 'string') {
     console.warn(`[UnifiedNodeLabel] Non-string text:`, typeof text, text);
@@ -35,18 +35,15 @@ function isValidNodeText(text: string): boolean {
     return false;
   }
   
-  const invalidValues = ['undefined', 'null', 'NaN', '[object Object]', 'true', 'false'];
+  // More relaxed validation - only reject obvious invalid values
+  const invalidValues = ['undefined', 'null', 'NaN', '[object Object]'];
   if (invalidValues.includes(trimmed.toLowerCase())) {
     console.warn(`[UnifiedNodeLabel] Invalid text value:`, trimmed);
     return false;
   }
   
-  if (/^\d+$/.test(trimmed)) {
-    console.warn(`[UnifiedNodeLabel] Numeric-only text:`, trimmed);
-    return false;
-  }
-  
-  if (trimmed.length < 2) {
+  // Allow single characters and special characters that are valid in node names
+  if (trimmed.length < 1) {
     console.warn(`[UnifiedNodeLabel] Text too short:`, trimmed);
     return false;
   }
@@ -74,7 +71,7 @@ export const UnifiedNodeLabel: React.FC<UnifiedNodeLabelProps> = ({
   const [displayText, setDisplayText] = useState<string>(id);
   const [isReady, setIsReady] = useState<boolean>(false);
 
-  // Validate node ID
+  // Validate node ID with relaxed validation
   const validNodeId = useMemo(() => {
     if (!isValidNodeText(id)) {
       console.warn(`[UnifiedNodeLabel] Invalid node ID: "${id}", using fallback`);
@@ -133,9 +130,9 @@ export const UnifiedNodeLabel: React.FC<UnifiedNodeLabelProps> = ({
     const clampedZoom = Math.max(15, Math.min(80, cameraZoom));
     const normalizedZoom = (clampedZoom - 15) / (80 - 15);
     const zoomFactor = 0.85 + (normalizedZoom * 0.15);
-    const baseSize = type === 'entity' ? 1.05 : 0.96; // 3x larger: 0.35 * 3 = 1.05, 0.32 * 3 = 0.96
+    const baseSize = type === 'entity' ? 2.1 : 1.92; // 6x larger: 0.35 * 6 = 2.1, 0.32 * 6 = 1.92
     const calculatedSize = baseSize * zoomFactor;
-    return Math.max(0.6, Math.min(1.2, calculatedSize)); // 3x larger constraints: 0.2 * 3 = 0.6, 0.4 * 3 = 1.2
+    return Math.max(1.2, Math.min(2.4, calculatedSize)); // 6x larger constraints: 0.2 * 6 = 1.2, 0.4 * 6 = 2.4
   }, [cameraZoom, type]);
 
   const textColor = useMemo(() => {
