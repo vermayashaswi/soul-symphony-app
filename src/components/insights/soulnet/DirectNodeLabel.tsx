@@ -1,3 +1,4 @@
+
 import React, { useMemo, useEffect } from 'react';
 import TranslatableText3D from './TranslatableText3D';
 import SimpleText from './SimpleText';
@@ -48,8 +49,8 @@ export const DirectNodeLabel: React.FC<DirectNodeLabelProps> = ({
     };
   }, [id, shouldShowLabel]);
 
-  // FIXED: Static text size of 8 regardless of zoom
-  console.log(`[DirectNodeLabel] FIXED STATIC TEXT SIZE 8: ${id} - No zoom dependency`);
+  // PLAN IMPLEMENTATION: Static text size of 2 (reduced from 8)
+  console.log(`[DirectNodeLabel] PLAN IMPLEMENTATION: FIXED STATIC TEXT SIZE 2: ${id} - Reduced from 8 for better scaling`);
 
   // Same base offset for both entity and emotion nodes
   const labelOffset = useMemo(() => {
@@ -60,33 +61,33 @@ export const DirectNodeLabel: React.FC<DirectNodeLabelProps> = ({
     return [0, scaledOffset, 0] as [number, number, number];
   }, [type, nodeScale, id]);
 
-  // FIXED: Static text size of 8
+  // PLAN IMPLEMENTATION: Static text size of 2 (reduced from 8)
   const textSize = useMemo(() => {
-    const staticSize = 8.0;
-    console.log(`[DirectNodeLabel] FIXED STATIC TEXT SIZE for ${id}: ${staticSize} (zoom ignored: ${cameraZoom})`);
+    const staticSize = 2.0; // Reduced from 8 to 2
+    console.log(`[DirectNodeLabel] PLAN IMPLEMENTATION: FIXED STATIC TEXT SIZE for ${id}: ${staticSize} (reduced from 8, zoom ignored: ${cameraZoom})`);
     return staticSize;
   }, [id, cameraZoom]);
 
-  // FIXED: Static percentage text size proportional to main text (8 * 0.35 = 2.8)
+  // PLAN IMPLEMENTATION: Fixed minimum percentage size of 1.5 (instead of proportional 0.7)
   const percentageTextSize = useMemo(() => {
-    const staticPercentageSize = 2.8; // 8 * 0.35
-    console.log(`[DirectNodeLabel] FIXED STATIC PERCENTAGE SIZE for ${id}: ${staticPercentageSize}`);
-    return staticPercentageSize;
+    const fixedPercentageSize = 1.5; // Fixed minimum size instead of 2.0 * 0.35 = 0.7
+    console.log(`[DirectNodeLabel] PLAN IMPLEMENTATION: FIXED PERCENTAGE SIZE for ${id}: ${fixedPercentageSize} (was 0.7, now fixed 1.5)`);
+    return fixedPercentageSize;
   }, [id]);
 
-  // UPDATED: High contrast colors for better visibility
+  // PLAN IMPLEMENTATION: High contrast colors for better visibility
   const textColor = useMemo(() => {
     const color = effectiveTheme === 'dark' ? '#ffffff' : '#000000';
     console.log(`[DirectNodeLabel] HIGH CONTRAST TEXT COLOR for ${id}: ${color} (theme: ${effectiveTheme})`);
     return color;
   }, [effectiveTheme, id]);
 
-  // FIXED: Bright, high-contrast percentage color
+  // PLAN IMPLEMENTATION: Enhanced percentage visibility with white text and black outline
   const percentageColor = useMemo(() => {
-    const color = effectiveTheme === 'dark' ? '#00ff00' : '#ff0000';
-    console.log(`[DirectNodeLabel] FIXED HIGH CONTRAST PERCENTAGE COLOR for ${id}: ${color} (theme: ${effectiveTheme})`);
+    const color = '#ffffff'; // Always white for maximum contrast
+    console.log(`[DirectNodeLabel] PLAN IMPLEMENTATION: ENHANCED PERCENTAGE COLOR for ${id}: ${color} (always white for maximum visibility)`);
     return color;
-  }, [effectiveTheme, id]);
+  }, [id]);
 
   const labelPosition: [number, number, number] = [
     position[0] + labelOffset[0],
@@ -94,29 +95,22 @@ export const DirectNodeLabel: React.FC<DirectNodeLabelProps> = ({
     position[2] + labelOffset[2]
   ];
 
-  // FIXED: Enhanced side positioning for percentage with better spacing and Z-offset
+  // PLAN IMPLEMENTATION: Simplified percentage positioning closer to nodes
   const percentagePosition: [number, number, number] = useMemo(() => {
-    const baseSideOffset = type === 'entity' ? 3.5 : 4.0;
-    const sideOffset = baseSideOffset * Math.max(1.0, nodeScale);
-    
-    let verticalOffset = 0;
-    if (type === 'emotion') {
-      verticalOffset = position[1] > 0 ? -2.0 : 2.0;
-    } else {
-      verticalOffset = -1.0;
-    }
-    
-    const zOffset = 2.0;
+    // Simplified positioning: place percentage to the right and slightly up from the node
+    const simpleSideOffset = 2.5; // Reduced from complex calculation
+    const simpleVerticalOffset = 0.5; // Small upward offset
+    const simpleZOffset = 0.5; // Small forward offset
     
     const finalPosition: [number, number, number] = [
-      position[0] + sideOffset,
-      position[1] + verticalOffset,
-      position[2] + zOffset
+      position[0] + simpleSideOffset,
+      position[1] + simpleVerticalOffset,
+      position[2] + simpleZOffset
     ];
     
-    console.log(`[DirectNodeLabel] FIXED PERCENTAGE POSITIONING for ${id} (${type}): sideOffset=${sideOffset}, verticalOffset=${verticalOffset}, zOffset=${zOffset}, final=`, finalPosition);
+    console.log(`[DirectNodeLabel] PLAN IMPLEMENTATION: SIMPLIFIED PERCENTAGE POSITIONING for ${id} (${type}): simple offsets - side=${simpleSideOffset}, vertical=${simpleVerticalOffset}, z=${simpleZOffset}, final=`, finalPosition);
     return finalPosition;
-  }, [position, type, nodeScale, id]);
+  }, [position, type, id]);
 
   // Enhanced visibility check for tutorial step 9
   const enhancedShouldShowLabel = useMemo(() => {
@@ -136,21 +130,23 @@ export const DirectNodeLabel: React.FC<DirectNodeLabelProps> = ({
     return null;
   }
 
-  // FIXED: Enhanced percentage display logging
+  // PLAN IMPLEMENTATION: Enhanced percentage display debugging
   if (showPercentage && connectionPercentage > 0) {
-    console.log(`[DirectNodeLabel] FIXED STATIC PERCENTAGE DISPLAY: ${id} (${type}) shows ${connectionPercentage}% at`, percentagePosition, `size: ${percentageTextSize}, color: ${percentageColor} - STATIC SIZE 2.8`);
+    console.log(`[DirectNodeLabel] PLAN IMPLEMENTATION: PERCENTAGE DISPLAY DEBUG: ${id} (${type}) shows ${connectionPercentage}% at`, percentagePosition, `size: ${percentageTextSize}, color: ${percentageColor}, showPercentage: ${showPercentage}, connectionPercentage: ${connectionPercentage}`);
+  } else {
+    console.log(`[DirectNodeLabel] PLAN IMPLEMENTATION: PERCENTAGE NOT DISPLAYED for ${id}: showPercentage=${showPercentage}, connectionPercentage=${connectionPercentage}`);
   }
 
-  console.log(`[DirectNodeLabel] FIXED STATIC TEXT SIZE 8: "${id}" at position`, labelPosition, 'with STATIC size:', textSize, 'color:', textColor, '- GOOGLE TRANSLATE INTEGRATION');
+  console.log(`[DirectNodeLabel] PLAN IMPLEMENTATION: RENDERING TEXT SIZE 2: "${id}" at position`, labelPosition, 'with STATIC size:', textSize, 'color:', textColor, '- REDUCED FROM 8 TO 2');
 
   return (
     <>
-      {/* Main text using TranslatableText3D with Google Translate integration and STATIC size 8 */}
+      {/* Main text using TranslatableText3D with Google Translate integration and STATIC size 2 */}
       <TranslatableText3D
         text={id}
         position={labelPosition}
         color={textColor}
-        size={textSize} // FIXED: Static size 8
+        size={textSize} // PLAN IMPLEMENTATION: Static size 2 (reduced from 8)
         visible={true}
         renderOrder={15}
         bold={isHighlighted || isSelected}
@@ -163,18 +159,18 @@ export const DirectNodeLabel: React.FC<DirectNodeLabelProps> = ({
         sourceLanguage="en"
       />
       
-      {/* FIXED: Enhanced percentage text with STATIC size 2.8 */}
+      {/* PLAN IMPLEMENTATION: Enhanced percentage text with fixed size 1.5 and better visibility */}
       {showPercentage && connectionPercentage > 0 && (
         <SimpleText
           text={`${connectionPercentage}%`}
           position={percentagePosition}
-          color={percentageColor}
-          size={percentageTextSize} // FIXED: Static size 2.8
+          color={percentageColor} // Always white for maximum contrast
+          size={percentageTextSize} // PLAN IMPLEMENTATION: Fixed size 1.5
           visible={true}
           renderOrder={20}
           bold={true}
-          outlineWidth={0.05}
-          outlineColor={effectiveTheme === 'dark' ? '#000000' : '#ffffff'}
+          outlineWidth={0.15} // Increased outline for better visibility
+          outlineColor="#000000" // Always black outline for contrast
           maxWidth={300}
           enableWrapping={false}
         />
