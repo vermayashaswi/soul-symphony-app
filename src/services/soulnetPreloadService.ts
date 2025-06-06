@@ -319,8 +319,8 @@ export class SoulNetPreloadService {
       const emotionRadius = EMOTION_LAYER_RADIUS;
       const emotionX = Math.cos(emotionAngle) * emotionRadius;
       
-      // UPDATED: New Y-axis pattern for emotions: +2, +3, +4, +5 / -2, -3, -4, -5
-      const yPatternValues = [2, 3, 4, 5];
+      // CORRECTED: New Y-axis pattern for emotions: +7, +9, +11, +13 / -7, -9, -11, -13
+      const yPatternValues = [7, 9, 11, 13];
       const patternIndex = emotionIndex % yPatternValues.length;
       const baseY = yPatternValues[patternIndex];
       const emotionY = (emotionIndex % 2 === 0) ? baseY : -baseY;
@@ -328,7 +328,7 @@ export class SoulNetPreloadService {
       // Z-axis uses circular distribution (same pattern as X-axis)
       const emotionZ = Math.sin(emotionAngle) * emotionRadius;
       
-      console.log(`[SoulNetPreloadService] UPDATED EMOTION Y-PATTERN: Emotion ${emotion} (index ${emotionIndex}) positioned at Y=${emotionY} (pattern: ${baseY}, positive: ${emotionIndex % 2 === 0})`);
+      console.log(`[SoulNetPreloadService] CORRECTED EMOTION Y-PATTERN: Emotion ${emotion} (index ${emotionIndex}) positioned at Y=${emotionY} (pattern: ${baseY}, positive: ${emotionIndex % 2 === 0})`);
       
       nodes.push({
         id: emotion,
@@ -339,9 +339,9 @@ export class SoulNetPreloadService {
       });
     });
 
-    console.log("[SoulNetPreloadService] UPDATED POSITIONING COMPLETE: Generated graph with", nodes.length, "nodes and", links.length, "links");
+    console.log("[SoulNetPreloadService] CORRECTED POSITIONING COMPLETE: Generated graph with", nodes.length, "nodes and", links.length, "links");
     console.log("[SoulNetPreloadService] ENTITY Y-PATTERN: Repeating +1, -2, +2, -1");
-    console.log("[SoulNetPreloadService] EMOTION Y-PATTERN: Updated to +2,+3,+4,+5 / -2,-3,-4,-5");
+    console.log("[SoulNetPreloadService] EMOTION Y-PATTERN: Corrected to +7,+9,+11,+13 / -7,-9,-11,-13");
     return { nodes, links };
   }
 
