@@ -27,18 +27,18 @@ export default function Auth() {
   // Get valid redirect path with priority
   const getValidRedirectPath = (path: string | null) => {
     if (!path) {
-      return onboardingComplete ? '/app/home' : '/app/home'; // Always go to home after auth
+      return onboardingComplete ? '/app/home' : '/app/onboarding';
     }
     
     // Normalize legacy paths
     if (path === '/home') return '/app/home';
-    if (path === '/onboarding') return '/app/home'; // Don't redirect back to onboarding
+    if (path === '/onboarding') return '/app/onboarding';
     
     return path;
   };
   
-  // Determine where to redirect after auth - always to home for logged in users
-  const redirectTo = user ? '/app/home' : getValidRedirectPath(redirectParam || fromLocation || storedRedirect);
+  // Determine where to redirect after auth
+  const redirectTo = getValidRedirectPath(redirectParam || fromLocation || storedRedirect);
 
   console.log('Auth page mounted', { 
     redirectTo, 
@@ -65,13 +65,18 @@ export default function Auth() {
       
       // Add small delay to ensure state updates before navigation
       const timer = setTimeout(() => {
-        // Always redirect logged in users to home
-        navigate('/app/home', { replace: true });
+        // If onboarding is not complete, redirect to onboarding
+        if (!onboardingComplete && !redirectTo.includes('onboarding')) {
+          console.log('Redirecting to onboarding as it is not complete');
+          navigate('/app/onboarding', { replace: true });
+        } else {
+          navigate(redirectTo, { replace: true });
+        }
       }, 500);
       
       return () => clearTimeout(timer);
     }
-  }, [user, authLoading, navigate, redirecting]);
+  }, [user, authLoading, navigate, redirecting, redirectTo, onboardingComplete]);
 
   const handleSignIn = async () => {
     try {
@@ -98,10 +103,18 @@ export default function Auth() {
     );
   }
 
-  // If already logged in, redirect to home
+  // If already logged in, redirect to target page
   if (user) {
-    console.log('User already logged in, redirecting to home');
-    return <Navigate to="/app/home" replace />;
+    // If onboarding is not complete, redirect to onboarding instead
+    const finalRedirect = !onboardingComplete && !redirectTo.includes('onboarding') 
+      ? '/app/onboarding'
+      : redirectTo;
+      
+    console.log('User already logged in, redirecting to:', finalRedirect, {
+      onboardingComplete,
+      originalRedirect: redirectTo
+    });
+    return <Navigate to={finalRedirect} replace />;
   }
 
   return (

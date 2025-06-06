@@ -1,6 +1,6 @@
 
 import React, { useMemo } from 'react';
-import UnifiedTextRenderer from './UnifiedTextRenderer';
+import ReliableText from './ReliableText';
 
 interface FixedConnectionPercentageProps {
   position: [number, number, number];
@@ -43,7 +43,7 @@ export const FixedConnectionPercentage: React.FC<FixedConnectionPercentageProps>
   console.log(`[FixedConnectionPercentage] Final render: "${formattedPercentage}" at`, percentagePosition, 'for nodeType:', nodeType);
 
   return (
-    <UnifiedTextRenderer
+    <ReliableText
       text={formattedPercentage}
       position={percentagePosition}
       color="#ffff00" // Bright yellow for better visibility

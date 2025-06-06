@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import '@/types/three-reference';
 import { Canvas } from '@react-three/fiber';
@@ -5,16 +6,15 @@ import { TimeRange } from '@/hooks/use-insights-data';
 import { useIsMobile } from '@/hooks/use-mobile';
 import SimplifiedSoulNetVisualization from './soulnet/SimplifiedSoulNetVisualization';
 import RenderingErrorBoundary from './soulnet/RenderingErrorBoundary';
+import { LoadingState } from './soulnet/LoadingState';
 import { EmptyState } from './soulnet/EmptyState';
 import { FullscreenWrapper } from './soulnet/FullscreenWrapper';
 import SoulNetDescription from './soulnet/SoulNetDescription';
-import { SoulNetErrorHandler } from './soulnet/SoulNetErrorHandler';
-import { SoulNetLoadingState } from './soulnet/SoulNetLoadingState';
 import { useUserColorThemeHex } from './soulnet/useUserColorThemeHex';
 import { cn } from '@/lib/utils';
 import { TranslatableText } from '@/components/translation/TranslatableText';
 import { useTranslation } from '@/contexts/TranslationContext';
-import { useFlickerFreeSoulNetData } from '@/hooks/useFlickerFreeSoulNetData';
+import { useInstantSoulNetData } from '@/hooks/useInstantSoulNetData';
 
 interface SoulNetProps {
   userId: string | undefined;
@@ -26,74 +26,64 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
   const [canvasError, setCanvasError] = useState<Error | null>(null);
   const [retryCount, setRetryCount] = useState(0);
   const [renderingReady, setRenderingReady] = useState(false);
-  const [isRetrying, setIsRetrying] = useState(false);
   const isMobile = useIsMobile();
   const themeHex = useUserColorThemeHex();
   const [selectedEntity, setSelectedEntity] = useState<string | null>(null);
   const { currentLanguage } = useTranslation();
   
-  const stableRenderingRef = useRef(false);
-  const maxRetryCount = 3;
+  // STABILIZATION: Use ref to track if rendering has been initialized to prevent unnecessary resets
+  const renderingInitialized = useRef(false);
 
-  // Use the enhanced flicker-free data hook
+  // Use the enhanced instant data hook
   const { 
     graphData, 
     loading, 
     error,
-    isReady,
-    isTranslationsReady,
-    translationProgress,
-    retryTranslations,
+    isInstantReady,
     getInstantConnectionPercentage,
     getInstantTranslation,
     getInstantNodeConnections
-  } = useFlickerFreeSoulNetData(userId, timeRange);
+  } = useInstantSoulNetData(userId, timeRange);
 
-  console.log("[SoulNet] UNIFIED STATE:", { 
+  console.log("[SoulNet] INSTANT DATA MODE - Zero loading delays", { 
     userId, 
     timeRange, 
     currentLanguage,
     nodesCount: graphData.nodes.length,
-    isReady,
-    isTranslationsReady,
-    translationProgress,
+    isInstantReady,
     loading,
     renderingReady,
-    stableRendering: stableRenderingRef.current,
-    canvasError: !!canvasError,
-    retryCount
+    renderingInitialized: renderingInitialized.current
   });
 
-  // Stable rendering initialization
   useEffect(() => {
-    const translationsActuallyReady = currentLanguage === 'en' || (isTranslationsReady && translationProgress === 100);
+    console.log("[SoulNet] Component mounted - Instant data mode enabled");
     
-    if (isReady && translationsActuallyReady && graphData.nodes.length > 0 && !stableRenderingRef.current && !canvasError) {
-      console.log("[SoulNet] INITIALIZING unified rendering", {
-        isReady,
-        translationsActuallyReady,
-        translationProgress,
-        currentLanguage,
-        nodesCount: graphData.nodes.length
-      });
-      setRenderingReady(true);
-      stableRenderingRef.current = true;
-    }
-    
-    if (error || (graphData.nodes.length === 0 && !loading && stableRenderingRef.current)) {
-      console.log("[SoulNet] RESETTING due to error or data loss", { 
-        error: !!error, 
-        nodesCount: graphData.nodes.length,
-        loading 
-      });
-      setRenderingReady(false);
-      stableRenderingRef.current = false;
-    }
-  }, [isReady, isTranslationsReady, translationProgress, graphData.nodes.length, loading, error, currentLanguage, canvasError]);
+    return () => {
+      console.log("[SoulNet] Component unmounted");
+    };
+  }, []);
 
-  // Node selection handler
+  // STABILIZED: Enhanced rendering initialization that doesn't reset once established
+  useEffect(() => {
+    // Only initialize rendering if we have data and haven't already initialized
+    if ((isInstantReady || (graphData.nodes.length > 0 && !loading)) && !renderingInitialized.current) {
+      console.log("[SoulNet] STABILIZED: Initializing rendering for the first time");
+      setRenderingReady(true);
+      renderingInitialized.current = true;
+    }
+    
+    // DEFENSIVE: Only reset rendering if there's an actual error or complete data loss
+    if (error || (graphData.nodes.length === 0 && !loading && renderingInitialized.current)) {
+      console.log("[SoulNet] DEFENSIVE: Resetting rendering due to error or data loss", { error: !!error, nodesCount: graphData.nodes.length });
+      setRenderingReady(false);
+      renderingInitialized.current = false;
+    }
+  }, [isInstantReady, graphData.nodes.length, loading, error]);
+
+  // OPTIMIZED: Node selection with stable state management
   const handleNodeSelect = useCallback((id: string) => {
-    console.log(`[SoulNet] Node selected: ${id}`);
+    console.log(`[SoulNet] STABLE: Node selected: ${id} - no re-render triggers`);
     if (selectedEntity === id) {
       setSelectedEntity(null);
     } else {
@@ -116,82 +106,106 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
     console.error('[SoulNet] Canvas error:', error);
     setCanvasError(error);
     setRetryCount(prev => prev + 1);
+    // DEFENSIVE: Reset rendering state on canvas errors
     setRenderingReady(false);
-    stableRenderingRef.current = false;
+    renderingInitialized.current = false;
   }, []);
 
-  const handleRetry = useCallback(async () => {
-    setIsRetrying(true);
+  const handleRetry = useCallback(() => {
     setCanvasError(null);
     setRetryCount(0);
-    stableRenderingRef.current = false;
-    setRenderingReady(false);
-    
-    setTimeout(() => {
-      setIsRetrying(false);
-    }, 1000);
+    // Allow re-initialization after retry
+    renderingInitialized.current = false;
   }, []);
 
-  const handleTranslationRetry = useCallback(async () => {
-    console.log("[SoulNet] RETRYING translations");
-    setIsRetrying(true);
-    setRenderingReady(false);
-    stableRenderingRef.current = false;
-    
-    try {
-      await retryTranslations();
-    } finally {
-      setIsRetrying(false);
-    }
-  }, [retryTranslations]);
-
-  // Loading state
-  const shouldShowLoading = loading && (!isReady || (currentLanguage !== 'en' && (!isTranslationsReady || translationProgress < 100))) && graphData.nodes.length === 0;
-  
-  if (shouldShowLoading || isRetrying) {
-    return (
-      <SoulNetLoadingState
-        translationProgress={translationProgress}
-        showTranslationProgress={currentLanguage !== 'en'}
-        currentLanguage={currentLanguage}
-      />
-    );
+  // ENHANCED: Only show loading if we truly have no data and are still loading
+  if (loading && !isInstantReady && graphData.nodes.length === 0) {
+    console.log("[SoulNet] ENHANCED: Showing loading state - no instant data available");
+    return <LoadingState />;
   }
   
-  // Error states
-  if (error) {
-    return (
-      <SoulNetErrorHandler
-        error={error}
-        onRetry={() => window.location.reload()}
-        isLoading={isRetrying}
-      />
-    );
-  }
+  if (error) return (
+    <div className="bg-background rounded-xl shadow-sm border w-full p-6">
+      <h2 className="text-xl font-semibold text-red-600 mb-4">
+        <TranslatableText 
+          text="Error Loading Soul-Net" 
+          forceTranslate={true}
+          enableFontScaling={true}
+          scalingContext="general"
+        />
+      </h2>
+      <p className="text-muted-foreground mb-4">{error.message}</p>
+      <button 
+        className="px-4 py-2 bg-primary text-white rounded-md" 
+        onClick={() => window.location.reload()}
+      >
+        <TranslatableText 
+          text="Retry" 
+          forceTranslate={true}
+          enableFontScaling={true}
+          scalingContext="general"
+        />
+      </button>
+    </div>
+  );
   
-  if (graphData.nodes.length === 0) {
-    return <EmptyState />;
-  }
+  if (graphData.nodes.length === 0) return <EmptyState />;
 
-  // Translation error state
-  if (currentLanguage !== 'en' && !isTranslationsReady) {
+  // Show simplified error UI for canvas errors
+  if (canvasError && retryCount > 2) {
     return (
-      <SoulNetErrorHandler
-        showTranslationError={true}
-        onTranslationRetry={handleTranslationRetry}
-        isLoading={isRetrying}
-      />
-    );
-  }
-
-  // Canvas error state with retry limit
-  if (canvasError && retryCount > maxRetryCount) {
-    return (
-      <SoulNetErrorHandler
-        error={new Error("3D visualization is experiencing technical difficulties. Your data is safe and you can try again.")}
-        onRetry={handleRetry}
-        isLoading={isRetrying}
-      />
+      <div className="bg-background rounded-xl shadow-sm border w-full p-6">
+        <h2 className="text-xl font-semibold mb-4">
+          <TranslatableText 
+            text="Soul-Net Visualization" 
+            forceTranslate={true}
+            enableFontScaling={true}
+            scalingContext="general"
+          />
+        </h2>
+        <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-4">
+          <h3 className="font-medium text-yellow-800 dark:text-yellow-300 mb-2">
+            <TranslatableText 
+              text="3D Visualization Unavailable" 
+              forceTranslate={true}
+              enableFontScaling={true}
+              scalingContext="general"
+            />
+          </h3>
+          <p className="text-yellow-700 dark:text-yellow-400 mb-3">
+            <TranslatableText 
+              text="The 3D visualization is experiencing technical difficulties. Your data is safe and you can try again." 
+              forceTranslate={true}
+              enableFontScaling={true}
+              scalingContext="general"
+            />
+          </p>
+          <div className="space-x-2">
+            <button
+              className="px-4 py-2 bg-yellow-600 text-white rounded hover:bg-yellow-700"
+              onClick={handleRetry}
+            >
+              <TranslatableText 
+                text="Try Again" 
+                forceTranslate={true}
+                enableFontScaling={true}
+                scalingContext="general"
+              />
+            </button>
+            <button
+              className="px-4 py-2 bg-gray-600 text-white rounded hover:bg-gray-700"
+              onClick={() => window.location.reload()}
+            >
+              <TranslatableText 
+                text="Reload Page" 
+                forceTranslate={true}
+                enableFontScaling={true}
+                scalingContext="general"
+              />
+            </button>
+          </div>
+        </div>
+      </div>
     );
   }
 
@@ -216,7 +230,7 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
     );
   };
 
-  console.log(`[SoulNet] UNIFIED RENDERING: ${graphData.nodes.length} nodes, ${graphData.links.length} links, ready: ${renderingReady}, userId: ${userId}, timeRange: ${timeRange}`);
+  console.log(`[SoulNet] STABILIZED RENDER: ${graphData.nodes.length} nodes, ${graphData.links.length} links, renderingReady: ${renderingReady}, initialized: ${renderingInitialized.current}`);
 
   return (
     <div className={cn(
@@ -232,14 +246,41 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
         <RenderingErrorBoundary
           onError={handleCanvasError}
           fallback={
-            <SoulNetErrorHandler
-              error={new Error("The 3D visualization encountered an error.")}
-              onRetry={handleRetry}
-              isLoading={isRetrying}
-            />
+            <div className="flex items-center justify-center p-10 bg-gray-100 dark:bg-gray-800 rounded-lg">
+              <div className="text-center">
+                <h3 className="text-lg font-medium">
+                  <TranslatableText 
+                    text="Visualization Error" 
+                    forceTranslate={true}
+                    enableFontScaling={true}
+                    scalingContext="general"
+                  />
+                </h3>
+                <p className="text-muted-foreground mt-2">
+                  <TranslatableText 
+                    text="The 3D visualization encountered an error." 
+                    forceTranslate={true}
+                    enableFontScaling={true}
+                    scalingContext="general"
+                  />
+                </p>
+                <button 
+                  className="mt-4 px-4 py-2 bg-primary text-white rounded-lg"
+                  onClick={handleRetry}
+                >
+                  <TranslatableText 
+                    text="Retry" 
+                    forceTranslate={true}
+                    enableFontScaling={true}
+                    scalingContext="general"
+                  />
+                </button>
+              </div>
+            </div>
           }
         >
-          {renderingReady && (currentLanguage === 'en' || isTranslationsReady) && (
+          {/* STABILIZED: Canvas only renders when truly ready and stays mounted during interactions */}
+          {renderingReady && (
             <Canvas
               style={{
                 width: '100%',
@@ -277,9 +318,7 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
                 getInstantConnectionPercentage={getInstantConnectionPercentage}
                 getInstantTranslation={getInstantTranslation}
                 getInstantNodeConnections={getInstantNodeConnections}
-                isInstantReady={isReady && (currentLanguage === 'en' || isTranslationsReady)}
-                userId={userId}
-                timeRange={timeRange}
+                isInstantReady={isInstantReady}
               />
             </Canvas>
           )}

@@ -1,11 +1,11 @@
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect } from 'react';
 import { enhancedFontService } from '@/services/enhancedFontService';
 import CanvasTextRenderer from './CanvasTextRenderer';
 import SimpleText from './SimpleText';
 import { wrapTextIntelligently, calculateOptimalMaxWidth } from '@/utils/textWrappingUtils';
 
-interface UnifiedTextRendererProps {
+interface SmartTextRendererProps {
   text: string;
   position: [number, number, number];
   color?: string;
@@ -21,7 +21,7 @@ interface UnifiedTextRendererProps {
   maxLines?: number;
 }
 
-export const UnifiedTextRenderer: React.FC<UnifiedTextRendererProps> = ({
+export const SmartTextRenderer: React.FC<SmartTextRendererProps> = ({
   text,
   position,
   color = '#000000',
@@ -29,7 +29,7 @@ export const UnifiedTextRenderer: React.FC<UnifiedTextRendererProps> = ({
   visible = true,
   renderOrder = 10,
   bold = false,
-  outlineWidth = 0,
+  outlineWidth = 0, // PLAN IMPLEMENTATION: Default to no outline
   outlineColor,
   maxWidth = 25,
   enableWrapping = false,
@@ -42,21 +42,10 @@ export const UnifiedTextRenderer: React.FC<UnifiedTextRendererProps> = ({
   const [processedText, setProcessedText] = useState('');
   const [optimalMaxWidth, setOptimalMaxWidth] = useState(maxWidth);
 
-  // Text validation
-  const isValidText = useMemo(() => {
-    return typeof text === 'string' && text.trim().length > 0;
-  }, [text]);
-
   useEffect(() => {
     const initializeRenderer = async () => {
       try {
-        if (!isValidText) {
-          console.warn(`[UnifiedTextRenderer] Invalid text: "${text}"`);
-          setHasError(true);
-          return;
-        }
-
-        // Process text wrapping
+        // Process text wrapping first
         let finalText = text;
         let calculatedMaxWidth = maxWidth;
 
@@ -64,44 +53,51 @@ export const UnifiedTextRenderer: React.FC<UnifiedTextRendererProps> = ({
           const wrappedResult = wrapTextIntelligently(text, maxCharsPerLine, maxLines);
           finalText = wrappedResult.lines.join('\n');
           calculatedMaxWidth = calculateOptimalMaxWidth(wrappedResult, size);
+          
+          console.log(`[SmartTextRenderer] Text wrapped: "${text}" -> "${finalText}" (${wrappedResult.totalLines} lines, maxWidth: ${calculatedMaxWidth})`);
         }
 
         setProcessedText(finalText);
         setOptimalMaxWidth(calculatedMaxWidth);
 
         const isComplex = enhancedFontService.isComplexScript(finalText);
+        const isMultiLine = finalText.includes('\n');
         
-        if (isComplex) {
-          console.log(`[UnifiedTextRenderer] Using Canvas renderer for complex script: "${finalText}"`);
+        // PLAN IMPLEMENTATION: Prefer Three.js renderer for consistent font sizing
+        // Only use Canvas for complex scripts that Three.js can't handle well
+        const preferCanvas = isComplex;
+        
+        if (preferCanvas) {
+          console.log(`[SmartTextRenderer] PLAN IMPLEMENTATION: Using Canvas renderer for complex script: "${finalText}"`);
           setUseCanvasRenderer(true);
           setFontLoaded(true);
         } else {
-          console.log(`[UnifiedTextRenderer] Using Three.js renderer for: "${finalText}"`);
+          console.log(`[SmartTextRenderer] PLAN IMPLEMENTATION: Using Three.js renderer for: "${finalText}" (multiline: ${isMultiLine}, size: ${size}) - CRISP FONT RENDERING`);
           try {
             await enhancedFontService.loadFont(finalText);
             setUseCanvasRenderer(false);
             setFontLoaded(true);
-            console.log(`[UnifiedTextRenderer] Three.js font loaded successfully for: "${finalText}"`);
+            console.log(`[SmartTextRenderer] Three.js font loaded successfully for: "${finalText}" with crisp rendering`);
           } catch (error) {
-            console.warn(`[UnifiedTextRenderer] Three.js font loading failed, using Canvas:`, error);
+            console.warn(`[SmartTextRenderer] Three.js font loading failed for: "${finalText}", falling back to Canvas`, error);
             setUseCanvasRenderer(true);
             setFontLoaded(true);
           }
         }
       } catch (error) {
-        console.error(`[UnifiedTextRenderer] Error initializing renderer:`, error);
+        console.error(`[SmartTextRenderer] Error initializing renderer for: "${text}"`, error);
         setHasError(true);
       }
     };
 
     initializeRenderer();
-  }, [text, size, enableWrapping, maxCharsPerLine, maxLines, maxWidth, isValidText]);
+  }, [text, size, enableWrapping, maxCharsPerLine, maxLines, maxWidth]);
 
-  if (!visible || hasError || !fontLoaded || !isValidText) {
+  if (!visible || hasError || !fontLoaded) {
     return null;
   }
 
-  console.log(`[UnifiedTextRenderer] Rendering with ${useCanvasRenderer ? 'Canvas' : 'Three.js'}: "${processedText}"`);
+  console.log(`[SmartTextRenderer] PLAN IMPLEMENTATION: Using ${useCanvasRenderer ? 'Canvas' : 'Three.js'} renderer for CRISP text: "${processedText}" with size: ${size}, color: ${color}`);
 
   if (useCanvasRenderer) {
     return (
@@ -128,7 +124,7 @@ export const UnifiedTextRenderer: React.FC<UnifiedTextRendererProps> = ({
       visible={visible}
       renderOrder={renderOrder}
       bold={bold}
-      outlineWidth={outlineWidth}
+      outlineWidth={outlineWidth} // PLAN IMPLEMENTATION: Pass through (should be 0 for black text)
       outlineColor={outlineColor}
       maxWidth={optimalMaxWidth}
       enableWrapping={enableWrapping}
@@ -136,4 +132,4 @@ export const UnifiedTextRenderer: React.FC<UnifiedTextRendererProps> = ({
   );
 };
 
-export default UnifiedTextRenderer;
+export default SmartTextRenderer;

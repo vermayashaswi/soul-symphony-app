@@ -2,13 +2,11 @@
 import React, { useState, useEffect } from 'react';
 import { Navigate, useLocation, Outlet } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
-import { useOnboarding } from '@/hooks/use-onboarding';
 
 const ProtectedRoute: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [user, setUser] = useState<any>(null);
   const location = useLocation();
-  const { onboardingComplete } = useOnboarding();
   
   useEffect(() => {
     const checkAuth = async () => {
@@ -32,6 +30,14 @@ const ProtectedRoute: React.FC = () => {
     return () => subscription.unsubscribe();
   }, []);
   
+  useEffect(() => {
+    if (!isLoading && !user) {
+      console.log("Protected route: No user, should redirect to /app/auth", {
+        path: location.pathname
+      });
+    }
+  }, [user, isLoading, location]);
+  
   if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -40,16 +46,9 @@ const ProtectedRoute: React.FC = () => {
     );
   }
   
-  // If no user, redirect to auth
   if (!user) {
-    console.log("ProtectedRoute: No user, redirecting to auth from:", location.pathname);
+    console.log("Redirecting to auth from protected route:", location.pathname);
     return <Navigate to={`/app/auth?redirectTo=${location.pathname}`} replace />;
-  }
-  
-  // If user exists but onboarding not complete, redirect to onboarding
-  if (onboardingComplete === false) {
-    console.log("ProtectedRoute: User exists but onboarding incomplete, redirecting to onboarding");
-    return <Navigate to="/app/onboarding" replace />;
   }
   
   // Use Outlet to render child routes
