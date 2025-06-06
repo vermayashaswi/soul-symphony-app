@@ -1,7 +1,8 @@
 
-import React, { useMemo, useEffect } from 'react';
+import React, { useMemo, useEffect, useState } from 'react';
 import FlickerFreeTranslatableText3D from './FlickerFreeTranslatableText3D';
 import SimpleText from './SimpleText';
+import { useTranslation } from '@/contexts/TranslationContext';
 
 interface DirectNodeLabelProps {
   id: string;
@@ -38,6 +39,9 @@ export const DirectNodeLabel: React.FC<DirectNodeLabelProps> = ({
   userId,
   timeRange
 }) => {
+  const { currentLanguage } = useTranslation();
+  const [hasValidTranslation, setHasValidTranslation] = useState<boolean>(false);
+
   // Listen for tutorial debugging events
   useEffect(() => {
     const handleTutorialDebug = (event: CustomEvent) => {
@@ -53,8 +57,27 @@ export const DirectNodeLabel: React.FC<DirectNodeLabelProps> = ({
     };
   }, [id, shouldShowLabel]);
 
-  // PLAN IMPLEMENTATION: Static text size of 2 (reduced from 8)
-  console.log(`[DirectNodeLabel] FLICKER-FREE RENDERING: ${id} - Static size 2, no translation delays`);
+  // Check if we have a valid translation or if we're in English
+  useEffect(() => {
+    if (currentLanguage === 'en') {
+      setHasValidTranslation(true);
+      return;
+    }
+
+    // For non-English languages, we need to verify translation availability
+    // This will be determined by the FlickerFreeTranslatableText3D component
+    setHasValidTranslation(false);
+  }, [currentLanguage, id]);
+
+  // Handle translation completion
+  const handleTranslationComplete = (translatedText: string) => {
+    if (translatedText) {
+      setHasValidTranslation(true);
+      console.log(`[DirectNodeLabel] Translation confirmed for ${id}: ${translatedText}`);
+    }
+  };
+
+  console.log(`[DirectNodeLabel] ENHANCED RENDERING: ${id} - hasValidTranslation: ${hasValidTranslation}, language: ${currentLanguage}`);
 
   // Same base offset for both entity and emotion nodes
   const labelOffset = useMemo(() => {
@@ -65,31 +88,31 @@ export const DirectNodeLabel: React.FC<DirectNodeLabelProps> = ({
     return [0, scaledOffset, 0] as [number, number, number];
   }, [type, nodeScale, id]);
 
-  // PLAN IMPLEMENTATION: Static text size of 2 (reduced from 8)
+  // Static text size of 2
   const textSize = useMemo(() => {
-    const staticSize = 2.0; // Reduced from 8 to 2
-    console.log(`[DirectNodeLabel] FLICKER-FREE: Static text size for ${id}: ${staticSize} (zoom independent)`);
+    const staticSize = 2.0;
+    console.log(`[DirectNodeLabel] ENHANCED: Static text size for ${id}: ${staticSize}`);
     return staticSize;
   }, [id]);
 
-  // PLAN IMPLEMENTATION: Fixed minimum percentage size of 1.5
+  // Fixed minimum percentage size of 1.5
   const percentageTextSize = useMemo(() => {
     const fixedPercentageSize = 1.5;
-    console.log(`[DirectNodeLabel] FLICKER-FREE: Fixed percentage size for ${id}: ${fixedPercentageSize}`);
+    console.log(`[DirectNodeLabel] ENHANCED: Fixed percentage size for ${id}: ${fixedPercentageSize}`);
     return fixedPercentageSize;
   }, [id]);
 
-  // PLAN IMPLEMENTATION: High contrast colors for better visibility
+  // High contrast colors for better visibility
   const textColor = useMemo(() => {
     const color = effectiveTheme === 'dark' ? '#ffffff' : '#000000';
     console.log(`[DirectNodeLabel] HIGH CONTRAST TEXT COLOR for ${id}: ${color} (theme: ${effectiveTheme})`);
     return color;
   }, [effectiveTheme, id]);
 
-  // PLAN IMPLEMENTATION: Enhanced percentage visibility with white text and black outline
+  // Enhanced percentage visibility with white text and black outline
   const percentageColor = useMemo(() => {
     const color = '#ffffff'; // Always white for maximum contrast
-    console.log(`[DirectNodeLabel] ENHANCED PERCENTAGE COLOR for ${id}: ${color} (always white for maximum visibility)`);
+    console.log(`[DirectNodeLabel] ENHANCED PERCENTAGE COLOR for ${id}: ${color}`);
     return color;
   }, [id]);
 
@@ -99,7 +122,7 @@ export const DirectNodeLabel: React.FC<DirectNodeLabelProps> = ({
     position[2] + labelOffset[2]
   ];
 
-  // PLAN IMPLEMENTATION: Simplified percentage positioning closer to nodes
+  // Simplified percentage positioning closer to nodes
   const percentagePosition: [number, number, number] = useMemo(() => {
     const simpleSideOffset = 2.5;
     const simpleVerticalOffset = 0.5;
@@ -111,7 +134,7 @@ export const DirectNodeLabel: React.FC<DirectNodeLabelProps> = ({
       position[2] + simpleZOffset
     ];
     
-    console.log(`[DirectNodeLabel] SIMPLIFIED PERCENTAGE POSITIONING for ${id} (${type}): simple offsets - side=${simpleSideOffset}, vertical=${simpleVerticalOffset}, z=${simpleZOffset}`);
+    console.log(`[DirectNodeLabel] ENHANCED PERCENTAGE POSITIONING for ${id} (${type}): simple offsets`);
     return finalPosition;
   }, [position, type, id]);
 
@@ -128,21 +151,19 @@ export const DirectNodeLabel: React.FC<DirectNodeLabelProps> = ({
     return shouldShowLabel;
   }, [shouldShowLabel, id]);
 
-  if (!enhancedShouldShowLabel || !id) {
-    console.log(`[DirectNodeLabel] Not rendering label for ${id}: shouldShow=${enhancedShouldShowLabel}, text="${id}"`);
+  // Don't show label if we don't have a valid translation (except for English)
+  const finalShouldShowLabel = enhancedShouldShowLabel && (currentLanguage === 'en' || hasValidTranslation);
+
+  if (!finalShouldShowLabel || !id) {
+    console.log(`[DirectNodeLabel] ENHANCED: Not rendering label for ${id}: shouldShow=${enhancedShouldShowLabel}, hasValidTranslation=${hasValidTranslation}, currentLanguage=${currentLanguage}`);
     return null;
   }
 
-  // PLAN IMPLEMENTATION: Enhanced percentage display debugging
-  if (showPercentage && connectionPercentage > 0) {
-    console.log(`[DirectNodeLabel] FLICKER-FREE PERCENTAGE: ${id} (${type}) shows ${connectionPercentage}% at`, percentagePosition, `size: ${percentageTextSize}, color: ${percentageColor}`);
-  }
-
-  console.log(`[DirectNodeLabel] FLICKER-FREE RENDERING: "${id}" at position`, labelPosition, 'with static size:', textSize, 'color:', textColor);
+  console.log(`[DirectNodeLabel] ENHANCED RENDERING: "${id}" with proper translation handling`);
 
   return (
     <>
-      {/* Main text using FlickerFreeTranslatableText3D with preloaded translations */}
+      {/* Main text using FlickerFreeTranslatableText3D with enhanced null handling */}
       <FlickerFreeTranslatableText3D
         text={id}
         position={labelPosition}
@@ -160,6 +181,7 @@ export const DirectNodeLabel: React.FC<DirectNodeLabelProps> = ({
         sourceLanguage="en"
         userId={userId}
         timeRange={timeRange}
+        onTranslationComplete={handleTranslationComplete}
       />
       
       {/* Enhanced percentage text with fixed size and better visibility */}

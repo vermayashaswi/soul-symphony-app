@@ -15,7 +15,8 @@ import { cn } from '@/lib/utils';
 import { TranslatableText } from '@/components/translation/TranslatableText';
 import { useTranslation } from '@/contexts/TranslationContext';
 import { useFlickerFreeSoulNetData } from '@/hooks/useFlickerFreeSoulNetData';
-import { SoulNetTranslationPreloader } from '@/services/soulnetTranslationPreloader';
+import { Button } from '@/components/ui/button';
+import { RefreshCw } from 'lucide-react';
 
 interface SoulNetProps {
   userId: string | undefined;
@@ -32,66 +33,71 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
   const [selectedEntity, setSelectedEntity] = useState<string | null>(null);
   const { currentLanguage } = useTranslation();
   
-  // FLICKER-FREE: Use ref to track stable rendering state
+  // ENHANCED: Use ref to track stable rendering state
   const stableRenderingRef = useRef(false);
 
-  // Use the flicker-free data hook
+  // Use the enhanced flicker-free data hook
   const { 
     graphData, 
     loading, 
     error,
     isReady,
     isTranslationsReady,
+    translationProgress,
+    retryTranslations,
     getInstantConnectionPercentage,
     getInstantTranslation,
     getInstantNodeConnections
   } = useFlickerFreeSoulNetData(userId, timeRange);
 
-  console.log("[SoulNet] FLICKER-FREE MODE - Stable rendering with preloaded translations", { 
+  console.log("[SoulNet] ENHANCED MODE - Enhanced translation handling", { 
     userId, 
     timeRange, 
     currentLanguage,
     nodesCount: graphData.nodes.length,
     isReady,
     isTranslationsReady,
+    translationProgress,
     loading,
     renderingReady,
     stableRendering: stableRenderingRef.current
   });
 
   useEffect(() => {
-    console.log("[SoulNet] FLICKER-FREE: Component mounted with preloaded translation system");
-    
-    // Preload translations immediately on mount
-    if (userId && currentLanguage !== 'en') {
-      SoulNetTranslationPreloader.preloadSoulNetTranslations(userId, timeRange, currentLanguage)
-        .catch(error => console.warn('[SoulNet] Background translation preload failed:', error));
-    }
+    console.log("[SoulNet] ENHANCED: Component mounted with enhanced translation system");
     
     return () => {
       console.log("[SoulNet] Component unmounted");
     };
   }, []);
 
-  // FLICKER-FREE: Stable rendering initialization - only initialize once when everything is ready
+  // ENHANCED: Stable rendering initialization with better translation readiness detection
   useEffect(() => {
-    if (isReady && isTranslationsReady && graphData.nodes.length > 0 && !stableRenderingRef.current) {
-      console.log("[SoulNet] FLICKER-FREE: Initializing stable rendering - all data and translations ready");
+    // For English, we're always ready for translations
+    const translationsActuallyReady = currentLanguage === 'en' || (isTranslationsReady && translationProgress === 100);
+    
+    if (isReady && translationsActuallyReady && graphData.nodes.length > 0 && !stableRenderingRef.current) {
+      console.log("[SoulNet] ENHANCED: Initializing stable rendering - all data and translations ready", {
+        isReady,
+        translationsActuallyReady,
+        translationProgress,
+        currentLanguage
+      });
       setRenderingReady(true);
       stableRenderingRef.current = true;
     }
     
-    // Only reset if there's a critical error or complete data loss
+    // Reset if there's a critical error or complete data loss
     if (error || (graphData.nodes.length === 0 && !loading && stableRenderingRef.current)) {
-      console.log("[SoulNet] FLICKER-FREE: Resetting due to error or data loss", { error: !!error, nodesCount: graphData.nodes.length });
+      console.log("[SoulNet] ENHANCED: Resetting due to error or data loss", { error: !!error, nodesCount: graphData.nodes.length });
       setRenderingReady(false);
       stableRenderingRef.current = false;
     }
-  }, [isReady, isTranslationsReady, graphData.nodes.length, loading, error]);
+  }, [isReady, isTranslationsReady, translationProgress, graphData.nodes.length, loading, error, currentLanguage]);
 
-  // OPTIMIZED: Stable node selection without re-renders
+  // Enhanced node selection without re-renders
   const handleNodeSelect = useCallback((id: string) => {
-    console.log(`[SoulNet] FLICKER-FREE: Node selected: ${id} - stable state management`);
+    console.log(`[SoulNet] ENHANCED: Node selected: ${id} - stable state management`);
     if (selectedEntity === id) {
       setSelectedEntity(null);
     } else {
@@ -126,10 +132,47 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
     stableRenderingRef.current = false;
   }, []);
 
-  // FLICKER-FREE: Only show loading if we have no data and translations aren't ready
-  if (loading && (!isReady || !isTranslationsReady) && graphData.nodes.length === 0) {
-    console.log("[SoulNet] FLICKER-FREE: Showing loading state - waiting for data and translations");
-    return <LoadingState />;
+  // Enhanced retry for translations
+  const handleTranslationRetry = useCallback(async () => {
+    console.log("[SoulNet] ENHANCED: Retrying translations");
+    setRenderingReady(false);
+    stableRenderingRef.current = false;
+    await retryTranslations();
+  }, [retryTranslations]);
+
+  // ENHANCED: Show loading if we have no data, translations aren't ready, or translation progress is incomplete
+  const shouldShowLoading = loading && (!isReady || !isTranslationsReady || (currentLanguage !== 'en' && translationProgress < 100)) && graphData.nodes.length === 0;
+  
+  if (shouldShowLoading) {
+    console.log("[SoulNet] ENHANCED: Showing loading state - waiting for data and translations", {
+      isReady,
+      isTranslationsReady,
+      translationProgress,
+      currentLanguage
+    });
+    return (
+      <div className="bg-background rounded-xl shadow-sm border w-full p-6">
+        <LoadingState />
+        {currentLanguage !== 'en' && translationProgress > 0 && translationProgress < 100 && (
+          <div className="mt-4">
+            <div className="w-full bg-gray-200 rounded-full h-2">
+              <div 
+                className="bg-primary h-2 rounded-full transition-all duration-300" 
+                style={{ width: `${translationProgress}%` }}
+              ></div>
+            </div>
+            <p className="text-sm text-muted-foreground mt-2">
+              <TranslatableText 
+                text={`Loading translations... ${translationProgress}%`}
+                forceTranslate={true}
+                enableFontScaling={true}
+                scalingContext="general"
+              />
+            </p>
+          </div>
+        )}
+      </div>
+    );
   }
   
   if (error) return (
@@ -158,6 +201,53 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
   );
   
   if (graphData.nodes.length === 0) return <EmptyState />;
+
+  // Enhanced: Show translation retry option if translations are not ready
+  if (currentLanguage !== 'en' && !isTranslationsReady) {
+    return (
+      <div className="bg-background rounded-xl shadow-sm border w-full p-6">
+        <h2 className="text-xl font-semibold mb-4">
+          <TranslatableText 
+            text="Soul-Net Visualization" 
+            forceTranslate={true}
+            enableFontScaling={true}
+            scalingContext="general"
+          />
+        </h2>
+        <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-4">
+          <h3 className="font-medium text-yellow-800 dark:text-yellow-300 mb-2">
+            <TranslatableText 
+              text="Translations Not Available" 
+              forceTranslate={true}
+              enableFontScaling={true}
+              scalingContext="general"
+            />
+          </h3>
+          <p className="text-yellow-700 dark:text-yellow-400 mb-3">
+            <TranslatableText 
+              text="The visualization translations are not ready. Please retry to load the translated content." 
+              forceTranslate={true}
+              enableFontScaling={true}
+              scalingContext="general"
+            />
+          </p>
+          <Button
+            onClick={handleTranslationRetry}
+            className="flex items-center gap-2"
+            variant="outline"
+          >
+            <RefreshCw className="h-4 w-4" />
+            <TranslatableText 
+              text="Retry Translations" 
+              forceTranslate={true}
+              enableFontScaling={true}
+              scalingContext="general"
+            />
+          </Button>
+        </div>
+      </div>
+    );
+  }
 
   // Show simplified error UI for canvas errors
   if (canvasError && retryCount > 2) {
@@ -238,7 +328,7 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
     );
   };
 
-  console.log(`[SoulNet] FLICKER-FREE RENDER: ${graphData.nodes.length} nodes, ${graphData.links.length} links, rendering ready: ${renderingReady}, stable: ${stableRenderingRef.current}`);
+  console.log(`[SoulNet] ENHANCED RENDER: ${graphData.nodes.length} nodes, ${graphData.links.length} links, rendering ready: ${renderingReady}, stable: ${stableRenderingRef.current}, translations ready: ${isTranslationsReady}`);
 
   return (
     <div className={cn(
@@ -287,8 +377,8 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
             </div>
           }
         >
-          {/* FLICKER-FREE: Canvas only renders when stable and translations are ready */}
-          {renderingReady && isTranslationsReady && (
+          {/* ENHANCED: Canvas only renders when stable and translations are ready */}
+          {renderingReady && (currentLanguage === 'en' || isTranslationsReady) && (
             <Canvas
               style={{
                 width: '100%',
@@ -326,7 +416,7 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
                 getInstantConnectionPercentage={getInstantConnectionPercentage}
                 getInstantTranslation={getInstantTranslation}
                 getInstantNodeConnections={getInstantNodeConnections}
-                isInstantReady={isReady && isTranslationsReady}
+                isInstantReady={isReady && (currentLanguage === 'en' || isTranslationsReady)}
                 userId={userId}
                 timeRange={timeRange}
               />
