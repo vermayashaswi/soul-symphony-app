@@ -15,6 +15,7 @@ import { cn } from '@/lib/utils';
 import { TranslatableText } from '@/components/translation/TranslatableText';
 import { useTranslation } from '@/contexts/TranslationContext';
 import { useInstantSoulNetData } from '@/hooks/useInstantSoulNetData';
+import { useInsightsTranslation } from './InsightsTranslationProvider';
 
 interface SoulNetProps {
   userId: string | undefined;
@@ -44,6 +45,9 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
     getInstantTranslation,
     getInstantNodeConnections
   } = useInstantSoulNetData(userId, timeRange);
+
+  // Get centralized translation function
+  const { getTranslation } = useInsightsTranslation();
 
   console.log("[SoulNet] STABLE TRANSLATION MODE - Centralized translation system", { 
     userId, 
@@ -117,6 +121,26 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
     // Allow re-initialization after retry
     renderingInitialized.current = false;
   }, []);
+
+  // Create adapter functions to match the expected signatures
+  const adaptedGetConnectionPercentage = useCallback((nodeId: string) => {
+    if (!selectedEntity) return 0;
+    return getInstantConnectionPercentage(selectedEntity, nodeId);
+  }, [selectedEntity, getInstantConnectionPercentage]);
+
+  const adaptedGetTranslation = useCallback((nodeId: string) => {
+    // Use centralized translation first, fallback to instant translation
+    const centralTranslation = getTranslation(nodeId);
+    if (centralTranslation && centralTranslation !== nodeId) {
+      return centralTranslation;
+    }
+    return getInstantTranslation(nodeId);
+  }, [getTranslation, getInstantTranslation]);
+
+  const adaptedGetNodeConnections = useCallback((nodeId: string) => {
+    const connectionData = getInstantNodeConnections(nodeId);
+    return new Set(connectionData.connectedNodes);
+  }, [getInstantNodeConnections]);
 
   // STABLE: Only show loading if we truly have no data and are still loading
   if (loading && !isInstantReady && graphData.nodes.length === 0) {
@@ -315,9 +339,9 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
                 themeHex={themeHex}
                 isFullScreen={isFullScreen}
                 shouldShowLabels={true}
-                getInstantConnectionPercentage={getInstantConnectionPercentage}
-                getInstantTranslation={getInstantTranslation}
-                getInstantNodeConnections={getInstantNodeConnections}
+                getInstantConnectionPercentage={adaptedGetConnectionPercentage}
+                getInstantTranslation={adaptedGetTranslation}
+                getInstantNodeConnections={adaptedGetNodeConnections}
                 isInstantReady={isInstantReady}
               />
             </Canvas>
