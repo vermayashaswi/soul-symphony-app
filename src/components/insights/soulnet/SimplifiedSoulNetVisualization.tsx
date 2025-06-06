@@ -154,18 +154,15 @@ export const SimplifiedSoulNetVisualization: React.FC<SimplifiedSoulNetVisualiza
   const [isInitialized, setIsInitialized] = useState(false);
   const mounted = useRef<boolean>(true);
   
-  console.log("[SimplifiedSoulNetVisualization] Rendering with translation props", {
+  console.log("[SimplifiedSoulNetVisualization] STREAMLINED TRANSLATION - All nodes will be translated", {
     nodeCount: data?.nodes?.length,
     linkCount: data?.links?.length,
     selectedNode,
-    shouldShowLabels,
-    isInstantReady,
-    userId,
-    timeRange
+    shouldShowLabels
   });
   
   useEffect(() => {
-    console.log("[SimplifiedSoulNetVisualization] Component mounted - Google Translate integration via TranslatableText3D");
+    console.log("[SimplifiedSoulNetVisualization] STREAMLINED: Component mounted - Direct translation for all nodes");
     return () => {
       console.log("[SimplifiedSoulNetVisualization] Component unmounted");
       mounted.current = false;
@@ -329,7 +326,7 @@ export const SimplifiedSoulNetVisualization: React.FC<SimplifiedSoulNetVisualiza
     return null;
   }
 
-  console.log(`[SimplifiedSoulNetVisualization] FLICKER-FREE FINAL RENDER: ${validData.nodes.length} nodes, ${validData.links.length} links, ready: ${isInstantReady}`);
+  console.log(`[SimplifiedSoulNetVisualization] STREAMLINED RENDERING: ${validData.nodes.length} nodes with direct translation`);
 
   return (
     <>
@@ -410,7 +407,7 @@ export const SimplifiedSoulNetVisualization: React.FC<SimplifiedSoulNetVisualiza
         );
       })}
       
-      {/* Display nodes with flicker-free rendering */}
+      {/* STREAMLINED: Display nodes with direct translation - no barriers */}
       {validData.nodes.map(node => {
         if (!node || typeof node !== 'object' || !node.id) {
           console.warn("[SimplifiedSoulNetVisualization] Invalid node:", node);

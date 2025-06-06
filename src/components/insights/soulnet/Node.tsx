@@ -2,7 +2,7 @@
 import React, { useRef, useState, useCallback, useMemo } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
-import UnifiedNodeLabel from './UnifiedNodeLabel';
+import StreamlinedNodeLabel from './StreamlinedNodeLabel';
 
 interface NodeData {
   id: string;
@@ -92,7 +92,7 @@ const Node: React.FC<NodeProps> = ({
     onClick(node.id, event);
   }, [onClick, node.id]);
 
-  // Always show labels when requested
+  // STREAMLINED: Always show labels when requested - no complex conditions
   const stableLabelVisibility = useMemo(() => {
     return forceShowLabels || showLabel;
   }, [forceShowLabels, showLabel]);
@@ -105,7 +105,7 @@ const Node: React.FC<NodeProps> = ({
     }
   });
 
-  console.log(`[Node] Rendering: ${node.id} (${node.type}) - scale: ${nodeScale}, color: ${nodeColor}, labels: ${stableLabelVisibility}, userId: ${userId}, timeRange: ${timeRange}`);
+  console.log(`[Node] STREAMLINED: ${node.id} (${node.type}) - labels: ${stableLabelVisibility}`);
 
   return (
     <group position={node.position}>
@@ -126,7 +126,7 @@ const Node: React.FC<NodeProps> = ({
         />
       </mesh>
       
-      <UnifiedNodeLabel
+      <StreamlinedNodeLabel
         id={node.id}
         type={node.type}
         position={[0, 0, 0]}
@@ -139,8 +139,6 @@ const Node: React.FC<NodeProps> = ({
         connectionPercentage={connectionPercentage}
         showPercentage={showPercentage}
         effectiveTheme={effectiveTheme}
-        userId={userId}
-        timeRange={timeRange}
       />
     </group>
   );
