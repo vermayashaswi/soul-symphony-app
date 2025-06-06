@@ -133,9 +133,9 @@ export const UnifiedNodeLabel: React.FC<UnifiedNodeLabelProps> = ({
     const clampedZoom = Math.max(15, Math.min(80, cameraZoom));
     const normalizedZoom = (clampedZoom - 15) / (80 - 15);
     const zoomFactor = 0.85 + (normalizedZoom * 0.15);
-    const baseSize = type === 'entity' ? 0.35 : 0.32;
+    const baseSize = type === 'entity' ? 1.05 : 0.96; // 3x larger: 0.35 * 3 = 1.05, 0.32 * 3 = 0.96
     const calculatedSize = baseSize * zoomFactor;
-    return Math.max(0.2, Math.min(0.4, calculatedSize));
+    return Math.max(0.6, Math.min(1.2, calculatedSize)); // 3x larger constraints: 0.2 * 3 = 0.6, 0.4 * 3 = 1.2
   }, [cameraZoom, type]);
 
   const textColor = useMemo(() => {
