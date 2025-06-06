@@ -32,7 +32,7 @@ function InsightsContent() {
   // Extract node labels from insights data for translation provider
   const nodeLabels = useMemo(() => {
     // Extract from existing data structures instead of non-existent topEntities/topEmotions
-    const emotionLabels = insightsData.aggregatedEmotionData?.map(emotion => emotion.emotion) || [];
+    const emotionLabels = (insightsData.aggregatedEmotionData || []).map(emotion => emotion.emotion);
     const dominantMoodLabel = insightsData.dominantMood?.emotion ? [insightsData.dominantMood.emotion] : [];
     const improvementLabel = insightsData.biggestImprovement?.emotion ? [insightsData.biggestImprovement.emotion] : [];
     
