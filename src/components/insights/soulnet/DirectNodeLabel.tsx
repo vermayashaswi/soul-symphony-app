@@ -1,7 +1,7 @@
 
 import React, { useMemo, useEffect } from 'react';
-import TranslatableText3D from './TranslatableText3D';
 import SimpleText from './SimpleText';
+import { useInsightsTranslation } from '../InsightsTranslationProvider';
 
 interface DirectNodeLabelProps {
   id: string;
@@ -34,6 +34,8 @@ export const DirectNodeLabel: React.FC<DirectNodeLabelProps> = ({
   effectiveTheme = 'light',
   isInstantMode = false
 }) => {
+  const { getNodeLabelTranslation, isTranslating } = useInsightsTranslation();
+
   // Listen for tutorial debugging events
   useEffect(() => {
     const handleTutorialDebug = (event: CustomEvent) => {
@@ -49,8 +51,15 @@ export const DirectNodeLabel: React.FC<DirectNodeLabelProps> = ({
     };
   }, [id, shouldShowLabel]);
 
-  // PLAN IMPLEMENTATION: Static text size of 2 (reduced from 8)
-  console.log(`[DirectNodeLabel] PLAN IMPLEMENTATION: STATIC TEXT SIZE 2: ${id} - Reduced from 8 for better scaling`);
+  // Get translated text from centralized provider
+  const translatedText = useMemo(() => {
+    const translated = getNodeLabelTranslation(id);
+    console.log(`[DirectNodeLabel] Using centralized translation for "${id}": "${translated}"`);
+    return translated;
+  }, [id, getNodeLabelTranslation]);
+
+  // Static text size of 2 (reduced from 8)
+  console.log(`[DirectNodeLabel] STATIC TEXT SIZE 2: ${id} - Reduced from 8 for better scaling`);
 
   // Same base offset for both entity and emotion nodes
   const labelOffset = useMemo(() => {
@@ -61,31 +70,31 @@ export const DirectNodeLabel: React.FC<DirectNodeLabelProps> = ({
     return [0, scaledOffset, 0] as [number, number, number];
   }, [type, nodeScale, id]);
 
-  // PLAN IMPLEMENTATION: Static text size of 2 (reduced from 8)
+  // Static text size of 2 (reduced from 8)
   const textSize = useMemo(() => {
     const staticSize = 2.0; // Reduced from 8 to 2
-    console.log(`[DirectNodeLabel] PLAN IMPLEMENTATION: STATIC TEXT SIZE for ${id}: ${staticSize} (reduced from 8, zoom ignored: ${cameraZoom})`);
+    console.log(`[DirectNodeLabel] STATIC TEXT SIZE for ${id}: ${staticSize} (reduced from 8, zoom ignored: ${cameraZoom})`);
     return staticSize;
   }, [id, cameraZoom]);
 
-  // PLAN IMPLEMENTATION: Fixed minimum percentage size of 1.5 (instead of proportional 0.7)
+  // Fixed minimum percentage size of 1.5
   const percentageTextSize = useMemo(() => {
-    const fixedPercentageSize = 1.5; // Fixed minimum size instead of 2.0 * 0.35 = 0.7
-    console.log(`[DirectNodeLabel] PLAN IMPLEMENTATION: FIXED PERCENTAGE SIZE for ${id}: ${fixedPercentageSize} (was 0.7, now fixed 1.5)`);
+    const fixedPercentageSize = 1.5; // Fixed minimum size
+    console.log(`[DirectNodeLabel] FIXED PERCENTAGE SIZE for ${id}: ${fixedPercentageSize} (was 0.7, now fixed 1.5)`);
     return fixedPercentageSize;
   }, [id]);
 
-  // PLAN IMPLEMENTATION: High contrast colors for better visibility
+  // High contrast colors for better visibility
   const textColor = useMemo(() => {
     const color = effectiveTheme === 'dark' ? '#ffffff' : '#000000';
     console.log(`[DirectNodeLabel] HIGH CONTRAST TEXT COLOR for ${id}: ${color} (theme: ${effectiveTheme})`);
     return color;
   }, [effectiveTheme, id]);
 
-  // PLAN IMPLEMENTATION: Enhanced percentage visibility with white text and black outline
+  // Enhanced percentage visibility with white text and black outline
   const percentageColor = useMemo(() => {
     const color = '#ffffff'; // Always white for maximum contrast
-    console.log(`[DirectNodeLabel] PLAN IMPLEMENTATION: ENHANCED PERCENTAGE COLOR for ${id}: ${color} (always white for maximum visibility)`);
+    console.log(`[DirectNodeLabel] ENHANCED PERCENTAGE COLOR for ${id}: ${color} (always white for maximum visibility)`);
     return color;
   }, [id]);
 
@@ -95,7 +104,7 @@ export const DirectNodeLabel: React.FC<DirectNodeLabelProps> = ({
     position[2] + labelOffset[2]
   ];
 
-  // PLAN IMPLEMENTATION: Simplified percentage positioning closer to nodes
+  // Simplified percentage positioning closer to nodes
   const percentagePosition: [number, number, number] = useMemo(() => {
     // Simplified positioning: place percentage to the right and slightly up from the node
     const simpleSideOffset = 2.5; // Reduced from complex calculation
@@ -108,7 +117,7 @@ export const DirectNodeLabel: React.FC<DirectNodeLabelProps> = ({
       position[2] + simpleZOffset
     ];
     
-    console.log(`[DirectNodeLabel] PLAN IMPLEMENTATION: SIMPLIFIED PERCENTAGE POSITIONING for ${id} (${type}): simple offsets - side=${simpleSideOffset}, vertical=${simpleVerticalOffset}, z=${simpleZOffset}, final=`, finalPosition);
+    console.log(`[DirectNodeLabel] SIMPLIFIED PERCENTAGE POSITIONING for ${id} (${type}): simple offsets - side=${simpleSideOffset}, vertical=${simpleVerticalOffset}, z=${simpleZOffset}, final=`, finalPosition);
     return finalPosition;
   }, [position, type, id]);
 
@@ -125,28 +134,29 @@ export const DirectNodeLabel: React.FC<DirectNodeLabelProps> = ({
     return shouldShowLabel;
   }, [shouldShowLabel, id]);
 
-  if (!enhancedShouldShowLabel || !id) {
-    console.log(`[DirectNodeLabel] Not rendering label for ${id}: shouldShow=${enhancedShouldShowLabel}, text="${id}"`);
+  // Hide labels during active translation to prevent flickering
+  if (!enhancedShouldShowLabel || !id || isTranslating) {
+    console.log(`[DirectNodeLabel] Not rendering label for ${id}: shouldShow=${enhancedShouldShowLabel}, text="${id}", isTranslating=${isTranslating}`);
     return null;
   }
 
-  // PLAN IMPLEMENTATION: Enhanced percentage display debugging
+  // Enhanced percentage display debugging
   if (showPercentage && connectionPercentage > 0) {
-    console.log(`[DirectNodeLabel] PLAN IMPLEMENTATION: PERCENTAGE DISPLAY DEBUG: ${id} (${type}) shows ${connectionPercentage}% at`, percentagePosition, `size: ${percentageTextSize}, color: ${percentageColor}, showPercentage: ${showPercentage}, connectionPercentage: ${connectionPercentage}`);
+    console.log(`[DirectNodeLabel] PERCENTAGE DISPLAY DEBUG: ${id} (${type}) shows ${connectionPercentage}% at`, percentagePosition, `size: ${percentageTextSize}, color: ${percentageColor}, showPercentage: ${showPercentage}, connectionPercentage: ${connectionPercentage}`);
   } else {
-    console.log(`[DirectNodeLabel] PLAN IMPLEMENTATION: PERCENTAGE NOT DISPLAYED for ${id}: showPercentage=${showPercentage}, connectionPercentage=${connectionPercentage}`);
+    console.log(`[DirectNodeLabel] PERCENTAGE NOT DISPLAYED for ${id}: showPercentage=${showPercentage}, connectionPercentage=${connectionPercentage}`);
   }
 
-  console.log(`[DirectNodeLabel] PLAN IMPLEMENTATION: RENDERING TEXT SIZE 2: "${id}" at position`, labelPosition, 'with STATIC size:', textSize, 'color:', textColor, '- REDUCED FROM 8 TO 2');
+  console.log(`[DirectNodeLabel] RENDERING WITH CENTRALIZED TRANSLATION: "${translatedText}" at position`, labelPosition, 'with STATIC size:', textSize, 'color:', textColor, '- NO INDIVIDUAL TRANSLATION CALLS');
 
   return (
     <>
-      {/* Main text using TranslatableText3D with Google Translate integration and STATIC size 2 */}
-      <TranslatableText3D
-        text={id}
+      {/* Main text using SimpleText with centralized translation */}
+      <SimpleText
+        text={translatedText}
         position={labelPosition}
         color={textColor}
-        size={textSize} // PLAN IMPLEMENTATION: Static size 2 (reduced from 8)
+        size={textSize} // Static size 2 (reduced from 8)
         visible={true}
         renderOrder={15}
         bold={isHighlighted || isSelected}
@@ -156,16 +166,15 @@ export const DirectNodeLabel: React.FC<DirectNodeLabelProps> = ({
         enableWrapping={true}
         maxCharsPerLine={18}
         maxLines={3}
-        sourceLanguage="en"
       />
       
-      {/* PLAN IMPLEMENTATION: Enhanced percentage text with fixed size 1.5 and better visibility */}
+      {/* Enhanced percentage text with fixed size 1.5 and better visibility */}
       {showPercentage && connectionPercentage > 0 && (
         <SimpleText
           text={`${connectionPercentage}%`}
           position={percentagePosition}
           color={percentageColor} // Always white for maximum contrast
-          size={percentageTextSize} // PLAN IMPLEMENTATION: Fixed size 1.5
+          size={percentageTextSize} // Fixed size 1.5
           visible={true}
           renderOrder={20}
           bold={true}

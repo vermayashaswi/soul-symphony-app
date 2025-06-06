@@ -1,5 +1,5 @@
 
-import React, { createContext, useContext, ReactNode } from 'react';
+import React, { createContext, useContext, ReactNode, useMemo } from 'react';
 import { usePageTranslation } from '@/hooks/use-page-translation';
 
 interface InsightsTranslationContextType {
@@ -7,12 +7,14 @@ interface InsightsTranslationContextType {
   progress: number;
   getTranslation: (text: string) => string | null;
   retryTranslation: () => void;
+  getNodeLabelTranslation: (nodeId: string) => string;
 }
 
 const InsightsTranslationContext = createContext<InsightsTranslationContextType | undefined>(undefined);
 
 interface InsightsTranslationProviderProps {
   children: ReactNode;
+  nodeLabels?: string[]; // Dynamic node labels from SoulNet data
 }
 
 // Common texts used throughout the Insights page
@@ -69,18 +71,48 @@ const INSIGHTS_PAGE_TEXTS = [
   'J', 'F', 'M', 'A', 'M', 'J', 'J', 'A', 'S', 'O', 'N', 'D'
 ];
 
-export const InsightsTranslationProvider: React.FC<InsightsTranslationProviderProps> = ({ children }) => {
+export const InsightsTranslationProvider: React.FC<InsightsTranslationProviderProps> = ({ 
+  children, 
+  nodeLabels = [] 
+}) => {
+  // Combine static UI texts with dynamic node labels for complete translation
+  const allTexts = useMemo(() => {
+    const uniqueNodeLabels = [...new Set(nodeLabels.filter(label => 
+      label && 
+      typeof label === 'string' && 
+      label.trim() !== '' &&
+      !INSIGHTS_PAGE_TEXTS.includes(label)
+    ))];
+    
+    const combinedTexts = [...INSIGHTS_PAGE_TEXTS, ...uniqueNodeLabels];
+    console.log(`[InsightsTranslationProvider] Combined texts for translation: ${combinedTexts.length} (UI: ${INSIGHTS_PAGE_TEXTS.length}, Nodes: ${uniqueNodeLabels.length})`);
+    
+    return combinedTexts;
+  }, [nodeLabels]);
+
   const pageTranslation = usePageTranslation({
-    pageTexts: INSIGHTS_PAGE_TEXTS,
+    pageTexts: allTexts,
     route: '/insights',
     enabled: true
   });
+
+  // Get translation for node labels specifically
+  const getNodeLabelTranslation = (nodeId: string): string => {
+    if (!nodeId || typeof nodeId !== 'string') return nodeId || '';
+    
+    const translation = pageTranslation.getTranslation(nodeId);
+    const result = translation || nodeId;
+    
+    console.log(`[InsightsTranslationProvider] Node label translation: "${nodeId}" -> "${result}"`);
+    return result;
+  };
 
   const value: InsightsTranslationContextType = {
     isTranslating: pageTranslation.isTranslating,
     progress: pageTranslation.progress,
     getTranslation: pageTranslation.getTranslation,
-    retryTranslation: pageTranslation.retryTranslation
+    retryTranslation: pageTranslation.retryTranslation,
+    getNodeLabelTranslation
   };
 
   return (

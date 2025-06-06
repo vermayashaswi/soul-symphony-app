@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { motion } from 'framer-motion';
 import { Calendar, Filter, TrendingUp, ArrowUp, ArrowDown, Activity, Award } from 'lucide-react';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
@@ -28,6 +28,17 @@ function InsightsContent() {
   const isMobile = useIsMobile();
   
   const { insightsData, loading } = useInsightsData(user?.id, timeRange);
+  
+  // Extract node labels from insights data for translation provider
+  const nodeLabels = useMemo(() => {
+    // Extract entity and emotion names from insights data
+    const entityLabels = insightsData.topEntities?.map(entity => entity.name) || [];
+    const emotionLabels = insightsData.topEmotions?.map(emotion => emotion.emotion) || [];
+    const allLabels = [...entityLabels, ...emotionLabels].filter(Boolean);
+    
+    console.log("[Insights] Extracted node labels for translation:", allLabels);
+    return allLabels;
+  }, [insightsData]);
   
   const timeRanges = [
     { value: 'today', label: 'Day' },
