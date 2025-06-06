@@ -25,6 +25,7 @@ export const TranslationProvider: React.FC<TranslationProviderProps> = ({ childr
   const [currentLanguage, setCurrentLanguage] = useState<string>('en');
   const [isTranslating, setIsTranslating] = useState<boolean>(false);
   const [translationCache, setTranslationCache] = useState<Record<string, string>>({});
+  const [translationProgress, setTranslationProgress] = useState<number>(0);
 
   // Load language from localStorage or browser default
   useEffect(() => {
@@ -103,6 +104,7 @@ export const TranslationProvider: React.FC<TranslationProviderProps> = ({ childr
 
     try {
       setIsTranslating(true);
+      setTranslationProgress(30);
       
       // ONLY USE GOOGLE TRANSLATE SERVICE
       console.log('[TranslationContext] Using Google Translate service only');
@@ -114,68 +116,55 @@ export const TranslationProvider: React.FC<TranslationProviderProps> = ({ childr
           translated: translatedText.substring(0, 30) 
         });
         
-        // Cache both locally and in on-demand cache
+        // Update both caches
         setTranslationCache(prev => ({ ...prev, [cacheKey]: translatedText }));
         onDemandTranslationCache.set(currentLanguage, text, translatedText);
         
+        setTranslationProgress(100);
         return translatedText;
+      } else {
+        console.log('[TranslationContext] Translation returned same text, using original');
+        setTranslationProgress(100);
+        return text;
       }
-      
-      console.log('[TranslationContext] Translation returned same text, using original');
-      return text;
     } catch (error) {
       console.error('[TranslationContext] Translation failed:', error);
-      return text;
+      setTranslationProgress(0);
+      return text; // Fallback to original text
     } finally {
       setIsTranslating(false);
+      // Reset progress after a delay
+      setTimeout(() => setTranslationProgress(0), 1000);
     }
   }, [currentLanguage, translationCache]);
+
+  const clearCache = useCallback(() => {
+    console.log('[TranslationContext] Clearing translation cache');
+    setTranslationCache({});
+    onDemandTranslationCache.clear();
+  }, []);
 
   const getCachedTranslation = useCallback((text: string): string | null => {
     const cacheKey = `${text}_en_${currentLanguage}`;
-    const localCache = translationCache[cacheKey];
-    const onDemandCache = onDemandTranslationCache.get(currentLanguage, text);
-    console.log('[TranslationContext] Checking cache for:', text.substring(0, 30), 
-      { localCache: !!localCache, onDemandCache: !!onDemandCache });
-    return localCache || onDemandCache || null;
+    return translationCache[cacheKey] || onDemandTranslationCache.get(currentLanguage, text) || null;
   }, [currentLanguage, translationCache]);
 
   const prefetchTranslationsForRoute = useCallback(async (route: string): Promise<void> => {
-    console.log(`[TranslationContext] Prefetching translations for route: ${route}`);
-    // Get common route texts for prefetching - can be expanded
-    const routeTexts = {
-      '/': ['Home', 'Download on App Store', 'Your Voice, Your Journey'],
-      '/insights': ['Insights', 'Discover patterns', 'Soul-Net Visualization', 'Dominant Mood'],
-      '/journal': ['Journal', 'New Entry', 'Search', 'Recent Entries']
-    };
+    if (currentLanguage === 'en') return;
     
-    const textsToTranslate = routeTexts[route] || [];
-    if (textsToTranslate.length > 0 && currentLanguage !== 'en') {
-      try {
-        const batchResults = await translationService.batchTranslate({
-          texts: textsToTranslate,
-          targetLanguage: currentLanguage
-        });
-        console.log(`[TranslationContext] Prefetched ${batchResults.size} translations for route ${route}`);
-      } catch (error) {
-        console.error('[TranslationContext] Error prefetching translations:', error);
-      }
-    }
+    console.log('[TranslationContext] Prefetching translations for route:', route);
+    // This could be expanded to preload common texts for specific routes
   }, [currentLanguage]);
 
   const value: TranslationContextType = {
     currentLanguage,
     setCurrentLanguage: handleLanguageChange,
-    setLanguage: handleLanguageChange, // Alias for backwards compatibility
+    setLanguage: handleLanguageChange, // Alias
     translate,
     isTranslating,
-    clearCache: useCallback(() => {
-      console.log('[TranslationContext] Clearing all translation caches');
-      setTranslationCache({});
-      onDemandTranslationCache.clearAll();
-    }, []),
+    clearCache,
     getCachedTranslation,
-    translationProgress: isTranslating ? 50 : 100,
+    translationProgress,
     prefetchTranslationsForRoute
   };
 
@@ -188,7 +177,7 @@ export const TranslationProvider: React.FC<TranslationProviderProps> = ({ childr
 
 export const useTranslation = (): TranslationContextType => {
   const context = useContext(TranslationContext);
-  if (context === undefined) {
+  if (!context) {
     throw new Error('useTranslation must be used within a TranslationProvider');
   }
   return context;
