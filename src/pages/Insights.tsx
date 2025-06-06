@@ -1,5 +1,4 @@
-
-import { useState, useEffect, useRef, useMemo } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
 import { Calendar, Filter, TrendingUp, ArrowUp, ArrowDown, Activity, Award } from 'lucide-react';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
@@ -30,22 +29,6 @@ function InsightsContent() {
   
   const { insightsData, loading } = useInsightsData(user?.id, timeRange);
   
-  // Extract node labels from insights data for translation provider
-  const nodeLabels = useMemo(() => {
-    // Safely extract emotion labels with proper type checking
-    const emotionLabels = Array.isArray(insightsData.aggregatedEmotionData) 
-      ? insightsData.aggregatedEmotionData.map(emotion => emotion.emotion).filter(Boolean)
-      : [];
-    
-    const dominantMoodLabel = insightsData.dominantMood?.emotion ? [insightsData.dominantMood.emotion] : [];
-    const improvementLabel = insightsData.biggestImprovement?.emotion ? [insightsData.biggestImprovement.emotion] : [];
-    
-    const allLabels = [...emotionLabels, ...dominantMoodLabel, ...improvementLabel].filter(Boolean);
-    
-    console.log("[Insights] Extracted node labels for translation:", allLabels);
-    return allLabels;
-  }, [insightsData]);
-
   const timeRanges = [
     { value: 'today', label: 'Day' },
     { value: 'week', label: 'Week' },
