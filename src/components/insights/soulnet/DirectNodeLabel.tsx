@@ -37,22 +37,22 @@ export const DirectNodeLabel: React.FC<DirectNodeLabelProps> = ({
   timeRange
 }) => {
   const { currentLanguage } = useTranslation();
-  const [hasValidTranslation, setHasValidTranslation] = useState<boolean>(false);
+  const [translationReady, setTranslationReady] = useState<boolean>(false);
 
-  // Check translation availability
+  // ENHANCED: Always ready for English, optimistic for other languages
   useEffect(() => {
     if (currentLanguage === 'en') {
-      setHasValidTranslation(true);
-      return;
+      setTranslationReady(true);
+    } else {
+      // Start optimistic, will be corrected by translation completion
+      setTranslationReady(true);
     }
-    setHasValidTranslation(false);
   }, [currentLanguage, id]);
 
   // Handle translation completion
   const handleTranslationComplete = useCallback((translatedText: string) => {
-    const isValid = !!translatedText;
-    setHasValidTranslation(isValid);
-    console.log(`[DirectNodeLabel] Translation ${isValid ? 'confirmed' : 'failed'} for ${id}`);
+    setTranslationReady(true);
+    console.log(`[DirectNodeLabel] Translation confirmed for ${id}: "${translatedText}"`);
   }, [id]);
 
   // Calculate positions and styling
@@ -85,12 +85,14 @@ export const DirectNodeLabel: React.FC<DirectNodeLabelProps> = ({
     return currentTutorialStep === '9' || shouldShowLabel;
   }, [shouldShowLabel]);
 
-  // Only show if translation is available
-  const finalShouldShowLabel = enhancedShouldShowLabel && (currentLanguage === 'en' || hasValidTranslation);
+  // ENHANCED: Always show labels if we should - don't wait for translations
+  const finalShouldShowLabel = enhancedShouldShowLabel;
 
   if (!finalShouldShowLabel || !id) {
     return null;
   }
+
+  console.log(`[DirectNodeLabel] RENDERING LABEL: ${id} (ready: ${translationReady}, lang: ${currentLanguage})`);
 
   return (
     <>

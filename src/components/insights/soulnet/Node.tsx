@@ -1,3 +1,4 @@
+
 import React, { useRef, useState, useCallback, useMemo } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
@@ -55,7 +56,7 @@ const Node: React.FC<NodeProps> = ({
   const meshRef = useRef<THREE.Mesh>(null);
   const [hovered, setHovered] = useState(false);
 
-  // FLICKER-FREE: Stable node properties
+  // ENHANCED: Stable node properties with improved colors
   const nodeScale = useMemo(() => {
     const baseScale = node.type === 'entity' ? 0.7 : 0.55;
     const connectionScale = isHighlighted ? (1.2 + (isSelected ? 0.3 : 0.4)) : (0.8 + node.value * 0.5);
@@ -68,8 +69,8 @@ const Node: React.FC<NodeProps> = ({
     }
     
     if (node.type === 'entity') {
-      // UPDATED: Much lighter green colors for entity nodes (circular nodes)
-      return isSelected ? '#90EE90' : (isHighlighted ? '#B3F0B3' : '#98FB98');
+      // ENHANCED: Brighter, more vibrant green colors for entity nodes
+      return isSelected ? '#32CD32' : (isHighlighted ? '#7CFC00' : '#90EE90');
     } else {
       // Keep existing orange colors for emotion nodes (square nodes)
       return isSelected ? '#FF9800' : (isHighlighted ? '#FFB74D' : '#F57C00');
@@ -93,7 +94,7 @@ const Node: React.FC<NodeProps> = ({
     onClick(node.id, event);
   }, [onClick, node.id]);
 
-  // FLICKER-FREE: Stable label visibility
+  // ENHANCED: Always show labels when requested - no conditional hiding
   const stableLabelVisibility = useMemo(() => {
     return forceShowLabels || showLabel;
   }, [forceShowLabels, showLabel]);
@@ -106,7 +107,7 @@ const Node: React.FC<NodeProps> = ({
     }
   });
 
-  console.log(`[Node] UPDATED COLORS: ${node.id} (${node.type}) - scale: ${nodeScale}, color: ${nodeColor}, stable labels: ${stableLabelVisibility}`);
+  console.log(`[Node] ENHANCED RENDERING: ${node.id} (${node.type}) - scale: ${nodeScale}, color: ${nodeColor}, labels: ${stableLabelVisibility}`);
 
   return (
     <group position={node.position}>
@@ -127,7 +128,7 @@ const Node: React.FC<NodeProps> = ({
         />
       </mesh>
       
-      {/* FLICKER-FREE: DirectNodeLabel with preloaded translations */}
+      {/* ENHANCED: DirectNodeLabel with improved error recovery */}
       <DirectNodeLabel
         id={node.id}
         type={node.type}
