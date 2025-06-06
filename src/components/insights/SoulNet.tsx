@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import '@/types/three-reference';
 import { Canvas } from '@react-three/fiber';
@@ -280,51 +281,46 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
         >
           {/* STABILIZED: Canvas only renders when truly ready and stays mounted during interactions */}
           {renderingReady && (
-            <div style={{ 
-              transition: 'opacity 0.3s ease-in-out',
-              opacity: 1
-            }}>
-              <Canvas
-                style={{
-                  width: '100%',
-                  height: '100%',
-                  maxWidth: isFullScreen ? 'none' : '800px',
-                  maxHeight: isFullScreen ? 'none' : '500px',
-                  position: 'relative',
-                  zIndex: 5,
-                  transition: 'all 0.3s ease-in-out',
-                }}
-                camera={{ 
-                  position: [0, 0, isFullScreen ? 40 : 45],
-                  near: 1, 
-                  far: 1000,
-                  fov: isFullScreen ? 60 : 50
-                }}
-                onPointerMissed={() => setSelectedEntity(null)}
-                gl={{ 
-                  preserveDrawingBuffer: true,
-                  antialias: !isMobile,
-                  powerPreference: 'high-performance',
-                  alpha: true,
-                  depth: true,
-                  stencil: false,
-                  precision: isMobile ? 'mediump' : 'highp'
-                }}
-              >
-                <SimplifiedSoulNetVisualization
-                  data={graphData}
-                  selectedNode={selectedEntity}
-                  onNodeClick={handleNodeSelect}
-                  themeHex={themeHex}
-                  isFullScreen={isFullScreen}
-                  shouldShowLabels={true}
-                  getInstantConnectionPercentage={getInstantConnectionPercentage}
-                  getInstantTranslation={getInstantTranslation}
-                  getInstantNodeConnections={getInstantNodeConnections}
-                  isInstantReady={isInstantReady}
-                />
-              </Canvas>
-            </div>
+            <Canvas
+              style={{
+                width: '100%',
+                height: '100%',
+                maxWidth: isFullScreen ? 'none' : '800px',
+                maxHeight: isFullScreen ? 'none' : '500px',
+                position: 'relative',
+                zIndex: 5,
+                transition: 'all 0.3s ease-in-out',
+              }}
+              camera={{ 
+                position: [0, 0, isFullScreen ? 40 : 45],
+                near: 1, 
+                far: 1000,
+                fov: isFullScreen ? 60 : 50
+              }}
+              onPointerMissed={() => setSelectedEntity(null)}
+              gl={{ 
+                preserveDrawingBuffer: true,
+                antialias: !isMobile,
+                powerPreference: 'high-performance',
+                alpha: true,
+                depth: true,
+                stencil: false,
+                precision: isMobile ? 'mediump' : 'highp'
+              }}
+            >
+              <SimplifiedSoulNetVisualization
+                data={graphData}
+                selectedNode={selectedEntity}
+                onNodeClick={handleNodeSelect}
+                themeHex={themeHex}
+                isFullScreen={isFullScreen}
+                shouldShowLabels={true}
+                getInstantConnectionPercentage={getInstantConnectionPercentage}
+                getInstantTranslation={getInstantTranslation}
+                getInstantNodeConnections={getInstantNodeConnections}
+                isInstantReady={isInstantReady}
+              />
+            </Canvas>
           )}
         </RenderingErrorBoundary>
       </FullscreenWrapper>
