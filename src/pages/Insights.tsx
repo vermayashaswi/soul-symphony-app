@@ -31,15 +31,17 @@ function InsightsContent() {
   
   // Extract node labels from insights data for translation provider
   const nodeLabels = useMemo(() => {
-    // Extract entity and emotion names from insights data
-    const entityLabels = insightsData.topEntities?.map(entity => entity.name) || [];
-    const emotionLabels = insightsData.topEmotions?.map(emotion => emotion.emotion) || [];
-    const allLabels = [...entityLabels, ...emotionLabels].filter(Boolean);
+    // Extract from existing data structures instead of non-existent topEntities/topEmotions
+    const emotionLabels = insightsData.aggregatedEmotionData?.map(emotion => emotion.emotion) || [];
+    const dominantMoodLabel = insightsData.dominantMood?.emotion ? [insightsData.dominantMood.emotion] : [];
+    const improvementLabel = insightsData.biggestImprovement?.emotion ? [insightsData.biggestImprovement.emotion] : [];
+    
+    const allLabels = [...emotionLabels, ...dominantMoodLabel, ...improvementLabel].filter(Boolean);
     
     console.log("[Insights] Extracted node labels for translation:", allLabels);
     return allLabels;
   }, [insightsData]);
-  
+
   const timeRanges = [
     { value: 'today', label: 'Day' },
     { value: 'week', label: 'Week' },

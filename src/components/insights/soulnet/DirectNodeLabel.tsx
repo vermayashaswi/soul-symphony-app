@@ -164,8 +164,6 @@ export const DirectNodeLabel: React.FC<DirectNodeLabelProps> = ({
         outlineColor={undefined}
         maxWidth={600}
         enableWrapping={true}
-        maxCharsPerLine={18}
-        maxLines={3}
       />
       
       {/* Enhanced percentage text with fixed size 1.5 and better visibility */}
