@@ -54,7 +54,7 @@ export function useFlickerFreeSoulNetData(
   const percentagesMapRef = useRef<Map<string, number>>(new Map());
   const retryCountRef = useRef(0);
 
-  console.log('[useFlickerFreeSoulNetData] ENHANCED STATE:', {
+  console.log('[useFlickerFreeSoulNetData] STRICT MODE:', {
     userId,
     timeRange,
     language: currentLanguage,
@@ -71,9 +71,17 @@ export function useFlickerFreeSoulNetData(
     return percentagesMapRef.current.get(key) || 0;
   }, []);
 
-  // Enhanced instant translation lookup - returns null when no translation available
+  // STRICT: Instant translation lookup - only returns translation if available
   const getInstantTranslation = useCallback((text: string): string | null => {
-    if (!userId || currentLanguage === 'en') return text;
+    // For English, always return the original text
+    if (currentLanguage === 'en') {
+      return text;
+    }
+    
+    if (!userId) {
+      console.log(`[useFlickerFreeSoulNetData] No userId for translation: "${text}"`);
+      return null;
+    }
     
     const translation = SoulNetTranslationPreloader.getTranslationSync(
       text, 
@@ -82,9 +90,9 @@ export function useFlickerFreeSoulNetData(
       timeRange
     );
     
-    // NO FALLBACK - return null if no translation available
+    // STRICT: Return null if no translation available - NO ENGLISH FALLBACK
     if (!translation) {
-      console.log(`[useFlickerFreeSoulNetData] NO TRANSLATION for "${text}" in ${currentLanguage}`);
+      console.log(`[useFlickerFreeSoulNetData] NO TRANSLATION: "${text}" in ${currentLanguage}`);
       return null;
     }
     
@@ -96,10 +104,16 @@ export function useFlickerFreeSoulNetData(
     return connectionsMapRef.current.get(nodeId) || new Set();
   }, []);
 
-  // Enhanced retry mechanism for translations
+  // ENHANCED: Retry mechanism for translations with proper error handling
   const retryTranslations = useCallback(async () => {
-    if (!userId || currentLanguage === 'en') {
+    if (!userId) {
+      console.log('[useFlickerFreeSoulNetData] Cannot retry translations: no userId');
+      return;
+    }
+
+    if (currentLanguage === 'en') {
       setIsTranslationsReady(true);
+      setTranslationProgress(100);
       return;
     }
 
@@ -118,10 +132,11 @@ export function useFlickerFreeSoulNetData(
         currentLanguage
       );
 
-      if (translationsData) {
-        console.log(`[useFlickerFreeSoulNetData] RETRY SUCCESS: Translations preloaded`);
+      if (translationsData && translationsData.nodeTranslations.size > 0) {
+        console.log(`[useFlickerFreeSoulNetData] RETRY SUCCESS: ${translationsData.nodeTranslations.size} translations loaded`);
         setTranslationProgress(100);
         setIsTranslationsReady(true);
+        retryCountRef.current = 0; // Reset on success
       } else {
         console.warn(`[useFlickerFreeSoulNetData] RETRY FAILED: No translations returned`);
         setIsTranslationsReady(false);
@@ -132,19 +147,27 @@ export function useFlickerFreeSoulNetData(
     }
   }, [userId, timeRange, currentLanguage]);
 
-  // Enhanced translation preloading with progress tracking
+  // ENHANCED: Translation preloading with strict validation
   useEffect(() => {
     let mounted = true;
 
     const preloadTranslations = async () => {
-      if (!userId || currentLanguage === 'en') {
+      if (!userId) {
+        setIsTranslationsReady(false);
+        setTranslationProgress(0);
+        return;
+      }
+
+      // For English, we're always ready
+      if (currentLanguage === 'en') {
         setIsTranslationsReady(true);
         setTranslationProgress(100);
         return;
       }
 
-      console.log(`[useFlickerFreeSoulNetData] ENHANCED: Preloading translations for ${currentLanguage}`);
+      console.log(`[useFlickerFreeSoulNetData] PRELOADING TRANSLATIONS for ${currentLanguage}`);
       setTranslationProgress(10);
+      setIsTranslationsReady(false);
       
       try {
         const translationsData = await SoulNetTranslationPreloader.preloadSoulNetTranslations(
@@ -155,18 +178,18 @@ export function useFlickerFreeSoulNetData(
 
         if (mounted) {
           if (translationsData && translationsData.nodeTranslations.size > 0) {
-            console.log(`[useFlickerFreeSoulNetData] ENHANCED SUCCESS: ${translationsData.nodeTranslations.size} translations preloaded`);
+            console.log(`[useFlickerFreeSoulNetData] TRANSLATION SUCCESS: ${translationsData.nodeTranslations.size} translations loaded`);
             setTranslationProgress(100);
             setIsTranslationsReady(true);
-            retryCountRef.current = 0; // Reset retry count on success
+            retryCountRef.current = 0;
           } else {
-            console.warn(`[useFlickerFreeSoulNetData] ENHANCED WARNING: No translations available`);
+            console.warn(`[useFlickerFreeSoulNetData] TRANSLATION FAILED: No translations available`);
             setTranslationProgress(0);
             setIsTranslationsReady(false);
           }
         }
       } catch (error) {
-        console.error(`[useFlickerFreeSoulNetData] ENHANCED ERROR: Translation preloading failed:`, error);
+        console.error(`[useFlickerFreeSoulNetData] TRANSLATION ERROR:`, error);
         if (mounted) {
           setTranslationProgress(0);
           setIsTranslationsReady(false);
@@ -193,7 +216,7 @@ export function useFlickerFreeSoulNetData(
         return;
       }
 
-      console.log(`[useFlickerFreeSoulNetData] ENHANCED: Loading SoulNet data for ${userId}, ${timeRange}`);
+      console.log(`[useFlickerFreeSoulNetData] LOADING DATA for ${userId}, ${timeRange}`);
       setLoading(true);
       setError(null);
 
@@ -203,7 +226,7 @@ export function useFlickerFreeSoulNetData(
         if (!mounted) return;
 
         if (data && data.nodes.length > 0) {
-          console.log(`[useFlickerFreeSoulNetData] ENHANCED: Data loaded: ${data.nodes.length} nodes, ${data.links.length} links`);
+          console.log(`[useFlickerFreeSoulNetData] DATA LOADED: ${data.nodes.length} nodes, ${data.links.length} links`);
           
           // Store preloaded data
           preloadedDataRef.current = data;
@@ -224,7 +247,7 @@ export function useFlickerFreeSoulNetData(
             connectionsMap.get(link.source)?.add(link.target);
             connectionsMap.get(link.target)?.add(link.source);
             
-            // Build percentages map from preloaded data
+            // Build percentages map
             const sourceKey = `${link.source}-${link.target}`;
             const targetKey = `${link.target}-${link.source}`;
             
@@ -242,14 +265,14 @@ export function useFlickerFreeSoulNetData(
           setGraphData({ nodes: data.nodes, links: data.links });
           setIsReady(true);
         } else {
-          console.log(`[useFlickerFreeSoulNetData] ENHANCED: No data available`);
+          console.log(`[useFlickerFreeSoulNetData] NO DATA available`);
           setGraphData({ nodes: [], links: [] });
           setIsReady(false);
         }
         
         setLoading(false);
       } catch (err) {
-        console.error(`[useFlickerFreeSoulNetData] ENHANCED ERROR: Data loading failed:`, err);
+        console.error(`[useFlickerFreeSoulNetData] DATA ERROR:`, err);
         if (mounted) {
           setError(err instanceof Error ? err : new Error('Failed to load SoulNet data'));
           setLoading(false);

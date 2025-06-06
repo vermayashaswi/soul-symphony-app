@@ -47,23 +47,23 @@ export const FlickerFreeTranslatableText3D: React.FC<FlickerFreeTranslatableText
   const [finalText, setFinalText] = useState<string | null>(null);
   const [isStable, setIsStable] = useState<boolean>(false);
 
-  // Get translated text without fallbacks - returns null if no translation available
+  // ENHANCED: Get translated text without any English fallbacks
   const translatedText = useMemo(() => {
     if (!text) {
       return null;
     }
 
-    // If same language, return original text
+    // If same language, return original text immediately
     if (currentLanguage === sourceLanguage) {
       return text;
     }
 
     if (!userId || !timeRange) {
-      console.log(`[FlickerFreeTranslatableText3D] Missing userId or timeRange, cannot get translation for: "${text}"`);
+      console.log(`[FlickerFreeTranslatableText3D] Missing userId or timeRange for translation: "${text}"`);
       return null;
     }
 
-    // Try to get preloaded translation - NO FALLBACK to original text
+    // STRICT: Get preloaded translation - NO FALLBACK to English
     const preloadedTranslation = SoulNetTranslationPreloader.getTranslationSync(
       text, 
       currentLanguage, 
@@ -72,21 +72,21 @@ export const FlickerFreeTranslatableText3D: React.FC<FlickerFreeTranslatableText
     );
 
     if (preloadedTranslation) {
-      console.log(`[FlickerFreeTranslatableText3D] Using preloaded translation: "${text}" -> "${preloadedTranslation}"`);
+      console.log(`[FlickerFreeTranslatableText3D] FOUND TRANSLATION: "${text}" -> "${preloadedTranslation}"`);
       return preloadedTranslation;
     }
 
-    console.log(`[FlickerFreeTranslatableText3D] NO TRANSLATION AVAILABLE for: "${text}" in ${currentLanguage}`);
+    console.log(`[FlickerFreeTranslatableText3D] NO TRANSLATION AVAILABLE: "${text}" in ${currentLanguage}`);
     return null;
   }, [text, currentLanguage, sourceLanguage, userId, timeRange]);
 
-  // Update final text only when translation actually changes
+  // ENHANCED: Update final text only when translation actually changes
   useEffect(() => {
     if (translatedText !== finalText) {
-      console.log(`[FlickerFreeTranslatableText3D] Text updated: "${finalText}" -> "${translatedText}"`);
+      console.log(`[FlickerFreeTranslatableText3D] TRANSLATION CHANGE: "${finalText}" -> "${translatedText}"`);
       setIsStable(false);
       
-      // Use a short delay to batch updates and prevent rapid flashing
+      // Short delay to prevent rapid flashing during language switches
       const timer = setTimeout(() => {
         setFinalText(translatedText);
         setIsStable(true);
@@ -99,15 +99,15 @@ export const FlickerFreeTranslatableText3D: React.FC<FlickerFreeTranslatableText
     }
   }, [translatedText, finalText, onTranslationComplete]);
 
-  // Don't render if no translation is available or not stable
+  // STRICT: Only render if we have a valid translation and stable state
   if (!visible || !isStable || !finalText) {
-    if (!finalText) {
-      console.log(`[FlickerFreeTranslatableText3D] NOT RENDERING - no translation available for: "${text}"`);
+    if (!finalText && currentLanguage !== sourceLanguage) {
+      console.log(`[FlickerFreeTranslatableText3D] HIDING NODE: No translation for "${text}" in ${currentLanguage}`);
     }
     return null;
   }
 
-  console.log(`[FlickerFreeTranslatableText3D] Rendering stable text: "${finalText}" at size ${size}`);
+  console.log(`[FlickerFreeTranslatableText3D] RENDERING: "${finalText}" at size ${size}`);
 
   return (
     <SmartTextRenderer

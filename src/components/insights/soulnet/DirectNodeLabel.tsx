@@ -57,62 +57,64 @@ export const DirectNodeLabel: React.FC<DirectNodeLabelProps> = ({
     };
   }, [id, shouldShowLabel]);
 
-  // Check if we have a valid translation or if we're in English
+  // STRICT: Check translation availability
   useEffect(() => {
     if (currentLanguage === 'en') {
       setHasValidTranslation(true);
       return;
     }
 
-    // For non-English languages, we need to verify translation availability
-    // This will be determined by the FlickerFreeTranslatableText3D component
+    // For non-English languages, start with false and wait for translation confirmation
     setHasValidTranslation(false);
   }, [currentLanguage, id]);
 
-  // Handle translation completion
+  // STRICT: Handle translation completion confirmation
   const handleTranslationComplete = (translatedText: string) => {
     if (translatedText) {
       setHasValidTranslation(true);
-      console.log(`[DirectNodeLabel] Translation confirmed for ${id}: ${translatedText}`);
+      console.log(`[DirectNodeLabel] TRANSLATION CONFIRMED for ${id}: ${translatedText}`);
+    } else {
+      setHasValidTranslation(false);
+      console.log(`[DirectNodeLabel] NO TRANSLATION for ${id}`);
     }
   };
 
-  console.log(`[DirectNodeLabel] ENHANCED RENDERING: ${id} - hasValidTranslation: ${hasValidTranslation}, language: ${currentLanguage}`);
+  console.log(`[DirectNodeLabel] STRICT MODE: ${id} - hasValidTranslation: ${hasValidTranslation}, language: ${currentLanguage}`);
 
   // Same base offset for both entity and emotion nodes
   const labelOffset = useMemo(() => {
     const baseOffset = 1.4;
     const scaledOffset = baseOffset * Math.max(0.8, Math.min(2.5, nodeScale));
     
-    console.log(`[DirectNodeLabel] Enhanced label offset for ${id} (${type}): ${scaledOffset} (scale: ${nodeScale}) - UNIFORM POSITIONING`);
+    console.log(`[DirectNodeLabel] Label offset for ${id} (${type}): ${scaledOffset} (scale: ${nodeScale})`);
     return [0, scaledOffset, 0] as [number, number, number];
   }, [type, nodeScale, id]);
 
-  // Static text size of 2
+  // Static text size
   const textSize = useMemo(() => {
     const staticSize = 2.0;
-    console.log(`[DirectNodeLabel] ENHANCED: Static text size for ${id}: ${staticSize}`);
+    console.log(`[DirectNodeLabel] Static text size for ${id}: ${staticSize}`);
     return staticSize;
   }, [id]);
 
-  // Fixed minimum percentage size of 1.5
+  // Fixed percentage size
   const percentageTextSize = useMemo(() => {
     const fixedPercentageSize = 1.5;
-    console.log(`[DirectNodeLabel] ENHANCED: Fixed percentage size for ${id}: ${fixedPercentageSize}`);
+    console.log(`[DirectNodeLabel] Fixed percentage size for ${id}: ${fixedPercentageSize}`);
     return fixedPercentageSize;
   }, [id]);
 
-  // High contrast colors for better visibility
+  // High contrast colors
   const textColor = useMemo(() => {
     const color = effectiveTheme === 'dark' ? '#ffffff' : '#000000';
-    console.log(`[DirectNodeLabel] HIGH CONTRAST TEXT COLOR for ${id}: ${color} (theme: ${effectiveTheme})`);
+    console.log(`[DirectNodeLabel] Text color for ${id}: ${color} (theme: ${effectiveTheme})`);
     return color;
   }, [effectiveTheme, id]);
 
-  // Enhanced percentage visibility with white text and black outline
+  // Enhanced percentage visibility
   const percentageColor = useMemo(() => {
     const color = '#ffffff'; // Always white for maximum contrast
-    console.log(`[DirectNodeLabel] ENHANCED PERCENTAGE COLOR for ${id}: ${color}`);
+    console.log(`[DirectNodeLabel] Percentage color for ${id}: ${color}`);
     return color;
   }, [id]);
 
@@ -122,7 +124,7 @@ export const DirectNodeLabel: React.FC<DirectNodeLabelProps> = ({
     position[2] + labelOffset[2]
   ];
 
-  // Simplified percentage positioning closer to nodes
+  // Simplified percentage positioning
   const percentagePosition: [number, number, number] = useMemo(() => {
     const simpleSideOffset = 2.5;
     const simpleVerticalOffset = 0.5;
@@ -134,7 +136,7 @@ export const DirectNodeLabel: React.FC<DirectNodeLabelProps> = ({
       position[2] + simpleZOffset
     ];
     
-    console.log(`[DirectNodeLabel] ENHANCED PERCENTAGE POSITIONING for ${id} (${type}): simple offsets`);
+    console.log(`[DirectNodeLabel] Percentage positioning for ${id} (${type}): simple offsets`);
     return finalPosition;
   }, [position, type, id]);
 
@@ -151,19 +153,19 @@ export const DirectNodeLabel: React.FC<DirectNodeLabelProps> = ({
     return shouldShowLabel;
   }, [shouldShowLabel, id]);
 
-  // Don't show label if we don't have a valid translation (except for English)
+  // STRICT: Only show label if we have valid translation OR we're in English
   const finalShouldShowLabel = enhancedShouldShowLabel && (currentLanguage === 'en' || hasValidTranslation);
 
   if (!finalShouldShowLabel || !id) {
-    console.log(`[DirectNodeLabel] ENHANCED: Not rendering label for ${id}: shouldShow=${enhancedShouldShowLabel}, hasValidTranslation=${hasValidTranslation}, currentLanguage=${currentLanguage}`);
+    console.log(`[DirectNodeLabel] NOT RENDERING: ${id} - shouldShow=${enhancedShouldShowLabel}, hasValidTranslation=${hasValidTranslation}, currentLanguage=${currentLanguage}`);
     return null;
   }
 
-  console.log(`[DirectNodeLabel] ENHANCED RENDERING: "${id}" with proper translation handling`);
+  console.log(`[DirectNodeLabel] RENDERING with strict translation handling: "${id}"`);
 
   return (
     <>
-      {/* Main text using FlickerFreeTranslatableText3D with enhanced null handling */}
+      {/* STRICT: Main text using FlickerFreeTranslatableText3D without fallbacks */}
       <FlickerFreeTranslatableText3D
         text={id}
         position={labelPosition}
@@ -184,7 +186,7 @@ export const DirectNodeLabel: React.FC<DirectNodeLabelProps> = ({
         onTranslationComplete={handleTranslationComplete}
       />
       
-      {/* Enhanced percentage text with fixed size and better visibility */}
+      {/* Percentage text with fixed size and better visibility */}
       {showPercentage && connectionPercentage > 0 && (
         <SimpleText
           text={`${connectionPercentage}%`}
