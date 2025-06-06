@@ -14,7 +14,8 @@ import { useUserColorThemeHex } from './soulnet/useUserColorThemeHex';
 import { cn } from '@/lib/utils';
 import { TranslatableText } from '@/components/translation/TranslatableText';
 import { useTranslation } from '@/contexts/TranslationContext';
-import { useInstantSoulNetData } from '@/hooks/useInstantSoulNetData';
+import { useFlickerFreeSoulNetData } from '@/hooks/useFlickerFreeSoulNetData';
+import { SoulNetTranslationPreloader } from '@/services/soulnetTranslationPreloader';
 
 interface SoulNetProps {
   userId: string | undefined;
@@ -31,59 +32,66 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
   const [selectedEntity, setSelectedEntity] = useState<string | null>(null);
   const { currentLanguage } = useTranslation();
   
-  // STABILIZATION: Use ref to track if rendering has been initialized to prevent unnecessary resets
-  const renderingInitialized = useRef(false);
+  // FLICKER-FREE: Use ref to track stable rendering state
+  const stableRenderingRef = useRef(false);
 
-  // Use the enhanced instant data hook
+  // Use the flicker-free data hook
   const { 
     graphData, 
     loading, 
     error,
-    isInstantReady,
+    isReady,
+    isTranslationsReady,
     getInstantConnectionPercentage,
     getInstantTranslation,
     getInstantNodeConnections
-  } = useInstantSoulNetData(userId, timeRange);
+  } = useFlickerFreeSoulNetData(userId, timeRange);
 
-  console.log("[SoulNet] INSTANT DATA MODE - Zero loading delays", { 
+  console.log("[SoulNet] FLICKER-FREE MODE - Stable rendering with preloaded translations", { 
     userId, 
     timeRange, 
     currentLanguage,
     nodesCount: graphData.nodes.length,
-    isInstantReady,
+    isReady,
+    isTranslationsReady,
     loading,
     renderingReady,
-    renderingInitialized: renderingInitialized.current
+    stableRendering: stableRenderingRef.current
   });
 
   useEffect(() => {
-    console.log("[SoulNet] Component mounted - Instant data mode enabled");
+    console.log("[SoulNet] FLICKER-FREE: Component mounted with preloaded translation system");
+    
+    // Preload translations immediately on mount
+    if (userId && currentLanguage !== 'en') {
+      SoulNetTranslationPreloader.preloadSoulNetTranslations(userId, timeRange, currentLanguage)
+        .catch(error => console.warn('[SoulNet] Background translation preload failed:', error));
+    }
     
     return () => {
       console.log("[SoulNet] Component unmounted");
     };
   }, []);
 
-  // STABILIZED: Enhanced rendering initialization that doesn't reset once established
+  // FLICKER-FREE: Stable rendering initialization - only initialize once when everything is ready
   useEffect(() => {
-    // Only initialize rendering if we have data and haven't already initialized
-    if ((isInstantReady || (graphData.nodes.length > 0 && !loading)) && !renderingInitialized.current) {
-      console.log("[SoulNet] STABILIZED: Initializing rendering for the first time");
+    if (isReady && isTranslationsReady && graphData.nodes.length > 0 && !stableRenderingRef.current) {
+      console.log("[SoulNet] FLICKER-FREE: Initializing stable rendering - all data and translations ready");
       setRenderingReady(true);
-      renderingInitialized.current = true;
+      stableRenderingRef.current = true;
     }
     
-    // DEFENSIVE: Only reset rendering if there's an actual error or complete data loss
-    if (error || (graphData.nodes.length === 0 && !loading && renderingInitialized.current)) {
-      console.log("[SoulNet] DEFENSIVE: Resetting rendering due to error or data loss", { error: !!error, nodesCount: graphData.nodes.length });
+    // Only reset if there's a critical error or complete data loss
+    if (error || (graphData.nodes.length === 0 && !loading && stableRenderingRef.current)) {
+      console.log("[SoulNet] FLICKER-FREE: Resetting due to error or data loss", { error: !!error, nodesCount: graphData.nodes.length });
       setRenderingReady(false);
-      renderingInitialized.current = false;
+      stableRenderingRef.current = false;
     }
-  }, [isInstantReady, graphData.nodes.length, loading, error]);
+  }, [isReady, isTranslationsReady, graphData.nodes.length, loading, error]);
 
-  // OPTIMIZED: Node selection with stable state management
+  // OPTIMIZED: Stable node selection without re-renders
   const handleNodeSelect = useCallback((id: string) => {
-    console.log(`[SoulNet] STABLE: Node selected: ${id} - no re-render triggers`);
+    console.log(`[SoulNet] FLICKER-FREE: Node selected: ${id} - stable state management`);
     if (selectedEntity === id) {
       setSelectedEntity(null);
     } else {
@@ -106,21 +114,21 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
     console.error('[SoulNet] Canvas error:', error);
     setCanvasError(error);
     setRetryCount(prev => prev + 1);
-    // DEFENSIVE: Reset rendering state on canvas errors
+    // Reset stable rendering on canvas errors
     setRenderingReady(false);
-    renderingInitialized.current = false;
+    stableRenderingRef.current = false;
   }, []);
 
   const handleRetry = useCallback(() => {
     setCanvasError(null);
     setRetryCount(0);
     // Allow re-initialization after retry
-    renderingInitialized.current = false;
+    stableRenderingRef.current = false;
   }, []);
 
-  // ENHANCED: Only show loading if we truly have no data and are still loading
-  if (loading && !isInstantReady && graphData.nodes.length === 0) {
-    console.log("[SoulNet] ENHANCED: Showing loading state - no instant data available");
+  // FLICKER-FREE: Only show loading if we have no data and translations aren't ready
+  if (loading && (!isReady || !isTranslationsReady) && graphData.nodes.length === 0) {
+    console.log("[SoulNet] FLICKER-FREE: Showing loading state - waiting for data and translations");
     return <LoadingState />;
   }
   
@@ -230,7 +238,7 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
     );
   };
 
-  console.log(`[SoulNet] STABILIZED RENDER: ${graphData.nodes.length} nodes, ${graphData.links.length} links, renderingReady: ${renderingReady}, initialized: ${renderingInitialized.current}`);
+  console.log(`[SoulNet] FLICKER-FREE RENDER: ${graphData.nodes.length} nodes, ${graphData.links.length} links, rendering ready: ${renderingReady}, stable: ${stableRenderingRef.current}`);
 
   return (
     <div className={cn(
@@ -279,8 +287,8 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
             </div>
           }
         >
-          {/* STABILIZED: Canvas only renders when truly ready and stays mounted during interactions */}
-          {renderingReady && (
+          {/* FLICKER-FREE: Canvas only renders when stable and translations are ready */}
+          {renderingReady && isTranslationsReady && (
             <Canvas
               style={{
                 width: '100%',
@@ -318,7 +326,9 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
                 getInstantConnectionPercentage={getInstantConnectionPercentage}
                 getInstantTranslation={getInstantTranslation}
                 getInstantNodeConnections={getInstantNodeConnections}
-                isInstantReady={isInstantReady}
+                isInstantReady={isReady && isTranslationsReady}
+                userId={userId}
+                timeRange={timeRange}
               />
             </Canvas>
           )}

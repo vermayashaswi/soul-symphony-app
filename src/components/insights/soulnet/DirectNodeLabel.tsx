@@ -1,6 +1,6 @@
 
 import React, { useMemo, useEffect } from 'react';
-import TranslatableText3D from './TranslatableText3D';
+import FlickerFreeTranslatableText3D from './FlickerFreeTranslatableText3D';
 import SimpleText from './SimpleText';
 
 interface DirectNodeLabelProps {
@@ -17,6 +17,8 @@ interface DirectNodeLabelProps {
   showPercentage?: boolean;
   effectiveTheme?: 'light' | 'dark';
   isInstantMode?: boolean;
+  userId?: string;
+  timeRange?: string;
 }
 
 export const DirectNodeLabel: React.FC<DirectNodeLabelProps> = ({
@@ -32,7 +34,9 @@ export const DirectNodeLabel: React.FC<DirectNodeLabelProps> = ({
   connectionPercentage = 0,
   showPercentage = false,
   effectiveTheme = 'light',
-  isInstantMode = false
+  isInstantMode = false,
+  userId,
+  timeRange
 }) => {
   // Listen for tutorial debugging events
   useEffect(() => {
@@ -50,7 +54,7 @@ export const DirectNodeLabel: React.FC<DirectNodeLabelProps> = ({
   }, [id, shouldShowLabel]);
 
   // PLAN IMPLEMENTATION: Static text size of 2 (reduced from 8)
-  console.log(`[DirectNodeLabel] PLAN IMPLEMENTATION: STATIC TEXT SIZE 2: ${id} - Reduced from 8 for better scaling`);
+  console.log(`[DirectNodeLabel] FLICKER-FREE RENDERING: ${id} - Static size 2, no translation delays`);
 
   // Same base offset for both entity and emotion nodes
   const labelOffset = useMemo(() => {
@@ -64,14 +68,14 @@ export const DirectNodeLabel: React.FC<DirectNodeLabelProps> = ({
   // PLAN IMPLEMENTATION: Static text size of 2 (reduced from 8)
   const textSize = useMemo(() => {
     const staticSize = 2.0; // Reduced from 8 to 2
-    console.log(`[DirectNodeLabel] PLAN IMPLEMENTATION: STATIC TEXT SIZE for ${id}: ${staticSize} (reduced from 8, zoom ignored: ${cameraZoom})`);
+    console.log(`[DirectNodeLabel] FLICKER-FREE: Static text size for ${id}: ${staticSize} (zoom independent)`);
     return staticSize;
-  }, [id, cameraZoom]);
+  }, [id]);
 
-  // PLAN IMPLEMENTATION: Fixed minimum percentage size of 1.5 (instead of proportional 0.7)
+  // PLAN IMPLEMENTATION: Fixed minimum percentage size of 1.5
   const percentageTextSize = useMemo(() => {
-    const fixedPercentageSize = 1.5; // Fixed minimum size instead of 2.0 * 0.35 = 0.7
-    console.log(`[DirectNodeLabel] PLAN IMPLEMENTATION: FIXED PERCENTAGE SIZE for ${id}: ${fixedPercentageSize} (was 0.7, now fixed 1.5)`);
+    const fixedPercentageSize = 1.5;
+    console.log(`[DirectNodeLabel] FLICKER-FREE: Fixed percentage size for ${id}: ${fixedPercentageSize}`);
     return fixedPercentageSize;
   }, [id]);
 
@@ -85,7 +89,7 @@ export const DirectNodeLabel: React.FC<DirectNodeLabelProps> = ({
   // PLAN IMPLEMENTATION: Enhanced percentage visibility with white text and black outline
   const percentageColor = useMemo(() => {
     const color = '#ffffff'; // Always white for maximum contrast
-    console.log(`[DirectNodeLabel] PLAN IMPLEMENTATION: ENHANCED PERCENTAGE COLOR for ${id}: ${color} (always white for maximum visibility)`);
+    console.log(`[DirectNodeLabel] ENHANCED PERCENTAGE COLOR for ${id}: ${color} (always white for maximum visibility)`);
     return color;
   }, [id]);
 
@@ -97,10 +101,9 @@ export const DirectNodeLabel: React.FC<DirectNodeLabelProps> = ({
 
   // PLAN IMPLEMENTATION: Simplified percentage positioning closer to nodes
   const percentagePosition: [number, number, number] = useMemo(() => {
-    // Simplified positioning: place percentage to the right and slightly up from the node
-    const simpleSideOffset = 2.5; // Reduced from complex calculation
-    const simpleVerticalOffset = 0.5; // Small upward offset
-    const simpleZOffset = 0.5; // Small forward offset
+    const simpleSideOffset = 2.5;
+    const simpleVerticalOffset = 0.5;
+    const simpleZOffset = 0.5;
     
     const finalPosition: [number, number, number] = [
       position[0] + simpleSideOffset,
@@ -108,7 +111,7 @@ export const DirectNodeLabel: React.FC<DirectNodeLabelProps> = ({
       position[2] + simpleZOffset
     ];
     
-    console.log(`[DirectNodeLabel] PLAN IMPLEMENTATION: SIMPLIFIED PERCENTAGE POSITIONING for ${id} (${type}): simple offsets - side=${simpleSideOffset}, vertical=${simpleVerticalOffset}, z=${simpleZOffset}, final=`, finalPosition);
+    console.log(`[DirectNodeLabel] SIMPLIFIED PERCENTAGE POSITIONING for ${id} (${type}): simple offsets - side=${simpleSideOffset}, vertical=${simpleVerticalOffset}, z=${simpleZOffset}`);
     return finalPosition;
   }, [position, type, id]);
 
@@ -132,21 +135,19 @@ export const DirectNodeLabel: React.FC<DirectNodeLabelProps> = ({
 
   // PLAN IMPLEMENTATION: Enhanced percentage display debugging
   if (showPercentage && connectionPercentage > 0) {
-    console.log(`[DirectNodeLabel] PLAN IMPLEMENTATION: PERCENTAGE DISPLAY DEBUG: ${id} (${type}) shows ${connectionPercentage}% at`, percentagePosition, `size: ${percentageTextSize}, color: ${percentageColor}, showPercentage: ${showPercentage}, connectionPercentage: ${connectionPercentage}`);
-  } else {
-    console.log(`[DirectNodeLabel] PLAN IMPLEMENTATION: PERCENTAGE NOT DISPLAYED for ${id}: showPercentage=${showPercentage}, connectionPercentage=${connectionPercentage}`);
+    console.log(`[DirectNodeLabel] FLICKER-FREE PERCENTAGE: ${id} (${type}) shows ${connectionPercentage}% at`, percentagePosition, `size: ${percentageTextSize}, color: ${percentageColor}`);
   }
 
-  console.log(`[DirectNodeLabel] PLAN IMPLEMENTATION: RENDERING TEXT SIZE 2: "${id}" at position`, labelPosition, 'with STATIC size:', textSize, 'color:', textColor, '- REDUCED FROM 8 TO 2');
+  console.log(`[DirectNodeLabel] FLICKER-FREE RENDERING: "${id}" at position`, labelPosition, 'with static size:', textSize, 'color:', textColor);
 
   return (
     <>
-      {/* Main text using TranslatableText3D with Google Translate integration and STATIC size 2 */}
-      <TranslatableText3D
+      {/* Main text using FlickerFreeTranslatableText3D with preloaded translations */}
+      <FlickerFreeTranslatableText3D
         text={id}
         position={labelPosition}
         color={textColor}
-        size={textSize} // PLAN IMPLEMENTATION: Static size 2 (reduced from 8)
+        size={textSize}
         visible={true}
         renderOrder={15}
         bold={isHighlighted || isSelected}
@@ -157,20 +158,22 @@ export const DirectNodeLabel: React.FC<DirectNodeLabelProps> = ({
         maxCharsPerLine={18}
         maxLines={3}
         sourceLanguage="en"
+        userId={userId}
+        timeRange={timeRange}
       />
       
-      {/* PLAN IMPLEMENTATION: Enhanced percentage text with fixed size 1.5 and better visibility */}
+      {/* Enhanced percentage text with fixed size and better visibility */}
       {showPercentage && connectionPercentage > 0 && (
         <SimpleText
           text={`${connectionPercentage}%`}
           position={percentagePosition}
-          color={percentageColor} // Always white for maximum contrast
-          size={percentageTextSize} // PLAN IMPLEMENTATION: Fixed size 1.5
+          color={percentageColor}
+          size={percentageTextSize}
           visible={true}
           renderOrder={20}
           bold={true}
-          outlineWidth={0.15} // Increased outline for better visibility
-          outlineColor="#000000" // Always black outline for contrast
+          outlineWidth={0.15}
+          outlineColor="#000000"
           maxWidth={300}
           enableWrapping={false}
         />
