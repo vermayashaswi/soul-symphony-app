@@ -27,7 +27,7 @@ interface SimplifiedSoulNetVisualizationProps {
   themeHex: string;
   isFullScreen?: boolean;
   shouldShowLabels?: boolean;
-  getInstantConnectionPercentage?: (nodeId: string) => number;
+  getInstantConnectionPercentage?: (nodeId: string, connectedNodeId: string) => number;
   getInstantTranslation?: (text: string) => string;
   getInstantNodeConnections?: (nodeId: string) => Set<string>;
   isInstantReady?: boolean;
@@ -421,8 +421,9 @@ export const SimplifiedSoulNetVisualization: React.FC<SimplifiedSoulNetVisualiza
         const dimmed = shouldDim && !(selectedNode === node.id || highlightedNodes.has(node.id));
         const isHighlighted = selectedNode === node.id || highlightedNodes.has(node.id);
         
-        const connectionPercentage = getInstantConnectionPercentage 
-          ? getInstantConnectionPercentage(node.id)
+        // FIXED: Use the correct function signature with 2 parameters
+        const connectionPercentage = getInstantConnectionPercentage && selectedNode && highlightedNodes.has(node.id)
+          ? getInstantConnectionPercentage(selectedNode, node.id)
           : (selectedNode && highlightedNodes.has(node.id) 
               ? connectionPercentages.get(node.id) || 0 
               : 0);
