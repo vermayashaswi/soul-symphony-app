@@ -10,6 +10,21 @@ interface SoulNetTranslationData {
   language: string;
 }
 
+// ENHANCED: Text validation utilities
+function isValidNodeText(text: string): boolean {
+  return typeof text === 'string' && text.trim().length > 0 && text.trim() !== 'undefined' && text.trim() !== 'null';
+}
+
+function filterValidNodeTexts(nodeTexts: string[]): string[] {
+  const validTexts = nodeTexts.filter(text => isValidNodeText(text));
+  
+  if (validTexts.length !== nodeTexts.length) {
+    console.log(`[SoulNetTranslationPreloader] Filtered ${nodeTexts.length - validTexts.length} invalid texts, keeping ${validTexts.length} valid texts`);
+  }
+  
+  return validTexts;
+}
+
 export class SoulNetTranslationPreloader {
   private static readonly CACHE_KEY = 'soulnet-translations';
   private static readonly CACHE_DURATION = 10 * 60 * 1000; // 10 minutes
@@ -48,9 +63,26 @@ export class SoulNetTranslationPreloader {
       const nodeTranslations = new Map<string, string>();
       
       if (nodeTexts && nodeTexts.length > 0) {
-        // Batch translate all node texts
+        // ENHANCED: Filter valid texts before translation
+        const validNodeTexts = filterValidNodeTexts(nodeTexts);
+        
+        if (validNodeTexts.length === 0) {
+          console.warn(`[SoulNetTranslationPreloader] No valid node texts to translate`);
+          const emptyData: SoulNetTranslationData = {
+            nodeTranslations: new Map(),
+            loadedAt: Date.now(),
+            userId,
+            timeRange,
+            language
+          };
+          return emptyData;
+        }
+
+        console.log(`[SoulNetTranslationPreloader] Batch translating ${validNodeTexts.length} valid node texts`);
+        
+        // Batch translate all valid node texts
         const batchResults = await translationService.batchTranslate({
-          texts: nodeTexts,
+          texts: validNodeTexts,
           targetLanguage: language
         });
         
@@ -61,6 +93,8 @@ export class SoulNetTranslationPreloader {
             onDemandTranslationCache.set(language, originalText, translatedText);
           }
         });
+
+        console.log(`[SoulNetTranslationPreloader] Successfully translated ${nodeTranslations.size} node texts`);
       }
 
       const translationData: SoulNetTranslationData = {
@@ -92,16 +126,25 @@ export class SoulNetTranslationPreloader {
       return text;
     }
 
+    // ENHANCED: Validate text before lookup
+    if (!isValidNodeText(text)) {
+      console.warn(`[SoulNetTranslationPreloader] Invalid text for sync lookup: "${text}"`);
+      return text; // Return original for invalid texts
+    }
+
     const cacheKey = `${userId}-${timeRange}-${language}`;
     const cached = this.cache.get(cacheKey);
     
     if (cached && cached.nodeTranslations.has(text)) {
-      return cached.nodeTranslations.get(text) || null;
+      const translation = cached.nodeTranslations.get(text);
+      if (translation && isValidNodeText(translation)) {
+        return translation;
+      }
     }
 
     // Check on-demand cache as fallback
     const onDemandResult = onDemandTranslationCache.get(language, text);
-    if (onDemandResult) {
+    if (onDemandResult && isValidNodeText(onDemandResult)) {
       return onDemandResult;
     }
 

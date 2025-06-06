@@ -32,6 +32,23 @@ interface CachedSoulNetData {
   language: string;
 }
 
+// ENHANCED: Node validation utilities
+function isValidNodeName(name: string): boolean {
+  return typeof name === 'string' && 
+         name.trim().length > 0 && 
+         name.trim() !== 'undefined' && 
+         name.trim() !== 'null' &&
+         name.trim() !== 'NaN';
+}
+
+function sanitizeNodeName(name: string): string {
+  if (!isValidNodeName(name)) {
+    console.warn(`[SoulNetPreloadService] Invalid node name: "${name}"`);
+    return `Node_${Date.now()}`; // Generate fallback name
+  }
+  return name.trim();
+}
+
 export class SoulNetPreloadService {
   private static readonly CACHE_KEY = 'soulnet-preloaded-data';
   private static readonly CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
@@ -72,7 +89,7 @@ export class SoulNetPreloadService {
         return { nodes: [], links: [], translations: new Map(), connectionPercentages: new Map() };
       }
 
-      // Process the raw data
+      // Process the raw data with enhanced validation
       const graphData = this.processEntities(entries);
       
       // Pre-translate all node names if not English
@@ -80,17 +97,27 @@ export class SoulNetPreloadService {
       const connectionPercentages = new Map<string, number>();
       
       if (language !== 'en') {
-        const nodesToTranslate = graphData.nodes.map(node => node.id);
-        console.log(`[SoulNetPreloadService] Pre-translating ${nodesToTranslate.length} node names`);
-        
-        const batchResults = await translationService.batchTranslate({
-          texts: nodesToTranslate,
-          targetLanguage: language
-        });
-        
-        batchResults.forEach((translatedText, originalText) => {
-          translations.set(originalText, translatedText);
-        });
+        // ENHANCED: Filter valid node names before translation
+        const validNodeNames = graphData.nodes
+          .map(node => node.id)
+          .filter(id => isValidNodeName(id));
+          
+        if (validNodeNames.length > 0) {
+          console.log(`[SoulNetPreloadService] Pre-translating ${validNodeNames.length} valid node names`);
+          
+          const batchResults = await translationService.batchTranslate({
+            texts: validNodeNames,
+            targetLanguage: language
+          });
+          
+          batchResults.forEach((translatedText, originalText) => {
+            if (translatedText && isValidNodeName(translatedText)) {
+              translations.set(originalText, translatedText);
+            }
+          });
+          
+          console.log(`[SoulNetPreloadService] Successfully translated ${translations.size} node names`);
+        }
       }
 
       // Pre-calculate connection percentages
@@ -245,17 +272,23 @@ export class SoulNetPreloadService {
       Object.entries(entry.entityemotion).forEach(([entity, emotions]) => {
         if (typeof emotions !== 'object') return;
         
-        if (!entityEmotionMap[entity]) {
-          entityEmotionMap[entity] = {};
+        // ENHANCED: Validate and sanitize entity name
+        const sanitizedEntity = sanitizeNodeName(entity);
+        
+        if (!entityEmotionMap[sanitizedEntity]) {
+          entityEmotionMap[sanitizedEntity] = {};
         }
         
         Object.entries(emotions).forEach(([emotion, score]) => {
           if (typeof score !== 'number') return;
           
-          if (entityEmotionMap[entity][emotion]) {
-            entityEmotionMap[entity][emotion] += score;
+          // ENHANCED: Validate and sanitize emotion name
+          const sanitizedEmotion = sanitizeNodeName(emotion);
+          
+          if (entityEmotionMap[sanitizedEntity][sanitizedEmotion]) {
+            entityEmotionMap[sanitizedEntity][sanitizedEmotion] += score;
           } else {
-            entityEmotionMap[entity][emotion] = score;
+            entityEmotionMap[sanitizedEntity][sanitizedEmotion] = score;
           }
         });
       });
@@ -270,7 +303,7 @@ export class SoulNetPreloadService {
     const entityNodes = new Set<string>();
     const emotionNodes = new Set<string>();
 
-    const entityList = Object.keys(entityEmotionMap);
+    const entityList = Object.keys(entityEmotionMap).filter(entity => isValidNodeName(entity));
     
     // POSITIONING: Updated emotion Y-pattern and entity radius settings
     const EMOTION_LAYER_RADIUS = 11;
@@ -279,7 +312,7 @@ export class SoulNetPreloadService {
     // ENTITY Y-PATTERN: +1, -2, +2, -1 repeating
     const ENTITY_Y_PATTERN = [1, -2, 2, -1];
 
-    console.log("[SoulNetPreloadService] ENTITY Y-PATTERN: Implementing +1, -2, +2, -1 repeating pattern for", entityList.length, "entities");
+    console.log("[SoulNetPreloadService] ENTITY Y-PATTERN: Implementing +1, -2, +2, -1 repeating pattern for", entityList.length, "valid entities");
     
     entityList.forEach((entity, entityIndex) => {
       entityNodes.add(entity);
@@ -305,17 +338,21 @@ export class SoulNetPreloadService {
       });
 
       Object.entries(entityEmotionMap[entity]).forEach(([emotion, score]) => {
-        emotionNodes.add(emotion);
-        links.push({
-          source: entity,
-          target: emotion,
-          value: score
-        });
+        if (isValidNodeName(emotion)) {
+          emotionNodes.add(emotion);
+          links.push({
+            source: entity,
+            target: emotion,
+            value: score
+          });
+        }
       });
     });
 
-    Array.from(emotionNodes).forEach((emotion, emotionIndex) => {
-      const emotionAngle = (emotionIndex / emotionNodes.size) * Math.PI * 2;
+    const validEmotions = Array.from(emotionNodes).filter(emotion => isValidNodeName(emotion));
+    
+    validEmotions.forEach((emotion, emotionIndex) => {
+      const emotionAngle = (emotionIndex / validEmotions.length) * Math.PI * 2;
       const emotionRadius = EMOTION_LAYER_RADIUS;
       const emotionX = Math.cos(emotionAngle) * emotionRadius;
       
@@ -339,7 +376,7 @@ export class SoulNetPreloadService {
       });
     });
 
-    console.log("[SoulNetPreloadService] CORRECTED POSITIONING COMPLETE: Generated graph with", nodes.length, "nodes and", links.length, "links");
+    console.log("[SoulNetPreloadService] ENHANCED POSITIONING COMPLETE: Generated graph with", nodes.length, "valid nodes and", links.length, "links");
     console.log("[SoulNetPreloadService] ENTITY Y-PATTERN: Repeating +1, -2, +2, -1");
     console.log("[SoulNetPreloadService] EMOTION Y-PATTERN: Corrected to +7,+9,+11,+13 / -7,-9,-11,-13");
     return { nodes, links };

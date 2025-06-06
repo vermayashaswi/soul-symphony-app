@@ -22,6 +22,15 @@ interface DirectNodeLabelProps {
   timeRange?: string;
 }
 
+// ENHANCED: Text validation for node labels
+function isValidNodeId(id: string): boolean {
+  return typeof id === 'string' && 
+         id.trim().length > 0 && 
+         id.trim() !== 'undefined' && 
+         id.trim() !== 'null' &&
+         id.trim() !== 'NaN';
+}
+
 export const DirectNodeLabel: React.FC<DirectNodeLabelProps> = ({
   id,
   type,
@@ -39,21 +48,30 @@ export const DirectNodeLabel: React.FC<DirectNodeLabelProps> = ({
   const { currentLanguage } = useTranslation();
   const [translationReady, setTranslationReady] = useState<boolean>(false);
 
+  // ENHANCED: Validate node ID before processing
+  const validNodeId = useMemo(() => {
+    if (!isValidNodeId(id)) {
+      console.warn(`[DirectNodeLabel] Invalid node ID: "${id}"`);
+      return null;
+    }
+    return id.trim();
+  }, [id]);
+
   // ENHANCED: Always ready for English, optimistic for other languages
   useEffect(() => {
-    if (currentLanguage === 'en') {
+    if (currentLanguage === 'en' || !validNodeId) {
       setTranslationReady(true);
     } else {
       // Start optimistic, will be corrected by translation completion
       setTranslationReady(true);
     }
-  }, [currentLanguage, id]);
+  }, [currentLanguage, validNodeId]);
 
   // Handle translation completion
   const handleTranslationComplete = useCallback((translatedText: string) => {
     setTranslationReady(true);
-    console.log(`[DirectNodeLabel] Translation confirmed for ${id}: "${translatedText}"`);
-  }, [id]);
+    console.log(`[DirectNodeLabel] Translation confirmed for ${validNodeId}: "${translatedText}"`);
+  }, [validNodeId]);
 
   // Calculate positions and styling
   const labelOffset = useMemo(() => {
@@ -85,19 +103,19 @@ export const DirectNodeLabel: React.FC<DirectNodeLabelProps> = ({
     return currentTutorialStep === '9' || shouldShowLabel;
   }, [shouldShowLabel]);
 
-  // ENHANCED: Always show labels if we should - don't wait for translations
-  const finalShouldShowLabel = enhancedShouldShowLabel;
+  // ENHANCED: Always show labels if we should - don't wait for translations, but validate node ID
+  const finalShouldShowLabel = enhancedShouldShowLabel && validNodeId;
 
-  if (!finalShouldShowLabel || !id) {
+  if (!finalShouldShowLabel) {
     return null;
   }
 
-  console.log(`[DirectNodeLabel] RENDERING LABEL: ${id} (ready: ${translationReady}, lang: ${currentLanguage})`);
+  console.log(`[DirectNodeLabel] RENDERING LABEL: ${validNodeId} (ready: ${translationReady}, lang: ${currentLanguage}, valid: ${!!validNodeId})`);
 
   return (
     <>
       <FlickerFreeTranslatableText3D
-        text={id}
+        text={validNodeId}
         position={labelPosition}
         color={textColor}
         size={textSize}

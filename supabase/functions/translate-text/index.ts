@@ -1,4 +1,3 @@
-
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.38.4';
@@ -7,6 +6,25 @@ const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
+
+// ENHANCED: Comprehensive text validation
+function validateTranslationText(text: string | string[]): { isValid: boolean; validTexts: string[]; error?: string } {
+  if (Array.isArray(text)) {
+    const validTexts = text.filter(t => t && typeof t === 'string' && t.trim().length > 0);
+    return {
+      isValid: validTexts.length > 0,
+      validTexts,
+      error: validTexts.length === 0 ? 'No valid texts in batch' : undefined
+    };
+  } else {
+    const isValid = text && typeof text === 'string' && text.trim().length > 0;
+    return {
+      isValid,
+      validTexts: isValid ? [text] : [],
+      error: !isValid ? 'Empty or invalid text provided' : undefined
+    };
+  }
+}
 
 serve(async (req) => {
   // Handle CORS preflight requests
@@ -26,13 +44,45 @@ serve(async (req) => {
     console.log('Starting translation with provided API key');
     
     // Parse request body
-    const { text, sourceLanguage, targetLanguage = 'hi', entryId, cleanResult = true, useDetectedLanguages = true } = await req.json();
+    const { text, texts, sourceLanguage, targetLanguage = 'hi', entryId, cleanResult = true, useDetectedLanguages = true } = await req.json();
 
-    if (!text) {
-      throw new Error('Missing required parameter: text is required');
+    // ENHANCED: Comprehensive input validation
+    const inputText = text || texts;
+    if (!inputText) {
+      console.error('[translate-text] No text or texts parameter provided');
+      return new Response(
+        JSON.stringify({ 
+          error: 'Missing required parameter: text or texts is required',
+          success: false
+        }),
+        {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 400,
+        }
+      );
     }
 
-    console.log(`Translating text: "${text.substring(0, 50)}..." from ${sourceLanguage || 'auto-detect'} to ${targetLanguage}${entryId ? ` for entry ${entryId}` : ''}`);
+    // Validate and filter texts
+    const validation = validateTranslationText(inputText);
+    if (!validation.isValid) {
+      console.error(`[translate-text] Invalid input: ${validation.error}`);
+      return new Response(
+        JSON.stringify({ 
+          error: validation.error,
+          success: false,
+          originalInput: inputText
+        }),
+        {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 400,
+        }
+      );
+    }
+
+    const validTexts = validation.validTexts;
+    const isBatchRequest = Array.isArray(inputText);
+
+    console.log(`[translate-text] Processing ${isBatchRequest ? 'batch' : 'single'} translation: ${validTexts.length} valid texts from ${sourceLanguage || 'auto-detect'} to ${targetLanguage}${entryId ? ` for entry ${entryId}` : ''}`);
 
     // Initialize Supabase if entryId is provided to fetch detected languages
     let detectedLanguagesFromDB = [];
@@ -66,9 +116,103 @@ serve(async (req) => {
         }
       } catch (dbError) {
         console.error(`[translate-text] Error fetching detected languages:`, dbError);
-        // Continue with original flow if database lookup fails
       }
     }
+
+    // ENHANCED: Handle batch translations
+    if (isBatchRequest) {
+      console.log(`[translate-text] Processing batch translation for ${validTexts.length} texts`);
+      
+      const results = new Map<string, string>();
+      
+      // Process texts in smaller batches to avoid API limits
+      const BATCH_SIZE = 50;
+      for (let i = 0; i < validTexts.length; i += BATCH_SIZE) {
+        const batch = validTexts.slice(i, i + BATCH_SIZE);
+        
+        // Language detection for first text in batch (if needed)
+        let detectedLanguage = finalSourceLanguage;
+        if (!detectedLanguage) {
+          const detectUrl = `https://translation.googleapis.com/language/translate/v2/detect?key=${GOOGLE_API_KEY}`;
+          
+          const detectResponse = await fetch(detectUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ q: batch[0] })
+          });
+
+          if (detectResponse.ok) {
+            const detectData = await detectResponse.json();
+            if (detectData.data?.detections?.[0]?.[0]?.language) {
+              detectedLanguage = detectData.data.detections[0][0].language;
+              console.log(`[translate-text] Batch detected language: ${detectedLanguage}`);
+            }
+          }
+        }
+
+        // Skip translation if same language
+        if (detectedLanguage === targetLanguage) {
+          batch.forEach(text => results.set(text, text));
+          continue;
+        }
+
+        // Translate batch
+        const translateUrl = `https://translation.googleapis.com/language/translate/v2?key=${GOOGLE_API_KEY}`;
+        
+        const translateResponse = await fetch(translateUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            q: batch,
+            source: detectedLanguage,
+            target: targetLanguage,
+            format: 'text'
+          })
+        });
+
+        if (translateResponse.ok) {
+          const translateData = await translateResponse.json();
+          if (translateData.data?.translations) {
+            batch.forEach((originalText, index) => {
+              let translatedText = translateData.data.translations[index]?.translatedText || originalText;
+              
+              if (cleanResult) {
+                const languageCodeRegex = /\s*[\(\[]([a-z]{2})[\)\]]\s*$/i;
+                translatedText = translatedText.replace(languageCodeRegex, '').trim();
+              }
+              
+              results.set(originalText, translatedText);
+            });
+          } else {
+            batch.forEach(text => results.set(text, text));
+          }
+        } else {
+          console.error(`[translate-text] Batch translation failed for batch ${i / BATCH_SIZE + 1}`);
+          batch.forEach(text => results.set(text, text));
+        }
+      }
+
+      console.log(`[translate-text] Batch translation completed: ${results.size} results`);
+      
+      return new Response(
+        JSON.stringify({
+          translatedTexts: Array.from(results.values()),
+          originalTexts: validTexts,
+          translationMap: Object.fromEntries(results),
+          detectedLanguage: detectedLanguage || 'en',
+          success: true,
+          batchSize: validTexts.length,
+          detectedLanguagesFromDB: detectedLanguagesFromDB
+        }),
+        {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 200,
+        }
+      );
+    }
+
+    // Single text translation (existing logic)
+    const singleText = validTexts[0];
 
     // Language detection (if needed)
     let detectedLanguage = finalSourceLanguage;
@@ -79,7 +223,7 @@ serve(async (req) => {
       const detectResponse = await fetch(detectUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ q: text })
+        body: JSON.stringify({ q: singleText })
       });
 
       if (!detectResponse.ok) {
@@ -120,7 +264,7 @@ serve(async (req) => {
           
           const updateFields = {
             "original_language": detectedLanguage,
-            "translation_text": text // Use original text as "translation"
+            "translation_text": singleText
           };
           
           const { error: updateError } = await supabase
@@ -140,7 +284,7 @@ serve(async (req) => {
       
       return new Response(
         JSON.stringify({
-          translatedText: text,
+          translatedText: singleText,
           detectedLanguage: detectedLanguage,
           success: true,
           skippedTranslation: true,
@@ -162,10 +306,10 @@ serve(async (req) => {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        q: text,
+        q: singleText,
         source: detectedLanguage,
         target: targetLanguage,
-        format: 'text' // Ensure we're using text format, not HTML
+        format: 'text'
       })
     });
 
@@ -178,7 +322,6 @@ serve(async (req) => {
     const translateData = await translateResponse.json();
     console.log('Translation API response:', JSON.stringify(translateData));
     
-    // Check if the response has the expected structure
     if (!translateData.data || !translateData.data.translations || !translateData.data.translations[0]) {
       console.error('Invalid translation response format:', JSON.stringify(translateData));
       throw new Error('Invalid translation response format');
@@ -187,9 +330,7 @@ serve(async (req) => {
     let translatedText = translateData.data.translations[0].translatedText;
     console.log(`Raw translated text: "${translatedText.substring(0, 50)}..."`);
     
-    // Clean the translation result if requested
     if (cleanResult) {
-      // Remove language code suffix like "(hi)" or "[hi]" that might be appended
       const languageCodeRegex = /\s*[\(\[]([a-z]{2})[\)\]]\s*$/i;
       translatedText = translatedText.replace(languageCodeRegex, '').trim();
       console.log(`Cleaned translated text: "${translatedText.substring(0, 50)}..."`);
@@ -288,7 +429,7 @@ serve(async (req) => {
         error: error.message,
         stack: error.stack,
         name: error.name,
-        originalText: req.json?.text || null
+        success: false
       }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },

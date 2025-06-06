@@ -24,6 +24,15 @@ interface FlickerFreeTranslatableText3DProps {
   onTranslationComplete?: (translatedText: string) => void;
 }
 
+// ENHANCED: Text validation utilities
+function isValidDisplayText(text: string): boolean {
+  return typeof text === 'string' && 
+         text.trim().length > 0 && 
+         text.trim() !== 'undefined' && 
+         text.trim() !== 'null' &&
+         text.trim() !== 'NaN';
+}
+
 export const FlickerFreeTranslatableText3D: React.FC<FlickerFreeTranslatableText3DProps> = ({
   text,
   position,
@@ -48,12 +57,13 @@ export const FlickerFreeTranslatableText3D: React.FC<FlickerFreeTranslatableText
   const [isStable, setIsStable] = useState<boolean>(false);
   const [translationAttempted, setTranslationAttempted] = useState<boolean>(false);
 
-  // ENHANCED: Graceful translation lookup with proper fallbacks
+  // ENHANCED: Comprehensive text validation and translation lookup
   const translatedText = useMemo(() => {
     try {
-      if (!text) {
-        console.warn('[FlickerFreeTranslatableText3D] Empty text provided');
-        return text;
+      // ENHANCED: Validate input text
+      if (!isValidDisplayText(text)) {
+        console.warn(`[FlickerFreeTranslatableText3D] Invalid text provided: "${text}"`);
+        return text; // Return as-is for invalid texts
       }
 
       // If same language, return original text immediately
@@ -70,14 +80,14 @@ export const FlickerFreeTranslatableText3D: React.FC<FlickerFreeTranslatableText
           timeRange
         );
 
-        if (preloadedTranslation && preloadedTranslation !== text) {
-          console.log(`[FlickerFreeTranslatableText3D] FOUND TRANSLATION: "${text}" -> "${preloadedTranslation}"`);
+        if (preloadedTranslation && isValidDisplayText(preloadedTranslation) && preloadedTranslation !== text) {
+          console.log(`[FlickerFreeTranslatableText3D] TRANSLATION FOUND: "${text}" -> "${preloadedTranslation}"`);
           return preloadedTranslation;
         }
       }
 
-      // FALLBACK: Return original text if no translation available
-      console.log(`[FlickerFreeTranslatableText3D] FALLBACK TO ORIGINAL: "${text}" (no translation in ${currentLanguage})`);
+      // ENHANCED: Graceful fallback to original text
+      console.log(`[FlickerFreeTranslatableText3D] USING ORIGINAL: "${text}" (no translation available in ${currentLanguage})`);
       return text;
     } catch (error) {
       console.error(`[FlickerFreeTranslatableText3D] Error in translation lookup:`, error);
@@ -85,8 +95,14 @@ export const FlickerFreeTranslatableText3D: React.FC<FlickerFreeTranslatableText
     }
   }, [text, currentLanguage, sourceLanguage, userId, timeRange]);
 
-  // ENHANCED: Stable text update with proper error recovery
+  // ENHANCED: Stable text update with validation
   const updateFinalText = useCallback((newText: string) => {
+    // Validate the new text before updating
+    if (!isValidDisplayText(newText)) {
+      console.warn(`[FlickerFreeTranslatableText3D] Invalid final text, using original: "${newText}"`);
+      newText = text; // Fallback to original
+    }
+
     if (newText !== finalText) {
       console.log(`[FlickerFreeTranslatableText3D] TEXT UPDATE: "${finalText}" -> "${newText}"`);
       setIsStable(false);
@@ -107,7 +123,7 @@ export const FlickerFreeTranslatableText3D: React.FC<FlickerFreeTranslatableText
       setIsStable(true);
       setTranslationAttempted(true);
     }
-  }, [finalText, isStable, onTranslationComplete]);
+  }, [finalText, isStable, onTranslationComplete, text]);
 
   // Update final text when translation changes
   useEffect(() => {
@@ -115,15 +131,15 @@ export const FlickerFreeTranslatableText3D: React.FC<FlickerFreeTranslatableText
     return cleanup;
   }, [translatedText, updateFinalText]);
 
-  // ENHANCED: Always show text - no hiding for missing translations
-  if (!visible || !text) {
+  // ENHANCED: Always show valid text - no hiding for missing translations
+  if (!visible || !isValidDisplayText(text)) {
     return null;
   }
 
   // Show original text immediately if we haven't attempted translation yet
   const displayText = isStable ? finalText : text;
 
-  console.log(`[FlickerFreeTranslatableText3D] RENDERING: "${displayText}" (stable: ${isStable}, attempted: ${translationAttempted})`);
+  console.log(`[FlickerFreeTranslatableText3D] RENDERING: "${displayText}" (stable: ${isStable}, attempted: ${translationAttempted}, valid: ${isValidDisplayText(displayText)})`);
 
   return (
     <SmartTextRenderer
