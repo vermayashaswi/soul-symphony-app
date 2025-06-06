@@ -15,33 +15,15 @@ interface BatchTranslationRequest {
   targetLanguage: string;
 }
 
-// Relaxed text validation - allow valid text with special characters
-function isValidTranslationText(text: string): boolean {
-  if (typeof text !== 'string') return false;
-  const trimmed = text.trim();
-  if (trimmed.length < 1) return false; // Allow single characters
-  // Only reject obvious invalid values, not special characters like &, spaces, etc.
-  const invalidValues = ['undefined', 'null', 'NaN', '[object Object]'];
-  return !invalidValues.includes(trimmed.toLowerCase());
-}
-
-function filterValidTexts(texts: string[]): string[] {
-  const validTexts = texts.filter(text => isValidTranslationText(text));
-  if (validTexts.length !== texts.length) {
-    const invalidTexts = texts.filter(text => !isValidTranslationText(text));
-    console.log(`[TranslationService] Invalid texts filtered out:`, invalidTexts);
-  }
-  return validTexts;
-}
-
 export class TranslationService {
   private static readonly BATCH_SIZE = 50;
   private static readonly MAX_RETRIES = 3;
   
   static async translateText(text: string, targetLanguage: string, sourceLanguage: string = 'en'): Promise<string> {
     try {
-      if (!isValidTranslationText(text)) {
-        console.warn(`[TranslationService] Invalid text provided: "${text}"`);
+      // SIMPLIFIED: No validation - translate everything
+      if (!text || typeof text !== 'string') {
+        console.warn(`[TranslationService] Invalid text type: "${text}"`);
         return text;
       }
       
@@ -55,7 +37,7 @@ export class TranslationService {
 
       const { data, error } = await supabase.functions.invoke('translate-text', {
         body: {
-          text: text.trim(),
+          text: text,
           sourceLanguage: sourceLanguage,
           targetLanguage: targetLanguage,
         },
@@ -93,19 +75,20 @@ export class TranslationService {
   static async batchTranslate(request: BatchTranslationRequest): Promise<Map<string, string>> {
     const results = new Map<string, string>();
 
-    const validTexts = filterValidTexts(request.texts);
+    // SIMPLIFIED: No filtering - translate all texts as-is
+    const textsToTranslate = request.texts.filter(text => text && typeof text === 'string');
     
-    if (validTexts.length === 0) {
+    if (textsToTranslate.length === 0) {
       console.warn('[TranslationService] No valid texts to translate');
       return results;
     }
 
-    console.log(`[TranslationService] Batch translating ${validTexts.length} valid texts (${request.texts.length - validTexts.length} invalid filtered out)`);
+    console.log(`[TranslationService] Batch translating ${textsToTranslate.length} texts`);
 
     const needsTranslation: string[] = [];
 
-    // Check cache first for all valid texts
-    for (const text of validTexts) {
+    // Check cache first for all texts
+    for (const text of textsToTranslate) {
       const cached = await translationCache.getTranslation(text, request.targetLanguage);
       if (cached) {
         results.set(text, cached.translatedText);

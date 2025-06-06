@@ -1,3 +1,4 @@
+
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.38.4';
@@ -6,25 +7,6 @@ const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
-
-// ENHANCED: Comprehensive text validation
-function validateTranslationText(text: string | string[]): { isValid: boolean; validTexts: string[]; error?: string } {
-  if (Array.isArray(text)) {
-    const validTexts = text.filter(t => t && typeof t === 'string' && t.trim().length > 0);
-    return {
-      isValid: validTexts.length > 0,
-      validTexts,
-      error: validTexts.length === 0 ? 'No valid texts in batch' : undefined
-    };
-  } else {
-    const isValid = text && typeof text === 'string' && text.trim().length > 0;
-    return {
-      isValid,
-      validTexts: isValid ? [text] : [],
-      error: !isValid ? 'Empty or invalid text provided' : undefined
-    };
-  }
-}
 
 serve(async (req) => {
   // Handle CORS preflight requests
@@ -46,7 +28,7 @@ serve(async (req) => {
     // Parse request body
     const { text, texts, sourceLanguage, targetLanguage = 'hi', entryId, cleanResult = true, useDetectedLanguages = true } = await req.json();
 
-    // ENHANCED: Comprehensive input validation
+    // SIMPLIFIED: Accept any non-empty text or texts parameter
     const inputText = text || texts;
     if (!inputText) {
       console.error('[translate-text] No text or texts parameter provided');
@@ -62,13 +44,23 @@ serve(async (req) => {
       );
     }
 
-    // Validate and filter texts
-    const validation = validateTranslationText(inputText);
-    if (!validation.isValid) {
-      console.error(`[translate-text] Invalid input: ${validation.error}`);
+    // SIMPLIFIED: Basic text processing - no strict validation
+    let processedTexts: string[] = [];
+    const isBatchRequest = Array.isArray(inputText);
+
+    if (isBatchRequest) {
+      processedTexts = inputText.filter(t => t && typeof t === 'string');
+    } else {
+      if (typeof inputText === 'string' && inputText.length > 0) {
+        processedTexts = [inputText];
+      }
+    }
+
+    if (processedTexts.length === 0) {
+      console.error(`[translate-text] No processable texts found`);
       return new Response(
         JSON.stringify({ 
-          error: validation.error,
+          error: 'No processable texts found',
           success: false,
           originalInput: inputText
         }),
@@ -79,10 +71,7 @@ serve(async (req) => {
       );
     }
 
-    const validTexts = validation.validTexts;
-    const isBatchRequest = Array.isArray(inputText);
-
-    console.log(`[translate-text] Processing ${isBatchRequest ? 'batch' : 'single'} translation: ${validTexts.length} valid texts from ${sourceLanguage || 'auto-detect'} to ${targetLanguage}${entryId ? ` for entry ${entryId}` : ''}`);
+    console.log(`[translate-text] Processing ${isBatchRequest ? 'batch' : 'single'} translation: ${processedTexts.length} texts from ${sourceLanguage || 'auto-detect'} to ${targetLanguage}${entryId ? ` for entry ${entryId}` : ''}`);
 
     // Initialize Supabase if entryId is provided to fetch detected languages
     let detectedLanguagesFromDB = [];
@@ -119,16 +108,16 @@ serve(async (req) => {
       }
     }
 
-    // ENHANCED: Handle batch translations
+    // Handle batch translations
     if (isBatchRequest) {
-      console.log(`[translate-text] Processing batch translation for ${validTexts.length} texts`);
+      console.log(`[translate-text] Processing batch translation for ${processedTexts.length} texts`);
       
       const results = new Map<string, string>();
       
       // Process texts in smaller batches to avoid API limits
       const BATCH_SIZE = 50;
-      for (let i = 0; i < validTexts.length; i += BATCH_SIZE) {
-        const batch = validTexts.slice(i, i + BATCH_SIZE);
+      for (let i = 0; i < processedTexts.length; i += BATCH_SIZE) {
+        const batch = processedTexts.slice(i, i + BATCH_SIZE);
         
         // Language detection for first text in batch (if needed)
         let detectedLanguage = finalSourceLanguage;
@@ -197,11 +186,11 @@ serve(async (req) => {
       return new Response(
         JSON.stringify({
           translatedTexts: Array.from(results.values()),
-          originalTexts: validTexts,
+          originalTexts: processedTexts,
           translationMap: Object.fromEntries(results),
           detectedLanguage: detectedLanguage || 'en',
           success: true,
-          batchSize: validTexts.length,
+          batchSize: processedTexts.length,
           detectedLanguagesFromDB: detectedLanguagesFromDB
         }),
         {
@@ -211,8 +200,8 @@ serve(async (req) => {
       );
     }
 
-    // Single text translation (existing logic)
-    const singleText = validTexts[0];
+    // Single text translation
+    const singleText = processedTexts[0];
 
     // Language detection (if needed)
     let detectedLanguage = finalSourceLanguage;

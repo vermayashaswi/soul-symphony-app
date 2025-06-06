@@ -19,11 +19,6 @@ interface StreamlinedNodeLabelProps {
   effectiveTheme?: 'light' | 'dark';
 }
 
-// Simple text validation - allow any reasonable text
-function isValidText(text: string): boolean {
-  return typeof text === 'string' && text.trim().length > 0;
-}
-
 export const StreamlinedNodeLabel: React.FC<StreamlinedNodeLabelProps> = ({
   id,
   type,
@@ -42,12 +37,12 @@ export const StreamlinedNodeLabel: React.FC<StreamlinedNodeLabelProps> = ({
   const [displayText, setDisplayText] = useState<string>(id);
   const [isTranslating, setIsTranslating] = useState<boolean>(false);
 
-  // Validate node ID
+  // SIMPLIFIED: Always use the node ID as-is - no validation
   const validNodeId = useMemo(() => {
-    return isValidText(id) ? id.trim() : `Node_${Date.now()}`;
+    return id || `Node_${Date.now()}`;
   }, [id]);
 
-  // STREAMLINED TRANSLATION - Always attempt translation for non-English
+  // ULTRA-SIMPLIFIED TRANSLATION - No barriers, no checks
   useEffect(() => {
     const translateNodeText = async () => {
       if (currentLanguage === 'en') {
@@ -55,20 +50,20 @@ export const StreamlinedNodeLabel: React.FC<StreamlinedNodeLabelProps> = ({
         return;
       }
 
-      // For non-English languages, ALWAYS attempt translation
+      // ALWAYS translate for non-English languages
       console.log(`[StreamlinedNodeLabel] ALWAYS translating "${validNodeId}" to ${currentLanguage}`);
       
       try {
         setIsTranslating(true);
         
-        // Direct translation call - no conditions, no prerequisites
+        // Direct translation - no conditions whatsoever
         const translatedText = await translationService.translateText(
           validNodeId,
           currentLanguage,
           'en'
         );
         
-        if (translatedText && isValidText(translatedText) && translatedText !== validNodeId) {
+        if (translatedText && translatedText !== validNodeId) {
           console.log(`[StreamlinedNodeLabel] SUCCESS: "${validNodeId}" -> "${translatedText}"`);
           setDisplayText(translatedText);
         } else {
