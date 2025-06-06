@@ -141,7 +141,7 @@ export const TranslationProvider: React.FC<TranslationProviderProps> = ({ childr
   const clearCache = useCallback(() => {
     console.log('[TranslationContext] Clearing translation cache');
     setTranslationCache({});
-    onDemandTranslationCache.clear();
+    onDemandTranslationCache.clearAll();
   }, []);
 
   const getCachedTranslation = useCallback((text: string): string | null => {
