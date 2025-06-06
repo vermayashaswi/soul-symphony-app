@@ -1,4 +1,3 @@
-
 import React, { useMemo, useEffect } from 'react';
 import TranslatableText3D from './TranslatableText3D';
 import SimpleText from './SimpleText';
@@ -26,7 +25,7 @@ export const DirectNodeLabel: React.FC<DirectNodeLabelProps> = ({
   isHighlighted,
   isSelected,
   shouldShowLabel,
-  cameraZoom = 45,
+  cameraZoom = 62.5, // Default to middle of new range
   themeHex,
   nodeScale = 1,
   connectionPercentage = 0,
@@ -49,65 +48,42 @@ export const DirectNodeLabel: React.FC<DirectNodeLabelProps> = ({
     };
   }, [id, shouldShowLabel]);
 
-  // Log rendering mode
-  if (isInstantMode) {
-    console.log(`[DirectNodeLabel] INSTANT MODE: ${id} with FIXED PERCENTAGE POSITIONING - NO LOADING DELAY`);
-  } else {
-    console.log(`[DirectNodeLabel] FIXED PERCENTAGE POSITIONING: ${id} with enhanced visibility`);
-  }
+  // FIXED: Static text size of 8 regardless of zoom
+  console.log(`[DirectNodeLabel] FIXED STATIC TEXT SIZE 8: ${id} - No zoom dependency`);
 
   // Same base offset for both entity and emotion nodes
   const labelOffset = useMemo(() => {
     const baseOffset = 1.4;
     const scaledOffset = baseOffset * Math.max(0.8, Math.min(2.5, nodeScale));
     
-    if (isInstantMode) {
-      console.log(`[DirectNodeLabel] INSTANT: Enhanced label offset for ${id} (${type}): ${scaledOffset} (scale: ${nodeScale}) - UNIFORM POSITIONING`);
-    } else {
-      console.log(`[DirectNodeLabel] Enhanced label offset for ${id} (${type}): ${scaledOffset} (scale: ${nodeScale}) - UNIFORM POSITIONING`);
-    }
+    console.log(`[DirectNodeLabel] Enhanced label offset for ${id} (${type}): ${scaledOffset} (scale: ${nodeScale}) - UNIFORM POSITIONING`);
     return [0, scaledOffset, 0] as [number, number, number];
-  }, [type, nodeScale, id, isInstantMode]);
+  }, [type, nodeScale, id]);
 
-  // Better text size calculation for enhanced visibility
+  // FIXED: Static text size of 8
   const textSize = useMemo(() => {
-    const zoom = Math.max(10, Math.min(100, cameraZoom));
-    const baseSize = isSelected ? 6.0 : (isHighlighted ? 5.2 : 4.8);
-    const zoomFactor = Math.max(0.8, Math.min(1.5, (50 - zoom) * 0.02 + 1));
-    const finalSize = Math.max(3.5, Math.min(16.0, baseSize * zoomFactor));
-    
-    if (isInstantMode) {
-      console.log(`[DirectNodeLabel] INSTANT: Enhanced text size for ${id}: ${finalSize} (zoom: ${zoom})`);
-    } else {
-      console.log(`[DirectNodeLabel] Enhanced text size for ${id}: ${finalSize} (zoom: ${zoom})`);
-    }
-    return finalSize;
-  }, [cameraZoom, id, isSelected, isHighlighted, isInstantMode]);
+    const staticSize = 8.0;
+    console.log(`[DirectNodeLabel] FIXED STATIC TEXT SIZE for ${id}: ${staticSize} (zoom ignored: ${cameraZoom})`);
+    return staticSize;
+  }, [id, cameraZoom]);
 
-  // FIXED: Larger percentage text size for better visibility
+  // FIXED: Static percentage text size proportional to main text (8 * 0.35 = 2.8)
   const percentageTextSize = useMemo(() => {
-    const basePercentageSize = textSize * 0.35; // Increased from 0.21 to 0.35
-    const minSize = Math.max(2.0, basePercentageSize); // Ensure minimum readable size
-    console.log(`[DirectNodeLabel] FIXED PERCENTAGE SIZE for ${id}: ${minSize} (base: ${basePercentageSize})`);
-    return minSize;
-  }, [textSize, id]);
+    const staticPercentageSize = 2.8; // 8 * 0.35
+    console.log(`[DirectNodeLabel] FIXED STATIC PERCENTAGE SIZE for ${id}: ${staticPercentageSize}`);
+    return staticPercentageSize;
+  }, [id]);
 
   // UPDATED: High contrast colors for better visibility
   const textColor = useMemo(() => {
     const color = effectiveTheme === 'dark' ? '#ffffff' : '#000000';
-    
-    if (isInstantMode) {
-      console.log(`[DirectNodeLabel] INSTANT: HIGH CONTRAST TEXT COLOR for ${id}: ${color} (theme: ${effectiveTheme})`);
-    } else {
-      console.log(`[DirectNodeLabel] HIGH CONTRAST TEXT COLOR for ${id}: ${color} (theme: ${effectiveTheme})`);
-    }
+    console.log(`[DirectNodeLabel] HIGH CONTRAST TEXT COLOR for ${id}: ${color} (theme: ${effectiveTheme})`);
     return color;
-  }, [effectiveTheme, id, isInstantMode]);
+  }, [effectiveTheme, id]);
 
   // FIXED: Bright, high-contrast percentage color
   const percentageColor = useMemo(() => {
-    // Use bright colors for maximum visibility
-    const color = effectiveTheme === 'dark' ? '#00ff00' : '#ff0000'; // Bright green for dark, bright red for light
+    const color = effectiveTheme === 'dark' ? '#00ff00' : '#ff0000';
     console.log(`[DirectNodeLabel] FIXED HIGH CONTRAST PERCENTAGE COLOR for ${id}: ${color} (theme: ${effectiveTheme})`);
     return color;
   }, [effectiveTheme, id]);
@@ -120,22 +96,17 @@ export const DirectNodeLabel: React.FC<DirectNodeLabelProps> = ({
 
   // FIXED: Enhanced side positioning for percentage with better spacing and Z-offset
   const percentagePosition: [number, number, number] = useMemo(() => {
-    // INCREASED: Much larger side offset for better separation
-    const baseSideOffset = type === 'entity' ? 3.5 : 4.0; // Increased from 2.0/2.5 to 3.5/4.0
+    const baseSideOffset = type === 'entity' ? 3.5 : 4.0;
     const sideOffset = baseSideOffset * Math.max(1.0, nodeScale);
     
-    // IMPROVED: Better vertical positioning based on node type and new Y positions
     let verticalOffset = 0;
     if (type === 'emotion') {
-      // Emotions are now at Y +10/-10, so adjust percentage positioning accordingly
-      verticalOffset = position[1] > 0 ? -2.0 : 2.0; // Offset away from emotion clusters
+      verticalOffset = position[1] > 0 ? -2.0 : 2.0;
     } else {
-      // Entities are in center layer, use small vertical offset
       verticalOffset = -1.0;
     }
     
-    // ENHANCED: Better Z-offset to bring percentages forward
-    const zOffset = 2.0; // Increased from 0.5 to 2.0 for better visibility
+    const zOffset = 2.0;
     
     const finalPosition: [number, number, number] = [
       position[0] + sideOffset,
@@ -161,37 +132,25 @@ export const DirectNodeLabel: React.FC<DirectNodeLabelProps> = ({
   }, [shouldShowLabel, id]);
 
   if (!enhancedShouldShowLabel || !id) {
-    if (isInstantMode) {
-      console.log(`[DirectNodeLabel] INSTANT: Not rendering label for ${id}: shouldShow=${enhancedShouldShowLabel}, text="${id}"`);
-    } else {
-      console.log(`[DirectNodeLabel] Not rendering label for ${id}: shouldShow=${enhancedShouldShowLabel}, text="${id}"`);
-    }
+    console.log(`[DirectNodeLabel] Not rendering label for ${id}: shouldShow=${enhancedShouldShowLabel}, text="${id}"`);
     return null;
   }
 
   // FIXED: Enhanced percentage display logging
   if (showPercentage && connectionPercentage > 0) {
-    if (isInstantMode) {
-      console.log(`[DirectNodeLabel] INSTANT MODE - FIXED PERCENTAGE DISPLAY: ${id} (${type}) shows ${connectionPercentage}% at`, percentagePosition, `size: ${percentageTextSize}, color: ${percentageColor} - ENHANCED VISIBILITY`);
-    } else {
-      console.log(`[DirectNodeLabel] FIXED PERCENTAGE DISPLAY: ${id} (${type}) shows ${connectionPercentage}% at`, percentagePosition, `size: ${percentageTextSize}, color: ${percentageColor} - ENHANCED VISIBILITY`);
-    }
+    console.log(`[DirectNodeLabel] FIXED STATIC PERCENTAGE DISPLAY: ${id} (${type}) shows ${connectionPercentage}% at`, percentagePosition, `size: ${percentageTextSize}, color: ${percentageColor} - STATIC SIZE 2.8`);
   }
 
-  if (isInstantMode) {
-    console.log(`[DirectNodeLabel] INSTANT MODE - MAIN TEXT: "${id}" at position`, labelPosition, 'with size:', textSize, 'color:', textColor, '- NO LOADING DELAY - GOOGLE TRANSLATE INTEGRATION');
-  } else {
-    console.log(`[DirectNodeLabel] ENHANCED POSITIONING - MAIN TEXT: "${id}" at position`, labelPosition, 'with size:', textSize, 'color:', textColor, '- GOOGLE TRANSLATE INTEGRATION');
-  }
+  console.log(`[DirectNodeLabel] FIXED STATIC TEXT SIZE 8: "${id}" at position`, labelPosition, 'with STATIC size:', textSize, 'color:', textColor, '- GOOGLE TRANSLATE INTEGRATION');
 
   return (
     <>
-      {/* Main text using TranslatableText3D with Google Translate integration */}
+      {/* Main text using TranslatableText3D with Google Translate integration and STATIC size 8 */}
       <TranslatableText3D
         text={id}
         position={labelPosition}
         color={textColor}
-        size={textSize}
+        size={textSize} // FIXED: Static size 8
         visible={true}
         renderOrder={15}
         bold={isHighlighted || isSelected}
@@ -204,19 +163,19 @@ export const DirectNodeLabel: React.FC<DirectNodeLabelProps> = ({
         sourceLanguage="en"
       />
       
-      {/* FIXED: Enhanced percentage text with improved visibility and positioning */}
+      {/* FIXED: Enhanced percentage text with STATIC size 2.8 */}
       {showPercentage && connectionPercentage > 0 && (
         <SimpleText
           text={`${connectionPercentage}%`}
           position={percentagePosition}
           color={percentageColor}
-          size={percentageTextSize}
+          size={percentageTextSize} // FIXED: Static size 2.8
           visible={true}
-          renderOrder={20} // INCREASED: Higher render order for better visibility (was 16, now 20)
+          renderOrder={20}
           bold={true}
-          outlineWidth={0.05} // ADDED: Small outline for better contrast
-          outlineColor={effectiveTheme === 'dark' ? '#000000' : '#ffffff'} // ADDED: Contrasting outline
-          maxWidth={300} // INCREASED: Larger max width (was 200, now 300)
+          outlineWidth={0.05}
+          outlineColor={effectiveTheme === 'dark' ? '#000000' : '#ffffff'}
+          maxWidth={300}
           enableWrapping={false}
         />
       )}

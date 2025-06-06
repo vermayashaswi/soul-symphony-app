@@ -1,4 +1,3 @@
-
 import React, { useRef, useEffect, useMemo, useState } from 'react';
 import '@/types/three-reference';
 import { OrbitControls } from '@react-three/drei';
@@ -138,16 +137,18 @@ export const SoulNetVisualization: React.FC<SoulNetVisualizationProps> = ({
 }) => {
   const { camera, size } = useThree();
   const controlsRef = useRef<any>(null);
-  const [cameraZoom, setCameraZoom] = useState<number>(45);
+  // FIXED: Initialize camera zoom to middle of new range (25-100)
+  const [cameraZoom, setCameraZoom] = useState<number>(62.5);
   const [forceUpdate, setForceUpdate] = useState<number>(0);
   const [isInitialized, setIsInitialized] = useState(false);
   const mounted = useRef<boolean>(true);
   
-  console.log("[SoulNetVisualization] GOOGLE TRANSLATE INTEGRATION - Using TranslatableText3D", {
+  console.log("[SoulNetVisualization] FIXED ZOOM RANGE (25-100) - Static text size 8", {
     nodeCount: data?.nodes?.length,
     linkCount: data?.links?.length,
     selectedNode,
-    shouldShowLabels
+    shouldShowLabels,
+    cameraZoom
   });
   
   useEffect(() => {
@@ -208,14 +209,15 @@ export const SoulNetVisualization: React.FC<SoulNetVisualizationProps> = ({
     }
   }, [selectedNode]);
 
-  // Optimized camera initialization
+  // FIXED: Optimized camera initialization with new zoom range
   useEffect(() => {
     if (camera && validData.nodes?.length > 0 && !isInitialized) {
-      console.log("[SoulNetVisualization] Initializing camera position");
+      console.log("[SoulNetVisualization] FIXED: Initializing camera with zoom range 25-100");
       try {
         const centerX = centerPosition.x;
         const centerY = centerPosition.y;
-        camera.position.set(centerX, centerY, 45);
+        // UPDATED: Set initial camera position within new zoom range
+        camera.position.set(centerX, centerY, 62.5); // Middle of 25-100 range
         camera.lookAt(centerX, centerY, 0);
         setIsInitialized(true);
       } catch (error) {
@@ -224,13 +226,15 @@ export const SoulNetVisualization: React.FC<SoulNetVisualizationProps> = ({
     }
   }, [camera, validData.nodes, centerPosition, isInitialized]);
 
-  // Track camera zoom with throttling
+  // FIXED: Track camera zoom with new range constraints
   useEffect(() => {
     const updateCameraDistance = () => {
       if (camera) {
         const currentZ = camera.position.z;
-        if (Math.abs(currentZ - cameraZoom) > 0.5) {
-          setCameraZoom(currentZ);
+        // UPDATED: Clamp to new zoom range 25-100
+        const clampedZ = Math.max(25, Math.min(100, currentZ));
+        if (Math.abs(clampedZ - cameraZoom) > 0.5) {
+          setCameraZoom(clampedZ);
         }
       }
     };
@@ -288,12 +292,14 @@ export const SoulNetVisualization: React.FC<SoulNetVisualizationProps> = ({
     return map;
   }, [validData.nodes, selectedNode, highlightedNodes, connectionStrengths]);
 
-  // Adjust controls
+  // FIXED: Adjust controls with new zoom range
   useEffect(() => {
     if (controlsRef.current) {
       controlsRef.current.dampingFactor = isFullScreen ? 0.08 : 0.05;
-      controlsRef.current.minDistance = isFullScreen ? 8 : 10;
-      controlsRef.current.maxDistance = isFullScreen ? 80 : 60;
+      // UPDATED: Set new zoom range 25-100
+      controlsRef.current.minDistance = 25;
+      controlsRef.current.maxDistance = 100;
+      console.log("[SoulNetVisualization] FIXED: Controls updated with zoom range 25-100");
     }
   }, [isFullScreen]);
 
@@ -310,9 +316,10 @@ export const SoulNetVisualization: React.FC<SoulNetVisualizationProps> = ({
     return null;
   }
 
-  console.log("[SoulNetVisualization] GOOGLE TRANSLATE FINAL RENDER - TranslatableText3D integration complete", { 
+  console.log("[SoulNetVisualization] FIXED ZOOM RANGE FINAL RENDER - Zoom: 25-100, Static text size 8", { 
     nodeCount: validData.nodes.length,
-    shouldShowLabels
+    shouldShowLabels,
+    currentZoom: cameraZoom
   });
 
   return (
@@ -330,14 +337,17 @@ export const SoulNetVisualization: React.FC<SoulNetVisualizationProps> = ({
         enableDamping
         dampingFactor={isFullScreen ? 0.08 : 0.05}
         rotateSpeed={0.5}
-        minDistance={isFullScreen ? 8 : 10}
-        maxDistance={isFullScreen ? 80 : 60}
+        // UPDATED: Fixed zoom range 25-100
+        minDistance={25}
+        maxDistance={100}
         target={centerPosition}
         onChange={() => {
           if (camera) {
             const currentZ = camera.position.z;
-            if (Math.abs(currentZ - cameraZoom) > 0.5) {
-              setCameraZoom(currentZ);
+            // UPDATED: Clamp to new zoom range
+            const clampedZ = Math.max(25, Math.min(100, currentZ));
+            if (Math.abs(clampedZ - cameraZoom) > 0.5) {
+              setCameraZoom(clampedZ);
             }
           }
         }}
@@ -391,7 +401,7 @@ export const SoulNetVisualization: React.FC<SoulNetVisualizationProps> = ({
         );
       })}
       
-      {/* Display nodes with Google Translate integration via TranslatableText3D */}
+      {/* FIXED: Display nodes with static text size 8 */}
       {validData.nodes.map(node => {
         if (!node || typeof node !== 'object' || !node.id) {
           console.warn("[SoulNetVisualization] Invalid node:", node);
@@ -435,7 +445,8 @@ export const SoulNetVisualization: React.FC<SoulNetVisualizationProps> = ({
             dimmed={dimmed}
             themeHex={themeHex}
             selectedNodeId={selectedNode}
-            cameraZoom={cameraZoom}
+            // FIXED: Pass clamped camera zoom for static text sizing
+            cameraZoom={Math.max(25, Math.min(100, cameraZoom))}
             isHighlighted={isHighlighted}
             connectionPercentage={connectionPercentage}
             showPercentage={showPercentage}
