@@ -105,7 +105,7 @@ const Node: React.FC<NodeProps> = ({
     }
   });
 
-  console.log(`[Node] Rendering: ${node.id} (${node.type}) - scale: ${nodeScale}, color: ${nodeColor}, labels: ${stableLabelVisibility}`);
+  console.log(`[Node] Rendering: ${node.id} (${node.type}) - scale: ${nodeScale}, color: ${nodeColor}, labels: ${stableLabelVisibility}, userId: ${userId}, timeRange: ${timeRange}`);
 
   return (
     <group position={node.position}>
