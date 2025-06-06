@@ -17,10 +17,15 @@ import { TranslationProgressIndicator } from '@/components/insights/TranslationP
 import { useTranslation } from '@/contexts/TranslationContext';
 import { PremiumFeatureGuard } from '@/components/subscription/PremiumFeatureGuard';
 
-function InsightsContent() {
+function InsightsContentWrapper({ 
+  timeRange, 
+  setTimeRange 
+}: { 
+  timeRange: TimeRange; 
+  setTimeRange: (range: TimeRange) => void; 
+}) {
   const { user } = useAuth();
   const { prefetchTranslationsForRoute } = useTranslation();
-  const [timeRange, setTimeRange] = useState<TimeRange>('week');
   const [isSticky, setIsSticky] = useState(false);
   const [selectedEmotion, setSelectedEmotion] = useState<string | null>(null);
   const timeToggleRef = useRef<HTMLDivElement>(null);
@@ -535,11 +540,13 @@ function InsightsContent() {
 }
 
 export default function Insights() {
+  const [timeRange, setTimeRange] = useState<TimeRange>('week');
+
   return (
     <PremiumFeatureGuard feature="insights">
       <ErrorBoundary>
-        <InsightsTranslationProvider>
-          <InsightsContent />
+        <InsightsTranslationProvider timeRange={timeRange}>
+          <InsightsContentWrapper timeRange={timeRange} setTimeRange={setTimeRange} />
         </InsightsTranslationProvider>
       </ErrorBoundary>
     </PremiumFeatureGuard>
