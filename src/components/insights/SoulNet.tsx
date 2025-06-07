@@ -15,7 +15,6 @@ import { cn } from '@/lib/utils';
 import { TranslatableText } from '@/components/translation/TranslatableText';
 import { useTranslation } from '@/contexts/TranslationContext';
 import { useInstantSoulNetData } from '@/hooks/useInstantSoulNetData';
-import { useInsightsTranslation } from './InsightsTranslationProvider';
 
 interface SoulNetProps {
   userId: string | undefined;
@@ -32,7 +31,7 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
   const [selectedEntity, setSelectedEntity] = useState<string | null>(null);
   const { currentLanguage } = useTranslation();
   
-  // STABLE: Use ref to track if rendering has been initialized to prevent unnecessary resets
+  // STABILIZATION: Use ref to track if rendering has been initialized to prevent unnecessary resets
   const renderingInitialized = useRef(false);
 
   // Use the enhanced instant data hook
@@ -46,10 +45,7 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
     getInstantNodeConnections
   } = useInstantSoulNetData(userId, timeRange);
 
-  // Get centralized translation function
-  const { getTranslation } = useInsightsTranslation();
-
-  console.log("[SoulNet] STABLE TRANSLATION MODE - Centralized translation system", { 
+  console.log("[SoulNet] INSTANT DATA MODE - Zero loading delays", { 
     userId, 
     timeRange, 
     currentLanguage,
@@ -61,18 +57,18 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
   });
 
   useEffect(() => {
-    console.log("[SoulNet] Component mounted - Stable translation mode enabled");
+    console.log("[SoulNet] Component mounted - Instant data mode enabled");
     
     return () => {
       console.log("[SoulNet] Component unmounted");
     };
   }, []);
 
-  // STABLE: Enhanced rendering initialization that doesn't reset once established
+  // STABILIZED: Enhanced rendering initialization that doesn't reset once established
   useEffect(() => {
     // Only initialize rendering if we have data and haven't already initialized
     if ((isInstantReady || (graphData.nodes.length > 0 && !loading)) && !renderingInitialized.current) {
-      console.log("[SoulNet] STABLE: Initializing rendering for the first time");
+      console.log("[SoulNet] STABILIZED: Initializing rendering for the first time");
       setRenderingReady(true);
       renderingInitialized.current = true;
     }
@@ -85,9 +81,9 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
     }
   }, [isInstantReady, graphData.nodes.length, loading, error]);
 
-  // STABLE: Node selection with stable state management
+  // OPTIMIZED: Node selection with stable state management
   const handleNodeSelect = useCallback((id: string) => {
-    console.log(`[SoulNet] STABLE: Node selected: ${id} - no translation re-triggers`);
+    console.log(`[SoulNet] STABLE: Node selected: ${id} - no re-render triggers`);
     if (selectedEntity === id) {
       setSelectedEntity(null);
     } else {
@@ -122,29 +118,9 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
     renderingInitialized.current = false;
   }, []);
 
-  // Create adapter functions to match the expected signatures
-  const adaptedGetConnectionPercentage = useCallback((nodeId: string) => {
-    if (!selectedEntity) return 0;
-    return getInstantConnectionPercentage(selectedEntity, nodeId);
-  }, [selectedEntity, getInstantConnectionPercentage]);
-
-  const adaptedGetTranslation = useCallback((nodeId: string) => {
-    // Use centralized translation first, fallback to instant translation
-    const centralTranslation = getTranslation(nodeId);
-    if (centralTranslation && centralTranslation !== nodeId) {
-      return centralTranslation;
-    }
-    return getInstantTranslation(nodeId);
-  }, [getTranslation, getInstantTranslation]);
-
-  const adaptedGetNodeConnections = useCallback((nodeId: string) => {
-    const connectionData = getInstantNodeConnections(nodeId);
-    return new Set(connectionData.connectedNodes);
-  }, [getInstantNodeConnections]);
-
-  // STABLE: Only show loading if we truly have no data and are still loading
+  // ENHANCED: Only show loading if we truly have no data and are still loading
   if (loading && !isInstantReady && graphData.nodes.length === 0) {
-    console.log("[SoulNet] STABLE: Showing loading state - no instant data available");
+    console.log("[SoulNet] ENHANCED: Showing loading state - no instant data available");
     return <LoadingState />;
   }
   
@@ -254,7 +230,7 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
     );
   };
 
-  console.log(`[SoulNet] STABLE RENDER: ${graphData.nodes.length} nodes, ${graphData.links.length} links, renderingReady: ${renderingReady}, initialized: ${renderingInitialized.current}`);
+  console.log(`[SoulNet] STABILIZED RENDER: ${graphData.nodes.length} nodes, ${graphData.links.length} links, renderingReady: ${renderingReady}, initialized: ${renderingInitialized.current}`);
 
   return (
     <div className={cn(
@@ -303,7 +279,7 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
             </div>
           }
         >
-          {/* STABLE: Canvas only renders when truly ready and stays mounted during interactions */}
+          {/* STABILIZED: Canvas only renders when truly ready and stays mounted during interactions */}
           {renderingReady && (
             <Canvas
               style={{
@@ -339,9 +315,9 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
                 themeHex={themeHex}
                 isFullScreen={isFullScreen}
                 shouldShowLabels={true}
-                getInstantConnectionPercentage={adaptedGetConnectionPercentage}
-                getInstantTranslation={adaptedGetTranslation}
-                getInstantNodeConnections={adaptedGetNodeConnections}
+                getInstantConnectionPercentage={getInstantConnectionPercentage}
+                getInstantTranslation={getInstantTranslation}
+                getInstantNodeConnections={getInstantNodeConnections}
                 isInstantReady={isInstantReady}
               />
             </Canvas>

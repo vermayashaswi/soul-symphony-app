@@ -1,7 +1,7 @@
 
 import React, { useMemo, useEffect } from 'react';
+import TranslatableText3D from './TranslatableText3D';
 import SimpleText from './SimpleText';
-import { useInsightsTranslation } from '../InsightsTranslationProvider';
 
 interface DirectNodeLabelProps {
   id: string;
@@ -34,8 +34,6 @@ export const DirectNodeLabel: React.FC<DirectNodeLabelProps> = ({
   effectiveTheme = 'light',
   isInstantMode = false
 }) => {
-  const { getTranslation } = useInsightsTranslation();
-  
   // Listen for tutorial debugging events
   useEffect(() => {
     const handleTutorialDebug = (event: CustomEvent) => {
@@ -50,17 +48,6 @@ export const DirectNodeLabel: React.FC<DirectNodeLabelProps> = ({
       window.removeEventListener('tutorial-soul-net-debug', handleTutorialDebug as EventListener);
     };
   }, [id, shouldShowLabel]);
-
-  // Get translated text from centralized translation system
-  const translatedText = useMemo(() => {
-    if (!id || typeof id !== 'string') return 'Node';
-    
-    const translation = getTranslation(id.trim());
-    const finalText = translation || id;
-    
-    console.log(`[DirectNodeLabel] Using centralized translation for "${id}": "${finalText}"`);
-    return finalText;
-  }, [id, getTranslation]);
 
   // PLAN IMPLEMENTATION: Static text size of 2 (reduced from 8)
   console.log(`[DirectNodeLabel] PLAN IMPLEMENTATION: STATIC TEXT SIZE 2: ${id} - Reduced from 8 for better scaling`);
@@ -150,13 +137,13 @@ export const DirectNodeLabel: React.FC<DirectNodeLabelProps> = ({
     console.log(`[DirectNodeLabel] PLAN IMPLEMENTATION: PERCENTAGE NOT DISPLAYED for ${id}: showPercentage=${showPercentage}, connectionPercentage=${connectionPercentage}`);
   }
 
-  console.log(`[DirectNodeLabel] PLAN IMPLEMENTATION: RENDERING CENTRALIZED TRANSLATION: "${translatedText}" at position`, labelPosition, 'with STATIC size:', textSize, 'color:', textColor, '- NO FLICKERING');
+  console.log(`[DirectNodeLabel] PLAN IMPLEMENTATION: RENDERING TEXT SIZE 2: "${id}" at position`, labelPosition, 'with STATIC size:', textSize, 'color:', textColor, '- REDUCED FROM 8 TO 2');
 
   return (
     <>
-      {/* Main text using centralized translation - NO MORE TranslatableText3D */}
-      <SimpleText
-        text={translatedText}
+      {/* Main text using TranslatableText3D with Google Translate integration and STATIC size 2 */}
+      <TranslatableText3D
+        text={id}
         position={labelPosition}
         color={textColor}
         size={textSize} // PLAN IMPLEMENTATION: Static size 2 (reduced from 8)
@@ -167,6 +154,9 @@ export const DirectNodeLabel: React.FC<DirectNodeLabelProps> = ({
         outlineColor={undefined}
         maxWidth={600}
         enableWrapping={true}
+        maxCharsPerLine={18}
+        maxLines={3}
+        sourceLanguage="en"
       />
       
       {/* PLAN IMPLEMENTATION: Enhanced percentage text with fixed size 1.5 and better visibility */}

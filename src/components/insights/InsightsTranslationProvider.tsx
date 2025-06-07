@@ -1,9 +1,6 @@
 
-import React, { createContext, useContext, ReactNode, useMemo } from 'react';
+import React, { createContext, useContext, ReactNode } from 'react';
 import { usePageTranslation } from '@/hooks/use-page-translation';
-import { useAuth } from '@/contexts/AuthContext';
-import { useInstantSoulNetData } from '@/hooks/useInstantSoulNetData';
-import { TimeRange } from '@/hooks/use-insights-data';
 
 interface InsightsTranslationContextType {
   isTranslating: boolean;
@@ -16,7 +13,6 @@ const InsightsTranslationContext = createContext<InsightsTranslationContextType 
 
 interface InsightsTranslationProviderProps {
   children: ReactNode;
-  timeRange?: TimeRange;
 }
 
 // Common texts used throughout the Insights page
@@ -73,40 +69,9 @@ const INSIGHTS_PAGE_TEXTS = [
   'J', 'F', 'M', 'A', 'M', 'J', 'J', 'A', 'S', 'O', 'N', 'D'
 ];
 
-export const InsightsTranslationProvider: React.FC<InsightsTranslationProviderProps> = ({ 
-  children, 
-  timeRange = 'week' 
-}) => {
-  const { user } = useAuth();
-  
-  // Get SoulNet data to extract dynamic node labels
-  const { graphData } = useInstantSoulNetData(user?.id, timeRange);
-  
-  // Extract all unique node labels from SoulNet data
-  const dynamicNodeLabels = useMemo(() => {
-    if (!graphData?.nodes) return [];
-    
-    const uniqueLabels = new Set<string>();
-    graphData.nodes.forEach(node => {
-      if (node?.id && typeof node.id === 'string' && node.id.trim()) {
-        uniqueLabels.add(node.id.trim());
-      }
-    });
-    
-    const labels = Array.from(uniqueLabels);
-    console.log('[InsightsTranslationProvider] Extracted dynamic node labels:', labels);
-    return labels;
-  }, [graphData?.nodes]);
-  
-  // Combine static texts with dynamic node labels for complete translation
-  const allTextsToTranslate = useMemo(() => {
-    const combined = [...INSIGHTS_PAGE_TEXTS, ...dynamicNodeLabels];
-    console.log('[InsightsTranslationProvider] Total texts to translate:', combined.length, 'Static:', INSIGHTS_PAGE_TEXTS.length, 'Dynamic:', dynamicNodeLabels.length);
-    return combined;
-  }, [dynamicNodeLabels]);
-
+export const InsightsTranslationProvider: React.FC<InsightsTranslationProviderProps> = ({ children }) => {
   const pageTranslation = usePageTranslation({
-    pageTexts: allTextsToTranslate,
+    pageTexts: INSIGHTS_PAGE_TEXTS,
     route: '/insights',
     enabled: true
   });
