@@ -1,9 +1,8 @@
 
-import React, { useRef, useMemo, useState, useEffect } from 'react';
+import React, { useRef, useState, useCallback, useMemo } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
-import DirectNodeLabel from './DirectNodeLabel';
-import { useUserColorThemeHex } from './useUserColorThemeHex';
+import StreamlinedNodeLabel from './StreamlinedNodeLabel';
 
 interface NodeData {
   id: string;
@@ -11,6 +10,8 @@ interface NodeData {
   value: number;
   color: string;
   position: [number, number, number];
+  scale?: number;
+  isHighlighted?: boolean;
 }
 
 interface NodeProps {
@@ -22,13 +23,15 @@ interface NodeProps {
   dimmed: boolean;
   themeHex: string;
   selectedNodeId: string | null;
-  cameraZoom: number;
+  cameraZoom?: number;
   isHighlighted: boolean;
   connectionPercentage?: number;
   showPercentage?: boolean;
   forceShowLabels?: boolean;
   effectiveTheme?: 'light' | 'dark';
   isInstantMode?: boolean;
+  userId?: string;
+  timeRange?: string;
 }
 
 const Node: React.FC<NodeProps> = ({
@@ -40,188 +43,103 @@ const Node: React.FC<NodeProps> = ({
   dimmed,
   themeHex,
   selectedNodeId,
-  cameraZoom,
+  cameraZoom = 62.5,
   isHighlighted,
   connectionPercentage = 0,
   showPercentage = false,
   forceShowLabels = false,
   effectiveTheme = 'light',
-  isInstantMode = false
+  isInstantMode = false,
+  userId,
+  timeRange
 }) => {
   const meshRef = useRef<THREE.Mesh>(null);
-  const userColorThemeHex = useUserColorThemeHex();
-  
-  // ANIMATION: Manual time tracking for pulsing effects
-  const [animationTime, setAnimationTime] = useState(0);
-  const [isReady, setIsReady] = useState(false);
-  
-  // Delayed initialization to prevent clock access issues
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      setIsReady(true);
-    }, 100);
-    
-    return () => clearTimeout(timer);
-  }, []);
+  const [hovered, setHovered] = useState(false);
 
-  // UPDATED: Use specific colors for each node type
-  const color = useMemo(() => {
-    if (isSelected) return new THREE.Color('#ffffff');
-    
-    if (isHighlighted) {
-      // Use specific colors based on node type
-      if (node.type === 'entity') {
-        return new THREE.Color('#90EE90'); // Medium light green for circular nodes (entities)
-      } else {
-        return new THREE.Color('#FFD700'); // Golden for square nodes (emotions)
-      }
+  // Stable node properties with improved colors
+  const nodeScale = useMemo(() => {
+    const baseScale = node.type === 'entity' ? 0.7 : 0.55;
+    const connectionScale = isHighlighted ? (1.2 + (isSelected ? 0.3 : 0.4)) : (0.8 + node.value * 0.5);
+    return baseScale * connectionScale;
+  }, [node.type, node.value, isHighlighted, isSelected]);
+
+  const nodeColor = useMemo(() => {
+    if (dimmed) {
+      return '#666666';
     }
     
-    // ENHANCED: 20% lighter colors for dimmed nodes instead of very dark
-    return new THREE.Color(dimmed ? '#3a3a3a' : '#cccccc');
-  }, [isSelected, isHighlighted, node.type, dimmed]);
+    if (node.type === 'entity') {
+      return isSelected ? '#32CD32' : (isHighlighted ? '#7CFC00' : '#90EE90');
+    } else {
+      return isSelected ? '#FF9800' : (isHighlighted ? '#FFB74D' : '#F57C00');
+    }
+  }, [node.type, isSelected, isHighlighted, dimmed]);
 
-  // ENHANCED: More dramatic scale differences for better hierarchy
-  const baseNodeScale = useMemo(() => {
-    const baseScale = 1.15;
-    if (isSelected) return baseScale * 1.6; // Even larger for selected
-    if (isHighlighted) return baseScale * 1.3; // Larger for highlighted
-    if (dimmed) return baseScale * 0.6; // Much smaller for dimmed
-    return baseScale;
-  }, [isSelected, isHighlighted, dimmed]);
+  const handlePointerOver = useCallback((event: any) => {
+    event.stopPropagation();
+    setHovered(true);
+    document.body.style.cursor = 'pointer';
+  }, []);
 
-  // ENHANCED: Increased opacity for dimmed nodes to 0.05-0.06
-  const nodeOpacity = useMemo(() => {
-    if (isSelected) return 1.0;
-    if (isHighlighted) return 0.9;
-    if (dimmed) return 0.05; // Increased from extremely low to 0.05
-    return 0.8;
-  }, [isSelected, isHighlighted, dimmed]);
+  const handlePointerOut = useCallback((event: any) => {
+    event.stopPropagation();
+    setHovered(false);
+    document.body.style.cursor = 'auto';
+  }, []);
 
-  // PULSATING ANIMATION: Enhanced frame animation with pulsing effects
-  useFrame((state, delta) => {
-    if (!meshRef.current || !isReady) return;
-    
-    try {
-      // Manual time tracking instead of clock access
-      setAnimationTime(prev => prev + delta);
-      
-      if (isHighlighted) {
-        // PULSATING: Different pulse intensities based on connection state
-        const pulseIntensity = isSelected ? 0.25 : (connectionPercentage > 0 ? connectionPercentage * 0.003 : 0.15);
-        const pulse = Math.sin(animationTime * 2.5) * pulseIntensity + 1.0;
-        const targetScale = baseNodeScale * pulse;
-        
-        // Apply pulsing scale
-        meshRef.current.scale.lerp(new THREE.Vector3(targetScale, targetScale, targetScale), 0.1);
-        
-        // PULSATING: Emissive glow breathing effect
-        if (meshRef.current.material instanceof THREE.MeshStandardMaterial) {
-          const emissiveIntensity = isSelected 
-            ? 1.0 + Math.sin(animationTime * 3) * 0.3
-            : 0.7 + (connectionPercentage > 0 ? connectionPercentage * 0.005 : 0.2) + Math.sin(animationTime * 3) * 0.2;
-          
-          meshRef.current.material.emissiveIntensity = Math.max(0, Math.min(2, emissiveIntensity));
-        }
-      } else {
-        // Static scale for non-highlighted nodes
-        const targetScale = dimmed ? baseNodeScale * 0.8 : baseNodeScale;
-        meshRef.current.scale.lerp(new THREE.Vector3(targetScale, targetScale, targetScale), 0.1);
-        
-        if (meshRef.current.material instanceof THREE.MeshStandardMaterial) {
-          meshRef.current.material.emissiveIntensity = dimmed ? 0 : 0.1;
-        }
-      }
-      
-      // Update material color and opacity
-      meshRef.current.material.color.lerp(color, 0.1);
-      if (meshRef.current.material instanceof THREE.MeshStandardMaterial) {
-        meshRef.current.material.opacity = nodeOpacity;
-      }
-    } catch (error) {
-      console.warn("Node pulsing animation error:", error);
+  const handleClick = useCallback((event: any) => {
+    event.stopPropagation();
+    onClick(node.id, event);
+  }, [onClick, node.id]);
+
+  // STREAMLINED: Always show labels when requested - no complex conditions
+  const stableLabelVisibility = useMemo(() => {
+    return forceShowLabels || showLabel;
+  }, [forceShowLabels, showLabel]);
+
+  // Smooth scale animation
+  useFrame(() => {
+    if (meshRef.current) {
+      const targetScale = hovered ? nodeScale * 1.1 : nodeScale;
+      meshRef.current.scale.lerp(new THREE.Vector3(targetScale, targetScale, targetScale), 0.1);
     }
   });
 
-  const handleNodeClick = (e: any) => {
-    e.stopPropagation();
-    onClick(node.id, e);
-  };
-
-  // ENHANCED: Only show labels for highlighted/selected nodes or when forced
-  const shouldShowLabel = useMemo(() => {
-    if (dimmed) return false; // Never show labels for dimmed nodes
-    return forceShowLabels || showLabel || isSelected || isHighlighted;
-  }, [forceShowLabels, showLabel, isSelected, isHighlighted, dimmed]);
-
-  // INSTANT MODE: Better logging for percentage tracking with comprehensive debug info
-  if (showPercentage && connectionPercentage > 0) {
-    if (isInstantMode) {
-      console.log(`[Node] PULSATING INSTANT MODE: ${node.id} (${node.type}) displays percentage: ${connectionPercentage}% with pulse intensity based on connection strength - NO LOADING DELAY`);
-    } else {
-      console.log(`[Node] PULSATING ENHANCED: ${node.id} (${node.type}) should display percentage: ${connectionPercentage}% with pulse intensity based on connection strength`);
-    }
-  }
-
-  if (isInstantMode) {
-    console.log(`[Node] PULSATING INSTANT MODE: Rendering ${node.type} node ${node.id} with pulsing animation, specific color (${node.type === 'entity' ? 'medium light green' : 'golden'}), base scale ${baseNodeScale.toFixed(2)} - NO LOADING DELAY`);
-  } else {
-    console.log(`[Node] PULSATING ENHANCED: Rendering ${node.type} node ${node.id} with pulsing animation, specific color (${node.type === 'entity' ? 'medium light green' : 'golden'}), base scale ${baseNodeScale.toFixed(2)}`);
-  }
-
-  // ENHANCED: Improved geometry sizes to work with the enhanced scale differences
-  const renderGeometry = () => {
-    if (node.type === 'emotion') {
-      // Cube for emotion nodes
-      return <boxGeometry args={[1.6, 1.6, 1.6]} />;
-    } else {
-      // Sphere for entity nodes
-      return <sphereGeometry args={[0.8, 32, 32]} />;
-    }
-  };
-
-  // Don't render until ready
-  if (!isReady) {
-    return null;
-  }
+  console.log(`[Node] STREAMLINED: ${node.id} (${node.type}) - labels: ${stableLabelVisibility}`);
 
   return (
-    <group>
+    <group position={node.position}>
       <mesh
         ref={meshRef}
-        position={node.position}
-        onClick={handleNodeClick}
-        scale={[baseNodeScale, baseNodeScale, baseNodeScale]}
+        onPointerOver={handlePointerOver}
+        onPointerOut={handlePointerOut}
+        onClick={handleClick}
+        scale={[nodeScale, nodeScale, nodeScale]}
       >
-        {renderGeometry()}
-        <meshStandardMaterial 
-          color={color} 
-          metalness={0.3} 
-          roughness={0.8}
-          transparent={true}
-          opacity={nodeOpacity}
-          emissive={color}
-          emissiveIntensity={isHighlighted ? 1.2 : (dimmed ? 0 : 0.1)}
+        <sphereGeometry args={[1, 16, 16]} />
+        <meshStandardMaterial
+          color={nodeColor}
+          transparent={dimmed}
+          opacity={dimmed ? 0.3 : 1.0}
+          roughness={0.4}
+          metalness={0.1}
         />
       </mesh>
       
-      {shouldShowLabel && (
-        <DirectNodeLabel
-          id={node.id}
-          type={node.type}
-          position={node.position}
-          isHighlighted={isHighlighted}
-          isSelected={isSelected}
-          shouldShowLabel={shouldShowLabel}
-          cameraZoom={cameraZoom}
-          themeHex={themeHex}
-          nodeScale={baseNodeScale}
-          connectionPercentage={connectionPercentage}
-          showPercentage={showPercentage}
-          effectiveTheme={effectiveTheme}
-          isInstantMode={isInstantMode}
-        />
-      )}
+      <StreamlinedNodeLabel
+        id={node.id}
+        type={node.type}
+        position={[0, 0, 0]}
+        isHighlighted={isHighlighted}
+        isSelected={isSelected}
+        shouldShowLabel={stableLabelVisibility}
+        cameraZoom={cameraZoom}
+        themeHex={themeHex}
+        nodeScale={nodeScale}
+        connectionPercentage={connectionPercentage}
+        showPercentage={showPercentage}
+        effectiveTheme={effectiveTheme}
+      />
     </group>
   );
 };

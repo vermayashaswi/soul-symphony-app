@@ -21,8 +21,9 @@ export class TranslationService {
   
   static async translateText(text: string, targetLanguage: string, sourceLanguage: string = 'en'): Promise<string> {
     try {
-      // Skip empty or whitespace-only strings
-      if (!text || text.trim() === '') {
+      // SIMPLIFIED: No validation - translate everything
+      if (!text || typeof text !== 'string') {
+        console.warn(`[TranslationService] Invalid text type: "${text}"`);
         return text;
       }
       
@@ -32,7 +33,8 @@ export class TranslationService {
         return cached.translatedText;
       }
 
-      // Call the edge function for translation
+      console.log(`[TranslationService] Translating: "${text.substring(0, 50)}..." to ${targetLanguage}`);
+
       const { data, error } = await supabase.functions.invoke('translate-text', {
         body: {
           text: text,
@@ -61,6 +63,7 @@ export class TranslationService {
         version: 1,
       });
 
+      console.log(`[TranslationService] Translation successful: "${text}" -> "${data.translatedText}"`);
       return data.translatedText;
     } catch (error) {
       console.error('Translation service error:', error);
@@ -71,17 +74,21 @@ export class TranslationService {
 
   static async batchTranslate(request: BatchTranslationRequest): Promise<Map<string, string>> {
     const results = new Map<string, string>();
-    const needsTranslation: string[] = [];
 
-    // Filter out empty strings
-    const validTexts = request.texts.filter(text => text && text.trim() !== '');
+    // SIMPLIFIED: No filtering - translate all texts as-is
+    const textsToTranslate = request.texts.filter(text => text && typeof text === 'string');
     
-    if (validTexts.length === 0) {
+    if (textsToTranslate.length === 0) {
+      console.warn('[TranslationService] No valid texts to translate');
       return results;
     }
 
+    console.log(`[TranslationService] Batch translating ${textsToTranslate.length} texts`);
+
+    const needsTranslation: string[] = [];
+
     // Check cache first for all texts
-    for (const text of validTexts) {
+    for (const text of textsToTranslate) {
       const cached = await translationCache.getTranslation(text, request.targetLanguage);
       if (cached) {
         results.set(text, cached.translatedText);
@@ -90,10 +97,20 @@ export class TranslationService {
       }
     }
 
+    if (needsTranslation.length === 0) {
+      console.log('[TranslationService] All texts found in cache');
+      return results;
+    }
+
+    console.log(`[TranslationService] ${needsTranslation.length} texts need translation`);
+
     // Split remaining texts into batches
     for (let i = 0; i < needsTranslation.length; i += this.BATCH_SIZE) {
       const batch = needsTranslation.slice(i, i + this.BATCH_SIZE);
+      
       try {
+        console.log(`[TranslationService] Processing batch ${Math.floor(i / this.BATCH_SIZE) + 1}: ${batch.length} texts`);
+        
         const { data, error } = await supabase.functions.invoke('translate-text', {
           body: {
             texts: batch,
@@ -101,12 +118,27 @@ export class TranslationService {
           },
         });
 
-        if (error) throw error;
+        if (error) {
+          console.error(`[TranslationService] Batch translation error:`, error);
+          batch.forEach(text => results.set(text, text));
+          continue;
+        }
 
-        if (data && data.translatedTexts && Array.isArray(data.translatedTexts)) {
-          // Cache and store results
+        if (data && data.translationMap) {
+          Object.entries(data.translationMap).forEach(([originalText, translatedText]) => {
+            results.set(originalText, translatedText as string);
+            translationCache.setTranslation({
+              originalText,
+              translatedText: translatedText as string,
+              language: request.targetLanguage,
+              timestamp: Date.now(),
+              version: 1,
+            });
+          });
+          console.log(`[TranslationService] Batch ${Math.floor(i / this.BATCH_SIZE) + 1} completed successfully`);
+        } else if (data && data.translatedTexts && Array.isArray(data.translatedTexts)) {
           batch.forEach((text, index) => {
-            const translatedText = data.translatedTexts[index];
+            const translatedText = data.translatedTexts[index] || text;
             results.set(text, translatedText);
             translationCache.setTranslation({
               originalText: text,
@@ -116,16 +148,18 @@ export class TranslationService {
               version: 1,
             });
           });
+          console.log(`[TranslationService] Batch ${Math.floor(i / this.BATCH_SIZE) + 1} completed with fallback mapping`);
         } else {
-          console.error('Invalid response format for batch translation:', data);
-          batch.forEach(text => results.set(text, text)); // Fallback to original text
+          console.error('Invalid batch translation response format:', data);
+          batch.forEach(text => results.set(text, text));
         }
       } catch (error) {
-        console.error('Batch translation error:', error);
-        batch.forEach(text => results.set(text, text)); // Fallback to original text
+        console.error(`[TranslationService] Batch translation error for batch ${Math.floor(i / this.BATCH_SIZE) + 1}:`, error);
+        batch.forEach(text => results.set(text, text));
       }
     }
 
+    console.log(`[TranslationService] Batch translation complete: ${results.size} results`);
     return results;
   }
 }
