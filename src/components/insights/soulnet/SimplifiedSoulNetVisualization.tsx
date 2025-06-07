@@ -154,15 +154,19 @@ export const SimplifiedSoulNetVisualization: React.FC<SimplifiedSoulNetVisualiza
   const [isInitialized, setIsInitialized] = useState(false);
   const mounted = useRef<boolean>(true);
   
-  console.log("[SimplifiedSoulNetVisualization] STREAMLINED TRANSLATION - All nodes will be translated", {
+  console.log("[SimplifiedSoulNetVisualization] FLICKER-FREE RENDERING", {
     nodeCount: data?.nodes?.length,
     linkCount: data?.links?.length,
     selectedNode,
-    shouldShowLabels
+    shouldShowLabels,
+    cameraZoom,
+    isInstantReady,
+    userId,
+    timeRange
   });
   
   useEffect(() => {
-    console.log("[SimplifiedSoulNetVisualization] STREAMLINED: Component mounted - Direct translation for all nodes");
+    console.log("[SimplifiedSoulNetVisualization] Component mounted - Google Translate integration via TranslatableText3D");
     return () => {
       console.log("[SimplifiedSoulNetVisualization] Component unmounted");
       mounted.current = false;
@@ -326,7 +330,7 @@ export const SimplifiedSoulNetVisualization: React.FC<SimplifiedSoulNetVisualiza
     return null;
   }
 
-  console.log(`[SimplifiedSoulNetVisualization] STREAMLINED RENDERING: ${validData.nodes.length} nodes with direct translation`);
+  console.log(`[SimplifiedSoulNetVisualization] FLICKER-FREE FINAL RENDER: ${validData.nodes.length} nodes, ${validData.links.length} links, ready: ${isInstantReady}`);
 
   return (
     <>
@@ -407,7 +411,7 @@ export const SimplifiedSoulNetVisualization: React.FC<SimplifiedSoulNetVisualiza
         );
       })}
       
-      {/* STREAMLINED: Display nodes with direct translation - no barriers */}
+      {/* Display nodes with flicker-free rendering */}
       {validData.nodes.map(node => {
         if (!node || typeof node !== 'object' || !node.id) {
           console.warn("[SimplifiedSoulNetVisualization] Invalid node:", node);
@@ -418,13 +422,11 @@ export const SimplifiedSoulNetVisualization: React.FC<SimplifiedSoulNetVisualiza
         const dimmed = shouldDim && !(selectedNode === node.id || highlightedNodes.has(node.id));
         const isHighlighted = selectedNode === node.id || highlightedNodes.has(node.id);
         
-        // FIXED: Use the correct function signature with 2 parameters
-        const connectionPercentage = getInstantConnectionPercentage && selectedNode && highlightedNodes.has(node.id)
+        // FLICKER-FREE: Use instant connection percentage lookup
+        const connectionPercentage = selectedNode && highlightedNodes.has(node.id) && getInstantConnectionPercentage
           ? getInstantConnectionPercentage(selectedNode, node.id)
-          : (selectedNode && highlightedNodes.has(node.id) 
-              ? connectionPercentages.get(node.id) || 0 
-              : 0);
-              
+          : 0;
+          
         const showPercentage = selectedNode !== null && 
                               isHighlighted && 
                               connectionPercentage > 0 &&
@@ -435,10 +437,6 @@ export const SimplifiedSoulNetVisualization: React.FC<SimplifiedSoulNetVisualiza
           return null;
         }
 
-        if (showPercentage) {
-          console.log(`[SimplifiedSoulNetVisualization] Enhanced: Showing ${connectionPercentage}% for ${node.id} connected to ${selectedNode}`);
-        }
-        
         return (
           <Node
             key={`node-${node.id}-${forceUpdate}`}

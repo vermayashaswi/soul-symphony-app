@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { TimeRange } from '@/hooks/use-insights-data';
 import { SoulNetPreloadService } from '@/services/soulnetPreloadService';
@@ -53,7 +54,7 @@ export function useFlickerFreeSoulNetData(
   const percentagesMapRef = useRef<Map<string, number>>(new Map());
   const retryCountRef = useRef(0);
 
-  console.log('[useFlickerFreeSoulNetData] ENHANCED MODE:', {
+  console.log('[useFlickerFreeSoulNetData] STRICT MODE:', {
     userId,
     timeRange,
     language: currentLanguage,
@@ -70,18 +71,16 @@ export function useFlickerFreeSoulNetData(
     return percentagesMapRef.current.get(key) || 0;
   }, []);
 
-  // ENHANCED: Always return text - graceful fallback to English
+  // STRICT: Instant translation lookup - only returns translation if available
   const getInstantTranslation = useCallback((text: string): string | null => {
-    if (!text) return null;
-    
     // For English, always return the original text
     if (currentLanguage === 'en') {
       return text;
     }
     
     if (!userId) {
-      console.log(`[useFlickerFreeSoulNetData] No userId, fallback to original: "${text}"`);
-      return text; // Fallback to original text
+      console.log(`[useFlickerFreeSoulNetData] No userId for translation: "${text}"`);
+      return null;
     }
     
     const translation = SoulNetTranslationPreloader.getTranslationSync(
@@ -91,13 +90,13 @@ export function useFlickerFreeSoulNetData(
       timeRange
     );
     
-    // ENHANCED: Always return something - prefer translation but fallback to original
-    if (translation && translation !== text) {
-      return translation;
+    // STRICT: Return null if no translation available - NO ENGLISH FALLBACK
+    if (!translation) {
+      console.log(`[useFlickerFreeSoulNetData] NO TRANSLATION: "${text}" in ${currentLanguage}`);
+      return null;
     }
     
-    console.log(`[useFlickerFreeSoulNetData] Fallback to original: "${text}" in ${currentLanguage}`);
-    return text; // Graceful fallback to original text
+    return translation;
   }, [userId, currentLanguage, timeRange]);
 
   // Instant node connections lookup
@@ -105,11 +104,10 @@ export function useFlickerFreeSoulNetData(
     return connectionsMapRef.current.get(nodeId) || new Set();
   }, []);
 
-  // ENHANCED: More resilient retry mechanism
+  // ENHANCED: Retry mechanism for translations with proper error handling
   const retryTranslations = useCallback(async () => {
     if (!userId) {
       console.log('[useFlickerFreeSoulNetData] Cannot retry translations: no userId');
-      setIsTranslationsReady(true); // Mark as ready to prevent blocking
       return;
     }
 
@@ -121,48 +119,42 @@ export function useFlickerFreeSoulNetData(
 
     console.log(`[useFlickerFreeSoulNetData] RETRYING translations (attempt ${retryCountRef.current + 1})`);
     retryCountRef.current += 1;
-    setTranslationProgress(10);
+    setTranslationProgress(0);
     setIsTranslationsReady(false);
 
     try {
       // Clear old cache before retry
       SoulNetTranslationPreloader.clearCache(userId);
       
-      // Get current node texts for translation
-      const nodeTexts = graphData.nodes.map(node => node.id);
-      
       const translationsData = await SoulNetTranslationPreloader.preloadSoulNetTranslations(
         userId,
         timeRange,
-        currentLanguage,
-        nodeTexts
+        currentLanguage
       );
 
-      if (translationsData) {
+      if (translationsData && translationsData.nodeTranslations.size > 0) {
         console.log(`[useFlickerFreeSoulNetData] RETRY SUCCESS: ${translationsData.nodeTranslations.size} translations loaded`);
         setTranslationProgress(100);
         setIsTranslationsReady(true);
         retryCountRef.current = 0; // Reset on success
       } else {
-        console.warn(`[useFlickerFreeSoulNetData] RETRY WARNING: No translations returned, but marking as ready`);
-        setTranslationProgress(100);
-        setIsTranslationsReady(true); // Mark as ready to avoid blocking UI
+        console.warn(`[useFlickerFreeSoulNetData] RETRY FAILED: No translations returned`);
+        setIsTranslationsReady(false);
       }
     } catch (error) {
       console.error(`[useFlickerFreeSoulNetData] RETRY ERROR:`, error);
-      setTranslationProgress(100);
-      setIsTranslationsReady(true); // Mark as ready even on error to avoid blocking UI
+      setIsTranslationsReady(false);
     }
-  }, [userId, timeRange, currentLanguage, graphData.nodes]);
+  }, [userId, timeRange, currentLanguage]);
 
-  // ENHANCED: More resilient translation preloading
+  // ENHANCED: Translation preloading with strict validation
   useEffect(() => {
     let mounted = true;
 
     const preloadTranslations = async () => {
       if (!userId) {
-        setIsTranslationsReady(true); // Don't block UI
-        setTranslationProgress(100);
+        setIsTranslationsReady(false);
+        setTranslationProgress(0);
         return;
       }
 
@@ -173,26 +165,15 @@ export function useFlickerFreeSoulNetData(
         return;
       }
 
-      console.log(`[useFlickerFreeSoulNetData] ENHANCED TRANSLATION PRELOAD for ${currentLanguage}`);
-      setTranslationProgress(20);
+      console.log(`[useFlickerFreeSoulNetData] PRELOADING TRANSLATIONS for ${currentLanguage}`);
+      setTranslationProgress(10);
       setIsTranslationsReady(false);
       
       try {
-        // Get current node texts for translation
-        const nodeTexts = graphData.nodes.map(node => node.id);
-        
-        if (nodeTexts.length === 0) {
-          console.log(`[useFlickerFreeSoulNetData] No nodes to translate yet`);
-          setTranslationProgress(100);
-          setIsTranslationsReady(true);
-          return;
-        }
-
         const translationsData = await SoulNetTranslationPreloader.preloadSoulNetTranslations(
           userId,
           timeRange,
-          currentLanguage,
-          nodeTexts
+          currentLanguage
         );
 
         if (mounted) {
@@ -202,32 +183,26 @@ export function useFlickerFreeSoulNetData(
             setIsTranslationsReady(true);
             retryCountRef.current = 0;
           } else {
-            console.warn(`[useFlickerFreeSoulNetData] TRANSLATION WARNING: No translations available, marking as ready`);
-            setTranslationProgress(100);
-            setIsTranslationsReady(true); // Don't block UI
+            console.warn(`[useFlickerFreeSoulNetData] TRANSLATION FAILED: No translations available`);
+            setTranslationProgress(0);
+            setIsTranslationsReady(false);
           }
         }
       } catch (error) {
         console.error(`[useFlickerFreeSoulNetData] TRANSLATION ERROR:`, error);
         if (mounted) {
-          setTranslationProgress(100);
-          setIsTranslationsReady(true); // Don't block UI even on error
+          setTranslationProgress(0);
+          setIsTranslationsReady(false);
         }
       }
     };
 
-    // Only preload translations if we have data
-    if (graphData.nodes.length > 0) {
-      preloadTranslations();
-    } else {
-      setIsTranslationsReady(true);
-      setTranslationProgress(100);
-    }
+    preloadTranslations();
 
     return () => {
       mounted = false;
     };
-  }, [userId, timeRange, currentLanguage, graphData.nodes.length]);
+  }, [userId, timeRange, currentLanguage]);
 
   // Load SoulNet data
   useEffect(() => {

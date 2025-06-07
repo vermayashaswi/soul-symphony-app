@@ -1,6 +1,6 @@
 
 import React, { useMemo } from 'react';
-import UnifiedTextRenderer from './UnifiedTextRenderer';
+import ReliableText from './ReliableText';
 
 interface ConnectionPercentageProps {
   position: [number, number, number];
@@ -41,7 +41,7 @@ export const ConnectionPercentage: React.FC<ConnectionPercentageProps> = ({
   console.log(`[ConnectionPercentage] Enhanced final render: "${formattedPercentage}" at`, labelPosition);
 
   return (
-    <UnifiedTextRenderer
+    <ReliableText
       text={formattedPercentage}
       position={labelPosition}
       color="#ffffff"

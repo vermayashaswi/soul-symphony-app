@@ -2,7 +2,7 @@
 import React, { useRef, useState, useCallback, useMemo } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
-import StreamlinedNodeLabel from './StreamlinedNodeLabel';
+import DirectNodeLabel from './DirectNodeLabel';
 
 interface NodeData {
   id: string;
@@ -56,7 +56,7 @@ const Node: React.FC<NodeProps> = ({
   const meshRef = useRef<THREE.Mesh>(null);
   const [hovered, setHovered] = useState(false);
 
-  // Stable node properties with improved colors
+  // FLICKER-FREE: Stable node properties
   const nodeScale = useMemo(() => {
     const baseScale = node.type === 'entity' ? 0.7 : 0.55;
     const connectionScale = isHighlighted ? (1.2 + (isSelected ? 0.3 : 0.4)) : (0.8 + node.value * 0.5);
@@ -69,7 +69,7 @@ const Node: React.FC<NodeProps> = ({
     }
     
     if (node.type === 'entity') {
-      return isSelected ? '#32CD32' : (isHighlighted ? '#7CFC00' : '#90EE90');
+      return isSelected ? '#4CAF50' : (isHighlighted ? '#81C784' : '#2E7D32');
     } else {
       return isSelected ? '#FF9800' : (isHighlighted ? '#FFB74D' : '#F57C00');
     }
@@ -92,7 +92,7 @@ const Node: React.FC<NodeProps> = ({
     onClick(node.id, event);
   }, [onClick, node.id]);
 
-  // STREAMLINED: Always show labels when requested - no complex conditions
+  // FLICKER-FREE: Stable label visibility
   const stableLabelVisibility = useMemo(() => {
     return forceShowLabels || showLabel;
   }, [forceShowLabels, showLabel]);
@@ -105,7 +105,7 @@ const Node: React.FC<NodeProps> = ({
     }
   });
 
-  console.log(`[Node] STREAMLINED: ${node.id} (${node.type}) - labels: ${stableLabelVisibility}`);
+  console.log(`[Node] FLICKER-FREE RENDERING: ${node.id} (${node.type}) - scale: ${nodeScale}, color: ${nodeColor}, stable labels: ${stableLabelVisibility}`);
 
   return (
     <group position={node.position}>
@@ -126,7 +126,8 @@ const Node: React.FC<NodeProps> = ({
         />
       </mesh>
       
-      <StreamlinedNodeLabel
+      {/* FLICKER-FREE: DirectNodeLabel with preloaded translations */}
+      <DirectNodeLabel
         id={node.id}
         type={node.type}
         position={[0, 0, 0]}
@@ -139,6 +140,9 @@ const Node: React.FC<NodeProps> = ({
         connectionPercentage={connectionPercentage}
         showPercentage={showPercentage}
         effectiveTheme={effectiveTheme}
+        isInstantMode={isInstantMode}
+        userId={userId}
+        timeRange={timeRange}
       />
     </group>
   );

@@ -1,190 +1,136 @@
-import { translationService } from '@/services/translationService';
-import { onDemandTranslationCache } from '@/utils/website-translations';
 
-interface SoulNetTranslationData {
+import { translationService } from '@/services/translationService';
+import { SoulNetPreloadService } from '@/services/soulnetPreloadService';
+
+interface PreloadedSoulNetTranslations {
   nodeTranslations: Map<string, string>;
-  loadedAt: number;
+  uiTranslations: Map<string, string>;
+  timestamp: number;
+  language: string;
   userId: string;
   timeRange: string;
-  language: string;
-}
-
-// Relaxed text validation - allow valid node names with special characters
-function isValidNodeText(text: string): boolean {
-  if (typeof text !== 'string') return false;
-  const trimmed = text.trim();
-  if (trimmed.length < 1) return false; // Allow single characters
-  // Only reject obvious invalid values, not special characters like &, spaces, etc.
-  const invalidValues = ['undefined', 'null', 'NaN', '[object Object]'];
-  return !invalidValues.includes(trimmed.toLowerCase());
-}
-
-function filterValidNodeTexts(nodeTexts: string[]): string[] {
-  const validTexts = nodeTexts.filter(isValidNodeText);
-  console.log(`[SoulNetTranslationPreloader] Filtered: ${validTexts.length}/${nodeTexts.length} valid texts`);
-  if (validTexts.length !== nodeTexts.length) {
-    const invalidTexts = nodeTexts.filter(text => !isValidNodeText(text));
-    console.log(`[SoulNetTranslationPreloader] Invalid texts rejected:`, invalidTexts);
-  }
-  return validTexts;
 }
 
 export class SoulNetTranslationPreloader {
-  private static readonly CACHE_KEY = 'soulnet-translations';
+  private static readonly CACHE_KEY = 'soulnet-translations-cache';
   private static readonly CACHE_DURATION = 10 * 60 * 1000; // 10 minutes
-  private static cache = new Map<string, SoulNetTranslationData>();
-  private static readonly MAX_RETRIES = 3;
+  private static cache = new Map<string, PreloadedSoulNetTranslations>();
 
   static async preloadSoulNetTranslations(
     userId: string,
     timeRange: string,
-    language: string,
-    nodeTexts?: string[]
-  ): Promise<SoulNetTranslationData | null> {
-    if (language === 'en') {
-      const englishData: SoulNetTranslationData = {
+    targetLanguage: string
+  ): Promise<PreloadedSoulNetTranslations | null> {
+    console.log(`[SoulNetTranslationPreloader] Preloading translations for ${targetLanguage}`);
+    
+    if (targetLanguage === 'en') {
+      return {
         nodeTranslations: new Map(),
-        loadedAt: Date.now(),
+        uiTranslations: new Map(),
+        timestamp: Date.now(),
+        language: targetLanguage,
         userId,
-        timeRange,
-        language: 'en'
+        timeRange
       };
-      return englishData;
     }
 
-    const cacheKey = `${userId}-${timeRange}-${language}`;
-    
-    // Check cache first
+    const cacheKey = `${userId}-${timeRange}-${targetLanguage}`;
     const cached = this.getCachedTranslations(cacheKey);
+    
     if (cached) {
       console.log(`[SoulNetTranslationPreloader] Using cached translations for ${cacheKey}`);
       return cached;
     }
 
-    console.log(`[SoulNetTranslationPreloader] Preloading translations for ${language}`);
-    
-    return this.performTranslationWithRetry(cacheKey, userId, timeRange, language, nodeTexts);
-  }
-
-  private static async performTranslationWithRetry(
-    cacheKey: string,
-    userId: string,
-    timeRange: string,
-    language: string,
-    nodeTexts?: string[],
-    retryCount: number = 0
-  ): Promise<SoulNetTranslationData | null> {
     try {
-      const nodeTranslations = new Map<string, string>();
+      // Get the SoulNet data first
+      const soulNetData = await SoulNetPreloadService.preloadSoulNetData(userId, timeRange, 'en');
       
-      if (nodeTexts && nodeTexts.length > 0) {
-        const validNodeTexts = filterValidNodeTexts(nodeTexts);
-        
-        if (validNodeTexts.length === 0) {
-          console.warn(`[SoulNetTranslationPreloader] No valid node texts to translate`);
-          const emptyData: SoulNetTranslationData = {
-            nodeTranslations: new Map(),
-            loadedAt: Date.now(),
-            userId,
-            timeRange,
-            language
-          };
-          return emptyData;
-        }
-
-        console.log(`[SoulNetTranslationPreloader] Batch translating ${validNodeTexts.length} texts to ${language}`);
-        
-        const batchResults = await translationService.batchTranslate({
-          texts: validNodeTexts,
-          targetLanguage: language
-        });
-        
-        batchResults.forEach((translatedText, originalText) => {
-          if (translatedText && isValidNodeText(translatedText) && translatedText !== originalText) {
-            nodeTranslations.set(originalText, translatedText);
-            onDemandTranslationCache.set(language, originalText, translatedText);
-            console.log(`[SoulNetTranslationPreloader] Translation stored: "${originalText}" -> "${translatedText}"`);
-          }
-        });
-
-        console.log(`[SoulNetTranslationPreloader] Successfully processed ${nodeTranslations.size} translations`);
+      if (!soulNetData || soulNetData.nodes.length === 0) {
+        console.log(`[SoulNetTranslationPreloader] No SoulNet data available`);
+        return null;
       }
 
-      const translationData: SoulNetTranslationData = {
-        nodeTranslations,
-        loadedAt: Date.now(),
+      // Extract all unique node names for translation
+      const nodeNames = Array.from(new Set(soulNetData.nodes.map(node => node.id)));
+      
+      // Preload UI translations
+      const uiTexts = [
+        'Soul-Net Visualization',
+        'Error Loading Soul-Net',
+        'Retry',
+        '3D Visualization Unavailable',
+        'The 3D visualization is experiencing technical difficulties. Your data is safe and you can try again.',
+        'Try Again',
+        'Reload Page',
+        'Drag to rotate • Pinch to zoom • Tap a node to highlight connections',
+        'Drag to rotate • Scroll to zoom • Click a node to highlight connections',
+        'Visualization Error',
+        'The 3D visualization encountered an error.'
+      ];
+
+      console.log(`[SoulNetTranslationPreloader] Batch translating ${nodeNames.length} nodes and ${uiTexts.length} UI texts`);
+
+      // Batch translate node names
+      const nodeTranslationsResult = await translationService.batchTranslate({
+        texts: nodeNames,
+        targetLanguage
+      });
+
+      // Batch translate UI texts
+      const uiTranslationsResult = await translationService.batchTranslate({
+        texts: uiTexts,
+        targetLanguage
+      });
+
+      const preloadedData: PreloadedSoulNetTranslations = {
+        nodeTranslations: nodeTranslationsResult,
+        uiTranslations: uiTranslationsResult,
+        timestamp: Date.now(),
+        language: targetLanguage,
         userId,
-        timeRange,
-        language
+        timeRange
       };
 
-      this.setCachedTranslations(cacheKey, translationData);
+      // Cache the results
+      this.setCachedTranslations(cacheKey, preloadedData);
       
-      console.log(`[SoulNetTranslationPreloader] Preloaded ${nodeTranslations.size} translations for ${cacheKey}`);
-      return translationData;
+      console.log(`[SoulNetTranslationPreloader] Successfully preloaded ${nodeTranslationsResult.size} node translations and ${uiTranslationsResult.size} UI translations`);
+      return preloadedData;
     } catch (error) {
-      console.error(`[SoulNetTranslationPreloader] Error preloading translations (attempt ${retryCount + 1}):`, error);
-      
-      if (retryCount < this.MAX_RETRIES) {
-        console.log(`[SoulNetTranslationPreloader] Retrying translation (${retryCount + 1}/${this.MAX_RETRIES})`);
-        await new Promise(resolve => setTimeout(resolve, 1000 * (retryCount + 1)));
-        return this.performTranslationWithRetry(cacheKey, userId, timeRange, language, nodeTexts, retryCount + 1);
-      }
-      
-      console.error(`[SoulNetTranslationPreloader] Max retries exceeded, returning null`);
+      console.error(`[SoulNetTranslationPreloader] Error preloading translations:`, error);
       return null;
     }
   }
 
-  static getTranslationSync(
-    text: string,
-    language: string,
-    userId: string,
-    timeRange: string
-  ): string | null {
-    if (language === 'en') {
-      return text;
-    }
-
-    if (!isValidNodeText(text)) {
-      console.warn(`[SoulNetTranslationPreloader] Invalid text for sync lookup: "${text}"`);
-      return text;
-    }
-
+  static getTranslationSync(text: string, language: string, userId: string, timeRange: string): string | null {
+    if (language === 'en') return text;
+    
     const cacheKey = `${userId}-${timeRange}-${language}`;
     const cached = this.cache.get(cacheKey);
     
-    if (cached && cached.nodeTranslations.has(text)) {
-      const translation = cached.nodeTranslations.get(text);
-      if (translation && isValidNodeText(translation)) {
-        console.log(`[SoulNetTranslationPreloader] Cache hit: "${text}" -> "${translation}"`);
-        return translation;
-      }
+    if (cached && (Date.now() - cached.timestamp) < this.CACHE_DURATION) {
+      return cached.nodeTranslations.get(text) || cached.uiTranslations.get(text) || null;
     }
-
-    // Check on-demand cache as fallback
-    const onDemandResult = onDemandTranslationCache.get(language, text);
-    if (onDemandResult && isValidNodeText(onDemandResult)) {
-      console.log(`[SoulNetTranslationPreloader] On-demand cache hit: "${text}" -> "${onDemandResult}"`);
-      return onDemandResult;
-    }
-
-    console.log(`[SoulNetTranslationPreloader] No translation found for "${text}" in ${language}`);
+    
     return null;
   }
 
-  private static getCachedTranslations(cacheKey: string): SoulNetTranslationData | null {
+  private static getCachedTranslations(cacheKey: string): PreloadedSoulNetTranslations | null {
     const cached = this.cache.get(cacheKey);
-    if (cached && (Date.now() - cached.loadedAt) < this.CACHE_DURATION) {
+    if (cached && (Date.now() - cached.timestamp) < this.CACHE_DURATION) {
       return cached;
     }
     
+    // Try localStorage as fallback
     try {
-      const stored = localStorage.getItem(`${this.CACHE_KEY}-${cacheKey}`);
-      if (stored) {
-        const parsed = JSON.parse(stored);
-        if ((Date.now() - parsed.loadedAt) < this.CACHE_DURATION) {
+      const storedData = localStorage.getItem(`${this.CACHE_KEY}-${cacheKey}`);
+      if (storedData) {
+        const parsed = JSON.parse(storedData);
+        if ((Date.now() - parsed.timestamp) < this.CACHE_DURATION) {
+          // Convert Maps back from objects
           parsed.nodeTranslations = new Map(Object.entries(parsed.nodeTranslations || {}));
+          parsed.uiTranslations = new Map(Object.entries(parsed.uiTranslations || {}));
           this.cache.set(cacheKey, parsed);
           return parsed;
         }
@@ -196,13 +142,15 @@ export class SoulNetTranslationPreloader {
     return null;
   }
 
-  private static setCachedTranslations(cacheKey: string, data: SoulNetTranslationData): void {
+  private static setCachedTranslations(cacheKey: string, data: PreloadedSoulNetTranslations): void {
     this.cache.set(cacheKey, data);
     
+    // Also store in localStorage
     try {
       const storableData = {
         ...data,
-        nodeTranslations: Object.fromEntries(data.nodeTranslations)
+        nodeTranslations: Object.fromEntries(data.nodeTranslations),
+        uiTranslations: Object.fromEntries(data.uiTranslations)
       };
       localStorage.setItem(`${this.CACHE_KEY}-${cacheKey}`, JSON.stringify(storableData));
     } catch (error) {
