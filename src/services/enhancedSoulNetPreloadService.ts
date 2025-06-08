@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 
 interface NodeData {
@@ -27,8 +26,8 @@ interface EnhancedSoulNetData {
   translations: Map<string, string>;
   connectionPercentages: Map<string, number>;
   nodeConnectionData: Map<string, NodeConnectionData>;
-  translationComplete: boolean; // NEW: Track if all translations are complete
-  translationProgress: number; // NEW: Track translation progress (0-100)
+  translationComplete: boolean;
+  translationProgress: number;
 }
 
 interface CachedEnhancedData {
@@ -48,11 +47,11 @@ interface AppLevelTranslationService {
 export class EnhancedSoulNetPreloadService {
   private static readonly CACHE_KEY = 'enhanced-soulnet-data';
   private static readonly CACHE_DURATION = 15 * 60 * 1000; // 15 minutes
-  private static readonly CACHE_VERSION = 4; // Increment for translation state tracking
+  private static readonly CACHE_VERSION = 5; // Increment for translation improvements
   private static cache = new Map<string, CachedEnhancedData>();
   private static translationCoordinator = new Map<string, Promise<Map<string, string>>>();
   
-  // NEW: Translation state tracking
+  // Translation state tracking
   private static translationStates = new Map<string, {
     isTranslating: boolean;
     progress: number;
@@ -69,7 +68,7 @@ export class EnhancedSoulNetPreloadService {
     this.appTranslationService = service;
   }
 
-  // NEW: Get translation state for a cache key
+  // Get translation state for a cache key
   static getTranslationState(cacheKey: string) {
     return this.translationStates.get(cacheKey) || {
       isTranslating: false,
@@ -87,6 +86,14 @@ export class EnhancedSoulNetPreloadService {
     console.log(`[EnhancedSoulNetPreloadService] APP-LEVEL: Preloading instant data for ${userId}, ${timeRange}, ${language}`);
     
     const cacheKey = this.generateCacheKey(userId, timeRange, language);
+    
+    // Clear cache if language changed to force fresh translation
+    const existingCache = this.cache.get(cacheKey);
+    if (existingCache && existingCache.language !== language) {
+      console.log(`[EnhancedSoulNetPreloadService] Language changed, clearing cache for fresh translation`);
+      this.clearInstantCache(userId);
+    }
+    
     const cached = this.getInstantData(cacheKey);
     
     // If we have cached data and it's complete, return it
@@ -230,7 +237,7 @@ export class EnhancedSoulNetPreloadService {
     return null;
   }
 
-  // APP-LEVEL: New coordinated translation using app-level service
+  // APP-LEVEL: Enhanced coordinated translation using app-level service
   private static async getAppLevelCoordinatedTranslations(
     nodes: NodeData[], 
     language: string, 
@@ -239,6 +246,7 @@ export class EnhancedSoulNetPreloadService {
     if (language === 'en') {
       const translations = new Map<string, string>();
       nodes.forEach(node => translations.set(node.id, node.id));
+      console.log(`[EnhancedSoulNetPreloadService] APP-LEVEL: Using English nodes directly, no translation needed`);
       return translations;
     }
 
@@ -255,6 +263,7 @@ export class EnhancedSoulNetPreloadService {
 
     try {
       const result = await translationPromise;
+      console.log(`[EnhancedSoulNetPreloadService] APP-LEVEL: Completed coordinated translation for ${cacheKey}`);
       return result;
     } finally {
       // Clean up coordinator
@@ -262,12 +271,12 @@ export class EnhancedSoulNetPreloadService {
     }
   }
 
-  // APP-LEVEL: Enhanced batch translation with proper source language
+  // APP-LEVEL: Enhanced batch translation with proper error handling
   private static async performAppLevelBatchTranslation(nodes: NodeData[], language: string, cacheKey: string): Promise<Map<string, string>> {
     const translations = new Map<string, string>();
     const nodesToTranslate = [...new Set(nodes.map(node => node.id))]; // Remove duplicates
     
-    console.log(`[EnhancedSoulNetPreloadService] APP-LEVEL: Batch translating ${nodesToTranslate.length} unique nodes using app-level service`);
+    console.log(`[EnhancedSoulNetPreloadService] APP-LEVEL: Batch translating ${nodesToTranslate.length} unique nodes to ${language}`);
     
     // Update translation state
     this.translationStates.set(cacheKey, {
@@ -296,23 +305,32 @@ export class EnhancedSoulNetPreloadService {
         return translations;
       }
 
-      // FIXED: Perform atomic batch translation with proper source language
+      // ENHANCED: Perform atomic batch translation with explicit source language
+      console.log(`[EnhancedSoulNetPreloadService] APP-LEVEL: Using app-level service to translate from 'en' to '${language}'`);
+      
       const batchResults = await this.appTranslationService.batchTranslate({
         texts: nodesToTranslate,
         targetLanguage: language,
-        sourceLanguage: 'en' // Fix: Use 'en' instead of 'auto'
+        sourceLanguage: 'en' // Always use 'en' as source for consistency
       });
       
-      console.log(`[EnhancedSoulNetPreloadService] APP-LEVEL: Successfully translated ${batchResults.size}/${nodesToTranslate.length} nodes`);
+      console.log(`[EnhancedSoulNetPreloadService] APP-LEVEL: Batch translation completed ${batchResults.size}/${nodesToTranslate.length} nodes`);
       
+      // Process batch results with enhanced error handling
       batchResults.forEach((translatedText, originalText) => {
-        translations.set(originalText, translatedText);
+        if (translatedText && translatedText.trim() !== '') {
+          translations.set(originalText, translatedText);
+          console.log(`[EnhancedSoulNetPreloadService] APP-LEVEL: ✓ "${originalText}" -> "${translatedText}"`);
+        } else {
+          console.warn(`[EnhancedSoulNetPreloadService] APP-LEVEL: ⚠ Empty translation for "${originalText}", using original`);
+          translations.set(originalText, originalText);
+        }
       });
 
       // Handle any missing translations
       nodesToTranslate.forEach(nodeId => {
         if (!translations.has(nodeId)) {
-          console.warn(`[EnhancedSoulNetPreloadService] APP-LEVEL: No translation found for node: ${nodeId}, using original`);
+          console.warn(`[EnhancedSoulNetPreloadService] APP-LEVEL: ⚠ No translation found for node: "${nodeId}", using original`);
           translations.set(nodeId, nodeId);
         }
       });
@@ -325,9 +343,11 @@ export class EnhancedSoulNetPreloadService {
         translatedNodes: translations.size
       });
 
+      console.log(`[EnhancedSoulNetPreloadService] APP-LEVEL: Translation summary - Total: ${nodesToTranslate.length}, Translated: ${translations.size}, Success rate: ${Math.round((translations.size / nodesToTranslate.length) * 100)}%`);
+
     } catch (error) {
       console.error('[EnhancedSoulNetPreloadService] APP-LEVEL: Error during batch translation:', error);
-      // Fallback: set original text for all nodes
+      // Enhanced fallback: set original text for all nodes
       nodesToTranslate.forEach(nodeId => {
         translations.set(nodeId, nodeId);
       });
@@ -443,7 +463,7 @@ export class EnhancedSoulNetPreloadService {
     }
   }
 
-  // CLEAR CACHE WITH PROPER INVALIDATION
+  // ENHANCED CACHE CLEARING with proper invalidation
   static clearInstantCache(userId?: string): void {
     console.log(`[EnhancedSoulNetPreloadService] APP-LEVEL: Clearing instant cache for user ${userId || 'all users'}`);
     

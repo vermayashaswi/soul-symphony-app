@@ -1,6 +1,9 @@
+
 import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react';
 import { onDemandTranslationCache } from '@/utils/website-translations';
 import { SoulNetPreloadService } from '@/services/soulnetPreloadService';
+import { EnhancedSoulNetPreloadService } from '@/services/enhancedSoulNetPreloadService';
+import { translationService } from '@/services/translationService';
 import { supabase } from '@/integrations/supabase/client';
 
 interface TranslationContextType {
@@ -28,6 +31,16 @@ export const TranslationProvider: React.FC<TranslationProviderProps> = ({ childr
   const [isTranslating, setIsTranslating] = useState<boolean>(false);
   const [isSoulNetTranslating, setIsSoulNetTranslating] = useState<boolean>(false);
   const [translationCache, setTranslationCache] = useState<Record<string, string>>({});
+
+  // APP-LEVEL: Set up translation service integration on context initialization
+  useEffect(() => {
+    console.log('[TranslationContext] APP-LEVEL: Setting up translation service integration');
+    
+    // Register translation service with EnhancedSoulNetPreloadService
+    EnhancedSoulNetPreloadService.setAppLevelTranslationService(translationService);
+    
+    console.log('[TranslationContext] APP-LEVEL: Translation service integration complete');
+  }, []);
 
   // Load language from localStorage or browser default
   useEffect(() => {
@@ -59,24 +72,24 @@ export const TranslationProvider: React.FC<TranslationProviderProps> = ({ childr
       return;
     }
 
-    console.log(`[TranslationContext] Pre-translating SoulNet data for ${userId}, ${timeRange}, ${currentLanguage}`);
+    console.log(`[TranslationContext] APP-LEVEL: Pre-translating SoulNet data for ${userId}, ${timeRange}, ${currentLanguage}`);
     
     try {
       setIsSoulNetTranslating(true);
       
-      // Pre-load SoulNet data with translations
-      await SoulNetPreloadService.preloadSoulNetData(userId, timeRange, currentLanguage);
+      // ENHANCED: Use enhanced preload service for better translation coordination
+      await EnhancedSoulNetPreloadService.preloadInstantData(userId, timeRange, currentLanguage);
       
-      console.log('[TranslationContext] SoulNet pre-translation completed successfully');
+      console.log('[TranslationContext] APP-LEVEL: SoulNet pre-translation completed successfully');
     } catch (error) {
-      console.error('[TranslationContext] Error pre-translating SoulNet data:', error);
+      console.error('[TranslationContext] APP-LEVEL: Error pre-translating SoulNet data:', error);
     } finally {
       setIsSoulNetTranslating(false);
     }
   }, [currentLanguage]);
 
   const handleLanguageChange = useCallback(async (language: string) => {
-    console.log('[TranslationContext] Changing language to:', language);
+    console.log('[TranslationContext] APP-LEVEL: Changing language to:', language);
     
     // Set loading state for SoulNet translations
     if (language !== 'en') {
@@ -88,13 +101,16 @@ export const TranslationProvider: React.FC<TranslationProviderProps> = ({ childr
     // Save to localStorage for persistence
     try {
       localStorage.setItem('soulo-language', language);
-      console.log('[TranslationContext] Saved language to localStorage:', language);
+      console.log('[TranslationContext] APP-LEVEL: Saved language to localStorage:', language);
     } catch (error) {
-      console.error('[TranslationContext] Error saving language to localStorage:', error);
+      console.error('[TranslationContext] APP-LEVEL: Error saving language to localStorage:', error);
     }
     
-    // Clear SoulNet cache when language changes to force refresh
+    // ENHANCED: Clear both enhanced and legacy SoulNet caches when language changes
+    EnhancedSoulNetPreloadService.clearInstantCache();
     SoulNetPreloadService.clearCache();
+    
+    console.log('[TranslationContext] APP-LEVEL: Cleared all SoulNet caches for language change');
     
     // Dispatch custom event for components that need to know about language changes
     const event = new CustomEvent('languageChange', { 
@@ -151,11 +167,11 @@ export const TranslationProvider: React.FC<TranslationProviderProps> = ({ childr
       
       console.log('[TranslationContext] Using Supabase edge function for translation');
       
-      // FIXED: Use Supabase edge function with proper source language
+      // ENHANCED: Use Supabase edge function with proper source language handling
       const { data, error } = await supabase.functions.invoke('translate-text', {
         body: {
           text,
-          sourceLanguage: sourceLanguage === 'auto' ? 'en' : sourceLanguage, // Fix: Convert auto to en
+          sourceLanguage: sourceLanguage === 'auto' ? 'en' : sourceLanguage,
           targetLanguage: currentLanguage,
           entryId,
           cleanResult: true
@@ -212,11 +228,11 @@ export const TranslationProvider: React.FC<TranslationProviderProps> = ({ childr
     const textsToTranslate = routeTexts[route] || [];
     if (textsToTranslate.length > 0 && currentLanguage !== 'en') {
       try {
-        // FIXED: Use Supabase edge function with proper source language
+        // ENHANCED: Use Supabase edge function with proper source language
         const { data, error } = await supabase.functions.invoke('translate-text', {
           body: {
             texts: textsToTranslate,
-            sourceLanguage: 'en', // Fix: Use 'en' instead of auto
+            sourceLanguage: 'en',
             targetLanguage: currentLanguage,
             cleanResult: true
           }
@@ -248,9 +264,10 @@ export const TranslationProvider: React.FC<TranslationProviderProps> = ({ childr
     translate,
     isTranslating,
     clearCache: useCallback(() => {
-      console.log('[TranslationContext] Clearing all translation caches');
+      console.log('[TranslationContext] APP-LEVEL: Clearing all translation caches');
       setTranslationCache({});
       onDemandTranslationCache.clearAll();
+      EnhancedSoulNetPreloadService.clearInstantCache();
       SoulNetPreloadService.clearCache();
     }, []),
     getCachedTranslation,
