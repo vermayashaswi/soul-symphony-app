@@ -556,7 +556,7 @@ export class EnhancedSoulNetPreloadService {
         id: entity,
         type: 'entity',
         value: 1,
-        color: '#fff',
+        color: '#22c55e', // Green for entity nodes (spheres)
         position: [entityX, entityY, entityZ]
       });
 
@@ -570,23 +570,44 @@ export class EnhancedSoulNetPreloadService {
       });
     });
 
+    // CUSTOM Y-AXIS POSITIONING: Apply specific pattern to emotion nodes (squares)
     Array.from(emotionNodes).forEach((emotion, emotionIndex) => {
       const emotionAngle = (emotionIndex / emotionNodes.size) * Math.PI * 2;
       const emotionRadius = EMOTION_LAYER_RADIUS;
       const emotionX = Math.cos(emotionAngle) * emotionRadius;
-      const emotionY = ((emotionIndex % 2) === 0 ? -1 : 1) * 0.7 * (Math.random() - 0.5) * EMOTION_Y_SPAN;
+      
+      // CUSTOM PATTERN: Node 1: +7, Node 2: -7, Node 3: +9, Node 4: -9, Node 5: +11, Node 6: -11, Node 7: +13, Node 8: -13, then cycle
+      const getCustomYPosition = (index: number): number => {
+        const cyclePosition = index % 8; // 8-node cycle
+        const basePairs = [
+          [7, -7],   // Nodes 1-2
+          [9, -9],   // Nodes 3-4
+          [11, -11], // Nodes 5-6
+          [13, -13]  // Nodes 7-8
+        ];
+        
+        const pairIndex = Math.floor(cyclePosition / 2);
+        const isEven = cyclePosition % 2 === 1; // 0-indexed, so index 1 is the second in pair
+        
+        return basePairs[pairIndex][isEven ? 1 : 0]; // Return negative for second in pair, positive for first
+      };
+      
+      const emotionY = getCustomYPosition(emotionIndex);
       const emotionZ = Math.sin(emotionAngle) * emotionRadius;
+      
+      console.log(`[EnhancedSoulNetPreloadService] CUSTOM Y-POSITIONING: Emotion node ${emotionIndex + 1} "${emotion}" positioned at Y=${emotionY}`);
       
       nodes.push({
         id: emotion,
         type: 'emotion',
         value: 0.8,
-        color: '#fff',
+        color: '#f59e0b', // Golden for emotion nodes (cubes)
         position: [emotionX, emotionY, emotionZ]
       });
     });
 
     console.log("[EnhancedSoulNetPreloadService] APP-LEVEL: Generated graph with", nodes.length, "nodes and", links.length, "links");
+    console.log("[EnhancedSoulNetPreloadService] CUSTOM COLORS: Applied GREEN to entity nodes (spheres) and GOLDEN to emotion nodes (squares)");
     return { nodes, links };
   }
 }

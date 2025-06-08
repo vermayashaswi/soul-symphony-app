@@ -77,18 +77,22 @@ const Node: React.FC<NodeProps> = ({
     return undefined;
   }, [node.id, getCoordinatedTranslation]);
 
-  // UPDATED: Use app color theme for both node types in both light and dark themes
+  // UPDATED: Custom color scheme - green for entities (spheres), golden for emotions (cubes)
   const color = useMemo(() => {
     if (isSelected) return new THREE.Color('#ffffff');
     
     if (isHighlighted) {
-      // Both entity and emotion nodes use the app color theme when highlighted
-      return new THREE.Color(userColorThemeHex);
+      // Use custom colors: green for entities, golden for emotions
+      if (node.type === 'entity') {
+        return new THREE.Color('#22c55e'); // Green for entity nodes (spheres)
+      } else {
+        return new THREE.Color('#f59e0b'); // Golden for emotion nodes (cubes)
+      }
     }
     
     // ENHANCED: 20% lighter colors for dimmed nodes instead of very dark
     return new THREE.Color(dimmed ? '#3a3a3a' : '#cccccc');
-  }, [isSelected, isHighlighted, userColorThemeHex, dimmed]);
+  }, [isSelected, isHighlighted, dimmed, node.type]);
 
   // ENHANCED: More dramatic scale differences for better hierarchy
   const baseNodeScale = useMemo(() => {
@@ -173,18 +177,18 @@ const Node: React.FC<NodeProps> = ({
   }
 
   if (isInstantMode) {
-    console.log(`[Node] COORDINATED PULSATING INSTANT MODE: Rendering ${node.type} node ${node.id} with pulsing animation, coordinated translation: "${coordinatedTranslation}", app theme color ${userColorThemeHex}, base scale ${baseNodeScale.toFixed(2)} - NO LOADING DELAY`);
+    console.log(`[Node] CUSTOM COLORS INSTANT MODE: Rendering ${node.type} node ${node.id} with ${node.type === 'entity' ? 'GREEN' : 'GOLDEN'} color, coordinated translation: "${coordinatedTranslation}", base scale ${baseNodeScale.toFixed(2)} - NO LOADING DELAY`);
   } else {
-    console.log(`[Node] COORDINATED PULSATING ENHANCED: Rendering ${node.type} node ${node.id} with pulsing animation, coordinated translation: "${coordinatedTranslation}", app theme color ${userColorThemeHex}, base scale ${baseNodeScale.toFixed(2)}`);
+    console.log(`[Node] CUSTOM COLORS ENHANCED: Rendering ${node.type} node ${node.id} with ${node.type === 'entity' ? 'GREEN' : 'GOLDEN'} color, coordinated translation: "${coordinatedTranslation}", base scale ${baseNodeScale.toFixed(2)}`);
   }
 
   // ENHANCED: Improved geometry sizes to work with the enhanced scale differences
   const renderGeometry = () => {
     if (node.type === 'emotion') {
-      // Cube for emotion nodes
+      // Cube for emotion nodes (golden)
       return <boxGeometry args={[1.6, 1.6, 1.6]} />;
     } else {
-      // Sphere for entity nodes
+      // Sphere for entity nodes (green)
       return <sphereGeometry args={[0.8, 32, 32]} />;
     }
   };
