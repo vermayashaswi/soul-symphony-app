@@ -29,6 +29,8 @@ interface NodeProps {
   forceShowLabels?: boolean;
   effectiveTheme?: 'light' | 'dark';
   isInstantMode?: boolean;
+  // NEW: Coordinated translation props
+  getCoordinatedTranslation?: (nodeId: string) => string;
 }
 
 const Node: React.FC<NodeProps> = ({
@@ -46,7 +48,8 @@ const Node: React.FC<NodeProps> = ({
   showPercentage = false,
   forceShowLabels = false,
   effectiveTheme = 'light',
-  isInstantMode = false
+  isInstantMode = false,
+  getCoordinatedTranslation
 }) => {
   const meshRef = useRef<THREE.Mesh>(null);
   const userColorThemeHex = useUserColorThemeHex();
@@ -63,6 +66,16 @@ const Node: React.FC<NodeProps> = ({
     
     return () => clearTimeout(timer);
   }, []);
+
+  // COORDINATED TRANSLATION: Get coordinated translation for this node
+  const coordinatedTranslation = useMemo(() => {
+    if (getCoordinatedTranslation) {
+      const translation = getCoordinatedTranslation(node.id);
+      console.log(`[Node] COORDINATED: Got coordinated translation for ${node.id}: "${translation}"`);
+      return translation;
+    }
+    return undefined;
+  }, [node.id, getCoordinatedTranslation]);
 
   // UPDATED: Use app color theme for both node types in both light and dark themes
   const color = useMemo(() => {
@@ -153,16 +166,16 @@ const Node: React.FC<NodeProps> = ({
   // INSTANT MODE: Better logging for percentage tracking with comprehensive debug info
   if (showPercentage && connectionPercentage > 0) {
     if (isInstantMode) {
-      console.log(`[Node] PULSATING INSTANT MODE: ${node.id} (${node.type}) displays percentage: ${connectionPercentage}% with pulse intensity based on connection strength - NO LOADING DELAY`);
+      console.log(`[Node] COORDINATED PULSATING INSTANT MODE: ${node.id} (${node.type}) displays percentage: ${connectionPercentage}% with pulse intensity based on connection strength - NO LOADING DELAY`);
     } else {
-      console.log(`[Node] PULSATING ENHANCED: ${node.id} (${node.type}) should display percentage: ${connectionPercentage}% with pulse intensity based on connection strength`);
+      console.log(`[Node] COORDINATED PULSATING ENHANCED: ${node.id} (${node.type}) should display percentage: ${connectionPercentage}% with pulse intensity based on connection strength`);
     }
   }
 
   if (isInstantMode) {
-    console.log(`[Node] PULSATING INSTANT MODE: Rendering ${node.type} node ${node.id} with pulsing animation, app theme color ${userColorThemeHex}, base scale ${baseNodeScale.toFixed(2)} - NO LOADING DELAY`);
+    console.log(`[Node] COORDINATED PULSATING INSTANT MODE: Rendering ${node.type} node ${node.id} with pulsing animation, coordinated translation: "${coordinatedTranslation}", app theme color ${userColorThemeHex}, base scale ${baseNodeScale.toFixed(2)} - NO LOADING DELAY`);
   } else {
-    console.log(`[Node] PULSATING ENHANCED: Rendering ${node.type} node ${node.id} with pulsing animation, app theme color ${userColorThemeHex}, base scale ${baseNodeScale.toFixed(2)}`);
+    console.log(`[Node] COORDINATED PULSATING ENHANCED: Rendering ${node.type} node ${node.id} with pulsing animation, coordinated translation: "${coordinatedTranslation}", app theme color ${userColorThemeHex}, base scale ${baseNodeScale.toFixed(2)}`);
   }
 
   // ENHANCED: Improved geometry sizes to work with the enhanced scale differences
@@ -216,6 +229,7 @@ const Node: React.FC<NodeProps> = ({
           showPercentage={showPercentage}
           effectiveTheme={effectiveTheme}
           isInstantMode={isInstantMode}
+          coordinatedTranslation={coordinatedTranslation}
         />
       )}
     </group>

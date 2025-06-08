@@ -1,3 +1,4 @@
+
 import React, { useMemo, useEffect } from 'react';
 import TranslatableText3D from './TranslatableText3D';
 import SimpleText from './SimpleText';
@@ -16,6 +17,8 @@ interface DirectNodeLabelProps {
   showPercentage?: boolean;
   effectiveTheme?: 'light' | 'dark';
   isInstantMode?: boolean;
+  // NEW: Coordinated translation props
+  coordinatedTranslation?: string;
 }
 
 export const DirectNodeLabel: React.FC<DirectNodeLabelProps> = ({
@@ -31,7 +34,8 @@ export const DirectNodeLabel: React.FC<DirectNodeLabelProps> = ({
   connectionPercentage = 0,
   showPercentage = false,
   effectiveTheme = 'light',
-  isInstantMode = false
+  isInstantMode = false,
+  coordinatedTranslation
 }) => {
   // Listen for tutorial debugging events
   useEffect(() => {
@@ -48,11 +52,11 @@ export const DirectNodeLabel: React.FC<DirectNodeLabelProps> = ({
     };
   }, [id, shouldShowLabel]);
 
-  // Log rendering mode
+  // Log rendering mode with coordination info
   if (isInstantMode) {
-    console.log(`[DirectNodeLabel] INSTANT MODE: ${id} with TranslatableText3D integration - NO LOADING DELAY`);
+    console.log(`[DirectNodeLabel] COORDINATED INSTANT MODE: ${id} with coordinated translation: "${coordinatedTranslation}" - NO LOADING DELAY`);
   } else {
-    console.log(`[DirectNodeLabel] ENHANCED POSITIONING: ${id} with TranslatableText3D integration`);
+    console.log(`[DirectNodeLabel] COORDINATED ENHANCED POSITIONING: ${id} with coordinated translation: "${coordinatedTranslation}"`);
   }
 
   // Same base offset for both entity and emotion nodes
@@ -61,9 +65,9 @@ export const DirectNodeLabel: React.FC<DirectNodeLabelProps> = ({
     const scaledOffset = baseOffset * Math.max(0.8, Math.min(2.5, nodeScale));
     
     if (isInstantMode) {
-      console.log(`[DirectNodeLabel] INSTANT: Enhanced label offset for ${id} (${type}): ${scaledOffset} (scale: ${nodeScale}) - UNIFORM POSITIONING`);
+      console.log(`[DirectNodeLabel] COORDINATED INSTANT: Enhanced label offset for ${id} (${type}): ${scaledOffset} (scale: ${nodeScale}) - UNIFORM POSITIONING`);
     } else {
-      console.log(`[DirectNodeLabel] Enhanced label offset for ${id} (${type}): ${scaledOffset} (scale: ${nodeScale}) - UNIFORM POSITIONING`);
+      console.log(`[DirectNodeLabel] COORDINATED: Enhanced label offset for ${id} (${type}): ${scaledOffset} (scale: ${nodeScale}) - UNIFORM POSITIONING`);
     }
     return [0, scaledOffset, 0] as [number, number, number];
   }, [type, nodeScale, id, isInstantMode]);
@@ -76,9 +80,9 @@ export const DirectNodeLabel: React.FC<DirectNodeLabelProps> = ({
     const finalSize = Math.max(3.5, Math.min(16.0, baseSize * zoomFactor));
     
     if (isInstantMode) {
-      console.log(`[DirectNodeLabel] INSTANT: Enhanced text size for ${id}: ${finalSize} (zoom: ${zoom})`);
+      console.log(`[DirectNodeLabel] COORDINATED INSTANT: Enhanced text size for ${id}: ${finalSize} (zoom: ${zoom})`);
     } else {
-      console.log(`[DirectNodeLabel] Enhanced text size for ${id}: ${finalSize} (zoom: ${zoom})`);
+      console.log(`[DirectNodeLabel] COORDINATED: Enhanced text size for ${id}: ${finalSize} (zoom: ${zoom})`);
     }
     return finalSize;
   }, [cameraZoom, id, isSelected, isHighlighted, isInstantMode]);
@@ -93,9 +97,9 @@ export const DirectNodeLabel: React.FC<DirectNodeLabelProps> = ({
     const color = effectiveTheme === 'dark' ? '#ffffff' : '#000000';
     
     if (isInstantMode) {
-      console.log(`[DirectNodeLabel] INSTANT: SOLID WHITE TEXT COLOR for ${id}: ${color} (theme: ${effectiveTheme})`);
+      console.log(`[DirectNodeLabel] COORDINATED INSTANT: SOLID WHITE TEXT COLOR for ${id}: ${color} (theme: ${effectiveTheme})`);
     } else {
-      console.log(`[DirectNodeLabel] SOLID WHITE TEXT COLOR for ${id}: ${color} (theme: ${effectiveTheme})`);
+      console.log(`[DirectNodeLabel] COORDINATED: SOLID WHITE TEXT COLOR for ${id}: ${color} (theme: ${effectiveTheme})`);
     }
     return color;
   }, [effectiveTheme, id, isInstantMode]);
@@ -103,7 +107,7 @@ export const DirectNodeLabel: React.FC<DirectNodeLabelProps> = ({
   // UPDATED: Percentage text also uses solid white for dark theme
   const percentageColor = useMemo(() => {
     const color = effectiveTheme === 'dark' ? '#ffffff' : '#000000';
-    console.log(`[DirectNodeLabel] SOLID WHITE PERCENTAGE COLOR for ${id}: ${color} (theme: ${effectiveTheme})`);
+    console.log(`[DirectNodeLabel] COORDINATED: SOLID WHITE PERCENTAGE COLOR for ${id}: ${color} (theme: ${effectiveTheme})`);
     return color;
   }, [effectiveTheme, id]);
 
@@ -130,7 +134,7 @@ export const DirectNodeLabel: React.FC<DirectNodeLabelProps> = ({
     const isTutorialStep9 = currentTutorialStep === '9';
     
     if (isTutorialStep9) {
-      console.log(`[DirectNodeLabel] Tutorial step 9 detected, forcing label visibility for ${id}`);
+      console.log(`[DirectNodeLabel] COORDINATED: Tutorial step 9 detected, forcing label visibility for ${id}`);
       return true;
     }
     
@@ -139,9 +143,9 @@ export const DirectNodeLabel: React.FC<DirectNodeLabelProps> = ({
 
   if (!enhancedShouldShowLabel || !id) {
     if (isInstantMode) {
-      console.log(`[DirectNodeLabel] INSTANT: Not rendering label for ${id}: shouldShow=${enhancedShouldShowLabel}, text="${id}"`);
+      console.log(`[DirectNodeLabel] COORDINATED INSTANT: Not rendering label for ${id}: shouldShow=${enhancedShouldShowLabel}, text="${id}"`);
     } else {
-      console.log(`[DirectNodeLabel] Not rendering label for ${id}: shouldShow=${enhancedShouldShowLabel}, text="${id}"`);
+      console.log(`[DirectNodeLabel] COORDINATED: Not rendering label for ${id}: shouldShow=${enhancedShouldShowLabel}, text="${id}"`);
     }
     return null;
   }
@@ -149,21 +153,21 @@ export const DirectNodeLabel: React.FC<DirectNodeLabelProps> = ({
   // Log percentage display state with side positioning
   if (showPercentage && connectionPercentage > 0) {
     if (isInstantMode) {
-      console.log(`[DirectNodeLabel] INSTANT MODE - SIDE POSITIONING - PERCENTAGE: ${id} (${type}) shows ${connectionPercentage}% on the side at`, percentagePosition, '- NO LOADING DELAY');
+      console.log(`[DirectNodeLabel] COORDINATED INSTANT MODE - SIDE POSITIONING - PERCENTAGE: ${id} (${type}) shows ${connectionPercentage}% on the side at`, percentagePosition, '- NO LOADING DELAY');
     } else {
-      console.log(`[DirectNodeLabel] ENHANCED SIDE POSITIONING - PERCENTAGE: ${id} (${type}) shows ${connectionPercentage}% on the side at`, percentagePosition);
+      console.log(`[DirectNodeLabel] COORDINATED ENHANCED SIDE POSITIONING - PERCENTAGE: ${id} (${type}) shows ${connectionPercentage}% on the side at`, percentagePosition);
     }
   }
 
   if (isInstantMode) {
-    console.log(`[DirectNodeLabel] INSTANT MODE - MAIN TEXT: "${id}" at position`, labelPosition, 'with size:', textSize, 'color:', textColor, '- NO LOADING DELAY - GOOGLE TRANSLATE INTEGRATION');
+    console.log(`[DirectNodeLabel] COORDINATED INSTANT MODE - MAIN TEXT: "${id}" at position`, labelPosition, 'with size:', textSize, 'color:', textColor, '- NO LOADING DELAY - COORDINATED GOOGLE TRANSLATE');
   } else {
-    console.log(`[DirectNodeLabel] ENHANCED POSITIONING - MAIN TEXT: "${id}" at position`, labelPosition, 'with size:', textSize, 'color:', textColor, '- GOOGLE TRANSLATE INTEGRATION');
+    console.log(`[DirectNodeLabel] COORDINATED ENHANCED POSITIONING - MAIN TEXT: "${id}" at position`, labelPosition, 'with size:', textSize, 'color:', textColor, '- COORDINATED GOOGLE TRANSLATE');
   }
 
   return (
     <>
-      {/* Main text using TranslatableText3D with Google Translate integration */}
+      {/* Main text using TranslatableText3D with coordinated translation integration */}
       <TranslatableText3D
         text={id}
         position={labelPosition}
@@ -172,13 +176,15 @@ export const DirectNodeLabel: React.FC<DirectNodeLabelProps> = ({
         visible={true}
         renderOrder={15}
         bold={isHighlighted || isSelected}
-        outlineWidth={0} // PLAN IMPLEMENTATION: No outline for crisp text
-        outlineColor={undefined} // PLAN IMPLEMENTATION: No outline color needed
+        outlineWidth={0}
+        outlineColor={undefined}
         maxWidth={600}
         enableWrapping={true}
         maxCharsPerLine={18}
         maxLines={3}
         sourceLanguage="en"
+        coordinatedTranslation={coordinatedTranslation}
+        useCoordinatedTranslation={!!coordinatedTranslation}
       />
       
       {/* Enhanced side-positioned percentage text with theme-aware color */}
@@ -191,8 +197,8 @@ export const DirectNodeLabel: React.FC<DirectNodeLabelProps> = ({
           visible={true}
           renderOrder={16}
           bold={true}
-          outlineWidth={0} // PLAN IMPLEMENTATION: No outline for crisp text
-          outlineColor={undefined} // PLAN IMPLEMENTATION: No outline color needed
+          outlineWidth={0}
+          outlineColor={undefined}
           maxWidth={200}
           enableWrapping={false}
         />

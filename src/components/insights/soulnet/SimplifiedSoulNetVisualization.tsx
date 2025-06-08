@@ -28,7 +28,7 @@ interface SimplifiedSoulNetVisualizationProps {
   themeHex: string;
   isFullScreen: boolean;
   shouldShowLabels: boolean;
-  // NEW: Instant data access functions
+  // COORDINATED: Enhanced instant data access functions
   getInstantConnectionPercentage?: (selectedNode: string, targetNode: string) => number;
   getInstantTranslation?: (nodeId: string) => string;
   getInstantNodeConnections?: (nodeId: string) => any;
@@ -55,8 +55,8 @@ export const SimplifiedSoulNetVisualization: React.FC<SimplifiedSoulNetVisualiza
   const { theme, systemTheme } = useTheme();
   const effectiveTheme = theme === 'system' ? systemTheme : theme;
 
-  console.log(`[SimplifiedSoulNetVisualization] FIXED THEME: Using app theme context - theme: ${theme}, systemTheme: ${systemTheme}, effective: ${effectiveTheme}`);
-  console.log(`[SimplifiedSoulNetVisualization] INSTANT MODE: Rendering with ${data.nodes.length} nodes, instantReady: ${isInstantReady}`);
+  console.log(`[SimplifiedSoulNetVisualization] COORDINATED THEME: Using app theme context - theme: ${theme}, systemTheme: ${systemTheme}, effective: ${effectiveTheme}`);
+  console.log(`[SimplifiedSoulNetVisualization] COORDINATED INSTANT MODE: Rendering with ${data.nodes.length} nodes, instantReady: ${isInstantReady}`);
 
   // Use Three.js controls for camera
   useFrame(({ camera }) => {
@@ -80,7 +80,7 @@ export const SimplifiedSoulNetVisualization: React.FC<SimplifiedSoulNetVisualiza
         });
         connectedNodes.add(selectedNode); // Include the selected node itself
         
-        console.log(`[SimplifiedSoulNetVisualization] INSTANT: Using precomputed connections for ${selectedNode}:`, connectionData.connectedNodes);
+        console.log(`[SimplifiedSoulNetVisualization] COORDINATED INSTANT: Using precomputed connections for ${selectedNode}:`, connectionData.connectedNodes);
       } else {
         // Fallback to link traversal
         data.links.forEach(link => {
@@ -101,7 +101,7 @@ export const SimplifiedSoulNetVisualization: React.FC<SimplifiedSoulNetVisualiza
       setHighlightedNodes(connectedNodes);
       setDimmedNodes(allOtherNodes);
       
-      console.log(`[SimplifiedSoulNetVisualization] ENHANCED HIERARCHY: Selected ${selectedNode}, highlighting ${connectedNodes.size} nodes, dimming ${allOtherNodes.size} nodes`);
+      console.log(`[SimplifiedSoulNetVisualization] COORDINATED ENHANCED HIERARCHY: Selected ${selectedNode}, highlighting ${connectedNodes.size} nodes, dimming ${allOtherNodes.size} nodes`);
     } else {
       // ENHANCED: When no node is selected, show all nodes normally (no dimming)
       setHighlightedNodes(new Set());
@@ -133,14 +133,14 @@ export const SimplifiedSoulNetVisualization: React.FC<SimplifiedSoulNetVisualiza
         const isHighlighted = highlightedNodes.has(node.id);
         const isDimmed = dimmedNodes.has(node.id);
         
-        // INSTANT connection percentage - no loading delay
+        // COORDINATED INSTANT connection percentage - no loading delay
         const connectionPercentage = selectedNode && isHighlighted && selectedNode !== node.id
           ? getInstantConnectionPercentage(selectedNode, node.id)
           : 0;
         
         const showPercentage = selectedNode !== null && isHighlighted && selectedNode !== node.id && connectionPercentage > 0;
         
-        console.log(`[SimplifiedSoulNetVisualization] ENHANCED HIERARCHY: Node ${node.id} - highlighted: ${isHighlighted}, dimmed: ${isDimmed}, percentage: ${connectionPercentage}%`);
+        console.log(`[SimplifiedSoulNetVisualization] COORDINATED ENHANCED HIERARCHY: Node ${node.id} - highlighted: ${isHighlighted}, dimmed: ${isDimmed}, percentage: ${connectionPercentage}%`);
         
         return (
           <Node
@@ -160,6 +160,7 @@ export const SimplifiedSoulNetVisualization: React.FC<SimplifiedSoulNetVisualiza
             forceShowLabels={false} // Let the dimming logic control this
             effectiveTheme={effectiveTheme}
             isInstantMode={isInstantReady}
+            getCoordinatedTranslation={getInstantTranslation}
           />
         );
       })}
@@ -169,7 +170,7 @@ export const SimplifiedSoulNetVisualization: React.FC<SimplifiedSoulNetVisualiza
         const targetNode = findNodeById(link.target);
         
         if (!sourceNode || !targetNode) {
-          console.warn(`[SimplifiedSoulNetVisualization] Missing node for link: ${link.source} -> ${link.target}`);
+          console.warn(`[SimplifiedSoulNetVisualization] COORDINATED: Missing node for link: ${link.source} -> ${link.target}`);
           return null;
         }
         
