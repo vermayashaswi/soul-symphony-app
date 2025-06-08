@@ -178,10 +178,12 @@ const SimplifiedSoulNetVisualization: React.FC<SimplifiedSoulNetVisualizationPro
             <bufferGeometry attach="geometry" {...geometry} />
             <lineBasicMaterial 
               attach="material" 
-              color={themeHex}
-              transparent
-              opacity={linkOpacity}
-              linewidth={Math.max(1, link.value * 5)}
+              args={[{
+                color: themeHex,
+                transparent: true,
+                opacity: linkOpacity,
+                linewidth: Math.max(1, link.value * 5)
+              }]}
             />
           </line>
         );
