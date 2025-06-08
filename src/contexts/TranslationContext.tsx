@@ -1,180 +1,235 @@
 
-import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
-import { useAuth } from './AuthContext';
-import { translationStateManager } from '@/services/translationStateManager';
+import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react';
+import { translationService } from '@/services/translationService';
+import { onDemandTranslationCache } from '@/utils/website-translations';
+import { SoulNetPreloadService } from '@/services/soulnetPreloadService';
 
 interface TranslationContextType {
   currentLanguage: string;
-  setLanguage: (language: string) => Promise<void>;
-  translate: ((text: string, sourceLanguage?: string) => Promise<string>) | null;
+  setCurrentLanguage: (language: string) => void;
+  setLanguage: (language: string) => void; // Alias for backwards compatibility
+  translate: (text: string, sourceLanguage?: string, entryId?: number) => Promise<string | null>;
   isTranslating: boolean;
+  clearCache: () => void;
   getCachedTranslation: (text: string) => string | null;
-  translationProgress: number;
-  translationError: Error | null;
-  isSoulNetTranslating: boolean;
+  translationProgress?: number;
+  prefetchTranslationsForRoute?: (route: string) => Promise<void>;
   prefetchSoulNetTranslations: (userId: string, timeRange: string) => Promise<void>;
-  prefetchTranslationsForRoute: (route: string) => Promise<void>;
+  isSoulNetTranslating: boolean;
 }
 
 const TranslationContext = createContext<TranslationContextType | undefined>(undefined);
 
-export const TranslationProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { user } = useAuth();
-  const [currentLanguage, setCurrentLanguage] = useState('en');
-  const [isTranslating, setIsTranslating] = useState(false);
-  const [isSoulNetTranslating, setIsSoulNetTranslating] = useState(false);
-  const [translationProgress, setTranslationProgress] = useState(0);
-  const [translationError, setTranslationError] = useState<Error | null>(null);
-  const translateFunctionRef = useRef<((text: string, sourceLanguage?: string) => Promise<string>) | null>(null);
+interface TranslationProviderProps {
+  children: ReactNode;
+}
 
-  // INTEGRATION: Connect to translation state manager
+export const TranslationProvider: React.FC<TranslationProviderProps> = ({ children }) => {
+  const [currentLanguage, setCurrentLanguage] = useState<string>('en');
+  const [isTranslating, setIsTranslating] = useState<boolean>(false);
+  const [isSoulNetTranslating, setIsSoulNetTranslating] = useState<boolean>(false);
+  const [translationCache, setTranslationCache] = useState<Record<string, string>>({});
+
+  // Load language from localStorage or browser default
   useEffect(() => {
-    const unsubscribe = translationStateManager.addListener({
-      onStateChange: (state) => {
-        console.log('[TranslationContext] COORDINATED: State change received:', state);
-        setCurrentLanguage(state.language);
-        setIsTranslating(state.loading);
-        setIsSoulNetTranslating(state.loading);
-        setTranslationProgress(state.progress);
-        setTranslationError(state.error);
-      },
-      onError: (error) => {
-        console.error('[TranslationContext] COORDINATED: Translation error:', error);
-        setTranslationError(error);
-        setIsTranslating(false);
-        setIsSoulNetTranslating(false);
-      },
-      onComplete: (language) => {
-        console.log('[TranslationContext] COORDINATED: Translation complete for:', language);
-        setIsTranslating(false);
-        setIsSoulNetTranslating(false);
-        setTranslationProgress(100);
-        setTranslationError(null);
+    try {
+      const savedLanguage = localStorage.getItem('soulo-language');
+      if (savedLanguage) {
+        console.log('[TranslationContext] Loading saved language:', savedLanguage);
+        setCurrentLanguage(savedLanguage);
+        return;
       }
-    });
+    } catch (error) {
+      console.error('[TranslationContext] Error loading saved language:', error);
+    }
 
-    return unsubscribe;
+    // Fallback to browser language
+    const browserLanguage = navigator.language.split('-')[0];
+    const supportedLanguages = ['en', 'es', 'fr', 'de', 'it', 'pt', 'ru', 'ja', 'ko', 'zh', 'hi', 'ar', 'bn', 'gu', 'kn', 'ml', 'mr', 'or', 'pa', 'ta', 'te'];
+    
+    if (supportedLanguages.includes(browserLanguage)) {
+      setCurrentLanguage(browserLanguage);
+    }
+    
+    console.log('[TranslationContext] Initialized with language:', browserLanguage, 'supported:', supportedLanguages.includes(browserLanguage));
   }, []);
 
-  // COORDINATED LANGUAGE CHANGE: Use translation state manager
-  const setLanguage = useCallback(async (language: string) => {
-    if (language === currentLanguage) {
-      console.log('[TranslationContext] COORDINATED: Language already set to', language);
+  const prefetchSoulNetTranslations = useCallback(async (userId: string, timeRange: string): Promise<void> => {
+    if (currentLanguage === 'en') {
+      console.log('[TranslationContext] Skipping SoulNet pre-translation for English');
       return;
     }
 
-    console.log('[TranslationContext] COORDINATED: Setting language to', language, 'for user', user?.id);
+    console.log(`[TranslationContext] Pre-translating SoulNet data for ${userId}, ${timeRange}, ${currentLanguage}`);
     
     try {
-      await translationStateManager.coordinateLanguageChange(language, user?.id);
+      setIsSoulNetTranslating(true);
       
-      // Store language preference
-      localStorage.setItem('preferred-language', language);
+      // Pre-load SoulNet data with translations
+      await SoulNetPreloadService.preloadSoulNetData(userId, timeRange, currentLanguage);
       
-      console.log('[TranslationContext] COORDINATED: Successfully set language to', language);
+      console.log('[TranslationContext] SoulNet pre-translation completed successfully');
     } catch (error) {
-      console.error('[TranslationContext] COORDINATED: Failed to set language:', error);
-      
-      // Attempt recovery
-      try {
-        await translationStateManager.recoverFromTranslationFailure(language, user?.id);
-      } catch (recoveryError) {
-        console.error('[TranslationContext] COORDINATED: Recovery failed:', recoveryError);
-        setTranslationError(recoveryError instanceof Error ? recoveryError : new Error('Language change failed'));
-      }
+      console.error('[TranslationContext] Error pre-translating SoulNet data:', error);
+    } finally {
+      setIsSoulNetTranslating(false);
     }
-  }, [currentLanguage, user?.id]);
-
-  // Initialize translation function
-  useEffect(() => {
-    const initializeTranslateFunction = async () => {
-      if (typeof window !== 'undefined' && window.google?.translate) {
-        console.log('[TranslationContext] COORDINATED: Google Translate is available');
-        
-        const translateFunction = async (text: string, sourceLanguage: string = 'en'): Promise<string> => {
-          if (!text || currentLanguage === sourceLanguage) {
-            return text;
-          }
-
-          try {
-            return new Promise((resolve, reject) => {
-              const element = document.createElement('div');
-              element.innerHTML = text;
-              element.style.display = 'none';
-              document.body.appendChild(element);
-
-              const translateElement = new window.google.translate.TranslateElement({
-                pageLanguage: sourceLanguage,
-                includedLanguages: currentLanguage,
-                autoDisplay: false
-              }, element.id || 'translate-element');
-
-              // Simplified translation logic for demonstration
-              // In practice, you'd integrate with the actual Google Translate API
-              setTimeout(() => {
-                const translatedText = text; // Placeholder - implement actual translation
-                document.body.removeChild(element);
-                resolve(translatedText);
-              }, 100);
-            });
-          } catch (error) {
-            console.error('[TranslationContext] COORDINATED: Translation error:', error);
-            return text; // Fallback to original text
-          }
-        };
-
-        translateFunctionRef.current = translateFunction;
-      } else {
-        console.log('[TranslationContext] COORDINATED: Google Translate not available, using fallback');
-        translateFunctionRef.current = async (text: string) => text;
-      }
-    };
-
-    initializeTranslateFunction();
   }, [currentLanguage]);
 
-  // Load saved language preference
-  useEffect(() => {
-    const savedLanguage = localStorage.getItem('preferred-language');
-    if (savedLanguage && savedLanguage !== currentLanguage) {
-      console.log('[TranslationContext] COORDINATED: Loading saved language preference:', savedLanguage);
-      setLanguage(savedLanguage);
+  const handleLanguageChange = useCallback(async (language: string) => {
+    console.log('[TranslationContext] Changing language to:', language);
+    
+    // Set loading state for SoulNet translations
+    if (language !== 'en') {
+      setIsSoulNetTranslating(true);
+    }
+    
+    setCurrentLanguage(language);
+    
+    // Save to localStorage for persistence
+    try {
+      localStorage.setItem('soulo-language', language);
+      console.log('[TranslationContext] Saved language to localStorage:', language);
+    } catch (error) {
+      console.error('[TranslationContext] Error saving language to localStorage:', error);
+    }
+    
+    // Clear SoulNet cache when language changes to force refresh
+    SoulNetPreloadService.clearCache();
+    
+    // Dispatch custom event for components that need to know about language changes
+    const event = new CustomEvent('languageChange', { 
+      detail: { 
+        language,
+        isSoulNetTranslating: language !== 'en'
+      } 
+    });
+    window.dispatchEvent(event);
+    
+    // If not English, indicate that SoulNet translations are ready
+    // (actual pre-translation will happen when SoulNet components mount)
+    if (language === 'en') {
+      setIsSoulNetTranslating(false);
     }
   }, []);
 
-  // Simple cache implementation for demonstration - return string directly
+  const translate = useCallback(async (text: string, sourceLanguage: string = 'en', entryId?: number): Promise<string | null> => {
+    if (!text || typeof text !== 'string') {
+      console.warn('[TranslationContext] Invalid text provided for translation:', text);
+      return text || '';
+    }
+
+    if (currentLanguage === sourceLanguage) {
+      console.log('[TranslationContext] Text already in target language, skipping translation:', { text, currentLanguage });
+      return text;
+    }
+
+    console.log('[TranslationContext] GOOGLE TRANSLATE ONLY - Attempting to translate:', { 
+      text: text.substring(0, 30) + (text.length > 30 ? '...' : ''), 
+      from: sourceLanguage, 
+      to: currentLanguage,
+      entryId
+    });
+
+    const cacheKey = `${text}_${sourceLanguage}_${currentLanguage}`;
+    
+    // Check local cache first
+    if (translationCache[cacheKey]) {
+      console.log('[TranslationContext] Using local cache for:', text.substring(0, 30));
+      return translationCache[cacheKey];
+    }
+
+    // Check on-demand cache
+    const cachedTranslation = onDemandTranslationCache.get(currentLanguage, text);
+    if (cachedTranslation) {
+      console.log('[TranslationContext] Using on-demand cache for:', text.substring(0, 30));
+      setTranslationCache(prev => ({ ...prev, [cacheKey]: cachedTranslation }));
+      return cachedTranslation;
+    }
+
+    try {
+      setIsTranslating(true);
+      
+      // ONLY USE GOOGLE TRANSLATE SERVICE
+      console.log('[TranslationContext] Using Google Translate service only');
+      const translatedText = await translationService.translateText(text, currentLanguage, sourceLanguage);
+
+      if (translatedText && translatedText !== text) {
+        console.log('[TranslationContext] Translation successful:', { 
+          original: text.substring(0, 30), 
+          translated: translatedText.substring(0, 30) 
+        });
+        
+        // Cache both locally and in on-demand cache
+        setTranslationCache(prev => ({ ...prev, [cacheKey]: translatedText }));
+        onDemandTranslationCache.set(currentLanguage, text, translatedText);
+        
+        return translatedText;
+      }
+      
+      console.log('[TranslationContext] Translation returned same text, using original');
+      return text;
+    } catch (error) {
+      console.error('[TranslationContext] Translation failed:', error);
+      return text;
+    } finally {
+      setIsTranslating(false);
+    }
+  }, [currentLanguage, translationCache]);
+
   const getCachedTranslation = useCallback((text: string): string | null => {
-    // This would integrate with the actual cache in a real implementation
-    return null;
-  }, []);
+    const cacheKey = `${text}_en_${currentLanguage}`;
+    const localCache = translationCache[cacheKey];
+    const onDemandCache = onDemandTranslationCache.get(currentLanguage, text);
+    console.log('[TranslationContext] Checking cache for:', text.substring(0, 30), 
+      { localCache: !!localCache, onDemandCache: !!onDemandCache });
+    return localCache || onDemandCache || null;
+  }, [currentLanguage, translationCache]);
 
-  // Prefetch SoulNet translations
-  const prefetchSoulNetTranslations = useCallback(async (userId: string, timeRange: string): Promise<void> => {
-    console.log('[TranslationContext] Prefetching SoulNet translations for:', userId, timeRange);
-    // Implementation would go here
-  }, []);
-
-  // Prefetch translations for a route
   const prefetchTranslationsForRoute = useCallback(async (route: string): Promise<void> => {
-    console.log('[TranslationContext] Prefetching translations for route:', route);
-    // Implementation would go here
-  }, []);
+    console.log(`[TranslationContext] Prefetching translations for route: ${route}`);
+    // Get common route texts for prefetching - can be expanded
+    const routeTexts = {
+      '/': ['Home', 'Download on App Store', 'Your Voice, Your Journey'],
+      '/insights': ['Insights', 'Discover patterns', 'Soul-Net Visualization', 'Dominant Mood'],
+      '/journal': ['Journal', 'New Entry', 'Search', 'Recent Entries']
+    };
+    
+    const textsToTranslate = routeTexts[route] || [];
+    if (textsToTranslate.length > 0 && currentLanguage !== 'en') {
+      try {
+        const batchResults = await translationService.batchTranslate({
+          texts: textsToTranslate,
+          targetLanguage: currentLanguage
+        });
+        console.log(`[TranslationContext] Prefetched ${batchResults.size} translations for route ${route}`);
+      } catch (error) {
+        console.error('[TranslationContext] Error prefetching translations:', error);
+      }
+    }
+  }, [currentLanguage]);
 
-  const contextValue: TranslationContextType = {
+  const value: TranslationContextType = {
     currentLanguage,
-    setLanguage,
-    translate: translateFunctionRef.current,
+    setCurrentLanguage: handleLanguageChange,
+    setLanguage: handleLanguageChange, // Alias for backwards compatibility
+    translate,
     isTranslating,
+    clearCache: useCallback(() => {
+      console.log('[TranslationContext] Clearing all translation caches');
+      setTranslationCache({});
+      onDemandTranslationCache.clearAll();
+      SoulNetPreloadService.clearCache();
+    }, []),
     getCachedTranslation,
-    translationProgress,
-    translationError,
-    isSoulNetTranslating,
+    translationProgress: isTranslating ? 50 : 100,
+    prefetchTranslationsForRoute,
     prefetchSoulNetTranslations,
-    prefetchTranslationsForRoute
+    isSoulNetTranslating
   };
 
   return (
-    <TranslationContext.Provider value={contextValue}>
+    <TranslationContext.Provider value={value}>
       {children}
     </TranslationContext.Provider>
   );
@@ -182,7 +237,7 @@ export const TranslationProvider: React.FC<{ children: React.ReactNode }> = ({ c
 
 export const useTranslation = (): TranslationContextType => {
   const context = useContext(TranslationContext);
-  if (!context) {
+  if (context === undefined) {
     throw new Error('useTranslation must be used within a TranslationProvider');
   }
   return context;

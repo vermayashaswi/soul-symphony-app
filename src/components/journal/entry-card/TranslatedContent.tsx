@@ -35,7 +35,7 @@ export function TranslatedContent({ content, isExpanded, language, entryId }: Tr
         
         // IMPORTANT: Always translate from English regardless of the detected language
         // This is the key change - we always assume the refined text is in English
-        const translated = await translate(content, "en");
+        const translated = await translate(content, "en", entryId);
         
         if (translated) {
           // Clean the translation result before setting it
