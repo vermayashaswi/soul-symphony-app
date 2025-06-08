@@ -4,6 +4,7 @@ import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import DirectNodeLabel from './DirectNodeLabel';
 import { useUserColorThemeHex } from './useUserColorThemeHex';
+import { useSoulNetTranslation } from '@/hooks/useSoulNetTranslation';
 
 interface NodeData {
   id: string;
@@ -50,6 +51,7 @@ const Node: React.FC<NodeProps> = ({
 }) => {
   const meshRef = useRef<THREE.Mesh>(null);
   const userColorThemeHex = useUserColorThemeHex();
+  const { isNodeTranslating } = useSoulNetTranslation();
   
   // ANIMATION: Manual time tracking for pulsing effects
   const [animationTime, setAnimationTime] = useState(0);
@@ -63,6 +65,9 @@ const Node: React.FC<NodeProps> = ({
     
     return () => clearTimeout(timer);
   }, []);
+
+  // Check if this node is currently being translated
+  const isTranslating = isNodeTranslating(node.id);
 
   // UPDATED: Use app color theme for both node types in both light and dark themes
   const color = useMemo(() => {
@@ -86,13 +91,14 @@ const Node: React.FC<NodeProps> = ({
     return baseScale;
   }, [isSelected, isHighlighted, dimmed]);
 
-  // ENHANCED: Increased opacity for dimmed nodes to 0.05-0.06
+  // ENHANCED: Increased opacity for dimmed nodes, slightly reduced for translating
   const nodeOpacity = useMemo(() => {
     if (isSelected) return 1.0;
+    if (isTranslating) return 0.7; // Slightly dimmed while translating
     if (isHighlighted) return 0.9;
     if (dimmed) return 0.05; // Increased from extremely low to 0.05
     return 0.8;
-  }, [isSelected, isHighlighted, dimmed]);
+  }, [isSelected, isHighlighted, dimmed, isTranslating]);
 
   // PULSATING ANIMATION: Enhanced frame animation with pulsing effects
   useFrame((state, delta) => {
@@ -153,16 +159,16 @@ const Node: React.FC<NodeProps> = ({
   // INSTANT MODE: Better logging for percentage tracking with comprehensive debug info
   if (showPercentage && connectionPercentage > 0) {
     if (isInstantMode) {
-      console.log(`[Node] PULSATING INSTANT MODE: ${node.id} (${node.type}) displays percentage: ${connectionPercentage}% with pulse intensity based on connection strength - NO LOADING DELAY`);
+      console.log(`[Node] MAIN TRANSLATION SERVICE INSTANT MODE: ${node.id} (${node.type}) displays percentage: ${connectionPercentage}% with pulse intensity based on connection strength - NO LOADING DELAY`);
     } else {
-      console.log(`[Node] PULSATING ENHANCED: ${node.id} (${node.type}) should display percentage: ${connectionPercentage}% with pulse intensity based on connection strength`);
+      console.log(`[Node] MAIN TRANSLATION SERVICE ENHANCED: ${node.id} (${node.type}) should display percentage: ${connectionPercentage}% with pulse intensity based on connection strength`);
     }
   }
 
   if (isInstantMode) {
-    console.log(`[Node] PULSATING INSTANT MODE: Rendering ${node.type} node ${node.id} with pulsing animation, app theme color ${userColorThemeHex}, base scale ${baseNodeScale.toFixed(2)} - NO LOADING DELAY`);
+    console.log(`[Node] MAIN TRANSLATION SERVICE INSTANT MODE: Rendering ${node.type} node ${node.id} with pulsing animation, app theme color ${userColorThemeHex}, base scale ${baseNodeScale.toFixed(2)}, translating: ${isTranslating} - NO LOADING DELAY`);
   } else {
-    console.log(`[Node] PULSATING ENHANCED: Rendering ${node.type} node ${node.id} with pulsing animation, app theme color ${userColorThemeHex}, base scale ${baseNodeScale.toFixed(2)}`);
+    console.log(`[Node] MAIN TRANSLATION SERVICE ENHANCED: Rendering ${node.type} node ${node.id} with pulsing animation, app theme color ${userColorThemeHex}, base scale ${baseNodeScale.toFixed(2)}, translating: ${isTranslating}`);
   }
 
   // ENHANCED: Improved geometry sizes to work with the enhanced scale differences
