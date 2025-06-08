@@ -1,7 +1,7 @@
 
 import React, { useMemo, useCallback, useState } from 'react';
-import { Line } from '@react-three/drei';
 import { Canvas } from '@react-three/fiber';
+import * as THREE from 'three';
 import TranslatableText3D from './TranslatableText3D';
 import FixedConnectionPercentage from './FixedConnectionPercentage';
 
@@ -162,7 +162,7 @@ const SimplifiedSoulNetVisualization: React.FC<SimplifiedSoulNetVisualizationPro
         );
       })}
 
-      {/* Enhanced Links Rendering */}
+      {/* Enhanced Links Rendering using native Three.js line */}
       {visibleLinks.map((link) => {
         const sourcePos = nodePositions.get(link.source);
         const targetPos = nodePositions.get(link.target);
@@ -170,17 +170,20 @@ const SimplifiedSoulNetVisualization: React.FC<SimplifiedSoulNetVisualizationPro
         if (!sourcePos || !targetPos) return null;
 
         const linkOpacity = selectedNode ? 0.8 : 0.4;
-        const linkWidth = Math.max(0.02, link.value * 0.15);
+        const points = [new THREE.Vector3(...sourcePos), new THREE.Vector3(...targetPos)];
+        const geometry = new THREE.BufferGeometry().setFromPoints(points);
 
         return (
-          <Line
-            key={`${link.source}-${link.target}`}
-            points={[sourcePos, targetPos]}
-            color={themeHex}
-            lineWidth={linkWidth}
-            transparent
-            opacity={linkOpacity}
-          />
+          <line key={`${link.source}-${link.target}`}>
+            <bufferGeometry attach="geometry" {...geometry} />
+            <lineBasicMaterial 
+              attach="material" 
+              color={themeHex}
+              transparent
+              opacity={linkOpacity}
+              linewidth={Math.max(1, link.value * 5)}
+            />
+          </line>
         );
       })}
     </>
