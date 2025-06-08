@@ -85,7 +85,17 @@ const SimplifiedSoulNetVisualization: React.FC<SimplifiedSoulNetVisualizationPro
     }
   }, [selectedNode, getInstantNodeConnections, isInstantReady]);
 
-  // Memoized nodes with enhanced error handling
+  // Create highlighted nodes set for Node component
+  const highlightedNodes = useMemo(() => {
+    const highlighted = new Set<string>();
+    if (selectedNode) {
+      highlighted.add(selectedNode);
+      highlightedConnections.forEach(nodeId => highlighted.add(nodeId));
+    }
+    return highlighted;
+  }, [selectedNode, highlightedConnections]);
+
+  // Memoized nodes with correct prop structure
   const renderedNodes = useMemo(() => {
     if (!data.nodes || data.nodes.length === 0) {
       console.log('[SimplifiedSoulNetVisualization] No nodes to render');
@@ -95,63 +105,50 @@ const SimplifiedSoulNetVisualization: React.FC<SimplifiedSoulNetVisualizationPro
     return data.nodes.map((node) => {
       const isSelected = selectedNode === node.id;
       const isHighlighted = highlightedConnections.has(node.id);
-      const nodeScale = isSelected ? 1.5 : isHighlighted ? 1.2 : 1;
+      const isDimmed = selectedNode !== null && !isSelected && !isHighlighted;
+      
+      const connectionPercentage = selectedNode ? getInstantConnectionPercentage(selectedNode, node.id) : 0;
       
       return (
-        <React.Fragment key={`${node.id}-${retryKey}`}>
-          <Node
-            id={node.id}
-            position={node.position}
-            color={node.color}
-            type={node.type}
-            value={node.value}
-            isSelected={isSelected}
-            isHighlighted={isHighlighted}
-            onClick={onNodeClick}
-            scale={nodeScale}
-            themeHex={themeHex}
-          />
-          
-          {shouldShowLabels && isInstantReady && (
-            <UnifiedNodeLabel
-              id={node.id}
-              type={node.type}
-              position={node.position}
-              isHighlighted={isHighlighted}
-              isSelected={isSelected}
-              shouldShowLabel={true}
-              cameraZoom={cameraZoom}
-              themeHex={themeHex}
-              nodeScale={nodeScale}
-              retryKey={retryKey}
-            />
-          )}
-          
-          {/* Show connection percentage for selected node */}
-          {isSelected && selectedNode && highlightedConnections.size > 0 && (
-            <RobustConnectionPercentage
-              position={node.position}
-              percentage={75} // Default percentage, could be enhanced with actual data
-              isVisible={true}
-              nodeType={node.type}
-            />
-          )}
-        </React.Fragment>
+        <Node
+          key={`${node.id}-${retryKey}`}
+          node={node}
+          isSelected={isSelected}
+          onClick={onNodeClick}
+          highlightedNodes={highlightedNodes}
+          showLabel={shouldShowLabels}
+          dimmed={isDimmed}
+          themeHex={themeHex}
+          selectedNodeId={selectedNode}
+          cameraZoom={cameraZoom}
+          isHighlighted={isHighlighted}
+          connectionPercentage={connectionPercentage}
+          showPercentage={isSelected && connectionPercentage > 0}
+          forceShowLabels={shouldShowLabels}
+          effectiveTheme="light"
+          isInstantMode={isInstantReady}
+          userId={userId}
+          timeRange={timeRange?.toString()}
+        />
       );
     });
   }, [
     data.nodes, 
     selectedNode, 
     highlightedConnections, 
+    highlightedNodes,
     onNodeClick, 
     shouldShowLabels, 
     isInstantReady, 
     cameraZoom, 
     themeHex,
-    retryKey
+    retryKey,
+    getInstantConnectionPercentage,
+    userId,
+    timeRange
   ]);
 
-  // Memoized edges with enhanced highlighting
+  // Memoized edges with correct prop structure
   const renderedEdges = useMemo(() => {
     if (!data.links || data.links.length === 0) {
       console.log('[SimplifiedSoulNetVisualization] No links to render');
@@ -173,6 +170,8 @@ const SimplifiedSoulNetVisualization: React.FC<SimplifiedSoulNetVisualizationPro
         (highlightedConnections.has(link.source) && highlightedConnections.has(link.target))
       );
 
+      const isDimmed = selectedNode !== null && !isHighlighted;
+
       return (
         <Edge
           key={`${link.source}-${link.target}-${index}-${retryKey}`}
@@ -180,11 +179,16 @@ const SimplifiedSoulNetVisualization: React.FC<SimplifiedSoulNetVisualizationPro
           end={targetNode.position}
           value={link.value}
           isHighlighted={isHighlighted}
-          themeHex={themeHex}
+          dimmed={isDimmed}
+          maxThickness={5}
+          startNodeType={sourceNode.type}
+          endNodeType={targetNode.type}
+          startNodeScale={1}
+          endNodeScale={1}
         />
       );
     }).filter(Boolean);
-  }, [data.links, data.nodes, selectedNode, highlightedConnections, themeHex, retryKey]);
+  }, [data.links, data.nodes, selectedNode, highlightedConnections, retryKey]);
 
   if (!data.nodes || data.nodes.length === 0) {
     console.log('[SimplifiedSoulNetVisualization] No data available for visualization');
