@@ -50,6 +50,17 @@ const HomePage = () => {
     }
   };
 
+  // Prevent any reload loops by ensuring the page renders immediately
+  useEffect(() => {
+    // Clear any potential auth-related redirects from localStorage that might cause issues
+    const keys = Object.keys(localStorage);
+    keys.forEach(key => {
+      if (key.includes('redirect') && key.includes('auth')) {
+        localStorage.removeItem(key);
+      }
+    });
+  }, []);
+
   // Log the route to help with debugging
   console.log('HomePage: Rendering the website home page at route "/"');
 
@@ -57,8 +68,12 @@ const HomePage = () => {
     <div className="min-h-screen bg-white overflow-x-hidden">
       <Navbar />
       
-      {/* SoulNet Translation Indicator */}
-      <SoulNetTranslationIndicator className="fixed top-20 right-4 z-50 bg-background/90 backdrop-blur-sm px-3 py-2 rounded-lg border" />
+      {/* SoulNet Translation Indicator - with error boundary */}
+      <div className="fixed top-20 right-4 z-50">
+        <React.Suspense fallback={null}>
+          <SoulNetTranslationIndicator className="bg-background/90 backdrop-blur-sm px-3 py-2 rounded-lg border" />
+        </React.Suspense>
+      </div>
       
       <HeroSection 
         openAppStore={openAppStore}

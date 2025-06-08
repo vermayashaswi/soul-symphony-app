@@ -10,7 +10,6 @@ import { useNetworkStatus } from '@/utils/network';
 import HomePage from '@/pages/website/HomePage';
 import { TranslatableText } from '@/components/translation/TranslatableText';
 import { useTranslation } from '@/contexts/TranslationContext';
-import { supabase } from '@/integrations/supabase/client';
 
 const Index = () => {
   const navigate = useNavigate();
@@ -26,7 +25,7 @@ const Index = () => {
   
   const shouldRenderMobile = isMobile.isMobile || mobileDemo;
 
-  // Enhanced tutorial status checking for proper navigation flow
+  // Enhanced tutorial status checking for proper navigation flow - only for authenticated users
   useEffect(() => {
     const handleTutorialNavigation = async () => {
       if (!user) return;
@@ -40,6 +39,9 @@ const Index = () => {
         // Check if user has completed onboarding
         if (onboardingComplete) {
           console.log('[Index] User completed onboarding, checking tutorial status');
+          
+          // Import supabase only when needed for authenticated users
+          const { supabase } = await import('@/integrations/supabase/client');
           
           // Check tutorial completion status
           const { data: profileData, error } = await supabase
@@ -89,7 +91,7 @@ const Index = () => {
     handleTutorialNavigation();
   }, [user, checkOnboardingStatus, onboardingComplete]);
 
-  // Handle explicit app redirects only
+  // Handle explicit app redirects only - don't interfere with public page viewing
   useEffect(() => {
     // Only redirect to app if explicitly requested with a URL parameter
     if (urlParams.has('app')) {
@@ -114,24 +116,37 @@ const Index = () => {
   }, [user, navigate, urlParams, onboardingComplete]);
 
   useEffect(() => {
-    // Pre-translate common strings used on the index page
+    // Pre-translate common strings used on the index page with timeout to prevent blocking
     const preTranslateCommonStrings = async () => {
       if (translate) {
         try {
           console.log('[Index] Pre-translating common strings...');
-          await translate("Welcome to Soul Symphony", "en");
-          await translate("We've detected you're on a slow connection. We're loading a lightweight version of our site for better performance.", "en");
-          await translate("Loading optimized content...", "en");
-          await translate("You're currently offline", "en");
-          await translate("Please check your connection to access all features. Some content may still be available from cache.", "en");
+          
+          // Use Promise.allSettled to prevent any single translation failure from blocking others
+          const translationPromises = [
+            translate("Welcome to Soul Symphony", "en"),
+            translate("We've detected you're on a slow connection. We're loading a lightweight version of our site for better performance.", "en"),
+            translate("Loading optimized content...", "en"),
+            translate("You're currently offline", "en"),
+            translate("Please check your connection to access all features. Some content may still be available from cache.", "en")
+          ];
+          
+          // Add timeout to prevent hanging
+          await Promise.race([
+            Promise.allSettled(translationPromises),
+            new Promise((resolve) => setTimeout(resolve, 3000)) // 3 second timeout
+          ]);
+          
           console.log('[Index] Pre-translation complete');
         } catch (error) {
           console.error("[Index] Error pre-translating index page strings:", error);
+          // Don't throw - let page load even if translations fail
         }
       }
     };
     
-    preTranslateCommonStrings();
+    // Delay pre-translation to not block initial render
+    setTimeout(preTranslateCommonStrings, 1000);
     
     if (networkStatus.speed === 'slow') {
       console.log('[Index] Slow network detected, optimizing experience...');
@@ -150,28 +165,28 @@ const Index = () => {
         lowBandwidthFallback={
           <div className="flex flex-col items-center justify-center min-h-screen p-4">
             <h1 className="text-2xl font-bold mb-4">
-              <TranslatableText text="Welcome to Soul Symphony" forceTranslate={true} />
+              <TranslatableText text="Welcome to Soul Symphony" forceTranslate={false} />
             </h1>
             <p className="text-center mb-6">
               <TranslatableText 
                 text="We've detected you're on a slow connection. We're loading a lightweight version of our site for better performance." 
-                forceTranslate={true}
+                forceTranslate={false}
               />
             </p>
             <div className="animate-pulse">
-              <TranslatableText text="Loading optimized content..." forceTranslate={true} />
+              <TranslatableText text="Loading optimized content..." forceTranslate={false} />
             </div>
           </div>
         }
         offlineFallback={
           <div className="flex flex-col items-center justify-center min-h-screen p-4">
             <h1 className="text-2xl font-bold mb-4">
-              <TranslatableText text="You're currently offline" forceTranslate={true} />
+              <TranslatableText text="You're currently offline" forceTranslate={false} />
             </h1>
             <p className="text-center mb-6">
               <TranslatableText 
                 text="Please check your connection to access all features. Some content may still be available from cache." 
-                forceTranslate={true}
+                forceTranslate={false}
               />
             </p>
           </div>

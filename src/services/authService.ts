@@ -25,6 +25,14 @@ export const getRedirectUrl = (): string => {
 };
 
 /**
+ * Check if current path is a public page that doesn't require auth
+ */
+const isPublicPage = (pathname: string): boolean => {
+  const publicPaths = ['/', '/privacy-policy', '/faq', '/download', '/blog'];
+  return publicPaths.includes(pathname) || pathname.startsWith('/blog/');
+};
+
+/**
  * Sign in with Google
  */
 export const signInWithGoogle = async (): Promise<void> => {
@@ -124,20 +132,36 @@ export const resetPassword = async (email: string): Promise<void> => {
 };
 
 /**
- * Sign out
- * @param navigate Optional navigation function to redirect after logout
+ * Sign out with improved error handling
  */
 export const signOut = async (navigate?: (path: string) => void): Promise<void> => {
   try {
     // Check if there's a session before trying to sign out
-    const { data: sessionData } = await supabase.auth.getSession();
+    const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+    
+    // If session check fails due to invalid token, clear local state
+    if (sessionError && sessionError.message.includes('refresh_token_not_found')) {
+      console.log('Invalid refresh token detected, clearing local auth state');
+      localStorage.removeItem('authRedirectTo');
+      
+      // Clear any Supabase auth data from localStorage
+      const keys = Object.keys(localStorage);
+      keys.forEach(key => {
+        if (key.startsWith('supabase.auth.token')) {
+          localStorage.removeItem(key);
+        }
+      });
+      
+      if (navigate) {
+        navigate('/app/onboarding');
+      }
+      return;
+    }
     
     // If no session exists, just clean up local state and redirect
     if (!sessionData?.session) {
-      // Clear any auth-related items from local storage
       localStorage.removeItem('authRedirectTo');
       
-      // Redirect to onboarding page if navigate function is provided
       if (navigate) {
         navigate('/app/onboarding');
       }
@@ -172,43 +196,111 @@ export const signOut = async (navigate?: (path: string) => void): Promise<void> 
 };
 
 /**
- * Refresh session
+ * Refresh session with improved error handling
  */
 export const refreshSession = async () => {
   try {
     const { data: { session }, error } = await supabase.auth.getSession();
+    
+    // Handle invalid refresh token errors
+    if (error && error.message.includes('refresh_token_not_found')) {
+      console.log('Invalid refresh token detected, clearing auth state');
+      
+      // Clear invalid tokens
+      const keys = Object.keys(localStorage);
+      keys.forEach(key => {
+        if (key.startsWith('supabase.auth.token')) {
+          localStorage.removeItem(key);
+        }
+      });
+      
+      return null;
+    }
+    
     if (error) {
       throw error;
     }
+    
     return session;
   } catch (error: any) {
     console.error('Error refreshing session:', error.message);
+    
+    // If it's a public page, don't throw error
+    if (isPublicPage(window.location.pathname)) {
+      console.log('On public page, ignoring session refresh error');
+      return null;
+    }
+    
     throw error;
   }
 };
 
 /**
- * Check if user is authenticated
+ * Check if user is authenticated with improved error handling
  */
 export const isAuthenticated = async () => {
   try {
-    const { data } = await supabase.auth.getSession();
+    const { data, error } = await supabase.auth.getSession();
+    
+    // Handle invalid refresh token gracefully
+    if (error && error.message.includes('refresh_token_not_found')) {
+      console.log('Invalid refresh token detected');
+      return false;
+    }
+    
+    if (error) {
+      // If we're on a public page, don't throw auth errors
+      if (isPublicPage(window.location.pathname)) {
+        console.log('Auth check failed on public page, ignoring error');
+        return false;
+      }
+      throw error;
+    }
+    
     return !!data.session;
   } catch (error) {
     console.error('Error checking authentication status:', error);
+    
+    // For public pages, return false instead of throwing
+    if (isPublicPage(window.location.pathname)) {
+      return false;
+    }
+    
     return false;
   }
 };
 
 /**
- * Get current user
+ * Get current user with improved error handling
  */
 export const getCurrentUser = async () => {
   try {
-    const { data } = await supabase.auth.getUser();
+    const { data, error } = await supabase.auth.getUser();
+    
+    // Handle invalid refresh token gracefully
+    if (error && error.message.includes('refresh_token_not_found')) {
+      console.log('Invalid refresh token detected when getting user');
+      return null;
+    }
+    
+    if (error) {
+      // If we're on a public page, don't throw auth errors
+      if (isPublicPage(window.location.pathname)) {
+        console.log('Get user failed on public page, ignoring error');
+        return null;
+      }
+      throw error;
+    }
+    
     return data.user;
   } catch (error) {
     console.error('Error getting current user:', error);
+    
+    // For public pages, return null instead of throwing
+    if (isPublicPage(window.location.pathname)) {
+      return null;
+    }
+    
     return null;
   }
 };
