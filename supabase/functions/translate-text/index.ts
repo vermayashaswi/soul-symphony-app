@@ -26,8 +26,97 @@ serve(async (req) => {
     console.log('Starting translation with provided API key');
     
     // Parse request body
-    const { text, sourceLanguage, targetLanguage = 'hi', entryId, cleanResult = true, useDetectedLanguages = true } = await req.json();
+    const { text, texts, sourceLanguage, targetLanguage = 'hi', entryId, cleanResult = true, useDetectedLanguages = true } = await req.json();
 
+    // Handle batch translation request
+    if (texts && Array.isArray(texts)) {
+      console.log(`[translate-text] Processing batch translation for ${texts.length} texts to ${targetLanguage}`);
+      
+      if (texts.length === 0) {
+        return new Response(
+          JSON.stringify({ translatedTexts: [], success: true }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      try {
+        // Process texts in chunks to respect Google API limits
+        const CHUNK_SIZE = 100; // Conservative chunk size for Google Translate API
+        const translatedTexts: string[] = [];
+        
+        for (let i = 0; i < texts.length; i += CHUNK_SIZE) {
+          const chunk = texts.slice(i, i + CHUNK_SIZE);
+          console.log(`[translate-text] Processing chunk ${Math.floor(i / CHUNK_SIZE) + 1}/${Math.ceil(texts.length / CHUNK_SIZE)} with ${chunk.length} texts`);
+          
+          const translateUrl = `https://translation.googleapis.com/language/translate/v2?key=${GOOGLE_API_KEY}`;
+          const translateResponse = await fetch(translateUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              q: chunk,
+              source: sourceLanguage || 'en',
+              target: targetLanguage,
+              format: 'text'
+            })
+          });
+
+          if (!translateResponse.ok) {
+            const errorData = await translateResponse.text();
+            console.error(`[translate-text] Batch translation failed with status ${translateResponse.status}: ${errorData}`);
+            throw new Error(`Batch translation failed: ${translateResponse.statusText}`);
+          }
+
+          const translateData = await translateResponse.json();
+          console.log(`[translate-text] Chunk translation response received`);
+          
+          if (!translateData.data || !translateData.data.translations) {
+            console.error('[translate-text] Invalid batch translation response format:', translateData);
+            throw new Error('Invalid batch translation response format');
+          }
+          
+          // Extract translated texts from this chunk
+          const chunkTranslated = translateData.data.translations.map((t: any) => {
+            let translatedText = t.translatedText;
+            
+            // Clean the translation result if requested
+            if (cleanResult) {
+              const languageCodeRegex = /\s*[\(\[]([a-z]{2})[\)\]]\s*$/i;
+              translatedText = translatedText.replace(languageCodeRegex, '').trim();
+            }
+            
+            return translatedText;
+          });
+          
+          translatedTexts.push(...chunkTranslated);
+        }
+
+        console.log(`[translate-text] Batch translation completed: ${translatedTexts.length} translations`);
+        
+        return new Response(
+          JSON.stringify({
+            translatedTexts,
+            success: true,
+            batchSize: texts.length
+          }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      } catch (error) {
+        console.error('[translate-text] Batch translation error:', error);
+        return new Response(
+          JSON.stringify({ 
+            error: error.message,
+            translatedTexts: texts, // Return original texts as fallback
+            success: false
+          }),
+          {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            status: 500,
+          }
+        );
+      }
+    }
+
+    // Handle single text translation (existing logic)
     if (!text) {
       throw new Error('Missing required parameter: text is required');
     }

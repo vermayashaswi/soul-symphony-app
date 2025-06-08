@@ -1,3 +1,4 @@
+
 import { supabase } from '@/integrations/supabase/client';
 import { translationService } from '@/services/translationService';
 import { onDemandTranslationCache } from '@/utils/website-translations';
@@ -33,7 +34,7 @@ interface CachedSoulNetData {
 
 export class SoulNetPreloadService {
   private static readonly CACHE_KEY = 'soulnet-preloaded-data';
-  private static readonly CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
+  private static readonly CACHE_DURATION = 10 * 60 * 1000; // Extended to 10 minutes
   private static cache = new Map<string, CachedSoulNetData>();
 
   static async preloadSoulNetData(
@@ -71,6 +72,8 @@ export class SoulNetPreloadService {
         return { nodes: [], links: [], translations: new Map(), connectionPercentages: new Map() };
       }
 
+      console.log(`[SoulNetPreloadService] Found ${entries.length} entries for processing`);
+
       // Process the raw data
       const graphData = this.processEntities(entries);
       
@@ -78,18 +81,38 @@ export class SoulNetPreloadService {
       const translations = new Map<string, string>();
       const connectionPercentages = new Map<string, number>();
       
-      if (language !== 'en') {
-        const nodesToTranslate = graphData.nodes.map(node => node.id);
-        console.log(`[SoulNetPreloadService] Pre-translating ${nodesToTranslate.length} node names`);
+      if (language !== 'en' && graphData.nodes.length > 0) {
+        const nodesToTranslate = [...new Set(graphData.nodes.map(node => node.id))]; // Remove duplicates
+        console.log(`[SoulNetPreloadService] Pre-translating ${nodesToTranslate.length} unique node names for ${timeRange} range`);
         
-        const batchResults = await translationService.batchTranslate({
-          texts: nodesToTranslate,
-          targetLanguage: language
-        });
-        
-        batchResults.forEach((translatedText, originalText) => {
-          translations.set(originalText, translatedText);
-        });
+        try {
+          const batchResults = await translationService.batchTranslate({
+            texts: nodesToTranslate,
+            targetLanguage: language
+          });
+          
+          console.log(`[SoulNetPreloadService] Successfully translated ${batchResults.size}/${nodesToTranslate.length} nodes`);
+          
+          batchResults.forEach((translatedText, originalText) => {
+            translations.set(originalText, translatedText);
+            // Also cache in on-demand cache for immediate access
+            onDemandTranslationCache.set(language, originalText, translatedText);
+          });
+
+          // Handle any missing translations
+          nodesToTranslate.forEach(nodeId => {
+            if (!translations.has(nodeId)) {
+              console.warn(`[SoulNetPreloadService] No translation found for node: ${nodeId}, using original`);
+              translations.set(nodeId, nodeId);
+            }
+          });
+        } catch (error) {
+          console.error('[SoulNetPreloadService] Error during batch translation:', error);
+          // Fallback: set original text for all nodes
+          nodesToTranslate.forEach(nodeId => {
+            translations.set(nodeId, nodeId);
+          });
+        }
       }
 
       // Pre-calculate connection percentages
@@ -111,7 +134,7 @@ export class SoulNetPreloadService {
         language
       });
 
-      console.log(`[SoulNetPreloadService] Successfully preloaded and cached data for ${cacheKey}`);
+      console.log(`[SoulNetPreloadService] Successfully preloaded and cached data for ${cacheKey} with ${processedData.nodes.length} nodes and ${processedData.translations.size} translations`);
       return processedData;
     } catch (error) {
       console.error('[SoulNetPreloadService] Error preloading data:', error);

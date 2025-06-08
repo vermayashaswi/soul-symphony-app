@@ -41,12 +41,14 @@ export const TranslatableText3D: React.FC<TranslatableText3DProps> = ({
   const { currentLanguage, getCachedTranslation, translate } = useTranslation();
   const [translatedText, setTranslatedText] = useState<string>(text);
   const [isTranslating, setIsTranslating] = useState(false);
+  const [translationAttempted, setTranslationAttempted] = useState(false);
 
   useEffect(() => {
     const translateText = async () => {
       if (!text || currentLanguage === sourceLanguage) {
         setTranslatedText(text);
         onTranslationComplete?.(text);
+        setTranslationAttempted(true);
         return;
       }
 
@@ -56,12 +58,22 @@ export const TranslatableText3D: React.FC<TranslatableText3DProps> = ({
         console.log(`[TranslatableText3D] Using pre-cached translation for "${text}": "${cachedTranslation}"`);
         setTranslatedText(cachedTranslation);
         onTranslationComplete?.(cachedTranslation);
+        setTranslationAttempted(true);
+        return;
+      }
+
+      // Skip translation if already attempted and failed
+      if (translationAttempted) {
+        console.log(`[TranslatableText3D] Translation already attempted for "${text}", using original`);
+        setTranslatedText(text);
+        onTranslationComplete?.(text);
         return;
       }
 
       if (!translate) {
         setTranslatedText(text);
         onTranslationComplete?.(text);
+        setTranslationAttempted(true);
         return;
       }
 
@@ -86,22 +98,19 @@ export const TranslatableText3D: React.FC<TranslatableText3DProps> = ({
         onTranslationComplete?.(text);
       } finally {
         setIsTranslating(false);
+        setTranslationAttempted(true);
       }
     };
 
     translateText();
-  }, [text, currentLanguage, sourceLanguage, translate, getCachedTranslation, onTranslationComplete]);
+  }, [text, currentLanguage, sourceLanguage, translate, getCachedTranslation, onTranslationComplete, translationAttempted]);
 
-  // Don't render while translating to prevent flicker
-  if (isTranslating) {
-    return null;
-  }
-
+  // Always render with current text - don't hide during translation
   return (
     <SmartTextRenderer
       text={translatedText}
       position={position}
-      color={color}
+      color={isTranslating ? '#888888' : color} // Slightly dim while translating
       size={size}
       visible={visible}
       renderOrder={renderOrder}
