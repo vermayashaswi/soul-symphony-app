@@ -1,3 +1,4 @@
+
 import React, { useMemo, useEffect } from 'react';
 import TranslatableText3D from './TranslatableText3D';
 import SimpleText from './SimpleText';
@@ -71,20 +72,24 @@ export const DirectNodeLabel: React.FC<DirectNodeLabelProps> = ({
     return [0, scaledOffset, 0] as [number, number, number];
   }, [type, nodeScale, id, isInstantMode]);
 
-  // Better text size calculation for enhanced visibility
+  // FIXED: Calculate fixed text size independent of zoom
   const textSize = useMemo(() => {
-    const zoom = Math.max(10, Math.min(100, cameraZoom));
+    // Calculate minimum font size (at max zoom out - zoom level 100)
+    const maxZoom = 100;
     const baseSize = isSelected ? 6.0 : (isHighlighted ? 5.2 : 4.8);
-    const zoomFactor = Math.max(0.8, Math.min(1.5, (50 - zoom) * 0.02 + 1));
-    const finalSize = Math.max(3.5, Math.min(16.0, baseSize * zoomFactor));
+    const minZoomFactor = Math.max(0.8, Math.min(1.5, (50 - maxZoom) * 0.02 + 1));
+    const minFontSize = Math.max(3.5, Math.min(16.0, baseSize * minZoomFactor));
+    
+    // Set fixed font size to 1.6 times the minimum size
+    const fixedSize = minFontSize * 1.6;
     
     if (isInstantMode) {
-      console.log(`[DirectNodeLabel] APP-LEVEL INSTANT: Enhanced text size for ${id}: ${finalSize} (zoom: ${zoom})`);
+      console.log(`[DirectNodeLabel] FIXED FONT SIZE INSTANT: ${id} uses fixed size ${fixedSize.toFixed(1)} (1.6x min size ${minFontSize.toFixed(1)})`);
     } else {
-      console.log(`[DirectNodeLabel] APP-LEVEL: Enhanced text size for ${id}: ${finalSize} (zoom: ${zoom})`);
+      console.log(`[DirectNodeLabel] FIXED FONT SIZE: ${id} uses fixed size ${fixedSize.toFixed(1)} (1.6x min size ${minFontSize.toFixed(1)})`);
     }
-    return finalSize;
-  }, [cameraZoom, id, isSelected, isHighlighted, isInstantMode]);
+    return fixedSize;
+  }, [id, isSelected, isHighlighted, isInstantMode]);
 
   // Much smaller percentage text size
   const percentageTextSize = useMemo(() => {
@@ -96,17 +101,17 @@ export const DirectNodeLabel: React.FC<DirectNodeLabelProps> = ({
     const color = effectiveTheme === 'dark' ? '#ffffff' : '#000000';
     
     if (isInstantMode) {
-      console.log(`[DirectNodeLabel] APP-LEVEL INSTANT: SOLID WHITE TEXT COLOR for ${id}: ${color} (theme: ${effectiveTheme})`);
+      console.log(`[DirectNodeLabel] APP-LEVEL INSTANT: SOLID TEXT COLOR for ${id}: ${color} (theme: ${effectiveTheme})`);
     } else {
-      console.log(`[DirectNodeLabel] APP-LEVEL: SOLID WHITE TEXT COLOR for ${id}: ${color} (theme: ${effectiveTheme})`);
+      console.log(`[DirectNodeLabel] APP-LEVEL: SOLID TEXT COLOR for ${id}: ${color} (theme: ${effectiveTheme})`);
     }
     return color;
   }, [effectiveTheme, id, isInstantMode]);
 
-  // UPDATED: Percentage text also uses solid white for dark theme
+  // UPDATED: Percentage text also uses solid color for theme
   const percentageColor = useMemo(() => {
     const color = effectiveTheme === 'dark' ? '#ffffff' : '#000000';
-    console.log(`[DirectNodeLabel] APP-LEVEL: SOLID WHITE PERCENTAGE COLOR for ${id}: ${color} (theme: ${effectiveTheme})`);
+    console.log(`[DirectNodeLabel] APP-LEVEL: SOLID PERCENTAGE COLOR for ${id}: ${color} (theme: ${effectiveTheme})`);
     return color;
   }, [effectiveTheme, id]);
 
@@ -159,9 +164,9 @@ export const DirectNodeLabel: React.FC<DirectNodeLabelProps> = ({
   }
 
   if (isInstantMode) {
-    console.log(`[DirectNodeLabel] APP-LEVEL INSTANT MODE - MAIN TEXT: "${id}" at position`, labelPosition, 'with size:', textSize, 'color:', textColor, '- NO LOADING DELAY - APP-LEVEL TRANSLATION');
+    console.log(`[DirectNodeLabel] FIXED FONT INSTANT MODE - MAIN TEXT: "${id}" at position`, labelPosition, 'with FIXED size:', textSize.toFixed(1), 'color:', textColor, '- NO LOADING DELAY - APP-LEVEL TRANSLATION');
   } else {
-    console.log(`[DirectNodeLabel] APP-LEVEL ENHANCED POSITIONING - MAIN TEXT: "${id}" at position`, labelPosition, 'with size:', textSize, 'color:', textColor, '- APP-LEVEL TRANSLATION');
+    console.log(`[DirectNodeLabel] FIXED FONT - MAIN TEXT: "${id}" at position`, labelPosition, 'with FIXED size:', textSize.toFixed(1), 'color:', textColor, '- APP-LEVEL TRANSLATION');
   }
 
   return (

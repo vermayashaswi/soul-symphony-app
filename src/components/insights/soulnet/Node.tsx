@@ -77,12 +77,19 @@ const Node: React.FC<NodeProps> = ({
     return undefined;
   }, [node.id, getCoordinatedTranslation]);
 
-  // UPDATED: Custom color scheme - green for entities (spheres), golden for emotions (cubes)
+  // UPDATED: Fixed color scheme with proper default and selected states
   const color = useMemo(() => {
-    if (isSelected) return new THREE.Color('#ffffff');
+    if (isSelected) {
+      // Selected state: Use darker/brighter shades
+      if (node.type === 'entity') {
+        return new THREE.Color('#16a34a'); // Darker green for selected entity nodes
+      } else {
+        return new THREE.Color('#d97706'); // Darker golden for selected emotion nodes
+      }
+    }
     
-    if (isHighlighted) {
-      // Use custom colors: green for entities, golden for emotions
+    if (isHighlighted || (!dimmed && !isSelected)) {
+      // Default state: Use the main colors for both highlighted and normal nodes
       if (node.type === 'entity') {
         return new THREE.Color('#22c55e'); // Green for entity nodes (spheres)
       } else {
@@ -177,9 +184,9 @@ const Node: React.FC<NodeProps> = ({
   }
 
   if (isInstantMode) {
-    console.log(`[Node] CUSTOM COLORS INSTANT MODE: Rendering ${node.type} node ${node.id} with ${node.type === 'entity' ? 'GREEN' : 'GOLDEN'} color, coordinated translation: "${coordinatedTranslation}", base scale ${baseNodeScale.toFixed(2)} - NO LOADING DELAY`);
+    console.log(`[Node] FIXED COLORS INSTANT MODE: Rendering ${node.type} node ${node.id} with ${isSelected ? 'SELECTED' : 'DEFAULT'} ${node.type === 'entity' ? 'GREEN' : 'GOLDEN'} color, coordinated translation: "${coordinatedTranslation}", base scale ${baseNodeScale.toFixed(2)} - NO LOADING DELAY`);
   } else {
-    console.log(`[Node] CUSTOM COLORS ENHANCED: Rendering ${node.type} node ${node.id} with ${node.type === 'entity' ? 'GREEN' : 'GOLDEN'} color, coordinated translation: "${coordinatedTranslation}", base scale ${baseNodeScale.toFixed(2)}`);
+    console.log(`[Node] FIXED COLORS: Rendering ${node.type} node ${node.id} with ${isSelected ? 'SELECTED' : 'DEFAULT'} ${node.type === 'entity' ? 'GREEN' : 'GOLDEN'} color, coordinated translation: "${coordinatedTranslation}", base scale ${baseNodeScale.toFixed(2)}`);
   }
 
   // ENHANCED: Improved geometry sizes to work with the enhanced scale differences
