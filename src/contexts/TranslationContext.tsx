@@ -150,9 +150,9 @@ export const TranslationProvider: React.FC<TranslationProviderProps> = ({ childr
     try {
       setIsTranslating(true);
       
-      // ONLY USE GOOGLE TRANSLATE SERVICE
+      // Use the correct method name 'translate' instead of 'translateText'
       console.log('[TranslationContext] Using Google Translate service only');
-      const translatedText = await translationService.translateText(text, currentLanguage, sourceLanguage);
+      const translatedText = await translationService.translate(text, sourceLanguage, currentLanguage);
 
       if (translatedText && translatedText !== text) {
         console.log('[TranslationContext] Translation successful:', { 

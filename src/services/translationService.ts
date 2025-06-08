@@ -1,3 +1,4 @@
+
 import { translationCache } from './translationCache';
 
 class TranslationService {
@@ -25,12 +26,11 @@ class TranslationService {
       return text;
     }
 
-    // Check cache first
-    const cacheKey = `${text}-${sourceLanguage}-${targetLanguage}`;
-    const cached = translationCache.get(cacheKey);
+    // Check cache first using the correct method name
+    const cached = await translationCache.getTranslation(text, targetLanguage);
     if (cached) {
       console.log(`[TranslationService] Cache hit for: ${text}`);
-      return cached;
+      return cached.translatedText;
     }
 
     if (!this.hasApiKey()) {
@@ -59,8 +59,14 @@ class TranslationService {
       const data = await response.json();
       const translatedText = data.data.translations[0].translatedText;
       
-      // Cache the result
-      translationCache.set(cacheKey, translatedText);
+      // Cache the result using the correct method name
+      await translationCache.setTranslation({
+        originalText: text,
+        translatedText,
+        language: targetLanguage,
+        timestamp: Date.now(),
+        version: 1
+      });
       
       console.log(`[TranslationService] Translated: "${text}" -> "${translatedText}"`);
       return translatedText;
@@ -105,19 +111,18 @@ class TranslationService {
 
     console.log(`[TranslationService] APP-LEVEL: Starting atomic batch translation for ${texts.length} texts`);
 
-    // Check cache for all texts first
+    // Check cache for all texts first using correct method names
     const uncachedTexts: string[] = [];
     const cacheHits = new Map<string, string>();
     
-    texts.forEach(text => {
-      const cacheKey = `${text}-${sourceLanguage}-${targetLanguage}`;
-      const cached = translationCache.get(cacheKey);
+    for (const text of texts) {
+      const cached = await translationCache.getTranslation(text, targetLanguage);
       if (cached) {
-        cacheHits.set(text, cached);
+        cacheHits.set(text, cached.translatedText);
       } else {
         uncachedTexts.push(text);
       }
-    });
+    }
 
     console.log(`[TranslationService] APP-LEVEL: Cache hits: ${cacheHits.size}, need translation: ${uncachedTexts.length}`);
 
@@ -160,14 +165,20 @@ class TranslationService {
         const data = await response.json();
         const translations = data.data.translations;
         
-        batch.forEach((originalText, index) => {
-          const translatedText = translations[index]?.translatedText || originalText;
+        for (let j = 0; j < batch.length; j++) {
+          const originalText = batch[j];
+          const translatedText = translations[j]?.translatedText || originalText;
           results.set(originalText, translatedText);
           
-          // Cache individual results
-          const cacheKey = `${originalText}-${sourceLanguage}-${targetLanguage}`;
-          translationCache.set(cacheKey, translatedText);
-        });
+          // Cache individual results using correct method name
+          await translationCache.setTranslation({
+            originalText,
+            translatedText,
+            language: targetLanguage,
+            timestamp: Date.now(),
+            version: 1
+          });
+        }
 
         console.log(`[TranslationService] APP-LEVEL: Translated batch ${Math.floor(i / batchSize) + 1} of ${Math.ceil(uncachedTexts.length / batchSize)}`);
         
@@ -182,13 +193,13 @@ class TranslationService {
     return results;
   }
 
-  getCachedTranslation(text: string, sourceLanguage: string = 'auto', targetLanguage?: string): string | null {
+  async getCachedTranslation(text: string, sourceLanguage: string = 'auto', targetLanguage?: string): Promise<string | null> {
     if (!targetLanguage || sourceLanguage === targetLanguage) {
       return text;
     }
 
-    const cacheKey = `${text}-${sourceLanguage}-${targetLanguage}`;
-    return translationCache.get(cacheKey) || null;
+    const cached = await translationCache.getTranslation(text, targetLanguage);
+    return cached ? cached.translatedText : null;
   }
 }
 
