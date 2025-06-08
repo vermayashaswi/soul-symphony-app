@@ -22,6 +22,37 @@ interface SoulNetProps {
   timeRange: TimeRange;
 }
 
+// NEW: Translation Loading Component
+const TranslationLoadingState: React.FC<{ progress: number }> = ({ progress }) => (
+  <div className="bg-background rounded-xl shadow-sm border w-full p-6">
+    <div className="flex flex-col items-center justify-center py-12 space-y-4">
+      <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+      <h3 className="text-lg font-medium">
+        <TranslatableText 
+          text="Translating Soul-Net..." 
+          forceTranslate={true}
+          enableFontScaling={true}
+          scalingContext="general"
+        />
+      </h3>
+      <div className="w-64 bg-gray-200 rounded-full h-2">
+        <div 
+          className="bg-primary h-2 rounded-full transition-all duration-300" 
+          style={{ width: `${progress}%` }}
+        ></div>
+      </div>
+      <p className="text-sm text-muted-foreground">
+        <TranslatableText 
+          text={`${progress}% complete`}
+          forceTranslate={false}
+          enableFontScaling={true}
+          scalingContext="general"
+        />
+      </p>
+    </div>
+  </div>
+);
+
 const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
   const [isFullScreen, setIsFullScreen] = useState(false);
   const [canvasError, setCanvasError] = useState<Error | null>(null);
@@ -47,46 +78,52 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
     loading, 
     error,
     isInstantReady,
+    isTranslating,
+    translationProgress,
+    translationComplete,
     getInstantConnectionPercentage,
     getInstantTranslation,
     getInstantNodeConnections
   } = useInstantSoulNetData(userId, timeRange);
 
-  console.log("[SoulNet] APP-LEVEL INSTANT DATA MODE - Zero loading delays with app-level translations", { 
+  console.log("[SoulNet] APP-LEVEL ENHANCED TRANSLATION STATE", { 
     userId, 
     timeRange, 
     currentLanguage,
     nodesCount: graphData.nodes.length,
     isInstantReady,
     loading,
+    isTranslating,
+    translationProgress,
+    translationComplete,
     renderingReady,
     renderingInitialized: renderingInitialized.current
   });
 
   useEffect(() => {
-    console.log("[SoulNet] APP-LEVEL: Component mounted - App-level instant data mode enabled");
+    console.log("[SoulNet] APP-LEVEL: Component mounted - Enhanced translation mode enabled");
     
     return () => {
       console.log("[SoulNet] APP-LEVEL: Component unmounted");
     };
   }, []);
 
-  // STABILIZED: Enhanced rendering initialization that doesn't reset once established
+  // ENHANCED: Rendering initialization that waits for translation completion
   useEffect(() => {
-    // Only initialize rendering if we have data and haven't already initialized
-    if ((isInstantReady || (graphData.nodes.length > 0 && !loading)) && !renderingInitialized.current) {
-      console.log("[SoulNet] APP-LEVEL STABILIZED: Initializing rendering for the first time");
+    // Only initialize rendering if we have data, translation is complete, and haven't already initialized
+    if (isInstantReady && translationComplete && graphData.nodes.length > 0 && !renderingInitialized.current) {
+      console.log("[SoulNet] APP-LEVEL ENHANCED: Initializing rendering after translation completion");
       setRenderingReady(true);
       renderingInitialized.current = true;
     }
     
-    // DEFENSIVE: Only reset rendering if there's an actual error or complete data loss
-    if (error || (graphData.nodes.length === 0 && !loading && renderingInitialized.current)) {
+    // DEFENSIVE: Reset rendering if there's an error or complete data loss
+    if (error || (graphData.nodes.length === 0 && !loading && !isTranslating && renderingInitialized.current)) {
       console.log("[SoulNet] APP-LEVEL DEFENSIVE: Resetting rendering due to error or data loss", { error: !!error, nodesCount: graphData.nodes.length });
       setRenderingReady(false);
       renderingInitialized.current = false;
     }
-  }, [isInstantReady, graphData.nodes.length, loading, error]);
+  }, [isInstantReady, translationComplete, graphData.nodes.length, loading, error, isTranslating]);
 
   // OPTIMIZED: Node selection with stable state management
   const handleNodeSelect = useCallback((id: string) => {
@@ -125,9 +162,15 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
     renderingInitialized.current = false;
   }, []);
 
-  // ENHANCED: Only show loading if we truly have no data and are still loading
+  // NEW: Show translation loading if translation is in progress
+  if (isTranslating && !translationComplete) {
+    console.log("[SoulNet] APP-LEVEL ENHANCED: Showing translation loading state");
+    return <TranslationLoadingState progress={translationProgress} />;
+  }
+
+  // ENHANCED: Only show general loading if we truly have no data and are still loading
   if (loading && !isInstantReady && graphData.nodes.length === 0) {
-    console.log("[SoulNet] APP-LEVEL ENHANCED: Showing loading state - no instant data available");
+    console.log("[SoulNet] APP-LEVEL ENHANCED: Showing general loading state - no instant data available");
     return <LoadingState />;
   }
   
@@ -237,7 +280,7 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
     );
   };
 
-  console.log(`[SoulNet] APP-LEVEL STABILIZED RENDER: ${graphData.nodes.length} nodes, ${graphData.links.length} links, renderingReady: ${renderingReady}, initialized: ${renderingInitialized.current}`);
+  console.log(`[SoulNet] APP-LEVEL ENHANCED RENDER: ${graphData.nodes.length} nodes, ${graphData.links.length} links, renderingReady: ${renderingReady}, initialized: ${renderingInitialized.current}, translationComplete: ${translationComplete}`);
 
   return (
     <div className={cn(
@@ -286,8 +329,8 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
             </div>
           }
         >
-          {/* STABILIZED: Canvas only renders when truly ready and stays mounted during interactions */}
-          {renderingReady && (
+          {/* ENHANCED: Canvas only renders when translation is complete and rendering is ready */}
+          {renderingReady && translationComplete && (
             <Canvas
               style={{
                 width: '100%',

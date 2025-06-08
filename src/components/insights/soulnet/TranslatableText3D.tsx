@@ -50,9 +50,9 @@ export const TranslatableText3D: React.FC<TranslatableText3DProps> = ({
 
   useEffect(() => {
     const translateText = async () => {
-      // APP-LEVEL: Use coordinated translation if available
+      // APP-LEVEL: Prioritize coordinated translation for atomic consistency
       if (useCoordinatedTranslation && coordinatedTranslation) {
-        console.log(`[TranslatableText3D] APP-LEVEL: Using coordinated translation for "${text}": "${coordinatedTranslation}"`);
+        console.log(`[TranslatableText3D] APP-LEVEL ATOMIC: Using coordinated translation for "${text}": "${coordinatedTranslation}"`);
         setTranslatedText(coordinatedTranslation);
         onTranslationComplete?.(coordinatedTranslation);
         setTranslationAttempted(true);
@@ -66,53 +66,64 @@ export const TranslatableText3D: React.FC<TranslatableText3DProps> = ({
         return;
       }
 
-      // APP-LEVEL: Check for app-level cached translation first
-      const cachedTranslation = getCachedTranslation(text);
-      if (cachedTranslation) {
-        console.log(`[TranslatableText3D] APP-LEVEL: Using app-level cached translation for "${text}": "${cachedTranslation}"`);
-        setTranslatedText(cachedTranslation);
-        onTranslationComplete?.(cachedTranslation);
-        setTranslationAttempted(true);
-        return;
-      }
-
-      // Skip translation if already attempted and failed
-      if (translationAttempted) {
-        console.log(`[TranslatableText3D] APP-LEVEL: Translation already attempted for "${text}", using original`);
-        setTranslatedText(text);
-        onTranslationComplete?.(text);
-        return;
-      }
-
-      if (!translate) {
+      // APP-LEVEL: When not using coordinated translation, show original text to avoid partial states
+      if (useCoordinatedTranslation && !coordinatedTranslation) {
+        console.log(`[TranslatableText3D] APP-LEVEL ATOMIC: Waiting for coordinated translation for "${text}", showing original`);
         setTranslatedText(text);
         onTranslationComplete?.(text);
         setTranslationAttempted(true);
         return;
       }
 
-      console.log(`[TranslatableText3D] APP-LEVEL: No cache or coordination found, translating "${text}" from ${sourceLanguage} to ${currentLanguage}`);
-      
-      try {
-        setIsTranslating(true);
-        const result = await translate(text, sourceLanguage);
-        
-        if (result && result !== text) {
-          console.log(`[TranslatableText3D] APP-LEVEL: Translation successful: "${text}" -> "${result}"`);
-          setTranslatedText(result);
-          onTranslationComplete?.(result);
-        } else {
-          console.log(`[TranslatableText3D] APP-LEVEL: Using original text for "${text}"`);
+      // APP-LEVEL: Check for app-level cached translation only for non-coordinated usage
+      if (!useCoordinatedTranslation) {
+        const cachedTranslation = getCachedTranslation(text);
+        if (cachedTranslation) {
+          console.log(`[TranslatableText3D] APP-LEVEL: Using app-level cached translation for "${text}": "${cachedTranslation}"`);
+          setTranslatedText(cachedTranslation);
+          onTranslationComplete?.(cachedTranslation);
+          setTranslationAttempted(true);
+          return;
+        }
+
+        // Skip translation if already attempted and failed
+        if (translationAttempted) {
+          console.log(`[TranslatableText3D] APP-LEVEL: Translation already attempted for "${text}", using original`);
           setTranslatedText(text);
           onTranslationComplete?.(text);
+          return;
         }
-      } catch (error) {
-        console.error(`[TranslatableText3D] APP-LEVEL: Translation failed for "${text}":`, error);
-        setTranslatedText(text);
-        onTranslationComplete?.(text);
-      } finally {
-        setIsTranslating(false);
-        setTranslationAttempted(true);
+
+        if (!translate) {
+          setTranslatedText(text);
+          onTranslationComplete?.(text);
+          setTranslationAttempted(true);
+          return;
+        }
+
+        console.log(`[TranslatableText3D] APP-LEVEL: No cache found, translating "${text}" from ${sourceLanguage} to ${currentLanguage}`);
+        
+        try {
+          setIsTranslating(true);
+          const result = await translate(text, sourceLanguage);
+          
+          if (result && result !== text) {
+            console.log(`[TranslatableText3D] APP-LEVEL: Translation successful: "${text}" -> "${result}"`);
+            setTranslatedText(result);
+            onTranslationComplete?.(result);
+          } else {
+            console.log(`[TranslatableText3D] APP-LEVEL: Using original text for "${text}"`);
+            setTranslatedText(text);
+            onTranslationComplete?.(text);
+          }
+        } catch (error) {
+          console.error(`[TranslatableText3D] APP-LEVEL: Translation failed for "${text}":`, error);
+          setTranslatedText(text);
+          onTranslationComplete?.(text);
+        } finally {
+          setIsTranslating(false);
+          setTranslationAttempted(true);
+        }
       }
     };
 

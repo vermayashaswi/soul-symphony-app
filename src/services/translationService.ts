@@ -1,185 +1,195 @@
-
-import { supabase } from '@/integrations/supabase/client';
 import { translationCache } from './translationCache';
-import { toast } from 'sonner';
 
-interface TranslationRequest {
-  text: string;
-  sourceLanguage?: string;
-  targetLanguage: string;
-  entryId?: number;
-}
-
-interface BatchTranslationRequest {
-  texts: string[];
-  targetLanguage: string;
-}
-
-export class TranslationService {
-  private static readonly BATCH_SIZE = 250; // Increased from 50 to 250
-  private static readonly MAX_RETRIES = 3;
+class TranslationService {
+  private apiKey: string | null = null;
+  private baseURL = 'https://translation.googleapis.com/language/translate/v2';
   
-  static async translateText(text: string, targetLanguage: string, sourceLanguage: string = 'en'): Promise<string> {
-    try {
-      // Skip empty or whitespace-only strings
-      if (!text || text.trim() === '') {
-        return text;
-      }
-      
-      // Check cache first
-      const cached = await translationCache.getTranslation(text, targetLanguage);
-      if (cached) {
-        return cached.translatedText;
-      }
+  // NEW: Batch operation tracking
+  private batchOperations = new Map<string, Promise<Map<string, string>>>();
 
-      // Call the edge function for translation
-      const { data, error } = await supabase.functions.invoke('translate-text', {
-        body: {
-          text: text,
-          sourceLanguage: sourceLanguage,
-          targetLanguage: targetLanguage,
-        },
-      });
+  async setApiKey(apiKey: string) {
+    this.apiKey = apiKey;
+  }
 
-      if (error) {
-        console.error('Translation error:', error);
-        toast.error('Translation failed. Falling back to original text.');
-        return text;
-      }
+  private hasApiKey(): boolean {
+    return !!this.apiKey;
+  }
 
-      if (!data || !data.translatedText) {
-        console.error('Translation response missing translatedText:', data);
-        return text;
-      }
-
-      // Cache the translation
-      await translationCache.setTranslation({
-        originalText: text,
-        translatedText: data.translatedText,
-        language: targetLanguage,
-        timestamp: Date.now(),
-        version: 1,
-      });
-
-      return data.translatedText;
-    } catch (error) {
-      console.error('Translation service error:', error);
-      toast.error('Translation service error. Using original text.');
+  async translate(text: string, sourceLanguage: string = 'auto', targetLanguage?: string): Promise<string | null> {
+    if (!targetLanguage) {
+      console.warn('[TranslationService] No target language provided, skipping translation');
       return text;
+    }
+
+    if (sourceLanguage === targetLanguage) {
+      return text;
+    }
+
+    // Check cache first
+    const cacheKey = `${text}-${sourceLanguage}-${targetLanguage}`;
+    const cached = translationCache.get(cacheKey);
+    if (cached) {
+      console.log(`[TranslationService] Cache hit for: ${text}`);
+      return cached;
+    }
+
+    if (!this.hasApiKey()) {
+      console.warn('[TranslationService] No API key set, returning original text');
+      return text;
+    }
+
+    try {
+      const response = await fetch(`${this.baseURL}?key=${this.apiKey}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          q: text,
+          source: sourceLanguage,
+          target: targetLanguage,
+          format: 'text'
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`Translation API error: ${response.status}`);
+      }
+
+      const data = await response.json();
+      const translatedText = data.data.translations[0].translatedText;
+      
+      // Cache the result
+      translationCache.set(cacheKey, translatedText);
+      
+      console.log(`[TranslationService] Translated: "${text}" -> "${translatedText}"`);
+      return translatedText;
+    } catch (error) {
+      console.error('[TranslationService] Translation error:', error);
+      return text; // Return original text on error
     }
   }
 
-  static async batchTranslate(request: BatchTranslationRequest): Promise<Map<string, string>> {
-    const results = new Map<string, string>();
-    const needsTranslation: string[] = [];
-
-    // Filter out empty strings
-    const validTexts = request.texts.filter(text => text && text.trim() !== '');
+  // NEW: Enhanced batch translate with atomic completion tracking
+  async batchTranslate(options: { texts: string[], targetLanguage: string, sourceLanguage?: string }): Promise<Map<string, string>> {
+    const { texts, targetLanguage, sourceLanguage = 'auto' } = options;
+    const batchKey = `${texts.join('|')}-${sourceLanguage}-${targetLanguage}`;
     
-    if (validTexts.length === 0) {
+    // Check if this exact batch is already being processed
+    const existingBatch = this.batchOperations.get(batchKey);
+    if (existingBatch) {
+      console.log('[TranslationService] APP-LEVEL: Reusing existing batch operation');
+      return existingBatch;
+    }
+
+    // Create new batch operation
+    const batchPromise = this.performBatchTranslation(texts, sourceLanguage, targetLanguage);
+    this.batchOperations.set(batchKey, batchPromise);
+
+    try {
+      const result = await batchPromise;
+      return result;
+    } finally {
+      // Clean up completed batch operation
+      this.batchOperations.delete(batchKey);
+    }
+  }
+
+  private async performBatchTranslation(texts: string[], sourceLanguage: string, targetLanguage: string): Promise<Map<string, string>> {
+    const results = new Map<string, string>();
+    
+    if (sourceLanguage === targetLanguage) {
+      texts.forEach(text => results.set(text, text));
       return results;
     }
 
-    console.log(`[TranslationService] Batch translating ${validTexts.length} texts to ${request.targetLanguage}`);
+    console.log(`[TranslationService] APP-LEVEL: Starting atomic batch translation for ${texts.length} texts`);
 
-    // Check cache first for all texts
-    for (const text of validTexts) {
-      const cached = await translationCache.getTranslation(text, request.targetLanguage);
+    // Check cache for all texts first
+    const uncachedTexts: string[] = [];
+    const cacheHits = new Map<string, string>();
+    
+    texts.forEach(text => {
+      const cacheKey = `${text}-${sourceLanguage}-${targetLanguage}`;
+      const cached = translationCache.get(cacheKey);
       if (cached) {
-        results.set(text, cached.translatedText);
+        cacheHits.set(text, cached);
       } else {
-        needsTranslation.push(text);
+        uncachedTexts.push(text);
       }
+    });
+
+    console.log(`[TranslationService] APP-LEVEL: Cache hits: ${cacheHits.size}, need translation: ${uncachedTexts.length}`);
+
+    // Add cache hits to results
+    cacheHits.forEach((translated, original) => {
+      results.set(original, translated);
+    });
+
+    // If no API key, return original texts for uncached items
+    if (!this.hasApiKey()) {
+      console.warn('[TranslationService] APP-LEVEL: No API key, using original texts for uncached items');
+      uncachedTexts.forEach(text => results.set(text, text));
+      return results;
     }
 
-    console.log(`[TranslationService] Found ${results.size} cached, need to translate ${needsTranslation.length}`);
+    // Translate uncached texts in smaller batches to respect API limits
+    const batchSize = 10; // Google Translate API batch limit
+    
+    for (let i = 0; i < uncachedTexts.length; i += batchSize) {
+      const batch = uncachedTexts.slice(i, i + batchSize);
+      
+      try {
+        const response = await fetch(`${this.baseURL}?key=${this.apiKey}`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            q: batch,
+            source: sourceLanguage,
+            target: targetLanguage,
+            format: 'text'
+          }),
+        });
 
-    // Split remaining texts into batches of 250
-    for (let i = 0; i < needsTranslation.length; i += this.BATCH_SIZE) {
-      const batch = needsTranslation.slice(i, i + this.BATCH_SIZE);
-      let retryCount = 0;
-      let batchSuccess = false;
-
-      console.log(`[TranslationService] Processing batch ${Math.floor(i / this.BATCH_SIZE) + 1} with ${batch.length} texts`);
-
-      while (retryCount < this.MAX_RETRIES && !batchSuccess) {
-        try {
-          const { data, error } = await supabase.functions.invoke('translate-text', {
-            body: {
-              texts: batch,
-              targetLanguage: request.targetLanguage,
-            },
-          });
-
-          if (error) {
-            console.error(`[TranslationService] Batch translation error (attempt ${retryCount + 1}):`, error);
-            throw error;
-          }
-
-          if (data && data.translatedTexts && Array.isArray(data.translatedTexts)) {
-            // Cache and store results
-            batch.forEach((text, index) => {
-              const translatedText = data.translatedTexts[index] || text; // Fallback to original
-              results.set(text, translatedText);
-              
-              // Cache successful translations
-              if (translatedText !== text) {
-                translationCache.setTranslation({
-                  originalText: text,
-                  translatedText,
-                  language: request.targetLanguage,
-                  timestamp: Date.now(),
-                  version: 1,
-                });
-              }
-            });
-            batchSuccess = true;
-            console.log(`[TranslationService] Successfully processed batch with ${batch.length} translations`);
-          } else {
-            throw new Error('Invalid response format for batch translation');
-          }
-        } catch (error) {
-          retryCount++;
-          console.error(`[TranslationService] Batch translation attempt ${retryCount} failed:`, error);
-          
-          if (retryCount >= this.MAX_RETRIES) {
-            console.error(`[TranslationService] Max retries reached for batch, using fallback`);
-            // Fallback: try individual translations for this batch
-            await this.fallbackIndividualTranslations(batch, request.targetLanguage, results);
-            batchSuccess = true; // Mark as handled
-          } else {
-            // Wait before retry
-            await new Promise(resolve => setTimeout(resolve, 1000 * retryCount));
-          }
+        if (!response.ok) {
+          throw new Error(`Translation API error: ${response.status}`);
         }
+
+        const data = await response.json();
+        const translations = data.data.translations;
+        
+        batch.forEach((originalText, index) => {
+          const translatedText = translations[index]?.translatedText || originalText;
+          results.set(originalText, translatedText);
+          
+          // Cache individual results
+          const cacheKey = `${originalText}-${sourceLanguage}-${targetLanguage}`;
+          translationCache.set(cacheKey, translatedText);
+        });
+
+        console.log(`[TranslationService] APP-LEVEL: Translated batch ${Math.floor(i / batchSize) + 1} of ${Math.ceil(uncachedTexts.length / batchSize)}`);
+        
+      } catch (error) {
+        console.error(`[TranslationService] APP-LEVEL: Error translating batch starting at ${i}:`, error);
+        // Use original texts for failed batch
+        batch.forEach(text => results.set(text, text));
       }
     }
 
-    console.log(`[TranslationService] Batch translation complete: ${results.size} total results`);
+    console.log(`[TranslationService] APP-LEVEL: Atomic batch translation complete: ${results.size}/${texts.length} texts processed`);
     return results;
   }
 
-  private static async fallbackIndividualTranslations(
-    batch: string[], 
-    targetLanguage: string, 
-    results: Map<string, string>
-  ): Promise<void> {
-    console.log(`[TranslationService] Falling back to individual translations for ${batch.length} texts`);
-    
-    for (const text of batch) {
-      try {
-        const translated = await this.translateText(text, targetLanguage);
-        results.set(text, translated);
-      } catch (error) {
-        console.error(`[TranslationService] Individual translation failed for "${text}":`, error);
-        results.set(text, text); // Use original text as last resort
-      }
+  getCachedTranslation(text: string, sourceLanguage: string = 'auto', targetLanguage?: string): string | null {
+    if (!targetLanguage || sourceLanguage === targetLanguage) {
+      return text;
     }
+
+    const cacheKey = `${text}-${sourceLanguage}-${targetLanguage}`;
+    return translationCache.get(cacheKey) || null;
   }
 }
 
-// Export a singleton instance for backwards compatibility
-export const translationService = {
-  translateText: TranslationService.translateText,
-  batchTranslate: TranslationService.batchTranslate
-};
+export const translationService = new TranslationService();
