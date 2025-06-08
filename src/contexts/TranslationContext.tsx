@@ -8,9 +8,12 @@ interface TranslationContextType {
   setLanguage: (language: string) => Promise<void>;
   translate: ((text: string, sourceLanguage?: string) => Promise<string>) | null;
   isTranslating: boolean;
-  getCachedTranslation: (text: string) => { translatedText: string } | null;
+  getCachedTranslation: (text: string) => string | null;
   translationProgress: number;
   translationError: Error | null;
+  isSoulNetTranslating: boolean;
+  prefetchSoulNetTranslations: (userId: string, timeRange: string) => Promise<void>;
+  prefetchTranslationsForRoute: (route: string) => Promise<void>;
 }
 
 const TranslationContext = createContext<TranslationContextType | undefined>(undefined);
@@ -19,6 +22,7 @@ export const TranslationProvider: React.FC<{ children: React.ReactNode }> = ({ c
   const { user } = useAuth();
   const [currentLanguage, setCurrentLanguage] = useState('en');
   const [isTranslating, setIsTranslating] = useState(false);
+  const [isSoulNetTranslating, setIsSoulNetTranslating] = useState(false);
   const [translationProgress, setTranslationProgress] = useState(0);
   const [translationError, setTranslationError] = useState<Error | null>(null);
   const translateFunctionRef = useRef<((text: string, sourceLanguage?: string) => Promise<string>) | null>(null);
@@ -30,6 +34,7 @@ export const TranslationProvider: React.FC<{ children: React.ReactNode }> = ({ c
         console.log('[TranslationContext] COORDINATED: State change received:', state);
         setCurrentLanguage(state.language);
         setIsTranslating(state.loading);
+        setIsSoulNetTranslating(state.loading);
         setTranslationProgress(state.progress);
         setTranslationError(state.error);
       },
@@ -37,10 +42,12 @@ export const TranslationProvider: React.FC<{ children: React.ReactNode }> = ({ c
         console.error('[TranslationContext] COORDINATED: Translation error:', error);
         setTranslationError(error);
         setIsTranslating(false);
+        setIsSoulNetTranslating(false);
       },
       onComplete: (language) => {
         console.log('[TranslationContext] COORDINATED: Translation complete for:', language);
         setIsTranslating(false);
+        setIsSoulNetTranslating(false);
         setTranslationProgress(100);
         setTranslationError(null);
       }
@@ -135,10 +142,22 @@ export const TranslationProvider: React.FC<{ children: React.ReactNode }> = ({ c
     }
   }, []);
 
-  // Simple cache implementation for demonstration
-  const getCachedTranslation = useCallback((text: string) => {
+  // Simple cache implementation for demonstration - return string directly
+  const getCachedTranslation = useCallback((text: string): string | null => {
     // This would integrate with the actual cache in a real implementation
     return null;
+  }, []);
+
+  // Prefetch SoulNet translations
+  const prefetchSoulNetTranslations = useCallback(async (userId: string, timeRange: string): Promise<void> => {
+    console.log('[TranslationContext] Prefetching SoulNet translations for:', userId, timeRange);
+    // Implementation would go here
+  }, []);
+
+  // Prefetch translations for a route
+  const prefetchTranslationsForRoute = useCallback(async (route: string): Promise<void> => {
+    console.log('[TranslationContext] Prefetching translations for route:', route);
+    // Implementation would go here
   }, []);
 
   const contextValue: TranslationContextType = {
@@ -148,7 +167,10 @@ export const TranslationProvider: React.FC<{ children: React.ReactNode }> = ({ c
     isTranslating,
     getCachedTranslation,
     translationProgress,
-    translationError
+    translationError,
+    isSoulNetTranslating,
+    prefetchSoulNetTranslations,
+    prefetchTranslationsForRoute
   };
 
   return (

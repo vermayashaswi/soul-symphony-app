@@ -99,7 +99,7 @@ export function EnhancedTranslatableText({
     }
       
     try {
-      const result = await translate(text, sourceLanguage, entryId);
+      const result = await translate(text, sourceLanguage);
       
       if (mountedRef.current && prevLangRef.current === currentLanguage && textRef.current === text) {
         if (result) {

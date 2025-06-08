@@ -93,7 +93,7 @@ export function TranslatableText({
       
     try {
       console.log(`TranslatableText: Calling translate service for "${text.substring(0, 30)}..." to ${currentLanguage}`);
-      const result = await translate(text, sourceLanguage, entryId);
+      const result = await translate(text, sourceLanguage);
       
       console.log(`TranslatableText: Translation service returned for "${text.substring(0, 30)}...": "${result?.substring(0, 30) || 'null'}..."`);
       
