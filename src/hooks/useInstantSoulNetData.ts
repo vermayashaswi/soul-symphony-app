@@ -2,6 +2,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { EnhancedSoulNetPreloadService } from '@/services/enhancedSoulNetPreloadService';
 import { useTranslation } from '@/contexts/TranslationContext';
+import { translationStateManager } from '@/services/translationStateManager';
 
 interface NodeData {
   id: string;
@@ -43,20 +44,22 @@ export const useInstantSoulNetData = (
 ): InstantSoulNetData => {
   const { currentLanguage } = useTranslation();
   
-  // Initialize with instant check for cached data
-  const cacheKey = useMemo(() => 
-    userId ? `${userId}-${timeRange}-${currentLanguage}` : '', 
-    [userId, timeRange, currentLanguage]
-  );
+  // COORDINATED CACHE KEY: Include coordinator ID for better cache validation
+  const cacheKey = useMemo(() => {
+    const coordinatorId = translationStateManager.getState().coordinatorId;
+    return userId ? `${userId}-${timeRange}-${currentLanguage}-${coordinatorId}` : '';
+  }, [userId, timeRange, currentLanguage]);
   
   const instantCached = useMemo(() => {
     if (!cacheKey) return null;
-    return EnhancedSoulNetPreloadService.getInstantData(cacheKey);
+    const cached = EnhancedSoulNetPreloadService.getInstantData(cacheKey);
+    console.log('[useInstantSoulNetData] COORDINATED CACHE CHECK:', { cacheKey, found: !!cached });
+    return cached;
   }, [cacheKey]);
 
   const [graphData, setGraphData] = useState<{ nodes: NodeData[], links: LinkData[] }>(() => {
     if (instantCached) {
-      console.log('[useInstantSoulNetData] INSTANT: Using cached data immediately');
+      console.log('[useInstantSoulNetData] COORDINATED INSTANT: Using cached data immediately');
       return { nodes: instantCached.data.nodes, links: instantCached.data.links };
     }
     return { nodes: [], links: [] };
@@ -78,7 +81,34 @@ export const useInstantSoulNetData = (
   const [error, setError] = useState<Error | null>(null);
   const [isInstantReady, setIsInstantReady] = useState(!!instantCached);
 
-  // Instant data getter functions
+  // COORDINATED STATE LISTENER: React to translation state changes
+  useEffect(() => {
+    const unsubscribe = translationStateManager.addListener({
+      onStateChange: (state) => {
+        console.log('[useInstantSoulNetData] COORDINATED STATE: Translation state change:', state);
+        if (state.loading) {
+          setLoading(true);
+          setError(null);
+        }
+      },
+      onError: (error) => {
+        console.error('[useInstantSoulNetData] COORDINATED STATE: Translation error:', error);
+        setError(error);
+        setLoading(false);
+      },
+      onComplete: (language) => {
+        console.log('[useInstantSoulNetData] COORDINATED STATE: Translation complete for:', language);
+        // Trigger data reload after language change
+        if (language === currentLanguage && userId) {
+          preloadData();
+        }
+      }
+    });
+
+    return unsubscribe;
+  }, [currentLanguage, userId]);
+
+  // ENHANCED instant data getter functions with better fallback handling
   const getInstantConnectionPercentage = useCallback((selectedNode: string, targetNode: string): number => {
     if (!selectedNode || selectedNode === targetNode) return 0;
     
@@ -86,11 +116,20 @@ export const useInstantSoulNetData = (
     const percentage = connectionPercentages.get(key);
     
     if (percentage !== undefined) {
-      console.log(`[useInstantSoulNetData] INSTANT: Got percentage ${percentage}% for ${key}`);
+      console.log(`[useInstantSoulNetData] COORDINATED INSTANT: Got percentage ${percentage}% for ${key}`);
       return percentage;
     }
     
-    console.log(`[useInstantSoulNetData] INSTANT: No percentage found for ${key}`);
+    console.log(`[useInstantSoulNetData] COORDINATED INSTANT: No percentage found for ${key}, checking reverse`);
+    
+    // Check reverse direction as fallback
+    const reverseKey = `${targetNode}-${selectedNode}`;
+    const reversePercentage = connectionPercentages.get(reverseKey);
+    if (reversePercentage !== undefined) {
+      console.log(`[useInstantSoulNetData] COORDINATED FALLBACK: Found reverse percentage ${reversePercentage}% for ${reverseKey}`);
+      return reversePercentage;
+    }
+    
     return 0;
   }, [connectionPercentages]);
 
@@ -99,30 +138,45 @@ export const useInstantSoulNetData = (
     
     const translation = translations.get(nodeId);
     if (translation) {
-      console.log(`[useInstantSoulNetData] INSTANT: Got translation for ${nodeId}: ${translation}`);
+      console.log(`[useInstantSoulNetData] COORDINATED INSTANT: Got translation for ${nodeId}: ${translation}`);
       return translation;
     }
     
-    console.log(`[useInstantSoulNetData] INSTANT: No translation for ${nodeId}, using original`);
+    console.log(`[useInstantSoulNetData] COORDINATED INSTANT: No translation for ${nodeId}, using original`);
     return nodeId;
   }, [currentLanguage, translations]);
 
   const getInstantNodeConnections = useCallback((nodeId: string): NodeConnectionData => {
-    return nodeConnectionData.get(nodeId) || {
+    const connections = nodeConnectionData.get(nodeId);
+    if (connections) {
+      console.log(`[useInstantSoulNetData] COORDINATED INSTANT: Found connections for ${nodeId}:`, connections);
+      return connections;
+    }
+    
+    console.log(`[useInstantSoulNetData] COORDINATED INSTANT: No connections found for ${nodeId}, returning empty`);
+    return {
       connectedNodes: [],
       totalStrength: 0,
       averageStrength: 0
     };
   }, [nodeConnectionData]);
 
-  // Background preloading
+  // ENHANCED background preloading with better error handling
   const preloadData = useCallback(async () => {
     if (!userId || isInstantReady) {
-      console.log('[useInstantSoulNetData] Skipping preload - no userId or already ready');
+      console.log('[useInstantSoulNetData] COORDINATED: Skipping preload - no userId or already ready');
       return;
     }
 
-    console.log('[useInstantSoulNetData] Starting background preload for', userId, timeRange, currentLanguage);
+    // Check if translation system is locked
+    if (translationStateManager.isTranslationLocked()) {
+      console.log('[useInstantSoulNetData] COORDINATED: Translation system locked, waiting...');
+      // Set a timeout to retry after lock is released
+      setTimeout(() => preloadData(), 1000);
+      return;
+    }
+
+    console.log('[useInstantSoulNetData] COORDINATED: Starting background preload for', userId, timeRange, currentLanguage);
     
     try {
       setError(null);
@@ -134,28 +188,37 @@ export const useInstantSoulNetData = (
       );
 
       if (result) {
-        console.log('[useInstantSoulNetData] Background preload successful');
+        console.log('[useInstantSoulNetData] COORDINATED: Background preload successful');
         setGraphData({ nodes: result.nodes, links: result.links });
         setTranslations(result.translations);
         setConnectionPercentages(result.connectionPercentages);
         setNodeConnectionData(result.nodeConnectionData);
         setIsInstantReady(true);
       } else {
-        console.log('[useInstantSoulNetData] No data returned from background preload');
+        console.log('[useInstantSoulNetData] COORDINATED: No data returned from background preload');
         setGraphData({ nodes: [], links: [] });
         setTranslations(new Map());
         setConnectionPercentages(new Map());
         setNodeConnectionData(new Map());
       }
     } catch (err) {
-      console.error('[useInstantSoulNetData] Background preload error:', err);
+      console.error('[useInstantSoulNetData] COORDINATED: Background preload error:', err);
       setError(err instanceof Error ? err : new Error('Unknown error occurred'));
+      
+      // Attempt recovery through translation state manager
+      if (err instanceof Error && err.message.includes('translation')) {
+        try {
+          await translationStateManager.recoverFromTranslationFailure(currentLanguage, userId);
+        } catch (recoveryError) {
+          console.error('[useInstantSoulNetData] COORDINATED: Recovery failed:', recoveryError);
+        }
+      }
     } finally {
       setLoading(false);
     }
   }, [userId, timeRange, currentLanguage, isInstantReady]);
 
-  // Background preload effect
+  // Background preload effect with translation lock awareness
   useEffect(() => {
     if (!isInstantReady) {
       preloadData();
@@ -164,14 +227,22 @@ export const useInstantSoulNetData = (
     }
   }, [preloadData, isInstantReady]);
 
-  // Clear cache when language changes
+  // ENHANCED cache invalidation on language change
   useEffect(() => {
     if (userId) {
+      console.log('[useInstantSoulNetData] COORDINATED: Language changed to', currentLanguage, 'clearing cache for', userId);
       EnhancedSoulNetPreloadService.clearInstantCache(userId);
+      
+      // Reset state
+      setIsInstantReady(false);
+      setGraphData({ nodes: [], links: [] });
+      setTranslations(new Map());
+      setConnectionPercentages(new Map());
+      setNodeConnectionData(new Map());
     }
   }, [currentLanguage, userId]);
 
-  console.log(`[useInstantSoulNetData] STATE: nodes=${graphData.nodes.length}, translations=${translations.size}, percentages=${connectionPercentages.size}, instantReady=${isInstantReady}, loading=${loading}`);
+  console.log(`[useInstantSoulNetData] COORDINATED STATE: nodes=${graphData.nodes.length}, translations=${translations.size}, percentages=${connectionPercentages.size}, instantReady=${isInstantReady}, loading=${loading}, coordinator=${translationStateManager.getState().coordinatorId}`);
 
   return {
     graphData,

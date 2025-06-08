@@ -1,6 +1,7 @@
 import { supabase } from '@/integrations/supabase/client';
 import { translationService } from '@/services/translationService';
 import { onDemandTranslationCache } from '@/utils/website-translations';
+import { translationStateManager } from './translationStateManager';
 
 interface NodeData {
   id: string;
@@ -36,13 +37,14 @@ interface CachedEnhancedData {
   userId: string;
   timeRange: string;
   language: string;
-  version: number; // Cache versioning
+  version: number;
+  coordinatorId: string; // Track which coordinator created this cache
 }
 
 export class EnhancedSoulNetPreloadService {
   private static readonly CACHE_KEY = 'enhanced-soulnet-data';
   private static readonly CACHE_DURATION = 15 * 60 * 1000; // 15 minutes
-  private static readonly CACHE_VERSION = 2; // Increment when cache structure changes
+  private static readonly CACHE_VERSION = 3; // Incremented for coordinator ID tracking
   private static cache = new Map<string, CachedEnhancedData>();
   private static translationCoordinator = new Map<string, Promise<Map<string, string>>>();
 
@@ -51,16 +53,34 @@ export class EnhancedSoulNetPreloadService {
     timeRange: string, 
     language: string
   ): Promise<EnhancedSoulNetData | null> {
-    console.log(`[EnhancedSoulNetPreloadService] COORDINATED: Preloading instant data for ${userId}, ${timeRange}, ${language}`);
+    const coordinatorId = translationStateManager.getState().coordinatorId;
+    console.log(`[EnhancedSoulNetPreloadService] COORDINATED PRELOAD: Starting with coordinator ${coordinatorId} for ${userId}, ${timeRange}, ${language}`);
     
     const cacheKey = this.generateCacheKey(userId, timeRange, language);
     const cached = this.getInstantData(cacheKey);
     
-    if (cached) {
-      console.log(`[EnhancedSoulNetPreloadService] COORDINATED: Using cached instant data for ${cacheKey}`);
+    // CACHE VALIDATION: Check if cache is from current coordinator
+    if (cached && cached.coordinatorId === coordinatorId) {
+      console.log(`[EnhancedSoulNetPreloadService] COORDINATED CACHE: Using cached data from same coordinator ${coordinatorId}`);
       return cached.data;
+    } else if (cached) {
+      console.log(`[EnhancedSoulNetPreloadService] COORDINATED CACHE: Invalidating cache from different coordinator (${cached.coordinatorId} vs ${coordinatorId})`);
+      this.invalidateCache(cacheKey);
     }
 
+    // Register this as an active translation
+    const translationPromise = this.performDataPreload(userId, timeRange, language, coordinatorId);
+    translationStateManager.registerActiveTranslation(cacheKey, translationPromise.then(() => {}));
+
+    return translationPromise;
+  }
+
+  private static async performDataPreload(
+    userId: string,
+    timeRange: string,
+    language: string,
+    coordinatorId: string
+  ): Promise<EnhancedSoulNetData | null> {
     try {
       // Fetch raw journal data
       const startDate = this.getStartDate(timeRange);
@@ -88,13 +108,13 @@ export class EnhancedSoulNetPreloadService {
         return emptyData;
       }
 
-      console.log(`[EnhancedSoulNetPreloadService] COORDINATED: Found ${entries.length} entries for processing`);
+      console.log(`[EnhancedSoulNetPreloadService] COORDINATED: Found ${entries.length} entries for processing with coordinator ${coordinatorId}`);
 
       // Process the raw data
       const graphData = this.processEntities(entries);
       
-      // COORDINATED TRANSLATION: Use translation coordinator to prevent race conditions
-      const translations = await this.getCoordinatedTranslations(graphData.nodes, language, cacheKey);
+      // COORDINATED TRANSLATION: Use improved translation coordination
+      const translations = await this.getCoordinatedTranslations(graphData.nodes, language, coordinatorId);
       const connectionPercentages = new Map<string, number>();
       const nodeConnectionData = new Map<string, NodeConnectionData>();
       
@@ -110,17 +130,19 @@ export class EnhancedSoulNetPreloadService {
         nodeConnectionData
       };
 
-      // Cache the processed data with versioning
+      // Cache the processed data with coordinator tracking
+      const cacheKey = this.generateCacheKey(userId, timeRange, language);
       this.setCachedData(cacheKey, {
         data: enhancedData,
         timestamp: Date.now(),
         userId,
         timeRange,
         language,
-        version: this.CACHE_VERSION
+        version: this.CACHE_VERSION,
+        coordinatorId
       });
 
-      console.log(`[EnhancedSoulNetPreloadService] COORDINATED: Successfully cached instant data for ${cacheKey} with ${enhancedData.nodes.length} nodes and ${enhancedData.translations.size} translations`);
+      console.log(`[EnhancedSoulNetPreloadService] COORDINATED: Successfully cached instant data for ${cacheKey} with coordinator ${coordinatorId}, ${enhancedData.nodes.length} nodes and ${enhancedData.translations.size} translations`);
       return enhancedData;
     } catch (error) {
       console.error('[EnhancedSoulNetPreloadService] Error preloading instant data:', error);
@@ -128,28 +150,47 @@ export class EnhancedSoulNetPreloadService {
     }
   }
 
-  // INSTANT ACCESS: Synchronous cache check
+  // IMPROVED INSTANT ACCESS: Better coordinator validation
   static getInstantData(cacheKey: string): CachedEnhancedData | null {
+    const currentCoordinatorId = translationStateManager.getState().coordinatorId;
     const cached = this.cache.get(cacheKey);
+    
     if (cached && this.isCacheValid(cached)) {
-      console.log(`[EnhancedSoulNetPreloadService] INSTANT: Found valid cache for ${cacheKey}`);
-      return cached;
+      // Check coordinator compatibility
+      if (cached.coordinatorId === currentCoordinatorId) {
+        console.log(`[EnhancedSoulNetPreloadService] COORDINATED INSTANT: Found valid cache for ${cacheKey} with matching coordinator ${currentCoordinatorId}`);
+        return cached;
+      } else {
+        console.log(`[EnhancedSoulNetPreloadService] COORDINATED INSTANT: Cache coordinator mismatch (${cached.coordinatorId} vs ${currentCoordinatorId}), invalidating`);
+        this.invalidateCache(cacheKey);
+        return null;
+      }
     }
     
-    // Try localStorage as fallback
+    // Try localStorage with coordinator validation
     try {
       const storedData = localStorage.getItem(`${this.CACHE_KEY}-${cacheKey}`);
       if (storedData) {
         const parsed = JSON.parse(storedData);
         if (this.isCacheValid(parsed)) {
+          // Check coordinator compatibility for localStorage data
+          if (parsed.coordinatorId && parsed.coordinatorId !== currentCoordinatorId) {
+            console.log(`[EnhancedSoulNetPreloadService] COORDINATED INSTANT: localStorage coordinator mismatch, clearing`);
+            localStorage.removeItem(`${this.CACHE_KEY}-${cacheKey}`);
+            return null;
+          }
+          
           // Convert Maps back from objects
           parsed.data.translations = new Map(Object.entries(parsed.data.translations || {}));
           parsed.data.connectionPercentages = new Map(Object.entries(parsed.data.connectionPercentages || {}));
           parsed.data.nodeConnectionData = new Map(
             Object.entries(parsed.data.nodeConnectionData || {}).map(([key, value]) => [key, value as NodeConnectionData])
           );
+          
+          // Update coordinator ID for localStorage data
+          parsed.coordinatorId = currentCoordinatorId;
           this.cache.set(cacheKey, parsed);
-          console.log(`[EnhancedSoulNetPreloadService] INSTANT: Found valid localStorage cache for ${cacheKey}`);
+          console.log(`[EnhancedSoulNetPreloadService] COORDINATED INSTANT: Found valid localStorage cache for ${cacheKey}, updated coordinator to ${currentCoordinatorId}`);
           return parsed;
         }
       }
@@ -157,15 +198,15 @@ export class EnhancedSoulNetPreloadService {
       console.error('[EnhancedSoulNetPreloadService] Error loading from localStorage:', error);
     }
     
-    console.log(`[EnhancedSoulNetPreloadService] INSTANT: No valid cache found for ${cacheKey}`);
+    console.log(`[EnhancedSoulNetPreloadService] COORDINATED INSTANT: No valid cache found for ${cacheKey}`);
     return null;
   }
 
-  // COORDINATED TRANSLATION: Prevents race conditions
+  // IMPROVED COORDINATED TRANSLATION: Better race condition prevention
   private static async getCoordinatedTranslations(
     nodes: NodeData[], 
     language: string, 
-    cacheKey: string
+    coordinatorId: string
   ): Promise<Map<string, string>> {
     if (language === 'en') {
       const translations = new Map<string, string>();
@@ -173,31 +214,33 @@ export class EnhancedSoulNetPreloadService {
       return translations;
     }
 
-    // Check if translation is already in progress for this cache key
-    const existingTranslation = this.translationCoordinator.get(cacheKey);
+    const coordinationKey = `${language}-${coordinatorId}`;
+    
+    // Check if translation is already in progress for this coordinator
+    const existingTranslation = this.translationCoordinator.get(coordinationKey);
     if (existingTranslation) {
-      console.log(`[EnhancedSoulNetPreloadService] COORDINATED: Waiting for existing translation for ${cacheKey}`);
+      console.log(`[EnhancedSoulNetPreloadService] COORDINATED TRANSLATION: Waiting for existing translation for ${coordinationKey}`);
       return existingTranslation;
     }
 
-    // Start new coordinated translation
-    const translationPromise = this.performBatchTranslation(nodes, language);
-    this.translationCoordinator.set(cacheKey, translationPromise);
+    // Start new coordinated translation with coordinator tracking
+    const translationPromise = this.performBatchTranslation(nodes, language, coordinatorId);
+    this.translationCoordinator.set(coordinationKey, translationPromise);
 
     try {
       const result = await translationPromise;
       return result;
     } finally {
       // Clean up coordinator
-      this.translationCoordinator.delete(cacheKey);
+      this.translationCoordinator.delete(coordinationKey);
     }
   }
 
-  private static async performBatchTranslation(nodes: NodeData[], language: string): Promise<Map<string, string>> {
+  private static async performBatchTranslation(nodes: NodeData[], language: string, coordinatorId: string): Promise<Map<string, string>> {
     const translations = new Map<string, string>();
     const nodesToTranslate = [...new Set(nodes.map(node => node.id))]; // Remove duplicates
     
-    console.log(`[EnhancedSoulNetPreloadService] COORDINATED: Batch translating ${nodesToTranslate.length} unique nodes`);
+    console.log(`[EnhancedSoulNetPreloadService] COORDINATED BATCH TRANSLATION: Translating ${nodesToTranslate.length} unique nodes for coordinator ${coordinatorId}`);
     
     try {
       const batchResults = await translationService.batchTranslate({
@@ -205,23 +248,23 @@ export class EnhancedSoulNetPreloadService {
         targetLanguage: language
       });
       
-      console.log(`[EnhancedSoulNetPreloadService] COORDINATED: Successfully translated ${batchResults.size}/${nodesToTranslate.length} nodes`);
+      console.log(`[EnhancedSoulNetPreloadService] COORDINATED BATCH TRANSLATION: Successfully translated ${batchResults.size}/${nodesToTranslate.length} nodes for coordinator ${coordinatorId}`);
       
       batchResults.forEach((translatedText, originalText) => {
         translations.set(originalText, translatedText);
-        // SYNCHRONIZED: Cache in on-demand cache for immediate access
+        // SYNCHRONIZED: Cache in on-demand cache with coordinator tracking
         onDemandTranslationCache.set(language, originalText, translatedText);
       });
 
-      // Handle any missing translations
+      // Handle any missing translations with fallback
       nodesToTranslate.forEach(nodeId => {
         if (!translations.has(nodeId)) {
-          console.warn(`[EnhancedSoulNetPreloadService] COORDINATED: No translation found for node: ${nodeId}, using original`);
+          console.warn(`[EnhancedSoulNetPreloadService] COORDINATED FALLBACK: No translation found for node: ${nodeId}, using original`);
           translations.set(nodeId, nodeId);
         }
       });
     } catch (error) {
-      console.error('[EnhancedSoulNetPreloadService] COORDINATED: Error during batch translation:', error);
+      console.error(`[EnhancedSoulNetPreloadService] COORDINATED BATCH TRANSLATION: Error for coordinator ${coordinatorId}:`, error);
       // Fallback: set original text for all nodes
       nodesToTranslate.forEach(nodeId => {
         translations.set(nodeId, nodeId);
@@ -330,25 +373,32 @@ export class EnhancedSoulNetPreloadService {
     }
   }
 
-  // CLEAR CACHE WITH PROPER INVALIDATION
+  // IMPROVED CACHE INVALIDATION: Single cache entry invalidation
+  private static invalidateCache(cacheKey: string): void {
+    console.log(`[EnhancedSoulNetPreloadService] COORDINATED INVALIDATION: Invalidating cache for ${cacheKey}`);
+    this.cache.delete(cacheKey);
+    localStorage.removeItem(`${this.CACHE_KEY}-${cacheKey}`);
+  }
+
+  // ENHANCED CLEAR CACHE: Better coordination with translation state manager
   static clearInstantCache(userId?: string): void {
-    console.log(`[EnhancedSoulNetPreloadService] COORDINATED: Clearing instant cache for user ${userId || 'all users'}`);
+    const coordinatorId = translationStateManager.getState().coordinatorId;
+    console.log(`[EnhancedSoulNetPreloadService] COORDINATED CLEAR: Clearing instant cache for user ${userId || 'all users'} with coordinator ${coordinatorId}`);
     
     if (userId) {
       // Clear specific user's cache including all versions
       const keysToDelete = Array.from(this.cache.keys()).filter(key => key.startsWith(userId));
       keysToDelete.forEach(key => {
-        this.cache.delete(key);
-        localStorage.removeItem(`${this.CACHE_KEY}-${key}`);
+        this.invalidateCache(key);
       });
       
       // Clear translation coordinator for this user
-      const coordinatorKeysToDelete = Array.from(this.translationCoordinator.keys()).filter(key => key.startsWith(userId));
+      const coordinatorKeysToDelete = Array.from(this.translationCoordinator.keys()).filter(key => key.includes(userId));
       coordinatorKeysToDelete.forEach(key => {
         this.translationCoordinator.delete(key);
       });
       
-      console.log(`[EnhancedSoulNetPreloadService] COORDINATED: Cleared instant cache for user ${userId}`);
+      console.log(`[EnhancedSoulNetPreloadService] COORDINATED CLEAR: Cleared instant cache for user ${userId} with coordinator ${coordinatorId}`);
     } else {
       // Clear all cache
       this.cache.clear();
@@ -358,7 +408,7 @@ export class EnhancedSoulNetPreloadService {
           localStorage.removeItem(key);
         }
       });
-      console.log('[EnhancedSoulNetPreloadService] COORDINATED: Cleared all instant cache');
+      console.log(`[EnhancedSoulNetPreloadService] COORDINATED CLEAR: Cleared all instant cache with coordinator ${coordinatorId}`);
     }
   }
 
