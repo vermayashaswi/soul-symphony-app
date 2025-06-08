@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 import { JournalEntry } from '@/types/journal';
 
@@ -158,9 +157,10 @@ export const storeJournalEmbedding = async (entryId: number, embedding: number[]
   try {
     console.log('[JournalEntryService] Storing embedding for entry:', entryId);
     
+    // Convert the number array to the proper format for the database function
     const { error } = await supabase.rpc('upsert_journal_embedding', {
       entry_id: entryId,
-      embedding_vector: embedding
+      embedding_vector: `[${embedding.join(',')}]`
     });
 
     if (error) {

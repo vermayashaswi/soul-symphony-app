@@ -1,7 +1,7 @@
 
 import { supabase } from '@/integrations/supabase/client';
 import { blobToBase64 } from './blob-utils';
-import { sendAudioForTranscription } from './transcription-service';
+import { transcribeAudio } from './transcription-service';
 import { getEntryIdForProcessingId, setEntryIdForProcessingId } from '../audio-processing';
 
 /**
@@ -16,34 +16,23 @@ export async function processRecordingInBackground(
   console.log('[BackgroundProcessor] Starting background processing for tempId:', tempId);
   
   try {
-    // Convert blob to base64
-    console.log('[BackgroundProcessor] Converting audio blob to base64');
-    const base64Audio = await blobToBase64(audioBlob);
-    
-    if (!base64Audio || base64Audio.length < 100) {
-      throw new Error('Audio conversion failed or produced invalid data');
+    if (!userId) {
+      throw new Error('User ID is required for processing');
     }
-    
-    console.log(`[BackgroundProcessor] Successfully converted audio to base64, length: ${base64Audio.length}`);
-    
-    // Send to transcription service
-    console.log('[BackgroundProcessor] Sending audio to transcription service');
-    const transcriptionResult = await sendAudioForTranscription(
-      base64Audio, 
-      userId,
-      false,
-      true
-    );
+
+    // Use the transcribeAudio function directly
+    console.log('[BackgroundProcessor] Calling transcribeAudio service');
+    const transcriptionResult = await transcribeAudio(audioBlob, userId);
     
     if (!transcriptionResult.success) {
       console.error('[BackgroundProcessor] Transcription service error:', transcriptionResult.error);
       throw new Error(transcriptionResult.error || 'Transcription failed');
     }
 
-    console.log('[BackgroundProcessor] Transcription result:', transcriptionResult.data);
+    console.log('[BackgroundProcessor] Transcription result:', transcriptionResult);
     
     // Extract the entry ID
-    const entryId = transcriptionResult.data?.entryId;
+    const entryId = transcriptionResult.entryId;
     
     if (!entryId) {
       throw new Error('No entry ID returned from transcription service');
