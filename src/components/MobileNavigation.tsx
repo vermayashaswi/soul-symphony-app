@@ -77,12 +77,10 @@ const MobileNavigation: React.FC<MobileNavigationProps> = ({ onboardingComplete 
       '/app/auth',
       '/onboarding',
       '/auth',
-      '/app',
       '/'
     ];
     
     const isOnboardingOrAuth = onboardingOrAuthPaths.includes(location.pathname);
-    const isAppRoot = location.pathname === '/app';
     
     const shouldShowNav = (isMobile || isNativeApp()) && 
                           !isKeyboardVisible && 
@@ -97,7 +95,6 @@ const MobileNavigation: React.FC<MobileNavigationProps> = ({ onboardingComplete 
       path: location.pathname,
       isKeyboardVisible,
       isOnboardingOrAuth,
-      isAppRoot,
       hasUser: !!user,
       onboardingComplete,
       isTutorialActive,
@@ -112,8 +109,8 @@ const MobileNavigation: React.FC<MobileNavigationProps> = ({ onboardingComplete 
     return null;
   }
   
-  if (onboardingComplete === false || location.pathname === '/app') {
-    console.log('MobileNavigation: Not rendering due to onboarding status or /app path');
+  if (onboardingComplete === false) {
+    console.log('MobileNavigation: Not rendering due to onboarding status');
     return null;
   }
   

@@ -32,7 +32,7 @@ const ProtectedRoute: React.FC = () => {
   
   useEffect(() => {
     if (!isLoading && !user) {
-      console.log("Protected route: No user, should redirect to /app/auth", {
+      console.log("Protected route: No user, should redirect to /app/onboarding", {
         path: location.pathname
       });
     }
@@ -47,8 +47,8 @@ const ProtectedRoute: React.FC = () => {
   }
   
   if (!user) {
-    console.log("Redirecting to auth from protected route:", location.pathname);
-    return <Navigate to={`/app/auth?redirectTo=${location.pathname}`} replace />;
+    console.log("Redirecting to onboarding from protected route:", location.pathname);
+    return <Navigate to={`/app/onboarding?redirectTo=${location.pathname}`} replace />;
   }
   
   // Use Outlet to render child routes

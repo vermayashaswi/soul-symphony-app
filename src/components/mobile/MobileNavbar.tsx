@@ -51,18 +51,18 @@ const MobileNavbar = () => {
           variant="ghost" 
           size="icon" 
           className="p-0" 
-          onClick={() => navigate('/')}
+          onClick={() => navigate('/app/home')}
         >
           <SouloLogo size="small" useColorTheme={true} />
         </Button>
 
-        <Button variant="ghost" size="icon" onClick={() => navigate('/profile')}>
+        <Button variant="ghost" size="icon" onClick={() => navigate('/app/settings')}>
           <User className="h-5 w-5" />
         </Button>
-        <Button variant="ghost" size="icon" onClick={() => navigate('/chat')}>
+        <Button variant="ghost" size="icon" onClick={() => navigate('/app/chat')}>
           <MessageSquare className="h-5 w-5" />
         </Button>
-        <Button variant="ghost" size="icon" onClick={() => navigate('/insights')}>
+        <Button variant="ghost" size="icon" onClick={() => navigate('/app/insights')}>
           <LineChart className="h-5 w-5" />
         </Button>
       </div>
