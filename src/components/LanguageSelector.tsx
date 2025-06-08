@@ -74,33 +74,26 @@ const LanguageSelector = () => {
   const [isOpen, setIsOpen] = useState(false);
 
   const handleLanguageChange = async (languageCode: string) => {
-    debug.info('Enhanced language change requested:', languageCode);
+    debug.info('Language change requested:', languageCode);
     
-    // First change the language which will trigger enhanced clearing and setup
+    // First change the language which will clear caches and set loading states
     await setLanguage(languageCode);
     
-    // Enhanced pre-translation for ALL time ranges if user is logged in and language is not English
+    // If user is logged in and language is not English, pre-translate SoulNet data for ALL time ranges
     if (user && languageCode !== 'en') {
       try {
-        debug.info('Enhanced pre-translating SoulNet data for new language:', languageCode);
+        debug.info('Pre-translating SoulNet data for new language:', languageCode);
+        // Pre-translate for ALL time ranges that users frequently view including "year"
+        const timeRanges = ['today', 'week', 'month', 'year'];
+        const preloadPromises = timeRanges.map(timeRange => 
+          prefetchSoulNetTranslations(user.id, timeRange)
+        );
         
-        // Enhanced: Pre-translate for ALL time ranges including "year" with priority
-        const timeRanges = ['year', 'month', 'week', 'today']; // Year first for priority
-        
-        // Sequential processing with "year" getting priority
-        for (const timeRange of timeRanges) {
-          try {
-            await prefetchSoulNetTranslations(user.id, timeRange);
-            console.log(`[LanguageSelector] Enhanced pre-translation completed for ${timeRange}`);
-          } catch (error) {
-            debug.error(`Enhanced pre-translation failed for ${timeRange}:`, error);
-            // Continue with other time ranges even if one fails
-          }
-        }
-        
-        console.log('[LanguageSelector] Enhanced pre-translation completed for all time ranges');
+        // Execute all pre-translations in parallel for better performance
+        await Promise.allSettled(preloadPromises);
+        console.log('[LanguageSelector] Completed pre-translation for all time ranges');
       } catch (error) {
-        debug.error('Enhanced pre-translation process failed:', error);
+        debug.error('Failed to pre-translate SoulNet data:', error);
       }
     }
     

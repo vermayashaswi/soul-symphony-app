@@ -1,9 +1,7 @@
 
-import { useState, useEffect, useCallback, useRef } from 'react';
-import { SoulNetPreloadService } from '@/services/soulnetPreloadService';
+import { useState, useEffect, useCallback, useMemo } from 'react';
+import { EnhancedSoulNetPreloadService } from '@/services/enhancedSoulNetPreloadService';
 import { useTranslation } from '@/contexts/TranslationContext';
-import { translationService } from '@/services/translationService';
-import { onDemandTranslationCache } from '@/utils/website-translations';
 
 interface NodeData {
   id: string;
@@ -19,208 +17,172 @@ interface LinkData {
   value: number;
 }
 
-interface UseInstantSoulNetDataReturn {
+interface NodeConnectionData {
+  connectedNodes: string[];
+  totalStrength: number;
+  averageStrength: number;
+}
+
+interface InstantSoulNetData {
   graphData: { nodes: NodeData[], links: LinkData[] };
+  translations: Map<string, string>;
+  connectionPercentages: Map<string, number>;
+  nodeConnectionData: Map<string, NodeConnectionData>;
   loading: boolean;
   error: Error | null;
   isInstantReady: boolean;
-  getInstantTranslation: (text: string) => string;
-  getInstantConnectionPercentage: (sourceId: string, targetId: string) => number;
-  getInstantNodeConnections: (nodeId: string) => LinkData[];
+  // Add the getter methods to the interface
+  getInstantConnectionPercentage: (selectedNode: string, targetNode: string) => number;
+  getInstantTranslation: (nodeId: string) => string;
+  getInstantNodeConnections: (nodeId: string) => NodeConnectionData;
 }
 
 export const useInstantSoulNetData = (
   userId: string | undefined,
   timeRange: string
-): UseInstantSoulNetDataReturn => {
+): InstantSoulNetData => {
   const { currentLanguage } = useTranslation();
   
-  // Initialize with synchronous cache check
-  const getCachedDataSync = useCallback(() => {
-    if (!userId) return null;
-    const cacheKey = `${userId}-${timeRange}-${currentLanguage}`;
-    return SoulNetPreloadService.getCachedDataSync(cacheKey);
-  }, [userId, timeRange, currentLanguage]);
-
-  const initialCachedData = getCachedDataSync();
-  
-  const [graphData, setGraphData] = useState<{ nodes: NodeData[], links: LinkData[] }>(
-    initialCachedData ? { nodes: initialCachedData.nodes, links: initialCachedData.links } : { nodes: [], links: [] }
+  // Initialize with instant check for cached data
+  const cacheKey = useMemo(() => 
+    userId ? `${userId}-${timeRange}-${currentLanguage}` : '', 
+    [userId, timeRange, currentLanguage]
   );
-  const [loading, setLoading] = useState(!initialCachedData);
-  const [error, setError] = useState<Error | null>(null);
-  const [isInstantReady, setIsInstantReady] = useState(!!initialCachedData);
   
-  // Store preloaded data for instant access
-  const preloadedDataRef = useRef<{
-    translations: Map<string, string>;
-    connectionPercentages: Map<string, number>;
-    nodeConnections: Map<string, LinkData[]>;
-  }>({
-    translations: initialCachedData?.translations || new Map(),
-    connectionPercentages: initialCachedData?.connectionPercentages || new Map(),
-    nodeConnections: new Map()
+  const instantCached = useMemo(() => {
+    if (!cacheKey) return null;
+    return EnhancedSoulNetPreloadService.getInstantData(cacheKey);
+  }, [cacheKey]);
+
+  const [graphData, setGraphData] = useState<{ nodes: NodeData[], links: LinkData[] }>(() => {
+    if (instantCached) {
+      console.log('[useInstantSoulNetData] INSTANT: Using cached data immediately');
+      return { nodes: instantCached.data.nodes, links: instantCached.data.links };
+    }
+    return { nodes: [], links: [] };
   });
 
-  // Update node connections when graph data changes
-  useEffect(() => {
-    if (graphData.links.length > 0) {
-      const connectionMap = new Map<string, LinkData[]>();
-      graphData.links.forEach(link => {
-        if (!connectionMap.has(link.source)) {
-          connectionMap.set(link.source, []);
-        }
-        if (!connectionMap.has(link.target)) {
-          connectionMap.set(link.target, []);
-        }
-        connectionMap.get(link.source)!.push(link);
-        connectionMap.get(link.target)!.push(link);
-      });
-      preloadedDataRef.current.nodeConnections = connectionMap;
+  const [translations, setTranslations] = useState<Map<string, string>>(() => {
+    return instantCached ? instantCached.data.translations : new Map();
+  });
+
+  const [connectionPercentages, setConnectionPercentages] = useState<Map<string, number>>(() => {
+    return instantCached ? instantCached.data.connectionPercentages : new Map();
+  });
+
+  const [nodeConnectionData, setNodeConnectionData] = useState<Map<string, NodeConnectionData>>(() => {
+    return instantCached ? instantCached.data.nodeConnectionData : new Map();
+  });
+
+  const [loading, setLoading] = useState(!instantCached);
+  const [error, setError] = useState<Error | null>(null);
+  const [isInstantReady, setIsInstantReady] = useState(!!instantCached);
+
+  // Instant data getter functions
+  const getInstantConnectionPercentage = useCallback((selectedNode: string, targetNode: string): number => {
+    if (!selectedNode || selectedNode === targetNode) return 0;
+    
+    const key = `${selectedNode}-${targetNode}`;
+    const percentage = connectionPercentages.get(key);
+    
+    if (percentage !== undefined) {
+      console.log(`[useInstantSoulNetData] INSTANT: Got percentage ${percentage}% for ${key}`);
+      return percentage;
     }
-  }, [graphData.links]);
+    
+    console.log(`[useInstantSoulNetData] INSTANT: No percentage found for ${key}`);
+    return 0;
+  }, [connectionPercentages]);
 
-  // Instant translation function with multiple fallbacks
-  const getInstantTranslation = useCallback((text: string): string => {
-    if (!text || currentLanguage === 'en') return text;
-
-    // PRIORITY 1: Pre-cached translation from SoulNet preload
-    const preloadedTranslation = preloadedDataRef.current.translations.get(text);
-    if (preloadedTranslation) {
-      return preloadedTranslation;
+  const getInstantTranslation = useCallback((nodeId: string): string => {
+    if (currentLanguage === 'en') return nodeId;
+    
+    const translation = translations.get(nodeId);
+    if (translation) {
+      console.log(`[useInstantSoulNetData] INSTANT: Got translation for ${nodeId}: ${translation}`);
+      return translation;
     }
+    
+    console.log(`[useInstantSoulNetData] INSTANT: No translation for ${nodeId}, using original`);
+    return nodeId;
+  }, [currentLanguage, translations]);
 
-    // PRIORITY 2: On-demand cache
-    const onDemandTranslation = onDemandTranslationCache.get(currentLanguage, text);
-    if (onDemandTranslation) {
-      return onDemandTranslation;
-    }
+  const getInstantNodeConnections = useCallback((nodeId: string): NodeConnectionData => {
+    return nodeConnectionData.get(nodeId) || {
+      connectedNodes: [],
+      totalStrength: 0,
+      averageStrength: 0
+    };
+  }, [nodeConnectionData]);
 
-    // PRIORITY 3: Background translation request (non-blocking)
-    if (userId) {
-      translationService.translateText(text, currentLanguage)
-        .then(translated => {
-          if (translated && translated !== text) {
-            // Update both caches
-            preloadedDataRef.current.translations.set(text, translated);
-            onDemandTranslationCache.set(currentLanguage, text, translated);
-          }
-        })
-        .catch(err => {
-          console.warn(`[useInstantSoulNetData] Background translation failed for "${text}":`, err);
-        });
-    }
-
-    // FALLBACK: Return original text (no loading states or delays)
-    return text;
-  }, [currentLanguage, userId]);
-
-  // Instant connection percentage lookup
-  const getInstantConnectionPercentage = useCallback((sourceId: string, targetId: string): number => {
-    const key = `${sourceId}-${targetId}`;
-    return preloadedDataRef.current.connectionPercentages.get(key) || 0;
-  }, []);
-
-  // Instant node connections lookup
-  const getInstantNodeConnections = useCallback((nodeId: string): LinkData[] => {
-    return preloadedDataRef.current.nodeConnections.get(nodeId) || [];
-  }, []);
-
-  // Enhanced data loading with race condition prevention
-  const loadData = useCallback(async () => {
-    if (!userId) {
-      setLoading(false);
-      setIsInstantReady(false);
+  // Background preloading
+  const preloadData = useCallback(async () => {
+    if (!userId || isInstantReady) {
+      console.log('[useInstantSoulNetData] Skipping preload - no userId or already ready');
       return;
     }
 
-    console.log(`[useInstantSoulNetData] Loading data for ${userId}, ${timeRange}, ${currentLanguage}`);
+    console.log('[useInstantSoulNetData] Starting background preload for', userId, timeRange, currentLanguage);
     
     try {
-      // Check cache again (might have been updated by background processes)
-      const cachedData = getCachedDataSync();
-      if (cachedData) {
-        console.log(`[useInstantSoulNetData] Using cached data with ${cachedData.nodes.length} nodes`);
-        setGraphData({ nodes: cachedData.nodes, links: cachedData.links });
-        preloadedDataRef.current = {
-          translations: cachedData.translations,
-          connectionPercentages: cachedData.connectionPercentages,
-          nodeConnections: preloadedDataRef.current.nodeConnections
-        };
-        setIsInstantReady(true);
-        setLoading(false);
-        return;
-      }
-
-      // Load fresh data if no cache available
-      setLoading(true);
       setError(null);
-
-      const result = await SoulNetPreloadService.preloadSoulNetData(
+      
+      const result = await EnhancedSoulNetPreloadService.preloadInstantData(
         userId,
         timeRange,
         currentLanguage
       );
 
       if (result) {
-        console.log(`[useInstantSoulNetData] Successfully loaded fresh data with ${result.nodes.length} nodes`);
+        console.log('[useInstantSoulNetData] Background preload successful');
         setGraphData({ nodes: result.nodes, links: result.links });
-        preloadedDataRef.current = {
-          translations: result.translations,
-          connectionPercentages: result.connectionPercentages,
-          nodeConnections: preloadedDataRef.current.nodeConnections
-        };
+        setTranslations(result.translations);
+        setConnectionPercentages(result.connectionPercentages);
+        setNodeConnectionData(result.nodeConnectionData);
         setIsInstantReady(true);
       } else {
-        console.log('[useInstantSoulNetData] No data returned from preload service');
+        console.log('[useInstantSoulNetData] No data returned from background preload');
         setGraphData({ nodes: [], links: [] });
-        setIsInstantReady(false);
+        setTranslations(new Map());
+        setConnectionPercentages(new Map());
+        setNodeConnectionData(new Map());
       }
     } catch (err) {
-      console.error('[useInstantSoulNetData] Error loading data:', err);
+      console.error('[useInstantSoulNetData] Background preload error:', err);
       setError(err instanceof Error ? err : new Error('Unknown error occurred'));
-      setIsInstantReady(false);
     } finally {
       setLoading(false);
     }
-  }, [userId, timeRange, currentLanguage, getCachedDataSync]);
+  }, [userId, timeRange, currentLanguage, isInstantReady]);
 
-  // Enhanced language change handler
+  // Background preload effect
   useEffect(() => {
-    const handleLanguageChange = async (event: CustomEvent) => {
-      const newLanguage = event.detail.language;
-      console.log(`[useInstantSoulNetData] Language changed to: ${newLanguage}`);
-      
-      if (userId && newLanguage !== 'en') {
-        // Clear old translations and reload for new language
-        preloadedDataRef.current.translations.clear();
-        setIsInstantReady(false);
-        await loadData();
-      } else if (newLanguage === 'en') {
-        // For English, we don't need translations
-        setIsInstantReady(true);
-      }
-    };
+    if (!isInstantReady) {
+      preloadData();
+    } else {
+      setLoading(false);
+    }
+  }, [preloadData, isInstantReady]);
 
-    window.addEventListener('languageChange', handleLanguageChange as EventListener);
-    
-    return () => {
-      window.removeEventListener('languageChange', handleLanguageChange as EventListener);
-    };
-  }, [userId, loadData]);
-
-  // Initial data load
+  // Clear cache when language changes
   useEffect(() => {
-    loadData();
-  }, [loadData]);
+    if (userId) {
+      EnhancedSoulNetPreloadService.clearInstantCache(userId);
+    }
+  }, [currentLanguage, userId]);
+
+  console.log(`[useInstantSoulNetData] STATE: nodes=${graphData.nodes.length}, translations=${translations.size}, percentages=${connectionPercentages.size}, instantReady=${isInstantReady}, loading=${loading}`);
 
   return {
     graphData,
+    translations,
+    connectionPercentages,
+    nodeConnectionData,
     loading,
     error,
     isInstantReady,
-    getInstantTranslation,
     getInstantConnectionPercentage,
+    getInstantTranslation,
     getInstantNodeConnections
   };
 };

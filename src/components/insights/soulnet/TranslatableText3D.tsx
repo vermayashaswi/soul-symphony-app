@@ -19,8 +19,6 @@ interface TranslatableText3DProps {
   maxLines?: number;
   sourceLanguage?: string;
   onTranslationComplete?: (translatedText: string) => void;
-  getInstantTranslation?: (text: string) => string;
-  isInstantReady?: boolean;
 }
 
 export const TranslatableText3D: React.FC<TranslatableText3DProps> = ({
@@ -38,80 +36,81 @@ export const TranslatableText3D: React.FC<TranslatableText3DProps> = ({
   maxCharsPerLine = 18,
   maxLines = 3,
   sourceLanguage = 'en',
-  onTranslationComplete,
-  getInstantTranslation,
-  isInstantReady = false
+  onTranslationComplete
 }) => {
   const { currentLanguage, getCachedTranslation, translate } = useTranslation();
   const [translatedText, setTranslatedText] = useState<string>(text);
   const [isTranslating, setIsTranslating] = useState(false);
+  const [translationAttempted, setTranslationAttempted] = useState(false);
 
   useEffect(() => {
     const translateText = async () => {
       if (!text || currentLanguage === sourceLanguage) {
         setTranslatedText(text);
         onTranslationComplete?.(text);
+        setTranslationAttempted(true);
         return;
       }
 
-      // ENHANCED PRIORITY 1: Use instant translation if available and ready
-      if (getInstantTranslation && isInstantReady) {
-        const instantTranslation = getInstantTranslation(text);
-        console.log(`[TranslatableText3D] Using enhanced instant translation for "${text}": "${instantTranslation}"`);
-        setTranslatedText(instantTranslation);
-        onTranslationComplete?.(instantTranslation);
-        return;
-      }
-
-      // ENHANCED PRIORITY 2: Check for pre-cached translation
+      // PRIORITY 1: Check for pre-cached translation first (from SoulNet preload)
       const cachedTranslation = getCachedTranslation(text);
       if (cachedTranslation) {
-        console.log(`[TranslatableText3D] Using enhanced pre-cached translation for "${text}": "${cachedTranslation}"`);
+        console.log(`[TranslatableText3D] Using pre-cached translation for "${text}": "${cachedTranslation}"`);
         setTranslatedText(cachedTranslation);
         onTranslationComplete?.(cachedTranslation);
+        setTranslationAttempted(true);
         return;
       }
 
-      // ENHANCED PRIORITY 3: Non-blocking background translation
-      if (!translate) {
+      // Skip translation if already attempted and failed
+      if (translationAttempted) {
+        console.log(`[TranslatableText3D] Translation already attempted for "${text}", using original`);
         setTranslatedText(text);
         onTranslationComplete?.(text);
         return;
       }
 
-      console.log(`[TranslatableText3D] Enhanced fallback translation for "${text}" from ${sourceLanguage} to ${currentLanguage}`);
+      if (!translate) {
+        setTranslatedText(text);
+        onTranslationComplete?.(text);
+        setTranslationAttempted(true);
+        return;
+      }
+
+      console.log(`[TranslatableText3D] No cache found, translating "${text}" from ${sourceLanguage} to ${currentLanguage}`);
       
       try {
         setIsTranslating(true);
         const result = await translate(text, sourceLanguage);
         
         if (result && result !== text) {
-          console.log(`[TranslatableText3D] Enhanced translation successful: "${text}" -> "${result}"`);
+          console.log(`[TranslatableText3D] Translation successful: "${text}" -> "${result}"`);
           setTranslatedText(result);
           onTranslationComplete?.(result);
         } else {
-          console.log(`[TranslatableText3D] Enhanced fallback to original text for "${text}"`);
+          console.log(`[TranslatableText3D] Using original text for "${text}"`);
           setTranslatedText(text);
           onTranslationComplete?.(text);
         }
       } catch (error) {
-        console.error(`[TranslatableText3D] Enhanced translation failed for "${text}":`, error);
+        console.error(`[TranslatableText3D] Translation failed for "${text}":`, error);
         setTranslatedText(text);
         onTranslationComplete?.(text);
       } finally {
         setIsTranslating(false);
+        setTranslationAttempted(true);
       }
     };
 
     translateText();
-  }, [text, currentLanguage, sourceLanguage, translate, getCachedTranslation, onTranslationComplete, getInstantTranslation, isInstantReady]);
+  }, [text, currentLanguage, sourceLanguage, translate, getCachedTranslation, onTranslationComplete, translationAttempted]);
 
-  // Enhanced rendering with instant fallback - no loading delays
+  // Always render with current text - don't hide during translation
   return (
     <SmartTextRenderer
       text={translatedText}
       position={position}
-      color={isTranslating ? '#888888' : color}
+      color={isTranslating ? '#888888' : color} // Slightly dim while translating
       size={size}
       visible={visible}
       renderOrder={renderOrder}
