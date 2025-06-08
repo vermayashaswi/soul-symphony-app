@@ -1,6 +1,6 @@
 
 import React, { useMemo, useCallback, useState } from 'react';
-import { Sphere, Line } from '@react-three/drei';
+import { Line } from '@react-three/drei';
 import { Canvas } from '@react-three/fiber';
 import TranslatableText3D from './TranslatableText3D';
 import FixedConnectionPercentage from './FixedConnectionPercentage';
@@ -100,13 +100,13 @@ const SimplifiedSoulNetVisualization: React.FC<SimplifiedSoulNetVisualizationPro
 
         return (
           <group key={node.id} position={node.position}>
-            <Sphere
-              args={[node.value * 0.8, 16, 16]}
+            <mesh
               scale={scale}
               onClick={() => handleNodeClick(node.id)}
               onPointerEnter={() => handleNodeHover(node.id)}
               onPointerLeave={handleNodeUnhover}
             >
+              <sphereGeometry args={[node.value * 0.8, 16, 16]} />
               <meshStandardMaterial
                 color={nodeColor}
                 transparent
@@ -114,7 +114,7 @@ const SimplifiedSoulNetVisualization: React.FC<SimplifiedSoulNetVisualizationPro
                 emissive={isHighlighted ? nodeColor : '#000000'}
                 emissiveIntensity={isHighlighted ? 0.3 : 0}
               />
-            </Sphere>
+            </mesh>
 
             {/* Enhanced Node Labels with Instant Translation */}
             {shouldShowLabels && (
