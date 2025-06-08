@@ -1,6 +1,6 @@
 
 import { supabase } from '@/integrations/supabase/client';
-import { SoulNetTranslationManager } from '@/services/soulNetTranslationManager';
+import { translationService } from '@/services/translationService';
 
 interface NodeData {
   id: string;
@@ -40,7 +40,7 @@ interface CachedInstantData {
 
 export class EnhancedSoulNetPreloadService {
   private static readonly CACHE_KEY = 'enhanced-soulnet-instant-data';
-  private static readonly CACHE_DURATION = 5 * 60 * 1000; // Extended to 5 minutes for better performance
+  private static readonly CACHE_DURATION = 3 * 60 * 1000; // 3 minutes for instant access
   private static cache = new Map<string, CachedInstantData>();
   private static worker: Worker | null = null;
   private static preloadingPromises = new Map<string, Promise<InstantSoulNetData | null>>();
@@ -56,37 +56,6 @@ export class EnhancedSoulNetPreloadService {
         console.warn('[EnhancedSoulNetPreloadService] Failed to initialize worker:', error);
       }
     }
-  }
-
-  // ENHANCED: Pre-translate all time ranges when language changes
-  static async preloadAllTimeRanges(
-    userId: string,
-    language: string,
-    onProgress?: (timeRange: string, completed: number, total: number) => void
-  ): Promise<void> {
-    if (language === 'en') {
-      console.log('[EnhancedSoulNetPreloadService] Skipping preload for English');
-      return;
-    }
-
-    console.log(`[EnhancedSoulNetPreloadService] Pre-translating all time ranges for ${userId} in ${language}`);
-    
-    const timeRanges = ['today', 'week', 'month', 'year'];
-    const totalRanges = timeRanges.length;
-    
-    for (let i = 0; i < timeRanges.length; i++) {
-      const timeRange = timeRanges[i];
-      try {
-        onProgress?.(timeRange, i, totalRanges);
-        await this.preloadInstantData(userId, timeRange, language);
-        console.log(`[EnhancedSoulNetPreloadService] Completed pre-translation for ${timeRange}`);
-      } catch (error) {
-        console.error(`[EnhancedSoulNetPreloadService] Failed to pre-translate ${timeRange}:`, error);
-      }
-    }
-    
-    onProgress?.('complete', totalRanges, totalRanges);
-    console.log('[EnhancedSoulNetPreloadService] All time ranges pre-translation completed');
   }
 
   static async preloadInstantData(
@@ -119,7 +88,7 @@ export class EnhancedSoulNetPreloadService {
     timeRange: string,
     language: string
   ): Promise<InstantSoulNetData | null> {
-    console.log('[EnhancedSoulNetPreloadService] Starting enhanced preload for', userId, timeRange, language);
+    console.log('[EnhancedSoulNetPreloadService] Starting instant preload for', userId, timeRange, language);
     
     const cacheKey = `${userId}-${timeRange}-${language}`;
     const cached = this.getInstantData(cacheKey);
@@ -169,26 +138,20 @@ export class EnhancedSoulNetPreloadService {
         connectionPercentages = this.calculatePercentagesFallback(graphData.nodes, graphData.links);
       }
 
-      // ENHANCED: Use SoulNet translation manager for comprehensive translations
+      // Pre-translate all node names
       const translations = new Map<string, string>();
       if (language !== 'en') {
         const nodesToTranslate = graphData.nodes.map(node => node.id);
-        console.log(`[EnhancedSoulNetPreloadService] Using SoulNet translation manager for ${nodesToTranslate.length} nodes`);
+        console.log('[EnhancedSoulNetPreloadService] Pre-translating', nodesToTranslate.length, 'node names');
         
-        const translationResults = await SoulNetTranslationManager.translateSoulNetNodes(
-          nodesToTranslate,
-          language,
-          (completed, total) => {
-            console.log(`[EnhancedSoulNetPreloadService] Translation progress: ${completed}/${total}`);
-          }
-        );
-        
-        // Copy results to our translations map
-        translationResults.forEach((translatedText, nodeId) => {
-          translations.set(nodeId, translatedText);
+        const batchResults = await translationService.batchTranslate({
+          texts: nodesToTranslate,
+          targetLanguage: language
         });
         
-        console.log(`[EnhancedSoulNetPreloadService] Successfully translated ${translations.size}/${nodesToTranslate.length} nodes`);
+        batchResults.forEach((translatedText, originalText) => {
+          translations.set(originalText, translatedText);
+        });
       }
 
       // Pre-calculate node connection metadata
@@ -236,6 +199,7 @@ export class EnhancedSoulNetPreloadService {
       const handleMessage = (e: MessageEvent) => {
         if (e.data.type === 'PERCENTAGES_CALCULATED') {
           this.worker!.removeEventListener('message', handleMessage);
+          // FIXED: Properly type the percentages object as Record<string, number>
           const percentagesObj = e.data.payload.percentages as Record<string, number>;
           const percentagesMap = new Map(Object.entries(percentagesObj));
           resolve(percentagesMap);
@@ -506,8 +470,5 @@ export class EnhancedSoulNetPreloadService {
       });
       console.log('[EnhancedSoulNetPreloadService] Cleared all instant cache');
     }
-    
-    // Also clear SoulNet translation manager cache
-    SoulNetTranslationManager.clearCache();
   }
 }

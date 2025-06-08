@@ -13,7 +13,6 @@ import {
 import { Button } from "@/components/ui/button";
 import { useTranslation } from '@/contexts/TranslationContext';
 import { useAuth } from '@/contexts/AuthContext';
-import { EnhancedSoulNetPreloadService } from '@/services/enhancedSoulNetPreloadService';
 import { createDebugger } from '@/utils/debug/debugUtils';
 
 const debug = createDebugger('languageSelector');
@@ -70,33 +69,31 @@ const languages = [
 ];
 
 const LanguageSelector = () => {
-  const { currentLanguage, setLanguage, isTranslating, soulNetTranslationProgress } = useTranslation();
+  const { currentLanguage, setLanguage, isTranslating, prefetchSoulNetTranslations } = useTranslation();
   const { user } = useAuth();
   const [isOpen, setIsOpen] = useState(false);
 
   const handleLanguageChange = async (languageCode: string) => {
-    debug.info('ENHANCED: Language change requested:', languageCode);
+    debug.info('Language change requested:', languageCode);
     
     // First change the language which will clear caches and set loading states
     await setLanguage(languageCode);
     
-    // ENHANCED: If user is logged in and language is not English, trigger comprehensive pre-translation
+    // If user is logged in and language is not English, pre-translate SoulNet data for ALL time ranges
     if (user && languageCode !== 'en') {
       try {
-        debug.info('ENHANCED: Starting comprehensive SoulNet pre-translation for:', languageCode);
-        
-        // Use the enhanced service to pre-translate ALL time ranges
-        await EnhancedSoulNetPreloadService.preloadAllTimeRanges(
-          user.id,
-          languageCode,
-          (timeRange, completed, total) => {
-            debug.info(`ENHANCED: Pre-translation progress - ${timeRange}: ${completed}/${total}`);
-          }
+        debug.info('Pre-translating SoulNet data for new language:', languageCode);
+        // Pre-translate for ALL time ranges that users frequently view including "year"
+        const timeRanges = ['today', 'week', 'month', 'year'];
+        const preloadPromises = timeRanges.map(timeRange => 
+          prefetchSoulNetTranslations(user.id, timeRange)
         );
         
-        console.log('[LanguageSelector] ENHANCED: Completed comprehensive pre-translation for all time ranges');
+        // Execute all pre-translations in parallel for better performance
+        await Promise.allSettled(preloadPromises);
+        console.log('[LanguageSelector] Completed pre-translation for all time ranges');
       } catch (error) {
-        debug.error('ENHANCED: Failed comprehensive SoulNet pre-translation:', error);
+        debug.error('Failed to pre-translate SoulNet data:', error);
       }
     }
     
@@ -143,28 +140,6 @@ const LanguageSelector = () => {
     return groups;
   };
 
-  // ENHANCED: Show translation progress in button
-  const getButtonContent = () => {
-    if (isTranslating || soulNetTranslationProgress.total > 0) {
-      const { currentRange, completed, total } = soulNetTranslationProgress;
-      if (currentRange && currentRange !== 'complete') {
-        return (
-          <span className="flex items-center gap-1">
-            <Globe className="h-5 w-5 animate-pulse" />
-            <span className="text-xs">
-              {currentRange === 'preparing' ? 'Preparing...' :
-               currentRange === 'initializing' ? 'Starting...' :
-               currentRange === 'error' ? 'Error' :
-               `${currentRange} ${completed}/${total}`}
-            </span>
-          </span>
-        );
-      }
-    }
-    
-    return <Globe className={`h-5 w-5 ${isTranslating ? 'animate-pulse' : ''}`} />;
-  };
-
   return (
     <DropdownMenu open={isOpen} onOpenChange={setIsOpen}>
       <DropdownMenuTrigger asChild>
@@ -173,9 +148,9 @@ const LanguageSelector = () => {
           size="icon" 
           aria-label="Select language"
           title="Select language"
-          disabled={isTranslating || soulNetTranslationProgress.total > 0}
+          disabled={isTranslating}
         >
-          {getButtonContent()}
+          <Globe className={`h-5 w-5 ${isTranslating ? 'animate-pulse' : ''}`} />
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent 
@@ -193,7 +168,7 @@ const LanguageSelector = () => {
                 className={`cursor-pointer ${
                   currentLanguage === language.code ? "bg-primary/10 text-primary font-medium" : ""
                 }`}
-                disabled={isTranslating || soulNetTranslationProgress.total > 0}
+                disabled={isTranslating}
               >
                 {language.label}
               </DropdownMenuItem>
@@ -213,7 +188,7 @@ const LanguageSelector = () => {
                 className={`cursor-pointer ${
                   currentLanguage === language.code ? "bg-primary/10 text-primary font-medium" : ""
                 }`}
-                disabled={isTranslating || soulNetTranslationProgress.total > 0}
+                disabled={isTranslating}
               >
                 {language.label}
               </DropdownMenuItem>

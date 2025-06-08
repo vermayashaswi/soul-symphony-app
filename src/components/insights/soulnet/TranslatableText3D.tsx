@@ -1,7 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
 import { useTranslation } from '@/contexts/TranslationContext';
-import { SoulNetTranslationManager } from '@/services/soulNetTranslationManager';
 import SmartTextRenderer from './SmartTextRenderer';
 
 interface TranslatableText3DProps {
@@ -39,108 +38,74 @@ export const TranslatableText3D: React.FC<TranslatableText3DProps> = ({
   sourceLanguage = 'en',
   onTranslationComplete
 }) => {
-  const { currentLanguage, getCachedTranslation } = useTranslation();
+  const { currentLanguage, getCachedTranslation, translate } = useTranslation();
   const [translatedText, setTranslatedText] = useState<string>(text);
   const [isTranslating, setIsTranslating] = useState(false);
-  const [retryCount, setRetryCount] = useState(0);
-  const [hasTranslationCompleted, setHasTranslationCompleted] = useState(false);
-
-  const MAX_RETRIES = 3;
-  const RETRY_DELAY = 1000; // 1 second
+  const [translationAttempted, setTranslationAttempted] = useState(false);
 
   useEffect(() => {
-    const translateWithRetry = async () => {
+    const translateText = async () => {
       if (!text || currentLanguage === sourceLanguage) {
         setTranslatedText(text);
         onTranslationComplete?.(text);
-        setHasTranslationCompleted(true);
+        setTranslationAttempted(true);
         return;
       }
 
-      // PRIORITY 1: Check for pre-cached translation (from SoulNet manager)
-      const managerTranslation = SoulNetTranslationManager.getCompletedTranslation(text, currentLanguage);
-      if (managerTranslation) {
-        console.log(`[TranslatableText3D] Using SoulNet manager translation for "${text}": "${managerTranslation}"`);
-        setTranslatedText(managerTranslation);
-        onTranslationComplete?.(managerTranslation);
-        setHasTranslationCompleted(true);
-        return;
-      }
-
-      // PRIORITY 2: Check for cached translation
+      // PRIORITY 1: Check for pre-cached translation first (from SoulNet preload)
       const cachedTranslation = getCachedTranslation(text);
       if (cachedTranslation) {
-        console.log(`[TranslatableText3D] Using cached translation for "${text}": "${cachedTranslation}"`);
+        console.log(`[TranslatableText3D] Using pre-cached translation for "${text}": "${cachedTranslation}"`);
         setTranslatedText(cachedTranslation);
         onTranslationComplete?.(cachedTranslation);
-        setHasTranslationCompleted(true);
+        setTranslationAttempted(true);
         return;
       }
 
-      // ENHANCED: Retry logic for failed translations
-      if (retryCount < MAX_RETRIES && !hasTranslationCompleted) {
-        console.log(`[TranslatableText3D] Attempting translation for "${text}" (attempt ${retryCount + 1}/${MAX_RETRIES})`);
-        
-        try {
-          setIsTranslating(true);
-          
-          // Use SoulNet translation manager for better reliability
-          const translations = await SoulNetTranslationManager.translateSoulNetNodes(
-            [text],
-            currentLanguage
-          );
-          
-          const result = translations.get(text);
-          
-          if (result && result !== text) {
-            console.log(`[TranslatableText3D] Translation successful: "${text}" -> "${result}"`);
-            setTranslatedText(result);
-            onTranslationComplete?.(result);
-            setHasTranslationCompleted(true);
-          } else if (retryCount < MAX_RETRIES - 1) {
-            console.log(`[TranslatableText3D] Translation attempt ${retryCount + 1} failed, retrying...`);
-            setTimeout(() => {
-              setRetryCount(prev => prev + 1);
-            }, RETRY_DELAY * (retryCount + 1)); // Exponential backoff
-          } else {
-            console.log(`[TranslatableText3D] All translation attempts failed for "${text}", using original`);
-            setTranslatedText(text);
-            onTranslationComplete?.(text);
-            setHasTranslationCompleted(true);
-          }
-        } catch (error) {
-          console.error(`[TranslatableText3D] Translation error for "${text}":`, error);
-          if (retryCount < MAX_RETRIES - 1) {
-            setTimeout(() => {
-              setRetryCount(prev => prev + 1);
-            }, RETRY_DELAY * (retryCount + 1));
-          } else {
-            setTranslatedText(text);
-            onTranslationComplete?.(text);
-            setHasTranslationCompleted(true);
-          }
-        } finally {
-          setIsTranslating(false);
-        }
-      } else if (!hasTranslationCompleted) {
-        // Fallback to original text
-        console.log(`[TranslatableText3D] Using original text for "${text}" after max retries`);
+      // Skip translation if already attempted and failed
+      if (translationAttempted) {
+        console.log(`[TranslatableText3D] Translation already attempted for "${text}", using original`);
         setTranslatedText(text);
         onTranslationComplete?.(text);
-        setHasTranslationCompleted(true);
+        return;
+      }
+
+      if (!translate) {
+        setTranslatedText(text);
+        onTranslationComplete?.(text);
+        setTranslationAttempted(true);
+        return;
+      }
+
+      console.log(`[TranslatableText3D] No cache found, translating "${text}" from ${sourceLanguage} to ${currentLanguage}`);
+      
+      try {
+        setIsTranslating(true);
+        const result = await translate(text, sourceLanguage);
+        
+        if (result && result !== text) {
+          console.log(`[TranslatableText3D] Translation successful: "${text}" -> "${result}"`);
+          setTranslatedText(result);
+          onTranslationComplete?.(result);
+        } else {
+          console.log(`[TranslatableText3D] Using original text for "${text}"`);
+          setTranslatedText(text);
+          onTranslationComplete?.(text);
+        }
+      } catch (error) {
+        console.error(`[TranslatableText3D] Translation failed for "${text}":`, error);
+        setTranslatedText(text);
+        onTranslationComplete?.(text);
+      } finally {
+        setIsTranslating(false);
+        setTranslationAttempted(true);
       }
     };
 
-    translateWithRetry();
-  }, [text, currentLanguage, sourceLanguage, getCachedTranslation, onTranslationComplete, retryCount, hasTranslationCompleted]);
+    translateText();
+  }, [text, currentLanguage, sourceLanguage, translate, getCachedTranslation, onTranslationComplete, translationAttempted]);
 
-  // Reset state when text or language changes
-  useEffect(() => {
-    setRetryCount(0);
-    setHasTranslationCompleted(false);
-    setIsTranslating(false);
-  }, [text, currentLanguage]);
-
+  // Always render with current text - don't hide during translation
   return (
     <SmartTextRenderer
       text={translatedText}
