@@ -4,7 +4,6 @@ import { useFrame } from '@react-three/fiber';
 import { OrbitControls } from '@react-three/drei';
 import * as THREE from 'three';
 import { useTheme } from '@/hooks/use-theme';
-import { useSoulNetTranslation } from '@/hooks/useSoulNetTranslation';
 import Node from './Node';
 import Edge from './Edge';
 
@@ -55,21 +54,9 @@ export const SimplifiedSoulNetVisualization: React.FC<SimplifiedSoulNetVisualiza
   // UPDATED: Use app's theme context instead of system theme detection
   const { theme, systemTheme } = useTheme();
   const effectiveTheme = theme === 'system' ? systemTheme : theme;
-  
-  // Use the new translation system
-  const { translateNodes, isAnyTranslating } = useSoulNetTranslation();
 
-  console.log(`[SimplifiedSoulNetVisualization] MAIN TRANSLATION SERVICE: Using app theme context - theme: ${theme}, systemTheme: ${systemTheme}, effective: ${effectiveTheme}`);
-  console.log(`[SimplifiedSoulNetVisualization] INSTANT MODE: Rendering with ${data.nodes.length} nodes, instantReady: ${isInstantReady}, anyTranslating: ${isAnyTranslating}`);
-
-  // Initialize translations when data changes
-  useEffect(() => {
-    if (data.nodes.length > 0) {
-      const nodeIds = data.nodes.map(node => node.id);
-      console.log(`[SimplifiedSoulNetVisualization] Initializing translations for ${nodeIds.length} nodes`);
-      translateNodes(nodeIds);
-    }
-  }, [data.nodes, translateNodes]);
+  console.log(`[SimplifiedSoulNetVisualization] FIXED THEME: Using app theme context - theme: ${theme}, systemTheme: ${systemTheme}, effective: ${effectiveTheme}`);
+  console.log(`[SimplifiedSoulNetVisualization] INSTANT MODE: Rendering with ${data.nodes.length} nodes, instantReady: ${isInstantReady}`);
 
   // Use Three.js controls for camera
   useFrame(({ camera }) => {
@@ -153,7 +140,7 @@ export const SimplifiedSoulNetVisualization: React.FC<SimplifiedSoulNetVisualiza
         
         const showPercentage = selectedNode !== null && isHighlighted && selectedNode !== node.id && connectionPercentage > 0;
         
-        console.log(`[SimplifiedSoulNetVisualization] MAIN TRANSLATION SERVICE HIERARCHY: Node ${node.id} - highlighted: ${isHighlighted}, dimmed: ${isDimmed}, percentage: ${connectionPercentage}%`);
+        console.log(`[SimplifiedSoulNetVisualization] ENHANCED HIERARCHY: Node ${node.id} - highlighted: ${isHighlighted}, dimmed: ${isDimmed}, percentage: ${connectionPercentage}%`);
         
         return (
           <Node

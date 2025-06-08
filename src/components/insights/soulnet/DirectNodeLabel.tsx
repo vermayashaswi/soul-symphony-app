@@ -1,7 +1,6 @@
-
 import React, { useMemo, useEffect } from 'react';
+import TranslatableText3D from './TranslatableText3D';
 import SimpleText from './SimpleText';
-import { useSoulNetTranslation } from '@/hooks/useSoulNetTranslation';
 
 interface DirectNodeLabelProps {
   id: string;
@@ -34,8 +33,6 @@ export const DirectNodeLabel: React.FC<DirectNodeLabelProps> = ({
   effectiveTheme = 'light',
   isInstantMode = false
 }) => {
-  const { getTranslatedText, isNodeTranslating } = useSoulNetTranslation();
-
   // Listen for tutorial debugging events
   useEffect(() => {
     const handleTutorialDebug = (event: CustomEvent) => {
@@ -51,15 +48,11 @@ export const DirectNodeLabel: React.FC<DirectNodeLabelProps> = ({
     };
   }, [id, shouldShowLabel]);
 
-  // Get translated text and translation state
-  const translatedText = getTranslatedText(id);
-  const isTranslating = isNodeTranslating(id);
-
   // Log rendering mode
   if (isInstantMode) {
-    console.log(`[DirectNodeLabel] INSTANT MODE: ${id} with main translation service - NO LOADING DELAY`);
+    console.log(`[DirectNodeLabel] INSTANT MODE: ${id} with TranslatableText3D integration - NO LOADING DELAY`);
   } else {
-    console.log(`[DirectNodeLabel] ENHANCED POSITIONING: ${id} with main translation service`);
+    console.log(`[DirectNodeLabel] ENHANCED POSITIONING: ${id} with TranslatableText3D integration`);
   }
 
   // Same base offset for both entity and emotion nodes
@@ -97,23 +90,20 @@ export const DirectNodeLabel: React.FC<DirectNodeLabelProps> = ({
 
   // UPDATED: Solid white text for dark theme, solid black text for light theme
   const textColor = useMemo(() => {
-    if (isTranslating) {
-      return '#888888'; // Gray while translating
-    }
     const color = effectiveTheme === 'dark' ? '#ffffff' : '#000000';
     
     if (isInstantMode) {
-      console.log(`[DirectNodeLabel] INSTANT: SOLID TEXT COLOR for ${id}: ${color} (theme: ${effectiveTheme})`);
+      console.log(`[DirectNodeLabel] INSTANT: SOLID WHITE TEXT COLOR for ${id}: ${color} (theme: ${effectiveTheme})`);
     } else {
-      console.log(`[DirectNodeLabel] SOLID TEXT COLOR for ${id}: ${color} (theme: ${effectiveTheme})`);
+      console.log(`[DirectNodeLabel] SOLID WHITE TEXT COLOR for ${id}: ${color} (theme: ${effectiveTheme})`);
     }
     return color;
-  }, [effectiveTheme, id, isInstantMode, isTranslating]);
+  }, [effectiveTheme, id, isInstantMode]);
 
-  // UPDATED: Percentage text also uses solid colors
+  // UPDATED: Percentage text also uses solid white for dark theme
   const percentageColor = useMemo(() => {
     const color = effectiveTheme === 'dark' ? '#ffffff' : '#000000';
-    console.log(`[DirectNodeLabel] SOLID PERCENTAGE COLOR for ${id}: ${color} (theme: ${effectiveTheme})`);
+    console.log(`[DirectNodeLabel] SOLID WHITE PERCENTAGE COLOR for ${id}: ${color} (theme: ${effectiveTheme})`);
     return color;
   }, [effectiveTheme, id]);
 
@@ -166,26 +156,29 @@ export const DirectNodeLabel: React.FC<DirectNodeLabelProps> = ({
   }
 
   if (isInstantMode) {
-    console.log(`[DirectNodeLabel] INSTANT MODE - MAIN TEXT: "${translatedText}" at position`, labelPosition, 'with size:', textSize, 'color:', textColor, '- NO LOADING DELAY - MAIN TRANSLATION SERVICE');
+    console.log(`[DirectNodeLabel] INSTANT MODE - MAIN TEXT: "${id}" at position`, labelPosition, 'with size:', textSize, 'color:', textColor, '- NO LOADING DELAY - GOOGLE TRANSLATE INTEGRATION');
   } else {
-    console.log(`[DirectNodeLabel] ENHANCED POSITIONING - MAIN TEXT: "${translatedText}" at position`, labelPosition, 'with size:', textSize, 'color:', textColor, '- MAIN TRANSLATION SERVICE');
+    console.log(`[DirectNodeLabel] ENHANCED POSITIONING - MAIN TEXT: "${id}" at position`, labelPosition, 'with size:', textSize, 'color:', textColor, '- GOOGLE TRANSLATE INTEGRATION');
   }
 
   return (
     <>
-      {/* Main text using the main translation service */}
-      <SimpleText
-        text={translatedText}
+      {/* Main text using TranslatableText3D with Google Translate integration */}
+      <TranslatableText3D
+        text={id}
         position={labelPosition}
         color={textColor}
         size={textSize}
         visible={true}
         renderOrder={15}
         bold={isHighlighted || isSelected}
-        outlineWidth={0}
-        outlineColor={undefined}
+        outlineWidth={0} // PLAN IMPLEMENTATION: No outline for crisp text
+        outlineColor={undefined} // PLAN IMPLEMENTATION: No outline color needed
         maxWidth={600}
         enableWrapping={true}
+        maxCharsPerLine={18}
+        maxLines={3}
+        sourceLanguage="en"
       />
       
       {/* Enhanced side-positioned percentage text with theme-aware color */}
@@ -198,8 +191,8 @@ export const DirectNodeLabel: React.FC<DirectNodeLabelProps> = ({
           visible={true}
           renderOrder={16}
           bold={true}
-          outlineWidth={0}
-          outlineColor={undefined}
+          outlineWidth={0} // PLAN IMPLEMENTATION: No outline for crisp text
+          outlineColor={undefined} // PLAN IMPLEMENTATION: No outline color needed
           maxWidth={200}
           enableWrapping={false}
         />
