@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+
+import React, { useState, useEffect, useRef } from 'react';
 import { useTranslation } from '@/contexts/TranslationContext';
 import SmartTextRenderer from './SmartTextRenderer';
 
@@ -21,6 +22,8 @@ interface TranslatableText3DProps {
   // ENHANCED APP-LEVEL: Coordinated translation props
   coordinatedTranslation?: string;
   useCoordinatedTranslation?: boolean;
+  // NEW: Force translation method
+  forceTranslate?: boolean;
 }
 
 export const TranslatableText3D: React.FC<TranslatableText3DProps> = ({
@@ -40,81 +43,66 @@ export const TranslatableText3D: React.FC<TranslatableText3DProps> = ({
   sourceLanguage = 'en',
   onTranslationComplete,
   coordinatedTranslation,
-  useCoordinatedTranslation = false
+  useCoordinatedTranslation = false,
+  forceTranslate = false
 }) => {
   const { currentLanguage, getCachedTranslation, translate } = useTranslation();
   const [translatedText, setTranslatedText] = useState<string>(text);
   const [isTranslating, setIsTranslating] = useState(false);
-  const [translationAttempted, setTranslationAttempted] = useState(false);
+  const [translationCompleted, setTranslationCompleted] = useState(false);
+  
+  // Refs to track stable values
+  const currentLangRef = useRef<string>(currentLanguage);
+  const textRef = useRef<string>(text);
+  const forceTranslateRef = useRef<boolean>(forceTranslate);
+
+  // Reset translation completion when text or language changes
+  useEffect(() => {
+    if (textRef.current !== text || currentLangRef.current !== currentLanguage || forceTranslateRef.current !== forceTranslate) {
+      setTranslationCompleted(false);
+      textRef.current = text;
+      currentLangRef.current = currentLanguage;
+      forceTranslateRef.current = forceTranslate;
+    }
+  }, [text, currentLanguage, forceTranslate]);
 
   useEffect(() => {
     const translateText = async () => {
+      // Skip if translation is already completed and not forced
+      if (translationCompleted && !forceTranslate) {
+        console.log(`[TranslatableText3D] Translation already completed for "${text}", skipping`);
+        return;
+      }
+
       // ENHANCED APP-LEVEL: Prioritize coordinated translation for atomic consistency
       if (useCoordinatedTranslation && coordinatedTranslation) {
         console.log(`[TranslatableText3D] ENHANCED APP-LEVEL ATOMIC: Using coordinated translation for "${text}": "${coordinatedTranslation}"`);
         setTranslatedText(coordinatedTranslation);
         onTranslationComplete?.(coordinatedTranslation);
-        setTranslationAttempted(true);
+        setTranslationCompleted(true);
         return;
       }
 
       if (!text || currentLanguage === sourceLanguage) {
         setTranslatedText(text);
         onTranslationComplete?.(text);
-        setTranslationAttempted(true);
+        setTranslationCompleted(true);
         return;
       }
 
-      // ENHANCED: Better fallback handling for coordinated translations with debugging
-      if (useCoordinatedTranslation && !coordinatedTranslation) {
-        console.log(`[TranslatableText3D] ENHANCED APP-LEVEL FALLBACK: No coordinated translation available for "${text}", checking app-level cache with improved error handling`);
-        
-        // Try app-level cache as fallback
-        const appLevelCached = getCachedTranslation(text);
-        if (appLevelCached) {
-          console.log(`[TranslatableText3D] ENHANCED APP-LEVEL FALLBACK: Using app-level cached translation for "${text}": "${appLevelCached}"`);
-          setTranslatedText(appLevelCached);
-          onTranslationComplete?.(appLevelCached);
-          setTranslationAttempted(true);
-          return;
-        }
-        
-        // If no cache available, keep original text to avoid partial states
-        console.log(`[TranslatableText3D] ENHANCED APP-LEVEL FALLBACK: No cache available, using original text for "${text}" to maintain consistency`);
-        setTranslatedText(text);
-        onTranslationComplete?.(text);
-        setTranslationAttempted(true);
+      // Check app-level cache first
+      const appLevelCached = getCachedTranslation(text);
+      if (appLevelCached) {
+        console.log(`[TranslatableText3D] ENHANCED APP-LEVEL: Using app-level cached translation for "${text}": "${appLevelCached}"`);
+        setTranslatedText(appLevelCached);
+        onTranslationComplete?.(appLevelCached);
+        setTranslationCompleted(true);
         return;
       }
 
-      // ENHANCED APP-LEVEL: Standard translation flow for non-coordinated usage
-      if (!useCoordinatedTranslation) {
-        const cachedTranslation = getCachedTranslation(text);
-        if (cachedTranslation) {
-          console.log(`[TranslatableText3D] ENHANCED APP-LEVEL: Using app-level cached translation for "${text}": "${cachedTranslation}"`);
-          setTranslatedText(cachedTranslation);
-          onTranslationComplete?.(cachedTranslation);
-          setTranslationAttempted(true);
-          return;
-        }
-
-        // Skip translation if already attempted and failed
-        if (translationAttempted) {
-          console.log(`[TranslatableText3D] ENHANCED APP-LEVEL: Translation already attempted for "${text}", using original to avoid loops`);
-          setTranslatedText(text);
-          onTranslationComplete?.(text);
-          return;
-        }
-
-        if (!translate) {
-          console.log(`[TranslatableText3D] ENHANCED APP-LEVEL: No translation function available, using original text for "${text}"`);
-          setTranslatedText(text);
-          onTranslationComplete?.(text);
-          setTranslationAttempted(true);
-          return;
-        }
-
-        console.log(`[TranslatableText3D] ENHANCED APP-LEVEL: No cache found, translating "${text}" from ${sourceLanguage} to ${currentLanguage} with enhanced error handling`);
+      // Only proceed with translation if not using coordinated translation
+      if (!useCoordinatedTranslation && translate) {
+        console.log(`[TranslatableText3D] ENHANCED APP-LEVEL: Starting translation for "${text}" from ${sourceLanguage} to ${currentLanguage}`);
         
         try {
           setIsTranslating(true);
@@ -129,19 +117,26 @@ export const TranslatableText3D: React.FC<TranslatableText3DProps> = ({
             setTranslatedText(text);
             onTranslationComplete?.(text);
           }
+          setTranslationCompleted(true);
         } catch (error) {
           console.error(`[TranslatableText3D] ENHANCED APP-LEVEL: Translation failed for "${text}":`, error);
           setTranslatedText(text);
           onTranslationComplete?.(text);
+          setTranslationCompleted(true);
         } finally {
           setIsTranslating(false);
-          setTranslationAttempted(true);
         }
+      } else {
+        // For coordinated translation without coordination data, use original text
+        console.log(`[TranslatableText3D] ENHANCED APP-LEVEL: Using original text for coordinated translation without data: "${text}"`);
+        setTranslatedText(text);
+        onTranslationComplete?.(text);
+        setTranslationCompleted(true);
       }
     };
 
     translateText();
-  }, [text, currentLanguage, sourceLanguage, translate, getCachedTranslation, onTranslationComplete, translationAttempted, coordinatedTranslation, useCoordinatedTranslation]);
+  }, [text, currentLanguage, sourceLanguage, translate, getCachedTranslation, onTranslationComplete, coordinatedTranslation, useCoordinatedTranslation, forceTranslate, translationCompleted]);
 
   // Always render with current text - don't hide during translation
   return (
