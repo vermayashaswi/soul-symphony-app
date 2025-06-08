@@ -1,23 +1,23 @@
 
 import React, { useMemo } from 'react';
-import SimpleText from './SimpleText';
+import SmartTextRenderer from './SmartTextRenderer';
 
-interface FixedConnectionPercentageProps {
+interface RobustConnectionPercentageProps {
   position: [number, number, number];
   percentage: number;
   isVisible: boolean;
   nodeType?: 'entity' | 'emotion';
 }
 
-export const FixedConnectionPercentage: React.FC<FixedConnectionPercentageProps> = ({
+export const RobustConnectionPercentage: React.FC<RobustConnectionPercentageProps> = ({
   position,
   percentage,
   isVisible,
   nodeType = 'emotion'
 }) => {
-  console.log(`[FixedConnectionPercentage] Rendering ${percentage}% at`, position, 'visible:', isVisible, 'nodeType:', nodeType);
+  console.log(`[RobustConnectionPercentage] Rendering ${percentage}% at`, position, 'visible:', isVisible, 'nodeType:', nodeType);
 
-  // Format percentage with validation
+  // Format percentage with robust validation
   const formattedPercentage = useMemo(() => {
     const validPercentage = Math.round(Math.max(0, Math.min(100, percentage || 0)));
     return `${validPercentage}%`;
@@ -25,7 +25,7 @@ export const FixedConnectionPercentage: React.FC<FixedConnectionPercentageProps>
 
   // Enhanced visibility check
   if (!isVisible || !percentage || percentage <= 0) {
-    console.log(`[FixedConnectionPercentage] Not rendering: visible=${isVisible}, percentage=${percentage}`);
+    console.log(`[RobustConnectionPercentage] Not rendering: visible=${isVisible}, percentage=${percentage}`);
     return null;
   }
 
@@ -40,10 +40,10 @@ export const FixedConnectionPercentage: React.FC<FixedConnectionPercentageProps>
     ];
   }, [position, nodeType]);
 
-  console.log(`[FixedConnectionPercentage] Final render: "${formattedPercentage}" at`, percentagePosition, 'for nodeType:', nodeType);
+  console.log(`[RobustConnectionPercentage] Final render: "${formattedPercentage}" at`, percentagePosition, 'for nodeType:', nodeType);
 
   return (
-    <SimpleText
+    <SmartTextRenderer
       text={formattedPercentage}
       position={percentagePosition}
       color="#ffff00"
@@ -58,4 +58,4 @@ export const FixedConnectionPercentage: React.FC<FixedConnectionPercentageProps>
   );
 };
 
-export default FixedConnectionPercentage;
+export default RobustConnectionPercentage;

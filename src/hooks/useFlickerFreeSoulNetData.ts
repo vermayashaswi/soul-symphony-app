@@ -28,8 +28,8 @@ interface UseFlickerFreeSoulNetDataReturn {
   loading: boolean;
   error: Error | null;
   isReady: boolean;
-  isTranslationsReady: boolean;
-  translationProgress: number;
+  retryCount: number;
+  incrementRetry: () => void;
   retryTranslations: () => Promise<void>;
   getInstantConnectionPercentage: (nodeId: string, connectedNodeId: string) => number;
   getInstantTranslation: (text: string) => string | null;
@@ -45,14 +45,12 @@ export function useFlickerFreeSoulNetData(
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
   const [isReady, setIsReady] = useState(false);
-  const [isTranslationsReady, setIsTranslationsReady] = useState(false);
-  const [translationProgress, setTranslationProgress] = useState(0);
+  const [retryCount, setRetryCount] = useState(0);
   
   const preloadedDataRef = useRef<any>(null);
   const connectionsMapRef = useRef<Map<string, Set<string>>>(new Map());
   const percentagesMapRef = useRef<Map<string, number>>(new Map());
   const translationCacheRef = useRef<Map<string, string>>(new Map());
-  const retryCountRef = useRef(0);
 
   console.log('[useFlickerFreeSoulNetData] HOOK STATE:', {
     userId,
@@ -60,9 +58,7 @@ export function useFlickerFreeSoulNetData(
     language: currentLanguage,
     nodesCount: graphData.nodes.length,
     isReady,
-    isTranslationsReady,
-    translationProgress,
-    retryCount: retryCountRef.current
+    retryCount
   });
 
   // Instant connection percentage lookup
@@ -71,19 +67,19 @@ export function useFlickerFreeSoulNetData(
     return percentagesMapRef.current.get(key) || 0;
   }, []);
 
-  // Instant translation lookup using local cache
+  // Robust instant translation lookup using local cache
   const getInstantTranslation = useCallback((text: string): string | null => {
     // For English, always return the original text
     if (currentLanguage === 'en') {
       return text;
     }
     
-    if (!userId) {
-      console.log(`[useFlickerFreeSoulNetData] No userId for translation: "${text}"`);
+    if (!userId || !text || typeof text !== 'string' || text.trim().length === 0) {
+      console.log(`[useFlickerFreeSoulNetData] Invalid input for translation: "${text}"`);
       return null;
     }
     
-    const cacheKey = `${text}-${currentLanguage}`;
+    const cacheKey = `${text.trim()}-${currentLanguage}`;
     const cached = translationCacheRef.current.get(cacheKey);
     
     if (cached) {
@@ -99,7 +95,12 @@ export function useFlickerFreeSoulNetData(
     return connectionsMapRef.current.get(nodeId) || new Set();
   }, []);
 
-  // Retry mechanism for translations
+  // Increment retry counter
+  const incrementRetry = useCallback(() => {
+    setRetryCount(prev => prev + 1);
+  }, []);
+
+  // Enhanced retry mechanism for translations
   const retryTranslations = useCallback(async () => {
     if (!userId) {
       console.log('[useFlickerFreeSoulNetData] Cannot retry translations: no userId');
@@ -107,22 +108,17 @@ export function useFlickerFreeSoulNetData(
     }
 
     if (currentLanguage === 'en') {
-      setIsTranslationsReady(true);
-      setTranslationProgress(100);
+      console.log('[useFlickerFreeSoulNetData] English language, no translation needed');
       return;
     }
 
     if (!translate) {
       console.log('[useFlickerFreeSoulNetData] No translate function available');
-      setIsTranslationsReady(false);
       return;
     }
 
-    console.log(`[useFlickerFreeSoulNetData] RETRYING translations (attempt ${retryCountRef.current + 1})`);
-    retryCountRef.current += 1;
-    setTranslationProgress(0);
-    setIsTranslationsReady(false);
-
+    console.log(`[useFlickerFreeSoulNetData] RETRYING translations (attempt ${retryCount + 1})`);
+    
     try {
       // Clear old cache before retry
       translationCacheRef.current.clear();
@@ -132,130 +128,44 @@ export function useFlickerFreeSoulNetData(
       
       if (nodeTexts.length === 0) {
         console.log('[useFlickerFreeSoulNetData] No node texts to translate');
-        setIsTranslationsReady(true);
-        setTranslationProgress(100);
         return;
       }
-
-      setTranslationProgress(25);
       
-      // Translate all node texts
+      // Translate all node texts with robust error handling
       const translationPromises = nodeTexts.map(async (text: string) => {
         try {
-          const translated = await translate(text);
-          const cacheKey = `${text}-${currentLanguage}`;
-          translationCacheRef.current.set(cacheKey, translated || text);
-          return { text, translated: translated || text };
+          if (!text || typeof text !== 'string' || text.trim().length === 0) {
+            console.warn(`[useFlickerFreeSoulNetData] Skipping invalid text: "${text}"`);
+            return { text, translated: text };
+          }
+
+          const translated = await translate(text.trim());
+          const cacheKey = `${text.trim()}-${currentLanguage}`;
+          
+          if (translated && typeof translated === 'string' && translated.trim().length > 0) {
+            translationCacheRef.current.set(cacheKey, translated.trim());
+            return { text, translated: translated.trim() };
+          } else {
+            translationCacheRef.current.set(cacheKey, text.trim());
+            return { text, translated: text.trim() };
+          }
         } catch (error) {
           console.error(`[useFlickerFreeSoulNetData] Failed to translate "${text}":`, error);
-          const cacheKey = `${text}-${currentLanguage}`;
-          translationCacheRef.current.set(cacheKey, text);
-          return { text, translated: text };
+          const cacheKey = `${text.trim()}-${currentLanguage}`;
+          translationCacheRef.current.set(cacheKey, text.trim());
+          return { text, translated: text.trim() };
         }
       });
-
-      setTranslationProgress(50);
       
       const results = await Promise.all(translationPromises);
       
-      setTranslationProgress(75);
-      
       console.log(`[useFlickerFreeSoulNetData] RETRY SUCCESS: ${results.length} translations processed`);
-      setTranslationProgress(100);
-      setIsTranslationsReady(true);
-      retryCountRef.current = 0; // Reset on success
+      setRetryCount(prev => prev + 1);
       
     } catch (error) {
       console.error(`[useFlickerFreeSoulNetData] RETRY ERROR:`, error);
-      setTranslationProgress(0);
-      setIsTranslationsReady(false);
     }
-  }, [userId, currentLanguage, translate]);
-
-  // Translation preloading effect
-  useEffect(() => {
-    let mounted = true;
-
-    const preloadTranslations = async () => {
-      if (!userId) {
-        setIsTranslationsReady(false);
-        setTranslationProgress(0);
-        return;
-      }
-
-      // For English, we're always ready
-      if (currentLanguage === 'en') {
-        setIsTranslationsReady(true);
-        setTranslationProgress(100);
-        return;
-      }
-
-      if (!translate) {
-        console.log('[useFlickerFreeSoulNetData] No translate function available');
-        setIsTranslationsReady(false);
-        setTranslationProgress(0);
-        return;
-      }
-
-      if (!preloadedDataRef.current?.nodes) {
-        console.log('[useFlickerFreeSoulNetData] No preloaded data for translations');
-        setIsTranslationsReady(false);
-        setTranslationProgress(0);
-        return;
-      }
-
-      console.log(`[useFlickerFreeSoulNetData] PRELOADING TRANSLATIONS for ${currentLanguage}`);
-      setTranslationProgress(10);
-      setIsTranslationsReady(false);
-      
-      try {
-        const nodeTexts = preloadedDataRef.current.nodes.map((node: NodeData) => node.id);
-        
-        setTranslationProgress(30);
-        
-        // Translate all node texts
-        const translationPromises = nodeTexts.map(async (text: string) => {
-          try {
-            const translated = await translate(text);
-            const cacheKey = `${text}-${currentLanguage}`;
-            translationCacheRef.current.set(cacheKey, translated || text);
-            return translated || text;
-          } catch (error) {
-            console.error(`[useFlickerFreeSoulNetData] Translation failed for "${text}":`, error);
-            const cacheKey = `${text}-${currentLanguage}`;
-            translationCacheRef.current.set(cacheKey, text);
-            return text;
-          }
-        });
-
-        setTranslationProgress(60);
-        
-        const results = await Promise.all(translationPromises);
-        
-        if (mounted) {
-          console.log(`[useFlickerFreeSoulNetData] TRANSLATION SUCCESS: ${results.length} translations loaded`);
-          setTranslationProgress(100);
-          setIsTranslationsReady(true);
-          retryCountRef.current = 0;
-        }
-      } catch (error) {
-        console.error(`[useFlickerFreeSoulNetData] TRANSLATION ERROR:`, error);
-        if (mounted) {
-          setTranslationProgress(0);
-          setIsTranslationsReady(false);
-        }
-      }
-    };
-
-    // Only start translation preloading if we have data
-    if (isReady && preloadedDataRef.current?.nodes) {
-      preloadTranslations();
-    }
-
-    return () => {
-      mounted = false;
-    };
-  }, [userId, currentLanguage, translate, isReady]);
+  }, [userId, currentLanguage, translate, retryCount]);
 
   // Load SoulNet data
   useEffect(() => {
@@ -346,8 +256,8 @@ export function useFlickerFreeSoulNetData(
     loading,
     error,
     isReady,
-    isTranslationsReady,
-    translationProgress,
+    retryCount,
+    incrementRetry,
     retryTranslations,
     getInstantConnectionPercentage,
     getInstantTranslation,

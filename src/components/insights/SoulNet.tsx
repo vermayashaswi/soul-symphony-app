@@ -26,9 +26,7 @@ interface SoulNetProps {
 const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
   const [isFullScreen, setIsFullScreen] = useState(false);
   const [canvasError, setCanvasError] = useState<Error | null>(null);
-  const [retryCount, setRetryCount] = useState(0);
   const [renderingReady, setRenderingReady] = useState(false);
-  const [translationRetryCount, setTranslationRetryCount] = useState(0);
   const isMobile = useIsMobile();
   const themeHex = useUserColorThemeHex();
   const [selectedEntity, setSelectedEntity] = useState<string | null>(null);
@@ -36,18 +34,21 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
   
   const stableRenderingRef = useRef(false);
 
-  // Use the data hook without strict translation requirements
+  // Use the enhanced data hook with retry functionality
   const { 
     graphData, 
     loading, 
     error,
     isReady,
+    retryCount,
+    incrementRetry,
+    retryTranslations,
     getInstantConnectionPercentage,
     getInstantTranslation,
     getInstantNodeConnections
   } = useFlickerFreeSoulNetData(userId, timeRange);
 
-  console.log("[SoulNet] Using GoogleWebTranslate approach", { 
+  console.log("[SoulNet] Using robust translation system", { 
     userId, 
     timeRange, 
     currentLanguage,
@@ -55,23 +56,25 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
     isReady,
     loading,
     renderingReady,
+    retryCount,
     stableRendering: stableRenderingRef.current
   });
 
   useEffect(() => {
-    console.log("[SoulNet] Component mounted with GoogleWebTranslate system");
+    console.log("[SoulNet] Component mounted with robust translation system");
     
     return () => {
       console.log("[SoulNet] Component unmounted");
     };
   }, []);
 
-  // Simplified rendering initialization - no strict translation requirements
+  // Enhanced rendering initialization
   useEffect(() => {
     if (isReady && graphData.nodes.length > 0 && !stableRenderingRef.current) {
       console.log("[SoulNet] INITIALIZING RENDERING - data ready", {
         isReady,
-        currentLanguage
+        currentLanguage,
+        retryCount
       });
       setRenderingReady(true);
       stableRenderingRef.current = true;
@@ -83,11 +86,11 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
       setRenderingReady(false);
       stableRenderingRef.current = false;
     }
-  }, [isReady, graphData.nodes.length, loading, error, currentLanguage]);
+  }, [isReady, graphData.nodes.length, loading, error, currentLanguage, retryCount]);
 
-  // Enhanced node selection without re-renders
+  // Enhanced node selection
   const handleNodeSelect = useCallback((id: string) => {
-    console.log(`[SoulNet] Node selected: ${id} - stable state management`);
+    console.log(`[SoulNet] Node selected: ${id}`);
     if (selectedEntity === id) {
       setSelectedEntity(null);
     } else {
@@ -109,32 +112,35 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
   const handleCanvasError = useCallback((error: Error) => {
     console.error('[SoulNet] Canvas error:', error);
     setCanvasError(error);
-    setRetryCount(prev => prev + 1);
-    // Reset stable rendering on canvas errors
+    incrementRetry();
     setRenderingReady(false);
     stableRenderingRef.current = false;
-  }, []);
+  }, [incrementRetry]);
 
   const handleRetry = useCallback(() => {
     setCanvasError(null);
-    setRetryCount(0);
-    // Allow re-initialization after retry
     stableRenderingRef.current = false;
-  }, []);
+    incrementRetry();
+  }, [incrementRetry]);
 
-  // Translation retry mechanism
-  const handleTranslationRetry = useCallback(() => {
+  // Enhanced translation retry mechanism
+  const handleTranslationRetry = useCallback(async () => {
     console.log("[SoulNet] RETRYING translations");
-    setTranslationRetryCount(prev => prev + 1);
     setRenderingReady(false);
     stableRenderingRef.current = false;
     
-    // Force component re-render to trigger new translations
-    setTimeout(() => {
-      setRenderingReady(true);
-      stableRenderingRef.current = true;
-    }, 100);
-  }, []);
+    try {
+      await retryTranslations();
+      
+      // Force component re-render after translations
+      setTimeout(() => {
+        setRenderingReady(true);
+        stableRenderingRef.current = true;
+      }, 500);
+    } catch (error) {
+      console.error('[SoulNet] Translation retry failed:', error);
+    }
+  }, [retryTranslations]);
 
   // Show loading only when we have no data
   if (loading && graphData.nodes.length === 0) {
@@ -261,18 +267,19 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
     )}>
       {!isFullScreen && <SoulNetDescription />}
       
-      {/* Translation retry mechanism */}
-      {currentLanguage !== 'en' && translationRetryCount < 3 && (
+      {/* Enhanced translation retry mechanism */}
+      {currentLanguage !== 'en' && (
         <div className="mb-4 flex justify-end">
           <Button
             onClick={handleTranslationRetry}
             size="sm"
             variant="outline"
             className="text-xs"
+            disabled={loading}
           >
             <RefreshCw className="h-3 w-3 mr-1" />
             <TranslatableText 
-              text="Refresh Translations" 
+              text={`Refresh Translations${retryCount > 0 ? ` (${retryCount})` : ''}`}
               forceTranslate={true}
               enableFontScaling={true}
               scalingContext="compact"
@@ -363,6 +370,7 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
                 isInstantReady={isReady}
                 userId={userId}
                 timeRange={timeRange}
+                retryKey={retryCount}
               />
             </Canvas>
           )}

@@ -1,9 +1,9 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
-import SimpleText from './SimpleText';
 import { useTranslation } from '@/contexts/TranslationContext';
+import SmartTextRenderer from './SmartTextRenderer';
 
-interface ProgressiveNodeLabelProps {
+interface UnifiedNodeLabelProps {
   id: string;
   type: 'entity' | 'emotion';
   position: [number, number, number];
@@ -13,9 +13,10 @@ interface ProgressiveNodeLabelProps {
   cameraZoom?: number;
   themeHex: string;
   nodeScale?: number;
+  retryKey?: number;
 }
 
-export const ProgressiveNodeLabel: React.FC<ProgressiveNodeLabelProps> = ({
+export const UnifiedNodeLabel: React.FC<UnifiedNodeLabelProps> = ({
   id,
   type,
   position,
@@ -24,18 +25,19 @@ export const ProgressiveNodeLabel: React.FC<ProgressiveNodeLabelProps> = ({
   shouldShowLabel,
   cameraZoom = 45,
   themeHex,
-  nodeScale = 1
+  nodeScale = 1,
+  retryKey = 0
 }) => {
   const { currentLanguage, translate } = useTranslation();
   const [displayText, setDisplayText] = useState<string>(id);
   const [isTranslationReady, setIsTranslationReady] = useState<boolean>(false);
 
-  console.log(`[ProgressiveNodeLabel] Rendering for ${id}, visible: ${shouldShowLabel}`);
+  console.log(`[UnifiedNodeLabel] Processing: ${id}, visible: ${shouldShowLabel}, retry: ${retryKey}`);
 
-  // Handle translation using GoogleWebTranslate approach
+  // Handle translation using robust approach
   useEffect(() => {
     const translateText = async () => {
-      if (!shouldShowLabel || !id) {
+      if (!shouldShowLabel || !id || typeof id !== 'string' || id.trim().length === 0) {
         setIsTranslationReady(false);
         return;
       }
@@ -47,36 +49,35 @@ export const ProgressiveNodeLabel: React.FC<ProgressiveNodeLabelProps> = ({
           return;
         }
 
-        console.log(`[ProgressiveNodeLabel] Translating "${id}" to ${currentLanguage}`);
+        console.log(`[UnifiedNodeLabel] Translating "${id}" to ${currentLanguage}`);
+        setIsTranslationReady(false);
+        
         const translated = await translate(id);
         
-        if (translated && typeof translated === 'string') {
+        if (translated && typeof translated === 'string' && translated.trim().length > 0) {
           setDisplayText(translated);
-          console.log(`[ProgressiveNodeLabel] Translation: "${id}" -> "${translated}"`);
+          console.log(`[UnifiedNodeLabel] Translation: "${id}" -> "${translated}"`);
         } else {
           setDisplayText(id);
         }
         
         setIsTranslationReady(true);
       } catch (error) {
-        console.warn(`[ProgressiveNodeLabel] Translation failed for ${id}:`, error);
+        console.warn(`[UnifiedNodeLabel] Translation failed for ${id}:`, error);
         setDisplayText(id);
         setIsTranslationReady(true);
       }
     };
 
-    setIsTranslationReady(false);
     translateText();
-  }, [id, currentLanguage, translate, shouldShowLabel]);
+  }, [id, currentLanguage, translate, shouldShowLabel, retryKey]);
 
   // Calculate position offset
   const labelOffset = useMemo(() => {
     const baseOffset = type === 'entity' ? 1.8 : 2.2;
     const scaledOffset = baseOffset * Math.max(0.5, Math.min(2, nodeScale));
-    
-    console.log(`[ProgressiveNodeLabel] Label offset for ${id} (${type}): ${scaledOffset} (scale: ${nodeScale})`);
     return [0, scaledOffset, 0] as [number, number, number];
-  }, [type, nodeScale, id]);
+  }, [type, nodeScale]);
 
   // Calculate text properties
   const textSize = useMemo(() => {
@@ -102,10 +103,8 @@ export const ProgressiveNodeLabel: React.FC<ProgressiveNodeLabelProps> = ({
     return null;
   }
 
-  console.log(`[ProgressiveNodeLabel] Final render: "${displayText}" at position`, labelPosition);
-
   return (
-    <SimpleText
+    <SmartTextRenderer
       text={displayText}
       position={labelPosition}
       color={textColor}
@@ -120,4 +119,4 @@ export const ProgressiveNodeLabel: React.FC<ProgressiveNodeLabelProps> = ({
   );
 };
 
-export default ProgressiveNodeLabel;
+export default UnifiedNodeLabel;
