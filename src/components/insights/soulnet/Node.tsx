@@ -128,10 +128,10 @@ const Node: React.FC<NodeProps> = ({
       >
         <sphereGeometry args={[1, 16, 16]} />
         <meshPhongMaterial
-          color={new THREE.Color(nodeColor)}
-          emissive={new THREE.Color(emissiveColor)}
+          color={nodeColor}
+          emissive={emissiveColor}
           emissiveIntensity={isSelected || hovered ? 0.2 : 0}
-          transparent={true}
+          transparent
           opacity={dimmed ? 0.3 : 0.9}
         />
       </mesh>
