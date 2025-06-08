@@ -1,13 +1,11 @@
 
-import React, { useMemo, useEffect, useRef, useState } from 'react';
-import { useFrame, useThree } from '@react-three/fiber';
+import React, { useState, useEffect, useCallback } from 'react';
+import { useFrame } from '@react-three/fiber';
 import { OrbitControls } from '@react-three/drei';
+import * as THREE from 'three';
+import { useTheme } from '@/hooks/use-theme';
 import Node from './Node';
 import Edge from './Edge';
-import { TimeRange } from '@/hooks/use-insights-data';
-import RobustTranslatableText3D from './RobustTranslatableText3D';
-import UnifiedNodeLabel from './UnifiedNodeLabel';
-import RobustConnectionPercentage from './RobustConnectionPercentage';
 
 interface NodeData {
   id: string;
@@ -23,215 +21,179 @@ interface LinkData {
   value: number;
 }
 
-interface GraphData {
-  nodes: NodeData[];
-  links: LinkData[];
-}
-
 interface SimplifiedSoulNetVisualizationProps {
-  data: GraphData;
+  data: { nodes: NodeData[], links: LinkData[] };
   selectedNode: string | null;
   onNodeClick: (id: string) => void;
   themeHex: string;
-  isFullScreen?: boolean;
-  shouldShowLabels?: boolean;
-  getInstantConnectionPercentage: (nodeId: string, connectedNodeId: string) => number;
-  getInstantTranslation: (text: string) => string | null;
-  getInstantNodeConnections: (nodeId: string) => Set<string>;
-  isInstantReady: boolean;
-  userId?: string;
-  timeRange?: TimeRange;
-  retryKey?: number;
+  isFullScreen: boolean;
+  shouldShowLabels: boolean;
+  // NEW: Instant data access functions
+  getInstantConnectionPercentage?: (selectedNode: string, targetNode: string) => number;
+  getInstantTranslation?: (nodeId: string) => string;
+  getInstantNodeConnections?: (nodeId: string) => any;
+  isInstantReady?: boolean;
 }
 
-const SimplifiedSoulNetVisualization: React.FC<SimplifiedSoulNetVisualizationProps> = ({
+export const SimplifiedSoulNetVisualization: React.FC<SimplifiedSoulNetVisualizationProps> = ({
   data,
   selectedNode,
   onNodeClick,
   themeHex,
-  isFullScreen = false,
-  shouldShowLabels = true,
-  getInstantConnectionPercentage,
-  getInstantTranslation,
-  getInstantNodeConnections,
-  isInstantReady,
-  userId,
-  timeRange,
-  retryKey = 0
+  isFullScreen,
+  shouldShowLabels,
+  getInstantConnectionPercentage = () => 0,
+  getInstantTranslation = (id: string) => id,
+  getInstantNodeConnections = () => ({ connectedNodes: [], totalStrength: 0, averageStrength: 0 }),
+  isInstantReady = false
 }) => {
-  const { camera } = useThree();
-  const controlsRef = useRef<any>();
+  const [highlightedNodes, setHighlightedNodes] = useState<Set<string>>(new Set());
+  const [dimmedNodes, setDimmedNodes] = useState<Set<string>>(new Set());
   const [cameraZoom, setCameraZoom] = useState(45);
-  const [highlightedConnections, setHighlightedConnections] = useState<Set<string>>(new Set());
+  
+  // UPDATED: Use app's theme context instead of system theme detection
+  const { theme, systemTheme } = useTheme();
+  const effectiveTheme = theme === 'system' ? systemTheme : theme;
 
-  console.log(`[SimplifiedSoulNetVisualization] Rendering with ${data.nodes.length} nodes, selectedNode: ${selectedNode}, retryKey: ${retryKey}`);
+  console.log(`[SimplifiedSoulNetVisualization] FIXED THEME: Using app theme context - theme: ${theme}, systemTheme: ${systemTheme}, effective: ${effectiveTheme}`);
+  console.log(`[SimplifiedSoulNetVisualization] INSTANT MODE: Rendering with ${data.nodes.length} nodes, instantReady: ${isInstantReady}`);
 
-  // Track camera zoom for responsive text sizing
-  useFrame(() => {
-    if (camera && camera.position) {
-      const distance = camera.position.length();
-      setCameraZoom(distance);
+  // Use Three.js controls for camera
+  useFrame(({ camera }) => {
+    const newZoom = camera.position.length();
+    if (Math.abs(newZoom - cameraZoom) > 0.1) {
+      setCameraZoom(newZoom);
     }
   });
 
-  // Handle node selection and connection highlighting
+  // ENHANCED: Instant highlighting effect with stronger visual hierarchy
   useEffect(() => {
-    if (selectedNode && isInstantReady) {
-      const connections = getInstantNodeConnections(selectedNode);
-      setHighlightedConnections(connections);
-      console.log(`[SimplifiedSoulNetVisualization] Selected ${selectedNode}, highlighting ${connections.size} connections`);
-    } else {
-      setHighlightedConnections(new Set());
-    }
-  }, [selectedNode, getInstantNodeConnections, isInstantReady]);
-
-  // Create highlighted nodes set for Node component
-  const highlightedNodes = useMemo(() => {
-    const highlighted = new Set<string>();
     if (selectedNode) {
-      highlighted.add(selectedNode);
-      highlightedConnections.forEach(nodeId => highlighted.add(nodeId));
-    }
-    return highlighted;
-  }, [selectedNode, highlightedConnections]);
-
-  // Memoized nodes with correct prop structure
-  const renderedNodes = useMemo(() => {
-    if (!data.nodes || data.nodes.length === 0) {
-      console.log('[SimplifiedSoulNetVisualization] No nodes to render');
-      return [];
-    }
-
-    return data.nodes.map((node) => {
-      const isSelected = selectedNode === node.id;
-      const isHighlighted = highlightedConnections.has(node.id);
-      const isDimmed = selectedNode !== null && !isSelected && !isHighlighted;
+      const connectedNodes = new Set<string>();
+      const allOtherNodes = new Set<string>();
       
-      const connectionPercentage = selectedNode ? getInstantConnectionPercentage(selectedNode, node.id) : 0;
-      
-      return (
-        <Node
-          key={`${node.id}-${retryKey}`}
-          node={node}
-          isSelected={isSelected}
-          onClick={onNodeClick}
-          highlightedNodes={highlightedNodes}
-          showLabel={shouldShowLabels}
-          dimmed={isDimmed}
-          themeHex={themeHex}
-          selectedNodeId={selectedNode}
-          cameraZoom={cameraZoom}
-          isHighlighted={isHighlighted}
-          connectionPercentage={connectionPercentage}
-          showPercentage={isSelected && connectionPercentage > 0}
-          forceShowLabels={shouldShowLabels}
-          effectiveTheme="light"
-          isInstantMode={isInstantReady}
-          userId={userId}
-          timeRange={timeRange?.toString()}
-        />
-      );
-    });
-  }, [
-    data.nodes, 
-    selectedNode, 
-    highlightedConnections, 
-    highlightedNodes,
-    onNodeClick, 
-    shouldShowLabels, 
-    isInstantReady, 
-    cameraZoom, 
-    themeHex,
-    retryKey,
-    getInstantConnectionPercentage,
-    userId,
-    timeRange
-  ]);
-
-  // Memoized edges with correct prop structure
-  const renderedEdges = useMemo(() => {
-    if (!data.links || data.links.length === 0) {
-      console.log('[SimplifiedSoulNetVisualization] No links to render');
-      return [];
-    }
-
-    return data.links.map((link, index) => {
-      const sourceNode = data.nodes.find(n => n.id === link.source);
-      const targetNode = data.nodes.find(n => n.id === link.target);
-      
-      if (!sourceNode || !targetNode) {
-        console.warn(`[SimplifiedSoulNetVisualization] Missing node for link: ${link.source} -> ${link.target}`);
-        return null;
+      // Use instant connection data if available
+      if (isInstantReady) {
+        const connectionData = getInstantNodeConnections(selectedNode);
+        connectionData.connectedNodes.forEach((nodeId: string) => {
+          connectedNodes.add(nodeId);
+        });
+        connectedNodes.add(selectedNode); // Include the selected node itself
+        
+        console.log(`[SimplifiedSoulNetVisualization] INSTANT: Using precomputed connections for ${selectedNode}:`, connectionData.connectedNodes);
+      } else {
+        // Fallback to link traversal
+        data.links.forEach(link => {
+          if (link.source === selectedNode || link.target === selectedNode) {
+            connectedNodes.add(link.source);
+            connectedNodes.add(link.target);
+          }
+        });
       }
+      
+      // ENHANCED: All nodes that are NOT connected become dimmed
+      data.nodes.forEach(node => {
+        if (!connectedNodes.has(node.id)) {
+          allOtherNodes.add(node.id);
+        }
+      });
+      
+      setHighlightedNodes(connectedNodes);
+      setDimmedNodes(allOtherNodes);
+      
+      console.log(`[SimplifiedSoulNetVisualization] ENHANCED HIERARCHY: Selected ${selectedNode}, highlighting ${connectedNodes.size} nodes, dimming ${allOtherNodes.size} nodes`);
+    } else {
+      // ENHANCED: When no node is selected, show all nodes normally (no dimming)
+      setHighlightedNodes(new Set());
+      setDimmedNodes(new Set());
+    }
+  }, [selectedNode, data.links, data.nodes, isInstantReady, getInstantNodeConnections]);
 
-      const isHighlighted = selectedNode && (
-        link.source === selectedNode || 
-        link.target === selectedNode ||
-        (highlightedConnections.has(link.source) && highlightedConnections.has(link.target))
-      );
-
-      const isDimmed = selectedNode !== null && !isHighlighted;
-
-      return (
-        <Edge
-          key={`${link.source}-${link.target}-${index}-${retryKey}`}
-          start={sourceNode.position}
-          end={targetNode.position}
-          value={link.value}
-          isHighlighted={isHighlighted}
-          dimmed={isDimmed}
-          maxThickness={5}
-          startNodeType={sourceNode.type}
-          endNodeType={targetNode.type}
-          startNodeScale={1}
-          endNodeScale={1}
-        />
-      );
-    }).filter(Boolean);
-  }, [data.links, data.nodes, selectedNode, highlightedConnections, retryKey]);
-
-  if (!data.nodes || data.nodes.length === 0) {
-    console.log('[SimplifiedSoulNetVisualization] No data available for visualization');
-    return null;
-  }
-
-  console.log(`[SimplifiedSoulNetVisualization] Final render: ${renderedNodes.length} nodes, ${renderedEdges.length} edges`);
+  // Helper function to find node by id
+  const findNodeById = useCallback((nodeId: string): NodeData | undefined => {
+    return data.nodes.find(node => node.id === nodeId);
+  }, [data.nodes]);
 
   return (
     <>
-      {/* Enhanced lighting for better visibility */}
-      <ambientLight intensity={0.6} />
-      <directionalLight 
-        position={[10, 10, 5]} 
-        intensity={0.8} 
-        castShadow
-        shadow-mapSize-width={2048}
-        shadow-mapSize-height={2048}
-      />
-      <pointLight position={[-10, -10, -5]} intensity={0.4} />
-      
-      {/* Enhanced camera controls */}
-      <OrbitControls
-        ref={controlsRef}
-        enableDamping
-        dampingFactor={0.1}
-        enableZoom
-        enableRotate
-        enablePan={isFullScreen}
-        minDistance={isFullScreen ? 20 : 25}
-        maxDistance={isFullScreen ? 100 : 80}
-        minPolarAngle={0.2}
-        maxPolarAngle={Math.PI - 0.2}
-        rotateSpeed={0.8}
-        zoomSpeed={1.2}
-        panSpeed={0.8}
+      {/* ENHANCED: Brighter ambient lighting for better visibility of highlighted elements */}
+      <ambientLight intensity={0.8} />
+      <directionalLight position={[10, 10, 5]} intensity={1.2} />
+      <OrbitControls 
+        enablePan={true} 
+        enableZoom={true} 
+        enableRotate={true}
+        minDistance={15}
+        maxDistance={120}
+        enableDamping={true}
+        dampingFactor={0.05}
       />
       
-      {/* Render all nodes */}
-      {renderedNodes}
+      {data.nodes.map((node) => {
+        const isHighlighted = highlightedNodes.has(node.id);
+        const isDimmed = dimmedNodes.has(node.id);
+        
+        // INSTANT connection percentage - no loading delay
+        const connectionPercentage = selectedNode && isHighlighted && selectedNode !== node.id
+          ? getInstantConnectionPercentage(selectedNode, node.id)
+          : 0;
+        
+        const showPercentage = selectedNode !== null && isHighlighted && selectedNode !== node.id && connectionPercentage > 0;
+        
+        console.log(`[SimplifiedSoulNetVisualization] ENHANCED HIERARCHY: Node ${node.id} - highlighted: ${isHighlighted}, dimmed: ${isDimmed}, percentage: ${connectionPercentage}%`);
+        
+        return (
+          <Node
+            key={node.id}
+            node={node}
+            isSelected={selectedNode === node.id}
+            onClick={onNodeClick}
+            highlightedNodes={highlightedNodes}
+            showLabel={shouldShowLabels && !isDimmed} // Don't show labels for dimmed nodes
+            dimmed={isDimmed}
+            themeHex={themeHex}
+            selectedNodeId={selectedNode}
+            cameraZoom={cameraZoom}
+            isHighlighted={isHighlighted}
+            connectionPercentage={connectionPercentage}
+            showPercentage={showPercentage}
+            forceShowLabels={false} // Let the dimming logic control this
+            effectiveTheme={effectiveTheme}
+            isInstantMode={isInstantReady}
+          />
+        );
+      })}
       
-      {/* Render all edges */}
-      {renderedEdges}
+      {data.links.map((link, index) => {
+        const sourceNode = findNodeById(link.source);
+        const targetNode = findNodeById(link.target);
+        
+        if (!sourceNode || !targetNode) {
+          console.warn(`[SimplifiedSoulNetVisualization] Missing node for link: ${link.source} -> ${link.target}`);
+          return null;
+        }
+        
+        // ENHANCED: Edge is highlighted only if BOTH nodes are highlighted
+        const isHighlighted = selectedNode !== null && 
+          (highlightedNodes.has(link.source) && highlightedNodes.has(link.target));
+        
+        // ENHANCED: Edge is dimmed if EITHER node is dimmed
+        const isDimmed = selectedNode !== null && 
+          (dimmedNodes.has(link.source) || dimmedNodes.has(link.target));
+        
+        return (
+          <Edge
+            key={`${link.source}-${link.target}-${index}`}
+            start={sourceNode.position}
+            end={targetNode.position}
+            value={link.value}
+            isHighlighted={isHighlighted}
+            dimmed={isDimmed}
+            startNodeType={sourceNode.type}
+            endNodeType={targetNode.type}
+          />
+        );
+      })}
     </>
   );
 };

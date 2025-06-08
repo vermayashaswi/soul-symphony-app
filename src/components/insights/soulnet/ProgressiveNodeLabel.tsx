@@ -1,9 +1,10 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
+import ReliableText from './ReliableText';
 import { useTranslation } from '@/contexts/TranslationContext';
-import SmartTextRenderer from './SmartTextRenderer';
+import { simplifiedFontService } from '@/services/simplifiedFontService';
 
-interface UnifiedNodeLabelProps {
+interface ProgressiveNodeLabelProps {
   id: string;
   type: 'entity' | 'emotion';
   position: [number, number, number];
@@ -13,10 +14,9 @@ interface UnifiedNodeLabelProps {
   cameraZoom?: number;
   themeHex: string;
   nodeScale?: number;
-  retryKey?: number;
 }
 
-export const UnifiedNodeLabel: React.FC<UnifiedNodeLabelProps> = ({
+export const ProgressiveNodeLabel: React.FC<ProgressiveNodeLabelProps> = ({
   id,
   type,
   position,
@@ -25,52 +25,39 @@ export const UnifiedNodeLabel: React.FC<UnifiedNodeLabelProps> = ({
   shouldShowLabel,
   cameraZoom = 45,
   themeHex,
-  nodeScale = 1,
-  retryKey = 0
+  nodeScale = 1
 }) => {
   const { currentLanguage, translate } = useTranslation();
   const [displayText, setDisplayText] = useState<string>(id);
-  const [isTranslationReady, setIsTranslationReady] = useState<boolean>(false);
 
-  console.log(`[UnifiedNodeLabel] Processing: ${id}, visible: ${shouldShowLabel}, retry: ${retryKey}`);
+  console.log(`[ProgressiveNodeLabel] Rendering for ${id}, visible: ${shouldShowLabel}`);
 
-  // Handle translation using robust approach
+  // Handle translation
   useEffect(() => {
-    const translateText = async () => {
-      if (!shouldShowLabel || !id || typeof id !== 'string' || id.trim().length === 0) {
-        setIsTranslationReady(false);
-        return;
-      }
+    if (!shouldShowLabel) return;
 
+    const translateText = async () => {
       try {
         if (currentLanguage === 'en' || !translate) {
           setDisplayText(id);
-          setIsTranslationReady(true);
           return;
         }
 
-        console.log(`[UnifiedNodeLabel] Translating "${id}" to ${currentLanguage}`);
-        setIsTranslationReady(false);
-        
         const translated = await translate(id);
-        
-        if (translated && typeof translated === 'string' && translated.trim().length > 0) {
+        if (translated && typeof translated === 'string') {
           setDisplayText(translated);
-          console.log(`[UnifiedNodeLabel] Translation: "${id}" -> "${translated}"`);
+          console.log(`[ProgressiveNodeLabel] Translation: "${id}" -> "${translated}"`);
         } else {
           setDisplayText(id);
         }
-        
-        setIsTranslationReady(true);
       } catch (error) {
-        console.warn(`[UnifiedNodeLabel] Translation failed for ${id}:`, error);
+        console.warn(`[ProgressiveNodeLabel] Translation failed for ${id}:`, error);
         setDisplayText(id);
-        setIsTranslationReady(true);
       }
     };
 
     translateText();
-  }, [id, currentLanguage, translate, shouldShowLabel, retryKey]);
+  }, [id, currentLanguage, translate, shouldShowLabel]);
 
   // Calculate position offset
   const labelOffset = useMemo(() => {
@@ -99,12 +86,14 @@ export const UnifiedNodeLabel: React.FC<UnifiedNodeLabelProps> = ({
     position[2] + labelOffset[2]
   ];
 
-  if (!shouldShowLabel || !displayText || !isTranslationReady) {
+  if (!shouldShowLabel || !displayText) {
     return null;
   }
 
+  console.log(`[ProgressiveNodeLabel] Final render: "${displayText}" at position`, labelPosition);
+
   return (
-    <SmartTextRenderer
+    <ReliableText
       text={displayText}
       position={labelPosition}
       color={textColor}
@@ -119,4 +108,4 @@ export const UnifiedNodeLabel: React.FC<UnifiedNodeLabelProps> = ({
   );
 };
 
-export default UnifiedNodeLabel;
+export default ProgressiveNodeLabel;

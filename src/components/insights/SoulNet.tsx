@@ -14,9 +14,7 @@ import { useUserColorThemeHex } from './soulnet/useUserColorThemeHex';
 import { cn } from '@/lib/utils';
 import { TranslatableText } from '@/components/translation/TranslatableText';
 import { useTranslation } from '@/contexts/TranslationContext';
-import { useFlickerFreeSoulNetData } from '@/hooks/useFlickerFreeSoulNetData';
-import { Button } from '@/components/ui/button';
-import { RefreshCw } from 'lucide-react';
+import { useInstantSoulNetData } from '@/hooks/useInstantSoulNetData';
 
 interface SoulNetProps {
   userId: string | undefined;
@@ -26,71 +24,66 @@ interface SoulNetProps {
 const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
   const [isFullScreen, setIsFullScreen] = useState(false);
   const [canvasError, setCanvasError] = useState<Error | null>(null);
+  const [retryCount, setRetryCount] = useState(0);
   const [renderingReady, setRenderingReady] = useState(false);
   const isMobile = useIsMobile();
   const themeHex = useUserColorThemeHex();
   const [selectedEntity, setSelectedEntity] = useState<string | null>(null);
   const { currentLanguage } = useTranslation();
   
-  const stableRenderingRef = useRef(false);
+  // STABILIZATION: Use ref to track if rendering has been initialized to prevent unnecessary resets
+  const renderingInitialized = useRef(false);
 
-  // Use the enhanced data hook with retry functionality
+  // Use the enhanced instant data hook
   const { 
     graphData, 
     loading, 
     error,
-    isReady,
-    retryCount,
-    incrementRetry,
-    retryTranslations,
+    isInstantReady,
     getInstantConnectionPercentage,
     getInstantTranslation,
     getInstantNodeConnections
-  } = useFlickerFreeSoulNetData(userId, timeRange);
+  } = useInstantSoulNetData(userId, timeRange);
 
-  console.log("[SoulNet] Using robust translation system", { 
+  console.log("[SoulNet] INSTANT DATA MODE - Zero loading delays", { 
     userId, 
     timeRange, 
     currentLanguage,
     nodesCount: graphData.nodes.length,
-    isReady,
+    isInstantReady,
     loading,
     renderingReady,
-    retryCount,
-    stableRendering: stableRenderingRef.current
+    renderingInitialized: renderingInitialized.current
   });
 
   useEffect(() => {
-    console.log("[SoulNet] Component mounted with robust translation system");
+    console.log("[SoulNet] Component mounted - Instant data mode enabled");
     
     return () => {
       console.log("[SoulNet] Component unmounted");
     };
   }, []);
 
-  // Enhanced rendering initialization
+  // STABILIZED: Enhanced rendering initialization that doesn't reset once established
   useEffect(() => {
-    if (isReady && graphData.nodes.length > 0 && !stableRenderingRef.current) {
-      console.log("[SoulNet] INITIALIZING RENDERING - data ready", {
-        isReady,
-        currentLanguage,
-        retryCount
-      });
+    // Only initialize rendering if we have data and haven't already initialized
+    if ((isInstantReady || (graphData.nodes.length > 0 && !loading)) && !renderingInitialized.current) {
+      console.log("[SoulNet] STABILIZED: Initializing rendering for the first time");
       setRenderingReady(true);
-      stableRenderingRef.current = true;
+      renderingInitialized.current = true;
     }
     
-    // Reset if there's an error or complete data loss
-    if (error || (graphData.nodes.length === 0 && !loading && stableRenderingRef.current)) {
-      console.log("[SoulNet] RESETTING due to error or data loss", { error: !!error, nodesCount: graphData.nodes.length });
+    // DEFENSIVE: Only reset rendering if there's an actual error or complete data loss
+    if (error || (graphData.nodes.length === 0 && !loading && renderingInitialized.current)) {
+      console.log("[SoulNet] DEFENSIVE: Resetting rendering due to error or data loss", { error: !!error, nodesCount: graphData.nodes.length });
       setRenderingReady(false);
-      stableRenderingRef.current = false;
+      renderingInitialized.current = false;
     }
-  }, [isReady, graphData.nodes.length, loading, error, currentLanguage, retryCount]);
+  }, [isInstantReady, graphData.nodes.length, loading, error]);
 
-  // Enhanced node selection
+  // OPTIMIZED: Node selection with stable state management
   const handleNodeSelect = useCallback((id: string) => {
-    console.log(`[SoulNet] Node selected: ${id}`);
+    console.log(`[SoulNet] STABLE: Node selected: ${id} - no re-render triggers`);
     if (selectedEntity === id) {
       setSelectedEntity(null);
     } else {
@@ -112,44 +105,23 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
   const handleCanvasError = useCallback((error: Error) => {
     console.error('[SoulNet] Canvas error:', error);
     setCanvasError(error);
-    incrementRetry();
+    setRetryCount(prev => prev + 1);
+    // DEFENSIVE: Reset rendering state on canvas errors
     setRenderingReady(false);
-    stableRenderingRef.current = false;
-  }, [incrementRetry]);
+    renderingInitialized.current = false;
+  }, []);
 
   const handleRetry = useCallback(() => {
     setCanvasError(null);
-    stableRenderingRef.current = false;
-    incrementRetry();
-  }, [incrementRetry]);
+    setRetryCount(0);
+    // Allow re-initialization after retry
+    renderingInitialized.current = false;
+  }, []);
 
-  // Enhanced translation retry mechanism
-  const handleTranslationRetry = useCallback(async () => {
-    console.log("[SoulNet] RETRYING translations");
-    setRenderingReady(false);
-    stableRenderingRef.current = false;
-    
-    try {
-      await retryTranslations();
-      
-      // Force component re-render after translations
-      setTimeout(() => {
-        setRenderingReady(true);
-        stableRenderingRef.current = true;
-      }, 500);
-    } catch (error) {
-      console.error('[SoulNet] Translation retry failed:', error);
-    }
-  }, [retryTranslations]);
-
-  // Show loading only when we have no data
-  if (loading && graphData.nodes.length === 0) {
-    console.log("[SoulNet] SHOWING LOADING - waiting for data");
-    return (
-      <div className="bg-background rounded-xl shadow-sm border w-full p-6">
-        <LoadingState />
-      </div>
-    );
+  // ENHANCED: Only show loading if we truly have no data and are still loading
+  if (loading && !isInstantReady && graphData.nodes.length === 0) {
+    console.log("[SoulNet] ENHANCED: Showing loading state - no instant data available");
+    return <LoadingState />;
   }
   
   if (error) return (
@@ -258,7 +230,7 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
     );
   };
 
-  console.log(`[SoulNet] RENDER: ${graphData.nodes.length} nodes, ${graphData.links.length} links, rendering ready: ${renderingReady}, stable: ${stableRenderingRef.current}`);
+  console.log(`[SoulNet] STABILIZED RENDER: ${graphData.nodes.length} nodes, ${graphData.links.length} links, renderingReady: ${renderingReady}, initialized: ${renderingInitialized.current}`);
 
   return (
     <div className={cn(
@@ -266,27 +238,6 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
       isMobile ? "p-0" : "p-6 md:p-8"
     )}>
       {!isFullScreen && <SoulNetDescription />}
-      
-      {/* Enhanced translation retry mechanism */}
-      {currentLanguage !== 'en' && (
-        <div className="mb-4 flex justify-end">
-          <Button
-            onClick={handleTranslationRetry}
-            size="sm"
-            variant="outline"
-            className="text-xs"
-            disabled={loading}
-          >
-            <RefreshCw className="h-3 w-3 mr-1" />
-            <TranslatableText 
-              text={`Refresh Translations${retryCount > 0 ? ` (${retryCount})` : ''}`}
-              forceTranslate={true}
-              enableFontScaling={true}
-              scalingContext="compact"
-            />
-          </Button>
-        </div>
-      )}
       
       <FullscreenWrapper
         isFullScreen={isFullScreen}
@@ -328,7 +279,7 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
             </div>
           }
         >
-          {/* Canvas renders when data is ready */}
+          {/* STABILIZED: Canvas only renders when truly ready and stays mounted during interactions */}
           {renderingReady && (
             <Canvas
               style={{
@@ -367,10 +318,7 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
                 getInstantConnectionPercentage={getInstantConnectionPercentage}
                 getInstantTranslation={getInstantTranslation}
                 getInstantNodeConnections={getInstantNodeConnections}
-                isInstantReady={isReady}
-                userId={userId}
-                timeRange={timeRange}
-                retryKey={retryCount}
+                isInstantReady={isInstantReady}
               />
             </Canvas>
           )}

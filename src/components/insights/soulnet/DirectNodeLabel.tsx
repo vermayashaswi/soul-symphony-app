@@ -1,9 +1,6 @@
-
-import React, { useMemo, useEffect, useState } from 'react';
+import React, { useMemo, useEffect } from 'react';
+import TranslatableText3D from './TranslatableText3D';
 import SimpleText from './SimpleText';
-import { useTranslation } from '@/contexts/TranslationContext';
-import { Button } from '@/components/ui/button';
-import { RefreshCw } from 'lucide-react';
 
 interface DirectNodeLabelProps {
   id: string;
@@ -19,8 +16,6 @@ interface DirectNodeLabelProps {
   showPercentage?: boolean;
   effectiveTheme?: 'light' | 'dark';
   isInstantMode?: boolean;
-  userId?: string;
-  timeRange?: string;
 }
 
 export const DirectNodeLabel: React.FC<DirectNodeLabelProps> = ({
@@ -30,80 +25,14 @@ export const DirectNodeLabel: React.FC<DirectNodeLabelProps> = ({
   isHighlighted,
   isSelected,
   shouldShowLabel,
-  cameraZoom = 62.5,
+  cameraZoom = 45,
   themeHex,
   nodeScale = 1,
   connectionPercentage = 0,
   showPercentage = false,
   effectiveTheme = 'light',
-  isInstantMode = false,
-  userId,
-  timeRange
+  isInstantMode = false
 }) => {
-  const { currentLanguage, translate } = useTranslation();
-  const [displayText, setDisplayText] = useState<string>(id);
-  const [isTranslationReady, setIsTranslationReady] = useState<boolean>(false);
-  const [translationError, setTranslationError] = useState<string | null>(null);
-  const [retryCount, setRetryCount] = useState<number>(0);
-
-  console.log(`[DirectNodeLabel] Rendering for ${id}, visible: ${shouldShowLabel}`);
-
-  // Handle translation with retry mechanism
-  const attemptTranslation = async (attempt: number = 0) => {
-    if (!shouldShowLabel || !id) {
-      setIsTranslationReady(false);
-      return;
-    }
-
-    try {
-      setTranslationError(null);
-      
-      if (currentLanguage === 'en' || !translate) {
-        setDisplayText(id);
-        setIsTranslationReady(true);
-        return;
-      }
-
-      console.log(`[DirectNodeLabel] Translation attempt ${attempt + 1} for "${id}" to ${currentLanguage}`);
-      const translated = await translate(id);
-      
-      if (translated && typeof translated === 'string') {
-        setDisplayText(translated);
-        console.log(`[DirectNodeLabel] Translation successful: "${id}" -> "${translated}"`);
-      } else {
-        setDisplayText(id);
-      }
-      
-      setIsTranslationReady(true);
-      setRetryCount(0);
-    } catch (error) {
-      console.error(`[DirectNodeLabel] Translation attempt ${attempt + 1} failed for ${id}:`, error);
-      setTranslationError(error.message || 'Translation failed');
-      
-      if (attempt < 2) {
-        // Auto-retry up to 3 times
-        setTimeout(() => attemptTranslation(attempt + 1), 1000 * (attempt + 1));
-      } else {
-        // After 3 attempts, show original text and allow manual retry
-        setDisplayText(id);
-        setIsTranslationReady(true);
-        setRetryCount(attempt + 1);
-      }
-    }
-  };
-
-  useEffect(() => {
-    setIsTranslationReady(false);
-    attemptTranslation();
-  }, [id, currentLanguage, translate, shouldShowLabel]);
-
-  // Manual retry function
-  const handleRetry = () => {
-    setIsTranslationReady(false);
-    setRetryCount(0);
-    attemptTranslation();
-  };
-
   // Listen for tutorial debugging events
   useEffect(() => {
     const handleTutorialDebug = (event: CustomEvent) => {
@@ -119,42 +48,64 @@ export const DirectNodeLabel: React.FC<DirectNodeLabelProps> = ({
     };
   }, [id, shouldShowLabel]);
 
+  // Log rendering mode
+  if (isInstantMode) {
+    console.log(`[DirectNodeLabel] INSTANT MODE: ${id} with TranslatableText3D integration - NO LOADING DELAY`);
+  } else {
+    console.log(`[DirectNodeLabel] ENHANCED POSITIONING: ${id} with TranslatableText3D integration`);
+  }
+
   // Same base offset for both entity and emotion nodes
   const labelOffset = useMemo(() => {
     const baseOffset = 1.4;
     const scaledOffset = baseOffset * Math.max(0.8, Math.min(2.5, nodeScale));
     
-    console.log(`[DirectNodeLabel] Label offset for ${id} (${type}): ${scaledOffset} (scale: ${nodeScale})`);
+    if (isInstantMode) {
+      console.log(`[DirectNodeLabel] INSTANT: Enhanced label offset for ${id} (${type}): ${scaledOffset} (scale: ${nodeScale}) - UNIFORM POSITIONING`);
+    } else {
+      console.log(`[DirectNodeLabel] Enhanced label offset for ${id} (${type}): ${scaledOffset} (scale: ${nodeScale}) - UNIFORM POSITIONING`);
+    }
     return [0, scaledOffset, 0] as [number, number, number];
-  }, [type, nodeScale, id]);
+  }, [type, nodeScale, id, isInstantMode]);
 
-  // Static text size
+  // Better text size calculation for enhanced visibility
   const textSize = useMemo(() => {
-    const staticSize = 2.0;
-    console.log(`[DirectNodeLabel] Static text size for ${id}: ${staticSize}`);
-    return staticSize;
-  }, [id]);
+    const zoom = Math.max(10, Math.min(100, cameraZoom));
+    const baseSize = isSelected ? 6.0 : (isHighlighted ? 5.2 : 4.8);
+    const zoomFactor = Math.max(0.8, Math.min(1.5, (50 - zoom) * 0.02 + 1));
+    const finalSize = Math.max(3.5, Math.min(16.0, baseSize * zoomFactor));
+    
+    if (isInstantMode) {
+      console.log(`[DirectNodeLabel] INSTANT: Enhanced text size for ${id}: ${finalSize} (zoom: ${zoom})`);
+    } else {
+      console.log(`[DirectNodeLabel] Enhanced text size for ${id}: ${finalSize} (zoom: ${zoom})`);
+    }
+    return finalSize;
+  }, [cameraZoom, id, isSelected, isHighlighted, isInstantMode]);
 
-  // Fixed percentage size
+  // Much smaller percentage text size
   const percentageTextSize = useMemo(() => {
-    const fixedPercentageSize = 1.5;
-    console.log(`[DirectNodeLabel] Fixed percentage size for ${id}: ${fixedPercentageSize}`);
-    return fixedPercentageSize;
-  }, [id]);
+    return textSize * 0.21;
+  }, [textSize]);
 
-  // High contrast colors
+  // UPDATED: Solid white text for dark theme, solid black text for light theme
   const textColor = useMemo(() => {
     const color = effectiveTheme === 'dark' ? '#ffffff' : '#000000';
-    console.log(`[DirectNodeLabel] Text color for ${id}: ${color} (theme: ${effectiveTheme})`);
+    
+    if (isInstantMode) {
+      console.log(`[DirectNodeLabel] INSTANT: SOLID WHITE TEXT COLOR for ${id}: ${color} (theme: ${effectiveTheme})`);
+    } else {
+      console.log(`[DirectNodeLabel] SOLID WHITE TEXT COLOR for ${id}: ${color} (theme: ${effectiveTheme})`);
+    }
+    return color;
+  }, [effectiveTheme, id, isInstantMode]);
+
+  // UPDATED: Percentage text also uses solid white for dark theme
+  const percentageColor = useMemo(() => {
+    const color = effectiveTheme === 'dark' ? '#ffffff' : '#000000';
+    console.log(`[DirectNodeLabel] SOLID WHITE PERCENTAGE COLOR for ${id}: ${color} (theme: ${effectiveTheme})`);
     return color;
   }, [effectiveTheme, id]);
-
-  // Enhanced percentage visibility
-  const percentageColor = useMemo(() => {
-    const color = '#ffffff'; // Always white for maximum contrast
-    console.log(`[DirectNodeLabel] Percentage color for ${id}: ${color}`);
-    return color;
-  }, [id]);
 
   const labelPosition: [number, number, number] = [
     position[0] + labelOffset[0],
@@ -162,21 +113,16 @@ export const DirectNodeLabel: React.FC<DirectNodeLabelProps> = ({
     position[2] + labelOffset[2]
   ];
 
-  // Simplified percentage positioning
+  // Side positioning for percentage
   const percentagePosition: [number, number, number] = useMemo(() => {
-    const simpleSideOffset = 2.5;
-    const simpleVerticalOffset = 0.5;
-    const simpleZOffset = 0.5;
-    
-    const finalPosition: [number, number, number] = [
-      position[0] + simpleSideOffset,
-      position[1] + simpleVerticalOffset,
-      position[2] + simpleZOffset
+    const sideOffset = (type === 'entity' ? 2.0 : 2.5) * nodeScale;
+    const verticalOffset = 0;
+    return [
+      position[0] + sideOffset,
+      position[1] + verticalOffset,
+      position[2] + 0.5
     ];
-    
-    console.log(`[DirectNodeLabel] Percentage positioning for ${id} (${type}): simple offsets`);
-    return finalPosition;
-  }, [position, type, id]);
+  }, [position, type, nodeScale]);
 
   // Enhanced visibility check for tutorial step 9
   const enhancedShouldShowLabel = useMemo(() => {
@@ -191,31 +137,51 @@ export const DirectNodeLabel: React.FC<DirectNodeLabelProps> = ({
     return shouldShowLabel;
   }, [shouldShowLabel, id]);
 
-  if (!enhancedShouldShowLabel || !id || !isTranslationReady) {
-    console.log(`[DirectNodeLabel] NOT RENDERING: ${id} - shouldShow=${enhancedShouldShowLabel}, isReady=${isTranslationReady}`);
+  if (!enhancedShouldShowLabel || !id) {
+    if (isInstantMode) {
+      console.log(`[DirectNodeLabel] INSTANT: Not rendering label for ${id}: shouldShow=${enhancedShouldShowLabel}, text="${id}"`);
+    } else {
+      console.log(`[DirectNodeLabel] Not rendering label for ${id}: shouldShow=${enhancedShouldShowLabel}, text="${id}"`);
+    }
     return null;
   }
 
-  console.log(`[DirectNodeLabel] RENDERING with GoogleWebTranslate: "${displayText}"`);
+  // Log percentage display state with side positioning
+  if (showPercentage && connectionPercentage > 0) {
+    if (isInstantMode) {
+      console.log(`[DirectNodeLabel] INSTANT MODE - SIDE POSITIONING - PERCENTAGE: ${id} (${type}) shows ${connectionPercentage}% on the side at`, percentagePosition, '- NO LOADING DELAY');
+    } else {
+      console.log(`[DirectNodeLabel] ENHANCED SIDE POSITIONING - PERCENTAGE: ${id} (${type}) shows ${connectionPercentage}% on the side at`, percentagePosition);
+    }
+  }
+
+  if (isInstantMode) {
+    console.log(`[DirectNodeLabel] INSTANT MODE - MAIN TEXT: "${id}" at position`, labelPosition, 'with size:', textSize, 'color:', textColor, '- NO LOADING DELAY - GOOGLE TRANSLATE INTEGRATION');
+  } else {
+    console.log(`[DirectNodeLabel] ENHANCED POSITIONING - MAIN TEXT: "${id}" at position`, labelPosition, 'with size:', textSize, 'color:', textColor, '- GOOGLE TRANSLATE INTEGRATION');
+  }
 
   return (
     <>
-      {/* Main text label */}
-      <SimpleText
-        text={displayText}
+      {/* Main text using TranslatableText3D with Google Translate integration */}
+      <TranslatableText3D
+        text={id}
         position={labelPosition}
         color={textColor}
         size={textSize}
         visible={true}
         renderOrder={15}
         bold={isHighlighted || isSelected}
-        outlineWidth={0}
-        outlineColor={undefined}
+        outlineWidth={0} // PLAN IMPLEMENTATION: No outline for crisp text
+        outlineColor={undefined} // PLAN IMPLEMENTATION: No outline color needed
         maxWidth={600}
         enableWrapping={true}
+        maxCharsPerLine={18}
+        maxLines={3}
+        sourceLanguage="en"
       />
       
-      {/* Percentage text with fixed size and better visibility */}
+      {/* Enhanced side-positioned percentage text with theme-aware color */}
       {showPercentage && connectionPercentage > 0 && (
         <SimpleText
           text={`${connectionPercentage}%`}
@@ -223,28 +189,13 @@ export const DirectNodeLabel: React.FC<DirectNodeLabelProps> = ({
           color={percentageColor}
           size={percentageTextSize}
           visible={true}
-          renderOrder={20}
+          renderOrder={16}
           bold={true}
-          outlineWidth={0.15}
-          outlineColor="#000000"
-          maxWidth={300}
+          outlineWidth={0} // PLAN IMPLEMENTATION: No outline for crisp text
+          outlineColor={undefined} // PLAN IMPLEMENTATION: No outline color needed
+          maxWidth={200}
           enableWrapping={false}
         />
-      )}
-      
-      {/* Retry button for failed translations */}
-      {translationError && retryCount > 2 && (
-        <group position={[position[0], position[1] - 2, position[2]]}>
-          <Button
-            onClick={handleRetry}
-            size="sm"
-            variant="outline"
-            className="text-xs"
-          >
-            <RefreshCw className="h-3 w-3 mr-1" />
-            Retry Translation
-          </Button>
-        </group>
       )}
     </>
   );

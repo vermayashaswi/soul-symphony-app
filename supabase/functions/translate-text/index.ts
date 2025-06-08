@@ -25,16 +25,14 @@ serve(async (req) => {
 
     console.log('Starting translation with provided API key');
     
-    // Parse request body with robust validation
+    // Parse request body
     const { text, sourceLanguage, targetLanguage = 'hi', entryId, cleanResult = true, useDetectedLanguages = true } = await req.json();
 
-    // Enhanced text validation - accept any non-empty string
-    if (!text || typeof text !== 'string' || text.trim().length === 0) {
-      throw new Error('Missing required parameter: text is required and must be a non-empty string');
+    if (!text) {
+      throw new Error('Missing required parameter: text is required');
     }
 
-    const trimmedText = text.trim();
-    console.log(`Translating text: "${trimmedText.substring(0, 50)}..." from ${sourceLanguage || 'auto-detect'} to ${targetLanguage}${entryId ? ` for entry ${entryId}` : ''}`);
+    console.log(`Translating text: "${text.substring(0, 50)}..." from ${sourceLanguage || 'auto-detect'} to ${targetLanguage}${entryId ? ` for entry ${entryId}` : ''}`);
 
     // Initialize Supabase if entryId is provided to fetch detected languages
     let detectedLanguagesFromDB = [];
@@ -68,10 +66,11 @@ serve(async (req) => {
         }
       } catch (dbError) {
         console.error(`[translate-text] Error fetching detected languages:`, dbError);
+        // Continue with original flow if database lookup fails
       }
     }
 
-    // Language detection (if needed) with robust error handling
+    // Language detection (if needed)
     let detectedLanguage = finalSourceLanguage;
     if (!detectedLanguage) {
       const detectUrl = `https://translation.googleapis.com/language/translate/v2/detect?key=${GOOGLE_API_KEY}`;
@@ -80,7 +79,7 @@ serve(async (req) => {
       const detectResponse = await fetch(detectUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ q: trimmedText })
+        body: JSON.stringify({ q: text })
       });
 
       if (!detectResponse.ok) {
@@ -121,7 +120,7 @@ serve(async (req) => {
           
           const updateFields = {
             "original_language": detectedLanguage,
-            "translation_text": trimmedText
+            "translation_text": text // Use original text as "translation"
           };
           
           const { error: updateError } = await supabase
@@ -141,7 +140,7 @@ serve(async (req) => {
       
       return new Response(
         JSON.stringify({
-          translatedText: trimmedText,
+          translatedText: text,
           detectedLanguage: detectedLanguage,
           success: true,
           skippedTranslation: true,
@@ -154,7 +153,7 @@ serve(async (req) => {
       );
     }
 
-    // Perform translation with enhanced error handling
+    // Perform translation
     const translateUrl = `https://translation.googleapis.com/language/translate/v2?key=${GOOGLE_API_KEY}`;
     console.log(`Sending translation request to: ${translateUrl}`);
     console.log(`Request parameters: from ${detectedLanguage} to ${targetLanguage}`);
@@ -163,10 +162,10 @@ serve(async (req) => {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        q: trimmedText,
+        q: text,
         source: detectedLanguage,
         target: targetLanguage,
-        format: 'text'
+        format: 'text' // Ensure we're using text format, not HTML
       })
     });
 
@@ -186,13 +185,6 @@ serve(async (req) => {
     }
     
     let translatedText = translateData.data.translations[0].translatedText;
-    
-    // Enhanced validation of translated text
-    if (!translatedText || typeof translatedText !== 'string') {
-      console.error('Invalid translated text received:', translatedText);
-      throw new Error('Invalid translated text received from Google API');
-    }
-    
     console.log(`Raw translated text: "${translatedText.substring(0, 50)}..."`);
     
     // Clean the translation result if requested
@@ -201,14 +193,6 @@ serve(async (req) => {
       const languageCodeRegex = /\s*[\(\[]([a-z]{2})[\)\]]\s*$/i;
       translatedText = translatedText.replace(languageCodeRegex, '').trim();
       console.log(`Cleaned translated text: "${translatedText.substring(0, 50)}..."`);
-    }
-
-    // Final validation after cleaning
-    if (!translatedText || translatedText.trim().length === 0) {
-      console.error('Empty translated text after cleaning');
-      translatedText = trimmedText; // Fallback to original
-    } else {
-      translatedText = translatedText.trim();
     }
 
     // Update the database with the translation and language information
@@ -234,25 +218,33 @@ serve(async (req) => {
     
         if (updateError) {
           console.error(`[translate-text] Database update error:`, updateError);
+          // Don't throw here, just log the error and continue
         } else {
           console.log(`[translate-text] Successfully updated entry ${entryId}`);
           
-          // Trigger post-processing functions
+          // Now trigger the post-processing functions for this entry
           try {
             console.log(`[translate-text] Triggering post-processing for entry ${entryId}`);
             
+            // Trigger entity extraction
             const entityPromise = supabase.functions.invoke('batch-extract-entities', {
-              body: { entryIds: [entryId], diagnosticMode: true }
+              body: {
+                entryIds: [entryId],
+                diagnosticMode: true
+              }
             });
             
+            // Trigger sentiment analysis
             const sentimentPromise = supabase.functions.invoke('analyze-sentiment', {
               body: { text: translatedText, entryId }
             });
             
+            // Trigger themes extraction
             const themePromise = supabase.functions.invoke('generate-themes', {
               body: { entryId, fromEdit: false }
             });
             
+            // Execute these in the background
             if (typeof EdgeRuntime !== 'undefined' && 'waitUntil' in EdgeRuntime) {
               EdgeRuntime.waitUntil(Promise.all([entityPromise, sentimentPromise, themePromise]));
             } else {
@@ -264,10 +256,12 @@ serve(async (req) => {
             console.log(`[translate-text] Post-processing successfully triggered`);
           } catch (postError) {
             console.error(`[translate-text] Error triggering post-processing:`, postError);
+            // Don't throw this error as it shouldn't affect the response
           }
         }
       } catch (dbError) {
         console.error(`[translate-text] Database operation error:`, dbError);
+        // Don't throw here, just log the error and continue
       }
     } else {
       console.log('[translate-text] No entryId provided, skipping database update');

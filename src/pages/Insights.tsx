@@ -37,7 +37,7 @@ function InsightsContent() {
   ];
 
   useEffect(() => {
-    console.log("Insights page mounted with robust translation system");
+    console.log("Insights page mounted");
     
     // Prefetch translations for the insights route
     if (prefetchTranslationsForRoute) {

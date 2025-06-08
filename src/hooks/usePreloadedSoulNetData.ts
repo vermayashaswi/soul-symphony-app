@@ -32,12 +32,6 @@ export const usePreloadedSoulNetData = (
 ): UsePreloadedSoulNetDataReturn => {
   const { currentLanguage } = useTranslation();
   
-  // Clear cache when component initializes to ensure fresh data with new positioning
-  useEffect(() => {
-    console.log('[usePreloadedSoulNetData] Clearing cache to ensure updated positioning is used');
-    SoulNetPreloadService.clearCache();
-  }, []);
-
   // Optimistic initialization - check cache synchronously first
   const getCachedDataSync = useCallback(() => {
     if (!userId) return null;
@@ -105,9 +99,13 @@ export const usePreloadedSoulNetData = (
   }, [userId, timeRange, currentLanguage, hasInitialCache]);
 
   useEffect(() => {
-    // Always preload to ensure we get the updated positioning
-    preloadData();
-  }, [preloadData]);
+    // Only preload if we don't have initial cached data
+    if (!hasInitialCache) {
+      preloadData();
+    } else {
+      console.log('[usePreloadedSoulNetData] Using initial cached data, skipping preload');
+    }
+  }, [preloadData, hasInitialCache]);
 
   // Clear cache when language changes to force refresh
   useEffect(() => {
