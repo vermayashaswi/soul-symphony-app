@@ -2,7 +2,7 @@
 import React, { Component, ErrorInfo, ReactNode } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { AlertTriangle, RefreshCw, Home } from 'lucide-react';
+import { AlertTriangle, RefreshCw, Home, ArrowLeft } from 'lucide-react';
 import { TranslatableText } from '@/components/translation/TranslatableText';
 
 interface Props {
@@ -15,17 +15,27 @@ interface State {
   hasError: boolean;
   error?: Error;
   errorInfo?: ErrorInfo;
+  attemptCount: number;
 }
 
 export class SettingsErrorBoundary extends Component<Props, State> {
+  private resetTimeoutId: NodeJS.Timeout | null = null;
+
   constructor(props: Props) {
     super(props);
-    this.state = { hasError: false };
+    this.state = { 
+      hasError: false, 
+      attemptCount: 0 
+    };
   }
 
   static getDerivedStateFromError(error: Error): State {
     console.error('[SettingsErrorBoundary] Error caught:', error);
-    return { hasError: true, error };
+    return { 
+      hasError: true, 
+      error,
+      attemptCount: 0 
+    };
   }
 
   componentDidCatch(error: Error, errorInfo: ErrorInfo) {
@@ -34,20 +44,48 @@ export class SettingsErrorBoundary extends Component<Props, State> {
     
     this.setState({
       error,
-      errorInfo
+      errorInfo,
+      attemptCount: this.state.attemptCount + 1
     });
+
+    // Auto-retry for the first error (might be temporary)
+    if (this.state.attemptCount === 0) {
+      console.log('[SettingsErrorBoundary] Auto-retrying after first error...');
+      this.resetTimeoutId = setTimeout(() => {
+        this.handleRetry();
+      }, 2000);
+    }
+  }
+
+  componentWillUnmount() {
+    if (this.resetTimeoutId) {
+      clearTimeout(this.resetTimeoutId);
+    }
   }
 
   handleRetry = () => {
-    console.log('[SettingsErrorBoundary] Retrying...');
+    console.log('[SettingsErrorBoundary] Manual retry initiated');
+    if (this.resetTimeoutId) {
+      clearTimeout(this.resetTimeoutId);
+      this.resetTimeoutId = null;
+    }
+    
     if (this.props.onReset) {
       this.props.onReset();
     }
-    this.setState({ hasError: false, error: undefined, errorInfo: undefined });
+    this.setState({ 
+      hasError: false, 
+      error: undefined, 
+      errorInfo: undefined 
+    });
   };
 
   handleGoHome = () => {
-    window.location.href = '/app';
+    window.location.href = '/app/home';
+  };
+
+  handleGoBack = () => {
+    window.history.back();
   };
 
   render() {
@@ -55,6 +93,8 @@ export class SettingsErrorBoundary extends Component<Props, State> {
       if (this.props.fallback) {
         return this.props.fallback;
       }
+
+      const isRepeatedError = this.state.attemptCount > 1;
 
       return (
         <div className="min-h-screen flex items-center justify-center p-4">
@@ -67,17 +107,32 @@ export class SettingsErrorBoundary extends Component<Props, State> {
             </CardHeader>
             <CardContent className="text-center space-y-4">
               <p className="text-sm text-muted-foreground">
-                <TranslatableText text="We encountered an error loading your settings. This might be due to a temporary issue." />
+                {isRepeatedError ? (
+                  <TranslatableText text="Settings are having persistent issues. Try going back or refreshing the page." />
+                ) : (
+                  <TranslatableText text="We encountered an error loading your settings. This might be due to a temporary issue." />
+                )}
               </p>
               
               <div className="flex flex-col gap-2">
+                {!isRepeatedError && (
+                  <Button 
+                    onClick={this.handleRetry}
+                    className="w-full"
+                    variant="default"
+                  >
+                    <RefreshCw className="h-4 w-4 mr-2" />
+                    <TranslatableText text="Try Again" />
+                  </Button>
+                )}
+                
                 <Button 
-                  onClick={this.handleRetry}
+                  onClick={this.handleGoBack}
                   className="w-full"
-                  variant="default"
+                  variant="outline"
                 >
-                  <RefreshCw className="h-4 w-4 mr-2" />
-                  <TranslatableText text="Try Again" />
+                  <ArrowLeft className="h-4 w-4 mr-2" />
+                  <TranslatableText text="Go Back" />
                 </Button>
                 
                 <Button 
@@ -92,7 +147,9 @@ export class SettingsErrorBoundary extends Component<Props, State> {
               
               {process.env.NODE_ENV === 'development' && this.state.error && (
                 <details className="text-left mt-4">
-                  <summary className="text-xs cursor-pointer font-medium">Error Details</summary>
+                  <summary className="text-xs cursor-pointer font-medium">
+                    Error Details (Attempt #{this.state.attemptCount})
+                  </summary>
                   <pre className="text-xs bg-muted p-2 rounded mt-2 overflow-auto max-h-40">
                     {this.state.error.toString()}
                     {this.state.errorInfo?.componentStack}

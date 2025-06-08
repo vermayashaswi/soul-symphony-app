@@ -68,8 +68,9 @@ export const SubscriptionManagement: React.FC = () => {
     }).format(date);
   };
 
-  if (isLoading) {
-    console.log('[SubscriptionManagement] Showing loading state');
+  // Progressive loading: Show skeleton only on initial load
+  if (isLoading && !hasInitialLoadCompleted) {
+    console.log('[SubscriptionManagement] Showing initial loading state');
     return (
       <Card className="p-6">
         <div className="animate-pulse">
@@ -83,6 +84,7 @@ export const SubscriptionManagement: React.FC = () => {
     );
   }
 
+  // Progressive loading: Show with data and refresh indicator for subsequent loads
   return (
     <>
       <motion.div
@@ -99,6 +101,9 @@ export const SubscriptionManagement: React.FC = () => {
                 <Calendar className="h-5 w-5" />
               )}
               <TranslatableText text="Subscription" />
+              {(isLoading || isRefreshing) && (
+                <RefreshCw className="h-4 w-4 animate-spin text-muted-foreground" />
+              )}
             </h3>
             <Button 
               variant="outline" 
