@@ -14,6 +14,8 @@ const ProfileSection: React.FC<{ isLoading: boolean; error?: string | null }> = 
   isLoading, 
   error 
 }) => {
+  console.log('[ProfileSection] Rendering - isLoading:', isLoading, 'error:', error);
+
   if (isLoading) {
     return (
       <Card className="p-6">
@@ -32,6 +34,7 @@ const ProfileSection: React.FC<{ isLoading: boolean; error?: string | null }> = 
   }
 
   if (error) {
+    console.error('[ProfileSection] Error:', error);
     return (
       <Card className="p-6">
         <div className="flex items-center gap-2 text-yellow-600">
@@ -66,6 +69,8 @@ const PreferencesSection: React.FC<{ isLoading: boolean; error?: string | null }
   isLoading, 
   error 
 }) => {
+  console.log('[PreferencesSection] Rendering - isLoading:', isLoading, 'error:', error);
+
   if (isLoading) {
     return (
       <Card className="p-6">
@@ -81,6 +86,7 @@ const PreferencesSection: React.FC<{ isLoading: boolean; error?: string | null }
   }
 
   if (error) {
+    console.error('[PreferencesSection] Error:', error);
     return (
       <Card className="p-6">
         <div className="flex items-center gap-2 text-yellow-600">
@@ -111,16 +117,22 @@ const PreferencesSection: React.FC<{ isLoading: boolean; error?: string | null }
 };
 
 export const ProgressiveSettingsPage: React.FC = () => {
+  console.log('[ProgressiveSettingsPage] Component mounting...');
+  
   const settingsState = useProgressiveSettings();
 
-  console.log('[ProgressiveSettingsPage] Render state:', {
+  console.log('[ProgressiveSettingsPage] Settings state:', {
     isReady: settingsState.isReady,
     isInitialLoading: settingsState.isInitialLoading,
     criticalError: settingsState.criticalError,
+    profileError: settingsState.profileError,
+    subscriptionError: settingsState.subscriptionError,
+    preferencesError: settingsState.preferencesError,
   });
 
   // Show critical error state
   if (settingsState.criticalError) {
+    console.error('[ProgressiveSettingsPage] Critical error:', settingsState.criticalError);
     return (
       <div className="min-h-screen flex items-center justify-center p-4">
         <Card className="w-full max-w-md">
@@ -150,9 +162,12 @@ export const ProgressiveSettingsPage: React.FC = () => {
 
   // Show initial loading
   if (settingsState.isInitialLoading) {
+    console.log('[ProgressiveSettingsPage] Showing initial loading skeleton');
     return <SettingsLoadingSkeleton />;
   }
 
+  console.log('[ProgressiveSettingsPage] Rendering main settings UI');
+  
   return (
     <div className="min-h-screen pb-20">
       <div className="max-w-3xl mx-auto px-4 pt-2">

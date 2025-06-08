@@ -4,10 +4,16 @@ import { SettingsErrorBoundary } from '@/components/settings/SettingsErrorBounda
 import { ProgressiveSettingsPage } from '@/components/settings/ProgressiveSettingsPage';
 
 const Settings = () => {
-  console.log('[Settings] Rendering Settings page with progressive loading');
+  console.log('[Settings] 🏗️ Settings page component mounting');
+  console.log('[Settings] Current URL:', window.location.href);
+  console.log('[Settings] Current pathname:', window.location.pathname);
+
+  const handleErrorBoundaryReset = () => {
+    console.log('[Settings] 🔄 Error boundary reset triggered');
+  };
 
   return (
-    <SettingsErrorBoundary>
+    <SettingsErrorBoundary onReset={handleErrorBoundaryReset}>
       <ProgressiveSettingsPage />
     </SettingsErrorBoundary>
   );

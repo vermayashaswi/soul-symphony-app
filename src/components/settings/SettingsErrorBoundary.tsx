@@ -31,6 +31,7 @@ export class SettingsErrorBoundary extends Component<Props, State> {
 
   static getDerivedStateFromError(error: Error): State {
     console.error('[SettingsErrorBoundary] Error caught:', error);
+    console.error('[SettingsErrorBoundary] Error stack:', error.stack);
     return { 
       hasError: true, 
       error,
@@ -41,6 +42,14 @@ export class SettingsErrorBoundary extends Component<Props, State> {
   componentDidCatch(error: Error, errorInfo: ErrorInfo) {
     console.error('[SettingsErrorBoundary] Component stack:', errorInfo.componentStack);
     console.error('[SettingsErrorBoundary] Error details:', error.message, error.stack);
+    console.error('[SettingsErrorBoundary] Error info:', errorInfo);
+    
+    // Log to console for debugging
+    console.group('[SettingsErrorBoundary] Full Error Report');
+    console.error('Error:', error);
+    console.error('Error Info:', errorInfo);
+    console.error('Component Stack:', errorInfo.componentStack);
+    console.groupEnd();
     
     this.setState({
       error,
@@ -81,15 +90,19 @@ export class SettingsErrorBoundary extends Component<Props, State> {
   };
 
   handleGoHome = () => {
+    console.log('[SettingsErrorBoundary] Navigating to home');
     window.location.href = '/app/home';
   };
 
   handleGoBack = () => {
+    console.log('[SettingsErrorBoundary] Going back');
     window.history.back();
   };
 
   render() {
     if (this.state.hasError) {
+      console.log('[SettingsErrorBoundary] Rendering error UI, attempt count:', this.state.attemptCount);
+      
       if (this.props.fallback) {
         return this.props.fallback;
       }
@@ -145,7 +158,7 @@ export class SettingsErrorBoundary extends Component<Props, State> {
                 </Button>
               </div>
               
-              {process.env.NODE_ENV === 'development' && this.state.error && (
+              {(process.env.NODE_ENV === 'development' || true) && this.state.error && (
                 <details className="text-left mt-4">
                   <summary className="text-xs cursor-pointer font-medium">
                     Error Details (Attempt #{this.state.attemptCount})
