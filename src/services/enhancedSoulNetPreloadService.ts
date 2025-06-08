@@ -1,3 +1,4 @@
+
 import { supabase } from '@/integrations/supabase/client';
 
 interface NodeData {
@@ -539,18 +540,21 @@ export class EnhancedSoulNetPreloadService {
     const entityList = Object.keys(entityEmotionMap);
     const EMOTION_LAYER_RADIUS = 11;
     const ENTITY_LAYER_RADIUS = 6;
-    const EMOTION_Y_SPAN = 6;
-    const ENTITY_Y_SPAN = 3;
 
     console.log("[EnhancedSoulNetPreloadService] APP-LEVEL: Generating graph with", entityList.length, "entities");
     
+    // UPDATED: Apply new y-axis pattern for entity nodes (circular): +2, -2, +2, -2...
     entityList.forEach((entity, entityIndex) => {
       entityNodes.add(entity);
       const entityAngle = (entityIndex / entityList.length) * Math.PI * 2;
       const entityRadius = ENTITY_LAYER_RADIUS;
       const entityX = Math.cos(entityAngle) * entityRadius;
-      const entityY = ((entityIndex % 2) === 0 ? -1 : 1) * 0.7 * (Math.random() - 0.5) * ENTITY_Y_SPAN;
+      
+      // NEW Y-AXIS PATTERN: Alternating +2, -2 for entity nodes
+      const entityY = (entityIndex % 2 === 0) ? 2 : -2;
       const entityZ = Math.sin(entityAngle) * entityRadius;
+      
+      console.log(`[EnhancedSoulNetPreloadService] UPDATED Y-POSITIONING: Entity node ${entityIndex + 1} "${entity}" positioned at Y=${entityY}`);
       
       nodes.push({
         id: entity,
@@ -570,32 +574,30 @@ export class EnhancedSoulNetPreloadService {
       });
     });
 
-    // CUSTOM Y-AXIS POSITIONING: Apply specific pattern to emotion nodes (squares)
+    // UPDATED: Apply new y-axis pattern for emotion nodes (squares): +7, +9, +11 repeating for positive, -7, -9, -11 for negative
     Array.from(emotionNodes).forEach((emotion, emotionIndex) => {
       const emotionAngle = (emotionIndex / emotionNodes.size) * Math.PI * 2;
       const emotionRadius = EMOTION_LAYER_RADIUS;
       const emotionX = Math.cos(emotionAngle) * emotionRadius;
       
-      // CUSTOM PATTERN: Node 1: +7, Node 2: -7, Node 3: +9, Node 4: -9, Node 5: +11, Node 6: -11, Node 7: +13, Node 8: -13, then cycle
-      const getCustomYPosition = (index: number): number => {
-        const cyclePosition = index % 8; // 8-node cycle
-        const basePairs = [
-          [7, -7],   // Nodes 1-2
-          [9, -9],   // Nodes 3-4
-          [11, -11], // Nodes 5-6
-          [13, -13]  // Nodes 7-8
-        ];
+      // NEW Y-AXIS PATTERN: Repeating +7, +9, +11 for positive y-axis and -7, -9, -11 for negative y-axis
+      const getEmotionYPosition = (index: number): number => {
+        const pattern = [7, 9, 11]; // Base pattern
+        const patternIndex = index % 6; // 6-position cycle (3 positive + 3 negative)
         
-        const pairIndex = Math.floor(cyclePosition / 2);
-        const isEven = cyclePosition % 2 === 1; // 0-indexed, so index 1 is the second in pair
-        
-        return basePairs[pairIndex][isEven ? 1 : 0]; // Return negative for second in pair, positive for first
+        if (patternIndex < 3) {
+          // Positive y-axis: +7, +9, +11
+          return pattern[patternIndex];
+        } else {
+          // Negative y-axis: -7, -9, -11
+          return -pattern[patternIndex - 3];
+        }
       };
       
-      const emotionY = getCustomYPosition(emotionIndex);
+      const emotionY = getEmotionYPosition(emotionIndex);
       const emotionZ = Math.sin(emotionAngle) * emotionRadius;
       
-      console.log(`[EnhancedSoulNetPreloadService] CUSTOM Y-POSITIONING: Emotion node ${emotionIndex + 1} "${emotion}" positioned at Y=${emotionY}`);
+      console.log(`[EnhancedSoulNetPreloadService] UPDATED Y-POSITIONING: Emotion node ${emotionIndex + 1} "${emotion}" positioned at Y=${emotionY}`);
       
       nodes.push({
         id: emotion,
@@ -608,6 +610,7 @@ export class EnhancedSoulNetPreloadService {
 
     console.log("[EnhancedSoulNetPreloadService] APP-LEVEL: Generated graph with", nodes.length, "nodes and", links.length, "links");
     console.log("[EnhancedSoulNetPreloadService] CUSTOM COLORS: Applied GREEN to entity nodes (spheres) and GOLDEN to emotion nodes (squares)");
+    console.log("[EnhancedSoulNetPreloadService] UPDATED Y-POSITIONING: Applied +2,-2 pattern to entity nodes and +7,+9,+11/-7,-9,-11 pattern to emotion nodes");
     return { nodes, links };
   }
 }
