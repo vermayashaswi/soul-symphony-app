@@ -41,6 +41,7 @@ export const TranslatableText3D: React.FC<TranslatableText3DProps> = ({
   const { currentLanguage, translate } = useTranslation();
   const [translatedText, setTranslatedText] = useState<string>(text);
   const [isTranslating, setIsTranslating] = useState(false);
+  const [hasError, setHasError] = useState(false);
 
   useEffect(() => {
     const translateText = async () => {
@@ -60,6 +61,8 @@ export const TranslatableText3D: React.FC<TranslatableText3DProps> = ({
       
       try {
         setIsTranslating(true);
+        setHasError(false);
+        
         const result = await translate(text, sourceLanguage);
         
         if (result && result !== text) {
@@ -73,6 +76,7 @@ export const TranslatableText3D: React.FC<TranslatableText3DProps> = ({
         }
       } catch (error) {
         console.error(`[TranslatableText3D] Translation failed for "${text}":`, error);
+        setHasError(true);
         setTranslatedText(text);
         onTranslationComplete?.(text);
       } finally {
@@ -83,14 +87,12 @@ export const TranslatableText3D: React.FC<TranslatableText3DProps> = ({
     translateText();
   }, [text, currentLanguage, sourceLanguage, translate, onTranslationComplete]);
 
-  // Don't render while translating to prevent flicker
-  if (isTranslating) {
-    return null;
-  }
+  // Show original text if translating to prevent flickering
+  const displayText = isTranslating ? text : translatedText;
 
   return (
     <SmartTextRenderer
-      text={translatedText}
+      text={displayText}
       position={position}
       color={color}
       size={size}

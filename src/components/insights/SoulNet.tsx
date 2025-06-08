@@ -28,59 +28,49 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
   const [canvasError, setCanvasError] = useState<Error | null>(null);
   const [retryCount, setRetryCount] = useState(0);
   const [renderingReady, setRenderingReady] = useState(false);
+  const [translationRetryCount, setTranslationRetryCount] = useState(0);
   const isMobile = useIsMobile();
   const themeHex = useUserColorThemeHex();
   const [selectedEntity, setSelectedEntity] = useState<string | null>(null);
   const { currentLanguage } = useTranslation();
   
-  // STRICT: Use ref to track stable rendering state
   const stableRenderingRef = useRef(false);
 
-  // Use the enhanced flicker-free data hook
+  // Use the data hook without strict translation requirements
   const { 
     graphData, 
     loading, 
     error,
     isReady,
-    isTranslationsReady,
-    translationProgress,
-    retryTranslations,
     getInstantConnectionPercentage,
     getInstantTranslation,
     getInstantNodeConnections
   } = useFlickerFreeSoulNetData(userId, timeRange);
 
-  console.log("[SoulNet] STRICT MODE - No English fallbacks", { 
+  console.log("[SoulNet] Using GoogleWebTranslate approach", { 
     userId, 
     timeRange, 
     currentLanguage,
     nodesCount: graphData.nodes.length,
     isReady,
-    isTranslationsReady,
-    translationProgress,
     loading,
     renderingReady,
     stableRendering: stableRenderingRef.current
   });
 
   useEffect(() => {
-    console.log("[SoulNet] Component mounted with strict translation system");
+    console.log("[SoulNet] Component mounted with GoogleWebTranslate system");
     
     return () => {
       console.log("[SoulNet] Component unmounted");
     };
   }, []);
 
-  // STRICT: Stable rendering initialization with strict translation requirements
+  // Simplified rendering initialization - no strict translation requirements
   useEffect(() => {
-    // For English, we're always ready for translations
-    const translationsActuallyReady = currentLanguage === 'en' || (isTranslationsReady && translationProgress === 100);
-    
-    if (isReady && translationsActuallyReady && graphData.nodes.length > 0 && !stableRenderingRef.current) {
-      console.log("[SoulNet] INITIALIZING STRICT RENDERING - all data and translations ready", {
+    if (isReady && graphData.nodes.length > 0 && !stableRenderingRef.current) {
+      console.log("[SoulNet] INITIALIZING RENDERING - data ready", {
         isReady,
-        translationsActuallyReady,
-        translationProgress,
         currentLanguage
       });
       setRenderingReady(true);
@@ -93,7 +83,7 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
       setRenderingReady(false);
       stableRenderingRef.current = false;
     }
-  }, [isReady, isTranslationsReady, translationProgress, graphData.nodes.length, loading, error, currentLanguage]);
+  }, [isReady, graphData.nodes.length, loading, error, currentLanguage]);
 
   // Enhanced node selection without re-renders
   const handleNodeSelect = useCallback((id: string) => {
@@ -132,45 +122,26 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
     stableRenderingRef.current = false;
   }, []);
 
-  // Enhanced retry for translations
-  const handleTranslationRetry = useCallback(async () => {
+  // Translation retry mechanism
+  const handleTranslationRetry = useCallback(() => {
     console.log("[SoulNet] RETRYING translations");
+    setTranslationRetryCount(prev => prev + 1);
     setRenderingReady(false);
     stableRenderingRef.current = false;
-    await retryTranslations();
-  }, [retryTranslations]);
+    
+    // Force component re-render to trigger new translations
+    setTimeout(() => {
+      setRenderingReady(true);
+      stableRenderingRef.current = true;
+    }, 100);
+  }, []);
 
-  // STRICT: Show loading if we have no data, translations aren't ready, or translation progress is incomplete
-  const shouldShowLoading = loading && (!isReady || (currentLanguage !== 'en' && (!isTranslationsReady || translationProgress < 100))) && graphData.nodes.length === 0;
-  
-  if (shouldShowLoading) {
-    console.log("[SoulNet] SHOWING LOADING - waiting for data and translations", {
-      isReady,
-      isTranslationsReady,
-      translationProgress,
-      currentLanguage
-    });
+  // Show loading only when we have no data
+  if (loading && graphData.nodes.length === 0) {
+    console.log("[SoulNet] SHOWING LOADING - waiting for data");
     return (
       <div className="bg-background rounded-xl shadow-sm border w-full p-6">
         <LoadingState />
-        {currentLanguage !== 'en' && translationProgress > 0 && translationProgress < 100 && (
-          <div className="mt-4">
-            <div className="w-full bg-gray-200 rounded-full h-2">
-              <div 
-                className="bg-primary h-2 rounded-full transition-all duration-300" 
-                style={{ width: `${translationProgress}%` }}
-              ></div>
-            </div>
-            <p className="text-sm text-muted-foreground mt-2">
-              <TranslatableText 
-                text={`Loading translations... ${translationProgress}%`}
-                forceTranslate={true}
-                enableFontScaling={true}
-                scalingContext="general"
-              />
-            </p>
-          </div>
-        )}
       </div>
     );
   }
@@ -201,53 +172,6 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
   );
   
   if (graphData.nodes.length === 0) return <EmptyState />;
-
-  // STRICT: Show translation retry if translations are not available for non-English languages
-  if (currentLanguage !== 'en' && !isTranslationsReady) {
-    return (
-      <div className="bg-background rounded-xl shadow-sm border w-full p-6">
-        <h2 className="text-xl font-semibold mb-4">
-          <TranslatableText 
-            text="Soul-Net Visualization" 
-            forceTranslate={true}
-            enableFontScaling={true}
-            scalingContext="general"
-          />
-        </h2>
-        <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-4">
-          <h3 className="font-medium text-yellow-800 dark:text-yellow-300 mb-2">
-            <TranslatableText 
-              text="Translations Not Available" 
-              forceTranslate={true}
-              enableFontScaling={true}
-              scalingContext="general"
-            />
-          </h3>
-          <p className="text-yellow-700 dark:text-yellow-400 mb-3">
-            <TranslatableText 
-              text="The visualization translations are not ready. Please retry to load the translated content." 
-              forceTranslate={true}
-              enableFontScaling={true}
-              scalingContext="general"
-            />
-          </p>
-          <Button
-            onClick={handleTranslationRetry}
-            className="flex items-center gap-2"
-            variant="outline"
-          >
-            <RefreshCw className="h-4 w-4" />
-            <TranslatableText 
-              text="Retry Translations" 
-              forceTranslate={true}
-              enableFontScaling={true}
-              scalingContext="general"
-            />
-          </Button>
-        </div>
-      </div>
-    );
-  }
 
   // Show simplified error UI for canvas errors
   if (canvasError && retryCount > 2) {
@@ -328,7 +252,7 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
     );
   };
 
-  console.log(`[SoulNet] STRICT RENDER: ${graphData.nodes.length} nodes, ${graphData.links.length} links, rendering ready: ${renderingReady}, stable: ${stableRenderingRef.current}, translations ready: ${isTranslationsReady}`);
+  console.log(`[SoulNet] RENDER: ${graphData.nodes.length} nodes, ${graphData.links.length} links, rendering ready: ${renderingReady}, stable: ${stableRenderingRef.current}`);
 
   return (
     <div className={cn(
@@ -336,6 +260,26 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
       isMobile ? "p-0" : "p-6 md:p-8"
     )}>
       {!isFullScreen && <SoulNetDescription />}
+      
+      {/* Translation retry mechanism */}
+      {currentLanguage !== 'en' && translationRetryCount < 3 && (
+        <div className="mb-4 flex justify-end">
+          <Button
+            onClick={handleTranslationRetry}
+            size="sm"
+            variant="outline"
+            className="text-xs"
+          >
+            <RefreshCw className="h-3 w-3 mr-1" />
+            <TranslatableText 
+              text="Refresh Translations" 
+              forceTranslate={true}
+              enableFontScaling={true}
+              scalingContext="compact"
+            />
+          </Button>
+        </div>
+      )}
       
       <FullscreenWrapper
         isFullScreen={isFullScreen}
@@ -377,8 +321,8 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
             </div>
           }
         >
-          {/* STRICT: Canvas only renders when stable and translations are ready */}
-          {renderingReady && (currentLanguage === 'en' || isTranslationsReady) && (
+          {/* Canvas renders when data is ready */}
+          {renderingReady && (
             <Canvas
               style={{
                 width: '100%',
@@ -416,7 +360,7 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
                 getInstantConnectionPercentage={getInstantConnectionPercentage}
                 getInstantTranslation={getInstantTranslation}
                 getInstantNodeConnections={getInstantNodeConnections}
-                isInstantReady={isReady && (currentLanguage === 'en' || isTranslationsReady)}
+                isInstantReady={isReady}
                 userId={userId}
                 timeRange={timeRange}
               />

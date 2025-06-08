@@ -26,11 +26,19 @@ export class TranslationService {
         return text;
       }
       
+      // Skip if same language
+      if (sourceLanguage === targetLanguage) {
+        return text;
+      }
+      
       // Check cache first
       const cached = await translationCache.getTranslation(text, targetLanguage);
       if (cached) {
+        console.log(`[TranslationService] Cache hit for: "${text}" -> "${cached.translatedText}"`);
         return cached.translatedText;
       }
+
+      console.log(`[TranslationService] Translating: "${text}" from ${sourceLanguage} to ${targetLanguage}`);
 
       // Call the edge function for translation
       const { data, error } = await supabase.functions.invoke('translate-text', {
@@ -43,14 +51,15 @@ export class TranslationService {
 
       if (error) {
         console.error('Translation error:', error);
-        toast.error('Translation failed. Falling back to original text.');
-        return text;
+        throw new Error(`Translation failed: ${error.message}`);
       }
 
       if (!data || !data.translatedText) {
         console.error('Translation response missing translatedText:', data);
-        return text;
+        throw new Error('Invalid translation response');
       }
+
+      console.log(`[TranslationService] Translation successful: "${text}" -> "${data.translatedText}"`);
 
       // Cache the translation
       await translationCache.setTranslation({
@@ -64,8 +73,7 @@ export class TranslationService {
       return data.translatedText;
     } catch (error) {
       console.error('Translation service error:', error);
-      toast.error('Translation service error. Using original text.');
-      return text;
+      throw error; // Re-throw for proper error handling in components
     }
   }
 

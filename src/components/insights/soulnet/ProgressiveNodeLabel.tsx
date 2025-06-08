@@ -1,8 +1,7 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
-import ReliableText from './ReliableText';
+import SimpleText from './SimpleText';
 import { useTranslation } from '@/contexts/TranslationContext';
-import { simplifiedFontService } from '@/services/simplifiedFontService';
 
 interface ProgressiveNodeLabelProps {
   id: string;
@@ -29,33 +28,44 @@ export const ProgressiveNodeLabel: React.FC<ProgressiveNodeLabelProps> = ({
 }) => {
   const { currentLanguage, translate } = useTranslation();
   const [displayText, setDisplayText] = useState<string>(id);
+  const [isTranslationReady, setIsTranslationReady] = useState<boolean>(false);
 
   console.log(`[ProgressiveNodeLabel] Rendering for ${id}, visible: ${shouldShowLabel}`);
 
-  // Handle translation
+  // Handle translation using GoogleWebTranslate approach
   useEffect(() => {
-    if (!shouldShowLabel) return;
-
     const translateText = async () => {
+      if (!shouldShowLabel || !id) {
+        setIsTranslationReady(false);
+        return;
+      }
+
       try {
         if (currentLanguage === 'en' || !translate) {
           setDisplayText(id);
+          setIsTranslationReady(true);
           return;
         }
 
+        console.log(`[ProgressiveNodeLabel] Translating "${id}" to ${currentLanguage}`);
         const translated = await translate(id);
+        
         if (translated && typeof translated === 'string') {
           setDisplayText(translated);
           console.log(`[ProgressiveNodeLabel] Translation: "${id}" -> "${translated}"`);
         } else {
           setDisplayText(id);
         }
+        
+        setIsTranslationReady(true);
       } catch (error) {
         console.warn(`[ProgressiveNodeLabel] Translation failed for ${id}:`, error);
         setDisplayText(id);
+        setIsTranslationReady(true);
       }
     };
 
+    setIsTranslationReady(false);
     translateText();
   }, [id, currentLanguage, translate, shouldShowLabel]);
 
@@ -63,8 +73,10 @@ export const ProgressiveNodeLabel: React.FC<ProgressiveNodeLabelProps> = ({
   const labelOffset = useMemo(() => {
     const baseOffset = type === 'entity' ? 1.8 : 2.2;
     const scaledOffset = baseOffset * Math.max(0.5, Math.min(2, nodeScale));
+    
+    console.log(`[ProgressiveNodeLabel] Label offset for ${id} (${type}): ${scaledOffset} (scale: ${nodeScale})`);
     return [0, scaledOffset, 0] as [number, number, number];
-  }, [type, nodeScale]);
+  }, [type, nodeScale, id]);
 
   // Calculate text properties
   const textSize = useMemo(() => {
@@ -86,14 +98,14 @@ export const ProgressiveNodeLabel: React.FC<ProgressiveNodeLabelProps> = ({
     position[2] + labelOffset[2]
   ];
 
-  if (!shouldShowLabel || !displayText) {
+  if (!shouldShowLabel || !displayText || !isTranslationReady) {
     return null;
   }
 
   console.log(`[ProgressiveNodeLabel] Final render: "${displayText}" at position`, labelPosition);
 
   return (
-    <ReliableText
+    <SimpleText
       text={displayText}
       position={labelPosition}
       color={textColor}
