@@ -1,6 +1,6 @@
 
 import { supabase } from '@/integrations/supabase/client';
-import { translationService } from '@/services/translationService';
+import { SoulNetTranslationManager } from '@/services/soulNetTranslationManager';
 
 interface NodeData {
   id: string;
@@ -40,7 +40,7 @@ interface CachedInstantData {
 
 export class EnhancedSoulNetPreloadService {
   private static readonly CACHE_KEY = 'enhanced-soulnet-instant-data';
-  private static readonly CACHE_DURATION = 3 * 60 * 1000; // 3 minutes for instant access
+  private static readonly CACHE_DURATION = 5 * 60 * 1000; // Extended to 5 minutes for better performance
   private static cache = new Map<string, CachedInstantData>();
   private static worker: Worker | null = null;
   private static preloadingPromises = new Map<string, Promise<InstantSoulNetData | null>>();
@@ -56,6 +56,37 @@ export class EnhancedSoulNetPreloadService {
         console.warn('[EnhancedSoulNetPreloadService] Failed to initialize worker:', error);
       }
     }
+  }
+
+  // ENHANCED: Pre-translate all time ranges when language changes
+  static async preloadAllTimeRanges(
+    userId: string,
+    language: string,
+    onProgress?: (timeRange: string, completed: number, total: number) => void
+  ): Promise<void> {
+    if (language === 'en') {
+      console.log('[EnhancedSoulNetPreloadService] Skipping preload for English');
+      return;
+    }
+
+    console.log(`[EnhancedSoulNetPreloadService] Pre-translating all time ranges for ${userId} in ${language}`);
+    
+    const timeRanges = ['today', 'week', 'month', 'year'];
+    const totalRanges = timeRanges.length;
+    
+    for (let i = 0; i < timeRanges.length; i++) {
+      const timeRange = timeRanges[i];
+      try {
+        onProgress?.(timeRange, i, totalRanges);
+        await this.preloadInstantData(userId, timeRange, language);
+        console.log(`[EnhancedSoulNetPreloadService] Completed pre-translation for ${timeRange}`);
+      } catch (error) {
+        console.error(`[EnhancedSoulNetPreloadService] Failed to pre-translate ${timeRange}:`, error);
+      }
+    }
+    
+    onProgress?.('complete', totalRanges, totalRanges);
+    console.log('[EnhancedSoulNetPreloadService] All time ranges pre-translation completed');
   }
 
   static async preloadInstantData(
@@ -88,7 +119,7 @@ export class EnhancedSoulNetPreloadService {
     timeRange: string,
     language: string
   ): Promise<InstantSoulNetData | null> {
-    console.log('[EnhancedSoulNetPreloadService] Starting instant preload for', userId, timeRange, language);
+    console.log('[EnhancedSoulNetPreloadService] Starting enhanced preload for', userId, timeRange, language);
     
     const cacheKey = `${userId}-${timeRange}-${language}`;
     const cached = this.getInstantData(cacheKey);
@@ -138,20 +169,26 @@ export class EnhancedSoulNetPreloadService {
         connectionPercentages = this.calculatePercentagesFallback(graphData.nodes, graphData.links);
       }
 
-      // Pre-translate all node names
+      // ENHANCED: Use SoulNet translation manager for comprehensive translations
       const translations = new Map<string, string>();
       if (language !== 'en') {
         const nodesToTranslate = graphData.nodes.map(node => node.id);
-        console.log('[EnhancedSoulNetPreloadService] Pre-translating', nodesToTranslate.length, 'node names');
+        console.log(`[EnhancedSoulNetPreloadService] Using SoulNet translation manager for ${nodesToTranslate.length} nodes`);
         
-        const batchResults = await translationService.batchTranslate({
-          texts: nodesToTranslate,
-          targetLanguage: language
+        const translationResults = await SoulNetTranslationManager.translateSoulNetNodes(
+          nodesToTranslate,
+          language,
+          (completed, total) => {
+            console.log(`[EnhancedSoulNetPreloadService] Translation progress: ${completed}/${total}`);
+          }
+        );
+        
+        // Copy results to our translations map
+        translationResults.forEach((translatedText, nodeId) => {
+          translations.set(nodeId, translatedText);
         });
         
-        batchResults.forEach((translatedText, originalText) => {
-          translations.set(originalText, translatedText);
-        });
+        console.log(`[EnhancedSoulNetPreloadService] Successfully translated ${translations.size}/${nodesToTranslate.length} nodes`);
       }
 
       // Pre-calculate node connection metadata
@@ -470,5 +507,274 @@ export class EnhancedSoulNetPreloadService {
       });
       console.log('[EnhancedSoulNetPreloadService] Cleared all instant cache');
     }
+    
+    // Also clear SoulNet translation manager cache
+    SoulNetTranslationManager.clearCache();
+  }
+
+  private static async calculatePercentagesWithWorker(
+    nodes: NodeData[],
+    links: LinkData[]
+  ): Promise<Map<string, number>> {
+    return new Promise((resolve) => {
+      if (!this.worker) {
+        resolve(this.calculatePercentagesFallback(nodes, links));
+        return;
+      }
+
+      const handleMessage = (e: MessageEvent) => {
+        if (e.data.type === 'PERCENTAGES_CALCULATED') {
+          this.worker!.removeEventListener('message', handleMessage);
+          const percentagesObj = e.data.payload.percentages as Record<string, number>;
+          const percentagesMap = new Map(Object.entries(percentagesObj));
+          resolve(percentagesMap);
+        } else if (e.data.type === 'ERROR') {
+          this.worker!.removeEventListener('message', handleMessage);
+          console.warn('[EnhancedSoulNetPreloadService] Worker error, using fallback');
+          resolve(this.calculatePercentagesFallback(nodes, links));
+        }
+      };
+
+      this.worker.addEventListener('message', handleMessage);
+      this.worker.postMessage({
+        type: 'CALCULATE_PERCENTAGES',
+        payload: { nodes, links }
+      });
+
+      // Timeout fallback
+      setTimeout(() => {
+        this.worker!.removeEventListener('message', handleMessage);
+        console.warn('[EnhancedSoulNetPreloadService] Worker timeout, using fallback');
+        resolve(this.calculatePercentagesFallback(nodes, links));
+      }, 5000);
+    });
+  }
+
+  private static calculatePercentagesFallback(
+    nodes: NodeData[],
+    links: LinkData[]
+  ): Map<string, number> {
+    console.log('[EnhancedSoulNetPreloadService] Using fallback percentage calculation');
+    
+    const percentageMap = new Map<string, number>();
+    const nodeConnectionTotals = new Map<string, number>();
+    
+    // Calculate total connection strength for each node
+    links.forEach(link => {
+      const sourceTotal = nodeConnectionTotals.get(link.source) || 0;
+      const targetTotal = nodeConnectionTotals.get(link.target) || 0;
+      
+      nodeConnectionTotals.set(link.source, sourceTotal + link.value);
+      nodeConnectionTotals.set(link.target, targetTotal + link.value);
+    });
+
+    // Calculate percentages for each connection
+    links.forEach(link => {
+      const sourceTotal = nodeConnectionTotals.get(link.source) || 1;
+      const targetTotal = nodeConnectionTotals.get(link.target) || 1;
+      
+      const sourcePercentage = Math.round((link.value / sourceTotal) * 100);
+      percentageMap.set(`${link.source}-${link.target}`, sourcePercentage);
+      
+      const targetPercentage = Math.round((link.value / targetTotal) * 100);
+      percentageMap.set(`${link.target}-${link.source}`, targetPercentage);
+    });
+
+    return percentageMap;
+  }
+
+  private static calculateNodeConnectionData(
+    nodes: NodeData[],
+    links: LinkData[]
+  ): Map<string, NodeConnectionData> {
+    const nodeData = new Map<string, NodeConnectionData>();
+    
+    nodes.forEach(node => {
+      const connectedNodes: string[] = [];
+      let totalStrength = 0;
+      let connectionCount = 0;
+      
+      links.forEach(link => {
+        if (link.source === node.id) {
+          connectedNodes.push(link.target);
+          totalStrength += link.value;
+          connectionCount++;
+        } else if (link.target === node.id) {
+          connectedNodes.push(link.source);
+          totalStrength += link.value;
+          connectionCount++;
+        }
+      });
+      
+      nodeData.set(node.id, {
+        connectedNodes: [...new Set(connectedNodes)], // Remove duplicates
+        totalStrength,
+        averageStrength: connectionCount > 0 ? totalStrength / connectionCount : 0
+      });
+    });
+    
+    return nodeData;
+  }
+
+  static getInstantData(cacheKey: string): CachedInstantData | null {
+    const cached = this.cache.get(cacheKey);
+    if (cached && (Date.now() - cached.timestamp) < this.CACHE_DURATION) {
+      return cached;
+    }
+    
+    // Try localStorage
+    try {
+      const stored = localStorage.getItem(`${this.CACHE_KEY}-${cacheKey}`);
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        if ((Date.now() - parsed.timestamp) < this.CACHE_DURATION) {
+          // Convert objects back to Maps
+          parsed.data.translations = new Map(Object.entries(parsed.data.translations || {}));
+          parsed.data.connectionPercentages = new Map(Object.entries(parsed.data.connectionPercentages || {}));
+          parsed.data.nodeConnectionData = new Map(Object.entries(parsed.data.nodeConnectionData || {}));
+          
+          this.cache.set(cacheKey, parsed);
+          return parsed;
+        }
+      }
+    } catch (error) {
+      console.error('[EnhancedSoulNetPreloadService] Error loading from localStorage:', error);
+    }
+    
+    return null;
+  }
+
+  private static setInstantData(cacheKey: string, data: CachedInstantData): void {
+    this.cache.set(cacheKey, data);
+    
+    // Store in localStorage
+    try {
+      const storableData = {
+        ...data,
+        data: {
+          ...data.data,
+          translations: Object.fromEntries(data.data.translations),
+          connectionPercentages: Object.fromEntries(data.data.connectionPercentages),
+          nodeConnectionData: Object.fromEntries(data.data.nodeConnectionData)
+        }
+      };
+      localStorage.setItem(`${this.CACHE_KEY}-${cacheKey}`, JSON.stringify(storableData));
+    } catch (error) {
+      console.error('[EnhancedSoulNetPreloadService] Error saving to localStorage:', error);
+    }
+  }
+
+  private static getStartDate(timeRange: string): Date {
+    const now = new Date();
+    switch (timeRange) {
+      case 'today':
+        return new Date(now.setHours(0, 0, 0, 0));
+      case 'week':
+        const weekStart = new Date(now);
+        weekStart.setDate(weekStart.getDate() - 7);
+        return weekStart;
+      case 'month':
+        const monthStart = new Date(now);
+        monthStart.setMonth(monthStart.getMonth() - 1);
+        return monthStart;
+      case 'year':
+        const yearStart = new Date(now);
+        yearStart.setFullYear(yearStart.getFullYear() - 1);
+        return yearStart;
+      default:
+        const defaultStart = new Date(now);
+        defaultStart.setDate(defaultStart.getDate() - 7);
+        return defaultStart;
+    }
+  }
+
+  private static processEntities(entries: any[]): { nodes: NodeData[], links: LinkData[] } {
+    console.log("[EnhancedSoulNetPreloadService] Processing entities for", entries.length, "entries");
+    
+    const entityEmotionMap: Record<string, Record<string, number>> = {};
+    
+    entries.forEach(entry => {
+      if (!entry.entityemotion) return;
+      
+      Object.entries(entry.entityemotion).forEach(([entity, emotions]) => {
+        if (typeof emotions !== 'object') return;
+        
+        if (!entityEmotionMap[entity]) {
+          entityEmotionMap[entity] = {};
+        }
+        
+        Object.entries(emotions).forEach(([emotion, score]) => {
+          if (typeof score !== 'number') return;
+          
+          if (entityEmotionMap[entity][emotion]) {
+            entityEmotionMap[entity][emotion] += score;
+          } else {
+            entityEmotionMap[entity][emotion] = score;
+          }
+        });
+      });
+    });
+
+    return this.generateGraph(entityEmotionMap);
+  }
+
+  private static generateGraph(entityEmotionMap: Record<string, Record<string, number>>): { nodes: NodeData[], links: LinkData[] } {
+    const nodes: NodeData[] = [];
+    const links: LinkData[] = [];
+    const entityNodes = new Set<string>();
+    const emotionNodes = new Set<string>();
+
+    const entityList = Object.keys(entityEmotionMap);
+    const EMOTION_LAYER_RADIUS = 11;
+    const ENTITY_LAYER_RADIUS = 6;
+    const EMOTION_Y_SPAN = 6;
+    const ENTITY_Y_SPAN = 3;
+
+    console.log("[EnhancedSoulNetPreloadService] Generating graph with", entityList.length, "entities");
+    
+    entityList.forEach((entity, entityIndex) => {
+      entityNodes.add(entity);
+      const entityAngle = (entityIndex / entityList.length) * Math.PI * 2;
+      const entityRadius = ENTITY_LAYER_RADIUS;
+      const entityX = Math.cos(entityAngle) * entityRadius;
+      const entityY = ((entityIndex % 2) === 0 ? -1 : 1) * 0.7 * (Math.random() - 0.5) * ENTITY_Y_SPAN;
+      const entityZ = Math.sin(entityAngle) * entityRadius;
+      
+      nodes.push({
+        id: entity,
+        type: 'entity',
+        value: 1,
+        color: '#fff',
+        position: [entityX, entityY, entityZ]
+      });
+
+      Object.entries(entityEmotionMap[entity]).forEach(([emotion, score]) => {
+        emotionNodes.add(emotion);
+        links.push({
+          source: entity,
+          target: emotion,
+          value: score
+        });
+      });
+    });
+
+    Array.from(emotionNodes).forEach((emotion, emotionIndex) => {
+      const emotionAngle = (emotionIndex / emotionNodes.size) * Math.PI * 2;
+      const emotionRadius = EMOTION_LAYER_RADIUS;
+      const emotionX = Math.cos(emotionAngle) * emotionRadius;
+      const emotionY = ((emotionIndex % 2) === 0 ? -1 : 1) * 0.7 * (Math.random() - 0.5) * EMOTION_Y_SPAN;
+      const emotionZ = Math.sin(emotionAngle) * emotionRadius;
+      
+      nodes.push({
+        id: emotion,
+        type: 'emotion',
+        value: 0.8,
+        color: '#fff',
+        position: [emotionX, emotionY, emotionZ]
+      });
+    });
+
+    console.log("[EnhancedSoulNetPreloadService] Generated graph with", nodes.length, "nodes and", links.length, "links");
+    return { nodes, links };
   }
 }
