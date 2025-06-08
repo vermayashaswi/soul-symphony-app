@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useTranslation } from '@/contexts/TranslationContext';
 import SmartTextRenderer from './SmartTextRenderer';
@@ -66,16 +65,29 @@ export const TranslatableText3D: React.FC<TranslatableText3DProps> = ({
         return;
       }
 
-      // APP-LEVEL: When not using coordinated translation, show original text to avoid partial states
+      // ENHANCED: Better fallback handling for coordinated translations
       if (useCoordinatedTranslation && !coordinatedTranslation) {
-        console.log(`[TranslatableText3D] APP-LEVEL ATOMIC: Waiting for coordinated translation for "${text}", showing original`);
+        console.log(`[TranslatableText3D] APP-LEVEL FALLBACK: No coordinated translation available for "${text}", checking app-level cache`);
+        
+        // Try app-level cache as fallback
+        const appLevelCached = getCachedTranslation(text);
+        if (appLevelCached) {
+          console.log(`[TranslatableText3D] APP-LEVEL FALLBACK: Using app-level cached translation for "${text}": "${appLevelCached}"`);
+          setTranslatedText(appLevelCached);
+          onTranslationComplete?.(appLevelCached);
+          setTranslationAttempted(true);
+          return;
+        }
+        
+        // If no cache available, keep original text to avoid partial states
+        console.log(`[TranslatableText3D] APP-LEVEL FALLBACK: No cache available, using original text for "${text}"`);
         setTranslatedText(text);
         onTranslationComplete?.(text);
         setTranslationAttempted(true);
         return;
       }
 
-      // APP-LEVEL: Check for app-level cached translation only for non-coordinated usage
+      // APP-LEVEL: Standard translation flow for non-coordinated usage
       if (!useCoordinatedTranslation) {
         const cachedTranslation = getCachedTranslation(text);
         if (cachedTranslation) {

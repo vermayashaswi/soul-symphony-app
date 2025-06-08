@@ -16,7 +16,7 @@ class TranslationService {
     return !!this.apiKey;
   }
 
-  async translate(text: string, sourceLanguage: string = 'auto', targetLanguage?: string): Promise<string | null> {
+  async translate(text: string, sourceLanguage: string = 'en', targetLanguage?: string): Promise<string | null> {
     if (!targetLanguage) {
       console.warn('[TranslationService] No target language provided, skipping translation');
       return text;
@@ -40,7 +40,7 @@ class TranslationService {
       const { data, error } = await supabase.functions.invoke('translate-text', {
         body: {
           text,
-          sourceLanguage,
+          sourceLanguage: sourceLanguage === 'auto' ? 'en' : sourceLanguage, // Fix: Convert auto to en
           targetLanguage,
           cleanResult: true
         }
@@ -74,9 +74,9 @@ class TranslationService {
     }
   }
 
-  // NEW: Enhanced batch translate with atomic completion tracking
+  // ENHANCED: Fixed batch translate with proper source language handling
   async batchTranslate(options: { texts: string[], targetLanguage: string, sourceLanguage?: string }): Promise<Map<string, string>> {
-    const { texts, targetLanguage, sourceLanguage = 'auto' } = options;
+    const { texts, targetLanguage, sourceLanguage = 'en' } = options; // Fix: Default to 'en' instead of 'auto'
     const batchKey = `${texts.join('|')}-${sourceLanguage}-${targetLanguage}`;
     
     // Check if this exact batch is already being processed
@@ -135,7 +135,7 @@ class TranslationService {
         const { data, error } = await supabase.functions.invoke('translate-text', {
           body: {
             texts: uncachedTexts,
-            sourceLanguage,
+            sourceLanguage: sourceLanguage === 'auto' ? 'en' : sourceLanguage, // Fix: Convert auto to en
             targetLanguage,
             cleanResult: true
           }
@@ -176,7 +176,7 @@ class TranslationService {
     return results;
   }
 
-  async getCachedTranslation(text: string, sourceLanguage: string = 'auto', targetLanguage?: string): Promise<string | null> {
+  async getCachedTranslation(text: string, sourceLanguage: string = 'en', targetLanguage?: string): Promise<string | null> {
     if (!targetLanguage || sourceLanguage === targetLanguage) {
       return text;
     }

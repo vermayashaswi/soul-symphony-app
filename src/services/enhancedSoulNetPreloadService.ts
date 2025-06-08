@@ -41,7 +41,7 @@ interface CachedEnhancedData {
 
 // APP-LEVEL: Translation service interface for integration
 interface AppLevelTranslationService {
-  batchTranslate(options: { texts: string[], targetLanguage: string }): Promise<Map<string, string>>;
+  batchTranslate(options: { texts: string[], targetLanguage: string, sourceLanguage?: string }): Promise<Map<string, string>>;
 }
 
 export class EnhancedSoulNetPreloadService {
@@ -261,7 +261,7 @@ export class EnhancedSoulNetPreloadService {
     }
   }
 
-  // APP-LEVEL: Enhanced batch translation with progress tracking
+  // APP-LEVEL: Enhanced batch translation with proper source language
   private static async performAppLevelBatchTranslation(nodes: NodeData[], language: string, cacheKey: string): Promise<Map<string, string>> {
     const translations = new Map<string, string>();
     const nodesToTranslate = [...new Set(nodes.map(node => node.id))]; // Remove duplicates
@@ -295,10 +295,11 @@ export class EnhancedSoulNetPreloadService {
         return translations;
       }
 
-      // Perform atomic batch translation
+      // FIXED: Perform atomic batch translation with proper source language
       const batchResults = await this.appTranslationService.batchTranslate({
         texts: nodesToTranslate,
-        targetLanguage: language
+        targetLanguage: language,
+        sourceLanguage: 'en' // Fix: Use 'en' instead of 'auto'
       });
       
       console.log(`[EnhancedSoulNetPreloadService] APP-LEVEL: Successfully translated ${batchResults.size}/${nodesToTranslate.length} nodes`);

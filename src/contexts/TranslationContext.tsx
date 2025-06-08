@@ -1,4 +1,3 @@
-
 import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react';
 import { onDemandTranslationCache } from '@/utils/website-translations';
 import { SoulNetPreloadService } from '@/services/soulnetPreloadService';
@@ -152,11 +151,11 @@ export const TranslationProvider: React.FC<TranslationProviderProps> = ({ childr
       
       console.log('[TranslationContext] Using Supabase edge function for translation');
       
-      // Use Supabase edge function for translation
+      // FIXED: Use Supabase edge function with proper source language
       const { data, error } = await supabase.functions.invoke('translate-text', {
         body: {
           text,
-          sourceLanguage,
+          sourceLanguage: sourceLanguage === 'auto' ? 'en' : sourceLanguage, // Fix: Convert auto to en
           targetLanguage: currentLanguage,
           entryId,
           cleanResult: true
@@ -213,11 +212,11 @@ export const TranslationProvider: React.FC<TranslationProviderProps> = ({ childr
     const textsToTranslate = routeTexts[route] || [];
     if (textsToTranslate.length > 0 && currentLanguage !== 'en') {
       try {
-        // Use Supabase edge function for batch translation
+        // FIXED: Use Supabase edge function with proper source language
         const { data, error } = await supabase.functions.invoke('translate-text', {
           body: {
             texts: textsToTranslate,
-            sourceLanguage: 'en',
+            sourceLanguage: 'en', // Fix: Use 'en' instead of auto
             targetLanguage: currentLanguage,
             cleanResult: true
           }
