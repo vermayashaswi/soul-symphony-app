@@ -2,6 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { useTranslation } from '@/contexts/TranslationContext';
 import SmartTextRenderer from './SmartTextRenderer';
+import { useSoulNetTranslation } from './SoulNetTranslationTracker';
 
 interface TranslatableText3DProps {
   text: string;
@@ -19,6 +20,7 @@ interface TranslatableText3DProps {
   maxLines?: number;
   sourceLanguage?: string;
   onTranslationComplete?: (translatedText: string) => void;
+  nodeId?: string; // For tracking purposes
 }
 
 export const TranslatableText3D: React.FC<TranslatableText3DProps> = ({
@@ -36,12 +38,30 @@ export const TranslatableText3D: React.FC<TranslatableText3DProps> = ({
   maxCharsPerLine = 18,
   maxLines = 3,
   sourceLanguage = 'en',
-  onTranslationComplete
+  onTranslationComplete,
+  nodeId
 }) => {
   const { currentLanguage, getCachedTranslation, translate } = useTranslation();
   const [translatedText, setTranslatedText] = useState<string>(text);
   const [isTranslating, setIsTranslating] = useState(false);
   const [translationAttempted, setTranslationAttempted] = useState(false);
+  
+  // Get translation tracker if available
+  const translationTracker = React.useContext(React.createContext<any>(undefined));
+  const soulNetTranslation = React.useMemo(() => {
+    try {
+      return require('./SoulNetTranslationTracker').useSoulNetTranslation?.();
+    } catch {
+      return null;
+    }
+  }, []);
+
+  // Register with tracker when nodeId is provided
+  useEffect(() => {
+    if (nodeId && soulNetTranslation) {
+      soulNetTranslation.registerNode(nodeId);
+    }
+  }, [nodeId, soulNetTranslation]);
 
   useEffect(() => {
     const translateText = async () => {
@@ -49,6 +69,11 @@ export const TranslatableText3D: React.FC<TranslatableText3DProps> = ({
         setTranslatedText(text);
         onTranslationComplete?.(text);
         setTranslationAttempted(true);
+        
+        // Mark as translated for tracker
+        if (nodeId && soulNetTranslation) {
+          soulNetTranslation.markNodeTranslated(nodeId);
+        }
         return;
       }
 
@@ -59,6 +84,11 @@ export const TranslatableText3D: React.FC<TranslatableText3DProps> = ({
         setTranslatedText(cachedTranslation);
         onTranslationComplete?.(cachedTranslation);
         setTranslationAttempted(true);
+        
+        // Mark as translated for tracker
+        if (nodeId && soulNetTranslation) {
+          soulNetTranslation.markNodeTranslated(nodeId);
+        }
         return;
       }
 
@@ -67,6 +97,11 @@ export const TranslatableText3D: React.FC<TranslatableText3DProps> = ({
         console.log(`[TranslatableText3D] Translation already attempted for "${text}", using original`);
         setTranslatedText(text);
         onTranslationComplete?.(text);
+        
+        // Mark as translated for tracker
+        if (nodeId && soulNetTranslation) {
+          soulNetTranslation.markNodeTranslated(nodeId);
+        }
         return;
       }
 
@@ -74,6 +109,11 @@ export const TranslatableText3D: React.FC<TranslatableText3DProps> = ({
         setTranslatedText(text);
         onTranslationComplete?.(text);
         setTranslationAttempted(true);
+        
+        // Mark as translated for tracker
+        if (nodeId && soulNetTranslation) {
+          soulNetTranslation.markNodeTranslated(nodeId);
+        }
         return;
       }
 
@@ -99,11 +139,16 @@ export const TranslatableText3D: React.FC<TranslatableText3DProps> = ({
       } finally {
         setIsTranslating(false);
         setTranslationAttempted(true);
+        
+        // Mark as translated for tracker
+        if (nodeId && soulNetTranslation) {
+          soulNetTranslation.markNodeTranslated(nodeId);
+        }
       }
     };
 
     translateText();
-  }, [text, currentLanguage, sourceLanguage, translate, getCachedTranslation, onTranslationComplete, translationAttempted]);
+  }, [text, currentLanguage, sourceLanguage, translate, getCachedTranslation, onTranslationComplete, translationAttempted, nodeId, soulNetTranslation]);
 
   // Always render with current text - don't hide during translation
   return (
