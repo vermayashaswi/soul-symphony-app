@@ -1,9 +1,9 @@
 
 import { translationCache } from './translationCache';
+import { supabase } from '@/integrations/supabase/client';
 
 class TranslationService {
   private apiKey: string | null = null;
-  private baseURL = 'https://translation.googleapis.com/language/translate/v2';
   
   // NEW: Batch operation tracking
   private batchOperations = new Map<string, Promise<Map<string, string>>>();
@@ -33,43 +33,41 @@ class TranslationService {
       return cached.translatedText;
     }
 
-    if (!this.hasApiKey()) {
-      console.warn('[TranslationService] No API key set, returning original text');
-      return text;
-    }
-
+    console.log('[TranslationService] Using Supabase edge function for translation');
+    
     try {
-      const response = await fetch(`${this.baseURL}?key=${this.apiKey}`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          q: text,
-          source: sourceLanguage,
-          target: targetLanguage,
-          format: 'text'
-        }),
+      // Use Supabase edge function instead of direct API calls
+      const { data, error } = await supabase.functions.invoke('translate-text', {
+        body: {
+          text,
+          sourceLanguage,
+          targetLanguage,
+          cleanResult: true
+        }
       });
 
-      if (!response.ok) {
-        throw new Error(`Translation API error: ${response.status}`);
+      if (error) {
+        console.error('[TranslationService] Edge function error:', error);
+        return text;
       }
 
-      const data = await response.json();
-      const translatedText = data.data.translations[0].translatedText;
-      
-      // Cache the result using the correct method name
-      await translationCache.setTranslation({
-        originalText: text,
-        translatedText,
-        language: targetLanguage,
-        timestamp: Date.now(),
-        version: 1
-      });
-      
-      console.log(`[TranslationService] Translated: "${text}" -> "${translatedText}"`);
-      return translatedText;
+      if (data && data.translatedText) {
+        const translatedText = data.translatedText;
+        
+        // Cache the result using the correct method name
+        await translationCache.setTranslation({
+          originalText: text,
+          translatedText,
+          language: targetLanguage,
+          timestamp: Date.now(),
+          version: 1
+        });
+        
+        console.log(`[TranslationService] Translated: "${text}" -> "${translatedText}"`);
+        return translatedText;
+      }
+
+      return text;
     } catch (error) {
       console.error('[TranslationService] Translation error:', error);
       return text; // Return original text on error
@@ -131,61 +129,46 @@ class TranslationService {
       results.set(original, translated);
     });
 
-    // If no API key, return original texts for uncached items
-    if (!this.hasApiKey()) {
-      console.warn('[TranslationService] APP-LEVEL: No API key, using original texts for uncached items');
-      uncachedTexts.forEach(text => results.set(text, text));
-      return results;
-    }
-
-    // Translate uncached texts in smaller batches to respect API limits
-    const batchSize = 10; // Google Translate API batch limit
-    
-    for (let i = 0; i < uncachedTexts.length; i += batchSize) {
-      const batch = uncachedTexts.slice(i, i + batchSize);
-      
+    // Use Supabase edge function for batch translation
+    if (uncachedTexts.length > 0) {
       try {
-        const response = await fetch(`${this.baseURL}?key=${this.apiKey}`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            q: batch,
-            source: sourceLanguage,
-            target: targetLanguage,
-            format: 'text'
-          }),
+        const { data, error } = await supabase.functions.invoke('translate-text', {
+          body: {
+            texts: uncachedTexts,
+            sourceLanguage,
+            targetLanguage,
+            cleanResult: true
+          }
         });
 
-        if (!response.ok) {
-          throw new Error(`Translation API error: ${response.status}`);
-        }
-
-        const data = await response.json();
-        const translations = data.data.translations;
-        
-        for (let j = 0; j < batch.length; j++) {
-          const originalText = batch[j];
-          const translatedText = translations[j]?.translatedText || originalText;
-          results.set(originalText, translatedText);
+        if (error) {
+          console.error('[TranslationService] APP-LEVEL: Batch translation error:', error);
+          // Use original texts for failed batch
+          uncachedTexts.forEach(text => results.set(text, text));
+        } else if (data && data.translatedTexts) {
+          const translations = data.translatedTexts;
           
-          // Cache individual results using correct method name
-          await translationCache.setTranslation({
-            originalText,
-            translatedText,
-            language: targetLanguage,
-            timestamp: Date.now(),
-            version: 1
-          });
-        }
+          for (let i = 0; i < uncachedTexts.length; i++) {
+            const originalText = uncachedTexts[i];
+            const translatedText = translations[i] || originalText;
+            results.set(originalText, translatedText);
+            
+            // Cache individual results using correct method name
+            await translationCache.setTranslation({
+              originalText,
+              translatedText,
+              language: targetLanguage,
+              timestamp: Date.now(),
+              version: 1
+            });
+          }
 
-        console.log(`[TranslationService] APP-LEVEL: Translated batch ${Math.floor(i / batchSize) + 1} of ${Math.ceil(uncachedTexts.length / batchSize)}`);
-        
+          console.log(`[TranslationService] APP-LEVEL: Batch translation complete: ${translations.length} texts translated`);
+        }
       } catch (error) {
-        console.error(`[TranslationService] APP-LEVEL: Error translating batch starting at ${i}:`, error);
+        console.error(`[TranslationService] APP-LEVEL: Error in batch translation:`, error);
         // Use original texts for failed batch
-        batch.forEach(text => results.set(text, text));
+        uncachedTexts.forEach(text => results.set(text, text));
       }
     }
 

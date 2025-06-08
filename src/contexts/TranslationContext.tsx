@@ -1,8 +1,8 @@
 
 import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react';
-import { translationService } from '@/services/translationService';
 import { onDemandTranslationCache } from '@/utils/website-translations';
 import { SoulNetPreloadService } from '@/services/soulnetPreloadService';
+import { supabase } from '@/integrations/supabase/client';
 
 interface TranslationContextType {
   currentLanguage: string;
@@ -124,7 +124,7 @@ export const TranslationProvider: React.FC<TranslationProviderProps> = ({ childr
       return text;
     }
 
-    console.log('[TranslationContext] GOOGLE TRANSLATE ONLY - Attempting to translate:', { 
+    console.log('[TranslationContext] SUPABASE EDGE FUNCTION - Attempting to translate:', { 
       text: text.substring(0, 30) + (text.length > 30 ? '...' : ''), 
       from: sourceLanguage, 
       to: currentLanguage,
@@ -150,11 +150,26 @@ export const TranslationProvider: React.FC<TranslationProviderProps> = ({ childr
     try {
       setIsTranslating(true);
       
-      // Use the correct method name 'translate' instead of 'translateText'
-      console.log('[TranslationContext] Using Google Translate service only');
-      const translatedText = await translationService.translate(text, sourceLanguage, currentLanguage);
+      console.log('[TranslationContext] Using Supabase edge function for translation');
+      
+      // Use Supabase edge function for translation
+      const { data, error } = await supabase.functions.invoke('translate-text', {
+        body: {
+          text,
+          sourceLanguage,
+          targetLanguage: currentLanguage,
+          entryId,
+          cleanResult: true
+        }
+      });
 
-      if (translatedText && translatedText !== text) {
+      if (error) {
+        console.error('[TranslationContext] Edge function error:', error);
+        return text;
+      }
+
+      if (data && data.translatedText && data.translatedText !== text) {
+        const translatedText = data.translatedText;
         console.log('[TranslationContext] Translation successful:', { 
           original: text.substring(0, 30), 
           translated: translatedText.substring(0, 30) 
@@ -198,11 +213,29 @@ export const TranslationProvider: React.FC<TranslationProviderProps> = ({ childr
     const textsToTranslate = routeTexts[route] || [];
     if (textsToTranslate.length > 0 && currentLanguage !== 'en') {
       try {
-        const batchResults = await translationService.batchTranslate({
-          texts: textsToTranslate,
-          targetLanguage: currentLanguage
+        // Use Supabase edge function for batch translation
+        const { data, error } = await supabase.functions.invoke('translate-text', {
+          body: {
+            texts: textsToTranslate,
+            sourceLanguage: 'en',
+            targetLanguage: currentLanguage,
+            cleanResult: true
+          }
         });
-        console.log(`[TranslationContext] Prefetched ${batchResults.size} translations for route ${route}`);
+
+        if (!error && data && data.translatedTexts) {
+          console.log(`[TranslationContext] Prefetched ${data.translatedTexts.length} translations for route ${route}`);
+          
+          // Cache the results
+          textsToTranslate.forEach((originalText, index) => {
+            const translatedText = data.translatedTexts[index];
+            if (translatedText) {
+              const cacheKey = `${originalText}_en_${currentLanguage}`;
+              setTranslationCache(prev => ({ ...prev, [cacheKey]: translatedText }));
+              onDemandTranslationCache.set(currentLanguage, originalText, translatedText);
+            }
+          });
+        }
       } catch (error) {
         console.error('[TranslationContext] Error prefetching translations:', error);
       }
