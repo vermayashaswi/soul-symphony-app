@@ -107,7 +107,7 @@ export const TranslationProvider: React.FC<{ children: React.ReactNode }> = ({ c
                 pageLanguage: sourceLanguage,
                 includedLanguages: currentLanguage,
                 autoDisplay: false
-              }, element);
+              }, element.id || 'translate-element');
 
               // Simplified translation logic for demonstration
               // In practice, you'd integrate with the actual Google Translate API

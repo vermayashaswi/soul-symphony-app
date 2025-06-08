@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Edit } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -48,7 +47,7 @@ export function EditEntryButton({ entryId, content, onEntryUpdated }: EditEntryB
     try {
       setIsLoadingTranslation(true);
       console.log('[EditEntryButton] Translating content for editing to', currentLanguage);
-      const translatedContent = await translate(originalContent, 'en', entryId);
+      const translatedContent = await translate(originalContent, 'en');
       return translatedContent || originalContent;
     } catch (error) {
       console.error('[EditEntryButton] Error translating content for editing:', error);
