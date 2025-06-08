@@ -19,7 +19,7 @@ interface TranslatableText3DProps {
   maxLines?: number;
   sourceLanguage?: string;
   onTranslationComplete?: (translatedText: string) => void;
-  // NEW: Coordinated translation props
+  // APP-LEVEL: Coordinated translation props
   coordinatedTranslation?: string;
   useCoordinatedTranslation?: boolean;
 }
@@ -50,9 +50,9 @@ export const TranslatableText3D: React.FC<TranslatableText3DProps> = ({
 
   useEffect(() => {
     const translateText = async () => {
-      // COORDINATED TRANSLATION: Use coordinated translation if available
+      // APP-LEVEL: Use coordinated translation if available
       if (useCoordinatedTranslation && coordinatedTranslation) {
-        console.log(`[TranslatableText3D] COORDINATED: Using coordinated translation for "${text}": "${coordinatedTranslation}"`);
+        console.log(`[TranslatableText3D] APP-LEVEL: Using coordinated translation for "${text}": "${coordinatedTranslation}"`);
         setTranslatedText(coordinatedTranslation);
         onTranslationComplete?.(coordinatedTranslation);
         setTranslationAttempted(true);
@@ -66,10 +66,10 @@ export const TranslatableText3D: React.FC<TranslatableText3DProps> = ({
         return;
       }
 
-      // PRIORITY 1: Check for pre-cached translation first (from SoulNet preload)
+      // APP-LEVEL: Check for app-level cached translation first
       const cachedTranslation = getCachedTranslation(text);
       if (cachedTranslation) {
-        console.log(`[TranslatableText3D] COORDINATED: Using pre-cached translation for "${text}": "${cachedTranslation}"`);
+        console.log(`[TranslatableText3D] APP-LEVEL: Using app-level cached translation for "${text}": "${cachedTranslation}"`);
         setTranslatedText(cachedTranslation);
         onTranslationComplete?.(cachedTranslation);
         setTranslationAttempted(true);
@@ -78,7 +78,7 @@ export const TranslatableText3D: React.FC<TranslatableText3DProps> = ({
 
       // Skip translation if already attempted and failed
       if (translationAttempted) {
-        console.log(`[TranslatableText3D] COORDINATED: Translation already attempted for "${text}", using original`);
+        console.log(`[TranslatableText3D] APP-LEVEL: Translation already attempted for "${text}", using original`);
         setTranslatedText(text);
         onTranslationComplete?.(text);
         return;
@@ -91,23 +91,23 @@ export const TranslatableText3D: React.FC<TranslatableText3DProps> = ({
         return;
       }
 
-      console.log(`[TranslatableText3D] COORDINATED: No cache or coordination found, translating "${text}" from ${sourceLanguage} to ${currentLanguage}`);
+      console.log(`[TranslatableText3D] APP-LEVEL: No cache or coordination found, translating "${text}" from ${sourceLanguage} to ${currentLanguage}`);
       
       try {
         setIsTranslating(true);
         const result = await translate(text, sourceLanguage);
         
         if (result && result !== text) {
-          console.log(`[TranslatableText3D] COORDINATED: Translation successful: "${text}" -> "${result}"`);
+          console.log(`[TranslatableText3D] APP-LEVEL: Translation successful: "${text}" -> "${result}"`);
           setTranslatedText(result);
           onTranslationComplete?.(result);
         } else {
-          console.log(`[TranslatableText3D] COORDINATED: Using original text for "${text}"`);
+          console.log(`[TranslatableText3D] APP-LEVEL: Using original text for "${text}"`);
           setTranslatedText(text);
           onTranslationComplete?.(text);
         }
       } catch (error) {
-        console.error(`[TranslatableText3D] COORDINATED: Translation failed for "${text}":`, error);
+        console.error(`[TranslatableText3D] APP-LEVEL: Translation failed for "${text}":`, error);
         setTranslatedText(text);
         onTranslationComplete?.(text);
       } finally {

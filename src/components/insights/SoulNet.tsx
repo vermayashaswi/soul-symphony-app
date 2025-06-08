@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import '@/types/three-reference';
 import { Canvas } from '@react-three/fiber';
@@ -15,6 +14,8 @@ import { cn } from '@/lib/utils';
 import { TranslatableText } from '@/components/translation/TranslatableText';
 import { useTranslation } from '@/contexts/TranslationContext';
 import { useInstantSoulNetData } from '@/hooks/useInstantSoulNetData';
+import { EnhancedSoulNetPreloadService } from '@/services/enhancedSoulNetPreloadService';
+import { translationService } from '@/services/translationService';
 
 interface SoulNetProps {
   userId: string | undefined;
@@ -34,7 +35,13 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
   // STABILIZATION: Use ref to track if rendering has been initialized to prevent unnecessary resets
   const renderingInitialized = useRef(false);
 
-  // Use the enhanced instant data hook with coordinated translations
+  // APP-LEVEL: Initialize the enhanced service with app-level translation service
+  useEffect(() => {
+    console.log("[SoulNet] APP-LEVEL: Setting up app-level translation service integration");
+    EnhancedSoulNetPreloadService.setAppLevelTranslationService(translationService);
+  }, []);
+
+  // Use the enhanced instant data hook with app-level translations
   const { 
     graphData, 
     loading, 
@@ -45,7 +52,7 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
     getInstantNodeConnections
   } = useInstantSoulNetData(userId, timeRange);
 
-  console.log("[SoulNet] COORDINATED INSTANT DATA MODE - Zero loading delays with coordinated translations", { 
+  console.log("[SoulNet] APP-LEVEL INSTANT DATA MODE - Zero loading delays with app-level translations", { 
     userId, 
     timeRange, 
     currentLanguage,
@@ -57,10 +64,10 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
   });
 
   useEffect(() => {
-    console.log("[SoulNet] COORDINATED: Component mounted - Coordinated instant data mode enabled");
+    console.log("[SoulNet] APP-LEVEL: Component mounted - App-level instant data mode enabled");
     
     return () => {
-      console.log("[SoulNet] COORDINATED: Component unmounted");
+      console.log("[SoulNet] APP-LEVEL: Component unmounted");
     };
   }, []);
 
@@ -68,14 +75,14 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
   useEffect(() => {
     // Only initialize rendering if we have data and haven't already initialized
     if ((isInstantReady || (graphData.nodes.length > 0 && !loading)) && !renderingInitialized.current) {
-      console.log("[SoulNet] COORDINATED STABILIZED: Initializing rendering for the first time");
+      console.log("[SoulNet] APP-LEVEL STABILIZED: Initializing rendering for the first time");
       setRenderingReady(true);
       renderingInitialized.current = true;
     }
     
     // DEFENSIVE: Only reset rendering if there's an actual error or complete data loss
     if (error || (graphData.nodes.length === 0 && !loading && renderingInitialized.current)) {
-      console.log("[SoulNet] COORDINATED DEFENSIVE: Resetting rendering due to error or data loss", { error: !!error, nodesCount: graphData.nodes.length });
+      console.log("[SoulNet] APP-LEVEL DEFENSIVE: Resetting rendering due to error or data loss", { error: !!error, nodesCount: graphData.nodes.length });
       setRenderingReady(false);
       renderingInitialized.current = false;
     }
@@ -83,7 +90,7 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
 
   // OPTIMIZED: Node selection with stable state management
   const handleNodeSelect = useCallback((id: string) => {
-    console.log(`[SoulNet] COORDINATED STABLE: Node selected: ${id} - no re-render triggers`);
+    console.log(`[SoulNet] APP-LEVEL STABLE: Node selected: ${id} - no re-render triggers`);
     if (selectedEntity === id) {
       setSelectedEntity(null);
     } else {
@@ -97,13 +104,13 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
   const toggleFullScreen = useCallback(() => {
     setIsFullScreen(prev => {
       if (!prev) setSelectedEntity(null);
-      console.log(`[SoulNet] COORDINATED: Toggling fullscreen: ${!prev}`);
+      console.log(`[SoulNet] APP-LEVEL: Toggling fullscreen: ${!prev}`);
       return !prev;
     });
   }, []);
 
   const handleCanvasError = useCallback((error: Error) => {
-    console.error('[SoulNet] COORDINATED: Canvas error:', error);
+    console.error('[SoulNet] APP-LEVEL: Canvas error:', error);
     setCanvasError(error);
     setRetryCount(prev => prev + 1);
     // DEFENSIVE: Reset rendering state on canvas errors
@@ -120,7 +127,7 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
 
   // ENHANCED: Only show loading if we truly have no data and are still loading
   if (loading && !isInstantReady && graphData.nodes.length === 0) {
-    console.log("[SoulNet] COORDINATED ENHANCED: Showing loading state - no instant data available");
+    console.log("[SoulNet] APP-LEVEL ENHANCED: Showing loading state - no instant data available");
     return <LoadingState />;
   }
   
@@ -230,7 +237,7 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
     );
   };
 
-  console.log(`[SoulNet] COORDINATED STABILIZED RENDER: ${graphData.nodes.length} nodes, ${graphData.links.length} links, renderingReady: ${renderingReady}, initialized: ${renderingInitialized.current}`);
+  console.log(`[SoulNet] APP-LEVEL STABILIZED RENDER: ${graphData.nodes.length} nodes, ${graphData.links.length} links, renderingReady: ${renderingReady}, initialized: ${renderingInitialized.current}`);
 
   return (
     <div className={cn(

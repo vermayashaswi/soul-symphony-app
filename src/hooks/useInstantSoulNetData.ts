@@ -41,7 +41,7 @@ export const useInstantSoulNetData = (
   userId: string | undefined,
   timeRange: string
 ): InstantSoulNetData => {
-  const { currentLanguage } = useTranslation();
+  const { currentLanguage, getCachedTranslation } = useTranslation();
   
   // Initialize with instant check for cached data
   const cacheKey = useMemo(() => 
@@ -56,7 +56,7 @@ export const useInstantSoulNetData = (
 
   const [graphData, setGraphData] = useState<{ nodes: NodeData[], links: LinkData[] }>(() => {
     if (instantCached) {
-      console.log('[useInstantSoulNetData] INSTANT: Using cached data immediately');
+      console.log('[useInstantSoulNetData] APP-LEVEL: Using cached data immediately');
       return { nodes: instantCached.data.nodes, links: instantCached.data.links };
     }
     return { nodes: [], links: [] };
@@ -78,7 +78,7 @@ export const useInstantSoulNetData = (
   const [error, setError] = useState<Error | null>(null);
   const [isInstantReady, setIsInstantReady] = useState(!!instantCached);
 
-  // Instant data getter functions
+  // APP-LEVEL: Enhanced instant data getter functions using app-level translation service
   const getInstantConnectionPercentage = useCallback((selectedNode: string, targetNode: string): number => {
     if (!selectedNode || selectedNode === targetNode) return 0;
     
@@ -86,26 +86,34 @@ export const useInstantSoulNetData = (
     const percentage = connectionPercentages.get(key);
     
     if (percentage !== undefined) {
-      console.log(`[useInstantSoulNetData] INSTANT: Got percentage ${percentage}% for ${key}`);
+      console.log(`[useInstantSoulNetData] APP-LEVEL: Got percentage ${percentage}% for ${key}`);
       return percentage;
     }
     
-    console.log(`[useInstantSoulNetData] INSTANT: No percentage found for ${key}`);
+    console.log(`[useInstantSoulNetData] APP-LEVEL: No percentage found for ${key}`);
     return 0;
   }, [connectionPercentages]);
 
   const getInstantTranslation = useCallback((nodeId: string): string => {
     if (currentLanguage === 'en') return nodeId;
     
-    const translation = translations.get(nodeId);
-    if (translation) {
-      console.log(`[useInstantSoulNetData] INSTANT: Got translation for ${nodeId}: ${translation}`);
-      return translation;
+    // APP-LEVEL: First check the coordinated translation cache
+    const coordinatedTranslation = translations.get(nodeId);
+    if (coordinatedTranslation) {
+      console.log(`[useInstantSoulNetData] APP-LEVEL: Got coordinated translation for ${nodeId}: ${coordinatedTranslation}`);
+      return coordinatedTranslation;
     }
     
-    console.log(`[useInstantSoulNetData] INSTANT: No translation for ${nodeId}, using original`);
+    // APP-LEVEL: Fallback to app-level translation cache
+    const appLevelTranslation = getCachedTranslation(nodeId);
+    if (appLevelTranslation) {
+      console.log(`[useInstantSoulNetData] APP-LEVEL: Got app-level cached translation for ${nodeId}: ${appLevelTranslation}`);
+      return appLevelTranslation;
+    }
+    
+    console.log(`[useInstantSoulNetData] APP-LEVEL: No translation found for ${nodeId}, using original`);
     return nodeId;
-  }, [currentLanguage, translations]);
+  }, [currentLanguage, translations, getCachedTranslation]);
 
   const getInstantNodeConnections = useCallback((nodeId: string): NodeConnectionData => {
     return nodeConnectionData.get(nodeId) || {
@@ -115,14 +123,14 @@ export const useInstantSoulNetData = (
     };
   }, [nodeConnectionData]);
 
-  // Background preloading
+  // Background preloading using app-level translation service
   const preloadData = useCallback(async () => {
     if (!userId || isInstantReady) {
-      console.log('[useInstantSoulNetData] Skipping preload - no userId or already ready');
+      console.log('[useInstantSoulNetData] APP-LEVEL: Skipping preload - no userId or already ready');
       return;
     }
 
-    console.log('[useInstantSoulNetData] Starting background preload for', userId, timeRange, currentLanguage);
+    console.log('[useInstantSoulNetData] APP-LEVEL: Starting background preload for', userId, timeRange, currentLanguage);
     
     try {
       setError(null);
@@ -134,21 +142,21 @@ export const useInstantSoulNetData = (
       );
 
       if (result) {
-        console.log('[useInstantSoulNetData] Background preload successful');
+        console.log('[useInstantSoulNetData] APP-LEVEL: Background preload successful');
         setGraphData({ nodes: result.nodes, links: result.links });
         setTranslations(result.translations);
         setConnectionPercentages(result.connectionPercentages);
         setNodeConnectionData(result.nodeConnectionData);
         setIsInstantReady(true);
       } else {
-        console.log('[useInstantSoulNetData] No data returned from background preload');
+        console.log('[useInstantSoulNetData] APP-LEVEL: No data returned from background preload');
         setGraphData({ nodes: [], links: [] });
         setTranslations(new Map());
         setConnectionPercentages(new Map());
         setNodeConnectionData(new Map());
       }
     } catch (err) {
-      console.error('[useInstantSoulNetData] Background preload error:', err);
+      console.error('[useInstantSoulNetData] APP-LEVEL: Background preload error:', err);
       setError(err instanceof Error ? err : new Error('Unknown error occurred'));
     } finally {
       setLoading(false);
@@ -171,7 +179,7 @@ export const useInstantSoulNetData = (
     }
   }, [currentLanguage, userId]);
 
-  console.log(`[useInstantSoulNetData] STATE: nodes=${graphData.nodes.length}, translations=${translations.size}, percentages=${connectionPercentages.size}, instantReady=${isInstantReady}, loading=${loading}`);
+  console.log(`[useInstantSoulNetData] APP-LEVEL STATE: nodes=${graphData.nodes.length}, translations=${translations.size}, percentages=${connectionPercentages.size}, instantReady=${isInstantReady}, loading=${loading}`);
 
   return {
     graphData,

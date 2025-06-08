@@ -1,6 +1,4 @@
 import { supabase } from '@/integrations/supabase/client';
-import { translationService } from '@/services/translationService';
-import { onDemandTranslationCache } from '@/utils/website-translations';
 
 interface NodeData {
   id: string;
@@ -39,25 +37,39 @@ interface CachedEnhancedData {
   version: number; // Cache versioning
 }
 
+// APP-LEVEL: Translation service interface for integration
+interface AppLevelTranslationService {
+  batchTranslate(options: { texts: string[], targetLanguage: string }): Promise<Map<string, string>>;
+}
+
 export class EnhancedSoulNetPreloadService {
   private static readonly CACHE_KEY = 'enhanced-soulnet-data';
   private static readonly CACHE_DURATION = 15 * 60 * 1000; // 15 minutes
-  private static readonly CACHE_VERSION = 2; // Increment when cache structure changes
+  private static readonly CACHE_VERSION = 3; // Increment for app-level integration
   private static cache = new Map<string, CachedEnhancedData>();
   private static translationCoordinator = new Map<string, Promise<Map<string, string>>>();
+  
+  // APP-LEVEL: Store reference to app-level translation service
+  private static appTranslationService: AppLevelTranslationService | null = null;
+
+  // APP-LEVEL: Method to set the app-level translation service
+  static setAppLevelTranslationService(service: AppLevelTranslationService) {
+    console.log('[EnhancedSoulNetPreloadService] APP-LEVEL: Setting app-level translation service');
+    this.appTranslationService = service;
+  }
 
   static async preloadInstantData(
     userId: string, 
     timeRange: string, 
     language: string
   ): Promise<EnhancedSoulNetData | null> {
-    console.log(`[EnhancedSoulNetPreloadService] COORDINATED: Preloading instant data for ${userId}, ${timeRange}, ${language}`);
+    console.log(`[EnhancedSoulNetPreloadService] APP-LEVEL: Preloading instant data for ${userId}, ${timeRange}, ${language}`);
     
     const cacheKey = this.generateCacheKey(userId, timeRange, language);
     const cached = this.getInstantData(cacheKey);
     
     if (cached) {
-      console.log(`[EnhancedSoulNetPreloadService] COORDINATED: Using cached instant data for ${cacheKey}`);
+      console.log(`[EnhancedSoulNetPreloadService] APP-LEVEL: Using cached instant data for ${cacheKey}`);
       return cached.data;
     }
 
@@ -88,13 +100,13 @@ export class EnhancedSoulNetPreloadService {
         return emptyData;
       }
 
-      console.log(`[EnhancedSoulNetPreloadService] COORDINATED: Found ${entries.length} entries for processing`);
+      console.log(`[EnhancedSoulNetPreloadService] APP-LEVEL: Found ${entries.length} entries for processing`);
 
       // Process the raw data
       const graphData = this.processEntities(entries);
       
-      // COORDINATED TRANSLATION: Use translation coordinator to prevent race conditions
-      const translations = await this.getCoordinatedTranslations(graphData.nodes, language, cacheKey);
+      // APP-LEVEL: Use app-level translation service for coordinated translation
+      const translations = await this.getAppLevelCoordinatedTranslations(graphData.nodes, language, cacheKey);
       const connectionPercentages = new Map<string, number>();
       const nodeConnectionData = new Map<string, NodeConnectionData>();
       
@@ -120,7 +132,7 @@ export class EnhancedSoulNetPreloadService {
         version: this.CACHE_VERSION
       });
 
-      console.log(`[EnhancedSoulNetPreloadService] COORDINATED: Successfully cached instant data for ${cacheKey} with ${enhancedData.nodes.length} nodes and ${enhancedData.translations.size} translations`);
+      console.log(`[EnhancedSoulNetPreloadService] APP-LEVEL: Successfully cached instant data for ${cacheKey} with ${enhancedData.nodes.length} nodes and ${enhancedData.translations.size} translations`);
       return enhancedData;
     } catch (error) {
       console.error('[EnhancedSoulNetPreloadService] Error preloading instant data:', error);
@@ -130,9 +142,10 @@ export class EnhancedSoulNetPreloadService {
 
   // INSTANT ACCESS: Synchronous cache check
   static getInstantData(cacheKey: string): CachedEnhancedData | null {
+    // ... keep existing code (synchronous cache checking)
     const cached = this.cache.get(cacheKey);
     if (cached && this.isCacheValid(cached)) {
-      console.log(`[EnhancedSoulNetPreloadService] INSTANT: Found valid cache for ${cacheKey}`);
+      console.log(`[EnhancedSoulNetPreloadService] APP-LEVEL: Found valid cache for ${cacheKey}`);
       return cached;
     }
     
@@ -149,7 +162,7 @@ export class EnhancedSoulNetPreloadService {
             Object.entries(parsed.data.nodeConnectionData || {}).map(([key, value]) => [key, value as NodeConnectionData])
           );
           this.cache.set(cacheKey, parsed);
-          console.log(`[EnhancedSoulNetPreloadService] INSTANT: Found valid localStorage cache for ${cacheKey}`);
+          console.log(`[EnhancedSoulNetPreloadService] APP-LEVEL: Found valid localStorage cache for ${cacheKey}`);
           return parsed;
         }
       }
@@ -157,12 +170,12 @@ export class EnhancedSoulNetPreloadService {
       console.error('[EnhancedSoulNetPreloadService] Error loading from localStorage:', error);
     }
     
-    console.log(`[EnhancedSoulNetPreloadService] INSTANT: No valid cache found for ${cacheKey}`);
+    console.log(`[EnhancedSoulNetPreloadService] APP-LEVEL: No valid cache found for ${cacheKey}`);
     return null;
   }
 
-  // COORDINATED TRANSLATION: Prevents race conditions
-  private static async getCoordinatedTranslations(
+  // APP-LEVEL: New coordinated translation using app-level service
+  private static async getAppLevelCoordinatedTranslations(
     nodes: NodeData[], 
     language: string, 
     cacheKey: string
@@ -176,12 +189,12 @@ export class EnhancedSoulNetPreloadService {
     // Check if translation is already in progress for this cache key
     const existingTranslation = this.translationCoordinator.get(cacheKey);
     if (existingTranslation) {
-      console.log(`[EnhancedSoulNetPreloadService] COORDINATED: Waiting for existing translation for ${cacheKey}`);
+      console.log(`[EnhancedSoulNetPreloadService] APP-LEVEL: Waiting for existing translation for ${cacheKey}`);
       return existingTranslation;
     }
 
-    // Start new coordinated translation
-    const translationPromise = this.performBatchTranslation(nodes, language);
+    // Start new coordinated translation using app-level service
+    const translationPromise = this.performAppLevelBatchTranslation(nodes, language);
     this.translationCoordinator.set(cacheKey, translationPromise);
 
     try {
@@ -193,35 +206,43 @@ export class EnhancedSoulNetPreloadService {
     }
   }
 
-  private static async performBatchTranslation(nodes: NodeData[], language: string): Promise<Map<string, string>> {
+  // APP-LEVEL: Batch translation using app-level service
+  private static async performAppLevelBatchTranslation(nodes: NodeData[], language: string): Promise<Map<string, string>> {
     const translations = new Map<string, string>();
     const nodesToTranslate = [...new Set(nodes.map(node => node.id))]; // Remove duplicates
     
-    console.log(`[EnhancedSoulNetPreloadService] COORDINATED: Batch translating ${nodesToTranslate.length} unique nodes`);
+    console.log(`[EnhancedSoulNetPreloadService] APP-LEVEL: Batch translating ${nodesToTranslate.length} unique nodes using app-level service`);
     
     try {
-      const batchResults = await translationService.batchTranslate({
+      if (!this.appTranslationService) {
+        console.warn('[EnhancedSoulNetPreloadService] APP-LEVEL: No app-level translation service available, using fallback');
+        // Fallback: set original text for all nodes
+        nodesToTranslate.forEach(nodeId => {
+          translations.set(nodeId, nodeId);
+        });
+        return translations;
+      }
+
+      const batchResults = await this.appTranslationService.batchTranslate({
         texts: nodesToTranslate,
         targetLanguage: language
       });
       
-      console.log(`[EnhancedSoulNetPreloadService] COORDINATED: Successfully translated ${batchResults.size}/${nodesToTranslate.length} nodes`);
+      console.log(`[EnhancedSoulNetPreloadService] APP-LEVEL: Successfully translated ${batchResults.size}/${nodesToTranslate.length} nodes`);
       
       batchResults.forEach((translatedText, originalText) => {
         translations.set(originalText, translatedText);
-        // SYNCHRONIZED: Cache in on-demand cache for immediate access
-        onDemandTranslationCache.set(language, originalText, translatedText);
       });
 
       // Handle any missing translations
       nodesToTranslate.forEach(nodeId => {
         if (!translations.has(nodeId)) {
-          console.warn(`[EnhancedSoulNetPreloadService] COORDINATED: No translation found for node: ${nodeId}, using original`);
+          console.warn(`[EnhancedSoulNetPreloadService] APP-LEVEL: No translation found for node: ${nodeId}, using original`);
           translations.set(nodeId, nodeId);
         }
       });
     } catch (error) {
-      console.error('[EnhancedSoulNetPreloadService] COORDINATED: Error during batch translation:', error);
+      console.error('[EnhancedSoulNetPreloadService] APP-LEVEL: Error during batch translation:', error);
       // Fallback: set original text for all nodes
       nodesToTranslate.forEach(nodeId => {
         translations.set(nodeId, nodeId);
@@ -235,7 +256,7 @@ export class EnhancedSoulNetPreloadService {
     graphData: { nodes: NodeData[], links: LinkData[] },
     nodeConnectionMap: Map<string, NodeConnectionData>
   ): void {
-    console.log('[EnhancedSoulNetPreloadService] COORDINATED: Pre-calculating node connections');
+    console.log('[EnhancedSoulNetPreloadService] APP-LEVEL: Pre-calculating node connections');
     
     graphData.nodes.forEach(node => {
       const connectedNodes: string[] = [];
@@ -260,14 +281,14 @@ export class EnhancedSoulNetPreloadService {
       });
     });
 
-    console.log(`[EnhancedSoulNetPreloadService] COORDINATED: Pre-calculated connections for ${nodeConnectionMap.size} nodes`);
+    console.log(`[EnhancedSoulNetPreloadService] APP-LEVEL: Pre-calculated connections for ${nodeConnectionMap.size} nodes`);
   }
 
   private static calculateConnectionPercentages(
     graphData: { nodes: NodeData[], links: LinkData[] },
     percentageMap: Map<string, number>
   ): void {
-    console.log('[EnhancedSoulNetPreloadService] COORDINATED: Pre-calculating connection percentages');
+    console.log('[EnhancedSoulNetPreloadService] APP-LEVEL: Pre-calculating connection percentages');
     
     // Calculate total connection strength for each node
     const nodeConnectionTotals = new Map<string, number>();
@@ -294,7 +315,7 @@ export class EnhancedSoulNetPreloadService {
       percentageMap.set(`${link.target}-${link.source}`, targetPercentage);
     });
 
-    console.log(`[EnhancedSoulNetPreloadService] COORDINATED: Pre-calculated ${percentageMap.size} connection percentages`);
+    console.log(`[EnhancedSoulNetPreloadService] APP-LEVEL: Pre-calculated ${percentageMap.size} connection percentages`);
   }
 
   // SYNCHRONIZED CACHE KEY GENERATION
@@ -332,7 +353,7 @@ export class EnhancedSoulNetPreloadService {
 
   // CLEAR CACHE WITH PROPER INVALIDATION
   static clearInstantCache(userId?: string): void {
-    console.log(`[EnhancedSoulNetPreloadService] COORDINATED: Clearing instant cache for user ${userId || 'all users'}`);
+    console.log(`[EnhancedSoulNetPreloadService] APP-LEVEL: Clearing instant cache for user ${userId || 'all users'}`);
     
     if (userId) {
       // Clear specific user's cache including all versions
@@ -348,7 +369,7 @@ export class EnhancedSoulNetPreloadService {
         this.translationCoordinator.delete(key);
       });
       
-      console.log(`[EnhancedSoulNetPreloadService] COORDINATED: Cleared instant cache for user ${userId}`);
+      console.log(`[EnhancedSoulNetPreloadService] APP-LEVEL: Cleared instant cache for user ${userId}`);
     } else {
       // Clear all cache
       this.cache.clear();
@@ -358,7 +379,7 @@ export class EnhancedSoulNetPreloadService {
           localStorage.removeItem(key);
         }
       });
-      console.log('[EnhancedSoulNetPreloadService] COORDINATED: Cleared all instant cache');
+      console.log('[EnhancedSoulNetPreloadService] APP-LEVEL: Cleared all instant cache');
     }
   }
 
@@ -387,7 +408,7 @@ export class EnhancedSoulNetPreloadService {
   }
 
   private static processEntities(entries: any[]): { nodes: NodeData[], links: LinkData[] } {
-    console.log("[EnhancedSoulNetPreloadService] COORDINATED: Processing entities for", entries.length, "entries");
+    console.log("[EnhancedSoulNetPreloadService] APP-LEVEL: Processing entities for", entries.length, "entries");
     
     const entityEmotionMap: Record<string, Record<string, number>> = {};
     
@@ -428,7 +449,7 @@ export class EnhancedSoulNetPreloadService {
     const EMOTION_Y_SPAN = 6;
     const ENTITY_Y_SPAN = 3;
 
-    console.log("[EnhancedSoulNetPreloadService] COORDINATED: Generating graph with", entityList.length, "entities");
+    console.log("[EnhancedSoulNetPreloadService] APP-LEVEL: Generating graph with", entityList.length, "entities");
     
     entityList.forEach((entity, entityIndex) => {
       entityNodes.add(entity);
@@ -472,7 +493,7 @@ export class EnhancedSoulNetPreloadService {
       });
     });
 
-    console.log("[EnhancedSoulNetPreloadService] COORDINATED: Generated graph with", nodes.length, "nodes and", links.length, "links");
+    console.log("[EnhancedSoulNetPreloadService] APP-LEVEL: Generated graph with", nodes.length, "nodes and", links.length, "links");
     return { nodes, links };
   }
 }
