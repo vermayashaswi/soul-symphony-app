@@ -1,4 +1,3 @@
-
 import React, { useMemo, useEffect } from 'react';
 import TranslatableText3D from './TranslatableText3D';
 import SimpleText from './SimpleText';
@@ -72,31 +71,22 @@ export const DirectNodeLabel: React.FC<DirectNodeLabelProps> = ({
     return [0, scaledOffset, 0] as [number, number, number];
   }, [type, nodeScale, id, isInstantMode]);
 
-  // TRULY FIXED: Constant text size independent of all zoom and camera calculations
+  // FIXED FONT SIZE IMPLEMENTATION: Constant text size of 3.2 independent of all zoom and camera calculations
   const textSize = useMemo(() => {
-    // Use absolute fixed sizes based on node state only
-    let baseSize: number;
-    
-    if (isSelected) {
-      baseSize = 5.2; // Fixed size for selected nodes
-    } else if (isHighlighted) {
-      baseSize = 4.8; // Fixed size for highlighted nodes
-    } else {
-      baseSize = 4.4; // Fixed size for normal nodes
-    }
+    const fixedSize = 3.2; // Fixed size for all nodes regardless of state
     
     if (isInstantMode) {
-      console.log(`[DirectNodeLabel] TRULY FIXED FONT SIZE INSTANT: ${id} uses absolute fixed size ${baseSize} (no zoom dependency)`);
+      console.log(`[DirectNodeLabel] FIXED FONT SIZE INSTANT: ${id} uses FIXED size ${fixedSize} (no zoom dependency, no state dependency)`);
     } else {
-      console.log(`[DirectNodeLabel] TRULY FIXED FONT SIZE: ${id} uses absolute fixed size ${baseSize} (no zoom dependency)`);
+      console.log(`[DirectNodeLabel] FIXED FONT SIZE: ${id} uses FIXED size ${fixedSize} (no zoom dependency, no state dependency)`);
     }
-    return baseSize;
-  }, [id, isSelected, isHighlighted, isInstantMode]);
+    return fixedSize;
+  }, [id, isInstantMode]);
 
-  // TRULY FIXED: Constant percentage text size
+  // FIXED FONT SIZE IMPLEMENTATION: Constant percentage text size
   const percentageTextSize = useMemo(() => {
     const fixedPercentageSize = 0.9; // Absolute fixed size for percentage text
-    console.log(`[DirectNodeLabel] TRULY FIXED PERCENTAGE SIZE: ${id} uses absolute fixed percentage size ${fixedPercentageSize}`);
+    console.log(`[DirectNodeLabel] FIXED PERCENTAGE SIZE: ${id} uses FIXED percentage size ${fixedPercentageSize}`);
     return fixedPercentageSize;
   }, [id]);
 
@@ -168,9 +158,9 @@ export const DirectNodeLabel: React.FC<DirectNodeLabelProps> = ({
   }
 
   if (isInstantMode) {
-    console.log(`[DirectNodeLabel] TRULY FIXED FONT INSTANT MODE - MAIN TEXT: "${id}" at position`, labelPosition, 'with TRULY FIXED size:', textSize, 'color:', textColor, '- NO LOADING DELAY - APP-LEVEL TRANSLATION');
+    console.log(`[DirectNodeLabel] FIXED FONT INSTANT MODE - MAIN TEXT: "${id}" at position`, labelPosition, 'with FIXED size:', textSize, 'color:', textColor, '- NO LOADING DELAY - APP-LEVEL TRANSLATION');
   } else {
-    console.log(`[DirectNodeLabel] TRULY FIXED FONT - MAIN TEXT: "${id}" at position`, labelPosition, 'with TRULY FIXED size:', textSize, 'color:', textColor, '- APP-LEVEL TRANSLATION');
+    console.log(`[DirectNodeLabel] FIXED FONT - MAIN TEXT: "${id}" at position`, labelPosition, 'with FIXED size:', textSize, 'color:', textColor, '- APP-LEVEL TRANSLATION');
   }
 
   return (

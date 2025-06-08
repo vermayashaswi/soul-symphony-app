@@ -74,7 +74,7 @@ export const SimpleText: React.FC<SimpleTextProps> = ({
   const effectiveOutlineWidth = shouldUseOutline ? outlineWidth : 0;
   const effectiveOutlineColor = shouldUseOutline ? (color === '#ffffff' ? '#000000' : outlineColor) : undefined;
   
-  console.log(`[SimpleText] PLAN IMPLEMENTATION: Rendering: "${displayText}" with fontSize: ${size}, color: ${color}, NO OUTLINE for black text: ${!shouldUseOutline}`);
+  console.log(`[SimpleText] FIXED FONT SIZE IMPLEMENTATION: Rendering "${displayText}" with FIXED fontSize: ${size}, color: ${color}, NO OUTLINE for black text: ${!shouldUseOutline}, frustumCulled: false, sizeAttenuation: false`);
 
   return (
     <Text
@@ -91,11 +91,13 @@ export const SimpleText: React.FC<SimpleTextProps> = ({
       material-transparent={true}
       material-depthTest={false}
       material-opacity={1.0}
+      material-sizeAttenuation={false}
       renderOrder={renderOrder}
       outlineWidth={effectiveOutlineWidth}
       outlineColor={effectiveOutlineColor}
       whiteSpace={enableWrapping || isMultiLine ? "normal" : "nowrap"}
       lineHeight={1.2}
+      frustumCulled={false}
     >
       {displayText}
     </Text>
