@@ -1,7 +1,7 @@
 
 import React from 'react';
 import { SettingsErrorBoundary } from '@/components/settings/SettingsErrorBoundary';
-import { ProgressiveSettingsPage } from '@/components/settings/ProgressiveSettingsPage';
+import { SimpleSettingsPage } from '@/components/settings/SimpleSettingsPage';
 
 const Settings = () => {
   console.log('[Settings] 🏗️ Settings page component mounting');
@@ -14,7 +14,7 @@ const Settings = () => {
 
   return (
     <SettingsErrorBoundary onReset={handleErrorBoundaryReset}>
-      <ProgressiveSettingsPage />
+      <SimpleSettingsPage />
     </SettingsErrorBoundary>
   );
 };

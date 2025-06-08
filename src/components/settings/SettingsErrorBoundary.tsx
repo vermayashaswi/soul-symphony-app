@@ -91,11 +91,13 @@ export class SettingsErrorBoundary extends Component<Props, State> {
 
   handleGoHome = () => {
     console.log('[SettingsErrorBoundary] Navigating to home');
+    // Use window.location for safer navigation that doesn't depend on router context
     window.location.href = '/app/home';
   };
 
   handleGoBack = () => {
     console.log('[SettingsErrorBoundary] Going back');
+    // Use window.history for safer navigation
     window.history.back();
   };
 
