@@ -116,6 +116,17 @@ const Node: React.FC<NodeProps> = ({
     return node.id;
   }, [isInstantMode, getInstantTranslation, node.id]);
 
+  // Create material with proper THREE.js material
+  const material = useMemo(() => {
+    return new THREE.MeshPhongMaterial({
+      color: nodeColor,
+      emissive: emissiveColor,
+      emissiveIntensity: isSelected || hovered ? 0.2 : 0,
+      transparent: true,
+      opacity: dimmed ? 0.3 : 0.9
+    });
+  }, [nodeColor, emissiveColor, isSelected, hovered, dimmed]);
+
   return (
     <group position={node.position}>
       {/* Node mesh */}
@@ -125,16 +136,9 @@ const Node: React.FC<NodeProps> = ({
         onPointerOver={handlePointerOver}
         onPointerOut={handlePointerOut}
         scale={[targetScale, targetScale, targetScale]}
+        material={material}
       >
         <sphereGeometry args={[1, 16, 16]} />
-        <meshPhongMaterial
-          attach="material"
-          color={new THREE.Color(nodeColor)}
-          emissive={new THREE.Color(emissiveColor)}
-          emissiveIntensity={isSelected || hovered ? 0.2 : 0}
-          transparent={true}
-          opacity={dimmed ? 0.3 : 0.9}
-        />
       </mesh>
 
       {/* Node label with translation tracking */}
