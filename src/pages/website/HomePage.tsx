@@ -1,7 +1,9 @@
+
 import React, { useEffect } from 'react';
 import Navbar from '@/components/website/Navbar';
 import Footer from '@/components/website/Footer';
 import HeroSection from '@/components/website/sections/HeroSection';
+import SoulNetTranslationIndicator from '@/components/translation/SoulNetTranslationIndicator';
 import { TranslatableText } from '@/components/translation/TranslatableText';
 import { forceEnableScrolling } from '@/hooks/use-scroll-restoration';
 
@@ -54,6 +56,10 @@ const HomePage = () => {
   return (
     <div className="min-h-screen bg-white overflow-x-hidden">
       <Navbar />
+      
+      {/* SoulNet Translation Indicator */}
+      <SoulNetTranslationIndicator className="fixed top-20 right-4 z-50 bg-background/90 backdrop-blur-sm px-3 py-2 rounded-lg border" />
+      
       <HeroSection 
         openAppStore={openAppStore}
         openPlayStore={openPlayStore}

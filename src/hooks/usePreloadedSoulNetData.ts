@@ -30,7 +30,7 @@ export const usePreloadedSoulNetData = (
   userId: string | undefined,
   timeRange: string
 ): UsePreloadedSoulNetDataReturn => {
-  const { currentLanguage } = useTranslation();
+  const { currentLanguage, prefetchSoulNetTranslations } = useTranslation();
   
   // Optimistic initialization - check cache synchronously first
   const getCachedDataSync = useCallback(() => {
@@ -97,6 +97,28 @@ export const usePreloadedSoulNetData = (
       setLoading(false);
     }
   }, [userId, timeRange, currentLanguage, hasInitialCache]);
+
+  // Listen for language changes and trigger pre-translation
+  useEffect(() => {
+    const handleLanguageChange = async (event: CustomEvent) => {
+      if (userId && event.detail.language !== 'en') {
+        console.log('[usePreloadedSoulNetData] Language changed, triggering pre-translation');
+        try {
+          await prefetchSoulNetTranslations(userId, timeRange);
+          // Refresh data after pre-translation
+          await preloadData();
+        } catch (error) {
+          console.error('[usePreloadedSoulNetData] Error during language change pre-translation:', error);
+        }
+      }
+    };
+
+    window.addEventListener('languageChange', handleLanguageChange as EventListener);
+    
+    return () => {
+      window.removeEventListener('languageChange', handleLanguageChange as EventListener);
+    };
+  }, [userId, timeRange, prefetchSoulNetTranslations, preloadData]);
 
   useEffect(() => {
     // Only preload if we don't have initial cached data

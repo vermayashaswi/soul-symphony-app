@@ -38,7 +38,7 @@ export const TranslatableText3D: React.FC<TranslatableText3DProps> = ({
   sourceLanguage = 'en',
   onTranslationComplete
 }) => {
-  const { currentLanguage, translate } = useTranslation();
+  const { currentLanguage, getCachedTranslation, translate } = useTranslation();
   const [translatedText, setTranslatedText] = useState<string>(text);
   const [isTranslating, setIsTranslating] = useState(false);
 
@@ -50,13 +50,22 @@ export const TranslatableText3D: React.FC<TranslatableText3DProps> = ({
         return;
       }
 
+      // PRIORITY 1: Check for pre-cached translation first (from SoulNet preload)
+      const cachedTranslation = getCachedTranslation(text);
+      if (cachedTranslation) {
+        console.log(`[TranslatableText3D] Using pre-cached translation for "${text}": "${cachedTranslation}"`);
+        setTranslatedText(cachedTranslation);
+        onTranslationComplete?.(cachedTranslation);
+        return;
+      }
+
       if (!translate) {
         setTranslatedText(text);
         onTranslationComplete?.(text);
         return;
       }
 
-      console.log(`[TranslatableText3D] Translating "${text}" from ${sourceLanguage} to ${currentLanguage}`);
+      console.log(`[TranslatableText3D] No cache found, translating "${text}" from ${sourceLanguage} to ${currentLanguage}`);
       
       try {
         setIsTranslating(true);
@@ -81,7 +90,7 @@ export const TranslatableText3D: React.FC<TranslatableText3DProps> = ({
     };
 
     translateText();
-  }, [text, currentLanguage, sourceLanguage, translate, onTranslationComplete]);
+  }, [text, currentLanguage, sourceLanguage, translate, getCachedTranslation, onTranslationComplete]);
 
   // Don't render while translating to prevent flicker
   if (isTranslating) {

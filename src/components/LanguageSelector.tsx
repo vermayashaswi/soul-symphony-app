@@ -1,3 +1,4 @@
+
 import React, { useState, useCallback } from 'react';
 import { Globe } from 'lucide-react';
 import {
@@ -11,6 +12,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
 import { useTranslation } from '@/contexts/TranslationContext';
+import { useAuth } from '@/contexts/AuthContext';
 import { createDebugger } from '@/utils/debug/debugUtils';
 
 const debug = createDebugger('languageSelector');
@@ -23,9 +25,7 @@ const LANGUAGE_GROUPS = {
   asian: ['zh', 'ja', 'ko', 'th', 'vi', 'id', 'hi', 'bn', 'ta', 'te']
 };
 
-// Comprehensive language list
 const languages = [
-  // Currently implemented languages
   { code: 'en', label: 'English', region: 'European' },
   { code: 'es', label: 'Español', region: 'European' },
   { code: 'fr', label: 'Français', region: 'European' },
@@ -36,8 +36,6 @@ const languages = [
   { code: 'ru', label: 'Русский', region: 'European' },
   { code: 'ar', label: 'العربية', region: 'Middle Eastern' },
   { code: 'pt', label: 'Português', region: 'European' },
-
-  // Additional Indian regional languages
   { code: 'bn', label: 'বাংলা', region: 'Indian' },
   { code: 'ta', label: 'தமிழ்', region: 'Indian' },
   { code: 'te', label: 'తెలుగు', region: 'Indian' },
@@ -53,8 +51,6 @@ const languages = [
   { code: 'ks', label: 'कॉशुर', region: 'Indian' },
   { code: 'kok', label: 'कोंकणी', region: 'Indian' },
   { code: 'mai', label: 'मैथिली', region: 'Indian' },
-
-  // Other major global languages
   { code: 'it', label: 'Italiano', region: 'European' },
   { code: 'ko', label: '한국어', region: 'Asian' },
   { code: 'tr', label: 'Türkçe', region: 'European' },
@@ -73,12 +69,28 @@ const languages = [
 ];
 
 const LanguageSelector = () => {
-  const { currentLanguage, setLanguage, isTranslating } = useTranslation();
+  const { currentLanguage, setLanguage, isTranslating, prefetchSoulNetTranslations } = useTranslation();
+  const { user } = useAuth();
   const [isOpen, setIsOpen] = useState(false);
 
   const handleLanguageChange = async (languageCode: string) => {
     debug.info('Language change requested:', languageCode);
+    
+    // First change the language which will clear caches and set loading states
     await setLanguage(languageCode);
+    
+    // If user is logged in and language is not English, pre-translate SoulNet data
+    if (user && languageCode !== 'en') {
+      try {
+        debug.info('Pre-translating SoulNet data for new language:', languageCode);
+        // Pre-translate for common time ranges that users frequently view
+        await prefetchSoulNetTranslations(user.id, 'week');
+        await prefetchSoulNetTranslations(user.id, 'month');
+      } catch (error) {
+        debug.error('Failed to pre-translate SoulNet data:', error);
+      }
+    }
+    
     setIsOpen(false);
     
     // Store recently used language
@@ -109,7 +121,6 @@ const LanguageSelector = () => {
     .map(code => languages.find(lang => lang.code === code))
     .filter(Boolean);
 
-  // Group languages by region for organized display
   const groupedLanguages = () => {
     const groups = {};
     
