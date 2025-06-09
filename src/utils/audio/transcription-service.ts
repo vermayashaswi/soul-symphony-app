@@ -162,53 +162,22 @@ export async function transcribeAudio(
       throw new Error('User ID mismatch - session user does not match request user');
     }
 
-    // Stage 7: Calculate and validate content length
-    console.log('[TranscriptionService] Stage 7: Calculating content length...');
-    debugInfo.stage = 'content_length_calculation';
-    
-    const payloadString = JSON.stringify(payload);
-    const contentLength = getUtf8ByteLength(payloadString);
-    
-    console.log('[TranscriptionService] Content length calculation:', {
-      payloadStringLength: payloadString.length,
-      utf8ByteLength: contentLength,
-      sizeMB: (contentLength / (1024 * 1024)).toFixed(2)
-    });
-
-    if (contentLength === 0) {
-      throw new Error('Calculated content length is 0 - payload serialization failed');
-    }
-
-    // Stage 8: Prepare request headers with explicit content length
-    console.log('[TranscriptionService] Stage 8: Preparing request headers...');
-    debugInfo.stage = 'request_preparation';
-    
-    const requestHeaders = {
-      'Content-Type': 'application/json',
-      'Content-Length': contentLength.toString(),
-      'Authorization': `Bearer ${session.access_token}`,
-      'X-Client-Info': 'supabase-js-web/2.49.1',
-      'Accept': 'application/json',
-      'Cache-Control': 'no-cache'
-    };
-
-    console.log('[TranscriptionService] Request headers prepared:', {
-      contentType: requestHeaders['Content-Type'],
-      contentLength: requestHeaders['Content-Length'],
-      hasAuth: !!requestHeaders['Authorization'],
-      clientInfo: requestHeaders['X-Client-Info']
-    });
-
-    // Stage 9: Make the API request with enhanced error handling
-    console.log('[TranscriptionService] Stage 9: Invoking edge function...');
+    // Stage 7: Make the API request with simplified headers
+    console.log('[TranscriptionService] Stage 7: Invoking edge function...');
     debugInfo.stage = 'api_request';
     
     const requestStartTime = Date.now();
     
     try {
+      console.log('[TranscriptionService] Sending payload to edge function:', {
+        payloadSize: JSON.stringify(payload).length,
+        audioDataLength: dataUrl.length,
+        userId,
+        recordingTime
+      });
+
       const { data, error } = await supabase.functions.invoke('transcribe-audio', {
-        body: payload,
-        headers: requestHeaders
+        body: payload
       });
       
       const requestTime = Date.now() - requestStartTime;
@@ -249,8 +218,8 @@ export async function transcribeAudio(
         throw new Error('No response from transcription service');
       }
 
-      // Stage 10: Validate response data
-      console.log('[TranscriptionService] Stage 10: Validating response...');
+      // Stage 8: Validate response data
+      console.log('[TranscriptionService] Stage 8: Validating response...');
       debugInfo.stage = 'response_validation';
       
       if (!data.entryId) {

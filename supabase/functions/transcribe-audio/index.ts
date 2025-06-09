@@ -128,43 +128,18 @@ async function validateAndParseRequest(req: Request): Promise<{
 
   try {
     const contentType = req.headers.get('content-type') || '';
-    const contentLength = req.headers.get('content-length');
     const authHeader = req.headers.get('authorization');
     
     logWithDetails('debug', 'Request headers analysis', {
       requestId,
       contentType,
-      contentLength,
       hasAuth: !!authHeader,
       userAgent: req.headers.get('user-agent')
     });
     
-    // Enhanced empty body detection
-    if (!contentLength || contentLength === '0') {
-      logWithDetails('error', 'Request has no content length or zero content length', { 
-        requestId,
-        contentLength,
-        allHeaders: Object.fromEntries(req.headers.entries())
-      });
-      throw new Error('Request body is empty - no audio data provided');
-    }
-    
-    const contentLengthNum = parseInt(contentLength);
-    if (isNaN(contentLengthNum)) {
-      throw new Error(`Invalid content length: ${contentLength}`);
-    }
-
-    if (contentLengthNum > MAX_REQUEST_SIZE) {
-      throw new Error(`Request too large: ${contentLength} bytes (max: ${MAX_REQUEST_SIZE})`);
-    }
-
-    if (contentLengthNum < 100) {
-      throw new Error(`Request too small: ${contentLength} bytes (min: 100)`);
-    }
-    
     // Handle JSON requests with enhanced validation
     if (contentType.includes('application/json')) {
-      logWithDetails('debug', 'Processing JSON request', { requestId, contentLengthNum });
+      logWithDetails('debug', 'Processing JSON request', { requestId });
       
       // Read request body with timeout and error handling
       let bodyText: string;
@@ -183,15 +158,12 @@ async function validateAndParseRequest(req: Request): Promise<{
         logWithDetails('debug', 'Request body read successfully', {
           requestId,
           bodyLength: bodyText.length,
-          readTime: bodyReadTime,
-          expectedLength: contentLengthNum,
-          lengthMatch: bodyText.length === contentLengthNum
+          readTime: bodyReadTime
         });
       } catch (error) {
         logWithDetails('error', 'Failed to read request body', {
           requestId,
-          error: error.message,
-          contentLength: contentLengthNum
+          error: error.message
         });
         throw new Error(`Failed to read request body: ${error.message}`);
       }
@@ -199,23 +171,11 @@ async function validateAndParseRequest(req: Request): Promise<{
       if (!bodyText || bodyText.trim() === '') {
         logWithDetails('error', 'Request body is empty after reading', {
           requestId,
-          bodyLength: bodyText?.length || 0,
-          expectedLength: contentLengthNum
+          bodyLength: bodyText?.length || 0
         });
         throw new Error('Request body is empty after reading - no data received');
       }
 
-      // Check if body length matches content-length header
-      const actualBodyLength = new TextEncoder().encode(bodyText).length;
-      if (Math.abs(actualBodyLength - contentLengthNum) > 10) { // Allow small discrepancy
-        logWithDetails('warn', 'Content-Length mismatch', {
-          requestId,
-          declaredLength: contentLengthNum,
-          actualLength: actualBodyLength,
-          difference: actualBodyLength - contentLengthNum
-        });
-      }
-      
       // Validate JSON structure before parsing
       const trimmedBody = bodyText.trim();
       if (!trimmedBody.startsWith('{') || !trimmedBody.endsWith('}')) {
@@ -492,7 +452,6 @@ serve(async (req) => {
     method: req.method,
     url: req.url,
     userAgent: req.headers.get('user-agent'),
-    contentLength: req.headers.get('content-length'),
     contentType: req.headers.get('content-type')
   });
 
@@ -672,3 +631,101 @@ serve(async (req) => {
     );
   }
 });
+
+// ... keep existing code (helper functions)
+function calculateDuration(audioBlob: Uint8Array): number {
+  try {
+    const estimatedDuration = audioBlob.length / 8000;
+    return Math.max(1, Math.min(600, Math.round(estimatedDuration)));
+  } catch (error) {
+    console.warn('[Audio] Could not calculate duration, using default:', error);
+    return 30;
+  }
+}
+
+async function analyzeTextSentiment(text: string): Promise<string> {
+  try {
+    logWithDetails('debug', 'Analyzing sentiment with OpenAI');
+    
+    const response = await fetch("https://api.openai.com/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${openaiApiKey}`
+      },
+      body: JSON.stringify({
+        model: "gpt-4o-mini",
+        messages: [
+          {
+            role: "system",
+            content: "You are an expert at analyzing text sentiment. Analyze the following text and return only one word: 'positive', 'negative', or 'neutral'."
+          },
+          {
+            role: "user",
+            content: text
+          }
+        ],
+        max_tokens: 10
+      })
+    });
+    
+    if (!response.ok) {
+      logWithDetails('error', 'Sentiment analysis API error', { 
+        status: response.status,
+        statusText: response.statusText
+      });
+      return 'neutral';
+    }
+    
+    const result = await response.json();
+    const sentiment = result.choices[0].message.content.toLowerCase().trim();
+    
+    if (['positive', 'negative', 'neutral'].includes(sentiment)) {
+      return sentiment;
+    }
+    
+    return 'neutral';
+  } catch (error) {
+    logWithDetails('error', 'Sentiment analysis error', { error: error.message });
+    return 'neutral';
+  }
+}
+
+const CURATED_THEMES = [
+  'Personal Growth', 'Relationships', 'Work & Career', 'Health & Wellness',
+  'Family', 'Creativity', 'Learning', 'Travel', 'Hobbies', 'Spirituality',
+  'Challenges', 'Achievements', 'Emotions', 'Goals', 'Reflection',
+  'Gratitude', 'Stress', 'Joy', 'Sadness', 'Anxiety', 'Love', 'Fear',
+  'Hope', 'Dreams', 'Memories', 'Friendship', 'Self-Care', 'Mindfulness'
+];
+
+function selectCuratedThemes(transcription: string, maxThemes: number = 3): string[] {
+  const text = transcription.toLowerCase();
+  const foundThemes: { theme: string; relevance: number }[] = [];
+  
+  for (const theme of CURATED_THEMES) {
+    let relevance = 0;
+    const themeWords = theme.toLowerCase().split(/[\s&]+/);
+    
+    for (const word of themeWords) {
+      if (text.includes(word)) {
+        relevance += 1;
+      }
+    }
+    
+    if (theme === 'Personal Growth' && (text.includes('improve') || text.includes('better') || text.includes('grow'))) relevance += 2;
+    if (theme === 'Relationships' && (text.includes('friend') || text.includes('partner') || text.includes('family'))) relevance += 2;
+    if (theme === 'Work & Career' && (text.includes('job') || text.includes('work') || text.includes('career'))) relevance += 2;
+    if (theme === 'Health & Wellness' && (text.includes('health') || text.includes('exercise') || text.includes('wellness'))) relevance += 2;
+    if (theme === 'Emotions' && (text.includes('feel') || text.includes('emotion') || text.includes('mood'))) relevance += 2;
+    if (theme === 'Gratitude' && (text.includes('grateful') || text.includes('thankful') || text.includes('appreciate'))) relevance += 2;
+    if (theme === 'Stress' && (text.includes('stress') || text.includes('pressure') || text.includes('overwhelm'))) relevance += 2;
+    
+    if (relevance > 0) {
+      foundThemes.push({ theme, relevance });
+    }
+  }
+  
+  foundThemes.sort((a, b) => b.relevance - a.relevance);
+  return foundThemes.slice(0, maxThemes).map(t => t.theme);
+}
