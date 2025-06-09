@@ -80,7 +80,8 @@ export function useJournalEntries() {
       return data.map((entry): JournalEntry => ({
         ...entry,
         content: entry["refined text"] || entry["transcription text"] || '',
-        themes: entry.master_themes || []
+        themes: entry.master_themes || [],
+        entities: Array.isArray(entry.entities) ? entry.entities : []
       }));
     },
     enabled: !!user?.id,

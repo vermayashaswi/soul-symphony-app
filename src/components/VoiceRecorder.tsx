@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef } from 'react';
 import { Loader2, AlertTriangle } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -257,18 +258,19 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className, update
   return (
     <div className={cn("flex flex-col items-center space-y-6 p-6", className)}>
       <div className="relative">
-        <FloatingLanguages />
+        <FloatingLanguages size="medium" />
         
         <div className="relative z-10">
           <RecordingButton
             isRecording={isRecording}
-            onStartRecording={startRecording}
-            onStopRecording={stopRecording}
+            isProcessing={isProcessing}
             hasPermission={hasPermission}
-            onRequestPermissions={requestPermissions}
+            onRecordingStart={startRecording}
+            onRecordingStop={stopRecording}
+            onPermissionRequest={requestPermissions}
             audioLevel={audioLevel}
-            ripples={ripples}
-            disabled={isSaving || isProcessing}
+            showAnimation={shouldShowFloatingLanguages}
+            audioBlob={audioBlob}
           />
         </div>
       </div>
@@ -276,8 +278,6 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className, update
       <RecordingStatus
         isRecording={isRecording}
         recordingTime={recordingTime}
-        hasAudioBlob={!!audioBlob}
-        isSaving={isSaving || isProcessing}
       />
 
       {audioBlob && !isRecording && (
@@ -287,7 +287,7 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className, update
           audioDuration={audioDuration}
           onTogglePlayback={togglePlayback}
           onSeek={seekTo}
-          onSave={handleSaveEntry}
+          onSaveEntry={handleSaveEntry}
           onCancel={handleCancel}
           disabled={isSaving || isProcessing}
           saving={isSaving || isProcessing}
@@ -307,7 +307,7 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className, update
 
       <AnimatePresence>
         {showAnimation && (
-          <AnimatedPrompt key="animated-prompt" />
+          <AnimatedPrompt key="animated-prompt" show={shouldShowPrompt} />
         )}
       </AnimatePresence>
     </div>

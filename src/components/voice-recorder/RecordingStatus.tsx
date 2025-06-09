@@ -5,14 +5,11 @@ import { formatTime } from '@/utils/format-time';
 
 interface RecordingStatusProps {
   isRecording: boolean;
-  recordingTime: number | string;
+  recordingTime: number;
 }
 
 export function RecordingStatus({ isRecording, recordingTime }: RecordingStatusProps) {
-  // If recordingTime is already a string, use it directly, otherwise format it
-  const displayTime = typeof recordingTime === 'string' 
-    ? recordingTime 
-    : formatTime(typeof recordingTime === 'number' ? recordingTime / 1000 : 0);
+  const displayTime = formatTime(recordingTime / 1000);
   
   return (
     <motion.div
