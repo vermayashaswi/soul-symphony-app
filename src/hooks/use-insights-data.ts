@@ -10,6 +10,12 @@ export type EmotionDataPoint = {
   emotion: string;
 };
 
+export type DailySentimentDataPoint = {
+  date: string;
+  value: number;
+  day: string;
+};
+
 export type AggregatedEmotionData = {
   [emotion: string]: EmotionDataPoint[];
 };
@@ -38,6 +44,7 @@ interface InsightsData {
   biggestImprovement: BiggestImprovement | null;
   journalActivity: JournalActivity;
   aggregatedEmotionData: AggregatedEmotionData;
+  dailySentimentData: DailySentimentDataPoint[];
 }
 
 export const useInsightsData = (userId: string | undefined, timeRange: TimeRange) => {
@@ -51,7 +58,8 @@ export const useInsightsData = (userId: string | undefined, timeRange: TimeRange
       streak: 0,
       maxStreak: 0
     },
-    aggregatedEmotionData: {}
+    aggregatedEmotionData: {},
+    dailySentimentData: []
   });
   const [loading, setLoading] = useState(true);
   const [lastTimeRange, setLastTimeRange] = useState<TimeRange>(timeRange);
@@ -109,6 +117,7 @@ export const useInsightsData = (userId: string | undefined, timeRange: TimeRange
       const biggestImprovement = calculateBiggestImprovement(allEntries, processedEntries, timeRange);
       const journalActivity = calculateJournalActivity(processedEntries, timeRange);
       const aggregatedEmotionData = processEmotionData(processedEntries, timeRange);
+      const dailySentimentData = processDailySentimentData(processedEntries, timeRange);
 
       const processedAllEntries = allEntries?.map(entry => {
         if ((!entry.sentiment || entry.sentiment === '0') && entry.emotions) {
@@ -173,7 +182,8 @@ export const useInsightsData = (userId: string | undefined, timeRange: TimeRange
         dominantMood,
         biggestImprovement,
         journalActivity,
-        aggregatedEmotionData
+        aggregatedEmotionData,
+        dailySentimentData
       });
     } catch (error) {
       console.error('Error fetching insights data:', error);
@@ -192,6 +202,134 @@ export const useInsightsData = (userId: string | undefined, timeRange: TimeRange
   }, [userId, timeRange, fetchInsightsData]);
 
   return { insightsData, loading };
+};
+
+const processDailySentimentData = (entries: any[], timeRange: TimeRange): DailySentimentDataPoint[] => {
+  if (timeRange !== 'month' || !entries || entries.length === 0) {
+    return [];
+  }
+
+  console.log('[processDailySentimentData] Processing daily sentiment for month view', { entryCount: entries.length });
+
+  // Group entries by day
+  const dailyGroups = new Map<string, any[]>();
+  
+  entries.forEach(entry => {
+    if (!entry.created_at) return;
+    
+    const dateStr = format(new Date(entry.created_at), 'yyyy-MM-dd');
+    
+    if (!dailyGroups.has(dateStr)) {
+      dailyGroups.set(dateStr, []);
+    }
+    dailyGroups.get(dateStr)!.push(entry);
+  });
+
+  console.log('[processDailySentimentData] Grouped entries by day', { 
+    daysWithEntries: dailyGroups.size,
+    dates: Array.from(dailyGroups.keys())
+  });
+
+  // Calculate average sentiment for each day
+  const dailySentimentData: DailySentimentDataPoint[] = [];
+  
+  Array.from(dailyGroups.entries())
+    .sort(([a], [b]) => a.localeCompare(b)) // Sort by date
+    .forEach(([dateStr, dayEntries]) => {
+      let totalSentiment = 0;
+      let sentimentCount = 0;
+
+      dayEntries.forEach(entry => {
+        // Use existing sentiment if available
+        if (entry.sentiment && entry.sentiment !== '0') {
+          const sentimentValue = parseFloat(entry.sentiment);
+          if (!isNaN(sentimentValue)) {
+            totalSentiment += sentimentValue;
+            sentimentCount++;
+            return;
+          }
+        }
+
+        // Calculate sentiment from emotions if not available
+        if (entry.emotions) {
+          try {
+            let emotions: any = entry.emotions;
+            if (typeof emotions === 'string') {
+              emotions = JSON.parse(emotions);
+            }
+
+            let entrySentiment = 0;
+            let emotionCount = 0;
+
+            if (emotions && typeof emotions === 'object') {
+              if (Array.isArray(emotions.emotions)) {
+                emotions.emotions.forEach((emotion: any) => {
+                  if (emotion && emotion.name && emotion.intensity) {
+                    const negativeEmotions = ['sad', 'angry', 'anxious', 'fearful', 'stressed', 'disappointed', 'frustrated'];
+                    const emotionName = emotion.name.toLowerCase();
+                    const multiplier = negativeEmotions.includes(emotionName) ? -1 : 1;
+                    entrySentiment += emotion.intensity * multiplier;
+                    emotionCount++;
+                  }
+                });
+              } else {
+                Object.entries(emotions).forEach(([emotion, score]: [string, any]) => {
+                  if (emotion.toLowerCase() === 'id' || 
+                      emotion.toLowerCase() === 'intensity' || 
+                      emotion.toLowerCase() === 'name' ||
+                      /^\d+$/.test(emotion) || 
+                      emotion.length < 2) {
+                    return;
+                  }
+                  
+                  const emotionValue = Number(score);
+                  if (!isNaN(emotionValue)) {
+                    const negativeEmotions = ['sad', 'angry', 'anxious', 'fearful', 'stressed', 'disappointed', 'frustrated'];
+                    const multiplier = negativeEmotions.includes(emotion.toLowerCase()) ? -1 : 1;
+                    entrySentiment += emotionValue * multiplier;
+                    emotionCount++;
+                  }
+                });
+              }
+
+              if (emotionCount > 0) {
+                let avgSentiment = entrySentiment / (emotionCount * 2); // Normalize to -1 to 1 range
+                if (avgSentiment > 1.0) avgSentiment = 1.0;
+                if (avgSentiment < -1.0) avgSentiment = -1.0;
+                
+                totalSentiment += avgSentiment;
+                sentimentCount++;
+              }
+            }
+          } catch (e) {
+            console.error('Error processing emotions for daily sentiment:', e);
+          }
+        }
+      });
+
+      if (sentimentCount > 0) {
+        const avgDailySentiment = totalSentiment / sentimentCount;
+        const dayFormatted = format(new Date(dateStr), 'MMM d');
+        
+        dailySentimentData.push({
+          date: dateStr,
+          value: parseFloat(avgDailySentiment.toFixed(3)),
+          day: dayFormatted
+        });
+
+        console.log(`[processDailySentimentData] ${dayFormatted}: ${avgDailySentiment.toFixed(3)} (from ${sentimentCount} entries)`);
+      }
+    });
+
+  console.log('[processDailySentimentData] Final daily sentiment data', { 
+    dataPoints: dailySentimentData.length,
+    range: dailySentimentData.length > 0 ? {
+      first: dailySentimentData[0],
+      last: dailySentimentData[dailySentimentData.length - 1]
+    } : null
+  });
+
+  return dailySentimentData;
 };
 
 const getDateRange = (timeRange: TimeRange) => {
