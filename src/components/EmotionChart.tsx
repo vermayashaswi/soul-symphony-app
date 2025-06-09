@@ -16,7 +16,7 @@ import { cn } from '@/lib/utils';
 import { AggregatedEmotionData, TimeRange } from '@/hooks/use-insights-data';
 import EmotionBubbles from './EmotionBubbles';
 import EntityStrips from './insights/EntityStrips';
-import { Sparkles, CircleDot } from 'lucide-react';
+import { Sparkles, CircleDot, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useTheme } from '@/hooks/use-theme';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { Separator } from '@/components/ui/separator';
@@ -34,6 +34,7 @@ interface EmotionChartProps {
   className?: string;
   timeframe?: TimeRange;
   aggregatedData?: AggregatedEmotionData;
+  onNavigate?: (direction: 'prev' | 'next') => void;
 }
 
 const EMOTION_COLORS: Record<string, string> = {
@@ -68,6 +69,13 @@ const EMOTION_COLORS: Record<string, string> = {
   apprehension: '#FD79A8',  // Rose
   distraction: '#A29BFE',   // Lilac
   admiration: '#FDCB6E'     // Amber
+};
+
+const timeRangeLabels: Record<TimeRange, string> = {
+  today: 'Day',
+  week: 'Week', 
+  month: 'Month',
+  year: 'Year'
 };
 
 const getEmotionColor = (emotion: string, index: number): string => {
@@ -106,7 +114,8 @@ const getEmotionColor = (emotion: string, index: number): string => {
 export function EmotionChart({ 
   className, 
   timeframe = 'week',
-  aggregatedData 
+  aggregatedData,
+  onNavigate
 }: EmotionChartProps) {
   const [chartType, setChartType] = useState<ChartType>('bubble');
   const [bubbleKey, setBubbleKey] = useState(0); 
@@ -536,32 +545,60 @@ export function EmotionChart({
       <div className="flex flex-wrap justify-between items-center mb-4">
         <h3 className="text-xl font-semibold">
           <TranslatableText 
-            text="TOP" 
+            text="Emotions & Life Areas" 
             forceTranslate={true}
             enableFontScaling={true}
             scalingContext="general"
           />
         </h3>
-        <div className="flex gap-2">
-          {chartTypes.map((type) => (
-            <button
-              key={type.id}
-              onClick={() => setChartType(type.id as ChartType)}
-              className={cn(
-                "px-3 py-1 rounded-full text-sm",
-                chartType === type.id
-                  ? "bg-primary text-white"
-                  : "bg-secondary text-muted-foreground hover:text-foreground"
-              )}
-            >
-              <TranslatableText 
-                text={type.label} 
-                forceTranslate={true}
-                enableFontScaling={true}
-                scalingContext="compact"
-              />
-            </button>
-          ))}
+        <div className="flex items-center gap-2">
+          {onNavigate && (
+            <div className="flex items-center gap-1 mr-3">
+              <button
+                onClick={() => onNavigate('prev')}
+                className="p-1.5 rounded-lg hover:bg-secondary transition-colors"
+                aria-label="Previous time range"
+              >
+                <ChevronLeft className="h-4 w-4 text-muted-foreground" />
+              </button>
+              <span className="text-sm font-medium text-muted-foreground min-w-[60px] text-center">
+                <TranslatableText 
+                  text={timeRangeLabels[timeframe]} 
+                  forceTranslate={true}
+                  enableFontScaling={true}
+                  scalingContext="compact"
+                />
+              </span>
+              <button
+                onClick={() => onNavigate('next')}
+                className="p-1.5 rounded-lg hover:bg-secondary transition-colors"
+                aria-label="Next time range"
+              >
+                <ChevronRight className="h-4 w-4 text-muted-foreground" />
+              </button>
+            </div>
+          )}
+          <div className="flex gap-2">
+            {chartTypes.map((type) => (
+              <button
+                key={type.id}
+                onClick={() => setChartType(type.id as ChartType)}
+                className={cn(
+                  "px-3 py-1 rounded-full text-sm",
+                  chartType === type.id
+                    ? "bg-primary text-white"
+                    : "bg-secondary text-muted-foreground hover:text-foreground"
+                )}
+              >
+                <TranslatableText 
+                  text={type.label} 
+                  forceTranslate={true}
+                  enableFontScaling={true}
+                  scalingContext="compact"
+                />
+              </button>
+            ))}
+          </div>
         </div>
       </div>
       
