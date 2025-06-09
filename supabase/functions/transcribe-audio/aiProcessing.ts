@@ -39,7 +39,7 @@ export async function transcribeAudioWithWhisper(
     // Create form data to send to the OpenAI API
     const formData = new FormData();
     formData.append("file", new Blob([audioBytes], { type: audioBlob.type }), filename);
-    formData.append("model", "whisper-1"); // FIXED: Use correct Whisper model
+    formData.append("model", "gpt-4o-transcribe");
     
     // Only add language parameter if it's not 'auto' and is a valid language code
     if (language !== 'auto' && language.length === 2) {
@@ -54,7 +54,7 @@ export async function transcribeAudioWithWhisper(
       fileType: audioBlob.type,
       fileExtension,
       hasApiKey: !!apiKey,
-      model: "whisper-1",
+      model: "gpt-4o-transcribe",
       autoLanguageDetection: language === 'auto',
       responseFormat: "json"
     });
@@ -127,7 +127,7 @@ export async function transcribeAudioWithWhisper(
     console.log("[Transcription] Success:", {
       textLength: transcribedText.length,
       sampleText: transcribedText.substring(0, 50) + "...",
-      model: "whisper-1",
+      model: "gpt-4o-transcribe",
       detectedLanguage: detectedLanguages[0] || 'unknown',
       allDetectedLanguages: detectedLanguages
     });
