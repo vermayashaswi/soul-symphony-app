@@ -3,7 +3,7 @@
  * Orchestrates the audio recording and transcription process
  */
 import { clearAllToasts, ensureAllToastsCleared } from '@/services/notificationService';
-import { blobToBase64, validatePayloadSize } from './audio/blob-utils';
+import { blobToBase64, validatePayloadSize, validateAudioBlob, testBlobProcessing } from './audio/blob-utils';
 import { transcribeAudio } from './audio/transcription-service';
 import { processingStateManager, EntryProcessingState } from './journal/processing-state-manager';
 
@@ -19,37 +19,17 @@ const MAX_AUDIO_SIZE = 25 * 1024 * 1024; // 25MB
 const MIN_AUDIO_SIZE = 100; // 100 bytes
 
 /**
- * Process and validate the audio blob
+ * Enhanced audio blob validation with comprehensive checks
  */
-function validateAudioBlob(audioBlob: Blob | null): boolean {
-  if (!audioBlob) {
-    console.error('[AudioProcessing] No audio data to process');
+function validateAudioBlobEnhanced(audioBlob: Blob | null): boolean {
+  const validation = validateAudioBlob(audioBlob);
+  
+  if (!validation.isValid) {
+    console.error('[AudioProcessing] Audio validation failed:', validation.errorMessage, validation.details);
     return false;
   }
   
-  // Check minimum size
-  if (audioBlob.size < MIN_AUDIO_SIZE) {
-    console.error('[AudioProcessing] Audio blob too small:', audioBlob.size, 'bytes');
-    return false;
-  }
-  
-  // Check maximum size
-  if (audioBlob.size > MAX_AUDIO_SIZE) {
-    console.error('[AudioProcessing] Audio blob too large:', audioBlob.size, 'bytes');
-    return false;
-  }
-  
-  // Check if the audio blob has duration
-  if (!('duration' in audioBlob) || (audioBlob as any).duration <= 0) {
-    console.warn('[AudioProcessing] Audio blob has no duration property or duration is 0');
-  }
-  
-  console.log('[AudioProcessing] Audio blob validation passed:', {
-    size: audioBlob.size,
-    type: audioBlob.type,
-    duration: (audioBlob as any).duration || 'unknown'
-  });
-  
+  console.log('[AudioProcessing] Audio blob validation passed:', validation.details);
   return true;
 }
 
@@ -62,7 +42,7 @@ function setupProcessingTimeout(): NodeJS.Timeout {
   }
   
   return setTimeout(() => {
-    console.log('[AudioProcessing] Processing timeout triggered');
+    console.log('[AudioProcessing] Processing timeout triggered - releasing lock');
     processingLock = false;
   }, 60000); // 60 second timeout
 }
@@ -104,105 +84,113 @@ export async function processRecording(audioBlob: Blob | null, userId: string | 
   success: boolean;
   tempId?: string;
   error?: string;
+  debugInfo?: any;
 }> {
-  console.log('[AudioProcessing] Starting processing with blob:', audioBlob?.size, audioBlob?.type);
+  console.log('[AudioProcessing] Starting enhanced processing with blob:', audioBlob?.size, audioBlob?.type);
   
-  // Clear all toasts to ensure UI is clean before processing
-  await ensureAllToastsCleared();
-  
-  // Validate inputs
-  if (!userId) {
-    console.error('[AudioProcessing] No user ID provided');
-    return { 
-      success: false, 
-      error: 'User authentication required' 
-    };
-  }
-  
-  // Validate the audio blob
-  if (!validateAudioBlob(audioBlob)) {
-    return { 
-      success: false, 
-      error: 'Invalid audio data - please try recording again' 
-    };
-  }
-  
-  // Test base64 conversion and payload validation before proceeding
+  const debugInfo = {
+    stage: 'initialization',
+    timestamp: Date.now(),
+    blobInfo: null,
+    validationInfo: null,
+    testResults: null,
+    processingInfo: null
+  };
+
   try {
-    console.log('[AudioProcessing] Testing base64 conversion...');
-    const dataUrl = await blobToBase64(audioBlob!);
-    console.log('[AudioProcessing] Base64 conversion successful:', {
-      dataUrlLength: dataUrl.length,
-      hasPrefix: dataUrl.startsWith('data:'),
-      mimeType: dataUrl.split(';')[0]
-    });
+    // Clear all toasts to ensure UI is clean before processing
+    await ensureAllToastsCleared();
     
-    // Validate data URL format
-    if (!dataUrl.startsWith('data:audio/') && !dataUrl.startsWith('data:video/')) {
-      console.error('[AudioProcessing] Invalid data URL format:', dataUrl.substring(0, 50));
-      return {
-        success: false,
-        error: 'Audio data format is invalid'
+    debugInfo.stage = 'input_validation';
+    
+    // Validate inputs
+    if (!userId) {
+      console.error('[AudioProcessing] No user ID provided');
+      return { 
+        success: false, 
+        error: 'User authentication required',
+        debugInfo
       };
     }
     
-    if (!dataUrl.includes('base64,')) {
-      console.error('[AudioProcessing] Missing base64 marker in data URL');
-      return {
-        success: false,
-        error: 'Audio encoding format is invalid'
+    // Enhanced audio blob validation
+    if (!validateAudioBlobEnhanced(audioBlob)) {
+      return { 
+        success: false, 
+        error: 'Invalid audio data - please try recording again',
+        debugInfo
       };
     }
-    
-    // Test base64 extraction
-    const base64Data = dataUrl.split('base64,')[1];
-    if (!/^[A-Za-z0-9+/]*={0,2}$/.test(base64Data)) {
-      console.error('[AudioProcessing] Invalid base64 format');
-      return {
-        success: false,
-        error: 'Audio data encoding is invalid'
-      };
-    }
-    
-    if (base64Data.length < 100) {
-      console.error('[AudioProcessing] Base64 data too short:', base64Data.length);
-      return {
-        success: false,
-        error: 'Audio data appears too short or invalid'
-      };
-    }
-    
-    // Test payload size validation
-    const testPayload = {
-      audio: dataUrl,
-      userId,
-      recordingTime: (audioBlob as any).duration || 0,
-      highQuality: true
+
+    debugInfo.blobInfo = {
+      size: audioBlob!.size,
+      type: audioBlob!.type,
+      constructor: audioBlob!.constructor.name,
+      hasDuration: 'duration' in audioBlob!
     };
+
+    // Stage 2: Test the complete blob processing pipeline
+    console.log('[AudioProcessing] Testing complete blob processing pipeline...');
+    debugInfo.stage = 'pipeline_testing';
     
-    const sizeValidation = validatePayloadSize(testPayload);
-    console.log('[AudioProcessing] Payload size validation:', sizeValidation);
+    const pipelineTest = await testBlobProcessing(audioBlob!);
+    debugInfo.testResults = pipelineTest;
     
-    if (!sizeValidation.isValid) {
+    if (!pipelineTest.success) {
+      console.error('[AudioProcessing] Pipeline test failed:', pipelineTest.error);
       return {
         success: false,
-        error: sizeValidation.errorMessage || 'Audio data too large for processing'
+        error: 'Audio processing validation failed - please try recording again',
+        debugInfo
+      };
+    }
+
+    console.log('[AudioProcessing] Pipeline test passed successfully');
+
+    // Stage 3: Advanced payload validation
+    console.log('[AudioProcessing] Performing advanced payload validation...');
+    debugInfo.stage = 'payload_validation';
+    
+    try {
+      const dataUrl = await blobToBase64(audioBlob!);
+      
+      const testPayload = {
+        audio: dataUrl,
+        userId,
+        recordingTime: (audioBlob as any).duration || 0,
+        highQuality: true,
+        timestamp: Date.now()
+      };
+      
+      const sizeValidation = validatePayloadSize(testPayload);
+      debugInfo.validationInfo = sizeValidation;
+      
+      console.log('[AudioProcessing] Payload validation result:', sizeValidation);
+      
+      if (!sizeValidation.isValid) {
+        return {
+          success: false,
+          error: sizeValidation.errorMessage || 'Audio data too large for processing',
+          debugInfo
+        };
+      }
+      
+    } catch (error) {
+      console.error('[AudioProcessing] Pre-processing validation failed:', error);
+      debugInfo.validationInfo = { error: error.message };
+      return {
+        success: false,
+        error: 'Error preparing audio data for processing',
+        debugInfo
       };
     }
     
-  } catch (error) {
-    console.error('[AudioProcessing] Pre-processing validation failed:', error);
-    return {
-      success: false,
-      error: 'Error preparing audio data for processing'
-    };
-  }
-  
-  // Generate a unique temporary ID for this processing task
-  const timestamp = Date.now();
-  const tempId = `entry-${timestamp}-${Math.floor(Math.random() * 1000)}`;
-  
-  try {
+    // Generate a unique temporary ID for this processing task
+    const timestamp = Date.now();
+    const tempId = `entry-${timestamp}-${Math.floor(Math.random() * 1000)}`;
+    
+    debugInfo.stage = 'processing_setup';
+    
     // Set processing lock to prevent multiple simultaneous processing
     processingLock = true;
     console.log('[AudioProcessing] Set processing lock');
@@ -219,22 +207,28 @@ export async function processRecording(audioBlob: Blob | null, userId: string | 
       size: audioBlob?.size || 0,
       type: audioBlob?.type || 'unknown',
       userId: userId || 'anonymous',
-      audioDuration: (audioBlob as any).duration || 'unknown'
+      audioDuration: (audioBlob as any).duration || 'unknown',
+      tempId
     });
     
-    // Launch the processing without awaiting it
-    console.log('[AudioProcessing] Launching background processing using transcription service');
-    processRecordingInBackground(audioBlob!, userId, tempId)
+    debugInfo.processingInfo = {
+      tempId,
+      lockSet: true,
+      timeoutSet: true,
+      stateRegistered: true
+    };
+    
+    // Launch the enhanced processing without awaiting it
+    console.log('[AudioProcessing] Launching enhanced background processing');
+    processRecordingInBackgroundEnhanced(audioBlob!, userId, tempId, debugInfo)
       .then(result => {
         console.log('[AudioProcessing] Background processing completed:', result);
         
-        // If we have an entryId in the result, store the mapping
         if (result.entryId) {
           processingStateManager.setEntryId(tempId, result.entryId);
           processingStateManager.updateEntryState(tempId, EntryProcessingState.COMPLETED);
           console.log(`[AudioProcessing] Mapped tempId ${tempId} to entryId ${result.entryId}`);
           
-          // Also store in our local map
           setEntryIdForProcessingId(tempId, result.entryId);
         }
       })
@@ -242,16 +236,13 @@ export async function processRecording(audioBlob: Blob | null, userId: string | 
         console.error('[AudioProcessing] Background processing error:', err);
         processingLock = false;
         
-        // Mark as error in the state manager
         processingStateManager.updateEntryState(tempId, EntryProcessingState.ERROR, err.message);
         
-        // Dispatch a failure event
         window.dispatchEvent(new CustomEvent('processingEntryFailed', {
           detail: { tempId, error: err.message, timestamp: Date.now() }
         }));
       })
       .finally(() => {
-        // Always release the lock when done
         processingLock = false;
         if (processingTimeoutId) {
           clearTimeout(processingTimeoutId);
@@ -259,70 +250,68 @@ export async function processRecording(audioBlob: Blob | null, userId: string | 
         }
       });
     
-    // Return immediately with the temp ID
     console.log('[AudioProcessing] Returning success with tempId:', tempId);
     
-    return { success: true, tempId };
+    return { 
+      success: true, 
+      tempId,
+      debugInfo
+    };
+    
   } catch (error: any) {
     console.error('[AudioProcessing] Error initiating recording process:', error);
     processingLock = false;
     
-    return { success: false, error: error.message || 'Unknown error' };
+    debugInfo.processingInfo = {
+      error: error.message,
+      stage: debugInfo.stage
+    };
+    
+    return { 
+      success: false, 
+      error: error.message || 'Unknown error',
+      debugInfo
+    };
   }
 }
 
 /**
- * Process recording in a separate function that can be executed async
- * This uses the new transcription service for better reliability
+ * Enhanced background processing with comprehensive error handling and logging
  */
-async function processRecordingInBackground(
+async function processRecordingInBackgroundEnhanced(
   audioBlob: Blob,
   userId: string,
-  tempId: string
+  tempId: string,
+  initialDebugInfo: any
 ): Promise<{ success: boolean; entryId?: number; error?: string }> {
   try {
-    console.log(`[AudioProcessing] Background processing started for ${tempId} using transcription service`);
+    console.log(`[AudioProcessing] Enhanced background processing started for ${tempId}`);
     
-    // Get the duration of the audio
-    let recordingTime = 0;
-    if ('duration' in audioBlob) {
-      recordingTime = Math.round((audioBlob as any).duration * 1000);
-    }
-    
-    console.log(`[AudioProcessing] Calling transcription service for ${tempId}`, {
-      blobSize: audioBlob.size,
-      blobType: audioBlob.type,
-      recordingTime,
-      userId
-    });
-    
-    // Use the transcription service with retry logic
     const result = await withRetry(async () => {
       return await transcribeAudio(audioBlob, userId);
     }, 3, 2000);
     
-    console.log(`[AudioProcessing] Transcription service result for ${tempId}:`, {
+    console.log(`[AudioProcessing] Enhanced transcription result for ${tempId}:`, {
       success: result.success,
       entryId: result.entryId,
       hasTranscription: !!result.transcription,
       hasRefinedText: !!result.refinedText,
-      error: result.error
+      hasDebugInfo: !!result.debugInfo
     });
     
     if (!result.success) {
+      console.error('[AudioProcessing] Transcription failed:', result.error);
+      console.log('[AudioProcessing] Debug info:', result.debugInfo);
       throw new Error(result.error || 'Transcription service failed');
     }
     
-    // Update the state manager with the entry ID
     if (result.entryId) {
       processingStateManager.setEntryId(tempId, result.entryId);
       processingStateManager.updateEntryState(tempId, EntryProcessingState.COMPLETED);
-      
-      // Also store in our local map
       setEntryIdForProcessingId(tempId, result.entryId);
     }
     
-    // Notify anyone who cares that processing is complete
+    // Notify components that processing is complete
     window.dispatchEvent(new CustomEvent('processingEntryCompleted', {
       detail: { 
         tempId, 
@@ -331,7 +320,6 @@ async function processRecordingInBackground(
       }
     }));
     
-    // Also dispatch a data-ready event for any components that need the actual content
     window.dispatchEvent(new CustomEvent('entryContentReady', {
       detail: { 
         tempId, 
@@ -341,7 +329,6 @@ async function processRecordingInBackground(
       }
     }));
     
-    // Also trigger a refresh of any components that show entries
     window.dispatchEvent(new CustomEvent('journalEntriesNeedRefresh', {
       detail: { 
         tempId, 
@@ -354,10 +341,10 @@ async function processRecordingInBackground(
       success: true, 
       entryId: result.entryId 
     };
-  } catch (error: any) {
-    console.error(`[AudioProcessing] Error in background processing for ${tempId}:`, error);
     
-    // Provide user-friendly error messages
+  } catch (error: any) {
+    console.error(`[AudioProcessing] Enhanced background processing failed for ${tempId}:`, error);
+    
     let userFriendlyError = 'Processing failed - please try again';
     
     if (error.message?.includes('network') || error.message?.includes('fetch')) {
@@ -385,11 +372,9 @@ async function processRecordingInBackground(
 export function setEntryIdForProcessingId(tempId: string, entryId: number): void {
   processingToEntryMap.set(tempId, entryId);
   
-  // Also notify the state manager
   processingStateManager.setEntryId(tempId, entryId);
   processingStateManager.updateEntryState(tempId, EntryProcessingState.COMPLETED);
   
-  // Also add to localStorage for persistence across page loads
   try {
     const mapStr = localStorage.getItem('processingToEntryMap') || '{}';
     const map = JSON.parse(mapStr);
@@ -397,7 +382,6 @@ export function setEntryIdForProcessingId(tempId: string, entryId: number): void
     localStorage.setItem('processingToEntryMap', JSON.stringify(map));
     console.log(`[AudioProcessing] Stored tempId -> entryId mapping in localStorage: ${tempId} -> ${entryId}`);
     
-    // Dispatch a global event to notify all components
     window.dispatchEvent(new CustomEvent('processingEntryMapped', {
       detail: { 
         tempId, 
@@ -415,27 +399,22 @@ export function setEntryIdForProcessingId(tempId: string, entryId: number): void
  * Get entry ID for a processing ID (temp ID)
  */
 export function getEntryIdForProcessingId(tempId: string): number | undefined {
-  // First check with the state manager
   const entryFromManager = processingStateManager.getEntryId(tempId);
   if (entryFromManager) {
     return entryFromManager;
   }
   
-  // Next check our in-memory map
   if (processingToEntryMap.has(tempId)) {
     return processingToEntryMap.get(tempId);
   }
   
-  // Try to get from localStorage as fallback
   try {
     const mapStr = localStorage.getItem('processingToEntryMap') || '{}';
     const map = JSON.parse(mapStr);
     const entryId = map[tempId];
     
-    // If found, also add to in-memory map for faster access next time
     if (entryId) {
       processingToEntryMap.set(tempId, Number(entryId));
-      // Also update the state manager
       processingStateManager.setEntryId(tempId, Number(entryId));
       return Number(entryId);
     }
@@ -472,13 +451,10 @@ export function resetProcessingState(): void {
  * Remove a processing entry by ID
  */
 export function removeProcessingEntryById(entryId: number | string): void {
-  // First notify the state manager
-  const entryIdString = entryId.toString(); // Convert to string for consistent handling
+  const entryIdString = entryId.toString();
   processingStateManager.removeEntry(entryIdString);
   
-  // If it's a number (real entry ID), also clean up any mappings
   if (typeof entryId === 'number') {
-    // Find all tempIds that map to this entryId
     for (const [tempId, mappedId] of processingToEntryMap.entries()) {
       if (mappedId === entryId) {
         processingToEntryMap.delete(tempId);
@@ -486,7 +462,6 @@ export function removeProcessingEntryById(entryId: number | string): void {
       }
     }
     
-    // Also clean up localStorage
     try {
       const mapStr = localStorage.getItem('processingToEntryMap') || '{}';
       const map = JSON.parse(mapStr);
@@ -508,7 +483,6 @@ export function removeProcessingEntryById(entryId: number | string): void {
     }
   }
   
-  // Dispatch an event to notify all components
   window.dispatchEvent(new CustomEvent('processingEntryRemoved', {
     detail: {
       id: entryId,
@@ -522,7 +496,6 @@ export function removeProcessingEntryById(entryId: number | string): void {
  */
 export function publishDebugEvent(category: string, action: string, details: string) {
   try {
-    // Create and dispatch a custom event for debugging
     const event = new CustomEvent('voiceRecorderDebug', {
       detail: {
         category,
@@ -535,7 +508,6 @@ export function publishDebugEvent(category: string, action: string, details: str
     window.dispatchEvent(event);
     console.log(`[Debug] ${category}: ${action} - ${details}`);
   } catch (error) {
-    // Fail silently
     console.error('Error publishing debug event:', error);
   }
 }
