@@ -1,4 +1,3 @@
-
 import { useState, useMemo, useEffect, useRef } from 'react';
 import { 
   LineChart, 
@@ -135,13 +134,14 @@ export function EmotionChart({
   const isMonthlyView = timeframe === 'month';
   const showDailySentiment = isMonthlyView && dailySentimentData && dailySentimentData.length > 0;
   
+  console.log('[EmotionChart] ========== EMOTION CHART RENDER ==========');
   console.log('[EmotionChart] Render state:', {
     timeframe,
     isMonthlyView,
     showDailySentiment,
     dailySentimentDataLength: dailySentimentData?.length || 0,
     chartType,
-    dailySentimentData: dailySentimentData.slice(0, 3) // Show first 3 for debugging
+    dailySentimentData: dailySentimentData
   });
 
   const chartTypes = [
@@ -238,6 +238,8 @@ export function EmotionChart({
   
   // Process daily sentiment data for chart display with enhanced debugging
   const dailySentimentChartData = useMemo((): DailySentimentChartData[] => {
+    console.log('[EmotionChart] ========== PROCESSING DAILY SENTIMENT CHART DATA ==========');
+    
     if (!showDailySentiment || !dailySentimentData) {
       console.log('[EmotionChart] Not processing daily sentiment chart data:', { 
         showDailySentiment, 
@@ -246,7 +248,7 @@ export function EmotionChart({
       return [];
     }
 
-    console.log('[EmotionChart] Processing daily sentiment chart data:', { 
+    console.log('[EmotionChart] Input daily sentiment data:', { 
       dataPoints: dailySentimentData.length,
       rawData: dailySentimentData
     });
@@ -265,7 +267,11 @@ export function EmotionChart({
       return chartPoint;
     });
 
-    console.log('[EmotionChart] Final daily sentiment chart data:', processedData);
+    console.log('[EmotionChart] Final daily sentiment chart data:', {
+      processedCount: processedData.length,
+      processedData
+    });
+    
     return processedData;
   }, [showDailySentiment, dailySentimentData]);
   
@@ -502,6 +508,7 @@ export function EmotionChart({
   };
 
   const renderLineChart = () => {
+    console.log('[EmotionChart] ========== RENDERING LINE CHART ==========');
     console.log('[EmotionChart] renderLineChart called:', {
       lineDataLength: lineData.length,
       lineData,
@@ -509,6 +516,7 @@ export function EmotionChart({
     });
 
     if (lineData.length === 0) {
+      console.log('[EmotionChart] No line data available, showing empty state');
       return (
         <div className="flex items-center justify-center h-full">
           <p className="text-muted-foreground">
@@ -524,9 +532,11 @@ export function EmotionChart({
     }
 
     if (showDailySentiment) {
-      console.log('[EmotionChart] Rendering daily sentiment chart with data:', {
+      console.log('[EmotionChart] ========== RENDERING DAILY SENTIMENT CHART ==========');
+      console.log('[EmotionChart] Daily sentiment chart data:', {
         chartDataLength: dailySentimentChartData.length,
-        chartData: dailySentimentChartData
+        chartData: dailySentimentChartData,
+        dataPoints: dailySentimentChartData.map(d => ({ day: d.day, sentiment: d.sentiment }))
       });
 
       // Render daily sentiment chart for month view
