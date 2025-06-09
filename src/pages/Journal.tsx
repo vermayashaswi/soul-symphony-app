@@ -65,22 +65,27 @@ const Journal = () => {
 
   const { 
     entries, 
-    isLoading, 
-    error: entriesError,
-    refetch,
-    triggerRefresh,
-    forceRefresh,
-    deleteEntry
-  } = useJournalEntries();
+    loading, 
+    fetchEntries, 
+    error: entriesError, 
+    profileExists 
+  } = useJournalEntries(
+    user?.id,
+    refreshKey,
+    isProfileChecked
+  );
 
   useEffect(() => {
     if (entries && entries.length > 0 && !hasLocalChanges) {
+      // Filter out any entries that are in our deleted entries list
       const filteredEntries = entries.filter(entry => !deletedEntryIds.has(entry.id));
       setLocalEntries(filteredEntries);
       lastSuccessfulEntriesRef.current = filteredEntries;
     } else if (entries && entries.length > 0) {
       const deletedIds = new Set([...pendingDeletionIds, ...deletedEntryIds]);
+      
       const mergedEntries = entries.filter(entry => !deletedIds.has(entry.id));
+      
       if (mergedEntries.length > 0) {
         setLocalEntries(mergedEntries);
         lastSuccessfulEntriesRef.current = mergedEntries;
@@ -108,19 +113,41 @@ const Journal = () => {
       if (event.detail && event.detail.tempId && event.detail.entryId) {
         console.log(`[Journal] Processing entry mapped: ${event.detail.tempId} -> ${event.detail.entryId}`);
         
+        if (deletedProcessingIds.has(event.detail.tempId)) {
+          console.log(`[Journal] Skipping mapped entry as its tempId was deleted: ${event.detail.tempId}`);
+          return;
+        }
+        
         processingToEntryMapRef.current.set(event.detail.tempId, event.detail.entryId);
         
         if (processingEntries.includes(event.detail.tempId)) {
           setProcessedEntryIds(prev => [...prev, event.detail.entryId]);
+          
+          console.log('[Journal] Fetching new data immediately after entry mapped');
           fetchEntries();
+          
+          // Remove the temporary entry if it exists
           setLocalEntries(prev => prev.filter(entry => !(entry.tempId === event.detail.tempId)));
+          
           setTimeout(() => {
             setProcessingEntries(prev => prev.filter(id => id !== event.detail.tempId));
           }, 3000);
+          
           toast.success('Journal entry analyzed and saved', {
             duration: 3000,
             id: 'journal-success-toast',
             closeButton: false
+          });
+          
+          const fetchIntervals = [500, 1500, 3000];
+          fetchIntervals.forEach(interval => {
+            setTimeout(() => {
+              if (componentMounted.current) {
+                console.log(`[Journal] Scheduled fetch at ${interval}ms after mapping`);
+                fetchEntries();
+                setRefreshKey(prev => prev + 1);
+              }
+            }, interval);
           });
         }
       }
@@ -179,6 +206,7 @@ const Journal = () => {
     if (entries.length > 0) {
       const currentEntryIds = entries.map(entry => entry.id);
       const prevEntryIds = previousEntriesRef.current;
+      
       const newEntryIds = currentEntryIds.filter(id => !prevEntryIds.includes(id));
       
       if (newEntryIds.length > 0) {
@@ -196,6 +224,7 @@ const Journal = () => {
         if (connectedProcessingEntries.length > 0 || processingEntries.length > 0) {
           console.log('[Journal] Found connection between new entries and processing entries:', connectedProcessingEntries);
           setEntryHasBeenProcessed(true);
+          
           setProcessedEntryIds(prev => [...prev, ...newEntryIds]);
           
           if (!newEntryIds.some(id => notifiedEntryIds.has(id))) {
@@ -204,6 +233,7 @@ const Journal = () => {
               id: 'journal-success-toast',
               closeButton: false
             });
+            
             setNotifiedEntryIds(prev => {
               const newSet = new Set(prev);
               newEntryIds.forEach(id => newSet.add(id));
@@ -442,6 +472,7 @@ const Journal = () => {
     }
     
     try {
+      // CRITICAL: Set processing intent IMMEDIATELY before any async operations
       console.log('[Journal] Setting processing intent immediately');
       setProcessingIntent(true);
       
@@ -461,6 +492,7 @@ const Journal = () => {
       setSafeToSwitchTab(false);
       setEntriesReady(false);
       
+      // Dispatch immediate processing events for instant UI feedback
       window.dispatchEvent(new CustomEvent('immediateProcessingStarted', {
         detail: { 
           tempId: 'immediate-processing',
@@ -481,15 +513,18 @@ const Journal = () => {
         setProcessingEntries(prev => [...prev, tempId]);
         setLastAction(`Processing Started (${tempId})`);
         
+        // Clear processing intent as real processing has started
         setProcessingIntent(false);
         
+        // Create a temporary processing entry to be displayed while the real one is being processed
         const tempEntry: JournalEntry = {
-          id: Date.now(),
+          id: Date.now(), // Temporary ID that won't conflict with real entries
           created_at: new Date().toISOString(),
           content: "Processing entry...",
-          tempId: tempId
+          tempId: tempId // To track which processing entry this corresponds to
         };
         
+        // Add the temporary entry to localEntries
         setLocalEntries(prev => [tempEntry, ...prev]);
         setHasLocalChanges(true);
         
@@ -526,6 +561,7 @@ const Journal = () => {
                 closeButton: false
               });
               
+              // Remove the temporary entry from localEntries if it's still there
               setLocalEntries(prev => prev.filter(entry => !(entry.tempId === tempId)));
               
               fetchEntries();
@@ -543,6 +579,7 @@ const Journal = () => {
         setProcessingError(error || 'Unknown error occurred');
         setLastAction(`Processing Failed: ${error || 'Unknown'}`);
         
+        // Clear processing intent on failure
         setProcessingIntent(false);
         
         await new Promise(resolve => setTimeout(resolve, 150));
@@ -565,6 +602,7 @@ const Journal = () => {
       setProcessingError(error?.message || 'Unknown error occurred');
       setLastAction(`Exception: ${error?.message || 'Unknown'}`);
       
+      // Clear processing intent on exception
       setProcessingIntent(false);
       
       clearAllToasts();
@@ -591,19 +629,150 @@ const Journal = () => {
     
     try {
       console.log(`[Journal] Deleting entry ${entryId}`);
-      await deleteEntry(entryId);
+      setLastAction(`Deleting Entry ${entryId}`);
+      setDeletingEntryId(entryId);
+      setIsDeletingEntry(true);
       
+      clearAllToasts();
+      
+      const tempIdsToDelete: string[] = [];
+      
+      processingEntries.forEach(tempId => {
+        const mappedId = getEntryIdForProcessingId(tempId);
+        if (mappedId === entryId) {
+          tempIdsToDelete.push(tempId);
+        }
+      });
+      
+      processingToEntryMapRef.current.forEach((mappedId, tempId) => {
+        if (mappedId === entryId && !tempIdsToDelete.includes(tempId)) {
+          tempIdsToDelete.push(tempId);
+        }
+      });
+      
+      if (tempIdsToDelete.length > 0) {
+        console.log(`[Journal] Marking processing entries as deleted:`, tempIdsToDelete);
+        setDeletedProcessingIds(prev => {
+          const newSet = new Set(prev);
+          tempIdsToDelete.forEach(id => newSet.add(id));
+          return newSet;
+        });
+      }
+      
+      removeProcessingEntryById(entryId);
+      
+      const updatedProcessingEntries = processingEntries.filter(
+        tempId => !tempIdsToDelete.includes(tempId) && getEntryIdForProcessingId(tempId) !== entryId
+      );
+      setProcessingEntries(updatedProcessingEntries);
+      
+      setNotifiedEntryIds(prev => {
+        const updated = new Set(prev);
+        updated.delete(entryId);
+        return updated;
+      });
+      
+      // Update local entries to immediately remove the deleted entry
+      setLocalEntries(prevEntries => {
+        const filteredEntries = prevEntries.filter(entry => entry.id !== entryId);
+        console.log(`[Journal] Locally filtered entries: ${filteredEntries.length} (removed entry ${entryId})`);
+        return filteredEntries;
+      });
+      
+      // Add to both pending deletion IDs (for temporary state) and permanent deleted entry IDs
+      setPendingDeletionIds(prev => {
+        const newSet = new Set(prev);
+        newSet.add(entryId);
+        return newSet;
+      });
+
+      // Add to permanent deleted entries record
       setDeletedEntryIds(prev => {
         const newSet = new Set(prev);
         newSet.add(entryId);
         return newSet;
       });
       
+      setHasLocalChanges(true);
+      
+      // Perform the actual deletion in the database
+      const { error } = await supabase
+        .from('Journal Entries')
+        .delete()
+        .eq('id', entryId);
+        
+      if (error) {
+        console.error('[Journal] Database error while deleting entry:', error);
+        throw new Error(`Database error: ${error.message}`);
+      }
+      
+      console.log(`[Journal] Entry ${entryId} successfully deleted from database`);
+      
+      // Dispatch event to notify other components about the deletion
+      window.dispatchEvent(new CustomEvent('journalEntriesNeedRefresh', {
+        detail: { 
+          action: 'delete',
+          entryId: entryId,
+          timestamp: Date.now()
+        }
+      }));
+      
+      // Schedule refresh intervals to ensure UI is updated
+      const refreshIntervals = [300, 1000, 2500];
+      refreshIntervals.forEach((interval, index) => {
+        setTimeout(() => {
+          if (index === refreshIntervals.length - 1) {
+            // Keep the entry ID in deletedEntryIds permanently, but remove from pendingDeletionIds
+            setPendingDeletionIds(prev => {
+              const newSet = new Set(prev);
+              newSet.delete(entryId);
+              return newSet;
+            });
+            
+            // Only reset hasLocalChanges when we've confirmed deletion
+            setHasLocalChanges(false);
+          }
+          
+          setRefreshKey(prev => prev + 1);
+          if (index === 0) {
+            fetchEntries();
+          }
+        }, interval);
+      });
+      
+      toast.success('Entry successfully deleted', {
+        duration: 3000,
+        id: 'delete-success-toast',
+        closeButton: false
+      });
+      
     } catch (error) {
       console.error('[Journal] Error deleting entry:', error);
+      setLastAction(`Delete Entry Error (${entryId})`);
+      toast.error('Failed to delete entry');
+      
+      // On error, restore the entry from the deleted lists
+      if (hasLocalChanges) {
+        setLocalEntries(entries);
+        setPendingDeletionIds(prev => {
+          const newSet = new Set(prev);
+          newSet.delete(entryId);
+          return newSet;
+        });
+        setDeletedEntryIds(prev => {
+          const newSet = new Set(prev);
+          newSet.delete(entryId);
+          return newSet;
+        });
+        setHasLocalChanges(false);
+      }
+      
       throw error;
+    } finally {
+      setIsDeletingEntry(false);
+      setDeletingEntryId(null);
     }
-  }, [user?.id, deleteEntry, isDeletingEntry]);
+  }, [user?.id, processingEntries, fetchEntries, entries, hasLocalChanges, isDeletingEntry]);
 
   const resetError = useCallback(() => {
     setHasRenderError(false);
@@ -613,9 +782,98 @@ const Journal = () => {
     setLastAction('Reset Error State');
     setSafeToSwitchTab(true);
     setTimeout(() => {
-      refetch();
+      fetchEntries();
     }, 100);
-  }, [refetch]);
+  }, [fetchEntries]);
+
+  const formatBytes = (bytes: number, decimals = 2) => {
+    if (bytes === 0) return '0 Bytes';
+    
+    const k = 1024;
+    const dm = decimals < 0 ? 0 : decimals;
+    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+    
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + ' ' + sizes[i];
+  };
+
+  const updateDebugInfo = (info: {status: string, duration?: number}) => {
+    setAudioStatus(info.status);
+    if (info.duration !== undefined) {
+      setRecordingDuration(info.duration);
+    }
+    setLastAction(`Recorder: ${info.status}`);
+  };
+
+  useEffect(() => {
+    const handleJournalEntryUpdated = (event: CustomEvent) => {
+      if (event.detail && event.detail.entryId) {
+        console.log(`[Journal] Entry updated event detected for ID: ${event.detail.entryId}, refreshing data`);
+        setRefreshKey(prev => prev + 1);
+        fetchEntries();
+      }
+    };
+    
+    // Add handler for entry deletion events
+    const handleJournalEntryDeleted = (event: CustomEvent) => {
+      if (event.detail && event.detail.entryId) {
+        const deletedId = Number(event.detail.entryId);
+        console.log(`[Journal] Entry deletion event detected for ID: ${deletedId}`);
+        
+        // Add to permanent deleted IDs
+        setDeletedEntryIds(prev => {
+          const newSet = new Set(prev);
+          newSet.add(deletedId);
+          return newSet;
+        });
+      }
+    };
+    
+    window.addEventListener('journalEntryUpdated', handleJournalEntryUpdated as EventListener);
+    window.addEventListener('journalEntryDeleted', handleJournalEntryDeleted as EventListener);
+    
+    return () => {
+      window.removeEventListener('journalEntryUpdated', handleJournalEntryUpdated as EventListener);
+      window.removeEventListener('journalEntryDeleted', handleJournalEntryDeleted as EventListener);
+    };
+  }, [fetchEntries]);
+
+  // Update the handleSearchResults function to ensure type compatibility
+  const handleSearchResults = (filtered: JournalEntry[]) => {
+    setFilteredEntries(filtered);
+  };
+
+  // Update the entries handling to ensure types are compatible
+  const displayEntries = hasLocalChanges ? localEntries : 
+                        (entries && entries.length > 0) ? 
+                          entries.filter(entry => !deletedEntryIds.has(entry.id)) : 
+                        (lastSuccessfulEntriesRef.current.length > 0) ? 
+                          lastSuccessfulEntriesRef.current.filter(entry => !deletedEntryIds.has(entry.id)) : [];
+  
+  // Define the missing showLoading variable
+  const isReallyEmpty = displayEntries.length === 0 && 
+                        lastSuccessfulEntriesRef.current.length === 0 && 
+                        !loading;
+                        
+  const showLoading = loading && displayEntries.length === 0 && !hasLocalChanges;
+
+  // Convert entries to ensure they have the required content field
+  const entriesToDisplay = (filteredEntries.length > 0 && displayEntries.length > 0) ? 
+    filteredEntries.map(entry => ({
+      ...entry,
+      content: entry.content || entry["refined text"] || entry["transcription text"] || ""
+    })) : 
+    displayEntries.map(entry => ({
+      ...entry,
+      content: entry.content || entry["refined text"] || entry["transcription text"] || ""
+    }));
+
+  if (hasRenderError) {
+    console.error('[Journal] Recovering from render error');
+    setHasRenderError(false);
+    setLastAction('Recovering from Render Error');
+  }
 
   return (
     <JournalErrorBoundary onReset={resetError}>
@@ -629,14 +887,14 @@ const Journal = () => {
               <p className="text-muted-foreground">Setting up your profile...</p>
             </div>
           </div>
-        ) : entriesError && !isLoading ? (
+        ) : entriesError && !loading ? (
           <>
             <div className="mt-8 p-4 border border-red-200 bg-red-50 dark:bg-red-900/20 dark:border-red-800 rounded-lg">
               <div className="flex flex-col gap-3">
                 <div className="flex items-start gap-2">
                   <AlertCircle className="w-5 h-5 text-red-600 shrink-0 mt-0.5" />
                   <p className="text-red-800 dark:text-red-200">
-                    Error loading your journal entries: {entriesError?.message || 'Unknown error'}
+                    Error loading your journal entries: {entriesError}
                   </p>
                 </div>
                 <Button 
@@ -644,7 +902,7 @@ const Journal = () => {
                   className="w-full sm:w-auto border-red-500 text-red-700 hover:bg-red-100 dark:text-red-300 dark:hover:bg-red-900/40"
                   onClick={() => {
                     setRefreshKey(prev => prev + 1);
-                    refetch();
+                    fetchEntries();
                   }}
                 >
                   <RefreshCw className="w-4 h-4 mr-2" /> 
