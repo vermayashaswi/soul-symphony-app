@@ -1,3 +1,4 @@
+
 /**
  * Main audio processing module
  * Orchestrates the audio recording and transcription process
@@ -258,7 +259,7 @@ async function processRecordingInBackground(
       recordingTime: payload.recordingTime
     });
     
-    // Call the Supabase Edge Function with proper authorization and timeout
+    // Call the Supabase Edge Function with proper headers and error handling
     const { data, error } = await supabase.functions.invoke('transcribe-audio', {
       body: payload,
       headers: {
@@ -273,12 +274,14 @@ async function processRecordingInBackground(
       // Provide more specific error messages
       let errorMessage = `Server error: ${error.message || 'Unknown error'}`;
       
-      if (error.message?.includes('JSON')) {
+      if (error.message?.includes('JSON') || error.message?.includes('empty')) {
         errorMessage = 'Audio data format error - please try recording again';
       } else if (error.message?.includes('auth')) {
         errorMessage = 'Authentication failed - please log in again';
       } else if (error.message?.includes('size') || error.message?.includes('large')) {
         errorMessage = 'Audio file too large - please record a shorter message';
+      } else if (error.message?.includes('Invalid request data')) {
+        errorMessage = 'Invalid audio data - please try recording again';
       }
       
       processingStateManager.updateEntryState(tempId, EntryProcessingState.ERROR, errorMessage);

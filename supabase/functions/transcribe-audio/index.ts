@@ -3,7 +3,6 @@ import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { corsHeaders } from '../_shared/cors.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.38.4';
 import { processAudio } from './audioProcessing.ts';
-import { transcribeWithDeepgram } from './nlProcessing.ts';
 import { transcribeAudioWithWhisper, translateAndRefineText, analyzeEmotions, generateEmbedding } from './aiProcessing.ts';
 import { createJournalEntry, updateJournalEntry, storeEmbedding } from './databaseOperations.ts';
 import { uploadAudioFile } from './storageOperations.ts';
@@ -146,7 +145,7 @@ function base64ToUint8Array(base64: string): Uint8Array {
   }
 }
 
-// Enhanced request validation
+// Enhanced request validation with better JSON parsing
 async function validateAndParseRequest(req: Request): Promise<{
   audioData: Uint8Array;
   userId: string;
@@ -163,7 +162,6 @@ async function validateAndParseRequest(req: Request): Promise<{
     throw new Error(`Request too large: ${contentLength} bytes (max: ${MAX_REQUEST_SIZE})`);
   }
   
-  let requestBody: string | FormData;
   let audioData: Uint8Array;
   let userId: string;
   let audioType: string = 'webm';
@@ -173,45 +171,59 @@ async function validateAndParseRequest(req: Request): Promise<{
     if (contentType.includes('application/json')) {
       console.log('[Transcribe] Processing JSON request');
       
-      // Read as text first to validate
-      const bodyText = await req.text();
+      // Check if request has content-length of 0
+      if (contentLength === '0') {
+        throw new Error('Request body is empty - no audio data provided');
+      }
+      
+      // Read the request body with error handling
+      let bodyText: string;
+      try {
+        bodyText = await req.text();
+      } catch (error) {
+        console.error('[Transcribe] Failed to read request body:', error);
+        throw new Error('Failed to read request body');
+      }
+      
       console.log('[Transcribe] Raw body length:', bodyText.length);
       
       if (!bodyText || bodyText.trim() === '') {
-        throw new Error('Empty request body');
+        throw new Error('Request body is empty after reading');
       }
       
       // Validate JSON structure before parsing
-      if (!bodyText.trim().startsWith('{') || !bodyText.trim().endsWith('}')) {
-        throw new Error('Invalid JSON structure - missing braces');
+      const trimmedBody = bodyText.trim();
+      if (!trimmedBody.startsWith('{') || !trimmedBody.endsWith('}')) {
+        console.error('[Transcribe] Invalid JSON structure. Body starts with:', trimmedBody.substring(0, 50));
+        throw new Error('Invalid JSON structure - request body must be a JSON object');
       }
       
       let parsedBody: any;
       try {
-        parsedBody = JSON.parse(bodyText);
+        parsedBody = JSON.parse(trimmedBody);
       } catch (parseError) {
         console.error('[Transcribe] JSON parse error:', parseError);
-        console.error('[Transcribe] Body preview:', bodyText.substring(0, 200));
-        throw new Error(`JSON parse error: ${parseError.message}`);
+        console.error('[Transcribe] Body preview:', trimmedBody.substring(0, 200));
+        throw new Error(`Invalid JSON format: ${parseError.message}`);
       }
       
-      console.log('[Transcribe] Successfully parsed JSON body');
+      console.log('[Transcribe] Successfully parsed JSON body with keys:', Object.keys(parsedBody));
       
       // Validate required fields
       if (!parsedBody.audio) {
-        throw new Error('Missing audio field in request body');
+        throw new Error('Missing required field: audio');
       }
       if (!parsedBody.userId) {
-        throw new Error('Missing userId field in request body');
+        throw new Error('Missing required field: userId');
       }
       
-      // Validate audio data
+      // Validate audio data type and content
       if (typeof parsedBody.audio !== 'string') {
         throw new Error('Audio field must be a base64 string');
       }
       
       if (parsedBody.audio.length < 100) {
-        throw new Error('Audio data too short - likely invalid');
+        throw new Error('Audio data too short - likely invalid or corrupted');
       }
       
       console.log('[Transcribe] Converting base64 audio data, length:', parsedBody.audio.length);
@@ -255,20 +267,20 @@ async function validateAndParseRequest(req: Request): Promise<{
       audioType = audioFile.type.split('/')[1] || 'webm';
       
     } else {
-      throw new Error(`Unsupported content type: ${contentType}`);
+      throw new Error(`Unsupported content type: ${contentType}. Expected application/json or multipart/form-data`);
     }
     
     // Final validation
     if (!audioData || audioData.length === 0) {
-      throw new Error('No audio data received');
+      throw new Error('No audio data received after processing');
     }
     
     if (audioData.length < 100) {
-      throw new Error(`Audio data too small: ${audioData.length} bytes`);
+      throw new Error(`Audio data too small after processing: ${audioData.length} bytes`);
     }
     
     if (audioData.length > MAX_AUDIO_SIZE) {
-      throw new Error(`Audio data too large: ${audioData.length} bytes (max: ${MAX_AUDIO_SIZE})`);
+      throw new Error(`Audio data too large after processing: ${audioData.length} bytes (max: ${MAX_AUDIO_SIZE})`);
     }
     
     console.log('[Transcribe] Request validation successful:', {
@@ -354,7 +366,7 @@ serve(async (req) => {
   console.log('[Transcribe] Headers:', Object.fromEntries(req.headers.entries()));
 
   try {
-    // Validate and parse request
+    // Validate and parse request with improved error handling
     const { audioData, userId, audioType, duration: providedDuration } = await validateAndParseRequest(req);
 
     // Validate authentication
@@ -492,9 +504,9 @@ serve(async (req) => {
     if (error.message.includes('Invalid user') || error.message.includes('User ID mismatch')) {
       statusCode = 401;
       errorMessage = 'Authentication failed';
-    } else if (error.message.includes('too large') || error.message.includes('too small') || error.message.includes('Invalid')) {
+    } else if (error.message.includes('too large') || error.message.includes('too small') || error.message.includes('Invalid') || error.message.includes('Missing') || error.message.includes('empty')) {
       statusCode = 400;
-      errorMessage = 'Invalid request';
+      errorMessage = 'Invalid request data';
     }
     
     return new Response(
