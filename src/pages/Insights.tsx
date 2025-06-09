@@ -1,6 +1,7 @@
+
 import { useState, useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
-import { Calendar, Filter, TrendingUp, ArrowUp, ArrowDown, Activity, Award } from 'lucide-react';
+import { Calendar, TrendingUp, ArrowUp, ArrowDown, Activity, Award } from 'lucide-react';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import EmotionChart from '@/components/EmotionChart';
 import MoodCalendar from '@/components/insights/MoodCalendar';
@@ -459,12 +460,11 @@ function InsightsContent() {
                   <div className="flex justify-between items-center mb-6">
                     <h2 className="text-xl font-semibold">
                       <StableTranslatableText 
-                        text="Emotion Distribution" 
+                        text="Emotions & Life Areas" 
                         forceTranslate={true}
                         timeRange={timeRange}
                       />
                     </h2>
-                    <Filter className="h-5 w-5 text-muted-foreground" />
                   </div>
                   <EmotionChart 
                     timeframe={timeRange}
