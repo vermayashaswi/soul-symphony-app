@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
-import { Calendar, TrendingUp, ArrowUp, ArrowDown, Activity, Award } from 'lucide-react';
+import { Calendar, Filter, TrendingUp, ArrowUp, ArrowDown, Activity, Award } from 'lucide-react';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import EmotionChart from '@/components/EmotionChart';
 import MoodCalendar from '@/components/insights/MoodCalendar';
@@ -22,7 +22,6 @@ function InsightsContent() {
   const { user } = useAuth();
   const { prefetchTranslationsForRoute, currentLanguage } = useTranslation();
   const [timeRange, setTimeRange] = useState<TimeRange>('week');
-  const [emotionChartTimeRange, setEmotionChartTimeRange] = useState<TimeRange>('week');
   const [isSticky, setIsSticky] = useState(false);
   const [selectedEmotion, setSelectedEmotion] = useState<string | null>(null);
   const timeToggleRef = useRef<HTMLDivElement>(null);
@@ -38,8 +37,6 @@ function InsightsContent() {
     { value: 'month', label: 'Month' },
     { value: 'year', label: 'Year' },
   ];
-
-  const emotionTimeRanges: TimeRange[] = ['today', 'week', 'month', 'year'];
 
   useEffect(() => {
     console.log("Insights page mounted");
@@ -95,19 +92,6 @@ function InsightsContent() {
         window.scrollTo({ top: currentScrollPosition });
       }, 10);
     }
-  };
-
-  const handleEmotionChartNavigation = (direction: 'prev' | 'next') => {
-    const currentIndex = emotionTimeRanges.indexOf(emotionChartTimeRange);
-    let newIndex: number;
-    
-    if (direction === 'prev') {
-      newIndex = currentIndex > 0 ? currentIndex - 1 : emotionTimeRanges.length - 1;
-    } else {
-      newIndex = currentIndex < emotionTimeRanges.length - 1 ? currentIndex + 1 : 0;
-    }
-    
-    setEmotionChartTimeRange(emotionTimeRanges[newIndex]);
   };
 
   const renderTimeToggle = () => (
@@ -472,10 +456,19 @@ function InsightsContent() {
                 className="bg-background rounded-xl shadow-sm border"
               >
                 <div className="p-6">
+                  <div className="flex justify-between items-center mb-6">
+                    <h2 className="text-xl font-semibold">
+                      <StableTranslatableText 
+                        text="Emotion Distribution" 
+                        forceTranslate={true}
+                        timeRange={timeRange}
+                      />
+                    </h2>
+                    <Filter className="h-5 w-5 text-muted-foreground" />
+                  </div>
                   <EmotionChart 
-                    timeframe={emotionChartTimeRange}
+                    timeframe={timeRange}
                     aggregatedData={insightsData.aggregatedEmotionData}
-                    onNavigate={handleEmotionChartNavigation}
                   />
                 </div>
               </motion.div>
