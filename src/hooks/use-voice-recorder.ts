@@ -2,11 +2,9 @@
 import { useState, useRef, useEffect } from "react";
 import { recordAudio } from "@/utils/audioRecorder";
 import { validateAudioBlob } from "@/utils/audio/blob-utils";
-import { processRecording } from "@/utils/audio-processing";
-import { useAuth } from "@/contexts/AuthContext";
 
 interface UseVoiceRecorderProps {
-  onRecordingComplete?: (audioBlob: Blob, tempId?: string) => void;
+  onRecordingComplete: (audioBlob: Blob, tempId?: string) => void;
   onError?: (error: any) => void;
   maxDuration?: number; // in seconds
 }
@@ -27,8 +25,6 @@ export function useVoiceRecorder({
   const recorderRef = useRef<Awaited<ReturnType<typeof recordAudio>> | null>(null);
   const timerInterval = useRef<ReturnType<typeof setInterval> | null>(null);
   const maxDurationTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
-  
-  const { user } = useAuth();
 
   // Clean up function
   const cleanupRecording = () => {
@@ -194,22 +190,22 @@ export function useVoiceRecorder({
       setStatus("idle");
       
       if (finalBlob.size > 0) {
-        if (opId) {
-          window.dispatchEvent(new CustomEvent('journalOperationUpdate', {
-            detail: {
-              id: opId,
-              status: 'success',
-              message: 'Recording completed',
-              details: `Audio size: ${formatBytes(finalBlob.size)}, Duration: ${actualDuration}s`
-            }
-          }));
+        if (onRecordingComplete) {
+          const tempId = generateTempId();
+          console.log(`[useVoiceRecorder] Calling onRecordingComplete with blob size: ${finalBlob.size}, duration: ${actualDuration}`);
+          onRecordingComplete(finalBlob, tempId);
+          
+          if (opId) {
+            window.dispatchEvent(new CustomEvent('journalOperationUpdate', {
+              detail: {
+                id: opId,
+                status: 'success',
+                message: 'Recording completed',
+                details: `Audio size: ${formatBytes(finalBlob.size)}, Duration: ${actualDuration}s, TempID: ${tempId}`
+              }
+            }));
+          }
         }
-        
-        console.log(`[useVoiceRecorder] Recording completed successfully:`, {
-          size: finalBlob.size,
-          duration: actualDuration,
-          type: finalBlob.type
-        });
       } else {
         console.error("[useVoiceRecorder] Recording failed: empty blob");
         
@@ -240,8 +236,6 @@ export function useVoiceRecorder({
   const clearRecording = () => {
     setRecordingBlob(null);
     setAudioDuration(0);
-    setElapsedTime(0);
-    setStatus("idle");
   };
 
   return {
