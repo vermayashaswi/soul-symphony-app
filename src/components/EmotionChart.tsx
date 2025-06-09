@@ -1,3 +1,4 @@
+
 import { useState, useMemo, useEffect, useRef } from 'react';
 import { 
   LineChart, 
@@ -376,22 +377,39 @@ export function EmotionChart({
     const { active, payload, label }: any = props;
     
     if (active && payload && payload.length) {
-      const emotionName = payload[0].dataKey.charAt(0).toUpperCase() + payload[0].dataKey.slice(1);
-      const value = payload[0].value;
+      // Filter out emotions with null values
+      const validEmotions = payload.filter((item: any) => item.value !== null && item.value !== undefined);
+      
+      if (validEmotions.length === 0) return null;
       
       return (
-        <div className="bg-card/95 backdrop-blur-sm p-2 rounded-lg border shadow-md">
-          <p className="text-sm font-medium">{label}</p>
-          <div className="flex items-center gap-2">
-            <div className="w-2 h-2 rounded-full" style={{ backgroundColor: payload[0].stroke }}></div>
-            <p className="text-sm">
-              <TranslatableText 
-                text={emotionName} 
-                forceTranslate={true}
-                enableFontScaling={true}
-                scalingContext="compact"
-              />: {value?.toFixed(1) || 'N/A'}
-            </p>
+        <div className="bg-card/95 backdrop-blur-sm p-3 rounded-lg border shadow-md min-w-[200px]">
+          <p className="text-sm font-medium mb-2">{label}</p>
+          <div className="space-y-1">
+            {validEmotions.map((item: any, index: number) => {
+              const emotionName = item.dataKey.charAt(0).toUpperCase() + item.dataKey.slice(1);
+              return (
+                <div key={index} className="flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-2">
+                    <div 
+                      className="w-2 h-2 rounded-full" 
+                      style={{ backgroundColor: item.stroke }}
+                    ></div>
+                    <span className="text-sm">
+                      <TranslatableText 
+                        text={emotionName} 
+                        forceTranslate={true}
+                        enableFontScaling={true}
+                        scalingContext="compact"
+                      />
+                    </span>
+                  </div>
+                  <span className="text-sm font-medium">
+                    {item.value?.toFixed(1) || 'N/A'}
+                  </span>
+                </div>
+              );
+            })}
           </div>
         </div>
       );
