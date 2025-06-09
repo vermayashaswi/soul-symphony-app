@@ -3,6 +3,9 @@ import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.7.1';
 import { analyzeWithGoogleNL } from './nlProcessing.ts';
+import { transcribeAudioWithWhisper, translateAndRefineText, analyzeEmotions, generateEmbedding } from './aiProcessing.ts';
+import { createSupabaseAdmin, createProfileIfNeeded, extractThemes, storeJournalEntry, storeEmbedding } from './databaseOperations.ts';
+import { storeAudioFile } from './storageOperations.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -31,7 +34,7 @@ serve(async (req) => {
     }
 
     // Create admin client for database operations
-    const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
+    const supabaseAdmin = createSupabaseAdmin(supabaseUrl, supabaseServiceKey);
     
     // Create client with user's auth for RLS compliance
     const supabaseClient = createClient(supabaseUrl, Deno.env.get('SUPABASE_ANON_KEY') ?? '', {
@@ -43,7 +46,7 @@ serve(async (req) => {
     console.log("Supabase clients initialized successfully");
 
     // Fix parameter mapping - use correct parameter names
-    const { audio, audioData, userId, highQuality = true, directTranscription = false } = await req.json();
+    const { audio, audioData, userId, highQuality = true, directTranscription = false, recordingTime = 0 } = await req.json();
     
     // Handle both parameter names for backward compatibility
     const actualAudioData = audio || audioData;
@@ -53,6 +56,7 @@ serve(async (req) => {
     console.log(`Direct transcription mode: ${directTranscription ? 'YES' : 'NO'}`);
     console.log(`High quality mode: ${highQuality ? 'YES' : 'NO'}`);
     console.log(`Audio data length: ${actualAudioData?.length || 0}`);
+    console.log(`Recording time: ${recordingTime}ms`);
     
     if (!actualAudioData) {
       throw new Error('No audio data received');
@@ -61,38 +65,12 @@ serve(async (req) => {
     if (!userId) {
       throw new Error('User ID is required for authentication');
     }
+
+    // Get timezone from request headers if available
+    const timezone = req.headers.get('x-timezone') || 'UTC';
     
-    // Always use the correct transcription model
-    const model = "whisper-1"; // Use the correct Whisper model name
-    console.log(`Using model: ${model}`);
-
-    // Verify user authentication by checking if user profile exists
-    const { data: profileData, error: profileError } = await supabaseClient
-      .from('profiles')
-      .select('id')
-      .eq('id', userId)
-      .single();
-
-    if (profileError && profileError.code !== 'PGRST116') {
-      console.error('Error checking user profile:', profileError);
-      throw new Error(`Authentication error: ${profileError.message}`);
-    }
-
-    const profileExists = !!profileData;
-    console.log(`User profile exists: ${profileExists ? 'YES' : 'NO'}`);
-
-    if (!profileExists && !directTranscription) {
-      console.log('Creating user profile...');
-      const { error: insertError } = await supabaseAdmin
-        .from('profiles')
-        .insert([{ id: userId }]);
-
-      if (insertError) {
-        console.error('Error creating user profile:', insertError);
-        throw new Error(`Failed to create user profile: ${insertError.message}`);
-      }
-      console.log('User profile created successfully');
-    }
+    // Create user profile if needed and update timezone
+    await createProfileIfNeeded(supabaseAdmin, userId, timezone);
 
     // Convert base64 to binary
     const binaryString = atob(actualAudioData);
@@ -103,6 +81,10 @@ serve(async (req) => {
     
     console.log(`Processed ${Math.ceil(binaryString.length / 8)} chunks into a ${bytes.length} byte array`);
     console.log(`Processed binary audio size: ${bytes.length}`);
+
+    // Calculate duration from recording time or estimate from audio size
+    const durationMs = recordingTime > 0 ? recordingTime : Math.floor(bytes.length / 32); // Rough estimate: 32 bytes per ms
+    console.log(`Calculated duration: ${durationMs}ms`);
 
     // File type detection
     let detectedFileType = 'wav';
@@ -116,6 +98,8 @@ serve(async (req) => {
         detectedFileType = 'mp3';
       } else if (bytes[0] === 0x4F && bytes[1] === 0x67 && bytes[2] === 0x67 && bytes[3] === 0x53) {
         detectedFileType = 'ogg';
+      } else if (bytes[4] === 0x66 && bytes[5] === 0x74 && bytes[6] === 0x79 && bytes[7] === 0x70) {
+        detectedFileType = 'mp4';
       }
     }
     
@@ -127,122 +111,47 @@ serve(async (req) => {
     
     console.log(`Storing audio file ${fileName} with size ${bytes.length} bytes`);
     
-    const { data: uploadData, error: uploadError } = await supabaseAdmin.storage
-      .from('journal-audio')
-      .upload(fileName, bytes, {
-        contentType: `audio/${detectedFileType}`,
-        upsert: false
-      });
-
-    if (uploadError) {
-      console.error('Error uploading audio file:', uploadError);
-      throw new Error(`Upload failed: ${uploadError.message}`);
+    const audioUrl = await storeAudioFile(supabaseAdmin, bytes, fileName, detectedFileType);
+    
+    if (!audioUrl) {
+      console.warn('Failed to store audio file, continuing without URL');
+    } else {
+      console.log(`File uploaded successfully: ${audioUrl}`);
     }
-
-    console.log(`Uploading ${fileName} to journal-audio bucket (audio/${detectedFileType})`);
-
-    const audioUrl = `${supabaseUrl}/storage/v1/object/public/journal-audio/${fileName}`;
-    console.log(`File uploaded successfully: ${audioUrl}`);
 
     // Create blob for transcription
     const audioBlob = new Blob([bytes], { type: `audio/${detectedFileType}` });
     console.log(`Created blob for transcription: { size: ${audioBlob.size}, type: "${audioBlob.type}", detectedFileType: "${detectedFileType}" }`);
 
-    // Send to OpenAI API for transcription
-    console.log("Sending audio to OpenAI API for transcription");
-    console.log(`Using model: ${model}`);
-
-    const formData = new FormData();
-    formData.append('file', audioBlob, `audio.${detectedFileType}`);
-    formData.append('model', model);
-    
-    console.log(`[Transcription] Using filename: audio.${detectedFileType}`);
-    console.log(`[Transcription] Preparing audio for OpenAI: { blobSize: ${audioBlob.size}, blobType: "${audioBlob.type}", fileExtension: "${detectedFileType}" }`);
-
+    // Get OpenAI API key
     const openaiApiKey = Deno.env.get('OPENAI_API_KEY');
     if (!openaiApiKey) {
       throw new Error('OpenAI API key not found');
     }
 
-    console.log(`[Transcription] Sending request to OpenAI with: {`);
-    console.log(`  fileSize: ${audioBlob.size},`);
-    console.log(`  fileType: "${audioBlob.type}",`);
-    console.log(`  fileExtension: "${detectedFileType}",`);
-    console.log(`  hasApiKey: ${!!openaiApiKey},`);
-    console.log(`  model: "${model}",`);
-    console.log(`  autoLanguageDetection: true`);
-    console.log(`}`);
+    // Step 1: Transcribe audio using the modular function
+    console.log('Step 1: Transcribing audio with Whisper...');
+    const { text: transcribedText, detectedLanguages } = await transcribeAudioWithWhisper(
+      audioBlob,
+      detectedFileType,
+      openaiApiKey,
+      'auto'
+    );
 
-    const transcriptionResponse = await fetch('https://api.openai.com/v1/audio/transcriptions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${openaiApiKey}`,
-      },
-      body: formData,
-    });
-
-    if (!transcriptionResponse.ok) {
-      const errorText = await transcriptionResponse.text();
-      console.error('OpenAI API error:', errorText);
-      throw new Error(`OpenAI API error: ${transcriptionResponse.status} - ${errorText}`);
+    if (!transcribedText || transcribedText.trim().length === 0) {
+      throw new Error('Transcription returned empty result');
     }
 
-    const transcriptionResult = await transcriptionResponse.json();
-    const transcribedText = transcriptionResult.text;
-
-    console.log(`[Transcription] Success: {`);
-    console.log(`  textLength: ${transcribedText.length},`);
-    console.log(`  sampleText: "${transcribedText.slice(0, 50)}${transcribedText.length > 50 ? '....' : ''}",`);
-    console.log(`  model: "${model}",`);
-    console.log(`  detectedLanguage: "${transcriptionResult.language || 'unknown'}"`);
-    console.log(`}`);
-
-    console.log(`Transcription successful: ${transcribedText ? 'yes' : 'no'}`);
-
-    // Detect language
-    let primaryLanguage = transcriptionResult.language || 'en';
-    console.log(`Primary detected language: ${primaryLanguage}`);
-
-    // Enhanced language detection using Google API for additional languages
-    let detectedLanguages = [primaryLanguage];
-    
-    const googleApiKey = Deno.env.get('GOOGLE_API');
-    if (googleApiKey && transcribedText.length > 10) {
-      try {
-        console.log('Performing enhanced language detection with Google API...');
-        const detectResponse = await fetch(`https://translation.googleapis.com/language/translate/v2/detect?key=${googleApiKey}`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ q: transcribedText })
-        });
-
-        if (detectResponse.ok) {
-          const detectData = await detectResponse.json();
-          if (detectData.data && detectData.data.detections && detectData.data.detections[0]) {
-            const googleDetected = detectData.data.detections[0][0].language;
-            const confidence = detectData.data.detections[0][0].confidence || 0;
-            
-            console.log(`Google detected language: ${googleDetected} (confidence: ${confidence})`);
-            
-            // Add Google's detection if it's different and has reasonable confidence
-            if (googleDetected !== primaryLanguage && confidence > 0.5) {
-              detectedLanguages.push(googleDetected);
-            }
-          }
-        }
-      } catch (error) {
-        console.error('Error with Google language detection:', error);
-      }
-    }
-
-    console.log(`Final detected languages: ${JSON.stringify(detectedLanguages)}`);
+    console.log(`Transcription successful: ${transcribedText.length} characters`);
+    console.log(`Sample: "${transcribedText.slice(0, 50)}${transcribedText.length > 50 ? '...' : ''}"`);
+    console.log(`Detected languages: ${JSON.stringify(detectedLanguages)}`);
 
     // If direct transcription mode, return the result immediately
     if (directTranscription) {
       console.log('Direct transcription mode, returning result immediately');
       return new Response(JSON.stringify({
         transcription: transcribedText,
-        language: primaryLanguage,
+        language: detectedLanguages[0] || 'unknown',
         languages: detectedLanguages,
         success: true
       }), {
@@ -250,50 +159,16 @@ serve(async (req) => {
       });
     }
 
-    // Refine the transcription with GPT-4
-    console.log('Refining transcription with GPT-4...');
-    
-    const refinementResponse = await fetch('https://api.openai.com/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${openaiApiKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: 'gpt-4o',
-        messages: [
-          {
-            role: 'system',
-            content: `You are a helpful assistant that refines transcribed text from voice recordings. 
-            Your task is to correct any obvious transcription errors, add proper punctuation, and format the text into clear paragraphs.
-            Maintain the original meaning and all factual content. Do not add new information or change the substance of what was said.
-            If the text is in a language other than English, maintain that language - do not translate.
-            Preserve all personal names, places, and specific terms exactly as they appear.`
-          },
-          {
-            role: 'user',
-            content: `Please refine this transcribed text from a voice recording: "${transcribedText}"`
-          }
-        ],
-        temperature: 0.3,
-        max_tokens: 2000
-      }),
-    });
+    // Step 2: Translate and refine text using the modular function
+    console.log('Step 2: Translating and refining text...');
+    const { refinedText } = await translateAndRefineText(transcribedText, openaiApiKey, detectedLanguages);
 
-    if (!refinementResponse.ok) {
-      console.error('Error refining transcription:', await refinementResponse.text());
-      throw new Error('Failed to refine transcription');
-    }
-
-    const refinementResult = await refinementResponse.json();
-    const refinedText = refinementResult.choices[0].message.content;
-
-    console.log('Transcription refined successfully');
+    console.log('Text refinement completed');
     console.log(`Original length: ${transcribedText.length}, Refined length: ${refinedText.length}`);
     console.log(`Refined sample: "${refinedText.slice(0, 50)}${refinedText.length > 50 ? '...' : ''}"`);
 
-    // Analyze sentiment with Google NL API
-    console.log('Analyzing sentiment with Google NL API...');
+    // Step 3: Analyze sentiment with Google NL API
+    console.log('Step 3: Analyzing sentiment with Google NL API...');
     const googleNLApiKey = Deno.env.get('GOOGLE_API');
     
     let sentimentResult = { sentiment: "0" };
@@ -310,157 +185,83 @@ serve(async (req) => {
       console.warn('Google NL API key not found, skipping sentiment analysis');
     }
 
-    // Store in database using admin client to bypass RLS for initial insert
-    console.log('Storing journal entry in database...');
+    // Step 4: Get emotions data and analyze emotions
+    console.log('Step 4: Analyzing emotions...');
     
-    const { data: journalEntry, error: insertError } = await supabaseAdmin
+    // Fetch emotions from database
+    const { data: emotionsData, error: emotionsError } = await supabaseAdmin
+      .from('emotions')
+      .select('name, description');
+
+    let emotions = {};
+    if (!emotionsError && emotionsData && emotionsData.length > 0) {
+      try {
+        emotions = await analyzeEmotions(refinedText, emotionsData, openaiApiKey);
+        console.log('Emotion analysis completed:', emotions);
+      } catch (emotionError) {
+        console.error('Error analyzing emotions:', emotionError);
+        console.log('Continuing with empty emotions');
+      }
+    } else {
+      console.warn('No emotions data found in database, skipping emotion analysis');
+    }
+
+    // Step 5: Store in database using the modular function
+    console.log('Step 5: Storing journal entry in database...');
+    
+    const entryId = await storeJournalEntry(
+      supabaseAdmin,
+      transcribedText,
+      refinedText,
+      audioUrl,
+      userId,
+      durationMs,
+      emotions,
+      sentimentResult.sentiment
+    );
+
+    console.log(`Journal entry stored successfully with ID: ${entryId}`);
+
+    // Step 6: Update with languages
+    console.log('Step 6: Updating entry with detected languages...');
+    const { error: languageUpdateError } = await supabaseAdmin
       .from('Journal Entries')
-      .insert([
-        {
-          user_id: userId, // Explicitly set user_id for RLS compliance
-          "transcription text": transcribedText,
-          "refined text": refinedText,
-          audio_url: audioUrl,
-          sentiment: sentimentResult.sentiment,
-          languages: detectedLanguages, // Store the detected languages
-          duration: null // Will be updated later if available
-        }
-      ])
-      .select()
-      .single();
+      .update({ languages: detectedLanguages })
+      .eq('id', entryId);
 
-    if (insertError) {
-      console.error('Error inserting journal entry:', insertError);
-      throw new Error(`Failed to store journal entry: ${insertError.message}`);
+    if (languageUpdateError) {
+      console.error('Error updating languages:', languageUpdateError);
+    } else {
+      console.log(`Languages updated: ${JSON.stringify(detectedLanguages)}`);
     }
 
-    console.log(`Journal entry stored successfully with ID: ${journalEntry.id}`);
-    console.log(`Stored languages: ${JSON.stringify(detectedLanguages)}`);
+    // Step 7: Extract themes using the modular function
+    console.log('Step 7: Extracting themes...');
+    await extractThemes(supabaseAdmin, refinedText, entryId);
 
-    // Analyze emotions and themes with GPT-4
-    console.log('Analyzing emotions and themes with GPT-4...');
-    
-    const analysisResponse = await fetch('https://api.openai.com/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${openaiApiKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: 'gpt-4o',
-        messages: [
-          {
-            role: 'system',
-            content: `You are an expert psychological analysis system. Analyze the journal entry for emotions and themes.
-            Return ONLY a JSON object with the following structure:
-            {
-              "emotions": {
-                "emotion1": score, // 0.0 to 1.0 where 1.0 is strongest
-                "emotion2": score,
-                // Include all emotions detected with score > 0.1
-              },
-              "master_themes": ["theme1", "theme2", "theme3"] // 3-5 main themes
-            }
-            Do not include any explanations or text outside the JSON object.`
-          },
-          {
-            role: 'user',
-            content: refinedText
-          }
-        ],
-        temperature: 0.2,
-        response_format: { type: "json_object" },
-        max_tokens: 800
-      }),
-    });
-
-    if (!analysisResponse.ok) {
-      console.error('Error analyzing emotions and themes:', await analysisResponse.text());
-      throw new Error('Failed to analyze emotions and themes');
-    }
-
-    const analysisResult = await analysisResponse.json();
-    let analysis;
-    
+    // Step 8: Generate and store embeddings
+    console.log('Step 8: Generating embeddings...');
     try {
-      analysis = JSON.parse(analysisResult.choices[0].message.content);
-      console.log('Emotion and theme analysis successful');
-    } catch (parseError) {
-      console.error('Error parsing analysis result:', parseError);
-      console.log('Raw analysis result:', analysisResult.choices[0].message.content);
-      analysis = { emotions: {}, master_themes: [] };
-    }
-
-    // Update journal entry with emotions and themes using admin client
-    console.log('Updating journal entry with emotions and themes...');
-    
-    const { error: updateError } = await supabaseAdmin
-      .from('Journal Entries')
-      .update({
-        emotions: analysis.emotions || {},
-        master_themes: analysis.master_themes || []
-      })
-      .eq('id', journalEntry.id);
-
-    if (updateError) {
-      console.error('Error updating journal entry with analysis:', updateError);
-    } else {
-      console.log('Journal entry updated with emotions and themes');
-    }
-
-    // Generate embeddings for vector search
-    console.log('Generating embeddings for vector search...');
-    
-    const embeddingResponse = await fetch('https://api.openai.com/v1/embeddings', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${openaiApiKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: 'text-embedding-3-small',
-        input: refinedText,
-        encoding_format: 'float'
-      }),
-    });
-
-    if (!embeddingResponse.ok) {
-      console.error('Error generating embeddings:', await embeddingResponse.text());
-      throw new Error('Failed to generate embeddings');
-    }
-
-    const embeddingResult = await embeddingResponse.json();
-    const embedding = embeddingResult.data[0].embedding;
-
-    console.log(`Embedding generated successfully with ${embedding.length} dimensions`);
-
-    // Store embeddings using admin client
-    console.log('Storing embeddings...');
-    
-    const { error: embeddingError } = await supabaseAdmin.rpc('upsert_journal_embedding', {
-      entry_id: journalEntry.id,
-      embedding_vector: embedding
-    });
-
-    if (embeddingError) {
-      console.error('Error storing embeddings:', embeddingError);
-    } else {
-      console.log('Embeddings stored successfully');
+      const embedding = await generateEmbedding(refinedText, openaiApiKey);
+      await storeEmbedding(supabaseAdmin, entryId, refinedText, embedding);
+      console.log('Embeddings generated and stored successfully');
+    } catch (embeddingError) {
+      console.error('Error with embeddings:', embeddingError);
     }
 
     // Return success response
     console.log('Processing complete, returning success response');
     
     return new Response(JSON.stringify({
-      id: journalEntry.id,
-      entryId: journalEntry.id, // Add entryId for compatibility
+      id: entryId,
+      entryId: entryId,
       transcription: transcribedText,
       refined: refinedText,
-      emotions: analysis.emotions,
-      themes: analysis.master_themes,
+      emotions: emotions,
       sentiment: sentimentResult.sentiment,
-      language: primaryLanguage,
+      language: detectedLanguages[0] || 'unknown',
       languages: detectedLanguages,
+      duration: durationMs,
       success: true
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },

@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 import { blobToBase64 } from '@/utils/audio/blob-utils';
 
@@ -14,12 +13,14 @@ interface TranscriptionResult {
  * @param userId - User ID for association with the transcription
  * @param directTranscription - If true, just returns the transcription without processing
  * @param processSentiment - If true, ensure sentiment analysis is performed with UTF-8 encoding
+ * @param recordingDuration - Recording duration in milliseconds
  */
 export async function sendAudioForTranscription(
   base64Audio: string,
   userId: string | undefined,
   directTranscription: boolean = false,
-  processSentiment: boolean = true
+  processSentiment: boolean = true,
+  recordingDuration?: number
 ): Promise<TranscriptionResult> {
   try {
     if (!base64Audio) {
@@ -35,15 +36,19 @@ export async function sendAudioForTranscription(
     console.log(`[TranscriptionService] Sending audio for ${directTranscription ? 'direct' : 'full'} transcription processing`);
     console.log(`[TranscriptionService] Audio data size: ${base64Audio.length} characters`);
     console.log('[TranscriptionService] User ID provided:', userId ? 'Yes' : 'No');
+    console.log('[TranscriptionService] Recording duration:', recordingDuration, 'ms');
 
     // Check if base64Audio is valid
     if (typeof base64Audio !== 'string' || base64Audio.length < 50) {
       throw new Error('Invalid audio data format');
     }
 
-    // Calculate estimated recording time based on audio data size
-    const estimatedDuration = Math.floor(base64Audio.length / 10000);
-    console.log(`[TranscriptionService] Estimated recording duration: ~${estimatedDuration}s`);
+    // Calculate estimated recording time if not provided
+    const estimatedDuration = recordingDuration || Math.floor(base64Audio.length / 10000);
+    console.log(`[TranscriptionService] Using duration: ${estimatedDuration}ms (${recordingDuration ? 'provided' : 'estimated'})`);
+
+    // Get user's timezone if available
+    const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
 
     // Log the request parameters for debugging
     console.log('[TranscriptionService] Request parameters:', {
@@ -51,7 +56,8 @@ export async function sendAudioForTranscription(
       directTranscription,
       highQuality: processSentiment,
       audioSize: base64Audio.length,
-      estimatedDuration: estimatedDuration * 1000
+      recordingTime: estimatedDuration,
+      timezone
     });
 
     // Invoke the edge function with corrected parameter names
@@ -64,8 +70,11 @@ export async function sendAudioForTranscription(
         userId,
         directTranscription,
         highQuality: processSentiment,
-        recordingTime: estimatedDuration * 1000 // Convert to milliseconds
+        recordingTime: estimatedDuration // Pass the duration to the edge function
       },
+      headers: {
+        'x-timezone': timezone // Pass timezone in headers
+      }
     });
     
     const elapsed = Date.now() - startTime;

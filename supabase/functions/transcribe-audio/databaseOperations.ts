@@ -1,4 +1,3 @@
-
 import { SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2.38.4';
 import { v4 as uuidv4 } from 'https://deno.land/std@0.168.0/uuid/mod.ts';
 import { Configuration, OpenAIApi } from "https://esm.sh/openai@3.2.1";
@@ -35,7 +34,7 @@ export async function createProfileIfNeeded(supabase: SupabaseClient, userId: st
       .eq('id', userId)
       .single();
 
-    if (error && error.status !== 406) {
+    if (error && error.code !== 'PGRST116') {
       console.error('Error checking profile:', error);
       throw error;
     }
@@ -43,19 +42,11 @@ export async function createProfileIfNeeded(supabase: SupabaseClient, userId: st
     // If profile doesn't exist, create one
     if (!data) {
       console.log('Creating profile for user:', userId);
-      const { data: userData, error: userError } = await supabase.auth.getUser();
-      if (userError) {
-        throw userError;
-      }
-
       const { error: insertError } = await supabase
         .from('profiles')
         .insert([{
           id: userId,
-          email: userData.user?.email,
-          full_name: userData.user?.user_metadata?.full_name || '',
-          avatar_url: userData.user?.user_metadata?.avatar_url || '',
-          timezone: timezone || 'UTC', // Use provided timezone or default to UTC
+          timezone: timezone || 'UTC',
           onboarding_completed: false
         }]);
 
@@ -94,18 +85,18 @@ export async function createProfileIfNeeded(supabase: SupabaseClient, userId: st
 }
 
 /**
- * Extracts themes from text using a simple regex
+ * Extracts themes from text and triggers comprehensive theme generation
  */
 export async function extractThemes(supabase: SupabaseClient, text: string, entryId: number) {
   try {
-    // Basic regex-based theme extraction
-    const themeRegex = /\b(anxiety|stress|happiness|joy|sadness|anger|fear|love|gratitude|health|work|relationships)\b/gi;
+    // Basic regex-based theme extraction for immediate storage
+    const themeRegex = /\b(anxiety|stress|happiness|joy|sadness|anger|fear|love|gratitude|health|work|relationships|family|friends|career|money|finance|exercise|fitness|travel|food|sleep|weather|nature|music|art|creativity|learning|growth|spirituality|meditation|mindfulness|goals|achievement|success|failure|challenge|problem|solution|hope|worry|excitement|peace|calm|energy|tired|motivation|inspiration|reflection|memory|future|past|present)\b/gi;
     const matches = text.match(themeRegex);
     const themes = [...new Set(matches ? matches.map(theme => theme.toLowerCase()) : [])];
 
     console.log(`Extracted themes: ${themes.join(', ')}`);
 
-    // Store themes in the database
+    // Store themes in the database immediately if any were found
     if (themes.length > 0) {
       const { error } = await supabase
         .from('Journal Entries')
@@ -114,10 +105,12 @@ export async function extractThemes(supabase: SupabaseClient, text: string, entr
 
       if (error) {
         console.error('Error storing themes in database:', error);
+      } else {
+        console.log('Basic themes stored successfully');
       }
     }
     
-    // Now trigger the more comprehensive theme generation
+    // Trigger the comprehensive theme generation edge function
     try {
       console.log(`Triggering comprehensive theme generation for entry ${entryId}`);
       
@@ -142,7 +135,7 @@ export async function extractThemes(supabase: SupabaseClient, text: string, entr
 }
 
 /**
- * Stores a journal entry in the database
+ * Stores a journal entry in the database and triggers related processing
  */
 export async function storeJournalEntry(
   supabase: SupabaseClient,
@@ -177,7 +170,7 @@ export async function storeJournalEntry(
       created_at: new Date().toISOString()
     };
 
-    console.log('[storeJournalEntry] Attempting to insert entry:', JSON.stringify(entry, null, 2));
+    console.log('[storeJournalEntry] Attempting to insert entry');
 
     const { data, error } = await supabase
       .from('Journal Entries')
@@ -192,7 +185,7 @@ export async function storeJournalEntry(
 
     console.log('[storeJournalEntry] Successfully stored entry with ID:', data.id);
     
-    // Trigger entity extraction
+    // Trigger entity extraction - this was missing from the inline version
     try {
       console.log(`[storeJournalEntry] Triggering entity extraction for entry ${data.id}`);
       
@@ -246,12 +239,10 @@ export async function storeJournalEntry(
 export async function storeEmbedding(supabase: SupabaseClient, entryId: number, content: string, embedding: number[]) {
   try {
     const { error } = await supabase
-      .from('embeddings')
-      .insert([{
+      .rpc('upsert_journal_embedding', {
         entry_id: entryId,
-        content: content,
-        embedding: embedding
-      }]);
+        embedding_vector: embedding
+      });
 
     if (error) {
       console.error('Error storing embedding:', error);

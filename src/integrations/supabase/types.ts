@@ -1082,6 +1082,10 @@ export type Database = {
         Args: { p_session_id: string; p_page?: string; p_language?: string }
         Returns: undefined
       }
+      upsert_journal_embedding: {
+        Args: { entry_id: number; embedding_vector: string }
+        Returns: undefined
+      }
     }
     Enums: {
       [_ in never]: never

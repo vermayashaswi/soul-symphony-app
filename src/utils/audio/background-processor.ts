@@ -11,9 +11,11 @@ import { getEntryIdForProcessingId, setEntryIdForProcessingId } from '../audio-p
 export async function processRecordingInBackground(
   audioBlob: Blob,
   userId: string | undefined,
-  tempId: string
+  tempId: string,
+  recordingDuration?: number
 ): Promise<{ success: boolean; entryId?: number; error?: string }> {
   console.log('[BackgroundProcessor] Starting background processing for tempId:', tempId);
+  console.log('[BackgroundProcessor] Recording duration:', recordingDuration, 'ms');
   
   try {
     // Convert blob to base64
@@ -26,13 +28,14 @@ export async function processRecordingInBackground(
     
     console.log(`[BackgroundProcessor] Successfully converted audio to base64, length: ${base64Audio.length}`);
     
-    // Send to transcription service
+    // Send to transcription service with recording duration
     console.log('[BackgroundProcessor] Sending audio to transcription service');
     const transcriptionResult = await sendAudioForTranscription(
       base64Audio, 
       userId,
       false,
-      true
+      true,
+      recordingDuration
     );
     
     if (!transcriptionResult.success) {
