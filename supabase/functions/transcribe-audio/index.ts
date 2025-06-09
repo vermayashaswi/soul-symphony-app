@@ -1,3 +1,4 @@
+
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { corsHeaders } from '../_shared/cors.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.38.4';
@@ -183,6 +184,12 @@ async function validateAndParseRequest(req: Request): Promise<{
   
   console.log('[Transcribe] Request validation - Content-Type:', contentType, 'Content-Length:', contentLength);
   
+  // Enhanced empty body detection
+  if (contentLength === '0' || contentLength === null) {
+    console.error('[Transcribe] Request has no content length or zero content length');
+    throw new Error('Request body is empty - no audio data provided');
+  }
+  
   // Check request size
   if (contentLength && parseInt(contentLength) > MAX_REQUEST_SIZE) {
     throw new Error(`Request too large: ${contentLength} bytes (max: ${MAX_REQUEST_SIZE})`);
@@ -197,11 +204,6 @@ async function validateAndParseRequest(req: Request): Promise<{
     if (contentType.includes('application/json')) {
       console.log('[Transcribe] Processing JSON request');
       
-      // Enhanced empty body detection
-      if (contentLength === '0') {
-        throw new Error('Request body is empty - no audio data provided');
-      }
-      
       // Read the request body with comprehensive error handling
       let bodyText: string;
       try {
@@ -215,7 +217,8 @@ async function validateAndParseRequest(req: Request): Promise<{
         length: bodyText.length,
         isEmpty: !bodyText || bodyText.trim() === '',
         startsWithBrace: bodyText.trim().startsWith('{'),
-        endsWithBrace: bodyText.trim().endsWith('}')
+        endsWithBrace: bodyText.trim().endsWith('}'),
+        preview: bodyText.substring(0, 100)
       });
       
       if (!bodyText || bodyText.trim() === '') {

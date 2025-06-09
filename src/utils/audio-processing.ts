@@ -1,11 +1,10 @@
-
 /**
  * Main audio processing module
  * Orchestrates the audio recording and transcription process
  */
 import { clearAllToasts, ensureAllToastsCleared } from '@/services/notificationService';
-import { blobToBase64 } from './audio/blob-utils';
-import { supabase } from '@/integrations/supabase/client';
+import { blobToBase64, validatePayloadSize } from './audio/blob-utils';
+import { transcribeAudio } from './audio/transcription-service';
 import { processingStateManager, EntryProcessingState } from './journal/processing-state-manager';
 
 // Refactored from original processing-state.ts to simplify
@@ -128,7 +127,7 @@ export async function processRecording(audioBlob: Blob | null, userId: string | 
     };
   }
   
-  // Test base64 conversion before proceeding
+  // Test base64 conversion and payload validation before proceeding
   try {
     console.log('[AudioProcessing] Testing base64 conversion...');
     const dataUrl = await blobToBase64(audioBlob!);
@@ -173,8 +172,26 @@ export async function processRecording(audioBlob: Blob | null, userId: string | 
       };
     }
     
+    // Test payload size validation
+    const testPayload = {
+      audio: dataUrl,
+      userId,
+      recordingTime: (audioBlob as any).duration || 0,
+      highQuality: true
+    };
+    
+    const sizeValidation = validatePayloadSize(testPayload);
+    console.log('[AudioProcessing] Payload size validation:', sizeValidation);
+    
+    if (!sizeValidation.isValid) {
+      return {
+        success: false,
+        error: sizeValidation.errorMessage || 'Audio data too large for processing'
+      };
+    }
+    
   } catch (error) {
-    console.error('[AudioProcessing] Base64 conversion failed:', error);
+    console.error('[AudioProcessing] Pre-processing validation failed:', error);
     return {
       success: false,
       error: 'Error preparing audio data for processing'
@@ -206,7 +223,7 @@ export async function processRecording(audioBlob: Blob | null, userId: string | 
     });
     
     // Launch the processing without awaiting it
-    console.log('[AudioProcessing] Launching background processing');
+    console.log('[AudioProcessing] Launching background processing using transcription service');
     processRecordingInBackground(audioBlob!, userId, tempId)
       .then(result => {
         console.log('[AudioProcessing] Background processing completed:', result);
@@ -256,7 +273,7 @@ export async function processRecording(audioBlob: Blob | null, userId: string | 
 
 /**
  * Process recording in a separate function that can be executed async
- * This is the part that makes the API call and waits for the response
+ * This uses the new transcription service for better reliability
  */
 async function processRecordingInBackground(
   audioBlob: Blob,
@@ -264,15 +281,7 @@ async function processRecordingInBackground(
   tempId: string
 ): Promise<{ success: boolean; entryId?: number; error?: string }> {
   try {
-    console.log(`[AudioProcessing] Background processing started for ${tempId}`);
-    
-    // Convert the blob to complete data URL
-    const dataUrl = await blobToBase64(audioBlob);
-    console.log(`[AudioProcessing] Data URL conversion complete:`, {
-      length: dataUrl.length,
-      prefix: dataUrl.substring(0, 50),
-      hasBase64Marker: dataUrl.includes('base64,')
-    });
+    console.log(`[AudioProcessing] Background processing started for ${tempId} using transcription service`);
     
     // Get the duration of the audio
     let recordingTime = 0;
@@ -280,74 +289,29 @@ async function processRecordingInBackground(
       recordingTime = Math.round((audioBlob as any).duration * 1000);
     }
     
-    // Get the current session for authorization
-    const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-    
-    if (sessionError) {
-      console.error(`[AudioProcessing] Session error for ${tempId}:`, sessionError);
-      throw new Error(`Authentication error: ${sessionError.message}`);
-    }
-    
-    const accessToken = session?.access_token;
-    
-    if (!accessToken) {
-      console.error(`[AudioProcessing] No access token found for ${tempId}`);
-      throw new Error('No valid session found - please log in again');
-    }
-    
-    // Prepare the payload with the complete data URL
-    const payload = {
-      audio: dataUrl, // Send complete data URL
-      userId,
+    console.log(`[AudioProcessing] Calling transcription service for ${tempId}`, {
+      blobSize: audioBlob.size,
+      blobType: audioBlob.type,
       recordingTime,
-      highQuality: true
-    };
-    
-    // Validate payload before sending
-    if (!payload.audio || payload.audio.length < 100) {
-      throw new Error('Invalid audio data in payload');
-    }
-    
-    if (!payload.userId) {
-      throw new Error('Missing userId in payload');
-    }
-    
-    console.log(`[AudioProcessing] Calling transcribe-audio Edge Function for ${tempId}`, {
-      audioLength: payload.audio.length,
-      userId: payload.userId,
-      recordingTime: payload.recordingTime,
-      audioPrefix: payload.audio.substring(0, 50)
+      userId
     });
     
-    // Call the Supabase Edge Function with retry logic
+    // Use the transcription service with retry logic
     const result = await withRetry(async () => {
-      const { data, error } = await supabase.functions.invoke('transcribe-audio', {
-        body: payload,
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${accessToken}`
-        }
-      });
-      
-      if (error) {
-        console.error(`[AudioProcessing] Edge function error for ${tempId}:`, error);
-        throw new Error(`Server error: ${error.message || 'Unknown error'}`);
-      }
-      
-      if (!data) {
-        console.error(`[AudioProcessing] No data returned from edge function for ${tempId}`);
-        throw new Error('No response from server - please try again');
-      }
-      
-      return data;
+      return await transcribeAudio(audioBlob, userId);
     }, 3, 2000);
     
-    console.log(`[AudioProcessing] Edge function success for ${tempId}:`, {
+    console.log(`[AudioProcessing] Transcription service result for ${tempId}:`, {
+      success: result.success,
       entryId: result.entryId,
-      transcriptionLength: result.transcription?.length || 0,
+      hasTranscription: !!result.transcription,
       hasRefinedText: !!result.refinedText,
-      processingTime: result.processingTime
+      error: result.error
     });
+    
+    if (!result.success) {
+      throw new Error(result.error || 'Transcription service failed');
+    }
     
     // Update the state manager with the entry ID
     if (result.entryId) {
@@ -402,6 +366,8 @@ async function processRecordingInBackground(
       userFriendlyError = 'Session expired - please log in again';
     } else if (error.message?.includes('audio') || error.message?.includes('base64')) {
       userFriendlyError = 'Audio format error - please try recording again';
+    } else if (error.message?.includes('too large')) {
+      userFriendlyError = 'Audio file too large - please record a shorter message';
     }
     
     processingStateManager.updateEntryState(tempId, EntryProcessingState.ERROR, userFriendlyError);

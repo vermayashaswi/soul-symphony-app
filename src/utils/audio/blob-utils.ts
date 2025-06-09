@@ -126,3 +126,63 @@ export async function normalizeAudioBlob(blob: Blob): Promise<Blob> {
   
   return normalizedBlob;
 }
+
+/**
+ * Calculate the byte length of a string when encoded as UTF-8
+ * @param str The string to measure
+ * @returns The byte length
+ */
+export function getUtf8ByteLength(str: string): number {
+  // Use TextEncoder for accurate UTF-8 byte length calculation
+  return new TextEncoder().encode(str).length;
+}
+
+/**
+ * Validate payload size before sending to edge function
+ * @param payload The payload object to validate
+ * @returns Validation result with size information
+ */
+export function validatePayloadSize(payload: any): {
+  isValid: boolean;
+  sizeBytes: number;
+  sizeMB: number;
+  errorMessage?: string;
+} {
+  try {
+    const payloadString = JSON.stringify(payload);
+    const sizeBytes = getUtf8ByteLength(payloadString);
+    const sizeMB = sizeBytes / (1024 * 1024);
+    
+    console.log('[PayloadValidation] Payload size:', {
+      sizeBytes,
+      sizeMB: sizeMB.toFixed(2),
+      audioLength: payload.audio?.length || 0
+    });
+    
+    // Check against 25MB limit (with some buffer)
+    const maxSizeBytes = 24 * 1024 * 1024; // 24MB to leave buffer
+    
+    if (sizeBytes > maxSizeBytes) {
+      return {
+        isValid: false,
+        sizeBytes,
+        sizeMB,
+        errorMessage: `Payload too large: ${sizeMB.toFixed(2)}MB (max: 24MB)`
+      };
+    }
+    
+    return {
+      isValid: true,
+      sizeBytes,
+      sizeMB
+    };
+  } catch (error) {
+    console.error('[PayloadValidation] Error validating payload size:', error);
+    return {
+      isValid: false,
+      sizeBytes: 0,
+      sizeMB: 0,
+      errorMessage: `Error validating payload: ${error.message}`
+    };
+  }
+}

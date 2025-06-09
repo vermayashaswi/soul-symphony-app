@@ -1,103 +1,142 @@
 
 import { supabase } from '@/integrations/supabase/client';
-import { storeJournalEmbedding } from '@/services/journalEntryService';
-import { toast } from 'sonner';
+import { blobToBase64, validatePayloadSize, getUtf8ByteLength } from './blob-utils';
 
-export interface TranscriptionResult {
+/**
+ * Transcribe audio using the Supabase edge function with enhanced error handling
+ */
+export async function transcribeAudio(
+  audioBlob: Blob,
+  userId: string
+): Promise<{
   success: boolean;
   entryId?: number;
   transcription?: string;
   refinedText?: string;
-  audioUrl?: string;
-  duration?: number;
-  sentiment?: string;
-  emotions?: any;
-  entities?: any;
-  themes?: string[];
   error?: string;
-}
-
-export async function transcribeAudio(
-  audioBlob: Blob, 
-  userId: string,
-  onProgress?: (stage: string) => void
-): Promise<TranscriptionResult> {
+}> {
   try {
-    console.log('[TranscriptionService] Starting transcription for user:', userId);
+    console.log('[TranscriptionService] Starting transcription process');
     
-    if (onProgress) onProgress('Preparing audio...');
-
-    // Validate user authentication
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user || user.id !== userId) {
-      throw new Error('User not authenticated');
-    }
-
-    // Create FormData for the request
-    const formData = new FormData();
-    formData.append('audio', audioBlob, 'recording.webm');
-    formData.append('userId', userId);
-
-    if (onProgress) onProgress('Uploading and transcribing...');
-
-    // Call the transcribe-audio edge function
-    const { data, error } = await supabase.functions.invoke('transcribe-audio', {
-      body: formData,
+    // Convert blob to base64 data URL
+    const dataUrl = await blobToBase64(audioBlob);
+    console.log('[TranscriptionService] Audio converted to data URL:', {
+      dataUrlLength: dataUrl.length,
+      blobSize: audioBlob.size,
+      hasPrefix: dataUrl.startsWith('data:')
     });
-
+    
+    // Get recording duration
+    let recordingTime = 0;
+    if ('duration' in audioBlob) {
+      recordingTime = Math.round((audioBlob as any).duration * 1000);
+    }
+    
+    // Prepare the payload
+    const payload = {
+      audio: dataUrl,
+      userId,
+      recordingTime,
+      highQuality: true
+    };
+    
+    // Validate payload size before sending
+    const sizeValidation = validatePayloadSize(payload);
+    console.log('[TranscriptionService] Payload validation:', sizeValidation);
+    
+    if (!sizeValidation.isValid) {
+      throw new Error(sizeValidation.errorMessage || 'Payload validation failed');
+    }
+    
+    // Convert payload to JSON string for size calculation
+    const payloadString = JSON.stringify(payload);
+    const payloadSizeBytes = getUtf8ByteLength(payloadString);
+    
+    console.log('[TranscriptionService] Making request to transcribe-audio:', {
+      payloadSizeBytes,
+      payloadSizeMB: (payloadSizeBytes / (1024 * 1024)).toFixed(2),
+      audioDataLength: payload.audio.length,
+      userId: payload.userId,
+      recordingTime: payload.recordingTime
+    });
+    
+    // Get current session for proper authorization
+    const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+    
+    if (sessionError) {
+      console.error('[TranscriptionService] Session error:', sessionError);
+      throw new Error(`Authentication error: ${sessionError.message}`);
+    }
+    
+    if (!session?.access_token) {
+      throw new Error('No valid session found - please log in again');
+    }
+    
+    // Make the request with explicit headers and retry logic
+    console.log('[TranscriptionService] Invoking edge function with session token');
+    
+    const startTime = Date.now();
+    const { data, error } = await supabase.functions.invoke('transcribe-audio', {
+      body: payload,
+      headers: {
+        'Content-Type': 'application/json',
+        'Content-Length': payloadSizeBytes.toString(),
+        'Authorization': `Bearer ${session.access_token}`,
+        'X-Client-Info': 'supabase-js-web/2.49.1'
+      }
+    });
+    
+    const requestTime = Date.now() - startTime;
+    console.log('[TranscriptionService] Edge function response received:', {
+      requestTimeMs: requestTime,
+      hasData: !!data,
+      hasError: !!error,
+      errorMessage: error?.message
+    });
+    
     if (error) {
       console.error('[TranscriptionService] Edge function error:', error);
-      throw new Error(error.message || 'Transcription failed');
+      throw new Error(`Server error: ${error.message || 'Unknown error from transcription service'}`);
     }
-
-    if (!data.success) {
-      console.error('[TranscriptionService] Transcription failed:', data.error);
-      throw new Error(data.error || 'Transcription failed');
+    
+    if (!data) {
+      console.error('[TranscriptionService] No data returned from edge function');
+      throw new Error('No response from transcription service');
     }
-
+    
     console.log('[TranscriptionService] Transcription successful:', {
       entryId: data.entryId,
-      transcriptionLength: data.transcription?.length,
+      hasTranscription: !!data.transcription,
       hasRefinedText: !!data.refinedText,
-      duration: data.duration,
-      sentiment: data.sentiment,
-      themesCount: data.themes?.length
+      processingTime: data.processingTime
     });
-
-    if (onProgress) onProgress('Completing...');
-
+    
     return {
       success: true,
       entryId: data.entryId,
       transcription: data.transcription,
-      refinedText: data.refinedText,
-      audioUrl: data.audioUrl,
-      duration: data.duration,
-      sentiment: data.sentiment,
-      emotions: data.emotions,
-      entities: data.entities,
-      themes: data.themes,
+      refinedText: data.refinedText
     };
-
-  } catch (error: any) {
-    console.error('[TranscriptionService] Error:', error);
     
-    // Show user-friendly error message
-    const errorMessage = error.message || 'Failed to process audio recording';
-    toast.error(errorMessage);
+  } catch (error: any) {
+    console.error('[TranscriptionService] Error in transcription:', error);
+    
+    // Provide user-friendly error messages
+    let userFriendlyError = 'Failed to transcribe audio - please try again';
+    
+    if (error.message?.includes('network') || error.message?.includes('fetch')) {
+      userFriendlyError = 'Network error - please check your connection';
+    } else if (error.message?.includes('auth') || error.message?.includes('session')) {
+      userFriendlyError = 'Session expired - please log in again';
+    } else if (error.message?.includes('too large') || error.message?.includes('size')) {
+      userFriendlyError = 'Audio file too large - please record a shorter message';
+    } else if (error.message?.includes('empty') || error.message?.includes('invalid')) {
+      userFriendlyError = 'Invalid audio data - please try recording again';
+    }
     
     return {
       success: false,
-      error: errorMessage,
+      error: userFriendlyError
     };
   }
-}
-
-// Legacy function for backward compatibility
-export async function processAudioRecording(
-  audioBlob: Blob,
-  userId: string,
-  onProgress?: (stage: string) => void
-): Promise<TranscriptionResult> {
-  return transcribeAudio(audioBlob, userId, onProgress);
 }
