@@ -22,6 +22,7 @@ import { useIsMobile } from '@/hooks/use-mobile';
 import { Separator } from '@/components/ui/separator';
 import { useAuth } from '@/contexts/AuthContext';
 import { TranslatableText } from '@/components/translation/TranslatableText';
+import { format, eachDayOfInterval, startOfWeek, endOfWeek, startOfMonth, endOfMonth, startOfYear, endOfYear, parseISO, isValid } from 'date-fns';
 
 type EmotionData = {
   day: string;
@@ -78,13 +79,70 @@ const getEmotionColor = (emotion: string, index: number): string => {
   
   // More diverse fallback colors - completely different hues
   const fallbackColors = [
-    '#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4', '#FFEAA7', 
-    '#DDA0DD', '#FF7675', '#FD79A8', '#FDCB6E', '#E84393', 
-    '#A29BFE', '#00B894', '#6C5CE7', '#74B9FF', '#E17055', 
-    '#00CEC9', '#81ECEC', '#FAB1A0', '#636E72', '#55A3FF'
+    '#FF6B6B', // Coral Red
+    '#4ECDC4', // Teal
+    '#45B7D1', // Sky Blue
+    '#96CEB4', // Mint Green
+    '#FFEAA7', // Light Yellow
+    '#DDA0DD', // Plum
+    '#FF7675', // Light Red
+    '#FD79A8', // Pink
+    '#FDCB6E', // Orange
+    '#E84393', // Magenta
+    '#A29BFE', // Lavender
+    '#00B894', // Emerald
+    '#6C5CE7', // Purple
+    '#74B9FF', // Light Blue
+    '#E17055', // Salmon
+    '#00CEC9', // Turquoise
+    '#81ECEC', // Cyan
+    '#FAB1A0', // Peach
+    '#636E72', // Gray
+    '#55A3FF'  // Bright Blue
   ];
   
   return fallbackColors[index % fallbackColors.length];
+};
+
+const getDateRangeForTimeframe = (timeframe: TimeRange) => {
+  const now = new Date();
+  
+  switch (timeframe) {
+    case 'today':
+      return { start: now, end: now };
+    case 'week':
+      return {
+        start: startOfWeek(now, { weekStartsOn: 1 }), // Start on Monday
+        end: endOfWeek(now, { weekStartsOn: 1 })
+      };
+    case 'month':
+      return {
+        start: startOfMonth(now),
+        end: endOfMonth(now)
+      };
+    case 'year':
+      return {
+        start: startOfYear(now),
+        end: endOfYear(now)
+      };
+    default:
+      return { start: now, end: now };
+  }
+};
+
+const formatDateForDisplay = (date: Date, timeframe: TimeRange): string => {
+  switch (timeframe) {
+    case 'today':
+      return format(date, 'HH:mm');
+    case 'week':
+      return format(date, 'EEE dd');
+    case 'month':
+      return format(date, 'MMM dd');
+    case 'year':
+      return format(date, 'MMM');
+    default:
+      return format(date, 'MMM dd');
+  }
 };
 
 export function EmotionChart({ 
@@ -92,8 +150,7 @@ export function EmotionChart({
   timeframe = 'week',
   aggregatedData 
 }: EmotionChartProps) {
-  // Set default chart type to 'line' to show mood trends by default
-  const [chartType, setChartType] = useState<ChartType>('line');
+  const [chartType, setChartType] = useState<ChartType>('bubble');
   const [bubbleKey, setBubbleKey] = useState(0); 
   const [selectedEmotionInfo, setSelectedEmotionInfo] = useState<{name: string, percentage: number} | null>(null);
   const [visibleEmotions, setVisibleEmotions] = useState<string[]>([]);
@@ -107,21 +164,9 @@ export function EmotionChart({
   const { user } = useAuth();
   
   const chartTypes = [
-    { id: 'line', label: 'Mood Trends' },
+    { id: 'line', label: 'Emotions' },
     { id: 'bubble', label: 'Life Areas' },
   ];
-
-  // Debug logging for data flow
-  useEffect(() => {
-    console.log('[EmotionChart] Debug - Component mounted with props:', {
-      timeframe,
-      hasAggregatedData: !!aggregatedData,
-      aggregatedDataKeys: aggregatedData ? Object.keys(aggregatedData) : [],
-      aggregatedDataLength: aggregatedData ? Object.keys(aggregatedData).length : 0,
-      chartType,
-      visibleEmotions
-    });
-  }, [timeframe, aggregatedData, chartType, visibleEmotions]);
   
   const bubbleData = useMemo(() => {
     if (!aggregatedData || Object.keys(aggregatedData).length === 0) {
@@ -211,39 +256,19 @@ export function EmotionChart({
   };
   
   const lineData = useMemo(() => {
-    console.log('[EmotionChart] Computing line data with aggregatedData:', aggregatedData);
-    
     if (!aggregatedData || Object.keys(aggregatedData).length === 0) {
-      console.log('[EmotionChart] No aggregated data for line chart');
       return [];
     }
     
+    console.log('[EmotionChart] Processing line data for timeframe:', timeframe);
+    
+    // Calculate emotion totals to determine top emotions
     const emotionTotals: Record<string, number> = {};
-    
-    // Create a map for each unique date
-    const dateMap = new Map<string, Map<string, {total: number, count: number}>>();
-    
     Object.entries(aggregatedData).forEach(([emotion, dataPoints]) => {
       let totalValue = 0;
-      
       dataPoints.forEach(point => {
-        if (!dateMap.has(point.date)) {
-          dateMap.set(point.date, new Map());
-        }
-        
-        const dateEntry = dateMap.get(point.date)!;
-        
-        if (!dateEntry.has(emotion)) {
-          dateEntry.set(emotion, { total: 0, count: 0 });
-        }
-        
-        const emotionEntry = dateEntry.get(emotion)!;
-        emotionEntry.total += point.value;
-        emotionEntry.count += 1;
-        
         totalValue += point.value;
       });
-      
       if (totalValue > 0) {
         emotionTotals[emotion] = totalValue;
       }
@@ -254,60 +279,130 @@ export function EmotionChart({
       .slice(0, 5)
       .map(([emotion]) => emotion);
     
-    console.log('[EmotionChart] Top emotions for line chart:', topEmotions);
+    if (topEmotions.length === 0) {
+      return [];
+    }
     
-    const mostDominantEmotion = topEmotions[0] || '';
-    
-    // Auto-select the most dominant emotion for line chart
+    // Set default visible emotion if none selected
+    const mostDominantEmotion = topEmotions[0];
     if (chartType === 'line' && visibleEmotions.length === 0 && mostDominantEmotion) {
-      console.log('[EmotionChart] Auto-selecting dominant emotion:', mostDominantEmotion);
       setVisibleEmotions([mostDominantEmotion]);
     }
     
-    // Create data points for each date
-    const result = Array.from(dateMap.entries())
-      .map(([date, emotions]) => {
-        // Format date based on timeframe
-        let formattedDay = '';
-        const dateObj = new Date(date);
+    // Get the date range for the timeframe
+    const { start: rangeStart, end: rangeEnd } = getDateRangeForTimeframe(timeframe);
+    
+    // For 'today', we don't generate a date range since it's hourly data
+    if (timeframe === 'today') {
+      // Process existing logic for today view
+      const dateMap = new Map<string, Map<string, {total: number, count: number}>>();
+      
+      Object.entries(aggregatedData).forEach(([emotion, dataPoints]) => {
+        dataPoints.forEach(point => {
+          if (!dateMap.has(point.date)) {
+            dateMap.set(point.date, new Map());
+          }
+          
+          const dateEntry = dateMap.get(point.date)!;
+          if (!dateEntry.has(emotion)) {
+            dateEntry.set(emotion, { total: 0, count: 0 });
+          }
+          
+          const emotionEntry = dateEntry.get(emotion)!;
+          emotionEntry.total += point.value;
+          emotionEntry.count += 1;
+        });
+      });
+      
+      return Array.from(dateMap.entries())
+        .map(([date, emotions]) => {
+          const dataPoint: EmotionData = { 
+            day: new Date(date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) 
+          };
+          
+          topEmotions.forEach(emotion => {
+            const emotionData = emotions.get(emotion);
+            if (emotionData && emotionData.count > 0) {
+              let avgValue = emotionData.total / emotionData.count;
+              if (avgValue > 1.0) avgValue = 1.0;
+              dataPoint[emotion] = parseFloat(avgValue.toFixed(2));
+            } else {
+              dataPoint[emotion] = null;
+            }
+          });
+          
+          return dataPoint;
+        })
+        .sort((a, b) => {
+          const dateA = new Date(a.day);
+          const dateB = new Date(b.day);
+          return dateA.getTime() - dateB.getTime();
+        });
+    }
+    
+    // Generate complete date range for week, month, and year
+    const allDates = eachDayOfInterval({ start: rangeStart, end: rangeEnd });
+    
+    // Create a map of dates to emotion data from aggregatedData
+    const dataByDate = new Map<string, Map<string, {total: number, count: number}>>();
+    const journalDates = new Set<string>(); // Track which dates have journal entries
+    
+    Object.entries(aggregatedData).forEach(([emotion, dataPoints]) => {
+      dataPoints.forEach(point => {
+        const dateStr = point.date;
+        journalDates.add(dateStr);
         
-        if (timeframe === 'month') {
-          // For month view, show day number only (e.g., "1", "2", "15")
-          formattedDay = dateObj.getDate().toString();
-        } else {
-          // For other views, show month and day (e.g., "Jan 1", "Dec 25")
-          formattedDay = dateObj.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+        if (!dataByDate.has(dateStr)) {
+          dataByDate.set(dateStr, new Map());
         }
         
-        const dataPoint: EmotionData = { day: formattedDay };
+        const dateEntry = dataByDate.get(dateStr)!;
+        if (!dateEntry.has(emotion)) {
+          dateEntry.set(emotion, { total: 0, count: 0 });
+        }
         
-        topEmotions.forEach(emotion => {
-          const emotionData = emotions.get(emotion);
-          if (emotionData && emotionData.count > 0) {
-            let avgValue = emotionData.total / emotionData.count;
-            if (avgValue > 1.0) avgValue = 1.0;
-            dataPoint[emotion] = parseFloat(avgValue.toFixed(2));
-          } else {
-            dataPoint[emotion] = null;
-          }
-        });
+        const emotionEntry = dateEntry.get(emotion)!;
+        emotionEntry.total += point.value;
+        emotionEntry.count += 1;
+      });
+    });
+    
+    // Generate the complete dataset
+    const result = allDates.map(date => {
+      const dateStr = format(date, 'yyyy-MM-dd');
+      const hasJournalEntry = journalDates.has(dateStr);
+      
+      const dataPoint: EmotionData = {
+        day: formatDateForDisplay(date, timeframe)
+      };
+      
+      topEmotions.forEach(emotion => {
+        const emotionData = dataByDate.get(dateStr)?.get(emotion);
         
-        return dataPoint;
-      })
-      .sort((a, b) => {
-        // Sort by date for proper chronological order
-        if (timeframe === 'month') {
-          // For month view, sort by day number
-          return parseInt(a.day) - parseInt(b.day);
+        if (emotionData && emotionData.count > 0) {
+          // Day has this emotion data - show actual value
+          let avgValue = emotionData.total / emotionData.count;
+          if (avgValue > 1.0) avgValue = 1.0;
+          dataPoint[emotion] = parseFloat(avgValue.toFixed(2));
+        } else if (hasJournalEntry) {
+          // Day has journal entries but not this specific emotion - show 0
+          dataPoint[emotion] = 0;
         } else {
-          // For other views, sort by full date
-          const dateA = new Date(`${new Date().getFullYear()} ${a.day}`);
-          const dateB = new Date(`${new Date().getFullYear()} ${b.day}`);
-          return dateA.getTime() - dateB.getTime();
+          // Day has no journal entries at all - use null to hide from chart
+          dataPoint[emotion] = null;
         }
       });
+      
+      return dataPoint;
+    });
     
-    console.log('[EmotionChart] Final line data:', result);
+    console.log('[EmotionChart] Generated line data:', {
+      timeframe,
+      totalDays: result.length,
+      topEmotions,
+      sampleData: result.slice(0, 3)
+    });
+    
     return result;
   }, [aggregatedData, visibleEmotions, chartType, timeframe]);
 
@@ -338,12 +433,9 @@ export function EmotionChart({
   
   useEffect(() => {
     if (dominantEmotion && chartType === 'line' && visibleEmotions.length === 0) {
-      console.log('[EmotionChart] Setting visible emotions to dominant emotion:', dominantEmotion);
       setVisibleEmotions([dominantEmotion]);
     }
   }, [dominantEmotion, chartType, visibleEmotions.length]);
-
-  // ... keep existing code (EmotionLineLabel, handleLegendClick, CustomDot, CustomTooltip functions)
 
   const EmotionLineLabel = (props: any) => {
     const { x, y, stroke, value, index, data, dataKey } = props;
@@ -403,39 +495,22 @@ export function EmotionChart({
     const { active, payload, label }: any = props;
     
     if (active && payload && payload.length) {
-      // Filter out emotions with null values
-      const validEmotions = payload.filter((item: any) => item.value !== null && item.value !== undefined);
-      
-      if (validEmotions.length === 0) return null;
+      const emotionName = payload[0].dataKey.charAt(0).toUpperCase() + payload[0].dataKey.slice(1);
+      const value = payload[0].value;
       
       return (
-        <div className="bg-card/95 backdrop-blur-sm p-3 rounded-lg border shadow-md min-w-[200px]">
-          <p className="text-sm font-medium mb-2">{label}</p>
-          <div className="space-y-1">
-            {validEmotions.map((item: any, index: number) => {
-              const emotionName = item.dataKey.charAt(0).toUpperCase() + item.dataKey.slice(1);
-              return (
-                <div key={index} className="flex items-center justify-between gap-3">
-                  <div className="flex items-center gap-2">
-                    <div 
-                      className="w-2 h-2 rounded-full" 
-                      style={{ backgroundColor: item.stroke }}
-                    ></div>
-                    <span className="text-sm">
-                      <TranslatableText 
-                        text={emotionName} 
-                        forceTranslate={true}
-                        enableFontScaling={true}
-                        scalingContext="compact"
-                      />
-                    </span>
-                  </div>
-                  <span className="text-sm font-medium">
-                    {item.value?.toFixed(1) || 'N/A'}
-                  </span>
-                </div>
-              );
-            })}
+        <div className="bg-card/95 backdrop-blur-sm p-2 rounded-lg border shadow-md">
+          <p className="text-sm font-medium">{label}</p>
+          <div className="flex items-center gap-2">
+            <div className="w-2 h-2 rounded-full" style={{ backgroundColor: payload[0].stroke }}></div>
+            <p className="text-sm">
+              <TranslatableText 
+                text={emotionName} 
+                forceTranslate={true}
+                enableFontScaling={true}
+                scalingContext="compact"
+              />: {value?.toFixed(1) || 'N/A'}
+            </p>
           </div>
         </div>
       );
@@ -445,14 +520,7 @@ export function EmotionChart({
   };
 
   const renderLineChart = () => {
-    console.log('[EmotionChart] Rendering line chart with data:', {
-      lineDataLength: lineData.length,
-      visibleEmotions,
-      firstDataPoint: lineData[0]
-    });
-    
     if (lineData.length === 0) {
-      console.log('[EmotionChart] No line data available');
       return (
         <div className="flex items-center justify-center h-full">
           <p className="text-muted-foreground">
@@ -471,10 +539,7 @@ export function EmotionChart({
       .filter(key => key !== 'day')
       .filter(key => lineData.some(point => point[key] !== null));
     
-    console.log('[EmotionChart] All emotions for rendering:', allEmotions);
-    
     if (allEmotions.length === 0) {
-      console.log('[EmotionChart] No valid emotions found');
       return (
         <div className="flex items-center justify-center h-full">
           <p className="text-muted-foreground">
@@ -503,6 +568,7 @@ export function EmotionChart({
               fontSize={isMobile ? 10 : 12} 
               tickMargin={10}
               tick={{ fontSize: isMobile ? 10 : 12 }}
+              interval={timeframe === 'month' ? 4 : timeframe === 'year' ? 0 : 'preserveStartEnd'}
             />
             <YAxis 
               stroke="#888" 
@@ -526,7 +592,7 @@ export function EmotionChart({
                 name={emotion.charAt(0).toUpperCase() + emotion.slice(1)}
                 label={isMobile ? null : <EmotionLineLabel />}
                 hide={!visibleEmotions.includes(emotion)}
-                connectNulls={true}
+                connectNulls={false}
               />
             ))}
           </LineChart>
@@ -590,7 +656,7 @@ export function EmotionChart({
       <div className="flex flex-wrap justify-between items-center mb-4">
         <h3 className="text-xl font-semibold">
           <TranslatableText 
-            text="Emotions & Trends" 
+            text="TOP" 
             forceTranslate={true}
             enableFontScaling={true}
             scalingContext="general"
