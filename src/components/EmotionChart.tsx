@@ -220,6 +220,7 @@ export function EmotionChart({
     
     const emotionTotals: Record<string, number> = {};
     
+    // Create a map for each unique date
     const dateMap = new Map<string, Map<string, {total: number, count: number}>>();
     
     Object.entries(aggregatedData).forEach(([emotion, dataPoints]) => {
@@ -259,11 +260,22 @@ export function EmotionChart({
       setVisibleEmotions([mostDominantEmotion]);
     }
     
+    // Create data points for each date
     const result = Array.from(dateMap.entries())
       .map(([date, emotions]) => {
-        const dataPoint: EmotionData = { 
-          day: new Date(date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) 
-        };
+        // Format date based on timeframe
+        let formattedDay = '';
+        const dateObj = new Date(date);
+        
+        if (timeframe === 'month') {
+          // For month view, show day number only (e.g., "1", "2", "15")
+          formattedDay = dateObj.getDate().toString();
+        } else {
+          // For other views, show month and day (e.g., "Jan 1", "Dec 25")
+          formattedDay = dateObj.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+        }
+        
+        const dataPoint: EmotionData = { day: formattedDay };
         
         topEmotions.forEach(emotion => {
           const emotionData = emotions.get(emotion);
@@ -279,13 +291,20 @@ export function EmotionChart({
         return dataPoint;
       })
       .sort((a, b) => {
-        const dateA = new Date(a.day);
-        const dateB = new Date(b.day);
-        return dateA.getTime() - dateB.getTime();
+        // Sort by date for proper chronological order
+        if (timeframe === 'month') {
+          // For month view, sort by day number
+          return parseInt(a.day) - parseInt(b.day);
+        } else {
+          // For other views, sort by full date
+          const dateA = new Date(`${new Date().getFullYear()} ${a.day}`);
+          const dateB = new Date(`${new Date().getFullYear()} ${b.day}`);
+          return dateA.getTime() - dateB.getTime();
+        }
       });
     
     return result;
-  }, [aggregatedData, visibleEmotions, chartType]);
+  }, [aggregatedData, visibleEmotions, chartType, timeframe]);
 
   const dominantEmotion = useMemo(() => {
     if (!aggregatedData || Object.keys(aggregatedData).length === 0) {

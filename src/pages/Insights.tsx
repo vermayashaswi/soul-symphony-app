@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
 import { Calendar, TrendingUp, ArrowUp, ArrowDown, Activity, Award } from 'lucide-react';
@@ -140,19 +139,6 @@ function InsightsContent() {
       }, 100);
     }
   }, [loading, insightsData]);
-
-  const getSentimentData = () => {
-    const entries = insightsData.allEntries || [];
-    if (entries.length === 0) return [];
-    
-    return entries
-      .filter(entry => entry.created_at && entry.sentiment !== undefined && entry.sentiment !== null)
-      .map(entry => ({
-        date: new Date(entry.created_at),
-        sentiment: parseFloat(entry.sentiment || 0) || 0
-      }))
-      .filter(item => !isNaN(item.sentiment) && !isNaN(item.date.getTime()));
-  };
 
   return (
     <div className="min-h-screen pb-20 insights-container">
@@ -449,13 +435,13 @@ function InsightsContent() {
               </motion.div>
             </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8 px-2 md:px-0">
-              <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.4, delay: 0.3 }}
-                className="bg-background rounded-xl shadow-sm border"
-              >
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.4, delay: 0.3 }}
+              className="mb-8 px-2 md:px-0"
+            >
+              <div className="bg-background rounded-xl shadow-sm border">
                 <div className="p-6">
                   <div className="flex justify-between items-center mb-6">
                     <h2 className="text-xl font-semibold">
@@ -471,32 +457,8 @@ function InsightsContent() {
                     aggregatedData={insightsData.aggregatedEmotionData}
                   />
                 </div>
-              </motion.div>
-
-              <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.4, delay: 0.4 }}
-                className="bg-background rounded-xl shadow-sm border"
-              >
-                <div className="p-6">
-                  <div className="flex justify-between items-center mb-6">
-                    <h2 className="text-xl font-semibold">
-                      <StableTranslatableText 
-                        text="Activity Calendar" 
-                        forceTranslate={true}
-                        timeRange={timeRange}
-                      />
-                    </h2>
-                    <Calendar className="h-5 w-5 text-muted-foreground" />
-                  </div>
-                  <MoodCalendar 
-                    sentimentData={getSentimentData()} 
-                    timeRange={timeRange}
-                  />
-                </div>
-              </motion.div>
-            </div>
+              </div>
+            </motion.div>
 
             <motion.div
               initial={{ opacity: 0, y: 20 }}
