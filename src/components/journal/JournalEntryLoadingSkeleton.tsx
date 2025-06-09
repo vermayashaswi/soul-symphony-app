@@ -1,137 +1,198 @@
 
-import React, { useEffect, useRef } from 'react';
-import { LoadingEntryContent } from './entry-card/LoadingEntryContent';
-import { ShimmerSkeleton } from '@/components/ui/skeleton';
-import { motion, AnimatePresence } from 'framer-motion';
+/**
+ * Enhanced loading skeleton with better state management
+ */
+import React, { useEffect, useState } from 'react';
 import { Card } from '@/components/ui/card';
-import { useDebugLog } from '@/utils/debug/DebugContext';
-import { processingStateManager } from '@/utils/journal/processing-state-manager';
+import { Skeleton } from '@/components/ui/skeleton';
+import { Button } from '@/components/ui/button';
+import { X, RotateCcw } from 'lucide-react';
+import { processingStateManager, EntryProcessingState } from '@/utils/journal/processing-state-manager';
+import { cn } from '@/lib/utils';
 
 interface JournalEntryLoadingSkeletonProps {
   count?: number;
   tempId?: string;
   isVisible?: boolean;
+  onRetry?: (tempId: string) => void;
+  onCancel?: (tempId: string) => void;
 }
 
-export default function JournalEntryLoadingSkeleton({ 
-  count = 1, 
-  tempId, 
-  isVisible = true 
-}: JournalEntryLoadingSkeletonProps) {
-  const { addEvent } = useDebugLog();
-  const mountTimeRef = useRef(Date.now());
-  const [shouldRender, setShouldRender] = React.useState(isVisible);
+const JournalEntryLoadingSkeleton: React.FC<JournalEntryLoadingSkeletonProps> = ({
+  count = 1,
+  tempId,
+  isVisible = true,
+  onRetry,
+  onCancel
+}) => {
+  const [processingState, setProcessingState] = useState<EntryProcessingState | null>(null);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [shouldShow, setShouldShow] = useState(isVisible);
   
   useEffect(() => {
-    if (tempId) {
-      console.log(`[JournalEntryLoadingSkeleton] Mounted with tempId ${tempId}, visible: ${isVisible}`);
-      addEvent('LoadingUI', `JournalEntryLoadingSkeleton rendered with tempId ${tempId}`, 'info');
-      
-      // Listen for hide events
-      const handleHidden = (event: CustomEvent) => {
-        if (event.detail.tempId === tempId) {
-          console.log(`[JournalEntryLoadingSkeleton] Hide event received for ${tempId}`);
-          setShouldRender(false);
-        }
-      };
-      
-      // Listen for real entry detection with faster polling
-      const handleRealEntryDetected = () => {
-        const hasRealEntry = document.querySelector(`[data-temp-id="${tempId}"][data-processing="false"]`) ||
-                            document.querySelector(`[data-temp-id="${tempId}"].journal-entry-card:not(.processing-card)`);
-        
-        if (hasRealEntry) {
-          console.log(`[JournalEntryLoadingSkeleton] Real entry detected for ${tempId}, hiding immediately`);
-          processingStateManager.hideEntry(tempId);
-          setShouldRender(false);
-        }
-      };
-      
-      // Very fast polling for real entry detection
-      const pollInterval = setInterval(handleRealEntryDetected, 100);
-      
-      window.addEventListener('processingEntryHidden', handleHidden as EventListener);
-      
-      // Initial check
-      setTimeout(handleRealEntryDetected, 50);
-      
-      return () => {
-        clearInterval(pollInterval);
-        window.removeEventListener('processingEntryHidden', handleHidden as EventListener);
-        
-        if (tempId) {
-          const visibleDuration = Date.now() - mountTimeRef.current;
-          console.log(`[JournalEntryLoadingSkeleton] Unmounting skeleton with tempId ${tempId}. Was visible for ${visibleDuration}ms`);
-        }
-      };
+    if (!tempId) return;
+    
+    // Get initial state
+    const entry = processingStateManager.getEntryById(tempId);
+    if (entry) {
+      setProcessingState(entry.state);
+      setErrorMessage(entry.errorMessage || null);
+      setShouldShow(entry.isVisible && isVisible);
     }
-  }, [tempId, addEvent, isVisible]);
+    
+    // Listen for state changes
+    const subscription = processingStateManager.entriesChanges().subscribe(entries => {
+      const currentEntry = entries.find(e => e.tempId === tempId);
+      if (currentEntry) {
+        setProcessingState(currentEntry.state);
+        setErrorMessage(currentEntry.errorMessage || null);
+        setShouldShow(currentEntry.isVisible && isVisible);
+      } else {
+        // Entry was removed
+        setShouldShow(false);
+      }
+    });
+    
+    // Listen for completion events
+    const handleEntryCompleted = (event: CustomEvent) => {
+      if (event.detail?.tempId === tempId) {
+        console.log(`[LoadingSkeleton] Entry ${tempId} completed, hiding`);
+        setShouldShow(false);
+      }
+    };
+    
+    const handleEntryHidden = (event: CustomEvent) => {
+      if (event.detail?.tempId === tempId) {
+        console.log(`[LoadingSkeleton] Entry ${tempId} hidden`);
+        setShouldShow(false);
+      }
+    };
+    
+    window.addEventListener('processingEntryCompleted', handleEntryCompleted as EventListener);
+    window.addEventListener('processingEntryHidden', handleEntryHidden as EventListener);
+    
+    return () => {
+      subscription.unsubscribe();
+      window.removeEventListener('processingEntryCompleted', handleEntryCompleted as EventListener);
+      window.removeEventListener('processingEntryHidden', handleEntryHidden as EventListener);
+    };
+  }, [tempId, isVisible]);
   
-  // SIMPLIFIED: Always show when prop says to show
-  useEffect(() => {
-    setShouldRender(isVisible);
-  }, [isVisible]);
+  const handleRetry = () => {
+    if (tempId && onRetry) {
+      onRetry(tempId);
+    } else if (tempId) {
+      processingStateManager.retryProcessing(tempId);
+    }
+  };
   
-  // FORCE VISIBILITY during critical first moments
-  const finalShouldRender = isVisible || shouldRender;
+  const handleCancel = () => {
+    if (tempId && onCancel) {
+      onCancel(tempId);
+    } else if (tempId) {
+      processingStateManager.removeEntry(tempId);
+    }
+  };
   
-  if (!finalShouldRender) {
+  if (!shouldShow) {
     return null;
   }
   
+  const isError = processingState === EntryProcessingState.ERROR;
+  
   return (
-    <AnimatePresence mode="wait">
-      <motion.div
-        key={`skeleton-${tempId}`}
-        initial={{ opacity: 0, y: 10 }}
-        animate={{ opacity: 1, y: 0 }} // Always animate to visible
-        exit={{ 
-          opacity: 0, 
-          y: -10,
-          transition: { duration: 0.15 }
-        }}
-        transition={{ duration: 0.15 }}
-        className="overflow-hidden skeleton-container"
-        data-loading-skeleton={true}
-        data-temp-id={tempId}
-        style={{ 
-          opacity: 1, // FORCE OPACITY
-          visibility: 'visible', // FORCE VISIBILITY
-          display: 'block', // FORCE DISPLAY
-          transition: 'opacity 0.15s ease-out'
-        }}
-      >
-        <Card className="p-4 bg-card border-2 border-primary/20 shadow-md relative journal-entry-card processing-card">
-          <div className="flex justify-between items-start mb-4">
-            <div>
-              <ShimmerSkeleton className="h-5 w-32 mb-2" />
-              <div className="flex items-center">
-                <ShimmerSkeleton className="h-5 w-5 rounded-full" />
-              </div>
-            </div>
-            <div className="flex items-center space-x-2">
-              <ShimmerSkeleton className="h-8 w-8 rounded-md" />
-              <ShimmerSkeleton className="h-8 w-8 rounded-md" />
-            </div>
-          </div>
-          
-          <LoadingEntryContent />
-          
-          {/* Processing indicator */}
-          <div className="absolute top-2 right-2 flex items-center justify-center h-8 w-8 bg-primary/30 rounded-full border-2 border-primary/50">
-            <div className="h-5 w-5 rounded-full bg-primary/60 animate-ping absolute"></div>
-            <div className="h-4 w-4 rounded-full bg-primary relative z-10"></div>
-          </div>
-          
-          {/* Debug info - now completely invisible */}
-          {tempId && (
-            <div className="absolute bottom-2 right-2 text-xs text-muted-foreground opacity-0" 
-                 data-temp-id={tempId}>
-              {tempId.substring(0, 8)}...
-            </div>
+    <>
+      {Array.from({ length: count }).map((_, index) => (
+        <Card 
+          key={`skeleton-${tempId || 'loading'}-${index}`}
+          className={cn(
+            "p-6 space-y-4 processing-card animate-pulse",
+            isError && "border-red-200 bg-red-50"
           )}
+          data-temp-id={tempId}
+          data-processing="true"
+          data-loading-skeleton="true"
+        >
+          <div className="flex justify-between items-start">
+            <div className="flex-1 space-y-3">
+              <div className="flex items-center gap-2">
+                <div className="w-3 h-3 rounded-full bg-blue-500 animate-pulse" />
+                <Skeleton className="h-4 w-32" />
+                {tempId && (
+                  <span className="text-xs text-muted-foreground font-mono">
+                    {tempId.slice(-8)}
+                  </span>
+                )}
+              </div>
+              
+              {isError ? (
+                <div className="space-y-2">
+                  <p className="text-sm text-red-600 font-medium">
+                    Processing failed
+                  </p>
+                  {errorMessage && (
+                    <p className="text-xs text-red-500">
+                      {errorMessage}
+                    </p>
+                  )}
+                  <div className="flex gap-2">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={handleRetry}
+                      className="text-xs"
+                    >
+                      <RotateCcw className="w-3 h-3 mr-1" />
+                      Retry
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={handleCancel}
+                      className="text-xs text-red-600"
+                    >
+                      <X className="w-3 h-3 mr-1" />
+                      Cancel
+                    </Button>
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  <p className="text-sm text-blue-600 font-medium">
+                    Processing your recording...
+                  </p>
+                  <div className="space-y-2">
+                    <Skeleton className="h-4 w-full" />
+                    <Skeleton className="h-4 w-4/5" />
+                    <Skeleton className="h-4 w-3/5" />
+                  </div>
+                </div>
+              )}
+            </div>
+            
+            {tempId && (
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={handleCancel}
+                className="text-muted-foreground hover:text-red-600"
+              >
+                <X className="w-4 h-4" />
+              </Button>
+            )}
+          </div>
+          
+          <div className="flex justify-between items-center text-xs text-muted-foreground">
+            <Skeleton className="h-3 w-20" />
+            <div className="flex gap-2">
+              <Skeleton className="h-6 w-16 rounded-full" />
+              <Skeleton className="h-6 w-20 rounded-full" />
+            </div>
+          </div>
         </Card>
-      </motion.div>
-    </AnimatePresence>
+      ))}
+    </>
   );
-}
+};
+
+export default JournalEntryLoadingSkeleton;

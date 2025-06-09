@@ -1,73 +1,59 @@
 
-import { processingStateManager } from './processing-state-manager';
-import { immediateProcessingStateSync } from './processing-state-sync';
+/**
+ * Processing intent utility for immediate UI feedback
+ */
+
+let processingIntentActive = false;
+let processingIntentTimeout: NodeJS.Timeout | null = null;
 
 /**
- * Set processing intent immediately when audio processing starts
- * This ensures loading cards appear before the actual processing state propagates
+ * Set processing intent to provide immediate UI feedback
  */
-export const setProcessingIntent = (intent: boolean) => {
-  console.log(`[ProcessingIntent] Setting processing intent: ${intent}`);
+export function setProcessingIntent(active: boolean, duration = 3000): void {
+  console.log(`[ProcessingIntent] Setting processing intent: ${active}`);
   
-  // Use immediate sync for critical state changes
-  immediateProcessingStateSync(() => {
-    // Set flag in processing state manager
-    processingStateManager.setProcessingIntent(intent);
+  processingIntentActive = active;
+  
+  if (processingIntentTimeout) {
+    clearTimeout(processingIntentTimeout);
+    processingIntentTimeout = null;
+  }
+  
+  if (active) {
+    // Dispatch intent event
+    window.dispatchEvent(new CustomEvent('processingIntent', {
+      detail: { active: true, timestamp: Date.now() }
+    }));
     
-    // Dispatch immediate events for UI components
-    if (intent) {
-      window.dispatchEvent(new CustomEvent('immediateProcessingStarted', {
-        detail: { 
-          tempId: 'intent-started',
-          timestamp: Date.now(),
-          immediate: true 
-        }
-      }));
-      
-      window.dispatchEvent(new CustomEvent('processingIntent', {
-        detail: { 
-          intent: true, 
-          timestamp: Date.now(),
-          immediate: true 
-        }
-      }));
-    } else {
-      window.dispatchEvent(new CustomEvent('processingIntent', {
-        detail: { 
-          intent: false, 
-          timestamp: Date.now(),
-          immediate: true 
-        }
-      }));
-    }
-  });
-};
+    // Auto-clear after duration
+    processingIntentTimeout = setTimeout(() => {
+      if (processingIntentActive) {
+        processingIntentActive = false;
+        console.log('[ProcessingIntent] Auto-cleared processing intent');
+        
+        window.dispatchEvent(new CustomEvent('processingIntent', {
+          detail: { active: false, timestamp: Date.now() }
+        }));
+      }
+    }, duration);
+  } else {
+    // Dispatch clear event
+    window.dispatchEvent(new CustomEvent('processingIntent', {
+      detail: { active: false, timestamp: Date.now() }
+    }));
+  }
+}
 
 /**
- * Check if there's currently processing intent
+ * Check if processing intent is active
  */
-export const hasProcessingIntent = (): boolean => {
-  return processingStateManager.hasProcessingIntent();
-};
+export function hasProcessingIntent(): boolean {
+  return processingIntentActive;
+}
 
 /**
- * Clear processing intent (usually called when real processing state takes over)
+ * Clear processing intent
  */
-export const clearProcessingIntent = () => {
-  console.log('[ProcessingIntent] Clearing processing intent');
+export function clearProcessingIntent(): void {
   setProcessingIntent(false);
-};
-
-/**
- * Get current processing intent state with additional context
- */
-export const getProcessingIntentState = () => {
-  const hasIntent = hasProcessingIntent();
-  const timestamp = Date.now();
-  
-  return {
-    hasIntent,
-    timestamp,
-    isActive: hasIntent
-  };
-};
+}

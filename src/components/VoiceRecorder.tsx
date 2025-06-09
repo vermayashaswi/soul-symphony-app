@@ -1,10 +1,10 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { Loader2, AlertTriangle } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import { useAudioRecorder } from '@/hooks/use-audio-recorder';
 import { useAudioPlayback } from '@/hooks/use-audio-playback';
+import { useVoiceRecorder } from '@/hooks/use-voice-recorder';
 import { normalizeAudioBlob, validateAudioBlob } from '@/utils/audio/blob-utils';
 import { blobToBase64 } from '@/utils/audio/blob-utils';
 import { toast } from 'sonner';
@@ -17,6 +17,7 @@ import { RecordingStatus } from '@/components/voice-recorder/RecordingStatus';
 import { PlaybackControls } from '@/components/voice-recorder/PlaybackControls';
 import { AnimatedPrompt } from '@/components/voice-recorder/AnimatedPrompt';
 import { clearAllToasts, ensureAllToastsCleared } from '@/services/notificationService';
+import { setProcessingIntent } from '@/utils/journal/processing-intent';
 
 interface VoiceRecorderProps {
   onRecordingComplete?: (audioBlob: Blob, tempId?: string) => void;
@@ -26,22 +27,24 @@ interface VoiceRecorderProps {
 }
 
 export function VoiceRecorder({ onRecordingComplete, onCancel, className, updateDebugInfo }: VoiceRecorderProps) {
-  const [isProcessing, setIsProcessing] = useState(false);
   const [recordingError, setRecordingError] = useState<string | null>(null);
   const [showAnimation, setShowAnimation] = useState(true);
   const [hasSaved, setHasSaved] = useState(false);
   const [hasPlayedOnce, setHasPlayedOnce] = useState(false);
   const [audioPrepared, setAudioPrepared] = useState(false);
-  const [waitingForClear, setWaitingForClear] = useState(false);
-  const [toastsCleared, setToastsCleared] = useState(false);
   
   const saveCompleteRef = useRef(false);
-  const savingInProgressRef = useRef(false);
-  const domClearAttemptedRef = useRef(false);
-  
   const { user } = useAuth();
   const { isMobile } = useIsMobile();
   const { isInStep } = useTutorial();
+  
+  // Use enhanced voice recorder hook
+  const { 
+    isSaving, 
+    isProcessing, 
+    processRecording, 
+    cancelProcessing 
+  } = useVoiceRecorder();
   
   const {
     isRecording,
@@ -82,7 +85,6 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className, update
   useEffect(() => {
     const clearToastsOnMount = async () => {
       await ensureAllToastsCleared();
-      setToastsCleared(true);
     };
     
     clearToastsOnMount();
@@ -129,6 +131,7 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className, update
   
   useEffect(() => {
     console.log('[VoiceRecorder] State update:', {
+      isSaving,
       isProcessing,
       hasAudioBlob: !!audioBlob,
       audioSize: audioBlob?.size || 0,
@@ -137,9 +140,7 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className, update
       audioDuration,
       hasSaved,
       hasPlayedOnce,
-      audioPrepared,
-      waitingForClear,
-      toastsCleared
+      audioPrepared
     });
     
     if (updateDebugInfo) {
@@ -150,20 +151,8 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className, update
         duration: audioDuration || (recordingTime / 1000)
       });
     }
-  }, [isProcessing, audioBlob, isRecording, hasPermission, audioDuration, hasSaved, hasPlayedOnce, recordingTime, 
-       audioPrepared, waitingForClear, toastsCleared, updateDebugInfo]);
-  
-  useEffect(() => {
-    return () => {
-      console.log('[VoiceRecorder] Component unmounting, resetting state');
-      
-      if (isProcessing && !saveCompleteRef.current) {
-        console.warn('[VoiceRecorder] Component unmounted during processing - potential source of UI errors');
-      }
-      
-      clearAllToasts();
-    };
-  }, [isProcessing]);
+  }, [isSaving, isProcessing, audioBlob, isRecording, hasPermission, audioDuration, hasSaved, hasPlayedOnce, recordingTime, 
+       audioPrepared, updateDebugInfo]);
   
   const handleSaveEntry = async () => {
     if (!audioBlob) {
@@ -171,45 +160,22 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className, update
       return;
     }
     
-    if (hasSaved || savingInProgressRef.current) {
-      console.log('[VoiceRecorder] Already saved this recording or save in progress, ignoring duplicate save request');
+    if (hasSaved) {
+      console.log('[VoiceRecorder] Already saved this recording, ignoring duplicate save request');
       return;
     }
     
     try {
       console.log('[VoiceRecorder] Starting save process');
-      savingInProgressRef.current = true;
       
-      // Set processing state IMMEDIATELY before any other operations
-      setIsProcessing(true);
-      setRecordingError(null);
+      // Set processing intent for immediate UI feedback
+      setProcessingIntent(true);
+      
+      // Set local state
       setHasSaved(true);
-      
-      setWaitingForClear(true);
+      setRecordingError(null);
       
       await ensureAllToastsCleared();
-      
-      if (!domClearAttemptedRef.current) {
-        domClearAttemptedRef.current = true;
-        try {
-          const toastElements = document.querySelectorAll('[data-sonner-toast]');
-          if (toastElements.length > 0) {
-            console.log(`[VoiceRecorder] Found ${toastElements.length} lingering toasts, removing manually`);
-            toastElements.forEach(el => {
-              if (el.parentNode) {
-                el.parentNode.removeChild(el);
-              }
-            });
-          }
-        } catch (e) {
-          console.error('[VoiceRecorder] Error in manual DOM cleanup:', e);
-        }
-      }
-      
-      await new Promise(resolve => setTimeout(resolve, 100));
-      
-      setWaitingForClear(false);
-      setToastsCleared(true);
       
       if (!hasPlayedOnce || audioDuration === 0) {
         console.log('[VoiceRecorder] Recording not played yet, preparing audio...');
@@ -220,142 +186,66 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className, update
         
         if (duration < 0.5) {
           setRecordingError("Recording is too short. Please try again.");
-          setIsProcessing(false);
+          setProcessingIntent(false);
           setHasSaved(false);
-          savingInProgressRef.current = false;
           return;
         }
-      } else if (audioDuration < 0.5) {
-        setRecordingError("Recording is too short. Please try again.");
-        setIsProcessing(false);
-        setHasSaved(false);
-        savingInProgressRef.current = false;
-        return;
       }
       
-      console.log('[VoiceRecorder] Normalizing audio blob before processing...');
+      console.log('[VoiceRecorder] Processing recording...');
       
-      let normalizedBlob: Blob;
-      try {
-        normalizedBlob = await normalizeAudioBlob(audioBlob);
-        console.log('[VoiceRecorder] Blob normalized successfully:', {
-          type: normalizedBlob.type,
-          size: normalizedBlob.size,
-          hasDuration: 'duration' in normalizedBlob,
-          duration: (normalizedBlob as any).duration || 'unknown'
-        });
+      // Process the recording
+      const result = await processRecording(audioBlob);
+      
+      if (result.success) {
+        console.log('[VoiceRecorder] Recording processed successfully:', result);
         
-        const validation = validateAudioBlob(normalizedBlob);
-        if (!validation.isValid) {
-          throw new Error(validation.errorMessage || "Invalid audio data after normalization");
+        // Call completion callback
+        if (onRecordingComplete) {
+          onRecordingComplete(audioBlob, result.tempId);
         }
-      } catch (error) {
-        console.error('[VoiceRecorder] Error normalizing audio blob:', error);
-        setRecordingError("Error processing audio. Please try again.");
-        setIsProcessing(false);
-        setHasSaved(false);
-        savingInProgressRef.current = false;
-        return;
-      }
-      
-      console.log('[VoiceRecorder] Processing audio:', {
-        type: normalizedBlob.type,
-        size: normalizedBlob.size,
-        duration: audioDuration,
-        recordingTime: recordingTime / 1000,
-        hasPlayedOnce: hasPlayedOnce,
-        audioPrepared: audioPrepared,
-        blobHasDuration: 'duration' in normalizedBlob
-      });
-      
-      if (!hasPlayedOnce && audioDuration === 0 && recordingTime > 0) {
-        const estimatedDuration = recordingTime / 1000;
-        console.log(`[VoiceRecorder] Recording not played yet, estimating duration as ${estimatedDuration}s`);
         
-        if (!('duration' in normalizedBlob)) {
-          try {
-            Object.defineProperty(normalizedBlob, 'duration', {
-              value: estimatedDuration,
-              writable: false
-            });
-          } catch (err) {
-            console.warn("[VoiceRecorder] Could not add duration to blob:", err);
-          }
-        }
+        // Clear processing intent
+        setProcessingIntent(false);
+        
+        saveCompleteRef.current = true;
+        
+      } else {
+        console.error('[VoiceRecorder] Recording processing failed:', result.error);
+        setRecordingError(result.error || 'Processing failed');
+        setHasSaved(false);
+        setProcessingIntent(false);
       }
       
-      if (onRecordingComplete) {
-        try {
-          console.log('[VoiceRecorder] Calling recording completion callback');
-          saveCompleteRef.current = false;
-          
-          const base64Test = await blobToBase64(normalizedBlob).catch(err => {
-            console.error('[VoiceRecorder] Base64 conversion test failed:', err);
-            throw new Error('Error preparing audio for processing');
-          });
-          
-          console.log('[VoiceRecorder] Base64 test conversion successful, length:', base64Test.length);
-          console.log('[VoiceRecorder] Directly calling onRecordingComplete with blob');
-          
-          await onRecordingComplete(normalizedBlob);
-          
-          saveCompleteRef.current = true;
-          savingInProgressRef.current = false;
-          
-          console.log('[VoiceRecorder] Recording callback completed successfully');
-        } catch (error: any) {
-          console.error('[VoiceRecorder] Error in recording callback:', error);
-          setRecordingError(error?.message || "An unexpected error occurred");
-          
-          setTimeout(() => {
-            toast.error("Error saving recording", {
-              id: 'error-toast',
-              duration: 3000
-            });
-          }, 300);
-          
-          setIsProcessing(false);
-          setHasSaved(false);
-          savingInProgressRef.current = false;
-        }
-      }
     } catch (error: any) {
-      console.error('[VoiceRecorder] Error in save entry:', error);
-      setRecordingError(error?.message || "An unexpected error occurred");
-      
-      setTimeout(() => {
-        toast.error("Error saving recording", {
-          id: 'error-toast',
-          duration: 3000
-        });
-      }, 300);
-      
-      setIsProcessing(false);
+      console.error('[VoiceRecorder] Error in save process:', error);
+      setRecordingError(error.message || 'Unknown error occurred');
       setHasSaved(false);
-      savingInProgressRef.current = false;
+      setProcessingIntent(false);
     }
   };
-
-  const handleRestart = async () => {
-    await ensureAllToastsCleared();
+  
+  const handleCancel = () => {
+    console.log('[VoiceRecorder] Cancelling recording');
     
+    // Cancel any ongoing processing
+    cancelProcessing();
+    
+    // Clear processing intent
+    setProcessingIntent(false);
+    
+    // Reset all state
     resetRecording();
     resetPlayback();
-    setRecordingError(null);
-    setShowAnimation(true);
-    setIsProcessing(false);
     setHasSaved(false);
     setHasPlayedOnce(false);
     setAudioPrepared(false);
+    setRecordingError(null);
     saveCompleteRef.current = false;
-    savingInProgressRef.current = false;
-    domClearAttemptedRef.current = false;
     
-    await new Promise(resolve => setTimeout(resolve, 300));
-    
-    toast.info("Starting a new recording", {
-      duration: 2000
-    });
+    if (onCancel) {
+      onCancel();
+    }
   };
 
   const shouldShowPrompt = !isRecording && !audioBlob;
@@ -365,105 +255,61 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className, update
   const shouldShowFloatingLanguages = !isInStep(3) && !isInStep(4);
 
   return (
-    <div className={cn("flex flex-col items-center relative z-10 w-full mb-[1rem]", className)}>
-      <audio ref={audioRef} className="hidden" />
-      
-      <div className={cn(
-        "relative w-full h-full flex flex-col items-center justify-between overflow-hidden rounded-2xl border border-slate-200/20",
-        isMobile ? "min-h-[calc(80vh-160px)]" : "min-h-[500px]"
-      )}>
-        {showAnimation && shouldShowFloatingLanguages && (
-          <div className="absolute inset-0 w-full h-full flex items-center justify-center">
-            <FloatingLanguages size="md" />
-          </div>
-        )}
+    <div className={cn("flex flex-col items-center space-y-6 p-6", className)}>
+      <div className="relative">
+        <FloatingLanguages />
         
-        <div className="relative z-10 flex flex-col items-center justify-start w-full h-full pt-4">
-          <AnimatedPrompt show={shouldShowPrompt} />
-          
-          <div className="relative z-10 flex justify-center items-center mt-40">
-            <RecordingButton
-              isRecording={isRecording}
-              isProcessing={isProcessing}
-              hasPermission={hasPermission}
-              onRecordingStart={async () => {
-                console.log('[VoiceRecorder] Starting new recording');
-                await ensureAllToastsCleared();
-                startRecording();
-              }}
-              onRecordingStop={() => {
-                console.log('[VoiceRecorder] Stopping recording');
-                stopRecording();
-              }}
-              onPermissionRequest={() => {
-                console.log('[VoiceRecorder] Requesting permissions');
-                requestPermissions().then(granted => {
-                });
-              }}
-              audioLevel={audioLevel}
-              showAnimation={false}
-              audioBlob={audioBlob}
-            />
-          </div>
-
-          <AnimatePresence mode="wait">
-            {isRecording ? (
-              <RecordingStatus 
-                isRecording={isRecording} 
-                recordingTime={recordingTime} 
-              />
-            ) : audioBlob ? (
-              <div className="flex flex-col items-center w-full relative z-10 mt-auto mb-8">
-                <PlaybackControls
-                  audioBlob={audioBlob}
-                  isPlaying={isPlaying}
-                  isProcessing={isProcessing || waitingForClear}
-                  playbackProgress={playbackProgress}
-                  audioDuration={audioDuration}
-                  onTogglePlayback={async () => {
-                    console.log('[VoiceRecorder] Toggle playback clicked');
-                    await ensureAllToastsCleared();
-                    togglePlayback();
-                  }}
-                  onSaveEntry={handleSaveEntry}
-                  onRestart={handleRestart}
-                  onSeek={seekTo}
-                />
-              </div>
-            ) : hasPermission === false ? (
-              <motion.p
-                key="permission"
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -10 }}
-                className="text-center text-muted-foreground relative z-10 mt-auto mb-8"
-              >
-                Microphone access is required for recording
-              </motion.p>
-            ) : (
-              <></>
-            )}
-          </AnimatePresence>
-          
-          {recordingError && (
-            <motion.div
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              className="mt-3 p-2 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm flex items-start gap-2 relative z-10 absolute bottom-8"
-            >
-              <AlertTriangle className="w-4 h-4 mt-0.5 flex-shrink-0" />
-              <div>{recordingError}</div>
-            </motion.div>
-          )}
-          
-          {(isProcessing || waitingForClear) && (
-            <div className="flex items-center gap-2 mt-3 text-sm text-muted-foreground relative z-10 absolute bottom-4">
-              <Loader2 className="w-4 h-4 animate-spin" />
-              <span>{waitingForClear ? "Preparing..." : "Processing..."}</span>
-            </div>
-          )}
+        <div className="relative z-10">
+          <RecordingButton
+            isRecording={isRecording}
+            onStartRecording={startRecording}
+            onStopRecording={stopRecording}
+            hasPermission={hasPermission}
+            onRequestPermissions={requestPermissions}
+            audioLevel={audioLevel}
+            ripples={ripples}
+            disabled={isSaving || isProcessing}
+          />
         </div>
       </div>
+
+      <RecordingStatus
+        isRecording={isRecording}
+        recordingTime={recordingTime}
+        hasAudioBlob={!!audioBlob}
+        isSaving={isSaving || isProcessing}
+      />
+
+      {audioBlob && !isRecording && (
+        <PlaybackControls
+          isPlaying={isPlaying}
+          playbackProgress={playbackProgress}
+          audioDuration={audioDuration}
+          onTogglePlayback={togglePlayback}
+          onSeek={seekTo}
+          onSave={handleSaveEntry}
+          onCancel={handleCancel}
+          disabled={isSaving || isProcessing}
+          saving={isSaving || isProcessing}
+        />
+      )}
+
+      {recordingError && (
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="flex items-center gap-2 text-red-600 bg-red-50 px-4 py-2 rounded-lg"
+        >
+          <AlertTriangle className="h-4 w-4" />
+          <span className="text-sm">{recordingError}</span>
+        </motion.div>
+      )}
+
+      <AnimatePresence>
+        {showAnimation && (
+          <AnimatedPrompt key="animated-prompt" />
+        )}
+      </AnimatePresence>
     </div>
   );
 }
