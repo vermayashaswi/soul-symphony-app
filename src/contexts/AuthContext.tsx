@@ -1,5 +1,4 @@
-
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { Session, User } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
@@ -17,17 +16,14 @@ import { debugLogger, logInfo, logError, logAuthError, logProfile, logAuth } fro
 import { isAppRoute } from '@/routes/RouteHelpers';
 import { useLocation } from 'react-router-dom';
 import { SessionTrackingService } from '@/services/sessionTrackingService';
+import { LocationProvider } from '@/contexts/LocationContext';
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 const MAX_AUTO_PROFILE_ATTEMPTS = 5;
 const BASE_RETRY_DELAY = 500;
 
-interface AuthProviderProps {
-  children: ReactNode;
-}
-
-export function AuthProvider({ children }: AuthProviderProps) {
+function AuthProviderCore({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -633,6 +629,14 @@ export function AuthProvider({ children }: AuthProviderProps) {
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+}
+
+export function AuthProvider({ children }: { children: ReactNode }) {
+  return (
+    <LocationProvider>
+      <AuthProviderCore>{children}</AuthProviderCore>
+    </LocationProvider>
+  );
 }
 
 export function useAuth() {

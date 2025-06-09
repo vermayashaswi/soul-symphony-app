@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
-import { Calendar, TrendingUp, ArrowUp, ArrowDown, Activity, Award } from 'lucide-react';
+import { Calendar, Filter, TrendingUp, ArrowUp, ArrowDown, Activity, Award } from 'lucide-react';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import EmotionChart from '@/components/EmotionChart';
 import MoodCalendar from '@/components/insights/MoodCalendar';
@@ -11,23 +11,21 @@ import { useInsightsData, TimeRange } from '@/hooks/use-insights-data';
 import { useAuth } from '@/contexts/AuthContext';
 import { useIsMobile } from '@/hooks/use-mobile';
 import ErrorBoundary from '@/components/insights/ErrorBoundary';
-import { StableTranslatableText } from '@/components/translation/StableTranslatableText';
+import { EnhancedTranslatableText } from '@/components/translation/EnhancedTranslatableText';
 import { InsightsTranslationProvider } from '@/components/insights/InsightsTranslationProvider';
 import { TranslationProgressIndicator } from '@/components/insights/TranslationProgressIndicator';
 import { useTranslation } from '@/contexts/TranslationContext';
 import { PremiumFeatureGuard } from '@/components/subscription/PremiumFeatureGuard';
-import { translationStabilityService } from '@/services/translationStabilityService';
 
 function InsightsContent() {
   const { user } = useAuth();
-  const { prefetchTranslationsForRoute, currentLanguage } = useTranslation();
+  const { prefetchTranslationsForRoute } = useTranslation();
   const [timeRange, setTimeRange] = useState<TimeRange>('week');
   const [isSticky, setIsSticky] = useState(false);
   const [selectedEmotion, setSelectedEmotion] = useState<string | null>(null);
   const timeToggleRef = useRef<HTMLDivElement>(null);
   const scrollPositionRef = useRef<number>(0);
   const isMobile = useIsMobile();
-  const currentLanguageRef = useRef<string>(currentLanguage);
   
   const { insightsData, loading } = useInsightsData(user?.id, timeRange);
   
@@ -41,13 +39,6 @@ function InsightsContent() {
   useEffect(() => {
     console.log("Insights page mounted");
     
-    // Check if language changed since last mount
-    if (currentLanguageRef.current !== currentLanguage) {
-      console.log(`[Insights] Language changed from ${currentLanguageRef.current} to ${currentLanguage}, clearing stability locks`);
-      translationStabilityService.unlockAllTranslations();
-      currentLanguageRef.current = currentLanguage;
-    }
-    
     // Prefetch translations for the insights route
     if (prefetchTranslationsForRoute) {
       prefetchTranslationsForRoute('/insights').catch(console.error);
@@ -56,7 +47,7 @@ function InsightsContent() {
     return () => {
       console.log("Insights page unmounted");
     };
-  }, [prefetchTranslationsForRoute, currentLanguage]);
+  }, [prefetchTranslationsForRoute]);
 
   useEffect(() => {
     const handleScroll = () => {
@@ -85,7 +76,6 @@ function InsightsContent() {
       const currentScrollPosition = window.scrollY;
       scrollPositionRef.current = currentScrollPosition;
       
-      console.log(`[Insights] Time range changing from ${timeRange} to ${value}, language: ${currentLanguage}`);
       setTimeRange(value as TimeRange);
       
       setTimeout(() => {
@@ -97,10 +87,12 @@ function InsightsContent() {
   const renderTimeToggle = () => (
     <div className="insights-time-toggle flex items-center gap-3">
       <span className="text-sm text-muted-foreground">
-        <StableTranslatableText 
+        <EnhancedTranslatableText 
           text="View:" 
           forceTranslate={true}
-          timeRange={timeRange}
+          enableFontScaling={true}
+          scalingContext="compact"
+          usePageTranslation={true}
         />
       </span>
       <ToggleGroup 
@@ -121,10 +113,12 @@ function InsightsContent() {
                 : "text-muted-foreground hover:text-foreground bg-transparent"
             )}
           >
-            <StableTranslatableText 
+            <EnhancedTranslatableText 
               text={range.label} 
               forceTranslate={true}
-              timeRange={timeRange}
+              enableFontScaling={true}
+              scalingContext="compact"
+              usePageTranslation={true}
             />
           </ToggleGroupItem>
         ))}
@@ -177,17 +171,21 @@ function InsightsContent() {
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 px-2">
           <div>
             <h1 className="text-3xl font-bold mb-2">
-              <StableTranslatableText 
+              <EnhancedTranslatableText 
                 text="Insights" 
                 forceTranslate={true}
-                timeRange={timeRange}
+                enableFontScaling={true}
+                scalingContext="general"
+                usePageTranslation={true}
               />
             </h1>
             <p className="text-muted-foreground">
-              <StableTranslatableText 
+              <EnhancedTranslatableText 
                 text="Discover patterns in your emotional journey" 
                 forceTranslate={true}
-                timeRange={timeRange}
+                enableFontScaling={true}
+                scalingContext="general"
+                usePageTranslation={true}
               />
             </p>
           </div>
@@ -207,24 +205,30 @@ function InsightsContent() {
         ) : insightsData.entries.length === 0 ? (
           <div className="bg-background rounded-xl p-8 text-center border mx-2">
             <h2 className="text-xl font-semibold mb-4">
-              <StableTranslatableText 
+              <EnhancedTranslatableText 
                 text="No journal data available" 
                 forceTranslate={true}
-                timeRange={timeRange}
+                enableFontScaling={true}
+                scalingContext="general"
+                usePageTranslation={true}
               />
             </h2>
             <p className="text-muted-foreground mb-6">
-              <StableTranslatableText 
+              <EnhancedTranslatableText 
                 text="Start recording journal entries to see your emotional insights." 
                 forceTranslate={true}
-                timeRange={timeRange}
+                enableFontScaling={true}
+                scalingContext="general"
+                usePageTranslation={true}
               />
             </p>
             <Button onClick={() => window.location.href = '/journal'}>
-              <StableTranslatableText 
+              <EnhancedTranslatableText 
                 text="Go to Journal" 
                 forceTranslate={true}
-                timeRange={timeRange}
+                enableFontScaling={true}
+                scalingContext="compact"
+                usePageTranslation={true}
               />
             </Button>
           </div>
@@ -241,17 +245,21 @@ function InsightsContent() {
               >
                 <div className="flex justify-between items-start mb-4">
                   <h2 className="font-semibold text-lg">
-                    <StableTranslatableText 
+                    <EnhancedTranslatableText 
                       text="Dominant Mood" 
                       forceTranslate={true}
-                      timeRange={timeRange}
+                      enableFontScaling={true}
+                      scalingContext="general"
+                      usePageTranslation={true}
                     />
                   </h2>
                   <span className="px-2 py-1 bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-200 rounded-full text-xs font-medium">
-                    <StableTranslatableText 
+                    <EnhancedTranslatableText 
                       text={`This ${timeRange}`} 
                       forceTranslate={true}
-                      timeRange={timeRange}
+                      enableFontScaling={true}
+                      scalingContext="compact"
+                      usePageTranslation={true}
                     />
                   </span>
                 </div>
@@ -262,17 +270,21 @@ function InsightsContent() {
                     </div>
                     <div>
                       <h3 className="text-2xl font-bold capitalize">
-                        <StableTranslatableText 
+                        <EnhancedTranslatableText 
                           text={insightsData.dominantMood.emotion} 
                           forceTranslate={true}
-                          timeRange={timeRange}
+                          enableFontScaling={true}
+                          scalingContext="general"
+                          usePageTranslation={true}
                         />
                       </h3>
                       <p className="text-muted-foreground text-sm">
-                        <StableTranslatableText 
+                        <EnhancedTranslatableText 
                           text="Appeared in most entries" 
                           forceTranslate={true}
-                          timeRange={timeRange}
+                          enableFontScaling={true}
+                          scalingContext="compact"
+                          usePageTranslation={true}
                         />
                       </p>
                     </div>
@@ -284,17 +296,21 @@ function InsightsContent() {
                     </div>
                     <div>
                       <h3 className="text-2xl font-bold">
-                        <StableTranslatableText 
+                        <EnhancedTranslatableText 
                           text="Not enough data" 
                           forceTranslate={true}
-                          timeRange={timeRange}
+                          enableFontScaling={true}
+                          scalingContext="general"
+                          usePageTranslation={true}
                         />
                       </h3>
                       <p className="text-muted-foreground text-sm">
-                        <StableTranslatableText 
+                        <EnhancedTranslatableText 
                           text="Add more journal entries" 
                           forceTranslate={true}
-                          timeRange={timeRange}
+                          enableFontScaling={true}
+                          scalingContext="compact"
+                          usePageTranslation={true}
                         />
                       </p>
                     </div>
@@ -310,10 +326,12 @@ function InsightsContent() {
               >
                 <div className="flex justify-between items-start mb-4">
                   <h2 className="font-semibold text-lg">
-                    <StableTranslatableText 
+                    <EnhancedTranslatableText 
                       text="Biggest Change" 
                       forceTranslate={true}
-                      timeRange={timeRange}
+                      enableFontScaling={true}
+                      scalingContext="general"
+                      usePageTranslation={true}
                     />
                   </h2>
                   {insightsData.biggestImprovement && (
@@ -353,20 +371,24 @@ function InsightsContent() {
                     </div>
                     <div>
                       <h3 className="text-2xl font-bold capitalize">
-                        <StableTranslatableText 
+                        <EnhancedTranslatableText 
                           text={insightsData.biggestImprovement.emotion} 
                           forceTranslate={true}
-                          timeRange={timeRange}
+                          enableFontScaling={true}
+                          scalingContext="general"
+                          usePageTranslation={true}
                         />
                       </h3>
                       <p className="text-muted-foreground text-sm">
-                        <StableTranslatableText 
+                        <EnhancedTranslatableText 
                           text={insightsData.biggestImprovement.percentage >= 0 
                             ? "Increased significantly" 
                             : "Decreased significantly"
                           } 
                           forceTranslate={true}
-                          timeRange={timeRange}
+                          enableFontScaling={true}
+                          scalingContext="compact"
+                          usePageTranslation={true}
                         />
                       </p>
                     </div>
@@ -378,17 +400,21 @@ function InsightsContent() {
                     </div>
                     <div>
                       <h3 className="text-2xl font-bold">
-                        <StableTranslatableText 
+                        <EnhancedTranslatableText 
                           text="Not enough data" 
                           forceTranslate={true}
-                          timeRange={timeRange}
+                          enableFontScaling={true}
+                          scalingContext="general"
+                          usePageTranslation={true}
                         />
                       </h3>
                       <p className="text-muted-foreground text-sm">
-                        <StableTranslatableText 
+                        <EnhancedTranslatableText 
                           text="Need more entries to compare" 
                           forceTranslate={true}
-                          timeRange={timeRange}
+                          enableFontScaling={true}
+                          scalingContext="compact"
+                          usePageTranslation={true}
                         />
                       </p>
                     </div>
@@ -404,18 +430,22 @@ function InsightsContent() {
               >
                 <div className="flex justify-between items-start mb-4">
                   <h2 className="font-semibold text-lg">
-                    <StableTranslatableText 
+                    <EnhancedTranslatableText 
                       text="Journal Activity" 
                       forceTranslate={true}
-                      timeRange={timeRange}
+                      enableFontScaling={true}
+                      scalingContext="general"
+                      usePageTranslation={true}
                     />
                   </h2>
                   {insightsData.journalActivity.maxStreak > 0 && (
                     <span className="px-2 py-1 bg-purple-100 dark:bg-purple-900 text-purple-700 dark:text-purple-200 rounded-full text-xs font-medium">
-                      <StableTranslatableText 
+                      <EnhancedTranslatableText 
                         text={`Max streak: ${insightsData.journalActivity.maxStreak} ${timeRange === 'today' ? 'entries' : 'days'}`}
                         forceTranslate={true}
-                        timeRange={timeRange}
+                        enableFontScaling={true}
+                        scalingContext="compact"
+                        usePageTranslation={true}
                       />
                     </span>
                   )}
@@ -430,97 +460,72 @@ function InsightsContent() {
                   </div>
                   <div>
                     <h3 className="text-2xl font-bold">
-                      <StableTranslatableText 
-                        text={`${insightsData.journalActivity.streak} ${timeRange === 'today' ? 'entries' : 'days'}`}
+                      <EnhancedTranslatableText 
+                        text={`${insightsData.journalActivity.entryCount} entries`} 
                         forceTranslate={true}
-                        timeRange={timeRange}
+                        enableFontScaling={true}
+                        scalingContext="general"
+                        usePageTranslation={true}
                       />
                     </h3>
-                    <p className="text-muted-foreground text-sm">
-                      <StableTranslatableText 
-                        text={insightsData.journalActivity.streak > 0 ? "Current streak" : "Start your streak"} 
+                    <p className="text-muted-foreground text-sm capitalize">
+                      <EnhancedTranslatableText 
+                        text={`This ${timeRange}`} 
                         forceTranslate={true}
-                        timeRange={timeRange}
+                        enableFontScaling={true}
+                        scalingContext="compact"
+                        usePageTranslation={true}
                       />
                     </p>
                   </div>
                 </div>
               </motion.div>
             </div>
-
+            
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.4, delay: 0.3 }}
-              className="mb-8 px-2 md:px-0"
+              className={cn(
+                "bg-background rounded-xl shadow-sm mb-8 border w-full mx-auto",
+                isMobile ? "p-4 md:p-8" : "p-6 md:p-8"
+              )}
+              whileHover={{ boxShadow: "0 10px 25px -5px rgba(0, 0, 0, 0.1)" }}
             >
-              <div className="bg-background rounded-xl shadow-sm border">
-                <div className="p-6">
-                  <div className="flex justify-between items-center mb-6">
-                    <h2 className="text-xl font-semibold">
-                      <StableTranslatableText 
-                        text="Emotions & Life Areas" 
-                        forceTranslate={true}
-                        timeRange={timeRange}
-                      />
-                    </h2>
-                  </div>
-                  <EmotionChart 
-                    timeframe={timeRange}
-                    aggregatedData={insightsData.aggregatedEmotionData}
-                  />
-                </div>
-              </div>
+              <EmotionChart 
+                timeframe={timeRange}
+                aggregatedData={insightsData.aggregatedEmotionData}
+              />
             </motion.div>
-
+            
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.4, delay: 0.4 }}
-              className="mb-8 px-2 md:px-0"
+              className={cn(
+                "mb-8",
+                isMobile ? "px-2" : "px-0"
+              )}
             >
               <MoodCalendar 
-                sentimentData={getSentimentData()} 
+                sentimentData={getSentimentData()}
                 timeRange={timeRange}
               />
             </motion.div>
-
+            
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.4, delay: 0.5 }}
-              className="mb-8 px-2 md:px-0"
+              className={cn(
+                "mb-8",
+                isMobile ? "px-2" : "px-0"
+              )}
             >
-              <PremiumFeatureGuard 
-                feature="insights"
-                fallbackTitle="Soul-Net Visualization"
-                fallbackDescription="Unlock the Soul-Net to see your emotional connections in a beautiful 3D visualization."
-              >
-                <div className="bg-background rounded-xl shadow-sm border overflow-hidden">
-                  <div className="p-6 border-b">
-                    <h2 className="text-xl font-semibold">
-                      <StableTranslatableText 
-                        text="Soul-Net Visualization" 
-                        forceTranslate={true}
-                        timeRange={timeRange}
-                      />
-                    </h2>
-                    <p className="text-muted-foreground mt-2">
-                      <StableTranslatableText 
-                        text="Explore your emotional journey through interconnected experiences" 
-                        forceTranslate={true}
-                        timeRange={timeRange}
-                      />
-                    </p>
-                  </div>
-                  <div className="h-96">
-                    <SoulNet 
-                      userId={user?.id}
-                      timeRange={timeRange}
-                    />
-                  </div>
-                </div>
-              </PremiumFeatureGuard>
+              <SoulNet
+                userId={user?.id}
+                timeRange={timeRange}
+              />
             </motion.div>
           </>
         )}
@@ -529,14 +534,14 @@ function InsightsContent() {
   );
 }
 
-function Insights() {
+export default function Insights() {
   return (
-    <ErrorBoundary>
-      <InsightsTranslationProvider>
-        <InsightsContent />
-      </InsightsTranslationProvider>
-    </ErrorBoundary>
+    <PremiumFeatureGuard feature="insights">
+      <ErrorBoundary>
+        <InsightsTranslationProvider>
+          <InsightsContent />
+        </InsightsTranslationProvider>
+      </ErrorBoundary>
+    </PremiumFeatureGuard>
   );
 }
-
-export default Insights;

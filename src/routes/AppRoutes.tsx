@@ -1,5 +1,5 @@
 
-import React, { useEffect, useState } from 'react';
+import React from 'react';
 import { Routes, Route, Navigate, Outlet } from 'react-router-dom';
 import Index from '@/pages/Index';
 import Home from '@/pages/Home';
@@ -22,18 +22,13 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useOnboarding } from '@/hooks/use-onboarding';
 
 const AppRoutes = () => {
+  console.log('Rendering AppRoutes component');
   const { user } = useAuth();
   const { onboardingComplete } = useOnboarding();
-  const [isRoutesInitialized, setIsRoutesInitialized] = useState(false);
-  
-  useEffect(() => {
-    console.log('[AppRoutes] Initializing routing system');
-    setIsRoutesInitialized(true);
-  }, []);
   
   // This will be used for conditional rendering of the /app route
   const AppRootRedirect = () => {
-    console.log('[AppRoutes] AppRootRedirect - Auth status:', { 
+    console.log('AppRootRedirect - Auth status:', { 
       user: !!user, 
       onboardingComplete 
     });
@@ -41,33 +36,19 @@ const AppRoutes = () => {
     if (user) {
       if (onboardingComplete) {
         // If user is logged in and onboarding is complete, go to home
-        console.log('[AppRoutes] User logged in and onboarding complete, redirecting to /app/home');
+        console.log('User logged in and onboarding complete, redirecting to /app/home');
         return <Navigate to="/app/home" replace />;
       } else {
         // If user is logged in but onboarding is not complete, go to onboarding
-        console.log('[AppRoutes] User logged in but onboarding not complete, redirecting to /app/onboarding');
+        console.log('User logged in but onboarding not complete, redirecting to /app/onboarding');
         return <Navigate to="/app/onboarding" replace />;
       }
     } else {
       // If user is not logged in, go to onboarding
-      console.log('[AppRoutes] User not logged in, redirecting to /app/onboarding');
+      console.log('User not logged in, redirecting to /app/onboarding');
       return <Navigate to="/app/onboarding" replace />;
     }
   };
-  
-  // Show loading state while routes initialize
-  if (!isRoutesInitialized) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
-          <p className="text-muted-foreground">Loading routes...</p>
-        </div>
-      </div>
-    );
-  }
-  
-  console.log('[AppRoutes] Rendering AppRoutes component with initialized routes');
   
   return (
     <Routes>

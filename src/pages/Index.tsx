@@ -1,5 +1,5 @@
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTheme } from '@/hooks/use-theme';
@@ -20,51 +20,11 @@ const Index = () => {
   const { onboardingComplete, checkOnboardingStatus } = useOnboarding();
   const networkStatus = useNetworkStatus();
   const { translate } = useTranslation();
-  const [isInitialized, setIsInitialized] = useState(false);
-  const [hasError, setHasError] = useState(false);
 
   const urlParams = new URLSearchParams(window.location.search);
   const mobileDemo = urlParams.get('mobileDemo') === 'true';
   
   const shouldRenderMobile = isMobile.isMobile || mobileDemo;
-
-  // Initialize the index page
-  useEffect(() => {
-    const initializeIndex = async () => {
-      try {
-        console.log('[Index] Initializing index page');
-        
-        // Pre-translate common strings used on the index page
-        if (translate) {
-          try {
-            console.log('[Index] Pre-translating common strings...');
-            await translate("Welcome to Soul Symphony", "en");
-            await translate("We've detected you're on a slow connection. We're loading a lightweight version of our site for better performance.", "en");
-            await translate("Loading optimized content...", "en");
-            await translate("You're currently offline", "en");
-            await translate("Please check your connection to access all features. Some content may still be available from cache.", "en");
-            console.log('[Index] Pre-translation complete');
-          } catch (error) {
-            console.error("[Index] Error pre-translating index page strings:", error);
-          }
-        }
-        
-        if (networkStatus.speed === 'slow') {
-          console.log('[Index] Slow network detected, optimizing experience...');
-        }
-        
-        setIsInitialized(true);
-        console.log('[Index] Index page initialization completed');
-        
-      } catch (error) {
-        console.error('[Index] Error initializing index page:', error);
-        setHasError(true);
-        setIsInitialized(true);
-      }
-    };
-
-    initializeIndex();
-  }, [networkStatus.speed, translate]);
 
   // Enhanced tutorial status checking for proper navigation flow
   useEffect(() => {
@@ -126,15 +86,11 @@ const Index = () => {
       }
     };
     
-    if (isInitialized) {
-      handleTutorialNavigation();
-    }
-  }, [user, checkOnboardingStatus, onboardingComplete, isInitialized]);
+    handleTutorialNavigation();
+  }, [user, checkOnboardingStatus, onboardingComplete]);
 
   // Handle explicit app redirects only
   useEffect(() => {
-    if (!isInitialized) return;
-    
     // Only redirect to app if explicitly requested with a URL parameter
     if (urlParams.has('app')) {
       console.log('[Index] User explicitly requested app with ?app parameter');
@@ -155,82 +111,75 @@ const Index = () => {
     if (urlParams.has('insights')) {
       navigate('/app/insights');
     }
-  }, [user, navigate, urlParams, onboardingComplete, isInitialized]);
+  }, [user, navigate, urlParams, onboardingComplete]);
+
+  useEffect(() => {
+    // Pre-translate common strings used on the index page
+    const preTranslateCommonStrings = async () => {
+      if (translate) {
+        try {
+          console.log('[Index] Pre-translating common strings...');
+          await translate("Welcome to Soul Symphony", "en");
+          await translate("We've detected you're on a slow connection. We're loading a lightweight version of our site for better performance.", "en");
+          await translate("Loading optimized content...", "en");
+          await translate("You're currently offline", "en");
+          await translate("Please check your connection to access all features. Some content may still be available from cache.", "en");
+          console.log('[Index] Pre-translation complete');
+        } catch (error) {
+          console.error("[Index] Error pre-translating index page strings:", error);
+        }
+      }
+    };
+    
+    preTranslateCommonStrings();
+    
+    if (networkStatus.speed === 'slow') {
+      console.log('[Index] Slow network detected, optimizing experience...');
+    }
+  }, [networkStatus.speed, translate]);
   
   console.log('[Index] Rendering Index.tsx component, path:', window.location.pathname, {
     hasUser: !!user,
-    onboardingComplete,
-    isInitialized,
-    hasError
+    onboardingComplete
   });
-
-  // Show loading state during initialization
-  if (!isInitialized) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
-          <p className="text-muted-foreground">Initializing...</p>
-        </div>
-      </div>
-    );
-  }
-
-  // Show error state if initialization failed
-  if (hasError) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
-        <div className="text-center max-w-md mx-auto p-6">
-          <h1 className="text-2xl font-bold mb-4">Loading Error</h1>
-          <p className="text-muted-foreground mb-6">
-            We're having trouble loading the page. Please try refreshing.
-          </p>
-          <button 
-            onClick={() => window.location.reload()} 
-            className="px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90"
-          >
-            Refresh Page
-          </button>
-        </div>
-      </div>
-    );
-  }
 
   // Always render the website homepage component when at root URL
   return (
-    <NetworkAwareContent
-      lowBandwidthFallback={
-        <div className="flex flex-col items-center justify-center min-h-screen p-4">
-          <h1 className="text-2xl font-bold mb-4">
-            <TranslatableText text="Welcome to Soul Symphony" forceTranslate={true} />
-          </h1>
-          <p className="text-center mb-6">
-            <TranslatableText 
-              text="We've detected you're on a slow connection. We're loading a lightweight version of our site for better performance." 
-              forceTranslate={true}
-            />
-          </p>
-          <div className="animate-pulse">
-            <TranslatableText text="Loading optimized content..." forceTranslate={true} />
+    <>
+      <NetworkAwareContent
+        lowBandwidthFallback={
+          <div className="flex flex-col items-center justify-center min-h-screen p-4">
+            <h1 className="text-2xl font-bold mb-4">
+              <TranslatableText text="Welcome to Soul Symphony" forceTranslate={true} />
+            </h1>
+            <p className="text-center mb-6">
+              <TranslatableText 
+                text="We've detected you're on a slow connection. We're loading a lightweight version of our site for better performance." 
+                forceTranslate={true}
+              />
+            </p>
+            <div className="animate-pulse">
+              <TranslatableText text="Loading optimized content..." forceTranslate={true} />
+            </div>
           </div>
-        </div>
-      }
-      offlineFallback={
-        <div className="flex flex-col items-center justify-center min-h-screen p-4">
-          <h1 className="text-2xl font-bold mb-4">
-            <TranslatableText text="You're currently offline" forceTranslate={true} />
-          </h1>
-          <p className="text-center mb-6">
-            <TranslatableText 
-              text="Please check your connection to access all features. Some content may still be available from cache." 
-              forceTranslate={true}
-            />
-          </p>
-        </div>
-      }
-    >
-      <HomePage />
-    </NetworkAwareContent>
+        }
+        offlineFallback={
+          <div className="flex flex-col items-center justify-center min-h-screen p-4">
+            <h1 className="text-2xl font-bold mb-4">
+              <TranslatableText text="You're currently offline" forceTranslate={true} />
+            </h1>
+            <p className="text-center mb-6">
+              <TranslatableText 
+                text="Please check your connection to access all features. Some content may still be available from cache." 
+                forceTranslate={true}
+              />
+            </p>
+          </div>
+        }
+      >
+        <HomePage />
+      </NetworkAwareContent>
+    </>
   );
 };
 

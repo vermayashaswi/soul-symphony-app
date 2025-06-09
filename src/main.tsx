@@ -10,7 +10,7 @@ import { ThemeProvider } from './hooks/use-theme'
 import { BrowserRouter } from 'react-router-dom'
 import { TranslationProvider } from './contexts/TranslationContext'
 
-// Enhanced Font Loading System with better error handling
+// Enhanced Font Loading System
 const initializeFontSystem = async () => {
   console.log('[FontSystem] Starting font initialization...');
   
@@ -28,7 +28,7 @@ const initializeFontSystem = async () => {
   ];
   
   // Font loading with timeout and retry
-  const loadFontWithRetry = async (fontFamily: string, retries = 2): Promise<boolean> => {
+  const loadFontWithRetry = async (fontFamily: string, retries = 3): Promise<boolean> => {
     for (let i = 0; i < retries; i++) {
       try {
         if (document.fonts && document.fonts.check) {
@@ -38,11 +38,11 @@ const initializeFontSystem = async () => {
             return true;
           }
           
-          // Wait for font to load with shorter timeout to prevent hanging
+          // Wait for font to load with timeout
           const fontFace = new FontFace(fontFamily, `local("${fontFamily}")`);
           await Promise.race([
             fontFace.load(),
-            new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout')), 2000)) // Reduced timeout
+            new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout')), 3000))
           ]);
           
           console.log(`[FontSystem] ${fontFamily} loaded successfully`);
@@ -51,24 +51,25 @@ const initializeFontSystem = async () => {
       } catch (error) {
         console.warn(`[FontSystem] Attempt ${i + 1} failed for ${fontFamily}:`, error);
         if (i < retries - 1) {
-          await new Promise(resolve => setTimeout(resolve, 300)); // Shorter retry delay
+          await new Promise(resolve => setTimeout(resolve, 500));
         }
       }
     }
     
-    console.warn(`[FontSystem] Failed to load ${fontFamily} after ${retries} attempts, continuing anyway`);
+    console.error(`[FontSystem] Failed to load ${fontFamily} after ${retries} attempts`);
     return false;
   };
   
+  // Load core fonts
+  const fontPromises = coreFonts.map(font => loadFontWithRetry(font));
+  
   try {
-    // Wait for document fonts ready with shorter timeout
+    // Wait for document fonts ready with timeout
     await Promise.race([
       document.fonts ? document.fonts.ready : Promise.resolve(),
-      new Promise(resolve => setTimeout(resolve, 3000)) // Reduced timeout
+      new Promise(resolve => setTimeout(resolve, 5000))
     ]);
     
-    // Load core fonts with reduced attempts to prevent hanging
-    const fontPromises = coreFonts.map(font => loadFontWithRetry(font, 2));
     const results = await Promise.allSettled(fontPromises);
     const loadedCount = results.filter(result => result.status === 'fulfilled' && result.value).length;
     
@@ -98,12 +99,8 @@ const initializeFontSystem = async () => {
 const fixViewportHeight = () => {
   // Set CSS variable for viewport height that updates on resize
   const setVhProperty = () => {
-    try {
-      const vh = window.innerHeight * 0.01;
-      document.documentElement.style.setProperty('--vh', `${vh}px`);
-    } catch (error) {
-      console.warn('[ViewportFix] Error setting viewport height:', error);
-    }
+    const vh = window.innerHeight * 0.01;
+    document.documentElement.style.setProperty('--vh', `${vh}px`);
   };
   
   // Initial set
@@ -141,46 +138,25 @@ const fixViewportHeight = () => {
   }
 };
 
-// Initialize systems with better error handling
+// Initialize systems
 const initializeApp = async () => {
-  try {
-    console.log('[Main] Starting application initialization');
-    
-    // Initialize viewport fix first
-    fixViewportHeight();
-    
-    // Detect iOS and set a class on the HTML element
-    if (/iPad|iPhone|iPod/.test(navigator.userAgent) || 
-        (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)) {
-      document.documentElement.classList.add('ios-device');
-    }
-    
-    // Initialize font system with timeout to prevent hanging
-    const fontTimeout = new Promise((resolve) => {
-      setTimeout(() => {
-        console.log('[Main] Font loading timeout reached, continuing with app initialization');
-        resolve(true);
-      }, 5000); // Maximum 5 seconds for font loading
-    });
-    
-    await Promise.race([
-      initializeFontSystem(),
-      fontTimeout
-    ]);
-    
-    console.log('[Main] Application initialization complete');
-    
-  } catch (error) {
-    console.error('[Main] Error during app initialization:', error);
-    // Continue with app initialization even if there are errors
+  // Initialize font system first
+  await initializeFontSystem();
+  
+  // Initialize viewport fix
+  fixViewportHeight();
+  
+  // Detect iOS and set a class on the HTML element
+  if (/iPad|iPhone|iPod/.test(navigator.userAgent) || 
+      (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)) {
+    document.documentElement.classList.add('ios-device');
   }
+  
+  console.log('[App] Initialization complete');
 };
 
-// Start initialization but don't wait for it to complete
+// Start initialization
 initializeApp();
-
-// Render the app immediately to prevent loading delays
-console.log('[Main] Starting React app render');
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>

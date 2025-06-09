@@ -1,9 +1,6 @@
-
 import React, { useState, useEffect } from 'react';
 import { useTranslation } from '@/contexts/TranslationContext';
 import SmartTextRenderer from './SmartTextRenderer';
-import { translationStabilityService } from '@/services/translationStabilityService';
-import { useLocation } from 'react-router-dom';
 
 interface TranslatableText3DProps {
   text: string;
@@ -24,7 +21,6 @@ interface TranslatableText3DProps {
   // ENHANCED APP-LEVEL: Coordinated translation props
   coordinatedTranslation?: string;
   useCoordinatedTranslation?: boolean;
-  timeRange?: string; // Added for stability tracking
 }
 
 export const TranslatableText3D: React.FC<TranslatableText3DProps> = ({
@@ -44,15 +40,12 @@ export const TranslatableText3D: React.FC<TranslatableText3DProps> = ({
   sourceLanguage = 'en',
   onTranslationComplete,
   coordinatedTranslation,
-  useCoordinatedTranslation = false,
-  timeRange = 'week'
+  useCoordinatedTranslation = false
 }) => {
   const { currentLanguage, getCachedTranslation, translate } = useTranslation();
-  const location = useLocation();
   const [translatedText, setTranslatedText] = useState<string>(text);
   const [isTranslating, setIsTranslating] = useState(false);
   const [translationAttempted, setTranslationAttempted] = useState(false);
-  const route = location.pathname;
 
   useEffect(() => {
     const translateText = async () => {
@@ -62,8 +55,6 @@ export const TranslatableText3D: React.FC<TranslatableText3DProps> = ({
         setTranslatedText(coordinatedTranslation);
         onTranslationComplete?.(coordinatedTranslation);
         setTranslationAttempted(true);
-        // Store in stability service for persistence
-        translationStabilityService.setTranslationState(text, coordinatedTranslation, currentLanguage, route, timeRange, sourceLanguage);
         return;
       }
 
@@ -74,40 +65,16 @@ export const TranslatableText3D: React.FC<TranslatableText3DProps> = ({
         return;
       }
 
-      // Check for persistent state first
-      const persistentState = translationStabilityService.getTranslationState(text, currentLanguage, route, timeRange);
-      if (persistentState) {
-        console.log(`[TranslatableText3D] Using persistent state for "${text.substring(0, 30)}"`);
-        setTranslatedText(persistentState.translatedText);
-        onTranslationComplete?.(persistentState.translatedText);
-        setTranslationAttempted(true);
-        return;
-      }
-
       // ENHANCED: Better fallback handling for coordinated translations with debugging
       if (useCoordinatedTranslation && !coordinatedTranslation) {
-        console.log(`[TranslatableText3D] ENHANCED APP-LEVEL FALLBACK: No coordinated translation available for "${text}", checking stability service`);
+        console.log(`[TranslatableText3D] ENHANCED APP-LEVEL FALLBACK: No coordinated translation available for "${text}", checking app-level cache with improved error handling`);
         
-        // Try stability service fallback first
-        const fallbackTranslation = translationStabilityService.getLastTranslatedText(text, currentLanguage);
-        if (fallbackTranslation) {
-          console.log(`[TranslatableText3D] ENHANCED APP-LEVEL FALLBACK: Using stability service fallback for "${text}": "${fallbackTranslation}"`);
-          setTranslatedText(fallbackTranslation);
-          onTranslationComplete?.(fallbackTranslation);
-          // Store for current view
-          translationStabilityService.setTranslationState(text, fallbackTranslation, currentLanguage, route, timeRange, sourceLanguage);
-          setTranslationAttempted(true);
-          return;
-        }
-        
-        // Try app-level cache as secondary fallback
+        // Try app-level cache as fallback
         const appLevelCached = getCachedTranslation(text);
         if (appLevelCached) {
           console.log(`[TranslatableText3D] ENHANCED APP-LEVEL FALLBACK: Using app-level cached translation for "${text}": "${appLevelCached}"`);
           setTranslatedText(appLevelCached);
           onTranslationComplete?.(appLevelCached);
-          // Store in stability service
-          translationStabilityService.setTranslationState(text, appLevelCached, currentLanguage, route, timeRange, sourceLanguage);
           setTranslationAttempted(true);
           return;
         }
@@ -122,32 +89,18 @@ export const TranslatableText3D: React.FC<TranslatableText3DProps> = ({
 
       // ENHANCED APP-LEVEL: Standard translation flow for non-coordinated usage
       if (!useCoordinatedTranslation) {
-        // Check stability service fallback first
-        const fallbackTranslation = translationStabilityService.getLastTranslatedText(text, currentLanguage);
-        if (fallbackTranslation) {
-          console.log(`[TranslatableText3D] Using stability service fallback for "${text}": "${fallbackTranslation}"`);
-          setTranslatedText(fallbackTranslation);
-          onTranslationComplete?.(fallbackTranslation);
-          // Store for current view
-          translationStabilityService.setTranslationState(text, fallbackTranslation, currentLanguage, route, timeRange, sourceLanguage);
-          setTranslationAttempted(true);
-          return;
-        }
-
         const cachedTranslation = getCachedTranslation(text);
         if (cachedTranslation) {
           console.log(`[TranslatableText3D] ENHANCED APP-LEVEL: Using app-level cached translation for "${text}": "${cachedTranslation}"`);
           setTranslatedText(cachedTranslation);
           onTranslationComplete?.(cachedTranslation);
-          // Store in stability service
-          translationStabilityService.setTranslationState(text, cachedTranslation, currentLanguage, route, timeRange, sourceLanguage);
           setTranslationAttempted(true);
           return;
         }
 
-        // Skip translation if already attempted and failed, or if translations are locked
-        if (translationAttempted || translationStabilityService.isTranslationLocked(currentLanguage, route, timeRange)) {
-          console.log(`[TranslatableText3D] ENHANCED APP-LEVEL: Translation skipped for "${text}", using original to avoid loops`);
+        // Skip translation if already attempted and failed
+        if (translationAttempted) {
+          console.log(`[TranslatableText3D] ENHANCED APP-LEVEL: Translation already attempted for "${text}", using original to avoid loops`);
           setTranslatedText(text);
           onTranslationComplete?.(text);
           return;
@@ -171,10 +124,6 @@ export const TranslatableText3D: React.FC<TranslatableText3DProps> = ({
             console.log(`[TranslatableText3D] ENHANCED APP-LEVEL: Translation successful: "${text}" -> "${result}"`);
             setTranslatedText(result);
             onTranslationComplete?.(result);
-            // Store in stability service
-            translationStabilityService.setTranslationState(text, result, currentLanguage, route, timeRange, sourceLanguage);
-            // Check if view is now stable
-            translationStabilityService.checkViewStability(currentLanguage, route, timeRange);
           } else {
             console.log(`[TranslatableText3D] ENHANCED APP-LEVEL: Using original text for "${text}" (same as result or null)`);
             setTranslatedText(text);
@@ -192,7 +141,7 @@ export const TranslatableText3D: React.FC<TranslatableText3DProps> = ({
     };
 
     translateText();
-  }, [text, currentLanguage, sourceLanguage, translate, getCachedTranslation, onTranslationComplete, translationAttempted, coordinatedTranslation, useCoordinatedTranslation, route, timeRange]);
+  }, [text, currentLanguage, sourceLanguage, translate, getCachedTranslation, onTranslationComplete, translationAttempted, coordinatedTranslation, useCoordinatedTranslation]);
 
   // Always render with current text - don't hide during translation
   return (
