@@ -22,7 +22,6 @@ import { useIsMobile } from '@/hooks/use-mobile';
 import { Separator } from '@/components/ui/separator';
 import { useAuth } from '@/contexts/AuthContext';
 import { TranslatableText } from '@/components/translation/TranslatableText';
-import { format, eachDayOfInterval, startOfWeek, endOfWeek, startOfMonth, endOfMonth, startOfYear, endOfYear, parseISO, isValid } from 'date-fns';
 
 type EmotionData = {
   day: string;
@@ -102,47 +101,6 @@ const getEmotionColor = (emotion: string, index: number): string => {
   ];
   
   return fallbackColors[index % fallbackColors.length];
-};
-
-const getDateRangeForTimeframe = (timeframe: TimeRange) => {
-  const now = new Date();
-  
-  switch (timeframe) {
-    case 'today':
-      return { start: now, end: now };
-    case 'week':
-      return {
-        start: startOfWeek(now, { weekStartsOn: 1 }), // Start on Monday
-        end: endOfWeek(now, { weekStartsOn: 1 })
-      };
-    case 'month':
-      return {
-        start: startOfMonth(now),
-        end: endOfMonth(now)
-      };
-    case 'year':
-      return {
-        start: startOfYear(now),
-        end: endOfYear(now)
-      };
-    default:
-      return { start: now, end: now };
-  }
-};
-
-const formatDateForDisplay = (date: Date, timeframe: TimeRange): string => {
-  switch (timeframe) {
-    case 'today':
-      return format(date, 'HH:mm');
-    case 'week':
-      return format(date, 'EEE dd');
-    case 'month':
-      return format(date, 'MMM dd');
-    case 'year':
-      return format(date, 'MMM');
-    default:
-      return format(date, 'MMM dd');
-  }
 };
 
 export function EmotionChart({ 
@@ -260,15 +218,31 @@ export function EmotionChart({
       return [];
     }
     
-    console.log('[EmotionChart] Processing line data for timeframe:', timeframe);
-    
-    // Calculate emotion totals to determine top emotions
     const emotionTotals: Record<string, number> = {};
+    
+    const dateMap = new Map<string, Map<string, {total: number, count: number}>>();
+    
     Object.entries(aggregatedData).forEach(([emotion, dataPoints]) => {
       let totalValue = 0;
+      
       dataPoints.forEach(point => {
+        if (!dateMap.has(point.date)) {
+          dateMap.set(point.date, new Map());
+        }
+        
+        const dateEntry = dateMap.get(point.date)!;
+        
+        if (!dateEntry.has(emotion)) {
+          dateEntry.set(emotion, { total: 0, count: 0 });
+        }
+        
+        const emotionEntry = dateEntry.get(emotion)!;
+        emotionEntry.total += point.value;
+        emotionEntry.count += 1;
+        
         totalValue += point.value;
       });
+      
       if (totalValue > 0) {
         emotionTotals[emotion] = totalValue;
       }
@@ -279,132 +253,39 @@ export function EmotionChart({
       .slice(0, 5)
       .map(([emotion]) => emotion);
     
-    if (topEmotions.length === 0) {
-      return [];
-    }
+    const mostDominantEmotion = topEmotions[0] || '';
     
-    // Set default visible emotion if none selected
-    const mostDominantEmotion = topEmotions[0];
     if (chartType === 'line' && visibleEmotions.length === 0 && mostDominantEmotion) {
       setVisibleEmotions([mostDominantEmotion]);
     }
     
-    // Get the date range for the timeframe
-    const { start: rangeStart, end: rangeEnd } = getDateRangeForTimeframe(timeframe);
-    
-    // For 'today', we don't generate a date range since it's hourly data
-    if (timeframe === 'today') {
-      // Process existing logic for today view
-      const dateMap = new Map<string, Map<string, {total: number, count: number}>>();
-      
-      Object.entries(aggregatedData).forEach(([emotion, dataPoints]) => {
-        dataPoints.forEach(point => {
-          if (!dateMap.has(point.date)) {
-            dateMap.set(point.date, new Map());
+    const result = Array.from(dateMap.entries())
+      .map(([date, emotions]) => {
+        const dataPoint: EmotionData = { 
+          day: new Date(date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) 
+        };
+        
+        topEmotions.forEach(emotion => {
+          const emotionData = emotions.get(emotion);
+          if (emotionData && emotionData.count > 0) {
+            let avgValue = emotionData.total / emotionData.count;
+            if (avgValue > 1.0) avgValue = 1.0;
+            dataPoint[emotion] = parseFloat(avgValue.toFixed(2));
+          } else {
+            dataPoint[emotion] = null;
           }
-          
-          const dateEntry = dateMap.get(point.date)!;
-          if (!dateEntry.has(emotion)) {
-            dateEntry.set(emotion, { total: 0, count: 0 });
-          }
-          
-          const emotionEntry = dateEntry.get(emotion)!;
-          emotionEntry.total += point.value;
-          emotionEntry.count += 1;
         });
+        
+        return dataPoint;
+      })
+      .sort((a, b) => {
+        const dateA = new Date(a.day);
+        const dateB = new Date(b.day);
+        return dateA.getTime() - dateB.getTime();
       });
-      
-      return Array.from(dateMap.entries())
-        .map(([date, emotions]) => {
-          const dataPoint: EmotionData = { 
-            day: new Date(date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) 
-          };
-          
-          topEmotions.forEach(emotion => {
-            const emotionData = emotions.get(emotion);
-            if (emotionData && emotionData.count > 0) {
-              let avgValue = emotionData.total / emotionData.count;
-              if (avgValue > 1.0) avgValue = 1.0;
-              dataPoint[emotion] = parseFloat(avgValue.toFixed(2));
-            } else {
-              dataPoint[emotion] = null;
-            }
-          });
-          
-          return dataPoint;
-        })
-        .sort((a, b) => {
-          const dateA = new Date(a.day);
-          const dateB = new Date(b.day);
-          return dateA.getTime() - dateB.getTime();
-        });
-    }
-    
-    // Generate complete date range for week, month, and year
-    const allDates = eachDayOfInterval({ start: rangeStart, end: rangeEnd });
-    
-    // Create a map of dates to emotion data from aggregatedData
-    const dataByDate = new Map<string, Map<string, {total: number, count: number}>>();
-    const journalDates = new Set<string>(); // Track which dates have journal entries
-    
-    Object.entries(aggregatedData).forEach(([emotion, dataPoints]) => {
-      dataPoints.forEach(point => {
-        const dateStr = point.date;
-        journalDates.add(dateStr);
-        
-        if (!dataByDate.has(dateStr)) {
-          dataByDate.set(dateStr, new Map());
-        }
-        
-        const dateEntry = dataByDate.get(dateStr)!;
-        if (!dateEntry.has(emotion)) {
-          dateEntry.set(emotion, { total: 0, count: 0 });
-        }
-        
-        const emotionEntry = dateEntry.get(emotion)!;
-        emotionEntry.total += point.value;
-        emotionEntry.count += 1;
-      });
-    });
-    
-    // Generate the complete dataset
-    const result = allDates.map(date => {
-      const dateStr = format(date, 'yyyy-MM-dd');
-      const hasJournalEntry = journalDates.has(dateStr);
-      
-      const dataPoint: EmotionData = {
-        day: formatDateForDisplay(date, timeframe)
-      };
-      
-      topEmotions.forEach(emotion => {
-        const emotionData = dataByDate.get(dateStr)?.get(emotion);
-        
-        if (emotionData && emotionData.count > 0) {
-          // Day has this emotion data - show actual value
-          let avgValue = emotionData.total / emotionData.count;
-          if (avgValue > 1.0) avgValue = 1.0;
-          dataPoint[emotion] = parseFloat(avgValue.toFixed(2));
-        } else if (hasJournalEntry) {
-          // Day has journal entries but not this specific emotion - show 0
-          dataPoint[emotion] = 0;
-        } else {
-          // Day has no journal entries at all - use null to hide from chart
-          dataPoint[emotion] = null;
-        }
-      });
-      
-      return dataPoint;
-    });
-    
-    console.log('[EmotionChart] Generated line data:', {
-      timeframe,
-      totalDays: result.length,
-      topEmotions,
-      sampleData: result.slice(0, 3)
-    });
     
     return result;
-  }, [aggregatedData, visibleEmotions, chartType, timeframe]);
+  }, [aggregatedData, visibleEmotions, chartType]);
 
   const dominantEmotion = useMemo(() => {
     if (!aggregatedData || Object.keys(aggregatedData).length === 0) {
@@ -568,7 +449,6 @@ export function EmotionChart({
               fontSize={isMobile ? 10 : 12} 
               tickMargin={10}
               tick={{ fontSize: isMobile ? 10 : 12 }}
-              interval={timeframe === 'month' ? 4 : timeframe === 'year' ? 0 : 'preserveStartEnd'}
             />
             <YAxis 
               stroke="#888" 
@@ -592,7 +472,7 @@ export function EmotionChart({
                 name={emotion.charAt(0).toUpperCase() + emotion.slice(1)}
                 label={isMobile ? null : <EmotionLineLabel />}
                 hide={!visibleEmotions.includes(emotion)}
-                connectNulls={false}
+                connectNulls={true}
               />
             ))}
           </LineChart>
