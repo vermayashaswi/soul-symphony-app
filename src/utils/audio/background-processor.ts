@@ -15,7 +15,7 @@ export async function processRecordingInBackground(
   recordingDuration?: number
 ): Promise<{ success: boolean; entryId?: number; error?: string }> {
   console.log('[BackgroundProcessor] Starting enhanced background processing for tempId:', tempId);
-  console.log('[BackgroundProcessor] Recording duration (actual):', recordingDuration, 'ms');
+  console.log('[BackgroundProcessor] Recording duration (actual from recorder):', recordingDuration, 'ms');
   
   try {
     // Enhanced validation
@@ -41,14 +41,14 @@ export async function processRecordingInBackground(
     
     console.log(`[BackgroundProcessor] Successfully converted audio to base64, length: ${base64Audio.length}`);
     
-    // Enhanced transcription call with proper duration handling
-    console.log('[BackgroundProcessor] Sending audio to enhanced transcription service');
+    // FIXED: Pass the actual recording duration to ensure accurate data
+    console.log('[BackgroundProcessor] Sending audio to enhanced transcription service with actual duration');
     const transcriptionResult = await sendAudioForTranscription(
       base64Audio, 
       userId,
       false, // Not direct transcription
       true,  // High quality processing
-      recordingDuration // Pass the actual recording duration from the recorder
+      recordingDuration || 0 // Pass the actual recording duration from the recorder
     );
     
     if (!transcriptionResult.success) {
@@ -65,7 +65,7 @@ export async function processRecordingInBackground(
       throw new Error('No entry ID returned from transcription service');
     }
     
-    console.log(`[BackgroundProcessor] Successfully created journal entry with ID: ${entryId}, duration: ${recordingDuration}ms`);
+    console.log(`[BackgroundProcessor] Successfully created journal entry with ID: ${entryId}, actual duration: ${recordingDuration}ms`);
     
     // Store the mapping between tempId and entryId
     setEntryIdForProcessingId(tempId, entryId);

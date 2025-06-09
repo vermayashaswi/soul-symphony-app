@@ -62,7 +62,7 @@ serve(async (req) => {
     console.log(`Direct transcription mode: ${directTranscription ? 'YES' : 'NO'}`);
     console.log(`High quality mode: ${highQuality ? 'YES' : 'NO'}`);
     console.log(`Audio data length: ${actualAudioData?.length || 0}`);
-    console.log(`Recording time (provided): ${recordingTime}ms`);
+    console.log(`Recording time (client-provided): ${recordingTime}ms`);
     
     if (!actualAudioData) {
       throw new Error('No audio data received');
@@ -91,9 +91,9 @@ serve(async (req) => {
     const validatedBytes = validateAndFixAudioData(bytes, detectedFileType);
     console.log(`Audio validation completed`);
 
-    // Use the provided recording time directly for duration calculation
+    // FIXED: Use the client-provided recording time directly
     const durationMs = recordingTime > 0 ? recordingTime : 0;
-    console.log(`Using recording duration: ${durationMs}ms (${recordingTime > 0 ? 'from client' : 'fallback to 0'})`);
+    console.log(`Using actual recording duration: ${durationMs}ms (source: ${recordingTime > 0 ? 'client' : 'fallback'})`);
 
     // Store audio file using admin client
     const timestamp = Date.now();
@@ -190,7 +190,7 @@ serve(async (req) => {
       console.warn('No emotions data found in database, skipping emotion analysis');
     }
 
-    // Step 5: Store in database using the enhanced function
+    // Step 5: Store in database using the enhanced function (without separate entity extraction)
     console.log('Step 5: Storing journal entry in database...');
     
     const entryId = await storeJournalEntry(
@@ -199,7 +199,7 @@ serve(async (req) => {
       refinedText,
       audioUrl,
       userId,
-      durationMs,
+      durationMs, // Use the actual recording duration
       emotions,
       sentimentResult.sentiment
     );
@@ -219,8 +219,8 @@ serve(async (req) => {
       console.log(`Languages updated: ${JSON.stringify(detectedLanguages)}`);
     }
 
-    // Step 7: Extract themes with enhanced processing
-    console.log('Step 7: Extracting themes with enhanced processing...');
+    // Step 7: Extract themes, entities, and categories using the unified generate-themes function
+    console.log('Step 7: Extracting themes, entities, and categories with unified processing...');
     await extractThemes(supabaseAdmin, refinedText, entryId);
 
     // Step 8: Generate and store embeddings with enhanced error handling
@@ -246,7 +246,7 @@ serve(async (req) => {
       sentiment: sentimentResult.sentiment,
       language: detectedLanguages[0] || 'unknown',
       languages: detectedLanguages,
-      duration: durationMs,
+      duration: durationMs, // Return the actual recording duration
       audioUrl: audioUrl,
       success: true
     }), {
