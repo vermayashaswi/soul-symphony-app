@@ -467,9 +467,8 @@ function InsightsContent() {
                     <Filter className="h-5 w-5 text-muted-foreground" />
                   </div>
                   <EmotionChart 
-                    data={insightsData.entries}
-                    onEmotionClick={handleEmotionClick}
-                    selectedEmotion={selectedEmotion}
+                    timeframe={timeRange}
+                    aggregatedData={insightsData.aggregatedEmotions}
                   />
                 </div>
               </motion.div>
