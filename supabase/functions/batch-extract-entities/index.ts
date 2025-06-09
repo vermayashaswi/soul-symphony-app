@@ -1,8 +1,8 @@
+
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.38.4";
 
-// Use proper API key from Supabase secrets
-const googleApiKey = Deno.env.get('GOOGLE_API') || '';
+const openAIApiKey = Deno.env.get('OPENAI_API_KEY') || '';
 const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
 
@@ -14,41 +14,77 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-// Function to extract entities from text using Google NL API
-async function extractEntities(text) {
-  if (!googleApiKey) {
-    console.error("Google API key not configured");
-    return { error: "Google API key not configured" };
+// Function to extract entities from text using GPT instead of Google NL API
+async function extractEntitiesWithGPT(text) {
+  if (!openAIApiKey) {
+    console.error("OpenAI API key not configured");
+    return { error: "OpenAI API key not configured" };
   }
 
   try {
-    console.log("Extracting entities from text:", text.substring(0, 50) + "...");
+    console.log("Extracting entities from text using GPT:", text.substring(0, 50) + "...");
     
-    const response = await fetch(`https://language.googleapis.com/v1/documents:analyzeEntities?key=${googleApiKey}`, {
+    const prompt = `
+      Extract traditional entities from this journal entry text. Focus on specific, concrete entities:
+      
+      - PERSON: Names of people, family members, friends, colleagues (e.g., "John", "mom", "my boss")
+      - PLACE: Locations, cities, countries, buildings, rooms (e.g., "New York", "office", "home")
+      - ORGANIZATION: Companies, schools, teams, groups (e.g., "Google", "Harvard", "Red Cross")
+      - THING: Specific objects, products, brands, books, movies (e.g., "iPhone", "Netflix", "coffee")
+      
+      Return as JSON with arrays for each type. Only include entities that are explicitly mentioned:
+      
+      {
+        "PERSON": ["name1", "name2"],
+        "PLACE": ["place1", "place2"], 
+        "ORGANIZATION": ["org1"],
+        "THING": ["item1", "item2"]
+      }
+      
+      Text: ${text}
+    `;
+
+    const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
+        'Authorization': `Bearer ${openAIApiKey}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        document: {
-          type: 'PLAIN_TEXT',
-          content: text
-        },
-        encodingType: 'UTF8'
-      })
+        model: 'gpt-4o-mini',
+        messages: [
+          {
+            role: 'system',
+            content: 'You are an expert at extracting traditional named entities from text. Only extract concrete, specific entities that are explicitly mentioned. Return only valid JSON.'
+          },
+          {
+            role: 'user',
+            content: prompt
+          }
+        ],
+        temperature: 0.1,
+        response_format: { type: "json_object" }
+      }),
     });
 
     if (!response.ok) {
-      const errorData = await response.json();
-      console.error("Google NL API error:", errorData);
+      const errorData = await response.text();
+      console.error("OpenAI API error:", errorData);
       return { error: errorData };
     }
 
     const result = await response.json();
-    console.log("Entity extraction successful, found", result.entities?.length || 0, "entities");
-    return { entities: result.entities || [] };
+    
+    if (!result.choices || !result.choices[0]?.message?.content) {
+      console.error("Invalid response structure from OpenAI");
+      return { error: "Invalid response from OpenAI" };
+    }
+
+    const entities = JSON.parse(result.choices[0].message.content);
+    console.log("Entity extraction successful using GPT, found entities:", entities);
+    return { entities };
   } catch (error) {
-    console.error("Error in entity extraction:", error);
+    console.error("Error in GPT entity extraction:", error);
     return { error: error.message };
   }
 }
@@ -61,7 +97,7 @@ async function processJournalEntries(entries, diagnosticMode = false) {
     try {
       console.log(`Processing entry ID: ${entry.id}`);
       
-      // Fix: Use "refined text" or "transcription text" field instead of "text"
+      // Use "refined text" or "transcription text" field
       const textToProcess = entry["refined text"] || entry["transcription text"] || "";
       
       if (!textToProcess) {
@@ -70,7 +106,7 @@ async function processJournalEntries(entries, diagnosticMode = false) {
         continue;
       }
       
-      const { entities, error } = await extractEntities(textToProcess);
+      const { entities, error } = await extractEntitiesWithGPT(textToProcess);
 
       if (error) {
         console.error(`Error extracting entities for entry ID ${entry.id}:`, error);
@@ -78,20 +114,10 @@ async function processJournalEntries(entries, diagnosticMode = false) {
         continue;
       }
 
-      // Ensure entities are properly formatted before saving to database
-      let formattedEntities = entities;
-      if (entities && Array.isArray(entities)) {
-        formattedEntities = entities.map(entity => ({
-          type: entity.type || 'other',
-          name: entity.name || entity.mentions?.[0]?.text?.content || 'unknown',
-          text: entity.mentions?.[0]?.text?.content
-        }));
-      }
-
-      // Update the journal entry with extracted entities
+      // Update the journal entry with extracted entities (traditional entities format)
       const { error: updateError } = await supabase
         .from('Journal Entries')
-        .update({ entities: formattedEntities })
+        .update({ entities: entities })
         .eq('id', entry.id);
 
       if (updateError) {
@@ -101,7 +127,13 @@ async function processJournalEntries(entries, diagnosticMode = false) {
       }
 
       console.log(`Successfully processed entry ID: ${entry.id}`);
-      results.push({ id: entry.id, success: true, entityCount: entities?.length || 0 });
+      
+      // Count total entities across all types
+      const totalEntityCount = Object.values(entities || {}).reduce((total, entityArray) => {
+        return total + (Array.isArray(entityArray) ? entityArray.length : 0);
+      }, 0);
+      
+      results.push({ id: entry.id, success: true, entityCount: totalEntityCount });
 
     } catch (error) {
       console.error(`Unexpected error processing entry ID ${entry.id}:`, error);
@@ -127,10 +159,10 @@ serve(async (req) => {
     } = await req.json();
 
     if (checkApiKeyOnly) {
-      if (!googleApiKey) {
+      if (!openAIApiKey) {
         return new Response(
           JSON.stringify({
-            message: "GOOGLE_API key is not configured.",
+            message: "OPENAI_API_KEY is not configured.",
             configured: false
           }),
           {
@@ -141,7 +173,7 @@ serve(async (req) => {
       } else {
         return new Response(
           JSON.stringify({
-            message: "GOOGLE_API key is configured.",
+            message: "OPENAI_API_KEY is configured.",
             configured: true
           }),
           {
@@ -152,7 +184,7 @@ serve(async (req) => {
       }
     }
 
-    console.log("Starting batch entity extraction...");
+    console.log("Starting batch entity extraction with GPT...");
     
     let entries = [];
     
@@ -217,7 +249,7 @@ serve(async (req) => {
     if (diagnosticMode) {
       return new Response(
         JSON.stringify({
-          message: `Batch processing completed. Success: ${successCount}, Errors: ${errorCount}`,
+          message: `Batch processing completed using GPT. Success: ${successCount}, Errors: ${errorCount}`,
           results: results
         }),
         {
@@ -228,7 +260,7 @@ serve(async (req) => {
     } else {
       // Standard response
       return new Response(
-        JSON.stringify({ message: `Batch processing completed. Success: ${successCount}, Errors: ${errorCount}` }),
+        JSON.stringify({ message: `Batch processing completed using GPT. Success: ${successCount}, Errors: ${errorCount}` }),
         {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
           status: 200,

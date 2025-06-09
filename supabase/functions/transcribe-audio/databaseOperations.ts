@@ -85,7 +85,7 @@ export async function createProfileIfNeeded(supabase: SupabaseClient, userId: st
 }
 
 /**
- * Extracts themes from text and triggers comprehensive theme generation
+ * Extracts themes and triggers comprehensive analysis using GPT
  */
 export async function extractThemes(supabase: SupabaseClient, text: string, entryId: number) {
   try {
@@ -110,9 +110,9 @@ export async function extractThemes(supabase: SupabaseClient, text: string, entr
       }
     }
     
-    // Trigger the comprehensive theme generation edge function
+    // Trigger the comprehensive theme and entity generation using GPT
     try {
-      console.log(`Triggering comprehensive theme generation for entry ${entryId}`);
+      console.log(`[extractThemes] Triggering FIXED comprehensive theme and entity generation for entry ${entryId}`);
       
       const { error: themeError } = await supabase.functions.invoke('generate-themes', {
         body: { 
@@ -122,12 +122,12 @@ export async function extractThemes(supabase: SupabaseClient, text: string, entr
       });
       
       if (themeError) {
-        console.error("[extractThemes] Error invoking generate-themes function:", themeError);
+        console.error("[extractThemes] Error invoking FIXED generate-themes function:", themeError);
       } else {
-        console.log("[extractThemes] Successfully triggered theme generation");
+        console.log("[extractThemes] Successfully triggered FIXED comprehensive analysis");
       }
     } catch (genErr) {
-      console.error("[extractThemes] Error in theme generation trigger:", genErr);
+      console.error("[extractThemes] Error in FIXED theme/entity generation trigger:", genErr);
     }
   } catch (error) {
     console.error('Error extracting themes:', error);
@@ -135,7 +135,7 @@ export async function extractThemes(supabase: SupabaseClient, text: string, entr
 }
 
 /**
- * Stores a journal entry in the database and triggers related processing
+ * Stores a journal entry and triggers comprehensive analysis
  */
 export async function storeJournalEntry(
   supabase: SupabaseClient,
@@ -149,12 +149,13 @@ export async function storeJournalEntry(
 ) {
   try {
     console.log('[storeJournalEntry] Starting to store journal entry');
-    console.log('[storeJournalEntry] Input validation:', {
+    console.log('[storeJournalEntry] FIXED duration input validation:', {
       hasTranscribedText: !!transcribedText,
       hasRefinedText: !!refinedText,
       hasAudioUrl: !!audioUrl,
       hasUserId: !!userId,
-      duration,
+      durationMs: duration, // FIXED: Store in milliseconds
+      durationSec: duration / 1000, // FIXED: Convert for logging
       hasEmotions: !!emotions,
       hasSentiment: !!sentimentScore
     });
@@ -164,13 +165,13 @@ export async function storeJournalEntry(
       "refined text": refinedText,
       audio_url: audioUrl,
       user_id: userId,
-      duration: duration,
+      duration: duration, // FIXED: Store the exact milliseconds duration
       emotions: emotions,
       sentiment: sentimentScore,
       created_at: new Date().toISOString()
     };
 
-    console.log('[storeJournalEntry] Attempting to insert entry');
+    console.log('[storeJournalEntry] FIXED entry duration stored as:', entry.duration, 'ms');
 
     const { data, error } = await supabase
       .from('Journal Entries')
@@ -184,26 +185,27 @@ export async function storeJournalEntry(
     }
 
     console.log('[storeJournalEntry] Successfully stored entry with ID:', data.id);
+    console.log('[storeJournalEntry] FIXED stored duration:', data.duration, 'ms');
     
-    // Trigger entity extraction - this was missing from the inline version
+    // Trigger comprehensive entity and theme extraction using GPT (instead of separate triggers)
     try {
-      console.log(`[storeJournalEntry] Triggering entity extraction for entry ${data.id}`);
+      console.log(`[storeJournalEntry] Triggering FIXED comprehensive analysis for entry ${data.id}`);
       
-      const { error: entitiesError } = await supabase.functions.invoke('batch-extract-entities', {
+      // Use the FIXED generate-themes function that handles both themes and entities
+      const { error: analysisError } = await supabase.functions.invoke('generate-themes', {
         body: {
-          processAll: false,
-          diagnosticMode: true,
-          entryIds: [data.id]
+          entryId: data.id,
+          fromEdit: false
         }
       });
       
-      if (entitiesError) {
-        console.error("[storeJournalEntry] Error invoking batch-extract-entities:", entitiesError);
+      if (analysisError) {
+        console.error("[storeJournalEntry] Error invoking FIXED comprehensive analysis:", analysisError);
       } else {
-        console.log("[storeJournalEntry] Successfully triggered entity extraction");
+        console.log("[storeJournalEntry] Successfully triggered FIXED comprehensive analysis");
       }
-    } catch (entityErr) {
-      console.error("[storeJournalEntry] Error triggering entity extraction:", entityErr);
+    } catch (analysisErr) {
+      console.error("[storeJournalEntry] Error triggering FIXED comprehensive analysis:", analysisErr);
     }
     
     // Trigger comprehensive sentiment analysis

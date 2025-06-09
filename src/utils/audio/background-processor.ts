@@ -5,7 +5,7 @@ import { sendAudioForTranscription } from './transcription-service';
 import { getEntryIdForProcessingId, setEntryIdForProcessingId } from '../audio-processing';
 
 /**
- * Process audio recording in the background with enhanced error handling
+ * Process audio recording in the background with FIXED duration handling
  * Returns immediately with tempId, processes in background
  */
 export async function processRecordingInBackground(
@@ -15,7 +15,7 @@ export async function processRecordingInBackground(
   recordingDuration?: number
 ): Promise<{ success: boolean; entryId?: number; error?: string }> {
   console.log('[BackgroundProcessor] Starting enhanced background processing for tempId:', tempId);
-  console.log('[BackgroundProcessor] Recording duration (actual):', recordingDuration, 'ms');
+  console.log('[BackgroundProcessor] FIXED Recording duration (actual from recorder):', recordingDuration, 'ms');
   
   try {
     // Enhanced validation
@@ -41,14 +41,18 @@ export async function processRecordingInBackground(
     
     console.log(`[BackgroundProcessor] Successfully converted audio to base64, length: ${base64Audio.length}`);
     
-    // Enhanced transcription call with proper duration handling
+    // FIXED: Ensure we pass the exact recording duration from the recorder
+    const exactDurationMs = recordingDuration || 0;
+    console.log(`[BackgroundProcessor] FIXED duration handling - passing exact duration: ${exactDurationMs}ms to transcription service`);
+    
+    // Enhanced transcription call with FIXED duration handling
     console.log('[BackgroundProcessor] Sending audio to enhanced transcription service');
     const transcriptionResult = await sendAudioForTranscription(
       base64Audio, 
       userId,
       false, // Not direct transcription
       true,  // High quality processing
-      recordingDuration // Pass the actual recording duration from the recorder
+      exactDurationMs // FIXED: Pass the exact recording duration from the recorder
     );
     
     if (!transcriptionResult.success) {
@@ -57,6 +61,7 @@ export async function processRecordingInBackground(
     }
 
     console.log('[BackgroundProcessor] Enhanced transcription result:', transcriptionResult.data);
+    console.log('[BackgroundProcessor] FIXED duration in transcription result:', transcriptionResult.data?.duration, 'ms');
     
     // Extract the entry ID with validation
     const entryId = transcriptionResult.data?.entryId || transcriptionResult.data?.id;
@@ -65,7 +70,7 @@ export async function processRecordingInBackground(
       throw new Error('No entry ID returned from transcription service');
     }
     
-    console.log(`[BackgroundProcessor] Successfully created journal entry with ID: ${entryId}, duration: ${recordingDuration}ms`);
+    console.log(`[BackgroundProcessor] Successfully created journal entry with ID: ${entryId}, FIXED duration: ${exactDurationMs}ms`);
     
     // Store the mapping between tempId and entryId
     setEntryIdForProcessingId(tempId, entryId);
@@ -77,7 +82,7 @@ export async function processRecordingInBackground(
         tempId,
         timestamp: Date.now(),
         forceUpdate: true,
-        duration: recordingDuration,
+        duration: exactDurationMs, // FIXED: Use exact duration
         processingComplete: true
       }
     }));
@@ -95,7 +100,7 @@ export async function processRecordingInBackground(
         tempId,
         error: error.message,
         timestamp: Date.now(),
-        duration: recordingDuration,
+        duration: recordingDuration, // Original duration for error tracking
         errorType: error.name || 'ProcessingError'
       }
     }));

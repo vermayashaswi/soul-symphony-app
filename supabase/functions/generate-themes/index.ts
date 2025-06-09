@@ -62,45 +62,50 @@ async function getKnownEmotions(): Promise<string[]> {
   }
 }
 
-async function extract_themes_and_entities(text: string, knownEmotions: string[]) {
+async function extract_themes_categories_and_entities(text: string, knownEmotions: string[]) {
   try {
     if (!openAIApiKey) {
       console.error('OpenAI API key is missing or empty');
       return {
         themes: ['Theme 1', 'Theme 2', 'Theme 3'],
+        categories: [],
         entities: [],
         entityemotion: {}
       };
     }
 
-    // -- Updated prompt to restrict categories to allowedCategories only --
+    // Updated prompt to extract both categories (themes) and traditional entities
     const prompt = `
-      Analyze the following journal entry and:
-      1. Extract the main themes or topics (max 5) described succinctly.
-      2. From ONLY the following list of Categories, select all that are relevant to this journal entry (list of up to 10 maximum). Do NOT make up new categories, pick only from the list provided below:
-         Categories:
+      Analyze the following journal entry and extract:
+      
+      1. Main themes/topics (max 5) - descriptive phrases about what the entry discusses
+      2. Categories from ONLY this list (select all relevant, max 10):
          [${allowedCategories.map(cat => `"${cat}"`).join(', ')}]
-      3. For each selected category, select the top 3 strongest matching emotions from this list: [${knownEmotions.join(', ')}]
-         - Provide the strength/score of each detected emotion for the category (between 0 and 1, rounded to 1 decimal).
-         - Only include emotions that are clearly relevant for the category.
-      Format your response as compact valid JSON with these keys:
+      3. Traditional entities - people, places, organizations, specific things mentioned:
+         - PERSON: Names of people, family members, friends, colleagues
+         - PLACE: Locations, cities, countries, buildings, rooms
+         - ORGANIZATION: Companies, schools, teams, groups
+         - THING: Specific objects, products, brands, books, movies
+      4. For each selected category, the top 3 strongest emotions from: [${knownEmotions.join(', ')}]
+         - Provide emotion strength (0.0-1.0, 1 decimal place)
+         - Only include clearly relevant emotions
+      
+      Format as valid JSON:
       {
-        "themes": [...],
-        "categories": [...], 
+        "themes": ["descriptive theme 1", "descriptive theme 2"],
+        "categories": ["Category 1", "Category 2"],
+        "entities": {
+          "PERSON": ["person name 1", "person name 2"],
+          "PLACE": ["place 1", "place 2"],
+          "ORGANIZATION": ["org 1"],
+          "THING": ["item 1", "item 2"]
+        },
         "entityemotion": {
-          "Category 1": { "emotion1": score, "emotion2": score, ... },
-          "Category 2": { ... }
+          "Category 1": { "emotion1": 0.8, "emotion2": 0.5 },
+          "Category 2": { "emotion1": 0.7 }
         }
       }
-      For example:
-      {
-        "themes": ["work stress", "personal growth"],
-        "categories": ["Career & Workplace", "Self & Identity"],
-        "entityemotion": {
-          "Career & Workplace": { "stress": 0.8, "boredom": 0.5 },
-          "Self & Identity": { "anxiety": 0.7, "joy": 0.2 }
-        }
-      }
+      
       Only output valid JSON. Do not explain.
       
       Journal entry:
@@ -119,7 +124,7 @@ async function extract_themes_and_entities(text: string, knownEmotions: string[]
         messages: [
           {
             role: 'system',
-            content: 'You are an advanced assistant that extracts journal themes, entities, and core emotions for each entity. Always return only a well-formatted JSON object as specified in the user request.'
+            content: 'You are an expert at analyzing journal entries and extracting themes, categories, entities, and emotions. Always return only well-formatted JSON as specified.'
           },
           {
             role: 'user',
@@ -137,7 +142,8 @@ async function extract_themes_and_entities(text: string, knownEmotions: string[]
       // Fallback
       return {
         themes: ['Personal', 'Experience'],
-        entities: [],
+        categories: [],
+        entities: {},
         entityemotion: {}
       };
     }
@@ -148,7 +154,8 @@ async function extract_themes_and_entities(text: string, knownEmotions: string[]
       console.error('Invalid response structure from OpenAI');
       return {
         themes: [],
-        entities: [],
+        categories: [],
+        entities: {},
         entityemotion: {}
       };
     }
@@ -156,12 +163,11 @@ async function extract_themes_and_entities(text: string, knownEmotions: string[]
     let contentText = result.choices[0].message.content;
     try {
       const parsed = JSON.parse(contentText);
-      // Defensive defaults:
+      // Defensive defaults and proper mapping:
       return {
         themes: Array.isArray(parsed.themes) ? parsed.themes : [],
-        // Support both keys: "categories" (new) or "entities"/"categories" for legacy compatibility
-        entities: Array.isArray(parsed.categories) ? parsed.categories :
-                 (Array.isArray(parsed.entities) ? parsed.entities : []),
+        categories: Array.isArray(parsed.categories) ? parsed.categories : [], // This will go to master_themes
+        entities: typeof parsed.entities === "object" && parsed.entities !== null ? parsed.entities : {}, // This will go to entities
         entityemotion: typeof parsed.entityemotion === "object" && parsed.entityemotion !== null ? parsed.entityemotion : {}
       };
     } catch (err) {
@@ -169,15 +175,17 @@ async function extract_themes_and_entities(text: string, knownEmotions: string[]
       // Return fallback structure if parsing fails
       return {
         themes: [],
-        entities: [],
+        categories: [],
+        entities: {},
         entityemotion: {}
       };
     }
   } catch (error) {
-    console.error('Error in extract_themes_and_entities:', error);
+    console.error('Error in extract_themes_categories_and_entities:', error);
     return {
       themes: [],
-      entities: [],
+      categories: [],
+      entities: {},
       entityemotion: {}
     };
   }
@@ -217,15 +225,21 @@ serve(async (req) => {
     // Fetch available emotions from Supabase
     const knownEmotionList = await getKnownEmotions();
 
-    // Get extraction results (themes, entities, entityemotion)
-    const { themes, entities, entityemotion } = await extract_themes_and_entities(textToProcess, knownEmotionList);
+    // Get extraction results (themes, categories, entities, entityemotion)
+    const { themes, categories, entities, entityemotion } = await extract_themes_categories_and_entities(textToProcess, knownEmotionList);
 
-    // Prepare updates
+    // Prepare updates with CORRECT mapping
     const updates = {};
     if (themes && Array.isArray(themes)) {
-      updates["master_themes"] = themes.length ? themes : ['Personal', 'Reflection', 'Experience'];
+      // Keep themes as descriptive themes (not used in DB currently but could be useful)
+      console.log('[generate-themes] Extracted themes:', themes);
     }
-    if (entities && Array.isArray(entities)) {
+    if (categories && Array.isArray(categories)) {
+      // FIXED: Categories go to master_themes (not entities)
+      updates["master_themes"] = categories.length ? categories : ['Personal', 'Reflection', 'Experience'];
+    }
+    if (entities && typeof entities === "object") {
+      // FIXED: Traditional entities go to entities field
       updates["entities"] = entities;
     }
     if (entityemotion && typeof entityemotion === "object") {
@@ -233,12 +247,15 @@ serve(async (req) => {
     }
 
     if (entryIdToUpdate && Object.keys(updates).length > 0) {
+      console.log('[generate-themes] Updating entry with:', updates);
       const { error } = await supabase
         .from('Journal Entries')
         .update(updates)
         .eq('id', entryIdToUpdate);
       if (error) {
         console.error(`[generate-themes] Error updating entry ${entryIdToUpdate}:`, error);
+      } else {
+        console.log(`[generate-themes] Successfully updated entry ${entryIdToUpdate}`);
       }
     }
 
@@ -246,7 +263,8 @@ serve(async (req) => {
       JSON.stringify({
         success: true,
         themes,
-        entities,
+        categories, // These are the master_themes
+        entities, // These are traditional entities
         entityemotion
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -258,7 +276,8 @@ serve(async (req) => {
       JSON.stringify({
         success: true,
         themes: [],
-        entities: [],
+        categories: [],
+        entities: {},
         entityemotion: {}
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
