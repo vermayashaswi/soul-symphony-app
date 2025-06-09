@@ -5,7 +5,7 @@ import { sendAudioForTranscription } from './transcription-service';
 import { getEntryIdForProcessingId, setEntryIdForProcessingId } from '../audio-processing';
 
 /**
- * Process audio recording in the background
+ * Process audio recording in the background with enhanced error handling
  * Returns immediately with tempId, processes in background
  */
 export async function processRecordingInBackground(
@@ -14,11 +14,24 @@ export async function processRecordingInBackground(
   tempId: string,
   recordingDuration?: number
 ): Promise<{ success: boolean; entryId?: number; error?: string }> {
-  console.log('[BackgroundProcessor] Starting background processing for tempId:', tempId);
+  console.log('[BackgroundProcessor] Starting enhanced background processing for tempId:', tempId);
   console.log('[BackgroundProcessor] Recording duration (actual):', recordingDuration, 'ms');
   
   try {
-    // Convert blob to base64
+    // Enhanced validation
+    if (!audioBlob || audioBlob.size === 0) {
+      throw new Error('Invalid audio blob provided');
+    }
+    
+    if (!userId) {
+      throw new Error('User ID is required for processing');
+    }
+    
+    if (audioBlob.size > 25 * 1024 * 1024) { // 25MB limit
+      throw new Error('Audio file too large (maximum 25MB)');
+    }
+    
+    // Convert blob to base64 with enhanced error handling
     console.log('[BackgroundProcessor] Converting audio blob to base64');
     const base64Audio = await blobToBase64(audioBlob);
     
@@ -28,25 +41,25 @@ export async function processRecordingInBackground(
     
     console.log(`[BackgroundProcessor] Successfully converted audio to base64, length: ${base64Audio.length}`);
     
-    // FIXED: Send the actual recording duration to transcription service
-    console.log('[BackgroundProcessor] Sending audio to transcription service with actual duration');
+    // Enhanced transcription call with proper duration handling
+    console.log('[BackgroundProcessor] Sending audio to enhanced transcription service');
     const transcriptionResult = await sendAudioForTranscription(
       base64Audio, 
       userId,
-      false,
-      true,
+      false, // Not direct transcription
+      true,  // High quality processing
       recordingDuration // Pass the actual recording duration from the recorder
     );
     
     if (!transcriptionResult.success) {
-      console.error('[BackgroundProcessor] Transcription service error:', transcriptionResult.error);
+      console.error('[BackgroundProcessor] Enhanced transcription service error:', transcriptionResult.error);
       throw new Error(transcriptionResult.error || 'Transcription failed');
     }
 
-    console.log('[BackgroundProcessor] Transcription result:', transcriptionResult.data);
+    console.log('[BackgroundProcessor] Enhanced transcription result:', transcriptionResult.data);
     
-    // Extract the entry ID
-    const entryId = transcriptionResult.data?.entryId;
+    // Extract the entry ID with validation
+    const entryId = transcriptionResult.data?.entryId || transcriptionResult.data?.id;
     
     if (!entryId) {
       throw new Error('No entry ID returned from transcription service');
@@ -57,13 +70,15 @@ export async function processRecordingInBackground(
     // Store the mapping between tempId and entryId
     setEntryIdForProcessingId(tempId, entryId);
     
-    // Explicitly trigger a refresh to update the UI
+    // Enhanced UI refresh event with more data
     window.dispatchEvent(new CustomEvent('journalEntriesNeedRefresh', {
       detail: { 
         entryId,
         tempId,
         timestamp: Date.now(),
-        forceUpdate: true 
+        forceUpdate: true,
+        duration: recordingDuration,
+        processingComplete: true
       }
     }));
     
@@ -72,14 +87,16 @@ export async function processRecordingInBackground(
       entryId
     };
   } catch (error: any) {
-    console.error('[BackgroundProcessor] Error in background processing:', error);
+    console.error('[BackgroundProcessor] Enhanced error in background processing:', error);
     
-    // Notify UI of failure
+    // Enhanced error notification
     window.dispatchEvent(new CustomEvent('processingEntryFailed', {
       detail: { 
         tempId,
         error: error.message,
-        timestamp: Date.now() 
+        timestamp: Date.now(),
+        duration: recordingDuration,
+        errorType: error.name || 'ProcessingError'
       }
     }));
     

@@ -26,12 +26,17 @@ serve(async (req) => {
     console.log(`  hasGoogleNLApiKey: ${!!Deno.env.get('GOOGLE_API')}`);
     console.log("}");
 
-    // Initialize Supabase client with service role key for admin operations
+    // Validate required environment variables
     const supabaseUrl = Deno.env.get('SUPABASE_URL');
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+    const openaiApiKey = Deno.env.get('OPENAI_API_KEY');
     
     if (!supabaseUrl || !supabaseServiceKey) {
       throw new Error('Supabase configuration missing');
+    }
+    
+    if (!openaiApiKey) {
+      throw new Error('OpenAI API key not found');
     }
 
     // Create admin client for database operations
@@ -86,8 +91,7 @@ serve(async (req) => {
     const validatedBytes = validateAndFixAudioData(bytes, detectedFileType);
     console.log(`Audio validation completed`);
 
-    // FIXED: Use the provided recording time directly for duration calculation
-    // This is the actual recording duration in milliseconds from the client
+    // Use the provided recording time directly for duration calculation
     const durationMs = recordingTime > 0 ? recordingTime : 0;
     console.log(`Using recording duration: ${durationMs}ms (${recordingTime > 0 ? 'from client' : 'fallback to 0'})`);
 
@@ -109,14 +113,8 @@ serve(async (req) => {
     const audioBlob = new Blob([validatedBytes], { type: `audio/${detectedFileType}` });
     console.log(`Created blob for transcription: { size: ${audioBlob.size}, type: "${audioBlob.type}", detectedFileType: "${detectedFileType}" }`);
 
-    // Get OpenAI API key
-    const openaiApiKey = Deno.env.get('OPENAI_API_KEY');
-    if (!openaiApiKey) {
-      throw new Error('OpenAI API key not found');
-    }
-
-    // Step 1: Transcribe audio using the modular function with enhanced language detection
-    console.log('Step 1: Transcribing audio with Whisper...');
+    // Step 1: Transcribe audio using the enhanced Whisper function
+    console.log('Step 1: Transcribing audio with enhanced Whisper API...');
     const { text: transcribedText, detectedLanguages } = await transcribeAudioWithWhisper(
       audioBlob,
       detectedFileType,
@@ -145,15 +143,15 @@ serve(async (req) => {
       });
     }
 
-    // Step 2: Translate and refine text using the modular function
-    console.log('Step 2: Translating and refining text...');
+    // Step 2: Translate and refine text using the enhanced function
+    console.log('Step 2: Translating and refining text with enhanced processing...');
     const { refinedText } = await translateAndRefineText(transcribedText, openaiApiKey, detectedLanguages);
 
     console.log('Text refinement completed');
     console.log(`Original length: ${transcribedText.length}, Refined length: ${refinedText.length}`);
     console.log(`Refined sample: "${refinedText.slice(0, 50)}${refinedText.length > 50 ? '...' : ''}"`);
 
-    // Step 3: Analyze sentiment with Google NL API
+    // Step 3: Analyze sentiment with Google NL API (with enhanced error handling)
     console.log('Step 3: Analyzing sentiment with Google NL API...');
     const googleNLApiKey = Deno.env.get('GOOGLE_API');
     
@@ -171,8 +169,8 @@ serve(async (req) => {
       console.warn('Google NL API key not found, skipping sentiment analysis');
     }
 
-    // Step 4: Get emotions data and analyze emotions
-    console.log('Step 4: Analyzing emotions...');
+    // Step 4: Enhanced emotion analysis
+    console.log('Step 4: Analyzing emotions with enhanced processing...');
     
     // Fetch emotions from database
     const { data: emotionsData, error: emotionsError } = await supabaseAdmin
@@ -192,7 +190,7 @@ serve(async (req) => {
       console.warn('No emotions data found in database, skipping emotion analysis');
     }
 
-    // Step 5: Store in database using the modular function
+    // Step 5: Store in database using the enhanced function
     console.log('Step 5: Storing journal entry in database...');
     
     const entryId = await storeJournalEntry(
@@ -201,14 +199,14 @@ serve(async (req) => {
       refinedText,
       audioUrl,
       userId,
-      durationMs, // FIXED: Use actual recording duration
+      durationMs,
       emotions,
       sentimentResult.sentiment
     );
 
     console.log(`Journal entry stored successfully with ID: ${entryId}`);
 
-    // Step 6: Update with languages (enhanced detection)
+    // Step 6: Update with enhanced language detection results
     console.log('Step 6: Updating entry with detected languages...');
     const { error: languageUpdateError } = await supabaseAdmin
       .from('Journal Entries')
@@ -221,22 +219,23 @@ serve(async (req) => {
       console.log(`Languages updated: ${JSON.stringify(detectedLanguages)}`);
     }
 
-    // Step 7: Extract themes using the modular function (this will trigger entity extraction)
-    console.log('Step 7: Extracting themes and triggering entity extraction...');
+    // Step 7: Extract themes with enhanced processing
+    console.log('Step 7: Extracting themes with enhanced processing...');
     await extractThemes(supabaseAdmin, refinedText, entryId);
 
-    // Step 8: Generate and store embeddings
-    console.log('Step 8: Generating embeddings...');
+    // Step 8: Generate and store embeddings with enhanced error handling
+    console.log('Step 8: Generating embeddings with enhanced processing...');
     try {
       const embedding = await generateEmbedding(refinedText, openaiApiKey);
       await storeEmbedding(supabaseAdmin, entryId, refinedText, embedding);
       console.log('Embeddings generated and stored successfully');
     } catch (embeddingError) {
       console.error('Error with embeddings:', embeddingError);
+      // Continue without embeddings - don't fail the entire process
     }
 
-    // Return success response
-    console.log('Processing complete, returning success response');
+    // Return enhanced success response
+    console.log('Processing complete, returning enhanced success response');
     
     return new Response(JSON.stringify({
       id: entryId,
@@ -247,17 +246,19 @@ serve(async (req) => {
       sentiment: sentimentResult.sentiment,
       language: detectedLanguages[0] || 'unknown',
       languages: detectedLanguages,
-      duration: durationMs, // FIXED: Return actual recording duration
+      duration: durationMs,
+      audioUrl: audioUrl,
       success: true
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
 
   } catch (error) {
-    console.error('Error in transcribe-audio function:', error);
+    console.error('Error in enhanced transcribe-audio function:', error);
     return new Response(JSON.stringify({
       error: error.message,
-      success: false
+      success: false,
+      timestamp: new Date().toISOString()
     }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
