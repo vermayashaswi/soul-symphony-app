@@ -78,26 +78,10 @@ const getEmotionColor = (emotion: string, index: number): string => {
   
   // More diverse fallback colors - completely different hues
   const fallbackColors = [
-    '#FF6B6B', // Coral Red
-    '#4ECDC4', // Teal
-    '#45B7D1', // Sky Blue
-    '#96CEB4', // Mint Green
-    '#FFEAA7', // Light Yellow
-    '#DDA0DD', // Plum
-    '#FF7675', // Light Red
-    '#FD79A8', // Pink
-    '#FDCB6E', // Orange
-    '#E84393', // Magenta
-    '#A29BFE', // Lavender
-    '#00B894', // Emerald
-    '#6C5CE7', // Purple
-    '#74B9FF', // Light Blue
-    '#E17055', // Salmon
-    '#00CEC9', // Turquoise
-    '#81ECEC', // Cyan
-    '#FAB1A0', // Peach
-    '#636E72', // Gray
-    '#55A3FF'  // Bright Blue
+    '#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4', '#FFEAA7', 
+    '#DDA0DD', '#FF7675', '#FD79A8', '#FDCB6E', '#E84393', 
+    '#A29BFE', '#00B894', '#6C5CE7', '#74B9FF', '#E17055', 
+    '#00CEC9', '#81ECEC', '#FAB1A0', '#636E72', '#55A3FF'
   ];
   
   return fallbackColors[index % fallbackColors.length];
@@ -108,7 +92,8 @@ export function EmotionChart({
   timeframe = 'week',
   aggregatedData 
 }: EmotionChartProps) {
-  const [chartType, setChartType] = useState<ChartType>('bubble');
+  // Set default chart type to 'line' to show mood trends by default
+  const [chartType, setChartType] = useState<ChartType>('line');
   const [bubbleKey, setBubbleKey] = useState(0); 
   const [selectedEmotionInfo, setSelectedEmotionInfo] = useState<{name: string, percentage: number} | null>(null);
   const [visibleEmotions, setVisibleEmotions] = useState<string[]>([]);
@@ -122,9 +107,21 @@ export function EmotionChart({
   const { user } = useAuth();
   
   const chartTypes = [
-    { id: 'line', label: 'Emotions' },
+    { id: 'line', label: 'Mood Trends' },
     { id: 'bubble', label: 'Life Areas' },
   ];
+
+  // Debug logging for data flow
+  useEffect(() => {
+    console.log('[EmotionChart] Debug - Component mounted with props:', {
+      timeframe,
+      hasAggregatedData: !!aggregatedData,
+      aggregatedDataKeys: aggregatedData ? Object.keys(aggregatedData) : [],
+      aggregatedDataLength: aggregatedData ? Object.keys(aggregatedData).length : 0,
+      chartType,
+      visibleEmotions
+    });
+  }, [timeframe, aggregatedData, chartType, visibleEmotions]);
   
   const bubbleData = useMemo(() => {
     if (!aggregatedData || Object.keys(aggregatedData).length === 0) {
@@ -214,7 +211,10 @@ export function EmotionChart({
   };
   
   const lineData = useMemo(() => {
+    console.log('[EmotionChart] Computing line data with aggregatedData:', aggregatedData);
+    
     if (!aggregatedData || Object.keys(aggregatedData).length === 0) {
+      console.log('[EmotionChart] No aggregated data for line chart');
       return [];
     }
     
@@ -254,9 +254,13 @@ export function EmotionChart({
       .slice(0, 5)
       .map(([emotion]) => emotion);
     
+    console.log('[EmotionChart] Top emotions for line chart:', topEmotions);
+    
     const mostDominantEmotion = topEmotions[0] || '';
     
+    // Auto-select the most dominant emotion for line chart
     if (chartType === 'line' && visibleEmotions.length === 0 && mostDominantEmotion) {
+      console.log('[EmotionChart] Auto-selecting dominant emotion:', mostDominantEmotion);
       setVisibleEmotions([mostDominantEmotion]);
     }
     
@@ -303,6 +307,7 @@ export function EmotionChart({
         }
       });
     
+    console.log('[EmotionChart] Final line data:', result);
     return result;
   }, [aggregatedData, visibleEmotions, chartType, timeframe]);
 
@@ -333,9 +338,12 @@ export function EmotionChart({
   
   useEffect(() => {
     if (dominantEmotion && chartType === 'line' && visibleEmotions.length === 0) {
+      console.log('[EmotionChart] Setting visible emotions to dominant emotion:', dominantEmotion);
       setVisibleEmotions([dominantEmotion]);
     }
   }, [dominantEmotion, chartType, visibleEmotions.length]);
+
+  // ... keep existing code (EmotionLineLabel, handleLegendClick, CustomDot, CustomTooltip functions)
 
   const EmotionLineLabel = (props: any) => {
     const { x, y, stroke, value, index, data, dataKey } = props;
@@ -437,7 +445,14 @@ export function EmotionChart({
   };
 
   const renderLineChart = () => {
+    console.log('[EmotionChart] Rendering line chart with data:', {
+      lineDataLength: lineData.length,
+      visibleEmotions,
+      firstDataPoint: lineData[0]
+    });
+    
     if (lineData.length === 0) {
+      console.log('[EmotionChart] No line data available');
       return (
         <div className="flex items-center justify-center h-full">
           <p className="text-muted-foreground">
@@ -456,7 +471,10 @@ export function EmotionChart({
       .filter(key => key !== 'day')
       .filter(key => lineData.some(point => point[key] !== null));
     
+    console.log('[EmotionChart] All emotions for rendering:', allEmotions);
+    
     if (allEmotions.length === 0) {
+      console.log('[EmotionChart] No valid emotions found');
       return (
         <div className="flex items-center justify-center h-full">
           <p className="text-muted-foreground">
@@ -572,7 +590,7 @@ export function EmotionChart({
       <div className="flex flex-wrap justify-between items-center mb-4">
         <h3 className="text-xl font-semibold">
           <TranslatableText 
-            text="TOP" 
+            text="Emotions & Trends" 
             forceTranslate={true}
             enableFontScaling={true}
             scalingContext="general"
