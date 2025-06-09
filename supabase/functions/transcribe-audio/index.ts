@@ -6,6 +6,7 @@ import { analyzeWithGoogleNL } from './nlProcessing.ts';
 import { transcribeAudioWithWhisper, translateAndRefineText, analyzeEmotions, generateEmbedding } from './aiProcessing.ts';
 import { createSupabaseAdmin, createProfileIfNeeded, extractThemes, storeJournalEntry, storeEmbedding } from './databaseOperations.ts';
 import { storeAudioFile } from './storageOperations.ts';
+import { processBase64Chunks, detectFileType, validateAndFixAudioData } from './audioProcessing.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -45,7 +46,7 @@ serve(async (req) => {
 
     console.log("Supabase clients initialized successfully");
 
-    // Fix parameter mapping - use correct parameter names
+    // Parse request body and handle parameter mapping
     const { audio, audioData, userId, highQuality = true, directTranscription = false, recordingTime = 0 } = await req.json();
     
     // Handle both parameter names for backward compatibility
@@ -56,7 +57,7 @@ serve(async (req) => {
     console.log(`Direct transcription mode: ${directTranscription ? 'YES' : 'NO'}`);
     console.log(`High quality mode: ${highQuality ? 'YES' : 'NO'}`);
     console.log(`Audio data length: ${actualAudioData?.length || 0}`);
-    console.log(`Recording time: ${recordingTime}ms`);
+    console.log(`Recording time (provided): ${recordingTime}ms`);
     
     if (!actualAudioData) {
       throw new Error('No audio data received');
@@ -72,46 +73,31 @@ serve(async (req) => {
     // Create user profile if needed and update timezone
     await createProfileIfNeeded(supabaseAdmin, userId, timezone);
 
-    // Convert base64 to binary
-    const binaryString = atob(actualAudioData);
-    const bytes = new Uint8Array(binaryString.length);
-    for (let i = 0; i < binaryString.length; i++) {
-      bytes[i] = binaryString.charCodeAt(i);
-    }
-    
-    console.log(`Processed ${Math.ceil(binaryString.length / 8)} chunks into a ${bytes.length} byte array`);
-    console.log(`Processed binary audio size: ${bytes.length}`);
+    // Convert base64 to binary using the improved processing function
+    console.log('Processing base64 audio data...');
+    const bytes = processBase64Chunks(actualAudioData);
+    console.log(`Processed binary audio size: ${bytes.length} bytes`);
 
-    // Calculate duration from recording time or estimate from audio size
-    const durationMs = recordingTime > 0 ? recordingTime : Math.floor(bytes.length / 32); // Rough estimate: 32 bytes per ms
-    console.log(`Calculated duration: ${durationMs}ms`);
-
-    // File type detection
-    let detectedFileType = 'wav';
-    if (bytes.length >= 8) {
-      const first8Bytes = Array.from(bytes.slice(0, 8)).map(b => b.toString(16).padStart(2, '0')).join(' ');
-      console.log(`First 8 bytes of audio data: ${first8Bytes}`);
-      
-      if (bytes[0] === 0x52 && bytes[1] === 0x49 && bytes[2] === 0x46 && bytes[3] === 0x46) {
-        detectedFileType = 'wav';
-      } else if (bytes[0] === 0xFF && (bytes[1] & 0xE0) === 0xE0) {
-        detectedFileType = 'mp3';
-      } else if (bytes[0] === 0x4F && bytes[1] === 0x67 && bytes[2] === 0x67 && bytes[3] === 0x53) {
-        detectedFileType = 'ogg';
-      } else if (bytes[4] === 0x66 && bytes[5] === 0x74 && bytes[6] === 0x79 && bytes[7] === 0x70) {
-        detectedFileType = 'mp4';
-      }
-    }
-    
+    // Detect file type using binary analysis
+    const detectedFileType = detectFileType(bytes);
     console.log(`Detected file type: ${detectedFileType}`);
+
+    // Validate and fix audio data
+    const validatedBytes = validateAndFixAudioData(bytes, detectedFileType);
+    console.log(`Audio validation completed`);
+
+    // FIXED: Use the provided recording time directly for duration calculation
+    // This is the actual recording duration in milliseconds from the client
+    const durationMs = recordingTime > 0 ? recordingTime : 0;
+    console.log(`Using recording duration: ${durationMs}ms (${recordingTime > 0 ? 'from client' : 'fallback to 0'})`);
 
     // Store audio file using admin client
     const timestamp = Date.now();
     const fileName = `journal-entry-${userId}-${timestamp}.${detectedFileType}`;
     
-    console.log(`Storing audio file ${fileName} with size ${bytes.length} bytes`);
+    console.log(`Storing audio file ${fileName} with size ${validatedBytes.length} bytes`);
     
-    const audioUrl = await storeAudioFile(supabaseAdmin, bytes, fileName, detectedFileType);
+    const audioUrl = await storeAudioFile(supabaseAdmin, validatedBytes, fileName, detectedFileType);
     
     if (!audioUrl) {
       console.warn('Failed to store audio file, continuing without URL');
@@ -120,7 +106,7 @@ serve(async (req) => {
     }
 
     // Create blob for transcription
-    const audioBlob = new Blob([bytes], { type: `audio/${detectedFileType}` });
+    const audioBlob = new Blob([validatedBytes], { type: `audio/${detectedFileType}` });
     console.log(`Created blob for transcription: { size: ${audioBlob.size}, type: "${audioBlob.type}", detectedFileType: "${detectedFileType}" }`);
 
     // Get OpenAI API key
@@ -129,13 +115,13 @@ serve(async (req) => {
       throw new Error('OpenAI API key not found');
     }
 
-    // Step 1: Transcribe audio using the modular function
+    // Step 1: Transcribe audio using the modular function with enhanced language detection
     console.log('Step 1: Transcribing audio with Whisper...');
     const { text: transcribedText, detectedLanguages } = await transcribeAudioWithWhisper(
       audioBlob,
       detectedFileType,
       openaiApiKey,
-      'auto'
+      'auto' // Always use auto-detection for better language detection
     );
 
     if (!transcribedText || transcribedText.trim().length === 0) {
@@ -215,14 +201,14 @@ serve(async (req) => {
       refinedText,
       audioUrl,
       userId,
-      durationMs,
+      durationMs, // FIXED: Use actual recording duration
       emotions,
       sentimentResult.sentiment
     );
 
     console.log(`Journal entry stored successfully with ID: ${entryId}`);
 
-    // Step 6: Update with languages
+    // Step 6: Update with languages (enhanced detection)
     console.log('Step 6: Updating entry with detected languages...');
     const { error: languageUpdateError } = await supabaseAdmin
       .from('Journal Entries')
@@ -235,8 +221,8 @@ serve(async (req) => {
       console.log(`Languages updated: ${JSON.stringify(detectedLanguages)}`);
     }
 
-    // Step 7: Extract themes using the modular function
-    console.log('Step 7: Extracting themes...');
+    // Step 7: Extract themes using the modular function (this will trigger entity extraction)
+    console.log('Step 7: Extracting themes and triggering entity extraction...');
     await extractThemes(supabaseAdmin, refinedText, entryId);
 
     // Step 8: Generate and store embeddings
@@ -261,7 +247,7 @@ serve(async (req) => {
       sentiment: sentimentResult.sentiment,
       language: detectedLanguages[0] || 'unknown',
       languages: detectedLanguages,
-      duration: durationMs,
+      duration: durationMs, // FIXED: Return actual recording duration
       success: true
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },

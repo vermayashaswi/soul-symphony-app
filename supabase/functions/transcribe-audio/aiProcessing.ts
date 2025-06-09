@@ -1,9 +1,8 @@
-
 // Import necessary Deno modules
 import { encode as base64Encode } from "https://deno.land/std@0.132.0/encoding/base64.ts";
 
 /**
- * Transcribe audio using OpenAI's Whisper API
+ * Transcribe audio using OpenAI's Whisper API with enhanced language detection
  * @param audioBlob - The audio blob to transcribe
  * @param fileType - The audio file type (webm, mp4, wav, etc.)
  * @param apiKey - The OpenAI API key
@@ -41,10 +40,14 @@ export async function transcribeAudioWithWhisper(
     formData.append("file", new Blob([audioBytes], { type: audioBlob.type }), filename);
     formData.append("model", "gpt-4o-transcribe");
     
+    // Always use auto-detection for better language detection
     // Only add language parameter if it's not 'auto'
     if (language !== 'auto') {
       formData.append("language", language);
     }
+    
+    // ENHANCED: Add response format to get more detailed language info
+    formData.append("response_format", "verbose_json");
     
     console.log("[Transcription] Sending request to OpenAI with:", {
       fileSize: audioBlob.size,
@@ -52,7 +55,8 @@ export async function transcribeAudioWithWhisper(
       fileExtension,
       hasApiKey: !!apiKey,
       model: "gpt-4o-transcribe",
-      autoLanguageDetection: language === 'auto'
+      autoLanguageDetection: language === 'auto',
+      responseFormat: "verbose_json"
     });
     
     // Call the OpenAI API for transcription
@@ -76,14 +80,22 @@ export async function transcribeAudioWithWhisper(
     // Get the transcribed text from the result
     const transcribedText = result.text || "";
     
-    // Get detected languages from the API response
-    const detectedLanguages = result.language ? [result.language] : ["unknown"];
+    // ENHANCED: Get detected languages from the API response with better detection
+    let detectedLanguages: string[] = [];
+    
+    if (result.language) {
+      detectedLanguages = [result.language];
+    } else {
+      // Fallback: try to detect language from text patterns
+      detectedLanguages = detectLanguageFromText(transcribedText);
+    }
     
     console.log("[Transcription] Success:", {
       textLength: transcribedText.length,
       sampleText: transcribedText.substring(0, 50) + "...",
       model: "gpt-4o-transcribe",
-      detectedLanguage: detectedLanguages[0]
+      detectedLanguage: detectedLanguages[0] || 'unknown',
+      allDetectedLanguages: detectedLanguages
     });
     
     return {
@@ -94,6 +106,60 @@ export async function transcribeAudioWithWhisper(
     console.error("[Transcription] Error:", error);
     throw error;
   }
+}
+
+/**
+ * Enhanced language detection from text patterns
+ */
+function detectLanguageFromText(text: string): string[] {
+  if (!text || text.trim().length === 0) {
+    return ['unknown'];
+  }
+  
+  const detectedLanguages: string[] = [];
+  
+  // Common patterns for different languages
+  const languagePatterns = {
+    'hi': /[\u0900-\u097F]/, // Devanagari script (Hindi)
+    'bn': /[\u0980-\u09FF]/, // Bengali script
+    'te': /[\u0C00-\u0C7F]/, // Telugu script
+    'ta': /[\u0B80-\u0BFF]/, // Tamil script
+    'gu': /[\u0A80-\u0AFF]/, // Gujarati script
+    'kn': /[\u0C80-\u0CFF]/, // Kannada script
+    'ml': /[\u0D00-\u0D7F]/, // Malayalam script
+    'or': /[\u0B00-\u0B7F]/, // Oriya script
+    'pa': /[\u0A00-\u0A7F]/, // Gurmukhi script (Punjabi)
+    'mr': /[\u0900-\u097F]/, // Marathi (also uses Devanagari)
+    'zh': /[\u4e00-\u9fff]/, // Chinese characters
+    'ja': /[\u3040-\u309f\u30a0-\u30ff\u4e00-\u9fff]/, // Japanese (Hiragana, Katakana, Kanji)
+    'ko': /[\uac00-\ud7af]/, // Korean
+    'ar': /[\u0600-\u06FF]/, // Arabic script
+    'ru': /[\u0400-\u04FF]/, // Cyrillic script
+    'fr': /\b(le|la|les|un|une|des|je|tu|il|elle|nous|vous|ils|elles|et|ou|mais|donc|car|ni|or)\b/i,
+    'es': /\b(el|la|los|las|un|una|y|o|pero|que|de|en|es|por|para|con|sin|sobre)\b/i,
+    'de': /\b(der|die|das|ein|eine|und|oder|aber|dass|von|zu|mit|auf|für|durch|über)\b/i,
+    'it': /\b(il|la|lo|gli|le|un|una|e|o|ma|che|di|in|è|per|con|su|da)\b/i,
+    'pt': /\b(o|a|os|as|um|uma|e|ou|mas|que|de|em|é|por|para|com|sem|sobre)\b/i,
+  };
+  
+  // Check for script-based languages first
+  for (const [lang, pattern] of Object.entries(languagePatterns)) {
+    if (pattern.test(text)) {
+      detectedLanguages.push(lang);
+    }
+  }
+  
+  // If no specific language detected, check if it's likely English
+  if (detectedLanguages.length === 0) {
+    const englishPattern = /^[a-zA-Z0-9\s.,!?;:'"()-]+$/;
+    if (englishPattern.test(text.trim())) {
+      detectedLanguages.push('en');
+    } else {
+      detectedLanguages.push('unknown');
+    }
+  }
+  
+  return detectedLanguages;
 }
 
 /**
