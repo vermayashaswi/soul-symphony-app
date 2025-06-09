@@ -1,4 +1,3 @@
-
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { corsHeaders } from '../_shared/cors.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.38.4';
@@ -118,15 +117,37 @@ async function analyzeTextSentiment(text: string): Promise<string> {
   }
 }
 
-// Helper function to convert base64 to Uint8Array
-function base64ToUint8Array(base64: string): Uint8Array {
+// Enhanced base64 to Uint8Array conversion with better error handling
+function base64ToUint8Array(audioData: string): Uint8Array {
   try {
-    // Remove data URL prefix if present
-    const base64Data = base64.replace(/^data:audio\/[^;]+;base64,/, '');
+    console.log('[Transcribe] Processing audio data format:', {
+      length: audioData.length,
+      isDataUrl: audioData.startsWith('data:'),
+      hasBase64Marker: audioData.includes('base64,'),
+      prefix: audioData.substring(0, 50)
+    });
+    
+    let base64Data = audioData;
+    
+    // Handle both complete data URLs and raw base64
+    if (audioData.startsWith('data:')) {
+      if (!audioData.includes('base64,')) {
+        throw new Error('Data URL missing base64 marker');
+      }
+      // Extract base64 portion from data URL
+      base64Data = audioData.split('base64,')[1];
+      console.log('[Transcribe] Extracted base64 from data URL, length:', base64Data.length);
+    } else {
+      console.log('[Transcribe] Processing raw base64 data, length:', base64Data.length);
+    }
     
     // Validate base64 format
     if (!/^[A-Za-z0-9+/]*={0,2}$/.test(base64Data)) {
       throw new Error('Invalid base64 format');
+    }
+    
+    if (base64Data.length < 100) {
+      throw new Error(`Base64 data too short: ${base64Data.length} characters`);
     }
     
     // Decode base64
@@ -137,15 +158,20 @@ function base64ToUint8Array(base64: string): Uint8Array {
       bytes[i] = binaryString.charCodeAt(i);
     }
     
-    console.log('[Transcribe] Successfully converted base64 to Uint8Array, size:', bytes.length);
+    console.log('[Transcribe] Successfully converted to Uint8Array:', {
+      originalLength: audioData.length,
+      base64Length: base64Data.length,
+      bytesLength: bytes.length
+    });
+    
     return bytes;
   } catch (error) {
-    console.error('[Transcribe] Error converting base64 to Uint8Array:', error);
-    throw new Error('Invalid base64 audio data');
+    console.error('[Transcribe] Error converting audio data:', error);
+    throw new Error(`Invalid audio data format: ${error.message}`);
   }
 }
 
-// Enhanced request validation with better JSON parsing
+// Enhanced request validation with comprehensive error handling
 async function validateAndParseRequest(req: Request): Promise<{
   audioData: Uint8Array;
   userId: string;
@@ -171,43 +197,47 @@ async function validateAndParseRequest(req: Request): Promise<{
     if (contentType.includes('application/json')) {
       console.log('[Transcribe] Processing JSON request');
       
-      // Check if request has content-length of 0
+      // Enhanced empty body detection
       if (contentLength === '0') {
         throw new Error('Request body is empty - no audio data provided');
       }
       
-      // Read the request body with error handling
+      // Read the request body with comprehensive error handling
       let bodyText: string;
       try {
         bodyText = await req.text();
       } catch (error) {
         console.error('[Transcribe] Failed to read request body:', error);
-        throw new Error('Failed to read request body');
+        throw new Error('Failed to read request body - connection may have been interrupted');
       }
       
-      console.log('[Transcribe] Raw body length:', bodyText.length);
+      console.log('[Transcribe] Raw body received:', {
+        length: bodyText.length,
+        isEmpty: !bodyText || bodyText.trim() === '',
+        startsWithBrace: bodyText.trim().startsWith('{'),
+        endsWithBrace: bodyText.trim().endsWith('}')
+      });
       
       if (!bodyText || bodyText.trim() === '') {
-        throw new Error('Request body is empty after reading');
+        throw new Error('Request body is empty after reading - no data received');
       }
       
       // Validate JSON structure before parsing
       const trimmedBody = bodyText.trim();
       if (!trimmedBody.startsWith('{') || !trimmedBody.endsWith('}')) {
-        console.error('[Transcribe] Invalid JSON structure. Body starts with:', trimmedBody.substring(0, 50));
+        console.error('[Transcribe] Invalid JSON structure. Body preview:', trimmedBody.substring(0, 100));
         throw new Error('Invalid JSON structure - request body must be a JSON object');
       }
       
       let parsedBody: any;
       try {
         parsedBody = JSON.parse(trimmedBody);
+        console.log('[Transcribe] Successfully parsed JSON with keys:', Object.keys(parsedBody));
       } catch (parseError) {
         console.error('[Transcribe] JSON parse error:', parseError);
         console.error('[Transcribe] Body preview:', trimmedBody.substring(0, 200));
         throw new Error(`Invalid JSON format: ${parseError.message}`);
       }
-      
-      console.log('[Transcribe] Successfully parsed JSON body with keys:', Object.keys(parsedBody));
       
       // Validate required fields
       if (!parsedBody.audio) {
@@ -219,14 +249,20 @@ async function validateAndParseRequest(req: Request): Promise<{
       
       // Validate audio data type and content
       if (typeof parsedBody.audio !== 'string') {
-        throw new Error('Audio field must be a base64 string');
+        throw new Error('Audio field must be a string (base64 or data URL)');
       }
       
       if (parsedBody.audio.length < 100) {
         throw new Error('Audio data too short - likely invalid or corrupted');
       }
       
-      console.log('[Transcribe] Converting base64 audio data, length:', parsedBody.audio.length);
+      console.log('[Transcribe] Converting audio data:', {
+        audioLength: parsedBody.audio.length,
+        audioType: typeof parsedBody.audio,
+        isDataUrl: parsedBody.audio.startsWith('data:'),
+        hasBase64: parsedBody.audio.includes('base64,')
+      });
+      
       audioData = base64ToUint8Array(parsedBody.audio);
       userId = parsedBody.userId;
       

@@ -1,30 +1,46 @@
 
 /**
- * Converts a Blob to a Base64 string
+ * Converts a Blob to a Base64 string WITH data URL prefix
  * @param blob The audio blob to convert
- * @returns A Promise that resolves to a Base64 string
+ * @returns A Promise that resolves to a complete data URL string
  */
 export async function blobToBase64(blob: Blob): Promise<string> {
   return new Promise((resolve, reject) => {
     try {
       const reader = new FileReader();
       reader.onloadend = () => {
-        // FileReader result is a string or ArrayBuffer
-        const base64String = reader.result as string;
-        
-        // If the result contains a data URL prefix, extract just the Base64 part
-        const base64Data = base64String.indexOf('base64,') !== -1 
-          ? base64String.split('base64,')[1]
-          : base64String;
-          
-        resolve(base64Data);
+        // Return the complete data URL including the prefix
+        const dataUrl = reader.result as string;
+        console.log('[BlobUtils] Base64 conversion completed:', {
+          originalSize: blob.size,
+          dataUrlLength: dataUrl.length,
+          hasPrefix: dataUrl.startsWith('data:'),
+          prefix: dataUrl.substring(0, 50)
+        });
+        resolve(dataUrl);
       };
-      reader.onerror = reject;
+      reader.onerror = (error) => {
+        console.error('[BlobUtils] FileReader error:', error);
+        reject(new Error('Failed to convert blob to base64'));
+      };
       reader.readAsDataURL(blob);
     } catch (error) {
+      console.error('[BlobUtils] Error in blobToBase64:', error);
       reject(error);
     }
   });
+}
+
+/**
+ * Extracts just the base64 data from a data URL
+ * @param dataUrl Complete data URL string
+ * @returns Just the base64 portion
+ */
+export function extractBase64FromDataUrl(dataUrl: string): string {
+  if (!dataUrl.includes('base64,')) {
+    throw new Error('Invalid data URL format - missing base64 prefix');
+  }
+  return dataUrl.split('base64,')[1];
 }
 
 /**

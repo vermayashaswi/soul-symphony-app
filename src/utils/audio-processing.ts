@@ -15,6 +15,10 @@ let processingTimeoutId: NodeJS.Timeout | null = null;
 // Map to track temporary IDs to entry IDs
 const processingToEntryMap = new Map<string, number>();
 
+// Request size limits
+const MAX_AUDIO_SIZE = 25 * 1024 * 1024; // 25MB
+const MIN_AUDIO_SIZE = 100; // 100 bytes
+
 /**
  * Process and validate the audio blob
  */
@@ -24,15 +28,14 @@ function validateAudioBlob(audioBlob: Blob | null): boolean {
     return false;
   }
   
-  // Check minimum size (at least 100 bytes for a valid audio file)
-  if (audioBlob.size < 100) {
+  // Check minimum size
+  if (audioBlob.size < MIN_AUDIO_SIZE) {
     console.error('[AudioProcessing] Audio blob too small:', audioBlob.size, 'bytes');
     return false;
   }
   
-  // Check maximum size (25MB limit)
-  const maxSize = 25 * 1024 * 1024; // 25MB
-  if (audioBlob.size > maxSize) {
+  // Check maximum size
+  if (audioBlob.size > MAX_AUDIO_SIZE) {
     console.error('[AudioProcessing] Audio blob too large:', audioBlob.size, 'bytes');
     return false;
   }
@@ -63,6 +66,35 @@ function setupProcessingTimeout(): NodeJS.Timeout {
     console.log('[AudioProcessing] Processing timeout triggered');
     processingLock = false;
   }, 60000); // 60 second timeout
+}
+
+/**
+ * Retry wrapper for processing operations
+ */
+async function withRetry<T>(
+  operation: () => Promise<T>,
+  maxRetries: number = 3,
+  delay: number = 1000
+): Promise<T> {
+  let lastError: Error;
+  
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      console.log(`[AudioProcessing] Attempt ${attempt}/${maxRetries}`);
+      return await operation();
+    } catch (error) {
+      lastError = error as Error;
+      console.error(`[AudioProcessing] Attempt ${attempt} failed:`, error);
+      
+      if (attempt < maxRetries) {
+        console.log(`[AudioProcessing] Retrying in ${delay}ms...`);
+        await new Promise(resolve => setTimeout(resolve, delay));
+        delay *= 2; // Exponential backoff
+      }
+    }
+  }
+  
+  throw lastError!;
 }
 
 /**
@@ -98,28 +130,51 @@ export async function processRecording(audioBlob: Blob | null, userId: string | 
   
   // Test base64 conversion before proceeding
   try {
-    const base64Test = await blobToBase64(audioBlob!);
-    console.log('[AudioProcessing] Base64 test conversion successful, length:', base64Test.length);
+    console.log('[AudioProcessing] Testing base64 conversion...');
+    const dataUrl = await blobToBase64(audioBlob!);
+    console.log('[AudioProcessing] Base64 conversion successful:', {
+      dataUrlLength: dataUrl.length,
+      hasPrefix: dataUrl.startsWith('data:'),
+      mimeType: dataUrl.split(';')[0]
+    });
     
-    // Make sure we have reasonable data
-    if (base64Test.length < 100) {
-      return {
-        success: false,
-        error: 'Audio data appears too short or invalid'
-      };
-    }
-    
-    // Validate base64 format
-    const base64Data = base64Test.replace(/^data:audio\/[^;]+;base64,/, '');
-    if (!/^[A-Za-z0-9+/]*={0,2}$/.test(base64Data)) {
+    // Validate data URL format
+    if (!dataUrl.startsWith('data:audio/') && !dataUrl.startsWith('data:video/')) {
+      console.error('[AudioProcessing] Invalid data URL format:', dataUrl.substring(0, 50));
       return {
         success: false,
         error: 'Audio data format is invalid'
       };
     }
     
+    if (!dataUrl.includes('base64,')) {
+      console.error('[AudioProcessing] Missing base64 marker in data URL');
+      return {
+        success: false,
+        error: 'Audio encoding format is invalid'
+      };
+    }
+    
+    // Test base64 extraction
+    const base64Data = dataUrl.split('base64,')[1];
+    if (!/^[A-Za-z0-9+/]*={0,2}$/.test(base64Data)) {
+      console.error('[AudioProcessing] Invalid base64 format');
+      return {
+        success: false,
+        error: 'Audio data encoding is invalid'
+      };
+    }
+    
+    if (base64Data.length < 100) {
+      console.error('[AudioProcessing] Base64 data too short:', base64Data.length);
+      return {
+        success: false,
+        error: 'Audio data appears too short or invalid'
+      };
+    }
+    
   } catch (error) {
-    console.error('[AudioProcessing] Base64 test conversion failed:', error);
+    console.error('[AudioProcessing] Base64 conversion failed:', error);
     return {
       success: false,
       error: 'Error preparing audio data for processing'
@@ -211,9 +266,13 @@ async function processRecordingInBackground(
   try {
     console.log(`[AudioProcessing] Background processing started for ${tempId}`);
     
-    // Convert the blob to base64
-    const base64Audio = await blobToBase64(audioBlob);
-    console.log(`[AudioProcessing] Base64 conversion complete, length: ${base64Audio.length}`);
+    // Convert the blob to complete data URL
+    const dataUrl = await blobToBase64(audioBlob);
+    console.log(`[AudioProcessing] Data URL conversion complete:`, {
+      length: dataUrl.length,
+      prefix: dataUrl.substring(0, 50),
+      hasBase64Marker: dataUrl.includes('base64,')
+    });
     
     // Get the duration of the audio
     let recordingTime = 0;
@@ -236,9 +295,9 @@ async function processRecordingInBackground(
       throw new Error('No valid session found - please log in again');
     }
     
-    // Prepare the payload with validation
+    // Prepare the payload with the complete data URL
     const payload = {
-      audio: base64Audio,
+      audio: dataUrl, // Send complete data URL
       userId,
       recordingTime,
       highQuality: true
@@ -256,66 +315,54 @@ async function processRecordingInBackground(
     console.log(`[AudioProcessing] Calling transcribe-audio Edge Function for ${tempId}`, {
       audioLength: payload.audio.length,
       userId: payload.userId,
-      recordingTime: payload.recordingTime
+      recordingTime: payload.recordingTime,
+      audioPrefix: payload.audio.substring(0, 50)
     });
     
-    // Call the Supabase Edge Function with proper headers and error handling
-    const { data, error } = await supabase.functions.invoke('transcribe-audio', {
-      body: payload,
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${accessToken}`
-      }
-    });
-    
-    if (error) {
-      console.error(`[AudioProcessing] Edge function error for ${tempId}:`, error);
+    // Call the Supabase Edge Function with retry logic
+    const result = await withRetry(async () => {
+      const { data, error } = await supabase.functions.invoke('transcribe-audio', {
+        body: payload,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${accessToken}`
+        }
+      });
       
-      // Provide more specific error messages
-      let errorMessage = `Server error: ${error.message || 'Unknown error'}`;
-      
-      if (error.message?.includes('JSON') || error.message?.includes('empty')) {
-        errorMessage = 'Audio data format error - please try recording again';
-      } else if (error.message?.includes('auth')) {
-        errorMessage = 'Authentication failed - please log in again';
-      } else if (error.message?.includes('size') || error.message?.includes('large')) {
-        errorMessage = 'Audio file too large - please record a shorter message';
-      } else if (error.message?.includes('Invalid request data')) {
-        errorMessage = 'Invalid audio data - please try recording again';
+      if (error) {
+        console.error(`[AudioProcessing] Edge function error for ${tempId}:`, error);
+        throw new Error(`Server error: ${error.message || 'Unknown error'}`);
       }
       
-      processingStateManager.updateEntryState(tempId, EntryProcessingState.ERROR, errorMessage);
-      return { success: false, error: errorMessage };
-    }
-    
-    if (!data) {
-      console.error(`[AudioProcessing] No data returned from edge function for ${tempId}`);
-      const errorMessage = 'No response from server - please try again';
-      processingStateManager.updateEntryState(tempId, EntryProcessingState.ERROR, errorMessage);
-      return { success: false, error: errorMessage };
-    }
+      if (!data) {
+        console.error(`[AudioProcessing] No data returned from edge function for ${tempId}`);
+        throw new Error('No response from server - please try again');
+      }
+      
+      return data;
+    }, 3, 2000);
     
     console.log(`[AudioProcessing] Edge function success for ${tempId}:`, {
-      entryId: data.entryId,
-      transcriptionLength: data.transcription?.length || 0,
-      hasRefinedText: !!data.refinedText,
-      processingTime: data.processingTime
+      entryId: result.entryId,
+      transcriptionLength: result.transcription?.length || 0,
+      hasRefinedText: !!result.refinedText,
+      processingTime: result.processingTime
     });
     
     // Update the state manager with the entry ID
-    if (data.entryId) {
-      processingStateManager.setEntryId(tempId, data.entryId);
+    if (result.entryId) {
+      processingStateManager.setEntryId(tempId, result.entryId);
       processingStateManager.updateEntryState(tempId, EntryProcessingState.COMPLETED);
       
       // Also store in our local map
-      setEntryIdForProcessingId(tempId, data.entryId);
+      setEntryIdForProcessingId(tempId, result.entryId);
     }
     
     // Notify anyone who cares that processing is complete
     window.dispatchEvent(new CustomEvent('processingEntryCompleted', {
       detail: { 
         tempId, 
-        entryId: data.entryId, 
+        entryId: result.entryId, 
         timestamp: Date.now() 
       }
     }));
@@ -324,8 +371,8 @@ async function processRecordingInBackground(
     window.dispatchEvent(new CustomEvent('entryContentReady', {
       detail: { 
         tempId, 
-        entryId: data.entryId, 
-        content: data.refinedText || data.transcription, 
+        entryId: result.entryId, 
+        content: result.refinedText || result.transcription, 
         timestamp: Date.now() 
       }
     }));
@@ -334,14 +381,14 @@ async function processRecordingInBackground(
     window.dispatchEvent(new CustomEvent('journalEntriesNeedRefresh', {
       detail: { 
         tempId, 
-        entryId: data.entryId, 
+        entryId: result.entryId, 
         timestamp: Date.now() 
       }
     }));
     
     return { 
       success: true, 
-      entryId: data.entryId 
+      entryId: result.entryId 
     };
   } catch (error: any) {
     console.error(`[AudioProcessing] Error in background processing for ${tempId}:`, error);
