@@ -81,10 +81,32 @@ serve(async (req) => {
     const audioFile = formData.get('audio') as File;
     const userId = formData.get('userId') as string;
 
+    console.log('[Transcribe] Received request with:', {
+      hasAudioFile: !!audioFile,
+      audioFileSize: audioFile?.size || 0,
+      audioFileType: audioFile?.type || 'unknown',
+      hasUserId: !!userId,
+      userIdLength: userId?.length || 0
+    });
+
     if (!audioFile || !userId) {
       console.error('[Transcribe] Missing required fields:', { hasAudio: !!audioFile, hasUserId: !!userId });
       return new Response(
-        JSON.stringify({ error: 'Audio file and userId are required' }),
+        JSON.stringify({ 
+          success: false,
+          error: 'Audio file and userId are required' 
+        }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    if (audioFile.size === 0) {
+      console.error('[Transcribe] Audio file is empty');
+      return new Response(
+        JSON.stringify({ 
+          success: false,
+          error: 'Audio file is empty' 
+        }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
@@ -94,7 +116,10 @@ serve(async (req) => {
     if (authError || !user || user.id !== userId) {
       console.error('[Transcribe] Authentication failed:', authError);
       return new Response(
-        JSON.stringify({ error: 'Unauthorized' }),
+        JSON.stringify({ 
+          success: false,
+          error: 'Unauthorized' 
+        }),
         { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
@@ -202,6 +227,7 @@ serve(async (req) => {
     
     return new Response(
       JSON.stringify({ 
+        success: false,
         error: 'Failed to process audio',
         details: error.message 
       }),
