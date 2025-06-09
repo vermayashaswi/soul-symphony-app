@@ -9,12 +9,12 @@ interface TranscriptionResult {
 }
 
 /**
- * Enhanced transcription service with improved error handling and FIXED duration handling
+ * Enhanced transcription service with improved error handling and validation
  * @param base64Audio - Base64 encoded audio data
  * @param userId - User ID for association with the transcription
  * @param directTranscription - If true, just returns the transcription without processing
  * @param processSentiment - If true, ensure sentiment analysis is performed with UTF-8 encoding
- * @param recordingDuration - Recording duration in milliseconds (ACTUAL recording time from recorder)
+ * @param recordingDuration - Recording duration in milliseconds (ACTUAL recording time)
  */
 export async function sendAudioForTranscription(
   base64Audio: string,
@@ -50,13 +50,11 @@ export async function sendAudioForTranscription(
     console.log(`[TranscriptionService] Sending audio for ${directTranscription ? 'direct' : 'enhanced'} transcription processing`);
     console.log(`[TranscriptionService] Audio data size: ${base64Audio.length} characters`);
     console.log('[TranscriptionService] User ID provided:', userId ? 'Yes' : 'No');
-    console.log('[TranscriptionService] Recording duration (actual from recorder):', recordingDuration, 'ms');
+    console.log('[TranscriptionService] Recording duration (actual):', recordingDuration, 'ms');
 
-    // FIXED: Use the exact recording duration provided by the client recorder
-    // Convert to seconds for better readability in logs, but store milliseconds in DB
-    const actualDurationMs = recordingDuration || 0;
-    const actualDurationSec = actualDurationMs / 1000;
-    console.log(`[TranscriptionService] FIXED duration handling - Using actual duration: ${actualDurationMs}ms (${actualDurationSec}s)`);
+    // Use the actual recording duration provided by the client
+    const actualDuration = recordingDuration || 0;
+    console.log(`[TranscriptionService] Using actual recording duration: ${actualDuration}ms`);
 
     // Get user's timezone if available
     const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
@@ -67,8 +65,7 @@ export async function sendAudioForTranscription(
       directTranscription,
       highQuality: processSentiment,
       audioSize: base64Audio.length,
-      recordingTimeMs: actualDurationMs, // FIXED: Send milliseconds
-      recordingTimeSec: actualDurationSec,
+      recordingTime: actualDuration,
       timezone
     });
 
@@ -87,7 +84,7 @@ export async function sendAudioForTranscription(
             userId,
             directTranscription,
             highQuality: processSentiment,
-            recordingTime: actualDurationMs // FIXED: Pass the exact milliseconds from recorder
+            recordingTime: actualDuration // Pass the actual recording duration
           },
           headers: {
             'x-timezone': timezone // Pass timezone in headers
@@ -131,7 +128,6 @@ export async function sendAudioForTranscription(
         }
 
         console.log('[TranscriptionService] Enhanced transcription response:', data);
-        console.log('[TranscriptionService] FIXED duration in response:', data.duration, 'ms');
         console.log('[TranscriptionService] Enhanced transcription completed successfully');
         
         return {
