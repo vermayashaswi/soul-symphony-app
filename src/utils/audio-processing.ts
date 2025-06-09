@@ -1,4 +1,3 @@
-
 /**
  * Main audio processing module
  * Orchestrates the audio recording and transcription process
@@ -24,10 +23,29 @@ function validateAudioBlob(audioBlob: Blob | null): boolean {
     return false;
   }
   
+  // Check minimum size (at least 100 bytes for a valid audio file)
+  if (audioBlob.size < 100) {
+    console.error('[AudioProcessing] Audio blob too small:', audioBlob.size, 'bytes');
+    return false;
+  }
+  
+  // Check maximum size (25MB limit)
+  const maxSize = 25 * 1024 * 1024; // 25MB
+  if (audioBlob.size > maxSize) {
+    console.error('[AudioProcessing] Audio blob too large:', audioBlob.size, 'bytes');
+    return false;
+  }
+  
   // Check if the audio blob has duration
   if (!('duration' in audioBlob) || (audioBlob as any).duration <= 0) {
     console.warn('[AudioProcessing] Audio blob has no duration property or duration is 0');
   }
+  
+  console.log('[AudioProcessing] Audio blob validation passed:', {
+    size: audioBlob.size,
+    type: audioBlob.type,
+    duration: (audioBlob as any).duration || 'unknown'
+  });
   
   return true;
 }
@@ -60,11 +78,20 @@ export async function processRecording(audioBlob: Blob | null, userId: string | 
   // Clear all toasts to ensure UI is clean before processing
   await ensureAllToastsCleared();
   
+  // Validate inputs
+  if (!userId) {
+    console.error('[AudioProcessing] No user ID provided');
+    return { 
+      success: false, 
+      error: 'User authentication required' 
+    };
+  }
+  
   // Validate the audio blob
   if (!validateAudioBlob(audioBlob)) {
     return { 
       success: false, 
-      error: 'No audio data to process' 
+      error: 'Invalid audio data - please try recording again' 
     };
   }
   
@@ -74,12 +101,22 @@ export async function processRecording(audioBlob: Blob | null, userId: string | 
     console.log('[AudioProcessing] Base64 test conversion successful, length:', base64Test.length);
     
     // Make sure we have reasonable data
-    if (base64Test.length < 50) {
+    if (base64Test.length < 100) {
       return {
         success: false,
         error: 'Audio data appears too short or invalid'
       };
     }
+    
+    // Validate base64 format
+    const base64Data = base64Test.replace(/^data:audio\/[^;]+;base64,/, '');
+    if (!/^[A-Za-z0-9+/]*={0,2}$/.test(base64Data)) {
+      return {
+        success: false,
+        error: 'Audio data format is invalid'
+      };
+    }
+    
   } catch (error) {
     console.error('[AudioProcessing] Base64 test conversion failed:', error);
     return {
@@ -167,7 +204,7 @@ export async function processRecording(audioBlob: Blob | null, userId: string | 
  */
 async function processRecordingInBackground(
   audioBlob: Blob,
-  userId: string | undefined,
+  userId: string,
   tempId: string
 ): Promise<{ success: boolean; entryId?: number; error?: string }> {
   try {
@@ -175,6 +212,7 @@ async function processRecordingInBackground(
     
     // Convert the blob to base64
     const base64Audio = await blobToBase64(audioBlob);
+    console.log(`[AudioProcessing] Base64 conversion complete, length: ${base64Audio.length}`);
     
     // Get the duration of the audio
     let recordingTime = 0;
@@ -183,14 +221,21 @@ async function processRecordingInBackground(
     }
     
     // Get the current session for authorization
-    const { data: { session } } = await supabase.auth.getSession();
+    const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+    
+    if (sessionError) {
+      console.error(`[AudioProcessing] Session error for ${tempId}:`, sessionError);
+      throw new Error(`Authentication error: ${sessionError.message}`);
+    }
+    
     const accessToken = session?.access_token;
     
     if (!accessToken) {
-      throw new Error('No valid session found');
+      console.error(`[AudioProcessing] No access token found for ${tempId}`);
+      throw new Error('No valid session found - please log in again');
     }
     
-    // Prepare the payload
+    // Prepare the payload with validation
     const payload = {
       audio: base64Audio,
       userId,
@@ -198,9 +243,22 @@ async function processRecordingInBackground(
       highQuality: true
     };
     
-    console.log(`[AudioProcessing] Calling transcribe-audio Edge Function for ${tempId}`);
+    // Validate payload before sending
+    if (!payload.audio || payload.audio.length < 100) {
+      throw new Error('Invalid audio data in payload');
+    }
     
-    // Call the Supabase Edge Function with proper authorization
+    if (!payload.userId) {
+      throw new Error('Missing userId in payload');
+    }
+    
+    console.log(`[AudioProcessing] Calling transcribe-audio Edge Function for ${tempId}`, {
+      audioLength: payload.audio.length,
+      userId: payload.userId,
+      recordingTime: payload.recordingTime
+    });
+    
+    // Call the Supabase Edge Function with proper authorization and timeout
     const { data, error } = await supabase.functions.invoke('transcribe-audio', {
       body: payload,
       headers: {
@@ -211,21 +269,35 @@ async function processRecordingInBackground(
     
     if (error) {
       console.error(`[AudioProcessing] Edge function error for ${tempId}:`, error);
-      processingStateManager.updateEntryState(tempId, EntryProcessingState.ERROR, 
-        `Server error: ${error.message || 'Unknown error'}`);
-        
-      return { success: false, error: error.message };
+      
+      // Provide more specific error messages
+      let errorMessage = `Server error: ${error.message || 'Unknown error'}`;
+      
+      if (error.message?.includes('JSON')) {
+        errorMessage = 'Audio data format error - please try recording again';
+      } else if (error.message?.includes('auth')) {
+        errorMessage = 'Authentication failed - please log in again';
+      } else if (error.message?.includes('size') || error.message?.includes('large')) {
+        errorMessage = 'Audio file too large - please record a shorter message';
+      }
+      
+      processingStateManager.updateEntryState(tempId, EntryProcessingState.ERROR, errorMessage);
+      return { success: false, error: errorMessage };
     }
     
     if (!data) {
       console.error(`[AudioProcessing] No data returned from edge function for ${tempId}`);
-      processingStateManager.updateEntryState(tempId, EntryProcessingState.ERROR, 
-        'No data returned from server');
-        
-      return { success: false, error: 'No data returned from server' };
+      const errorMessage = 'No response from server - please try again';
+      processingStateManager.updateEntryState(tempId, EntryProcessingState.ERROR, errorMessage);
+      return { success: false, error: errorMessage };
     }
     
-    console.log(`[AudioProcessing] Edge function success for ${tempId}:`, data);
+    console.log(`[AudioProcessing] Edge function success for ${tempId}:`, {
+      entryId: data.entryId,
+      transcriptionLength: data.transcription?.length || 0,
+      hasRefinedText: !!data.refinedText,
+      processingTime: data.processingTime
+    });
     
     // Update the state manager with the entry ID
     if (data.entryId) {
@@ -270,12 +342,23 @@ async function processRecordingInBackground(
     };
   } catch (error: any) {
     console.error(`[AudioProcessing] Error in background processing for ${tempId}:`, error);
-    processingStateManager.updateEntryState(tempId, EntryProcessingState.ERROR, 
-      error.message || 'Unknown error');
-      
+    
+    // Provide user-friendly error messages
+    let userFriendlyError = 'Processing failed - please try again';
+    
+    if (error.message?.includes('network') || error.message?.includes('fetch')) {
+      userFriendlyError = 'Network error - please check your connection';
+    } else if (error.message?.includes('auth') || error.message?.includes('session')) {
+      userFriendlyError = 'Session expired - please log in again';
+    } else if (error.message?.includes('audio') || error.message?.includes('base64')) {
+      userFriendlyError = 'Audio format error - please try recording again';
+    }
+    
+    processingStateManager.updateEntryState(tempId, EntryProcessingState.ERROR, userFriendlyError);
+    
     return { 
       success: false, 
-      error: error.message || 'Unknown error' 
+      error: userFriendlyError 
     };
   }
 }
