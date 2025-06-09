@@ -39,7 +39,7 @@ export async function transcribeAudioWithWhisper(
     // Create form data to send to the OpenAI API
     const formData = new FormData();
     formData.append("file", new Blob([audioBytes], { type: audioBlob.type }), filename);
-    formData.append("model", "whisper-1"); // FIXED: Use correct Whisper model
+    formData.append("model", "gpt-4o-transcribe");
     
     // Only add language parameter if it's not 'auto' and is a valid language code
     if (language !== 'auto' && language.length === 2) {
@@ -54,7 +54,7 @@ export async function transcribeAudioWithWhisper(
       fileType: audioBlob.type,
       fileExtension,
       hasApiKey: !!apiKey,
-      model: "whisper-1",
+      model: "gpt-4o-transcribe",
       autoLanguageDetection: language === 'auto',
       responseFormat: "json"
     });
@@ -127,7 +127,7 @@ export async function transcribeAudioWithWhisper(
     console.log("[Transcription] Success:", {
       textLength: transcribedText.length,
       sampleText: transcribedText.substring(0, 50) + "...",
-      model: "whisper-1",
+      model: "gpt-4o-transcribe",
       detectedLanguage: detectedLanguages[0] || 'unknown',
       allDetectedLanguages: detectedLanguages
     });
@@ -173,261 +173,262 @@ function detectLanguageFromText(text: string): string[] {
     'ru': /[\u0400-\u04FF]/,        // Cyrillic script
     
     // Word-based detection for Latin script languages
-    'fr': /\b(le|la|les|un|une|des|je|tu|il|elle|nous|vous|ils|elles|et|ou|mais|donc|car|ni|or|avec|dans|pour|sur|par|sans|sous|entre|vers|chez|depuis|pendant|avant|après|très|plus|moins|bien|mal|tout|tous|toute|toutes|même|autre|autres|cette|celui|celle|ceux|celles)\b/gi,
+    'fr': /\b(le|la|les|un|une|des|je|tu|il|elle|nous|vous|ils|elles|et|ou|mais|donc|car|ni|or|avec|dans|pour|sur|par|sans|sous|entre|vers|chez|depuis|pendant|avant|après|très|plus|moins|bien|mal|tout|tous|toute|toutes|même|autre|autres|cette|cette|celui|celle|ceux|celles)\b/gi,
     'es': /\b(el|la|los|las|un|una|y|o|pero|que|de|en|es|por|para|con|sin|sobre|bajo|entre|hasta|desde|durante|según|como|cuando|donde|mientras|aunque|porque|si|no|sí|muy|más|menos|bien|mal|todo|toda|todos|todas|esto|esta|este|eso|esa|ese|aquel|aquella|aquellos|aquellas)\b/gi,
     'de': /\b(der|die|das|ein|eine|und|oder|aber|dass|von|zu|mit|auf|für|durch|über|unter|zwischen|während|wegen|trotz|ohne|gegen|um|nach|vor|bei|seit|bis|als|wenn|weil|obwohl|damit|so|sehr|mehr|weniger|gut|schlecht|alle|alles|dieser|diese|dieses|jener|jene|jenes)\b/gi,
-    'it': /\b(il|la|lo|gli|le|un|una|e|o|ma|che|di|in|è|per|con|su|da|tra|fra|durante|secondo|come|quando|dove|mentre|anche|se|non|sì|molto|più|meno|bene|male|tutto|tutti|questa|questo|quello|quella|quelli|quelle)\b/gi,
-    
-    // Portuguese detection
-    'pt': /\b(o|a|os|as|um|uma|e|ou|mas|que|de|em|é|para|com|por|sem|sobre|sob|entre|até|desde|durante|segundo|como|quando|onde|enquanto|embora|porque|se|não|sim|muito|mais|menos|bem|mal|todo|toda|todos|todas|este|esta|isto|esse|essa|isso|aquele|aquela|aquilo)\b/gi,
-    
-    // Dutch detection
-    'nl': /\b(de|het|een|en|of|maar|dat|van|in|is|voor|met|op|door|zonder|over|onder|tussen|tot|sinds|tijdens|volgens|zoals|wanneer|waar|terwijl|hoewel|omdat|als|niet|ja|zeer|meer|minder|goed|slecht|alle|alles|deze|dit|die|dat|degene|degenen)\b/gi,
-    
-    // English (default fallback for Latin script)
-    'en': /\b(the|a|an|and|or|but|that|of|in|is|for|with|on|by|without|over|under|between|to|since|during|according|like|when|where|while|although|because|if|not|yes|very|more|less|good|bad|all|this|that|these|those|who|which)\b/gi
+    'it': /\b(il|la|lo|gli|le|un|una|e|o|ma|che|di|in|è|per|con|su|da|tra|fra|durante|secondo|come|quando|dove|mentre|anche|se|non|sì|molto|più|meno|bene|male|tutto|tutta|tutti|tutte|questo|questa|quello|quella|quelli|quelle)\b/gi,
+    'pt': /\b(o|a|os|as|um|uma|e|ou|mas|que|de|em|é|por|para|com|sem|sobre|sob|entre|até|desde|durante|segundo|como|quando|onde|enquanto|também|se|não|sim|muito|mais|menos|bem|mal|todo|toda|todos|todas|este|esta|esse|essa|aquele|aquela)\b/gi,
+    'nl': /\b(de|het|een|en|of|maar|dat|van|in|is|voor|met|op|door|over|onder|tussen|tijdens|volgens|als|wanneer|waar|terwijl|ook|als|niet|ja|zeer|meer|minder|goed|slecht|alle|alles|deze|dit|die|dat|zo|heel|erg)\b/gi,
+    'sv': /\b(en|ett|och|eller|men|att|av|i|är|för|med|på|genom|över|under|mellan|under|enligt|som|när|var|medan|också|om|inte|ja|mycket|mer|mindre|bra|dålig|alla|allt|denna|detta|den|det|så|väldigt)\b/gi,
+    'no': /\b(en|et|og|eller|men|at|av|i|er|for|med|på|gjennom|over|under|mellom|i|løpet|av|ifølge|som|når|hvor|mens|også|hvis|ikke|ja|veldig|mer|mindre|bra|dårlig|alle|alt|denne|dette|den|det|så|meget)\b/gi
   };
   
-  // Check each language pattern
+  // Check for script-based languages first (most reliable)
   for (const [lang, pattern] of Object.entries(languagePatterns)) {
-    if (pattern.test(normalizedText)) {
+    if (pattern.test(text)) {
       detectedLanguages.push(lang);
     }
   }
   
-  // If no languages detected, default to English for Latin script
+  // If no specific language detected and it's Latin script, try English detection
   if (detectedLanguages.length === 0) {
-    detectedLanguages.push('en');
+    const englishIndicators = /\b(the|and|or|but|that|of|in|is|for|with|on|by|from|as|at|to|a|an|this|that|these|those|i|you|he|she|it|we|they|me|him|her|us|them|my|your|his|hers|its|our|their|be|have|do|will|would|could|should|may|might|can|must|shall|very|more|most|less|least|good|bad|well|better|best|worse|worst|all|some|any|no|not|yes)\b/gi;
+    
+    const englishMatches = (normalizedText.match(englishIndicators) || []).length;
+    const totalWords = normalizedText.split(/\s+/).length;
+    
+    // If more than 20% of words are English indicators, consider it English
+    if (totalWords > 0 && (englishMatches / totalWords) > 0.2) {
+      detectedLanguages.push('en');
+    } else {
+      // Check if it's basic Latin characters
+      const latinPattern = /^[a-zA-Z0-9\s.,!?;:'"()\-]+$/;
+      if (latinPattern.test(text.trim())) {
+        detectedLanguages.push('en'); // Default to English for Latin script
+      } else {
+        detectedLanguages.push('unknown');
+      }
+    }
   }
   
-  // Sort by likely accuracy (script-based first, then common languages)
-  const scriptBasedLangs = ['hi', 'bn', 'te', 'ta', 'gu', 'kn', 'ml', 'or', 'pa', 'mr', 'zh', 'ja', 'ko', 'ar', 'ru'];
-  detectedLanguages.sort((a, b) => {
-    const aIsScript = scriptBasedLangs.includes(a);
-    const bIsScript = scriptBasedLangs.includes(b);
-    if (aIsScript && !bIsScript) return -1;
-    if (!aIsScript && bIsScript) return 1;
-    return 0;
-  });
-  
-  return detectedLanguages.slice(0, 3); // Return top 3 detected languages
+  return detectedLanguages.length > 0 ? detectedLanguages : ['unknown'];
 }
 
 /**
- * Translate and refine text using OpenAI GPT with enhanced processing
- * @param text - The text to translate and refine
- * @param apiKey - The OpenAI API key
- * @param detectedLanguages - Array of detected languages
- * @returns Refined text
+ * Translates and refines text using GPT-4.1 with enhanced error handling
  */
 export async function translateAndRefineText(
-  text: string,
+  text: string, 
   apiKey: string,
-  detectedLanguages: string[] = ['en']
-): Promise<{ refinedText: string }> {
+  detectedLanguages: string[]
+): Promise<{ refinedText: string; }> {
   try {
-    const primaryLanguage = detectedLanguages[0] || 'en';
+    console.log("[AI] Starting text refinement:", text.substring(0, 50) + "...");
+    console.log("[AI] Detected languages:", detectedLanguages);
     
-    console.log("[Text Processing] Starting translation and refinement:", {
-      textLength: text.length,
-      primaryLanguage,
-      allLanguages: detectedLanguages
-    });
+    // Check if the detected language indicates non-English content
+    const isNonEnglish = detectedLanguages[0] !== 'en' && detectedLanguages[0] !== 'unknown';
+    const detectedLanguagesInfo = detectedLanguages.join(', ');
     
-    // Enhanced prompt for better text processing
-    const prompt = `You are an expert text processor specializing in voice transcription refinement. 
-
-Your task is to improve the following voice transcription by:
-1. Correcting obvious speech-to-text errors (wrong words, missing punctuation)
-2. Adding proper punctuation and formatting
-3. Maintaining the original meaning and speaker's voice
-4. Keeping the same language as the original (detected: ${primaryLanguage})
-5. Preserving emotional tone and personal expressions
-6. NOT translating unless the text is clearly in a different language than intended
-
-Original transcription:
-"${text}"
-
-Please return only the refined text without any additional commentary or explanation.`;
-
-    const response = await fetch("https://api.openai.com/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        "Authorization": `Bearer ${apiKey}`,
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify({
-        model: "gpt-4o-mini",
-        messages: [
-          {
-            role: "system",
-            content: "You are a text refinement specialist. Return only the refined text without any additional commentary."
+    // Enhanced system messages for better translation and refinement
+    const systemMessage = isNonEnglish 
+      ? `You are a professional multilingual translator. Translate the following text into natural, fluent English while preserving the original meaning, tone, and emotional context. Do not add explanations or interpretations. The detected language is: ${detectedLanguagesInfo}.`
+      : `You are an expert transcription editor. Improve the grammar, punctuation, and sentence structure of the following English text while preserving the original meaning and tone. Remove only obvious filler words (um, uh, like) where they don't affect meaning. Keep the speaker's natural style and intent.`;
+    
+    // Retry logic for AI processing
+    let attempts = 0;
+    const maxAttempts = 3;
+    
+    while (attempts < maxAttempts) {
+      try {
+        const response = await fetch("https://api.openai.com/v1/chat/completions", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${apiKey}`
           },
-          {
-            role: "user",
-            content: prompt
+          body: JSON.stringify({
+            model: "gpt-4.1-2025-04-14", // FIXED: Use correct GPT model
+            messages: [
+              {
+                role: "system",
+                content: systemMessage
+              },
+              {
+                role: "user",
+                content: text
+              }
+            ],
+            max_tokens: 1500,
+            temperature: 0.3 // Lower temperature for more consistent results
+          })
+        });
+        
+        if (!response.ok) {
+          const errorText = await response.text();
+          console.error(`[AI] OpenAI API error (attempt ${attempts + 1}):`, errorText);
+          
+          // Don't retry on client errors
+          if (response.status >= 400 && response.status < 500) {
+            throw new Error(`OpenAI API client error: ${errorText}`);
           }
-        ],
-        temperature: 0.3,
-        max_tokens: Math.min(4000, text.length * 2)
-      })
-    });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error("[Text Processing] OpenAI API error:", errorText);
-      // Return original text if refinement fails
-      return { refinedText: text };
+          
+          // Retry on server errors
+          if (attempts < maxAttempts - 1) {
+            const delay = Math.pow(2, attempts) * 1000;
+            await new Promise(resolve => setTimeout(resolve, delay));
+            attempts++;
+            continue;
+          }
+          
+          throw new Error(`OpenAI API error: ${errorText}`);
+        }
+        
+        const result = await response.json();
+        const refinedText = result.choices?.[0]?.message?.content || text;
+        
+        console.log("[AI] Text refined successfully, new length:", refinedText.length);
+        console.log("[AI] Original text sample:", text.substring(0, 50));
+        console.log("[AI] Refined text sample:", refinedText.substring(0, 50));
+        console.log("[AI] Used detected language(s):", detectedLanguagesInfo);
+        
+        return { refinedText };
+      } catch (error) {
+        attempts++;
+        if (attempts >= maxAttempts) {
+          console.error("[AI] Text refinement failed after all attempts:", error);
+          return { refinedText: text }; // Return original text on failure
+        }
+        
+        const delay = Math.pow(2, attempts - 1) * 1000;
+        console.log(`[AI] Retrying text refinement in ${delay}ms...`);
+        await new Promise(resolve => setTimeout(resolve, delay));
+      }
     }
-
-    const result = await response.json();
-    const refinedText = result.choices?.[0]?.message?.content?.trim() || text;
-
-    console.log("[Text Processing] Refinement completed:", {
-      originalLength: text.length,
-      refinedLength: refinedText.length,
-      originalSample: text.substring(0, 50),
-      refinedSample: refinedText.substring(0, 50)
-    });
-
-    return { refinedText };
-  } catch (error) {
-    console.error("[Text Processing] Error in text refinement:", error);
-    // Return original text if there's an error
+    
     return { refinedText: text };
+  } catch (error) {
+    console.error("[AI] Text refinement error:", error);
+    return { refinedText: text }; // Return original text on error
   }
 }
 
 /**
- * Analyze emotions in text using OpenAI with available emotions from database
- * @param text - The text to analyze
- * @param availableEmotions - Array of emotion objects from database
- * @param apiKey - The OpenAI API key
- * @returns Emotion analysis results
+ * Analyze emotions in text using OpenAI's GPT-4.1 with enhanced error handling
  */
 export async function analyzeEmotions(
   text: string,
-  availableEmotions: any[],
+  emotionsData: Array<{ name: string; description: string }>,
   apiKey: string
 ): Promise<Record<string, number>> {
   try {
-    if (!availableEmotions || availableEmotions.length === 0) {
-      console.warn("[Emotion Analysis] No emotions available from database");
-      return {};
-    }
-
-    const emotionNames = availableEmotions.map(e => e.name).join(', ');
+    console.log("[AI] Analyzing emotions in text:", text.substring(0, 50) + "....");
     
-    console.log("[Emotion Analysis] Starting analysis with emotions:", emotionNames);
+    if (!emotionsData || emotionsData.length === 0) {
+      console.warn("[AI] No emotions data provided");
+      return { Neutral: 0.5 };
+    }
+    
+    // Create a prompt with available emotions
+    const emotionOptions = emotionsData
+      .map(e => `${e.name}: ${e.description}`)
+      .join("\n");
+    
+    const systemPrompt = `You are an expert at detecting emotions in text. Analyze the following text and assign scores to the emotions below:
 
-    const prompt = `Analyze the emotional content of the following text and return scores (0.0 to 1.0) for relevant emotions.
+${emotionOptions}
 
-Available emotions: ${emotionNames}
-
-Text to analyze: "${text}"
-
-Return a JSON object with emotion names as keys and numerical scores (0.0 to 1.0) as values. Only include emotions that are clearly present in the text with a score of at least 0.1.
-
-Example format:
-{
-  "joy": 0.8,
-  "excitement": 0.6,
-  "gratitude": 0.4
-}`;
-
+Rules:
+- Only return emotions that are clearly present in the text
+- Use a scale of 0.0 to 1.0, where 0.0 means not present and 1.0 means strongly present
+- Be conservative with high scores (0.8+) - reserve them for very clear emotional expressions
+- Return ONLY a valid JSON object with emotion names as keys and scores as values
+- Do not include explanations or additional text`;
+    
     const response = await fetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
       headers: {
-        "Authorization": `Bearer ${apiKey}`,
-        "Content-Type": "application/json"
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${apiKey}`
       },
       body: JSON.stringify({
-        model: "gpt-4o-mini",
+        model: "gpt-4.1-2025-04-14", // FIXED: Use correct GPT model
         messages: [
           {
             role: "system",
-            content: "You are an emotion analysis expert. Return only valid JSON with emotion scores."
+            content: systemPrompt
           },
           {
             role: "user",
-            content: prompt
+            content: text
           }
         ],
-        temperature: 0.2,
-        response_format: { type: "json_object" }
+        response_format: { type: "json_object" },
+        temperature: 0.3
       })
     });
-
+    
     if (!response.ok) {
       const errorText = await response.text();
-      console.error("[Emotion Analysis] OpenAI API error:", errorText);
-      return {};
+      console.error("[AI] Emotion analysis API error:", errorText);
+      return { Neutral: 0.5 };
     }
-
-    const result = await response.json();
-    const emotionsText = result.choices?.[0]?.message?.content;
     
-    if (!emotionsText) {
-      console.warn("[Emotion Analysis] No emotion analysis content returned");
-      return {};
+    const result = await response.json();
+    const emotionsResult = JSON.parse(result.choices[0].message.content);
+    
+    // Validate the result
+    if (typeof emotionsResult !== 'object' || emotionsResult === null) {
+      console.warn("[AI] Invalid emotions result format");
+      return { Neutral: 0.5 };
     }
-
-    try {
-      const emotions = JSON.parse(emotionsText);
-      console.log("[Emotion Analysis] Analysis completed:", emotions);
-      return emotions;
-    } catch (parseError) {
-      console.error("[Emotion Analysis] Failed to parse emotion results:", parseError);
-      return {};
-    }
+    
+    console.log("[AI] Emotions analyzed successfully:", emotionsResult);
+    
+    return emotionsResult;
   } catch (error) {
-    console.error("[Emotion Analysis] Error in emotion analysis:", error);
-    return {};
+    console.error("[AI] Emotion analysis error:", error);
+    return { Neutral: 0.5 };
   }
 }
 
 /**
- * Generate embedding for text using OpenAI's text-embedding-ada-002 model
- * @param text - The text to generate embedding for
- * @param apiKey - The OpenAI API key
- * @returns Embedding vector
+ * Generate embedding for text using OpenAI's embedding API with error handling
  */
-export async function generateEmbedding(
-  text: string,
-  apiKey: string
-): Promise<number[]> {
+export async function generateEmbedding(text: string, apiKey: string): Promise<number[]> {
   try {
-    console.log("[Embedding] Generating embedding for text length:", text.length);
-
+    console.log("[AI] Generating embedding for text:", text.substring(0, 50) + "....");
+    
     const response = await fetch("https://api.openai.com/v1/embeddings", {
       method: "POST",
       headers: {
-        "Authorization": `Bearer ${apiKey}`,
-        "Content-Type": "application/json"
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${apiKey}`
       },
       body: JSON.stringify({
-        model: "text-embedding-ada-002",
-        input: text.substring(0, 8000) // Limit to avoid token limits
+        model: "text-embedding-3-small",
+        input: text
       })
     });
-
+    
     if (!response.ok) {
       const errorText = await response.text();
-      console.error("[Embedding] OpenAI API error:", errorText);
-      throw new Error(`Embedding generation failed: ${errorText}`);
+      console.error("[AI] Embedding API error:", errorText);
+      throw new Error(`OpenAI Embedding API error: ${errorText}`);
     }
-
+    
     const result = await response.json();
-    const embedding = result.data?.[0]?.embedding;
-
+    const embedding = result.data[0].embedding;
+    
     if (!embedding || !Array.isArray(embedding)) {
-      throw new Error("Invalid embedding response format");
+      throw new Error("Invalid embedding format received from API");
     }
-
-    console.log("[Embedding] Embedding generated successfully, dimensions:", embedding.length);
+    
+    console.log("[AI] Embedding generated successfully, dimensions:", embedding.length);
+    
     return embedding;
   } catch (error) {
-    console.error("[Embedding] Error generating embedding:", error);
+    console.error("[AI] Embedding error:", error);
     throw error;
   }
 }

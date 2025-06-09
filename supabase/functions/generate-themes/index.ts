@@ -1,4 +1,3 @@
-
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.38.4";
@@ -63,51 +62,39 @@ async function getKnownEmotions(): Promise<string[]> {
   }
 }
 
-async function extract_themes_entities_and_emotions(text: string, knownEmotions: string[]) {
+async function extract_themes_and_entities(text: string, knownEmotions: string[]) {
   try {
     if (!openAIApiKey) {
       console.error('OpenAI API key is missing or empty');
       return {
         themes: ['Theme 1', 'Theme 2', 'Theme 3'],
         entities: [],
-        categories: [],
         entityemotion: {}
       };
     }
 
-    // Updated prompt to extract both themes, entities, and categories in one call
+    // -- Updated prompt to restrict categories to allowedCategories only --
     const prompt = `
-      Analyze the following journal entry and extract:
-      1. Main themes or topics (max 5) described succinctly.
-      2. Named entities (people, places, organizations, events) with their types. Extract actual names, places, and specific entities mentioned.
-      3. From ONLY the following list of Categories, select all that are relevant to this journal entry (list of up to 10 maximum):
-         Categories: [${allowedCategories.map(cat => `"${cat}"`).join(', ')}]
-      4. For each selected category, select the top 3 strongest matching emotions from this list: [${knownEmotions.join(', ')}]
+      Analyze the following journal entry and:
+      1. Extract the main themes or topics (max 5) described succinctly.
+      2. From ONLY the following list of Categories, select all that are relevant to this journal entry (list of up to 10 maximum). Do NOT make up new categories, pick only from the list provided below:
+         Categories:
+         [${allowedCategories.map(cat => `"${cat}"`).join(', ')}]
+      3. For each selected category, select the top 3 strongest matching emotions from this list: [${knownEmotions.join(', ')}]
          - Provide the strength/score of each detected emotion for the category (between 0 and 1, rounded to 1 decimal).
          - Only include emotions that are clearly relevant for the category.
-      
       Format your response as compact valid JSON with these keys:
       {
         "themes": [...],
-        "entities": [
-          {"name": "entity_name", "type": "PERSON|LOCATION|ORGANIZATION|EVENT|OTHER"},
-          ...
-        ],
         "categories": [...], 
         "entityemotion": {
           "Category 1": { "emotion1": score, "emotion2": score, ... },
           "Category 2": { ... }
         }
       }
-      
       For example:
       {
         "themes": ["work stress", "personal growth"],
-        "entities": [
-          {"name": "Sarah", "type": "PERSON"},
-          {"name": "New York", "type": "LOCATION"},
-          {"name": "Microsoft", "type": "ORGANIZATION"}
-        ],
         "categories": ["Career & Workplace", "Self & Identity"],
         "entityemotion": {
           "Career & Workplace": { "stress": 0.8, "boredom": 0.5 },
@@ -132,7 +119,7 @@ async function extract_themes_entities_and_emotions(text: string, knownEmotions:
         messages: [
           {
             role: 'system',
-            content: 'You are an advanced assistant that extracts journal themes, entities, categories, and core emotions for each entity. Always return only a well-formatted JSON object as specified in the user request.'
+            content: 'You are an advanced assistant that extracts journal themes, entities, and core emotions for each entity. Always return only a well-formatted JSON object as specified in the user request.'
           },
           {
             role: 'user',
@@ -151,7 +138,6 @@ async function extract_themes_entities_and_emotions(text: string, knownEmotions:
       return {
         themes: ['Personal', 'Experience'],
         entities: [],
-        categories: [],
         entityemotion: {}
       };
     }
@@ -163,7 +149,6 @@ async function extract_themes_entities_and_emotions(text: string, knownEmotions:
       return {
         themes: [],
         entities: [],
-        categories: [],
         entityemotion: {}
       };
     }
@@ -171,25 +156,12 @@ async function extract_themes_entities_and_emotions(text: string, knownEmotions:
     let contentText = result.choices[0].message.content;
     try {
       const parsed = JSON.parse(contentText);
-      
-      // Process entities to match the expected format for the database
-      let processedEntities = {};
-      if (Array.isArray(parsed.entities)) {
-        // Group entities by type for the JSONB format expected by the database
-        parsed.entities.forEach(entity => {
-          const type = entity.type || 'OTHER';
-          if (!processedEntities[type]) {
-            processedEntities[type] = [];
-          }
-          processedEntities[type].push(entity.name || entity);
-        });
-      }
-      
       // Defensive defaults:
       return {
         themes: Array.isArray(parsed.themes) ? parsed.themes : [],
-        entities: processedEntities, // Store as JSONB object grouped by type
-        categories: Array.isArray(parsed.categories) ? parsed.categories : [],
+        // Support both keys: "categories" (new) or "entities"/"categories" for legacy compatibility
+        entities: Array.isArray(parsed.categories) ? parsed.categories :
+                 (Array.isArray(parsed.entities) ? parsed.entities : []),
         entityemotion: typeof parsed.entityemotion === "object" && parsed.entityemotion !== null ? parsed.entityemotion : {}
       };
     } catch (err) {
@@ -197,17 +169,15 @@ async function extract_themes_entities_and_emotions(text: string, knownEmotions:
       // Return fallback structure if parsing fails
       return {
         themes: [],
-        entities: {},
-        categories: [],
+        entities: [],
         entityemotion: {}
       };
     }
   } catch (error) {
-    console.error('Error in extract_themes_entities_and_emotions:', error);
+    console.error('Error in extract_themes_and_entities:', error);
     return {
       themes: [],
-      entities: {},
-      categories: [],
+      entities: [],
       entityemotion: {}
     };
   }
@@ -247,21 +217,16 @@ serve(async (req) => {
     // Fetch available emotions from Supabase
     const knownEmotionList = await getKnownEmotions();
 
-    // Get extraction results (themes, entities, categories, entityemotion)
-    const { themes, entities, categories, entityemotion } = await extract_themes_entities_and_emotions(textToProcess, knownEmotionList);
+    // Get extraction results (themes, entities, entityemotion)
+    const { themes, entities, entityemotion } = await extract_themes_and_entities(textToProcess, knownEmotionList);
 
     // Prepare updates
     const updates = {};
     if (themes && Array.isArray(themes)) {
       updates["master_themes"] = themes.length ? themes : ['Personal', 'Reflection', 'Experience'];
     }
-    // Updated to use both entities and categories (legacy compatibility)
-    if (entities && typeof entities === "object") {
-      updates["entities"] = entities; // Store the grouped entities object
-    }
-    if (categories && Array.isArray(categories)) {
-      // For backward compatibility, also store categories in a separate field if needed
-      // or use entities field for categories as well
+    if (entities && Array.isArray(entities)) {
+      updates["entities"] = entities;
     }
     if (entityemotion && typeof entityemotion === "object") {
       updates["entityemotion"] = entityemotion;
@@ -282,7 +247,6 @@ serve(async (req) => {
         success: true,
         themes,
         entities,
-        categories,
         entityemotion
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -294,8 +258,7 @@ serve(async (req) => {
       JSON.stringify({
         success: true,
         themes: [],
-        entities: {},
-        categories: [],
+        entities: [],
         entityemotion: {}
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }

@@ -110,9 +110,9 @@ export async function extractThemes(supabase: SupabaseClient, text: string, entr
       }
     }
     
-    // Trigger the comprehensive theme generation edge function (this will now also handle entities)
+    // Trigger the comprehensive theme generation edge function
     try {
-      console.log(`Triggering comprehensive theme and entity generation for entry ${entryId}`);
+      console.log(`Triggering comprehensive theme generation for entry ${entryId}`);
       
       const { error: themeError } = await supabase.functions.invoke('generate-themes', {
         body: { 
@@ -124,7 +124,7 @@ export async function extractThemes(supabase: SupabaseClient, text: string, entr
       if (themeError) {
         console.error("[extractThemes] Error invoking generate-themes function:", themeError);
       } else {
-        console.log("[extractThemes] Successfully triggered theme and entity generation");
+        console.log("[extractThemes] Successfully triggered theme generation");
       }
     } catch (genErr) {
       console.error("[extractThemes] Error in theme generation trigger:", genErr);
@@ -184,6 +184,27 @@ export async function storeJournalEntry(
     }
 
     console.log('[storeJournalEntry] Successfully stored entry with ID:', data.id);
+    
+    // Trigger entity extraction - this was missing from the inline version
+    try {
+      console.log(`[storeJournalEntry] Triggering entity extraction for entry ${data.id}`);
+      
+      const { error: entitiesError } = await supabase.functions.invoke('batch-extract-entities', {
+        body: {
+          processAll: false,
+          diagnosticMode: true,
+          entryIds: [data.id]
+        }
+      });
+      
+      if (entitiesError) {
+        console.error("[storeJournalEntry] Error invoking batch-extract-entities:", entitiesError);
+      } else {
+        console.log("[storeJournalEntry] Successfully triggered entity extraction");
+      }
+    } catch (entityErr) {
+      console.error("[storeJournalEntry] Error triggering entity extraction:", entityErr);
+    }
     
     // Trigger comprehensive sentiment analysis
     try {
