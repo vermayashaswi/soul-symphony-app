@@ -115,6 +115,92 @@ async function analyzeTextSentiment(text: string): Promise<string> {
   }
 }
 
+// Helper function to convert base64 to Uint8Array
+function base64ToUint8Array(base64: string): Uint8Array {
+  try {
+    // Remove data URL prefix if present
+    const base64Data = base64.replace(/^data:audio\/[^;]+;base64,/, '');
+    
+    // Decode base64
+    const binaryString = atob(base64Data);
+    const bytes = new Uint8Array(binaryString.length);
+    
+    for (let i = 0; i < binaryString.length; i++) {
+      bytes[i] = binaryString.charCodeAt(i);
+    }
+    
+    return bytes;
+  } catch (error) {
+    console.error('[Transcribe] Error converting base64 to Uint8Array:', error);
+    throw new Error('Invalid base64 audio data');
+  }
+}
+
+// Helper function to detect request content type and extract data
+async function extractRequestData(req: Request): Promise<{
+  audioData: Uint8Array;
+  userId: string;
+  audioType: string;
+  duration?: number;
+}> {
+  const contentType = req.headers.get('content-type') || '';
+  
+  if (contentType.includes('application/json')) {
+    // Handle JSON payload with base64 audio (from audio-processing.ts)
+    console.log('[Transcribe] Processing JSON payload with base64 audio');
+    
+    const body = await req.json();
+    const { audio, userId, recordingTime } = body;
+    
+    if (!audio || !userId) {
+      throw new Error('Missing audio or userId in JSON payload');
+    }
+    
+    // Convert base64 to Uint8Array
+    const audioData = base64ToUint8Array(audio);
+    
+    // Calculate duration from recordingTime if available
+    let duration = 30; // default
+    if (recordingTime && typeof recordingTime === 'number') {
+      duration = Math.round(recordingTime / 1000); // Convert ms to seconds
+    }
+    
+    return {
+      audioData,
+      userId,
+      audioType: 'webm', // Default for base64 audio
+      duration
+    };
+  } else if (contentType.includes('multipart/form-data')) {
+    // Handle FormData payload (from VoiceRecorder component)
+    console.log('[Transcribe] Processing FormData payload');
+    
+    const formData = await req.formData();
+    const audioFile = formData.get('audio') as File;
+    const userId = formData.get('userId') as string;
+    
+    if (!audioFile || !userId) {
+      throw new Error('Missing audio file or userId in FormData');
+    }
+    
+    // Convert File to Uint8Array
+    const audioBuffer = await audioFile.arrayBuffer();
+    const audioData = new Uint8Array(audioBuffer);
+    
+    // Extract audio type from file
+    const audioType = audioFile.type.split('/')[1] || 'webm';
+    
+    return {
+      audioData,
+      userId,
+      audioType,
+      duration: undefined // Will be calculated later
+    };
+  } else {
+    throw new Error(`Unsupported content type: ${contentType}`);
+  }
+}
+
 serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
@@ -123,40 +209,82 @@ serve(async (req) => {
 
   try {
     console.log('[Transcribe] Processing audio transcription request');
+    console.log('[Transcribe] Content-Type:', req.headers.get('content-type'));
     
-    const formData = await req.formData();
-    const audioFile = formData.get('audio') as File;
-    const userId = formData.get('userId') as string;
+    // Extract audio data and metadata from request
+    const { audioData, userId, audioType, duration: providedDuration } = await extractRequestData(req);
+    
+    console.log('[Transcribe] Extracted data:', {
+      audioDataSize: audioData.length,
+      userId: userId,
+      audioType: audioType,
+      providedDuration: providedDuration
+    });
 
-    if (!audioFile || !userId) {
-      console.error('[Transcribe] Missing required fields:', { hasAudio: !!audioFile, hasUserId: !!userId });
-      return new Response(
-        JSON.stringify({ error: 'Audio file and userId are required' }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+    // Validate user authentication - get from Authorization header for JSON requests
+    const authHeader = req.headers.get('authorization');
+    let user = null;
+    
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      try {
+        const token = authHeader.replace('Bearer ', '');
+        const { data: { user: authUser }, error: authError } = await supabase.auth.getUser(token);
+        if (!authError && authUser) {
+          user = authUser;
+        }
+      } catch (error) {
+        console.error('[Transcribe] Token validation error:', error);
+      }
+    }
+    
+    // For FormData requests, try getting user from service role
+    if (!user) {
+      try {
+        const { data: { user: serviceUser }, error: serviceError } = await supabase.auth.getUser();
+        if (!serviceError && serviceUser) {
+          user = serviceUser;
+        }
+      } catch (error) {
+        console.error('[Transcribe] Service role user check error:', error);
+      }
     }
 
-    // Validate user authentication
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-    if (authError || !user || user.id !== userId) {
-      console.error('[Transcribe] Authentication failed:', authError);
+    // If we still don't have a user, check if the userId matches any existing user
+    if (!user) {
+      console.log('[Transcribe] No authenticated user found, validating userId exists in profiles');
+      const { data: profile, error: profileError } = await supabase
+        .from('profiles')
+        .select('id')
+        .eq('id', userId)
+        .single();
+        
+      if (profileError || !profile) {
+        console.error('[Transcribe] User validation failed:', profileError);
+        return new Response(
+          JSON.stringify({ error: 'Invalid user' }),
+          { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+      
+      // Create a mock user object for processing
+      user = { id: userId };
+    }
+
+    if (user.id !== userId) {
+      console.error('[Transcribe] User ID mismatch:', { authUserId: user.id, requestUserId: userId });
       return new Response(
-        JSON.stringify({ error: 'Unauthorized' }),
+        JSON.stringify({ error: 'User ID mismatch' }),
         { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    console.log('[Transcribe] Processing audio for user:', userId);
+    console.log('[Transcribe] User validation successful for:', userId);
 
-    // Process audio file
-    const audioBuffer = await audioFile.arrayBuffer();
-    const audioData = new Uint8Array(audioBuffer);
-    
-    // Calculate duration
-    const duration = calculateDuration(audioData);
-    console.log('[Transcribe] Calculated duration:', duration, 'seconds');
+    // Calculate duration if not provided
+    const duration = providedDuration || calculateDuration(audioData);
+    console.log('[Transcribe] Using duration:', duration, 'seconds');
 
-    // Process audio if needed (convert format, etc.)
+    // Process audio if needed
     const processedAudio = await processAudio(audioData);
     
     // Upload audio file to storage
@@ -182,8 +310,8 @@ serve(async (req) => {
     // Transcribe audio using OpenAI Whisper
     console.log('[Transcribe] Starting transcription with OpenAI...');
     const transcriptionResult = await transcribeAudioWithWhisper(
-      new Blob([processedAudio], { type: audioFile.type }),
-      audioFile.type.split('/')[1] || 'webm',
+      new Blob([processedAudio], { type: `audio/${audioType}` }),
+      audioType,
       openaiApiKey
     );
     

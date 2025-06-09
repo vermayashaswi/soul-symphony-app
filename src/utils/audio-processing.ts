@@ -1,3 +1,4 @@
+
 /**
  * Main audio processing module
  * Orchestrates the audio recording and transcription process
@@ -181,6 +182,14 @@ async function processRecordingInBackground(
       recordingTime = Math.round((audioBlob as any).duration * 1000);
     }
     
+    // Get the current session for authorization
+    const { data: { session } } = await supabase.auth.getSession();
+    const accessToken = session?.access_token;
+    
+    if (!accessToken) {
+      throw new Error('No valid session found');
+    }
+    
     // Prepare the payload
     const payload = {
       audio: base64Audio,
@@ -191,9 +200,13 @@ async function processRecordingInBackground(
     
     console.log(`[AudioProcessing] Calling transcribe-audio Edge Function for ${tempId}`);
     
-    // Call the Supabase Edge Function to transcribe the audio
+    // Call the Supabase Edge Function with proper authorization
     const { data, error } = await supabase.functions.invoke('transcribe-audio', {
-      body: payload
+      body: payload,
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${accessToken}`
+      }
     });
     
     if (error) {
