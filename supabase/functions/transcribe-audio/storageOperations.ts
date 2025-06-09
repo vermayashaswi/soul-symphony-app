@@ -1,83 +1,42 @@
 
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.7.1';
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.38.4';
 
-/**
- * Stores an audio file in Supabase storage
- * @param supabase - Supabase client
- * @param audioData - Binary audio data
- * @param filename - Filename to use
- * @param fileExtension - File extension (webm, mp4, etc)
- */
-export async function storeAudioFile(
-  supabase: any,
-  audioData: Uint8Array,
-  filename: string,
-  fileExtension: string
-): Promise<string | null> {
+const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+const supabase = createClient(supabaseUrl, supabaseServiceKey);
+
+export async function uploadAudioFile(audioData: Uint8Array, userId: string): Promise<string | null> {
   try {
-    console.log(`Storing audio file ${filename} with size ${audioData.length} bytes`);
+    const timestamp = Date.now();
+    const filename = `${userId}/${timestamp}.webm`;
     
-    // Create a storage bucket if it doesn't exist
-    const { data: buckets, error: bucketsError } = await supabase
-      .storage
-      .listBuckets();
-      
-    if (bucketsError) {
-      console.error('Error listing buckets:', bucketsError);
-      throw bucketsError;
-    }
-    
-    // Check if journal-audio bucket exists
-    const bucketExists = buckets.some(bucket => bucket.name === 'journal-audio');
-    
-    if (!bucketExists) {
-      console.log('Creating journal-audio bucket');
-      const { error: createError } = await supabase
-        .storage
-        .createBucket('journal-audio', { public: false });
-        
-      if (createError) {
-        console.error('Error creating bucket:', createError);
-        throw createError;
-      }
-    }
-
-    // Upload the file
-    const mimeType = 
-      fileExtension === 'webm' ? 'audio/webm' :
-      fileExtension === 'mp4' ? 'audio/mp4' :
-      fileExtension === 'wav' ? 'audio/wav' :
-      fileExtension === 'mp3' ? 'audio/mp3' :
-      'application/octet-stream';
+    console.log(`Uploading audio file: ${filename}, size: ${audioData.length} bytes`);
     
     // Create a blob from the audio data
-    const blob = new Blob([audioData], { type: mimeType });
+    const blob = new Blob([audioData], { type: 'audio/webm' });
     
-    // Upload the blob
-    console.log(`Uploading ${filename} to journal-audio bucket (${mimeType})`);
-    const { data, error } = await supabase
-      .storage
+    // Upload the file to Supabase storage
+    const { data, error } = await supabase.storage
       .from('journal-audio')
       .upload(filename, blob, {
-        contentType: mimeType,
+        contentType: 'audio/webm',
         upsert: true
       });
       
     if (error) {
-      console.error('Error uploading file:', error);
+      console.error('Error uploading audio file:', error);
       return null;
     }
     
-    // Get the public URL for the file
-    const { data: urlData } = await supabase
-      .storage
+    // Get the public URL
+    const { data: urlData } = supabase.storage
       .from('journal-audio')
       .getPublicUrl(filename);
       
-    console.log('File uploaded successfully:', urlData?.publicUrl);
-    return urlData?.publicUrl || null;
+    console.log('Audio file uploaded successfully:', urlData.publicUrl);
+    return urlData.publicUrl;
   } catch (error) {
-    console.error('Error in storeAudioFile:', error);
+    console.error('Error in uploadAudioFile:', error);
     return null;
   }
 }

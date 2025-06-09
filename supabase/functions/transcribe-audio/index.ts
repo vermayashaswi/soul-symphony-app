@@ -4,12 +4,13 @@ import { corsHeaders } from '../_shared/cors.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.38.4';
 import { processAudio } from './audioProcessing.ts';
 import { transcribeWithDeepgram } from './nlProcessing.ts';
-import { analyzeText, generateEmbedding } from './aiProcessing.ts';
+import { transcribeAudioWithWhisper, translateAndRefineText, analyzeEmotions, generateEmbedding } from './aiProcessing.ts';
 import { createJournalEntry, updateJournalEntry, storeEmbedding } from './databaseOperations.ts';
 import { uploadAudioFile } from './storageOperations.ts';
 
 const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+const openaiApiKey = Deno.env.get('OPENAI_API_KEY')!;
 const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
 // Curated themes for better categorization
@@ -65,6 +66,52 @@ function calculateDuration(audioBlob: Uint8Array): number {
   } catch (error) {
     console.warn('[Audio] Could not calculate duration, using default:', error);
     return 30; // Default 30 seconds
+  }
+}
+
+async function analyzeTextSentiment(text: string): Promise<string> {
+  try {
+    console.log('[Transcribe] Analyzing sentiment with OpenAI...');
+    
+    const response = await fetch("https://api.openai.com/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${openaiApiKey}`
+      },
+      body: JSON.stringify({
+        model: "gpt-4o-mini",
+        messages: [
+          {
+            role: "system",
+            content: "You are an expert at analyzing text sentiment. Analyze the following text and return only one word: 'positive', 'negative', or 'neutral'."
+          },
+          {
+            role: "user",
+            content: text
+          }
+        ],
+        max_tokens: 10
+      })
+    });
+    
+    if (!response.ok) {
+      console.error('[Transcribe] Sentiment analysis API error:', await response.text());
+      return 'neutral';
+    }
+    
+    const result = await response.json();
+    const sentiment = result.choices[0].message.content.toLowerCase().trim();
+    
+    // Validate sentiment response
+    if (['positive', 'negative', 'neutral'].includes(sentiment)) {
+      return sentiment;
+    }
+    
+    return 'neutral';
+  } catch (error) {
+    console.error('[Transcribe] Sentiment analysis error:', error);
+    return 'neutral';
   }
 }
 
@@ -132,9 +179,16 @@ serve(async (req) => {
     const entryId = journalEntry.id;
     console.log('[Transcribe] Created journal entry with ID:', entryId);
 
-    // Transcribe audio
-    console.log('[Transcribe] Starting transcription...');
-    const transcription = await transcribeWithDeepgram(processedAudio);
+    // Transcribe audio using OpenAI Whisper
+    console.log('[Transcribe] Starting transcription with OpenAI...');
+    const transcriptionResult = await transcribeAudioWithWhisper(
+      new Blob([processedAudio], { type: audioFile.type }),
+      audioFile.type.split('/')[1] || 'webm',
+      openaiApiKey
+    );
+    
+    const transcription = transcriptionResult.text;
+    const detectedLanguages = transcriptionResult.detectedLanguages;
     
     if (!transcription) {
       throw new Error('Failed to transcribe audio');
@@ -145,18 +199,36 @@ serve(async (req) => {
     // Update entry with transcription
     await updateJournalEntry(entryId, {
       'transcription text': transcription,
+      languages: detectedLanguages,
     });
 
+    // Translate and refine text if needed
+    console.log('[Transcribe] Starting text refinement...');
+    const refinementResult = await translateAndRefineText(transcription, openaiApiKey, detectedLanguages);
+    const refinedText = refinementResult.refinedText;
+
     // Generate curated themes
-    const themes = selectCuratedThemes(transcription);
+    const themes = selectCuratedThemes(refinedText || transcription);
     console.log('[Transcribe] Selected themes:', themes);
 
-    // Analyze text with AI
-    console.log('[Transcribe] Starting AI analysis...');
-    const analysis = await analyzeText(transcription);
+    // Analyze sentiment
+    console.log('[Transcribe] Starting sentiment analysis...');
+    const sentiment = await analyzeTextSentiment(refinedText || transcription);
+
+    // Get emotions data from database
+    const { data: emotionsData } = await supabase
+      .from('emotions')
+      .select('name, description');
+
+    let emotions = {};
+    if (emotionsData && emotionsData.length > 0) {
+      console.log('[Transcribe] Starting emotion analysis...');
+      emotions = await analyzeEmotions(refinedText || transcription, emotionsData, openaiApiKey);
+    }
     
     // Generate embedding
-    const embedding = await generateEmbedding(transcription);
+    console.log('[Transcribe] Generating embedding...');
+    const embedding = await generateEmbedding(refinedText || transcription, openaiApiKey);
     
     // Store embedding using the database function
     if (embedding) {
@@ -165,11 +237,9 @@ serve(async (req) => {
 
     // Update journal entry with all analysis results
     const updateData: any = {
-      'refined text': analysis.refinedText || transcription,
-      sentiment: analysis.sentiment,
-      emotions: analysis.emotions,
-      entities: analysis.entities,
-      entityemotion: analysis.entityEmotion,
+      'refined text': refinedText || transcription,
+      sentiment: sentiment,
+      emotions: emotions,
       master_themes: themes,
     };
 
@@ -183,12 +253,11 @@ serve(async (req) => {
         success: true,
         entryId: entryId,
         transcription: transcription,
-        refinedText: analysis.refinedText || transcription,
+        refinedText: refinedText || transcription,
         audioUrl: audioUrl,
         duration: duration,
-        sentiment: analysis.sentiment,
-        emotions: analysis.emotions,
-        entities: analysis.entities,
+        sentiment: sentiment,
+        emotions: emotions,
         themes: themes,
       }),
       { 
