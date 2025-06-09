@@ -140,7 +140,8 @@ export function EmotionChart({
     isMonthlyView,
     showDailySentiment,
     dailySentimentDataLength: dailySentimentData?.length || 0,
-    chartType
+    chartType,
+    dailySentimentData: dailySentimentData.slice(0, 3) // Show first 3 for debugging
   });
 
   const chartTypes = [
@@ -235,26 +236,45 @@ export function EmotionChart({
     }, 2000);
   };
   
-  // Process daily sentiment data for chart display
+  // Process daily sentiment data for chart display with enhanced debugging
   const dailySentimentChartData = useMemo((): DailySentimentChartData[] => {
     if (!showDailySentiment || !dailySentimentData) {
+      console.log('[EmotionChart] Not processing daily sentiment chart data:', { 
+        showDailySentiment, 
+        hasDailySentimentData: !!dailySentimentData 
+      });
       return [];
     }
 
     console.log('[EmotionChart] Processing daily sentiment chart data:', { 
       dataPoints: dailySentimentData.length,
-      sampleData: dailySentimentData.slice(0, 3)
+      rawData: dailySentimentData
     });
 
-    return dailySentimentData.map(point => ({
-      day: point.day,
-      sentiment: point.value
-    }));
+    const processedData = dailySentimentData.map((point, index) => {
+      const chartPoint = {
+        day: point.day,
+        sentiment: point.value
+      };
+      
+      console.log(`[EmotionChart] Chart data point ${index}:`, {
+        original: point,
+        processed: chartPoint
+      });
+      
+      return chartPoint;
+    });
+
+    console.log('[EmotionChart] Final daily sentiment chart data:', processedData);
+    return processedData;
   }, [showDailySentiment, dailySentimentData]);
   
   const lineData = useMemo(() => {
     if (showDailySentiment) {
-      console.log('[EmotionChart] Using daily sentiment data for line chart');
+      console.log('[EmotionChart] Using daily sentiment data for line chart:', {
+        chartDataLength: dailySentimentChartData.length,
+        chartData: dailySentimentChartData
+      });
       return dailySentimentChartData;
     }
 
@@ -424,7 +444,7 @@ export function EmotionChart({
   const CustomDot = (props: any) => {
     const { cx, cy, stroke, strokeWidth, r, value } = props;
     
-    if (value === null) return null;
+    if (value === null || value === undefined) return null;
     
     return (
       <circle 
@@ -482,6 +502,12 @@ export function EmotionChart({
   };
 
   const renderLineChart = () => {
+    console.log('[EmotionChart] renderLineChart called:', {
+      lineDataLength: lineData.length,
+      lineData,
+      showDailySentiment
+    });
+
     if (lineData.length === 0) {
       return (
         <div className="flex items-center justify-center h-full">
@@ -498,6 +524,11 @@ export function EmotionChart({
     }
 
     if (showDailySentiment) {
+      console.log('[EmotionChart] Rendering daily sentiment chart with data:', {
+        chartDataLength: dailySentimentChartData.length,
+        chartData: dailySentimentChartData
+      });
+
       // Render daily sentiment chart for month view
       return (
         <div className="flex flex-col h-full">
@@ -528,12 +559,12 @@ export function EmotionChart({
                 type="monotone"
                 dataKey="sentiment"
                 stroke={DAILY_SENTIMENT_COLOR}
-                strokeWidth={2}
+                strokeWidth={3}
                 dot={<CustomDot />}
-                activeDot={{ r: isMobile ? 5 : 6 }}
+                activeDot={{ r: isMobile ? 6 : 8, fill: DAILY_SENTIMENT_COLOR }}
                 name="Daily Sentiment"
                 label={isMobile ? null : <SentimentLineLabel />}
-                connectNulls={true}
+                connectNulls={false}
               />
             </LineChart>
           </ResponsiveContainer>
