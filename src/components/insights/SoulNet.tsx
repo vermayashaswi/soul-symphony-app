@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import '@/types/three-reference';
 import { Canvas } from '@react-three/fiber';
@@ -8,7 +9,6 @@ import RenderingErrorBoundary from './soulnet/RenderingErrorBoundary';
 import { LoadingState } from './soulnet/LoadingState';
 import { EmptyState } from './soulnet/EmptyState';
 import { FullscreenWrapper } from './soulnet/FullscreenWrapper';
-import SoulNetDescription from './soulnet/SoulNetDescription';
 import { useUserColorThemeHex } from './soulnet/useUserColorThemeHex';
 import { cn } from '@/lib/utils';
 import { TranslatableText } from '@/components/translation/TranslatableText';
@@ -287,8 +287,6 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
       "bg-background rounded-xl shadow-sm border w-full",
       isMobile ? "p-0" : "p-6 md:p-8"
     )}>
-      {!isFullScreen && <SoulNetDescription />}
-      
       <FullscreenWrapper
         isFullScreen={isFullScreen}
         toggleFullScreen={toggleFullScreen}
