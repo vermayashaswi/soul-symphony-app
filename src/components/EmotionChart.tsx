@@ -13,7 +13,7 @@ import {
   Text
 } from 'recharts';
 import { cn } from '@/lib/utils';
-import { AggregatedEmotionData, TimeRange, DailySentimentDataPoint } from '@/hooks/use-insights-data';
+import { AggregatedEmotionData, TimeRange } from '@/hooks/use-insights-data';
 import EmotionBubbles from './EmotionBubbles';
 import EntityStrips from './insights/EntityStrips';
 import { Sparkles, CircleDot } from 'lucide-react';
@@ -28,18 +28,12 @@ type EmotionData = {
   [key: string]: number | string | null;
 };
 
-type DailySentimentChartData = {
-  day: string;
-  sentiment: number;
-};
-
 type ChartType = 'line' | 'bubble';
 
 interface EmotionChartProps {
   className?: string;
   timeframe?: TimeRange;
   aggregatedData?: AggregatedEmotionData;
-  dailySentimentData?: DailySentimentDataPoint[];
 }
 
 const EMOTION_COLORS: Record<string, string> = {
@@ -75,8 +69,6 @@ const EMOTION_COLORS: Record<string, string> = {
   distraction: '#A29BFE',   // Lilac
   admiration: '#FDCB6E'     // Amber
 };
-
-const DAILY_SENTIMENT_COLOR = '#4ECDC4'; // Teal for daily sentiment
 
 const getEmotionColor = (emotion: string, index: number): string => {
   const normalized = emotion.toLowerCase();
@@ -114,10 +106,9 @@ const getEmotionColor = (emotion: string, index: number): string => {
 export function EmotionChart({ 
   className, 
   timeframe = 'week',
-  aggregatedData,
-  dailySentimentData = []
+  aggregatedData 
 }: EmotionChartProps) {
-  const [chartType, setChartType] = useState<ChartType>('line');
+  const [chartType, setChartType] = useState<ChartType>('bubble');
   const [bubbleKey, setBubbleKey] = useState(0); 
   const [selectedEmotionInfo, setSelectedEmotionInfo] = useState<{name: string, percentage: number} | null>(null);
   const [visibleEmotions, setVisibleEmotions] = useState<string[]>([]);
@@ -130,22 +121,8 @@ export function EmotionChart({
   const initialRenderRef = useRef(true);
   const { user } = useAuth();
   
-  // Determine if we should show daily sentiment (for month view) or emotions
-  const isMonthlyView = timeframe === 'month';
-  const showDailySentiment = isMonthlyView && dailySentimentData && dailySentimentData.length > 0;
-  
-  console.log('[EmotionChart] ========== EMOTION CHART RENDER ==========');
-  console.log('[EmotionChart] Render state:', {
-    timeframe,
-    isMonthlyView,
-    showDailySentiment,
-    dailySentimentDataLength: dailySentimentData?.length || 0,
-    chartType,
-    dailySentimentData: dailySentimentData
-  });
-
   const chartTypes = [
-    { id: 'line', label: showDailySentiment ? 'Mood Trends' : 'Emotions' },
+    { id: 'line', label: 'Emotions' },
     { id: 'bubble', label: 'Life Areas' },
   ];
   
@@ -236,54 +213,7 @@ export function EmotionChart({
     }, 2000);
   };
   
-  // Process daily sentiment data for chart display with enhanced debugging
-  const dailySentimentChartData = useMemo((): DailySentimentChartData[] => {
-    console.log('[EmotionChart] ========== PROCESSING DAILY SENTIMENT CHART DATA ==========');
-    
-    if (!showDailySentiment || !dailySentimentData) {
-      console.log('[EmotionChart] Not processing daily sentiment chart data:', { 
-        showDailySentiment, 
-        hasDailySentimentData: !!dailySentimentData 
-      });
-      return [];
-    }
-
-    console.log('[EmotionChart] Input daily sentiment data:', { 
-      dataPoints: dailySentimentData.length,
-      rawData: dailySentimentData
-    });
-
-    const processedData = dailySentimentData.map((point, index) => {
-      const chartPoint = {
-        day: point.day,
-        sentiment: point.value
-      };
-      
-      console.log(`[EmotionChart] Chart data point ${index}:`, {
-        original: point,
-        processed: chartPoint
-      });
-      
-      return chartPoint;
-    });
-
-    console.log('[EmotionChart] Final daily sentiment chart data:', {
-      processedCount: processedData.length,
-      processedData
-    });
-    
-    return processedData;
-  }, [showDailySentiment, dailySentimentData]);
-  
   const lineData = useMemo(() => {
-    if (showDailySentiment) {
-      console.log('[EmotionChart] Using daily sentiment data for line chart:', {
-        chartDataLength: dailySentimentChartData.length,
-        chartData: dailySentimentChartData
-      });
-      return dailySentimentChartData;
-    }
-
     if (!aggregatedData || Object.keys(aggregatedData).length === 0) {
       return [];
     }
@@ -355,7 +285,7 @@ export function EmotionChart({
       });
     
     return result;
-  }, [aggregatedData, visibleEmotions, chartType, showDailySentiment, dailySentimentChartData]);
+  }, [aggregatedData, visibleEmotions, chartType]);
 
   const dominantEmotion = useMemo(() => {
     if (!aggregatedData || Object.keys(aggregatedData).length === 0) {
@@ -383,10 +313,10 @@ export function EmotionChart({
   }, [aggregatedData]);
   
   useEffect(() => {
-    if (dominantEmotion && chartType === 'line' && visibleEmotions.length === 0 && !showDailySentiment) {
+    if (dominantEmotion && chartType === 'line' && visibleEmotions.length === 0) {
       setVisibleEmotions([dominantEmotion]);
     }
-  }, [dominantEmotion, chartType, visibleEmotions.length, showDailySentiment]);
+  }, [dominantEmotion, chartType, visibleEmotions.length]);
 
   const EmotionLineLabel = (props: any) => {
     const { x, y, stroke, value, index, data, dataKey } = props;
@@ -410,29 +340,7 @@ export function EmotionChart({
     );
   };
 
-  const SentimentLineLabel = (props: any) => {
-    const { x, y, stroke, value, index, data } = props;
-    
-    if (index !== data.length - 1) return null;
-    
-    return (
-      <text 
-        x={x + 5} 
-        y={y} 
-        dy={4} 
-        fill={stroke} 
-        fontSize={12} 
-        textAnchor="start"
-        fontWeight="500"
-      >
-        Daily Sentiment
-      </text>
-    );
-  };
-
   const handleLegendClick = (emotion: string) => {
-    if (showDailySentiment) return; // No legend interaction for daily sentiment
-    
     setVisibleEmotions(prev => {
       if (prev.length === 1 && prev[0] === emotion) {
         return prev;
@@ -450,7 +358,7 @@ export function EmotionChart({
   const CustomDot = (props: any) => {
     const { cx, cy, stroke, strokeWidth, r, value } = props;
     
-    if (value === null || value === undefined) return null;
+    if (value === null) return null;
     
     return (
       <circle 
@@ -468,55 +376,32 @@ export function EmotionChart({
     const { active, payload, label }: any = props;
     
     if (active && payload && payload.length) {
-      if (showDailySentiment) {
-        const value = payload[0].value;
-        return (
-          <div className="bg-card/95 backdrop-blur-sm p-2 rounded-lg border shadow-md">
-            <p className="text-sm font-medium">{label}</p>
-            <div className="flex items-center gap-2">
-              <div className="w-2 h-2 rounded-full" style={{ backgroundColor: DAILY_SENTIMENT_COLOR }}></div>
-              <p className="text-sm">
-                Daily Sentiment: {value?.toFixed(2) || 'N/A'}
-              </p>
-            </div>
+      const emotionName = payload[0].dataKey.charAt(0).toUpperCase() + payload[0].dataKey.slice(1);
+      const value = payload[0].value;
+      
+      return (
+        <div className="bg-card/95 backdrop-blur-sm p-2 rounded-lg border shadow-md">
+          <p className="text-sm font-medium">{label}</p>
+          <div className="flex items-center gap-2">
+            <div className="w-2 h-2 rounded-full" style={{ backgroundColor: payload[0].stroke }}></div>
+            <p className="text-sm">
+              <TranslatableText 
+                text={emotionName} 
+                forceTranslate={true}
+                enableFontScaling={true}
+                scalingContext="compact"
+              />: {value?.toFixed(1) || 'N/A'}
+            </p>
           </div>
-        );
-      } else {
-        const emotionName = payload[0].dataKey.charAt(0).toUpperCase() + payload[0].dataKey.slice(1);
-        const value = payload[0].value;
-        
-        return (
-          <div className="bg-card/95 backdrop-blur-sm p-2 rounded-lg border shadow-md">
-            <p className="text-sm font-medium">{label}</p>
-            <div className="flex items-center gap-2">
-              <div className="w-2 h-2 rounded-full" style={{ backgroundColor: payload[0].stroke }}></div>
-              <p className="text-sm">
-                <TranslatableText 
-                  text={emotionName} 
-                  forceTranslate={true}
-                  enableFontScaling={true}
-                  scalingContext="compact"
-                />: {value?.toFixed(1) || 'N/A'}
-              </p>
-            </div>
-          </div>
-        );
-      }
+        </div>
+      );
     }
     
     return null;
   };
 
   const renderLineChart = () => {
-    console.log('[EmotionChart] ========== RENDERING LINE CHART ==========');
-    console.log('[EmotionChart] renderLineChart called:', {
-      lineDataLength: lineData.length,
-      lineData,
-      showDailySentiment
-    });
-
     if (lineData.length === 0) {
-      console.log('[EmotionChart] No line data available, showing empty state');
       return (
         <div className="flex items-center justify-center h-full">
           <p className="text-muted-foreground">
@@ -530,75 +415,7 @@ export function EmotionChart({
         </div>
       );
     }
-
-    if (showDailySentiment) {
-      console.log('[EmotionChart] ========== RENDERING DAILY SENTIMENT CHART ==========');
-      console.log('[EmotionChart] Daily sentiment chart data:', {
-        chartDataLength: dailySentimentChartData.length,
-        chartData: dailySentimentChartData,
-        dataPoints: dailySentimentChartData.map(d => ({ day: d.day, sentiment: d.sentiment }))
-      });
-
-      // Render daily sentiment chart for month view
-      return (
-        <div className="flex flex-col h-full">
-          <ResponsiveContainer width="100%" height={isMobile ? 250 : 300}>
-            <LineChart
-              data={dailySentimentChartData}
-              margin={{ top: 20, right: isMobile ? 10 : 60, left: 0, bottom: 10 }}
-            >
-              <CartesianGrid strokeDasharray="3 3" stroke={theme === 'dark' ? '#333' : '#eee'} />
-              <XAxis 
-                dataKey="day" 
-                stroke="#888" 
-                fontSize={isMobile ? 10 : 12} 
-                tickMargin={10}
-                tick={{ fontSize: isMobile ? 10 : 12 }}
-              />
-              <YAxis 
-                stroke="#888" 
-                fontSize={isMobile ? 10 : 12} 
-                tickMargin={isMobile ? 5 : 10} 
-                domain={[-1, 1]} 
-                ticks={[-1, -0.5, 0, 0.5, 1]}
-                tickFormatter={(value) => value.toFixed(1)}
-                width={isMobile ? 25 : 40}
-              />
-              <Tooltip content={<CustomTooltip />} />
-              <Line
-                type="monotone"
-                dataKey="sentiment"
-                stroke={DAILY_SENTIMENT_COLOR}
-                strokeWidth={3}
-                dot={<CustomDot />}
-                activeDot={{ r: isMobile ? 6 : 8, fill: DAILY_SENTIMENT_COLOR }}
-                name="Daily Sentiment"
-                label={isMobile ? null : <SentimentLineLabel />}
-                connectNulls={false}
-              />
-            </LineChart>
-          </ResponsiveContainer>
-          
-          <div className="flex justify-center mt-4">
-            <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-secondary font-medium shadow-sm border-2 border-primary">
-              <div className="w-3 h-3 rounded-full animate-pulse" style={{ backgroundColor: DAILY_SENTIMENT_COLOR }}></div>
-              <span className="text-sm font-bold">Daily Sentiment</span>
-            </div>
-          </div>
-          
-          <div className="flex justify-center flex-wrap gap-4 mt-4 text-xs text-muted-foreground">
-            <TranslatableText 
-              text="* Shows average daily sentiment from journal entries" 
-              forceTranslate={true}
-              enableFontScaling={true}
-              scalingContext="compact"
-            />
-          </div>
-        </div>
-      );
-    }
-
-    // Render regular emotion chart for other views
+    
     const allEmotions = Object.keys(lineData[0])
       .filter(key => key !== 'day')
       .filter(key => lineData.some(point => point[key] !== null));

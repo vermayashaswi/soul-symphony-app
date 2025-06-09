@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import { Mic, Square } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -9,7 +8,6 @@ import { cn } from "@/lib/utils";
 import { LanguageBackground } from "@/components/voice-recorder/MultilingualTextAnimation";
 import { getAudioConfig, getRecorderOptions, RECORDING_LIMITS } from "@/utils/audio/recording-config";
 import { useTutorial } from "@/contexts/TutorialContext";
-import { validateAudioBlob } from "@/utils/audio/blob-utils";
 
 interface VoiceRecordingButtonProps {
   isLoading: boolean;
@@ -53,58 +51,23 @@ const VoiceRecordingButton: React.FC<VoiceRecordingButtonProps> = ({
     if (isRecording) {
       const setupRecording = async () => {
         try {
-          console.log("[VoiceRecordingButton] Starting recording setup");
           const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
           const isAndroid = /Android/.test(navigator.userAgent);
           const platform = isIOS ? 'ios' : (isAndroid ? 'android' : 'web');
           
-          console.log(`[VoiceRecordingButton] Detected platform: ${platform}`);
-          
-          // Get audio configuration based on platform
-          const audioConfig = getAudioConfig();
-          console.log("[VoiceRecordingButton] Audio config:", audioConfig);
-          
-          // Request microphone access with enhanced error handling
-          let mediaStream: MediaStream;
-          try {
-            mediaStream = await navigator.mediaDevices.getUserMedia({ 
-              audio: audioConfig
-            });
-          } catch (error) {
-            console.error("[VoiceRecordingButton] Microphone access denied:", error);
-            throw new Error("Microphone access denied. Please check browser permissions.");
-          }
-          
-          setStream(mediaStream);
-          console.log("[VoiceRecordingButton] MediaStream obtained successfully");
-          
-          // Get recorder options based on platform
-          const options = getRecorderOptions(platform);
-          console.log("[VoiceRecordingButton] Recorder options:", options);
-          
-          // Create and start recorder with enhanced options
-          const rtcRecorder = new RecordRTC(mediaStream, {
-            ...options,
-            type: 'audio',
-            recorderType: StereoAudioRecorder,
-            numberOfAudioChannels: platform === 'ios' ? 1 : 2, // Mono for iOS, stereo for others
-            desiredSampRate: platform === 'ios' ? 44100 : 48000,
-            disableLogs: false,
-            
-            // Enhanced quality settings
-            audioBitsPerSecond: platform === 'ios' ? 128000 : 256000,
-            checkForInactiveTracks: true,
-            bufferSize: 16384
+          const mediaStream = await navigator.mediaDevices.getUserMedia({ 
+            audio: getAudioConfig()
           });
           
-          console.log("[VoiceRecordingButton] Starting recorder");
+          setStream(mediaStream);
+          
+          const options = getRecorderOptions(platform);
+          const rtcRecorder = new RecordRTC(mediaStream, options);
           rtcRecorder.startRecording();
           setRecorder(rtcRecorder);
           
-          // Set recording time limit
           const timeout = setTimeout(() => {
             if (isRecording) {
-              console.log("[VoiceRecordingButton] Maximum recording duration reached");
               toast({
                 title: "Recording limit reached",
                 description: "Maximum recording duration reached (5 minutes)",
@@ -115,7 +78,6 @@ const VoiceRecordingButton: React.FC<VoiceRecordingButtonProps> = ({
           }, RECORDING_LIMITS.MAX_DURATION * 1000);
           
           cleanup = () => {
-            console.log("[VoiceRecordingButton] Cleaning up recording");
             clearTimeout(timeout);
             if (rtcRecorder) {
               rtcRecorder.stopRecording(() => {
@@ -125,10 +87,10 @@ const VoiceRecordingButton: React.FC<VoiceRecordingButtonProps> = ({
             }
           };
         } catch (error) {
-          console.error("[VoiceRecordingButton] Error recording audio:", error);
+          console.error("Error recording audio:", error);
           toast({
             title: "Recording error",
-            description: error.message || "Could not access microphone. Check browser permissions.",
+            description: "Could not access microphone. Check browser permissions.",
             variant: "destructive"
           });
         }
@@ -142,7 +104,6 @@ const VoiceRecordingButton: React.FC<VoiceRecordingButtonProps> = ({
   
   const handleVoiceRecording = () => {
     if (isRecording && recorder) {
-      console.log("[VoiceRecordingButton] Stopping recording");
       recorder.stopRecording(() => {
         try {
           const blob = recorder.getBlob();
@@ -152,13 +113,10 @@ const VoiceRecordingButton: React.FC<VoiceRecordingButtonProps> = ({
             duration: (blob as any).duration || 'unknown'
           });
           
-          // Validate the blob before processing
-          const validation = validateAudioBlob(blob);
-          if (!validation.isValid) {
-            throw new Error(validation.errorMessage || "Invalid audio recording");
+          if (blob.size < 100) {
+            throw new Error("Recording produced an empty or invalid audio file");
           }
           
-          // Add duration property if not present
           if (!('duration' in blob)) {
             try {
               Object.defineProperty(blob, 'duration', {
@@ -173,10 +131,10 @@ const VoiceRecordingButton: React.FC<VoiceRecordingButtonProps> = ({
           
           onStopRecording(blob);
         } catch (error) {
-          console.error("[VoiceRecordingButton] Error processing recording:", error);
+          console.error("[VoiceRecordingButton] Error getting blob:", error);
           toast({
             title: "Recording error",
-            description: error.message || "Failed to process recording. Please try again.",
+            description: "Failed to process recording. Please try again.",
             variant: "destructive"
           });
         }
@@ -189,7 +147,6 @@ const VoiceRecordingButton: React.FC<VoiceRecordingButtonProps> = ({
         setRecorder(null);
       });
     } else {
-      console.log("[VoiceRecordingButton] Starting recording");
       onStartRecording();
     }
   };

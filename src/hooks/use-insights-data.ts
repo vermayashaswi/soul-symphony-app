@@ -10,12 +10,6 @@ export type EmotionDataPoint = {
   emotion: string;
 };
 
-export type DailySentimentDataPoint = {
-  date: string;
-  value: number;
-  day: string;
-};
-
 export type AggregatedEmotionData = {
   [emotion: string]: EmotionDataPoint[];
 };
@@ -44,7 +38,6 @@ interface InsightsData {
   biggestImprovement: BiggestImprovement | null;
   journalActivity: JournalActivity;
   aggregatedEmotionData: AggregatedEmotionData;
-  dailySentimentData: DailySentimentDataPoint[];
 }
 
 export const useInsightsData = (userId: string | undefined, timeRange: TimeRange) => {
@@ -58,8 +51,7 @@ export const useInsightsData = (userId: string | undefined, timeRange: TimeRange
       streak: 0,
       maxStreak: 0
     },
-    aggregatedEmotionData: {},
-    dailySentimentData: []
+    aggregatedEmotionData: {}
   });
   const [loading, setLoading] = useState(true);
   const [lastTimeRange, setLastTimeRange] = useState<TimeRange>(timeRange);
@@ -117,7 +109,6 @@ export const useInsightsData = (userId: string | undefined, timeRange: TimeRange
       const biggestImprovement = calculateBiggestImprovement(allEntries, processedEntries, timeRange);
       const journalActivity = calculateJournalActivity(processedEntries, timeRange);
       const aggregatedEmotionData = processEmotionData(processedEntries, timeRange);
-      const dailySentimentData = processDailySentimentData(processedEntries, timeRange);
 
       const processedAllEntries = allEntries?.map(entry => {
         if ((!entry.sentiment || entry.sentiment === '0') && entry.emotions) {
@@ -182,8 +173,7 @@ export const useInsightsData = (userId: string | undefined, timeRange: TimeRange
         dominantMood,
         biggestImprovement,
         journalActivity,
-        aggregatedEmotionData,
-        dailySentimentData
+        aggregatedEmotionData
       });
     } catch (error) {
       console.error('Error fetching insights data:', error);
@@ -202,230 +192,6 @@ export const useInsightsData = (userId: string | undefined, timeRange: TimeRange
   }, [userId, timeRange, fetchInsightsData]);
 
   return { insightsData, loading };
-};
-
-const processDailySentimentData = (entries: any[], timeRange: TimeRange): DailySentimentDataPoint[] => {
-  console.log('[processDailySentimentData] ========== STARTING DETAILED PROCESSING ==========');
-  console.log('[processDailySentimentData] Input parameters:', { 
-    timeRange, 
-    entryCount: entries.length,
-    entries: entries.map(e => ({ 
-      id: e.id, 
-      created_at: e.created_at, 
-      sentiment: e.sentiment,
-      emotions: e.emotions ? 'has emotions' : 'no emotions'
-    }))
-  });
-
-  if (timeRange !== 'month') {
-    console.log('[processDailySentimentData] Exiting early - not month view, timeRange:', timeRange);
-    return [];
-  }
-
-  if (!entries || entries.length === 0) {
-    console.log('[processDailySentimentData] Exiting early - no entries provided');
-    return [];
-  }
-
-  // Group entries by day with detailed logging
-  const dailyGroups = new Map<string, any[]>();
-  
-  entries.forEach((entry, index) => {
-    if (!entry.created_at) {
-      console.log(`[processDailySentimentData] SKIPPING entry ${index} - missing created_at:`, entry);
-      return;
-    }
-    
-    const entryDate = new Date(entry.created_at);
-    const dateStr = format(entryDate, 'yyyy-MM-dd');
-    
-    console.log(`[processDailySentimentData] Processing entry ${index}:`, {
-      entryId: entry.id,
-      created_at: entry.created_at,
-      entryDate: entryDate.toISOString(),
-      dateStr,
-      sentiment: entry.sentiment,
-      hasEmotions: !!entry.emotions,
-      emotionsType: typeof entry.emotions
-    });
-    
-    if (!dailyGroups.has(dateStr)) {
-      dailyGroups.set(dateStr, []);
-      console.log(`[processDailySentimentData] Created new day group for: ${dateStr}`);
-    }
-    dailyGroups.get(dateStr)!.push(entry);
-    console.log(`[processDailySentimentData] Added entry to day ${dateStr}, group size now: ${dailyGroups.get(dateStr)!.length}`);
-  });
-
-  console.log('[processDailySentimentData] ========== DAILY GROUPS SUMMARY ==========');
-  console.log('[processDailySentimentData] Total unique days:', dailyGroups.size);
-  console.log('[processDailySentimentData] All dates found:', Array.from(dailyGroups.keys()).sort());
-  
-  Array.from(dailyGroups.entries()).forEach(([date, dayEntries]) => {
-    console.log(`[processDailySentimentData] Day ${date}: ${dayEntries.length} entries`, {
-      entryIds: dayEntries.map(e => e.id),
-      sentiments: dayEntries.map(e => e.sentiment)
-    });
-  });
-
-  // Calculate average sentiment for each day with enhanced debugging
-  const dailySentimentData: DailySentimentDataPoint[] = [];
-  
-  Array.from(dailyGroups.entries())
-    .sort(([a], [b]) => a.localeCompare(b)) // Sort by date chronologically
-    .forEach(([dateStr, dayEntries]) => {
-      console.log(`[processDailySentimentData] ========== PROCESSING DAY: ${dateStr} ==========`);
-      console.log(`[processDailySentimentData] Day entries count: ${dayEntries.length}`);
-
-      let totalSentiment = 0;
-      let sentimentCount = 0;
-
-      dayEntries.forEach((entry, entryIndex) => {
-        console.log(`[processDailySentimentData] Processing entry ${entryIndex + 1}/${dayEntries.length} for day ${dateStr}:`, {
-          entryId: entry.id,
-          existingSentiment: entry.sentiment,
-          sentimentType: typeof entry.sentiment,
-          hasEmotions: !!entry.emotions
-        });
-
-        // Use existing sentiment if available and valid
-        if (entry.sentiment && entry.sentiment !== '0' && entry.sentiment !== 0) {
-          const sentimentValue = parseFloat(entry.sentiment);
-          if (!isNaN(sentimentValue)) {
-            totalSentiment += sentimentValue;
-            sentimentCount++;
-            console.log(`[processDailySentimentData] ✓ Used existing sentiment for entry ${entry.id}:`, {
-              sentimentValue,
-              runningTotal: totalSentiment,
-              count: sentimentCount
-            });
-            return;
-          } else {
-            console.log(`[processDailySentimentData] ✗ Invalid sentiment value for entry ${entry.id}:`, entry.sentiment);
-          }
-        }
-
-        // Calculate sentiment from emotions if not available
-        if (entry.emotions) {
-          console.log(`[processDailySentimentData] Calculating sentiment from emotions for entry ${entry.id}`);
-          try {
-            let emotions: any = entry.emotions;
-            if (typeof emotions === 'string') {
-              emotions = JSON.parse(emotions);
-              console.log(`[processDailySentimentData] Parsed emotions string for entry ${entry.id}`);
-            }
-
-            let entrySentiment = 0;
-            let emotionCount = 0;
-
-            if (emotions && typeof emotions === 'object') {
-              if (Array.isArray(emotions.emotions)) {
-                console.log(`[processDailySentimentData] Processing emotions array for entry ${entry.id}, count: ${emotions.emotions.length}`);
-                emotions.emotions.forEach((emotion: any, idx: number) => {
-                  if (emotion && emotion.name && emotion.intensity) {
-                    const negativeEmotions = ['sad', 'angry', 'anxious', 'fearful', 'stressed', 'disappointed', 'frustrated'];
-                    const emotionName = emotion.name.toLowerCase();
-                    const multiplier = negativeEmotions.includes(emotionName) ? -1 : 1;
-                    entrySentiment += emotion.intensity * multiplier;
-                    emotionCount++;
-                    console.log(`[processDailySentimentData] Emotion ${idx}: ${emotion.name} (${emotion.intensity}) * ${multiplier} = ${emotion.intensity * multiplier}`);
-                  }
-                });
-              } else {
-                console.log(`[processDailySentimentData] Processing emotions object for entry ${entry.id}`);
-                Object.entries(emotions).forEach(([emotion, score]: [string, any]) => {
-                  if (emotion.toLowerCase() === 'id' || 
-                      emotion.toLowerCase() === 'intensity' || 
-                      emotion.toLowerCase() === 'name' ||
-                      /^\d+$/.test(emotion) || 
-                      emotion.length < 2) {
-                    return;
-                  }
-                  
-                  const emotionValue = Number(score);
-                  if (!isNaN(emotionValue)) {
-                    const negativeEmotions = ['sad', 'angry', 'anxious', 'fearful', 'stressed', 'disappointed', 'frustrated'];
-                    const multiplier = negativeEmotions.includes(emotion.toLowerCase()) ? -1 : 1;
-                    entrySentiment += emotionValue * multiplier;
-                    emotionCount++;
-                    console.log(`[processDailySentimentData] Emotion: ${emotion} (${emotionValue}) * ${multiplier} = ${emotionValue * multiplier}`);
-                  }
-                });
-              }
-
-              if (emotionCount > 0) {
-                let avgSentiment = entrySentiment / (emotionCount * 2); // Normalize to -1 to 1 range
-                if (avgSentiment > 1.0) avgSentiment = 1.0;
-                if (avgSentiment < -1.0) avgSentiment = -1.0;
-                
-                totalSentiment += avgSentiment;
-                sentimentCount++;
-                
-                console.log(`[processDailySentimentData] ✓ Calculated sentiment from emotions for entry ${entry.id}:`, {
-                  emotionCount,
-                  rawSentiment: entrySentiment,
-                  avgSentiment,
-                  runningTotal: totalSentiment,
-                  count: sentimentCount
-                });
-              } else {
-                console.log(`[processDailySentimentData] ✗ No valid emotions found for entry ${entry.id}`);
-              }
-            } else {
-              console.log(`[processDailySentimentData] ✗ Invalid emotions object for entry ${entry.id}:`, emotions);
-            }
-          } catch (e) {
-            console.error(`[processDailySentimentData] ✗ Error processing emotions for entry ${entry.id}:`, e);
-          }
-        } else {
-          console.log(`[processDailySentimentData] ✗ Entry ${entry.id} has no emotions data`);
-        }
-      });
-
-      console.log(`[processDailySentimentData] Day ${dateStr} summary:`, {
-        totalSentiment,
-        sentimentCount,
-        willCreateDataPoint: sentimentCount > 0
-      });
-
-      if (sentimentCount > 0) {
-        const avgDailySentiment = totalSentiment / sentimentCount;
-        const dayFormatted = format(new Date(dateStr), 'MMM d');
-        
-        const dataPoint = {
-          date: dateStr,
-          value: parseFloat(avgDailySentiment.toFixed(3)),
-          day: dayFormatted
-        };
-        
-        dailySentimentData.push(dataPoint);
-
-        console.log(`[processDailySentimentData] ✓ CREATED DATA POINT for ${dayFormatted}:`, {
-          originalDate: dateStr,
-          formattedDay: dayFormatted,
-          avgDailySentiment,
-          finalValue: dataPoint.value,
-          sentimentCount,
-          totalDataPointsNow: dailySentimentData.length
-        });
-      } else {
-        console.log(`[processDailySentimentData] ✗ NO DATA POINT created for day ${dateStr} - no valid sentiment data`);
-      }
-    });
-
-  console.log('[processDailySentimentData] ========== FINAL RESULTS ==========');
-  console.log('[processDailySentimentData] Total data points created:', dailySentimentData.length);
-  console.log('[processDailySentimentData] All data points:', dailySentimentData.map(dp => ({
-    date: dp.date,
-    day: dp.day,
-    value: dp.value
-  })));
-
-  // Sort by date to ensure chronological order
-  const sortedData = dailySentimentData.sort((a, b) => a.date.localeCompare(b.date));
-  console.log('[processDailySentimentData] Final sorted data:', sortedData);
-
-  return sortedData;
 };
 
 const getDateRange = (timeRange: TimeRange) => {

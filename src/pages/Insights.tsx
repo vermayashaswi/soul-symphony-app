@@ -468,7 +468,6 @@ function InsightsContent() {
                   <EmotionChart 
                     timeframe={timeRange}
                     aggregatedData={insightsData.aggregatedEmotionData}
-                    dailySentimentData={insightsData.dailySentimentData}
                   />
                 </div>
               </div>
