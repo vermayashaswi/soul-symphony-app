@@ -212,7 +212,9 @@ const MoodCalendar: React.FC<MoodCalendarProps> = ({ sentimentData, timeRange })
     const groupedData = new Map();
     
     filteredData.forEach(item => {
-      const formattedDate = formatDateForTimeRange(item.date, timeRange, currentLanguage);
+      // Use different formatting strategy for month view to show individual days
+      const formatRange = timeRange === 'month' ? 'short' : timeRange;
+      const formattedDate = formatDateForTimeRange(item.date, formatRange, currentLanguage);
       const dateKey = formattedDate;
       
       if (!groupedData.has(dateKey)) {
