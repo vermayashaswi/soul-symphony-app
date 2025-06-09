@@ -11,50 +11,35 @@ export interface UserProfileData {
 
 export const useUserProfile = (): UserProfileData & { 
   updateDisplayName: (name: string) => Promise<void>,
-  updateTimezone: (timezone: string) => Promise<void>,
-  profile: UserProfileData | null,
-  isLoading: boolean,
-  error: string | null
+  updateTimezone: (timezone: string) => Promise<void>
 } => {
   const { user } = useAuth();
   const [displayName, setDisplayName] = useState<string | null>(null);
   const [timezone, setTimezone] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchUserProfile = async () => {
-      if (!user) {
-        setIsLoading(false);
-        return;
-      }
+      if (!user) return;
 
       try {
-        setIsLoading(true);
-        setError(null);
-
         // First ensure the profile exists (this will work with our improved trigger)
         const profileExists = await ensureProfileExists(user);
         if (!profileExists) {
           console.error('Failed to ensure profile exists');
-          setError('Failed to load profile');
-          setIsLoading(false);
           return;
         }
 
         // Check for local storage name first
         const localName = localStorage.getItem('user_display_name');
 
-        const { data, error: fetchError } = await supabase
+        const { data, error } = await supabase
           .from('profiles')
           .select('display_name, full_name, timezone')
           .eq('id', user.id)
           .single();
 
-        if (fetchError && fetchError.code !== 'PGRST116') {
-          console.error('Error fetching profile', fetchError);
-          setError('Failed to load profile');
-          setIsLoading(false);
+        if (error && error.code !== 'PGRST116') {
+          console.error('Error fetching profile', error);
           return;
         }
 
@@ -80,12 +65,8 @@ export const useUserProfile = (): UserProfileData & {
             setTimezone(browserTimezone);
           }
         }
-
-        setIsLoading(false);
       } catch (error) {
         console.error('Error in profile fetching', error);
-        setError('Failed to load profile');
-        setIsLoading(false);
       }
     };
 
@@ -145,18 +126,5 @@ export const useUserProfile = (): UserProfileData & {
     }
   };
 
-  const profile: UserProfileData | null = displayName || timezone ? {
-    displayName,
-    timezone
-  } : null;
-
-  return { 
-    displayName, 
-    timezone, 
-    updateDisplayName, 
-    updateTimezone,
-    profile,
-    isLoading,
-    error
-  };
+  return { displayName, timezone, updateDisplayName, updateTimezone };
 };

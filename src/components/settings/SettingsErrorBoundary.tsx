@@ -2,7 +2,7 @@
 import React, { Component, ErrorInfo, ReactNode } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { AlertTriangle, RefreshCw, Home, ArrowLeft } from 'lucide-react';
+import { AlertTriangle, RefreshCw, Home } from 'lucide-react';
 import { TranslatableText } from '@/components/translation/TranslatableText';
 
 interface Props {
@@ -15,101 +15,46 @@ interface State {
   hasError: boolean;
   error?: Error;
   errorInfo?: ErrorInfo;
-  attemptCount: number;
 }
 
 export class SettingsErrorBoundary extends Component<Props, State> {
-  private resetTimeoutId: NodeJS.Timeout | null = null;
-
   constructor(props: Props) {
     super(props);
-    this.state = { 
-      hasError: false, 
-      attemptCount: 0 
-    };
+    this.state = { hasError: false };
   }
 
   static getDerivedStateFromError(error: Error): State {
     console.error('[SettingsErrorBoundary] Error caught:', error);
-    console.error('[SettingsErrorBoundary] Error stack:', error.stack);
-    return { 
-      hasError: true, 
-      error,
-      attemptCount: 0 
-    };
+    return { hasError: true, error };
   }
 
   componentDidCatch(error: Error, errorInfo: ErrorInfo) {
     console.error('[SettingsErrorBoundary] Component stack:', errorInfo.componentStack);
     console.error('[SettingsErrorBoundary] Error details:', error.message, error.stack);
-    console.error('[SettingsErrorBoundary] Error info:', errorInfo);
-    
-    // Log to console for debugging
-    console.group('[SettingsErrorBoundary] Full Error Report');
-    console.error('Error:', error);
-    console.error('Error Info:', errorInfo);
-    console.error('Component Stack:', errorInfo.componentStack);
-    console.groupEnd();
     
     this.setState({
       error,
-      errorInfo,
-      attemptCount: this.state.attemptCount + 1
+      errorInfo
     });
-
-    // Auto-retry for the first error (might be temporary)
-    if (this.state.attemptCount === 0) {
-      console.log('[SettingsErrorBoundary] Auto-retrying after first error...');
-      this.resetTimeoutId = setTimeout(() => {
-        this.handleRetry();
-      }, 2000);
-    }
-  }
-
-  componentWillUnmount() {
-    if (this.resetTimeoutId) {
-      clearTimeout(this.resetTimeoutId);
-    }
   }
 
   handleRetry = () => {
-    console.log('[SettingsErrorBoundary] Manual retry initiated');
-    if (this.resetTimeoutId) {
-      clearTimeout(this.resetTimeoutId);
-      this.resetTimeoutId = null;
-    }
-    
+    console.log('[SettingsErrorBoundary] Retrying...');
     if (this.props.onReset) {
       this.props.onReset();
     }
-    this.setState({ 
-      hasError: false, 
-      error: undefined, 
-      errorInfo: undefined 
-    });
+    this.setState({ hasError: false, error: undefined, errorInfo: undefined });
   };
 
   handleGoHome = () => {
-    console.log('[SettingsErrorBoundary] Navigating to home');
-    // Use window.location for safer navigation that doesn't depend on router context
-    window.location.href = '/app/home';
-  };
-
-  handleGoBack = () => {
-    console.log('[SettingsErrorBoundary] Going back');
-    // Use window.history for safer navigation
-    window.history.back();
+    window.location.href = '/app';
   };
 
   render() {
     if (this.state.hasError) {
-      console.log('[SettingsErrorBoundary] Rendering error UI, attempt count:', this.state.attemptCount);
-      
       if (this.props.fallback) {
         return this.props.fallback;
       }
-
-      const isRepeatedError = this.state.attemptCount > 1;
 
       return (
         <div className="min-h-screen flex items-center justify-center p-4">
@@ -122,32 +67,17 @@ export class SettingsErrorBoundary extends Component<Props, State> {
             </CardHeader>
             <CardContent className="text-center space-y-4">
               <p className="text-sm text-muted-foreground">
-                {isRepeatedError ? (
-                  <TranslatableText text="Settings are having persistent issues. Try going back or refreshing the page." />
-                ) : (
-                  <TranslatableText text="We encountered an error loading your settings. This might be due to a temporary issue." />
-                )}
+                <TranslatableText text="We encountered an error loading your settings. This might be due to a temporary issue." />
               </p>
               
               <div className="flex flex-col gap-2">
-                {!isRepeatedError && (
-                  <Button 
-                    onClick={this.handleRetry}
-                    className="w-full"
-                    variant="default"
-                  >
-                    <RefreshCw className="h-4 w-4 mr-2" />
-                    <TranslatableText text="Try Again" />
-                  </Button>
-                )}
-                
                 <Button 
-                  onClick={this.handleGoBack}
+                  onClick={this.handleRetry}
                   className="w-full"
-                  variant="outline"
+                  variant="default"
                 >
-                  <ArrowLeft className="h-4 w-4 mr-2" />
-                  <TranslatableText text="Go Back" />
+                  <RefreshCw className="h-4 w-4 mr-2" />
+                  <TranslatableText text="Try Again" />
                 </Button>
                 
                 <Button 
@@ -160,11 +90,9 @@ export class SettingsErrorBoundary extends Component<Props, State> {
                 </Button>
               </div>
               
-              {(process.env.NODE_ENV === 'development' || true) && this.state.error && (
+              {process.env.NODE_ENV === 'development' && this.state.error && (
                 <details className="text-left mt-4">
-                  <summary className="text-xs cursor-pointer font-medium">
-                    Error Details (Attempt #{this.state.attemptCount})
-                  </summary>
+                  <summary className="text-xs cursor-pointer font-medium">Error Details</summary>
                   <pre className="text-xs bg-muted p-2 rounded mt-2 overflow-auto max-h-40">
                     {this.state.error.toString()}
                     {this.state.errorInfo?.componentStack}
