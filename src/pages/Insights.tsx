@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
 import { Calendar, Filter, TrendingUp, ArrowUp, ArrowDown, Activity, Award } from 'lucide-react';
@@ -467,7 +468,7 @@ function InsightsContent() {
                     <Filter className="h-5 w-5 text-muted-foreground" />
                   </div>
                   <EmotionChart 
-                    data={insightsData.emotionData}
+                    emotions={insightsData.entries}
                     onEmotionClick={handleEmotionClick}
                     selectedEmotion={selectedEmotion}
                   />
@@ -491,7 +492,10 @@ function InsightsContent() {
                     </h2>
                     <Calendar className="h-5 w-5 text-muted-foreground" />
                   </div>
-                  <MoodCalendar entries={insightsData.entries} />
+                  <MoodCalendar 
+                    sentimentData={getSentimentData()} 
+                    timeRange={timeRange}
+                  />
                 </div>
               </motion.div>
             </div>
@@ -503,7 +507,6 @@ function InsightsContent() {
               className="mb-8 px-2 md:px-0"
             >
               <PremiumFeatureGuard 
-                featureName="Soul-Net Visualization"
                 fallbackContent={
                   <div className="bg-background rounded-xl p-8 text-center border">
                     <h2 className="text-xl font-semibold mb-4">
@@ -542,8 +545,7 @@ function InsightsContent() {
                   </div>
                   <div className="h-96">
                     <SoulNet 
-                      entries={insightsData.entries} 
-                      sentimentData={getSentimentData()}
+                      userId={user?.id}
                       timeRange={timeRange}
                     />
                   </div>
