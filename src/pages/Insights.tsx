@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
 import { Calendar, Filter, TrendingUp, ArrowUp, ArrowDown, Activity, Award } from 'lucide-react';
@@ -468,7 +467,7 @@ function InsightsContent() {
                     <Filter className="h-5 w-5 text-muted-foreground" />
                   </div>
                   <EmotionChart 
-                    emotions={insightsData.entries}
+                    data={insightsData.entries}
                     onEmotionClick={handleEmotionClick}
                     selectedEmotion={selectedEmotion}
                   />
@@ -507,24 +506,9 @@ function InsightsContent() {
               className="mb-8 px-2 md:px-0"
             >
               <PremiumFeatureGuard 
-                fallbackContent={
-                  <div className="bg-background rounded-xl p-8 text-center border">
-                    <h2 className="text-xl font-semibold mb-4">
-                      <StableTranslatableText 
-                        text="Soul-Net Visualization" 
-                        forceTranslate={true}
-                        timeRange={timeRange}
-                      />
-                    </h2>
-                    <p className="text-muted-foreground mb-6">
-                      <StableTranslatableText 
-                        text="Unlock the Soul-Net to see your emotional connections in a beautiful 3D visualization." 
-                        forceTranslate={true}
-                        timeRange={timeRange}
-                      />
-                    </p>
-                  </div>
-                }
+                feature="insights"
+                fallbackTitle="Soul-Net Visualization"
+                fallbackDescription="Unlock the Soul-Net to see your emotional connections in a beautiful 3D visualization."
               >
                 <div className="bg-background rounded-xl shadow-sm border overflow-hidden">
                   <div className="p-6 border-b">
