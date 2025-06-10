@@ -18,6 +18,9 @@ import FAQPage from '@/pages/website/FAQPage';
 import BlogPage from '@/pages/website/BlogPage';
 import BlogPostPage from '@/pages/website/BlogPostPage';
 import OnboardingScreen from '@/components/onboarding/OnboardingScreen';
+import AudioRecorder from '@/pages/AudioRecorder';
+import Profile from '@/pages/Profile';
+import Feedback from '@/pages/Feedback';
 import { useAuth } from '@/contexts/AuthContext';
 import { useOnboarding } from '@/hooks/use-onboarding';
 
@@ -73,6 +76,7 @@ const AppRoutes = () => {
           <Route index element={<AppRootRedirect />} />
           <Route path="home" element={<Home />} />
           <Route path="journal" element={<Journal />} />
+          <Route path="record" element={<AudioRecorder />} />
           <Route path="insights" element={
             <React.Suspense fallback={<div className="flex items-center justify-center h-screen">Loading...</div>}>
               <Insights />
@@ -80,6 +84,8 @@ const AppRoutes = () => {
           } />
           <Route path="chat" element={<Chat />} />
           <Route path="smart-chat" element={<SmartChat />} />
+          <Route path="profile" element={<Profile />} />
+          <Route path="feedback" element={<Feedback />} />
           <Route path="settings" element={<Settings />} />
         </Route>
         
