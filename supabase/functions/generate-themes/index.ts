@@ -63,14 +63,14 @@ async function getKnownEmotions(): Promise<string[]> {
   }
 }
 
-async function extract_themes_and_entities(text: string, knownEmotions: string[]) {
+async function extract_themes_and_categories(text: string, knownEmotions: string[]) {
   try {
     if (!openAIApiKey) {
       console.error('FIXED: OpenAI API key is missing or empty');
       return {
         themes: ['Personal Growth', 'Daily Reflection', 'Life Experience'],
         categories: [],
-        entityemotion: {}
+        themeemotion: {} // FIXED: Changed from entityemotion to themeemotion
       };
     }
 
@@ -92,7 +92,7 @@ async function extract_themes_and_entities(text: string, knownEmotions: string[]
          - Maximum 5 categories, minimum 1
          - Do NOT create new categories outside this list
       
-      3. EMOTION ANALYSIS per category:
+      3. THEME-EMOTION ANALYSIS per category:
          - For each selected category, identify the top 2-3 emotions from: [${knownEmotions.join(', ')}]
          - Provide emotion strength scores (0.1 to 1.0, one decimal place)
          - Only include emotions clearly present in the text for that category
@@ -101,7 +101,7 @@ async function extract_themes_and_entities(text: string, knownEmotions: string[]
       {
         "themes": ["theme1", "theme2", "theme3"],
         "categories": ["Category 1", "Category 2"],
-        "entityemotion": {
+        "themeemotion": {
           "Category 1": { "emotion1": 0.8, "emotion2": 0.6 },
           "Category 2": { "emotion3": 0.7, "emotion4": 0.5 }
         }
@@ -119,7 +119,7 @@ async function extract_themes_and_entities(text: string, knownEmotions: string[]
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'gpt-4o-mini',
+        model: 'gpt-4.1-2025-04-14', // FIXED: Use the current flagship model
         messages: [
           {
             role: 'system',
@@ -141,7 +141,7 @@ async function extract_themes_and_entities(text: string, knownEmotions: string[]
       return {
         themes: ['Personal Reflection', 'Daily Experience'],
         categories: [],
-        entityemotion: {}
+        themeemotion: {} // FIXED: Changed from entityemotion to themeemotion
       };
     }
 
@@ -153,7 +153,7 @@ async function extract_themes_and_entities(text: string, knownEmotions: string[]
       return {
         themes: [],
         categories: [],
-        entityemotion: {}
+        themeemotion: {} // FIXED: Changed from entityemotion to themeemotion
       };
     }
 
@@ -168,34 +168,34 @@ async function extract_themes_and_entities(text: string, knownEmotions: string[]
       const validatedCategories = Array.isArray(parsed.categories) ? 
         parsed.categories.filter(cat => typeof cat === 'string' && allowedCategories.includes(cat)) : [];
       
-      const validatedEntityemotion = typeof parsed.entityemotion === "object" && parsed.entityemotion !== null ? 
-        parsed.entityemotion : {};
+      const validatedThemeemotion = typeof parsed.themeemotion === "object" && parsed.themeemotion !== null ? 
+        parsed.themeemotion : {};
 
       console.log('[generate-themes] FIXED: Validated extraction results:', {
         themes: validatedThemes,
         categories: validatedCategories,
-        entityemotionKeys: Object.keys(validatedEntityemotion)
+        themeemotionKeys: Object.keys(validatedThemeemotion)
       });
 
       return {
         themes: validatedThemes,
         categories: validatedCategories,
-        entityemotion: validatedEntityemotion
+        themeemotion: validatedThemeemotion // FIXED: Changed from entityemotion to themeemotion
       };
     } catch (err) {
       console.error('[generate-themes] FIXED: Error parsing JSON:', err, contentText);
       return {
         themes: ['Personal', 'Reflection'],
         categories: [],
-        entityemotion: {}
+        themeemotion: {} // FIXED: Changed from entityemotion to themeemotion
       };
     }
   } catch (error) {
-    console.error('FIXED: Error in extract_themes_and_entities:', error);
+    console.error('FIXED: Error in extract_themes_and_categories:', error);
     return {
       themes: ['Experience'],
       categories: [],
-      entityemotion: {}
+      themeemotion: {} // FIXED: Changed from entityemotion to themeemotion
     };
   }
 }
@@ -242,12 +242,12 @@ serve(async (req) => {
     const knownEmotionList = await getKnownEmotions();
 
     // FIXED: Get enhanced extraction results
-    const { themes, categories, entityemotion } = await extract_themes_and_entities(textToProcess, knownEmotionList);
+    const { themes, categories, themeemotion } = await extract_themes_and_categories(textToProcess, knownEmotionList);
 
     console.log('[generate-themes] FIXED: Enhanced extraction results:', {
       themes: themes,
       categories: categories,
-      entityemotionKeys: Object.keys(entityemotion)
+      themeemotionKeys: Object.keys(themeemotion)
     });
 
     // FIXED: Prepare enhanced updates with proper column mapping
@@ -267,11 +267,11 @@ serve(async (req) => {
       updates["entities"] = [];
     }
     
-    // FIXED: Store emotion analysis per category
-    if (entityemotion && typeof entityemotion === "object") {
-      updates["entityemotion"] = entityemotion;
+    // FIXED: Store theme-emotion analysis in themeemotion column
+    if (themeemotion && typeof themeemotion === "object") {
+      updates["themeemotion"] = themeemotion;
     } else {
-      updates["entityemotion"] = {};
+      updates["themeemotion"] = {};
     }
 
     console.log('[generate-themes] FIXED: Enhanced database updates:', updates);
@@ -294,7 +294,7 @@ serve(async (req) => {
         themes,
         entities: categories, // Return categories as entities for backward compatibility
         categories, // Also return as categories for clarity
-        entityemotion,
+        themeemotion, // FIXED: Changed from entityemotion to themeemotion
         processed_at: new Date().toISOString()
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -307,7 +307,7 @@ serve(async (req) => {
         themes: ['Personal', 'Reflection'],
         entities: [],
         categories: [],
-        entityemotion: {},
+        themeemotion: {}, // FIXED: Changed from entityemotion to themeemotion
         error: error.message,
         processed_at: new Date().toISOString()
       }),

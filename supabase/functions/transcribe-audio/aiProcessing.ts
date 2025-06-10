@@ -1,3 +1,4 @@
+
 // Import necessary Deno modules
 import { encode as base64Encode } from "https://deno.land/std@0.132.0/encoding/base64.ts";
 
@@ -41,7 +42,7 @@ export async function transcribeAudioWithWhisper(
     const formData = new FormData();
     formData.append("file", new Blob([audioBytes], { type: audioBlob.type }), filename);
     formData.append("model", "whisper-1");
-    formData.append("response_format", "verbose_json"); // ENHANCED: Get detailed response with language info
+    formData.append("response_format", "json"); // FIXED: Use json instead of verbose_json
     
     // Only add language parameter if it's not 'auto'
     if (language !== 'auto') {
@@ -54,7 +55,7 @@ export async function transcribeAudioWithWhisper(
       fileExtension,
       hasApiKey: !!apiKey,
       model: "whisper-1",
-      responseFormat: "verbose_json",
+      responseFormat: "json",
       autoLanguageDetection: language === 'auto'
     });
     
@@ -79,56 +80,20 @@ export async function transcribeAudioWithWhisper(
     // Get the transcribed text from the result
     const transcribedText = result.text || "";
     
-    // ENHANCED: Extract language information from verbose response
+    // ENHANCED: For simple JSON response, we need to detect language ourselves
     let detectedLanguages: string[] = [];
     
-    if (result.language) {
-      // Primary detected language from Whisper
-      detectedLanguages = [result.language];
-      console.log("[Transcription] Primary language detected:", result.language);
-    }
-    
-    // ENHANCED: Analyze segments for multi-language detection
-    if (result.segments && Array.isArray(result.segments)) {
-      const segmentLanguages = new Set<string>();
-      
-      result.segments.forEach((segment: any) => {
-        // Look for language indicators in segment metadata
-        if (segment.language) {
-          segmentLanguages.add(segment.language);
-        }
-        // Analyze text patterns for language hints
-        if (segment.text) {
-          const segmentLangs = detectLanguagePatterns(segment.text);
-          segmentLangs.forEach(lang => segmentLanguages.add(lang));
-        }
-      });
-      
-      // Combine with primary language
-      const allLanguages = Array.from(segmentLanguages);
-      if (allLanguages.length > 0) {
-        // Merge with primary language, keeping primary first
-        detectedLanguages = result.language ? 
-          [result.language, ...allLanguages.filter(l => l !== result.language)] :
-          allLanguages;
-      }
-    }
-    
-    // Fallback if no language detected
+    // Analyze the text content for language patterns
+    detectedLanguages = detectLanguagePatterns(transcribedText);
     if (detectedLanguages.length === 0) {
-      // Analyze the text content for language patterns
-      detectedLanguages = detectLanguagePatterns(transcribedText);
-      if (detectedLanguages.length === 0) {
-        detectedLanguages = ["unknown"];
-      }
+      detectedLanguages = ["unknown"];
     }
     
     console.log("[Transcription] Success:", {
       textLength: transcribedText.length,
       sampleText: transcribedText.substring(0, 100) + "...",
       model: "whisper-1",
-      detectedLanguages: detectedLanguages,
-      hasSegments: !!result.segments
+      detectedLanguages: detectedLanguages
     });
     
     return {
@@ -159,13 +124,19 @@ function detectLanguagePatterns(text: string): string[] {
     'zh': /[\u4e00-\u9fff]/gi,
     'ja': /[\u3040-\u309f\u30a0-\u30ff]/gi,
     'ko': /[\uac00-\ud7af]/gi,
-    'hi': /[\u0900-\u097f]/gi
+    'hi': /[\u0900-\u097f]/gi,
+    'ur': /[\u0600-\u06FF]/gi // Urdu uses Arabic script
   };
   
   for (const [lang, pattern] of Object.entries(patterns)) {
     if (pattern.test(text)) {
       languages.push(lang);
     }
+  }
+  
+  // If no specific language detected, default to English
+  if (languages.length === 0) {
+    languages.push('en');
   }
   
   return languages;
@@ -227,7 +198,7 @@ export async function translateAndRefineText(
         "Authorization": `Bearer ${apiKey}`
       },
       body: JSON.stringify({
-        model: "gpt-4o",
+        model: "gpt-4.1-2025-04-14", // FIXED: Use the current flagship model
         messages: [
           {
             role: "system",
@@ -320,7 +291,7 @@ export async function analyzeEmotions(
         "Authorization": `Bearer ${apiKey}`
       },
       body: JSON.stringify({
-        model: "gpt-4o",
+        model: "gpt-4.1-2025-04-14", // FIXED: Use the current flagship model
         messages: [
           {
             role: "system",

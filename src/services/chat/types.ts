@@ -1,3 +1,4 @@
+
 // Chat thread type definition
 export interface ChatThread {
   id: string;
@@ -54,6 +55,7 @@ export interface ChatMessage {
   diagnostics?: any;
   is_processing?: boolean;
   time_pattern_analysis?: any; // Add this field for time pattern analysis results
+  themeemotion?: any; // FIXED: Added themeemotion field to replace entityemotion
 }
 
 // Type guard to check if an object has thread metadata

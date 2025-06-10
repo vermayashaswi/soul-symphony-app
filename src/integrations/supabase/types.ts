@@ -127,13 +127,13 @@ export type Database = {
           Edit_Status: number
           emotions: Json | null
           entities: Json | null
-          entityemotion: Json | null
           "foreign key": string | null
           id: number
           languages: Json | null
           master_themes: string[] | null
           "refined text": string | null
           sentiment: string | null
+          themeemotion: Json | null
           "transcription text": string | null
           translation_status: string | null
           user_feedback: string | null
@@ -146,13 +146,13 @@ export type Database = {
           Edit_Status?: number
           emotions?: Json | null
           entities?: Json | null
-          entityemotion?: Json | null
           "foreign key"?: string | null
           id?: number
           languages?: Json | null
           master_themes?: string[] | null
           "refined text"?: string | null
           sentiment?: string | null
+          themeemotion?: Json | null
           "transcription text"?: string | null
           translation_status?: string | null
           user_feedback?: string | null
@@ -165,13 +165,13 @@ export type Database = {
           Edit_Status?: number
           emotions?: Json | null
           entities?: Json | null
-          entityemotion?: Json | null
           "foreign key"?: string | null
           id?: number
           languages?: Json | null
           master_themes?: string[] | null
           "refined text"?: string | null
           sentiment?: string | null
+          themeemotion?: Json | null
           "transcription text"?: string | null
           translation_status?: string | null
           user_feedback?: string | null

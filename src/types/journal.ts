@@ -26,6 +26,7 @@ export interface JournalEntry {
   translation_text?: string; // Keep as optional
   languages?: string[]; // Array of detected language codes
   tempId?: string; // Temporary ID for tracking processing entries
+  themeemotion?: Json; // FIXED: Added themeemotion field to replace entityemotion
 }
 
 export interface JournalEntryFormData extends JournalEntry {
