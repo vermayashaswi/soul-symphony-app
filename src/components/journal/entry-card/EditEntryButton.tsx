@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Edit } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -160,12 +159,11 @@ export function EditEntryButton({ entryId, content, onEntryUpdated }: EditEntryB
       onEntryUpdated(editedContent, true);
       setIsProcessing(true);
       
-      // Update the database with the English content
+      // Update the database with ONLY the refined text column, preserving transcription text
       const { error: updateError } = await supabase
         .from('Journal Entries')
         .update({ 
-          "refined text": contentToSave,
-          "transcription text": contentToSave,
+          "refined text": contentToSave, // Only update refined text with English content
           "Edit_Status": 1
         })
         .eq('id', entryId);
