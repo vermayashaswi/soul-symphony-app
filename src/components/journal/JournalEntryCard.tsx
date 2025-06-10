@@ -43,7 +43,7 @@ export function JournalEntryCard({
     created_at: entry?.created_at || new Date().toISOString(),
     sentiment: entry?.sentiment || null,
     master_themes: Array.isArray(entry?.master_themes) ? entry.master_themes : [],
-    themes: Array.isArray(entry?.themes) ? entry.themes : [], // FIXED: Include themes array
+    themes: Array.isArray(entry?.themes) ? entry.themes : [],
     Edit_Status: entry?.Edit_Status || null,
     user_feedback: entry?.user_feedback || null,
     translation_text: entry?.translation_text,
@@ -52,7 +52,7 @@ export function JournalEntryCard({
     emotions: entry?.emotions || null
   };
 
-  const [isExpanded, setIsExpanded] = useState(true); // Always expanded now
+  const [isExpanded, setIsExpanded] = useState(true);
   const [showThemes, setShowThemes] = useState(false);
   const [highlightNew, setHighlightNew] = useState(isNew);
   const [hasError, setHasError] = useState(false);
@@ -95,7 +95,7 @@ export function JournalEntryCard({
   
   const extractThemes = (): string[] => {
     try {
-      // FIXED: Prioritize themes column for display (specific themes)
+      // Prioritize themes column for display (specific themes)
       const specificThemes = Array.isArray(safeEntry.themes) ? safeEntry.themes : [];
       const masterThemes = Array.isArray(safeEntry.master_themes) ? safeEntry.master_themes : [];
       
@@ -147,7 +147,7 @@ export function JournalEntryCard({
     if (score > 0.2) {
       return 'border-green-500 border-2';
     } else if (score >= -0.1 && score <= 0.2) {
-      return 'border-yellow-400 border-2'; // Material Design yellow
+      return 'border-yellow-400 border-2';
     } else {
       return 'border-[#ea384c] border-2';
     }
@@ -195,11 +195,9 @@ export function JournalEntryCard({
     }
   }, [isNew]);
 
-  // This function is no longer needed as we're removing the expand/collapse button
-  // but we'll keep it for other components that might use it
   const toggleExpanded = () => {
     console.log(`[JournalEntryCard] Toggling expansion for entry ${safeEntry.id}, current state:`, isExpanded);
-    setIsExpanded(!isExpanded); // Will always be true now
+    setIsExpanded(!isExpanded);
   };
 
   const toggleThemes = () => {
@@ -209,7 +207,6 @@ export function JournalEntryCard({
 
   const handleUserFeedback = async (feedback: number) => {
     try {
-      // Toggle thumbs state
       if (feedback === 1) {
         if (!thumbsUp) {
           setThumbsUp(true);
@@ -217,7 +214,6 @@ export function JournalEntryCard({
           toast.success('Glad you liked the translation');
         } else {
           setThumbsUp(false);
-          // No toast when deselecting
         }
       } else {
         if (!thumbsDown) {
@@ -226,7 +222,6 @@ export function JournalEntryCard({
           toast.error("We'll try and improve on the translation");
         } else {
           setThumbsDown(false);
-          // No toast when deselecting
         }
       }
       
@@ -254,13 +249,11 @@ export function JournalEntryCard({
 
   const createdAtFormatted = (() => {
     try {
-      // Make sure we pass a valid date string to formatShortDate
       if (!safeEntry.created_at) {
         console.error('[JournalEntryCard] Invalid created_at:', safeEntry.created_at);
         return { type: 'translatable' as const, text: 'Recently' };
       }
       
-      // formatShortDate now returns an object with translation info
       const formatted = formatShortDate(safeEntry.created_at);
       return formatted;
     } catch (error) {
@@ -271,7 +264,6 @@ export function JournalEntryCard({
 
   const initialThemes = extractThemes();
   
-  // Determine if this is a processing entry
   const isContentProcessing = processing || isProcessing || 
                             safeEntry.content === "Processing entry..." ||
                             safeEntry.content === "Loading...";
@@ -293,7 +285,6 @@ export function JournalEntryCard({
               'refined text': newContent,
               'transcription text': newContent,
               Edit_Status: 1,
-              // Clear analysis data if processing
               sentiment: isProcessing ? null : e.sentiment,
               emotions: isProcessing ? null : e.emotions,
               master_themes: isProcessing ? [] : e.master_themes,
@@ -305,7 +296,6 @@ export function JournalEntryCard({
       });
     }
     
-    // Don't do additional polling here since the EditEntryButton now triggers proper refresh events
     console.log('[JournalEntryCard] Entry update completed, refresh events will handle the rest');
   };
 
@@ -330,7 +320,6 @@ export function JournalEntryCard({
     );
   }
 
-  // If this is a processing entry, render a simplified card
   if (isContentProcessing && (safeEntry.content === "Processing entry..." || processing)) {
     console.log(`[JournalEntryCard] Rendering processing card for ${safeEntry.tempId || 'unknown'}`);
     
@@ -373,10 +362,8 @@ export function JournalEntryCard({
       if (onDelete && safeEntry.id) {
         console.log(`[JournalEntryCard] Deleting entry ${safeEntry.id}`);
         
-        // Mark as deleted immediately to prevent re-renders
         setIsDeleted(true);
         
-        // Call the parent's onDelete handler and ensure we return the promise
         return await onDelete(safeEntry.id);
       } else {
         throw new Error("Delete handler not available or invalid entry ID");
@@ -384,10 +371,9 @@ export function JournalEntryCard({
     } catch (error) {
       console.error("[JournalEntryCard] Error during deletion:", error);
       
-      // Reset deleted state if there was an error
       setIsDeleted(false);
       
-      throw error; // Propagate the error to be handled by the dialog
+      throw error;
     }
   };
 

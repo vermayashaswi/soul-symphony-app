@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { ThemeBoxes } from '../ThemeBoxes';
 import { supabase } from '@/integrations/supabase/client';
@@ -12,13 +13,11 @@ interface ThemeLoaderProps {
   isNew?: boolean;
 }
 
-// Define interface for the entry data from database
 interface EntryData {
   id: number;
   original_language?: string;
-  themes?: string[]; // FIXED: Changed from master_themes to themes
-  master_themes?: string[]; // Keep for backward compatibility
-  // Other fields that might be returned
+  themes?: string[];
+  master_themes?: string[];
   [key: string]: any;
 }
 
@@ -37,10 +36,10 @@ export function ThemeLoader({ entryId, initialThemes = [], content, isProcessing
         setLoading(true);
         setError(null);
 
-        // FIXED: Select both themes and master_themes to handle transition period
+        // Select both themes and master_themes to handle transition period
         const { data, error } = await supabase
           .from('Journal Entries')
-          .select('*')  // Select all columns to ensure we get what's available
+          .select('*')
           .eq('id', entryId)
           .single();
 
@@ -51,15 +50,13 @@ export function ThemeLoader({ entryId, initialThemes = [], content, isProcessing
         }
 
         if (data) {
-          // Cast to our interface to safely access properties
           const entryData = data as EntryData;
           
-          // Check if there's a language field in the data
           if (entryData.original_language) {
             setEntryLanguage(entryData.original_language);
           }
           
-          // FIXED: Prioritize themes column for display (specific themes)
+          // Prioritize specific themes from themes column for display
           let displayThemes: string[] = [];
           
           if (Array.isArray(entryData.themes) && entryData.themes.length > 0) {
@@ -89,7 +86,6 @@ export function ThemeLoader({ entryId, initialThemes = [], content, isProcessing
     fetchEntryData();
   }, [entryId, isNew]);
 
-  // Display the themes with translation
   return (
     <div className="mt-2">
       <h3 className="text-sm font-medium mb-1 text-primary">

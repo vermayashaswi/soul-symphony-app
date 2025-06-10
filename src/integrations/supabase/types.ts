@@ -134,6 +134,7 @@ export type Database = {
           "refined text": string | null
           sentiment: string | null
           themeemotion: Json | null
+          themes: string[] | null
           "transcription text": string | null
           translation_status: string | null
           user_feedback: string | null
@@ -153,6 +154,7 @@ export type Database = {
           "refined text"?: string | null
           sentiment?: string | null
           themeemotion?: Json | null
+          themes?: string[] | null
           "transcription text"?: string | null
           translation_status?: string | null
           user_feedback?: string | null
@@ -172,6 +174,7 @@ export type Database = {
           "refined text"?: string | null
           sentiment?: string | null
           themeemotion?: Json | null
+          themes?: string[] | null
           "transcription text"?: string | null
           translation_status?: string | null
           user_feedback?: string | null
@@ -213,7 +216,7 @@ export type Database = {
           {
             foreignKeyName: "journal_embeddings_journal_entry_id_fkey"
             columns: ["journal_entry_id"]
-            isOneToOne: false
+            isOneToOne: true
             referencedRelation: "Journal Entries"
             referencedColumns: ["id"]
           },
@@ -1053,6 +1056,10 @@ export type Database = {
           themes: string[]
           emotions: Json
         }[]
+      }
+      regenerate_missing_data_for_entry: {
+        Args: { target_entry_id: number }
+        Returns: Json
       }
       store_user_query: {
         Args:
