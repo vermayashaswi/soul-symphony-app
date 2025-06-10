@@ -130,9 +130,9 @@ async function invokeTranscriptionFunction(
       
       // Enhanced timeout based on audio size
       const audioSize = requestData.body.audio.length;
-      const baseTimeout = 60000; // 1 minute base
+      const baseTimeout = 90000; // 1.5 minute base (increased for OpenAI SDK)
       const sizeMultiplier = Math.min(audioSize / 100000, 10); // Max 10x multiplier
-      const dynamicTimeout = baseTimeout + (sizeMultiplier * 30000); // Up to 5 minutes total
+      const dynamicTimeout = baseTimeout + (sizeMultiplier * 30000); // Up to 6 minutes total
       
       console.log(`[TranscriptionService] ENHANCED: Using timeout: ${dynamicTimeout}ms for audio size: ${audioSize}`);
       
@@ -162,7 +162,7 @@ async function invokeTranscriptionFunction(
       
       // Wait before retry with exponential backoff
       if (attempt < maxRetries) {
-        const waitTime = Math.pow(2, attempt) * 2000; // 2s, 4s, 8s...
+        const waitTime = Math.pow(2, attempt) * 3000; // 3s, 6s, 12s...
         console.log(`[TranscriptionService] ENHANCED: Retrying in ${waitTime}ms...`);
         await new Promise(resolve => setTimeout(resolve, waitTime));
       }
@@ -212,7 +212,7 @@ export async function sendAudioForTranscription(
   const startTime = Date.now();
   
   try {
-    console.log(`[TranscriptionService] ENHANCED: Starting ${directTranscription ? 'direct' : 'full'} transcription processing`);
+    console.log(`[TranscriptionService] ENHANCED: Starting ${directTranscription ? 'direct' : 'full'} transcription processing with OpenAI SDK`);
     console.log(`[TranscriptionService] ENHANCED: Audio data size: ${base64Audio?.length || 0} characters`);
     console.log(`[TranscriptionService] ENHANCED: Recording duration (ms): ${recordingDuration}`);
 
@@ -246,10 +246,10 @@ export async function sendAudioForTranscription(
       recordingDuration
     );
 
-    console.log('[TranscriptionService] ENHANCED: Request prepared with enhanced validation');
+    console.log('[TranscriptionService] ENHANCED: Request prepared with enhanced validation and OpenAI SDK support');
 
     // Step 5: Enhanced function invocation with retry logic
-    console.log('[TranscriptionService] ENHANCED: Calling transcribe-audio edge function...');
+    console.log('[TranscriptionService] ENHANCED: Calling transcribe-audio edge function with OpenAI SDK...');
     
     const { data, error } = await invokeTranscriptionFunction(requestData);
     
@@ -268,6 +268,8 @@ export async function sendAudioForTranscription(
         errorMessage = 'Audio file too large - please try with a shorter recording';
       } else if (error.message?.includes('format') || error.message?.includes('invalid')) {
         errorMessage = 'Invalid audio format - please try recording again';
+      } else if (error.message?.includes('model')) {
+        errorMessage = 'Audio transcription service temporarily unavailable - please try again';
       }
       
       throw new Error(`Transcription service error: ${errorMessage}`);
@@ -280,7 +282,7 @@ export async function sendAudioForTranscription(
     }
 
     console.log('[TranscriptionService] ENHANCED: Response validation passed');
-    console.log('[TranscriptionService] ENHANCED: Processing completed successfully');
+    console.log('[TranscriptionService] ENHANCED: Processing completed successfully with OpenAI SDK');
     
     // Step 8: Enhanced success logging
     if (data.languages) {

@@ -1,6 +1,8 @@
-
 // Import necessary Deno modules
 import { encode as base64Encode } from "https://deno.land/std@0.132.0/encoding/base64.ts";
+
+// Import the official OpenAI SDK
+import OpenAI from "https://esm.sh/openai@4.63.0";
 
 /**
  * Transcribe audio using OpenAI's Whisper API with enhanced language detection
@@ -18,6 +20,11 @@ export async function transcribeAudioWithWhisper(
 ): Promise<{ text: string; detectedLanguages: string[] }> {
   try {
     console.log("[Transcription] Starting enhanced Whisper transcription");
+    
+    // Initialize OpenAI client
+    const openai = new OpenAI({
+      apiKey: apiKey,
+    });
     
     // Determine the appropriate filename extension based on audio type
     const fileExtension = fileType === 'webm' ? 'webm' : 
@@ -38,15 +45,19 @@ export async function transcribeAudioWithWhisper(
       fileExtension
     });
     
-    // Create form data to send to the OpenAI API
-    const formData = new FormData();
-    formData.append("file", new Blob([audioBytes], { type: audioBlob.type }), filename);
-    formData.append("model", "gpt-4o-transcribe");
-    formData.append("response_format", "json");
+    // Create a File object from the audio data
+    const audioFile = new File([audioBytes], filename, { type: audioBlob.type });
+    
+    // Prepare transcription parameters
+    const transcriptionParams: any = {
+      file: audioFile,
+      model: "gpt-4o-transcribe",
+      response_format: "json"
+    };
     
     // Only add language parameter if it's not 'auto'
     if (language !== 'auto') {
-      formData.append("language", language);
+      transcriptionParams.language = language;
     }
     
     console.log("[Transcription] Sending request to OpenAI with:", {
@@ -59,26 +70,11 @@ export async function transcribeAudioWithWhisper(
       autoLanguageDetection: language === 'auto'
     });
     
-    // Call the OpenAI API for transcription
-    const response = await fetch("https://api.openai.com/v1/audio/transcriptions", {
-      method: "POST",
-      headers: {
-        "Authorization": `Bearer ${apiKey}`
-      },
-      body: formData
-    });
-    
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error("[Transcription] OpenAI API error:", errorText);
-      throw new Error(`OpenAI API error: ${errorText}`);
-    }
-    
-    // Parse the response
-    const result = await response.json();
+    // Call the OpenAI API for transcription using the official SDK
+    const transcription = await openai.audio.transcriptions.create(transcriptionParams);
     
     // Get the transcribed text from the result
-    const transcribedText = result.text || "";
+    const transcribedText = transcription.text || "";
     
     // ENHANCED: For simple JSON response, we need to detect language ourselves
     let detectedLanguages: string[] = [];
@@ -102,6 +98,58 @@ export async function transcribeAudioWithWhisper(
     };
   } catch (error) {
     console.error("[Transcription] Error:", error);
+    
+    // Check if the error is due to model not being available
+    if (error.message && error.message.includes('model') && error.message.includes('gpt-4o-transcribe')) {
+      console.log("[Transcription] gpt-4o-transcribe not available, falling back to whisper-1");
+      
+      // Fallback to whisper-1 model
+      try {
+        const openai = new OpenAI({
+          apiKey: apiKey,
+        });
+        
+        const fileExtension = fileType === 'webm' ? 'webm' : 
+                             fileType === 'mp4' ? 'm4a' :
+                             fileType === 'wav' ? 'wav' : 'ogg';
+        
+        const filename = `audio.${fileExtension}`;
+        const arrayBuffer = await audioBlob.arrayBuffer();
+        const audioBytes = new Uint8Array(arrayBuffer);
+        const audioFile = new File([audioBytes], filename, { type: audioBlob.type });
+        
+        const fallbackParams: any = {
+          file: audioFile,
+          model: "whisper-1",
+          response_format: "json"
+        };
+        
+        if (language !== 'auto') {
+          fallbackParams.language = language;
+        }
+        
+        console.log("[Transcription] Using fallback model whisper-1");
+        const transcription = await openai.audio.transcriptions.create(fallbackParams);
+        
+        const transcribedText = transcription.text || "";
+        const detectedLanguages = detectLanguagePatterns(transcribedText);
+        
+        console.log("[Transcription] Fallback success:", {
+          textLength: transcribedText.length,
+          model: "whisper-1",
+          detectedLanguages: detectedLanguages.length > 0 ? detectedLanguages : ["unknown"]
+        });
+        
+        return {
+          text: transcribedText,
+          detectedLanguages: detectedLanguages.length > 0 ? detectedLanguages : ["unknown"]
+        };
+      } catch (fallbackError) {
+        console.error("[Transcription] Fallback also failed:", fallbackError);
+        throw fallbackError;
+      }
+    }
+    
     throw error;
   }
 }
@@ -156,6 +204,11 @@ export async function translateAndRefineText(
     console.log("[AI] Starting enhanced text refinement:", text.substring(0, 100) + "...");
     console.log("[AI] Input detected languages:", detectedLanguages);
     
+    // Initialize OpenAI client
+    const openai = new OpenAI({
+      apiKey: apiKey,
+    });
+    
     // Check if the detected language indicates non-English content
     const isNonEnglish = !detectedLanguages.includes('en') && detectedLanguages[0] !== 'en';
     const detectedLanguagesInfo = detectedLanguages.join(', ');
@@ -191,40 +244,31 @@ export async function translateAndRefineText(
            "preserved_languages": ["en"]
          }`;
     
-    const response = await fetch("https://api.openai.com/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Authorization": `Bearer ${apiKey}`
-      },
-      body: JSON.stringify({
-        model: "gpt-4o-mini",
-        messages: [
-          {
-            role: "system",
-            content: systemMessage
-          },
-          {
-            role: "user",
-            content: text
-          }
-        ],
-        max_tokens: 1500,
-        temperature: 0.3,
-        response_format: { type: "json_object" }
-      })
+    const completion = await openai.chat.completions.create({
+      model: "gpt-4o-mini",
+      messages: [
+        {
+          role: "system",
+          content: systemMessage
+        },
+        {
+          role: "user",
+          content: text
+        }
+      ],
+      max_tokens: 1500,
+      temperature: 0.3,
+      response_format: { type: "json_object" }
     });
     
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error("[AI] OpenAI API error:", errorText);
-      throw new Error(`OpenAI API error: ${errorText}`);
+    const result = completion.choices[0]?.message?.content;
+    
+    if (!result) {
+      throw new Error('No response from OpenAI');
     }
     
-    const result = await response.json();
-    
     try {
-      const parsedResult = JSON.parse(result.choices[0].message.content);
+      const parsedResult = JSON.parse(result);
       const refinedText = parsedResult.refined_text || text;
       const preservedLanguages = parsedResult.preserved_languages || detectedLanguages;
       
@@ -243,7 +287,7 @@ export async function translateAndRefineText(
     } catch (parseError) {
       console.error("[AI] Failed to parse JSON response:", parseError);
       // Fallback to original approach
-      const refinedText = result.choices?.[0]?.message?.content || text;
+      const refinedText = result || text;
       return { 
         refinedText,
         preservedLanguages: detectedLanguages 
@@ -269,6 +313,11 @@ export async function analyzeEmotions(
   try {
     console.log("[AI] Analyzing emotions in text:", text.substring(0, 100) + "....");
     
+    // Initialize OpenAI client
+    const openai = new OpenAI({
+      apiKey: apiKey,
+    });
+    
     // Create a prompt with available emotions
     const emotionOptions = emotionsData
       .map(e => `${e.name}: ${e.description}`)
@@ -284,36 +333,27 @@ export async function analyzeEmotions(
       Return ONLY a valid JSON object without any additional text.
     `;
     
-    const response = await fetch("https://api.openai.com/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Authorization": `Bearer ${apiKey}`
-      },
-      body: JSON.stringify({
-        model: "gpt-4o-mini",
-        messages: [
-          {
-            role: "system",
-            content: systemPrompt
-          },
-          {
-            role: "user",
-            content: text
-          }
-        ],
-        response_format: { type: "json_object" }
-      })
+    const completion = await openai.chat.completions.create({
+      model: "gpt-4o-mini",
+      messages: [
+        {
+          role: "system",
+          content: systemPrompt
+        },
+        {
+          role: "user",
+          content: text
+        }
+      ],
+      response_format: { type: "json_object" }
     });
     
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error("[AI] Emotion analysis API error:", errorText);
-      throw new Error(`OpenAI API error: ${errorText}`);
+    const result = completion.choices[0]?.message?.content;
+    if (!result) {
+      throw new Error('No response from OpenAI');
     }
     
-    const result = await response.json();
-    const emotionsResult = JSON.parse(result.choices[0].message.content);
+    const emotionsResult = JSON.parse(result);
     
     console.log("[AI] Emotions analyzed successfully:", emotionsResult);
     
@@ -332,30 +372,21 @@ export async function generateEmbedding(text: string, apiKey: string): Promise<n
   try {
     console.log("[AI] Generating embedding for text:", text.substring(0, 100) + "....");
     
-    const response = await fetch("https://api.openai.com/v1/embeddings", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Authorization": `Bearer ${apiKey}`
-      },
-      body: JSON.stringify({
-        model: "text-embedding-3-small",
-        input: text
-      })
+    // Initialize OpenAI client
+    const openai = new OpenAI({
+      apiKey: apiKey,
     });
     
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error("[AI] Embedding API error:", errorText);
-      throw new Error(`OpenAI API error: ${errorText}`);
-    }
+    const embedding = await openai.embeddings.create({
+      model: "text-embedding-3-small",
+      input: text
+    });
     
-    const result = await response.json();
-    const embedding = result.data[0].embedding;
+    const embeddingVector = embedding.data[0].embedding;
     
     console.log("[AI] Embedding generated successfully");
     
-    return embedding;
+    return embeddingVector;
   } catch (error) {
     console.error("[AI] Embedding error:", error);
     throw error;
