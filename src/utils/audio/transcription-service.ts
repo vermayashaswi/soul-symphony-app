@@ -13,16 +13,14 @@ interface TranscriptionResult {
  * @param userId - User ID for association with the transcription
  * @param directTranscription - If true, just returns the transcription without processing
  * @param processSentiment - If true, ensure sentiment analysis is performed with UTF-8 encoding
- * @param recordingDuration - Recording duration in milliseconds (ACTUAL recording time)
- * @param preserveOriginalLanguage - If true, preserve original language without translation
+ * @param recordingDuration - Recording duration in milliseconds
  */
 export async function sendAudioForTranscription(
   base64Audio: string,
   userId: string | undefined,
   directTranscription: boolean = false,
   processSentiment: boolean = true,
-  recordingDuration?: number,
-  preserveOriginalLanguage: boolean = false
+  recordingDuration?: number
 ): Promise<TranscriptionResult> {
   try {
     if (!base64Audio) {
@@ -38,17 +36,16 @@ export async function sendAudioForTranscription(
     console.log(`[TranscriptionService] Sending audio for ${directTranscription ? 'direct' : 'full'} transcription processing`);
     console.log(`[TranscriptionService] Audio data size: ${base64Audio.length} characters`);
     console.log('[TranscriptionService] User ID provided:', userId ? 'Yes' : 'No');
-    console.log('[TranscriptionService] Recording duration (actual):', recordingDuration, 'ms');
-    console.log('[TranscriptionService] Preserve original language:', preserveOriginalLanguage);
+    console.log('[TranscriptionService] Recording duration:', recordingDuration, 'ms');
 
     // Check if base64Audio is valid
     if (typeof base64Audio !== 'string' || base64Audio.length < 50) {
       throw new Error('Invalid audio data format');
     }
 
-    // Use the actual recording duration provided by the client
-    const actualDuration = recordingDuration || 0;
-    console.log(`[TranscriptionService] Using actual recording duration: ${actualDuration}ms`);
+    // Calculate estimated recording time if not provided
+    const estimatedDuration = recordingDuration || Math.floor(base64Audio.length / 10000);
+    console.log(`[TranscriptionService] Using duration: ${estimatedDuration}ms (${recordingDuration ? 'provided' : 'estimated'})`);
 
     // Get user's timezone if available
     const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
@@ -59,12 +56,11 @@ export async function sendAudioForTranscription(
       directTranscription,
       highQuality: processSentiment,
       audioSize: base64Audio.length,
-      recordingTime: actualDuration,
-      preserveOriginalLanguage,
+      recordingTime: estimatedDuration,
       timezone
     });
 
-    // Invoke the edge function with the actual recording duration and language preference
+    // Invoke the edge function with corrected parameter names
     console.log('[TranscriptionService] Calling transcribe-audio edge function...');
     const startTime = Date.now();
     
@@ -74,8 +70,7 @@ export async function sendAudioForTranscription(
         userId,
         directTranscription,
         highQuality: processSentiment,
-        recordingTime: actualDuration, // Pass the actual recording duration
-        preserveOriginalLanguage // IMPROVED: Pass language preservation preference
+        recordingTime: estimatedDuration // Pass the duration to the edge function
       },
       headers: {
         'x-timezone': timezone // Pass timezone in headers
