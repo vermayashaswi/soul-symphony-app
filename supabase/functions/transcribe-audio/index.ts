@@ -10,141 +10,335 @@ import { processBase64Chunks, detectFileType, isValidAudioData } from './audioPr
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-timezone, x-request-timestamp',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-timezone, x-request-timestamp, x-client-version, x-audio-size',
 };
+
+/**
+ * Enhanced environment validation
+ */
+function validateEnvironment(): { valid: boolean; errors: string[] } {
+  const errors: string[] = [];
+  
+  if (!Deno.env.get('OPENAI_API_KEY')) {
+    errors.push('OPENAI_API_KEY not configured');
+  }
+  
+  if (!Deno.env.get('SUPABASE_URL')) {
+    errors.push('SUPABASE_URL not configured');
+  }
+  
+  if (!Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')) {
+    errors.push('SUPABASE_SERVICE_ROLE_KEY not configured');
+  }
+  
+  // Google NL API is optional but log if missing
+  if (!Deno.env.get('GOOGLE_API')) {
+    console.warn('ENHANCED: GOOGLE_API not configured - sentiment analysis will be skipped');
+  }
+  
+  return {
+    valid: errors.length === 0,
+    errors
+  };
+}
+
+/**
+ * Enhanced request validation
+ */
+function validateRequest(requestData: any): { valid: boolean; errors: string[] } {
+  const errors: string[] = [];
+  
+  if (!requestData.audio && !requestData.audioData) {
+    errors.push('No audio data provided');
+  }
+  
+  if (!requestData.userId) {
+    errors.push('User ID is required');
+  } else if (typeof requestData.userId !== 'string' || requestData.userId.length < 10) {
+    errors.push('Invalid user ID format');
+  }
+  
+  const audioData = requestData.audio || requestData.audioData;
+  if (audioData && (typeof audioData !== 'string' || audioData.length < 100)) {
+    errors.push('Invalid audio data format or size');
+  }
+  
+  if (requestData.recordingTime !== null && requestData.recordingTime !== undefined) {
+    if (typeof requestData.recordingTime !== 'number' || requestData.recordingTime < 0) {
+      errors.push('Invalid recording time format');
+    }
+  }
+  
+  return {
+    valid: errors.length === 0,
+    errors
+  };
+}
+
+/**
+ * Enhanced memory monitoring
+ */
+function logMemoryUsage(stage: string) {
+  try {
+    const memUsage = Deno.memoryUsage();
+    console.log(`ENHANCED [${stage}] Memory usage:`, {
+      rss: `${(memUsage.rss / 1024 / 1024).toFixed(2)}MB`,
+      heapUsed: `${(memUsage.heapUsed / 1024 / 1024).toFixed(2)}MB`,
+      heapTotal: `${(memUsage.heapTotal / 1024 / 1024).toFixed(2)}MB`,
+      external: `${(memUsage.external / 1024 / 1024).toFixed(2)}MB`
+    });
+  } catch (error) {
+    console.warn(`ENHANCED: Could not get memory usage for ${stage}:`, error.message);
+  }
+}
+
+/**
+ * Enhanced garbage collection hint
+ */
+function requestGarbageCollection() {
+  try {
+    // Force garbage collection if available
+    if (typeof global !== 'undefined' && global.gc) {
+      global.gc();
+      console.log('ENHANCED: Garbage collection requested');
+    }
+  } catch (error) {
+    // Ignore GC errors
+  }
+}
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
 
+  const startTime = Date.now();
+  let processingStage = 'initialization';
+  
   try {
-    console.log("=== FIXED TRANSCRIBE-AUDIO PIPELINE START ===");
-    console.log("Environment check: {");
-    console.log(`  hasOpenAIKey: ${!!Deno.env.get('OPENAI_API_KEY')},`);
-    console.log(`  hasSupabaseUrl: ${!!Deno.env.get('SUPABASE_URL')},`);
-    console.log(`  hasSupabaseServiceKey: ${!!Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')},`);
-    console.log(`  hasGoogleNLApiKey: ${!!Deno.env.get('GOOGLE_API')}`);
-    console.log("}");
-
-    // Initialize Supabase client with service role key for admin operations
-    const supabaseUrl = Deno.env.get('SUPABASE_URL');
-    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+    console.log("=== ENHANCED TRANSCRIBE-AUDIO PIPELINE START ===");
+    logMemoryUsage('pipeline-start');
     
-    if (!supabaseUrl || !supabaseServiceKey) {
-      throw new Error('Supabase configuration missing');
+    // Step 1: Enhanced environment validation
+    console.log("ENHANCED: Validating environment configuration");
+    const envValidation = validateEnvironment();
+    
+    if (!envValidation.valid) {
+      console.error("ENHANCED: Environment validation failed:", envValidation.errors);
+      return new Response(JSON.stringify({
+        error: `Configuration error: ${envValidation.errors.join(', ')}`,
+        timestamp: new Date().toISOString(),
+        success: false
+      }), {
+        status: 500,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+    
+    console.log("ENHANCED: Environment validation passed");
+
+    // Step 2: Enhanced Supabase client initialization with error handling
+    processingStage = 'supabase-init';
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+    
+    let supabaseAdmin;
+    let supabaseClient;
+    
+    try {
+      supabaseAdmin = createSupabaseAdmin(supabaseUrl, supabaseServiceKey);
+      supabaseClient = createClient(supabaseUrl, Deno.env.get('SUPABASE_ANON_KEY') ?? '', {
+        global: {
+          headers: { Authorization: req.headers.get('Authorization')! },
+        },
+      });
+      
+      console.log("ENHANCED: Supabase clients initialized successfully");
+    } catch (error) {
+      console.error("ENHANCED: Failed to initialize Supabase clients:", error);
+      throw new Error(`Database connection failed: ${error.message}`);
     }
 
-    // Create admin client for database operations
-    const supabaseAdmin = createSupabaseAdmin(supabaseUrl, supabaseServiceKey);
+    // Step 3: Enhanced request parsing with timeout
+    processingStage = 'request-parsing';
+    console.log("ENHANCED: Parsing request data");
     
-    // Create client with user's auth for RLS compliance
-    const supabaseClient = createClient(supabaseUrl, Deno.env.get('SUPABASE_ANON_KEY') ?? '', {
-      global: {
-        headers: { Authorization: req.headers.get('Authorization')! },
-      },
-    });
-
-    console.log("FIXED: Supabase clients initialized successfully");
-
-    // Parse request parameters with enhanced logging
-    const { audio, audioData, userId, highQuality = true, directTranscription = false, recordingTime = null } = await req.json();
+    let requestData;
+    try {
+      requestData = await Promise.race([
+        req.json(),
+        new Promise<never>((_, reject) => 
+          setTimeout(() => reject(new Error('Request parsing timeout')), 10000)
+        )
+      ]);
+    } catch (error) {
+      console.error("ENHANCED: Request parsing failed:", error);
+      throw new Error(`Request parsing failed: ${error.message}`);
+    }
     
-    // Handle both parameter names for backward compatibility
-    const actualAudioData = audio || audioData;
+    // Step 4: Enhanced request validation
+    const requestValidation = validateRequest(requestData);
+    if (!requestValidation.valid) {
+      console.error("ENHANCED: Request validation failed:", requestValidation.errors);
+      return new Response(JSON.stringify({
+        error: `Invalid request: ${requestValidation.errors.join(', ')}`,
+        timestamp: new Date().toISOString(),
+        success: false
+      }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
     
-    console.log("=== FIXED REQUEST PARAMETERS ===");
+    // Extract validated parameters
+    const { userId, highQuality = true, directTranscription = false, recordingTime = null } = requestData;
+    const actualAudioData = requestData.audio || requestData.audioData;
+    
+    console.log("=== ENHANCED REQUEST PARAMETERS ===");
     console.log(`User ID: ${userId}`);
     console.log(`Direct transcription mode: ${directTranscription ? 'YES' : 'NO'}`);
     console.log(`High quality mode: ${highQuality ? 'YES' : 'NO'}`);
     console.log(`Audio data length: ${actualAudioData?.length || 0}`);
-    console.log(`FIXED: Recording time received: ${recordingTime} (${typeof recordingTime})`);
+    console.log(`ENHANCED: Recording time received: ${recordingTime} (${typeof recordingTime})`);
     
-    if (!actualAudioData) {
-      throw new Error('No audio data received');
-    }
-
-    if (!userId) {
-      throw new Error('User ID is required for authentication');
-    }
-
-    // Get timezone from request headers if available
+    // Get enhanced request metadata
     const timezone = req.headers.get('x-timezone') || 'UTC';
     const requestTimestamp = req.headers.get('x-request-timestamp') || new Date().toISOString();
-    console.log(`FIXED: User timezone: ${timezone}, Request timestamp: ${requestTimestamp}`);
+    const clientVersion = req.headers.get('x-client-version') || 'unknown';
+    const audioSizeHeader = req.headers.get('x-audio-size');
     
-    // Create user profile if needed and update timezone
-    await createProfileIfNeeded(supabaseAdmin, userId, timezone);
-
-    // FIXED: Enhanced audio processing with proper chunking and validation
-    console.log("=== FIXED AUDIO PROCESSING ===");
-    const bytes = processBase64Chunks(actualAudioData);
-    const detectedFileType = detectFileType(bytes);
+    console.log(`ENHANCED: Request metadata - timezone: ${timezone}, version: ${clientVersion}, timestamp: ${requestTimestamp}`);
     
-    console.log(`FIXED: Processed binary audio size: ${bytes.length} bytes`);
-    console.log(`FIXED: Detected file type: ${detectedFileType}`);
+    logMemoryUsage('request-validated');
 
-    // FIXED: Validate audio data before processing
-    if (!isValidAudioData(bytes)) {
-      throw new Error('Invalid audio data detected');
+    // Step 5: Enhanced user profile management
+    processingStage = 'profile-management';
+    try {
+      await createProfileIfNeeded(supabaseAdmin, userId, timezone);
+      console.log("ENHANCED: User profile validated/created");
+    } catch (error) {
+      console.error("ENHANCED: Profile management failed:", error);
+      // Don't fail the entire process for profile issues
+      console.warn("ENHANCED: Continuing without profile validation");
     }
 
-    // FIXED: Proper duration calculation - use actual recording time if provided
+    // Step 6: Enhanced audio processing with memory management
+    processingStage = 'audio-processing';
+    console.log("=== ENHANCED AUDIO PROCESSING ===");
+    logMemoryUsage('before-audio-processing');
+    
+    let bytes: Uint8Array;
+    let detectedFileType: string;
+    
+    try {
+      bytes = processBase64Chunks(actualAudioData);
+      detectedFileType = detectFileType(bytes);
+      
+      console.log(`ENHANCED: Processed binary audio size: ${bytes.length} bytes`);
+      console.log(`ENHANCED: Detected file type: ${detectedFileType}`);
+      
+      // Enhanced audio validation
+      if (!isValidAudioData(bytes)) {
+        throw new Error('Audio data validation failed - invalid format or content');
+      }
+      
+      console.log("ENHANCED: Audio validation passed");
+      
+    } catch (error) {
+      console.error("ENHANCED: Audio processing failed:", error);
+      throw new Error(`Audio processing failed: ${error.message}`);
+    }
+    
+    logMemoryUsage('after-audio-processing');
+
+    // Step 7: Enhanced duration calculation with validation
+    processingStage = 'duration-calculation';
     let durationSeconds: number;
+    
     if (recordingTime !== null && recordingTime > 0) {
-      // Convert milliseconds to seconds and round to nearest second
-      durationSeconds = Math.round(recordingTime / 1000);
-      console.log(`FIXED: Using provided recording duration: ${recordingTime}ms -> ${durationSeconds}s`);
+      // Validate recording time
+      if (recordingTime > 7200000) { // 2 hours max
+        console.warn(`ENHANCED: Recording time too long: ${recordingTime}ms, capping at 2 hours`);
+        durationSeconds = 7200;
+      } else {
+        durationSeconds = Math.round(recordingTime / 1000);
+      }
+      console.log(`ENHANCED: Using provided recording duration: ${recordingTime}ms -> ${durationSeconds}s`);
     } else {
-      // Fallback estimation based on audio data size
-      durationSeconds = Math.floor(bytes.length / 32000); // Rough estimate for audio bitrate
-      console.log(`FIXED: Estimated duration from audio size: ${durationSeconds}s`);
+      // Enhanced fallback estimation
+      const estimatedBitrate = 32000; // Conservative estimate
+      durationSeconds = Math.max(1, Math.floor(bytes.length / estimatedBitrate));
+      console.log(`ENHANCED: Estimated duration from audio size: ${durationSeconds}s`);
     }
 
-    // Store audio file using admin client
+    // Step 8: Enhanced audio file storage with error handling
+    processingStage = 'file-storage';
     const timestamp = Date.now();
     const fileName = `journal-entry-${userId}-${timestamp}.${detectedFileType}`;
     
-    console.log(`FIXED: Storing audio file ${fileName} with size ${bytes.length} bytes`);
-    
-    const audioUrl = await storeAudioFile(supabaseAdmin, bytes, fileName, detectedFileType);
-    
-    if (!audioUrl) {
-      console.warn('FIXED: Failed to store audio file, continuing without URL');
-    } else {
-      console.log(`FIXED: File uploaded successfully: ${audioUrl}`);
+    let audioUrl: string | null = null;
+    try {
+      console.log(`ENHANCED: Storing audio file ${fileName} with size ${bytes.length} bytes`);
+      audioUrl = await storeAudioFile(supabaseAdmin, bytes, fileName, detectedFileType);
+      
+      if (audioUrl) {
+        console.log(`ENHANCED: File uploaded successfully: ${audioUrl}`);
+      } else {
+        console.warn('ENHANCED: File storage failed, continuing without URL');
+      }
+    } catch (storageError) {
+      console.error('ENHANCED: Audio storage failed:', storageError);
+      console.warn('ENHANCED: Continuing without audio URL');
     }
+    
+    logMemoryUsage('after-file-storage');
 
-    // Create blob for transcription
+    // Step 9: Enhanced transcription with memory cleanup
+    processingStage = 'transcription';
+    console.log('=== ENHANCED STEP 1: AUDIO TRANSCRIPTION ===');
+    
     const audioBlob = new Blob([bytes], { type: `audio/${detectedFileType}` });
-    console.log(`FIXED: Created blob for transcription: { size: ${audioBlob.size}, type: "${audioBlob.type}" }`);
-
-    // Get OpenAI API key
-    const openaiApiKey = Deno.env.get('OPENAI_API_KEY');
-    if (!openaiApiKey) {
-      throw new Error('OpenAI API key not found');
+    console.log(`ENHANCED: Created blob for transcription: { size: ${audioBlob.size}, type: "${audioBlob.type}" }`);
+    
+    // Clear bytes array to free memory
+    bytes = null as any;
+    requestGarbageCollection();
+    logMemoryUsage('before-transcription');
+    
+    const openaiApiKey = Deno.env.get('OPENAI_API_KEY')!;
+    
+    let transcribedText: string;
+    let detectedLanguages: string[];
+    
+    try {
+      const transcriptionResult = await transcribeAudioWithWhisper(
+        audioBlob,
+        detectedFileType,
+        openaiApiKey,
+        'auto'
+      );
+      
+      transcribedText = transcriptionResult.text;
+      detectedLanguages = transcriptionResult.detectedLanguages;
+      
+      if (!transcribedText || transcribedText.trim().length === 0) {
+        throw new Error('Transcription returned empty result');
+      }
+      
+      console.log(`ENHANCED: Transcription successful: ${transcribedText.length} characters`);
+      console.log(`ENHANCED: Sample: "${transcribedText.slice(0, 100)}${transcribedText.length > 100 ? '...' : ''}"`);
+      console.log(`ENHANCED: Detected languages: ${JSON.stringify(detectedLanguages)}`);
+      
+    } catch (error) {
+      console.error("ENHANCED: Transcription failed:", error);
+      throw new Error(`Transcription failed: ${error.message}`);
     }
+    
+    logMemoryUsage('after-transcription');
 
-    // Step 1: FIXED Enhanced transcription with better language detection
-    console.log('=== FIXED STEP 1: ENHANCED AUDIO TRANSCRIPTION ===');
-    const { text: transcribedText, detectedLanguages } = await transcribeAudioWithWhisper(
-      audioBlob,
-      detectedFileType,
-      openaiApiKey,
-      'auto' // Always use auto-detection for best results
-    );
-
-    if (!transcribedText || transcribedText.trim().length === 0) {
-      throw new Error('Transcription returned empty result');
-    }
-
-    console.log(`FIXED: Transcription successful: ${transcribedText.length} characters`);
-    console.log(`FIXED: Sample: "${transcribedText.slice(0, 100)}${transcribedText.length > 100 ? '...' : ''}"`);
-    console.log(`FIXED: Enhanced detected languages: ${JSON.stringify(detectedLanguages)}`);
-
-    // If direct transcription mode, return the result immediately with enhanced language info
+    // Enhanced direct transcription mode response
     if (directTranscription) {
-      console.log('FIXED: Direct transcription mode, returning enhanced result');
+      console.log('ENHANCED: Direct transcription mode, returning result');
       return new Response(JSON.stringify({
         transcription: transcribedText,
         language: detectedLanguages[0] || 'unknown',
@@ -156,111 +350,160 @@ serve(async (req) => {
       });
     }
 
-    // Step 2: FIXED Enhanced translation and refinement with proper language preservation
-    console.log('=== FIXED STEP 2: ENHANCED TRANSLATION & REFINEMENT ===');
-    const { refinedText, preservedLanguages } = await translateAndRefineText(
-      transcribedText, 
-      openaiApiKey, 
-      detectedLanguages
-    );
-
-    console.log('FIXED: Enhanced text refinement completed');
-    console.log(`FIXED: Original length: ${transcribedText.length}, Refined length: ${refinedText.length}`);
-    console.log(`FIXED: Refined sample: "${refinedText.slice(0, 100)}${refinedText.length > 100 ? '...' : ''}"`);
-    console.log(`FIXED: Enhanced preserved languages: ${JSON.stringify(preservedLanguages)}`);
-
-    // FIXED: Use enhanced language preservation
+    // Step 10: Enhanced text refinement
+    processingStage = 'text-refinement';
+    console.log('=== ENHANCED STEP 2: TEXT REFINEMENT ===');
+    logMemoryUsage('before-refinement');
+    
+    let refinedText: string;
+    let preservedLanguages: string[];
+    
+    try {
+      const refinementResult = await translateAndRefineText(
+        transcribedText, 
+        openaiApiKey, 
+        detectedLanguages
+      );
+      
+      refinedText = refinementResult.refinedText;
+      preservedLanguages = refinementResult.preservedLanguages;
+      
+      console.log('ENHANCED: Text refinement completed');
+      console.log(`ENHANCED: Original length: ${transcribedText.length}, Refined length: ${refinedText.length}`);
+      console.log(`ENHANCED: Preserved languages: ${JSON.stringify(preservedLanguages)}`);
+      
+    } catch (error) {
+      console.error("ENHANCED: Text refinement failed:", error);
+      // Use original text as fallback
+      refinedText = transcribedText;
+      preservedLanguages = detectedLanguages;
+      console.warn("ENHANCED: Using original text as fallback");
+    }
+    
     const finalLanguages = preservedLanguages && preservedLanguages.length > 0 ? preservedLanguages : detectedLanguages;
-    console.log(`FIXED: Final languages for storage: ${JSON.stringify(finalLanguages)}`);
+    logMemoryUsage('after-refinement');
 
-    // Step 3: FIXED Enhanced sentiment analysis
-    console.log('=== FIXED STEP 3: ENHANCED SENTIMENT ANALYSIS ===');
-    const googleNLApiKey = Deno.env.get('GOOGLE_API');
+    // Step 11: Enhanced sentiment analysis with error handling
+    processingStage = 'sentiment-analysis';
+    console.log('=== ENHANCED STEP 3: SENTIMENT ANALYSIS ===');
     
     let sentimentResult = { sentiment: "0" };
+    const googleNLApiKey = Deno.env.get('GOOGLE_API');
     
     if (googleNLApiKey) {
       try {
         sentimentResult = await analyzeWithGoogleNL(refinedText, googleNLApiKey);
-        console.log(`FIXED: Enhanced sentiment analysis result: ${sentimentResult.sentiment}`);
+        console.log(`ENHANCED: Sentiment analysis result: ${sentimentResult.sentiment}`);
       } catch (sentimentError) {
-        console.error('FIXED: Error analyzing sentiment:', sentimentError);
-        console.log('FIXED: Continuing with default sentiment value of 0');
+        console.error('ENHANCED: Sentiment analysis failed:', sentimentError);
+        console.log('ENHANCED: Using default sentiment value of 0');
       }
     } else {
-      console.warn('FIXED: Google NL API key not found, skipping sentiment analysis');
+      console.log('ENHANCED: Google NL API key not found, skipping sentiment analysis');
     }
 
-    // Step 4: FIXED Enhanced emotion analysis
-    console.log('=== FIXED STEP 4: ENHANCED EMOTION ANALYSIS ===');
+    // Step 12: Enhanced emotion analysis
+    processingStage = 'emotion-analysis';
+    console.log('=== ENHANCED STEP 4: EMOTION ANALYSIS ===');
     
-    // Fetch emotions from database
-    const { data: emotionsData, error: emotionsError } = await supabaseAdmin
-      .from('emotions')
-      .select('name, description');
-
     let emotions = {};
-    if (!emotionsError && emotionsData && emotionsData.length > 0) {
-      try {
-        emotions = await analyzeEmotions(refinedText, emotionsData, openaiApiKey);
-        console.log('FIXED: Enhanced emotion analysis completed:', emotions);
-      } catch (emotionError) {
-        console.error('FIXED: Error analyzing emotions:', emotionError);
-        console.log('FIXED: Continuing with empty emotions');
-      }
-    } else {
-      console.warn('FIXED: No emotions data found in database, skipping emotion analysis');
-    }
-
-    // Step 5: FIXED Enhanced database storage with corrected duration
-    console.log('=== FIXED STEP 5: ENHANCED DATABASE STORAGE ===');
     
-    const entryId = await storeJournalEntry(
-      supabaseAdmin,
-      transcribedText,
-      refinedText,
-      audioUrl,
-      userId,
-      durationSeconds, // FIXED: Proper duration in seconds
-      emotions,
-      sentimentResult.sentiment
-    );
+    try {
+      const { data: emotionsData, error: emotionsError } = await supabaseAdmin
+        .from('emotions')
+        .select('name, description');
 
-    console.log(`FIXED: Journal entry stored successfully with ID: ${entryId}`);
+      if (!emotionsError && emotionsData && emotionsData.length > 0) {
+        try {
+          emotions = await analyzeEmotions(refinedText, emotionsData, openaiApiKey);
+          console.log('ENHANCED: Emotion analysis completed:', emotions);
+        } catch (emotionError) {
+          console.error('ENHANCED: Emotion analysis failed:', emotionError);
+        }
+      } else {
+        console.warn('ENHANCED: No emotions data found, skipping emotion analysis');
+      }
+    } catch (error) {
+      console.error('ENHANCED: Emotions database query failed:', error);
+    }
+    
+    logMemoryUsage('after-emotion-analysis');
 
-    // Step 6: FIXED Enhanced language metadata update
-    console.log('=== FIXED STEP 6: ENHANCED LANGUAGE METADATA UPDATE ===');
-    const { error: languageUpdateError } = await supabaseAdmin
-      .from('Journal Entries')
-      .update({ 
-        languages: finalLanguages,
-        duration: durationSeconds // Ensure duration is properly set
-      })
-      .eq('id', entryId);
+    // Step 13: Enhanced database storage with transaction-like behavior
+    processingStage = 'database-storage';
+    console.log('=== ENHANCED STEP 5: DATABASE STORAGE ===');
+    
+    let entryId: number;
+    
+    try {
+      entryId = await storeJournalEntry(
+        supabaseAdmin,
+        transcribedText,
+        refinedText,
+        audioUrl,
+        userId,
+        durationSeconds,
+        emotions,
+        sentimentResult.sentiment
+      );
+      
+      console.log(`ENHANCED: Journal entry stored successfully with ID: ${entryId}`);
+      
+      // Enhanced language metadata update with error handling
+      try {
+        const { error: languageUpdateError } = await supabaseAdmin
+          .from('Journal Entries')
+          .update({ 
+            languages: finalLanguages,
+            duration: durationSeconds
+          })
+          .eq('id', entryId);
 
-    if (languageUpdateError) {
-      console.error('FIXED: Error updating languages and duration:', languageUpdateError);
-    } else {
-      console.log(`FIXED: Enhanced metadata updated: languages=${JSON.stringify(finalLanguages)}, duration=${durationSeconds}s`);
+        if (languageUpdateError) {
+          console.error('ENHANCED: Error updating languages and duration:', languageUpdateError);
+        } else {
+          console.log(`ENHANCED: Metadata updated: languages=${JSON.stringify(finalLanguages)}, duration=${durationSeconds}s`);
+        }
+      } catch (updateError) {
+        console.error('ENHANCED: Language update failed:', updateError);
+      }
+      
+    } catch (error) {
+      console.error("ENHANCED: Database storage failed:", error);
+      throw new Error(`Database storage failed: ${error.message}`);
+    }
+    
+    logMemoryUsage('after-database-storage');
+
+    // Step 14: Enhanced background processing with error isolation
+    processingStage = 'background-processing';
+    console.log('=== ENHANCED BACKGROUND PROCESSING ===');
+    
+    // Theme extraction
+    try {
+      await extractThemes(supabaseAdmin, refinedText, entryId);
+      console.log('ENHANCED: Theme extraction initiated');
+    } catch (error) {
+      console.error('ENHANCED: Theme extraction failed:', error);
     }
 
-    // Step 7: FIXED Enhanced theme extraction (stores themes in master_themes, categories in entities)
-    console.log('=== FIXED STEP 7: ENHANCED THEME EXTRACTION ===');
-    await extractThemes(supabaseAdmin, refinedText, entryId);
-
-    // Step 8: FIXED Enhanced embedding generation
-    console.log('=== FIXED STEP 8: ENHANCED EMBEDDING GENERATION ===');
+    // Embedding generation
     try {
       const embedding = await generateEmbedding(refinedText, openaiApiKey);
       await storeEmbedding(supabaseAdmin, entryId, refinedText, embedding);
-      console.log('FIXED: Enhanced embeddings generated and stored successfully');
+      console.log('ENHANCED: Embeddings generated and stored');
     } catch (embeddingError) {
-      console.error('FIXED: Error with embeddings:', embeddingError);
+      console.error('ENHANCED: Embedding generation failed:', embeddingError);
     }
+    
+    // Final memory cleanup
+    requestGarbageCollection();
+    logMemoryUsage('pipeline-complete');
 
-    // FIXED: Enhanced success response
-    console.log('=== FIXED PIPELINE COMPLETE ===');
-    console.log('FIXED: Enhanced processing complete, returning comprehensive response');
+    // Step 15: Enhanced success response
+    const totalTime = Date.now() - startTime;
+    console.log('=== ENHANCED PIPELINE COMPLETE ===');
+    console.log(`ENHANCED: Total processing time: ${totalTime}ms`);
     
     return new Response(JSON.stringify({
       id: entryId,
@@ -271,23 +514,50 @@ serve(async (req) => {
       sentiment: sentimentResult.sentiment,
       language: finalLanguages[0] || 'unknown',
       languages: finalLanguages,
-      duration: durationSeconds, // FIXED: Return correct duration in seconds
+      duration: durationSeconds,
       audioUrl: audioUrl,
       processingTimestamp: requestTimestamp,
+      processingTime: totalTime,
       success: true
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
 
   } catch (error) {
-    console.error('=== FIXED PIPELINE ERROR ===');
-    console.error('FIXED: Error in transcribe-audio function:', error);
+    const totalTime = Date.now() - startTime;
+    console.error('=== ENHANCED PIPELINE ERROR ===');
+    console.error(`ENHANCED: Error in ${processingStage}:`, error);
+    console.error(`ENHANCED: Processing failed after: ${totalTime}ms`);
+    
+    logMemoryUsage('error-state');
+    
+    // Enhanced error classification
+    let statusCode = 500;
+    let errorType = 'internal_error';
+    
+    if (error.message.includes('timeout')) {
+      statusCode = 408;
+      errorType = 'timeout';
+    } else if (error.message.includes('validation')) {
+      statusCode = 400;
+      errorType = 'validation_error';
+    } else if (error.message.includes('authentication') || error.message.includes('authorization')) {
+      statusCode = 401;
+      errorType = 'auth_error';
+    } else if (error.message.includes('size') || error.message.includes('large')) {
+      statusCode = 413;
+      errorType = 'payload_too_large';
+    }
+    
     return new Response(JSON.stringify({
       error: error.message,
+      errorType,
+      stage: processingStage,
+      processingTime: totalTime,
       timestamp: new Date().toISOString(),
       success: false
     }), {
-      status: 500,
+      status: statusCode,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   }
