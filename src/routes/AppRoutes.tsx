@@ -50,6 +50,8 @@ const AppRoutes = () => {
     }
   };
   
+  // NOTE: This component should NOT wrap routes in a Router
+  // The Router should be provided by the parent component (App.tsx)
   return (
     <Routes>
       {/* Wrap all routes that need ViewportManager in a parent Route */}
