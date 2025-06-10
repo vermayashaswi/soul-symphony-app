@@ -1,3 +1,4 @@
+
 import { supabase } from '@/integrations/supabase/client';
 
 interface NodeData {
@@ -47,7 +48,7 @@ interface AppLevelTranslationService {
 export class EnhancedSoulNetPreloadService {
   private static readonly CACHE_KEY = 'enhanced-soulnet-data';
   private static readonly CACHE_DURATION = 15 * 60 * 1000; // 15 minutes
-  private static readonly CACHE_VERSION = 5; // Increment for translation improvements
+  private static readonly CACHE_VERSION = 6; // Increment for themeemotion fix
   private static cache = new Map<string, CachedEnhancedData>();
   private static translationCoordinator = new Map<string, Promise<Map<string, string>>>();
   
@@ -103,11 +104,11 @@ export class EnhancedSoulNetPreloadService {
     }
 
     try {
-      // Fetch raw journal data
+      // Fetch raw journal data - FIXED: Use themeemotion instead of entityemotion
       const startDate = this.getStartDate(timeRange);
       const { data: entries, error } = await supabase
         .from('Journal Entries')
-        .select('id, entityemotion, "refined text", "transcription text"')
+        .select('id, themeemotion, "refined text", "transcription text"')
         .eq('user_id', userId)
         .gte('created_at', startDate.toISOString())
         .order('created_at', { ascending: false });
@@ -527,9 +528,10 @@ export class EnhancedSoulNetPreloadService {
     const entityEmotionMap: Record<string, Record<string, number>> = {};
     
     entries.forEach(entry => {
-      if (!entry.entityemotion) return;
+      // FIXED: Use themeemotion instead of entityemotion
+      if (!entry.themeemotion) return;
       
-      Object.entries(entry.entityemotion).forEach(([entity, emotions]) => {
+      Object.entries(entry.themeemotion).forEach(([entity, emotions]) => {
         if (typeof emotions !== 'object') return;
         
         if (!entityEmotionMap[entity]) {

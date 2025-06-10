@@ -53,11 +53,11 @@ export class SoulNetPreloadService {
     }
 
     try {
-      // Fetch raw journal data
+      // Fetch raw journal data - FIXED: Use themeemotion instead of entityemotion
       const startDate = this.getStartDate(timeRange);
       const { data: entries, error } = await supabase
         .from('Journal Entries')
-        .select('id, entityemotion, "refined text", "transcription text"')
+        .select('id, themeemotion, "refined text", "transcription text"')
         .eq('user_id', userId)
         .gte('created_at', startDate.toISOString())
         .order('created_at', { ascending: false });
@@ -262,9 +262,10 @@ export class SoulNetPreloadService {
     const entityEmotionMap: Record<string, Record<string, number>> = {};
     
     entries.forEach(entry => {
-      if (!entry.entityemotion) return;
+      // FIXED: Use themeemotion instead of entityemotion
+      if (!entry.themeemotion) return;
       
-      Object.entries(entry.entityemotion).forEach(([entity, emotions]) => {
+      Object.entries(entry.themeemotion).forEach(([entity, emotions]) => {
         if (typeof emotions !== 'object') return;
         
         if (!entityEmotionMap[entity]) {
