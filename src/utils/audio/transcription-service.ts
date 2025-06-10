@@ -17,11 +17,12 @@ function validateEnvironment(): { valid: boolean; error?: string } {
     return { valid: false, error: 'Supabase client not initialized' };
   }
 
-  // Check if we can access Supabase URL (basic connectivity check)
+  // Check if we can access Supabase through a simple test
   try {
-    const url = supabase.supabaseUrl;
-    if (!url || !url.includes('supabase')) {
-      return { valid: false, error: 'Invalid Supabase configuration' };
+    // Test if the client is properly configured by checking if we can call a method
+    // This is safer than accessing protected properties
+    if (typeof supabase.auth.getUser !== 'function') {
+      return { valid: false, error: 'Supabase client not properly configured' };
     }
   } catch (error) {
     return { valid: false, error: 'Supabase configuration error' };
