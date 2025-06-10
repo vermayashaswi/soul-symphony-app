@@ -1,64 +1,91 @@
 
-import { Suspense, lazy } from "react";
-import { Toaster } from "@/components/ui/sonner";
-import { TooltipProvider } from "@/components/ui/tooltip";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter } from "react-router-dom";
-import { AuthProvider } from "@/contexts/AuthContext";
-import { ErrorBoundary } from "@/components/ErrorBoundary";
-import { AuthErrorBoundary } from "@/components/auth/AuthErrorBoundary";
-import { ThemeProvider } from "@/contexts/ThemeContext";
-import { TranslationProvider } from "@/contexts/TranslationContext";
-import { TutorialProvider } from "@/contexts/TutorialContext";
-import { OnboardingProvider } from "@/contexts/OnboardingContext";
-import DebugPanel from "@/components/debug/DebugPanel";
-import LoadingSpinner from "@/components/LoadingSpinner";
-import AppRoutes from "@/routes/AppRoutes";
+import React, { useEffect, useState } from 'react';
+import AppRoutes from './routes/AppRoutes';
+import { Toaster } from "@/components/ui/toaster";
+import { Toaster as SonnerToaster } from "sonner";
+import { TranslationProvider } from '@/contexts/TranslationContext';
+import { SubscriptionProvider } from '@/contexts/SubscriptionContext';
+import { TranslationLoadingOverlay } from '@/components/translation/TranslationLoadingOverlay';
+import { JournalProcessingInitializer } from './app/journal-processing-init';
+import { TutorialProvider } from './contexts/TutorialContext';
+import TutorialOverlay from './components/tutorial/TutorialOverlay';
+import ErrorBoundary from './components/insights/ErrorBoundary';
+import { preloadCriticalImages } from './utils/imagePreloader';
+import { toast } from 'sonner';
+import './styles/emoji.css';
+import './styles/tutorial.css';
 
-const queryClient = new QueryClient({
-  defaultOptions: {
-    queries: {
-      retry: (failureCount, error: any) => {
-        // Don't retry auth errors
-        if (error?.message?.includes('auth') || error?.message?.includes('profile')) {
-          return false;
-        }
-        return failureCount < 3;
-      },
-      staleTime: 5 * 60 * 1000, // 5 minutes
-      gcTime: 10 * 60 * 1000, // 10 minutes
-    },
-  },
-});
+const App: React.FC = () => {
+  const [isInitialized, setIsInitialized] = useState(false);
 
-function App() {
+  useEffect(() => {
+    console.log('[App] App mounted, current path:', window.location.pathname);
+    
+    // Clean up any malformed paths
+    const currentPath = window.location.pathname;
+    
+    // Fix incorrectly formatted URLs that have domains or https in the path
+    if (currentPath.includes('https://') || currentPath.includes('soulo.online')) {
+      console.log('[App] Fixing malformed URL path:', currentPath);
+      window.history.replaceState(null, '', '/');
+    }
+    
+    // Apply a CSS class to the document body for theme-specific overrides
+    document.body.classList.add('app-initialized');
+    
+    // Preload critical images including the chat avatar
+    try {
+      preloadCriticalImages();
+      console.log('[App] Critical images preloaded successfully');
+    } catch (error) {
+      console.warn('[App] Failed to preload some images:', error);
+      // Non-critical error, continue app initialization
+    }
+
+    // Mark app as initialized after a brief delay to ensure smooth startup
+    setTimeout(() => {
+      setIsInitialized(true);
+      console.log('[App] App marked as fully initialized');
+    }, 500);
+  }, []);
+
+  const handleAppError = (error: Error, errorInfo: any) => {
+    console.error('[App] Application-level error:', error, errorInfo);
+    
+    // Log critical app errors for debugging
+    const errorData = {
+      message: error.message,
+      stack: error.stack,
+      componentStack: errorInfo.componentStack,
+      timestamp: new Date().toISOString(),
+      userAgent: navigator.userAgent,
+      url: window.location.href
+    };
+    
+    console.error('[App] Detailed error info:', errorData);
+
+    // Show user-friendly error notification
+    toast.error('Something went wrong. The app will try to recover automatically.');
+
+    // Allow the app to continue functioning despite errors
+  };
+
   return (
-    <ErrorBoundary>
-      <QueryClientProvider client={queryClient}>
-        <TooltipProvider>
-          <ThemeProvider>
-            <Toaster position="top-center" />
-            <BrowserRouter>
-              <TranslationProvider>
-                <AuthErrorBoundary>
-                  <AuthProvider>
-                    <OnboardingProvider>
-                      <TutorialProvider>
-                        <Suspense fallback={<LoadingSpinner />}>
-                          <AppRoutes />
-                        </Suspense>
-                        <DebugPanel />
-                      </TutorialProvider>
-                    </OnboardingProvider>
-                  </AuthProvider>
-                </AuthErrorBoundary>
-              </TranslationProvider>
-            </BrowserRouter>
-          </ThemeProvider>
-        </TooltipProvider>
-      </QueryClientProvider>
+    <ErrorBoundary onError={handleAppError}>
+      <TranslationProvider>
+        <SubscriptionProvider>
+          <TutorialProvider>
+            <TranslationLoadingOverlay />
+            <JournalProcessingInitializer />
+            <AppRoutes key={isInitialized ? 'initialized' : 'initializing'} />
+            <TutorialOverlay />
+            <Toaster />
+            <SonnerToaster position="top-right" />
+          </TutorialProvider>
+        </SubscriptionProvider>
+      </TranslationProvider>
     </ErrorBoundary>
   );
-}
+};
 
 export default App;

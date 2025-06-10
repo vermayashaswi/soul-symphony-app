@@ -3,8 +3,7 @@ import { Session, User } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { AuthContextType } from '@/types/auth';
-import { enhancedProfileService } from '@/services/enhancedProfileService';
-import { sessionManager } from '@/services/sessionManager';
+import { ensureProfileExists as ensureProfileExistsService, updateUserProfile as updateUserProfileService } from '@/services/profileService';
 import { 
   signInWithGoogle as signInWithGoogleService,
   signInWithEmail as signInWithEmailService,
@@ -40,13 +39,20 @@ function AuthProviderCore({ children }: { children: ReactNode }) {
   const location = useLocation();
 
   const detectUserLanguage = (): string => {
+    // Try to get language from various sources in order of preference
     const browserLanguage = navigator.language || navigator.languages?.[0] || 'en';
+    
+    // Extract the language code (e.g., 'en' from 'en-US')
     const languageCode = browserLanguage.split('-')[0].toLowerCase();
+    
+    // Map to supported languages or default to 'en'
     const supportedLanguages = ['en', 'es', 'fr', 'de', 'it', 'pt', 'ru', 'zh', 'ja', 'ko', 'ar', 'hi', 'bn'];
+    
     return supportedLanguages.includes(languageCode) ? languageCode : 'en';
   };
 
   const getReferrer = (): string | null => {
+    // Get referrer, but exclude same-domain referrers
     const referrer = document.referrer;
     if (!referrer) return null;
     
@@ -54,6 +60,7 @@ function AuthProviderCore({ children }: { children: ReactNode }) {
       const referrerUrl = new URL(referrer);
       const currentUrl = new URL(window.location.href);
       
+      // Only return external referrers
       if (referrerUrl.hostname !== currentUrl.hostname) {
         return referrer;
       }
@@ -68,6 +75,7 @@ function AuthProviderCore({ children }: { children: ReactNode }) {
     try {
       console.log('Creating enhanced user session for user:', userId);
       
+      // Check if session already exists to prevent duplicates
       const { data: hasSession, error: checkError } = await supabase
         .rpc('has_active_session', { p_user_id: userId });
       
@@ -86,6 +94,7 @@ function AuthProviderCore({ children }: { children: ReactNode }) {
       const referrer = getReferrer();
       const utmParams = SessionTrackingService.extractUtmParameters();
       
+      // Detect location asynchronously
       let locationData = null;
       try {
         locationData = await SessionTrackingService.detectLocation();
@@ -150,6 +159,7 @@ function AuthProviderCore({ children }: { children: ReactNode }) {
     }
   };
 
+  // Track conversion events
   const trackConversion = async (eventType: string, eventData: Record<string, any> = {}) => {
     if (currentSessionId) {
       await SessionTrackingService.trackConversion(currentSessionId, eventType, eventData);
@@ -173,7 +183,6 @@ function AuthProviderCore({ children }: { children: ReactNode }) {
     };
   }, [autoRetryTimeoutId]);
 
-  // ENHANCED: Use the new enhanced profile service
   const ensureProfileExists = async (forceRetry = false): Promise<boolean> => {
     if (!user || (profileCreationInProgress && !forceRetry)) {
       logProfile(`Profile check skipped: ${!user ? 'No user' : 'Already in progress'}`, 'AuthContext');
@@ -196,23 +205,23 @@ function AuthProviderCore({ children }: { children: ReactNode }) {
       setLastProfileAttemptTime(now);
       setProfileCreationAttempts(prev => prev + 1);
       
-      logProfile(`Enhanced attempt #${profileCreationAttempts + 1} to ensure profile exists for user: ${user.id}`, 'AuthContext', {
+      logProfile(`Attempt #${profileCreationAttempts + 1} to ensure profile exists for user: ${user.id}`, 'AuthContext', {
         userEmail: user.email,
         provider: user.app_metadata?.provider,
         hasUserMetadata: !!user.user_metadata,
         userMetadataKeys: user.user_metadata ? Object.keys(user.user_metadata) : []
       });
       
-      // Use enhanced profile service
-      const result = await enhancedProfileService.ensureProfileExists(user);
+      const result = await ensureProfileExistsService(user);
       
-      if (result.success) {
-        logProfile('Enhanced profile creation or verification successful', 'AuthContext');
+      if (result) {
+        logProfile('Profile created or verified successfully', 'AuthContext');
         setProfileCreationAttempts(0);
         setProfileExistsStatus(true);
         setProfileCreationComplete(true);
         debugLogger.setLastProfileError(null);
         
+        // Only create session once per auth session
         if (!sessionCreated) {
           const sessionSuccess = await createUserSession(user.id);
           if (sessionSuccess) {
@@ -222,38 +231,34 @@ function AuthProviderCore({ children }: { children: ReactNode }) {
         
         return true;
       } else {
-        const errorMsg = result.error || 'Unknown profile creation error';
-        logAuthError(`Enhanced profile creation failed: ${errorMsg}`, 'AuthContext');
+        const errorMsg = `Profile creation failed on attempt #${profileCreationAttempts + 1}`;
+        logAuthError(errorMsg, 'AuthContext');
         debugLogger.setLastProfileError(errorMsg);
         setProfileExistsStatus(false);
         
-        // Enhanced retry logic
         if (profileCreationAttempts < MAX_AUTO_PROFILE_ATTEMPTS) {
           const nextAttemptDelay = BASE_RETRY_DELAY * Math.pow(1.5, profileCreationAttempts);
-          logProfile(`Scheduling enhanced automatic retry in ${nextAttemptDelay}ms`, 'AuthContext');
+          logProfile(`Scheduling automatic retry in ${nextAttemptDelay}ms`, 'AuthContext');
           
           if (autoRetryTimeoutId) {
             clearTimeout(autoRetryTimeoutId);
           }
           
           const timeoutId = setTimeout(() => {
-            logProfile(`Executing enhanced automatic retry #${profileCreationAttempts + 1}`, 'AuthContext');
+            logProfile(`Executing automatic retry #${profileCreationAttempts + 1}`, 'AuthContext');
             setAutoRetryTimeoutId(null);
             ensureProfileExists(true).catch(e => {
-              logAuthError(`Enhanced auto-retry failed: ${e.message}`, 'AuthContext', e);
+              logAuthError(`Auto-retry failed: ${e.message}`, 'AuthContext', e);
             });
           }, nextAttemptDelay);
           
           setAutoRetryTimeoutId(timeoutId);
-        } else {
-          // Show user-friendly error after max attempts
-          toast.error('Unable to complete account setup. Please refresh the page and try again.');
         }
       }
       
-      return result.success;
+      return result;
     } catch (error: any) {
-      const errorMsg = `Error in enhanced ensureProfileExists: ${error.message}`;
+      const errorMsg = `Error in ensureProfileExists: ${error.message}`;
       logAuthError(errorMsg, 'AuthContext', error);
       debugLogger.setLastProfileError(errorMsg);
       setProfileExistsStatus(false);
@@ -266,6 +271,7 @@ function AuthProviderCore({ children }: { children: ReactNode }) {
   const updateUserProfile = async (metadata: Record<string, any>): Promise<boolean> => {
     logProfile(`Updating user profile metadata`, 'AuthContext', { metadataKeys: Object.keys(metadata) });
     
+    // Always include timezone in updates if not explicitly provided
     if (!metadata.timezone) {
       try {
         metadata.timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
@@ -275,17 +281,14 @@ function AuthProviderCore({ children }: { children: ReactNode }) {
       }
     }
     
-    if (!user) return false;
-    
-    // Use enhanced profile service for updates
-    const result = await enhancedProfileService.updateProfile(user.id, metadata);
-    
-    if (result.success) {
+    const result = await updateUserProfileService(user, metadata);
+    if (result) {
       const { data } = await supabase.auth.getUser();
       if (data.user) {
         setUser(data.user);
         logProfile('User profile updated successfully', 'AuthContext');
         
+        // Track profile update as conversion event
         await trackConversion('profile_updated', { 
           updatedFields: Object.keys(metadata),
           timestamp: new Date().toISOString(),
@@ -294,7 +297,7 @@ function AuthProviderCore({ children }: { children: ReactNode }) {
     } else {
       logAuthError('Failed to update user profile', 'AuthContext');
     }
-    return result.success;
+    return result;
   };
 
   const signInWithGoogle = async (): Promise<void> => {
@@ -308,6 +311,7 @@ function AuthProviderCore({ children }: { children: ReactNode }) {
       await signInWithGoogleService();
       logInfo('Google sign-in initiated', 'AuthContext');
       
+      // Track sign-in attempt
       await trackConversion('sign_in_attempt', { 
         method: 'google',
         timestamp: new Date().toISOString(),
@@ -330,6 +334,7 @@ function AuthProviderCore({ children }: { children: ReactNode }) {
       await signInWithEmailService(email, password);
       logInfo('Email sign-in initiated', 'AuthContext');
       
+      // Track sign-in attempt
       await trackConversion('sign_in_attempt', { 
         method: 'email',
         timestamp: new Date().toISOString(),
@@ -352,6 +357,7 @@ function AuthProviderCore({ children }: { children: ReactNode }) {
       await signUpService(email, password);
       logInfo('Sign-up initiated', 'AuthContext');
       
+      // Track sign-up attempt
       await trackConversion('sign_up_attempt', { 
         method: 'email',
         timestamp: new Date().toISOString(),
@@ -383,6 +389,7 @@ function AuthProviderCore({ children }: { children: ReactNode }) {
     try {
       console.log('[AuthContext] Attempting to sign out user');
       
+      // Track sign-out event
       await trackConversion('sign_out', {
         timestamp: new Date().toISOString(),
       });
@@ -392,9 +399,6 @@ function AuthProviderCore({ children }: { children: ReactNode }) {
       setProfileExistsStatus(null);
       setProfileCreationComplete(false);
       setCurrentSessionId(null);
-      
-      // Stop session monitoring
-      sessionManager.stopSessionMonitoring();
       
       await signOutService((path: string) => {
         console.log(`[AuthContext] Redirecting to ${path} after signout`);
@@ -414,11 +418,9 @@ function AuthProviderCore({ children }: { children: ReactNode }) {
       setSession(currentSession);
       setUser(currentSession?.user ?? null);
     } catch (error) {
-      // Silent failure for refresh
     }
   };
 
-  // Enhanced profile creation function
   const createOrVerifyProfile = async (currentUser: User): Promise<boolean> => {
     if (profileCreationInProgress || profileCreationComplete) {
       logProfile(`Profile creation skipped: ${profileCreationInProgress ? 'In progress' : 'Already complete'}`, 'AuthContext');
@@ -434,7 +436,7 @@ function AuthProviderCore({ children }: { children: ReactNode }) {
       setProfileCreationInProgress(true);
       setProfileCreationAttempts(prev => prev + 1);
       
-      logProfile(`Enhanced attempt #${profileCreationAttempts + 1} to create profile for user: ${currentUser.email}`, 'AuthContext', {
+      logProfile(`Attempt #${profileCreationAttempts + 1} to create profile for user: ${currentUser.email}`, 'AuthContext', {
         userProvider: currentUser.app_metadata?.provider,
         userMetadataKeys: currentUser.user_metadata ? Object.keys(currentUser.user_metadata) : []
       });
@@ -444,19 +446,16 @@ function AuthProviderCore({ children }: { children: ReactNode }) {
         await new Promise(resolve => setTimeout(resolve, 800));
       }
       
-      // Start session monitoring
-      sessionManager.startSessionMonitoring();
+      const profileCreated = await ensureProfileExistsService(currentUser);
       
-      // Use enhanced profile service
-      const profileResult = await enhancedProfileService.ensureProfileExists(currentUser);
-      
-      if (profileResult.success) {
-        logProfile(`Enhanced profile created or verified for user: ${currentUser.email}`, 'AuthContext');
+      if (profileCreated) {
+        logProfile(`Profile created or verified for user: ${currentUser.email}`, 'AuthContext');
         setProfileCreationAttempts(0);
         setProfileExistsStatus(true);
         setProfileCreationComplete(true);
         debugLogger.setLastProfileError(null);
         
+        // Only create session once per auth session
         if (!sessionCreated) {
           const sessionSuccess = await createUserSession(currentUser.id);
           if (sessionSuccess) {
@@ -466,25 +465,47 @@ function AuthProviderCore({ children }: { children: ReactNode }) {
         
         return true;
       } else {
-        const errorMsg = profileResult.error || 'Enhanced profile creation failed';
+        logAuthError('First attempt to create profile failed, retrying once...', 'AuthContext');
+        
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        
+        const retryResult = await ensureProfileExistsService(currentUser);
+        if (retryResult) {
+          logProfile(`Profile created or verified on retry for user: ${currentUser.email}`, 'AuthContext');
+          setProfileCreationAttempts(0);
+          setProfileExistsStatus(true);
+          setProfileCreationComplete(true);
+          debugLogger.setLastProfileError(null);
+          
+          // Only create session once per auth session
+          if (!sessionCreated) {
+            const sessionSuccess = await createUserSession(currentUser.id);
+            if (sessionSuccess) {
+              setSessionCreated(true);
+            }
+          }
+          
+          return true;
+        }
+        
+        const errorMsg = `Failed to create profile after retry for user: ${currentUser.email}`;
         logAuthError(errorMsg, 'AuthContext');
         debugLogger.setLastProfileError(errorMsg);
         setProfileExistsStatus(false);
         
-        // Enhanced retry logic
         if (profileCreationAttempts < MAX_AUTO_PROFILE_ATTEMPTS) {
           const nextAttemptDelay = BASE_RETRY_DELAY * Math.pow(1.5, profileCreationAttempts);
-          logProfile(`Scheduling enhanced automatic retry in ${nextAttemptDelay}ms`, 'AuthContext');
+          logProfile(`Scheduling automatic retry in ${nextAttemptDelay}ms`, 'AuthContext');
           
           if (autoRetryTimeoutId) {
             clearTimeout(autoRetryTimeoutId);
           }
           
           const timeoutId = setTimeout(() => {
-            logProfile(`Executing enhanced automatic retry #${profileCreationAttempts + 1}`, 'AuthContext');
+            logProfile(`Executing automatic retry #${profileCreationAttempts + 1}`, 'AuthContext');
             setAutoRetryTimeoutId(null);
             ensureProfileExists(true).catch(e => {
-              logAuthError(`Enhanced auto-retry failed: ${e.message}`, 'AuthContext', e);
+              logAuthError(`Auto-retry failed: ${e.message}`, 'AuthContext', e);
             });
           }, nextAttemptDelay);
           
@@ -494,7 +515,7 @@ function AuthProviderCore({ children }: { children: ReactNode }) {
         return false;
       }
     } catch (error: any) {
-      const errorMsg = `Enhanced error in profile creation: ${error.message}`;
+      const errorMsg = `Error in profile creation: ${error.message}`;
       logAuthError(errorMsg, 'AuthContext', error);
       debugLogger.setLastProfileError(errorMsg);
       setProfileExistsStatus(false);
@@ -504,32 +525,31 @@ function AuthProviderCore({ children }: { children: ReactNode }) {
     }
   };
 
-  // Enhanced auth state management
   useEffect(() => {
-    logInfo("Setting up enhanced auth state listener", 'AuthContext');
+    logInfo("Setting up auth state listener", 'AuthContext');
     
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, currentSession) => {
-        logInfo(`Enhanced auth state changed: ${event}, user: ${currentSession?.user?.email}`, 'AuthContext');
+        logInfo(`Auth state changed: ${event}, user: ${currentSession?.user?.email}`, 'AuthContext');
         setSession(currentSession);
         setUser(currentSession?.user ?? null);
         
+        // Reset session tracking on new session
         if (event === 'SIGNED_IN' && currentSession?.user) {
           setSessionCreated(false);
           setCurrentSessionId(null);
           
           const initialDelay = isMobileDevice ? 1500 : 1000;
-          logProfile(`Scheduling enhanced profile creation in ${initialDelay}ms for platform stability`, 'AuthContext');
+          logProfile(`Scheduling profile creation in ${initialDelay}ms for platform stability`, 'AuthContext');
           
           setTimeout(() => {
             createOrVerifyProfile(currentSession.user)
               .catch(error => {
-                logAuthError(`Error in enhanced initial profile creation: ${error.message}`, 'AuthContext', error);
-                // Show user-friendly error
-                toast.error('Account setup encountered an issue. Please refresh the page.');
+                logAuthError(`Error in initial profile creation: ${error.message}`, 'AuthContext', error);
               });
           }, initialDelay);
 
+          // Track successful sign-in
           await trackConversion('sign_in_success', {
             method: currentSession.user.app_metadata?.provider || 'unknown',
             timestamp: new Date().toISOString(),
@@ -551,9 +571,6 @@ function AuthProviderCore({ children }: { children: ReactNode }) {
           setCurrentSessionId(null);
           debugLogger.setLastProfileError(null);
           
-          // Stop session monitoring
-          sessionManager.stopSessionMonitoring();
-          
           if (autoRetryTimeoutId) {
             clearTimeout(autoRetryTimeoutId);
             setAutoRetryTimeoutId(null);
@@ -567,7 +584,7 @@ function AuthProviderCore({ children }: { children: ReactNode }) {
     );
 
     supabase.auth.getSession().then(async ({ data: { session: currentSession } }) => {
-      logInfo(`Enhanced initial session check: ${currentSession?.user?.email || 'No session'}`, 'AuthContext');
+      logInfo(`Initial session check: ${currentSession?.user?.email || 'No session'}`, 'AuthContext');
       setSession(currentSession);
       setUser(currentSession?.user ?? null);
       
@@ -576,13 +593,12 @@ function AuthProviderCore({ children }: { children: ReactNode }) {
         setCurrentSessionId(null);
         
         const initialDelay = isMobileDevice ? 1500 : 1000;
-        logProfile(`Scheduling enhanced initial profile creation in ${initialDelay}ms for platform stability`, 'AuthContext');
+        logProfile(`Scheduling initial profile creation in ${initialDelay}ms for platform stability`, 'AuthContext');
         
         setTimeout(() => {
           createOrVerifyProfile(currentSession.user)
             .catch(error => {
-              logAuthError(`Error in enhanced initial profile creation: ${error.message}`, 'AuthContext', error);
-              toast.error('Account setup encountered an issue. Please refresh the page.');
+              logAuthError(`Error in initial profile creation: ${error.message}`, 'AuthContext', error);
             });
         }, initialDelay);
       }
@@ -592,7 +608,6 @@ function AuthProviderCore({ children }: { children: ReactNode }) {
 
     return () => {
       subscription.unsubscribe();
-      sessionManager.cleanup();
       if (autoRetryTimeoutId) {
         clearTimeout(autoRetryTimeoutId);
       }
