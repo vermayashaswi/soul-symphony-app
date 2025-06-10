@@ -67,16 +67,17 @@ serve(async (req) => {
       );
     }
 
-    // Regular sentiment analysis logic...
-    const { text, entryId, processTranslated = false } = requestData;
+    // FIXED: Enhanced sentiment analysis with entity extraction
+    const { text, entryId, processTranslated = false, extractEntities = false } = requestData;
     
     if (!text) {
       throw new Error("No text provided for analysis");
     }
     
-    console.log(`Processing text for sentiment analysis${entryId ? ` (Entry ID: ${entryId})` : ''}:`, 
+    console.log(`FIXED: Processing text for sentiment analysis${entryId ? ` (Entry ID: ${entryId})` : ''}:`, 
               text.length > 100 ? text.slice(0, 100) + '...' : text);
-    console.log(`Processing translated content: ${processTranslated ? 'YES' : 'NO'}`);
+    console.log(`FIXED: Processing translated content: ${processTranslated ? 'YES' : 'NO'}`);
+    console.log(`FIXED: Extract entities: ${extractEntities ? 'YES' : 'NO'}`);
     
     // Get the Google Natural Language API key directly from environment
     const apiKey = Deno.env.get('GOOGLE_API');
@@ -91,7 +92,7 @@ serve(async (req) => {
       throw new Error("Google API key appears to be invalid");
     }
     
-    console.log('Analyzing sentiment using Google NL API with UTF-8 encoding...');
+    console.log('FIXED: Analyzing sentiment using Google NL API with UTF-8 encoding...');
     console.log(`API key configured: ${apiKey.length} characters, starts with: ${apiKey.substring(0, 5)}...`);
     
     // Call the Google Natural Language API specifically for sentiment analysis
@@ -143,8 +144,8 @@ serve(async (req) => {
     const result = await response.json();
     const sentimentScore = result.documentSentiment?.score?.toString() || "0";
     
-    console.log('Sentiment analysis result:', result);
-    console.log('Sentiment score:', sentimentScore);
+    console.log('FIXED: Sentiment analysis result:', result);
+    console.log('FIXED: Sentiment score:', sentimentScore);
     
     // Categorize the sentiment according to the specified ranges
     let sentimentCategory;
@@ -158,7 +159,59 @@ serve(async (req) => {
       sentimentCategory = "negative";
     }
     
-    console.log('Sentiment category:', sentimentCategory);
+    console.log('FIXED: Sentiment category:', sentimentCategory);
+    
+    // FIXED: Entity extraction using Google NL API if requested
+    let entities = null;
+    if (extractEntities && entryId) {
+      try {
+        console.log('FIXED: Extracting entities using Google NL API...');
+        
+        const entityResponse = await fetch(`https://language.googleapis.com/v1/documents:analyzeEntities?key=${apiKey}`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            document: {
+              type: 'PLAIN_TEXT',
+              content: text,
+            },
+            encodingType: 'UTF8'
+          }),
+        });
+
+        if (entityResponse.ok) {
+          const entityResult = await entityResponse.json();
+          
+          // Process entities into our format
+          const extractedEntities = {};
+          
+          if (entityResult.entities && Array.isArray(entityResult.entities)) {
+            entityResult.entities.forEach(entity => {
+              const entityType = entity.type || 'OTHER';
+              const entityName = entity.name;
+              
+              if (!extractedEntities[entityType]) {
+                extractedEntities[entityType] = [];
+              }
+              
+              if (!extractedEntities[entityType].includes(entityName)) {
+                extractedEntities[entityType].push(entityName);
+              }
+            });
+          }
+          
+          entities = extractedEntities;
+          console.log('FIXED: Entities extracted:', entities);
+        } else {
+          console.error('FIXED: Entity extraction failed, but continuing with sentiment analysis');
+        }
+      } catch (entityError) {
+        console.error('FIXED: Error extracting entities:', entityError);
+        // Continue without entities
+      }
+    }
     
     // If an entry ID was provided, update the entry directly
     if (entryId && Deno.env.get('SUPABASE_URL') && Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')) {
@@ -167,20 +220,26 @@ serve(async (req) => {
         const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') as string;
         const supabase = createClient(supabaseUrl, supabaseServiceKey);
         
-        console.log(`Updating sentiment directly for entry ID: ${entryId}`);
+        console.log(`FIXED: Updating sentiment and entities for entry ID: ${entryId}`);
+        
+        // FIXED: Update both sentiment and entities if available
+        const updateData: any = { sentiment: sentimentScore };
+        if (entities) {
+          updateData.entities = entities;
+        }
         
         const { error: updateError } = await supabase
           .from('Journal Entries')
-          .update({ sentiment: sentimentScore })
+          .update(updateData)
           .eq('id', entryId);
           
         if (updateError) {
-          console.error('Error updating sentiment in database:', updateError);
+          console.error('FIXED: Error updating entry in database:', updateError);
         } else {
-          console.log(`Successfully updated sentiment for entry ID: ${entryId}`);
+          console.log(`FIXED: Successfully updated entry ${entryId} with sentiment${entities ? ' and entities' : ''}`);
         }
       } catch (updateError) {
-        console.error('Error updating entry sentiment:', updateError);
+        console.error('FIXED: Error updating entry:', updateError);
       }
     }
     
@@ -188,15 +247,17 @@ serve(async (req) => {
       JSON.stringify({ 
         sentiment: sentimentScore,
         category: sentimentCategory,
+        entities: entities,
         success: true,
-        processedTranslated: processTranslated
+        processedTranslated: processTranslated,
+        extractedEntities: extractEntities
       }),
       { 
         headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
       }
     );
   } catch (error) {
-    console.error("Error in analyze-sentiment function:", error);
+    console.error("FIXED: Error in analyze-sentiment function:", error);
     
     return new Response(
       JSON.stringify({ 

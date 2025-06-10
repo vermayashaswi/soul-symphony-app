@@ -24,9 +24,9 @@ export interface JournalEntry {
   content: string; // Changed from optional to required
   original_language?: string; // Keep as optional
   translation_text?: string; // Keep as optional
-  languages?: string[]; // Array of detected language codes
+  languages?: string[]; // FIXED: Array of detected language codes from refinement step
   tempId?: string; // Temporary ID for tracking processing entries
-  themeemotion?: Json; // FIXED: Added themeemotion field to replace entityemotion
+  themeemotion?: Json; // FIXED: Theme-emotion relationships from enhanced processing
 }
 
 export interface JournalEntryFormData extends JournalEntry {

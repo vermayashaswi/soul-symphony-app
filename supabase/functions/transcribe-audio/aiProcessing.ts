@@ -6,21 +6,21 @@ import { encode as base64Encode } from "https://deno.land/std@0.132.0/encoding/b
 import OpenAI from "https://esm.sh/openai@4.63.0";
 
 /**
- * Transcribe audio using OpenAI's Whisper API with enhanced error handling and retry logic
+ * Transcribe audio using OpenAI's Whisper API - FIXED: No language detection here
  * @param audioBlob - The audio blob to transcribe
  * @param fileType - The audio file type (webm, mp4, wav, etc.)
  * @param apiKey - The OpenAI API key
  * @param language - The language code or 'auto' for auto-detection
- * @returns Transcribed text and detected languages
+ * @returns Transcribed text only (language detection moved to translation step)
  */
 export async function transcribeAudioWithWhisper(
   audioBlob: Blob,
   fileType: string,
   apiKey: string,
   language: string = 'auto'
-): Promise<{ text: string; detectedLanguages: string[] }> {
+): Promise<{ text: string }> {
   try {
-    console.log("[Transcription] Starting enhanced Whisper transcription with retry logic");
+    console.log("[Transcription] FIXED: Starting Whisper transcription (no language detection)");
     
     // Initialize OpenAI client
     const openai = new OpenAI({
@@ -91,19 +91,15 @@ export async function transcribeAudioWithWhisper(
             throw new Error('Transcription returned empty result');
           }
           
-          // Analyze the text content for language patterns
-          const detectedLanguages = detectLanguagePatterns(transcribedText);
-          
-          console.log(`[Transcription] Success with model ${model} on attempt ${attempt}:`, {
+          console.log(`[Transcription] FIXED: Success with model ${model} on attempt ${attempt}:`, {
             textLength: transcribedText.length,
             sampleText: transcribedText.substring(0, 100) + "...",
-            model: model,
-            detectedLanguages: detectedLanguages.length > 0 ? detectedLanguages : ["unknown"]
+            model: model
           });
           
+          // FIXED: Return only transcribed text, no language detection
           return {
-            text: transcribedText,
-            detectedLanguages: detectedLanguages.length > 0 ? detectedLanguages : ["unknown"]
+            text: transcribedText
           };
           
         } catch (error: any) {
@@ -146,99 +142,44 @@ export async function transcribeAudioWithWhisper(
 }
 
 /**
- * Enhanced: Detect language patterns in text content
- */
-function detectLanguagePatterns(text: string): string[] {
-  const languages: string[] = [];
-  
-  // Simple pattern detection (can be enhanced)
-  const patterns = {
-    'es': /\b(el|la|los|las|un|una|y|o|de|en|con|por|para|que|es|son)\b/gi,
-    'fr': /\b(le|la|les|un|une|et|ou|de|en|avec|pour|que|est|sont)\b/gi,
-    'de': /\b(der|die|das|ein|eine|und|oder|von|in|mit|für|dass|ist|sind)\b/gi,
-    'it': /\b(il|la|i|le|un|una|e|o|di|in|con|per|che|è|sono)\b/gi,
-    'pt': /\b(o|a|os|as|um|uma|e|ou|de|em|com|para|que|é|são)\b/gi,
-    'ru': /[а-яё]/gi,
-    'ar': /[\u0600-\u06FF]/gi,
-    'zh': /[\u4e00-\u9fff]/gi,
-    'ja': /[\u3040-\u309f\u30a0-\u30ff]/gi,
-    'ko': /[\uac00-\ud7af]/gi,
-    'hi': /[\u0900-\u097f]/gi,
-    'ur': /[\u0600-\u06FF]/gi // Urdu uses Arabic script
-  };
-  
-  for (const [lang, pattern] of Object.entries(patterns)) {
-    if (pattern.test(text)) {
-      languages.push(lang);
-    }
-  }
-  
-  // If no specific language detected, default to English
-  if (languages.length === 0) {
-    languages.push('en');
-  }
-  
-  return languages;
-}
-
-/**
- * Enhanced: Translates and refines text with improved error handling
+ * FIXED: Translates and refines text with proper language detection
  */
 export async function translateAndRefineText(
   text: string, 
-  apiKey: string,
-  detectedLanguages: string[]
-): Promise<{ refinedText: string; preservedLanguages: string[] }> {
+  apiKey: string
+): Promise<{ refinedText: string; detectedLanguages: string[] }> {
   try {
-    console.log("[AI] Starting enhanced text refinement with retry logic:", text.substring(0, 100) + "...");
-    console.log("[AI] Input detected languages:", detectedLanguages);
+    console.log("[AI] FIXED: Starting text refinement with language detection");
+    console.log("[AI] Input text:", text.substring(0, 100) + "...");
     
     // Initialize OpenAI client
     const openai = new OpenAI({
       apiKey: apiKey,
     });
     
-    // Check if the detected language indicates non-English content
-    const isNonEnglish = !detectedLanguages.includes('en') && detectedLanguages[0] !== 'en';
-    const detectedLanguagesInfo = detectedLanguages.join(', ');
-    
-    // Enhanced prompt for mixed-language handling
-    const systemMessage = isNonEnglish 
-      ? `You are a multilingual translator and text refinement specialist. 
+    // FIXED: Enhanced prompt for language detection and refinement
+    const systemMessage = `You are a multilingual text refinement specialist. 
          
-         Your task is to:
-         1. If the text is primarily in a non-English language (${detectedLanguagesInfo}), translate it to natural, fluent English
-         2. Preserve any mixed-language content by noting the original languages
-         3. Improve grammar and clarity while maintaining the original meaning and tone
-         4. Do not add any explanation, interpretation, or additional context
-         
-         Return your response as a JSON object with this exact format:
-         {
-           "refined_text": "the translated/refined text in English",
-           "preserved_languages": ["list", "of", "detected", "languages"]
-         }
-         
-         The original languages detected were: ${detectedLanguagesInfo}.`
-      : `You are a text refinement specialist for English content.
-         
-         Your task is to:
-         1. Improve the grammar and sentence structure of the English text
-         2. Remove filler words only where it doesn't affect the speaker's intent
-         3. Keep tone and phrasing as close to the original as possible
-         4. Do not change the meaning or add new information
-         
-         Return your response as a JSON object with this exact format:
-         {
-           "refined_text": "the improved English text",
-           "preserved_languages": ["en"]
-         }`;
+Your task is to:
+1. Detect the primary language(s) used in the text
+2. If the text is in a non-English language, translate it to natural, fluent English
+3. If the text is already in English, improve grammar and clarity while maintaining the original meaning and tone
+4. Preserve any mixed-language content by noting the original languages
+
+Return your response as a JSON object with this exact format:
+{
+  "refined_text": "the translated/refined text in English",
+  "detected_languages": ["list", "of", "detected", "language", "codes"]
+}
+
+Language codes to use: en (English), es (Spanish), fr (French), de (German), it (Italian), pt (Portuguese), ru (Russian), ar (Arabic), zh (Chinese), ja (Japanese), ko (Korean), hi (Hindi), ur (Urdu), etc.`;
 
     // Retry logic for text refinement
     let lastError: Error | null = null;
     
     for (let attempt = 1; attempt <= 2; attempt++) {
       try {
-        console.log(`[AI] Text refinement attempt ${attempt}/2`);
+        console.log(`[AI] FIXED: Text refinement attempt ${attempt}/2`);
         
         const completion = await openai.chat.completions.create({
           model: "gpt-4o-mini",
@@ -266,33 +207,34 @@ export async function translateAndRefineText(
         try {
           const parsedResult = JSON.parse(result);
           const refinedText = parsedResult.refined_text || text;
-          const preservedLanguages = parsedResult.preserved_languages || detectedLanguages;
+          const detectedLanguages = Array.isArray(parsedResult.detected_languages) ? 
+            parsedResult.detected_languages.filter(lang => typeof lang === 'string' && lang.length > 0) : ['en'];
           
-          console.log("[AI] Text refined successfully:", {
+          console.log("[AI] FIXED: Text refined successfully:", {
             originalLength: text.length,
             refinedLength: refinedText.length,
             originalSample: text.substring(0, 100),
             refinedSample: refinedText.substring(0, 100),
-            preservedLanguages: preservedLanguages
+            detectedLanguages: detectedLanguages
           });
           
           return { 
             refinedText,
-            preservedLanguages 
+            detectedLanguages 
           };
         } catch (parseError) {
-          console.error("[AI] Failed to parse JSON response:", parseError);
+          console.error("[AI] FIXED: Failed to parse JSON response:", parseError);
           // Fallback to original approach
           const refinedText = result || text;
           return { 
             refinedText,
-            preservedLanguages: detectedLanguages 
+            detectedLanguages: ['en'] 
           };
         }
         
       } catch (error: any) {
         lastError = error;
-        console.error(`[AI] Text refinement attempt ${attempt}/2 failed:`, error.message);
+        console.error(`[AI] FIXED: Text refinement attempt ${attempt}/2 failed:`, error.message);
         
         // Check if this is a retryable error
         const isRetryableError = error.status >= 500 || 
@@ -305,22 +247,22 @@ export async function translateAndRefineText(
         
         // Wait before retry
         const waitTime = 2000; // 2 second wait
-        console.log(`[AI] Retrying text refinement in ${waitTime}ms...`);
+        console.log(`[AI] FIXED: Retrying text refinement in ${waitTime}ms...`);
         await new Promise(resolve => setTimeout(resolve, waitTime));
       }
     }
     
-    console.error("[AI] Text refinement failed after all attempts:", lastError?.message);
+    console.error("[AI] FIXED: Text refinement failed after all attempts:", lastError?.message);
     return { 
       refinedText: text,
-      preservedLanguages: detectedLanguages 
+      detectedLanguages: ['en'] 
     };
     
   } catch (error) {
-    console.error("[AI] Text refinement error:", error);
+    console.error("[AI] FIXED: Text refinement error:", error);
     return { 
       refinedText: text,
-      preservedLanguages: detectedLanguages 
+      detectedLanguages: ['en'] 
     };
   }
 }

@@ -261,6 +261,7 @@ serve(async (req) => {
     }
     
     // FIXED: Store categories in entities column (maintaining current architecture)
+    // NOTE: This maintains consistency until entities are properly extracted via sentiment analysis
     if (categories && Array.isArray(categories) && categories.length > 0) {
       updates["entities"] = categories;
     } else {
