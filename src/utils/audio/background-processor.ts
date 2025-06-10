@@ -33,7 +33,7 @@ function validateAudioBlob(audioBlob: Blob): { valid: boolean; error?: string } 
 }
 
 /**
- * Enhanced process recording with comprehensive error handling and validation
+ * Enhanced process recording with comprehensive error handling and robust retry logic
  */
 export async function processRecordingInBackground(
   audioBlob: Blob,
@@ -98,16 +98,18 @@ export async function processRecordingInBackground(
     
     console.log(`[BackgroundProcessor] ENHANCED: Successfully converted audio to base64, length: ${base64Audio.length}`);
     
-    // Step 5: Enhanced transcription with timeout and retry logic
+    // Step 5: Enhanced transcription with aggressive retry logic for server errors
     console.log('[BackgroundProcessor] ENHANCED: Sending audio to transcription service');
     const transcriptionStart = Date.now();
     
     let transcriptionResult;
     let retryCount = 0;
-    const maxRetries = 2;
+    const maxRetries = 3; // Increased retries for server issues
     
     while (retryCount <= maxRetries) {
       try {
+        console.log(`[BackgroundProcessor] ENHANCED: Transcription attempt ${retryCount + 1}/${maxRetries + 1}`);
+        
         transcriptionResult = await Promise.race([
           sendAudioForTranscription(
             base64Audio, 
@@ -117,7 +119,7 @@ export async function processRecordingInBackground(
             normalizedDuration
           ),
           new Promise<never>((_, reject) => 
-            setTimeout(() => reject(new Error('Transcription service timeout')), 120000) // 2 minute timeout
+            setTimeout(() => reject(new Error('Transcription service timeout')), 180000) // 3 minute timeout
           )
         ]);
         
@@ -130,13 +132,39 @@ export async function processRecordingInBackground(
         retryCount++;
         console.error(`[BackgroundProcessor] ENHANCED: Transcription attempt ${retryCount} failed:`, error.message);
         
+        // Enhanced error classification for better retry decisions
+        const isServerError = error.message.includes('500') || 
+                             error.message.includes('server error') ||
+                             error.message.includes('internal error') ||
+                             error.message.includes('timeout') ||
+                             error.message.includes('request_timeout');
+        
+        const isAuthError = error.message.includes('authentication') || 
+                           error.message.includes('authorization') ||
+                           error.message.includes('401') ||
+                           error.message.includes('403');
+        
+        const isInvalidDataError = error.message.includes('Invalid audio data') ||
+                                  error.message.includes('validation failed');
+        
+        // Don't retry on authentication or data validation errors
+        if (isAuthError || isInvalidDataError) {
+          console.log('[BackgroundProcessor] ENHANCED: Non-retryable error detected, stopping');
+          break;
+        }
+        
+        // Always retry server errors
         if (retryCount > maxRetries) {
+          console.error('[BackgroundProcessor] ENHANCED: Max retries exceeded');
           throw error;
         }
         
-        // Wait before retry (exponential backoff)
-        const waitTime = Math.pow(2, retryCount) * 1000; // 2s, 4s, 8s...
-        console.log(`[BackgroundProcessor] ENHANCED: Retrying in ${waitTime}ms...`);
+        // Exponential backoff with jitter for server errors
+        const baseWaitTime = Math.pow(2, retryCount) * 2000; // 2s, 4s, 8s, 16s...
+        const jitter = Math.random() * 1000; // Add up to 1s jitter
+        const waitTime = baseWaitTime + jitter;
+        
+        console.log(`[BackgroundProcessor] ENHANCED: Retrying in ${Math.round(waitTime)}ms... (Server error detected: ${isServerError})`);
         await new Promise(resolve => setTimeout(resolve, waitTime));
       }
     }
@@ -185,7 +213,8 @@ export async function processRecordingInBackground(
       languages: transcriptionResult.data?.languages || [],
       processingTime: totalTime,
       audioSize: audioBlob.size,
-      retryCount
+      retryCount,
+      success: true
     };
     
     window.dispatchEvent(new CustomEvent('journalEntriesNeedRefresh', {
@@ -204,28 +233,37 @@ export async function processRecordingInBackground(
     console.error('[BackgroundProcessor] ENHANCED: Error in background processing:', error);
     console.error('[BackgroundProcessor] ENHANCED: Processing failed after:', totalTime, 'ms');
     
-    // Enhanced error classification
+    // Enhanced error classification for user feedback
     let errorType = 'unknown';
+    let userFriendlyMessage = error.message;
+    
     if (error.message.includes('timeout')) {
       errorType = 'timeout';
+      userFriendlyMessage = 'Processing took too long - please try with a shorter recording';
     } else if (error.message.includes('validation')) {
       errorType = 'validation';
+      userFriendlyMessage = 'Invalid audio format - please try recording again';
     } else if (error.message.includes('conversion')) {
       errorType = 'conversion';
-    } else if (error.message.includes('transcription')) {
-      errorType = 'transcription';
+      userFriendlyMessage = 'Audio conversion failed - please try recording again';
+    } else if (error.message.includes('server error') || error.message.includes('500')) {
+      errorType = 'server_error';
+      userFriendlyMessage = 'OpenAI servers are experiencing issues - please try again in a moment';
     } else if (error.message.includes('network') || error.message.includes('fetch')) {
       errorType = 'network';
+      userFriendlyMessage = 'Network connection issue - please check your connection and try again';
     }
     
     // Enhanced failure notification with error details
     const failureDetail = {
       tempId,
-      error: error.message,
+      error: userFriendlyMessage,
+      originalError: error.message,
       errorType,
       timestamp: Date.now(),
       processingTime: totalTime,
-      audioSize: audioBlob?.size || 0
+      audioSize: audioBlob?.size || 0,
+      success: false
     };
     
     window.dispatchEvent(new CustomEvent('processingEntryFailed', {
@@ -234,7 +272,7 @@ export async function processRecordingInBackground(
     
     return {
       success: false,
-      error: error.message || 'Unknown error in background processing'
+      error: userFriendlyMessage
     };
   }
 }
