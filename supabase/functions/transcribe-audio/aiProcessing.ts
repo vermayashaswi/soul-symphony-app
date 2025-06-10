@@ -1,3 +1,4 @@
+
 // Import necessary Deno modules
 import { encode as base64Encode } from "https://deno.land/std@0.132.0/encoding/base64.ts";
 
@@ -38,7 +39,7 @@ export async function transcribeAudioWithWhisper(
     // Create form data to send to the OpenAI API
     const formData = new FormData();
     formData.append("file", new Blob([audioBytes], { type: audioBlob.type }), filename);
-    formData.append("model", "whisper-1"); // FIXED: Use correct Whisper model name
+    formData.append("model", "gpt-4o-transcribe"); // CHANGED: Back to gpt-4o-transcribe as requested
     
     // Always use auto-detection for better language detection
     // Only add language parameter if it's not 'auto'
@@ -46,7 +47,7 @@ export async function transcribeAudioWithWhisper(
       formData.append("language", language);
     }
     
-    // FIXED: Use json response format that's compatible with whisper-1
+    // Use json response format
     formData.append("response_format", "json");
     
     console.log("[Transcription] Sending request to OpenAI with:", {
@@ -54,7 +55,7 @@ export async function transcribeAudioWithWhisper(
       fileType: audioBlob.type,
       fileExtension,
       hasApiKey: !!apiKey,
-      model: "whisper-1",
+      model: "gpt-4o-transcribe",
       autoLanguageDetection: language === 'auto',
       responseFormat: "json"
     });
@@ -93,7 +94,7 @@ export async function transcribeAudioWithWhisper(
     console.log("[Transcription] Success:", {
       textLength: transcribedText.length,
       sampleText: transcribedText.substring(0, 50) + "...",
-      model: "whisper-1",
+      model: "gpt-4o-transcribe",
       detectedLanguage: detectedLanguages[0] || 'unknown',
       allDetectedLanguages: detectedLanguages
     });
