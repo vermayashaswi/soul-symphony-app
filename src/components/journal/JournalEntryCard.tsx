@@ -43,7 +43,7 @@ export function JournalEntryCard({
     created_at: entry?.created_at || new Date().toISOString(),
     sentiment: entry?.sentiment || null,
     master_themes: Array.isArray(entry?.master_themes) ? entry.master_themes : [],
-    themes: Array.isArray(entry?.themes) ? entry.themes : [],
+    themes: Array.isArray(entry?.themes) ? entry.themes : [], // FIXED: Include themes array
     Edit_Status: entry?.Edit_Status || null,
     user_feedback: entry?.user_feedback || null,
     translation_text: entry?.translation_text,
@@ -95,20 +95,29 @@ export function JournalEntryCard({
   
   const extractThemes = (): string[] => {
     try {
+      // FIXED: Prioritize themes column for display (specific themes)
+      const specificThemes = Array.isArray(safeEntry.themes) ? safeEntry.themes : [];
       const masterThemes = Array.isArray(safeEntry.master_themes) ? safeEntry.master_themes : [];
-      const entryThemes = Array.isArray(safeEntry.themes) ? safeEntry.themes : [];
       
-      const filteredMasterThemes = masterThemes.filter(theme => 
+      // Filter specific themes first
+      const filteredSpecificThemes = specificThemes.filter(theme => 
         theme && typeof theme === 'string' && theme.trim() !== '' && theme !== '•'
       );
-      const filteredEntryThemes = entryThemes.filter(theme => 
+      
+      // If we have specific themes, use those
+      if (filteredSpecificThemes.length > 0) {
+        console.log('[JournalEntryCard] Using specific themes for display:', filteredSpecificThemes);
+        return filteredSpecificThemes;
+      }
+      
+      // Fallback to master_themes for backward compatibility
+      const filteredMasterThemes = masterThemes.filter(theme => 
         theme && typeof theme === 'string' && theme.trim() !== '' && theme !== '•'
       );
       
       if (filteredMasterThemes.length > 0) {
+        console.log('[JournalEntryCard] Fallback to master_themes for display:', filteredMasterThemes);
         return filteredMasterThemes;
-      } else if (filteredEntryThemes.length > 0) {
-        return filteredEntryThemes;
       }
       
       return [];

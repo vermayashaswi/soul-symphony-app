@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { ThemeBoxes } from '../ThemeBoxes';
 import { supabase } from '@/integrations/supabase/client';
@@ -17,7 +16,8 @@ interface ThemeLoaderProps {
 interface EntryData {
   id: number;
   original_language?: string;
-  master_themes?: string[];
+  themes?: string[]; // FIXED: Changed from master_themes to themes
+  master_themes?: string[]; // Keep for backward compatibility
   // Other fields that might be returned
   [key: string]: any;
 }
@@ -37,6 +37,7 @@ export function ThemeLoader({ entryId, initialThemes = [], content, isProcessing
         setLoading(true);
         setError(null);
 
+        // FIXED: Select both themes and master_themes to handle transition period
         const { data, error } = await supabase
           .from('Journal Entries')
           .select('*')  // Select all columns to ensure we get what's available
@@ -58,13 +59,24 @@ export function ThemeLoader({ entryId, initialThemes = [], content, isProcessing
             setEntryLanguage(entryData.original_language);
           }
           
-          // Check if master_themes exists in the response
-          if (Array.isArray(entryData.master_themes)) {
-            const filteredThemes = entryData.master_themes.filter(theme => 
+          // FIXED: Prioritize themes column for display (specific themes)
+          let displayThemes: string[] = [];
+          
+          if (Array.isArray(entryData.themes) && entryData.themes.length > 0) {
+            // Use specific themes from themes column
+            displayThemes = entryData.themes.filter(theme => 
               theme && typeof theme === 'string' && theme.trim() !== '' && theme !== '•'
             );
-            setThemes(filteredThemes);
+            console.log('[ThemeLoader] Using specific themes from themes column:', displayThemes);
+          } else if (Array.isArray(entryData.master_themes) && entryData.master_themes.length > 0) {
+            // Fallback to master_themes for backward compatibility
+            displayThemes = entryData.master_themes.filter(theme => 
+              theme && typeof theme === 'string' && theme.trim() !== '' && theme !== '•'
+            );
+            console.log('[ThemeLoader] Fallback to master_themes:', displayThemes);
           }
+          
+          setThemes(displayThemes);
         }
       } catch (err) {
         console.error('Exception in theme loading:', err);

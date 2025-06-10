@@ -249,14 +249,21 @@ serve(async (req) => {
       themeemotionKeys: Object.keys(themeemotion)
     });
 
-    // FIXED: Update ONLY theme-related columns - NO entity manipulation
+    // FIXED: Update ONLY theme-related columns - Store CATEGORIES in master_themes
     const updates = {};
     
-    // FIXED: Store themes in master_themes column
-    if (themes && Array.isArray(themes) && themes.length > 0) {
-      updates["master_themes"] = themes;
+    // FIXED: Store CATEGORIES in master_themes column (this is the key fix)
+    if (categories && Array.isArray(categories) && categories.length > 0) {
+      updates["master_themes"] = categories; // Store categories, not themes
     } else {
-      updates["master_themes"] = ['Personal', 'Reflection', 'Experience'];
+      updates["master_themes"] = ['Self & Identity']; // Default category
+    }
+    
+    // FIXED: Store specific themes in themes column for display
+    if (themes && Array.isArray(themes) && themes.length > 0) {
+      updates["themes"] = themes; // Store specific themes for display
+    } else {
+      updates["themes"] = ['Personal', 'Reflection']; // Default themes
     }
     
     // FIXED: Store theme-emotion analysis in themeemotion column
@@ -277,7 +284,7 @@ serve(async (req) => {
       if (error) {
         console.error(`[generate-themes] FIXED: Error updating entry ${entryIdToUpdate}:`, error);
       } else {
-        console.log(`[generate-themes] FIXED: Successfully updated entry ${entryIdToUpdate} with themes only`);
+        console.log(`[generate-themes] FIXED: Successfully updated entry ${entryIdToUpdate} with categories in master_themes`);
       }
     }
 
@@ -288,7 +295,7 @@ serve(async (req) => {
         categories, // Return categories directly
         themeemotion,
         processed_at: new Date().toISOString(),
-        note: "This function only handles themes and categories. Entities are handled by analyze-sentiment."
+        note: "FIXED: Categories are now stored in master_themes, themes stored in themes column for display"
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
