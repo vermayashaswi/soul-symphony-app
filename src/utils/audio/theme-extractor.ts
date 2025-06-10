@@ -31,16 +31,14 @@ export const triggerThemeExtraction = async (entryId: number): Promise<boolean> 
 };
 
 /**
- * Triggers background processing for a journal entry after text edit
- * This function initiates the same analysis processes that happen after voice transcription
- * but skips the audio processing steps since we already have text
+ * FIXED: Triggers background processing for a journal entry after text edit
+ * This function initiates analysis processes but ensures no entity conflicts
  */
 export const triggerFullTextProcessing = async (entryId: number): Promise<void> => {
   console.log(`[theme-extractor] Triggering full text processing for entry: ${entryId}`);
   
   try {
-    // Step 1: First, trigger theme extraction with the "fromEdit" flag set to true
-    // This ensures themes get regenerated completely for edited text
+    // Step 1: Trigger theme extraction (themes and categories only)
     const { data: themeData, error: themeError } = await supabase.functions.invoke('generate-themes', {
       body: { 
         entryId: entryId,
@@ -54,44 +52,26 @@ export const triggerFullTextProcessing = async (entryId: number): Promise<void> 
       console.log("[theme-extractor] Theme extraction triggered successfully:", themeData);
     }
 
-    // Step 2: Trigger entity extraction
+    // Step 2: FIXED: Trigger sentiment analysis WITH entity extraction
+    // This ensures entities are extracted by the sentiment analysis function only
     try {
-      console.log("[theme-extractor] Starting entity extraction for entry:", entryId);
-      const { error: entitiesError } = await supabase.functions.invoke('batch-extract-entities', {
+      const { error: sentimentError } = await supabase.functions.invoke('analyze-sentiment', {
         body: {
-          processAll: false,
-          diagnosticMode: false,
-          entryIds: [entryId]  // Pass as array to match expected format
-        }
-      });
-      
-      if (entitiesError) {
-        console.error("[theme-extractor] Error invoking batch-extract-entities:", entitiesError);
-      } else {
-        console.log("[theme-extractor] Successfully triggered entity extraction");
-      }
-    } catch (entityErr) {
-      console.error("[theme-extractor] Error starting entity extraction:", entityErr);
-    }
-
-    // Step 3: Trigger sentiment analysis
-    try {
-      const { error: sentimentError } = await supabase.functions.invoke('batch-analyze-sentiment', {
-        body: {
-          entryIds: [entryId]
+          entryId: entryId,
+          extractEntities: true // FIXED: Ensure entity extraction happens here
         }
       });
       
       if (sentimentError) {
-        console.error("[theme-extractor] Error triggering sentiment analysis:", sentimentError);
+        console.error("[theme-extractor] Error triggering sentiment analysis with entity extraction:", sentimentError);
       } else {
-        console.log("[theme-extractor] Sentiment analysis triggered successfully");
+        console.log("[theme-extractor] Sentiment analysis with entity extraction triggered successfully");
       }
     } catch (sentimentErr) {
-      console.error("[theme-extractor] Error starting sentiment analysis:", sentimentErr);
+      console.error("[theme-extractor] Error starting sentiment analysis with entity extraction:", sentimentErr);
     }
     
-    // Step 4: Trigger emotions analysis (using the same API endpoint used for new recordings)
+    // Step 3: Trigger emotions analysis
     try {
       const { data: entryData, error: fetchError } = await supabase
         .from('Journal Entries')
@@ -102,8 +82,6 @@ export const triggerFullTextProcessing = async (entryId: number): Promise<void> 
       if (fetchError || !entryData || !entryData["refined text"]) {
         console.error("[theme-extractor] Error fetching entry text for emotions analysis:", fetchError);
       } else {
-        // Call the OpenAI API through the edge function for emotions analysis
-        // This is the same endpoint used for new recordings
         const { error: emotionsError } = await supabase.functions.invoke('analyze-emotions', {
           body: {
             entryId: entryId,

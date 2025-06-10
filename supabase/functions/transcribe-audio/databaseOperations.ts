@@ -87,7 +87,7 @@ export async function createProfileIfNeeded(supabase: SupabaseClient, userId: st
 
 /**
  * FIXED: Extracts themes from text and triggers comprehensive theme generation
- * This function now handles both themes and entity extraction in one place
+ * This function now handles ONLY themes - entity extraction is done via sentiment analysis
  */
 export async function extractThemes(supabase: SupabaseClient, text: string, entryId: number) {
   try {
@@ -96,7 +96,7 @@ export async function extractThemes(supabase: SupabaseClient, text: string, entr
     const matches = text.match(themeRegex);
     const themes = [...new Set(matches ? matches.map(theme => theme.toLowerCase()) : [])];
 
-    console.log(`FIXED: Extracted themes: ${themes.join(', ')}`);
+    console.log(`FIXED: Extracted basic themes: ${themes.join(', ')}`);
 
     // Store themes in the database immediately if any were found
     if (themes.length > 0) {
@@ -112,9 +112,9 @@ export async function extractThemes(supabase: SupabaseClient, text: string, entr
       }
     }
     
-    // FIXED: Trigger the comprehensive theme and entity generation edge function
+    // FIXED: Trigger comprehensive theme generation (themes and categories ONLY)
     try {
-      console.log(`FIXED: Triggering comprehensive theme and entity generation for entry ${entryId}`);
+      console.log(`FIXED: Triggering theme generation (NO entity extraction) for entry ${entryId}`);
       
       const { error: themeError } = await supabase.functions.invoke('generate-themes', {
         body: { 
@@ -126,7 +126,7 @@ export async function extractThemes(supabase: SupabaseClient, text: string, entr
       if (themeError) {
         console.error("[extractThemes] FIXED: Error invoking generate-themes function:", themeError);
       } else {
-        console.log("[extractThemes] FIXED: Successfully triggered theme and entity generation");
+        console.log("[extractThemes] FIXED: Successfully triggered theme generation (themes only)");
       }
     } catch (genErr) {
       console.error("[extractThemes] FIXED: Error in theme generation trigger:", genErr);
@@ -137,8 +137,8 @@ export async function extractThemes(supabase: SupabaseClient, text: string, entr
 }
 
 /**
- * FIXED: Stores a journal entry in the database and triggers related processing
- * Entity extraction is now moved to the sentiment analysis step
+ * FIXED: Stores a journal entry and triggers sentiment analysis with entity extraction
+ * Entity extraction is now handled ONLY by the sentiment analysis function
  */
 export async function storeJournalEntry(
   supabase: SupabaseClient,
@@ -188,15 +188,15 @@ export async function storeJournalEntry(
 
     console.log('[storeJournalEntry] FIXED: Successfully stored entry with ID:', data.id);
     
-    // FIXED: Enhanced sentiment analysis that also handles entity extraction
+    // FIXED: Trigger sentiment analysis with entity extraction (this is the ONLY place entities are extracted)
     try {
-      console.log(`[storeJournalEntry] FIXED: Triggering enhanced sentiment analysis with entity extraction for entry ${data.id}`);
+      console.log(`[storeJournalEntry] FIXED: Triggering sentiment analysis WITH entity extraction for entry ${data.id}`);
       
       const { error: sentimentError } = await supabase.functions.invoke('analyze-sentiment', {
         body: { 
           text: refinedText, 
           entryId: data.id,
-          extractEntities: true // FIXED: Add flag to trigger entity extraction
+          extractEntities: true // FIXED: This ensures entity extraction happens HERE
         }
       });
       
