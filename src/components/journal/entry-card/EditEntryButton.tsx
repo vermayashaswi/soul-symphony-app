@@ -27,6 +27,7 @@ export function EditEntryButton({ entryId, content, onEntryUpdated }: EditEntryB
   const [isProcessing, setIsProcessing] = useState(false);
   const [updatedInBackground, setUpdatedInBackground] = useState(false);
   const [isLoadingTranslation, setIsLoadingTranslation] = useState(false);
+  const [isTranslatingForSave, setIsTranslatingForSave] = useState(false);
   const isMobile = useIsMobile();
   const { currentLanguage, translate, getCachedTranslation } = useTranslation();
 
@@ -58,6 +59,45 @@ export function EditEntryButton({ entryId, content, onEntryUpdated }: EditEntryB
     }
   };
 
+  // Function to translate edited content back to English for database storage
+  const translateToEnglishForSave = async (editedText: string): Promise<string> => {
+    if (currentLanguage === 'en') {
+      return editedText;
+    }
+
+    try {
+      setIsTranslatingForSave(true);
+      console.log('[EditEntryButton] Translating edited content back to English for database storage');
+      
+      // Use Supabase edge function to translate back to English
+      const { data, error } = await supabase.functions.invoke('translate-text', {
+        body: {
+          text: editedText,
+          sourceLanguage: currentLanguage,
+          targetLanguage: 'en',
+          cleanResult: true
+        }
+      });
+
+      if (error) {
+        console.error('[EditEntryButton] Error translating to English:', error);
+        throw new Error('Translation to English failed');
+      }
+
+      if (data && data.translatedText) {
+        console.log('[EditEntryButton] Successfully translated to English for storage');
+        return data.translatedText;
+      }
+
+      throw new Error('No translated text returned');
+    } catch (error) {
+      console.error('[EditEntryButton] Error in translateToEnglishForSave:', error);
+      throw error;
+    } finally {
+      setIsTranslatingForSave(false);
+    }
+  };
+
   const handleOpenDialog = async () => {
     setIsDialogOpen(true);
     setUpdatedInBackground(false);
@@ -84,39 +124,48 @@ export function EditEntryButton({ entryId, content, onEntryUpdated }: EditEntryB
       
       let contentToSave = editedContent;
       
-      // If editing in a non-English language, we need to handle translation caching
+      // If editing in a non-English language, translate back to English for database storage
       if (currentLanguage !== 'en') {
+        try {
+          contentToSave = await translateToEnglishForSave(editedContent);
+          console.log('[EditEntryButton] Translated content for database storage:', {
+            original: editedContent.substring(0, 50) + '...',
+            translated: contentToSave.substring(0, 50) + '...'
+          });
+        } catch (translationError) {
+          console.error('[EditEntryButton] Failed to translate to English, using original content:', translationError);
+          await showTranslatedToast(
+            'toasts.error',
+            'toasts.translationFailed',
+            translate
+          );
+          setIsSubmitting(false);
+          return;
+        }
+        
         // Cache the edited translation for consistency in the UI
         const { translationCache } = await import('@/services/translationCache');
         await translationCache.setTranslation({
-          originalText: content,
-          translatedText: editedContent,
+          originalText: contentToSave, // Store the English version as original
+          translatedText: editedContent, // Store the edited version as translation
           language: currentLanguage,
           timestamp: Date.now(),
           version: 1,
         });
         
-        // For database storage, we save the original English content
-        // The user edited in Spanish, but we keep English as the source of truth
-        contentToSave = content;
-        
-        console.log('[EditEntryButton] Cached edited translation:', {
-          originalText: content.substring(0, 50) + '...',
-          translatedText: editedContent.substring(0, 50) + '...',
-          language: currentLanguage
-        });
+        console.log('[EditEntryButton] Cached edited translation for UI consistency');
       }
       
       // Always update UI immediately with the edited content (what the user sees)
       onEntryUpdated(editedContent, true);
       setIsProcessing(true);
       
-      // Update the database with the appropriate content
+      // Update the database with the English content
       const { error: updateError } = await supabase
         .from('Journal Entries')
         .update({ 
-          "refined text": currentLanguage === 'en' ? editedContent : content,
-          "transcription text": currentLanguage === 'en' ? editedContent : content,
+          "refined text": contentToSave,
+          "transcription text": contentToSave,
           "Edit_Status": 1
         })
         .eq('id', entryId);
@@ -142,25 +191,23 @@ export function EditEntryButton({ entryId, content, onEntryUpdated }: EditEntryB
       window.dispatchEvent(new CustomEvent('journalEntryUpdated', {
         detail: { 
           entryId: entryId,
-          newContent: currentLanguage === 'en' ? editedContent : content,
-          displayContent: editedContent,
+          newContent: contentToSave, // English content for processing
+          displayContent: editedContent, // User's edited content for display
           isProcessing: true
         }
       }));
       
       try {
-        // Only reprocess if we actually changed the English content
-        if (currentLanguage === 'en' && editedContent !== content) {
-          const success = await reprocessJournalEntry(entryId);
-          
-          if (!success) {
-            console.error('Reprocessing failed for entry:', entryId);
-            await showTranslatedToast(
-              'toasts.error',
-              'toasts.processingError',
-              translate
-            );
-          }
+        // Always reprocess since we changed the English content
+        const success = await reprocessJournalEntry(entryId);
+        
+        if (!success) {
+          console.error('Reprocessing failed for entry:', entryId);
+          await showTranslatedToast(
+            'toasts.error',
+            'toasts.processingError',
+            translate
+          );
         }
         
         // Ensure minimum processing time for UX consistency
@@ -182,19 +229,11 @@ export function EditEntryButton({ entryId, content, onEntryUpdated }: EditEntryB
         setIsSubmitting(false);
         setIsProcessing(false);
         
-        if (currentLanguage === 'en') {
-          await showTranslatedToast(
-            'toasts.success',
-            'toasts.entryUpdated',
-            translate
-          );
-        } else {
-          await showTranslatedToast(
-            'toasts.success',
-            'toasts.translationUpdated',
-            translate
-          );
-        }
+        await showTranslatedToast(
+          'toasts.success',
+          'toasts.entryUpdated',
+          translate
+        );
         
       } catch (processingError) {
         console.error('Processing failed:', processingError);
@@ -230,6 +269,8 @@ export function EditEntryButton({ entryId, content, onEntryUpdated }: EditEntryB
       return editedContent !== (cachedTranslation || content);
     }
   }, [editedContent, content, currentLanguage, getCachedTranslation]);
+
+  const isAnyLoading = isLoadingTranslation || isTranslatingForSave;
 
   return (
     <>
@@ -271,7 +312,7 @@ export function EditEntryButton({ entryId, content, onEntryUpdated }: EditEntryB
             </DialogTitle>
           </DialogHeader>
           
-          {isLoadingTranslation ? (
+          {isAnyLoading ? (
             <div className="flex items-center justify-center min-h-[200px] py-8">
               <div className="flex flex-col items-center space-y-3">
                 <Loader2 className="h-6 w-6 animate-spin" />
@@ -280,7 +321,7 @@ export function EditEntryButton({ entryId, content, onEntryUpdated }: EditEntryB
                   currentLanguage !== 'en' && "text-xs"
                 )}>
                   <EnhancedTranslatableText 
-                    text="Loading translation..." 
+                    text={isTranslatingForSave ? "Preparing to save..." : "Loading translation..."} 
                     forceTranslate={true}
                     enableFontScaling={true}
                     scalingContext="compact"
@@ -360,7 +401,7 @@ export function EditEntryButton({ entryId, content, onEntryUpdated }: EditEntryB
             ) : (
               <Button 
                 onClick={handleSaveChanges}
-                disabled={!editedContent.trim() || !hasContentChanged || isLoadingTranslation}
+                disabled={!editedContent.trim() || !hasContentChanged || isAnyLoading}
                 className={cn(
                   "rounded-full w-full sm:w-auto",
                   "h-10 px-4 text-sm",
