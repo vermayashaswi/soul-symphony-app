@@ -1,9 +1,8 @@
-
 // Import necessary Deno modules
 import { encode as base64Encode } from "https://deno.land/std@0.132.0/encoding/base64.ts";
 
 /**
- * Transcribe audio using OpenAI's Whisper API
+ * Transcribe audio using OpenAI's Whisper API with enhanced language detection
  * @param audioBlob - The audio blob to transcribe
  * @param fileType - The audio file type (webm, mp4, wav, etc.)
  * @param apiKey - The OpenAI API key
@@ -17,6 +16,8 @@ export async function transcribeAudioWithWhisper(
   language: string = 'auto'
 ): Promise<{ text: string; detectedLanguages: string[] }> {
   try {
+    console.log("[Transcription] Starting enhanced Whisper transcription");
+    
     // Determine the appropriate filename extension based on audio type
     const fileExtension = fileType === 'webm' ? 'webm' : 
                          fileType === 'mp4' ? 'm4a' :
@@ -39,7 +40,8 @@ export async function transcribeAudioWithWhisper(
     // Create form data to send to the OpenAI API
     const formData = new FormData();
     formData.append("file", new Blob([audioBytes], { type: audioBlob.type }), filename);
-    formData.append("model", "gpt-4o-transcribe");
+    formData.append("model", "whisper-1");
+    formData.append("response_format", "verbose_json"); // ENHANCED: Get detailed response with language info
     
     // Only add language parameter if it's not 'auto'
     if (language !== 'auto') {
@@ -51,7 +53,8 @@ export async function transcribeAudioWithWhisper(
       fileType: audioBlob.type,
       fileExtension,
       hasApiKey: !!apiKey,
-      model: "gpt-4o-transcribe",
+      model: "whisper-1",
+      responseFormat: "verbose_json",
       autoLanguageDetection: language === 'auto'
     });
     
@@ -76,14 +79,56 @@ export async function transcribeAudioWithWhisper(
     // Get the transcribed text from the result
     const transcribedText = result.text || "";
     
-    // Get detected languages from the API response
-    const detectedLanguages = result.language ? [result.language] : ["unknown"];
+    // ENHANCED: Extract language information from verbose response
+    let detectedLanguages: string[] = [];
+    
+    if (result.language) {
+      // Primary detected language from Whisper
+      detectedLanguages = [result.language];
+      console.log("[Transcription] Primary language detected:", result.language);
+    }
+    
+    // ENHANCED: Analyze segments for multi-language detection
+    if (result.segments && Array.isArray(result.segments)) {
+      const segmentLanguages = new Set<string>();
+      
+      result.segments.forEach((segment: any) => {
+        // Look for language indicators in segment metadata
+        if (segment.language) {
+          segmentLanguages.add(segment.language);
+        }
+        // Analyze text patterns for language hints
+        if (segment.text) {
+          const segmentLangs = detectLanguagePatterns(segment.text);
+          segmentLangs.forEach(lang => segmentLanguages.add(lang));
+        }
+      });
+      
+      // Combine with primary language
+      const allLanguages = Array.from(segmentLanguages);
+      if (allLanguages.length > 0) {
+        // Merge with primary language, keeping primary first
+        detectedLanguages = result.language ? 
+          [result.language, ...allLanguages.filter(l => l !== result.language)] :
+          allLanguages;
+      }
+    }
+    
+    // Fallback if no language detected
+    if (detectedLanguages.length === 0) {
+      // Analyze the text content for language patterns
+      detectedLanguages = detectLanguagePatterns(transcribedText);
+      if (detectedLanguages.length === 0) {
+        detectedLanguages = ["unknown"];
+      }
+    }
     
     console.log("[Transcription] Success:", {
       textLength: transcribedText.length,
-      sampleText: transcribedText.substring(0, 50) + "...",
-      model: "gpt-4o-transcribe",
-      detectedLanguage: detectedLanguages[0]
+      sampleText: transcribedText.substring(0, 100) + "...",
+      model: "whisper-1",
+      detectedLanguages: detectedLanguages,
+      hasSegments: !!result.segments
     });
     
     return {
@@ -97,28 +142,83 @@ export async function transcribeAudioWithWhisper(
 }
 
 /**
- * Translates and refines text using GPT-4 
+ * ENHANCED: Detect language patterns in text content
+ */
+function detectLanguagePatterns(text: string): string[] {
+  const languages: string[] = [];
+  
+  // Simple pattern detection (can be enhanced)
+  const patterns = {
+    'es': /\b(el|la|los|las|un|una|y|o|de|en|con|por|para|que|es|son)\b/gi,
+    'fr': /\b(le|la|les|un|une|et|ou|de|en|avec|pour|que|est|sont)\b/gi,
+    'de': /\b(der|die|das|ein|eine|und|oder|von|in|mit|für|dass|ist|sind)\b/gi,
+    'it': /\b(il|la|i|le|un|una|e|o|di|in|con|per|che|è|sono)\b/gi,
+    'pt': /\b(o|a|os|as|um|uma|e|ou|de|em|com|para|que|é|são)\b/gi,
+    'ru': /[а-яё]/gi,
+    'ar': /[\u0600-\u06FF]/gi,
+    'zh': /[\u4e00-\u9fff]/gi,
+    'ja': /[\u3040-\u309f\u30a0-\u30ff]/gi,
+    'ko': /[\uac00-\ud7af]/gi,
+    'hi': /[\u0900-\u097f]/gi
+  };
+  
+  for (const [lang, pattern] of Object.entries(patterns)) {
+    if (pattern.test(text)) {
+      languages.push(lang);
+    }
+  }
+  
+  return languages;
+}
+
+/**
+ * ENHANCED: Translates and refines text with language preservation
  * Handles translation to English if needed and improves transcription quality
+ * Returns both refined text and preserved language information
  */
 export async function translateAndRefineText(
   text: string, 
   apiKey: string,
   detectedLanguages: string[]
-): Promise<{ refinedText: string; }> {
+): Promise<{ refinedText: string; preservedLanguages: string[] }> {
   try {
-    console.log("[AI] Starting text refinement:", text.substring(0, 50) + "...");
-    console.log("[AI] Detected languages:", detectedLanguages);
+    console.log("[AI] Starting enhanced text refinement:", text.substring(0, 100) + "...");
+    console.log("[AI] Input detected languages:", detectedLanguages);
     
     // Check if the detected language indicates non-English content
-    // We never default to 'en' here - we only use what the transcription model detected
-    const isNonEnglish = detectedLanguages[0] !== 'en';
+    const isNonEnglish = !detectedLanguages.includes('en') && detectedLanguages[0] !== 'en';
     const detectedLanguagesInfo = detectedLanguages.join(', ');
     
-    // Call the OpenAI API with the appropriate system message
-    // Include detected language information in both prompts
+    // ENHANCED: Create a more sophisticated prompt for mixed-language handling
     const systemMessage = isNonEnglish 
-      ? `You are a multilingual translator. Translate the following text exactly into natural, fluent English. Do not add any explanation, interpretation, or additional context. Preserve all original meaning, tone, and emotion as closely as possible. The original language was detected as: ${detectedLanguagesInfo}.`
-      : `You are a transcription refinement assistant. Improve the grammar and sentence structure of the following English text without changing its meaning. Do not add, infer, or rephrase anything beyond clarity and correctness. Remove filler words only where it doesn't affect the speaker's intent. Keep tone and phrasing as close to the original as possible.`;
+      ? `You are a multilingual translator and text refinement specialist. 
+         
+         Your task is to:
+         1. If the text is primarily in a non-English language (${detectedLanguagesInfo}), translate it to natural, fluent English
+         2. Preserve any mixed-language content by noting the original languages
+         3. Improve grammar and clarity while maintaining the original meaning and tone
+         4. Do not add any explanation, interpretation, or additional context
+         
+         Return your response as a JSON object with this exact format:
+         {
+           "refined_text": "the translated/refined text in English",
+           "preserved_languages": ["list", "of", "detected", "languages"]
+         }
+         
+         The original languages detected were: ${detectedLanguagesInfo}.`
+      : `You are a text refinement specialist for English content.
+         
+         Your task is to:
+         1. Improve the grammar and sentence structure of the English text
+         2. Remove filler words only where it doesn't affect the speaker's intent
+         3. Keep tone and phrasing as close to the original as possible
+         4. Do not change the meaning or add new information
+         
+         Return your response as a JSON object with this exact format:
+         {
+           "refined_text": "the improved English text",
+           "preserved_languages": ["en"]
+         }`;
     
     const response = await fetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
@@ -127,7 +227,7 @@ export async function translateAndRefineText(
         "Authorization": `Bearer ${apiKey}`
       },
       body: JSON.stringify({
-        model: "gpt-4o", // Using main model for high-quality translation/refinement
+        model: "gpt-4o",
         messages: [
           {
             role: "system",
@@ -138,7 +238,9 @@ export async function translateAndRefineText(
             content: text
           }
         ],
-        max_tokens: 1000
+        max_tokens: 1500,
+        temperature: 0.3,
+        response_format: { type: "json_object" }
       })
     });
     
@@ -149,17 +251,39 @@ export async function translateAndRefineText(
     }
     
     const result = await response.json();
-    const refinedText = result.choices?.[0]?.message?.content || text;
     
-    console.log("[AI] Text refined successfully, new length:", refinedText.length);
-    console.log("[AI] Original text sample:", text.substring(0, 50));
-    console.log("[AI] Refined text sample:", refinedText.substring(0, 50));
-    console.log("[AI] Used detected language(s):", detectedLanguagesInfo);
-    
-    return { refinedText };
+    try {
+      const parsedResult = JSON.parse(result.choices[0].message.content);
+      const refinedText = parsedResult.refined_text || text;
+      const preservedLanguages = parsedResult.preserved_languages || detectedLanguages;
+      
+      console.log("[AI] Text refined successfully:", {
+        originalLength: text.length,
+        refinedLength: refinedText.length,
+        originalSample: text.substring(0, 100),
+        refinedSample: refinedText.substring(0, 100),
+        preservedLanguages: preservedLanguages
+      });
+      
+      return { 
+        refinedText,
+        preservedLanguages 
+      };
+    } catch (parseError) {
+      console.error("[AI] Failed to parse JSON response:", parseError);
+      // Fallback to original approach
+      const refinedText = result.choices?.[0]?.message?.content || text;
+      return { 
+        refinedText,
+        preservedLanguages: detectedLanguages 
+      };
+    }
   } catch (error) {
     console.error("[AI] Text refinement error:", error);
-    return { refinedText: text }; // Return original text on error
+    return { 
+      refinedText: text,
+      preservedLanguages: detectedLanguages 
+    };
   }
 }
 
@@ -172,7 +296,7 @@ export async function analyzeEmotions(
   apiKey: string
 ): Promise<Record<string, number>> {
   try {
-    console.log("[AI] Analyzing emotions in text:", text.substring(0, 50) + "....");
+    console.log("[AI] Analyzing emotions in text:", text.substring(0, 100) + "....");
     
     // Create a prompt with available emotions
     const emotionOptions = emotionsData
@@ -235,7 +359,7 @@ export async function analyzeEmotions(
  */
 export async function generateEmbedding(text: string, apiKey: string): Promise<number[]> {
   try {
-    console.log("[AI] Generating embedding for text:", text.substring(0, 50) + "....");
+    console.log("[AI] Generating embedding for text:", text.substring(0, 100) + "....");
     
     const response = await fetch("https://api.openai.com/v1/embeddings", {
       method: "POST",

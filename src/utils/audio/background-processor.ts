@@ -28,14 +28,14 @@ export async function processRecordingInBackground(
     
     console.log(`[BackgroundProcessor] Successfully converted audio to base64, length: ${base64Audio.length}`);
     
-    // Send to transcription service with recording duration
+    // CORRECTED: Pass recording duration and ensure proper processing
     console.log('[BackgroundProcessor] Sending audio to transcription service');
     const transcriptionResult = await sendAudioForTranscription(
       base64Audio, 
       userId,
       false,
       true,
-      recordingDuration
+      recordingDuration // Pass duration in milliseconds - will be converted to seconds in edge function
     );
     
     if (!transcriptionResult.success) {

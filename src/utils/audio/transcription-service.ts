@@ -1,3 +1,4 @@
+
 import { supabase } from '@/integrations/supabase/client';
 import { blobToBase64 } from '@/utils/audio/blob-utils';
 
@@ -43,7 +44,7 @@ export async function sendAudioForTranscription(
       throw new Error('Invalid audio data format');
     }
 
-    // Calculate estimated recording time if not provided
+    // CORRECTED: Use the actual recording duration if provided, otherwise estimate
     const estimatedDuration = recordingDuration || Math.floor(base64Audio.length / 10000);
     console.log(`[TranscriptionService] Using duration: ${estimatedDuration}ms (${recordingDuration ? 'provided' : 'estimated'})`);
 
@@ -60,7 +61,7 @@ export async function sendAudioForTranscription(
       timezone
     });
 
-    // Invoke the edge function with corrected parameter names
+    // CORRECTED: Invoke the edge function with proper parameter names
     console.log('[TranscriptionService] Calling transcribe-audio edge function...');
     const startTime = Date.now();
     
@@ -70,7 +71,7 @@ export async function sendAudioForTranscription(
         userId,
         directTranscription,
         highQuality: processSentiment,
-        recordingTime: estimatedDuration // Pass the duration to the edge function
+        recordingTime: estimatedDuration // Pass duration in milliseconds - edge function will convert to seconds
       },
       headers: {
         'x-timezone': timezone // Pass timezone in headers

@@ -1,3 +1,4 @@
+
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.38.4";
@@ -15,7 +16,7 @@ const corsHeaders = {
 
 const allowedCategories = [
   "Self & Identity",
-  "Body & Health",
+  "Body & Health", 
   "Mental Health",
   "Romantic Relationships",
   "Family",
@@ -68,12 +69,14 @@ async function extract_themes_and_entities(text: string, knownEmotions: string[]
       console.error('OpenAI API key is missing or empty');
       return {
         themes: ['Theme 1', 'Theme 2', 'Theme 3'],
-        entities: [],
+        categories: [],
         entityemotion: {}
       };
     }
 
-    // -- Updated prompt to restrict categories to allowedCategories only --
+    console.log('[generate-themes] Starting theme and category extraction');
+
+    // CORRECTED: Updated prompt to generate themes and categories separately, no entities
     const prompt = `
       Analyze the following journal entry and:
       1. Extract the main themes or topics (max 5) described succinctly.
@@ -119,7 +122,7 @@ async function extract_themes_and_entities(text: string, knownEmotions: string[]
         messages: [
           {
             role: 'system',
-            content: 'You are an advanced assistant that extracts journal themes, entities, and core emotions for each entity. Always return only a well-formatted JSON object as specified in the user request.'
+            content: 'You are an advanced assistant that extracts journal themes and categories with emotional associations. Always return only a well-formatted JSON object as specified in the user request.'
           },
           {
             role: 'user',
@@ -137,18 +140,18 @@ async function extract_themes_and_entities(text: string, knownEmotions: string[]
       // Fallback
       return {
         themes: ['Personal', 'Experience'],
-        entities: [],
+        categories: [],
         entityemotion: {}
       };
     }
 
     const result = await response.json();
-    console.log(`Raw response from OpenAI:`, JSON.stringify(result, null, 2));
+    console.log(`[generate-themes] Raw response from OpenAI:`, JSON.stringify(result, null, 2));
     if (!result.choices || !result.choices[0]?.message?.content) {
       console.error('Invalid response structure from OpenAI');
       return {
         themes: [],
-        entities: [],
+        categories: [],
         entityemotion: {}
       };
     }
@@ -156,12 +159,10 @@ async function extract_themes_and_entities(text: string, knownEmotions: string[]
     let contentText = result.choices[0].message.content;
     try {
       const parsed = JSON.parse(contentText);
-      // Defensive defaults:
+      // CORRECTED: Return categories separately from themes
       return {
         themes: Array.isArray(parsed.themes) ? parsed.themes : [],
-        // Support both keys: "categories" (new) or "entities"/"categories" for legacy compatibility
-        entities: Array.isArray(parsed.categories) ? parsed.categories :
-                 (Array.isArray(parsed.entities) ? parsed.entities : []),
+        categories: Array.isArray(parsed.categories) ? parsed.categories : [],
         entityemotion: typeof parsed.entityemotion === "object" && parsed.entityemotion !== null ? parsed.entityemotion : {}
       };
     } catch (err) {
@@ -169,7 +170,7 @@ async function extract_themes_and_entities(text: string, knownEmotions: string[]
       // Return fallback structure if parsing fails
       return {
         themes: [],
-        entities: [],
+        categories: [],
         entityemotion: {}
       };
     }
@@ -177,7 +178,7 @@ async function extract_themes_and_entities(text: string, knownEmotions: string[]
     console.error('Error in extract_themes_and_entities:', error);
     return {
       themes: [],
-      entities: [],
+      categories: [],
       entityemotion: {}
     };
   }
@@ -193,6 +194,12 @@ serve(async (req) => {
     const { text, entryId, fromEdit = false } = requestData;
     let textToProcess = text;
     let entryIdToUpdate = entryId;
+
+    console.log('[generate-themes] Processing request:', {
+      hasText: !!textToProcess,
+      entryId: entryIdToUpdate,
+      fromEdit
+    });
 
     // If no direct text, fetch entry text by ID
     if (!textToProcess && entryIdToUpdate) {
@@ -217,20 +224,29 @@ serve(async (req) => {
     // Fetch available emotions from Supabase
     const knownEmotionList = await getKnownEmotions();
 
-    // Get extraction results (themes, entities, entityemotion)
-    const { themes, entities, entityemotion } = await extract_themes_and_entities(textToProcess, knownEmotionList);
+    // Get extraction results (themes, categories, entityemotion)
+    const { themes, categories, entityemotion } = await extract_themes_and_entities(textToProcess, knownEmotionList);
 
-    // Prepare updates
+    console.log('[generate-themes] Extraction results:', {
+      themes: themes,
+      categories: categories,
+      entityemotionKeys: Object.keys(entityemotion)
+    });
+
+    // CORRECTED: Prepare updates - themes go to master_themes, categories go to entities (as per current usage)
     const updates = {};
     if (themes && Array.isArray(themes)) {
       updates["master_themes"] = themes.length ? themes : ['Personal', 'Reflection', 'Experience'];
     }
-    if (entities && Array.isArray(entities)) {
-      updates["entities"] = entities;
+    if (categories && Array.isArray(categories)) {
+      // Store categories in entities column for now (maintaining backward compatibility)
+      updates["entities"] = categories;
     }
     if (entityemotion && typeof entityemotion === "object") {
       updates["entityemotion"] = entityemotion;
     }
+
+    console.log('[generate-themes] Database updates:', updates);
 
     if (entryIdToUpdate && Object.keys(updates).length > 0) {
       const { error } = await supabase
@@ -239,6 +255,8 @@ serve(async (req) => {
         .eq('id', entryIdToUpdate);
       if (error) {
         console.error(`[generate-themes] Error updating entry ${entryIdToUpdate}:`, error);
+      } else {
+        console.log(`[generate-themes] Successfully updated entry ${entryIdToUpdate}`);
       }
     }
 
@@ -246,7 +264,7 @@ serve(async (req) => {
       JSON.stringify({
         success: true,
         themes,
-        entities,
+        entities: categories, // Return categories as entities for backward compatibility
         entityemotion
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
