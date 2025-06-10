@@ -14,36 +14,38 @@ export async function processRecordingInBackground(
   tempId: string,
   recordingDuration?: number
 ): Promise<{ success: boolean; entryId?: number; error?: string }> {
-  console.log('[BackgroundProcessor] Starting background processing for tempId:', tempId);
-  console.log('[BackgroundProcessor] Recording duration:', recordingDuration, 'ms');
+  console.log('[BackgroundProcessor] FIXED: Starting background processing for tempId:', tempId);
+  console.log('[BackgroundProcessor] FIXED: Recording duration (ms):', recordingDuration);
+  console.log('[BackgroundProcessor] FIXED: Audio blob size:', audioBlob.size, 'bytes');
   
   try {
     // Convert blob to base64
-    console.log('[BackgroundProcessor] Converting audio blob to base64');
+    console.log('[BackgroundProcessor] FIXED: Converting audio blob to base64');
     const base64Audio = await blobToBase64(audioBlob);
     
     if (!base64Audio || base64Audio.length < 100) {
       throw new Error('Audio conversion failed or produced invalid data');
     }
     
-    console.log(`[BackgroundProcessor] Successfully converted audio to base64, length: ${base64Audio.length}`);
+    console.log(`[BackgroundProcessor] FIXED: Successfully converted audio to base64, length: ${base64Audio.length}`);
     
-    // CORRECTED: Pass recording duration and ensure proper processing
-    console.log('[BackgroundProcessor] Sending audio to transcription service');
+    // FIXED: Pass actual recording duration in milliseconds - edge function will handle conversion
+    console.log('[BackgroundProcessor] FIXED: Sending audio to transcription service with actual duration');
     const transcriptionResult = await sendAudioForTranscription(
       base64Audio, 
       userId,
-      false,
-      true,
-      recordingDuration // Pass duration in milliseconds - will be converted to seconds in edge function
+      false, // Full processing
+      true,  // High quality
+      recordingDuration // FIXED: Pass actual duration in milliseconds
     );
     
     if (!transcriptionResult.success) {
-      console.error('[BackgroundProcessor] Transcription service error:', transcriptionResult.error);
+      console.error('[BackgroundProcessor] FIXED: Transcription service error:', transcriptionResult.error);
       throw new Error(transcriptionResult.error || 'Transcription failed');
     }
 
-    console.log('[BackgroundProcessor] Transcription result:', transcriptionResult.data);
+    console.log('[BackgroundProcessor] FIXED: Transcription result:', transcriptionResult.data);
+    console.log('[BackgroundProcessor] FIXED: Entry created with languages:', transcriptionResult.data?.languages);
     
     // Extract the entry ID
     const entryId = transcriptionResult.data?.entryId;
@@ -52,7 +54,7 @@ export async function processRecordingInBackground(
       throw new Error('No entry ID returned from transcription service');
     }
     
-    console.log(`[BackgroundProcessor] Successfully created journal entry with ID: ${entryId}`);
+    console.log(`[BackgroundProcessor] FIXED: Successfully created journal entry with ID: ${entryId}`);
     
     // Store the mapping between tempId and entryId
     setEntryIdForProcessingId(tempId, entryId);
@@ -63,7 +65,8 @@ export async function processRecordingInBackground(
         entryId,
         tempId,
         timestamp: Date.now(),
-        forceUpdate: true 
+        forceUpdate: true,
+        languages: transcriptionResult.data?.languages || []
       }
     }));
     
@@ -72,7 +75,7 @@ export async function processRecordingInBackground(
       entryId
     };
   } catch (error: any) {
-    console.error('[BackgroundProcessor] Error in background processing:', error);
+    console.error('[BackgroundProcessor] FIXED: Error in background processing:', error);
     
     // Notify UI of failure
     window.dispatchEvent(new CustomEvent('processingEntryFailed', {

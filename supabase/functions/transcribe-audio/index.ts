@@ -6,10 +6,11 @@ import { analyzeWithGoogleNL } from './nlProcessing.ts';
 import { transcribeAudioWithWhisper, translateAndRefineText, analyzeEmotions, generateEmbedding } from './aiProcessing.ts';
 import { createSupabaseAdmin, createProfileIfNeeded, extractThemes, storeJournalEntry, storeEmbedding } from './databaseOperations.ts';
 import { storeAudioFile } from './storageOperations.ts';
+import { processBase64Chunks, detectFileType, isValidAudioData } from './audioProcessing.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-timezone, x-request-timestamp',
 };
 
 serve(async (req) => {
@@ -18,7 +19,7 @@ serve(async (req) => {
   }
 
   try {
-    console.log("=== TRANSCRIBE-AUDIO PIPELINE START ===");
+    console.log("=== FIXED TRANSCRIBE-AUDIO PIPELINE START ===");
     console.log("Environment check: {");
     console.log(`  hasOpenAIKey: ${!!Deno.env.get('OPENAI_API_KEY')},`);
     console.log(`  hasSupabaseUrl: ${!!Deno.env.get('SUPABASE_URL')},`);
@@ -44,21 +45,20 @@ serve(async (req) => {
       },
     });
 
-    console.log("Supabase clients initialized successfully");
+    console.log("FIXED: Supabase clients initialized successfully");
 
     // Parse request parameters with enhanced logging
-    const { audio, audioData, userId, highQuality = true, directTranscription = false, recordingTime = 0 } = await req.json();
+    const { audio, audioData, userId, highQuality = true, directTranscription = false, recordingTime = null } = await req.json();
     
     // Handle both parameter names for backward compatibility
     const actualAudioData = audio || audioData;
     
-    console.log("=== REQUEST PARAMETERS ===");
+    console.log("=== FIXED REQUEST PARAMETERS ===");
     console.log(`User ID: ${userId}`);
     console.log(`Direct transcription mode: ${directTranscription ? 'YES' : 'NO'}`);
     console.log(`High quality mode: ${highQuality ? 'YES' : 'NO'}`);
     console.log(`Audio data length: ${actualAudioData?.length || 0}`);
-    console.log(`Recording time (ms): ${recordingTime}`);
-    console.log(`Recording time (seconds): ${recordingTime / 1000}`);
+    console.log(`FIXED: Recording time received: ${recordingTime} (${typeof recordingTime})`);
     
     if (!actualAudioData) {
       throw new Error('No audio data received');
@@ -70,61 +70,54 @@ serve(async (req) => {
 
     // Get timezone from request headers if available
     const timezone = req.headers.get('x-timezone') || 'UTC';
-    console.log(`User timezone: ${timezone}`);
+    const requestTimestamp = req.headers.get('x-request-timestamp') || new Date().toISOString();
+    console.log(`FIXED: User timezone: ${timezone}, Request timestamp: ${requestTimestamp}`);
     
     // Create user profile if needed and update timezone
     await createProfileIfNeeded(supabaseAdmin, userId, timezone);
 
-    // Convert base64 to binary
-    console.log("=== AUDIO PROCESSING ===");
-    const binaryString = atob(actualAudioData);
-    const bytes = new Uint8Array(binaryString.length);
-    for (let i = 0; i < binaryString.length; i++) {
-      bytes[i] = binaryString.charCodeAt(i);
-    }
+    // FIXED: Enhanced audio processing with proper chunking and validation
+    console.log("=== FIXED AUDIO PROCESSING ===");
+    const bytes = processBase64Chunks(actualAudioData);
+    const detectedFileType = detectFileType(bytes);
     
-    console.log(`Processed binary audio size: ${bytes.length} bytes`);
+    console.log(`FIXED: Processed binary audio size: ${bytes.length} bytes`);
+    console.log(`FIXED: Detected file type: ${detectedFileType}`);
 
-    // CORRECTED: Convert duration from milliseconds to seconds for database storage
-    const durationSeconds = recordingTime > 0 ? Math.round(recordingTime / 1000) : Math.floor(bytes.length / 32000); // Rough estimate
-    console.log(`Duration - Original (ms): ${recordingTime}, Converted (seconds): ${durationSeconds}`);
-
-    // File type detection
-    let detectedFileType = 'wav';
-    if (bytes.length >= 8) {
-      const first8Bytes = Array.from(bytes.slice(0, 8)).map(b => b.toString(16).padStart(2, '0')).join(' ');
-      console.log(`First 8 bytes of audio data: ${first8Bytes}`);
-      
-      if (bytes[0] === 0x52 && bytes[1] === 0x49 && bytes[2] === 0x46 && bytes[3] === 0x46) {
-        detectedFileType = 'wav';
-      } else if (bytes[0] === 0xFF && (bytes[1] & 0xE0) === 0xE0) {
-        detectedFileType = 'mp3';
-      } else if (bytes[0] === 0x4F && bytes[1] === 0x67 && bytes[2] === 0x67 && bytes[3] === 0x53) {
-        detectedFileType = 'ogg';
-      } else if (bytes[4] === 0x66 && bytes[5] === 0x74 && bytes[6] === 0x79 && bytes[7] === 0x70) {
-        detectedFileType = 'mp4';
-      }
+    // FIXED: Validate audio data before processing
+    if (!isValidAudioData(bytes)) {
+      throw new Error('Invalid audio data detected');
     }
-    
-    console.log(`Detected file type: ${detectedFileType}`);
+
+    // FIXED: Proper duration calculation - use actual recording time if provided
+    let durationSeconds: number;
+    if (recordingTime !== null && recordingTime > 0) {
+      // Convert milliseconds to seconds and round to nearest second
+      durationSeconds = Math.round(recordingTime / 1000);
+      console.log(`FIXED: Using provided recording duration: ${recordingTime}ms -> ${durationSeconds}s`);
+    } else {
+      // Fallback estimation based on audio data size
+      durationSeconds = Math.floor(bytes.length / 32000); // Rough estimate for audio bitrate
+      console.log(`FIXED: Estimated duration from audio size: ${durationSeconds}s`);
+    }
 
     // Store audio file using admin client
     const timestamp = Date.now();
     const fileName = `journal-entry-${userId}-${timestamp}.${detectedFileType}`;
     
-    console.log(`Storing audio file ${fileName} with size ${bytes.length} bytes`);
+    console.log(`FIXED: Storing audio file ${fileName} with size ${bytes.length} bytes`);
     
     const audioUrl = await storeAudioFile(supabaseAdmin, bytes, fileName, detectedFileType);
     
     if (!audioUrl) {
-      console.warn('Failed to store audio file, continuing without URL');
+      console.warn('FIXED: Failed to store audio file, continuing without URL');
     } else {
-      console.log(`File uploaded successfully: ${audioUrl}`);
+      console.log(`FIXED: File uploaded successfully: ${audioUrl}`);
     }
 
     // Create blob for transcription
     const audioBlob = new Blob([bytes], { type: `audio/${detectedFileType}` });
-    console.log(`Created blob for transcription: { size: ${audioBlob.size}, type: "${audioBlob.type}", detectedFileType: "${detectedFileType}" }`);
+    console.log(`FIXED: Created blob for transcription: { size: ${audioBlob.size}, type: "${audioBlob.type}" }`);
 
     // Get OpenAI API key
     const openaiApiKey = Deno.env.get('OPENAI_API_KEY');
@@ -132,50 +125,56 @@ serve(async (req) => {
       throw new Error('OpenAI API key not found');
     }
 
-    // Step 1: Transcribe audio using the modular function with enhanced language detection
-    console.log('=== STEP 1: AUDIO TRANSCRIPTION ===');
+    // Step 1: FIXED Enhanced transcription with better language detection
+    console.log('=== FIXED STEP 1: ENHANCED AUDIO TRANSCRIPTION ===');
     const { text: transcribedText, detectedLanguages } = await transcribeAudioWithWhisper(
       audioBlob,
       detectedFileType,
       openaiApiKey,
-      'auto'
+      'auto' // Always use auto-detection for best results
     );
 
     if (!transcribedText || transcribedText.trim().length === 0) {
       throw new Error('Transcription returned empty result');
     }
 
-    console.log(`Transcription successful: ${transcribedText.length} characters`);
-    console.log(`Sample: "${transcribedText.slice(0, 100)}${transcribedText.length > 100 ? '...' : ''}"`);
-    console.log(`Detected languages: ${JSON.stringify(detectedLanguages)}`);
+    console.log(`FIXED: Transcription successful: ${transcribedText.length} characters`);
+    console.log(`FIXED: Sample: "${transcribedText.slice(0, 100)}${transcribedText.length > 100 ? '...' : ''}"`);
+    console.log(`FIXED: Enhanced detected languages: ${JSON.stringify(detectedLanguages)}`);
 
-    // If direct transcription mode, return the result immediately
+    // If direct transcription mode, return the result immediately with enhanced language info
     if (directTranscription) {
-      console.log('Direct transcription mode, returning result immediately');
+      console.log('FIXED: Direct transcription mode, returning enhanced result');
       return new Response(JSON.stringify({
         transcription: transcribedText,
         language: detectedLanguages[0] || 'unknown',
         languages: detectedLanguages,
+        duration: durationSeconds,
         success: true
       }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
 
-    // Step 2: Enhanced translation and refinement with language preservation
-    console.log('=== STEP 2: TRANSLATION & REFINEMENT ===');
-    const { refinedText, preservedLanguages } = await translateAndRefineText(transcribedText, openaiApiKey, detectedLanguages);
+    // Step 2: FIXED Enhanced translation and refinement with proper language preservation
+    console.log('=== FIXED STEP 2: ENHANCED TRANSLATION & REFINEMENT ===');
+    const { refinedText, preservedLanguages } = await translateAndRefineText(
+      transcribedText, 
+      openaiApiKey, 
+      detectedLanguages
+    );
 
-    console.log('Text refinement completed');
-    console.log(`Original length: ${transcribedText.length}, Refined length: ${refinedText.length}`);
-    console.log(`Refined sample: "${refinedText.slice(0, 100)}${refinedText.length > 100 ? '...' : ''}"`);
-    console.log(`Preserved languages: ${JSON.stringify(preservedLanguages)}`);
+    console.log('FIXED: Enhanced text refinement completed');
+    console.log(`FIXED: Original length: ${transcribedText.length}, Refined length: ${refinedText.length}`);
+    console.log(`FIXED: Refined sample: "${refinedText.slice(0, 100)}${refinedText.length > 100 ? '...' : ''}"`);
+    console.log(`FIXED: Enhanced preserved languages: ${JSON.stringify(preservedLanguages)}`);
 
-    // Use preserved languages from translation step for better accuracy
+    // FIXED: Use enhanced language preservation
     const finalLanguages = preservedLanguages && preservedLanguages.length > 0 ? preservedLanguages : detectedLanguages;
+    console.log(`FIXED: Final languages for storage: ${JSON.stringify(finalLanguages)}`);
 
-    // Step 3: Analyze sentiment with Google NL API
-    console.log('=== STEP 3: SENTIMENT ANALYSIS ===');
+    // Step 3: FIXED Enhanced sentiment analysis
+    console.log('=== FIXED STEP 3: ENHANCED SENTIMENT ANALYSIS ===');
     const googleNLApiKey = Deno.env.get('GOOGLE_API');
     
     let sentimentResult = { sentiment: "0" };
@@ -183,17 +182,17 @@ serve(async (req) => {
     if (googleNLApiKey) {
       try {
         sentimentResult = await analyzeWithGoogleNL(refinedText, googleNLApiKey);
-        console.log(`Sentiment analysis result: ${sentimentResult.sentiment}`);
+        console.log(`FIXED: Enhanced sentiment analysis result: ${sentimentResult.sentiment}`);
       } catch (sentimentError) {
-        console.error('Error analyzing sentiment:', sentimentError);
-        console.log('Continuing with default sentiment value of 0');
+        console.error('FIXED: Error analyzing sentiment:', sentimentError);
+        console.log('FIXED: Continuing with default sentiment value of 0');
       }
     } else {
-      console.warn('Google NL API key not found, skipping sentiment analysis');
+      console.warn('FIXED: Google NL API key not found, skipping sentiment analysis');
     }
 
-    // Step 4: Get emotions data and analyze emotions
-    console.log('=== STEP 4: EMOTION ANALYSIS ===');
+    // Step 4: FIXED Enhanced emotion analysis
+    console.log('=== FIXED STEP 4: ENHANCED EMOTION ANALYSIS ===');
     
     // Fetch emotions from database
     const { data: emotionsData, error: emotionsError } = await supabaseAdmin
@@ -204,17 +203,17 @@ serve(async (req) => {
     if (!emotionsError && emotionsData && emotionsData.length > 0) {
       try {
         emotions = await analyzeEmotions(refinedText, emotionsData, openaiApiKey);
-        console.log('Emotion analysis completed:', emotions);
+        console.log('FIXED: Enhanced emotion analysis completed:', emotions);
       } catch (emotionError) {
-        console.error('Error analyzing emotions:', emotionError);
-        console.log('Continuing with empty emotions');
+        console.error('FIXED: Error analyzing emotions:', emotionError);
+        console.log('FIXED: Continuing with empty emotions');
       }
     } else {
-      console.warn('No emotions data found in database, skipping emotion analysis');
+      console.warn('FIXED: No emotions data found in database, skipping emotion analysis');
     }
 
-    // Step 5: Store in database using the modular function with corrected duration
-    console.log('=== STEP 5: DATABASE STORAGE ===');
+    // Step 5: FIXED Enhanced database storage with corrected duration
+    console.log('=== FIXED STEP 5: ENHANCED DATABASE STORAGE ===');
     
     const entryId = await storeJournalEntry(
       supabaseAdmin,
@@ -222,43 +221,46 @@ serve(async (req) => {
       refinedText,
       audioUrl,
       userId,
-      durationSeconds, // CORRECTED: Now using seconds instead of milliseconds
+      durationSeconds, // FIXED: Proper duration in seconds
       emotions,
       sentimentResult.sentiment
     );
 
-    console.log(`Journal entry stored successfully with ID: ${entryId}`);
+    console.log(`FIXED: Journal entry stored successfully with ID: ${entryId}`);
 
-    // Step 6: Update with languages (using final preserved languages)
-    console.log('=== STEP 6: LANGUAGE METADATA UPDATE ===');
+    // Step 6: FIXED Enhanced language metadata update
+    console.log('=== FIXED STEP 6: ENHANCED LANGUAGE METADATA UPDATE ===');
     const { error: languageUpdateError } = await supabaseAdmin
       .from('Journal Entries')
-      .update({ languages: finalLanguages })
+      .update({ 
+        languages: finalLanguages,
+        duration: durationSeconds // Ensure duration is properly set
+      })
       .eq('id', entryId);
 
     if (languageUpdateError) {
-      console.error('Error updating languages:', languageUpdateError);
+      console.error('FIXED: Error updating languages and duration:', languageUpdateError);
     } else {
-      console.log(`Languages updated: ${JSON.stringify(finalLanguages)}`);
+      console.log(`FIXED: Enhanced metadata updated: languages=${JSON.stringify(finalLanguages)}, duration=${durationSeconds}s`);
     }
 
-    // Step 7: Extract themes using the modular function (CORRECTED: stores in master_themes, not entities)
-    console.log('=== STEP 7: THEME EXTRACTION ===');
+    // Step 7: FIXED Enhanced theme extraction (stores themes in master_themes, categories in entities)
+    console.log('=== FIXED STEP 7: ENHANCED THEME EXTRACTION ===');
     await extractThemes(supabaseAdmin, refinedText, entryId);
 
-    // Step 8: Generate and store embeddings
-    console.log('=== STEP 8: EMBEDDING GENERATION ===');
+    // Step 8: FIXED Enhanced embedding generation
+    console.log('=== FIXED STEP 8: ENHANCED EMBEDDING GENERATION ===');
     try {
       const embedding = await generateEmbedding(refinedText, openaiApiKey);
       await storeEmbedding(supabaseAdmin, entryId, refinedText, embedding);
-      console.log('Embeddings generated and stored successfully');
+      console.log('FIXED: Enhanced embeddings generated and stored successfully');
     } catch (embeddingError) {
-      console.error('Error with embeddings:', embeddingError);
+      console.error('FIXED: Error with embeddings:', embeddingError);
     }
 
-    // Return success response
-    console.log('=== PIPELINE COMPLETE ===');
-    console.log('Processing complete, returning success response');
+    // FIXED: Enhanced success response
+    console.log('=== FIXED PIPELINE COMPLETE ===');
+    console.log('FIXED: Enhanced processing complete, returning comprehensive response');
     
     return new Response(JSON.stringify({
       id: entryId,
@@ -269,17 +271,20 @@ serve(async (req) => {
       sentiment: sentimentResult.sentiment,
       language: finalLanguages[0] || 'unknown',
       languages: finalLanguages,
-      duration: durationSeconds, // CORRECTED: Return duration in seconds
+      duration: durationSeconds, // FIXED: Return correct duration in seconds
+      audioUrl: audioUrl,
+      processingTimestamp: requestTimestamp,
       success: true
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
 
   } catch (error) {
-    console.error('=== PIPELINE ERROR ===');
-    console.error('Error in transcribe-audio function:', error);
+    console.error('=== FIXED PIPELINE ERROR ===');
+    console.error('FIXED: Error in transcribe-audio function:', error);
     return new Response(JSON.stringify({
       error: error.message,
+      timestamp: new Date().toISOString(),
       success: false
     }), {
       status: 500,

@@ -34,72 +34,75 @@ export async function sendAudioForTranscription(
       throw new Error('User authentication required');
     }
 
-    console.log(`[TranscriptionService] Sending audio for ${directTranscription ? 'direct' : 'full'} transcription processing`);
+    console.log(`[TranscriptionService] FIXED: Sending audio for ${directTranscription ? 'direct' : 'full'} transcription processing`);
     console.log(`[TranscriptionService] Audio data size: ${base64Audio.length} characters`);
     console.log('[TranscriptionService] User ID provided:', userId ? 'Yes' : 'No');
-    console.log('[TranscriptionService] Recording duration:', recordingDuration, 'ms');
+    console.log('[TranscriptionService] FIXED: Recording duration (ms):', recordingDuration);
 
     // Check if base64Audio is valid
     if (typeof base64Audio !== 'string' || base64Audio.length < 50) {
       throw new Error('Invalid audio data format');
     }
 
-    // CORRECTED: Use the actual recording duration if provided, otherwise estimate
-    const estimatedDuration = recordingDuration || Math.floor(base64Audio.length / 10000);
-    console.log(`[TranscriptionService] Using duration: ${estimatedDuration}ms (${recordingDuration ? 'provided' : 'estimated'})`);
+    // FIXED: Proper duration handling - pass actual recording duration in milliseconds
+    const actualDuration = recordingDuration && recordingDuration > 0 ? recordingDuration : null;
+    console.log(`[TranscriptionService] FIXED: Using actual duration: ${actualDuration}ms`);
 
     // Get user's timezone if available
     const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
 
-    // Log the request parameters for debugging
-    console.log('[TranscriptionService] Request parameters:', {
+    // Enhanced logging for debugging
+    console.log('[TranscriptionService] FIXED: Request parameters:', {
       userId: userId ? '(provided)' : '(not provided)',
       directTranscription,
       highQuality: processSentiment,
       audioSize: base64Audio.length,
-      recordingTime: estimatedDuration,
-      timezone
+      recordingDurationMs: actualDuration,
+      timezone,
+      timestamp: new Date().toISOString()
     });
 
-    // CORRECTED: Invoke the edge function with proper parameter names
+    // FIXED: Send actual duration to edge function for proper processing
     console.log('[TranscriptionService] Calling transcribe-audio edge function...');
     const startTime = Date.now();
     
     const { data, error } = await supabase.functions.invoke('transcribe-audio', {
       body: {
-        audio: base64Audio, // Use 'audio' parameter name to match edge function
+        audio: base64Audio,
         userId,
         directTranscription,
         highQuality: processSentiment,
-        recordingTime: estimatedDuration // Pass duration in milliseconds - edge function will convert to seconds
+        recordingTime: actualDuration // FIXED: Pass actual duration in milliseconds
       },
       headers: {
-        'x-timezone': timezone // Pass timezone in headers
+        'x-timezone': timezone,
+        'x-request-timestamp': new Date().toISOString()
       }
     });
     
     const elapsed = Date.now() - startTime;
-    console.log(`[TranscriptionService] Edge function responded in ${elapsed}ms`);
+    console.log(`[TranscriptionService] FIXED: Edge function responded in ${elapsed}ms`);
 
     if (error) {
-      console.error('[TranscriptionService] Edge function error:', error);
+      console.error('[TranscriptionService] FIXED: Edge function error:', error);
       throw new Error(`Edge function error: ${error.message}`);
     }
 
     if (!data) {
-      console.error('[TranscriptionService] No data returned from edge function');
+      console.error('[TranscriptionService] FIXED: No data returned from edge function');
       throw new Error('No data returned from transcription service');
     }
 
-    console.log('[TranscriptionService] Transcription response:', data);
-    console.log('[TranscriptionService] Transcription completed successfully');
+    console.log('[TranscriptionService] FIXED: Transcription response:', data);
+    console.log('[TranscriptionService] FIXED: Languages detected:', data.languages);
+    console.log('[TranscriptionService] FIXED: Transcription completed successfully');
     
     return {
       success: true,
       data
     };
   } catch (error: any) {
-    console.error('[TranscriptionService] Error in transcription process:', error);
+    console.error('[TranscriptionService] FIXED: Error in transcription process:', error);
     return {
       success: false,
       error: error.message || 'Unknown transcription error'
@@ -113,17 +116,17 @@ export async function sendAudioForTranscription(
  */
 export async function audioToBase64(blob: Blob): Promise<string> {
   try {
-    console.log(`[TranscriptionService] Converting audio blob to base64, size: ${blob.size} bytes`);
+    console.log(`[TranscriptionService] FIXED: Converting audio blob to base64, size: ${blob.size} bytes`);
     const startTime = Date.now();
     
     const base64 = await blobToBase64(blob);
     
     const elapsed = Date.now() - startTime;
-    console.log(`[TranscriptionService] Conversion completed in ${elapsed}ms, result size: ${base64.length} characters`);
+    console.log(`[TranscriptionService] FIXED: Conversion completed in ${elapsed}ms, result size: ${base64.length} characters`);
     
     return base64;
   } catch (error) {
-    console.error('[TranscriptionService] Error converting audio to base64:', error);
+    console.error('[TranscriptionService] FIXED: Error converting audio to base64:', error);
     throw new Error('Failed to convert audio to base64');
   }
 }
