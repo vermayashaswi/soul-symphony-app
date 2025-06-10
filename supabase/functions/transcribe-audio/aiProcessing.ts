@@ -41,8 +41,8 @@ export async function transcribeAudioWithWhisper(
     // Create form data to send to the OpenAI API
     const formData = new FormData();
     formData.append("file", new Blob([audioBytes], { type: audioBlob.type }), filename);
-    formData.append("model", "whisper-1");
-    formData.append("response_format", "json"); // FIXED: Use json instead of verbose_json
+    formData.append("model", "gpt-4o-transcribe");
+    formData.append("response_format", "json");
     
     // Only add language parameter if it's not 'auto'
     if (language !== 'auto') {
@@ -54,7 +54,7 @@ export async function transcribeAudioWithWhisper(
       fileType: audioBlob.type,
       fileExtension,
       hasApiKey: !!apiKey,
-      model: "whisper-1",
+      model: "gpt-4o-transcribe",
       responseFormat: "json",
       autoLanguageDetection: language === 'auto'
     });
@@ -92,7 +92,7 @@ export async function transcribeAudioWithWhisper(
     console.log("[Transcription] Success:", {
       textLength: transcribedText.length,
       sampleText: transcribedText.substring(0, 100) + "...",
-      model: "whisper-1",
+      model: "gpt-4o-transcribe",
       detectedLanguages: detectedLanguages
     });
     
@@ -198,7 +198,7 @@ export async function translateAndRefineText(
         "Authorization": `Bearer ${apiKey}`
       },
       body: JSON.stringify({
-        model: "gpt-4.1-2025-04-14", // FIXED: Use the current flagship model
+        model: "gpt-4o-mini",
         messages: [
           {
             role: "system",
@@ -291,7 +291,7 @@ export async function analyzeEmotions(
         "Authorization": `Bearer ${apiKey}`
       },
       body: JSON.stringify({
-        model: "gpt-4.1-2025-04-14", // FIXED: Use the current flagship model
+        model: "gpt-4o-mini",
         messages: [
           {
             role: "system",

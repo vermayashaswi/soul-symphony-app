@@ -70,7 +70,7 @@ async function extract_themes_and_categories(text: string, knownEmotions: string
       return {
         themes: ['Personal Growth', 'Daily Reflection', 'Life Experience'],
         categories: [],
-        themeemotion: {} // FIXED: Changed from entityemotion to themeemotion
+        themeemotion: {}
       };
     }
 
@@ -119,7 +119,7 @@ async function extract_themes_and_categories(text: string, knownEmotions: string
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'gpt-4.1-2025-04-14', // FIXED: Use the current flagship model
+        model: 'gpt-4o-mini',
         messages: [
           {
             role: 'system',
@@ -130,7 +130,7 @@ async function extract_themes_and_categories(text: string, knownEmotions: string
             content: prompt
           }
         ],
-        temperature: 0.2, // Lower temperature for more consistent results
+        temperature: 0.2,
         response_format: { type: "json_object" }
       }),
     });
@@ -141,7 +141,7 @@ async function extract_themes_and_categories(text: string, knownEmotions: string
       return {
         themes: ['Personal Reflection', 'Daily Experience'],
         categories: [],
-        themeemotion: {} // FIXED: Changed from entityemotion to themeemotion
+        themeemotion: {}
       };
     }
 
@@ -153,7 +153,7 @@ async function extract_themes_and_categories(text: string, knownEmotions: string
       return {
         themes: [],
         categories: [],
-        themeemotion: {} // FIXED: Changed from entityemotion to themeemotion
+        themeemotion: {}
       };
     }
 
@@ -180,14 +180,14 @@ async function extract_themes_and_categories(text: string, knownEmotions: string
       return {
         themes: validatedThemes,
         categories: validatedCategories,
-        themeemotion: validatedThemeemotion // FIXED: Changed from entityemotion to themeemotion
+        themeemotion: validatedThemeemotion
       };
     } catch (err) {
       console.error('[generate-themes] FIXED: Error parsing JSON:', err, contentText);
       return {
         themes: ['Personal', 'Reflection'],
         categories: [],
-        themeemotion: {} // FIXED: Changed from entityemotion to themeemotion
+        themeemotion: {}
       };
     }
   } catch (error) {
@@ -195,7 +195,7 @@ async function extract_themes_and_categories(text: string, knownEmotions: string
     return {
       themes: ['Experience'],
       categories: [],
-      themeemotion: {} // FIXED: Changed from entityemotion to themeemotion
+      themeemotion: {}
     };
   }
 }
