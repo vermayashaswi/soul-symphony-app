@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 import { blobToBase64 } from '@/utils/audio/blob-utils';
 
@@ -15,13 +14,15 @@ interface TranscriptionResult {
  * @param directTranscription - If true, just returns the transcription without processing
  * @param processSentiment - If true, ensure sentiment analysis is performed with UTF-8 encoding
  * @param recordingDuration - Recording duration in milliseconds (ACTUAL recording time)
+ * @param preserveOriginalLanguage - If true, preserve original language without translation
  */
 export async function sendAudioForTranscription(
   base64Audio: string,
   userId: string | undefined,
   directTranscription: boolean = false,
   processSentiment: boolean = true,
-  recordingDuration?: number
+  recordingDuration?: number,
+  preserveOriginalLanguage: boolean = false
 ): Promise<TranscriptionResult> {
   try {
     if (!base64Audio) {
@@ -38,14 +39,14 @@ export async function sendAudioForTranscription(
     console.log(`[TranscriptionService] Audio data size: ${base64Audio.length} characters`);
     console.log('[TranscriptionService] User ID provided:', userId ? 'Yes' : 'No');
     console.log('[TranscriptionService] Recording duration (actual):', recordingDuration, 'ms');
+    console.log('[TranscriptionService] Preserve original language:', preserveOriginalLanguage);
 
     // Check if base64Audio is valid
     if (typeof base64Audio !== 'string' || base64Audio.length < 50) {
       throw new Error('Invalid audio data format');
     }
 
-    // FIXED: Use the actual recording duration provided by the client
-    // This is the real recording time, not an estimate
+    // Use the actual recording duration provided by the client
     const actualDuration = recordingDuration || 0;
     console.log(`[TranscriptionService] Using actual recording duration: ${actualDuration}ms`);
 
@@ -59,10 +60,11 @@ export async function sendAudioForTranscription(
       highQuality: processSentiment,
       audioSize: base64Audio.length,
       recordingTime: actualDuration,
+      preserveOriginalLanguage,
       timezone
     });
 
-    // Invoke the edge function with the actual recording duration
+    // Invoke the edge function with the actual recording duration and language preference
     console.log('[TranscriptionService] Calling transcribe-audio edge function...');
     const startTime = Date.now();
     
@@ -72,7 +74,8 @@ export async function sendAudioForTranscription(
         userId,
         directTranscription,
         highQuality: processSentiment,
-        recordingTime: actualDuration // FIXED: Pass the actual recording duration
+        recordingTime: actualDuration, // Pass the actual recording duration
+        preserveOriginalLanguage // IMPROVED: Pass language preservation preference
       },
       headers: {
         'x-timezone': timezone // Pass timezone in headers

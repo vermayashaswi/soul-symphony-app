@@ -47,7 +47,7 @@ serve(async (req) => {
     console.log("Supabase clients initialized successfully");
 
     // Parse request body and handle parameter mapping
-    const { audio, audioData, userId, highQuality = true, directTranscription = false, recordingTime = 0 } = await req.json();
+    const { audio, audioData, userId, highQuality = true, directTranscription = false, recordingTime = 0, preserveOriginalLanguage = false } = await req.json();
     
     // Handle both parameter names for backward compatibility
     const actualAudioData = audio || audioData;
@@ -56,6 +56,7 @@ serve(async (req) => {
     console.log(`User ID: ${userId}`);
     console.log(`Direct transcription mode: ${directTranscription ? 'YES' : 'NO'}`);
     console.log(`High quality mode: ${highQuality ? 'YES' : 'NO'}`);
+    console.log(`Preserve original language: ${preserveOriginalLanguage ? 'YES' : 'NO'}`);
     console.log(`Audio data length: ${actualAudioData?.length || 0}`);
     console.log(`Recording time (provided): ${recordingTime}ms`);
     
@@ -86,8 +87,7 @@ serve(async (req) => {
     const validatedBytes = validateAndFixAudioData(bytes, detectedFileType);
     console.log(`Audio validation completed`);
 
-    // FIXED: Use the provided recording time directly for duration calculation
-    // This is the actual recording duration in milliseconds from the client
+    // Use the provided recording time directly for duration calculation
     const durationMs = recordingTime > 0 ? recordingTime : 0;
     console.log(`Using recording duration: ${durationMs}ms (${recordingTime > 0 ? 'from client' : 'fallback to 0'})`);
 
@@ -145,13 +145,19 @@ serve(async (req) => {
       });
     }
 
-    // Step 2: Translate and refine text using the modular function
-    console.log('Step 2: Translating and refining text...');
-    const { refinedText } = await translateAndRefineText(transcribedText, openaiApiKey, detectedLanguages);
+    // Step 2: IMPROVED - Conditionally translate and refine text based on user preference
+    console.log('Step 2: Processing text based on language preferences...');
+    const { refinedText, needsTranslation } = await translateAndRefineText(
+      transcribedText, 
+      openaiApiKey, 
+      detectedLanguages, 
+      preserveOriginalLanguage // Pass the user preference
+    );
 
-    console.log('Text refinement completed');
-    console.log(`Original length: ${transcribedText.length}, Refined length: ${refinedText.length}`);
-    console.log(`Refined sample: "${refinedText.slice(0, 50)}${refinedText.length > 50 ? '...' : ''}"`);
+    console.log('Text processing completed');
+    console.log(`Original length: ${transcribedText.length}, Processed length: ${refinedText.length}`);
+    console.log(`Processed sample: "${refinedText.slice(0, 50)}${refinedText.length > 50 ? '...' : ''}"`);
+    console.log(`Translation applied: ${needsTranslation && !preserveOriginalLanguage ? 'YES' : 'NO'}`);
 
     // Step 3: Analyze sentiment with Google NL API
     console.log('Step 3: Analyzing sentiment with Google NL API...');
@@ -192,62 +198,72 @@ serve(async (req) => {
       console.warn('No emotions data found in database, skipping emotion analysis');
     }
 
-    // Step 5: Store in database using the modular function
+    // Step 5: IMPROVED - Store both original and processed text in database
     console.log('Step 5: Storing journal entry in database...');
+    
+    // Store the original transcription and the processed text separately
+    const originalText = transcribedText; // Always preserve the original
+    const processedText = preserveOriginalLanguage ? transcribedText : refinedText;
     
     const entryId = await storeJournalEntry(
       supabaseAdmin,
-      transcribedText,
-      refinedText,
+      originalText, // Store original transcription
+      processedText, // Store processed/translated text based on preference
       audioUrl,
       userId,
-      durationMs, // FIXED: Use actual recording duration
+      durationMs,
       emotions,
       sentimentResult.sentiment
     );
 
     console.log(`Journal entry stored successfully with ID: ${entryId}`);
 
-    // Step 6: Update with languages (enhanced detection)
-    console.log('Step 6: Updating entry with detected languages...');
-    const { error: languageUpdateError } = await supabaseAdmin
+    // Step 6: Update with languages and processing metadata
+    console.log('Step 6: Updating entry with detected languages and metadata...');
+    const { error: metadataUpdateError } = await supabaseAdmin
       .from('Journal Entries')
-      .update({ languages: detectedLanguages })
+      .update({ 
+        languages: detectedLanguages,
+        is_translated: needsTranslation && !preserveOriginalLanguage,
+        original_language: detectedLanguages[0] || 'unknown'
+      })
       .eq('id', entryId);
 
-    if (languageUpdateError) {
-      console.error('Error updating languages:', languageUpdateError);
+    if (metadataUpdateError) {
+      console.error('Error updating metadata:', metadataUpdateError);
     } else {
-      console.log(`Languages updated: ${JSON.stringify(detectedLanguages)}`);
+      console.log(`Metadata updated: languages=${JSON.stringify(detectedLanguages)}, translated=${needsTranslation && !preserveOriginalLanguage}`);
     }
 
     // Step 7: Extract themes using the modular function (this will trigger entity extraction)
     console.log('Step 7: Extracting themes and triggering entity extraction...');
-    await extractThemes(supabaseAdmin, refinedText, entryId);
+    await extractThemes(supabaseAdmin, processedText, entryId);
 
     // Step 8: Generate and store embeddings
     console.log('Step 8: Generating embeddings...');
     try {
-      const embedding = await generateEmbedding(refinedText, openaiApiKey);
-      await storeEmbedding(supabaseAdmin, entryId, refinedText, embedding);
+      const embedding = await generateEmbedding(processedText, openaiApiKey);
+      await storeEmbedding(supabaseAdmin, entryId, processedText, embedding);
       console.log('Embeddings generated and stored successfully');
     } catch (embeddingError) {
       console.error('Error with embeddings:', embeddingError);
     }
 
-    // Return success response
+    // Return success response with language preservation info
     console.log('Processing complete, returning success response');
     
     return new Response(JSON.stringify({
       id: entryId,
       entryId: entryId,
-      transcription: transcribedText,
-      refined: refinedText,
+      transcription: originalText, // Always return original transcription
+      refined: processedText, // Return processed text based on user preference
       emotions: emotions,
       sentiment: sentimentResult.sentiment,
       language: detectedLanguages[0] || 'unknown',
       languages: detectedLanguages,
-      duration: durationMs, // FIXED: Return actual recording duration
+      duration: durationMs,
+      isTranslated: needsTranslation && !preserveOriginalLanguage,
+      originalLanguage: detectedLanguages[0] || 'unknown',
       success: true
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },

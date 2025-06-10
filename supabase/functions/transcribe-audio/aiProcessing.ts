@@ -38,7 +38,7 @@ export async function transcribeAudioWithWhisper(
     // Create form data to send to the OpenAI API
     const formData = new FormData();
     formData.append("file", new Blob([audioBytes], { type: audioBlob.type }), filename);
-    formData.append("model", "gpt-4o-transcribe");
+    formData.append("model", "whisper-1"); // FIXED: Use correct Whisper model name
     
     // Always use auto-detection for better language detection
     // Only add language parameter if it's not 'auto'
@@ -46,17 +46,17 @@ export async function transcribeAudioWithWhisper(
       formData.append("language", language);
     }
     
-    // ENHANCED: Add response format to get more detailed language info
-    formData.append("response_format", "verbose_json");
+    // FIXED: Use json response format that's compatible with whisper-1
+    formData.append("response_format", "json");
     
     console.log("[Transcription] Sending request to OpenAI with:", {
       fileSize: audioBlob.size,
       fileType: audioBlob.type,
       fileExtension,
       hasApiKey: !!apiKey,
-      model: "gpt-4o-transcribe",
+      model: "whisper-1",
       autoLanguageDetection: language === 'auto',
-      responseFormat: "verbose_json"
+      responseFormat: "json"
     });
     
     // Call the OpenAI API for transcription
@@ -80,7 +80,7 @@ export async function transcribeAudioWithWhisper(
     // Get the transcribed text from the result
     const transcribedText = result.text || "";
     
-    // ENHANCED: Get detected languages from the API response with better detection
+    // Enhanced language detection from the API response and text patterns
     let detectedLanguages: string[] = [];
     
     if (result.language) {
@@ -93,7 +93,7 @@ export async function transcribeAudioWithWhisper(
     console.log("[Transcription] Success:", {
       textLength: transcribedText.length,
       sampleText: transcribedText.substring(0, 50) + "...",
-      model: "gpt-4o-transcribe",
+      model: "whisper-1",
       detectedLanguage: detectedLanguages[0] || 'unknown',
       allDetectedLanguages: detectedLanguages
     });
@@ -163,27 +163,70 @@ function detectLanguageFromText(text: string): string[] {
 }
 
 /**
- * Translates and refines text using GPT-4 
- * Handles translation to English if needed and improves transcription quality
+ * IMPROVED: Conditional translation and refinement based on detected language
+ * Only translates if the detected language is NOT English
  */
 export async function translateAndRefineText(
   text: string, 
   apiKey: string,
-  detectedLanguages: string[]
-): Promise<{ refinedText: string; }> {
+  detectedLanguages: string[],
+  preserveOriginal: boolean = true
+): Promise<{ refinedText: string; needsTranslation: boolean; }> {
   try {
     console.log("[AI] Starting text refinement:", text.substring(0, 50) + "...");
     console.log("[AI] Detected languages:", detectedLanguages);
     
     // Check if the detected language indicates non-English content
-    // We never default to 'en' here - we only use what the transcription model detected
-    const isNonEnglish = detectedLanguages[0] !== 'en';
-    const detectedLanguagesInfo = detectedLanguages.join(', ');
+    const primaryLanguage = detectedLanguages[0] || 'unknown';
+    const needsTranslation = primaryLanguage !== 'en' && primaryLanguage !== 'unknown';
     
-    // Call the OpenAI API with the appropriate system message
-    // Include detected language information in both prompts
-    const systemMessage = isNonEnglish 
-      ? `You are a multilingual translator. Translate the following text exactly into natural, fluent English. Do not add any explanation, interpretation, or additional context. Preserve all original meaning, tone, and emotion as closely as possible. The original language was detected as: ${detectedLanguagesInfo}.`
+    console.log("[AI] Primary language:", primaryLanguage);
+    console.log("[AI] Needs translation:", needsTranslation);
+    
+    // If preserveOriginal is true and text is not in English, don't translate
+    if (preserveOriginal && needsTranslation) {
+      console.log("[AI] Preserving original language, skipping translation");
+      
+      // Just clean up the text without translating
+      const systemMessage = `You are a transcription refinement assistant. Improve the grammar and sentence structure of the following ${primaryLanguage === 'hi' ? 'Hindi' : primaryLanguage} text without changing its meaning or language. Do not translate to English. Keep the original language intact. Remove only obvious transcription errors and improve clarity while preserving the original language, tone, and phrasing.`;
+      
+      const response = await fetch("https://api.openai.com/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${apiKey}`
+        },
+        body: JSON.stringify({
+          model: "gpt-4o-mini",
+          messages: [
+            {
+              role: "system",
+              content: systemMessage
+            },
+            {
+              role: "user",
+              content: text
+            }
+          ],
+          max_tokens: 1000
+        })
+      });
+      
+      if (!response.ok) {
+        console.log("[AI] Refinement failed, returning original text");
+        return { refinedText: text, needsTranslation };
+      }
+      
+      const result = await response.json();
+      const refinedText = result.choices?.[0]?.message?.content || text;
+      
+      console.log("[AI] Text refined in original language");
+      return { refinedText, needsTranslation };
+    }
+    
+    // Handle translation or English refinement
+    const systemMessage = needsTranslation 
+      ? `You are a multilingual translator. Translate the following text exactly into natural, fluent English. Do not add any explanation, interpretation, or additional context. Preserve all original meaning, tone, and emotion as closely as possible. The original language was detected as: ${primaryLanguage}.`
       : `You are a transcription refinement assistant. Improve the grammar and sentence structure of the following English text without changing its meaning. Do not add, infer, or rephrase anything beyond clarity and correctness. Remove filler words only where it doesn't affect the speaker's intent. Keep tone and phrasing as close to the original as possible.`;
     
     const response = await fetch("https://api.openai.com/v1/chat/completions", {
@@ -193,7 +236,7 @@ export async function translateAndRefineText(
         "Authorization": `Bearer ${apiKey}`
       },
       body: JSON.stringify({
-        model: "gpt-4o", // Using main model for high-quality translation/refinement
+        model: "gpt-4o-mini",
         messages: [
           {
             role: "system",
@@ -217,15 +260,15 @@ export async function translateAndRefineText(
     const result = await response.json();
     const refinedText = result.choices?.[0]?.message?.content || text;
     
-    console.log("[AI] Text refined successfully, new length:", refinedText.length);
+    console.log("[AI] Text processed successfully, new length:", refinedText.length);
     console.log("[AI] Original text sample:", text.substring(0, 50));
-    console.log("[AI] Refined text sample:", refinedText.substring(0, 50));
-    console.log("[AI] Used detected language(s):", detectedLanguagesInfo);
+    console.log("[AI] Processed text sample:", refinedText.substring(0, 50));
+    console.log("[AI] Used detected language(s):", detectedLanguages.join(', '));
     
-    return { refinedText };
+    return { refinedText, needsTranslation };
   } catch (error) {
     console.error("[AI] Text refinement error:", error);
-    return { refinedText: text }; // Return original text on error
+    return { refinedText: text, needsTranslation: false }; // Return original text on error
   }
 }
 
@@ -262,7 +305,7 @@ export async function analyzeEmotions(
         "Authorization": `Bearer ${apiKey}`
       },
       body: JSON.stringify({
-        model: "gpt-4o",
+        model: "gpt-4o-mini",
         messages: [
           {
             role: "system",
