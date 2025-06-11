@@ -1,14 +1,15 @@
-import { Home } from '@/pages/Home'
-import { Insights } from '@/pages/Insights'
-import { Journal } from '@/pages/Journal'
-import { Auth } from '@/pages/Auth'
-import { Settings } from '@/pages/Settings'
-import { Focus } from '@/pages/Focus'
-import { NotFound } from '@/pages/NotFound'
-import { Tutorial } from '@/pages/Tutorial'
-import { Onboarding } from '@/pages/Onboarding'
-import { Pricing } from '@/pages/Pricing'
-import { Legal } from '@/pages/Legal'
+
+import Home from '@/pages/Home'
+import Insights from '@/pages/Insights'
+import Journal from '@/pages/Journal'
+import Auth from '@/pages/Auth'
+import Settings from '@/pages/Settings'
+import Focus from '@/pages/Focus'
+import NotFound from '@/pages/NotFound'
+import Tutorial from '@/pages/Tutorial'
+import Onboarding from '@/pages/Onboarding'
+import Pricing from '@/pages/Pricing'
+import Legal from '@/pages/Legal'
 import Admin from '@/pages/Admin';
 
 export const routes = [
