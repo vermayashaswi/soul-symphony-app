@@ -95,7 +95,7 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({
   useEffect(() => {
     const onThreadChange = (event: CustomEvent) => {
       if (event.detail.threadId) {
-        setCurrentThreadId(event.detail.threadId);
+        setInternalThreadId(event.detail.threadId);
         loadThreadMessages(event.detail.threadId);
         debugLog.addEvent("Thread Change", `Thread selected: ${event.detail.threadId}`, "info");
       }
@@ -105,7 +105,7 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({
     
     const storedThreadId = localStorage.getItem("lastActiveChatThreadId");
     if (storedThreadId && user?.id) {
-      setCurrentThreadId(storedThreadId);
+      setInternalThreadId(storedThreadId);
       loadThreadMessages(storedThreadId);
       debugLog.addEvent("Initialization", `Loading stored thread: ${storedThreadId}`, "info");
     } else {
@@ -669,7 +669,7 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({
       if (error) throw error;
 
       if (threads && threads.length > 0) {
-        setCurrentThreadId(threads[0].id);
+        setInternalThreadId(threads[0].id);
         loadThreadMessages(threads[0].id);
         window.dispatchEvent(
           new CustomEvent('threadSelected', { 
@@ -690,7 +690,7 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({
           .single();
 
         if (!insertError && newThread) {
-          setCurrentThreadId(newThread.id);
+          setInternalThreadId(newThread.id);
           window.dispatchEvent(
             new CustomEvent('threadSelected', { 
               detail: { threadId: newThread.id } 
@@ -714,9 +714,6 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({
       });
     }
   };
-
-  // Check if deletion should be disabled - use realtime processing state
-  const isDeletionDisabled = isProcessing || processingStatus === 'processing' || isLoading;
 
   return (
     <div className="h-full flex flex-col">
