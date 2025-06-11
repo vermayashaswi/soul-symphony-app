@@ -703,7 +703,8 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({ mentalHealthIns
   const isDeletionDisabled = isProcessing || processingStatus === 'processing' || isLoading;
 
   return (
-    <div className="h-full overflow-y-auto flex flex-col">
+    <div className="h-full flex flex-col">
+      {/* Sticky Header */}
       <div className="sticky top-0 z-40 bg-background flex items-center justify-between py-3 px-4 border-b shrink-0">
         <h2 className="text-xl font-semibold"><TranslatableText text="Rūḥ" /></h2>
         
@@ -740,7 +741,8 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({ mentalHealthIns
         </div>
       </div>
       
-      <div className="flex-1 min-h-0">
+      {/* Scrollable Content Area */}
+      <div className="flex-1 min-h-0 overflow-y-auto">
         {initialLoading ? (
           <div className="flex items-center justify-center h-full">
             <div className="animate-spin h-6 w-6 border-2 border-primary border-t-transparent rounded-full"></div>
@@ -762,6 +764,7 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({ mentalHealthIns
         )}
       </div>
       
+      {/* Sticky Footer */}
       <div className="sticky bottom-0 bg-background border-t p-4 shrink-0">
         <div className="flex items-end gap-2">
           <div className="flex-1">

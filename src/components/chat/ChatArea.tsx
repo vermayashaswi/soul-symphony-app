@@ -57,7 +57,7 @@ const ChatArea: React.FC<ChatAreaProps> = ({
   }, [chatMessages, threadId]);
 
   return (
-    <div className="flex flex-col p-4 pb-20">
+    <div className="flex flex-col p-4">
       {chatMessages.map((message, index) => (
         <div
           key={index}
@@ -147,7 +147,7 @@ const ChatArea: React.FC<ChatAreaProps> = ({
         </div>
       )}
 
-      <div ref={messagesEndRef} className="pb-5" />
+      <div ref={messagesEndRef} className="h-4" />
     </div>
   );
 };
