@@ -740,7 +740,7 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({ mentalHealthIns
         </div>
       </div>
       
-      <div className="chat-content flex-1 min-h-0 overflow-hidden">
+      <div className="chat-content flex-1 min-h-0 overflow-y-auto">
         {initialLoading ? (
           <div className="flex items-center justify-center h-full">
             <div className="animate-spin h-6 w-6 border-2 border-primary border-t-transparent rounded-full"></div>
@@ -749,7 +749,7 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({ mentalHealthIns
         ) : chatHistory.length === 0 ? (
           <EmptyChatState />
         ) : (
-          <div className="h-full overflow-y-auto">
+          <>
             <ChatArea 
               chatMessages={chatHistory}
               isLoading={isLoading || isProcessing}
@@ -758,7 +758,7 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({ mentalHealthIns
               onInteractiveOptionClick={handleInteractiveOptionClick}
             />
             <div ref={chatBottomRef} />
-          </div>
+          </>
         )}
       </div>
       

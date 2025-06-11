@@ -57,7 +57,7 @@ const ChatArea: React.FC<ChatAreaProps> = ({
   }, [chatMessages, threadId]);
 
   return (
-    <div className="flex flex-col p-4 overflow-y-auto h-full pb-20">
+    <div className="flex flex-col p-4 pb-20">
       {chatMessages.map((message, index) => (
         <div
           key={index}
