@@ -704,7 +704,7 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({ mentalHealthIns
 
   return (
     <div className="chat-interface flex flex-col h-full">
-      <div className="chat-header flex items-center justify-between py-3 px-4 border-b">
+      <div className="chat-header sticky top-0 z-40 bg-background flex items-center justify-between py-3 px-4 border-b">
         <h2 className="text-xl font-semibold"><TranslatableText text="Rūḥ" /></h2>
         
         <div className="flex items-center gap-2">
