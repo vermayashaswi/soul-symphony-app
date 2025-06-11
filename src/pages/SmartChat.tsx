@@ -1,3 +1,4 @@
+
 import { useEffect, useState, useRef } from "react";
 import { SmartChatInterface } from "@/components/chat/SmartChatInterface";
 import MobileChatInterface from "@/components/chat/mobile/MobileChatInterface";
@@ -365,7 +366,7 @@ export default function SmartChat() {
           />
         </div>
         
-        <div className="flex-1">
+        <div className="flex-1 h-full">
           <SmartChatInterface 
             mentalHealthInsights={mentalHealthInsights}
             currentThreadId={currentThreadId}

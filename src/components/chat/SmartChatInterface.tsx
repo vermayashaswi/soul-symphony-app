@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef } from "react";
 import ChatInput from "./ChatInput";
 import ChatArea from "./ChatArea";
@@ -755,7 +756,7 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({
       </div>
       
       {/* Scrollable Content Area */}
-      <div className="flex-1 min-h-0 overflow-y-auto">
+      <div className="flex-1 h-0 overflow-y-auto">
         {initialLoading ? (
           <div className="flex items-center justify-center h-full">
             <div className="animate-spin h-6 w-6 border-2 border-primary border-t-transparent rounded-full"></div>

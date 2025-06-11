@@ -57,7 +57,7 @@ const ChatArea: React.FC<ChatAreaProps> = ({
   }, [chatMessages, threadId]);
 
   return (
-    <div className="flex flex-col p-4">
+    <div className="flex flex-col">
       {chatMessages.map((message, index) => (
         <div
           key={index}
@@ -65,7 +65,7 @@ const ChatArea: React.FC<ChatAreaProps> = ({
             message.sender === "user" || message.role === "user"
               ? "justify-end"
               : "justify-start"
-          } mb-4`}
+          } mb-4 px-4`}
         >
           <div
             className={`flex gap-3 max-w-[80%] ${
@@ -142,7 +142,7 @@ const ChatArea: React.FC<ChatAreaProps> = ({
       ))}
 
       {isLoading && (
-        <div className="flex justify-start mb-4">
+        <div className="flex justify-start mb-4 px-4">
           <TypingIndicator />
         </div>
       )}
