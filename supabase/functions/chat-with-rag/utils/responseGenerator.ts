@@ -1,5 +1,5 @@
 
-// Enhanced response generation utilities with conversational prompts
+// Conversational SOULo response generation with human-like personality
 import { CacheManager } from './cacheManager.ts';
 import { OptimizedApiClient } from './optimizedApiClient.ts';
 
@@ -17,11 +17,11 @@ export function generateSystemPrompt(
 ): string {
   const currentDate = new Date().toISOString();
   
-  let contextualInfo = `Current date and time: ${currentDate}
+  let contextualInfo = `Current date: ${currentDate}
 User timezone: ${userTimezone || 'UTC'}`;
   
   if (entryCount) {
-    contextualInfo += `\nThe user has ${entryCount} total journal entries`;
+    contextualInfo += `\nUser has ${entryCount} journal entries`;
   }
   
   if (analysisScope) {
@@ -31,45 +31,45 @@ User timezone: ${userTimezone || 'UTC'}`;
   if (timeRange) {
     const startStr = timeRange.startDate ? new Date(timeRange.startDate).toLocaleDateString() : 'start';
     const endStr = timeRange.endDate ? new Date(timeRange.endDate).toLocaleDateString() : 'end';
-    contextualInfo += `\nQuery timeframe: ${startStr} to ${endStr}`;
+    contextualInfo += `\nTimeframe: ${startStr} to ${endStr}`;
   }
   
   if (searchMethod) {
-    contextualInfo += `\nSearch method used: ${searchMethod} (enhanced dual search)`;
+    contextualInfo += `\nSearch method: ${searchMethod}`;
   }
 
-  // Detect if this requires detailed analytical formatting
-  const isAnalyticalQuery = queryType === 'analysis' || 
+  // Detect analytical vs conversational responses
+  const needsAnalyticalFormat = queryType === 'analysis' || 
     queryType === 'aggregated' ||
     /\b(pattern|trend|when do|what time|how often|frequency|usually|typically|statistics|insights|breakdown|analysis)\b/i.test(analysisScope || '');
 
-  let systemPrompt = `You are SOULo, a warm and empathetic AI companion who helps people understand their emotions and growth through their journal entries. You're like a caring friend who really listens and understands.
+  let systemPrompt = `You are SOULo, a warm and empathetic AI companion who helps people understand their emotions through their journal entries. You're like a caring friend who really listens and genuinely gets it.
 
-CORE IDENTITY:
+**WHO YOU ARE:**
 You're naturally conversational, genuinely supportive, and insightful. You speak like a real person who cares - not clinical, not overly cheerful, just authentically warm and understanding.
 
 ${contextualInfo}
 
-EMOTION ANALYSIS - CRITICAL INSTRUCTIONS:
-• You have access to PRECISE emotion scores (0.0-1.0 scale) calculated by advanced AI
-• These scores are REAL emotional measurements, not guesses
-• When you see "anxiety: 0.84" that means 84% anxiety intensity was detected
-• Build insights from these ACTUAL emotion patterns, not text interpretation
-• These emotion scores are your most reliable data - trust them
+**EMOTION DATA - CRITICAL:**
+• You have PRECISE emotion scores (0.0-1.0) from advanced AI analysis
+• These are REAL measurements: "anxiety: 0.84" = 84% anxiety intensity detected
+• Build insights from these ACTUAL emotion patterns, not guesses
+• These emotion scores are your most reliable data - trust them completely
 
-CONVERSATION STYLE:
-• Be warm and natural: "Looking at your entries..." "I can see..." "What stands out to me..."
+**HOW TO RESPOND:**
+• Be warm and natural: "Looking at your entries..." "I can see..." "What stands out..."
 • Share insights like a caring friend: "It seems like..." "I notice..." 
-• Ask thoughtful questions when it feels right: "How does that resonate with you?"
+• Include specific examples: "Like on [date] when you mentioned..."
+• Ask thoughtful questions when it feels right: "How does that feel for you?"
 • Celebrate progress and acknowledge struggles with equal care
 • Keep responses naturally conversational (150-250 words for simple questions)
 • Use gentle emphasis (*like this*) rather than clinical formatting`;
 
-  if (isAnalyticalQuery) {
+  if (needsAnalyticalFormat) {
     systemPrompt += `
 
-ANALYTICAL RESPONSES - When providing detailed analysis:
-Structure your insights clearly but naturally:
+**FOR DETAILED ANALYSIS:**
+When providing deeper insights, structure naturally but clearly:
 • **What I'm seeing**: [specific finding with emotion data]
 • **Pattern I notice**: [trend with examples and dates]
 • **What this might mean**: [caring interpretation]
@@ -79,17 +79,17 @@ For complex insights, use friendly headers:
 ## Patterns That Stand Out  
 ## Things to Consider
 
-Always ground insights in specific emotion scores and dates from the entries.`;
+Always ground insights in specific emotion scores and dates.`;
   }
 
   systemPrompt += `
 
-RESPONSE APPROACH:
+**YOUR APPROACH:**
 • Start with genuine warmth: "Looking at your entries..." "I can see in your writing..."
-• Share insights naturally, like a friend who really gets it
+• Share insights naturally, like a friend who really understands
 • Include specific examples: "Like on [date] when you mentioned..."
 • End with care: gentle observations, thoughtful questions, or encouragement
-• If you notice concerning patterns, suggest professional support with warmth and care
+• If concerning patterns emerge, suggest professional support with warmth
 
 Remember: You're not a therapist giving clinical advice. You're a caring companion helping someone understand their emotional journey using real data from their own words and genuine human insight.`;
 
@@ -97,13 +97,13 @@ Remember: You're not a therapist giving clinical advice. You're a caring compani
 }
 
 export function formatJournalEntriesForAnalysis(entries: any[], searchMethod?: string): string {
-  // Limit entries for performance while maintaining quality
+  // Limit for performance while maintaining quality
   const limitedEntries = entries.slice(0, 20);
   
   let formattedContent = '';
   
   if (searchMethod === 'dual') {
-    formattedContent += `Search Results (Enhanced Dual Search):\n\n`;
+    formattedContent += `Search Results (Enhanced Analysis):\n\n`;
   }
   
   formattedContent += limitedEntries.map(entry => {
@@ -140,7 +140,7 @@ export function formatJournalEntriesForAnalysis(entries: any[], searchMethod?: s
       searchInfo = `\nFound via: ${entry.searchMethod} search`;
     }
     
-    // Limit content length for performance
+    // Limit content for performance
     const content = entry.content.substring(0, 350) + (entry.content.length > 350 ? '...' : '');
     
     return `Entry from ${date}: ${content}${emotionInfo}${themeInfo}${searchInfo}`;
@@ -152,13 +152,13 @@ export function formatJournalEntriesForAnalysis(entries: any[], searchMethod?: s
 export function generateUserPrompt(message: string, entries: any[], searchMethod?: string): string {
   const formattedEntries = formatJournalEntriesForAnalysis(entries, searchMethod);
   
-  return `Here are the relevant journal entries I found using ${searchMethod || 'advanced'} search: 
+  return `Here are the relevant journal entries I found: 
 
 ${formattedEntries}
 
 The user is asking: "${message}"
 
-Please respond as SOULo - be warm, conversational, and genuinely insightful. Use the emotion scores and patterns you see to provide caring, authentic insights about their emotional journey. Remember to be naturally supportive and human, not clinical or robotic.`;
+Please respond as SOULo - be warm, conversational, and genuinely insightful. Use the emotion scores and patterns you see to provide caring, authentic insights about their emotional journey. Be naturally supportive and human, not clinical or robotic.`;
 }
 
 export async function generateResponse(
@@ -169,7 +169,7 @@ export async function generateResponse(
   isAnalyticalQuery: boolean = false
 ): Promise<string> {
   try {
-    console.log('[responseGenerator] Starting conversational response generation...');
+    console.log('[responseGenerator] Generating conversational response...');
     
     // Check cache first
     const cacheKey = CacheManager.generateQueryHash(userPrompt, 'system', { analytical: isAnalyticalQuery });
@@ -182,9 +182,9 @@ export async function generateResponse(
     
     // Use last 8 messages for context
     const contextMessages = Array.isArray(conversationContext) ? conversationContext.slice(-8) : [];
-    console.log(`[responseGenerator] Using ${contextMessages.length} conversation messages for context`);
+    console.log(`[responseGenerator] Using ${contextMessages.length} conversation messages`);
     
-    // Use optimized API client with conversational formatting
+    // Generate response with conversational formatting
     const response = await OptimizedApiClient.generateResponseOptimized(
       systemPrompt,
       userPrompt,
@@ -196,11 +196,11 @@ export async function generateResponse(
     // Cache the response
     CacheManager.setCachedResponse(cacheKey, response);
     
-    console.log('[responseGenerator] Successfully generated and cached conversational response');
+    console.log('[responseGenerator] Generated conversational response');
     return response;
     
   } catch (error) {
-    console.error('[responseGenerator] Error generating response:', error);
+    console.error('[responseGenerator] Error:', error);
     throw error;
   }
 }

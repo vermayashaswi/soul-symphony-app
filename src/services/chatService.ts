@@ -24,7 +24,7 @@ export async function processChatMessage(
   try {
     console.log('[ChatService] Processing message:', message);
     
-    // First classify the message to determine the response approach
+    // Classify message for natural conversation flow
     const { data: classificationData, error: classificationError } = await supabase.functions.invoke('chat-query-classifier', {
       body: { message, conversationContext: [] }
     });
@@ -36,7 +36,7 @@ export async function processChatMessage(
     const classification = classificationData || { category: 'JOURNAL_SPECIFIC', shouldUseJournal: true };
     console.log('[ChatService] Message classification:', classification);
 
-    // Handle general mental health questions with conversational flow
+    // Handle general mental health with conversational SOULo personality
     if (classification.category === 'GENERAL_MENTAL_HEALTH' || classification.category === 'CONVERSATIONAL') {
       console.log('[ChatService] Handling general/conversational question');
       
@@ -47,8 +47,8 @@ export async function processChatMessage(
       };
     }
 
-    // For journal-specific questions, proceed with enhanced analysis
-    console.log('[ChatService] Processing journal-specific question with conversational approach');
+    // For journal-specific questions, use enhanced conversational analysis
+    console.log('[ChatService] Processing journal-specific question with conversational SOULo');
     
     // Get current session for authentication
     const { data: { session }, error: sessionError } = await supabase.auth.getSession();
@@ -72,7 +72,7 @@ export async function processChatMessage(
         timestamp: msg.created_at
       })) : [];
 
-    // Call smart-query-planner for intelligent analysis
+    // Get intelligent query plan
     const queryPlanResponse = await supabase.functions.invoke('smart-query-planner', {
       body: {
         message,
@@ -91,7 +91,7 @@ export async function processChatMessage(
 
     const queryPlan = queryPlanResponse.data?.queryPlan || {};
 
-    // Call chat-with-rag for conversational journal analysis
+    // Use conversational RAG with SOULo personality
     const ragResponse = await supabase.functions.invoke('chat-with-rag', {
       body: {
         message,
@@ -162,7 +162,7 @@ Some gentle approaches that many people find helpful:
 • **Notice your strengths** - what are you naturally good at?
 • **Challenge that inner critic** - would you talk to a friend the way you talk to yourself?
 
-I'd love to help you understand your personal confidence patterns! If you're journaling with SOULo, try asking me something like "When do I feel most confident?" and I can analyze your entries for personalized insights about what specifically boosts your confidence.
+I'd love to help you understand your personal confidence patterns! If you're journaling with SOULo, try asking me something like "When do I feel most confident?" and I can analyze your entries for personalized insights.
 
 What aspects of confidence feel most important to you right now?`;
   }

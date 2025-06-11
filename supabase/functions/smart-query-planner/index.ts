@@ -16,7 +16,7 @@ const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
 const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-// Database schema context for GPT
+// Database context for intelligent planning
 const DATABASE_SCHEMA_CONTEXT = `
 Available PostgreSQL Functions:
 1. get_top_emotions_with_entries(user_id, start_date, end_date, limit_count) - Returns top emotions with sample entries
@@ -255,7 +255,7 @@ async function retryOpenAICall(promptFunction: () => Promise<Response>, maxRetri
 }
 
 /**
- * Intelligent query analysis with fixed temporal handling and personal pronoun prioritization
+ * Enhanced conversational query analysis with SOULo personality
  */
 async function analyzeQueryWithSubQuestions(message: string, conversationContext: any[], userEntryCount: number) {
   try {
@@ -263,12 +263,7 @@ async function analyzeQueryWithSubQuestions(message: string, conversationContext
       ? `\nConversation context: ${conversationContext.slice(-2).map(msg => `${msg.role}: ${msg.content}`).join('\n')}`
       : '';
 
-    // FIXED: Extract potential date range for better context using current year
-    const extractedDateRange = extractDateRangeFromQuery(message);
-    const dateContext = extractedDateRange ? 
-      `\nDetected date range: ${extractedDateRange.startDate} to ${extractedDateRange.endDate}` : '';
-
-    // ENHANCED: Check for personal pronouns - HIGHEST PRIORITY
+    // Enhanced personal pronoun detection
     const personalPronounPatterns = [
       /\b(i|me|my|mine|myself)\b/i,
       /\bam i\b/i,
@@ -289,64 +284,59 @@ async function analyzeQueryWithSubQuestions(message: string, conversationContext
     const hasPersonalPronouns = personalPronounPatterns.some(pattern => pattern.test(message.toLowerCase()));
     const hasExplicitTimeReference = /\b(last week|yesterday|this week|last month|today|recently|lately|this morning|last night)\b/i.test(message.toLowerCase());
     
-    console.log(`[Query Analysis] Personal pronouns: ${hasPersonalPronouns}, Explicit time ref: ${hasExplicitTimeReference}`);
+    console.log(`[Query Analysis] Personal pronouns: ${hasPersonalPronouns}, Time reference: ${hasExplicitTimeReference}`);
 
-    const prompt = `You are an intelligent query planner for a voice journaling app called SOULo. Your task is to break down user queries into executable sub-questions with detailed search plans.
+    const prompt = `You are SOULo's intelligent query planner. Help me understand how to best answer this user's question using their journal data.
 
 ${DATABASE_SCHEMA_CONTEXT}
 
 User query: "${message}"
-User has ${userEntryCount} journal entries.${contextString}${dateContext}
+User has ${userEntryCount} journal entries.${contextString}
 
-CRITICAL PERSONAL PRONOUN OVERRIDE RULES:
-- If the query contains personal pronouns (I, me, my, mine, myself, am I, do I, how am I, etc.) WITHOUT explicit time references, you MUST set useAllEntries: true and ignore any date constraints
-- Personal pronoun questions like "How am I doing?" should analyze ALL entries regardless of time
-- Only apply date filters when there are BOTH personal pronouns AND explicit time references like "How was I last week?"
+**PERSONAL PRONOUN PRIORITY RULES:**
+- Personal pronouns (I, me, my) WITHOUT time references → analyze ALL entries (useAllEntries: true)
+- Personal pronouns WITH time references → respect the time constraint
+- Questions like "How am I doing?" should use ALL entries for comprehensive insights
+- Questions like "How was I last week?" should use date filters
 
-CRITICAL RULES FOR TEMPORAL QUERIES:
-- If the query mentions "last week", "yesterday", "today", etc., you MUST include exact date filters
-- NEVER use fallback strategies for temporal queries - if no entries exist in the date range, return empty
-- Use SQL functions with start_date and end_date parameters for temporal queries
-- Set vectorSearch.dateFilter for all temporal queries
+**CONVERSATION FLOW APPROACH:**
+Break this into 1-3 strategic sub-questions that will provide warm, insightful responses.
 
-Break this query into 1-3 strategic sub-questions that will help answer the original query.
-
-Return ONLY valid JSON with this structure:
+Return ONLY valid JSON:
 {
   "queryType": "journal_specific" | "general_question" | "direct_response",
   "strategy": "intelligent_sub_query",
   "subQuestions": [
     {
-      "question": "Specific sub-question to answer",
-      "purpose": "Why this sub-question helps answer the main query",
+      "question": "Specific sub-question",
+      "purpose": "Why this helps answer the main query",
       "searchPlan": {
         "vectorSearch": {
           "enabled": boolean,
-          "threshold": number (0.01-0.05 for personality, 0.05-0.15 for others),
-          "query": "optimized search query for this sub-question",
+          "threshold": number (0.01-0.05 for personal, 0.05-0.15 for others),
+          "query": "optimized search query",
           "dateFilter": null | {"startDate": "ISO", "endDate": "ISO"}
         },
         "sqlQueries": [
           {
             "function": "function_name",
             "parameters": {...},
-            "purpose": "what this query achieves"
+            "purpose": "what this achieves"
           }
         ],
-        "fallbackStrategy": null | "recent_entries" | "emotion_based" | "keyword_search"
+        "fallbackStrategy": null | "recent_entries" | "emotion_based"
       }
     }
   ],
   "confidence": number,
-  "reasoning": "brief explanation of the approach including personal pronoun detection",
+  "reasoning": "brief explanation focusing on conversational approach",
   "expectedResponse": "analysis" | "direct_answer" | "clarification_needed",
   "useAllEntries": boolean,
   "hasPersonalPronouns": boolean,
   "hasExplicitTimeReference": boolean
 }
 
-IMPORTANT: For temporal queries, ALWAYS set fallbackStrategy to null to prevent analyzing entries outside the date range.
-For personal pronoun queries without time references, set useAllEntries: true.`;
+Focus on creating a warm, conversational analysis plan that will help SOULo provide genuinely helpful insights.`;
 
     const promptFunction = () => fetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
@@ -368,19 +358,19 @@ For personal pronoun queries without time references, set useAllEntries: true.`;
     const analysisResult = extractAndParseJSON(content, message);
     
     if (!analysisResult) {
-      console.error("Failed to parse GPT response, using enhanced temporal-aware fallback");
-      return createEnhancedFallback(message, hasPersonalPronouns, hasExplicitTimeReference, extractedDateRange);
+      console.error("Failed to parse GPT response, using conversational fallback");
+      return createConversationalFallback(message, hasPersonalPronouns, hasExplicitTimeReference);
     }
     
-    // Validate and enhance the sub-questions with enhanced logic
-    const validatedResult = validateAndEnhanceSubQuestions(analysisResult, message, hasPersonalPronouns, hasExplicitTimeReference, extractedDateRange);
+    // Validate and enhance with conversational focus
+    const validatedResult = validateAndEnhanceSubQuestions(analysisResult, message, hasPersonalPronouns, hasExplicitTimeReference);
     
     console.log("Final Analysis Result:", JSON.stringify(validatedResult, null, 2));
     return validatedResult;
 
   } catch (error) {
     console.error("Error in GPT query analysis:", error);
-    return createEnhancedFallback(message, false, false, null);
+    return createConversationalFallback(message, false, false);
   }
 }
 
@@ -582,7 +572,7 @@ function createDefaultSubQuestions(message: string, isPersonality: boolean, isEm
 /**
  * ENHANCED: Create fallback with proper personal pronoun and time handling
  */
-function createEnhancedFallback(message: string, hasPersonalPronouns: boolean, hasExplicitTimeReference: boolean, dateRange: any) {
+function createConversationalFallback(message: string, hasPersonalPronouns: boolean, hasExplicitTimeReference: boolean) {
   const lowerMessage = message.toLowerCase();
   const isEmotionQuery = /emotion|feel|mood|happy|sad|anxious|stressed|emotional/.test(lowerMessage);
   
@@ -601,15 +591,15 @@ function createEnhancedFallback(message: string, hasPersonalPronouns: boolean, h
       vectorSearch: {
         threshold: hasPersonalPronouns ? 0.01 : 0.05,
         enabled: true,
-        dateFilter: (hasPersonalPronouns && !hasExplicitTimeReference) ? null : dateRange
+        dateFilter: (hasPersonalPronouns && !hasExplicitTimeReference) ? null : null
       },
       sqlQueries: isEmotionQuery ? [
         {
           function: "get_top_emotions_with_entries",
           parameters: {
             user_id_param: "USER_ID_PLACEHOLDER",
-            start_date: (hasPersonalPronouns && !hasExplicitTimeReference) ? null : dateRange?.startDate,
-            end_date: (hasPersonalPronouns && !hasExplicitTimeReference) ? null : dateRange?.endDate,
+            start_date: (hasPersonalPronouns && !hasExplicitTimeReference) ? null : null,
+            end_date: (hasPersonalPronouns && !hasExplicitTimeReference) ? null : null,
             limit_count: 5
           },
           purpose: "Get top emotions with sample entries"
@@ -637,124 +627,98 @@ function createEnhancedFallback(message: string, hasPersonalPronouns: boolean, h
   };
 }
 
+/**
+ * Create basic fallback plan for error handling
+ */
+function createBasicFallbackPlan() {
+  return {
+    strategy: "intelligent_sub_query",
+    queryType: "journal_specific",
+    subQuestions: [
+      {
+        question: "Find relevant journal entries with ultra-sensitive search",
+        searchPlan: {
+          vectorSearch: {
+            enabled: true,
+            threshold: 0.01
+          },
+          sqlQueries: [],
+          fallbackStrategy: "keyword_search"
+        }
+      }
+    ],
+    totalEntryCount: 0,
+    confidence: 0.3,
+    reasoning: "Emergency fallback plan with enhanced error handling",
+    expectedResponse: "analysis",
+    useAllEntries: true, // Default to all entries on error
+    isErrorFallback: true
+  };
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    const { message, userId, conversationContext = [], isFollowUp = false } = await req.json();
+    const { 
+      message, 
+      userId, 
+      conversationContext = [], 
+      isFollowUp = false, 
+      preserveTopicContext = false, 
+      threadMetadata = {}, 
+      isAnalysisFollowUp = false 
+    } = await req.json();
 
-    console.log(`[Smart Query Planner] ENHANCED ANALYSIS with fixed date calculations: "${message}"`);
-
-    // Get user's journal entry count with timeout
-    let entryCount = 0;
-    try {
-      const countController = new AbortController();
-      const countTimeoutId = setTimeout(() => countController.abort(), 25000);
-      
-      const { count, error } = await supabase
-        .from('Journal Entries')
-        .select('*', { count: 'exact', head: true })
-        .eq('user_id', userId)
-        .abortSignal(countController.signal);
-        
-      clearTimeout(countTimeoutId);
-        
-      if (!error && count !== null) {
-        entryCount = count;
-        console.log(`User ${userId} has ${entryCount} journal entries`);
-      }
-    } catch (error) {
-      console.error("Error fetching entry count:", error);
+    if (!message || !userId) {
+      return new Response(
+        JSON.stringify({ error: 'Message and userId are required' }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
+      );
     }
 
-    // Use GPT to analyze the query with enhanced temporal awareness and personal pronoun prioritization
-    const analysisResult = await analyzeQueryWithSubQuestions(message, conversationContext, entryCount);
+    console.log(`[Smart Query Planner] Conversational analysis: "${message}"`);
 
-    // Handle direct responses
-    if (analysisResult.queryType === "general_question") {
-      return new Response(JSON.stringify({
-        directResponse: "I'm SOULo, your voice journaling assistant. I can help you analyze your journal entries to understand emotions, patterns, and personal insights. What would you like to explore about your journaling journey?",
-        plan: analysisResult
-      }), {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
+    // Get user's entry count for context
+    const { count: userEntryCount } = await supabase
+      .from('Journal Entries')
+      .select('*', { count: 'exact', head: true })
+      .eq('user_id', userId);
 
-    if (analysisResult.queryType === "direct_response") {
-      return new Response(JSON.stringify({
-        directResponse: "I can help you with that! Could you please provide more details about what you're looking for in your journal entries?",
-        plan: analysisResult
-      }), {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
+    console.log(`User ${userId} has ${userEntryCount} journal entries`);
 
-    // Enhanced query plan with fixed date constraints and personal pronoun handling
-    const enhancedPlan = {
-      strategy: analysisResult.strategy,
-      queryType: analysisResult.queryType,
-      subQuestions: analysisResult.subQuestions,
-      totalEntryCount: entryCount,
-      confidence: analysisResult.confidence,
-      reasoning: analysisResult.reasoning,
-      expectedResponse: analysisResult.expectedResponse,
-      isPersonalityQuery: analysisResult.isPersonalityQuery,
-      isEmotionQuery: analysisResult.isEmotionQuery,
-      isTemporalQuery: analysisResult.isTemporalQuery,
-      hasDateConstraints: analysisResult.hasDateConstraints,
-      dateRange: analysisResult.dateRange,
-      useAllEntries: analysisResult.useAllEntries, // CRITICAL: Pass this flag
-      hasPersonalPronouns: analysisResult.hasPersonalPronouns,
-      hasExplicitTimeReference: analysisResult.hasExplicitTimeReference,
-      domainContext: analysisResult.isPersonalityQuery ? "personal_insights" : 
-                   analysisResult.isEmotionQuery ? "emotional_analysis" : "general_insights"
-    };
-
-    console.log("ENHANCED Query Plan with Fixed Date Calculations:", JSON.stringify(enhancedPlan, null, 2));
+    // Generate conversational query plan
+    const queryPlan = await analyzeQueryWithSubQuestions(message, conversationContext, userEntryCount || 0);
+    
+    console.log(`Conversational Query Plan: ${JSON.stringify(queryPlan, null, 2)}`);
 
     return new Response(JSON.stringify({
-      queryPlan: enhancedPlan,
-      rawPlan: JSON.stringify({ plan: enhancedPlan })
+      queryPlan,
+      conversationMetadata: {
+        isFollowUp,
+        preserveTopicContext,
+        threadMetadata
+      },
+      userContext: {
+        entryCount: userEntryCount,
+        hasPersonalPronouns: queryPlan.hasPersonalPronouns,
+        hasTimeReference: queryPlan.hasExplicitTimeReference
+      },
+      timestamp: new Date().toISOString()
     }), {
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
 
   } catch (error) {
-    console.error("Error in smart-query-planner:", error);
-    
-    const fallbackPlan = {
-      strategy: "intelligent_sub_query",
-      queryType: "journal_specific",
-      subQuestions: [
-        {
-          question: "Find relevant journal entries with ultra-sensitive search",
-          searchPlan: {
-            vectorSearch: {
-              enabled: true,
-              threshold: 0.01
-            },
-            sqlQueries: [],
-            fallbackStrategy: "keyword_search"
-          }
-        }
-      ],
-      totalEntryCount: 0,
-      confidence: 0.3,
-      reasoning: "Emergency fallback plan with enhanced error handling",
-      expectedResponse: "analysis",
-      useAllEntries: true, // Default to all entries on error
-      isErrorFallback: true
-    };
-    
+    console.error('Error in smart query planner:', error);
     return new Response(JSON.stringify({
-      queryPlan: fallbackPlan,
-      rawPlan: JSON.stringify({ plan: fallbackPlan }),
-      error: error.message
+      error: error.message,
+      fallbackPlan: createBasicFallbackPlan()
     }), {
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-      status: 200
+      status: 500,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   }
 });

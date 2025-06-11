@@ -7,7 +7,7 @@ const corsHeaders = {
 };
 
 /**
- * ENHANCED GPT-powered message classifier with conversational flow prioritization
+ * CONVERSATIONAL GPT-powered message classifier focusing on natural flow
  */
 serve(async (req) => {
   // Handle CORS preflight requests
@@ -25,23 +25,23 @@ serve(async (req) => {
       );
     }
 
-    console.log(`[Query Classifier] Conversational classification for: "${message}"`);
+    console.log(`[Query Classifier] Analyzing message: "${message}"`);
 
     // Get OpenAI API key
     const openAiApiKey = Deno.env.get('OPENAI_API_KEY');
     if (!openAiApiKey) {
-      console.error('[Query Classifier] OpenAI API key not found, falling back to enhanced rule-based classification');
-      const fallbackResult = enhancedRuleBased_classifyMessage(message);
+      console.error('[Query Classifier] OpenAI API key not found, using rule-based classification');
+      const fallbackResult = enhancedRuleBasedClassification(message);
       return new Response(
         JSON.stringify(fallbackResult),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    // Use GPT for classification with conversational prioritization
+    // Use GPT for natural conversation flow classification
     const classification = await gptClassifyMessage(message, conversationContext, openAiApiKey);
 
-    console.log(`[Query Classifier] Result: ${classification.category} (confidence: ${classification.confidence}) - UseAllEntries: ${classification.useAllEntries}`);
+    console.log(`[Query Classifier] Result: ${classification.category} (confidence: ${classification.confidence})`);
 
     return new Response(
       JSON.stringify(classification),
@@ -50,10 +50,10 @@ serve(async (req) => {
   } catch (error) {
     console.error('[Query Classifier] Error:', error);
     
-    // Fallback to enhanced rule-based classification on error
+    // Fallback to rule-based classification
     try {
       const { message } = await req.json();
-      const fallbackResult = enhancedRuleBased_classifyMessage(message);
+      const fallbackResult = enhancedRuleBasedClassification(message);
       return new Response(
         JSON.stringify({ ...fallbackResult, fallbackUsed: true }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -68,7 +68,7 @@ serve(async (req) => {
 });
 
 /**
- * CONVERSATIONAL GPT-powered classification with human-like flow detection
+ * GPT-powered classification with conversational flow prioritization
  */
 async function gptClassifyMessage(
   message: string, 
@@ -86,29 +86,29 @@ async function gptClassifyMessage(
     ? `\nConversation context: ${conversationContext.slice(-3).map(msg => `${msg.role}: ${msg.content}`).join('\n')}`
     : '';
 
-  const classificationPrompt = `You're a friendly assistant helping classify user messages for SOULo, a voice journaling app. I need to determine how to respond naturally and helpfully.
+  const classificationPrompt = `You're SOULo's conversation flow analyzer. Help me understand how to respond naturally to this user message.
 
-**CLASSIFICATION TYPES:**
+**RESPONSE TYPES:**
 
-1. **JOURNAL_SPECIFIC** - Personal questions about their own patterns/experiences
-   - "How am I doing?", "What makes me happy?", "Am I getting better at...?"
-   - Personal pronouns + seeking insights from their own data
+1. **JOURNAL_SPECIFIC** - Personal questions about their own emotional patterns
+   - "How am I doing?", "What makes me happy?", "When do I feel stressed?"
+   - Contains personal pronouns ("I", "me", "my") seeking insights from their data
    - Use ALL entries unless specific time mentioned
 
-2. **GENERAL_MENTAL_HEALTH** - General advice/education questions
-   - "How to manage stress?", "What is anxiety?", "Tips for better sleep?"
+2. **GENERAL_MENTAL_HEALTH** - General wellness questions  
+   - "How to manage anxiety?", "What are coping strategies?", "Tips for better sleep?"
    - Educational content, not personal analysis
 
-3. **CONVERSATIONAL** - Natural chat/follow-ups
+3. **CONVERSATIONAL** - Natural chat flow
    - "Thanks!", "That's helpful", "Tell me more", "How are you?"
-   - Conversational responses that keep the flow going
+   - Keep the conversation flowing naturally
 
-**KEY RULES:**
+**ANALYSIS RULES:**
 - Personal pronouns ("I", "me", "my") = JOURNAL_SPECIFIC (high confidence)
-- "How am I?" without time = useAllEntries: true
+- "How am I?" without time = useAllEntries: true  
 - "How was I yesterday?" = useAllEntries: false
-- Follow-ups and conversational flow = CONVERSATIONAL
-- Educational questions = GENERAL_MENTAL_HEALTH
+- Follow-ups and thanks = CONVERSATIONAL
+- Educational "how to" questions = GENERAL_MENTAL_HEALTH
 
 User message: "${message}"${contextString}
 
@@ -168,7 +168,7 @@ Respond with ONLY this JSON:
       confidence: Math.max(0, Math.min(1, result.confidence || 0.8)),
       shouldUseJournal: result.category === 'JOURNAL_SPECIFIC',
       useAllEntries: result.useAllEntries || false,
-      reasoning: result.reasoning || 'GPT classification with conversational flow prioritization'
+      reasoning: result.reasoning || 'GPT classification for conversational flow'
     };
 
   } catch (error) {
@@ -178,9 +178,9 @@ Respond with ONLY this JSON:
 }
 
 /**
- * ENHANCED rule-based classification with conversational flow support
+ * Enhanced rule-based classification with conversational flow support
  */
-function enhancedRuleBased_classifyMessage(message: string): {
+function enhancedRuleBasedClassification(message: string): {
   category: string;
   confidence: number;
   shouldUseJournal: boolean;
@@ -189,10 +189,10 @@ function enhancedRuleBased_classifyMessage(message: string): {
 } {
   const lowerMessage = message.toLowerCase().trim();
   
-  console.log(`[Rule-Based] Analyzing message: "${message}"`);
+  console.log(`[Rule-Based] Analyzing: "${message}"`);
   
-  // PRIORITY 1: Personal pronouns = JOURNAL_SPECIFIC
-  const personalPronounPatterns = [
+  // Personal pronouns = JOURNAL_SPECIFIC
+  const personalPatterns = [
     /\b(i|me|my|mine|myself)\b/i,
     /\bam i\b/i,
     /\bhow am i\b/i,
@@ -202,24 +202,24 @@ function enhancedRuleBased_classifyMessage(message: string): {
     /\bwhy do i\b/i
   ];
   
-  for (const pattern of personalPronounPatterns) {
+  for (const pattern of personalPatterns) {
     if (pattern.test(lowerMessage)) {
       const hasTemporalReference = /\b(last week|yesterday|this week|last month|today|recently|lately)\b/i.test(lowerMessage);
       const useAllEntries = !hasTemporalReference;
       
-      console.log(`[Rule-Based] PERSONAL PRONOUNS DETECTED - UseAllEntries: ${useAllEntries}`);
+      console.log(`[Rule-Based] PERSONAL PRONOUNS - UseAllEntries: ${useAllEntries}`);
       
       return {
         category: "JOURNAL_SPECIFIC",
         confidence: 0.95,
         shouldUseJournal: true,
         useAllEntries: useAllEntries,
-        reasoning: `Personal pronouns detected - journal analysis needed. ${hasTemporalReference ? 'Time constraint respected.' : 'Analyzing all entries for comprehensive insights.'}`
+        reasoning: `Personal question - analyzing ${hasTemporalReference ? 'specific timeframe' : 'all entries'}`
       };
     }
   }
   
-  // PRIORITY 2: Conversational patterns
+  // Conversational patterns
   const conversationalPatterns = [
     /^(hi|hello|hey|good morning|good afternoon|good evening)\b/i,
     /^(thank you|thanks|thank u|thx)\b/i,
@@ -236,12 +236,12 @@ function enhancedRuleBased_classifyMessage(message: string): {
         category: "CONVERSATIONAL",
         confidence: 0.9,
         shouldUseJournal: false,
-        reasoning: "Conversational response - maintaining natural flow"
+        reasoning: "Conversational response for natural flow"
       };
     }
   }
   
-  // PRIORITY 3: General mental health patterns
+  // General mental health patterns
   const mentalHealthPatterns = [
     /\b(anxiety|depression|stress|mental health|wellbeing)\b/i,
     /\b(meditation|mindfulness|self[\s-]care|therapy)\b/i,
@@ -255,7 +255,7 @@ function enhancedRuleBased_classifyMessage(message: string): {
         category: "GENERAL_MENTAL_HEALTH",
         confidence: 0.7,
         shouldUseJournal: false,
-        reasoning: "General mental health question - educational response needed"
+        reasoning: "General mental health question"
       };
     }
   }
@@ -266,6 +266,6 @@ function enhancedRuleBased_classifyMessage(message: string): {
     category: "CONVERSATIONAL",
     confidence: 0.6,
     shouldUseJournal: false,
-    reasoning: "Unclear intent - treating as conversational for natural flow"
+    reasoning: "Unclear intent - maintaining conversational flow"
   };
 }

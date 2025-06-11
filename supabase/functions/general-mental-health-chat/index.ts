@@ -1,3 +1,4 @@
+
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 
 const corsHeaders = {
@@ -5,105 +6,60 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-// Topic validation for scope enforcement
+// Simple scope validation
 function isWithinScope(message: string): boolean {
   const lowerMessage = message.toLowerCase().trim();
   
-  // In-scope keywords - mental health, wellness, journaling, SOULo app
+  // Mental health and wellness keywords
   const inScopeKeywords = [
-    // Mental health terms
     'mental health', 'anxiety', 'depression', 'stress', 'mood', 'emotion', 'feeling',
     'therapy', 'counseling', 'wellbeing', 'wellness', 'mindfulness', 'meditation',
     'self-care', 'coping', 'cope', 'overwhelmed', 'worried', 'sad', 'happy',
-    'angry', 'frustrated', 'calm', 'relaxed', 'nervous', 'panic', 'fear',
-    
-    // Journaling terms
-    'journal', 'journaling', 'writing', 'diary', 'reflection', 'thoughts',
-    'experiences', 'emotions', 'feelings', 'daily', 'weekly', 'entries',
-    
-    // Wellness and self-improvement
-    'sleep', 'exercise', 'nutrition', 'habits', 'routine', 'goals',
-    'motivation', 'productivity', 'balance', 'growth', 'development',
-    
-    // SOULo app specific
-    'soulo', 'app', 'voice recording', 'voice journal', 'transcription',
-    'insights', 'analysis', 'patterns', 'trends', 'themes'
+    'journal', 'journaling', 'reflection', 'sleep', 'exercise', 'habits'
   ];
   
-  // Out-of-scope indicators - clearly unrelated topics
+  // Clearly unrelated topics
   const outOfScopeIndicators = [
-    // Politics and current events
-    'president', 'politics', 'election', 'government', 'minister', 'parliament',
-    'congress', 'senate', 'political party', 'voting', 'campaign',
-    
-    // Technology unrelated to mental health
-    'programming', 'coding', 'software development', 'computer science',
-    'artificial intelligence', 'machine learning', 'blockchain', 'cryptocurrency',
-    
-    // Entertainment
-    'movie', 'film', 'tv show', 'celebrity', 'actor', 'actress', 'music band',
-    'album', 'song', 'concert', 'entertainment',
-    
-    // Sports
-    'football', 'basketball', 'cricket', 'tennis', 'soccer', 'baseball',
-    'olympics', 'championship', 'tournament', 'sports team',
-    
-    // Geography and travel
-    'country', 'capital city', 'population', 'geography', 'tourism',
-    'vacation', 'travel destination', 'landmark',
-    
-    // Science and academics (unless related to mental health)
-    'physics', 'chemistry', 'mathematics', 'biology', 'history',
-    'literature', 'philosophy', 'economics',
-    
-    // Other unrelated topics
-    'recipe', 'cooking', 'food', 'restaurant', 'shopping', 'fashion',
-    'weather forecast', 'news', 'stock market', 'finance'
+    'president', 'politics', 'election', 'programming', 'coding', 'movie', 'film',
+    'sports', 'football', 'basketball', 'recipe', 'cooking', 'weather'
   ];
   
-  // Check for explicit out-of-scope indicators first
+  // Quick exclusion check
   if (outOfScopeIndicators.some(keyword => lowerMessage.includes(keyword))) {
     return false;
   }
   
-  // Check for in-scope keywords
+  // Quick inclusion check
   if (inScopeKeywords.some(keyword => lowerMessage.includes(keyword))) {
     return true;
   }
   
-  // For general questions without clear indicators, be more restrictive
-  // Allow common conversational patterns but reject specific factual questions
-  const generalQuestionPatterns = [
-    /^(hi|hello|hey|good morning|good afternoon|good evening)/i,
-    /^(thank you|thanks|thank u)/i,
+  // Allow general conversational patterns
+  const conversationalPatterns = [
+    /^(hi|hello|hey|good morning)/i,
+    /^(thank you|thanks)/i,
     /^(how are you|how do you)/i,
-    /^(what (are|is) you|who are you)/i,
-    /^(can you|could you|would you).*(help|assist)/i,
-    /^(yes|no|okay|ok|sure)/i,
     /how (can|do) (i|you)/i,
     /what (is|are) (some|good|best|effective) (ways?|methods?|techniques?)/i
   ];
   
-  // Allow basic conversational patterns
-  if (generalQuestionPatterns.some(pattern => pattern.test(lowerMessage))) {
+  if (conversationalPatterns.some(pattern => pattern.test(lowerMessage))) {
     return true;
   }
   
-  // Reject specific factual questions (who is, what is the capital, etc.)
-  const factualQuestionPatterns = [
+  // Reject specific factual questions
+  const factualPatterns = [
     /^who is (the )?.*\?/i,
-    /^what is the (capital|population|president|prime minister)/i,
+    /^what is the (capital|population|president)/i,
     /^when (was|did|is)/i,
-    /^where is/i,
-    /^which (country|city|state)/i,
-    /^how many (people|countries|states)/i
+    /^where is/i
   ];
   
-  if (factualQuestionPatterns.some(pattern => pattern.test(lowerMessage))) {
+  if (factualPatterns.some(pattern => pattern.test(lowerMessage))) {
     return false;
   }
   
-  // Default to allowing if no clear indicators either way (benefit of doubt for mental health context)
+  // Default to allowing (benefit of doubt for mental health context)
   return true;
 }
 
@@ -122,14 +78,14 @@ serve(async (req) => {
       );
     }
 
-    console.log(`[General Mental Health] Processing: "${message}" with ${conversationContext.length} context messages`);
+    console.log(`[General Mental Health] Processing: "${message}"`);
 
-    // Check if the question is within scope
+    // Check scope
     if (!isWithinScope(message)) {
-      console.log(`[General Mental Health] Question out of scope: "${message}"`);
+      console.log(`[General Mental Health] Out of scope: "${message}"`);
       return new Response(
         JSON.stringify({ 
-          response: "I'm SOULo, your personal mental health companion! I'm here to chat about emotional wellbeing, stress management, self-care, and help you understand your feelings better. For other topics, you might want to try a general search engine. What's on your mind about your mental health or emotional journey today?" 
+          response: "I'm SOULo, your mental health companion! I love chatting about emotional wellbeing, stress management, and helping you understand your feelings. For other topics, try a general search engine. What's on your mind about your emotional journey today?" 
         }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
@@ -143,40 +99,38 @@ serve(async (req) => {
       );
     }
 
-    // Build messages array with conversation context
+    // Build conversation with SOULo personality
     const messages = [
       {
         role: 'system',
-        content: `You are SOULo, a warm and caring mental health companion. Think of yourself as a supportive friend who happens to know a lot about emotional wellbeing.
+        content: `You are SOULo, a warm and caring mental health companion. You're like a supportive friend who genuinely cares about emotional wellbeing.
 
-YOUR PERSONALITY:
-- Conversational and genuine, not clinical or robotic
-- Empathetic and understanding, like talking to a wise friend
-- Encouraging without being dismissive of real struggles
-- Knowledgeable about mental health but not preachy
+**YOUR PERSONALITY:**
+- Naturally conversational and genuine - not clinical or robotic
+- Warm and understanding, like talking to a wise friend
+- Encouraging without dismissing real struggles
+- Knowledgeable but not preachy
 
-WHAT YOU HELP WITH:
+**WHAT YOU HELP WITH:**
 - Emotional wellbeing and mental health support
-- Stress, anxiety, and mood management
-- Self-care strategies and healthy habits
+- Stress, anxiety, and mood management strategies
+- Self-care practices and healthy habits
 - Understanding feelings and emotional patterns
-- Journaling and self-reflection techniques
-- Mindfulness and coping skills
-- Using the SOULo voice journaling app
+- Journaling and self-reflection guidance
+- Mindfulness and coping techniques
 
-CONVERSATION STYLE:
-- Be naturally warm: "I can understand how that feels..."
-- Share insights gently: "Something that often helps is..."
-- Ask caring follow-ups: "How has that been affecting you?"
-- Offer hope: "Many people find that..." 
-- Keep responses conversational length (150-250 words)
-- Use natural emphasis and bullet points when helpful
+**HOW YOU TALK:**
+- Be genuinely warm: "I can understand how that feels..."
+- Share insights gently: "Something that often helps..."
+- Ask caring follow-ups: "How has that been for you?"
+- Offer hope: "Many people find that..."
+- Keep responses conversational (150-250 words)
+- Use natural emphasis when helpful
 
-BOUNDARIES - I DON'T help with:
-- Medical diagnosis or clinical advice (suggest professional help)
-- Crisis situations (encourage immediate professional support)
-- Topics outside mental health/wellness
-- Personal information about users' journal entries (suggest they ask me directly about their patterns)
+**BOUNDARIES:**
+- No medical diagnosis or clinical advice (suggest professional help)
+- No crisis intervention (encourage immediate professional support)
+- Stay focused on mental health and wellness topics
 
 If someone asks about their personal patterns, warmly suggest: "I'd love to help you understand your emotional patterns! Try asking me something like 'How am I doing emotionally?' and I can analyze your journal entries for personalized insights."
 
@@ -184,12 +138,12 @@ Remember: You're a caring companion, not a therapist. Be helpful, warm, and genu
       }
     ];
 
-    // Add conversation context (last 5 messages to keep context manageable)
+    // Add conversation context
     if (conversationContext.length > 0) {
       messages.push(...conversationContext.slice(-5));
     }
 
-    // Add current user message
+    // Add current message
     messages.push({ role: 'user', content: message });
 
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
@@ -213,9 +167,10 @@ Remember: You're a caring companion, not a therapist. Be helpful, warm, and genu
     }
 
     const data = await response.json();
-    const responseContent = data.choices[0]?.message?.content || 'I understand you\'re reaching out, and I want to help. Could you tell me a bit more about what\'s on your mind regarding your emotional wellbeing?';
+    const responseContent = data.choices[0]?.message?.content || 
+      'I understand you\'re reaching out, and I want to help. Could you tell me more about what\'s on your mind regarding your emotional wellbeing?';
 
-    console.log(`[General Mental Health] Generated conversational response`);
+    console.log(`[General Mental Health] Generated response`);
 
     return new Response(
       JSON.stringify({ response: responseContent }),
