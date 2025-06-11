@@ -52,9 +52,17 @@ import {
 
 export interface SmartChatInterfaceProps {
   mentalHealthInsights?: MentalHealthInsights;
+  currentThreadId?: string | null;
+  onDeleteThread?: () => void;
+  isDeletionDisabled?: boolean;
 }
 
-const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({ mentalHealthInsights }) => {
+const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({ 
+  mentalHealthInsights,
+  currentThreadId: propCurrentThreadId,
+  onDeleteThread,
+  isDeletionDisabled = false
+}) => {
   const [chatHistory, setChatHistory] = useState<ChatMessage[]>([]);
   const [initialLoading, setInitialLoading] = useState(true);
   const [showSuggestions, setShowSuggestions] = useState(true);
@@ -67,8 +75,9 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({ mentalHealthIns
   const loadedThreadRef = useRef<string | null>(null);
   const debugLog = useDebugLog();
   
-  // State for the current thread
-  const [currentThreadId, setCurrentThreadId] = useState<string | null>(null);
+  // State for the current thread - use prop if provided, otherwise manage internally
+  const [internalThreadId, setInternalThreadId] = useState<string | null>(null);
+  const currentThreadId = propCurrentThreadId || internalThreadId;
   
   // Use the GPT-based message classification hook
   const { classifyMessage, classification } = useChatMessageClassification();
@@ -598,6 +607,13 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({ mentalHealthIns
   };
 
   const handleDeleteCurrentThread = async () => {
+    if (onDeleteThread) {
+      // Use the parent's delete handler if provided
+      setShowDeleteDialog(false);
+      onDeleteThread();
+      return;
+    }
+
     if (!currentThreadId || !user?.id) {
       toast({
         title: "Error",

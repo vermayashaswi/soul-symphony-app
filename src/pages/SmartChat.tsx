@@ -365,40 +365,12 @@ export default function SmartChat() {
           />
         </div>
         
-        <div className="flex-1 relative">
-          {currentThreadId && (
-            <div className="absolute top-4 right-4 z-10">
-              <TooltipProvider>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className={`${
-                        isDeletionDisabled 
-                          ? 'text-muted-foreground/50 cursor-not-allowed' 
-                          : 'text-muted-foreground hover:text-destructive hover:bg-destructive/10 dark:hover:bg-destructive/20'
-                      }`}
-                      onClick={() => !isDeletionDisabled && setShowDeleteDialog(true)}
-                      disabled={isDeletionDisabled}
-                      aria-label="Delete conversation"
-                    >
-                      <Trash2 className="h-5 w-5" />
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent>
-                    {isDeletionDisabled ? (
-                      <TranslatableText text="Cannot delete while processing" />
-                    ) : (
-                      <TranslatableText text="Delete conversation" />
-                    )}
-                  </TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
-            </div>
-          )}
+        <div className="flex-1">
           <SmartChatInterface 
-            mentalHealthInsights={mentalHealthInsights} 
+            mentalHealthInsights={mentalHealthInsights}
+            currentThreadId={currentThreadId}
+            onDeleteThread={handleDeleteCurrentThread}
+            isDeletionDisabled={isDeletionDisabled}
           />
         </div>
       </motion.div>
