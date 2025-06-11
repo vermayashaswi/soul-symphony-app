@@ -47,8 +47,8 @@ export async function processChatMessage(
       };
     }
 
-    // For journal-specific questions, use enhanced conversational analysis
-    console.log('[ChatService] Processing journal-specific question with conversational SOULo');
+    // For journal-specific questions, use enhanced dual-search conversational analysis
+    console.log('[ChatService] Processing journal-specific question with enhanced dual-search SOULo');
     
     // Get current session for authentication
     const { data: { session }, error: sessionError } = await supabase.auth.getSession();
@@ -72,7 +72,7 @@ export async function processChatMessage(
         timestamp: msg.created_at
       })) : [];
 
-    // Get intelligent query plan
+    // Get intelligent query plan with enhanced dual-search requirements
     const queryPlanResponse = await supabase.functions.invoke('smart-query-planner', {
       body: {
         message,
@@ -81,7 +81,9 @@ export async function processChatMessage(
         isFollowUp: conversationContext.length > 0,
         preserveTopicContext: true,
         threadMetadata: {},
-        isAnalysisFollowUp: false
+        isAnalysisFollowUp: false,
+        requireDualSearch: true, // Force dual-search approach
+        confidenceThreshold: 0.9 // 90% confidence threshold
       }
     });
 
@@ -90,8 +92,13 @@ export async function processChatMessage(
     }
 
     const queryPlan = queryPlanResponse.data?.queryPlan || {};
+    
+    // Log dual-search enforcement
+    if (queryPlan.searchConfidence <= 0.9) {
+      console.log(`[ChatService] DUAL SEARCH ENFORCED - Confidence: ${queryPlan.searchConfidence} <= 90%`);
+    }
 
-    // Use conversational RAG with SOULo personality
+    // Use enhanced conversational RAG with SOULo personality and dual-search
     const ragResponse = await supabase.functions.invoke('chat-with-rag', {
       body: {
         message,
@@ -102,6 +109,9 @@ export async function processChatMessage(
         useAllEntries: queryPlan.useAllEntries || false,
         hasPersonalPronouns: queryPlan.hasPersonalPronouns || false,
         hasExplicitTimeReference: queryPlan.hasExplicitTimeReference || false,
+        enforceDualSearch: queryPlan.searchConfidence <= 0.9,
+        themeFilters: queryPlan.themeFilters || [],
+        emotionFilters: queryPlan.emotionFilters || [],
         threadMetadata: {}
       },
       headers: {
@@ -124,7 +134,7 @@ export async function processChatMessage(
   } catch (error) {
     console.error('[ChatService] Error processing message:', error);
     return {
-      content: `I'm having trouble understanding that right now. Could you try rephrasing your question? I'm here to help you explore your emotional patterns and wellbeing.`,
+      content: `I'm having trouble understanding that right now. Could you try rephrasing your question? I'm here to help you explore your emotional patterns and wellbeing using both your themes and emotional data.`,
       role: 'error'
     };
   }
@@ -162,7 +172,7 @@ Some gentle approaches that many people find helpful:
 • **Notice your strengths** - what are you naturally good at?
 • **Challenge that inner critic** - would you talk to a friend the way you talk to yourself?
 
-I'd love to help you understand your personal confidence patterns! If you're journaling with SOULo, try asking me something like "When do I feel most confident?" and I can analyze your entries for personalized insights.
+I'd love to help you understand your personal confidence patterns! If you're journaling with SOULo, try asking me something like "When do I feel most confident?" and I can analyze your entries for personalized insights using both your themes and emotional patterns.
 
 What aspects of confidence feel most important to you right now?`;
   }
@@ -176,7 +186,7 @@ Some gentle strategies that often help:
 • **Move your body** - even a short walk can shift your energy
 • **Be kind to yourself** - anxiety is tough, and you're doing your best
 
-If you're using SOULo for journaling, I can help you understand your personal anxiety patterns. Try asking me "What triggers my anxiety?" or "How am I handling stress?" and I'll analyze your entries for insights.
+If you're using SOULo for journaling, I can help you understand your personal anxiety patterns and themes. Try asking me "What triggers my anxiety?" or "How am I handling stress?" and I'll analyze your entries for insights.
 
 What would feel most helpful for you right now?`;
   }
@@ -190,7 +200,7 @@ I can share general insights about topics like:
 • Understanding emotions and mood patterns
 • Self-care and mindfulness practices
 
-**For personalized insights,** I can also analyze your journal entries to understand your unique patterns. Just ask me something personal like "How am I doing?" or "What makes me happiest?" and I'll dive into your journaling data.
+**For personalized insights,** I can also analyze your journal entries to understand your unique patterns and theme-emotion relationships. Just ask me something personal like "How am I doing?" or "What makes me happiest?" and I'll dive into your journaling data using both thematic and emotional analysis.
 
 What would you like to explore together?`;
 }

@@ -1,4 +1,3 @@
-
 // Conversational SOULo response generation with human-like personality
 import { CacheManager } from './cacheManager.ts';
 import { OptimizedApiClient } from './optimizedApiClient.ts';
@@ -50,11 +49,12 @@ You're naturally conversational, genuinely supportive, and insightful. You speak
 
 ${contextualInfo}
 
-**EMOTION DATA - CRITICAL:**
+**EMOTION & THEME DATA - CRITICAL:**
 • You have PRECISE emotion scores (0.0-1.0) from advanced AI analysis
+• You have THEME-EMOTION relationships from the themeemotion column showing how themes connect to emotions
 • These are REAL measurements: "anxiety: 0.84" = 84% anxiety intensity detected
-• Build insights from these ACTUAL emotion patterns, not guesses
-• These emotion scores are your most reliable data - trust them completely
+• Build insights from these ACTUAL emotion patterns and theme connections, not guesses
+• These emotion scores and theme-emotion relationships are your most reliable data - trust them completely
 
 **HOW TO RESPOND:**
 • Be warm and natural: "Looking at your entries..." "I can see..." "What stands out..."
@@ -70,7 +70,7 @@ ${contextualInfo}
 
 **FOR DETAILED ANALYSIS:**
 When providing deeper insights, structure naturally but clearly:
-• **What I'm seeing**: [specific finding with emotion data]
+• **What I'm seeing**: [specific finding with emotion data and theme connections]
 • **Pattern I notice**: [trend with examples and dates]
 • **What this might mean**: [caring interpretation]
 
@@ -79,7 +79,7 @@ For complex insights, use friendly headers:
 ## Patterns That Stand Out  
 ## Things to Consider
 
-Always ground insights in specific emotion scores and dates.`;
+Always ground insights in specific emotion scores, theme-emotion relationships, and dates.`;
   }
 
   systemPrompt += `
@@ -135,6 +135,30 @@ export function formatJournalEntriesForAnalysis(entries: any[], searchMethod?: s
       themeInfo = `\nThemes: ${entry.master_themes.slice(0, 3).join(', ')}`;
     }
 
+    // Add theme-emotion relationship data
+    let themeEmotionInfo = '';
+    if (entry.themeemotion && typeof entry.themeemotion === 'object') {
+      const themeEmotions = Object.entries(entry.themeemotion)
+        .slice(0, 2)
+        .map(([theme, emotions]: [string, any]) => {
+          if (emotions && typeof emotions === 'object') {
+            const topEmotions = Object.entries(emotions)
+              .sort(([_, a], [__, b]) => (b as number) - (a as number))
+              .slice(0, 2)
+              .map(([emotion, score]) => `${emotion}: ${(score as number).toFixed(2)}`)
+              .join(', ');
+            return `${theme} → ${topEmotions}`;
+          }
+          return null;
+        })
+        .filter(Boolean)
+        .join('; ');
+      
+      if (themeEmotions) {
+        themeEmotionInfo = `\nTheme-Emotion Links: ${themeEmotions}`;
+      }
+    }
+
     let searchInfo = '';
     if (entry.searchMethod) {
       searchInfo = `\nFound via: ${entry.searchMethod} search`;
@@ -143,7 +167,7 @@ export function formatJournalEntriesForAnalysis(entries: any[], searchMethod?: s
     // Limit content for performance
     const content = entry.content.substring(0, 350) + (entry.content.length > 350 ? '...' : '');
     
-    return `Entry from ${date}: ${content}${emotionInfo}${themeInfo}${searchInfo}`;
+    return `Entry from ${date}: ${content}${emotionInfo}${themeInfo}${themeEmotionInfo}${searchInfo}`;
   }).join('\n\n');
 
   return formattedContent;
@@ -158,7 +182,7 @@ ${formattedEntries}
 
 The user is asking: "${message}"
 
-Please respond as SOULo - be warm, conversational, and genuinely insightful. Use the emotion scores and patterns you see to provide caring, authentic insights about their emotional journey. Be naturally supportive and human, not clinical or robotic.`;
+Please respond as SOULo - be warm, conversational, and genuinely insightful. Use the emotion scores, theme-emotion relationships, and patterns you see to provide caring, authentic insights about their emotional journey. Be naturally supportive and human, not clinical or robotic.`;
 }
 
 export async function generateResponse(
