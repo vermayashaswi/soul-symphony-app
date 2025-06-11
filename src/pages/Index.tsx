@@ -86,30 +86,36 @@ const Index = () => {
       }
     };
     
-    handleTutorialNavigation();
+    if (user) {
+      handleTutorialNavigation();
+    }
   }, [user, checkOnboardingStatus, onboardingComplete]);
 
   // Handle explicit app redirects only
   useEffect(() => {
-    // Only redirect to app if explicitly requested with a URL parameter
-    if (urlParams.has('app')) {
-      console.log('[Index] User explicitly requested app with ?app parameter');
-      
-      if (user) {
-        console.log('[Index] User is logged in, redirecting to appropriate app page');
-        if (onboardingComplete) {
-          navigate('/app/home');
+    try {
+      // Only redirect to app if explicitly requested with a URL parameter
+      if (urlParams.has('app')) {
+        console.log('[Index] User explicitly requested app with ?app parameter');
+        
+        if (user) {
+          console.log('[Index] User is logged in, redirecting to appropriate app page');
+          if (onboardingComplete) {
+            navigate('/app/home');
+          } else {
+            navigate('/app/onboarding');
+          }
         } else {
-          navigate('/app/onboarding');
+          navigate('/app/auth');
         }
-      } else {
-        navigate('/app/auth');
       }
-    }
-    
-    // Check URL parameters for specific app features redirects
-    if (urlParams.has('insights')) {
-      navigate('/app/insights');
+      
+      // Check URL parameters for specific app features redirects
+      if (urlParams.has('insights')) {
+        navigate('/app/insights');
+      }
+    } catch (error) {
+      console.error('[Index] Navigation error:', error);
     }
   }, [user, navigate, urlParams, onboardingComplete]);
 
@@ -143,44 +149,62 @@ const Index = () => {
     onboardingComplete
   });
 
-  // Always render the website homepage component when at root URL
-  return (
-    <>
-      <NetworkAwareContent
-        lowBandwidthFallback={
-          <div className="flex flex-col items-center justify-center min-h-screen p-4">
-            <h1 className="text-2xl font-bold mb-4">
-              <TranslatableText text="Welcome to Soul Symphony" forceTranslate={true} />
-            </h1>
-            <p className="text-center mb-6">
-              <TranslatableText 
-                text="We've detected you're on a slow connection. We're loading a lightweight version of our site for better performance." 
-                forceTranslate={true}
-              />
-            </p>
-            <div className="animate-pulse">
-              <TranslatableText text="Loading optimized content..." forceTranslate={true} />
+  try {
+    // Always render the website homepage component when at root URL
+    return (
+      <>
+        <NetworkAwareContent
+          lowBandwidthFallback={
+            <div className="flex flex-col items-center justify-center min-h-screen p-4">
+              <h1 className="text-2xl font-bold mb-4">
+                <TranslatableText text="Welcome to Soul Symphony" forceTranslate={true} />
+              </h1>
+              <p className="text-center mb-6">
+                <TranslatableText 
+                  text="We've detected you're on a slow connection. We're loading a lightweight version of our site for better performance." 
+                  forceTranslate={true}
+                />
+              </p>
+              <div className="animate-pulse">
+                <TranslatableText text="Loading optimized content..." forceTranslate={true} />
+              </div>
             </div>
-          </div>
-        }
-        offlineFallback={
-          <div className="flex flex-col items-center justify-center min-h-screen p-4">
-            <h1 className="text-2xl font-bold mb-4">
-              <TranslatableText text="You're currently offline" forceTranslate={true} />
-            </h1>
-            <p className="text-center mb-6">
-              <TranslatableText 
-                text="Please check your connection to access all features. Some content may still be available from cache." 
-                forceTranslate={true}
-              />
-            </p>
-          </div>
-        }
-      >
-        <HomePage />
-      </NetworkAwareContent>
-    </>
-  );
+          }
+          offlineFallback={
+            <div className="flex flex-col items-center justify-center min-h-screen p-4">
+              <h1 className="text-2xl font-bold mb-4">
+                <TranslatableText text="You're currently offline" forceTranslate={true} />
+              </h1>
+              <p className="text-center mb-6">
+                <TranslatableText 
+                  text="Please check your connection to access all features. Some content may still be available from cache." 
+                  forceTranslate={true}
+                />
+              </p>
+            </div>
+          }
+        >
+          <HomePage />
+        </NetworkAwareContent>
+      </>
+    );
+  } catch (error) {
+    console.error('[Index] Render error:', error);
+    return (
+      <div className="flex flex-col items-center justify-center min-h-screen p-4">
+        <h1 className="text-2xl font-bold mb-4">Loading Error</h1>
+        <p className="text-center mb-6">
+          There was an issue loading the page. Please refresh to try again.
+        </p>
+        <button 
+          onClick={() => window.location.reload()} 
+          className="px-4 py-2 bg-primary text-primary-foreground rounded hover:bg-primary/90"
+        >
+          Refresh Page
+        </button>
+      </div>
+    );
+  }
 };
 
 export default Index;

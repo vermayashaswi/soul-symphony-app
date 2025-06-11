@@ -18,6 +18,7 @@ import FAQPage from '@/pages/website/FAQPage';
 import BlogPage from '@/pages/website/BlogPage';
 import BlogPostPage from '@/pages/website/BlogPostPage';
 import OnboardingScreen from '@/components/onboarding/OnboardingScreen';
+import TestStickyHeader from '@/components/TestStickyHeader';
 import { useAuth } from '@/contexts/AuthContext';
 import { useOnboarding } from '@/hooks/use-onboarding';
 
@@ -33,69 +34,86 @@ const AppRoutes = () => {
       onboardingComplete 
     });
     
-    if (user) {
-      if (onboardingComplete) {
-        // If user is logged in and onboarding is complete, go to home
-        console.log('User logged in and onboarding complete, redirecting to /app/home');
-        return <Navigate to="/app/home" replace />;
+    try {
+      if (user) {
+        if (onboardingComplete) {
+          console.log('User logged in and onboarding complete, redirecting to /app/home');
+          return <Navigate to="/app/home" replace />;
+        } else {
+          console.log('User logged in but onboarding not complete, redirecting to /app/onboarding');
+          return <Navigate to="/app/onboarding" replace />;
+        }
       } else {
-        // If user is logged in but onboarding is not complete, go to onboarding
-        console.log('User logged in but onboarding not complete, redirecting to /app/onboarding');
+        console.log('User not logged in, redirecting to /app/onboarding');
         return <Navigate to="/app/onboarding" replace />;
       }
-    } else {
-      // If user is not logged in, go to onboarding
-      console.log('User not logged in, redirecting to /app/onboarding');
+    } catch (error) {
+      console.error('AppRootRedirect error:', error);
       return <Navigate to="/app/onboarding" replace />;
     }
   };
   
-  return (
-    <Routes>
-      {/* Wrap all routes that need ViewportManager in a parent Route */}
-      <Route element={<ViewportManager />}>
-        {/* Website Routes - Now properly wrapped in translation context */}
-        <Route path="/" element={<Index />} />
-        <Route path="/privacy-policy" element={<PrivacyPolicyPage />} />
-        <Route path="/faq" element={<FAQPage />} />
-        <Route path="/download" element={<AppDownload />} />
-        <Route path="/blog" element={<BlogPage />} />
-        <Route path="/blog/:slug" element={<BlogPostPage />} />
+  try {
+    return (
+      <Routes>
+        {/* Test route for debugging */}
+        <Route path="/test" element={<TestStickyHeader />} />
         
-        {/* App Routes - reordered to fix routing issue */}
-        <Route path="/app/onboarding" element={<OnboardingScreen />} />
-        <Route path="/app/auth" element={<Auth />} />
-        
-        {/* Protected App Routes */}
-        <Route path="/app" element={<ProtectedRoute />}>
-          <Route index element={<AppRootRedirect />} />
-          <Route path="home" element={<Home />} />
-          <Route path="journal" element={<Journal />} />
-          <Route path="insights" element={
-            <React.Suspense fallback={<div className="flex items-center justify-center h-screen">Loading...</div>}>
-              <Insights />
-            </React.Suspense>
-          } />
-          <Route path="chat" element={<Chat />} />
-          <Route path="smart-chat" element={<SmartChat />} />
-          <Route path="settings" element={<Settings />} />
+        {/* Wrap all routes that need ViewportManager in a parent Route */}
+        <Route element={<ViewportManager />}>
+          {/* Website Routes */}
+          <Route path="/" element={<Index />} />
+          <Route path="/privacy-policy" element={<PrivacyPolicyPage />} />
+          <Route path="/faq" element={<FAQPage />} />
+          <Route path="/download" element={<AppDownload />} />
+          <Route path="/blog" element={<BlogPage />} />
+          <Route path="/blog/:slug" element={<BlogPostPage />} />
+          
+          {/* App Routes */}
+          <Route path="/app/onboarding" element={<OnboardingScreen />} />
+          <Route path="/app/auth" element={<Auth />} />
+          
+          {/* Protected App Routes */}
+          <Route path="/app" element={<ProtectedRoute />}>
+            <Route index element={<AppRootRedirect />} />
+            <Route path="home" element={<Home />} />
+            <Route path="journal" element={<Journal />} />
+            <Route path="insights" element={
+              <React.Suspense fallback={<div className="flex items-center justify-center h-screen">Loading...</div>}>
+                <Insights />
+              </React.Suspense>
+            } />
+            <Route path="chat" element={<Chat />} />
+            <Route path="smart-chat" element={<SmartChat />} />
+            <Route path="settings" element={<Settings />} />
+          </Route>
+          
+          {/* Legacy Route Redirects */}
+          <Route path="/auth" element={<Navigate to="/app/auth" replace />} />
+          <Route path="/onboarding" element={<Navigate to="/app/onboarding" replace />} />
+          <Route path="/home" element={<Navigate to="/app/home" replace />} />
+          <Route path="/journal" element={<Navigate to="/app/journal" replace />} />
+          <Route path="/insights" element={<Navigate to="/app/insights" replace />} />
+          <Route path="/chat" element={<Navigate to="/app/chat" replace />} />
+          <Route path="/smart-chat" element={<Navigate to="/app/smart-chat" replace />} />
+          <Route path="/settings" element={<Navigate to="/app/settings" replace />} />
+          
+          {/* Catch-all route */}
+          <Route path="*" element={<NotFound />} />
         </Route>
-        
-        {/* Legacy Route Redirects - all app features redirect to /app/ routes */}
-        <Route path="/auth" element={<Navigate to="/app/auth" replace />} />
-        <Route path="/onboarding" element={<Navigate to="/app/onboarding" replace />} />
-        <Route path="/home" element={<Navigate to="/app/home" replace />} />
-        <Route path="/journal" element={<Navigate to="/app/journal" replace />} />
-        <Route path="/insights" element={<Navigate to="/app/insights" replace />} />
-        <Route path="/chat" element={<Navigate to="/app/chat" replace />} />
-        <Route path="/smart-chat" element={<Navigate to="/app/smart-chat" replace />} />
-        <Route path="/settings" element={<Navigate to="/app/settings" replace />} />
-        
-        {/* Catch-all route */}
-        <Route path="*" element={<NotFound />} />
-      </Route>
-    </Routes>
-  );
+      </Routes>
+    );
+  } catch (error) {
+    console.error('AppRoutes render error:', error);
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center">
+          <h1 className="text-2xl font-bold mb-4">Application Error</h1>
+          <p className="text-muted-foreground">Please refresh the page to try again.</p>
+        </div>
+      </div>
+    );
+  }
 };
 
 export default AppRoutes;

@@ -32,124 +32,144 @@ const ChatArea: React.FC<ChatAreaProps> = ({
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    try {
+      messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    } catch (error) {
+      console.error('Scroll error:', error);
+    }
   }, [chatMessages, isLoading]);
 
   // Enhanced logging to ensure context is being passed properly
   useEffect(() => {
-    if (chatMessages.length > 0) {
-      console.log(`ChatArea: Rendering ${chatMessages.length} messages`);
-      console.log("Last message:", chatMessages[chatMessages.length - 1]?.content.substring(0, 50) + "...");
-      
-      // Enhanced context logging for better debugging
-      if (threadId) {
-        const lastUserQuestion = chatMessages
-          .filter(msg => msg.sender === 'user' || msg.role === 'user')
-          .slice(-1)[0]?.content;
-          
-        console.log("Last user question:", lastUserQuestion);
+    try {
+      if (chatMessages.length > 0) {
+        console.log(`ChatArea: Rendering ${chatMessages.length} messages`);
+        console.log("Last message:", chatMessages[chatMessages.length - 1]?.content.substring(0, 50) + "...");
         
-        // Log the full thread conversation for context analysis
-        console.log("Full conversation context for analysis:", 
-          chatMessages.map(msg => `[${msg.sender || msg.role}]: ${msg.content.substring(0, 30)}...`));
+        // Enhanced context logging for better debugging
+        if (threadId) {
+          const lastUserQuestion = chatMessages
+            .filter(msg => msg.sender === 'user' || msg.role === 'user')
+            .slice(-1)[0]?.content;
+            
+          console.log("Last user question:", lastUserQuestion);
+          
+          // Log the full thread conversation for context analysis
+          console.log("Full conversation context for analysis:", 
+            chatMessages.map(msg => `[${msg.sender || msg.role}]: ${msg.content.substring(0, 30)}...`));
+        }
       }
+    } catch (error) {
+      console.error('ChatArea useEffect error:', error);
     }
   }, [chatMessages, threadId]);
 
-  return (
-    <div className="flex flex-col">
-      {chatMessages.map((message, index) => (
-        <div
-          key={index}
-          className={`flex ${
-            message.sender === "user" || message.role === "user"
-              ? "justify-end"
-              : "justify-start"
-          } mb-4 px-4`}
-        >
+  try {
+    return (
+      <div className="flex flex-col">
+        {chatMessages.map((message, index) => (
           <div
-            className={`flex gap-3 max-w-[80%] ${
+            key={`message-${index}-${message.id || 'no-id'}`}
+            className={`flex ${
               message.sender === "user" || message.role === "user"
-                ? "flex-row-reverse"
-                : ""
-            }`}
+                ? "justify-end"
+                : "justify-start"
+            } mb-4 px-4`}
           >
-            <div className="mt-1">
-              {message.sender === "user" || message.role === "user" ? (
-                <Avatar className="h-8 w-8">
-                  <AvatarImage 
-                    src={undefined} 
-                    alt="User"
-                    className="bg-primary/20"
-                    loading="eager"
-                  />
-                  <AvatarFallback className="bg-primary text-primary-foreground">
-                    U
-                  </AvatarFallback>
-                </Avatar>
-              ) : (
-                <ParticleAvatar className="h-8 w-8" size={32} />
-              )}
-            </div>
-
-            <Card
-              className={`${
+            <div
+              className={`flex gap-3 max-w-[80%] ${
                 message.sender === "user" || message.role === "user"
-                  ? "bg-primary text-primary-foreground"
-                  : message.sender === "error" || message.role === "error"
-                  ? "bg-destructive/10 border-destructive/50"
+                  ? "flex-row-reverse"
                   : ""
-              } overflow-hidden`}
+              }`}
             >
-              <CardContent className="p-3">
-                <div className="prose prose-sm dark:prose-invert max-w-none">
-                  <ReactMarkdown>{message.content}</ReactMarkdown>
-                  
-                  {/* Interactive Options */}
-                  {message.isInteractive && message.interactiveOptions && onInteractiveOptionClick && (
-                    <div className="mt-4 flex flex-col gap-2">
-                      {message.interactiveOptions.map((option, idx) => (
-                        <Button
-                          key={idx}
-                          variant="outline"
-                          className="text-left justify-start"
-                          onClick={() => onInteractiveOptionClick(option)}
-                          data-test-id={`interactive-option-${idx}`}
-                        >
-                          {option.text}
-                        </Button>
-                      ))}
-                    </div>
-                  )}
-
-                  {/* References */}
-                  {message.reference_entries && Array.isArray(message.reference_entries) && message.reference_entries.length > 0 && (
-                    <ReferencesDisplay 
-                      references={message.reference_entries} 
-                      threadId={threadId || undefined}
+              <div className="mt-1">
+                {message.sender === "user" || message.role === "user" ? (
+                  <Avatar className="h-8 w-8">
+                    <AvatarImage 
+                      src={undefined} 
+                      alt="User"
+                      className="bg-primary/20"
+                      loading="eager"
                     />
-                  )}
+                    <AvatarFallback className="bg-primary text-primary-foreground">
+                      U
+                    </AvatarFallback>
+                  </Avatar>
+                ) : (
+                  <ParticleAvatar className="h-8 w-8" size={32} />
+                )}
+              </div>
 
-                  {/* Analytics Display for analysis data */}
-                  {message.analysis_data && message.has_numeric_result && (
-                    <AnalyticsDisplay analysisData={message.analysis_data} />
-                  )}
-                </div>
-              </CardContent>
-            </Card>
+              <Card
+                className={`${
+                  message.sender === "user" || message.role === "user"
+                    ? "bg-primary text-primary-foreground"
+                    : message.sender === "error" || message.role === "error"
+                    ? "bg-destructive/10 border-destructive/50"
+                    : ""
+                } overflow-hidden`}
+              >
+                <CardContent className="p-3">
+                  <div className="prose prose-sm dark:prose-invert max-w-none">
+                    <ReactMarkdown>{message.content}</ReactMarkdown>
+                    
+                    {/* Interactive Options */}
+                    {message.isInteractive && message.interactiveOptions && onInteractiveOptionClick && (
+                      <div className="mt-4 flex flex-col gap-2">
+                        {message.interactiveOptions.map((option, idx) => (
+                          <Button
+                            key={`option-${idx}`}
+                            variant="outline"
+                            className="text-left justify-start"
+                            onClick={() => onInteractiveOptionClick(option)}
+                            data-test-id={`interactive-option-${idx}`}
+                          >
+                            {option.text}
+                          </Button>
+                        ))}
+                      </div>
+                    )}
+
+                    {/* References */}
+                    {message.reference_entries && Array.isArray(message.reference_entries) && message.reference_entries.length > 0 && (
+                      <ReferencesDisplay 
+                        references={message.reference_entries} 
+                        threadId={threadId || undefined}
+                      />
+                    )}
+
+                    {/* Analytics Display for analysis data */}
+                    {message.analysis_data && message.has_numeric_result && (
+                      <AnalyticsDisplay analysisData={message.analysis_data} />
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
           </div>
-        </div>
-      ))}
+        ))}
 
-      {isLoading && (
-        <div className="flex justify-start mb-4 px-4">
-          <TypingIndicator />
-        </div>
-      )}
+        {isLoading && (
+          <div className="flex justify-start mb-4 px-4">
+            <TypingIndicator />
+          </div>
+        )}
 
-      <div ref={messagesEndRef} className="h-4" />
-    </div>
-  );
+        <div ref={messagesEndRef} className="h-4" />
+      </div>
+    );
+  } catch (error) {
+    console.error('ChatArea render error:', error);
+    return (
+      <div className="flex items-center justify-center h-full">
+        <div className="text-center">
+          <h3 className="text-lg font-semibold mb-2">Chat Loading Error</h3>
+          <p className="text-muted-foreground">Please refresh to try again.</p>
+        </div>
+      </div>
+    );
+  }
 };
 
 export default ChatArea;
