@@ -499,6 +499,39 @@ export type Database = {
         }
         Relationships: []
       }
+      themes: {
+        Row: {
+          category_type: string
+          created_at: string
+          description: string | null
+          display_order: number | null
+          id: number
+          is_active: boolean
+          name: string
+          updated_at: string
+        }
+        Insert: {
+          category_type?: string
+          created_at?: string
+          description?: string | null
+          display_order?: number | null
+          id?: number
+          is_active?: boolean
+          name: string
+          updated_at?: string
+        }
+        Update: {
+          category_type?: string
+          created_at?: string
+          description?: string | null
+          display_order?: number | null
+          id?: number
+          is_active?: boolean
+          name?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       user_sessions: {
         Row: {
           attribution_data: Json | null
@@ -657,6 +690,15 @@ export type Database = {
       execute_dynamic_query: {
         Args: { query_text: string; param_values?: string[] }
         Returns: Json
+      }
+      get_active_themes: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          id: number
+          name: string
+          description: string
+          display_order: number
+        }[]
       }
       get_attribution_analytics: {
         Args: { p_start_date?: string; p_end_date?: string }

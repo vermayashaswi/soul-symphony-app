@@ -14,30 +14,60 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-const allowedCategories = [
-  "Self & Identity",
-  "Body & Health", 
-  "Mental Health",
-  "Romantic Relationships",
-  "Family",
-  "Friendships & Social Circle",
-  "Sexuality & Gender",
-  "Career & Workplace",
-  "Money & Finances",
-  "Education & Learning",
-  "Habits & Routines",
-  "Sleep & Rest",
-  "Creativity & Hobbies",
-  "Spirituality & Beliefs",
-  "Technology & Social Media",
-  "Environment & Living Space",
-  "Time & Productivity",
-  "Travel & Movement",
-  "Loss & Grief",
-  "Purpose & Fulfillment",
-  "Conflict & Trauma",
-  "Celebration & Achievement"
-];
+async function getActiveThemesFromDatabase(): Promise<string[]> {
+  try {
+    const { data, error } = await supabase
+      .from('themes')
+      .select('name')
+      .eq('is_active', true)
+      .order('display_order', { ascending: true });
+    
+    if (error) {
+      console.error('[generate-themes] Error fetching themes from database:', error);
+      // Fallback to hardcoded list if database fails
+      return getHardcodedThemes();
+    }
+    
+    if (!data || !Array.isArray(data)) {
+      console.warn('[generate-themes] No themes found in database, using fallback');
+      return getHardcodedThemes();
+    }
+    
+    const themeNames = data.map(theme => theme.name).filter(Boolean);
+    console.log(`[generate-themes] Successfully loaded ${themeNames.length} themes from database`);
+    return themeNames;
+  } catch (err) {
+    console.error('[generate-themes] Exception fetching themes from database:', err);
+    return getHardcodedThemes();
+  }
+}
+
+function getHardcodedThemes(): string[] {
+  return [
+    "Self & Identity",
+    "Body & Health", 
+    "Mental Health",
+    "Romantic Relationships",
+    "Family",
+    "Friendships & Social Circle",
+    "Sexuality & Gender",
+    "Career & Workplace",
+    "Money & Finances",
+    "Education & Learning",
+    "Habits & Routines",
+    "Sleep & Rest",
+    "Creativity & Hobbies",
+    "Spirituality & Beliefs",
+    "Technology & Social Media",
+    "Environment & Living Space",
+    "Time & Productivity",
+    "Travel & Movement",
+    "Loss & Grief",
+    "Purpose & Fulfillment",
+    "Conflict & Trauma",
+    "Celebration & Achievement"
+  ];
+}
 
 async function getKnownEmotions(): Promise<string[]> {
   try {
@@ -62,7 +92,7 @@ async function getKnownEmotions(): Promise<string[]> {
   }
 }
 
-async function extract_themes_and_categories(text: string, knownEmotions: string[]) {
+async function extract_themes_and_categories(text: string, knownEmotions: string[], allowedCategories: string[]) {
   try {
     if (!openAIApiKey) {
       console.error('OpenAI API key is missing or empty');
@@ -235,11 +265,20 @@ serve(async (req) => {
       throw new Error('No text provided for theme extraction');
     }
 
-    // Fetch available emotions from Supabase
-    const knownEmotionList = await getKnownEmotions();
+    // Fetch available emotions and themes from database
+    const [knownEmotionList, allowedCategories] = await Promise.all([
+      getKnownEmotions(),
+      getActiveThemesFromDatabase()
+    ]);
+
+    console.log(`[generate-themes] Using ${allowedCategories.length} categories from database`);
 
     // Extract themes and categories
-    const { themes, categories, themeemotion } = await extract_themes_and_categories(textToProcess, knownEmotionList);
+    const { themes, categories, themeemotion } = await extract_themes_and_categories(
+      textToProcess, 
+      knownEmotionList, 
+      allowedCategories
+    );
 
     console.log('[generate-themes] Extraction results:', {
       themes: themes,
@@ -292,7 +331,7 @@ serve(async (req) => {
         categories,
         themeemotion,
         processed_at: new Date().toISOString(),
-        note: "Categories stored in master_themes, specific themes in themes column"
+        note: "Categories loaded from database and stored in master_themes, specific themes in themes column"
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
