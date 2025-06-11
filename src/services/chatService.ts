@@ -124,7 +124,7 @@ export async function processChatMessage(
   } catch (error) {
     console.error('[ChatService] Error processing message:', error);
     return {
-      content: `I apologize, but I encountered an error processing your request: ${error.message}. Please try again.`,
+      content: `I'm having trouble understanding that right now. Could you try rephrasing your question? I'm here to help you explore your emotional patterns and wellbeing.`,
       role: 'error'
     };
   }
@@ -155,55 +155,43 @@ function getGeneralMentalHealthFallback(message: string): string {
   const lowerMessage = message.toLowerCase();
   
   if (lowerMessage.includes('confident')) {
-    return `## Building Confidence: General Strategies
+    return `Building confidence is such a personal journey, and I love that you're thinking about it! 
 
-**Practical Ways to Become More Confident:**
+Some gentle approaches that many people find helpful:
+• **Start small** - celebrate tiny wins to build momentum
+• **Practice self-compassion** - treat yourself like you would a good friend
+• **Notice your strengths** - what are you naturally good at?
+• **Challenge that inner critic** - would you talk to a friend the way you talk to yourself?
 
-- **Practice self-compassion** - Treat yourself with the same kindness you'd show a good friend
-- **Set small, achievable goals** - Build momentum with consistent small wins
-- **Challenge negative self-talk** - Notice and reframe harsh inner criticism
-- **Focus on your strengths** - Make a list of things you're good at and review it regularly
-- **Step outside your comfort zone gradually** - Take on challenges that stretch but don't overwhelm you
-- **Improve your posture and body language** - Stand tall, make eye contact, and take up space
-- **Learn new skills** - Competence builds confidence naturally
-- **Exercise regularly** - Physical activity boosts mood and self-esteem
-- **Practice mindfulness** - Stay present instead of worrying about future judgments
+I'd love to help you understand your personal confidence patterns! If you're journaling with SOULo, try asking me something like "When do I feel most confident?" and I can analyze your entries for personalized insights about what specifically boosts your confidence.
 
-**Remember:** Confidence is built through consistent practice and self-acceptance, not perfection. Start with one or two strategies that resonate with you and build from there.
-
-Would you like me to analyze your personal confidence patterns from your journal entries? Just ask something like "How can I become more confident?" to get personalized insights.`;
+What aspects of confidence feel most important to you right now?`;
   }
   
   if (lowerMessage.includes('anxiety') || lowerMessage.includes('stress')) {
-    return `## Managing Anxiety and Stress: General Approaches
+    return `I hear you, and anxiety can feel so overwhelming. You're not alone in this.
 
-**Evidence-Based Strategies:**
+Some gentle strategies that often help:
+• **Breathe mindfully** - try the 4-7-8 technique (inhale 4, hold 7, exhale 8)
+• **Ground yourself** - name 5 things you can see, 4 you can hear, 3 you can touch
+• **Move your body** - even a short walk can shift your energy
+• **Be kind to yourself** - anxiety is tough, and you're doing your best
 
-- **Deep breathing exercises** - Practice 4-7-8 breathing or box breathing
-- **Progressive muscle relaxation** - Tense and release muscle groups systematically
-- **Mindfulness meditation** - Focus on the present moment without judgment
-- **Regular exercise** - Physical activity reduces stress hormones
-- **Maintain good sleep hygiene** - Aim for 7-9 hours of quality sleep
-- **Limit caffeine and alcohol** - These can worsen anxiety symptoms
-- **Connect with others** - Share your feelings with trusted friends or family
-- **Practice grounding techniques** - Use the 5-4-3-2-1 sensory method
-- **Consider professional help** - Therapy can provide personalized coping strategies
+If you're using SOULo for journaling, I can help you understand your personal anxiety patterns. Try asking me "What triggers my anxiety?" or "How am I handling stress?" and I'll analyze your entries for insights.
 
-**When to seek professional help:** If anxiety significantly impacts your daily life, work, or relationships.
-
-For personalized insights about your stress patterns, I can analyze your journal entries if you'd like!`;
+What would feel most helpful for you right now?`;
   }
 
-  return `I'd be happy to help with general mental health information! However, for the most helpful response, could you be more specific about what you're looking for?
+  return `I'm here to support you with whatever's on your mind about emotional wellbeing and mental health. 
 
-**I can provide general information about:**
-- Stress and anxiety management
-- Building confidence and self-esteem  
-- Improving mood and emotional well-being
-- Sleep and lifestyle factors
-- Mindfulness and coping strategies
+I can share general insights about topics like:
+• Managing stress and anxiety
+• Building confidence and self-esteem  
+• Developing healthy habits and routines
+• Understanding emotions and mood patterns
+• Self-care and mindfulness practices
 
-**For personalized insights,** I can also analyze your journal entries to understand your unique patterns and provide tailored advice. Just ask a more personal question like "How can I..." or "What helps me..." and I'll look at your journal data.
+**For personalized insights,** I can also analyze your journal entries to understand your unique patterns. Just ask me something personal like "How am I doing?" or "What makes me happiest?" and I'll dive into your journaling data.
 
-What specific aspect of mental health would you like to explore?`;
+What would you like to explore together?`;
 }

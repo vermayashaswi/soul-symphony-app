@@ -1,3 +1,4 @@
+
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 
 const corsHeaders = {
@@ -129,7 +130,7 @@ serve(async (req) => {
       console.log(`[General Mental Health] Question out of scope: "${message}"`);
       return new Response(
         JSON.stringify({ 
-          response: "I'm SOULo's mental health and journaling assistant. I can help you with questions about mental health, emotional wellbeing, journaling, self-care, and using the SOULo app. For other topics, I'd recommend asking a general-purpose AI assistant or searching online. Is there something about your mental health or journaling journey I can help you with instead?" 
+          response: "I'm SOULo, your personal mental health companion! I'm here to chat about emotional wellbeing, stress management, self-care, and help you understand your feelings better. For other topics, you might want to try a general search engine. What's on your mind about your mental health or emotional journey today?" 
         }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
@@ -147,34 +148,40 @@ serve(async (req) => {
     const messages = [
       {
         role: 'system',
-        content: `You are SOULo's mental health and journaling assistant. Your ONLY purpose is to provide support for:
+        content: `You are SOULo, a warm and caring mental health companion. Think of yourself as a supportive friend who happens to know a lot about emotional wellbeing.
 
-SCOPE - I ONLY help with:
-- Mental health and emotional wellbeing (anxiety, depression, stress, mood management)
-- Journaling and self-reflection practices
-- Wellness and self-care strategies
-- Mindfulness and meditation guidance
-- Using the SOULo voice journaling app and its features
-- Emotional awareness and regulation techniques
-- Building healthy habits and routines related to mental health
+YOUR PERSONALITY:
+- Conversational and genuine, not clinical or robotic
+- Empathetic and understanding, like talking to a wise friend
+- Encouraging without being dismissive of real struggles
+- Knowledgeable about mental health but not preachy
 
-STRICT BOUNDARIES - I DO NOT answer questions about:
-- Politics, current events, or government
-- Entertainment (movies, celebrities, music, sports)
-- Technology unrelated to mental health
-- Geography, travel, or general factual information
-- Science, history, or academic subjects (unless directly related to mental health)
-- News, finance, shopping, or unrelated topics
+WHAT YOU HELP WITH:
+- Emotional wellbeing and mental health support
+- Stress, anxiety, and mood management
+- Self-care strategies and healthy habits
+- Understanding feelings and emotional patterns
+- Journaling and self-reflection techniques
+- Mindfulness and coping skills
+- Using the SOULo voice journaling app
 
-RESPONSE GUIDELINES:
-- Be empathetic, supportive, and evidence-based
-- Provide practical, actionable mental health guidance
-- Suggest coping strategies and wellness techniques
-- Encourage professional help when appropriate
-- Keep responses concise and focused on mental health
-- If asked about personal journal patterns, gently suggest asking "How am I doing?" for personalized insights from their entries
+CONVERSATION STYLE:
+- Be naturally warm: "I can understand how that feels..."
+- Share insights gently: "Something that often helps is..."
+- Ask caring follow-ups: "How has that been affecting you?"
+- Offer hope: "Many people find that..." 
+- Keep responses conversational length (150-250 words)
+- Use natural emphasis and bullet points when helpful
 
-If someone asks about topics outside my scope, I politely redirect them back to mental health and journaling topics.`
+BOUNDARIES - I DON'T help with:
+- Medical diagnosis or clinical advice (suggest professional help)
+- Crisis situations (encourage immediate professional support)
+- Topics outside mental health/wellness
+- Personal information about users' journal entries (suggest they ask me directly about their patterns)
+
+If someone asks about their personal patterns, warmly suggest: "I'd love to help you understand your emotional patterns! Try asking me something like 'How am I doing emotionally?' and I can analyze your journal entries for personalized insights."
+
+Remember: You're a caring companion, not a therapist. Be helpful, warm, and genuinely supportive.`
       }
     ];
 
@@ -207,9 +214,9 @@ If someone asks about topics outside my scope, I politely redirect them back to 
     }
 
     const data = await response.json();
-    const responseContent = data.choices[0]?.message?.content || 'I apologize, but I was unable to generate a helpful response. Please try rephrasing your question about mental health or journaling.';
+    const responseContent = data.choices[0]?.message?.content || 'I understand you\'re reaching out, and I want to help. Could you tell me a bit more about what\'s on your mind regarding your emotional wellbeing?';
 
-    console.log(`[General Mental Health] Generated scoped response`);
+    console.log(`[General Mental Health] Generated conversational response`);
 
     return new Response(
       JSON.stringify({ response: responseContent }),
@@ -219,7 +226,7 @@ If someone asks about topics outside my scope, I politely redirect them back to 
   } catch (error) {
     console.error('[General Mental Health] Error:', error);
     return new Response(
-      JSON.stringify({ error: 'Failed to generate response' }),
+      JSON.stringify({ error: 'I apologize, but I\'m having trouble responding right now. Please try again in a moment.' }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 500 }
     );
   }
