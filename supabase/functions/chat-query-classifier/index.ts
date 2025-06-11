@@ -7,7 +7,7 @@ const corsHeaders = {
 };
 
 /**
- * ENHANCED GPT-powered message classifier with PRIORITY personal pronoun detection
+ * ENHANCED GPT-powered message classifier with conversational flow prioritization
  */
 serve(async (req) => {
   // Handle CORS preflight requests
@@ -25,7 +25,7 @@ serve(async (req) => {
       );
     }
 
-    console.log(`[Query Classifier] ENHANCED classification with PRIORITY personal pronoun detection: "${message}"`);
+    console.log(`[Query Classifier] Conversational classification for: "${message}"`);
 
     // Get OpenAI API key
     const openAiApiKey = Deno.env.get('OPENAI_API_KEY');
@@ -38,7 +38,7 @@ serve(async (req) => {
       );
     }
 
-    // Use GPT for classification with ENHANCED personal pronoun handling
+    // Use GPT for classification with conversational prioritization
     const classification = await gptClassifyMessage(message, conversationContext, openAiApiKey);
 
     console.log(`[Query Classifier] Result: ${classification.category} (confidence: ${classification.confidence}) - UseAllEntries: ${classification.useAllEntries}`);
@@ -68,7 +68,7 @@ serve(async (req) => {
 });
 
 /**
- * ENHANCED GPT-powered classification with HIGHEST PRIORITY personal pronoun detection
+ * CONVERSATIONAL GPT-powered classification with human-like flow detection
  */
 async function gptClassifyMessage(
   message: string, 
@@ -86,27 +86,29 @@ async function gptClassifyMessage(
     ? `\nConversation context: ${conversationContext.slice(-3).map(msg => `${msg.role}: ${msg.content}`).join('\n')}`
     : '';
 
-  const classificationPrompt = `You are a friendly query classifier for SOULo, a personal voice journaling app that helps users understand their emotional patterns through conversational AI.
+  const classificationPrompt = `You're a friendly assistant helping classify user messages for SOULo, a voice journaling app. I need to determine how to respond naturally and helpfully.
 
-**CLASSIFICATION RULES:**
+**CLASSIFICATION TYPES:**
 
-1. **JOURNAL_SPECIFIC** - Questions about the user's personal patterns, emotions, or experiences
-   - PRIORITY TRIGGERS: Personal pronouns ("I", "me", "my", "how am I", "what makes me", etc.)
-   - Time-based personal questions: "How was I last week?", "What made me happy recently?"
-   - Pattern questions: "When do I feel...", "What triggers my..."
-   - useAllEntries = true UNLESS explicit time mentioned ("last week", "yesterday", etc.)
+1. **JOURNAL_SPECIFIC** - Personal questions about their own patterns/experiences
+   - "How am I doing?", "What makes me happy?", "Am I getting better at...?"
+   - Personal pronouns + seeking insights from their own data
+   - Use ALL entries unless specific time mentioned
 
-2. **GENERAL_MENTAL_HEALTH** - Educational questions about mental health topics
-   - "What is anxiety?", "How to manage stress?", "Signs of depression"
-   - General advice without personal context
+2. **GENERAL_MENTAL_HEALTH** - General advice/education questions
+   - "How to manage stress?", "What is anxiety?", "Tips for better sleep?"
+   - Educational content, not personal analysis
 
-3. **CONVERSATIONAL** - Greetings, thanks, clarifications
-   - "Hello", "Thank you", "How are you?", "What can you do?"
+3. **CONVERSATIONAL** - Natural chat/follow-ups
+   - "Thanks!", "That's helpful", "Tell me more", "How are you?"
+   - Conversational responses that keep the flow going
 
-**CRITICAL LOGIC:**
-- Personal pronouns = JOURNAL_SPECIFIC with confidence 0.9+
-- "How am I?" without time = useAllEntries: true (analyze everything)
-- "How was I yesterday?" = useAllEntries: false (respect time constraint)
+**KEY RULES:**
+- Personal pronouns ("I", "me", "my") = JOURNAL_SPECIFIC (high confidence)
+- "How am I?" without time = useAllEntries: true
+- "How was I yesterday?" = useAllEntries: false
+- Follow-ups and conversational flow = CONVERSATIONAL
+- Educational questions = GENERAL_MENTAL_HEALTH
 
 User message: "${message}"${contextString}
 
@@ -166,7 +168,7 @@ Respond with ONLY this JSON:
       confidence: Math.max(0, Math.min(1, result.confidence || 0.8)),
       shouldUseJournal: result.category === 'JOURNAL_SPECIFIC',
       useAllEntries: result.useAllEntries || false,
-      reasoning: result.reasoning || 'GPT classification with enhanced personal pronoun prioritization'
+      reasoning: result.reasoning || 'GPT classification with conversational flow prioritization'
     };
 
   } catch (error) {
@@ -176,7 +178,7 @@ Respond with ONLY this JSON:
 }
 
 /**
- * ENHANCED rule-based classification with PRIORITIZED personal pronoun detection
+ * ENHANCED rule-based classification with conversational flow support
  */
 function enhancedRuleBased_classifyMessage(message: string): {
   category: string;
@@ -189,52 +191,43 @@ function enhancedRuleBased_classifyMessage(message: string): {
   
   console.log(`[Rule-Based] Analyzing message: "${message}"`);
   
-  // PRIORITY 1: Check for personal pronouns - ABSOLUTE HIGHEST PRIORITY
+  // PRIORITY 1: Personal pronouns = JOURNAL_SPECIFIC
   const personalPronounPatterns = [
     /\b(i|me|my|mine|myself)\b/i,
     /\bam i\b/i,
-    /\bdo i\b/i,
     /\bhow am i\b/i,
-    /\bhow do i\b/i,
     /\bwhat makes me\b/i,
     /\bhow was i\b/i,
-    /\bwhat do i\b/i,
-    /\bwhere do i\b/i,
     /\bwhen do i\b/i,
-    /\bwhy do i\b/i,
-    /\bwhat about me\b/i,
-    /\bam i getting\b/i,
-    /\bwhat can i\b/i,
-    /\bwhat should i\b/i
+    /\bwhy do i\b/i
   ];
   
   for (const pattern of personalPronounPatterns) {
     if (pattern.test(lowerMessage)) {
-      // Check if there's an explicit temporal reference
-      const hasTemporalReference = /\b(last week|yesterday|this week|last month|today|recently|lately|this morning|last night)\b/i.test(lowerMessage);
-      
+      const hasTemporalReference = /\b(last week|yesterday|this week|last month|today|recently|lately)\b/i.test(lowerMessage);
       const useAllEntries = !hasTemporalReference;
       
-      console.log(`[Rule-Based] PERSONAL PRONOUNS DETECTED - Pattern: ${pattern}, Time ref: ${hasTemporalReference}, UseAllEntries: ${useAllEntries}`);
+      console.log(`[Rule-Based] PERSONAL PRONOUNS DETECTED - UseAllEntries: ${useAllEntries}`);
       
       return {
         category: "JOURNAL_SPECIFIC",
         confidence: 0.95,
         shouldUseJournal: true,
         useAllEntries: useAllEntries,
-        reasoning: `PERSONAL PRONOUNS DETECTED - automatically classified as journal-specific. ${hasTemporalReference ? 'Time constraint detected - will respect date range.' : 'No time constraint - will analyze ALL entries for comprehensive personal insights.'}`
+        reasoning: `Personal pronouns detected - journal analysis needed. ${hasTemporalReference ? 'Time constraint respected.' : 'Analyzing all entries for comprehensive insights.'}`
       };
     }
   }
   
-  // Enhanced conversational patterns (including typos/abbreviations)
+  // PRIORITY 2: Conversational patterns
   const conversationalPatterns = [
-    /^(hi|hello|hey|good morning|good afternoon|good evening|hii|helo)\b/i,
-    /^(thank you|thanks|thank u|thx|ty)\b/i,
-    /^(how are you|how do you|how r u|how r you)\b/i,
-    /^(what (are|is) you|who are you|tell me about yourself|wat r u)\b/i,
-    /^(can you|could you|would you|can u).{0,20}(help|assist|explain|clarify)\b/i,
-    /^(yes|no|okay|ok|sure|alright|ya|nah)\s*\.?\s*$/i
+    /^(hi|hello|hey|good morning|good afternoon|good evening)\b/i,
+    /^(thank you|thanks|thank u|thx)\b/i,
+    /^(how are you|how do you)\b/i,
+    /^(what (are|is) you|who are you)\b/i,
+    /^(yes|no|okay|ok|sure|ya)\s*\.?\s*$/i,
+    /^(that's|thats) (helpful|interesting|good|great)/i,
+    /^(tell me more|more about|can you explain)/i
   ];
   
   for (const pattern of conversationalPatterns) {
@@ -243,51 +236,17 @@ function enhancedRuleBased_classifyMessage(message: string): {
         category: "CONVERSATIONAL",
         confidence: 0.9,
         shouldUseJournal: false,
-        reasoning: "Conversational greeting or response (including common abbreviations/typos)"
+        reasoning: "Conversational response - maintaining natural flow"
       };
     }
   }
   
-  // Enhanced journal-specific indicators (with typo tolerance)
-  const journalSpecificIndicators = [
-    // Temporal patterns with personal context
-    /\bhow (was|am|did) i\b.{0,15}\b(last week|yesterday|today|this week|recently|lately)\b/i,
-    /\b(last week|yesterday|recently|lately|this week|last month)\b.{0,20}\bhow (was|am|did) i\b/i,
-    
-    // Personal trait/identity questions without pronouns
-    /\bmy (mental health|wellbeing|anxiety|depression|stress|personality|emotions)\b/i,
-    /\b(intro|extro)vert\b/i,
-    /\bwhat (type|kind) of person\b/i,
-    /\bmy (personality|character|nature|patterns|habits)\b/i,
-    
-    // Temporal references (even without complete sentences)
-    /\b(last week|yesterday|recently|lately|this week|last month)\b/i,
-    
-    // Questions with typos/missing words (but no personal pronouns)
-    /\bwat (makes|helps)\b/i, // "wat makes" without "me"
-    /\bhow r\b/i, // "how r" abbreviations
-  ];
-  
-  for (const pattern of journalSpecificIndicators) {
-    if (pattern.test(lowerMessage)) {
-      const hasTemporal = /\b(last week|yesterday|recently|lately|this week|last month)\b/i.test(lowerMessage);
-      
-      return {
-        category: "JOURNAL_SPECIFIC",
-        confidence: 0.8,
-        shouldUseJournal: true,
-        useAllEntries: !hasTemporal,
-        reasoning: "Contains journal-related context or temporal references (with typo tolerance)"
-      };
-    }
-  }
-  
-  // General mental health patterns (without personal context)
+  // PRIORITY 3: General mental health patterns
   const mentalHealthPatterns = [
-    /\b(anxiety|depression|stress|mental health|wellbeing|wellness)\b/i,
-    /\b(meditation|mindfulness|self[\s-]care|therapy|counseling)\b/i,
+    /\b(anxiety|depression|stress|mental health|wellbeing)\b/i,
+    /\b(meditation|mindfulness|self[\s-]care|therapy)\b/i,
     /\bwhat (are|is) (the )?(best|good|effective) (ways?|methods?|techniques?)\b/i,
-    /\bhow (to|can|do).{0,30}(improve|increase|reduce|manage|cope with|deal with)\b/i
+    /\bhow (to|can|do).{0,30}(improve|manage|cope with|deal with)\b/i
   ];
   
   for (const pattern of mentalHealthPatterns) {
@@ -296,7 +255,7 @@ function enhancedRuleBased_classifyMessage(message: string): {
         category: "GENERAL_MENTAL_HEALTH",
         confidence: 0.7,
         shouldUseJournal: false,
-        reasoning: "General mental health question without personal context"
+        reasoning: "General mental health question - educational response needed"
       };
     }
   }
@@ -307,6 +266,6 @@ function enhancedRuleBased_classifyMessage(message: string): {
     category: "CONVERSATIONAL",
     confidence: 0.6,
     shouldUseJournal: false,
-    reasoning: "No clear indicators for journal-specific or mental health categories"
+    reasoning: "Unclear intent - treating as conversational for natural flow"
   };
 }

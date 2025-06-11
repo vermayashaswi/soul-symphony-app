@@ -24,7 +24,7 @@ export async function processChatMessage(
   try {
     console.log('[ChatService] Processing message:', message);
     
-    // First classify the message to determine if it needs journal analysis
+    // First classify the message to determine the response approach
     const { data: classificationData, error: classificationError } = await supabase.functions.invoke('chat-query-classifier', {
       body: { message, conversationContext: [] }
     });
@@ -36,9 +36,9 @@ export async function processChatMessage(
     const classification = classificationData || { category: 'JOURNAL_SPECIFIC', shouldUseJournal: true };
     console.log('[ChatService] Message classification:', classification);
 
-    // Handle general mental health questions without journal analysis
+    // Handle general mental health questions with conversational flow
     if (classification.category === 'GENERAL_MENTAL_HEALTH' || classification.category === 'CONVERSATIONAL') {
-      console.log('[ChatService] Handling general question without journal analysis');
+      console.log('[ChatService] Handling general/conversational question');
       
       const generalResponse = await handleGeneralQuestion(message);
       return {
@@ -47,8 +47,8 @@ export async function processChatMessage(
       };
     }
 
-    // For journal-specific questions, proceed with the existing pipeline
-    console.log('[ChatService] Processing journal-specific question');
+    // For journal-specific questions, proceed with enhanced analysis
+    console.log('[ChatService] Processing journal-specific question with conversational approach');
     
     // Get current session for authentication
     const { data: { session }, error: sessionError } = await supabase.auth.getSession();
@@ -57,7 +57,7 @@ export async function processChatMessage(
       throw new Error('Authentication required');
     }
 
-    // Build conversation context
+    // Build conversation context for natural flow
     const { data: previousMessages } = await supabase
       .from('chat_messages')
       .select('content, sender, role, created_at')
@@ -72,14 +72,14 @@ export async function processChatMessage(
         timestamp: msg.created_at
       })) : [];
 
-    // Call smart-query-planner for journal analysis
+    // Call smart-query-planner for intelligent analysis
     const queryPlanResponse = await supabase.functions.invoke('smart-query-planner', {
       body: {
         message,
         userId,
         conversationContext,
         isFollowUp: conversationContext.length > 0,
-        preserveTopicContext: false,
+        preserveTopicContext: true,
         threadMetadata: {},
         isAnalysisFollowUp: false
       }
@@ -91,7 +91,7 @@ export async function processChatMessage(
 
     const queryPlan = queryPlanResponse.data?.queryPlan || {};
 
-    // Call chat-with-rag for journal analysis
+    // Call chat-with-rag for conversational journal analysis
     const ragResponse = await supabase.functions.invoke('chat-with-rag', {
       body: {
         message,
@@ -131,9 +131,8 @@ export async function processChatMessage(
 }
 
 async function handleGeneralQuestion(message: string): Promise<string> {
-  console.log('[ChatService] Generating general response for:', message);
+  console.log('[ChatService] Generating conversational response for:', message);
   
-  // Use OpenAI directly for general mental health questions
   try {
     const { data, error } = await supabase.functions.invoke('general-mental-health-chat', {
       body: { message }
@@ -141,17 +140,17 @@ async function handleGeneralQuestion(message: string): Promise<string> {
 
     if (error) {
       console.error('[ChatService] General chat error:', error);
-      return getGeneralMentalHealthFallback(message);
+      return getConversationalFallback(message);
     }
 
-    return data.response || getGeneralMentalHealthFallback(message);
+    return data.response || getConversationalFallback(message);
   } catch (error) {
     console.error('[ChatService] General chat exception:', error);
-    return getGeneralMentalHealthFallback(message);
+    return getConversationalFallback(message);
   }
 }
 
-function getGeneralMentalHealthFallback(message: string): string {
+function getConversationalFallback(message: string): string {
   const lowerMessage = message.toLowerCase();
   
   if (lowerMessage.includes('confident')) {
