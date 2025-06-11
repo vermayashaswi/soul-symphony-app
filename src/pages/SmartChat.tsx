@@ -365,7 +365,7 @@ export default function SmartChat() {
           />
         </div>
         
-        <div className="flex-1 p-4 relative">
+        <div className="flex-1 relative">
           {currentThreadId && (
             <div className="absolute top-4 right-4 z-10">
               <TooltipProvider>
