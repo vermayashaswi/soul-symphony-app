@@ -22,12 +22,14 @@ export const SubscriptionBadge: React.FC<SubscriptionBadgeProps> = ({
   className = "",
   size = "default"
 }) => {
+  const sizeClasses = size === 'sm' ? 'text-xs px-2 py-0.5' : 'text-xs px-2.5 py-0.5';
+  const iconSize = size === 'sm' ? 'w-3 h-3' : 'w-4 h-4';
+
   if (isLoading) {
     return (
       <Badge 
         variant="secondary" 
-        size={size}
-        className={cn("ml-2 animate-pulse", className)}
+        className={cn("ml-2 animate-pulse", sizeClasses, className)}
       >
         <div className="w-12 h-3 bg-muted-foreground/20 rounded" />
       </Badge>
@@ -38,10 +40,9 @@ export const SubscriptionBadge: React.FC<SubscriptionBadgeProps> = ({
     return (
       <Badge 
         variant="secondary" 
-        size={size}
-        className={cn("ml-2 bg-gradient-to-r from-blue-400 to-blue-600 text-white border-0 font-semibold", className)}
+        className={cn("ml-2 bg-gradient-to-r from-blue-400 to-blue-600 text-white border-0 font-semibold", sizeClasses, className)}
       >
-        <Clock className={cn("mr-1", size === 'sm' ? "w-3 h-3" : "w-4 h-4")} />
+        <Clock className={cn("mr-1", iconSize)} />
         <TranslatableText text="Trial" forceTranslate={true} />
       </Badge>
     );
@@ -51,10 +52,9 @@ export const SubscriptionBadge: React.FC<SubscriptionBadgeProps> = ({
     return (
       <Badge 
         variant="secondary" 
-        size={size}
-        className={cn("ml-2 bg-gradient-to-r from-yellow-400 to-orange-500 text-white border-0 font-semibold", className)}
+        className={cn("ml-2 bg-gradient-to-r from-yellow-400 to-orange-500 text-white border-0 font-semibold", sizeClasses, className)}
       >
-        <Crown className={cn("mr-1", size === 'sm' ? "w-3 h-3" : "w-4 h-4")} />
+        <Crown className={cn("mr-1", iconSize)} />
         <TranslatableText text="Premium" forceTranslate={true} />
       </Badge>
     );
@@ -63,10 +63,9 @@ export const SubscriptionBadge: React.FC<SubscriptionBadgeProps> = ({
   return (
     <Badge 
       variant="outline" 
-      size={size}
-      className={cn("ml-2 text-muted-foreground border-muted-foreground/30", className)}
+      className={cn("ml-2 text-muted-foreground border-muted-foreground/30", sizeClasses, className)}
     >
-      <User className={cn("mr-1", size === 'sm' ? "w-3 h-3" : "w-4 h-4")} />
+      <User className={cn("mr-1", iconSize)} />
       <TranslatableText text="Free" forceTranslate={true} />
     </Badge>
   );
