@@ -57,7 +57,7 @@ export interface SmartChatInterfaceProps {
 const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({ mentalHealthInsights }) => {
   const [chatHistory, setChatHistory] = useState<ChatMessage[]>([]);
   const [initialLoading, setInitialLoading] = useState(true);
-  const [showSuggestions, setShowSuggestions] = useState(showSuggestions);
+  const [showSuggestions, setShowSuggestions] = useState(true);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [showDebugPanel, setShowDebugPanel] = useState(false);
   const { toast } = useToast();
