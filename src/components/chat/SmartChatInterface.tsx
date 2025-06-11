@@ -52,17 +52,9 @@ import {
 
 export interface SmartChatInterfaceProps {
   mentalHealthInsights?: MentalHealthInsights;
-  currentThreadId?: string | null;
-  onDeleteThread?: () => void;
-  isDeletionDisabled?: boolean;
 }
 
-const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({ 
-  mentalHealthInsights,
-  currentThreadId: propCurrentThreadId,
-  onDeleteThread,
-  isDeletionDisabled = false
-}) => {
+const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({ mentalHealthInsights }) => {
   const [chatHistory, setChatHistory] = useState<ChatMessage[]>([]);
   const [initialLoading, setInitialLoading] = useState(true);
   const [showSuggestions, setShowSuggestions] = useState(true);
@@ -75,9 +67,8 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({
   const loadedThreadRef = useRef<string | null>(null);
   const debugLog = useDebugLog();
   
-  // State for the current thread - use prop if provided, otherwise manage internally
-  const [internalThreadId, setInternalThreadId] = useState<string | null>(null);
-  const currentThreadId = propCurrentThreadId || internalThreadId;
+  // State for the current thread
+  const [currentThreadId, setCurrentThreadId] = useState<string | null>(null);
   
   // Use the GPT-based message classification hook
   const { classifyMessage, classification } = useChatMessageClassification();
@@ -95,7 +86,7 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({
   useEffect(() => {
     const onThreadChange = (event: CustomEvent) => {
       if (event.detail.threadId) {
-        setInternalThreadId(event.detail.threadId);
+        setCurrentThreadId(event.detail.threadId);
         loadThreadMessages(event.detail.threadId);
         debugLog.addEvent("Thread Change", `Thread selected: ${event.detail.threadId}`, "info");
       }
@@ -105,7 +96,7 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({
     
     const storedThreadId = localStorage.getItem("lastActiveChatThreadId");
     if (storedThreadId && user?.id) {
-      setInternalThreadId(storedThreadId);
+      setCurrentThreadId(storedThreadId);
       loadThreadMessages(storedThreadId);
       debugLog.addEvent("Initialization", `Loading stored thread: ${storedThreadId}`, "info");
     } else {
@@ -607,13 +598,6 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({
   };
 
   const handleDeleteCurrentThread = async () => {
-    if (onDeleteThread) {
-      // Use the parent's delete handler if provided
-      setShowDeleteDialog(false);
-      onDeleteThread();
-      return;
-    }
-
     if (!currentThreadId || !user?.id) {
       toast({
         title: "Error",
@@ -669,7 +653,7 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({
       if (error) throw error;
 
       if (threads && threads.length > 0) {
-        setInternalThreadId(threads[0].id);
+        setCurrentThreadId(threads[0].id);
         loadThreadMessages(threads[0].id);
         window.dispatchEvent(
           new CustomEvent('threadSelected', { 
@@ -690,7 +674,7 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({
           .single();
 
         if (!insertError && newThread) {
-          setInternalThreadId(newThread.id);
+          setCurrentThreadId(newThread.id);
           window.dispatchEvent(
             new CustomEvent('threadSelected', { 
               detail: { threadId: newThread.id } 
@@ -715,10 +699,12 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({
     }
   };
 
+  // Check if deletion should be disabled - use realtime processing state
+  const isDeletionDisabled = isProcessing || processingStatus === 'processing' || isLoading;
+
   return (
-    <div className="h-full flex flex-col">
-      {/* Sticky Header */}
-      <div className="sticky top-0 z-40 bg-background flex items-center justify-between py-3 px-4 border-b shrink-0">
+    <div className="chat-interface flex flex-col h-full">
+      <div className="chat-header flex items-center justify-between py-3 px-4 border-b">
         <h2 className="text-xl font-semibold"><TranslatableText text="Rūḥ" /></h2>
         
         <div className="flex items-center gap-2">
@@ -754,33 +740,26 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({
         </div>
       </div>
       
-      {/* Scrollable Content Area - This is the key fix */}
-      <div className="flex-1 min-h-0 overflow-hidden">
-        <div className="h-full overflow-y-auto">
-          {initialLoading ? (
-            <div className="flex items-center justify-center h-full">
-              <div className="animate-spin h-6 w-6 border-2 border-primary border-t-transparent rounded-full"></div>
-              <span className="ml-2 text-muted-foreground"><TranslatableText text="Loading conversation..." /></span>
-            </div>
-          ) : chatHistory.length === 0 ? (
-            <EmptyChatState />
-          ) : (
-            <>
-              <ChatArea 
-                chatMessages={chatHistory}
-                isLoading={isLoading || isProcessing}
-                processingStage={processingStage || undefined}
-                threadId={currentThreadId}
-                onInteractiveOptionClick={handleInteractiveOptionClick}
-              />
-              <div ref={chatBottomRef} />
-            </>
-          )}
-        </div>
+      <div className="chat-content flex-1 overflow-hidden">
+        {initialLoading ? (
+          <div className="flex items-center justify-center h-full">
+            <div className="animate-spin h-6 w-6 border-2 border-primary border-t-transparent rounded-full"></div>
+            <span className="ml-2 text-muted-foreground"><TranslatableText text="Loading conversation..." /></span>
+          </div>
+        ) : chatHistory.length === 0 ? (
+          <EmptyChatState />
+        ) : (
+          <ChatArea 
+            chatMessages={chatHistory}
+            isLoading={isLoading || isProcessing}
+            processingStage={processingStage || undefined}
+            threadId={currentThreadId}
+            onInteractiveOptionClick={handleInteractiveOptionClick}
+          />
+        )}
       </div>
       
-      {/* Sticky Footer */}
-      <div className="sticky bottom-0 bg-background border-t p-4 shrink-0">
+      <div className="chat-input-container bg-white border-t p-4">
         <div className="flex items-end gap-2">
           <div className="flex-1">
             <ChatInput 

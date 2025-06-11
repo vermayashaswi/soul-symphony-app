@@ -1,4 +1,3 @@
-
 import React, { createContext, useContext, useState } from 'react';
 
 // Provide a context with debugging functionality
@@ -49,71 +48,39 @@ export const DebugProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const [showRecorderDebug, setShowRecorderDebug] = useState<boolean>(false);
 
   const addLog = (...args: any[]) => {
-    try {
-      setLogs(prevLogs => [...prevLogs, ...args]);
-      console.log(...args);
-    } catch (error) {
-      console.error('Debug log error:', error);
-    }
+    setLogs(prevLogs => [...prevLogs, ...args]);
+    console.log(...args);
   };
 
   const addEvent = (...args: any[]) => {
-    try {
-      setLogs(prevLogs => [...prevLogs, { event: args }]);
-      console.debug('Event:', ...args);
-    } catch (error) {
-      console.error('Debug event error:', error);
-    }
+    setLogs(prevLogs => [...prevLogs, { event: args }]);
+    console.debug('Event:', ...args);
   };
 
   const clearLogs = () => {
-    try {
-      setLogs([]);
-    } catch (error) {
-      console.error('Clear logs error:', error);
-    }
+    setLogs([]);
   };
 
   const toggleEnabled = () => {
-    try {
-      setIsEnabled(prev => !prev);
-    } catch (error) {
-      console.error('Toggle enabled error:', error);
-    }
+    setIsEnabled(prev => !prev);
   };
 
   const addRecorderStep = (step: DebugStep) => {
-    try {
-      setRecorderSteps(prevSteps => [...prevSteps, { ...step, timestamp: Date.now() }]);
-    } catch (error) {
-      console.error('Add recorder step error:', error);
-    }
+    setRecorderSteps(prevSteps => [...prevSteps, { ...step, timestamp: Date.now() }]);
   };
 
   const updateRecorderStep = (id: string, updates: Partial<DebugStep>) => {
-    try {
-      setRecorderSteps(prevSteps =>
-        prevSteps.map(step => (step.id === id ? { ...step, ...updates, duration: Date.now() - (step.timestamp || Date.now()) } : step))
-      );
-    } catch (error) {
-      console.error('Update recorder step error:', error);
-    }
+    setRecorderSteps(prevSteps =>
+      prevSteps.map(step => (step.id === id ? { ...step, ...updates, duration: Date.now() - (step.timestamp || Date.now()) } : step))
+    );
   };
 
   const resetRecorderSteps = () => {
-    try {
-      setRecorderSteps([]);
-    } catch (error) {
-      console.error('Reset recorder steps error:', error);
-    }
+    setRecorderSteps([]);
   };
 
   const toggleRecorderDebug = () => {
-    try {
-      setShowRecorderDebug(prev => !prev);
-    } catch (error) {
-      console.error('Toggle recorder debug error:', error);
-    }
+    setShowRecorderDebug(prev => !prev);
   };
 
   return (
@@ -136,24 +103,4 @@ export const DebugProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   );
 };
 
-export const useDebugLog = () => {
-  try {
-    return useContext(DebugContext);
-  } catch (error) {
-    console.error('useDebugLog error:', error);
-    return {
-      logs: [],
-      addLog: () => {},
-      addEvent: () => {},
-      clearLogs: () => {},
-      isEnabled: false,
-      toggleEnabled: () => {},
-      recorderSteps: [],
-      addRecorderStep: () => {},
-      updateRecorderStep: () => {},
-      resetRecorderSteps: () => {},
-      showRecorderDebug: false,
-      toggleRecorderDebug: () => {},
-    };
-  }
-};
+export const useDebugLog = () => useContext(DebugContext);
