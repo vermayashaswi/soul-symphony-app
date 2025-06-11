@@ -1,4 +1,3 @@
-
 import { useEffect, useState, useRef } from "react";
 import { SmartChatInterface } from "@/components/chat/SmartChatInterface";
 import MobileChatInterface from "@/components/chat/mobile/MobileChatInterface";
@@ -355,7 +354,7 @@ export default function SmartChat() {
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
-        className="smart-chat-container w-full h-[calc(100vh)] flex"
+        className="smart-chat-container w-full h-screen flex"
         ref={chatContainerRef}
       >
         <div className="w-72 h-full border-r">
