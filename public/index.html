@@ -3,12 +3,42 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <link rel="icon" type="image/svg+xml" href="/favicon.ico" />
+  
+  <!-- Favicons and Icons -->
+  <link rel="icon" type="image/png" sizes="32x32" href="/icons/favicon-32x32.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/icons/favicon-16x16.png">
+  <link rel="icon" type="image/png" sizes="96x96" href="/icons/favicon-96x96.png">
+  
+  <!-- Apple Touch Icons -->
+  <link rel="apple-touch-icon" sizes="57x57" href="/icons/apple-icon-57x57.png">
+  <link rel="apple-touch-icon" sizes="60x60" href="/icons/apple-icon-60x60.png">
+  <link rel="apple-touch-icon" sizes="72x72" href="/icons/apple-icon-72x72.png">
+  <link rel="apple-touch-icon" sizes="76x76" href="/icons/apple-icon-76x76.png">
+  <link rel="apple-touch-icon" sizes="114x114" href="/icons/apple-icon-114x114.png">
+  <link rel="apple-touch-icon" sizes="120x120" href="/icons/apple-icon-120x120.png">
+  <link rel="apple-touch-icon" sizes="144x144" href="/icons/apple-icon-144x144.png">
+  <link rel="apple-touch-icon" sizes="152x152" href="/icons/apple-icon-152x152.png">
+  <link rel="apple-touch-icon" sizes="180x180" href="/icons/apple-icon-180x180.png">
+  
+  <!-- Android Chrome -->
+  <link rel="icon" type="image/png" sizes="192x192" href="/icons/android-icon-192x192.png">
+  
+  <!-- PWA Manifest -->
+  <link rel="manifest" href="/manifest.json">
+  
+  <!-- Mobile Viewport and PWA Meta Tags -->
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-  <meta name="theme-color" content="#ffffff" />
-  <meta name="msapplication-TileColor" content="#ffffff" />
+  <meta name="apple-mobile-web-app-title" content="SOULo" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  
+  <!-- Theme Colors -->
+  <meta name="theme-color" content="#8b5cf6" />
+  <meta name="msapplication-TileColor" content="#8b5cf6" />
+  <meta name="msapplication-TileImage" content="/icons/android-icon-144x144.png" />
+  <meta name="msapplication-navbutton-color" content="#8b5cf6" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   
   <!-- Primary Meta Tags -->
   <title>SOULo - Express. Reflect. Grow | Voice Journaling with AI</title>
@@ -21,14 +51,14 @@
   <meta property="og:url" content="https://soulo.online">
   <meta property="og:title" content="SOULo - Voice Journaling for Self-Discovery">
   <meta property="og:description" content="Express your thoughts through voice, reflect on your emotions with AI insights, and grow through personalized guidance.">
-  <meta property="og:image" content="https://soulo.online/opengraph-image.png">
+  <meta property="og:image" content="https://soulo.online/icons/icon-512x512.png">
   
   <!-- Twitter -->
   <meta property="twitter:card" content="summary_large_image">
   <meta property="twitter:url" content="https://soulo.online">
   <meta property="twitter:title" content="SOULo - Voice Journaling for Self-Discovery">
   <meta property="twitter:description" content="Express your thoughts through voice, reflect on your emotions with AI insights, and grow through personalized guidance.">
-  <meta property="twitter:image" content="https://soulo.online/twitter-image.png">
+  <meta property="twitter:image" content="https://soulo.online/icons/icon-512x512.png">
   
   <!-- Fonts -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -48,6 +78,7 @@
       height: 100%;
       -webkit-tap-highlight-color: transparent;
       font-family: 'Inter', sans-serif;
+      background-color: #8b5cf6;
     }
     /* Add a simple loading state */
     #root:empty:before {
@@ -60,8 +91,8 @@
       left: 50%;
       margin: -25px 0 0 -25px;
       border-radius: 50%;
-      border: 5px solid #f3f3f3;
-      border-top-color: #3b82f6;
+      border: 5px solid rgba(255, 255, 255, 0.3);
+      border-top-color: #ffffff;
       animation: spin 1s linear infinite;
     }
     @keyframes spin {
@@ -77,11 +108,33 @@
     html {
       -webkit-text-size-adjust: 100%;
     }
+    /* PWA display mode detection */
+    @media (display-mode: standalone) {
+      body {
+        padding-top: env(safe-area-inset-top);
+        padding-bottom: env(safe-area-inset-bottom);
+      }
+    }
   </style>
 </head>
 <body>
   <div id="root"></div>
   <script src="https://cdn.gpteng.co/gptengineer.js" type="module"></script>
   <script type="module" src="/src/main.tsx"></script>
+  
+  <!-- PWA Service Worker Registration -->
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', function() {
+        navigator.serviceWorker.register('/sw.js')
+          .then(function(registration) {
+            console.log('[PWA] Service Worker registered successfully:', registration.scope);
+          })
+          .catch(function(error) {
+            console.log('[PWA] Service Worker registration failed:', error);
+          });
+      });
+    }
+  </script>
 </body>
 </html>

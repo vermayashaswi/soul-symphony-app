@@ -9,6 +9,7 @@ import { AuthProvider } from './contexts/AuthContext'
 import { ThemeProvider } from './hooks/use-theme'
 import { BrowserRouter } from 'react-router-dom'
 import { TranslationProvider } from './contexts/TranslationContext'
+import { pwaService } from './services/pwaService'
 
 // Enhanced Font Loading System
 const initializeFontSystem = async () => {
@@ -138,6 +139,44 @@ const fixViewportHeight = () => {
   }
 };
 
+// Initialize PWA functionality
+const initializePWA = () => {
+  console.log('[PWA] Initializing PWA functionality...');
+  
+  // Get PWA info
+  const pwaInfo = pwaService.getPWAInfo();
+  console.log('[PWA] Current state:', pwaInfo);
+  
+  // Set PWA class on document element
+  if (pwaInfo.isStandalone) {
+    document.documentElement.classList.add('pwa-standalone');
+  }
+  
+  // Add platform-specific classes
+  document.documentElement.classList.add(`platform-${pwaInfo.platform}`);
+  
+  // Listen for network changes
+  pwaService.onNetworkChange(
+    () => {
+      console.log('[PWA] Back online');
+      document.documentElement.classList.remove('offline');
+      document.documentElement.classList.add('online');
+    },
+    () => {
+      console.log('[PWA] Gone offline');
+      document.documentElement.classList.remove('online');
+      document.documentElement.classList.add('offline');
+    }
+  );
+  
+  // Set initial network state
+  if (pwaService.isOnline()) {
+    document.documentElement.classList.add('online');
+  } else {
+    document.documentElement.classList.add('offline');
+  }
+};
+
 // Initialize systems
 const initializeApp = async () => {
   // Initialize font system first
@@ -145,6 +184,9 @@ const initializeApp = async () => {
   
   // Initialize viewport fix
   fixViewportHeight();
+  
+  // Initialize PWA functionality
+  initializePWA();
   
   // Detect iOS and set a class on the HTML element
   if (/iPad|iPhone|iPod/.test(navigator.userAgent) || 
