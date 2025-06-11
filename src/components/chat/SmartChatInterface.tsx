@@ -703,8 +703,8 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({ mentalHealthIns
   const isDeletionDisabled = isProcessing || processingStatus === 'processing' || isLoading;
 
   return (
-    <div className="chat-interface flex flex-col h-full">
-      <div className="chat-header sticky top-0 z-40 bg-background flex items-center justify-between py-3 px-4 border-b">
+    <div className="chat-interface flex flex-col h-full overflow-hidden">
+      <div className="chat-header sticky top-0 z-40 bg-background flex items-center justify-between py-3 px-4 border-b shrink-0">
         <h2 className="text-xl font-semibold"><TranslatableText text="Rūḥ" /></h2>
         
         <div className="flex items-center gap-2">
@@ -740,7 +740,7 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({ mentalHealthIns
         </div>
       </div>
       
-      <div className="chat-content flex-1 overflow-hidden">
+      <div className="chat-content flex-1 min-h-0 overflow-hidden">
         {initialLoading ? (
           <div className="flex items-center justify-center h-full">
             <div className="animate-spin h-6 w-6 border-2 border-primary border-t-transparent rounded-full"></div>
@@ -749,17 +749,20 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({ mentalHealthIns
         ) : chatHistory.length === 0 ? (
           <EmptyChatState />
         ) : (
-          <ChatArea 
-            chatMessages={chatHistory}
-            isLoading={isLoading || isProcessing}
-            processingStage={processingStage || undefined}
-            threadId={currentThreadId}
-            onInteractiveOptionClick={handleInteractiveOptionClick}
-          />
+          <div className="h-full overflow-y-auto">
+            <ChatArea 
+              chatMessages={chatHistory}
+              isLoading={isLoading || isProcessing}
+              processingStage={processingStage || undefined}
+              threadId={currentThreadId}
+              onInteractiveOptionClick={handleInteractiveOptionClick}
+            />
+            <div ref={chatBottomRef} />
+          </div>
         )}
       </div>
       
-      <div className="chat-input-container bg-white border-t p-4">
+      <div className="chat-input-container bg-background border-t p-4 shrink-0">
         <div className="flex items-end gap-2">
           <div className="flex-1">
             <ChatInput 

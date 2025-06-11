@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from 'react';
 import SmartChatInterface from '@/components/chat/SmartChatInterface';
 import { useAuth } from '@/contexts/AuthContext';
@@ -343,8 +344,10 @@ const Chat = () => {
 
   return (
     <PremiumFeatureGuard feature="chat">
-      <div className="w-full h-full flex flex-col">
-        <SmartChatInterface />
+      <div className="w-full h-screen flex flex-col overflow-hidden">
+        <div className="flex-1 min-h-0">
+          <SmartChatInterface />
+        </div>
       </div>
     </PremiumFeatureGuard>
   );
