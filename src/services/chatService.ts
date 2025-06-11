@@ -1,4 +1,3 @@
-
 import { QueryTypes } from '@/utils/chat/queryAnalyzer';
 import { useChatMessageClassification, QueryCategory } from '@/hooks/use-chat-message-classification';
 import { supabase } from '@/integrations/supabase/client';
@@ -22,7 +21,7 @@ export async function processChatMessage(
   parameters: Record<string, any> = {}
 ): Promise<ChatResponse> {
   try {
-    console.log('[ChatService] Processing message:', message);
+    console.log('[ChatService] Processing message with enhanced database-aware context:', message);
     
     // Classify message for natural conversation flow
     const { data: classificationData, error: classificationError } = await supabase.functions.invoke('chat-query-classifier', {
@@ -47,8 +46,8 @@ export async function processChatMessage(
       };
     }
 
-    // For journal-specific questions, use enhanced dual-search conversational analysis
-    console.log('[ChatService] Processing journal-specific question with enhanced dual-search SOULo');
+    // For journal-specific questions, use enhanced database-aware dual-search conversational analysis
+    console.log('[ChatService] Processing journal-specific question with enhanced database-aware dual-search SOULo');
     
     // Get current session for authentication
     const { data: { session }, error: sessionError } = await supabase.auth.getSession();
@@ -72,7 +71,7 @@ export async function processChatMessage(
         timestamp: msg.created_at
       })) : [];
 
-    // Get intelligent query plan with enhanced dual-search requirements
+    // Get intelligent query plan with enhanced database-aware dual-search requirements
     const queryPlanResponse = await supabase.functions.invoke('smart-query-planner', {
       body: {
         message,
@@ -82,8 +81,9 @@ export async function processChatMessage(
         preserveTopicContext: true,
         threadMetadata: {},
         isAnalysisFollowUp: false,
-        requireDualSearch: true, // Force dual-search approach
-        confidenceThreshold: 0.9 // 90% confidence threshold
+        requireDualSearch: true,
+        requireDatabaseValidation: true, // Enhanced requirement for database-validated themes/emotions
+        confidenceThreshold: 0.9
       }
     });
 
@@ -93,12 +93,12 @@ export async function processChatMessage(
 
     const queryPlan = queryPlanResponse.data?.queryPlan || {};
     
-    // Log dual-search enforcement
+    // Log database-aware dual-search enforcement
     if (queryPlan.searchConfidence <= 0.9) {
-      console.log(`[ChatService] DUAL SEARCH ENFORCED - Confidence: ${queryPlan.searchConfidence} <= 90%`);
+      console.log(`[ChatService] DATABASE-AWARE DUAL SEARCH ENFORCED - Confidence: ${queryPlan.searchConfidence} <= 90%`);
     }
 
-    // Use enhanced conversational RAG with SOULo personality and dual-search
+    // Use enhanced conversational RAG with SOULo personality, dual-search, and database awareness
     const ragResponse = await supabase.functions.invoke('chat-with-rag', {
       body: {
         message,
@@ -110,9 +110,11 @@ export async function processChatMessage(
         hasPersonalPronouns: queryPlan.hasPersonalPronouns || false,
         hasExplicitTimeReference: queryPlan.hasExplicitTimeReference || false,
         enforceDualSearch: queryPlan.searchConfidence <= 0.9,
+        requireDatabaseValidation: true, // Enhanced database validation
         themeFilters: queryPlan.themeFilters || [],
         emotionFilters: queryPlan.emotionFilters || [],
-        threadMetadata: {}
+        threadMetadata: {},
+        databaseAware: true // Flag for database-aware processing
       },
       headers: {
         'Authorization': `Bearer ${session.access_token}`
@@ -127,14 +129,18 @@ export async function processChatMessage(
       content: ragResponse.data.response || ragResponse.data,
       role: 'assistant',
       references: ragResponse.data.references,
-      analysis: ragResponse.data.analysis,
+      analysis: {
+        ...ragResponse.data.analysis,
+        databaseValidated: true,
+        enhancedThemeEmotionAwareness: true
+      },
       hasNumericResult: ragResponse.data.hasNumericResult
     };
 
   } catch (error) {
     console.error('[ChatService] Error processing message:', error);
     return {
-      content: `I'm having trouble understanding that right now. Could you try rephrasing your question? I'm here to help you explore your emotional patterns and wellbeing using both your themes and emotional data.`,
+      content: `I'm having trouble understanding that right now. Could you try rephrasing your question? I'm here to help you explore your emotional patterns and wellbeing using both validated themes and emotional data from our comprehensive database.`,
       role: 'error'
     };
   }

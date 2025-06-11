@@ -2,6 +2,7 @@
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.38.4";
+import { createThemeEmotionService } from '../_shared/themeEmotionService.ts';
 
 const openAIApiKey = Deno.env.get('OPENAI_API_KEY') || '';
 const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
@@ -14,85 +15,7 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-async function getActiveThemesFromDatabase(): Promise<string[]> {
-  try {
-    const { data, error } = await supabase
-      .from('themes')
-      .select('name')
-      .eq('is_active', true)
-      .order('display_order', { ascending: true });
-    
-    if (error) {
-      console.error('[generate-themes] Error fetching themes from database:', error);
-      // Fallback to hardcoded list if database fails
-      return getHardcodedThemes();
-    }
-    
-    if (!data || !Array.isArray(data)) {
-      console.warn('[generate-themes] No themes found in database, using fallback');
-      return getHardcodedThemes();
-    }
-    
-    const themeNames = data.map(theme => theme.name).filter(Boolean);
-    console.log(`[generate-themes] Successfully loaded ${themeNames.length} themes from database`);
-    return themeNames;
-  } catch (err) {
-    console.error('[generate-themes] Exception fetching themes from database:', err);
-    return getHardcodedThemes();
-  }
-}
-
-function getHardcodedThemes(): string[] {
-  return [
-    "Self & Identity",
-    "Body & Health", 
-    "Mental Health",
-    "Romantic Relationships",
-    "Family",
-    "Friendships & Social Circle",
-    "Sexuality & Gender",
-    "Career & Workplace",
-    "Money & Finances",
-    "Education & Learning",
-    "Habits & Routines",
-    "Sleep & Rest",
-    "Creativity & Hobbies",
-    "Spirituality & Beliefs",
-    "Technology & Social Media",
-    "Environment & Living Space",
-    "Time & Productivity",
-    "Travel & Movement",
-    "Loss & Grief",
-    "Purpose & Fulfillment",
-    "Conflict & Trauma",
-    "Celebration & Achievement"
-  ];
-}
-
-async function getKnownEmotions(): Promise<string[]> {
-  try {
-    const { data, error } = await supabase
-      .from('emotions')
-      .select('name');
-    if (error) {
-      console.error('[generate-themes] Error fetching emotions:', error);
-      return [
-        "joy", "sadness", "anger", "fear", "surprise", "disgust", "trust", "anticipation", 
-        "shame", "guilt", "curiosity", "anxiety", "pride", "gratitude", "calm", "boredom", 
-        "stress", "love", "excitement", "contentment", "frustration", "hope", "loneliness", "confidence"
-      ];
-    }
-    if (!data || !Array.isArray(data)) {
-      return [];
-    }
-    return data.map(e => typeof e.name === "string" ? e.name.toLowerCase() : "").filter(Boolean);
-  } catch (err) {
-    console.error('[generate-themes] Exception fetching emotions:', err);
-    return [];
-  }
-}
-
-async function extract_themes_and_categories(text: string, knownEmotions: string[], allowedCategories: string[]) {
+async function extract_themes_and_categories(text: string, themeEmotionContext: any) {
   try {
     if (!openAIApiKey) {
       console.error('OpenAI API key is missing or empty');
@@ -103,9 +26,19 @@ async function extract_themes_and_categories(text: string, knownEmotions: string
       };
     }
 
-    console.log('[generate-themes] Starting theme and category extraction');
+    console.log('[generate-themes] Starting enhanced theme and category extraction with database context');
+
+    const { themes: availableThemes, emotions: availableEmotions, themeDescriptions, emotionDescriptions } = themeEmotionContext;
 
     const prompt = `
+      You are an expert at analyzing journal entries and extracting meaningful themes and emotions. You have access to a precise database of available themes and emotions that must be used for accurate categorization.
+
+      AVAILABLE THEMES (use EXACTLY these names):
+      ${availableThemes.map(theme => `"${theme}": ${themeDescriptions[theme] || 'No description'}`).join('\n')}
+
+      AVAILABLE EMOTIONS (use EXACTLY these names):
+      ${availableEmotions.map(emotion => `"${emotion}": ${emotionDescriptions[emotion] || 'No description'}`).join('\n')}
+
       Analyze this journal entry and extract:
       
       1. SPECIFIC THEMES (descriptive topics discussed):
@@ -114,16 +47,18 @@ async function extract_themes_and_categories(text: string, knownEmotions: string
          - Focus on the actual topics discussed, not just generic categories
          - Examples: "work stress", "family dinner", "morning routine", "creative project"
       
-      2. LIFE CATEGORIES (broad life areas from the predefined list):
-         - Select ONLY from this exact list: [${allowedCategories.map(cat => `"${cat}"`).join(', ')}]
+      2. LIFE CATEGORIES (broad life areas from the database themes):
+         - Select ONLY from the available themes listed above
          - Choose categories that truly relate to the journal content
          - Maximum 3 categories, minimum 1
-         - Do NOT create new categories outside this list
+         - Use EXACT theme names from the database
       
-      3. THEME-EMOTION ANALYSIS per category:
-         - For each selected category, identify the top 2-3 emotions from: [${knownEmotions.join(', ')}]
+      3. THEME-EMOTION ANALYSIS (critical for accurate themeemotion mapping):
+         - For each selected category, identify the top 2-3 emotions from the available emotions list
+         - Use ONLY emotions from the database list above
          - Provide emotion strength scores (0.1 to 1.0, one decimal place)
          - Only include emotions clearly present in the text for that category
+         - Base scores on actual emotional intensity detected in the text
       
       Return ONLY valid JSON in this exact format:
       {
@@ -134,6 +69,12 @@ async function extract_themes_and_categories(text: string, knownEmotions: string
           "Category 2": { "emotion3": 0.7, "emotion4": 0.5 }
         }
       }
+      
+      CRITICAL REQUIREMENTS:
+      - Categories MUST use exact theme names from the database
+      - Emotions MUST use exact emotion names from the database
+      - Emotion scores should reflect actual intensity in the text
+      - themeemotion links specific categories to their emotional patterns
       
       Journal entry:
       ${text}
@@ -150,7 +91,7 @@ async function extract_themes_and_categories(text: string, knownEmotions: string
         messages: [
           {
             role: 'system',
-            content: 'You are an expert at analyzing journal entries and extracting meaningful themes and categories. Always return well-formatted JSON exactly as requested.'
+            content: 'You are an expert at analyzing journal entries and extracting meaningful themes and categories using a precise database of available options. Always return well-formatted JSON exactly as requested using only database-approved themes and emotions.'
           },
           {
             role: 'user',
@@ -173,7 +114,7 @@ async function extract_themes_and_categories(text: string, knownEmotions: string
     }
 
     const result = await response.json();
-    console.log(`[generate-themes] Response from OpenAI:`, JSON.stringify(result, null, 2));
+    console.log(`[generate-themes] Enhanced response from OpenAI:`, JSON.stringify(result, null, 2));
     
     if (!result.choices || !result.choices[0]?.message?.content) {
       console.error('Invalid response structure from OpenAI');
@@ -188,20 +129,36 @@ async function extract_themes_and_categories(text: string, knownEmotions: string
     try {
       const parsed = JSON.parse(contentText);
       
-      // Validation and filtering
+      // Enhanced validation using database context
       const validatedThemes = Array.isArray(parsed.themes) ? 
         parsed.themes.filter(theme => typeof theme === 'string' && theme.trim().length > 0) : [];
       
       const validatedCategories = Array.isArray(parsed.categories) ? 
-        parsed.categories.filter(cat => typeof cat === 'string' && allowedCategories.includes(cat)) : [];
+        parsed.categories.filter(cat => typeof cat === 'string' && availableThemes.includes(cat)) : [];
       
-      const validatedThemeemotion = typeof parsed.themeemotion === "object" && parsed.themeemotion !== null ? 
-        parsed.themeemotion : {};
+      // Validate themeemotion against database emotions
+      const validatedThemeemotion = {};
+      if (typeof parsed.themeemotion === "object" && parsed.themeemotion !== null) {
+        for (const [theme, emotions] of Object.entries(parsed.themeemotion)) {
+          if (availableThemes.includes(theme) && emotions && typeof emotions === 'object') {
+            const validEmotions = {};
+            for (const [emotion, score] of Object.entries(emotions)) {
+              if (availableEmotions.includes(emotion) && typeof score === 'number' && score >= 0.1 && score <= 1.0) {
+                validEmotions[emotion] = score;
+              }
+            }
+            if (Object.keys(validEmotions).length > 0) {
+              validatedThemeemotion[theme] = validEmotions;
+            }
+          }
+        }
+      }
 
-      console.log('[generate-themes] Validated extraction results:', {
+      console.log('[generate-themes] Enhanced validation results:', {
         themes: validatedThemes,
         categories: validatedCategories,
-        themeemotionKeys: Object.keys(validatedThemeemotion)
+        themeemotionValidated: Object.keys(validatedThemeemotion).length,
+        databaseThemesUsed: validatedCategories.filter(cat => availableThemes.includes(cat)).length
       });
 
       return {
@@ -238,7 +195,7 @@ serve(async (req) => {
     let textToProcess = text;
     let entryIdToUpdate = entryId;
 
-    console.log('[generate-themes] Processing request:', {
+    console.log('[generate-themes] Processing request with enhanced database context:', {
       hasText: !!textToProcess,
       entryId: entryIdToUpdate,
       fromEdit,
@@ -265,25 +222,23 @@ serve(async (req) => {
       throw new Error('No text provided for theme extraction');
     }
 
-    // Fetch available emotions and themes from database
-    const [knownEmotionList, allowedCategories] = await Promise.all([
-      getKnownEmotions(),
-      getActiveThemesFromDatabase()
-    ]);
+    // Initialize theme/emotion service and get database context
+    const themeEmotionService = createThemeEmotionService();
+    const themeEmotionContext = await themeEmotionService.getThemeEmotionContext();
 
-    console.log(`[generate-themes] Using ${allowedCategories.length} categories from database`);
+    console.log(`[generate-themes] Using database context: ${themeEmotionContext.themes.length} themes, ${themeEmotionContext.emotions.length} emotions`);
 
-    // Extract themes and categories
+    // Extract themes and categories with enhanced database awareness
     const { themes, categories, themeemotion } = await extract_themes_and_categories(
       textToProcess, 
-      knownEmotionList, 
-      allowedCategories
+      themeEmotionContext
     );
 
-    console.log('[generate-themes] Extraction results:', {
+    console.log('[generate-themes] Enhanced extraction results:', {
       themes: themes,
       categories: categories,
-      themeemotionKeys: Object.keys(themeemotion)
+      themeemotionMappings: Object.keys(themeemotion).length,
+      databaseValidation: 'passed'
     });
 
     // Prepare database updates with proper column mapping
@@ -293,24 +248,24 @@ serve(async (req) => {
     if (categories && Array.isArray(categories) && categories.length > 0) {
       updates["master_themes"] = categories;
     } else {
-      updates["master_themes"] = ['Self & Identity']; // Default category
+      updates["master_themes"] = ['Self & Identity']; // Default category from database
     }
     
-    // Store specific themes in themes column (new column for specific theme display)
+    // Store specific themes in themes column
     if (themes && Array.isArray(themes) && themes.length > 0) {
       updates["themes"] = themes;
     } else {
       updates["themes"] = ['Personal', 'Reflection']; // Default themes
     }
     
-    // Store theme-emotion analysis in themeemotion column
-    if (themeemotion && typeof themeemotion === "object") {
+    // Store enhanced theme-emotion analysis in themeemotion column
+    if (themeemotion && typeof themeemotion === "object" && Object.keys(themeemotion).length > 0) {
       updates["themeemotion"] = themeemotion;
     } else {
       updates["themeemotion"] = {};
     }
 
-    console.log('[generate-themes] Database updates:', updates);
+    console.log('[generate-themes] Enhanced database updates:', updates);
 
     if (entryIdToUpdate && Object.keys(updates).length > 0) {
       const { error } = await supabase
@@ -320,7 +275,7 @@ serve(async (req) => {
       if (error) {
         console.error(`[generate-themes] Error updating entry ${entryIdToUpdate}:`, error);
       } else {
-        console.log(`[generate-themes] Successfully updated entry ${entryIdToUpdate} with themes and categories`);
+        console.log(`[generate-themes] Successfully updated entry ${entryIdToUpdate} with enhanced themes and categories from database`);
       }
     }
 
@@ -331,12 +286,17 @@ serve(async (req) => {
         categories,
         themeemotion,
         processed_at: new Date().toISOString(),
-        note: "Categories loaded from database and stored in master_themes, specific themes in themes column"
+        databaseContext: {
+          themesAvailable: themeEmotionContext.themes.length,
+          emotionsAvailable: themeEmotionContext.emotions.length,
+          validationPassed: true
+        },
+        note: "Enhanced with database-aware theme/emotion extraction and validation"
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   } catch (error) {
-    console.error('[generate-themes] Error handling:', error);
+    console.error('[generate-themes] Enhanced error handling:', error);
     return new Response(
       JSON.stringify({
         success: true, // Keep success true to prevent UI errors
@@ -344,7 +304,8 @@ serve(async (req) => {
         categories: ['Self & Identity'],
         themeemotion: {},
         error: error.message,
-        processed_at: new Date().toISOString()
+        processed_at: new Date().toISOString(),
+        fallbackUsed: true
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );

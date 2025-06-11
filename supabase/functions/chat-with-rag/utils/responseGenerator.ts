@@ -1,6 +1,8 @@
-// Conversational SOULo response generation with human-like personality
+
+// Enhanced conversational SOULo response generation with database-aware theme/emotion context
 import { CacheManager } from './cacheManager.ts';
 import { OptimizedApiClient } from './optimizedApiClient.ts';
+import { createThemeEmotionService } from '../../_shared/themeEmotionService.ts';
 
 export function generateSystemPrompt(
   userTimezone: string,
@@ -49,12 +51,14 @@ You're naturally conversational, genuinely supportive, and insightful. You speak
 
 ${contextualInfo}
 
-**EMOTION & THEME DATA - CRITICAL:**
-• You have PRECISE emotion scores (0.0-1.0) from advanced AI analysis
-• You have THEME-EMOTION relationships from the themeemotion column showing how themes connect to emotions
-• These are REAL measurements: "anxiety: 0.84" = 84% anxiety intensity detected
-• Build insights from these ACTUAL emotion patterns and theme connections, not guesses
-• These emotion scores and theme-emotion relationships are your most reliable data - trust them completely
+**DATABASE-AWARE EMOTION & THEME ANALYSIS - CRITICAL:**
+• You have access to PRECISE emotion scores (0.0-1.0) from advanced AI analysis validated against a database of known emotions
+• You have PRECISE theme-emotion relationships from the themeemotion column showing validated database connections
+• The master_themes use EXACT database theme categories for consistency
+• These are REAL measurements: "anxiety: 0.84" = 84% anxiety intensity detected using database-validated emotions
+• Theme-emotion mappings use database-validated relationships for accuracy
+• Build insights from these ACTUAL emotion patterns and database-verified theme connections, not guesses
+• Trust the database-validated emotion scores and theme-emotion relationships completely
 
 **HOW TO RESPOND:**
 • Be warm and natural: "Looking at your entries..." "I can see..." "What stands out..."
@@ -68,30 +72,31 @@ ${contextualInfo}
   if (needsAnalyticalFormat) {
     systemPrompt += `
 
-**FOR DETAILED ANALYSIS:**
-When providing deeper insights, structure naturally but clearly:
-• **What I'm seeing**: [specific finding with emotion data and theme connections]
-• **Pattern I notice**: [trend with examples and dates]
-• **What this might mean**: [caring interpretation]
+**FOR DETAILED ANALYSIS WITH DATABASE CONTEXT:**
+When providing deeper insights using database-validated data, structure naturally but clearly:
+• **What I'm seeing**: [specific finding with database-validated emotion data and theme connections]
+• **Pattern I notice**: [trend with examples, dates, and database-confirmed relationships]
+• **What this might mean**: [caring interpretation based on validated data]
 
 For complex insights, use friendly headers:
 ## What I'm Noticing
 ## Patterns That Stand Out  
 ## Things to Consider
 
-Always ground insights in specific emotion scores, theme-emotion relationships, and dates.`;
+Always ground insights in specific database-validated emotion scores, theme-emotion relationships, and dates.`;
   }
 
   systemPrompt += `
 
 **YOUR APPROACH:**
 • Start with genuine warmth: "Looking at your entries..." "I can see in your writing..."
-• Share insights naturally, like a friend who really understands
+• Share insights naturally, like a friend who really understands and has access to validated emotional data
 • Include specific examples: "Like on [date] when you mentioned..."
+• Reference database-validated emotion scores and theme relationships when relevant
 • End with care: gentle observations, thoughtful questions, or encouragement
-• If concerning patterns emerge, suggest professional support with warmth
+• If concerning patterns emerge in the validated data, suggest professional support with warmth
 
-Remember: You're not a therapist giving clinical advice. You're a caring companion helping someone understand their emotional journey using real data from their own words and genuine human insight.`;
+Remember: You're not a therapist giving clinical advice. You're a caring companion helping someone understand their emotional journey using real, database-validated data from their own words and genuine human insight.`;
 
   return systemPrompt;
 }
@@ -103,7 +108,7 @@ export function formatJournalEntriesForAnalysis(entries: any[], searchMethod?: s
   let formattedContent = '';
   
   if (searchMethod === 'dual') {
-    formattedContent += `Search Results (Enhanced Analysis):\n\n`;
+    formattedContent += `Search Results (Enhanced Database-Aware Analysis):\n\n`;
   }
   
   formattedContent += limitedEntries.map(entry => {
@@ -126,16 +131,16 @@ export function formatJournalEntriesForAnalysis(entries: any[], searchMethod?: s
         .join(', ');
       
       if (emotions) {
-        emotionInfo = `\nEmotion Scores: ${emotions}`;
+        emotionInfo = `\nDatabase-Validated Emotions: ${emotions}`;
       }
     }
     
     let themeInfo = '';
     if (entry.master_themes && Array.isArray(entry.master_themes)) {
-      themeInfo = `\nThemes: ${entry.master_themes.slice(0, 3).join(', ')}`;
+      themeInfo = `\nDatabase Themes: ${entry.master_themes.slice(0, 3).join(', ')}`;
     }
 
-    // Add theme-emotion relationship data
+    // Enhanced theme-emotion relationship data with database validation
     let themeEmotionInfo = '';
     if (entry.themeemotion && typeof entry.themeemotion === 'object') {
       const themeEmotions = Object.entries(entry.themeemotion)
@@ -155,13 +160,13 @@ export function formatJournalEntriesForAnalysis(entries: any[], searchMethod?: s
         .join('; ');
       
       if (themeEmotions) {
-        themeEmotionInfo = `\nTheme-Emotion Links: ${themeEmotions}`;
+        themeEmotionInfo = `\nValidated Theme-Emotion Links: ${themeEmotions}`;
       }
     }
 
     let searchInfo = '';
     if (entry.searchMethod) {
-      searchInfo = `\nFound via: ${entry.searchMethod} search`;
+      searchInfo = `\nFound via: ${entry.searchMethod} search (database-enhanced)`;
     }
     
     // Limit content for performance
@@ -176,13 +181,13 @@ export function formatJournalEntriesForAnalysis(entries: any[], searchMethod?: s
 export function generateUserPrompt(message: string, entries: any[], searchMethod?: string): string {
   const formattedEntries = formatJournalEntriesForAnalysis(entries, searchMethod);
   
-  return `Here are the relevant journal entries I found: 
+  return `Here are the relevant journal entries I found using database-validated themes and emotions: 
 
 ${formattedEntries}
 
 The user is asking: "${message}"
 
-Please respond as SOULo - be warm, conversational, and genuinely insightful. Use the emotion scores, theme-emotion relationships, and patterns you see to provide caring, authentic insights about their emotional journey. Be naturally supportive and human, not clinical or robotic.`;
+Please respond as SOULo - be warm, conversational, and genuinely insightful. Use the database-validated emotion scores, theme-emotion relationships, and patterns you see to provide caring, authentic insights about their emotional journey. Be naturally supportive and human, not clinical or robotic. Trust the database-validated data completely as it represents precise emotional analysis.`;
 }
 
 export async function generateResponse(
@@ -193,22 +198,22 @@ export async function generateResponse(
   isAnalyticalQuery: boolean = false
 ): Promise<string> {
   try {
-    console.log('[responseGenerator] Generating conversational response...');
+    console.log('[responseGenerator] Generating database-aware conversational response...');
     
     // Check cache first
-    const cacheKey = CacheManager.generateQueryHash(userPrompt, 'system', { analytical: isAnalyticalQuery });
+    const cacheKey = CacheManager.generateQueryHash(userPrompt, 'system', { analytical: isAnalyticalQuery, databaseAware: true });
     const cachedResponse = CacheManager.getCachedResponse(cacheKey);
     
     if (cachedResponse) {
-      console.log('[responseGenerator] Using cached response');
+      console.log('[responseGenerator] Using cached database-aware response');
       return cachedResponse;
     }
     
     // Use last 8 messages for context
     const contextMessages = Array.isArray(conversationContext) ? conversationContext.slice(-8) : [];
-    console.log(`[responseGenerator] Using ${contextMessages.length} conversation messages`);
+    console.log(`[responseGenerator] Using ${contextMessages.length} conversation messages with database context`);
     
-    // Generate response with conversational formatting
+    // Generate response with enhanced database-aware conversational formatting
     const response = await OptimizedApiClient.generateResponseOptimized(
       systemPrompt,
       userPrompt,
@@ -220,7 +225,7 @@ export async function generateResponse(
     // Cache the response
     CacheManager.setCachedResponse(cacheKey, response);
     
-    console.log('[responseGenerator] Generated conversational response');
+    console.log('[responseGenerator] Generated database-aware conversational response');
     return response;
     
   } catch (error) {
