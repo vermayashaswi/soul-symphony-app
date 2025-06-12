@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { Routes, Route, Navigate } from 'react-router-dom';
+import { Routes, Route, Navigate, Outlet } from 'react-router-dom';
 import Index from '@/pages/Index';
 import Home from '@/pages/Home';
 import Journal from '@/pages/Journal';
@@ -22,36 +22,39 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useOnboarding } from '@/hooks/use-onboarding';
 
 const AppRoutes = () => {
-  console.log('AppRoutes: Rendering at path:', window.location.pathname);
+  console.log('Rendering AppRoutes component');
   const { user } = useAuth();
   const { onboardingComplete } = useOnboarding();
   
-  // Simple app route redirect handler with safety checks
+  // This will be used for conditional rendering of the /app route
   const AppRootRedirect = () => {
-    console.log('AppRootRedirect:', { user: !!user, onboardingComplete });
+    console.log('AppRootRedirect - Auth status:', { 
+      user: !!user, 
+      onboardingComplete 
+    });
     
-    // Prevent infinite redirect loops by checking current path
-    const currentPath = window.location.pathname;
-    
-    if (currentPath === '/app/onboarding' || currentPath === '/app/auth' || currentPath === '/app/home') {
-      return null; // Don't redirect if already on target routes
-    }
-    
-    if (!user) {
+    if (user) {
+      if (onboardingComplete) {
+        // If user is logged in and onboarding is complete, go to home
+        console.log('User logged in and onboarding complete, redirecting to /app/home');
+        return <Navigate to="/app/home" replace />;
+      } else {
+        // If user is logged in but onboarding is not complete, go to onboarding
+        console.log('User logged in but onboarding not complete, redirecting to /app/onboarding');
+        return <Navigate to="/app/onboarding" replace />;
+      }
+    } else {
+      // If user is not logged in, go to onboarding
+      console.log('User not logged in, redirecting to /app/onboarding');
       return <Navigate to="/app/onboarding" replace />;
     }
-    
-    if (!onboardingComplete) {
-      return <Navigate to="/app/onboarding" replace />;
-    }
-    
-    return <Navigate to="/app/home" replace />;
   };
   
   return (
     <Routes>
+      {/* Wrap all routes that need ViewportManager in a parent Route */}
       <Route element={<ViewportManager />}>
-        {/* Marketing Website Routes - These should load without auth providers */}
+        {/* Website Routes - Now properly wrapped in translation context */}
         <Route path="/" element={<Index />} />
         <Route path="/privacy-policy" element={<PrivacyPolicyPage />} />
         <Route path="/faq" element={<FAQPage />} />
@@ -59,7 +62,7 @@ const AppRoutes = () => {
         <Route path="/blog" element={<BlogPage />} />
         <Route path="/blog/:slug" element={<BlogPostPage />} />
         
-        {/* App Routes */}
+        {/* App Routes - reordered to fix routing issue */}
         <Route path="/app/onboarding" element={<OnboardingScreen />} />
         <Route path="/app/auth" element={<Auth />} />
         
@@ -68,13 +71,17 @@ const AppRoutes = () => {
           <Route index element={<AppRootRedirect />} />
           <Route path="home" element={<Home />} />
           <Route path="journal" element={<Journal />} />
-          <Route path="insights" element={<Insights />} />
+          <Route path="insights" element={
+            <React.Suspense fallback={<div className="flex items-center justify-center h-screen">Loading...</div>}>
+              <Insights />
+            </React.Suspense>
+          } />
           <Route path="chat" element={<Chat />} />
           <Route path="smart-chat" element={<SmartChat />} />
           <Route path="settings" element={<Settings />} />
         </Route>
         
-        {/* Legacy Route Redirects */}
+        {/* Legacy Route Redirects - all app features redirect to /app/ routes */}
         <Route path="/auth" element={<Navigate to="/app/auth" replace />} />
         <Route path="/onboarding" element={<Navigate to="/app/onboarding" replace />} />
         <Route path="/home" element={<Navigate to="/app/home" replace />} />

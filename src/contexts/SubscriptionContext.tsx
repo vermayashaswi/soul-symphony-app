@@ -1,5 +1,6 @@
+
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { useAuth } from './SimplifiedAuthContext';
+import { useAuth } from './AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { subscriptionErrorHandler } from '@/services/subscriptionErrorHandler';
 

@@ -19,21 +19,15 @@ export const SplashScreenWrapper: React.FC<SplashScreenWrapperProps> = ({
     minDisplayTime
   });
 
-  // Always render children to prevent app blocking
-  // Splash screen is an overlay, not a blocker
   return (
     <>
-      {isVisible && (
-        <SplashScreen 
-          isVisible={isVisible}
-          onComplete={hideSplashScreen}
-        />
-      )}
+      <SplashScreen 
+        isVisible={isVisible}
+        onComplete={hideSplashScreen}
+      />
       
-      {/* Always render app content, splash is just an overlay */}
-      <div style={{ visibility: isVisible ? 'hidden' : 'visible' }}>
-        {children}
-      </div>
+      {/* Only render app content when ready and splash is hidden */}
+      {isAppReady && !isVisible && children}
     </>
   );
 };

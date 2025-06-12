@@ -9,16 +9,13 @@ const ProtectedRoute: React.FC = () => {
   const location = useLocation();
   
   useEffect(() => {
-    console.log('ProtectedRoute: Checking auth at', location.pathname);
-    
     const checkAuth = async () => {
       try {
         const { data } = await supabase.auth.getSession();
         setUser(data.session?.user || null);
-        console.log('ProtectedRoute: Auth check complete', { user: !!data.session?.user });
+        setIsLoading(false);
       } catch (error) {
-        console.error('ProtectedRoute: Auth check error:', error);
-      } finally {
+        console.error('Error checking authentication in ProtectedRoute:', error);
         setIsLoading(false);
       }
     };
@@ -26,13 +23,20 @@ const ProtectedRoute: React.FC = () => {
     checkAuth();
     
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      console.log('ProtectedRoute: Auth state changed', { event, user: !!session?.user });
       setUser(session?.user || null);
       setIsLoading(false);
     });
     
     return () => subscription.unsubscribe();
   }, []);
+  
+  useEffect(() => {
+    if (!isLoading && !user) {
+      console.log("Protected route: No user, should redirect to /app/onboarding", {
+        path: location.pathname
+      });
+    }
+  }, [user, isLoading, location]);
   
   if (isLoading) {
     return (
@@ -43,10 +47,11 @@ const ProtectedRoute: React.FC = () => {
   }
   
   if (!user) {
-    console.log('ProtectedRoute: No user, redirecting to onboarding');
+    console.log("Redirecting to onboarding from protected route:", location.pathname);
     return <Navigate to={`/app/onboarding?redirectTo=${location.pathname}`} replace />;
   }
   
+  // Use Outlet to render child routes
   return <Outlet />;
 };
 

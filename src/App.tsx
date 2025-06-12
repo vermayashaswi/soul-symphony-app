@@ -1,70 +1,111 @@
 
-import { Suspense } from "react";
-import { BrowserRouter as Router } from "react-router-dom";
+import { Suspense, useEffect } from "react";
+import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-dom";
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { ThemeProvider as NextThemeProvider } from "next-themes";
-import { ThemeProvider as CustomThemeProvider } from "@/hooks/use-theme";
-import { ErrorBoundary } from "@/components/ErrorBoundary";
-import SafeAppRoutes from "./routes/SafeAppRoutes";
-import EmergencyFallback from "./routes/EmergencyFallback";
-import "./App.css";
-
-// Simplified context providers - only include essential ones
-import { AuthProvider } from "@/contexts/SimplifiedAuthContext";
+import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import { SubscriptionProvider } from "@/contexts/SubscriptionContext";
+import { LocationProvider } from "@/contexts/LocationContext";
 import { TranslationProvider } from "@/contexts/TranslationContext";
 import { TutorialProvider } from "@/contexts/TutorialContext";
+import { ThemeProvider } from "next-themes";
+import { JournalProcessingInitializer } from '@/app/journal-processing-init';
+import { SplashScreenWrapper } from '@/components/splash/SplashScreenWrapper';
+import { useOnboarding } from '@/hooks/use-onboarding';
+import { routes } from "./routes/routeConfig";
+import { isAppRoute } from "./routes/RouteHelpers";
+import ProtectedRoute from "./routes/ProtectedRoute";
+import OnboardingCheck from "./routes/OnboardingCheck";
+import ViewportManager from "./routes/ViewportManager";
+import { useLocation } from "react-router-dom";
+import "./App.css";
 
-const queryClient = new QueryClient({
-  defaultOptions: {
-    queries: {
-      retry: 1,
-      refetchOnWindowFocus: false,
-      staleTime: 5 * 60 * 1000, // 5 minutes
-    },
-  },
-});
+const queryClient = new QueryClient();
 
-// Loading fallback component
-const AppLoading = () => (
-  <div className="min-h-screen flex items-center justify-center">
-    <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-primary"></div>
-  </div>
-);
+function AppContent() {
+  const location = useLocation();
+  const { user } = useAuth();
+  const { onboardingComplete, loading: onboardingLoading } = useOnboarding();
+  const isApp = isAppRoute(location.pathname);
+
+  return (
+    <Routes>
+      {routes.map((route) => (
+        <Route
+          key={route.path}
+          path={route.path}
+          element={
+            route.protected ? (
+              <ProtectedRoute>
+                <OnboardingCheck 
+                  onboardingComplete={onboardingComplete}
+                  onboardingLoading={onboardingLoading}
+                  user={user}
+                >
+                  <ViewportManager>
+                    {route.element}
+                  </ViewportManager>
+                </OnboardingCheck>
+              </ProtectedRoute>
+            ) : (
+              <ViewportManager>
+                {route.element}
+              </ViewportManager>
+            )
+          }
+        />
+      ))}
+    </Routes>
+  );
+}
 
 function App() {
-  console.log('[App] Rendering application');
-  
+  // Check if app should show splash screen based on environment and route
+  const shouldShowSplash = () => {
+    // Always show splash for production builds
+    if (process.env.NODE_ENV === 'production') return true;
+    
+    // For development, check if we're on an app route
+    const currentPath = window.location.pathname;
+    return isAppRoute(currentPath);
+  };
+
   return (
-    <ErrorBoundary fallback={<EmergencyFallback />}>
-      <QueryClientProvider client={queryClient}>
-        <NextThemeProvider attribute="class" defaultTheme="light" enableSystem>
-          <CustomThemeProvider>
-            <TooltipProvider>
-              <Router>
-                <ErrorBoundary fallback={<EmergencyFallback />}>
-                  <AuthProvider>
-                    <SubscriptionProvider>
-                      <TranslationProvider>
-                        <TutorialProvider>
-                          <Suspense fallback={<AppLoading />}>
-                            <SafeAppRoutes />
-                          </Suspense>
-                          
-                          <Toaster />
-                        </TutorialProvider>
-                      </TranslationProvider>
-                    </SubscriptionProvider>
-                  </AuthProvider>
-                </ErrorBoundary>
-              </Router>
-            </TooltipProvider>
-          </CustomThemeProvider>
-        </NextThemeProvider>
-      </QueryClientProvider>
-    </ErrorBoundary>
+    <QueryClientProvider client={queryClient}>
+      <ThemeProvider attribute="class" defaultTheme="light" enableSystem>
+        <TooltipProvider>
+          <AuthProvider>
+            <SubscriptionProvider>
+              <LocationProvider>
+                <TranslationProvider>
+                  <TutorialProvider>
+                    <Router>
+                      <JournalProcessingInitializer />
+                      
+                      <SplashScreenWrapper 
+                        enabledInDev={shouldShowSplash()}
+                        minDisplayTime={2500}
+                      >
+                        <Suspense fallback={
+                          <div className="min-h-screen flex items-center justify-center">
+                            <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-primary"></div>
+                          </div>
+                        }>
+                          <AppContent />
+                        </Suspense>
+                      </SplashScreenWrapper>
+                      
+                      <Toaster />
+                    </Router>
+                  </TutorialProvider>
+                </TranslationProvider>
+              </LocationProvider>
+            </SubscriptionProvider>
+          </AuthProvider>
+        </TooltipProvider>
+      </ThemeProvider>
+    </QueryClientProvider>
   );
 }
 

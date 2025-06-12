@@ -10,13 +10,10 @@ interface UseSplashScreenOptions {
 export const useSplashScreen = (options: UseSplashScreenOptions = {}) => {
   const { 
     minDisplayTime = 3000, 
-    enabledInDev = false  // Default to false to prevent issues
+    enabledInDev = true 
   } = options;
   
-  const [isVisible, setIsVisible] = useState(() => {
-    // Only show splash in production by default
-    return process.env.NODE_ENV === 'production' && enabledInDev;
-  });
+  const [isVisible, setIsVisible] = useState(true);
   const [isAppReady, setIsAppReady] = useState(false);
   const { user, isLoading: authLoading } = useAuth();
 
@@ -25,12 +22,6 @@ export const useSplashScreen = (options: UseSplashScreenOptions = {}) => {
   // Check if app is ready based on auth state and other conditions
   useEffect(() => {
     const checkAppReady = async () => {
-      // If splash is not visible, app is ready
-      if (!isVisible) {
-        setIsAppReady(true);
-        return;
-      }
-
       // Wait for auth to finish loading
       if (authLoading) return;
 
@@ -47,7 +38,7 @@ export const useSplashScreen = (options: UseSplashScreenOptions = {}) => {
     };
 
     checkAppReady();
-  }, [authLoading, minDisplayTime, startTime, isVisible]);
+  }, [authLoading, minDisplayTime, startTime]);
 
   // Hide splash screen when app is ready
   const hideSplashScreen = useCallback(() => {
