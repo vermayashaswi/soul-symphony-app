@@ -1,4 +1,3 @@
-
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { useAuth } from '@/contexts/SimplifiedAuthContext';
 
@@ -7,6 +6,9 @@ export interface TutorialStep {
   target: string;
   content: string;
   placement: string;
+  title: string;
+  infographicType?: string;
+  showNextButton: boolean;
 }
 
 export interface TutorialNavigationState {
@@ -58,31 +60,41 @@ export const TutorialProvider: React.FC<{ children: ReactNode }> = ({ children }
       id: 1,
       target: '[data-tutorial="voice-button"]',
       content: 'Start by tapping this button to record your voice journal',
-      placement: 'top'
+      placement: 'top',
+      title: 'Record Your Voice',
+      showNextButton: true
     },
     {
       id: 2,
       target: '[data-tutorial="journal-entries"]',
       content: 'View all your journal entries here',
-      placement: 'right'
+      placement: 'right',
+      title: 'View Journal Entries',
+      showNextButton: true
     },
     {
       id: 3,
       target: '[data-tutorial="insights"]',
       content: 'Discover insights about your emotional patterns',
-      placement: 'bottom'
+      placement: 'bottom',
+      title: 'Explore Insights',
+      showNextButton: true
     },
     {
       id: 4,
       target: '[data-tutorial="chat"]',
       content: 'Chat with AI about your journal entries',
-      placement: 'left'
+      placement: 'left',
+      title: 'Chat with AI',
+      showNextButton: true
     },
     {
       id: 5,
       target: '[data-tutorial="settings"]',
       content: 'Customize your experience in settings',
-      placement: 'top'
+      placement: 'top',
+      title: 'Customize Settings',
+      showNextButton: true
     }
   ];
   
