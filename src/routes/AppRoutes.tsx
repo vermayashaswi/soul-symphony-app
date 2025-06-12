@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { Routes, Route, Navigate, Outlet } from 'react-router-dom';
+import { Routes, Route, Navigate } from 'react-router-dom';
 import Index from '@/pages/Index';
 import Home from '@/pages/Home';
 import Journal from '@/pages/Journal';
@@ -22,39 +22,29 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useOnboarding } from '@/hooks/use-onboarding';
 
 const AppRoutes = () => {
-  console.log('Rendering AppRoutes component');
+  console.log('AppRoutes: Rendering at path:', window.location.pathname);
   const { user } = useAuth();
   const { onboardingComplete } = useOnboarding();
   
-  // This will be used for conditional rendering of the /app route
+  // Simple app route redirect handler
   const AppRootRedirect = () => {
-    console.log('AppRootRedirect - Auth status:', { 
-      user: !!user, 
-      onboardingComplete 
-    });
+    console.log('AppRootRedirect:', { user: !!user, onboardingComplete });
     
-    if (user) {
-      if (onboardingComplete) {
-        // If user is logged in and onboarding is complete, go to home
-        console.log('User logged in and onboarding complete, redirecting to /app/home');
-        return <Navigate to="/app/home" replace />;
-      } else {
-        // If user is logged in but onboarding is not complete, go to onboarding
-        console.log('User logged in but onboarding not complete, redirecting to /app/onboarding');
-        return <Navigate to="/app/onboarding" replace />;
-      }
-    } else {
-      // If user is not logged in, go to onboarding
-      console.log('User not logged in, redirecting to /app/onboarding');
+    if (!user) {
       return <Navigate to="/app/onboarding" replace />;
     }
+    
+    if (!onboardingComplete) {
+      return <Navigate to="/app/onboarding" replace />;
+    }
+    
+    return <Navigate to="/app/home" replace />;
   };
   
   return (
     <Routes>
-      {/* Wrap all routes that need ViewportManager in a parent Route */}
       <Route element={<ViewportManager />}>
-        {/* Website Routes - Now properly wrapped in translation context */}
+        {/* Marketing Website Routes */}
         <Route path="/" element={<Index />} />
         <Route path="/privacy-policy" element={<PrivacyPolicyPage />} />
         <Route path="/faq" element={<FAQPage />} />
@@ -62,7 +52,7 @@ const AppRoutes = () => {
         <Route path="/blog" element={<BlogPage />} />
         <Route path="/blog/:slug" element={<BlogPostPage />} />
         
-        {/* App Routes - reordered to fix routing issue */}
+        {/* App Routes */}
         <Route path="/app/onboarding" element={<OnboardingScreen />} />
         <Route path="/app/auth" element={<Auth />} />
         
@@ -71,17 +61,13 @@ const AppRoutes = () => {
           <Route index element={<AppRootRedirect />} />
           <Route path="home" element={<Home />} />
           <Route path="journal" element={<Journal />} />
-          <Route path="insights" element={
-            <React.Suspense fallback={<div className="flex items-center justify-center h-screen">Loading...</div>}>
-              <Insights />
-            </React.Suspense>
-          } />
+          <Route path="insights" element={<Insights />} />
           <Route path="chat" element={<Chat />} />
           <Route path="smart-chat" element={<SmartChat />} />
           <Route path="settings" element={<Settings />} />
         </Route>
         
-        {/* Legacy Route Redirects - all app features redirect to /app/ routes */}
+        {/* Legacy Route Redirects */}
         <Route path="/auth" element={<Navigate to="/app/auth" replace />} />
         <Route path="/onboarding" element={<Navigate to="/app/onboarding" replace />} />
         <Route path="/home" element={<Navigate to="/app/home" replace />} />

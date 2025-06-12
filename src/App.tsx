@@ -11,24 +11,12 @@ import { TranslationProvider } from "@/contexts/TranslationContext";
 import { TutorialProvider } from "@/contexts/TutorialContext";
 import { ThemeProvider } from "next-themes";
 import { JournalProcessingInitializer } from '@/app/journal-processing-init';
-import { SplashScreenWrapper } from '@/components/splash/SplashScreenWrapper';
 import AppRoutes from "./routes/AppRoutes";
-import { isAppRoute } from "./routes/RouteHelpers";
 import "./App.css";
 
 const queryClient = new QueryClient();
 
 function App() {
-  // Check if app should show splash screen based on environment and route
-  const shouldShowSplash = () => {
-    // Always show splash for production builds
-    if (process.env.NODE_ENV === 'production') return true;
-    
-    // For development, check if we're on an app route
-    const currentPath = window.location.pathname;
-    return isAppRoute(currentPath);
-  };
-
   return (
     <QueryClientProvider client={queryClient}>
       <ThemeProvider attribute="class" defaultTheme="light" enableSystem>
@@ -41,18 +29,13 @@ function App() {
                     <Router>
                       <JournalProcessingInitializer />
                       
-                      <SplashScreenWrapper 
-                        enabledInDev={shouldShowSplash()}
-                        minDisplayTime={2500}
-                      >
-                        <Suspense fallback={
-                          <div className="min-h-screen flex items-center justify-center">
-                            <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-primary"></div>
-                          </div>
-                        }>
-                          <AppRoutes />
-                        </Suspense>
-                      </SplashScreenWrapper>
+                      <Suspense fallback={
+                        <div className="min-h-screen flex items-center justify-center">
+                          <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-primary"></div>
+                        </div>
+                      }>
+                        <AppRoutes />
+                      </Suspense>
                       
                       <Toaster />
                     </Router>

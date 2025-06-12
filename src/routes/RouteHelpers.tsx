@@ -3,56 +3,51 @@ import React, { useEffect } from 'react';
 import { Navigate, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 
-// Instead of checking subdomain, now we check path prefix
+// Check if running in native app
 export const isNativeApp = (): boolean => {
   return /native/i.test(window.navigator.userAgent);
 };
 
-// Update the path-based check to be more strict about app routes
+// Check if route is an app route
 export const isAppRoute = (pathname: string): boolean => {
-  // App routes must start with /app/ or be exactly /app
   const isApp = pathname.startsWith('/app/') || pathname === '/app';
-  console.log(`isAppRoute check for ${pathname}: ${isApp}`);
+  console.log(`RouteHelpers: isAppRoute(${pathname}) = ${isApp}`);
   return isApp;
 };
 
+// Check if route is a website route
 export const isWebsiteRoute = (pathname: string): boolean => {
-  // If it has an app prefix, it's not a website route
+  // If it's an app route, it's not a website route
   if (isAppRoute(pathname)) {
-    console.log(`${pathname} is an app route, so not a website route`);
     return false;
   }
   
-  // For root URL (/), consider it as a website route
+  // Root path is a website route
   if (pathname === '/') {
-    console.log(`${pathname} is root, treating as website route`);
     return true;
   }
   
-  // Explicitly define website routes
-  const websitePrefixes = ['/', '/about', '/pricing', '/terms', '/privacy', '/blog', '/contact', '/faq', '/download'];
+  // Website route prefixes
+  const websitePrefixes = ['/about', '/pricing', '/terms', '/privacy', '/blog', '/contact', '/faq', '/download'];
   
-  // Check for specific website routes
   const isWebsite = websitePrefixes.some(prefix => 
     pathname === prefix || pathname.startsWith(`${prefix}/`)
   );
   
-  console.log(`isWebsiteRoute check for ${pathname}: ${isWebsite}`);
+  console.log(`RouteHelpers: isWebsiteRoute(${pathname}) = ${isWebsite}`);
   return isWebsite;
 };
 
+// Get base URL
 export const getBaseUrl = (): string => {
-  // For development environment
   if (window.location.hostname === 'localhost' || window.location.hostname.match(/^\d+\.\d+\.\d+\.\d+$/)) {
     return window.location.origin;
   }
-  
-  // For production, always use main domain
   return 'https://soulo.online';
 };
 
+// Website route wrapper
 export const WebsiteRouteWrapper = ({ element }: { element: React.ReactNode }) => {
-  // Website routes don't require any auth
   return (
     <div className="website-route">
       {element}
@@ -60,30 +55,27 @@ export const WebsiteRouteWrapper = ({ element }: { element: React.ReactNode }) =
   );
 };
 
+// App route wrapper
 export const AppRouteWrapper = ({ 
   element, 
-  requiresAuth = true,
-  hideNavbar = false 
+  requiresAuth = true 
 }: { 
   element: React.ReactNode, 
-  requiresAuth?: boolean,
-  hideNavbar?: boolean 
+  requiresAuth?: boolean 
 }) => {
   const { user } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   
-  console.log('AppRouteWrapper rendering:', location.pathname, { 
+  console.log('AppRouteWrapper:', { 
+    path: location.pathname,
     requiresAuth, 
-    userExists: !!user,
-    isAppRoute: isAppRoute(location.pathname)
+    user: !!user 
   });
   
   useEffect(() => {
     if (requiresAuth && !user) {
-      console.log('Protected route accessed without auth, redirecting to auth');
-      
-      // Redirect to /app/auth
+      console.log('AppRouteWrapper: Redirecting to auth');
       navigate('/app/auth', { 
         state: { from: location },
         replace: true
@@ -91,8 +83,6 @@ export const AppRouteWrapper = ({
     }
   }, [user, navigate, requiresAuth, location]);
 
-  // If this is a protected route and user is not authenticated,
-  // render nothing while the redirect happens
   if (requiresAuth && !user) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -103,22 +93,21 @@ export const AppRouteWrapper = ({
 
   return (
     <div className="min-h-screen app-route">
-      <div className="min-h-screen">
-        {element}
-      </div>
+      {element}
     </div>
   );
 };
 
+// Redirect route component
 export const RedirectRoute = ({ to }: { to: string }) => {
-  // Handle absolute URLs (like https://soulo.online)
-  if (to.startsWith('http')) {
-    // For external redirects, use a useEffect to navigate
-    useEffect(() => {
-      console.log('RedirectRoute: Redirecting to external URL:', to);
+  useEffect(() => {
+    if (to.startsWith('http')) {
+      console.log('RedirectRoute: External redirect to:', to);
       window.location.replace(to);
-    }, [to]);
-    
+    }
+  }, [to]);
+  
+  if (to.startsWith('http')) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
@@ -126,7 +115,6 @@ export const RedirectRoute = ({ to }: { to: string }) => {
     );
   }
   
-  // For internal redirects, use Navigate
-  console.log('RedirectRoute: Redirecting to internal path:', to);
+  console.log('RedirectRoute: Internal redirect to:', to);
   return <Navigate to={to} replace />;
 };

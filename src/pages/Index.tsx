@@ -4,7 +4,6 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTheme } from '@/hooks/use-theme';
 import { useIsMobile } from '@/hooks/use-mobile';
-import { useOnboarding } from '@/hooks/use-onboarding';
 import NetworkAwareContent from '@/components/NetworkAwareContent';
 import { useNetworkStatus } from '@/utils/network';
 import HomePage from '@/pages/website/HomePage';
@@ -16,7 +15,6 @@ const Index = () => {
   const { user } = useAuth();
   const { colorTheme } = useTheme();
   const isMobile = useIsMobile();
-  const { onboardingComplete, checkOnboardingStatus } = useOnboarding();
   const networkStatus = useNetworkStatus();
   const { translate } = useTranslation();
 
@@ -25,97 +23,78 @@ const Index = () => {
   
   const shouldRenderMobile = isMobile.isMobile || mobileDemo;
 
-  // Handle explicit app redirects only - no automatic redirects
+  // Only handle explicit app redirects via URL parameters
   useEffect(() => {
-    // Only redirect to app if explicitly requested with a URL parameter
-    if (urlParams.has('app')) {
-      console.log('[Index] User explicitly requested app with ?app parameter');
-      
-      if (user) {
-        console.log('[Index] User is logged in, redirecting to appropriate app page');
-        if (onboardingComplete) {
-          navigate('/app/home');
-        } else {
-          navigate('/app/onboarding');
-        }
-      } else {
-        navigate('/app/auth');
-      }
-    }
+    console.log('Index: Checking URL parameters:', Object.fromEntries(urlParams.entries()));
     
-    // Check URL parameters for specific app features redirects
-    if (urlParams.has('insights')) {
+    // Only redirect if explicitly requested via URL parameters
+    if (urlParams.has('app') && user) {
+      console.log('Index: Explicit app redirect requested');
+      navigate('/app/home');
+    } else if (urlParams.has('insights')) {
+      console.log('Index: Insights redirect requested');
       navigate('/app/insights');
     }
-  }, [user, navigate, urlParams, onboardingComplete]);
+  }, [user, navigate, urlParams]);
 
   useEffect(() => {
-    // Pre-translate common strings used on the index page
-    const preTranslateCommonStrings = async () => {
+    // Pre-translate common strings for better performance
+    const preTranslateStrings = async () => {
       if (translate) {
         try {
-          console.log('[Index] Pre-translating common strings...');
-          await translate("Welcome to Soul Symphony", "en");
-          await translate("We've detected you're on a slow connection. We're loading a lightweight version of our site for better performance.", "en");
-          await translate("Loading optimized content...", "en");
-          await translate("You're currently offline", "en");
-          await translate("Please check your connection to access all features. Some content may still be available from cache.", "en");
-          console.log('[Index] Pre-translation complete');
+          await Promise.all([
+            translate("Welcome to Soul Symphony", "en"),
+            translate("We've detected you're on a slow connection. We're loading a lightweight version of our site for better performance.", "en"),
+            translate("Loading optimized content...", "en"),
+            translate("You're currently offline", "en"),
+            translate("Please check your connection to access all features. Some content may still be available from cache.", "en")
+          ]);
+          console.log('Index: Pre-translation complete');
         } catch (error) {
-          console.error("[Index] Error pre-translating index page strings:", error);
+          console.error("Index: Pre-translation error:", error);
         }
       }
     };
     
-    preTranslateCommonStrings();
-    
-    if (networkStatus.speed === 'slow') {
-      console.log('[Index] Slow network detected, optimizing experience...');
-    }
-  }, [networkStatus.speed, translate]);
+    preTranslateStrings();
+  }, [translate]);
   
-  console.log('[Index] Rendering Index.tsx component, path:', window.location.pathname, {
-    hasUser: !!user,
-    onboardingComplete
-  });
+  console.log('Index: Rendering marketing homepage at:', window.location.pathname);
 
-  // Always render the website homepage component when at root URL
   return (
-    <>
-      <NetworkAwareContent
-        lowBandwidthFallback={
-          <div className="flex flex-col items-center justify-center min-h-screen p-4">
-            <h1 className="text-2xl font-bold mb-4">
-              <TranslatableText text="Welcome to Soul Symphony" forceTranslate={true} />
-            </h1>
-            <p className="text-center mb-6">
-              <TranslatableText 
-                text="We've detected you're on a slow connection. We're loading a lightweight version of our site for better performance." 
-                forceTranslate={true}
-              />
-            </p>
-            <div className="animate-pulse">
-              <TranslatableText text="Loading optimized content..." forceTranslate={true} />
-            </div>
+    <NetworkAwareContent
+      lowBandwidthFallback={
+        <div className="flex flex-col items-center justify-center min-h-screen p-4">
+          <h1 className="text-2xl font-bold mb-4">
+            <TranslatableText text="Welcome to Soul Symphony" forceTranslate={true} />
+          </h1>
+          <p className="text-center mb-6">
+            <TranslatableText 
+              text="We've detected you're on a slow connection. We're loading a lightweight version of our site for better performance." 
+              forceTranslate={true}
+            />
+          </p>
+          <div className="animate-pulse">
+            <TranslatableText text="Loading optimized content..." forceTranslate={true} />
           </div>
-        }
-        offlineFallback={
-          <div className="flex flex-col items-center justify-center min-h-screen p-4">
-            <h1 className="text-2xl font-bold mb-4">
-              <TranslatableText text="You're currently offline" forceTranslate={true} />
-            </h1>
-            <p className="text-center mb-6">
-              <TranslatableText 
-                text="Please check your connection to access all features. Some content may still be available from cache." 
-                forceTranslate={true}
-              />
-            </p>
-          </div>
-        }
-      >
-        <HomePage />
-      </NetworkAwareContent>
-    </>
+        </div>
+      }
+      offlineFallback={
+        <div className="flex flex-col items-center justify-center min-h-screen p-4">
+          <h1 className="text-2xl font-bold mb-4">
+            <TranslatableText text="You're currently offline" forceTranslate={true} />
+          </h1>
+          <p className="text-center mb-6">
+            <TranslatableText 
+              text="Please check your connection to access all features. Some content may still be available from cache." 
+              forceTranslate={true}
+            />
+          </p>
+        </div>
+      }
+    >
+      <HomePage />
+    </NetworkAwareContent>
   );
 };
 
