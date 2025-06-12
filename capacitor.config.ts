@@ -11,16 +11,18 @@ const config: CapacitorConfig = {
   },
   // Ensure proper permissions for iOS and Android
   plugins: {
-    // Add specific iOS-related configurations
+    // Enhanced splash screen configuration
     SplashScreen: {
-      launchAutoHide: false,
+      launchAutoHide: false, // We control this from our React app
       backgroundColor: "#8b5cf6",
-      showSpinner: true,
+      showSpinner: false, // We have our own loading indicator
       androidSpinnerStyle: "large",
       iosSpinnerStyle: "small",
       spinnerColor: "#ffffff",
       splashFullScreen: true,
-      splashImmersive: true
+      splashImmersive: true,
+      layoutName: "launch_screen",
+      useDialog: true
     },
     // Handle keyboard properly
     Keyboard: {
@@ -31,7 +33,8 @@ const config: CapacitorConfig = {
     // Add status bar configuration
     StatusBar: {
       backgroundColor: "#8b5cf6",
-      style: "light"
+      style: "light",
+      overlaysWebView: false
     }
   },
   // iOS-specific configuration
@@ -41,14 +44,16 @@ const config: CapacitorConfig = {
     scrollEnabled: true,
     useUserAgentString: false,
     limitsNavigationsToAppBoundDomains: true,
-    backgroundColor: "#8b5cf6"
+    backgroundColor: "#8b5cf6",
+    handleApplicationNotifications: false
   },
   // Android-specific configuration
   android: {
     allowMixedContent: true,
     captureInput: true,
-    webContentsDebuggingEnabled: true,
-    backgroundColor: "#8b5cf6"
+    webContentsDebuggingEnabled: false, // Disable for production
+    backgroundColor: "#8b5cf6",
+    loggingBehavior: "none"
   }
 };
 

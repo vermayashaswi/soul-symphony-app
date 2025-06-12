@@ -1,91 +1,105 @@
 
-import React, { useEffect, useState } from 'react';
-import AppRoutes from './routes/AppRoutes';
-import { Toaster } from "@/components/ui/toaster";
-import { Toaster as SonnerToaster } from "sonner";
-import { TranslationProvider } from '@/contexts/TranslationContext';
-import { SubscriptionProvider } from '@/contexts/SubscriptionContext';
-import { TranslationLoadingOverlay } from '@/components/translation/TranslationLoadingOverlay';
-import { JournalProcessingInitializer } from './app/journal-processing-init';
-import { TutorialProvider } from './contexts/TutorialContext';
-import TutorialOverlay from './components/tutorial/TutorialOverlay';
-import ErrorBoundary from './components/insights/ErrorBoundary';
-import { preloadCriticalImages } from './utils/imagePreloader';
-import { toast } from 'sonner';
-import './styles/emoji.css';
-import './styles/tutorial.css';
+import { Suspense, useEffect } from "react";
+import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-dom";
+import { Toaster } from "@/components/ui/sonner";
+import { TooltipProvider } from "@/components/ui/tooltip";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { AuthProvider } from "@/contexts/AuthContext";
+import { SubscriptionProvider } from "@/contexts/SubscriptionContext";
+import { LocationProvider } from "@/contexts/LocationContext";
+import { TranslationProvider } from "@/contexts/TranslationContext";
+import { TutorialProvider } from "@/contexts/TutorialContext";
+import { ThemeProvider } from "next-themes";
+import { JournalProcessingInitializer } from '@/app/journal-processing-init';
+import { SplashScreenWrapper } from '@/components/splash/SplashScreenWrapper';
+import { routes } from "./routes/routeConfig";
+import { isAppRoute } from "./routes/RouteHelpers";
+import ProtectedRoute from "./routes/ProtectedRoute";
+import OnboardingCheck from "./routes/OnboardingCheck";
+import ViewportManager from "./routes/ViewportManager";
+import { useLocation } from "react-router-dom";
+import "./App.css";
 
-const App: React.FC = () => {
-  const [isInitialized, setIsInitialized] = useState(false);
+const queryClient = new QueryClient();
 
-  useEffect(() => {
-    console.log('[App] App mounted, current path:', window.location.pathname);
+function AppContent() {
+  const location = useLocation();
+  const isApp = isAppRoute(location.pathname);
+
+  return (
+    <Routes>
+      {routes.map((route) => (
+        <Route
+          key={route.path}
+          path={route.path}
+          element={
+            route.protected ? (
+              <ProtectedRoute>
+                <OnboardingCheck>
+                  <ViewportManager>
+                    {route.element}
+                  </ViewportManager>
+                </OnboardingCheck>
+              </ProtectedRoute>
+            ) : (
+              <ViewportManager>
+                {route.element}
+              </ViewportManager>
+            )
+          }
+        />
+      ))}
+    </Routes>
+  );
+}
+
+function App() {
+  // Check if app should show splash screen based on environment and route
+  const shouldShowSplash = () => {
+    // Always show splash for production builds
+    if (process.env.NODE_ENV === 'production') return true;
     
-    // Clean up any malformed paths
+    // For development, check if we're on an app route
     const currentPath = window.location.pathname;
-    
-    // Fix incorrectly formatted URLs that have domains or https in the path
-    if (currentPath.includes('https://') || currentPath.includes('soulo.online')) {
-      console.log('[App] Fixing malformed URL path:', currentPath);
-      window.history.replaceState(null, '', '/');
-    }
-    
-    // Apply a CSS class to the document body for theme-specific overrides
-    document.body.classList.add('app-initialized');
-    
-    // Preload critical images including the chat avatar
-    try {
-      preloadCriticalImages();
-      console.log('[App] Critical images preloaded successfully');
-    } catch (error) {
-      console.warn('[App] Failed to preload some images:', error);
-      // Non-critical error, continue app initialization
-    }
-
-    // Mark app as initialized after a brief delay to ensure smooth startup
-    setTimeout(() => {
-      setIsInitialized(true);
-      console.log('[App] App marked as fully initialized');
-    }, 500);
-  }, []);
-
-  const handleAppError = (error: Error, errorInfo: any) => {
-    console.error('[App] Application-level error:', error, errorInfo);
-    
-    // Log critical app errors for debugging
-    const errorData = {
-      message: error.message,
-      stack: error.stack,
-      componentStack: errorInfo.componentStack,
-      timestamp: new Date().toISOString(),
-      userAgent: navigator.userAgent,
-      url: window.location.href
-    };
-    
-    console.error('[App] Detailed error info:', errorData);
-
-    // Show user-friendly error notification
-    toast.error('Something went wrong. The app will try to recover automatically.');
-
-    // Allow the app to continue functioning despite errors
+    return isAppRoute(currentPath);
   };
 
   return (
-    <ErrorBoundary onError={handleAppError}>
-      <TranslationProvider>
-        <SubscriptionProvider>
-          <TutorialProvider>
-            <TranslationLoadingOverlay />
-            <JournalProcessingInitializer />
-            <AppRoutes key={isInitialized ? 'initialized' : 'initializing'} />
-            <TutorialOverlay />
-            <Toaster />
-            <SonnerToaster position="top-right" />
-          </TutorialProvider>
-        </SubscriptionProvider>
-      </TranslationProvider>
-    </ErrorBoundary>
+    <QueryClientProvider client={queryClient}>
+      <ThemeProvider attribute="class" defaultTheme="light" enableSystem>
+        <TooltipProvider>
+          <AuthProvider>
+            <SubscriptionProvider>
+              <LocationProvider>
+                <TranslationProvider>
+                  <TutorialProvider>
+                    <Router>
+                      <JournalProcessingInitializer />
+                      
+                      <SplashScreenWrapper 
+                        enabledInDev={shouldShowSplash()}
+                        minDisplayTime={2500}
+                      >
+                        <Suspense fallback={
+                          <div className="min-h-screen flex items-center justify-center">
+                            <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-primary"></div>
+                          </div>
+                        }>
+                          <AppContent />
+                        </Suspense>
+                      </SplashScreenWrapper>
+                      
+                      <Toaster />
+                    </Router>
+                  </TutorialProvider>
+                </TranslationProvider>
+              </LocationProvider>
+            </SubscriptionProvider>
+          </AuthProvider>
+        </TooltipProvider>
+      </ThemeProvider>
+    </QueryClientProvider>
   );
-};
+}
 
 export default App;
