@@ -12,27 +12,45 @@ interface SplashScreenWrapperProps {
 export const SplashScreenWrapper: React.FC<SplashScreenWrapperProps> = ({
   children,
   enabledInDev = false,
-  minDisplayTime = 2000 // Reduced default time
+  minDisplayTime = 1500
 }) => {
   const { isVisible, isAppReady, hideSplashScreen } = useSplashScreen({
     enabledInDev,
     minDisplayTime
   });
 
-  // Always render children in development mode for faster iteration
+  // For marketing routes, never show splash - just render children immediately
+  const isMarketingRoute = window.location.pathname === '/' || 
+                          window.location.pathname.startsWith('/blog') ||
+                          window.location.pathname.startsWith('/faq') ||
+                          window.location.pathname.startsWith('/privacy') ||
+                          window.location.pathname.startsWith('/download');
+
+  if (isMarketingRoute) {
+    console.log('[SplashScreenWrapper] Marketing route, rendering children directly');
+    return <>{children}</>;
+  }
+
+  // For development mode, don't show splash unless explicitly enabled
   if (process.env.NODE_ENV === 'development' && !enabledInDev) {
     return <>{children}</>;
   }
 
+  // Emergency fallback - if something goes wrong, always show children
+  const shouldShowChildren = isAppReady || !isVisible || isMarketingRoute;
+
   return (
     <>
-      <SplashScreen 
-        isVisible={isVisible}
-        onComplete={hideSplashScreen}
-      />
+      {/* Only show splash for app routes and when explicitly visible */}
+      {isVisible && !isMarketingRoute && (
+        <SplashScreen 
+          isVisible={isVisible}
+          onComplete={hideSplashScreen}
+        />
+      )}
       
-      {/* Render app content when ready OR when splash is hidden */}
-      {(isAppReady || !isVisible) && children}
+      {/* Always render children for marketing routes, or when app is ready */}
+      {shouldShowChildren && children}
     </>
   );
 };

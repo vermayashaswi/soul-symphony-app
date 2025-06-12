@@ -35,16 +35,13 @@ const AppRoutes = () => {
     
     if (user) {
       if (onboardingComplete) {
-        // If user is logged in and onboarding is complete, go to home
         console.log('User logged in and onboarding complete, redirecting to /app/home');
         return <Navigate to="/app/home" replace />;
       } else {
-        // If user is logged in but onboarding is not complete, go to onboarding
         console.log('User logged in but onboarding not complete, redirecting to /app/onboarding');
         return <Navigate to="/app/onboarding" replace />;
       }
     } else {
-      // If user is not logged in, go to onboarding
       console.log('User not logged in, redirecting to /app/onboarding');
       return <Navigate to="/app/onboarding" replace />;
     }
@@ -52,22 +49,21 @@ const AppRoutes = () => {
   
   return (
     <Routes>
-      {/* Wrap all routes that need ViewportManager in a parent Route */}
-      <Route path="/*" element={<ViewportManager />}>
-        {/* Website Routes - Now properly wrapped in translation context */}
-        <Route index element={<Index />} />
-        <Route path="privacy-policy" element={<PrivacyPolicyPage />} />
-        <Route path="faq" element={<FAQPage />} />
-        <Route path="download" element={<AppDownload />} />
-        <Route path="blog" element={<BlogPage />} />
-        <Route path="blog/:slug" element={<BlogPostPage />} />
-        
-        {/* App Routes - reordered to fix routing issue */}
-        <Route path="app/onboarding" element={<OnboardingScreen />} />
-        <Route path="app/auth" element={<Auth />} />
+      {/* Marketing Routes - NO ViewportManager wrapper */}
+      <Route index element={<Index />} />
+      <Route path="privacy-policy" element={<PrivacyPolicyPage />} />
+      <Route path="faq" element={<FAQPage />} />
+      <Route path="download" element={<AppDownload />} />
+      <Route path="blog" element={<BlogPage />} />
+      <Route path="blog/:slug" element={<BlogPostPage />} />
+      
+      {/* App Routes - WITH ViewportManager wrapper */}
+      <Route path="app/*" element={<ViewportManager />}>
+        <Route path="onboarding" element={<OnboardingScreen />} />
+        <Route path="auth" element={<Auth />} />
         
         {/* Protected App Routes */}
-        <Route path="app" element={<ProtectedRoute />}>
+        <Route path="" element={<ProtectedRoute />}>
           <Route index element={<AppRootRedirect />} />
           <Route path="home" element={<Home />} />
           <Route path="journal" element={<Journal />} />
@@ -80,20 +76,20 @@ const AppRoutes = () => {
           <Route path="smart-chat" element={<SmartChat />} />
           <Route path="settings" element={<Settings />} />
         </Route>
-        
-        {/* Legacy Route Redirects - all app features redirect to /app/ routes */}
-        <Route path="auth" element={<Navigate to="/app/auth" replace />} />
-        <Route path="onboarding" element={<Navigate to="/app/onboarding" replace />} />
-        <Route path="home" element={<Navigate to="/app/home" replace />} />
-        <Route path="journal" element={<Navigate to="/app/journal" replace />} />
-        <Route path="insights" element={<Navigate to="/app/insights" replace />} />
-        <Route path="chat" element={<Navigate to="/app/chat" replace />} />
-        <Route path="smart-chat" element={<Navigate to="/app/smart-chat" replace />} />
-        <Route path="settings" element={<Navigate to="/app/settings" replace />} />
-        
-        {/* Catch-all route */}
-        <Route path="*" element={<NotFound />} />
       </Route>
+      
+      {/* Legacy Route Redirects */}
+      <Route path="auth" element={<Navigate to="/app/auth" replace />} />
+      <Route path="onboarding" element={<Navigate to="/app/onboarding" replace />} />
+      <Route path="home" element={<Navigate to="/app/home" replace />} />
+      <Route path="journal" element={<Navigate to="/app/journal" replace />} />
+      <Route path="insights" element={<Navigate to="/app/insights" replace />} />
+      <Route path="chat" element={<Navigate to="/app/chat" replace />} />
+      <Route path="smart-chat" element={<Navigate to="/app/smart-chat" replace />} />
+      <Route path="settings" element={<Navigate to="/app/settings" replace />} />
+      
+      {/* Catch-all route */}
+      <Route path="*" element={<NotFound />} />
     </Routes>
   );
 };
