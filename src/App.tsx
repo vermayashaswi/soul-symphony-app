@@ -4,7 +4,8 @@ import { BrowserRouter as Router } from "react-router-dom";
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { ThemeProvider } from "next-themes";
+import { ThemeProvider as NextThemeProvider } from "next-themes";
+import { ThemeProvider as CustomThemeProvider } from "@/hooks/use-theme";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import SafeAppRoutes from "./routes/SafeAppRoutes";
 import EmergencyFallback from "./routes/EmergencyFallback";
@@ -39,27 +40,29 @@ function App() {
   return (
     <ErrorBoundary fallback={<EmergencyFallback />}>
       <QueryClientProvider client={queryClient}>
-        <ThemeProvider attribute="class" defaultTheme="light" enableSystem>
-          <TooltipProvider>
-            <Router>
-              <ErrorBoundary fallback={<EmergencyFallback />}>
-                <AuthProvider>
-                  <SubscriptionProvider>
-                    <TranslationProvider>
-                      <TutorialProvider>
-                        <Suspense fallback={<AppLoading />}>
-                          <SafeAppRoutes />
-                        </Suspense>
-                        
-                        <Toaster />
-                      </TutorialProvider>
-                    </TranslationProvider>
-                  </SubscriptionProvider>
-                </AuthProvider>
-              </ErrorBoundary>
-            </Router>
-          </TooltipProvider>
-        </ThemeProvider>
+        <NextThemeProvider attribute="class" defaultTheme="light" enableSystem>
+          <CustomThemeProvider>
+            <TooltipProvider>
+              <Router>
+                <ErrorBoundary fallback={<EmergencyFallback />}>
+                  <AuthProvider>
+                    <SubscriptionProvider>
+                      <TranslationProvider>
+                        <TutorialProvider>
+                          <Suspense fallback={<AppLoading />}>
+                            <SafeAppRoutes />
+                          </Suspense>
+                          
+                          <Toaster />
+                        </TutorialProvider>
+                      </TranslationProvider>
+                    </SubscriptionProvider>
+                  </AuthProvider>
+                </ErrorBoundary>
+              </Router>
+            </TooltipProvider>
+          </CustomThemeProvider>
+        </NextThemeProvider>
       </QueryClientProvider>
     </ErrorBoundary>
   );
