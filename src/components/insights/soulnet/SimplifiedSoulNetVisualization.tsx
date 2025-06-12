@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useCallback } from 'react';
 import { useFrame } from '@react-three/fiber';
 import { OrbitControls } from '@react-three/drei';
@@ -33,6 +32,8 @@ interface SimplifiedSoulNetVisualizationProps {
   getInstantTranslation?: (nodeId: string) => string;
   getInstantNodeConnections?: (nodeId: string) => any;
   isInstantReady?: boolean;
+  // ENHANCED: Add missing isAtomicMode prop
+  isAtomicMode?: boolean;
 }
 
 export const SimplifiedSoulNetVisualization: React.FC<SimplifiedSoulNetVisualizationProps> = ({
@@ -45,7 +46,8 @@ export const SimplifiedSoulNetVisualization: React.FC<SimplifiedSoulNetVisualiza
   getInstantConnectionPercentage = () => 0,
   getInstantTranslation = (id: string) => id,
   getInstantNodeConnections = () => ({ connectedNodes: [], totalStrength: 0, averageStrength: 0 }),
-  isInstantReady = false
+  isInstantReady = false,
+  isAtomicMode = true
 }) => {
   const [highlightedNodes, setHighlightedNodes] = useState<Set<string>>(new Set());
   const [dimmedNodes, setDimmedNodes] = useState<Set<string>>(new Set());
@@ -56,7 +58,7 @@ export const SimplifiedSoulNetVisualization: React.FC<SimplifiedSoulNetVisualiza
   const effectiveTheme = theme === 'system' ? systemTheme : theme;
 
   console.log(`[SimplifiedSoulNetVisualization] COORDINATED THEME: Using app theme context - theme: ${theme}, systemTheme: ${systemTheme}, effective: ${effectiveTheme}`);
-  console.log(`[SimplifiedSoulNetVisualization] COORDINATED INSTANT MODE: Rendering with ${data.nodes.length} nodes, instantReady: ${isInstantReady}`);
+  console.log(`[SimplifiedSoulNetVisualization] COORDINATED INSTANT MODE: Rendering with ${data.nodes.length} nodes, instantReady: ${isInstantReady}, atomicMode: ${isAtomicMode}`);
 
   // Use Three.js controls for camera
   useFrame(({ camera }) => {
