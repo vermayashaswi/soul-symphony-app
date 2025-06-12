@@ -10,17 +10,22 @@ export interface UserProfileData {
 }
 
 export const useUserProfile = (): UserProfileData & { 
-  updateDisplayName: (name: string) => Promise<void>,
-  updateTimezone: (timezone: string) => Promise<void>
+  profile: UserProfileData;
+  updateProfile: (data: Partial<UserProfileData>) => Promise<void>;
+  updateDisplayName: (name: string) => Promise<void>;
+  updateTimezone: (timezone: string) => Promise<void>;
+  isLoading: boolean;
 } => {
   const { user } = useAuth();
   const [displayName, setDisplayName] = useState<string | null>(null);
   const [timezone, setTimezone] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
     const fetchUserProfile = async () => {
       if (!user) return;
 
+      setIsLoading(true);
       try {
         // First ensure the profile exists (this will work with our improved trigger)
         const profileExists = await ensureProfileExists(user);
@@ -67,6 +72,8 @@ export const useUserProfile = (): UserProfileData & {
         }
       } catch (error) {
         console.error('Error in profile fetching', error);
+      } finally {
+        setIsLoading(false);
       }
     };
 
@@ -126,5 +133,24 @@ export const useUserProfile = (): UserProfileData & {
     }
   };
 
-  return { displayName, timezone, updateDisplayName, updateTimezone };
+  const updateProfile = async (data: Partial<UserProfileData>) => {
+    if (data.displayName !== undefined) {
+      await updateDisplayName(data.displayName);
+    }
+    if (data.timezone !== undefined) {
+      await updateTimezone(data.timezone);
+    }
+  };
+
+  const profile: UserProfileData = { displayName, timezone };
+
+  return { 
+    displayName, 
+    timezone, 
+    profile,
+    updateProfile,
+    updateDisplayName, 
+    updateTimezone,
+    isLoading
+  };
 };
