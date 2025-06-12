@@ -19,10 +19,9 @@ export const SplashScreen: React.FC<SplashScreenProps> = ({ onComplete, isVisibl
     if (!isVisible) return;
 
     const stages = [
-      { progress: 20, stage: 'Loading app resources...' },
-      { progress: 40, stage: 'Connecting to services...' },
-      { progress: 60, stage: 'Preparing your journal...' },
-      { progress: 80, stage: 'Almost ready...' },
+      { progress: 25, stage: 'Loading app resources...' },
+      { progress: 50, stage: 'Connecting to services...' },
+      { progress: 75, stage: 'Preparing your journal...' },
       { progress: 100, stage: 'Welcome to SOULo!' }
     ];
 
@@ -36,12 +35,12 @@ export const SplashScreen: React.FC<SplashScreenProps> = ({ onComplete, isVisibl
         currentStageIndex++;
       } else {
         clearInterval(progressInterval);
-        // Wait a moment before completing
+        // Complete immediately after reaching 100%
         setTimeout(() => {
           onComplete();
-        }, 800);
+        }, 300);
       }
-    }, 600);
+    }, 400); // Faster progression
 
     return () => clearInterval(progressInterval);
   }, [isVisible, onComplete]);
@@ -54,7 +53,7 @@ export const SplashScreen: React.FC<SplashScreenProps> = ({ onComplete, isVisibl
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
-          transition={{ duration: 0.5 }}
+          transition={{ duration: 0.3 }}
         >
           {/* Animated Background Elements */}
           <div className="absolute inset-0 overflow-hidden">
@@ -74,40 +73,23 @@ export const SplashScreen: React.FC<SplashScreenProps> = ({ onComplete, isVisibl
             initial={{ scale: 0.8, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
             transition={{ 
-              duration: 0.8, 
-              ease: "easeOut",
-              delay: 0.2
+              duration: 0.5, 
+              ease: "easeOut"
             }}
           >
             {/* Animated Logo */}
             <motion.div
               className="relative"
               animate={{ 
-                scale: [1, 1.05, 1],
-                rotate: [0, 360]
+                scale: [1, 1.05, 1]
               }}
               transition={{ 
-                duration: 4,
+                duration: 2,
                 repeat: Infinity,
                 ease: "easeInOut"
               }}
             >
               <SouloLogo size="large" useColorTheme={true} />
-              
-              {/* Pulsing Ring Around Logo */}
-              <motion.div
-                className="absolute inset-0 rounded-full border-2 opacity-30"
-                style={{ borderColor: `hsl(var(--primary))` }}
-                animate={{ 
-                  scale: [1, 1.2, 1],
-                  opacity: [0.3, 0.1, 0.3]
-                }}
-                transition={{ 
-                  duration: 2,
-                  repeat: Infinity,
-                  ease: "easeInOut"
-                }}
-              />
             </motion.div>
 
             {/* App Name */}
@@ -116,8 +98,8 @@ export const SplashScreen: React.FC<SplashScreenProps> = ({ onComplete, isVisibl
               initial={{ y: 20, opacity: 0 }}
               animate={{ y: 0, opacity: 1 }}
               transition={{ 
-                duration: 0.6,
-                delay: 0.5
+                duration: 0.4,
+                delay: 0.2
               }}
             >
               <h1 
@@ -137,8 +119,8 @@ export const SplashScreen: React.FC<SplashScreenProps> = ({ onComplete, isVisibl
               initial={{ y: 20, opacity: 0 }}
               animate={{ y: 0, opacity: 1 }}
               transition={{ 
-                duration: 0.6,
-                delay: 0.8
+                duration: 0.4,
+                delay: 0.3
               }}
             >
               {/* Progress Bar */}
@@ -155,7 +137,7 @@ export const SplashScreen: React.FC<SplashScreenProps> = ({ onComplete, isVisibl
                   initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: -10 }}
-                  transition={{ duration: 0.3 }}
+                  transition={{ duration: 0.2 }}
                 >
                   {loadingStage}
                 </motion.p>
@@ -169,8 +151,8 @@ export const SplashScreen: React.FC<SplashScreenProps> = ({ onComplete, isVisibl
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ 
-              duration: 0.6,
-              delay: 1.2
+              duration: 0.4,
+              delay: 0.5
             }}
           >
             <p className="text-xs text-muted-foreground">
