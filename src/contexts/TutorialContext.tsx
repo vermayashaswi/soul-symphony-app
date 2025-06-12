@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { useAuth } from '@/contexts/SimplifiedAuthContext';
+import { InfographicType } from '@/components/tutorial/TutorialInfographic';
 
 export interface TutorialStep {
   id: number;
@@ -7,7 +8,7 @@ export interface TutorialStep {
   content: string;
   placement: string;
   title: string;
-  infographicType?: string;
+  infographicType?: InfographicType;
   showNextButton: boolean;
 }
 
