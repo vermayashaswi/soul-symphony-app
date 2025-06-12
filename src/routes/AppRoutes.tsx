@@ -22,27 +22,27 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useOnboarding } from '@/hooks/use-onboarding';
 
 const AppRoutes = () => {
-  console.log('Rendering AppRoutes component');
+  console.log('[AppRoutes] Rendering routes');
   const { user } = useAuth();
   const { onboardingComplete } = useOnboarding();
   
   // This will be used for conditional rendering of the /app route
   const AppRootRedirect = () => {
-    console.log('AppRootRedirect - Auth status:', { 
+    console.log('[AppRootRedirect] Auth status:', { 
       user: !!user, 
       onboardingComplete 
     });
     
     if (user) {
       if (onboardingComplete) {
-        console.log('User logged in and onboarding complete, redirecting to /app/home');
+        console.log('[AppRootRedirect] User logged in and onboarding complete, redirecting to /app/home');
         return <Navigate to="/app/home" replace />;
       } else {
-        console.log('User logged in but onboarding not complete, redirecting to /app/onboarding');
+        console.log('[AppRootRedirect] User logged in but onboarding not complete, redirecting to /app/onboarding');
         return <Navigate to="/app/onboarding" replace />;
       }
     } else {
-      console.log('User not logged in, redirecting to /app/onboarding');
+      console.log('[AppRootRedirect] User not logged in, redirecting to /app/onboarding');
       return <Navigate to="/app/onboarding" replace />;
     }
   };

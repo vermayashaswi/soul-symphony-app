@@ -9,89 +9,74 @@ interface UseSplashScreenOptions {
 
 export const useSplashScreen = (options: UseSplashScreenOptions = {}) => {
   const { 
-    minDisplayTime = 1500, // Reduced further
+    minDisplayTime = 1500,
     enabledInDev = false
   } = options;
   
-  const [isVisible, setIsVisible] = useState(false); // Start as hidden by default
-  const [isAppReady, setIsAppReady] = useState(true); // Start as ready by default
+  const [isVisible, setIsVisible] = useState(false);
+  const [isAppReady, setIsAppReady] = useState(true);
   const { user, isLoading: authLoading } = useAuth();
-
   const [startTime] = useState(Date.now());
 
-  // Emergency timeout to prevent infinite blocking
+  console.log('[useSplashScreen] Hook initialized', {
+    pathname: window.location.pathname,
+    enabledInDev,
+    authLoading,
+    hasUser: !!user
+  });
+
+  // Check if we should show splash at all
   useEffect(() => {
-    const emergencyTimeout = setTimeout(() => {
-      console.log('[SplashScreen] Emergency timeout triggered, forcing app ready');
-      setIsAppReady(true);
+    const currentPath = window.location.pathname;
+    
+    console.log('[useSplashScreen] Evaluating splash visibility for path:', currentPath);
+    
+    // NEVER show splash for marketing routes
+    if (currentPath === '/' || 
+        currentPath.startsWith('/blog') ||
+        currentPath.startsWith('/faq') ||
+        currentPath.startsWith('/privacy') ||
+        currentPath.startsWith('/download')) {
+      console.log('[useSplashScreen] Marketing route - splash disabled');
       setIsVisible(false);
-    }, 5000); // 5 second maximum
+      setIsAppReady(true);
+      return;
+    }
 
-    return () => clearTimeout(emergencyTimeout);
-  }, []);
+    // For development, don't show splash unless explicitly enabled
+    if (process.env.NODE_ENV === 'development' && !enabledInDev) {
+      console.log('[useSplashScreen] Development mode - splash disabled');
+      setIsVisible(false);
+      setIsAppReady(true);
+      return;
+    }
 
-  // Check if app is ready based on auth state and other conditions
-  useEffect(() => {
-    const checkAppReady = async () => {
-      // For development, don't show splash unless explicitly enabled
-      if (process.env.NODE_ENV === 'development' && !enabledInDev) {
-        setIsAppReady(true);
-        setIsVisible(false);
-        return;
-      }
-
-      // For marketing routes, never show splash
-      if (window.location.pathname === '/' || 
-          window.location.pathname.startsWith('/blog') ||
-          window.location.pathname.startsWith('/faq') ||
-          window.location.pathname.startsWith('/privacy')) {
-        console.log('[SplashScreen] Marketing route detected, skipping splash');
-        setIsAppReady(true);
-        setIsVisible(false);
-        return;
-      }
-
-      // Only show splash for app routes
-      if (!window.location.pathname.startsWith('/app/')) {
-        setIsAppReady(true);
-        setIsVisible(false);
-        return;
-      }
-
-      // For app routes, show splash but with timeout protection
+    // Only show splash for app routes in production
+    if (currentPath.startsWith('/app/')) {
+      console.log('[useSplashScreen] App route detected - enabling splash');
       setIsVisible(true);
+      setIsAppReady(false);
       
-      // Don't wait for auth if it's taking too long
-      const authTimeout = setTimeout(() => {
-        console.log('[SplashScreen] Auth timeout, proceeding anyway');
+      // Simple timeout-based completion
+      const timer = setTimeout(() => {
+        console.log('[useSplashScreen] Timer completed - hiding splash');
         setIsAppReady(true);
-      }, 3000);
-
-      // Wait for auth to finish loading (with timeout)
-      if (!authLoading) {
-        clearTimeout(authTimeout);
-        
-        // Simulate minimal app initialization
-        await new Promise(resolve => setTimeout(resolve, 200));
-
-        // Check if minimum display time has passed
-        const elapsedTime = Date.now() - startTime;
-        const remainingTime = Math.max(0, minDisplayTime - elapsedTime);
-
-        setTimeout(() => {
-          setIsAppReady(true);
-        }, remainingTime);
-      }
-
-      return () => clearTimeout(authTimeout);
-    };
-
-    checkAppReady();
-  }, [authLoading, minDisplayTime, startTime, enabledInDev]);
+        setIsVisible(false);
+      }, minDisplayTime);
+      
+      return () => clearTimeout(timer);
+    } else {
+      console.log('[useSplashScreen] Non-app route - splash disabled');
+      setIsVisible(false);
+      setIsAppReady(true);
+    }
+  }, [minDisplayTime, enabledInDev]);
 
   // Hide splash screen when app is ready
   const hideSplashScreen = useCallback(() => {
+    console.log('[useSplashScreen] Manual hide triggered');
     setIsVisible(false);
+    setIsAppReady(true);
   }, []);
 
   return {

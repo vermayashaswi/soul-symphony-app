@@ -1,5 +1,5 @@
 
-import React, { Suspense, useEffect } from "react";
+import React, { Suspense } from "react";
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
@@ -11,16 +11,23 @@ import { TutorialProvider } from "@/contexts/TutorialContext";
 import { ThemeProvider } from "next-themes";
 import { JournalProcessingInitializer } from '@/app/journal-processing-init';
 import { SplashScreenWrapper } from '@/components/splash/SplashScreenWrapper';
+import { EmergencyFallback } from '@/components/EmergencyFallback';
 import AppRoutes from "./routes/AppRoutes";
-import { isAppRoute } from "./routes/RouteHelpers";
 import "./App.css";
 
-const queryClient = new QueryClient();
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      retry: 1,
+      staleTime: 5 * 60 * 1000, // 5 minutes
+    },
+  },
+});
 
 // Error Boundary Component
 class AppErrorBoundary extends React.Component<
   { children: React.ReactNode },
-  { hasError: boolean }
+  { hasError: boolean; error?: Error }
 > {
   constructor(props: { children: React.ReactNode }) {
     super(props);
@@ -29,7 +36,7 @@ class AppErrorBoundary extends React.Component<
 
   static getDerivedStateFromError(error: Error) {
     console.error('[AppErrorBoundary] Error caught:', error);
-    return { hasError: true };
+    return { hasError: true, error };
   }
 
   componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
@@ -38,22 +45,7 @@ class AppErrorBoundary extends React.Component<
 
   render() {
     if (this.state.hasError) {
-      return (
-        <div className="min-h-screen flex items-center justify-center p-4">
-          <div className="text-center">
-            <h1 className="text-2xl font-bold mb-4">Something went wrong</h1>
-            <p className="text-muted-foreground mb-4">
-              The application encountered an error. Please refresh the page.
-            </p>
-            <button 
-              onClick={() => window.location.reload()}
-              className="px-4 py-2 bg-primary text-primary-foreground rounded hover:bg-primary/90"
-            >
-              Refresh Page
-            </button>
-          </div>
-        </div>
-      );
+      return <EmergencyFallback error={this.state.error} resetError={() => this.setState({ hasError: false, error: undefined })} />;
     }
 
     return this.props.children;
@@ -61,9 +53,11 @@ class AppErrorBoundary extends React.Component<
 }
 
 function App() {
+  console.log('[App] Rendering App component');
+  
   // Simple loading fallback
   const LoadingFallback = () => (
-    <div className="min-h-screen flex items-center justify-center">
+    <div className="min-h-screen flex items-center justify-center bg-background">
       <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
     </div>
   );
@@ -72,20 +66,25 @@ function App() {
   const shouldShowSplash = () => {
     const currentPath = window.location.pathname;
     
+    console.log('[App] Checking splash visibility for path:', currentPath);
+    
     // Never show splash for marketing routes
     if (currentPath === '/' || 
         currentPath.startsWith('/blog') ||
         currentPath.startsWith('/faq') ||
         currentPath.startsWith('/privacy') ||
         currentPath.startsWith('/download')) {
+      console.log('[App] Marketing route - splash disabled');
       return false;
     }
     
     // For production app routes, show splash
-    if (process.env.NODE_ENV === 'production' && isAppRoute(currentPath)) {
+    if (process.env.NODE_ENV === 'production' && currentPath.startsWith('/app/')) {
+      console.log('[App] Production app route - splash enabled');
       return true;
     }
     
+    console.log('[App] Default - splash disabled');
     return false;
   };
 
@@ -102,8 +101,8 @@ function App() {
                       <JournalProcessingInitializer />
                       
                       <SplashScreenWrapper 
-                        enabledInDev={shouldShowSplash()}
-                        minDisplayTime={1500}
+                        enabledInDev={false}
+                        minDisplayTime={1000}
                       >
                         <Suspense fallback={<LoadingFallback />}>
                           <AppRoutes />
