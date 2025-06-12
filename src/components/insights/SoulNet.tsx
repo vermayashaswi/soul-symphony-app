@@ -15,6 +15,7 @@ import { TranslatableText } from '@/components/translation/TranslatableText';
 import { useTranslation } from '@/contexts/TranslationContext';
 import { useInstantSoulNetData } from '@/hooks/useInstantSoulNetData';
 import { EnhancedSoulNetPreloadService } from '@/services/enhancedSoulNetPreloadService';
+import { LanguageLevelTranslationCache } from '@/services/languageLevelTranslationCache';
 import { translationService } from '@/services/translationService';
 
 interface SoulNetProps {
@@ -22,14 +23,14 @@ interface SoulNetProps {
   timeRange: TimeRange;
 }
 
-// ENHANCED: Atomic Translation Loading Component
-const AtomicTranslationLoadingState: React.FC<{ progress: number }> = ({ progress }) => (
+// ENHANCED: Language-level translation loading component
+const LanguageLevelTranslationLoadingState: React.FC<{ progress: number }> = ({ progress }) => (
   <div className="bg-background rounded-xl shadow-sm border w-full p-6">
     <div className="flex flex-col items-center justify-center py-12 space-y-4">
       <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
       <h3 className="text-lg font-medium">
         <TranslatableText 
-          text="Preparing Soul-Net with atomic translations..." 
+          text="Preparing language translations for Soul-Net..." 
           forceTranslate={true}
           enableFontScaling={true}
           scalingContext="general"
@@ -43,7 +44,7 @@ const AtomicTranslationLoadingState: React.FC<{ progress: number }> = ({ progres
       </div>
       <p className="text-sm text-muted-foreground">
         <TranslatableText 
-          text={`${progress}% complete`}
+          text={`${progress}% complete - This happens once per language`}
           forceTranslate={false}
           enableFontScaling={true}
           scalingContext="general"
@@ -63,16 +64,18 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
   const [selectedEntity, setSelectedEntity] = useState<string | null>(null);
   const { currentLanguage } = useTranslation();
   
-  // ENHANCED: Use ref to track atomic rendering initialization
-  const atomicRenderingInitialized = useRef(false);
+  // ENHANCED: Use ref to track language-level rendering initialization
+  const languageLevelRenderingInitialized = useRef(false);
+  const currentLanguageRef = useRef(currentLanguage);
 
   // APP-LEVEL: Initialize the enhanced service with app-level translation service
   useEffect(() => {
-    console.log("[SoulNet] ATOMIC: Setting up atomic app-level translation service integration");
+    console.log("[SoulNet] LANGUAGE-LEVEL: Setting up language-level translation service integration");
     EnhancedSoulNetPreloadService.setAppLevelTranslationService(translationService);
+    LanguageLevelTranslationCache.setAppLevelTranslationService(translationService);
   }, []);
 
-  // ENHANCED: Use the atomic instant data hook
+  // ENHANCED: Use the language-level instant data hook
   const { 
     graphData, 
     loading, 
@@ -87,7 +90,7 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
     getInstantNodeConnections
   } = useInstantSoulNetData(userId, timeRange);
 
-  console.log("[SoulNet] ATOMIC TRANSLATION STATE", { 
+  console.log("[SoulNet] LANGUAGE-LEVEL TRANSLATION STATE", { 
     userId, 
     timeRange, 
     currentLanguage,
@@ -99,31 +102,41 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
     translationComplete,
     isAtomicMode,
     renderingReady,
-    atomicInitialized: atomicRenderingInitialized.current
+    languageLevelInitialized: languageLevelRenderingInitialized.current
   });
 
   useEffect(() => {
-    console.log("[SoulNet] ATOMIC: Component mounted - Atomic translation mode enabled");
+    console.log("[SoulNet] LANGUAGE-LEVEL: Component mounted - Language-level translation mode enabled");
     
     return () => {
-      console.log("[SoulNet] ATOMIC: Component unmounted");
+      console.log("[SoulNet] LANGUAGE-LEVEL: Component unmounted");
     };
   }, []);
 
-  // ENHANCED: Atomic rendering initialization that waits for complete translation
+  // ENHANCED: Reset rendering when language changes
   useEffect(() => {
-    // ENHANCED: Only initialize rendering if we have data, atomic translation is complete, and haven't already initialized
-    if (isInstantReady && translationComplete && isAtomicMode && graphData.nodes.length > 0 && !atomicRenderingInitialized.current) {
-      console.log("[SoulNet] ATOMIC: Initializing rendering after atomic translation completion");
+    if (currentLanguageRef.current !== currentLanguage) {
+      console.log(`[SoulNet] LANGUAGE-LEVEL: Language changed from ${currentLanguageRef.current} to ${currentLanguage}, resetting rendering`);
+      setRenderingReady(false);
+      languageLevelRenderingInitialized.current = false;
+      currentLanguageRef.current = currentLanguage;
+    }
+  }, [currentLanguage]);
+
+  // ENHANCED: Language-level rendering initialization that waits for complete translation
+  useEffect(() => {
+    // ENHANCED: Only initialize rendering if we have data, translation is complete, and haven't already initialized for this language
+    if (isInstantReady && translationComplete && isAtomicMode && graphData.nodes.length > 0 && !languageLevelRenderingInitialized.current) {
+      console.log("[SoulNet] LANGUAGE-LEVEL: Initializing rendering after language-level translation completion");
       setRenderingReady(true);
-      atomicRenderingInitialized.current = true;
+      languageLevelRenderingInitialized.current = true;
     }
     
     // ENHANCED: Reset rendering if there's an error or complete data loss
-    if (error || (graphData.nodes.length === 0 && !loading && !isTranslating && atomicRenderingInitialized.current)) {
-      console.log("[SoulNet] ATOMIC: Resetting rendering due to error or data loss", { error: !!error, nodesCount: graphData.nodes.length });
+    if (error || (graphData.nodes.length === 0 && !loading && !isTranslating && languageLevelRenderingInitialized.current)) {
+      console.log("[SoulNet] LANGUAGE-LEVEL: Resetting rendering due to error or data loss", { error: !!error, nodesCount: graphData.nodes.length });
       setRenderingReady(false);
-      atomicRenderingInitialized.current = false;
+      languageLevelRenderingInitialized.current = false;
     }
   }, [isInstantReady, translationComplete, isAtomicMode, graphData.nodes.length, loading, error, isTranslating]);
 
@@ -152,27 +165,25 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
     console.error('[SoulNet] APP-LEVEL: Canvas error:', error);
     setCanvasError(error);
     setRetryCount(prev => prev + 1);
-    // DEFENSIVE: Reset rendering state on canvas errors
     setRenderingReady(false);
-    atomicRenderingInitialized.current = false;
+    languageLevelRenderingInitialized.current = false;
   }, []);
 
   const handleRetry = useCallback(() => {
     setCanvasError(null);
     setRetryCount(0);
-    // Allow re-initialization after retry
-    atomicRenderingInitialized.current = false;
+    languageLevelRenderingInitialized.current = false;
   }, []);
 
-  // ENHANCED: Show atomic translation loading if translation is in progress
+  // ENHANCED: Show language-level translation loading if translation is in progress
   if (isTranslating && !translationComplete && isAtomicMode) {
-    console.log("[SoulNet] ATOMIC: Showing atomic translation loading state");
-    return <AtomicTranslationLoadingState progress={translationProgress} />;
+    console.log("[SoulNet] LANGUAGE-LEVEL: Showing language-level translation loading state");
+    return <LanguageLevelTranslationLoadingState progress={translationProgress} />;
   }
 
   // ENHANCED: Only show general loading if we truly have no data and are still loading
   if (loading && !isInstantReady && graphData.nodes.length === 0) {
-    console.log("[SoulNet] ATOMIC: Showing general loading state - no atomic instant data available");
+    console.log("[SoulNet] LANGUAGE-LEVEL: Showing general loading state - no instant data available");
     return <LoadingState />;
   }
   
@@ -282,7 +293,7 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
     );
   };
 
-  console.log(`[SoulNet] ATOMIC RENDER: ${graphData.nodes.length} nodes, ${graphData.links.length} links, renderingReady: ${renderingReady}, atomicInitialized: ${atomicRenderingInitialized.current}, translationComplete: ${translationComplete}, atomicMode: ${isAtomicMode}`);
+  console.log(`[SoulNet] LANGUAGE-LEVEL RENDER: ${graphData.nodes.length} nodes, ${graphData.links.length} links, renderingReady: ${renderingReady}, languageLevelInitialized: ${languageLevelRenderingInitialized.current}, translationComplete: ${translationComplete}, atomicMode: ${isAtomicMode}`);
 
   return (
     <div className={cn(
@@ -331,7 +342,7 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
             </div>
           }
         >
-          {/* ENHANCED: Canvas only renders when atomic translation is complete and rendering is ready */}
+          {/* ENHANCED: Canvas only renders when language-level translation is complete and rendering is ready */}
           {renderingReady && translationComplete && isAtomicMode && (
             <Canvas
               style={{
