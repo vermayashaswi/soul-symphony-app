@@ -57,6 +57,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  // Fix the refreshSession function to match the expected return type
+  const refreshSessionWrapper = async (): Promise<void> => {
+    try {
+      const currentSession = await refreshSession();
+      setSession(currentSession);
+      setUser(currentSession?.user ?? null);
+    } catch (error) {
+      console.error('[SimplifiedAuthContext] Session refresh failed:', error);
+    }
+  };
+
   // Simplified auth initialization
   useEffect(() => {
     let mounted = true;
@@ -117,7 +128,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     signUp,
     resetPassword,
     signOut,
-    refreshSession,
+    refreshSession: refreshSessionWrapper,
     updateUserProfile,
     ensureProfileExists,
   };
