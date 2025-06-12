@@ -1,10 +1,9 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useMemo, useCallback, useRef, useEffect, useState } from 'react';
 import { useFrame } from '@react-three/fiber';
-import { OrbitControls } from '@react-three/drei';
 import * as THREE from 'three';
-import { useTheme } from '@/hooks/use-theme';
 import Node from './Node';
 import Edge from './Edge';
+import { useIsMobile } from '@/hooks/use-mobile';
 
 interface NodeData {
   id: string;
@@ -20,183 +19,196 @@ interface LinkData {
   value: number;
 }
 
+interface GraphData {
+  nodes: NodeData[];
+  links: LinkData[];
+}
+
 interface SimplifiedSoulNetVisualizationProps {
-  data: { nodes: NodeData[], links: LinkData[] };
+  data: GraphData;
   selectedNode: string | null;
-  onNodeClick: (id: string) => void;
+  onNodeClick: (id: string, event: any) => void;
   themeHex: string;
   isFullScreen: boolean;
   shouldShowLabels: boolean;
-  // COORDINATED: Enhanced instant data access functions
   getInstantConnectionPercentage?: (selectedNode: string, targetNode: string) => number;
   getInstantTranslation?: (nodeId: string) => string;
   getInstantNodeConnections?: (nodeId: string) => any;
   isInstantReady?: boolean;
-  // ENHANCED: Add missing isAtomicMode prop
   isAtomicMode?: boolean;
 }
 
-export const SimplifiedSoulNetVisualization: React.FC<SimplifiedSoulNetVisualizationProps> = ({
+// ENHANCED: Y-axis distance pattern for circle nodes (entity nodes)
+const getCircleNodeYDistance = (nodeIndex: number): number => {
+  const patterns = [
+    2,      // node 1: +2
+    -2,     // node 2: -2
+    2.25,   // node 3: +2.25
+    -2.25,  // node 4: -2.25
+    2.5,    // node 5: +2.5
+    -2.5,   // node 6: -2.5
+    2,      // node 7: +2
+    -2      // node 8: -2
+  ];
+  
+  // For nodes beyond the initial pattern, continue the alternating pattern
+  if (nodeIndex >= patterns.length) {
+    const cycleIndex = nodeIndex % 8;
+    return patterns[cycleIndex];
+  }
+  
+  return patterns[nodeIndex];
+};
+
+const SimplifiedSoulNetVisualization: React.FC<SimplifiedSoulNetVisualizationProps> = ({
   data,
   selectedNode,
   onNodeClick,
   themeHex,
   isFullScreen,
   shouldShowLabels,
-  getInstantConnectionPercentage = () => 0,
-  getInstantTranslation = (id: string) => id,
-  getInstantNodeConnections = () => ({ connectedNodes: [], totalStrength: 0, averageStrength: 0 }),
+  getInstantConnectionPercentage,
+  getInstantTranslation,
+  getInstantNodeConnections,
   isInstantReady = false,
-  isAtomicMode = true
+  isAtomicMode = false
 }) => {
-  const [highlightedNodes, setHighlightedNodes] = useState<Set<string>>(new Set());
-  const [dimmedNodes, setDimmedNodes] = useState<Set<string>>(new Set());
-  const [cameraZoom, setCameraZoom] = useState(45);
-  
-  // UPDATED: Use app's theme context instead of system theme detection
-  const { theme, systemTheme } = useTheme();
-  const effectiveTheme = theme === 'system' ? systemTheme : theme;
+  const groupRef = useRef<THREE.Group>(null);
+  const isMobile = useIsMobile();
+  const [effectiveTheme, setEffectiveTheme] = useState<'light' | 'dark'>('light');
 
-  console.log(`[SimplifiedSoulNetVisualization] COORDINATED THEME: Using app theme context - theme: ${theme}, systemTheme: ${systemTheme}, effective: ${effectiveTheme}`);
-  console.log(`[SimplifiedSoulNetVisualization] COORDINATED INSTANT MODE: Rendering with ${data.nodes.length} nodes, instantReady: ${isInstantReady}, atomicMode: ${isAtomicMode}`);
+  // ENHANCED: Apply custom y-axis positioning for circle nodes
+  const processedNodes = useMemo(() => {
+    if (!data.nodes || data.nodes.length === 0) return [];
 
-  // Use Three.js controls for camera
-  useFrame(({ camera }) => {
-    const newZoom = camera.position.length();
-    if (Math.abs(newZoom - cameraZoom) > 0.1) {
-      setCameraZoom(newZoom);
+    // Separate entity (circle) and emotion (cube) nodes
+    const entityNodes = data.nodes.filter(node => node.type === 'entity');
+    const emotionNodes = data.nodes.filter(node => node.type === 'emotion');
+
+    console.log(`[SimplifiedSoulNetVisualization] Processing ${entityNodes.length} entity nodes and ${emotionNodes.length} emotion nodes`);
+
+    // Apply custom y-axis distances to entity nodes
+    const processedEntityNodes = entityNodes.map((node, index) => {
+      const customYDistance = getCircleNodeYDistance(index);
+      const newPosition: [number, number, number] = [
+        node.position[0], // keep x
+        customYDistance,  // apply custom y pattern
+        node.position[2]  // keep z
+      ];
+      
+      console.log(`[SimplifiedSoulNetVisualization] Entity node ${index + 1} (${node.id}): y-distance = ${customYDistance}`);
+      
+      return {
+        ...node,
+        position: newPosition
+      };
+    });
+
+    // Keep emotion nodes unchanged
+    return [...processedEntityNodes, ...emotionNodes];
+  }, [data.nodes]);
+
+  const highlightedNodes = useMemo(() => {
+    if (!selectedNode) return new Set<string>();
+    
+    const highlighted = new Set<string>([selectedNode]);
+    
+    data.links.forEach(link => {
+      if (link.source === selectedNode) {
+        highlighted.add(link.target);
+      } else if (link.target === selectedNode) {
+        highlighted.add(link.source);
+      }
+    });
+    
+    return highlighted;
+  }, [selectedNode, data.links]);
+
+  const handleNodeClick = useCallback((nodeId: string, event: any) => {
+    if (onNodeClick) {
+      onNodeClick(nodeId, event);
+    }
+  }, [onNodeClick]);
+
+  useEffect(() => {
+    const checkTheme = () => {
+      const isDark = document.documentElement.classList.contains('dark');
+      setEffectiveTheme(isDark ? 'dark' : 'light');
+    };
+
+    checkTheme();
+    const observer = new MutationObserver(checkTheme);
+    observer.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ['class']
+    });
+
+    return () => observer.disconnect();
+  }, []);
+
+  useFrame((state) => {
+    if (groupRef.current && !selectedNode) {
+      groupRef.current.rotation.y += 0.001;
     }
   });
 
-  // ENHANCED: Instant highlighting effect with stronger visual hierarchy
-  useEffect(() => {
-    if (selectedNode) {
-      const connectedNodes = new Set<string>();
-      const allOtherNodes = new Set<string>();
-      
-      // Use instant connection data if available
-      if (isInstantReady) {
-        const connectionData = getInstantNodeConnections(selectedNode);
-        connectionData.connectedNodes.forEach((nodeId: string) => {
-          connectedNodes.add(nodeId);
-        });
-        connectedNodes.add(selectedNode); // Include the selected node itself
-        
-        console.log(`[SimplifiedSoulNetVisualization] COORDINATED INSTANT: Using precomputed connections for ${selectedNode}:`, connectionData.connectedNodes);
-      } else {
-        // Fallback to link traversal
-        data.links.forEach(link => {
-          if (link.source === selectedNode || link.target === selectedNode) {
-            connectedNodes.add(link.source);
-            connectedNodes.add(link.target);
-          }
-        });
-      }
-      
-      // ENHANCED: All nodes that are NOT connected become dimmed
-      data.nodes.forEach(node => {
-        if (!connectedNodes.has(node.id)) {
-          allOtherNodes.add(node.id);
-        }
-      });
-      
-      setHighlightedNodes(connectedNodes);
-      setDimmedNodes(allOtherNodes);
-      
-      console.log(`[SimplifiedSoulNetVisualization] COORDINATED ENHANCED HIERARCHY: Selected ${selectedNode}, highlighting ${connectedNodes.size} nodes, dimming ${allOtherNodes.size} nodes`);
-    } else {
-      // ENHANCED: When no node is selected, show all nodes normally (no dimming)
-      setHighlightedNodes(new Set());
-      setDimmedNodes(new Set());
+  const getCoordinatedTranslation = useCallback((nodeId: string) => {
+    if (getInstantTranslation) {
+      return getInstantTranslation(nodeId);
     }
-  }, [selectedNode, data.links, data.nodes, isInstantReady, getInstantNodeConnections]);
+    return nodeId;
+  }, [getInstantTranslation]);
 
-  // Helper function to find node by id
-  const findNodeById = useCallback((nodeId: string): NodeData | undefined => {
-    return data.nodes.find(node => node.id === nodeId);
-  }, [data.nodes]);
+  console.log(`[SimplifiedSoulNetVisualization] Rendering with ${processedNodes.length} processed nodes, selected: ${selectedNode}, atomic mode: ${isAtomicMode}`);
 
   return (
     <>
-      {/* ENHANCED: Brighter ambient lighting for better visibility of highlighted elements */}
-      <ambientLight intensity={0.8} />
-      <directionalLight position={[10, 10, 5]} intensity={1.2} />
-      <OrbitControls 
-        enablePan={true} 
-        enableZoom={true} 
-        enableRotate={true}
-        minDistance={15}
-        maxDistance={120}
-        enableDamping={true}
-        dampingFactor={0.05}
-      />
+      <ambientLight intensity={0.6} />
+      <directionalLight position={[10, 10, 5]} intensity={0.8} />
+      <pointLight position={[-10, -10, -5]} intensity={0.3} />
       
-      {data.nodes.map((node) => {
-        const isHighlighted = highlightedNodes.has(node.id);
-        const isDimmed = dimmedNodes.has(node.id);
-        
-        // COORDINATED INSTANT connection percentage - no loading delay
-        const connectionPercentage = selectedNode && isHighlighted && selectedNode !== node.id
-          ? getInstantConnectionPercentage(selectedNode, node.id)
-          : 0;
-        
-        const showPercentage = selectedNode !== null && isHighlighted && selectedNode !== node.id && connectionPercentage > 0;
-        
-        console.log(`[SimplifiedSoulNetVisualization] COORDINATED ENHANCED HIERARCHY: Node ${node.id} - highlighted: ${isHighlighted}, dimmed: ${isDimmed}, percentage: ${connectionPercentage}%`);
-        
-        return (
+      <group ref={groupRef}>
+        {processedNodes.map((node) => (
           <Node
             key={node.id}
             node={node}
             isSelected={selectedNode === node.id}
-            onClick={onNodeClick}
+            onClick={handleNodeClick}
             highlightedNodes={highlightedNodes}
-            showLabel={shouldShowLabels && !isDimmed} // Don't show labels for dimmed nodes
-            dimmed={isDimmed}
+            showLabel={shouldShowLabels}
+            dimmed={selectedNode !== null && !highlightedNodes.has(node.id)}
             themeHex={themeHex}
             selectedNodeId={selectedNode}
-            cameraZoom={cameraZoom}
-            isHighlighted={isHighlighted}
-            connectionPercentage={connectionPercentage}
-            showPercentage={showPercentage}
-            forceShowLabels={false} // Let the dimming logic control this
+            cameraZoom={isFullScreen ? 40 : 45}
+            isHighlighted={highlightedNodes.has(node.id)}
+            connectionPercentage={selectedNode ? (getInstantConnectionPercentage?.(selectedNode, node.id) || 0) : 0}
+            showPercentage={selectedNode !== null && selectedNode !== node.id}
+            forceShowLabels={shouldShowLabels}
             effectiveTheme={effectiveTheme}
-            isInstantMode={isInstantReady}
-            getCoordinatedTranslation={getInstantTranslation}
+            isInstantMode={isAtomicMode}
+            getCoordinatedTranslation={getCoordinatedTranslation}
           />
-        );
-      })}
-      
-      {data.links.map((link, index) => {
-        const sourceNode = findNodeById(link.source);
-        const targetNode = findNodeById(link.target);
+        ))}
         
-        if (!sourceNode || !targetNode) {
-          console.warn(`[SimplifiedSoulNetVisualization] COORDINATED: Missing node for link: ${link.source} -> ${link.target}`);
-          return null;
-        }
-        
-        // ENHANCED: Edge is highlighted only if BOTH nodes are highlighted
-        const isHighlighted = selectedNode !== null && 
-          (highlightedNodes.has(link.source) && highlightedNodes.has(link.target));
-        
-        // ENHANCED: Edge is dimmed if EITHER node is dimmed
-        const isDimmed = selectedNode !== null && 
-          (dimmedNodes.has(link.source) || dimmedNodes.has(link.target));
-        
-        return (
+        {data.links.map((link, index) => (
           <Edge
             key={`${link.source}-${link.target}-${index}`}
-            start={sourceNode.position}
-            end={targetNode.position}
+            source={processedNodes.find(n => n.id === link.source)}
+            target={processedNodes.find(n => n.id === link.target)}
             value={link.value}
-            isHighlighted={isHighlighted}
-            dimmed={isDimmed}
-            startNodeType={sourceNode.type}
-            endNodeType={targetNode.type}
+            isHighlighted={
+              selectedNode !== null && 
+              (link.source === selectedNode || link.target === selectedNode)
+            }
+            isDimmed={
+              selectedNode !== null && 
+              link.source !== selectedNode && 
+              link.target !== selectedNode
+            }
+            themeHex={themeHex}
           />
-        );
-      })}
+        ))}
+      </group>
     </>
   );
 };
