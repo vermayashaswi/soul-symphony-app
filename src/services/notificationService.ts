@@ -1,5 +1,5 @@
-
 import { toast } from '@/hooks/use-toast';
+import { webToNativeNotificationService } from './webToNativeNotificationService';
 
 // Component mount tracking for safe DOM operations
 const mountedComponents = new Set<string>();
@@ -140,8 +140,17 @@ const TIME_MAPPINGS: Record<NotificationTime, { hour: number; minute: number }> 
   night: { hour: 22, minute: 0 }
 };
 
-// Request notification permission
+// ENHANCED: Request notification permission with WebToNative support
 export async function requestNotificationPermission(): Promise<boolean> {
+  console.log('[notificationService] Requesting notification permission');
+  
+  // Check if we're in WebToNative environment
+  if (webToNativeNotificationService.isWebToNativeEnvironment()) {
+    console.log('[notificationService] Using WebToNative notification service');
+    return await webToNativeNotificationService.requestPermission();
+  }
+  
+  // Fallback to standard web API
   if (!('Notification' in window)) {
     console.log('This browser does not support notifications');
     return false;
@@ -165,10 +174,27 @@ export async function requestNotificationPermission(): Promise<boolean> {
   }
 }
 
-// Show immediate notification
+// ENHANCED: Show immediate notification with WebToNative support
 export function showNotification(title: string, body: string, options?: NotificationOptions) {
+  console.log('[notificationService] Showing notification:', title);
+  
+  // Use WebToNative service if available
+  if (webToNativeNotificationService.isWebToNativeEnvironment()) {
+    webToNativeNotificationService.showNotification(title, {
+      body,
+      icon: '/favicon.ico',
+      badge: '/favicon.ico',
+      tag: 'journal-reminder',
+      requireInteraction: false,
+      silent: false,
+      ...options
+    });
+    return;
+  }
+  
+  // Fallback to standard web notification
   if (!('Notification' in window) || Notification.permission !== 'granted') {
-    console.log('Cannot show notification - permission not granted');
+    console.log('Cannot show notification - permission not granted or not supported');
     return;
   }
 
@@ -284,7 +310,7 @@ export function setupJournalReminder(enabled: boolean, frequency: NotificationFr
     return;
   }
   
-  // Request permission first
+  // Request permission first (with WebToNative support)
   requestNotificationPermission().then(granted => {
     if (!granted) {
       console.log('Notification permission not granted, cannot schedule notifications');
@@ -355,13 +381,23 @@ export function getNotificationSettings(): NotificationSettings {
   return { enabled, times };
 }
 
-// Test notification (for debugging)
+// ENHANCED: Test notification with WebToNative support
 export function testNotification() {
-  showNotification(
-    'Test Notification 🧪',
-    'This is a test notification to verify your settings are working correctly.',
-    { tag: 'test-notification' }
-  );
+  console.log('[notificationService] Testing notification');
+  
+  if (webToNativeNotificationService.isWebToNativeEnvironment()) {
+    webToNativeNotificationService.showNotification(
+      'Test Notification 🧪',
+      'This is a test notification to verify your settings are working correctly.',
+      { tag: 'test-notification' }
+    );
+  } else {
+    showNotification(
+      'Test Notification 🧪',
+      'This is a test notification to verify your settings are working correctly.',
+      { tag: 'test-notification' }
+    );
+  }
 }
 
 // Initialize notifications on module load
