@@ -12,12 +12,17 @@ interface SplashScreenWrapperProps {
 export const SplashScreenWrapper: React.FC<SplashScreenWrapperProps> = ({
   children,
   enabledInDev = false,
-  minDisplayTime = 3000
+  minDisplayTime = 2000 // Reduced default time
 }) => {
   const { isVisible, isAppReady, hideSplashScreen } = useSplashScreen({
     enabledInDev,
     minDisplayTime
   });
+
+  // Always render children in development mode for faster iteration
+  if (process.env.NODE_ENV === 'development' && !enabledInDev) {
+    return <>{children}</>;
+  }
 
   return (
     <>
@@ -26,8 +31,8 @@ export const SplashScreenWrapper: React.FC<SplashScreenWrapperProps> = ({
         onComplete={hideSplashScreen}
       />
       
-      {/* Only render app content when ready and splash is hidden */}
-      {isAppReady && !isVisible && children}
+      {/* Render app content when ready OR when splash is hidden */}
+      {(isAppReady || !isVisible) && children}
     </>
   );
 };

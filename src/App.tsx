@@ -1,6 +1,5 @@
 
 import { Suspense, useEffect } from "react";
-import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-dom";
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
@@ -12,25 +11,11 @@ import { TutorialProvider } from "@/contexts/TutorialContext";
 import { ThemeProvider } from "next-themes";
 import { JournalProcessingInitializer } from '@/app/journal-processing-init';
 import { SplashScreenWrapper } from '@/components/splash/SplashScreenWrapper';
-import { routes } from "./routes/routeConfig";
+import AppRoutes from "./routes/AppRoutes";
 import { isAppRoute } from "./routes/RouteHelpers";
 import "./App.css";
 
 const queryClient = new QueryClient();
-
-function AppContent() {
-  return (
-    <Routes>
-      {routes.map((route) => (
-        <Route
-          key={route.path}
-          path={route.path}
-          element={route.element}
-        />
-      ))}
-    </Routes>
-  );
-}
 
 function App() {
   // Check if app should show splash screen based on environment and route
@@ -52,24 +37,22 @@ function App() {
               <LocationProvider>
                 <TranslationProvider>
                   <TutorialProvider>
-                    <Router>
-                      <JournalProcessingInitializer />
-                      
-                      <SplashScreenWrapper 
-                        enabledInDev={shouldShowSplash()}
-                        minDisplayTime={2500}
-                      >
-                        <Suspense fallback={
-                          <div className="min-h-screen flex items-center justify-center">
-                            <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-primary"></div>
-                          </div>
-                        }>
-                          <AppContent />
-                        </Suspense>
-                      </SplashScreenWrapper>
-                      
-                      <Toaster />
-                    </Router>
+                    <JournalProcessingInitializer />
+                    
+                    <SplashScreenWrapper 
+                      enabledInDev={shouldShowSplash()}
+                      minDisplayTime={2500}
+                    >
+                      <Suspense fallback={
+                        <div className="min-h-screen flex items-center justify-center">
+                          <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-primary"></div>
+                        </div>
+                      }>
+                        <AppRoutes />
+                      </Suspense>
+                    </SplashScreenWrapper>
+                    
+                    <Toaster />
                   </TutorialProvider>
                 </TranslationProvider>
               </LocationProvider>

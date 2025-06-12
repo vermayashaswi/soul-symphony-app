@@ -9,8 +9,8 @@ interface UseSplashScreenOptions {
 
 export const useSplashScreen = (options: UseSplashScreenOptions = {}) => {
   const { 
-    minDisplayTime = 3000, 
-    enabledInDev = true 
+    minDisplayTime = 2000, // Reduced from 3000
+    enabledInDev = false // Changed default to false for development
   } = options;
   
   const [isVisible, setIsVisible] = useState(true);
@@ -22,11 +22,18 @@ export const useSplashScreen = (options: UseSplashScreenOptions = {}) => {
   // Check if app is ready based on auth state and other conditions
   useEffect(() => {
     const checkAppReady = async () => {
+      // For development, don't show splash unless explicitly enabled
+      if (process.env.NODE_ENV === 'development' && !enabledInDev) {
+        setIsAppReady(true);
+        setIsVisible(false);
+        return;
+      }
+
       // Wait for auth to finish loading
       if (authLoading) return;
 
       // Simulate additional app initialization tasks
-      await new Promise(resolve => setTimeout(resolve, 500));
+      await new Promise(resolve => setTimeout(resolve, 300)); // Reduced delay
 
       // Check if minimum display time has passed
       const elapsedTime = Date.now() - startTime;
@@ -38,20 +45,12 @@ export const useSplashScreen = (options: UseSplashScreenOptions = {}) => {
     };
 
     checkAppReady();
-  }, [authLoading, minDisplayTime, startTime]);
+  }, [authLoading, minDisplayTime, startTime, enabledInDev]);
 
   // Hide splash screen when app is ready
   const hideSplashScreen = useCallback(() => {
     setIsVisible(false);
   }, []);
-
-  // Don't show splash in development unless explicitly enabled
-  useEffect(() => {
-    if (process.env.NODE_ENV === 'development' && !enabledInDev) {
-      setIsVisible(false);
-      setIsAppReady(true);
-    }
-  }, [enabledInDev]);
 
   return {
     isVisible,
