@@ -1,5 +1,6 @@
 
 import React, { Component, ErrorInfo, ReactNode } from 'react';
+import EmergencyFallback from '@/routes/EmergencyFallback';
 
 interface Props {
   children: ReactNode;
@@ -17,30 +18,32 @@ export class ErrorBoundary extends Component<Props, State> {
   };
 
   public static getDerivedStateFromError(error: Error): State {
+    console.error('[ErrorBoundary] Error caught:', error);
     return { hasError: true, error };
   }
 
   public componentDidCatch(error: Error, errorInfo: ErrorInfo) {
-    console.error('ErrorBoundary caught an error:', error, errorInfo);
+    console.error('[ErrorBoundary] Error details:', error, errorInfo);
+    
+    // If this is a loading loop error, try to break it
+    if (error.message?.includes('Maximum update depth exceeded') || 
+        error.message?.includes('Too many re-renders')) {
+      console.error('[ErrorBoundary] Detected infinite loop, clearing state');
+      localStorage.clear();
+    }
   }
 
   public render() {
     if (this.state.hasError) {
+      const resetErrorBoundary = () => {
+        this.setState({ hasError: false, error: undefined });
+      };
+
       return this.props.fallback || (
-        <div className="min-h-screen flex items-center justify-center p-4">
-          <div className="text-center">
-            <h1 className="text-2xl font-bold mb-4">Something went wrong</h1>
-            <p className="text-muted-foreground mb-4">
-              We're having trouble loading the page. Please try refreshing.
-            </p>
-            <button 
-              onClick={() => window.location.reload()}
-              className="px-4 py-2 bg-primary text-primary-foreground rounded hover:bg-primary/90"
-            >
-              Refresh Page
-            </button>
-          </div>
-        </div>
+        <EmergencyFallback 
+          error={this.state.error} 
+          resetErrorBoundary={resetErrorBoundary} 
+        />
       );
     }
 

@@ -4,21 +4,24 @@ import { BrowserRouter as Router } from "react-router-dom";
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { AuthProvider } from "@/contexts/AuthContext";
-import { SubscriptionProvider } from "@/contexts/SubscriptionContext";
-import { LocationProvider } from "@/contexts/LocationContext";
-import { TranslationProvider } from "@/contexts/TranslationContext";
-import { TutorialProvider } from "@/contexts/TutorialContext";
 import { ThemeProvider } from "next-themes";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
-import AppRoutes from "./routes/AppRoutes";
+import SafeAppRoutes from "./routes/SafeAppRoutes";
+import EmergencyFallback from "./routes/EmergencyFallback";
 import "./App.css";
+
+// Simplified context providers - only include essential ones
+import { AuthProvider } from "@/contexts/SimplifiedAuthContext";
+import { SubscriptionProvider } from "@/contexts/SubscriptionContext";
+import { TranslationProvider } from "@/contexts/TranslationContext";
+import { TutorialProvider } from "@/contexts/TutorialContext";
 
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
       retry: 1,
       refetchOnWindowFocus: false,
+      staleTime: 5 * 60 * 1000, // 5 minutes
     },
   },
 });
@@ -34,25 +37,23 @@ function App() {
   console.log('[App] Rendering application');
   
   return (
-    <ErrorBoundary>
+    <ErrorBoundary fallback={<EmergencyFallback />}>
       <QueryClientProvider client={queryClient}>
         <ThemeProvider attribute="class" defaultTheme="light" enableSystem>
           <TooltipProvider>
             <Router>
-              <ErrorBoundary>
+              <ErrorBoundary fallback={<EmergencyFallback />}>
                 <AuthProvider>
                   <SubscriptionProvider>
-                    <LocationProvider>
-                      <TranslationProvider>
-                        <TutorialProvider>
-                          <Suspense fallback={<AppLoading />}>
-                            <AppRoutes />
-                          </Suspense>
-                          
-                          <Toaster />
-                        </TutorialProvider>
-                      </TranslationProvider>
-                    </LocationProvider>
+                    <TranslationProvider>
+                      <TutorialProvider>
+                        <Suspense fallback={<AppLoading />}>
+                          <SafeAppRoutes />
+                        </Suspense>
+                        
+                        <Toaster />
+                      </TutorialProvider>
+                    </TranslationProvider>
                   </SubscriptionProvider>
                 </AuthProvider>
               </ErrorBoundary>
