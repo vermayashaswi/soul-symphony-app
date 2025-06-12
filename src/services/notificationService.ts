@@ -1,3 +1,4 @@
+
 import { toast } from '@/hooks/use-toast';
 import { webToNativeNotificationService } from './webToNativeNotificationService';
 
@@ -388,8 +389,10 @@ export function testNotification() {
   if (webToNativeNotificationService.isWebToNativeEnvironment()) {
     webToNativeNotificationService.showNotification(
       'Test Notification 🧪',
-      'This is a test notification to verify your settings are working correctly.',
-      { tag: 'test-notification' }
+      {
+        body: 'This is a test notification to verify your settings are working correctly.',
+        tag: 'test-notification'
+      }
     );
   } else {
     showNotification(
