@@ -15,7 +15,7 @@ export const useSplashScreen = (options: UseSplashScreenOptions = {}) => {
   
   const [isVisible, setIsVisible] = useState(true);
   const [isAppReady, setIsAppReady] = useState(false);
-  const { user, loading: authLoading } = useAuth();
+  const { user, isLoading: authLoading } = useAuth();
 
   const [startTime] = useState(Date.now());
 

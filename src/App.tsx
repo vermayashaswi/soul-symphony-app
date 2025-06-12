@@ -4,7 +4,7 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-d
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { AuthProvider } from "@/contexts/AuthContext";
+import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import { SubscriptionProvider } from "@/contexts/SubscriptionContext";
 import { LocationProvider } from "@/contexts/LocationContext";
 import { TranslationProvider } from "@/contexts/TranslationContext";
@@ -12,6 +12,7 @@ import { TutorialProvider } from "@/contexts/TutorialContext";
 import { ThemeProvider } from "next-themes";
 import { JournalProcessingInitializer } from '@/app/journal-processing-init';
 import { SplashScreenWrapper } from '@/components/splash/SplashScreenWrapper';
+import { useOnboarding } from '@/hooks/use-onboarding';
 import { routes } from "./routes/routeConfig";
 import { isAppRoute } from "./routes/RouteHelpers";
 import ProtectedRoute from "./routes/ProtectedRoute";
@@ -24,6 +25,8 @@ const queryClient = new QueryClient();
 
 function AppContent() {
   const location = useLocation();
+  const { user } = useAuth();
+  const { onboardingComplete, loading: onboardingLoading } = useOnboarding();
   const isApp = isAppRoute(location.pathname);
 
   return (
@@ -35,7 +38,11 @@ function AppContent() {
           element={
             route.protected ? (
               <ProtectedRoute>
-                <OnboardingCheck>
+                <OnboardingCheck 
+                  onboardingComplete={onboardingComplete}
+                  onboardingLoading={onboardingLoading}
+                  user={user}
+                >
                   <ViewportManager>
                     {route.element}
                   </ViewportManager>
