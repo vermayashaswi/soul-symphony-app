@@ -23,7 +23,7 @@ import { Bell, BellOff, Smartphone, Globe, Palette, User, Shield, Vibrate } from
 import { toast } from 'sonner';
 
 const Settings: React.FC = () => {
-  const { profile, updateProfile, loading: profileLoading } = useUserProfile();
+  const { displayName: profileDisplayName, timezone, updateDisplayName, updateTimezone } = useUserProfile();
   const { theme, setTheme } = useTheme();
   const { 
     settings: notificationSettings, 
@@ -42,14 +42,24 @@ const Settings: React.FC = () => {
   const [bio, setBio] = useState('');
   const [tempNotificationTimes, setTempNotificationTimes] = useState<string[]>(['evening']);
   const [vibrationEnabled, setVibrationEnabled] = useState(true);
+  const [accentColor, setAccentColor] = useState('#3b82f6');
+
+  // Create a profile object for compatibility
+  const profile = {
+    display_name: profileDisplayName,
+    bio: bio,
+    avatar_url: null, // This would need to come from auth user metadata if available
+    timezone: timezone
+  };
+
+  const profileLoading = false; // The useUserProfile hook doesn't expose loading state
 
   // Initialize form data
   useEffect(() => {
-    if (profile) {
-      setDisplayName(profile.display_name || '');
-      setBio(profile.bio || '');
+    if (profileDisplayName) {
+      setDisplayName(profileDisplayName);
     }
-  }, [profile]);
+  }, [profileDisplayName]);
 
   useEffect(() => {
     if (notificationSettings) {
@@ -59,13 +69,9 @@ const Settings: React.FC = () => {
   }, [notificationSettings]);
 
   const handleSaveProfile = async () => {
-    if (!profile) return;
-    
     try {
-      await updateProfile({
-        display_name: displayName,
-        bio: bio,
-      });
+      await updateDisplayName(displayName);
+      // Note: bio functionality would need to be added to the useUserProfile hook
       toast.success('Profile updated successfully');
     } catch (error) {
       console.error('Error updating profile:', error);
@@ -94,6 +100,12 @@ const Settings: React.FC = () => {
   const handleVibrationToggle = async (enabled: boolean) => {
     setVibrationEnabled(enabled);
     await updateSettings({ vibrationEnabled: enabled });
+  };
+
+  const handleColorChange = (color: string) => {
+    setAccentColor(color);
+    // Apply the color to CSS variables or theme context
+    document.documentElement.style.setProperty('--theme-color', color);
   };
 
   const getPermissionBadge = () => {
@@ -335,7 +347,11 @@ const Settings: React.FC = () => {
             <Label className="text-sm font-medium">
               <TranslatableText text="Accent Color" />
             </Label>
-            <ColorPicker />
+            <ColorPicker 
+              value={accentColor}
+              onChange={handleColorChange}
+              applyImmediately={true}
+            />
           </div>
         </CardContent>
       </Card>
