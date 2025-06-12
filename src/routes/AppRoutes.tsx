@@ -26,9 +26,16 @@ const AppRoutes = () => {
   const { user } = useAuth();
   const { onboardingComplete } = useOnboarding();
   
-  // Simple app route redirect handler
+  // Simple app route redirect handler with safety checks
   const AppRootRedirect = () => {
     console.log('AppRootRedirect:', { user: !!user, onboardingComplete });
+    
+    // Prevent infinite redirect loops by checking current path
+    const currentPath = window.location.pathname;
+    
+    if (currentPath === '/app/onboarding' || currentPath === '/app/auth' || currentPath === '/app/home') {
+      return null; // Don't redirect if already on target routes
+    }
     
     if (!user) {
       return <Navigate to="/app/onboarding" replace />;
@@ -44,7 +51,7 @@ const AppRoutes = () => {
   return (
     <Routes>
       <Route element={<ViewportManager />}>
-        {/* Marketing Website Routes */}
+        {/* Marketing Website Routes - These should load without auth providers */}
         <Route path="/" element={<Index />} />
         <Route path="/privacy-policy" element={<PrivacyPolicyPage />} />
         <Route path="/faq" element={<FAQPage />} />

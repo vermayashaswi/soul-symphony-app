@@ -10,43 +10,57 @@ import { LocationProvider } from "@/contexts/LocationContext";
 import { TranslationProvider } from "@/contexts/TranslationContext";
 import { TutorialProvider } from "@/contexts/TutorialContext";
 import { ThemeProvider } from "next-themes";
-import { JournalProcessingInitializer } from '@/app/journal-processing-init';
+import { ErrorBoundary } from "@/components/ErrorBoundary";
 import AppRoutes from "./routes/AppRoutes";
 import "./App.css";
 
-const queryClient = new QueryClient();
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      retry: 1,
+      refetchOnWindowFocus: false,
+    },
+  },
+});
+
+// Loading fallback component
+const AppLoading = () => (
+  <div className="min-h-screen flex items-center justify-center">
+    <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-primary"></div>
+  </div>
+);
 
 function App() {
+  console.log('[App] Rendering application');
+  
   return (
-    <QueryClientProvider client={queryClient}>
-      <ThemeProvider attribute="class" defaultTheme="light" enableSystem>
-        <TooltipProvider>
-          <AuthProvider>
-            <SubscriptionProvider>
-              <LocationProvider>
-                <TranslationProvider>
-                  <TutorialProvider>
-                    <Router>
-                      <JournalProcessingInitializer />
-                      
-                      <Suspense fallback={
-                        <div className="min-h-screen flex items-center justify-center">
-                          <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-primary"></div>
-                        </div>
-                      }>
-                        <AppRoutes />
-                      </Suspense>
-                      
-                      <Toaster />
-                    </Router>
-                  </TutorialProvider>
-                </TranslationProvider>
-              </LocationProvider>
-            </SubscriptionProvider>
-          </AuthProvider>
-        </TooltipProvider>
-      </ThemeProvider>
-    </QueryClientProvider>
+    <ErrorBoundary>
+      <QueryClientProvider client={queryClient}>
+        <ThemeProvider attribute="class" defaultTheme="light" enableSystem>
+          <TooltipProvider>
+            <Router>
+              <ErrorBoundary>
+                <AuthProvider>
+                  <SubscriptionProvider>
+                    <LocationProvider>
+                      <TranslationProvider>
+                        <TutorialProvider>
+                          <Suspense fallback={<AppLoading />}>
+                            <AppRoutes />
+                          </Suspense>
+                          
+                          <Toaster />
+                        </TutorialProvider>
+                      </TranslationProvider>
+                    </LocationProvider>
+                  </SubscriptionProvider>
+                </AuthProvider>
+              </ErrorBoundary>
+            </Router>
+          </TooltipProvider>
+        </ThemeProvider>
+      </QueryClientProvider>
+    </ErrorBoundary>
   );
 }
 
