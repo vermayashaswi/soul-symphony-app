@@ -25,10 +25,10 @@ const Index = () => {
     forceEnableScrolling();
   }, []);
 
-  const urlParams = new URLSearchParams(window.location.search);
-
   // Only handle explicit app redirects via URL parameters
   useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    
     // Only redirect to app if explicitly requested with a URL parameter
     if (urlParams.has('app')) {
       console.log('[Index] User explicitly requested app with ?app parameter');
@@ -43,13 +43,15 @@ const Index = () => {
       } else {
         navigate('/app/auth');
       }
+      return;
     }
     
     // Check URL parameters for specific app features redirects
     if (urlParams.has('insights')) {
       navigate('/app/insights');
+      return;
     }
-  }, [user, navigate, urlParams, onboardingComplete]);
+  }, [user, navigate, onboardingComplete]);
 
   console.log('[Index] Rendering HomePage component for root URL');
   

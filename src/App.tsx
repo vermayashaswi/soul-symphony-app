@@ -62,32 +62,6 @@ function App() {
     </div>
   );
 
-  // Check if we should show splash - only for app routes in production
-  const shouldShowSplash = () => {
-    const currentPath = window.location.pathname;
-    
-    console.log('[App] Checking splash visibility for path:', currentPath);
-    
-    // Never show splash for marketing routes
-    if (currentPath === '/' || 
-        currentPath.startsWith('/blog') ||
-        currentPath.startsWith('/faq') ||
-        currentPath.startsWith('/privacy') ||
-        currentPath.startsWith('/download')) {
-      console.log('[App] Marketing route - splash disabled');
-      return false;
-    }
-    
-    // For production app routes, show splash
-    if (process.env.NODE_ENV === 'production' && currentPath.startsWith('/app/')) {
-      console.log('[App] Production app route - splash enabled');
-      return true;
-    }
-    
-    console.log('[App] Default - splash disabled');
-    return false;
-  };
-
   return (
     <AppErrorBoundary>
       <QueryClientProvider client={queryClient}>

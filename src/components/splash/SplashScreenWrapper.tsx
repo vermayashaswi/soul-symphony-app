@@ -14,19 +14,9 @@ export const SplashScreenWrapper: React.FC<SplashScreenWrapperProps> = ({
   enabledInDev = false,
   minDisplayTime = 1500
 }) => {
-  const { isVisible, isAppReady, hideSplashScreen } = useSplashScreen({
-    enabledInDev,
-    minDisplayTime
-  });
-
   const currentPath = window.location.pathname;
   
-  console.log('[SplashScreenWrapper] Rendering with state:', {
-    currentPath,
-    isVisible,
-    isAppReady,
-    enabledInDev
-  });
+  console.log('[SplashScreenWrapper] Rendering with path:', currentPath);
 
   // For marketing routes, ALWAYS render children immediately without any splash logic
   const isMarketingRoute = currentPath === '/' || 
@@ -40,7 +30,18 @@ export const SplashScreenWrapper: React.FC<SplashScreenWrapperProps> = ({
     return <>{children}</>;
   }
 
-  // For app routes, show splash only if visible and ready
+  // For app routes, use splash screen logic
+  const { isVisible, isAppReady, hideSplashScreen } = useSplashScreen({
+    enabledInDev,
+    minDisplayTime
+  });
+
+  console.log('[SplashScreenWrapper] App route - splash state:', {
+    isVisible,
+    isAppReady,
+    enabledInDev
+  });
+
   return (
     <>
       {/* Show splash screen only for app routes when explicitly visible */}

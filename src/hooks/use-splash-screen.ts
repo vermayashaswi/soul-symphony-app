@@ -37,7 +37,7 @@ export const useSplashScreen = (options: UseSplashScreenOptions = {}) => {
         currentPath.startsWith('/faq') ||
         currentPath.startsWith('/privacy') ||
         currentPath.startsWith('/download')) {
-      console.log('[useSplashScreen] Marketing route - splash disabled');
+      console.log('[useSplashScreen] Marketing route - splash disabled, app ready');
       setIsVisible(false);
       setIsAppReady(true);
       return;
@@ -52,8 +52,8 @@ export const useSplashScreen = (options: UseSplashScreenOptions = {}) => {
     }
 
     // Only show splash for app routes in production
-    if (currentPath.startsWith('/app/')) {
-      console.log('[useSplashScreen] App route detected - enabling splash');
+    if (currentPath.startsWith('/app/') && process.env.NODE_ENV === 'production') {
+      console.log('[useSplashScreen] App route in production - enabling splash');
       setIsVisible(true);
       setIsAppReady(false);
       
@@ -66,7 +66,7 @@ export const useSplashScreen = (options: UseSplashScreenOptions = {}) => {
       
       return () => clearTimeout(timer);
     } else {
-      console.log('[useSplashScreen] Non-app route - splash disabled');
+      console.log('[useSplashScreen] Non-production app route or other - splash disabled');
       setIsVisible(false);
       setIsAppReady(true);
     }

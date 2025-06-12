@@ -42,14 +42,14 @@ const AppRoutes = () => {
         return <Navigate to="/app/onboarding" replace />;
       }
     } else {
-      console.log('[AppRootRedirect] User not logged in, redirecting to /app/onboarding');
-      return <Navigate to="/app/onboarding" replace />;
+      console.log('[AppRootRedirect] User not logged in, redirecting to /app/auth');
+      return <Navigate to="/app/auth" replace />;
     }
   };
   
   return (
     <Routes>
-      {/* Marketing Routes - NO ViewportManager wrapper */}
+      {/* Marketing Routes - NO ViewportManager wrapper, NO splash screen */}
       <Route index element={<Index />} />
       <Route path="privacy-policy" element={<PrivacyPolicyPage />} />
       <Route path="faq" element={<FAQPage />} />

@@ -18,6 +18,23 @@ export const EmergencyFallback: React.FC<EmergencyFallbackProps> = ({
     window.location.href = '/';
   };
 
+  const handleGoToApp = () => {
+    window.location.href = '/app/auth';
+  };
+
+  // Log error details for debugging
+  React.useEffect(() => {
+    if (error) {
+      console.error('[EmergencyFallback] Error details:', {
+        message: error.message,
+        stack: error.stack,
+        name: error.name,
+        currentPath: window.location.pathname,
+        timestamp: new Date().toISOString()
+      });
+    }
+  }, [error]);
+
   return (
     <div className="min-h-screen flex items-center justify-center p-4 bg-background">
       <div className="text-center max-w-md">
@@ -28,8 +45,13 @@ export const EmergencyFallback: React.FC<EmergencyFallbackProps> = ({
             </svg>
           </div>
           <h1 className="text-2xl font-bold text-foreground mb-2">Something went wrong</h1>
-          <p className="text-muted-foreground">
+          <p className="text-muted-foreground mb-4">
             {error?.message || 'The application encountered an unexpected error.'}
+          </p>
+          
+          {/* Show current path for debugging */}
+          <p className="text-xs text-muted-foreground mb-4">
+            Current path: {window.location.pathname}
           </p>
         </div>
         
@@ -48,6 +70,13 @@ export const EmergencyFallback: React.FC<EmergencyFallbackProps> = ({
             Go to Homepage
           </button>
           
+          <button 
+            onClick={handleGoToApp}
+            className="w-full px-4 py-2 bg-accent text-accent-foreground rounded-md hover:bg-accent/90 transition-colors"
+          >
+            Go to App
+          </button>
+          
           {resetError && (
             <button 
               onClick={resetError}
@@ -64,6 +93,7 @@ export const EmergencyFallback: React.FC<EmergencyFallbackProps> = ({
             <li>Clearing your browser cache</li>
             <li>Disabling browser extensions</li>
             <li>Using an incognito/private window</li>
+            <li>Checking the browser console for errors</li>
           </ul>
         </div>
       </div>
