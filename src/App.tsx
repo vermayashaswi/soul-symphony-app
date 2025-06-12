@@ -10,6 +10,7 @@ import { JournalProcessingInitializer } from './app/journal-processing-init';
 import { TutorialProvider } from './contexts/TutorialContext';
 import TutorialOverlay from './components/tutorial/TutorialOverlay';
 import ErrorBoundary from './components/insights/ErrorBoundary';
+import { NotificationBridgeProvider } from '@/components/notifications/NotificationBridge';
 import { preloadCriticalImages } from './utils/imagePreloader';
 import { toast } from 'sonner';
 import './styles/emoji.css';
@@ -74,14 +75,16 @@ const App: React.FC = () => {
     <ErrorBoundary onError={handleAppError}>
       <TranslationProvider>
         <SubscriptionProvider>
-          <TutorialProvider>
-            <TranslationLoadingOverlay />
-            <JournalProcessingInitializer />
-            <AppRoutes key={isInitialized ? 'initialized' : 'initializing'} />
-            <TutorialOverlay />
-            <Toaster />
-            <SonnerToaster position="top-right" />
-          </TutorialProvider>
+          <NotificationBridgeProvider>
+            <TutorialProvider>
+              <TranslationLoadingOverlay />
+              <JournalProcessingInitializer />
+              <AppRoutes key={isInitialized ? 'initialized' : 'initializing'} />
+              <TutorialOverlay />
+              <Toaster />
+              <SonnerToaster position="top-right" />
+            </TutorialProvider>
+          </NotificationBridgeProvider>
         </SubscriptionProvider>
       </TranslationProvider>
     </ErrorBoundary>

@@ -32,6 +32,8 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { TranslatableText } from '@/components/translation/TranslatableText';
 import { useTranslation } from '@/contexts/TranslationContext';
 import { useTutorial } from '@/contexts/TutorialContext';
+import { useMobileNotifications } from '@/hooks/use-mobile-notifications';
+import { useNotificationBridge } from '@/components/notifications/NotificationBridge';
 
 interface SettingItemProps {
   icon: React.ElementType;
@@ -65,9 +67,23 @@ function SettingsContent() {
   console.log('[Settings] SettingsContent rendering');
   
   const { theme, setTheme, colorTheme, setColorTheme, customColor, setCustomColor, systemTheme } = useTheme();
-  const [notificationsEnabled, setNotificationsEnabled] = useState(false);
-  const [notificationTimes, setNotificationTimes] = useState<NotificationTime[]>(['evening']);
+  
+  // Replace the old notification state with the new mobile notifications hook
+  const { 
+    settings: notificationSettings, 
+    hasPermission: notificationPermission, 
+    canRequestPermission,
+    enableNotifications,
+    disableNotifications,
+    testNotification: testMobileNotification,
+    isLoading: notificationLoading 
+  } = useMobileNotifications();
+  
+  const { deviceInfo } = useNotificationBridge();
+  
   const [showNotificationSettings, setShowNotificationSettings] = useState(false);
+  const [tempNotificationTimes, setTempNotificationTimes] = useState<NotificationTime[]>(notificationSettings.times);
+  
   const { user, signOut } = useAuth();
   const { 
     isPremium, 
@@ -315,35 +331,17 @@ function SettingsContent() {
   };
   
   const handleToggleNotifications = async (checked: boolean) => {
-    setNotificationsEnabled(checked);
-    
     if (checked) {
-      // Request permission first
-      if ('Notification' in window) {
-        const permission = await Notification.requestPermission();
-        if (permission === 'granted') {
-          setShowNotificationSettings(true);
-          toast.success(<TranslatableText text="Notifications enabled! Set your preferences." forceTranslate={true} />);
-        } else {
-          setNotificationsEnabled(false);
-          toast.error(<TranslatableText text="Notification permission denied" forceTranslate={true} />);
-        }
-      } else {
-        // For mobile/capacitor
-        setShowNotificationSettings(true);
-        toast.success(<TranslatableText text="Customize your notification settings" forceTranslate={true} />);
-      }
+      // Show notification settings dialog first
+      setTempNotificationTimes(notificationSettings.times.length > 0 ? notificationSettings.times : ['evening']);
+      setShowNotificationSettings(true);
     } else {
-      toast.info(<TranslatableText text="Notifications disabled" forceTranslate={true} />);
-      if (typeof window !== 'undefined') {
-        localStorage.removeItem('notification_enabled');
-        localStorage.removeItem('notification_times');
-      }
+      await disableNotifications();
     }
   };
   
   const handleTimeChange = (time: NotificationTime) => {
-    setNotificationTimes(prev => {
+    setTempNotificationTimes(prev => {
       if (prev.includes(time)) {
         return prev.filter(t => t !== time);
       }
@@ -351,44 +349,30 @@ function SettingsContent() {
     });
   };
   
-  const applyNotificationSettings = () => {
-    if (notificationTimes.length === 0) {
+  const applyNotificationSettings = async () => {
+    if (tempNotificationTimes.length === 0) {
       toast.error(<TranslatableText text="Please select at least one time for notifications" forceTranslate={true} />);
       return;
     }
     
-    setupJournalReminder(true, 'once', notificationTimes);
-    toast.success(<TranslatableText text="Notification settings saved" forceTranslate={true} />);
-    setShowNotificationSettings(false);
+    const success = await enableNotifications(tempNotificationTimes);
+    if (success) {
+      toast.success(<TranslatableText text="Notification settings saved" forceTranslate={true} />);
+      setShowNotificationSettings(false);
+    }
   };
 
   const cancelNotificationSettings = () => {
-    // Reset to previous state
-    const enabled = localStorage.getItem('notification_enabled') === 'true';
-    const times = localStorage.getItem('notification_times');
-    
-    setNotificationsEnabled(enabled);
-    
-    if (times) {
-      try {
-        const parsedTimes = JSON.parse(times) as NotificationTime[];
-        if (Array.isArray(parsedTimes) && parsedTimes.length > 0) {
-          setNotificationTimes(parsedTimes);
-        }
-      } catch (e) {
-        setNotificationTimes(['evening']);
-      }
-    } else {
-      setNotificationTimes(['evening']);
-    }
-    
+    setTempNotificationTimes(notificationSettings.times);
     setShowNotificationSettings(false);
   };
   
   const getNotificationSummary = () => {
-    if (!notificationsEnabled) return <TranslatableText text="Disabled" />;
+    if (!notificationSettings.enabled || !notificationPermission) {
+      return <TranslatableText text="Disabled" />;
+    }
     
-    const timeLabels = notificationTimes.map(time => {
+    const timeLabels = notificationSettings.times.map(time => {
       return {
         'morning': 'Morning',
         'afternoon': 'Afternoon', 
@@ -400,6 +384,9 @@ function SettingsContent() {
     return (
       <div className="flex flex-wrap items-center gap-1">
         <TranslatableText text={timeLabels} />
+        {deviceInfo?.isNative && (
+          <Badge variant="secondary" className="text-xs">Native</Badge>
+        )}
       </div>
     );
   };
@@ -695,21 +682,26 @@ function SettingsContent() {
                   icon={Bell}
                   title="Journal Reminders"
                   description={
-                    notificationsEnabled 
+                    notificationSettings.enabled && notificationPermission
                       ? ""
                       : "Get reminders to journal and stay on track"
                   }
                 >
                   <div className="flex items-center gap-2">
                     <Switch 
-                      checked={notificationsEnabled}
+                      checked={notificationSettings.enabled && notificationPermission}
                       onCheckedChange={handleToggleNotifications}
+                      disabled={notificationLoading}
                     />
-                    {notificationsEnabled && (
+                    {notificationSettings.enabled && notificationPermission && (
                       <Button 
                         variant="outline" 
                         size="sm"
-                        onClick={() => setShowNotificationSettings(true)}
+                        onClick={() => {
+                          setTempNotificationTimes(notificationSettings.times);
+                          setShowNotificationSettings(true);
+                        }}
+                        disabled={notificationLoading}
                       >
                         <TranslatableText text="Customize" />
                       </Button>
@@ -717,7 +709,7 @@ function SettingsContent() {
                   </div>
                 </SettingItem>
                 
-                {notificationsEnabled && (
+                {(notificationSettings.enabled || notificationPermission) && (
                   <div className="pt-2 text-sm text-muted-foreground">
                     {getNotificationSummary()}
                   </div>
@@ -1057,6 +1049,18 @@ function SettingsContent() {
             </DialogHeader>
             
             <div className="space-y-6 py-4">
+              {deviceInfo && (
+                <div className="p-3 bg-muted rounded-lg">
+                  <p className="text-sm font-medium mb-1">
+                    <TranslatableText text="Environment" />
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    {deviceInfo.isNative ? 'Native App' : 'Web Browser'} • {deviceInfo.platform}
+                    {deviceInfo.isMobile && ' • Mobile Device'}
+                  </p>
+                </div>
+              )}
+              
               <div className="space-y-4">
                 <h3 className="font-medium text-sm">
                   <TranslatableText text="Reminder Times" />
@@ -1068,14 +1072,14 @@ function SettingsContent() {
                       key={option.value} 
                       className={cn(
                         "border rounded-md px-3 py-2 flex items-center space-x-2 cursor-pointer",
-                        notificationTimes.includes(option.value) 
+                        tempNotificationTimes.includes(option.value) 
                           ? "border-primary bg-primary/10" 
                           : "border-input"
                       )}
                       onClick={() => handleTimeChange(option.value)}
                     >
                       <Checkbox 
-                        checked={notificationTimes.includes(option.value)} 
+                        checked={tempNotificationTimes.includes(option.value)} 
                         onCheckedChange={() => handleTimeChange(option.value)}
                         id={`time-${option.value}`}
                       />
@@ -1088,6 +1092,16 @@ function SettingsContent() {
                     </div>
                   ))}
                 </div>
+                
+                <Button
+                  onClick={testMobileNotification}
+                  size="sm"
+                  variant="outline"
+                  className="w-full"
+                  disabled={!notificationPermission || notificationLoading}
+                >
+                  <TranslatableText text="Test Notification" />
+                </Button>
               </div>
             </div>
             
@@ -1095,12 +1109,13 @@ function SettingsContent() {
               <Button 
                 variant="outline" 
                 onClick={cancelNotificationSettings}
+                disabled={notificationLoading}
               >
                 <TranslatableText text="Cancel" />
               </Button>
               <Button 
                 onClick={applyNotificationSettings}
-                disabled={notificationTimes.length === 0}
+                disabled={tempNotificationTimes.length === 0 || notificationLoading}
               >
                 <TranslatableText text="Save Settings" />
               </Button>
