@@ -8,7 +8,7 @@ import { SubscriptionProvider } from "@/contexts/SubscriptionContext";
 import { LocationProvider } from "@/contexts/LocationContext";
 import { TranslationProvider } from "@/contexts/TranslationContext";
 import { TutorialProvider } from "@/contexts/TutorialContext";
-import { ThemeProvider } from "next-themes";
+import { ThemeProvider } from "@/hooks/use-theme";
 import { JournalProcessingInitializer } from '@/app/journal-processing-init';
 import { SplashScreenWrapper } from '@/components/splash/SplashScreenWrapper';
 import { EmergencyFallback } from '@/components/EmergencyFallback';
@@ -91,7 +91,7 @@ function App() {
   return (
     <AppErrorBoundary>
       <QueryClientProvider client={queryClient}>
-        <ThemeProvider attribute="class" defaultTheme="light" enableSystem>
+        <ThemeProvider>
           <TooltipProvider>
             <AuthProvider>
               <SubscriptionProvider>
