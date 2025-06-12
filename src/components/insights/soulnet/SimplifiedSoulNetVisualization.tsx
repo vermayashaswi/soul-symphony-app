@@ -190,24 +190,32 @@ const SimplifiedSoulNetVisualization: React.FC<SimplifiedSoulNetVisualizationPro
           />
         ))}
         
-        {data.links.map((link, index) => (
-          <Edge
-            key={`${link.source}-${link.target}-${index}`}
-            source={processedNodes.find(n => n.id === link.source)}
-            target={processedNodes.find(n => n.id === link.target)}
-            value={link.value}
-            isHighlighted={
-              selectedNode !== null && 
-              (link.source === selectedNode || link.target === selectedNode)
-            }
-            isDimmed={
-              selectedNode !== null && 
-              link.source !== selectedNode && 
-              link.target !== selectedNode
-            }
-            themeHex={themeHex}
-          />
-        ))}
+        {data.links.map((link, index) => {
+          const sourceNode = processedNodes.find(n => n.id === link.source);
+          const targetNode = processedNodes.find(n => n.id === link.target);
+          
+          if (!sourceNode || !targetNode) return null;
+          
+          return (
+            <Edge
+              key={`${link.source}-${link.target}-${index}`}
+              start={sourceNode.position}
+              end={targetNode.position}
+              value={link.value}
+              isHighlighted={
+                selectedNode !== null && 
+                (link.source === selectedNode || link.target === selectedNode)
+              }
+              dimmed={
+                selectedNode !== null && 
+                link.source !== selectedNode && 
+                link.target !== selectedNode
+              }
+              startNodeType={sourceNode.type}
+              endNodeType={targetNode.type}
+            />
+          );
+        })}
       </group>
     </>
   );
