@@ -38,30 +38,6 @@ export const useNotificationPermission = () => {
     }
   };
 
-  const showNotification = (title: string, body?: string, options?: NotificationOptions) => {
-    if (!isSupported || permission !== 'granted') {
-      console.warn('Cannot show notification - permission not granted or not supported');
-      return;
-    }
-
-    const notification = new Notification(title, {
-      body,
-      icon: '/favicon.ico',
-      badge: '/favicon.ico',
-      tag: 'notification',
-      requireInteraction: false,
-      silent: false,
-      ...options
-    });
-
-    // Auto-close after 5 seconds
-    setTimeout(() => {
-      notification.close();
-    }, 5000);
-
-    return notification;
-  };
-
   const isGranted = permission === 'granted';
   const isDenied = permission === 'denied';
   const isDefault = permission === 'default';
@@ -72,7 +48,6 @@ export const useNotificationPermission = () => {
     isGranted,
     isDenied,
     isDefault,
-    requestPermission,
-    showNotification
+    requestPermission
   };
 };
