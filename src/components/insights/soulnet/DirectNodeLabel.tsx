@@ -1,4 +1,3 @@
-
 import React, { useMemo, useEffect } from 'react';
 import TranslatableText3D from './TranslatableText3D';
 import SimpleText from './SimpleText';
@@ -59,40 +58,18 @@ export const DirectNodeLabel: React.FC<DirectNodeLabelProps> = ({
     console.log(`[DirectNodeLabel] APP-LEVEL ENHANCED POSITIONING: ${id} with coordinated translation: "${coordinatedTranslation}"`);
   }
 
-  // NEW: Function to determine if entity node should have label below (alternating pattern)
-  const shouldLabelBeBelow = useMemo(() => {
-    if (type !== 'entity') return false; // Only apply to entity nodes
-    
-    // Create a simple hash from the node ID to get consistent alternating
-    let hash = 0;
-    for (let i = 0; i < id.length; i++) {
-      const char = id.charCodeAt(i);
-      hash = ((hash << 5) - hash) + char;
-      hash = hash & hash; // Convert to 32-bit integer
-    }
-    
-    // Use absolute value and modulo to get 0 or 1
-    const isBelow = Math.abs(hash) % 2 === 1;
-    
-    console.log(`[DirectNodeLabel] ALTERNATING LOGIC: Entity "${id}" hash=${hash}, isBelow=${isBelow}`);
-    return isBelow;
-  }, [id, type]);
-
-  // UPDATED: Label offset with alternating positioning for entity nodes
+  // Same base offset for both entity and emotion nodes
   const labelOffset = useMemo(() => {
     const baseOffset = 1.4;
     const scaledOffset = baseOffset * Math.max(0.8, Math.min(2.5, nodeScale));
     
-    // NEW: Apply alternating positioning only for entity nodes
-    const finalOffset = (type === 'entity' && shouldLabelBeBelow) ? -scaledOffset : scaledOffset;
-    
     if (isInstantMode) {
-      console.log(`[DirectNodeLabel] APP-LEVEL INSTANT: Enhanced label offset for ${id} (${type}): ${finalOffset} (scale: ${nodeScale}, below: ${shouldLabelBeBelow}) - ALTERNATING POSITIONING`);
+      console.log(`[DirectNodeLabel] APP-LEVEL INSTANT: Enhanced label offset for ${id} (${type}): ${scaledOffset} (scale: ${nodeScale}) - UNIFORM POSITIONING`);
     } else {
-      console.log(`[DirectNodeLabel] APP-LEVEL: Enhanced label offset for ${id} (${type}): ${finalOffset} (scale: ${nodeScale}, below: ${shouldLabelBeBelow}) - ALTERNATING POSITIONING`);
+      console.log(`[DirectNodeLabel] APP-LEVEL: Enhanced label offset for ${id} (${type}): ${scaledOffset} (scale: ${nodeScale}) - UNIFORM POSITIONING`);
     }
-    return [0, finalOffset, 0] as [number, number, number];
-  }, [type, nodeScale, id, isInstantMode, shouldLabelBeBelow]);
+    return [0, scaledOffset, 0] as [number, number, number];
+  }, [type, nodeScale, id, isInstantMode]);
 
   // FIXED FONT SIZE IMPLEMENTATION: Constant text size of 3.2 independent of all zoom and camera calculations
   const textSize = useMemo(() => {
@@ -201,7 +178,7 @@ export const DirectNodeLabel: React.FC<DirectNodeLabelProps> = ({
         outlineColor={undefined}
         maxWidth={600}
         enableWrapping={true}
-        maxCharsPerLine={14} // UPDATED: Reduced from 18 to 14
+        maxCharsPerLine={18}
         maxLines={3}
         sourceLanguage="en"
         coordinatedTranslation={coordinatedTranslation}

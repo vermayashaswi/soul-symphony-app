@@ -14,7 +14,7 @@ export interface WrappedTextResult {
  */
 export const wrapTextIntelligently = (
   text: string, 
-  maxCharsPerLine: number = 14, // UPDATED: Reduced from 18 to 14
+  maxCharsPerLine: number = 18,
   maxLines: number = 3
 ): WrappedTextResult => {
   if (!text || typeof text !== 'string') {

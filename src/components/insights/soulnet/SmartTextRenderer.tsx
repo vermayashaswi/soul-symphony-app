@@ -33,7 +33,7 @@ export const SmartTextRenderer: React.FC<SmartTextRendererProps> = ({
   outlineColor,
   maxWidth = 25,
   enableWrapping = false,
-  maxCharsPerLine = 14, // UPDATED: Reduced from 18 to 14
+  maxCharsPerLine = 18,
   maxLines = 3
 }) => {
   const [useCanvasRenderer, setUseCanvasRenderer] = useState(false);
