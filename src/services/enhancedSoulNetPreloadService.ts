@@ -1,3 +1,4 @@
+
 import { supabase } from '@/integrations/supabase/client';
 
 interface NodeData {
@@ -564,18 +565,32 @@ export class EnhancedSoulNetPreloadService {
 
     console.log("[EnhancedSoulNetPreloadService] APP-LEVEL: Generating graph with", entityList.length, "entities");
     
-    // UPDATED: Apply new y-axis pattern for entity nodes (circular): +2, -2, +2, -2...
+    // UPDATED: Apply NEW y-axis pattern for entity nodes (circular): +2.5, -2.5, +4, -4, +5.5, -5.5, repeating
     entityList.forEach((entity, entityIndex) => {
       entityNodes.add(entity);
       const entityAngle = (entityIndex / entityList.length) * Math.PI * 2;
       const entityRadius = ENTITY_LAYER_RADIUS;
       const entityX = Math.cos(entityAngle) * entityRadius;
       
-      // NEW Y-AXIS PATTERN: Alternating +2, -2 for entity nodes
-      const entityY = (entityIndex % 2 === 0) ? 2 : -2;
+      // NEW Y-AXIS PATTERN: +2.5, -2.5, +4, -4, +5.5, -5.5, repeating
+      const getEntityYPosition = (index: number): number => {
+        const position = index % 6; // 6-position cycle
+        
+        switch (position) {
+          case 0: return 2.5;   // +2.5
+          case 1: return -2.5;  // -2.5
+          case 2: return 4;     // +4
+          case 3: return -4;    // -4
+          case 4: return 5.5;   // +5.5
+          case 5: return -5.5;  // -5.5
+          default: return 2.5;  // fallback
+        }
+      };
+      
+      const entityY = getEntityYPosition(entityIndex);
       const entityZ = Math.sin(entityAngle) * entityRadius;
       
-      console.log(`[EnhancedSoulNetPreloadService] UPDATED Y-POSITIONING: Entity node ${entityIndex + 1} "${entity}" positioned at Y=${entityY}`);
+      console.log(`[EnhancedSoulNetPreloadService] NEW Y-POSITIONING: Entity node ${entityIndex + 1} "${entity}" positioned at Y=${entityY}`);
       
       nodes.push({
         id: entity,
@@ -632,7 +647,7 @@ export class EnhancedSoulNetPreloadService {
 
     console.log("[EnhancedSoulNetPreloadService] APP-LEVEL: Generated graph with", nodes.length, "nodes and", links.length, "links");
     console.log("[EnhancedSoulNetPreloadService] CUSTOM COLORS: Applied GREEN to entity nodes (spheres) and GOLDEN to emotion nodes (cubes)");
-    console.log("[EnhancedSoulNetPreloadService] NEW Y-POSITIONING: Applied +2,-2 pattern to entity nodes and +7,-7,+9,-9,+11,-11 pattern to emotion nodes");
+    console.log("[EnhancedSoulNetPreloadService] NEW Y-POSITIONING: Applied +2.5,-2.5,+4,-4,+5.5,-5.5 pattern to entity nodes and +7,-7,+9,-9,+11,-11 pattern to emotion nodes");
     return { nodes, links };
   }
 }
