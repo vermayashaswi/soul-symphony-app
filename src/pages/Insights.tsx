@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
 import { Calendar, Filter, TrendingUp, ArrowUp, ArrowDown, Activity, Award } from 'lucide-react';
@@ -447,7 +446,7 @@ function InsightsContent() {
               >
                 <ErrorBoundary>
                   <MoodCalendar 
-                    data={getSentimentData()}
+                    sentimentData={getSentimentData()}
                     timeRange={timeRange}
                   />
                 </ErrorBoundary>
