@@ -28,7 +28,9 @@ interface NodeProps {
   showPercentage?: boolean;
   forceShowLabels?: boolean;
   effectiveTheme?: 'light' | 'dark';
-  // SIMPLIFIED: Remove coordinated translation props
+  isInstantMode?: boolean;
+  // ENHANCED: Coordinated translation props
+  getCoordinatedTranslation?: (nodeId: string) => string;
 }
 
 const Node: React.FC<NodeProps> = ({
@@ -45,7 +47,9 @@ const Node: React.FC<NodeProps> = ({
   connectionPercentage = 0,
   showPercentage = false,
   forceShowLabels = false,
-  effectiveTheme = 'light'
+  effectiveTheme = 'light',
+  isInstantMode = false,
+  getCoordinatedTranslation
 }) => {
   const meshRef = useRef<THREE.Mesh>(null);
   const userColorThemeHex = useUserColorThemeHex();
@@ -62,6 +66,25 @@ const Node: React.FC<NodeProps> = ({
     
     return () => clearTimeout(timer);
   }, []);
+
+  // ENHANCED COORDINATED TRANSLATION: Get coordinated translation for this node with better debugging
+  const coordinatedTranslation = useMemo(() => {
+    if (getCoordinatedTranslation) {
+      const translation = getCoordinatedTranslation(node.id);
+      if (isInstantMode) {
+        console.log(`[Node] ENHANCED COORDINATED INSTANT: Got coordinated translation for ${node.id}: "${translation}" - NO LOADING DELAY`);
+      } else {
+        console.log(`[Node] ENHANCED COORDINATED: Got coordinated translation for ${node.id}: "${translation}"`);
+      }
+      return translation;
+    }
+    if (isInstantMode) {
+      console.log(`[Node] ENHANCED COORDINATED INSTANT: No coordinated translation function available for ${node.id} - NO LOADING DELAY`);
+    } else {
+      console.log(`[Node] ENHANCED COORDINATED: No coordinated translation function available for ${node.id}`);
+    }
+    return undefined;
+  }, [node.id, getCoordinatedTranslation, isInstantMode]);
 
   // UPDATED: Fixed color scheme with proper default and selected states
   const color = useMemo(() => {
@@ -160,7 +183,20 @@ const Node: React.FC<NodeProps> = ({
     return forceShowLabels || showLabel || isSelected || isHighlighted;
   }, [forceShowLabels, showLabel, isSelected, isHighlighted, dimmed]);
 
-  console.log(`[Node] SIMPLIFIED: Rendering ${node.type} node ${node.id}, base scale ${baseNodeScale.toFixed(2)}`);
+  // ENHANCED INSTANT MODE: Better logging for coordinated translation tracking
+  if (showPercentage && connectionPercentage > 0) {
+    if (isInstantMode) {
+      console.log(`[Node] ENHANCED COORDINATED PULSATING INSTANT MODE: ${node.id} (${node.type}) displays percentage: ${connectionPercentage}% with coordinated translation: "${coordinatedTranslation}" - NO LOADING DELAY`);
+    } else {
+      console.log(`[Node] ENHANCED COORDINATED PULSATING: ${node.id} (${node.type}) should display percentage: ${connectionPercentage}% with coordinated translation: "${coordinatedTranslation}"`);
+    }
+  }
+
+  if (isInstantMode) {
+    console.log(`[Node] ENHANCED FIXED COLORS INSTANT MODE: Rendering ${node.type} node ${node.id} with ${isSelected ? 'SELECTED' : 'DEFAULT'} ${node.type === 'entity' ? 'GREEN' : 'GOLDEN'} color, enhanced coordinated translation: "${coordinatedTranslation}", base scale ${baseNodeScale.toFixed(2)} - NO LOADING DELAY`);
+  } else {
+    console.log(`[Node] ENHANCED FIXED COLORS: Rendering ${node.type} node ${node.id} with ${isSelected ? 'SELECTED' : 'DEFAULT'} ${node.type === 'entity' ? 'GREEN' : 'GOLDEN'} color, enhanced coordinated translation: "${coordinatedTranslation}", base scale ${baseNodeScale.toFixed(2)}`);
+  }
 
   // ENHANCED: Improved geometry sizes to work with the enhanced scale differences
   const renderGeometry = () => {
@@ -212,6 +248,8 @@ const Node: React.FC<NodeProps> = ({
           connectionPercentage={connectionPercentage}
           showPercentage={showPercentage}
           effectiveTheme={effectiveTheme}
+          isInstantMode={isInstantMode}
+          coordinatedTranslation={coordinatedTranslation}
         />
       )}
     </group>

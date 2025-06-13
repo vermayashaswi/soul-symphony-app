@@ -1,5 +1,7 @@
+
 import { supabase } from '@/integrations/supabase/client';
-import { translationService } from './translationService';
+import { translationService } from '@/services/translationService';
+import { onDemandTranslationCache } from '@/utils/website-translations';
 
 interface NodeData {
   id: string;
@@ -15,81 +17,43 @@ interface LinkData {
   value: number;
 }
 
-interface SoulNetGraphData {
+interface ProcessedSoulNetData {
   nodes: NodeData[];
   links: LinkData[];
+  translations: Map<string, string>;
+  connectionPercentages: Map<string, number>;
 }
 
-interface TranslationResult {
-  [key: string]: string;
+interface CachedSoulNetData {
+  data: ProcessedSoulNetData;
+  timestamp: number;
+  userId: string;
+  timeRange: string;
+  language: string;
 }
 
-class SoulNetPreloadServiceClass {
-  private cache = new Map<string, any>();
-  private translationPromises = new Map<string, Promise<Map<string, string>>>();
+export class SoulNetPreloadService {
+  private static readonly CACHE_KEY = 'soulnet-preloaded-data';
+  private static readonly CACHE_DURATION = 10 * 60 * 1000; // Extended to 10 minutes
+  private static cache = new Map<string, CachedSoulNetData>();
 
-  async preloadData(userId: string, timeRange: string, targetLanguage?: string): Promise<any> {
-    const cacheKey = `${userId}-${timeRange}-${targetLanguage || 'en'}`;
+  static async preloadSoulNetData(
+    userId: string, 
+    timeRange: string, 
+    language: string
+  ): Promise<ProcessedSoulNetData | null> {
+    console.log(`[SoulNetPreloadService] Preloading data for user ${userId}, range ${timeRange}, language ${language}`);
     
-    if (this.cache.has(cacheKey)) {
-      console.log('[SoulNetPreloadService] Using cached data for', cacheKey);
-      return this.cache.get(cacheKey);
+    const cacheKey = `${userId}-${timeRange}-${language}`;
+    const cached = this.getCachedData(cacheKey);
+    
+    if (cached) {
+      console.log(`[SoulNetPreloadService] Using cached data for ${cacheKey}`);
+      return cached.data;
     }
 
     try {
-      console.log('[SoulNetPreloadService] Fetching and processing data for', cacheKey);
-      
-      // Get base data first
-      const baseData = await this.fetchSoulNetData(userId, timeRange);
-      if (!baseData) {
-        console.log('[SoulNetPreloadService] No base data available');
-        return null;
-      }
-
-      // Process translations if needed
-      if (targetLanguage && targetLanguage !== 'en') {
-        console.log('[SoulNetPreloadService] Processing translations for', targetLanguage);
-        const nodeTexts = [...new Set(baseData.nodes.map(node => node.id))];
-        
-        // FIXED: Use correct batchTranslate API
-        const translations = await translationService.batchTranslate(
-          nodeTexts,
-          'en',
-          targetLanguage
-        );
-
-        const processedData = {
-          ...baseData,
-          translations: translations,
-          translationComplete: true
-        };
-
-        this.cache.set(cacheKey, processedData);
-        console.log('[SoulNetPreloadService] Data processed and cached for', cacheKey);
-        return processedData;
-      }
-
-      // No translation needed
-      const processedData = {
-        ...baseData,
-        translations: new Map(),
-        translationComplete: true
-      };
-
-      this.cache.set(cacheKey, processedData);
-      return processedData;
-    } catch (error) {
-      console.error('[SoulNetPreloadService] Error preloading data:', error);
-      return null;
-    }
-  }
-
-  private async fetchSoulNetData(userId: string, timeRange: string): Promise<SoulNetGraphData | null> {
-    console.log(`[SoulNetPreloadService] Fetching SoulNet data for user ${userId}, range ${timeRange}`);
-    
-    try {
-      // Fetch data from Supabase or your data source
-      // Replace this with your actual data fetching logic
+      // Fetch raw journal data - FIXED: Use themeemotion instead of entityemotion
       const startDate = this.getStartDate(timeRange);
       const { data: entries, error } = await supabase
         .from('Journal Entries')
@@ -105,21 +69,170 @@ class SoulNetPreloadServiceClass {
 
       if (!entries || entries.length === 0) {
         console.log('[SoulNetPreloadService] No entries found');
-        return { nodes: [], links: [] };
+        return { nodes: [], links: [], translations: new Map(), connectionPercentages: new Map() };
       }
 
       console.log(`[SoulNetPreloadService] Found ${entries.length} entries for processing`);
 
       // Process the raw data
       const graphData = this.processEntities(entries);
-      return graphData;
+      
+      // Pre-translate all node names if not English
+      const translations = new Map<string, string>();
+      const connectionPercentages = new Map<string, number>();
+      
+      if (language !== 'en' && graphData.nodes.length > 0) {
+        const nodesToTranslate = [...new Set(graphData.nodes.map(node => node.id))]; // Remove duplicates
+        console.log(`[SoulNetPreloadService] Pre-translating ${nodesToTranslate.length} unique node names for ${timeRange} range`);
+        
+        try {
+          const batchResults = await translationService.batchTranslate({
+            texts: nodesToTranslate,
+            targetLanguage: language
+          });
+          
+          console.log(`[SoulNetPreloadService] Successfully translated ${batchResults.size}/${nodesToTranslate.length} nodes`);
+          
+          batchResults.forEach((translatedText, originalText) => {
+            translations.set(originalText, translatedText);
+            // Also cache in on-demand cache for immediate access
+            onDemandTranslationCache.set(language, originalText, translatedText);
+          });
+
+          // Handle any missing translations
+          nodesToTranslate.forEach(nodeId => {
+            if (!translations.has(nodeId)) {
+              console.warn(`[SoulNetPreloadService] No translation found for node: ${nodeId}, using original`);
+              translations.set(nodeId, nodeId);
+            }
+          });
+        } catch (error) {
+          console.error('[SoulNetPreloadService] Error during batch translation:', error);
+          // Fallback: set original text for all nodes
+          nodesToTranslate.forEach(nodeId => {
+            translations.set(nodeId, nodeId);
+          });
+        }
+      }
+
+      // Pre-calculate connection percentages
+      this.calculateConnectionPercentages(graphData, connectionPercentages);
+
+      const processedData: ProcessedSoulNetData = {
+        nodes: graphData.nodes,
+        links: graphData.links,
+        translations,
+        connectionPercentages
+      };
+
+      // Cache the processed data
+      this.setCachedData(cacheKey, {
+        data: processedData,
+        timestamp: Date.now(),
+        userId,
+        timeRange,
+        language
+      });
+
+      console.log(`[SoulNetPreloadService] Successfully preloaded and cached data for ${cacheKey} with ${processedData.nodes.length} nodes and ${processedData.translations.size} translations`);
+      return processedData;
     } catch (error) {
-      console.error('[SoulNetPreloadService] Error fetching data:', error);
+      console.error('[SoulNetPreloadService] Error preloading data:', error);
       return null;
     }
   }
 
-  private getStartDate(timeRange: string): Date {
+  static getCachedDataSync(cacheKey: string): ProcessedSoulNetData | null {
+    const cached = this.cache.get(cacheKey);
+    if (cached && (Date.now() - cached.timestamp) < this.CACHE_DURATION) {
+      console.log(`[SoulNetPreloadService] Found valid cache for ${cacheKey}`);
+      return cached.data;
+    }
+    
+    // Try localStorage as fallback
+    try {
+      const storedData = localStorage.getItem(`${this.CACHE_KEY}-${cacheKey}`);
+      if (storedData) {
+        const parsed = JSON.parse(storedData);
+        if ((Date.now() - parsed.timestamp) < this.CACHE_DURATION) {
+          // Convert Maps back from objects
+          parsed.data.translations = new Map(Object.entries(parsed.data.translations || {}));
+          parsed.data.connectionPercentages = new Map(Object.entries(parsed.data.connectionPercentages || {}));
+          this.cache.set(cacheKey, parsed);
+          console.log(`[SoulNetPreloadService] Found valid localStorage cache for ${cacheKey}`);
+          return parsed.data;
+        }
+      }
+    } catch (error) {
+      console.error('[SoulNetPreloadService] Error loading from localStorage:', error);
+    }
+    
+    console.log(`[SoulNetPreloadService] No valid cache found for ${cacheKey}`);
+    return null;
+  }
+
+  private static getCachedData(cacheKey: string): CachedSoulNetData | null {
+    const syncResult = this.getCachedDataSync(cacheKey);
+    if (syncResult) {
+      return this.cache.get(cacheKey) || null;
+    }
+    return null;
+  }
+
+  private static setCachedData(cacheKey: string, data: CachedSoulNetData): void {
+    this.cache.set(cacheKey, data);
+    
+    // Also store in localStorage
+    try {
+      const storableData = {
+        ...data,
+        data: {
+          ...data.data,
+          translations: Object.fromEntries(data.data.translations),
+          connectionPercentages: Object.fromEntries(data.data.connectionPercentages)
+        }
+      };
+      localStorage.setItem(`${this.CACHE_KEY}-${cacheKey}`, JSON.stringify(storableData));
+    } catch (error) {
+      console.error('[SoulNetPreloadService] Error saving to localStorage:', error);
+    }
+  }
+
+  private static calculateConnectionPercentages(
+    graphData: { nodes: NodeData[], links: LinkData[] },
+    percentageMap: Map<string, number>
+  ): void {
+    console.log('[SoulNetPreloadService] Pre-calculating connection percentages');
+    
+    // Calculate total connection strength for each node
+    const nodeConnectionTotals = new Map<string, number>();
+    
+    graphData.links.forEach(link => {
+      const sourceTotal = nodeConnectionTotals.get(link.source) || 0;
+      const targetTotal = nodeConnectionTotals.get(link.target) || 0;
+      
+      nodeConnectionTotals.set(link.source, sourceTotal + link.value);
+      nodeConnectionTotals.set(link.target, targetTotal + link.value);
+    });
+
+    // Calculate percentages for each connection
+    graphData.links.forEach(link => {
+      const sourceTotal = nodeConnectionTotals.get(link.source) || 1;
+      const targetTotal = nodeConnectionTotals.get(link.target) || 1;
+      
+      // Calculate percentage from source perspective
+      const sourcePercentage = Math.round((link.value / sourceTotal) * 100);
+      percentageMap.set(`${link.source}-${link.target}`, sourcePercentage);
+      
+      // Calculate percentage from target perspective
+      const targetPercentage = Math.round((link.value / targetTotal) * 100);
+      percentageMap.set(`${link.target}-${link.source}`, targetPercentage);
+    });
+
+    console.log(`[SoulNetPreloadService] Pre-calculated ${percentageMap.size} connection percentages`);
+  }
+
+  private static getStartDate(timeRange: string): Date {
     const now = new Date();
     switch (timeRange) {
       case 'today':
@@ -143,7 +256,7 @@ class SoulNetPreloadServiceClass {
     }
   }
 
-  private processEntities(entries: any[]): SoulNetGraphData {
+  private static processEntities(entries: any[]): { nodes: NodeData[], links: LinkData[] } {
     console.log("[SoulNetPreloadService] Processing entities for", entries.length, "entries");
     
     const entityEmotionMap: Record<string, Record<string, number>> = {};
@@ -174,7 +287,7 @@ class SoulNetPreloadServiceClass {
     return this.generateGraph(entityEmotionMap);
   }
 
-  private generateGraph(entityEmotionMap: Record<string, Record<string, number>>): SoulNetGraphData {
+  private static generateGraph(entityEmotionMap: Record<string, Record<string, number>>): { nodes: NodeData[], links: LinkData[] } {
     const nodes: NodeData[] = [];
     const links: LinkData[] = [];
     const entityNodes = new Set<string>();
@@ -230,25 +343,28 @@ class SoulNetPreloadServiceClass {
       });
     });
 
-    console.log("[SoulNetPreloadService] Generated graph with", nodes.length, "nodes and", links.length);
+    console.log("[SoulNetPreloadService] Generated graph with", nodes.length, "nodes and", links.length, "links");
     return { nodes, links };
   }
 
-  clearCache(userId?: string): void {
+  static clearCache(userId?: string): void {
     if (userId) {
+      // Clear specific user's cache
       const keysToDelete = Array.from(this.cache.keys()).filter(key => key.startsWith(userId));
-      keysToDelete.forEach(key => this.cache.delete(key));
+      keysToDelete.forEach(key => {
+        this.cache.delete(key);
+        localStorage.removeItem(`${this.CACHE_KEY}-${key}`);
+      });
       console.log(`[SoulNetPreloadService] Cleared cache for user ${userId}`);
     } else {
+      // Clear all cache
       this.cache.clear();
-      this.translationPromises.clear();
+      Object.keys(localStorage).forEach(key => {
+        if (key.startsWith(this.CACHE_KEY)) {
+          localStorage.removeItem(key);
+        }
+      });
       console.log('[SoulNetPreloadService] Cleared all cache');
     }
   }
-
-  getCacheSize(): number {
-    return this.cache.size;
-  }
 }
-
-export const SoulNetPreloadService = new SoulNetPreloadServiceClass();

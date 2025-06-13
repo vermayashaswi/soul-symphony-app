@@ -40,7 +40,7 @@ class TranslationService {
       const { data, error } = await supabase.functions.invoke('translate-text', {
         body: {
           text,
-          sourceLanguage: sourceLanguage === 'auto' ? 'en' : sourceLanguage,
+          sourceLanguage: sourceLanguage === 'auto' ? 'en' : sourceLanguage, // Fix: Convert auto to en
           targetLanguage,
           cleanResult: true
         }
@@ -75,21 +75,18 @@ class TranslationService {
   }
 
   // ENHANCED: Fixed batch translate with proper source language handling
-  async batchTranslate(texts: string[], sourceLanguage: string = 'en', targetLanguage?: string): Promise<Map<string, string>> {
-    if (!targetLanguage || sourceLanguage === targetLanguage) {
-      const resultMap = new Map<string, string>();
-      texts.forEach(text => resultMap.set(text, text));
-      return resultMap;
-    }
-
-    const batchKey = `${targetLanguage}-${texts.join('|')}`;
+  async batchTranslate(options: { texts: string[], targetLanguage: string, sourceLanguage?: string }): Promise<Map<string, string>> {
+    const { texts, targetLanguage, sourceLanguage = 'en' } = options; // Fix: Default to 'en' instead of 'auto'
+    const batchKey = `${texts.join('|')}-${sourceLanguage}-${targetLanguage}`;
     
-    // Check if this batch is already being processed
-    if (this.batchOperations.has(batchKey)) {
-      console.log('[TranslationService] Batch operation already in progress, waiting...');
-      return await this.batchOperations.get(batchKey)!;
+    // Check if this exact batch is already being processed
+    const existingBatch = this.batchOperations.get(batchKey);
+    if (existingBatch) {
+      console.log('[TranslationService] APP-LEVEL: Reusing existing batch operation');
+      return existingBatch;
     }
 
+    // Create new batch operation
     const batchPromise = this.performBatchTranslation(texts, sourceLanguage, targetLanguage);
     this.batchOperations.set(batchKey, batchPromise);
 
@@ -97,97 +94,95 @@ class TranslationService {
       const result = await batchPromise;
       return result;
     } finally {
+      // Clean up completed batch operation
       this.batchOperations.delete(batchKey);
     }
   }
 
   private async performBatchTranslation(texts: string[], sourceLanguage: string, targetLanguage: string): Promise<Map<string, string>> {
     const results = new Map<string, string>();
-    const textsToTranslate: string[] = [];
-
-    // Check cache for each text
-    for (const text of texts) {
-      const cached = await translationCache.getTranslation(text, targetLanguage);
-      if (cached) {
-        results.set(text, cached.translatedText);
-        console.log(`[TranslationService] Batch cache hit for: ${text}`);
-      } else {
-        textsToTranslate.push(text);
-      }
-    }
-
-    // If all texts are cached, return early
-    if (textsToTranslate.length === 0) {
-      console.log('[TranslationService] All texts found in cache for batch translation');
+    
+    if (sourceLanguage === targetLanguage) {
+      texts.forEach(text => results.set(text, text));
       return results;
     }
 
-    console.log(`[TranslationService] Batch translating ${textsToTranslate.length} texts from ${sourceLanguage} to ${targetLanguage}`);
+    console.log(`[TranslationService] APP-LEVEL: Starting atomic batch translation for ${texts.length} texts`);
 
-    try {
-      // Use Supabase edge function for batch translation
-      const { data, error } = await supabase.functions.invoke('translate-text', {
-        body: {
-          texts: textsToTranslate,
-          sourceLanguage: sourceLanguage === 'auto' ? 'en' : sourceLanguage,
-          targetLanguage,
-          cleanResult: true
-        }
-      });
-
-      if (error) {
-        console.error('[TranslationService] Batch translation edge function error:', error);
-        // Fallback: add original texts to results
-        textsToTranslate.forEach(text => results.set(text, text));
-        return results;
-      }
-
-      if (data && data.translatedTexts && Array.isArray(data.translatedTexts)) {
-        // Process batch results
-        for (let i = 0; i < textsToTranslate.length; i++) {
-          const originalText = textsToTranslate[i];
-          const translatedText = data.translatedTexts[i] || originalText;
-          
-          results.set(originalText, translatedText);
-          
-          // Cache each result
-          await translationCache.setTranslation({
-            originalText,
-            translatedText,
-            language: targetLanguage,
-            timestamp: Date.now(),
-            version: 1
-          });
-        }
-        
-        console.log(`[TranslationService] Batch translation successful: ${textsToTranslate.length} texts processed`);
+    // Check cache for all texts first using correct method names
+    const uncachedTexts: string[] = [];
+    const cacheHits = new Map<string, string>();
+    
+    for (const text of texts) {
+      const cached = await translationCache.getTranslation(text, targetLanguage);
+      if (cached) {
+        cacheHits.set(text, cached.translatedText);
       } else {
-        console.warn('[TranslationService] Invalid batch translation response format');
-        textsToTranslate.forEach(text => results.set(text, text));
+        uncachedTexts.push(text);
       }
-    } catch (error) {
-      console.error('[TranslationService] Batch translation error:', error);
-      textsToTranslate.forEach(text => results.set(text, text));
     }
 
+    console.log(`[TranslationService] APP-LEVEL: Cache hits: ${cacheHits.size}, need translation: ${uncachedTexts.length}`);
+
+    // Add cache hits to results
+    cacheHits.forEach((translated, original) => {
+      results.set(original, translated);
+    });
+
+    // Use Supabase edge function for batch translation
+    if (uncachedTexts.length > 0) {
+      try {
+        const { data, error } = await supabase.functions.invoke('translate-text', {
+          body: {
+            texts: uncachedTexts,
+            sourceLanguage: sourceLanguage === 'auto' ? 'en' : sourceLanguage, // Fix: Convert auto to en
+            targetLanguage,
+            cleanResult: true
+          }
+        });
+
+        if (error) {
+          console.error('[TranslationService] APP-LEVEL: Batch translation error:', error);
+          // Use original texts for failed batch
+          uncachedTexts.forEach(text => results.set(text, text));
+        } else if (data && data.translatedTexts) {
+          const translations = data.translatedTexts;
+          
+          for (let i = 0; i < uncachedTexts.length; i++) {
+            const originalText = uncachedTexts[i];
+            const translatedText = translations[i] || originalText;
+            results.set(originalText, translatedText);
+            
+            // Cache individual results using correct method name
+            await translationCache.setTranslation({
+              originalText,
+              translatedText,
+              language: targetLanguage,
+              timestamp: Date.now(),
+              version: 1
+            });
+          }
+
+          console.log(`[TranslationService] APP-LEVEL: Batch translation complete: ${translations.length} texts translated`);
+        }
+      } catch (error) {
+        console.error(`[TranslationService] APP-LEVEL: Error in batch translation:`, error);
+        // Use original texts for failed batch
+        uncachedTexts.forEach(text => results.set(text, text));
+      }
+    }
+
+    console.log(`[TranslationService] APP-LEVEL: Atomic batch translation complete: ${results.size}/${texts.length} texts processed`);
     return results;
   }
 
-  // ENHANCED: Coordinated cache access for consistency
-  async getCachedTranslation(text: string, targetLanguage: string): Promise<string | null> {
+  async getCachedTranslation(text: string, sourceLanguage: string = 'en', targetLanguage?: string): Promise<string | null> {
+    if (!targetLanguage || sourceLanguage === targetLanguage) {
+      return text;
+    }
+
     const cached = await translationCache.getTranslation(text, targetLanguage);
     return cached ? cached.translatedText : null;
-  }
-
-  // Clear translations for a specific language
-  async clearLanguageCache(language: string): Promise<void> {
-    console.log(`[TranslationService] Clearing cache for language: ${language}`);
-    await translationCache.clearCache(language);
-  }
-
-  // Get all cached translations for debugging
-  async getAllCachedTranslations(): Promise<any[]> {
-    return await translationCache.getAllTranslations();
   }
 }
 

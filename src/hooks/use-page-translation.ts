@@ -79,12 +79,11 @@ export const usePageTranslation = ({
       }));
 
       if (textsToTranslate.length > 0) {
-        // FIXED: Use correct batchTranslate API
-        const batchResults = await translationService.batchTranslate(
-          textsToTranslate,
-          'en',
-          currentLanguage
-        );
+        // Batch translate remaining texts
+        const batchResults = await translationService.batchTranslate({
+          texts: textsToTranslate,
+          targetLanguage: currentLanguage
+        });
 
         // Update state with results
         batchResults.forEach((translation, text) => {

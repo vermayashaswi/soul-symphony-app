@@ -1,5 +1,4 @@
-
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import '@/types/three-reference';
 import { Canvas } from '@react-three/fiber';
 import { TimeRange } from '@/hooks/use-insights-data';
@@ -13,54 +12,124 @@ import SoulNetDescription from './soulnet/SoulNetDescription';
 import { useUserColorThemeHex } from './soulnet/useUserColorThemeHex';
 import { cn } from '@/lib/utils';
 import { TranslatableText } from '@/components/translation/TranslatableText';
-import { usePreloadedSoulNetData } from '@/hooks/usePreloadedSoulNetData';
+import { useTranslation } from '@/contexts/TranslationContext';
+import { useInstantSoulNetData } from '@/hooks/useInstantSoulNetData';
+import { EnhancedSoulNetPreloadService } from '@/services/enhancedSoulNetPreloadService';
+import { translationService } from '@/services/translationService';
 
 interface SoulNetProps {
   userId: string | undefined;
   timeRange: TimeRange;
 }
 
+// ENHANCED: Atomic Translation Loading Component
+const AtomicTranslationLoadingState: React.FC<{ progress: number }> = ({ progress }) => (
+  <div className="bg-background rounded-xl shadow-sm border w-full p-6">
+    <div className="flex flex-col items-center justify-center py-12 space-y-4">
+      <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+      <h3 className="text-lg font-medium">
+        <TranslatableText 
+          text="Preparing Soul-Net with atomic translations..." 
+          forceTranslate={true}
+          enableFontScaling={true}
+          scalingContext="general"
+        />
+      </h3>
+      <div className="w-64 bg-gray-200 rounded-full h-2">
+        <div 
+          className="bg-primary h-2 rounded-full transition-all duration-300" 
+          style={{ width: `${progress}%` }}
+        ></div>
+      </div>
+      <p className="text-sm text-muted-foreground">
+        <TranslatableText 
+          text={`${progress}% complete`}
+          forceTranslate={false}
+          enableFontScaling={true}
+          scalingContext="general"
+        />
+      </p>
+    </div>
+  </div>
+);
+
 const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
   const [isFullScreen, setIsFullScreen] = useState(false);
   const [canvasError, setCanvasError] = useState<Error | null>(null);
   const [retryCount, setRetryCount] = useState(0);
+  const [renderingReady, setRenderingReady] = useState(false);
   const isMobile = useIsMobile();
   const themeHex = useUserColorThemeHex();
   const [selectedEntity, setSelectedEntity] = useState<string | null>(null);
+  const { currentLanguage } = useTranslation();
+  
+  // ENHANCED: Use ref to track atomic rendering initialization
+  const atomicRenderingInitialized = useRef(false);
 
-  // SIMPLIFIED: Use the simplified preloaded data hook
+  // APP-LEVEL: Initialize the enhanced service with app-level translation service
+  useEffect(() => {
+    console.log("[SoulNet] ATOMIC: Setting up atomic app-level translation service integration");
+    EnhancedSoulNetPreloadService.setAppLevelTranslationService(translationService);
+  }, []);
+
+  // ENHANCED: Use the atomic instant data hook
   const { 
     graphData, 
     loading, 
     error,
-    connectionPercentages
-  } = usePreloadedSoulNetData(userId, timeRange);
+    isInstantReady,
+    isTranslating,
+    translationProgress,
+    translationComplete,
+    isAtomicMode,
+    getInstantConnectionPercentage,
+    getInstantTranslation,
+    getInstantNodeConnections
+  } = useInstantSoulNetData(userId, timeRange);
 
-  console.log("[SoulNet] SIMPLIFIED STATE", { 
+  console.log("[SoulNet] ATOMIC TRANSLATION STATE", { 
     userId, 
-    timeRange,
+    timeRange, 
+    currentLanguage,
     nodesCount: graphData.nodes.length,
+    isInstantReady,
     loading,
-    error: !!error
+    isTranslating,
+    translationProgress,
+    translationComplete,
+    isAtomicMode,
+    renderingReady,
+    atomicInitialized: atomicRenderingInitialized.current
   });
 
-  // SIMPLIFIED: Connection percentage getter
-  const getConnectionPercentage = useCallback((selectedNode: string, targetNode: string): number => {
-    if (!selectedNode || selectedNode === targetNode) return 0;
+  useEffect(() => {
+    console.log("[SoulNet] ATOMIC: Component mounted - Atomic translation mode enabled");
     
-    const key = `${selectedNode}-${targetNode}`;
-    const percentage = connectionPercentages.get(key);
-    
-    if (percentage !== undefined) {
-      console.log(`[SoulNet] SIMPLIFIED: Got percentage ${percentage}% for ${key}`);
-      return percentage;
+    return () => {
+      console.log("[SoulNet] ATOMIC: Component unmounted");
+    };
+  }, []);
+
+  // ENHANCED: Atomic rendering initialization that waits for complete translation
+  useEffect(() => {
+    // ENHANCED: Only initialize rendering if we have data, atomic translation is complete, and haven't already initialized
+    if (isInstantReady && translationComplete && isAtomicMode && graphData.nodes.length > 0 && !atomicRenderingInitialized.current) {
+      console.log("[SoulNet] ATOMIC: Initializing rendering after atomic translation completion");
+      setRenderingReady(true);
+      atomicRenderingInitialized.current = true;
     }
     
-    return 0;
-  }, [connectionPercentages]);
+    // ENHANCED: Reset rendering if there's an error or complete data loss
+    if (error || (graphData.nodes.length === 0 && !loading && !isTranslating && atomicRenderingInitialized.current)) {
+      console.log("[SoulNet] ATOMIC: Resetting rendering due to error or data loss", { error: !!error, nodesCount: graphData.nodes.length });
+      setRenderingReady(false);
+      atomicRenderingInitialized.current = false;
+    }
+  }, [isInstantReady, translationComplete, isAtomicMode, graphData.nodes.length, loading, error, isTranslating]);
 
+  // OPTIMIZED: Node selection with stable state management
   const handleNodeSelect = useCallback((id: string) => {
-    console.log(`[SoulNet] SIMPLIFIED: Node selected: ${id}`);
+    console.log(`[SoulNet] APP-LEVEL STABLE: Node selected: ${id} - no re-render triggers`);
     if (selectedEntity === id) {
       setSelectedEntity(null);
     } else {
@@ -74,24 +143,36 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
   const toggleFullScreen = useCallback(() => {
     setIsFullScreen(prev => {
       if (!prev) setSelectedEntity(null);
-      console.log(`[SoulNet] SIMPLIFIED: Toggling fullscreen: ${!prev}`);
+      console.log(`[SoulNet] APP-LEVEL: Toggling fullscreen: ${!prev}`);
       return !prev;
     });
   }, []);
 
   const handleCanvasError = useCallback((error: Error) => {
-    console.error('[SoulNet] SIMPLIFIED: Canvas error:', error);
+    console.error('[SoulNet] APP-LEVEL: Canvas error:', error);
     setCanvasError(error);
     setRetryCount(prev => prev + 1);
+    // DEFENSIVE: Reset rendering state on canvas errors
+    setRenderingReady(false);
+    atomicRenderingInitialized.current = false;
   }, []);
 
   const handleRetry = useCallback(() => {
     setCanvasError(null);
     setRetryCount(0);
+    // Allow re-initialization after retry
+    atomicRenderingInitialized.current = false;
   }, []);
 
-  if (loading) {
-    console.log("[SoulNet] SIMPLIFIED: Showing loading state");
+  // ENHANCED: Show atomic translation loading if translation is in progress
+  if (isTranslating && !translationComplete && isAtomicMode) {
+    console.log("[SoulNet] ATOMIC: Showing atomic translation loading state");
+    return <AtomicTranslationLoadingState progress={translationProgress} />;
+  }
+
+  // ENHANCED: Only show general loading if we truly have no data and are still loading
+  if (loading && !isInstantReady && graphData.nodes.length === 0) {
+    console.log("[SoulNet] ATOMIC: Showing general loading state - no atomic instant data available");
     return <LoadingState />;
   }
   
@@ -201,7 +282,7 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
     );
   };
 
-  console.log(`[SoulNet] SIMPLIFIED RENDER: ${graphData.nodes.length} nodes, ${graphData.links.length} links`);
+  console.log(`[SoulNet] ATOMIC RENDER: ${graphData.nodes.length} nodes, ${graphData.links.length} links, renderingReady: ${renderingReady}, atomicInitialized: ${atomicRenderingInitialized.current}, translationComplete: ${translationComplete}, atomicMode: ${isAtomicMode}`);
 
   return (
     <div className={cn(
@@ -250,43 +331,50 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
             </div>
           }
         >
-          <Canvas
-            style={{
-              width: '100%',
-              height: '100%',
-              maxWidth: isFullScreen ? 'none' : '800px',
-              maxHeight: isFullScreen ? 'none' : '500px',
-              position: 'relative',
-              zIndex: 5,
-              transition: 'all 0.3s ease-in-out',
-            }}
-            camera={{ 
-              position: [0, 0, isFullScreen ? 40 : 45],
-              near: 1, 
-              far: 1000,
-              fov: isFullScreen ? 60 : 50
-            }}
-            onPointerMissed={() => setSelectedEntity(null)}
-            gl={{ 
-              preserveDrawingBuffer: true,
-              antialias: !isMobile,
-              powerPreference: 'high-performance',
-              alpha: true,
-              depth: true,
-              stencil: false,
-              precision: isMobile ? 'mediump' : 'highp'
-            }}
-          >
-            <SimplifiedSoulNetVisualization
-              data={graphData}
-              selectedNode={selectedEntity}
-              onNodeClick={handleNodeSelect}
-              themeHex={themeHex}
-              isFullScreen={isFullScreen}
-              shouldShowLabels={true}
-              getConnectionPercentage={getConnectionPercentage}
-            />
-          </Canvas>
+          {/* ENHANCED: Canvas only renders when atomic translation is complete and rendering is ready */}
+          {renderingReady && translationComplete && isAtomicMode && (
+            <Canvas
+              style={{
+                width: '100%',
+                height: '100%',
+                maxWidth: isFullScreen ? 'none' : '800px',
+                maxHeight: isFullScreen ? 'none' : '500px',
+                position: 'relative',
+                zIndex: 5,
+                transition: 'all 0.3s ease-in-out',
+              }}
+              camera={{ 
+                position: [0, 0, isFullScreen ? 40 : 45],
+                near: 1, 
+                far: 1000,
+                fov: isFullScreen ? 60 : 50
+              }}
+              onPointerMissed={() => setSelectedEntity(null)}
+              gl={{ 
+                preserveDrawingBuffer: true,
+                antialias: !isMobile,
+                powerPreference: 'high-performance',
+                alpha: true,
+                depth: true,
+                stencil: false,
+                precision: isMobile ? 'mediump' : 'highp'
+              }}
+            >
+              <SimplifiedSoulNetVisualization
+                data={graphData}
+                selectedNode={selectedEntity}
+                onNodeClick={handleNodeSelect}
+                themeHex={themeHex}
+                isFullScreen={isFullScreen}
+                shouldShowLabels={true}
+                getInstantConnectionPercentage={getInstantConnectionPercentage}
+                getInstantTranslation={getInstantTranslation}
+                getInstantNodeConnections={getInstantNodeConnections}
+                isInstantReady={isInstantReady}
+                isAtomicMode={isAtomicMode}
+              />
+            </Canvas>
+          )}
         </RenderingErrorBoundary>
       </FullscreenWrapper>
       

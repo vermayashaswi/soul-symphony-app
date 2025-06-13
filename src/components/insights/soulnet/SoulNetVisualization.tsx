@@ -1,3 +1,4 @@
+
 import React, { useRef, useEffect, useMemo, useState } from 'react';
 import '@/types/three-reference';
 import { OrbitControls } from '@react-three/drei';
@@ -440,6 +441,7 @@ export const SoulNetVisualization: React.FC<SoulNetVisualizationProps> = ({
             showPercentage={showPercentage}
             forceShowLabels={shouldShowLabels}
             effectiveTheme="light"
+            isInstantMode={true}
           />
         );
       })}
