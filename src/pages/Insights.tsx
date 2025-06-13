@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
 import { Calendar, Filter, TrendingUp, ArrowUp, ArrowDown, Activity, Award } from 'lucide-react';
@@ -172,6 +173,24 @@ function InsightsContent() {
       .filter(item => !isNaN(item.sentiment) && !isNaN(item.date.getTime()));
   };
 
+  // Helper functions to safely access data properties
+  const getDominantMood = () => {
+    const mood = insightsData.dominantMood;
+    return {
+      emoji: mood?.emoji || '😊',
+      name: mood?.emotion || 'Peaceful',
+      percentage: mood?.count || 0
+    };
+  };
+
+  const getAverageSentiment = () => {
+    return insightsData.averageSentiment || 0;
+  };
+
+  const getEmotionChartData = () => {
+    return insightsData.emotionDistribution || [];
+  };
+
   return (
     <div className="min-h-screen pb-20 insights-container">
       <TranslationProgressIndicator />
@@ -290,11 +309,11 @@ function InsightsContent() {
                 </div>
                 <div className="text-center">
                   <div className="text-3xl mb-2">
-                    {insightsData.dominantMood?.emoji || '😊'}
+                    {getDominantMood().emoji}
                   </div>
                   <div className="text-lg font-medium mb-1">
                     <EnhancedTranslatableText 
-                      text={insightsData.dominantMood?.name || 'Peaceful'} 
+                      text={getDominantMood().name} 
                       forceTranslate={true}
                       enableFontScaling={true}
                       scalingContext="general"
@@ -302,7 +321,7 @@ function InsightsContent() {
                     />
                   </div>
                   <div className="text-sm text-muted-foreground">
-                    {insightsData.dominantMood?.percentage || 0}% <EnhancedTranslatableText 
+                    {getDominantMood().percentage}% <EnhancedTranslatableText 
                       text="of entries" 
                       forceTranslate={true}
                       enableFontScaling={true}
@@ -342,7 +361,7 @@ function InsightsContent() {
                 </div>
                 <div className="text-center">
                   <div className="text-3xl font-bold mb-2 text-green-600">
-                    {((insightsData.avgSentiment || 0) * 100).toFixed(1)}%
+                    {(getAverageSentiment() * 100).toFixed(1)}%
                   </div>
                   <div className="text-sm text-muted-foreground">
                     <EnhancedTranslatableText 
@@ -408,7 +427,7 @@ function InsightsContent() {
               >
                 <ErrorBoundary>
                   <EmotionChart 
-                    data={insightsData.emotions} 
+                    emotions={getEmotionChartData()} 
                     onEmotionClick={handleEmotionClick}
                     selectedEmotion={selectedEmotion}
                   />
@@ -422,7 +441,7 @@ function InsightsContent() {
               >
                 <ErrorBoundary>
                   <MoodCalendar 
-                    data={getSentimentData()}
+                    sentiments={getSentimentData()}
                     timeRange={timeRange}
                   />
                 </ErrorBoundary>
@@ -439,7 +458,7 @@ function InsightsContent() {
             >
               <ErrorBoundary>
                 <PremiumFeatureGuard 
-                  feature="soulnet"
+                  feature="insights"
                   fallback={
                     <div className="bg-background rounded-xl p-8 text-center border">
                       <h2 className="text-xl font-semibold mb-4">
