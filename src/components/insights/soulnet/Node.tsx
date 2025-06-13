@@ -1,3 +1,4 @@
+
 import React, { useRef, useMemo, useState, useEffect } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
@@ -27,9 +28,7 @@ interface NodeProps {
   showPercentage?: boolean;
   forceShowLabels?: boolean;
   effectiveTheme?: 'light' | 'dark';
-  isInstantMode?: boolean;
-  // ENHANCED: Coordinated translation props
-  getCoordinatedTranslation?: (nodeId: string) => string;
+  // SIMPLIFIED: Remove coordinated translation props
 }
 
 const Node: React.FC<NodeProps> = ({
@@ -46,9 +45,7 @@ const Node: React.FC<NodeProps> = ({
   connectionPercentage = 0,
   showPercentage = false,
   forceShowLabels = false,
-  effectiveTheme = 'light',
-  isInstantMode = false,
-  getCoordinatedTranslation
+  effectiveTheme = 'light'
 }) => {
   const meshRef = useRef<THREE.Mesh>(null);
   const userColorThemeHex = useUserColorThemeHex();
@@ -65,25 +62,6 @@ const Node: React.FC<NodeProps> = ({
     
     return () => clearTimeout(timer);
   }, []);
-
-  // ENHANCED COORDINATED TRANSLATION: Get coordinated translation with strict atomic consistency
-  const coordinatedTranslation = useMemo(() => {
-    if (getCoordinatedTranslation) {
-      const translation = getCoordinatedTranslation(node.id);
-      if (isInstantMode) {
-        console.log(`[Node] ATOMIC-STRICT INSTANT: Got coordinated translation for ${node.id}: "${translation}" - NO INDIVIDUAL TRANSLATIONS`);
-      } else {
-        console.log(`[Node] ATOMIC-STRICT: Got coordinated translation for ${node.id}: "${translation}" - COORDINATED ONLY`);
-      }
-      return translation;
-    }
-    if (isInstantMode) {
-      console.log(`[Node] ATOMIC-STRICT INSTANT: No coordinated translation function available for ${node.id} - USING ORIGINAL TEXT`);
-    } else {
-      console.log(`[Node] ATOMIC-STRICT: No coordinated translation function available for ${node.id} - USING ORIGINAL TEXT`);
-    }
-    return undefined;
-  }, [node.id, getCoordinatedTranslation, isInstantMode]);
 
   // UPDATED: Fixed color scheme with proper default and selected states
   const color = useMemo(() => {
@@ -182,20 +160,7 @@ const Node: React.FC<NodeProps> = ({
     return forceShowLabels || showLabel || isSelected || isHighlighted;
   }, [forceShowLabels, showLabel, isSelected, isHighlighted, dimmed]);
 
-  // ENHANCED INSTANT MODE: Better logging for coordinated translation tracking
-  if (showPercentage && connectionPercentage > 0) {
-    if (isInstantMode) {
-      console.log(`[Node] ATOMIC-STRICT PULSATING INSTANT MODE: ${node.id} (${node.type}) displays percentage: ${connectionPercentage}% with coordinated translation: "${coordinatedTranslation}" - NO LOADING DELAY`);
-    } else {
-      console.log(`[Node] ATOMIC-STRICT PULSATING: ${node.id} (${node.type}) should display percentage: ${connectionPercentage}% with coordinated translation: "${coordinatedTranslation}"`);
-    }
-  }
-
-  if (isInstantMode) {
-    console.log(`[Node] ATOMIC-STRICT INSTANT MODE: Rendering ${node.type} node ${node.id} with coordinated translation: "${coordinatedTranslation}", base scale ${baseNodeScale.toFixed(2)} - COORDINATED ONLY`);
-  } else {
-    console.log(`[Node] ATOMIC-STRICT: Rendering ${node.type} node ${node.id} with coordinated translation: "${coordinatedTranslation}", base scale ${baseNodeScale.toFixed(2)} - COORDINATED ONLY`);
-  }
+  console.log(`[Node] SIMPLIFIED: Rendering ${node.type} node ${node.id}, base scale ${baseNodeScale.toFixed(2)}`);
 
   // ENHANCED: Improved geometry sizes to work with the enhanced scale differences
   const renderGeometry = () => {
@@ -247,8 +212,6 @@ const Node: React.FC<NodeProps> = ({
           connectionPercentage={connectionPercentage}
           showPercentage={showPercentage}
           effectiveTheme={effectiveTheme}
-          isInstantMode={isInstantMode}
-          coordinatedTranslation={coordinatedTranslation}
         />
       )}
     </group>

@@ -2,7 +2,6 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react';
 import { onDemandTranslationCache } from '@/utils/website-translations';
 import { SoulNetPreloadService } from '@/services/soulnetPreloadService';
-import { EnhancedSoulNetPreloadService } from '@/services/enhancedSoulNetPreloadService';
 import { translationService } from '@/services/translationService';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -34,12 +33,8 @@ export const TranslationProvider: React.FC<TranslationProviderProps> = ({ childr
 
   // APP-LEVEL: Set up translation service integration on context initialization
   useEffect(() => {
-    console.log('[TranslationContext] APP-LEVEL: Setting up coordinated translation service integration');
-    
-    // Register translation service with EnhancedSoulNetPreloadService
-    EnhancedSoulNetPreloadService.setAppLevelTranslationService(translationService);
-    
-    console.log('[TranslationContext] APP-LEVEL: Coordinated translation service integration complete');
+    console.log('[TranslationContext] APP-LEVEL: Setting up translation service integration');
+    console.log('[TranslationContext] APP-LEVEL: Translation service integration complete');
   }, []);
 
   // Load language from localStorage or browser default
@@ -77,19 +72,19 @@ export const TranslationProvider: React.FC<TranslationProviderProps> = ({ childr
     try {
       setIsSoulNetTranslating(true);
       
-      // ENHANCED: Use enhanced preload service for coordinated translation
-      await EnhancedSoulNetPreloadService.preloadInstantData(userId, timeRange, currentLanguage);
+      // Use the standard preload service
+      await SoulNetPreloadService.preloadData(userId, timeRange, currentLanguage);
       
-      console.log('[TranslationContext] APP-LEVEL: SoulNet coordinated pre-translation completed successfully');
+      console.log('[TranslationContext] APP-LEVEL: SoulNet pre-translation completed successfully');
     } catch (error) {
-      console.error('[TranslationContext] APP-LEVEL: Error in coordinated pre-translation:', error);
+      console.error('[TranslationContext] APP-LEVEL: Error in pre-translation:', error);
     } finally {
       setIsSoulNetTranslating(false);
     }
   }, [currentLanguage]);
 
   const handleLanguageChange = useCallback(async (language: string) => {
-    console.log('[TranslationContext] APP-LEVEL: Coordinated language change to:', language);
+    console.log('[TranslationContext] APP-LEVEL: Language change to:', language);
     
     // Set loading state for SoulNet translations
     if (language !== 'en') {
@@ -106,14 +101,13 @@ export const TranslationProvider: React.FC<TranslationProviderProps> = ({ childr
       console.error('[TranslationContext] APP-LEVEL: Error saving language to localStorage:', error);
     }
     
-    // ENHANCED: Clear coordinated caches when language changes
-    EnhancedSoulNetPreloadService.clearInstantCache();
+    // Clear caches when language changes
     SoulNetPreloadService.clearCache();
     
-    // ENHANCED: Clear translation service cache for the new language
+    // Clear translation service cache for the new language
     await translationService.clearLanguageCache(language);
     
-    console.log('[TranslationContext] APP-LEVEL: Cleared all coordinated caches for language change');
+    console.log('[TranslationContext] APP-LEVEL: Cleared all caches for language change');
     
     // Dispatch custom event for components that need to know about language changes
     const event = new CustomEvent('languageChange', { 
@@ -142,7 +136,7 @@ export const TranslationProvider: React.FC<TranslationProviderProps> = ({ childr
       return text;
     }
 
-    console.log('[TranslationContext] COORDINATED TRANSLATION - Attempting to translate:', { 
+    console.log('[TranslationContext] TRANSLATION - Attempting to translate:', { 
       text: text.substring(0, 30) + (text.length > 30 ? '...' : ''), 
       from: sourceLanguage, 
       to: currentLanguage,
@@ -157,10 +151,10 @@ export const TranslationProvider: React.FC<TranslationProviderProps> = ({ childr
       return translationCache[cacheKey];
     }
 
-    // ENHANCED: Use coordinated translation service
+    // Use translation service
     const cachedTranslation = await translationService.getCachedTranslation(text, currentLanguage);
     if (cachedTranslation) {
-      console.log('[TranslationContext] Using coordinated cache for:', text.substring(0, 30));
+      console.log('[TranslationContext] Using service cache for:', text.substring(0, 30));
       setTranslationCache(prev => ({ ...prev, [cacheKey]: cachedTranslation }));
       return cachedTranslation;
     }
@@ -168,13 +162,13 @@ export const TranslationProvider: React.FC<TranslationProviderProps> = ({ childr
     try {
       setIsTranslating(true);
       
-      console.log('[TranslationContext] Using coordinated translation service');
+      console.log('[TranslationContext] Using translation service');
       
-      // ENHANCED: Use coordinated translation service
+      // Use translation service
       const result = await translationService.translate(text, sourceLanguage, currentLanguage);
 
       if (result && result !== text) {
-        console.log('[TranslationContext] Coordinated translation successful:', { 
+        console.log('[TranslationContext] Translation successful:', { 
           original: text.substring(0, 30), 
           translated: result.substring(0, 30) 
         });
@@ -185,10 +179,10 @@ export const TranslationProvider: React.FC<TranslationProviderProps> = ({ childr
         return result;
       }
       
-      console.log('[TranslationContext] Coordinated translation returned same text, using original');
+      console.log('[TranslationContext] Translation returned same text, using original');
       return text;
     } catch (error) {
-      console.error('[TranslationContext] Coordinated translation failed:', error);
+      console.error('[TranslationContext] Translation failed:', error);
       return text;
     } finally {
       setIsTranslating(false);
@@ -217,7 +211,7 @@ export const TranslationProvider: React.FC<TranslationProviderProps> = ({ childr
     const textsToTranslate = routeTexts[route] || [];
     if (textsToTranslate.length > 0 && currentLanguage !== 'en') {
       try {
-        // ENHANCED: Use Supabase edge function with proper source language
+        // Use Supabase edge function with proper source language
         const { data, error } = await supabase.functions.invoke('translate-text', {
           body: {
             texts: textsToTranslate,
@@ -253,12 +247,11 @@ export const TranslationProvider: React.FC<TranslationProviderProps> = ({ childr
     translate,
     isTranslating,
     clearCache: useCallback(async () => {
-      console.log('[TranslationContext] APP-LEVEL: Clearing all coordinated translation caches');
+      console.log('[TranslationContext] APP-LEVEL: Clearing all translation caches');
       setTranslationCache({});
       onDemandTranslationCache.clearAll();
-      EnhancedSoulNetPreloadService.clearInstantCache();
       SoulNetPreloadService.clearCache();
-      // ENHANCED: Clear coordinated translation service cache
+      // Clear translation service cache
       await translationService.clearLanguageCache(currentLanguage);
     }, [currentLanguage]),
     getCachedTranslation,
