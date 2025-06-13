@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import '@/types/three-reference';
 import { Canvas } from '@react-three/fiber';
@@ -58,24 +59,23 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
   const [isFullScreen, setIsFullScreen] = useState(false);
   const [canvasError, setCanvasError] = useState<Error | null>(null);
   const [retryCount, setRetryCount] = useState(0);
-  const [renderingReady, setRenderingReady] = useState(false);
   const isMobile = useIsMobile();
   const themeHex = useUserColorThemeHex();
   const [selectedEntity, setSelectedEntity] = useState<string | null>(null);
   const { currentLanguage } = useTranslation();
   
-  // ENHANCED: Use ref to track language-level rendering initialization
-  const languageLevelRenderingInitialized = useRef(false);
+  // FIXED: Simplified rendering state - no complex dependency tracking
+  const [shouldRender, setShouldRender] = useState(false);
   const currentLanguageRef = useRef(currentLanguage);
 
   // APP-LEVEL: Initialize the enhanced service with app-level translation service
   useEffect(() => {
-    console.log("[SoulNet] LANGUAGE-LEVEL: Setting up language-level translation service integration");
+    console.log("[SoulNet] APP-LEVEL: Setting up translation service integration");
     EnhancedSoulNetPreloadService.setAppLevelTranslationService(translationService);
     LanguageLevelTranslationCache.setAppLevelTranslationService(translationService);
   }, []);
 
-  // ENHANCED: Use the language-level instant data hook
+  // ENHANCED: Use the instant data hook
   const { 
     graphData, 
     loading, 
@@ -90,7 +90,7 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
     getInstantNodeConnections
   } = useInstantSoulNetData(userId, timeRange);
 
-  console.log("[SoulNet] LANGUAGE-LEVEL TRANSLATION STATE", { 
+  console.log("[SoulNet] FIXED NODE SELECTION STATE", { 
     userId, 
     timeRange, 
     currentLanguage,
@@ -101,52 +101,56 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
     translationProgress,
     translationComplete,
     isAtomicMode,
-    renderingReady,
-    languageLevelInitialized: languageLevelRenderingInitialized.current
+    shouldRender,
+    selectedEntity,
+    canvasError: !!canvasError
   });
 
-  useEffect(() => {
-    console.log("[SoulNet] LANGUAGE-LEVEL: Component mounted - Language-level translation mode enabled");
-    
-    return () => {
-      console.log("[SoulNet] LANGUAGE-LEVEL: Component unmounted");
-    };
-  }, []);
-
-  // ENHANCED: Reset rendering when language changes
+  // FIXED: Simplified language change handling
   useEffect(() => {
     if (currentLanguageRef.current !== currentLanguage) {
-      console.log(`[SoulNet] LANGUAGE-LEVEL: Language changed from ${currentLanguageRef.current} to ${currentLanguage}, resetting rendering`);
-      setRenderingReady(false);
-      languageLevelRenderingInitialized.current = false;
+      console.log(`[SoulNet] FIXED: Language changed from ${currentLanguageRef.current} to ${currentLanguage}, resetting render state`);
+      setShouldRender(false);
+      setSelectedEntity(null); // Clear selection on language change
       currentLanguageRef.current = currentLanguage;
     }
   }, [currentLanguage]);
 
-  // ENHANCED: Language-level rendering initialization that waits for complete translation
+  // FIXED: Simplified rendering logic - only check for data availability
   useEffect(() => {
-    // ENHANCED: Only initialize rendering if we have data, translation is complete, and haven't already initialized for this language
-    if (isInstantReady && translationComplete && isAtomicMode && graphData.nodes.length > 0 && !languageLevelRenderingInitialized.current) {
-      console.log("[SoulNet] LANGUAGE-LEVEL: Initializing rendering after language-level translation completion");
-      setRenderingReady(true);
-      languageLevelRenderingInitialized.current = true;
-    }
+    const hasData = graphData.nodes.length > 0;
+    const readyToRender = isInstantReady && !loading && !error;
     
-    // ENHANCED: Reset rendering if there's an error or complete data loss
-    if (error || (graphData.nodes.length === 0 && !loading && !isTranslating && languageLevelRenderingInitialized.current)) {
-      console.log("[SoulNet] LANGUAGE-LEVEL: Resetting rendering due to error or data loss", { error: !!error, nodesCount: graphData.nodes.length });
-      setRenderingReady(false);
-      languageLevelRenderingInitialized.current = false;
+    console.log("[SoulNet] FIXED RENDER LOGIC", {
+      hasData,
+      readyToRender,
+      isInstantReady,
+      loading,
+      error: !!error,
+      translationComplete,
+      currentShouldRender: shouldRender
+    });
+    
+    if (hasData && readyToRender) {
+      setShouldRender(true);
+    } else if (!hasData || error) {
+      setShouldRender(false);
+      setSelectedEntity(null); // Clear selection if no data
     }
-  }, [isInstantReady, translationComplete, isAtomicMode, graphData.nodes.length, loading, error, isTranslating]);
+  }, [graphData.nodes.length, isInstantReady, loading, error, translationComplete, shouldRender]);
 
-  // OPTIMIZED: Node selection with stable state management
+  // FIXED: Stabilized node selection handler - no dependencies on translation state
   const handleNodeSelect = useCallback((id: string) => {
-    console.log(`[SoulNet] APP-LEVEL STABLE: Node selected: ${id} - no re-render triggers`);
+    console.log(`[SoulNet] FIXED NODE SELECTION: Attempting to select node: ${id}, current selected: ${selectedEntity}`);
+    
     if (selectedEntity === id) {
+      console.log(`[SoulNet] FIXED NODE SELECTION: Deselecting node: ${id}`);
       setSelectedEntity(null);
     } else {
+      console.log(`[SoulNet] FIXED NODE SELECTION: Selecting node: ${id}`);
       setSelectedEntity(id);
+      
+      // Add haptic feedback if available
       if (navigator.vibrate) {
         navigator.vibrate(50);
       }
@@ -155,35 +159,39 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
 
   const toggleFullScreen = useCallback(() => {
     setIsFullScreen(prev => {
-      if (!prev) setSelectedEntity(null);
-      console.log(`[SoulNet] APP-LEVEL: Toggling fullscreen: ${!prev}`);
-      return !prev;
+      const newValue = !prev;
+      if (newValue) {
+        console.log("[SoulNet] FIXED: Entering fullscreen, clearing selection");
+        setSelectedEntity(null);
+      }
+      return newValue;
     });
   }, []);
 
   const handleCanvasError = useCallback((error: Error) => {
-    console.error('[SoulNet] APP-LEVEL: Canvas error:', error);
+    console.error('[SoulNet] FIXED: Canvas error occurred:', error);
     setCanvasError(error);
     setRetryCount(prev => prev + 1);
-    setRenderingReady(false);
-    languageLevelRenderingInitialized.current = false;
+    setShouldRender(false);
+    setSelectedEntity(null); // Clear selection on error
   }, []);
 
   const handleRetry = useCallback(() => {
+    console.log('[SoulNet] FIXED: Retrying after error');
     setCanvasError(null);
     setRetryCount(0);
-    languageLevelRenderingInitialized.current = false;
+    setSelectedEntity(null);
   }, []);
 
-  // ENHANCED: Show language-level translation loading if translation is in progress
-  if (isTranslating && !translationComplete && isAtomicMode) {
-    console.log("[SoulNet] LANGUAGE-LEVEL: Showing language-level translation loading state");
+  // FIXED: Show language-level translation loading only when actively translating
+  if (isTranslating && !translationComplete) {
+    console.log("[SoulNet] FIXED: Showing translation loading state");
     return <LanguageLevelTranslationLoadingState progress={translationProgress} />;
   }
 
-  // ENHANCED: Only show general loading if we truly have no data and are still loading
-  if (loading && !isInstantReady && graphData.nodes.length === 0) {
-    console.log("[SoulNet] LANGUAGE-LEVEL: Showing general loading state - no instant data available");
+  // FIXED: Show loading only when truly loading and no data available
+  if (loading && graphData.nodes.length === 0) {
+    console.log("[SoulNet] FIXED: Showing general loading state");
     return <LoadingState />;
   }
   
@@ -293,7 +301,7 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
     );
   };
 
-  console.log(`[SoulNet] LANGUAGE-LEVEL RENDER: ${graphData.nodes.length} nodes, ${graphData.links.length} links, renderingReady: ${renderingReady}, languageLevelInitialized: ${languageLevelRenderingInitialized.current}, translationComplete: ${translationComplete}, atomicMode: ${isAtomicMode}`);
+  console.log(`[SoulNet] FIXED FINAL RENDER: ${graphData.nodes.length} nodes, shouldRender: ${shouldRender}, selectedEntity: ${selectedEntity}`);
 
   return (
     <div className={cn(
@@ -342,8 +350,8 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
             </div>
           }
         >
-          {/* ENHANCED: Canvas only renders when language-level translation is complete and rendering is ready */}
-          {renderingReady && translationComplete && isAtomicMode && (
+          {/* FIXED: Canvas renders when we have data and should render */}
+          {shouldRender && graphData.nodes.length > 0 && (
             <Canvas
               style={{
                 width: '100%',
@@ -360,7 +368,10 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
                 far: 1000,
                 fov: isFullScreen ? 60 : 50
               }}
-              onPointerMissed={() => setSelectedEntity(null)}
+              onPointerMissed={() => {
+                console.log("[SoulNet] FIXED: Canvas pointer missed, clearing selection");
+                setSelectedEntity(null);
+              }}
               gl={{ 
                 preserveDrawingBuffer: true,
                 antialias: !isMobile,
