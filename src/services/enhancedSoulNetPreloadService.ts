@@ -1,5 +1,5 @@
+
 import { supabase } from '@/integrations/supabase/client';
-import { LanguageLevelTranslationCache } from './languageLevelTranslationCache';
 
 interface NodeData {
   id: string;
@@ -48,15 +48,18 @@ interface AppLevelTranslationService {
 export class EnhancedSoulNetPreloadService {
   private static readonly CACHE_KEY = 'enhanced-soulnet-data';
   private static readonly CACHE_DURATION = 15 * 60 * 1000; // 15 minutes
-  private static readonly CACHE_VERSION = 8; // Increment for language-level translation fixes
+  private static readonly CACHE_VERSION = 7; // Increment for atomic translation fixes
   private static cache = new Map<string, CachedEnhancedData>();
+  private static translationCoordinator = new Map<string, Promise<Map<string, string>>>();
   
-  // ENHANCED: Language-level translation state tracking
-  private static languageTranslationStates = new Map<string, {
+  // ENHANCED: Atomic translation state tracking with better coordination
+  private static translationStates = new Map<string, {
     isTranslating: boolean;
     progress: number;
-    isComplete: boolean;
-    startedAt: number;
+    totalNodes: number;
+    translatedNodes: number;
+    isAtomic: boolean; // NEW: Track if translation should be atomic
+    startedAt: number; // NEW: Track when translation started
   }>();
   
   // APP-LEVEL: Store reference to app-level translation service
@@ -64,35 +67,35 @@ export class EnhancedSoulNetPreloadService {
 
   // APP-LEVEL: Method to set the app-level translation service
   static setAppLevelTranslationService(service: AppLevelTranslationService) {
-    console.log('[EnhancedSoulNetPreloadService] APP-LEVEL: Setting app-level translation service for language-level coordination');
+    console.log('[EnhancedSoulNetPreloadService] APP-LEVEL: Setting app-level translation service for atomic coordination');
     this.appTranslationService = service;
-    // Also set it for the language-level cache
-    LanguageLevelTranslationCache.setAppLevelTranslationService(service);
   }
 
-  // ENHANCED: Get language-level translation state
-  static getLanguageTranslationState(userId: string, language: string) {
-    const stateKey = `${userId}-${language}`;
-    const state = this.languageTranslationStates.get(stateKey);
-    
+  // ENHANCED: Get translation state with atomic coordination checks
+  static getTranslationState(cacheKey: string) {
+    const state = this.translationStates.get(cacheKey);
     if (!state) {
       return {
         isTranslating: false,
         progress: 100,
-        isComplete: true,
+        totalNodes: 0,
+        translatedNodes: 0,
+        isAtomic: true,
         startedAt: 0
       };
     }
     
-    // Check for stale translation states (timeout after 30 seconds)
+    // ENHANCED: Check for stale translation states (timeout after 30 seconds)
     const now = Date.now();
     if (state.isTranslating && (now - state.startedAt) > 30000) {
-      console.log(`[EnhancedSoulNetPreloadService] LANGUAGE-LEVEL: Translation timeout detected for ${stateKey}, resetting state`);
-      this.languageTranslationStates.delete(stateKey);
+      console.log(`[EnhancedSoulNetPreloadService] ATOMIC: Translation timeout detected for ${cacheKey}, resetting state`);
+      this.translationStates.delete(cacheKey);
       return {
         isTranslating: false,
         progress: 100,
-        isComplete: true,
+        totalNodes: state.totalNodes,
+        translatedNodes: state.totalNodes,
+        isAtomic: true,
         startedAt: 0
       };
     }
@@ -100,25 +103,32 @@ export class EnhancedSoulNetPreloadService {
     return state;
   }
 
-  // ENHANCED: Language-level atomic preload with coordination
+  // ENHANCED: Atomic preload with coordinated translation
   static async preloadInstantData(
     userId: string, 
     timeRange: string, 
     language: string
   ): Promise<EnhancedSoulNetData | null> {
-    console.log(`[EnhancedSoulNetPreloadService] LANGUAGE-LEVEL: Starting preload for ${userId}, ${timeRange}, ${language}`);
+    console.log(`[EnhancedSoulNetPreloadService] ATOMIC: Starting atomic preload for ${userId}, ${timeRange}, ${language}`);
     
     const cacheKey = this.generateCacheKey(userId, timeRange, language);
     
-    // Check for existing graph data cache (time-range specific)
+    // ENHANCED: Clear any stale cache on language change for fresh atomic translation
+    const existingCache = this.cache.get(cacheKey);
+    if (existingCache && existingCache.language !== language) {
+      console.log(`[EnhancedSoulNetPreloadService] ATOMIC: Language change detected, clearing cache for atomic fresh translation`);
+      this.clearInstantCache(userId);
+    }
+    
+    // ENHANCED: Check for complete atomic translation
     const cached = this.getInstantData(cacheKey);
     if (cached && cached.data.translationComplete) {
-      console.log(`[EnhancedSoulNetPreloadService] LANGUAGE-LEVEL: Using complete cached data for ${cacheKey}`);
+      console.log(`[EnhancedSoulNetPreloadService] ATOMIC: Using complete cached atomic translation for ${cacheKey}`);
       return cached.data;
     }
 
     try {
-      // Fetch raw journal data
+      // Fetch raw journal data with enhanced error handling
       const startDate = this.getStartDate(timeRange);
       const { data: entries, error } = await supabase
         .from('Journal Entries')
@@ -128,12 +138,12 @@ export class EnhancedSoulNetPreloadService {
         .order('created_at', { ascending: false });
 
       if (error) {
-        console.error('[EnhancedSoulNetPreloadService] LANGUAGE-LEVEL: Error fetching journal entries:', error);
+        console.error('[EnhancedSoulNetPreloadService] ATOMIC: Error fetching journal entries:', error);
         return null;
       }
 
       if (!entries || entries.length === 0) {
-        console.log('[EnhancedSoulNetPreloadService] LANGUAGE-LEVEL: No entries found, returning empty data');
+        console.log('[EnhancedSoulNetPreloadService] ATOMIC: No entries found, returning empty atomic data');
         const emptyData: EnhancedSoulNetData = {
           nodes: [], 
           links: [], 
@@ -146,115 +156,59 @@ export class EnhancedSoulNetPreloadService {
         return emptyData;
       }
 
-      console.log(`[EnhancedSoulNetPreloadService] LANGUAGE-LEVEL: Processing ${entries.length} entries`);
+      console.log(`[EnhancedSoulNetPreloadService] ATOMIC: Processing ${entries.length} entries with atomic translation coordination`);
 
-      // Process the raw data to get graph structure
+      // Process the raw data
       const graphData = this.processEntities(entries);
+      
+      // ENHANCED: Initialize atomic translation state
       const uniqueNodes = [...new Set(graphData.nodes.map(node => node.id))];
+      const isEnglish = language === 'en';
       
-      // Get all unique node texts that need translation (across all time ranges for this user)
-      const allUserNodeTexts = await this.getAllUserNodeTexts(userId);
-      const allTextsToTranslate = [...new Set([...uniqueNodes, ...allUserNodeTexts])];
-      
-      console.log(`[EnhancedSoulNetPreloadService] LANGUAGE-LEVEL: Found ${uniqueNodes.length} nodes for ${timeRange}, ${allTextsToTranslate.length} total unique texts for user`);
-      
-      // ENHANCED: Language-level translation coordination
-      const stateKey = `${userId}-${language}`;
-      
-      // Check if language translations are complete
-      const hasCompleteLanguageTranslations = LanguageLevelTranslationCache.hasCompleteTranslations(userId, language);
-      
-      if (hasCompleteLanguageTranslations) {
-        console.log(`[EnhancedSoulNetPreloadService] LANGUAGE-LEVEL: Using existing complete language translations for ${language}`);
-        
-        // Get translations from language-level cache
-        const languageTranslations = LanguageLevelTranslationCache.getLanguageTranslations(userId, language);
-        
-        // Filter to get only translations for current nodes
-        const currentTranslations = new Map<string, string>();
-        uniqueNodes.forEach(nodeId => {
-          const translation = languageTranslations.get(nodeId) || nodeId;
-          currentTranslations.set(nodeId, translation);
-        });
-        
-        // Calculate other data
-        const connectionPercentages = new Map<string, number>();
-        const nodeConnectionData = new Map<string, NodeConnectionData>();
-        this.calculateConnectionPercentages(graphData, connectionPercentages);
-        this.calculateNodeConnections(graphData, nodeConnectionData);
-
-        const enhancedData: EnhancedSoulNetData = {
-          nodes: graphData.nodes,
-          links: graphData.links,
-          translations: currentTranslations,
-          connectionPercentages,
-          nodeConnectionData,
-          translationComplete: true,
-          translationProgress: 100
-        };
-
-        // Cache the complete data for this time range
-        this.setCachedData(cacheKey, {
-          data: enhancedData,
-          timestamp: Date.now(),
-          userId,
-          timeRange,
-          language,
-          version: this.CACHE_VERSION
-        });
-
-        return enhancedData;
-      }
-      
-      // ENHANCED: Start language-level translation if not complete
-      this.languageTranslationStates.set(stateKey, {
-        isTranslating: true,
-        progress: 0,
-        isComplete: false,
+      this.translationStates.set(cacheKey, {
+        isTranslating: !isEnglish && uniqueNodes.length > 0,
+        progress: isEnglish ? 100 : 0,
+        totalNodes: uniqueNodes.length,
+        translatedNodes: isEnglish ? uniqueNodes.length : 0,
+        isAtomic: true, // Force atomic behavior
         startedAt: Date.now()
       });
-      
-      console.log(`[EnhancedSoulNetPreloadService] LANGUAGE-LEVEL: Starting language-level translation for ${language}`);
-      
-      const translationResult = await LanguageLevelTranslationCache.ensureLanguageTranslations(
-        userId, 
-        language, 
-        allTextsToTranslate
-      );
-      
-      // Update language translation state
-      this.languageTranslationStates.set(stateKey, {
-        isTranslating: false,
-        progress: translationResult.progress,
-        isComplete: translationResult.isComplete,
-        startedAt: 0
-      });
-      
-      // Filter to get only translations for current nodes
-      const currentTranslations = new Map<string, string>();
-      uniqueNodes.forEach(nodeId => {
-        const translation = translationResult.translations.get(nodeId) || nodeId;
-        currentTranslations.set(nodeId, translation);
-      });
 
-      // Calculate other data
+      // ENHANCED: Atomic coordinated translation
+      const translations = await this.getAtomicCoordinatedTranslations(graphData.nodes, language, cacheKey);
       const connectionPercentages = new Map<string, number>();
       const nodeConnectionData = new Map<string, NodeConnectionData>();
+      
+      // Pre-calculate connection data
       this.calculateConnectionPercentages(graphData, connectionPercentages);
       this.calculateNodeConnections(graphData, nodeConnectionData);
+
+      // ENHANCED: Determine atomic completion
+      const isTranslationComplete = isEnglish || translations.size === uniqueNodes.length;
+      const translationProgress = isEnglish ? 100 : Math.round((translations.size / uniqueNodes.length) * 100);
+
+      // ENHANCED: Update atomic translation state
+      this.translationStates.set(cacheKey, {
+        isTranslating: false,
+        progress: translationProgress,
+        totalNodes: uniqueNodes.length,
+        translatedNodes: translations.size,
+        isAtomic: true,
+        startedAt: 0
+      });
 
       const enhancedData: EnhancedSoulNetData = {
         nodes: graphData.nodes,
         links: graphData.links,
-        translations: currentTranslations,
+        translations,
         connectionPercentages,
         nodeConnectionData,
-        translationComplete: translationResult.isComplete,
-        translationProgress: translationResult.progress
+        translationComplete: isTranslationComplete,
+        translationProgress
       };
 
-      // Cache the data for this time range
-      if (translationResult.isComplete) {
+      // ENHANCED: Only cache when atomic translation is complete
+      if (isTranslationComplete) {
         this.setCachedData(cacheKey, {
           data: enhancedData,
           timestamp: Date.now(),
@@ -263,64 +217,29 @@ export class EnhancedSoulNetPreloadService {
           language,
           version: this.CACHE_VERSION
         });
-        console.log(`[EnhancedSoulNetPreloadService] LANGUAGE-LEVEL: Successfully cached complete data for ${cacheKey}`);
+        console.log(`[EnhancedSoulNetPreloadService] ATOMIC: Successfully cached complete atomic translation for ${cacheKey}`);
+      } else {
+        console.log(`[EnhancedSoulNetPreloadService] ATOMIC: Translation incomplete, maintaining consistency for ${cacheKey}`);
       }
 
       return enhancedData;
     } catch (error) {
-      console.error('[EnhancedSoulNetPreloadService] LANGUAGE-LEVEL: Error in preload:', error);
+      console.error('[EnhancedSoulNetPreloadService] ATOMIC: Error in atomic preload:', error);
       // Clear translation state on error
-      const stateKey = `${userId}-${language}`;
-      this.languageTranslationStates.delete(stateKey);
+      this.translationStates.delete(cacheKey);
       return null;
     }
   }
 
-  // ENHANCED: Get all unique node texts for a user (across all time ranges)
-  private static async getAllUserNodeTexts(userId: string): Promise<string[]> {
-    try {
-      const { data: entries, error } = await supabase
-        .from('Journal Entries')
-        .select('themeemotion')
-        .eq('user_id', userId)
-        .order('created_at', { ascending: false });
-
-      if (error || !entries) {
-        console.error('[EnhancedSoulNetPreloadService] Error fetching all user entries:', error);
-        return [];
-      }
-
-      const allTexts = new Set<string>();
-      
-      entries.forEach(entry => {
-        if (!entry.themeemotion) return;
-        
-        Object.entries(entry.themeemotion).forEach(([entity, emotions]) => {
-          if (typeof emotions !== 'object') return;
-          
-          allTexts.add(entity);
-          
-          Object.keys(emotions).forEach(emotion => {
-            allTexts.add(emotion);
-          });
-        });
-      });
-
-      return Array.from(allTexts);
-    } catch (error) {
-      console.error('[EnhancedSoulNetPreloadService] Error getting all user node texts:', error);
-      return [];
-    }
-  }
-
+  // ENHANCED: Instant data access with atomic coordination
   static getInstantData(cacheKey: string): CachedEnhancedData | null {
     const cached = this.cache.get(cacheKey);
     if (cached && this.isCacheValid(cached)) {
-      console.log(`[EnhancedSoulNetPreloadService] LANGUAGE-LEVEL: Found valid cache for ${cacheKey}`);
+      console.log(`[EnhancedSoulNetPreloadService] ATOMIC: Found valid atomic cache for ${cacheKey}`);
       return cached;
     }
     
-    // Try localStorage with validation
+    // ENHANCED: Try localStorage with atomic validation
     try {
       const storedData = localStorage.getItem(`${this.CACHE_KEY}-${cacheKey}`);
       if (storedData) {
@@ -333,20 +252,169 @@ export class EnhancedSoulNetPreloadService {
             Object.entries(parsed.data.nodeConnectionData || {}).map(([key, value]) => [key, value as NodeConnectionData])
           );
           
+          // ENHANCED: Ensure atomic translation fields have proper defaults
           parsed.data.translationComplete = parsed.data.translationComplete ?? true;
           parsed.data.translationProgress = parsed.data.translationProgress ?? 100;
           
           this.cache.set(cacheKey, parsed);
-          console.log(`[EnhancedSoulNetPreloadService] LANGUAGE-LEVEL: Found valid localStorage cache for ${cacheKey}`);
+          console.log(`[EnhancedSoulNetPreloadService] ATOMIC: Found valid localStorage atomic cache for ${cacheKey}`);
           return parsed;
         }
       }
     } catch (error) {
-      console.error('[EnhancedSoulNetPreloadService] Error loading from localStorage:', error);
+      console.error('[EnhancedSoulNetPreloadService] ATOMIC: Error loading from localStorage:', error);
     }
     
-    console.log(`[EnhancedSoulNetPreloadService] LANGUAGE-LEVEL: No valid cache found for ${cacheKey}`);
+    console.log(`[EnhancedSoulNetPreloadService] ATOMIC: No valid atomic cache found for ${cacheKey}`);
     return null;
+  }
+
+  // ENHANCED: Atomic coordinated translation with timeout protection
+  private static async getAtomicCoordinatedTranslations(
+    nodes: NodeData[], 
+    language: string, 
+    cacheKey: string
+  ): Promise<Map<string, string>> {
+    if (language === 'en') {
+      const translations = new Map<string, string>();
+      nodes.forEach(node => translations.set(node.id, node.id));
+      console.log(`[EnhancedSoulNetPreloadService] ATOMIC: Using English nodes directly for atomic consistency`);
+      return translations;
+    }
+
+    // ENHANCED: Check for existing atomic translation in progress
+    const existingTranslation = this.translationCoordinator.get(cacheKey);
+    if (existingTranslation) {
+      console.log(`[EnhancedSoulNetPreloadService] ATOMIC: Waiting for existing atomic translation for ${cacheKey}`);
+      try {
+        // Add timeout protection for atomic coordination
+        return await Promise.race([
+          existingTranslation,
+          new Promise<Map<string, string>>((_, reject) => 
+            setTimeout(() => reject(new Error('Atomic translation timeout')), 25000)
+          )
+        ]);
+      } catch (error) {
+        console.error(`[EnhancedSoulNetPreloadService] ATOMIC: Existing translation failed for ${cacheKey}:`, error);
+        this.translationCoordinator.delete(cacheKey);
+      }
+    }
+
+    // ENHANCED: Start new atomic coordinated translation
+    const translationPromise = this.performAtomicBatchTranslation(nodes, language, cacheKey);
+    this.translationCoordinator.set(cacheKey, translationPromise);
+
+    try {
+      const result = await translationPromise;
+      console.log(`[EnhancedSoulNetPreloadService] ATOMIC: Completed atomic coordinated translation for ${cacheKey}`);
+      return result;
+    } finally {
+      // Clean up coordinator
+      this.translationCoordinator.delete(cacheKey);
+    }
+  }
+
+  // ENHANCED: Atomic batch translation with complete error handling
+  private static async performAtomicBatchTranslation(nodes: NodeData[], language: string, cacheKey: string): Promise<Map<string, string>> {
+    const translations = new Map<string, string>();
+    const nodesToTranslate = [...new Set(nodes.map(node => node.id))];
+    
+    console.log(`[EnhancedSoulNetPreloadService] ATOMIC: Starting atomic batch translation ${nodesToTranslate.length} unique nodes to ${language}`);
+    
+    // ENHANCED: Update atomic translation state with progress tracking
+    this.translationStates.set(cacheKey, {
+      isTranslating: true,
+      progress: 0,
+      totalNodes: nodesToTranslate.length,
+      translatedNodes: 0,
+      isAtomic: true,
+      startedAt: Date.now()
+    });
+    
+    try {
+      if (!this.appTranslationService) {
+        console.warn('[EnhancedSoulNetPreloadService] ATOMIC: No app-level translation service available, using atomic fallback');
+        
+        // ENHANCED: Atomic fallback with all original text
+        nodesToTranslate.forEach(nodeId => {
+          translations.set(nodeId, nodeId);
+        });
+        
+        // Update atomic completion state
+        this.translationStates.set(cacheKey, {
+          isTranslating: false,
+          progress: 100,
+          totalNodes: nodesToTranslate.length,
+          translatedNodes: nodesToTranslate.length,
+          isAtomic: true,
+          startedAt: 0
+        });
+        
+        return translations;
+      }
+
+      // ENHANCED: Perform atomic batch translation with explicit coordination
+      console.log(`[EnhancedSoulNetPreloadService] ATOMIC: Using app-level service for atomic translation from 'en' to '${language}'`);
+      
+      const batchResults = await this.appTranslationService.batchTranslate({
+        texts: nodesToTranslate,
+        targetLanguage: language,
+        sourceLanguage: 'en'
+      });
+      
+      console.log(`[EnhancedSoulNetPreloadService] ATOMIC: Atomic batch translation completed ${batchResults.size}/${nodesToTranslate.length} nodes`);
+      
+      // ENHANCED: Process atomic results with strict validation
+      batchResults.forEach((translatedText, originalText) => {
+        if (translatedText && translatedText.trim() !== '') {
+          translations.set(originalText, translatedText);
+          console.log(`[EnhancedSoulNetPreloadService] ATOMIC: ✓ "${originalText}" -> "${translatedText}"`);
+        } else {
+          console.warn(`[EnhancedSoulNetPreloadService] ATOMIC: ⚠ Empty atomic translation for "${originalText}", using original`);
+          translations.set(originalText, originalText);
+        }
+      });
+
+      // ENHANCED: Ensure atomic completeness - handle any missing translations
+      nodesToTranslate.forEach(nodeId => {
+        if (!translations.has(nodeId)) {
+          console.warn(`[EnhancedSoulNetPreloadService] ATOMIC: ⚠ No atomic translation found for node: "${nodeId}", using original`);
+          translations.set(nodeId, nodeId);
+        }
+      });
+
+      // ENHANCED: Update atomic completion state
+      this.translationStates.set(cacheKey, {
+        isTranslating: false,
+        progress: 100,
+        totalNodes: nodesToTranslate.length,
+        translatedNodes: translations.size,
+        isAtomic: true,
+        startedAt: 0
+      });
+
+      console.log(`[EnhancedSoulNetPreloadService] ATOMIC: Translation summary - Total: ${nodesToTranslate.length}, Translated: ${translations.size}, Atomic success rate: ${Math.round((translations.size / nodesToTranslate.length) * 100)}%`);
+
+    } catch (error) {
+      console.error('[EnhancedSoulNetPreloadService] ATOMIC: Error during atomic batch translation:', error);
+      
+      // ENHANCED: Atomic fallback with complete original text coverage
+      nodesToTranslate.forEach(nodeId => {
+        translations.set(nodeId, nodeId);
+      });
+      
+      // Update atomic error state
+      this.translationStates.set(cacheKey, {
+        isTranslating: false,
+        progress: 100,
+        totalNodes: nodesToTranslate.length,
+        translatedNodes: nodesToTranslate.length,
+        isAtomic: true,
+        startedAt: 0
+      });
+    }
+
+    return translations;
   }
 
   private static calculateNodeConnections(
@@ -448,38 +516,37 @@ export class EnhancedSoulNetPreloadService {
     }
   }
 
-  // ENHANCED CACHE CLEARING with language-level coordination
+  // ENHANCED CACHE CLEARING with proper invalidation
   static clearInstantCache(userId?: string): void {
-    console.log(`[EnhancedSoulNetPreloadService] LANGUAGE-LEVEL: Clearing cache for user ${userId || 'all users'}`);
+    console.log(`[EnhancedSoulNetPreloadService] ATOMIC: Clearing atomic cache for user ${userId || 'all users'}`);
     
     if (userId) {
-      // Clear specific user's cache including language-level states
+      // Clear specific user's cache including atomic states
       const keysToDelete = Array.from(this.cache.keys()).filter(key => key.startsWith(userId));
       keysToDelete.forEach(key => {
         this.cache.delete(key);
         localStorage.removeItem(`${this.CACHE_KEY}-${key}`);
+        this.translationStates.delete(key);
       });
       
-      // Clear language-level translation states for this user
-      const languageKeysToDelete = Array.from(this.languageTranslationStates.keys()).filter(key => key.startsWith(userId));
-      languageKeysToDelete.forEach(key => {
-        this.languageTranslationStates.delete(key);
+      // Clear atomic translation coordinator for this user
+      const coordinatorKeysToDelete = Array.from(this.translationCoordinator.keys()).filter(key => key.startsWith(userId));
+      coordinatorKeysToDelete.forEach(key => {
+        this.translationCoordinator.delete(key);
       });
       
-      // Clear language-level cache
-      LanguageLevelTranslationCache.clearLanguageCache(userId);
-      
-      console.log(`[EnhancedSoulNetPreloadService] LANGUAGE-LEVEL: Cleared cache for user ${userId}`);
+      console.log(`[EnhancedSoulNetPreloadService] ATOMIC: Cleared atomic cache for user ${userId}`);
     } else {
-      // Clear all cache
+      // Clear all atomic cache
       this.cache.clear();
-      this.languageTranslationStates.clear();
+      this.translationCoordinator.clear();
+      this.translationStates.clear();
       Object.keys(localStorage).forEach(key => {
         if (key.startsWith(this.CACHE_KEY)) {
           localStorage.removeItem(key);
         }
       });
-      console.log('[EnhancedSoulNetPreloadService] LANGUAGE-LEVEL: Cleared all cache');
+      console.log('[EnhancedSoulNetPreloadService] ATOMIC: Cleared all atomic cache');
     }
   }
 
@@ -513,6 +580,7 @@ export class EnhancedSoulNetPreloadService {
     const entityEmotionMap: Record<string, Record<string, number>> = {};
     
     entries.forEach(entry => {
+      // FIXED: Use themeemotion instead of entityemotion
       if (!entry.themeemotion) return;
       
       Object.entries(entry.themeemotion).forEach(([entity, emotions]) => {
@@ -549,7 +617,7 @@ export class EnhancedSoulNetPreloadService {
 
     console.log("[EnhancedSoulNetPreloadService] APP-LEVEL: Generating graph with", entityList.length, "entities");
     
-    // Apply NEW y-axis pattern for entity nodes (circular): +2, -2, +2.25, -2.25, +2.5, -2.5, +2, -2, repeating
+    // UPDATED: Apply NEW y-axis pattern for entity nodes (circular): +2, -2, +2.25, -2.25, +2.5, -2.5, +2, -2, repeating
     entityList.forEach((entity, entityIndex) => {
       entityNodes.add(entity);
       const entityAngle = (entityIndex / entityList.length) * Math.PI * 2;
@@ -596,7 +664,7 @@ export class EnhancedSoulNetPreloadService {
       });
     });
 
-    // Apply NEW y-axis pattern for emotion nodes (squares): +7, -7, +9, -9, +11, -11, repeating
+    // UPDATED: Apply NEW y-axis pattern for emotion nodes (squares): +7, -7, +9, -9, +11, -11, repeating
     Array.from(emotionNodes).forEach((emotion, emotionIndex) => {
       const emotionAngle = (emotionIndex / emotionNodes.size) * Math.PI * 2;
       const emotionRadius = EMOTION_LAYER_RADIUS;

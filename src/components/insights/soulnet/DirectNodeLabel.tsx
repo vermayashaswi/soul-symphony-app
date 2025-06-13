@@ -1,4 +1,3 @@
-
 import React, { useMemo, useEffect } from 'react';
 import TranslatableText3D from './TranslatableText3D';
 import SimpleText from './SimpleText';
@@ -17,7 +16,7 @@ interface DirectNodeLabelProps {
   showPercentage?: boolean;
   effectiveTheme?: 'light' | 'dark';
   isInstantMode?: boolean;
-  // LANGUAGE-LEVEL: Coordinated translation props
+  // APP-LEVEL: Coordinated translation props
   coordinatedTranslation?: string;
 }
 
@@ -54,9 +53,9 @@ export const DirectNodeLabel: React.FC<DirectNodeLabelProps> = ({
 
   // Log rendering mode with coordination info
   if (isInstantMode) {
-    console.log(`[DirectNodeLabel] LANGUAGE-LEVEL INSTANT MODE: ${id} with coordinated translation: "${coordinatedTranslation}" - NO LOADING DELAY`);
+    console.log(`[DirectNodeLabel] APP-LEVEL INSTANT MODE: ${id} with coordinated translation: "${coordinatedTranslation}" - NO LOADING DELAY`);
   } else {
-    console.log(`[DirectNodeLabel] LANGUAGE-LEVEL ENHANCED POSITIONING: ${id} with coordinated translation: "${coordinatedTranslation}"`);
+    console.log(`[DirectNodeLabel] APP-LEVEL ENHANCED POSITIONING: ${id} with coordinated translation: "${coordinatedTranslation}"`);
   }
 
   // Same base offset for both entity and emotion nodes
@@ -65,9 +64,9 @@ export const DirectNodeLabel: React.FC<DirectNodeLabelProps> = ({
     const scaledOffset = baseOffset * Math.max(0.8, Math.min(2.5, nodeScale));
     
     if (isInstantMode) {
-      console.log(`[DirectNodeLabel] LANGUAGE-LEVEL INSTANT: Enhanced label offset for ${id} (${type}): ${scaledOffset} (scale: ${nodeScale}) - UNIFORM POSITIONING`);
+      console.log(`[DirectNodeLabel] APP-LEVEL INSTANT: Enhanced label offset for ${id} (${type}): ${scaledOffset} (scale: ${nodeScale}) - UNIFORM POSITIONING`);
     } else {
-      console.log(`[DirectNodeLabel] LANGUAGE-LEVEL: Enhanced label offset for ${id} (${type}): ${scaledOffset} (scale: ${nodeScale}) - UNIFORM POSITIONING`);
+      console.log(`[DirectNodeLabel] APP-LEVEL: Enhanced label offset for ${id} (${type}): ${scaledOffset} (scale: ${nodeScale}) - UNIFORM POSITIONING`);
     }
     return [0, scaledOffset, 0] as [number, number, number];
   }, [type, nodeScale, id, isInstantMode]);
@@ -91,22 +90,22 @@ export const DirectNodeLabel: React.FC<DirectNodeLabelProps> = ({
     return fixedPercentageSize;
   }, [id]);
 
-  // Solid white text for dark theme, solid black text for light theme
+  // UPDATED: Solid white text for dark theme, solid black text for light theme
   const textColor = useMemo(() => {
     const color = effectiveTheme === 'dark' ? '#ffffff' : '#000000';
     
     if (isInstantMode) {
-      console.log(`[DirectNodeLabel] LANGUAGE-LEVEL INSTANT: SOLID TEXT COLOR for ${id}: ${color} (theme: ${effectiveTheme})`);
+      console.log(`[DirectNodeLabel] APP-LEVEL INSTANT: SOLID TEXT COLOR for ${id}: ${color} (theme: ${effectiveTheme})`);
     } else {
-      console.log(`[DirectNodeLabel] LANGUAGE-LEVEL: SOLID TEXT COLOR for ${id}: ${color} (theme: ${effectiveTheme})`);
+      console.log(`[DirectNodeLabel] APP-LEVEL: SOLID TEXT COLOR for ${id}: ${color} (theme: ${effectiveTheme})`);
     }
     return color;
   }, [effectiveTheme, id, isInstantMode]);
 
-  // Percentage text also uses solid color for theme
+  // UPDATED: Percentage text also uses solid color for theme
   const percentageColor = useMemo(() => {
     const color = effectiveTheme === 'dark' ? '#ffffff' : '#000000';
-    console.log(`[DirectNodeLabel] LANGUAGE-LEVEL: SOLID PERCENTAGE COLOR for ${id}: ${color} (theme: ${effectiveTheme})`);
+    console.log(`[DirectNodeLabel] APP-LEVEL: SOLID PERCENTAGE COLOR for ${id}: ${color} (theme: ${effectiveTheme})`);
     return color;
   }, [effectiveTheme, id]);
 
@@ -133,7 +132,7 @@ export const DirectNodeLabel: React.FC<DirectNodeLabelProps> = ({
     const isTutorialStep9 = currentTutorialStep === '9';
     
     if (isTutorialStep9) {
-      console.log(`[DirectNodeLabel] LANGUAGE-LEVEL: Tutorial step 9 detected, forcing label visibility for ${id}`);
+      console.log(`[DirectNodeLabel] APP-LEVEL: Tutorial step 9 detected, forcing label visibility for ${id}`);
       return true;
     }
     
@@ -142,9 +141,9 @@ export const DirectNodeLabel: React.FC<DirectNodeLabelProps> = ({
 
   if (!enhancedShouldShowLabel || !id) {
     if (isInstantMode) {
-      console.log(`[DirectNodeLabel] LANGUAGE-LEVEL INSTANT: Not rendering label for ${id}: shouldShow=${enhancedShouldShowLabel}, text="${id}"`);
+      console.log(`[DirectNodeLabel] APP-LEVEL INSTANT: Not rendering label for ${id}: shouldShow=${enhancedShouldShowLabel}, text="${id}"`);
     } else {
-      console.log(`[DirectNodeLabel] LANGUAGE-LEVEL: Not rendering label for ${id}: shouldShow=${enhancedShouldShowLabel}, text="${id}"`);
+      console.log(`[DirectNodeLabel] APP-LEVEL: Not rendering label for ${id}: shouldShow=${enhancedShouldShowLabel}, text="${id}"`);
     }
     return null;
   }
@@ -152,21 +151,21 @@ export const DirectNodeLabel: React.FC<DirectNodeLabelProps> = ({
   // Log percentage display state with side positioning
   if (showPercentage && connectionPercentage > 0) {
     if (isInstantMode) {
-      console.log(`[DirectNodeLabel] LANGUAGE-LEVEL INSTANT MODE - SIDE POSITIONING - PERCENTAGE: ${id} (${type}) shows ${connectionPercentage}% on the side at`, percentagePosition, '- NO LOADING DELAY');
+      console.log(`[DirectNodeLabel] APP-LEVEL INSTANT MODE - SIDE POSITIONING - PERCENTAGE: ${id} (${type}) shows ${connectionPercentage}% on the side at`, percentagePosition, '- NO LOADING DELAY');
     } else {
-      console.log(`[DirectNodeLabel] LANGUAGE-LEVEL ENHANCED SIDE POSITIONING - PERCENTAGE: ${id} (${type}) shows ${connectionPercentage}% on the side at`, percentagePosition);
+      console.log(`[DirectNodeLabel] APP-LEVEL ENHANCED SIDE POSITIONING - PERCENTAGE: ${id} (${type}) shows ${connectionPercentage}% on the side at`, percentagePosition);
     }
   }
 
   if (isInstantMode) {
-    console.log(`[DirectNodeLabel] FIXED FONT INSTANT MODE - MAIN TEXT: "${id}" at position`, labelPosition, 'with FIXED size:', textSize, 'color:', textColor, '- NO LOADING DELAY - LANGUAGE-LEVEL TRANSLATION');
+    console.log(`[DirectNodeLabel] FIXED FONT INSTANT MODE - MAIN TEXT: "${id}" at position`, labelPosition, 'with FIXED size:', textSize, 'color:', textColor, '- NO LOADING DELAY - APP-LEVEL TRANSLATION');
   } else {
-    console.log(`[DirectNodeLabel] FIXED FONT - MAIN TEXT: "${id}" at position`, labelPosition, 'with FIXED size:', textSize, 'color:', textColor, '- LANGUAGE-LEVEL TRANSLATION');
+    console.log(`[DirectNodeLabel] FIXED FONT - MAIN TEXT: "${id}" at position`, labelPosition, 'with FIXED size:', textSize, 'color:', textColor, '- APP-LEVEL TRANSLATION');
   }
 
   return (
     <>
-      {/* LANGUAGE-LEVEL: Main text using TranslatableText3D with language-level translation integration */}
+      {/* APP-LEVEL: Main text using TranslatableText3D with app-level translation integration */}
       <TranslatableText3D
         text={id}
         position={labelPosition}
@@ -184,7 +183,6 @@ export const DirectNodeLabel: React.FC<DirectNodeLabelProps> = ({
         sourceLanguage="en"
         coordinatedTranslation={coordinatedTranslation}
         useCoordinatedTranslation={!!coordinatedTranslation}
-        isAtomicMode={true}
       />
       
       {/* Enhanced side-positioned percentage text with theme-aware color */}
