@@ -57,6 +57,26 @@ export const useAtomicSoulNetData = (
   const [translationComplete, setTranslationComplete] = useState(false);
   const [canRender, setCanRender] = useState(false);
 
+  // RENDERING LOGIC: Determine if visualization can render
+  const canRenderVisualization = useCallback((
+    nodeIds: string[], 
+    currentTranslations: Map<string, string>, 
+    language: string
+  ): boolean => {
+    if (nodeIds.length === 0) return false;
+    
+    // For English, we can always render immediately
+    if (language === 'en') return true;
+    
+    // For other languages, check if we have enough translations
+    // We can render if we have at least 70% of translations available
+    const translationCoverage = currentTranslations.size / nodeIds.length;
+    const canRender = translationCoverage >= 0.7;
+    
+    console.log(`[useAtomicSoulNetData] RENDERING: Coverage ${Math.round(translationCoverage * 100)}%, can render: ${canRender}`);
+    return canRender;
+  }, []);
+
   // CACHE-FIRST: Pre-load cached translations immediately
   const preloadCachedTranslations = useCallback(async (nodeIds: string[]) => {
     if (!nodeIds || nodeIds.length === 0) {
@@ -139,7 +159,7 @@ export const useAtomicSoulNetData = (
       const loadedTranslations = await preloadCachedTranslations(nodeIds);
 
       // Step 3: Determine if we can render
-      const shouldRender = this.canRenderVisualization(nodeIds, loadedTranslations, currentLanguage);
+      const shouldRender = canRenderVisualization(nodeIds, loadedTranslations, currentLanguage);
       setCanRender(shouldRender);
 
       console.log(`[useAtomicSoulNetData] OPTIMIZED: Can render: ${shouldRender}, translations: ${loadedTranslations.size}/${nodeIds.length}`);
@@ -151,27 +171,7 @@ export const useAtomicSoulNetData = (
       setCanRender(false);
       setLoading(false);
     }
-  }, [userId, timeRange, currentLanguage, preloadCachedTranslations]);
-
-  // RENDERING LOGIC: Determine if visualization can render
-  const canRenderVisualization = useCallback((
-    nodeIds: string[], 
-    currentTranslations: Map<string, string>, 
-    language: string
-  ): boolean => {
-    if (nodeIds.length === 0) return false;
-    
-    // For English, we can always render immediately
-    if (language === 'en') return true;
-    
-    // For other languages, check if we have enough translations
-    // We can render if we have at least 70% of translations available
-    const translationCoverage = currentTranslations.size / nodeIds.length;
-    const canRender = translationCoverage >= 0.7;
-    
-    console.log(`[useAtomicSoulNetData] RENDERING: Coverage ${Math.round(translationCoverage * 100)}%, can render: ${canRender}`);
-    return canRender;
-  }, []);
+  }, [userId, timeRange, currentLanguage, preloadCachedTranslations, canRenderVisualization]);
 
   // Load data when dependencies change
   useEffect(() => {
