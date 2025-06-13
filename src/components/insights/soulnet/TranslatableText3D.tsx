@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useTranslation } from '@/contexts/TranslationContext';
 import SmartTextRenderer from './SmartTextRenderer';
@@ -18,10 +19,6 @@ interface TranslatableText3DProps {
   maxLines?: number;
   sourceLanguage?: string;
   onTranslationComplete?: (translatedText: string) => void;
-  // ENHANCED: Atomic coordinated translation props
-  coordinatedTranslation?: string;
-  useCoordinatedTranslation?: boolean;
-  isAtomicMode?: boolean;
 }
 
 export const TranslatableText3D: React.FC<TranslatableText3DProps> = ({
@@ -39,44 +36,43 @@ export const TranslatableText3D: React.FC<TranslatableText3DProps> = ({
   maxCharsPerLine = 18,
   maxLines = 3,
   sourceLanguage = 'en',
-  onTranslationComplete,
-  coordinatedTranslation,
-  useCoordinatedTranslation = false,
-  isAtomicMode = true
+  onTranslationComplete
 }) => {
-  const { currentLanguage } = useTranslation();
+  const { currentLanguage, translate } = useTranslation();
   const [translatedText, setTranslatedText] = useState<string>(text);
+  const [isTranslating, setIsTranslating] = useState(false);
 
   useEffect(() => {
-    // ENHANCED: STRICT ATOMIC - Only use coordinated translations, never fallback
-    if (useCoordinatedTranslation && coordinatedTranslation && isAtomicMode) {
-      console.log(`[TranslatableText3D] ATOMIC-STRICT: Using atomic coordinated translation for "${text}": "${coordinatedTranslation}"`);
-      setTranslatedText(coordinatedTranslation);
-      onTranslationComplete?.(coordinatedTranslation);
-      return;
-    }
+    // SIMPLIFIED: Direct translation without complex coordination
+    const performTranslation = async () => {
+      if (!text || currentLanguage === sourceLanguage) {
+        setTranslatedText(text);
+        onTranslationComplete?.(text);
+        return;
+      }
 
-    if (!text || currentLanguage === sourceLanguage) {
-      setTranslatedText(text);
-      onTranslationComplete?.(text);
-      return;
-    }
+      console.log(`[TranslatableText3D] SIMPLIFIED: Translating "${text}" from ${sourceLanguage} to ${currentLanguage}`);
+      
+      try {
+        setIsTranslating(true);
+        const result = await translate(text, sourceLanguage);
+        const finalText = result || text;
+        
+        console.log(`[TranslatableText3D] SIMPLIFIED: Translation result for "${text}": "${finalText}"`);
+        setTranslatedText(finalText);
+        onTranslationComplete?.(finalText);
+      } catch (error) {
+        console.error(`[TranslatableText3D] SIMPLIFIED: Translation error for "${text}":`, error);
+        setTranslatedText(text);
+        onTranslationComplete?.(text);
+      } finally {
+        setIsTranslating(false);
+      }
+    };
 
-    // ENHANCED: In atomic mode, ALWAYS use original text if no coordinated translation
-    if (useCoordinatedTranslation && isAtomicMode) {
-      console.log(`[TranslatableText3D] ATOMIC-STRICT: No coordinated translation for "${text}", using original text to maintain atomic consistency`);
-      setTranslatedText(text);
-      onTranslationComplete?.(text);
-      return;
-    }
+    performTranslation();
+  }, [text, currentLanguage, sourceLanguage, translate, onTranslationComplete]);
 
-    // ENHANCED: For non-atomic usage, use original text (no individual translations)
-    console.log(`[TranslatableText3D] ATOMIC-STRICT: Using original text for "${text}" (atomic mode: ${isAtomicMode})`);
-    setTranslatedText(text);
-    onTranslationComplete?.(text);
-  }, [text, currentLanguage, sourceLanguage, onTranslationComplete, coordinatedTranslation, useCoordinatedTranslation, isAtomicMode]);
-
-  // ENHANCED: Always render with current text - maintain atomic consistency
   return (
     <SmartTextRenderer
       text={translatedText}
