@@ -76,13 +76,24 @@ export const useLocationPricing = () => {
           });
 
           // Use a geocoding service to convert coordinates to country
-          const response = await fetch(
-            `https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${position.coords.latitude}&longitude=${position.coords.longitude}&localityLanguage=en`
-          );
+          const controller = new AbortController();
+          const timeoutId = setTimeout(() => controller.abort(), 3000);
           
-          if (response.ok) {
-            const data = await response.json();
-            countryCode = data.countryCode;
+          try {
+            const response = await fetch(
+              `https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${position.coords.latitude}&longitude=${position.coords.longitude}&localityLanguage=en`,
+              { signal: controller.signal }
+            );
+            
+            clearTimeout(timeoutId);
+            
+            if (response.ok) {
+              const data = await response.json();
+              countryCode = data.countryCode;
+            }
+          } catch (fetchError) {
+            clearTimeout(timeoutId);
+            throw fetchError;
           }
         } catch (geoError) {
           console.log('[LocationPricing] Geolocation failed:', geoError);
@@ -91,13 +102,23 @@ export const useLocationPricing = () => {
         // Method 2: Fallback to IP-based detection
         if (!countryCode) {
           try {
-            const response = await fetch('https://ipapi.co/json/', {
-              timeout: 3000
-            });
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 3000);
             
-            if (response.ok) {
-              const data = await response.json();
-              countryCode = data.country_code;
+            try {
+              const response = await fetch('https://ipapi.co/json/', {
+                signal: controller.signal
+              });
+              
+              clearTimeout(timeoutId);
+              
+              if (response.ok) {
+                const data = await response.json();
+                countryCode = data.country_code;
+              }
+            } catch (fetchError) {
+              clearTimeout(timeoutId);
+              throw fetchError;
             }
           } catch (ipError) {
             console.log('[LocationPricing] IP geolocation failed:', ipError);
