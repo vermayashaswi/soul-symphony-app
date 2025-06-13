@@ -21,27 +21,18 @@ import BlogPostPage from '@/pages/website/BlogPostPage';
 import OnboardingScreen from '@/components/onboarding/OnboardingScreen';
 import { useAuth } from '@/contexts/AuthContext';
 import { useOnboarding } from '@/hooks/use-onboarding';
-import { useIsMobile } from '@/hooks/use-mobile';
 
 const AppRoutes = () => {
   console.log('Rendering AppRoutes component');
   const { user } = useAuth();
   const { onboardingComplete } = useOnboarding();
-  const isMobile = useIsMobile();
   
-  // Enhanced redirect logic for mobile-first app experience
+  // App root redirect logic - only for /app route, not for marketing homepage
   const AppRootRedirect = () => {
     console.log('AppRootRedirect - Auth status:', { 
       user: !!user, 
-      onboardingComplete,
-      isMobile: isMobile.isMobile
+      onboardingComplete
     });
-    
-    // For mobile/app contexts, always route through splash first
-    if (isMobile.isMobile && !window.location.pathname.includes('/splash')) {
-      console.log('Mobile context detected, ensuring splash flow');
-      return <Navigate to="/app/splash" replace />;
-    }
     
     if (user) {
       if (onboardingComplete) {
@@ -61,7 +52,7 @@ const AppRoutes = () => {
     <Routes>
       {/* Wrap all routes that need ViewportManager in a parent Route */}
       <Route element={<ViewportManager />}>
-        {/* Website Routes - Desktop fallback */}
+        {/* Marketing Website Routes - Now properly renders HomePage */}
         <Route path="/" element={<Index />} />
         <Route path="/privacy-policy" element={<PrivacyPolicyPage />} />
         <Route path="/faq" element={<FAQPage />} />

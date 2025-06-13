@@ -2,42 +2,38 @@
 import React, { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
-import { useTheme } from '@/hooks/use-theme';
 import { useIsMobile } from '@/hooks/use-mobile';
-import { useOnboarding } from '@/hooks/use-onboarding';
 import { pwaService } from '@/services/pwaService';
+import HomePage from '@/pages/website/HomePage';
 
 const Index = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
-  const { colorTheme } = useTheme();
   const isMobile = useIsMobile();
-  const { onboardingComplete, checkOnboardingStatus } = useOnboarding();
 
   useEffect(() => {
-    // Immediate redirect to splash for mobile app experience
-    const handleMobileAppFlow = async () => {
-      console.log('[Index] Starting mobile app flow detection');
+    // Only redirect to app routes if explicitly requested or in standalone PWA mode
+    const handleAppRedirection = async () => {
+      console.log('[Index] Checking for app redirection needs');
       
-      // Check if this is a PWA or native app context
+      // Check if this is a PWA standalone mode (actual app installation)
       const pwaInfo = pwaService.getPWAInfo();
-      const isAppContext = pwaInfo.isStandalone || isMobile.isMobile || window.location.href.includes('app');
+      const isStandaloneApp = pwaInfo.isStandalone;
       
       console.log('[Index] App context detection:', {
-        isStandalone: pwaInfo.isStandalone,
-        isMobile: isMobile.isMobile,
+        isStandalone: isStandaloneApp,
         platform: pwaInfo.platform,
-        isAppContext
+        userAgent: navigator.userAgent.slice(0, 100)
       });
 
-      // For mobile/app contexts, always start with splash
-      if (isAppContext) {
-        console.log('[Index] Mobile/app context detected, redirecting to splash');
+      // Only redirect to app if in standalone PWA mode
+      if (isStandaloneApp) {
+        console.log('[Index] Standalone PWA detected, redirecting to app splash');
         navigate('/app/splash', { replace: true });
         return;
       }
 
-      // For desktop web, check URL parameters for explicit app access
+      // Check URL parameters for explicit app access
       const urlParams = new URLSearchParams(window.location.search);
       if (urlParams.has('app') || urlParams.has('mobile')) {
         console.log('[Index] Explicit app access requested via URL params');
@@ -45,44 +41,36 @@ const Index = () => {
         return;
       }
 
-      // Default behavior for desktop web - stay on website homepage
-      console.log('[Index] Desktop web context, staying on homepage');
+      // For all other cases (including mobile web), stay on marketing homepage
+      console.log('[Index] Rendering marketing homepage for route "/"');
     };
 
-    handleMobileAppFlow();
-  }, [navigate, isMobile.isMobile]);
+    handleAppRedirection();
+  }, [navigate]);
 
-  // Enhanced performance optimization for mobile
+  // Enhanced performance optimization for mobile web users
   useEffect(() => {
-    // Preload critical app resources when mobile is detected
     if (isMobile.isMobile) {
-      console.log('[Index] Preloading mobile app resources');
+      console.log('[Index] Mobile web user detected, optimizing for mobile experience');
       
-      // Preload splash screen assets
+      // Set mobile-specific optimizations for the marketing page
+      document.documentElement.style.setProperty('--mobile-viewport-height', '100vh');
+      document.body.style.touchAction = 'manipulation';
+      
+      // Preload app assets for potential future navigation
       const preloadImage = (src: string) => {
         const img = new Image();
         img.src = src;
       };
-
-      // Preload key icons
+      
+      // Preload key app icons in case user navigates to app later
       preloadImage('/icons/icon-192x192.png');
       preloadImage('/icons/icon-512x512.png');
-      
-      // Set mobile-specific optimizations
-      document.documentElement.style.setProperty('--mobile-viewport-height', '100vh');
-      document.body.style.touchAction = 'manipulation';
     }
   }, [isMobile.isMobile]);
 
-  // Loading state for smooth transition
-  return (
-    <div className="flex items-center justify-center min-h-screen bg-purple-900">
-      <div className="text-center">
-        <div className="w-16 h-16 border-4 border-purple-300 border-t-white rounded-full animate-spin mx-auto mb-4"></div>
-        <p className="text-white text-lg">Loading SOULo...</p>
-      </div>
-    </div>
-  );
+  // Render the marketing homepage directly
+  return <HomePage />;
 };
 
 export default Index;
