@@ -37,14 +37,14 @@ export const SoulNetLink: React.FC<SoulNetLinkProps> = ({
   const opacity = isHighlighted ? 0.8 : 0.3;
 
   return (
-    <line geometry={lineGeometry}>
+    <mesh>
+      <primitive object={lineGeometry} />
       <lineBasicMaterial
         color={color}
         transparent
         opacity={opacity}
-        linewidth={isHighlighted ? 3 : 1}
       />
-    </line>
+    </mesh>
   );
 };
 
