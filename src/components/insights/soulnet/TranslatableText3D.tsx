@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useTranslation } from '@/contexts/TranslationContext';
 import SmartTextRenderer from './SmartTextRenderer';
@@ -45,109 +44,44 @@ export const TranslatableText3D: React.FC<TranslatableText3DProps> = ({
   useCoordinatedTranslation = false,
   isAtomicMode = true
 }) => {
-  const { currentLanguage, getCachedTranslation, translate } = useTranslation();
+  const { currentLanguage } = useTranslation();
   const [translatedText, setTranslatedText] = useState<string>(text);
-  const [isTranslating, setIsTranslating] = useState(false);
-  const [translationAttempted, setTranslationAttempted] = useState(false);
 
   useEffect(() => {
-    const translateText = async () => {
-      // ENHANCED: Prioritize atomic coordinated translation for consistency
-      if (useCoordinatedTranslation && coordinatedTranslation && isAtomicMode) {
-        console.log(`[TranslatableText3D] ATOMIC: Using atomic coordinated translation for "${text}": "${coordinatedTranslation}"`);
-        setTranslatedText(coordinatedTranslation);
-        onTranslationComplete?.(coordinatedTranslation);
-        setTranslationAttempted(true);
-        return;
-      }
+    // ENHANCED: STRICT ATOMIC - Only use coordinated translations, never fallback
+    if (useCoordinatedTranslation && coordinatedTranslation && isAtomicMode) {
+      console.log(`[TranslatableText3D] ATOMIC-STRICT: Using atomic coordinated translation for "${text}": "${coordinatedTranslation}"`);
+      setTranslatedText(coordinatedTranslation);
+      onTranslationComplete?.(coordinatedTranslation);
+      return;
+    }
 
-      if (!text || currentLanguage === sourceLanguage) {
-        setTranslatedText(text);
-        onTranslationComplete?.(text);
-        setTranslationAttempted(true);
-        return;
-      }
+    if (!text || currentLanguage === sourceLanguage) {
+      setTranslatedText(text);
+      onTranslationComplete?.(text);
+      return;
+    }
 
-      // ENHANCED: Atomic fallback handling with strict consistency
-      if (useCoordinatedTranslation && !coordinatedTranslation && isAtomicMode) {
-        console.log(`[TranslatableText3D] ATOMIC: No atomic coordinated translation available for "${text}", maintaining consistency`);
-        
-        // ENHANCED: In atomic mode, always use original text if no coordinated translation
-        console.log(`[TranslatableText3D] ATOMIC: Using original text for "${text}" to maintain atomic consistency`);
-        setTranslatedText(text);
-        onTranslationComplete?.(text);
-        setTranslationAttempted(true);
-        return;
-      }
+    // ENHANCED: In atomic mode, ALWAYS use original text if no coordinated translation
+    if (useCoordinatedTranslation && isAtomicMode) {
+      console.log(`[TranslatableText3D] ATOMIC-STRICT: No coordinated translation for "${text}", using original text to maintain atomic consistency`);
+      setTranslatedText(text);
+      onTranslationComplete?.(text);
+      return;
+    }
 
-      // ENHANCED: Standard translation flow only for non-atomic usage
-      if (!useCoordinatedTranslation && !isAtomicMode) {
-        const cachedTranslation = getCachedTranslation(text);
-        if (cachedTranslation) {
-          console.log(`[TranslatableText3D] STANDARD: Using app-level cached translation for "${text}": "${cachedTranslation}"`);
-          setTranslatedText(cachedTranslation);
-          onTranslationComplete?.(cachedTranslation);
-          setTranslationAttempted(true);
-          return;
-        }
-
-        // Skip translation if already attempted and failed
-        if (translationAttempted) {
-          console.log(`[TranslatableText3D] STANDARD: Translation already attempted for "${text}", using original to avoid loops`);
-          setTranslatedText(text);
-          onTranslationComplete?.(text);
-          return;
-        }
-
-        if (!translate) {
-          console.log(`[TranslatableText3D] STANDARD: No translation function available, using original text for "${text}"`);
-          setTranslatedText(text);
-          onTranslationComplete?.(text);
-          setTranslationAttempted(true);
-          return;
-        }
-
-        console.log(`[TranslatableText3D] STANDARD: No cache found, translating "${text}" from ${sourceLanguage} to ${currentLanguage}`);
-        
-        try {
-          setIsTranslating(true);
-          const result = await translate(text, sourceLanguage);
-          
-          if (result && result !== text) {
-            console.log(`[TranslatableText3D] STANDARD: Translation successful: "${text}" -> "${result}"`);
-            setTranslatedText(result);
-            onTranslationComplete?.(result);
-          } else {
-            console.log(`[TranslatableText3D] STANDARD: Using original text for "${text}" (same as result or null)`);
-            setTranslatedText(text);
-            onTranslationComplete?.(text);
-          }
-        } catch (error) {
-          console.error(`[TranslatableText3D] STANDARD: Translation failed for "${text}":`, error);
-          setTranslatedText(text);
-          onTranslationComplete?.(text);
-        } finally {
-          setIsTranslating(false);
-          setTranslationAttempted(true);
-        }
-      } else {
-        // ENHANCED: In atomic mode, always use original text to maintain consistency
-        console.log(`[TranslatableText3D] ATOMIC: Maintaining original text for "${text}" in atomic mode`);
-        setTranslatedText(text);
-        onTranslationComplete?.(text);
-        setTranslationAttempted(true);
-      }
-    };
-
-    translateText();
-  }, [text, currentLanguage, sourceLanguage, translate, getCachedTranslation, onTranslationComplete, translationAttempted, coordinatedTranslation, useCoordinatedTranslation, isAtomicMode]);
+    // ENHANCED: For non-atomic usage, use original text (no individual translations)
+    console.log(`[TranslatableText3D] ATOMIC-STRICT: Using original text for "${text}" (atomic mode: ${isAtomicMode})`);
+    setTranslatedText(text);
+    onTranslationComplete?.(text);
+  }, [text, currentLanguage, sourceLanguage, onTranslationComplete, coordinatedTranslation, useCoordinatedTranslation, isAtomicMode]);
 
   // ENHANCED: Always render with current text - maintain atomic consistency
   return (
     <SmartTextRenderer
       text={translatedText}
       position={position}
-      color={isTranslating ? '#888888' : color} // Slightly dim while translating
+      color={color}
       size={size}
       visible={visible}
       renderOrder={renderOrder}

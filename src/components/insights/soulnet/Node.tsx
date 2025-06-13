@@ -1,4 +1,3 @@
-
 import React, { useRef, useMemo, useState, useEffect } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
@@ -67,21 +66,21 @@ const Node: React.FC<NodeProps> = ({
     return () => clearTimeout(timer);
   }, []);
 
-  // ENHANCED COORDINATED TRANSLATION: Get coordinated translation for this node with better debugging
+  // ENHANCED COORDINATED TRANSLATION: Get coordinated translation with strict atomic consistency
   const coordinatedTranslation = useMemo(() => {
     if (getCoordinatedTranslation) {
       const translation = getCoordinatedTranslation(node.id);
       if (isInstantMode) {
-        console.log(`[Node] ENHANCED COORDINATED INSTANT: Got coordinated translation for ${node.id}: "${translation}" - NO LOADING DELAY`);
+        console.log(`[Node] ATOMIC-STRICT INSTANT: Got coordinated translation for ${node.id}: "${translation}" - NO INDIVIDUAL TRANSLATIONS`);
       } else {
-        console.log(`[Node] ENHANCED COORDINATED: Got coordinated translation for ${node.id}: "${translation}"`);
+        console.log(`[Node] ATOMIC-STRICT: Got coordinated translation for ${node.id}: "${translation}" - COORDINATED ONLY`);
       }
       return translation;
     }
     if (isInstantMode) {
-      console.log(`[Node] ENHANCED COORDINATED INSTANT: No coordinated translation function available for ${node.id} - NO LOADING DELAY`);
+      console.log(`[Node] ATOMIC-STRICT INSTANT: No coordinated translation function available for ${node.id} - USING ORIGINAL TEXT`);
     } else {
-      console.log(`[Node] ENHANCED COORDINATED: No coordinated translation function available for ${node.id}`);
+      console.log(`[Node] ATOMIC-STRICT: No coordinated translation function available for ${node.id} - USING ORIGINAL TEXT`);
     }
     return undefined;
   }, [node.id, getCoordinatedTranslation, isInstantMode]);
@@ -186,16 +185,16 @@ const Node: React.FC<NodeProps> = ({
   // ENHANCED INSTANT MODE: Better logging for coordinated translation tracking
   if (showPercentage && connectionPercentage > 0) {
     if (isInstantMode) {
-      console.log(`[Node] ENHANCED COORDINATED PULSATING INSTANT MODE: ${node.id} (${node.type}) displays percentage: ${connectionPercentage}% with coordinated translation: "${coordinatedTranslation}" - NO LOADING DELAY`);
+      console.log(`[Node] ATOMIC-STRICT PULSATING INSTANT MODE: ${node.id} (${node.type}) displays percentage: ${connectionPercentage}% with coordinated translation: "${coordinatedTranslation}" - NO LOADING DELAY`);
     } else {
-      console.log(`[Node] ENHANCED COORDINATED PULSATING: ${node.id} (${node.type}) should display percentage: ${connectionPercentage}% with coordinated translation: "${coordinatedTranslation}"`);
+      console.log(`[Node] ATOMIC-STRICT PULSATING: ${node.id} (${node.type}) should display percentage: ${connectionPercentage}% with coordinated translation: "${coordinatedTranslation}"`);
     }
   }
 
   if (isInstantMode) {
-    console.log(`[Node] ENHANCED FIXED COLORS INSTANT MODE: Rendering ${node.type} node ${node.id} with ${isSelected ? 'SELECTED' : 'DEFAULT'} ${node.type === 'entity' ? 'GREEN' : 'GOLDEN'} color, enhanced coordinated translation: "${coordinatedTranslation}", base scale ${baseNodeScale.toFixed(2)} - NO LOADING DELAY`);
+    console.log(`[Node] ATOMIC-STRICT INSTANT MODE: Rendering ${node.type} node ${node.id} with coordinated translation: "${coordinatedTranslation}", base scale ${baseNodeScale.toFixed(2)} - COORDINATED ONLY`);
   } else {
-    console.log(`[Node] ENHANCED FIXED COLORS: Rendering ${node.type} node ${node.id} with ${isSelected ? 'SELECTED' : 'DEFAULT'} ${node.type === 'entity' ? 'GREEN' : 'GOLDEN'} color, enhanced coordinated translation: "${coordinatedTranslation}", base scale ${baseNodeScale.toFixed(2)}`);
+    console.log(`[Node] ATOMIC-STRICT: Rendering ${node.type} node ${node.id} with coordinated translation: "${coordinatedTranslation}", base scale ${baseNodeScale.toFixed(2)} - COORDINATED ONLY`);
   }
 
   // ENHANCED: Improved geometry sizes to work with the enhanced scale differences

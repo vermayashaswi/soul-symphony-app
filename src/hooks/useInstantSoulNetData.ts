@@ -57,7 +57,7 @@ export const useInstantSoulNetData = (
     return EnhancedSoulNetPreloadService.getInstantData(cacheKey);
   }, [cacheKey]);
 
-  // ENHANCED: Atomic state initialization
+  // ENHANCED: Atomic state initialization - only use complete atomic data
   const [graphData, setGraphData] = useState<{ nodes: NodeData[], links: LinkData[] }>(() => {
     if (instantCached && instantCached.data.translationComplete) {
       console.log('[useInstantSoulNetData] ATOMIC: Using complete atomic cached data immediately');
@@ -88,6 +88,24 @@ export const useInstantSoulNetData = (
   const [translationComplete, setTranslationComplete] = useState(!!(instantCached && instantCached.data.translationComplete));
   const [isAtomicMode] = useState(true); // Always use atomic mode for consistency
 
+  // ENHANCED: Coordinated translation functions - NEVER re-translate, only retrieve
+  const getInstantTranslation = useCallback((nodeId: string): string => {
+    if (currentLanguage === 'en') return nodeId;
+    
+    // ENHANCED: STRICT - Only use atomic translations when complete
+    if (translationComplete && isAtomicMode) {
+      const atomicTranslation = translations.get(nodeId);
+      if (atomicTranslation) {
+        console.log(`[useInstantSoulNetData] ATOMIC-STRICT: Got atomic translation for ${nodeId}: ${atomicTranslation}`);
+        return atomicTranslation;
+      }
+    }
+    
+    // ENHANCED: NO FALLBACK - maintain atomic consistency, always use original text
+    console.log(`[useInstantSoulNetData] ATOMIC-STRICT: Using original text for ${nodeId} (atomic: ${isAtomicMode}, complete: ${translationComplete})`);
+    return nodeId;
+  }, [currentLanguage, translations, translationComplete, isAtomicMode]);
+
   // ENHANCED: Atomic instant data getter functions
   const getInstantConnectionPercentage = useCallback((selectedNode: string, targetNode: string): number => {
     if (!selectedNode || selectedNode === targetNode) return 0;
@@ -104,32 +122,6 @@ export const useInstantSoulNetData = (
     return 0;
   }, [connectionPercentages]);
 
-  const getInstantTranslation = useCallback((nodeId: string): string => {
-    if (currentLanguage === 'en') return nodeId;
-    
-    // ENHANCED: Only use translations if atomic translation is complete
-    if (translationComplete && isAtomicMode) {
-      const atomicTranslation = translations.get(nodeId);
-      if (atomicTranslation) {
-        console.log(`[useInstantSoulNetData] ATOMIC: Got atomic translation for ${nodeId}: ${atomicTranslation}`);
-        return atomicTranslation;
-      }
-    }
-    
-    // ENHANCED: Fallback only if not in atomic translation mode
-    if (!isTranslating && !isAtomicMode) {
-      const appLevelTranslation = getCachedTranslation(nodeId);
-      if (appLevelTranslation) {
-        console.log(`[useInstantSoulNetData] FALLBACK: Got app-level cached translation for ${nodeId}: ${appLevelTranslation}`);
-        return appLevelTranslation;
-      }
-    }
-    
-    // ENHANCED: Show original text to maintain atomic consistency
-    console.log(`[useInstantSoulNetData] ATOMIC: Using original text for ${nodeId} (atomic: ${isAtomicMode}, translating: ${isTranslating}, complete: ${translationComplete})`);
-    return nodeId;
-  }, [currentLanguage, translations, getCachedTranslation, translationComplete, isTranslating, isAtomicMode]);
-
   const getInstantNodeConnections = useCallback((nodeId: string): NodeConnectionData => {
     return nodeConnectionData.get(nodeId) || {
       connectedNodes: [],
@@ -138,7 +130,7 @@ export const useInstantSoulNetData = (
     };
   }, [nodeConnectionData]);
 
-  // ENHANCED: Atomic background preloading with state tracking
+  // ENHANCED: Atomic background preloading - only load when truly needed
   const preloadData = useCallback(async () => {
     if (!userId) {
       console.log('[useInstantSoulNetData] ATOMIC: Skipping preload - no userId');

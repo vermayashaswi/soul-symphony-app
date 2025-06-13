@@ -53,9 +53,9 @@ export const DirectNodeLabel: React.FC<DirectNodeLabelProps> = ({
 
   // Log rendering mode with coordination info
   if (isInstantMode) {
-    console.log(`[DirectNodeLabel] APP-LEVEL INSTANT MODE: ${id} with coordinated translation: "${coordinatedTranslation}" - NO LOADING DELAY`);
+    console.log(`[DirectNodeLabel] ATOMIC-STRICT INSTANT MODE: ${id} with coordinated translation: "${coordinatedTranslation}" - NO INDIVIDUAL TRANSLATIONS`);
   } else {
-    console.log(`[DirectNodeLabel] APP-LEVEL ENHANCED POSITIONING: ${id} with coordinated translation: "${coordinatedTranslation}"`);
+    console.log(`[DirectNodeLabel] ATOMIC-STRICT: ${id} with coordinated translation: "${coordinatedTranslation}" - COORDINATED ONLY`);
   }
 
   // Same base offset for both entity and emotion nodes
@@ -132,7 +132,7 @@ export const DirectNodeLabel: React.FC<DirectNodeLabelProps> = ({
     const isTutorialStep9 = currentTutorialStep === '9';
     
     if (isTutorialStep9) {
-      console.log(`[DirectNodeLabel] APP-LEVEL: Tutorial step 9 detected, forcing label visibility for ${id}`);
+      console.log(`[DirectNodeLabel] ATOMIC-STRICT: Tutorial step 9 detected, forcing label visibility for ${id}`);
       return true;
     }
     
@@ -141,9 +141,9 @@ export const DirectNodeLabel: React.FC<DirectNodeLabelProps> = ({
 
   if (!enhancedShouldShowLabel || !id) {
     if (isInstantMode) {
-      console.log(`[DirectNodeLabel] APP-LEVEL INSTANT: Not rendering label for ${id}: shouldShow=${enhancedShouldShowLabel}, text="${id}"`);
+      console.log(`[DirectNodeLabel] ATOMIC-STRICT INSTANT: Not rendering label for ${id}: shouldShow=${enhancedShouldShowLabel}, text="${id}"`);
     } else {
-      console.log(`[DirectNodeLabel] APP-LEVEL: Not rendering label for ${id}: shouldShow=${enhancedShouldShowLabel}, text="${id}"`);
+      console.log(`[DirectNodeLabel] ATOMIC-STRICT: Not rendering label for ${id}: shouldShow=${enhancedShouldShowLabel}, text="${id}"`);
     }
     return null;
   }
@@ -151,21 +151,21 @@ export const DirectNodeLabel: React.FC<DirectNodeLabelProps> = ({
   // Log percentage display state with side positioning
   if (showPercentage && connectionPercentage > 0) {
     if (isInstantMode) {
-      console.log(`[DirectNodeLabel] APP-LEVEL INSTANT MODE - SIDE POSITIONING - PERCENTAGE: ${id} (${type}) shows ${connectionPercentage}% on the side at`, percentagePosition, '- NO LOADING DELAY');
+      console.log(`[DirectNodeLabel] ATOMIC-STRICT INSTANT MODE - SIDE POSITIONING - PERCENTAGE: ${id} (${type}) shows ${connectionPercentage}% on the side at`, percentagePosition, '- NO LOADING DELAY');
     } else {
-      console.log(`[DirectNodeLabel] APP-LEVEL ENHANCED SIDE POSITIONING - PERCENTAGE: ${id} (${type}) shows ${connectionPercentage}% on the side at`, percentagePosition);
+      console.log(`[DirectNodeLabel] ATOMIC-STRICT ENHANCED SIDE POSITIONING - PERCENTAGE: ${id} (${type}) shows ${connectionPercentage}% on the side at`, percentagePosition);
     }
   }
 
   if (isInstantMode) {
-    console.log(`[DirectNodeLabel] FIXED FONT INSTANT MODE - MAIN TEXT: "${id}" at position`, labelPosition, 'with FIXED size:', textSize, 'color:', textColor, '- NO LOADING DELAY - APP-LEVEL TRANSLATION');
+    console.log(`[DirectNodeLabel] ATOMIC-STRICT INSTANT MODE - MAIN TEXT: "${id}" at position`, labelPosition, 'with FIXED size:', textSize, 'color:', textColor, '- COORDINATED TRANSLATION ONLY');
   } else {
-    console.log(`[DirectNodeLabel] FIXED FONT - MAIN TEXT: "${id}" at position`, labelPosition, 'with FIXED size:', textSize, 'color:', textColor, '- APP-LEVEL TRANSLATION');
+    console.log(`[DirectNodeLabel] ATOMIC-STRICT - MAIN TEXT: "${id}" at position`, labelPosition, 'with FIXED size:', textSize, 'color:', textColor, '- COORDINATED TRANSLATION ONLY');
   }
 
   return (
     <>
-      {/* APP-LEVEL: Main text using TranslatableText3D with app-level translation integration */}
+      {/* ENHANCED: Main text using TranslatableText3D with STRICT atomic coordination */}
       <TranslatableText3D
         text={id}
         position={labelPosition}
@@ -182,7 +182,8 @@ export const DirectNodeLabel: React.FC<DirectNodeLabelProps> = ({
         maxLines={3}
         sourceLanguage="en"
         coordinatedTranslation={coordinatedTranslation}
-        useCoordinatedTranslation={!!coordinatedTranslation}
+        useCoordinatedTranslation={true}
+        isAtomicMode={true}
       />
       
       {/* Enhanced side-positioned percentage text with theme-aware color */}

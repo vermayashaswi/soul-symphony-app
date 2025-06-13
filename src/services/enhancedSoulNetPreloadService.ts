@@ -1,5 +1,6 @@
 
-import { supabase } from '@/integrations/supabase/client';
+import { soulNetDataService } from './soulNetDataService';
+import { translationService } from './translationService';
 
 interface NodeData {
   id: string;
@@ -21,7 +22,7 @@ interface NodeConnectionData {
   averageStrength: number;
 }
 
-interface EnhancedSoulNetData {
+interface InstantSoulNetData {
   nodes: NodeData[];
   links: LinkData[];
   translations: Map<string, string>;
@@ -31,677 +32,227 @@ interface EnhancedSoulNetData {
   translationProgress: number;
 }
 
-interface CachedEnhancedData {
-  data: EnhancedSoulNetData;
-  timestamp: number;
-  userId: string;
-  timeRange: string;
-  language: string;
-  version: number;
+interface TranslationState {
+  isTranslating: boolean;
+  progress: number;
+  complete: boolean;
 }
 
-// APP-LEVEL: Translation service interface for integration
-interface AppLevelTranslationService {
-  batchTranslate(options: { texts: string[], targetLanguage: string, sourceLanguage?: string }): Promise<Map<string, string>>;
-}
+class EnhancedSoulNetPreloadService {
+  private instantCache = new Map<string, InstantSoulNetData>();
+  private translationStates = new Map<string, TranslationState>();
+  private appLevelTranslationService: any = null;
 
-export class EnhancedSoulNetPreloadService {
-  private static readonly CACHE_KEY = 'enhanced-soulnet-data';
-  private static readonly CACHE_DURATION = 15 * 60 * 1000; // 15 minutes
-  private static readonly CACHE_VERSION = 7; // Increment for atomic translation fixes
-  private static cache = new Map<string, CachedEnhancedData>();
-  private static translationCoordinator = new Map<string, Promise<Map<string, string>>>();
-  
-  // ENHANCED: Atomic translation state tracking with better coordination
-  private static translationStates = new Map<string, {
-    isTranslating: boolean;
-    progress: number;
-    totalNodes: number;
-    translatedNodes: number;
-    isAtomic: boolean; // NEW: Track if translation should be atomic
-    startedAt: number; // NEW: Track when translation started
-  }>();
-  
-  // APP-LEVEL: Store reference to app-level translation service
-  private static appTranslationService: AppLevelTranslationService | null = null;
-
-  // APP-LEVEL: Method to set the app-level translation service
-  static setAppLevelTranslationService(service: AppLevelTranslationService) {
-    console.log('[EnhancedSoulNetPreloadService] APP-LEVEL: Setting app-level translation service for atomic coordination');
-    this.appTranslationService = service;
+  // ENHANCED: Set app-level translation service for coordination
+  setAppLevelTranslationService(service: any): void {
+    this.appLevelTranslationService = service;
+    console.log('[EnhancedSoulNetPreloadService] APP-LEVEL: Translation service integration established');
   }
 
-  // ENHANCED: Get translation state with atomic coordination checks
-  static getTranslationState(cacheKey: string) {
-    const state = this.translationStates.get(cacheKey);
-    if (!state) {
-      return {
-        isTranslating: false,
-        progress: 100,
-        totalNodes: 0,
-        translatedNodes: 0,
-        isAtomic: true,
-        startedAt: 0
-      };
-    }
-    
-    // ENHANCED: Check for stale translation states (timeout after 30 seconds)
-    const now = Date.now();
-    if (state.isTranslating && (now - state.startedAt) > 30000) {
-      console.log(`[EnhancedSoulNetPreloadService] ATOMIC: Translation timeout detected for ${cacheKey}, resetting state`);
-      this.translationStates.delete(cacheKey);
-      return {
-        isTranslating: false,
-        progress: 100,
-        totalNodes: state.totalNodes,
-        translatedNodes: state.totalNodes,
-        isAtomic: true,
-        startedAt: 0
-      };
-    }
-    
-    return state;
+  // ENHANCED: Get current translation state for atomic tracking
+  getTranslationState(cacheKey: string): TranslationState {
+    return this.translationStates.get(cacheKey) || {
+      isTranslating: false,
+      progress: 100,
+      complete: true
+    };
   }
 
-  // ENHANCED: Atomic preload with coordinated translation
-  static async preloadInstantData(
-    userId: string, 
-    timeRange: string, 
-    language: string
-  ): Promise<EnhancedSoulNetData | null> {
-    console.log(`[EnhancedSoulNetPreloadService] ATOMIC: Starting atomic preload for ${userId}, ${timeRange}, ${language}`);
+  // ENHANCED: Update translation state atomically
+  private setTranslationState(cacheKey: string, state: Partial<TranslationState>): void {
+    const currentState = this.getTranslationState(cacheKey);
+    const newState = { ...currentState, ...state };
+    this.translationStates.set(cacheKey, newState);
+    console.log(`[EnhancedSoulNetPreloadService] ATOMIC: Translation state updated for ${cacheKey}:`, newState);
+  }
+
+  async preloadInstantData(
+    userId: string,
+    timeRange: string,
+    targetLanguage: string
+  ): Promise<InstantSoulNetData | null> {
+    const cacheKey = `${userId}-${timeRange}-${targetLanguage}`;
     
-    const cacheKey = this.generateCacheKey(userId, timeRange, language);
-    
-    // ENHANCED: Clear any stale cache on language change for fresh atomic translation
-    const existingCache = this.cache.get(cacheKey);
-    if (existingCache && existingCache.language !== language) {
-      console.log(`[EnhancedSoulNetPreloadService] ATOMIC: Language change detected, clearing cache for atomic fresh translation`);
-      this.clearInstantCache(userId);
-    }
-    
-    // ENHANCED: Check for complete atomic translation
-    const cached = this.getInstantData(cacheKey);
-    if (cached && cached.data.translationComplete) {
-      console.log(`[EnhancedSoulNetPreloadService] ATOMIC: Using complete cached atomic translation for ${cacheKey}`);
-      return cached.data;
+    // ENHANCED: Check for complete atomic data first
+    const existing = this.instantCache.get(cacheKey);
+    if (existing && existing.translationComplete) {
+      console.log('[EnhancedSoulNetPreloadService] ATOMIC: Using complete cached data for', cacheKey);
+      return existing;
     }
 
     try {
-      // Fetch raw journal data with enhanced error handling
-      const startDate = this.getStartDate(timeRange);
-      const { data: entries, error } = await supabase
-        .from('Journal Entries')
-        .select('id, themeemotion, "refined text", "transcription text"')
-        .eq('user_id', userId)
-        .gte('created_at', startDate.toISOString())
-        .order('created_at', { ascending: false });
+      console.log('[EnhancedSoulNetPreloadService] ATOMIC: Starting atomic preload for', cacheKey);
+      
+      // Set translation state to in progress
+      this.setTranslationState(cacheKey, {
+        isTranslating: true,
+        progress: 0,
+        complete: false
+      });
 
-      if (error) {
-        console.error('[EnhancedSoulNetPreloadService] ATOMIC: Error fetching journal entries:', error);
+      // Get base graph data
+      const graphData = await soulNetDataService.getSoulNetData(userId, timeRange);
+      if (!graphData || graphData.nodes.length === 0) {
+        console.log('[EnhancedSoulNetPreloadService] ATOMIC: No graph data available');
+        this.setTranslationState(cacheKey, {
+          isTranslating: false,
+          progress: 100,
+          complete: true
+        });
         return null;
       }
 
-      if (!entries || entries.length === 0) {
-        console.log('[EnhancedSoulNetPreloadService] ATOMIC: No entries found, returning empty atomic data');
-        const emptyData: EnhancedSoulNetData = {
-          nodes: [], 
-          links: [], 
-          translations: new Map(), 
-          connectionPercentages: new Map(),
-          nodeConnectionData: new Map(),
-          translationComplete: true,
-          translationProgress: 100
-        };
-        return emptyData;
-      }
+      console.log(`[EnhancedSoulNetPreloadService] ATOMIC: Processing ${graphData.nodes.length} nodes for atomic translation`);
 
-      console.log(`[EnhancedSoulNetPreloadService] ATOMIC: Processing ${entries.length} entries with atomic translation coordination`);
-
-      // Process the raw data
-      const graphData = this.processEntities(entries);
-      
-      // ENHANCED: Initialize atomic translation state
-      const uniqueNodes = [...new Set(graphData.nodes.map(node => node.id))];
-      const isEnglish = language === 'en';
-      
-      this.translationStates.set(cacheKey, {
-        isTranslating: !isEnglish && uniqueNodes.length > 0,
-        progress: isEnglish ? 100 : 0,
-        totalNodes: uniqueNodes.length,
-        translatedNodes: isEnglish ? uniqueNodes.length : 0,
-        isAtomic: true, // Force atomic behavior
-        startedAt: Date.now()
-      });
-
-      // ENHANCED: Atomic coordinated translation
-      const translations = await this.getAtomicCoordinatedTranslations(graphData.nodes, language, cacheKey);
+      // Calculate connection percentages and node connection data
       const connectionPercentages = new Map<string, number>();
       const nodeConnectionData = new Map<string, NodeConnectionData>();
       
-      // Pre-calculate connection data
-      this.calculateConnectionPercentages(graphData, connectionPercentages);
-      this.calculateNodeConnections(graphData, nodeConnectionData);
+      // Process connections
+      graphData.nodes.forEach(node => {
+        const connections = graphData.links.filter(link => 
+          link.source === node.id || link.target === node.id
+        );
+        
+        const connectedNodes = connections.map(link => 
+          link.source === node.id ? link.target : link.source
+        );
+        
+        const totalStrength = connections.reduce((sum, link) => sum + link.value, 0);
+        const averageStrength = connections.length > 0 ? totalStrength / connections.length : 0;
+        
+        nodeConnectionData.set(node.id, {
+          connectedNodes,
+          totalStrength,
+          averageStrength
+        });
 
-      // ENHANCED: Determine atomic completion
-      const isTranslationComplete = isEnglish || translations.size === uniqueNodes.length;
-      const translationProgress = isEnglish ? 100 : Math.round((translations.size / uniqueNodes.length) * 100);
-
-      // ENHANCED: Update atomic translation state
-      this.translationStates.set(cacheKey, {
-        isTranslating: false,
-        progress: translationProgress,
-        totalNodes: uniqueNodes.length,
-        translatedNodes: translations.size,
-        isAtomic: true,
-        startedAt: 0
+        // Calculate percentages for all connections
+        connections.forEach(link => {
+          const percentage = Math.round((link.value / Math.max(totalStrength, 1)) * 100);
+          const key1 = `${node.id}-${link.source === node.id ? link.target : link.source}`;
+          connectionPercentages.set(key1, percentage);
+        });
       });
 
-      const enhancedData: EnhancedSoulNetData = {
+      // ENHANCED: Atomic translation using coordinated service
+      let translations = new Map<string, string>();
+      let translationComplete = true;
+
+      if (targetLanguage !== 'en') {
+        console.log('[EnhancedSoulNetPreloadService] ATOMIC: Starting coordinated atomic translation');
+        
+        this.setTranslationState(cacheKey, {
+          isTranslating: true,
+          progress: 25,
+          complete: false
+        });
+
+        const nodeTexts = [...new Set(graphData.nodes.map(node => node.id))];
+        
+        try {
+          // Use the coordinated translation service for atomic consistency
+          const translationResults = await translationService.batchTranslate(
+            nodeTexts,
+            'en',
+            targetLanguage
+          );
+
+          translations = translationResults;
+          translationComplete = true;
+          
+          console.log(`[EnhancedSoulNetPreloadService] ATOMIC: Coordinated translation completed for ${translations.size} nodes`);
+          
+          this.setTranslationState(cacheKey, {
+            isTranslating: false,
+            progress: 100,
+            complete: true
+          });
+        } catch (error) {
+          console.error('[EnhancedSoulNetPreloadService] ATOMIC: Coordinated translation failed:', error);
+          translationComplete = false;
+          
+          this.setTranslationState(cacheKey, {
+            isTranslating: false,
+            progress: 0,
+            complete: false
+          });
+        }
+      } else {
+        // For English, no translation needed
+        this.setTranslationState(cacheKey, {
+          isTranslating: false,
+          progress: 100,
+          complete: true
+        });
+      }
+
+      // ENHANCED: Only cache when atomic translation is complete
+      const instantData: InstantSoulNetData = {
         nodes: graphData.nodes,
         links: graphData.links,
         translations,
         connectionPercentages,
         nodeConnectionData,
-        translationComplete: isTranslationComplete,
-        translationProgress
+        translationComplete,
+        translationProgress: translationComplete ? 100 : 0
       };
 
-      // ENHANCED: Only cache when atomic translation is complete
-      if (isTranslationComplete) {
-        this.setCachedData(cacheKey, {
-          data: enhancedData,
-          timestamp: Date.now(),
-          userId,
-          timeRange,
-          language,
-          version: this.CACHE_VERSION
-        });
-        console.log(`[EnhancedSoulNetPreloadService] ATOMIC: Successfully cached complete atomic translation for ${cacheKey}`);
+      if (translationComplete) {
+        this.instantCache.set(cacheKey, instantData);
+        console.log('[EnhancedSoulNetPreloadService] ATOMIC: Complete atomic data cached for', cacheKey);
       } else {
-        console.log(`[EnhancedSoulNetPreloadService] ATOMIC: Translation incomplete, maintaining consistency for ${cacheKey}`);
+        console.log('[EnhancedSoulNetPreloadService] ATOMIC: Incomplete translation, not caching');
       }
 
-      return enhancedData;
+      return instantData;
     } catch (error) {
-      console.error('[EnhancedSoulNetPreloadService] ATOMIC: Error in atomic preload:', error);
-      // Clear translation state on error
-      this.translationStates.delete(cacheKey);
+      console.error('[EnhancedSoulNetPreloadService] ATOMIC: Preload error:', error);
+      this.setTranslationState(cacheKey, {
+        isTranslating: false,
+        progress: 0,
+        complete: false
+      });
       return null;
     }
   }
 
-  // ENHANCED: Instant data access with atomic coordination
-  static getInstantData(cacheKey: string): CachedEnhancedData | null {
-    const cached = this.cache.get(cacheKey);
-    if (cached && this.isCacheValid(cached)) {
-      console.log(`[EnhancedSoulNetPreloadService] ATOMIC: Found valid atomic cache for ${cacheKey}`);
-      return cached;
+  // ENHANCED: Get atomic instant data
+  getInstantData(cacheKey: string): { data: InstantSoulNetData } | null {
+    const data = this.instantCache.get(cacheKey);
+    if (data && data.translationComplete) {
+      console.log('[EnhancedSoulNetPreloadService] ATOMIC: Retrieved complete atomic data for', cacheKey);
+      return { data };
     }
-    
-    // ENHANCED: Try localStorage with atomic validation
-    try {
-      const storedData = localStorage.getItem(`${this.CACHE_KEY}-${cacheKey}`);
-      if (storedData) {
-        const parsed = JSON.parse(storedData);
-        if (this.isCacheValid(parsed)) {
-          // Convert Maps back from objects with validation
-          parsed.data.translations = new Map(Object.entries(parsed.data.translations || {}));
-          parsed.data.connectionPercentages = new Map(Object.entries(parsed.data.connectionPercentages || {}));
-          parsed.data.nodeConnectionData = new Map(
-            Object.entries(parsed.data.nodeConnectionData || {}).map(([key, value]) => [key, value as NodeConnectionData])
-          );
-          
-          // ENHANCED: Ensure atomic translation fields have proper defaults
-          parsed.data.translationComplete = parsed.data.translationComplete ?? true;
-          parsed.data.translationProgress = parsed.data.translationProgress ?? 100;
-          
-          this.cache.set(cacheKey, parsed);
-          console.log(`[EnhancedSoulNetPreloadService] ATOMIC: Found valid localStorage atomic cache for ${cacheKey}`);
-          return parsed;
-        }
-      }
-    } catch (error) {
-      console.error('[EnhancedSoulNetPreloadService] ATOMIC: Error loading from localStorage:', error);
-    }
-    
-    console.log(`[EnhancedSoulNetPreloadService] ATOMIC: No valid atomic cache found for ${cacheKey}`);
+    console.log('[EnhancedSoulNetPreloadService] ATOMIC: No complete atomic data for', cacheKey);
     return null;
   }
 
-  // ENHANCED: Atomic coordinated translation with timeout protection
-  private static async getAtomicCoordinatedTranslations(
-    nodes: NodeData[], 
-    language: string, 
-    cacheKey: string
-  ): Promise<Map<string, string>> {
-    if (language === 'en') {
-      const translations = new Map<string, string>();
-      nodes.forEach(node => translations.set(node.id, node.id));
-      console.log(`[EnhancedSoulNetPreloadService] ATOMIC: Using English nodes directly for atomic consistency`);
-      return translations;
-    }
-
-    // ENHANCED: Check for existing atomic translation in progress
-    const existingTranslation = this.translationCoordinator.get(cacheKey);
-    if (existingTranslation) {
-      console.log(`[EnhancedSoulNetPreloadService] ATOMIC: Waiting for existing atomic translation for ${cacheKey}`);
-      try {
-        // Add timeout protection for atomic coordination
-        return await Promise.race([
-          existingTranslation,
-          new Promise<Map<string, string>>((_, reject) => 
-            setTimeout(() => reject(new Error('Atomic translation timeout')), 25000)
-          )
-        ]);
-      } catch (error) {
-        console.error(`[EnhancedSoulNetPreloadService] ATOMIC: Existing translation failed for ${cacheKey}:`, error);
-        this.translationCoordinator.delete(cacheKey);
-      }
-    }
-
-    // ENHANCED: Start new atomic coordinated translation
-    const translationPromise = this.performAtomicBatchTranslation(nodes, language, cacheKey);
-    this.translationCoordinator.set(cacheKey, translationPromise);
-
-    try {
-      const result = await translationPromise;
-      console.log(`[EnhancedSoulNetPreloadService] ATOMIC: Completed atomic coordinated translation for ${cacheKey}`);
-      return result;
-    } finally {
-      // Clean up coordinator
-      this.translationCoordinator.delete(cacheKey);
-    }
-  }
-
-  // ENHANCED: Atomic batch translation with complete error handling
-  private static async performAtomicBatchTranslation(nodes: NodeData[], language: string, cacheKey: string): Promise<Map<string, string>> {
-    const translations = new Map<string, string>();
-    const nodesToTranslate = [...new Set(nodes.map(node => node.id))];
-    
-    console.log(`[EnhancedSoulNetPreloadService] ATOMIC: Starting atomic batch translation ${nodesToTranslate.length} unique nodes to ${language}`);
-    
-    // ENHANCED: Update atomic translation state with progress tracking
-    this.translationStates.set(cacheKey, {
-      isTranslating: true,
-      progress: 0,
-      totalNodes: nodesToTranslate.length,
-      translatedNodes: 0,
-      isAtomic: true,
-      startedAt: Date.now()
-    });
-    
-    try {
-      if (!this.appTranslationService) {
-        console.warn('[EnhancedSoulNetPreloadService] ATOMIC: No app-level translation service available, using atomic fallback');
-        
-        // ENHANCED: Atomic fallback with all original text
-        nodesToTranslate.forEach(nodeId => {
-          translations.set(nodeId, nodeId);
-        });
-        
-        // Update atomic completion state
-        this.translationStates.set(cacheKey, {
-          isTranslating: false,
-          progress: 100,
-          totalNodes: nodesToTranslate.length,
-          translatedNodes: nodesToTranslate.length,
-          isAtomic: true,
-          startedAt: 0
-        });
-        
-        return translations;
-      }
-
-      // ENHANCED: Perform atomic batch translation with explicit coordination
-      console.log(`[EnhancedSoulNetPreloadService] ATOMIC: Using app-level service for atomic translation from 'en' to '${language}'`);
-      
-      const batchResults = await this.appTranslationService.batchTranslate({
-        texts: nodesToTranslate,
-        targetLanguage: language,
-        sourceLanguage: 'en'
-      });
-      
-      console.log(`[EnhancedSoulNetPreloadService] ATOMIC: Atomic batch translation completed ${batchResults.size}/${nodesToTranslate.length} nodes`);
-      
-      // ENHANCED: Process atomic results with strict validation
-      batchResults.forEach((translatedText, originalText) => {
-        if (translatedText && translatedText.trim() !== '') {
-          translations.set(originalText, translatedText);
-          console.log(`[EnhancedSoulNetPreloadService] ATOMIC: ✓ "${originalText}" -> "${translatedText}"`);
-        } else {
-          console.warn(`[EnhancedSoulNetPreloadService] ATOMIC: ⚠ Empty atomic translation for "${originalText}", using original`);
-          translations.set(originalText, originalText);
-        }
-      });
-
-      // ENHANCED: Ensure atomic completeness - handle any missing translations
-      nodesToTranslate.forEach(nodeId => {
-        if (!translations.has(nodeId)) {
-          console.warn(`[EnhancedSoulNetPreloadService] ATOMIC: ⚠ No atomic translation found for node: "${nodeId}", using original`);
-          translations.set(nodeId, nodeId);
-        }
-      });
-
-      // ENHANCED: Update atomic completion state
-      this.translationStates.set(cacheKey, {
-        isTranslating: false,
-        progress: 100,
-        totalNodes: nodesToTranslate.length,
-        translatedNodes: translations.size,
-        isAtomic: true,
-        startedAt: 0
-      });
-
-      console.log(`[EnhancedSoulNetPreloadService] ATOMIC: Translation summary - Total: ${nodesToTranslate.length}, Translated: ${translations.size}, Atomic success rate: ${Math.round((translations.size / nodesToTranslate.length) * 100)}%`);
-
-    } catch (error) {
-      console.error('[EnhancedSoulNetPreloadService] ATOMIC: Error during atomic batch translation:', error);
-      
-      // ENHANCED: Atomic fallback with complete original text coverage
-      nodesToTranslate.forEach(nodeId => {
-        translations.set(nodeId, nodeId);
-      });
-      
-      // Update atomic error state
-      this.translationStates.set(cacheKey, {
-        isTranslating: false,
-        progress: 100,
-        totalNodes: nodesToTranslate.length,
-        translatedNodes: nodesToTranslate.length,
-        isAtomic: true,
-        startedAt: 0
-      });
-    }
-
-    return translations;
-  }
-
-  private static calculateNodeConnections(
-    graphData: { nodes: NodeData[], links: LinkData[] },
-    nodeConnectionMap: Map<string, NodeConnectionData>
-  ): void {
-    console.log('[EnhancedSoulNetPreloadService] APP-LEVEL: Pre-calculating node connections');
-    
-    graphData.nodes.forEach(node => {
-      const connectedNodes: string[] = [];
-      let totalStrength = 0;
-      
-      graphData.links.forEach(link => {
-        if (link.source === node.id) {
-          connectedNodes.push(link.target);
-          totalStrength += link.value;
-        } else if (link.target === node.id) {
-          connectedNodes.push(link.source);
-          totalStrength += link.value;
-        }
-      });
-      
-      const averageStrength = connectedNodes.length > 0 ? totalStrength / connectedNodes.length : 0;
-      
-      nodeConnectionMap.set(node.id, {
-        connectedNodes,
-        totalStrength,
-        averageStrength
-      });
-    });
-
-    console.log(`[EnhancedSoulNetPreloadService] APP-LEVEL: Pre-calculated connections for ${nodeConnectionMap.size} nodes`);
-  }
-
-  private static calculateConnectionPercentages(
-    graphData: { nodes: NodeData[], links: LinkData[] },
-    percentageMap: Map<string, number>
-  ): void {
-    console.log('[EnhancedSoulNetPreloadService] APP-LEVEL: Pre-calculating connection percentages');
-    
-    // Calculate total connection strength for each node
-    const nodeConnectionTotals = new Map<string, number>();
-    
-    graphData.links.forEach(link => {
-      const sourceTotal = nodeConnectionTotals.get(link.source) || 0;
-      const targetTotal = nodeConnectionTotals.get(link.target) || 0;
-      
-      nodeConnectionTotals.set(link.source, sourceTotal + link.value);
-      nodeConnectionTotals.set(link.target, targetTotal + link.value);
-    });
-
-    // Calculate percentages for each connection
-    graphData.links.forEach(link => {
-      const sourceTotal = nodeConnectionTotals.get(link.source) || 1;
-      const targetTotal = nodeConnectionTotals.get(link.target) || 1;
-      
-      // Calculate percentage from source perspective
-      const sourcePercentage = Math.round((link.value / sourceTotal) * 100);
-      percentageMap.set(`${link.source}-${link.target}`, sourcePercentage);
-      
-      // Calculate percentage from target perspective
-      const targetPercentage = Math.round((link.value / targetTotal) * 100);
-      percentageMap.set(`${link.target}-${link.source}`, targetPercentage);
-    });
-
-    console.log(`[EnhancedSoulNetPreloadService] APP-LEVEL: Pre-calculated ${percentageMap.size} connection percentages`);
-  }
-
-  // SYNCHRONIZED CACHE KEY GENERATION
-  private static generateCacheKey(userId: string, timeRange: string, language: string): string {
-    return `${userId}-${timeRange}-${language}-v${this.CACHE_VERSION}`;
-  }
-
-  private static isCacheValid(cached: CachedEnhancedData): boolean {
-    const isWithinDuration = (Date.now() - cached.timestamp) < this.CACHE_DURATION;
-    const isCorrectVersion = cached.version === this.CACHE_VERSION;
-    return isWithinDuration && isCorrectVersion;
-  }
-
-  private static setCachedData(cacheKey: string, data: CachedEnhancedData): void {
-    this.cache.set(cacheKey, data);
-    
-    // Also store in localStorage
-    try {
-      const storableData = {
-        ...data,
-        data: {
-          ...data.data,
-          translations: Object.fromEntries(data.data.translations),
-          connectionPercentages: Object.fromEntries(data.data.connectionPercentages),
-          nodeConnectionData: Object.fromEntries(
-            Array.from(data.data.nodeConnectionData.entries()).map(([key, value]) => [key, value])
-          )
-        }
-      };
-      localStorage.setItem(`${this.CACHE_KEY}-${cacheKey}`, JSON.stringify(storableData));
-    } catch (error) {
-      console.error('[EnhancedSoulNetPreloadService] Error saving to localStorage:', error);
-    }
-  }
-
-  // ENHANCED CACHE CLEARING with proper invalidation
-  static clearInstantCache(userId?: string): void {
-    console.log(`[EnhancedSoulNetPreloadService] ATOMIC: Clearing atomic cache for user ${userId || 'all users'}`);
-    
+  // ENHANCED: Clear instant cache for specific user or all
+  clearInstantCache(userId?: string): void {
     if (userId) {
-      // Clear specific user's cache including atomic states
-      const keysToDelete = Array.from(this.cache.keys()).filter(key => key.startsWith(userId));
+      const keysToDelete = Array.from(this.instantCache.keys()).filter(key => key.startsWith(userId));
       keysToDelete.forEach(key => {
-        this.cache.delete(key);
-        localStorage.removeItem(`${this.CACHE_KEY}-${key}`);
+        this.instantCache.delete(key);
         this.translationStates.delete(key);
       });
-      
-      // Clear atomic translation coordinator for this user
-      const coordinatorKeysToDelete = Array.from(this.translationCoordinator.keys()).filter(key => key.startsWith(userId));
-      coordinatorKeysToDelete.forEach(key => {
-        this.translationCoordinator.delete(key);
-      });
-      
       console.log(`[EnhancedSoulNetPreloadService] ATOMIC: Cleared atomic cache for user ${userId}`);
     } else {
-      // Clear all atomic cache
-      this.cache.clear();
-      this.translationCoordinator.clear();
+      this.instantCache.clear();
       this.translationStates.clear();
-      Object.keys(localStorage).forEach(key => {
-        if (key.startsWith(this.CACHE_KEY)) {
-          localStorage.removeItem(key);
-        }
-      });
       console.log('[EnhancedSoulNetPreloadService] ATOMIC: Cleared all atomic cache');
     }
   }
 
-  private static getStartDate(timeRange: string): Date {
-    const now = new Date();
-    switch (timeRange) {
-      case 'today':
-        return new Date(now.setHours(0, 0, 0, 0));
-      case 'week':
-        const weekStart = new Date(now);
-        weekStart.setDate(weekStart.getDate() - 7);
-        return weekStart;
-      case 'month':
-        const monthStart = new Date(now);
-        monthStart.setMonth(monthStart.getMonth() - 1);
-        return monthStart;
-      case 'year':
-        const yearStart = new Date(now);
-        yearStart.setFullYear(yearStart.getFullYear() - 1);
-        return yearStart;
-      default:
-        const defaultStart = new Date(now);
-        defaultStart.setDate(defaultStart.getDate() - 7);
-        return defaultStart;
-    }
+  // Get cache size for debugging
+  getCacheSize(): number {
+    return this.instantCache.size;
   }
 
-  private static processEntities(entries: any[]): { nodes: NodeData[], links: LinkData[] } {
-    console.log("[EnhancedSoulNetPreloadService] APP-LEVEL: Processing entities for", entries.length, "entries");
-    
-    const entityEmotionMap: Record<string, Record<string, number>> = {};
-    
-    entries.forEach(entry => {
-      // FIXED: Use themeemotion instead of entityemotion
-      if (!entry.themeemotion) return;
-      
-      Object.entries(entry.themeemotion).forEach(([entity, emotions]) => {
-        if (typeof emotions !== 'object') return;
-        
-        if (!entityEmotionMap[entity]) {
-          entityEmotionMap[entity] = {};
-        }
-        
-        Object.entries(emotions).forEach(([emotion, score]) => {
-          if (typeof score !== 'number') return;
-          
-          if (entityEmotionMap[entity][emotion]) {
-            entityEmotionMap[entity][emotion] += score;
-          } else {
-            entityEmotionMap[entity][emotion] = score;
-          }
-        });
-      });
-    });
-
-    return this.generateGraph(entityEmotionMap);
-  }
-
-  private static generateGraph(entityEmotionMap: Record<string, Record<string, number>>): { nodes: NodeData[], links: LinkData[] } {
-    const nodes: NodeData[] = [];
-    const links: LinkData[] = [];
-    const entityNodes = new Set<string>();
-    const emotionNodes = new Set<string>();
-
-    const entityList = Object.keys(entityEmotionMap);
-    const EMOTION_LAYER_RADIUS = 11;
-    const ENTITY_LAYER_RADIUS = 6;
-
-    console.log("[EnhancedSoulNetPreloadService] APP-LEVEL: Generating graph with", entityList.length, "entities");
-    
-    // UPDATED: Apply NEW y-axis pattern for entity nodes (circular): +2, -2, +2.25, -2.25, +2.5, -2.5, +2, -2, repeating
-    entityList.forEach((entity, entityIndex) => {
-      entityNodes.add(entity);
-      const entityAngle = (entityIndex / entityList.length) * Math.PI * 2;
-      const entityRadius = ENTITY_LAYER_RADIUS;
-      const entityX = Math.cos(entityAngle) * entityRadius;
-      
-      // NEW Y-AXIS PATTERN: +2, -2, +2.25, -2.25, +2.5, -2.5, +2, -2, repeating
-      const getEntityYPosition = (index: number): number => {
-        const position = index % 8; // 8-position cycle
-        
-        switch (position) {
-          case 0: return 2;     // +2
-          case 1: return -2;    // -2
-          case 2: return 2.25;  // +2.25
-          case 3: return -2.25; // -2.25
-          case 4: return 2.5;   // +2.5
-          case 5: return -2.5;  // -2.5
-          case 6: return 2;     // +2
-          case 7: return -2;    // -2
-          default: return 2;    // fallback
-        }
-      };
-      
-      const entityY = getEntityYPosition(entityIndex);
-      const entityZ = Math.sin(entityAngle) * entityRadius;
-      
-      console.log(`[EnhancedSoulNetPreloadService] NEW Y-POSITIONING: Entity node ${entityIndex + 1} "${entity}" positioned at Y=${entityY}`);
-      
-      nodes.push({
-        id: entity,
-        type: 'entity',
-        value: 1,
-        color: '#22c55e', // Green for entity nodes (spheres)
-        position: [entityX, entityY, entityZ]
-      });
-
-      Object.entries(entityEmotionMap[entity]).forEach(([emotion, score]) => {
-        emotionNodes.add(emotion);
-        links.push({
-          source: entity,
-          target: emotion,
-          value: score
-        });
-      });
-    });
-
-    // UPDATED: Apply NEW y-axis pattern for emotion nodes (squares): +7, -7, +9, -9, +11, -11, repeating
-    Array.from(emotionNodes).forEach((emotion, emotionIndex) => {
-      const emotionAngle = (emotionIndex / emotionNodes.size) * Math.PI * 2;
-      const emotionRadius = EMOTION_LAYER_RADIUS;
-      const emotionX = Math.cos(emotionAngle) * emotionRadius;
-      
-      // NEW Y-AXIS PATTERN: +7, -7, +9, -9, +11, -11, repeating
-      const getEmotionYPosition = (index: number): number => {
-        const position = index % 6; // 6-position cycle
-        
-        switch (position) {
-          case 0: return 7;   // +7
-          case 1: return -7;  // -7
-          case 2: return 9;   // +9
-          case 3: return -9;  // -9
-          case 4: return 11;  // +11
-          case 5: return -11; // -11
-          default: return 7;  // fallback
-        }
-      };
-      
-      const emotionY = getEmotionYPosition(emotionIndex);
-      const emotionZ = Math.sin(emotionAngle) * emotionRadius;
-      
-      console.log(`[EnhancedSoulNetPreloadService] NEW Y-POSITIONING: Emotion node ${emotionIndex + 1} "${emotion}" positioned at Y=${emotionY}`);
-      
-      nodes.push({
-        id: emotion,
-        type: 'emotion',
-        value: 0.8,
-        color: '#f59e0b', // Golden for emotion nodes (cubes)
-        position: [emotionX, emotionY, emotionZ]
-      });
-    });
-
-    console.log("[EnhancedSoulNetPreloadService] APP-LEVEL: Generated graph with", nodes.length, "nodes and", links.length, "links");
-    console.log("[EnhancedSoulNetPreloadService] CUSTOM COLORS: Applied GREEN to entity nodes (spheres) and GOLDEN to emotion nodes (cubes)");
-    console.log("[EnhancedSoulNetPreloadService] NEW Y-POSITIONING: Applied +2,-2,+2.25,-2.25,+2.5,-2.5,+2,-2 pattern to entity nodes and +7,-7,+9,-9,+11,-11 pattern to emotion nodes");
-    return { nodes, links };
+  // Get cached data keys for debugging
+  getCachedKeys(): string[] {
+    return Array.from(this.instantCache.keys());
   }
 }
+
+export const EnhancedSoulNetPreloadService = new EnhancedSoulNetPreloadService();
