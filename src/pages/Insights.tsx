@@ -19,7 +19,7 @@ import { PremiumFeatureGuard } from '@/components/subscription/PremiumFeatureGua
 
 function InsightsContent() {
   const { user } = useAuth();
-  const { prefetchTranslationsForRoute } = useTranslation();
+  const { prefetchTranslationsForRoute, prefetchSoulNetTranslations, currentLanguage } = useTranslation();
   const [timeRange, setTimeRange] = useState<TimeRange>('week');
   const [isSticky, setIsSticky] = useState(false);
   const [selectedEmotion, setSelectedEmotion] = useState<string | null>(null);
@@ -44,10 +44,18 @@ function InsightsContent() {
       prefetchTranslationsForRoute('/insights').catch(console.error);
     }
     
+    // ENHANCED: Trigger SoulNet pre-translation when page loads
+    if (user?.id && currentLanguage !== 'en') {
+      console.log('[Insights] ENHANCED: Triggering SoulNet pre-translation for comprehensive caching');
+      prefetchSoulNetTranslations(user.id, 'year').catch(error => {
+        console.error('[Insights] ENHANCED: Error during SoulNet pre-translation:', error);
+      });
+    }
+    
     return () => {
       console.log("Insights page unmounted");
     };
-  }, [prefetchTranslationsForRoute]);
+  }, [prefetchTranslationsForRoute, prefetchSoulNetTranslations, user?.id, currentLanguage]);
 
   useEffect(() => {
     const handleScroll = () => {
@@ -522,6 +530,7 @@ function InsightsContent() {
                 isMobile ? "px-2" : "px-0"
               )}
             >
+              {/* ENHANCED: SoulNet with comprehensive pre-translation support */}
               <SoulNet
                 userId={user?.id}
                 timeRange={timeRange}

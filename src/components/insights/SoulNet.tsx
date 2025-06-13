@@ -19,8 +19,8 @@ interface SoulNetProps {
   timeRange: TimeRange;
 }
 
-// OPTIMIZED: Translation loading component for genuine translation needs only
-const OptimizedTranslationLoadingState: React.FC<{ 
+// ENHANCED: Comprehensive translation loading component for pre-translation
+const ComprehensiveTranslationLoadingState: React.FC<{ 
   progress: number; 
   isComplete: boolean;
 }> = ({ progress, isComplete }) => (
@@ -29,7 +29,7 @@ const OptimizedTranslationLoadingState: React.FC<{
       <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
       <h3 className="text-lg font-medium">
         <TranslatableText 
-          text="Loading Soul-Net translations..." 
+          text="Preparing Soul-Net translations..." 
           forceTranslate={true}
           enableFontScaling={true}
           scalingContext="general"
@@ -51,7 +51,7 @@ const OptimizedTranslationLoadingState: React.FC<{
       </p>
       <p className="text-xs text-muted-foreground text-center max-w-sm">
         <TranslatableText 
-          text="Loading translations for new content. This will be cached for future visits."
+          text="Translating content for seamless viewing. This happens once per language."
           forceTranslate={true}
           enableFontScaling={true}
           scalingContext="general"
@@ -72,7 +72,7 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
   
   const renderingInitialized = useRef(false);
 
-  // OPTIMIZED: Use the enhanced hook with cache-ready detection
+  // ENHANCED: Use the enhanced hook with comprehensive pre-translation
   const { 
     graphData, 
     translations,
@@ -90,7 +90,7 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
     getNodeConnections
   } = useAtomicSoulNetData(userId, timeRange);
 
-  console.log("[SoulNet] OPTIMIZED STATE", { 
+  console.log("[SoulNet] ENHANCED STATE", { 
     userId, 
     timeRange,
     nodesCount: graphData.nodes.length,
@@ -106,25 +106,26 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
   });
 
   useEffect(() => {
-    console.log("[SoulNet] OPTIMIZED: Component mounted");
+    console.log("[SoulNet] ENHANCED: Component mounted");
     
     return () => {
-      console.log("[SoulNet] OPTIMIZED: Component unmounted");
+      console.log("[SoulNet] ENHANCED: Component unmounted");
     };
   }, []);
 
-  // OPTIMIZED: Initialize rendering with cache-ready logic
+  // ENHANCED: Initialize rendering with comprehensive cache-ready logic
   useEffect(() => {
     const shouldInitializeRendering = (
       !loading && 
       graphData.nodes.length > 0 && 
       canRender &&
-      (isCacheReady || !isTranslating) && // NEW: Use cache readiness or no active translation
+      isCacheReady && // Require cache to be completely ready
+      !isTranslating && // Ensure no active translation/pre-translation
       !renderingInitialized.current
     );
 
     if (shouldInitializeRendering) {
-      console.log("[SoulNet] OPTIMIZED: Initializing rendering - cache ready or no translation needed");
+      console.log("[SoulNet] ENHANCED: Initializing rendering - comprehensive cache ready");
       setRenderingReady(true);
       renderingInitialized.current = true;
     }
@@ -137,7 +138,7 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
     );
 
     if (shouldResetRendering) {
-      console.log("[SoulNet] OPTIMIZED: Resetting rendering due to error or data loss");
+      console.log("[SoulNet] ENHANCED: Resetting rendering due to error or data loss");
       setRenderingReady(false);
       renderingInitialized.current = false;
     }
@@ -146,7 +147,7 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
   // Reset rendering when time range changes
   useEffect(() => {
     if (renderingInitialized.current) {
-      console.log("[SoulNet] OPTIMIZED: Time range changed, resetting rendering");
+      console.log("[SoulNet] ENHANCED: Time range changed, resetting rendering");
       setRenderingReady(false);
       renderingInitialized.current = false;
     }
@@ -154,7 +155,7 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
 
   // Node selection with stable state management
   const handleNodeSelect = useCallback((id: string) => {
-    console.log(`[SoulNet] OPTIMIZED: Node selected: ${id}`);
+    console.log(`[SoulNet] ENHANCED: Node selected: ${id}`);
     if (selectedEntity === id) {
       setSelectedEntity(null);
     } else {
@@ -168,13 +169,13 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
   const toggleFullScreen = useCallback(() => {
     setIsFullScreen(prev => {
       if (!prev) setSelectedEntity(null);
-      console.log(`[SoulNet] OPTIMIZED: Toggling fullscreen: ${!prev}`);
+      console.log(`[SoulNet] ENHANCED: Toggling fullscreen: ${!prev}`);
       return !prev;
     });
   }, []);
 
   const handleCanvasError = useCallback((error: Error) => {
-    console.error('[SoulNet] OPTIMIZED: Canvas error:', error);
+    console.error('[SoulNet] ENHANCED: Canvas error:', error);
     setCanvasError(error);
     setRetryCount(prev => prev + 1);
     setRenderingReady(false);
@@ -187,19 +188,18 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
     renderingInitialized.current = false;
   }, []);
 
-  // OPTIMIZED: Show translation loading only for genuine missing translations
-  const shouldShowTranslationLoader = (
-    graphData.nodes.length > 0 && 
+  // ENHANCED: Show comprehensive translation loading for pre-translation
+  const shouldShowComprehensiveLoader = (
+    isTranslating && 
     !canRender && 
     !isCacheReady && 
-    isTranslating && 
-    !translationComplete
+    translationProgress < 100
   );
 
-  if (shouldShowTranslationLoader) {
-    console.log("[SoulNet] OPTIMIZED: Showing translation loading - genuine translation in progress");
+  if (shouldShowComprehensiveLoader) {
+    console.log("[SoulNet] ENHANCED: Showing comprehensive translation loading - pre-translation in progress");
     return (
-      <OptimizedTranslationLoadingState 
+      <ComprehensiveTranslationLoadingState 
         progress={translationProgress}
         isComplete={translationComplete}
       />
@@ -208,7 +208,7 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
 
   // Show general loading if we have no data and are still loading
   if (loading && graphData.nodes.length === 0) {
-    console.log("[SoulNet] OPTIMIZED: Showing general loading state");
+    console.log("[SoulNet] ENHANCED: Showing general loading state");
     return <LoadingState />;
   }
   
@@ -318,7 +318,7 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
     );
   };
 
-  console.log(`[SoulNet] OPTIMIZED RENDER: ${graphData.nodes.length} nodes, ${graphData.links.length} links, renderingReady: ${renderingReady}, canRender: ${canRender}, cacheReady: ${isCacheReady}`);
+  console.log(`[SoulNet] ENHANCED RENDER: ${graphData.nodes.length} nodes, ${graphData.links.length} links, renderingReady: ${renderingReady}, canRender: ${canRender}, cacheReady: ${isCacheReady}`);
 
   return (
     <div className={cn(
@@ -367,8 +367,8 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
             </div>
           }
         >
-          {/* OPTIMIZED: Canvas renders when ready with cache-aware logic */}
-          {renderingReady && canRender && (isCacheReady || !isTranslating) && (
+          {/* ENHANCED: Canvas renders only when comprehensive cache is ready */}
+          {renderingReady && canRender && isCacheReady && !isTranslating && (
             <Canvas
               style={{
                 width: '100%',

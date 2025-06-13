@@ -1,4 +1,3 @@
-
 import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react';
 import { onDemandTranslationCache } from '@/utils/website-translations';
 import { SoulNetPreloadService } from '@/services/soulnetPreloadService';
@@ -89,7 +88,7 @@ export const TranslationProvider: React.FC<TranslationProviderProps> = ({ childr
   }, [currentLanguage]);
 
   const handleLanguageChange = useCallback(async (language: string) => {
-    console.log('[TranslationContext] APP-LEVEL: Changing language to:', language);
+    console.log('[TranslationContext] ENHANCED: Changing language to:', language);
     
     // Set loading state for SoulNet translations
     if (language !== 'en') {
@@ -101,16 +100,20 @@ export const TranslationProvider: React.FC<TranslationProviderProps> = ({ childr
     // Save to localStorage for persistence
     try {
       localStorage.setItem('soulo-language', language);
-      console.log('[TranslationContext] APP-LEVEL: Saved language to localStorage:', language);
+      console.log('[TranslationContext] ENHANCED: Saved language to localStorage:', language);
     } catch (error) {
-      console.error('[TranslationContext] APP-LEVEL: Error saving language to localStorage:', error);
+      console.error('[TranslationContext] ENHANCED: Error saving language to localStorage:', error);
     }
     
-    // ENHANCED: Clear both enhanced and legacy SoulNet caches when language changes
+    // ENHANCED: Clear all caches when language changes to trigger fresh pre-translation
     EnhancedSoulNetPreloadService.clearInstantCache();
     SoulNetPreloadService.clearCache();
     
-    console.log('[TranslationContext] APP-LEVEL: Cleared all SoulNet caches for language change');
+    // ENHANCED: Clear translation caches to ensure fresh translations
+    setTranslationCache({});
+    onDemandTranslationCache.clearAll();
+    
+    console.log('[TranslationContext] ENHANCED: Cleared all caches for fresh language setup');
     
     // Dispatch custom event for components that need to know about language changes
     const event = new CustomEvent('languageChange', { 
@@ -121,11 +124,7 @@ export const TranslationProvider: React.FC<TranslationProviderProps> = ({ childr
     });
     window.dispatchEvent(event);
     
-    // If not English, indicate that SoulNet translations are ready
-    // (actual pre-translation will happen when SoulNet components mount)
-    if (language === 'en') {
-      setIsSoulNetTranslating(false);
-    }
+    console.log('[TranslationContext] ENHANCED: Language change complete, components will re-initialize');
   }, []);
 
   const translate = useCallback(async (text: string, sourceLanguage: string = 'en', entryId?: number): Promise<string | null> => {
@@ -264,7 +263,7 @@ export const TranslationProvider: React.FC<TranslationProviderProps> = ({ childr
     translate,
     isTranslating,
     clearCache: useCallback(() => {
-      console.log('[TranslationContext] APP-LEVEL: Clearing all translation caches');
+      console.log('[TranslationContext] ENHANCED: Clearing all translation caches');
       setTranslationCache({});
       onDemandTranslationCache.clearAll();
       EnhancedSoulNetPreloadService.clearInstantCache();

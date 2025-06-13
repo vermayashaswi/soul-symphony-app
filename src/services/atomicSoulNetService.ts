@@ -189,7 +189,116 @@ export class AtomicSoulNetService {
     }
   }
 
-  // ATOMIC: Translation state management
+  // ENHANCED: Batch translation and caching for comprehensive pre-translation
+  static async batchTranslateAndCacheNodes(
+    nodeIds: string[], 
+    language: string, 
+    userId: string,
+    progressCallback?: (progress: number) => void
+  ): Promise<Map<string, string>> {
+    const translations = new Map<string, string>();
+    
+    if (language === 'en') {
+      nodeIds.forEach(nodeId => translations.set(nodeId, nodeId));
+      progressCallback?.(100);
+      return translations;
+    }
+
+    console.log(`[AtomicSoulNetService] ENHANCED: Batch translating ${nodeIds.length} nodes for comprehensive caching`);
+
+    try {
+      // Check existing cache first
+      const cachedTranslations = await NodeTranslationCacheService.getBatchCachedTranslations(nodeIds, language);
+      cachedTranslations.forEach((translation, nodeId) => {
+        translations.set(nodeId, translation);
+      });
+
+      const uncachedNodes = nodeIds.filter(nodeId => !translations.has(nodeId));
+      
+      if (uncachedNodes.length === 0) {
+        console.log('[AtomicSoulNetService] ENHANCED: All nodes already cached');
+        progressCallback?.(100);
+        return translations;
+      }
+
+      console.log(`[AtomicSoulNetService] ENHANCED: Translating ${uncachedNodes.length} uncached nodes`);
+
+      // Report initial progress based on cached translations
+      const initialProgress = Math.round((translations.size / nodeIds.length) * 100);
+      progressCallback?.(initialProgress);
+
+      // Translate uncached nodes in batches
+      const batchSize = 10;
+      const batches = [];
+      for (let i = 0; i < uncachedNodes.length; i += batchSize) {
+        batches.push(uncachedNodes.slice(i, i + batchSize));
+      }
+
+      for (let i = 0; i < batches.length; i++) {
+        const batch = batches[i];
+        
+        try {
+          const batchResults = await translationService.batchTranslate({
+            texts: batch,
+            targetLanguage: language,
+            sourceLanguage: 'en'
+          });
+
+          const batchTranslations = new Map<string, string>();
+          batch.forEach(nodeId => {
+            const translatedText = batchResults.get(nodeId);
+            if (translatedText && translatedText.trim()) {
+              batchTranslations.set(nodeId, translatedText);
+              translations.set(nodeId, translatedText);
+            } else {
+              batchTranslations.set(nodeId, nodeId);
+              translations.set(nodeId, nodeId);
+            }
+          });
+
+          // Cache this batch
+          await NodeTranslationCacheService.setBatchCachedTranslations(batchTranslations, language);
+          
+          // Report progress
+          const currentProgress = Math.round((translations.size / nodeIds.length) * 100);
+          progressCallback?.(currentProgress);
+          
+          console.log(`[AtomicSoulNetService] ENHANCED: Completed batch ${i + 1}/${batches.length}, progress: ${currentProgress}%`);
+          
+        } catch (batchError) {
+          console.error(`[AtomicSoulNetService] ENHANCED: Error translating batch ${i + 1}:`, batchError);
+          
+          // Set fallback translations for failed batch
+          batch.forEach(nodeId => {
+            if (!translations.has(nodeId)) {
+              translations.set(nodeId, nodeId);
+            }
+          });
+        }
+      }
+
+      progressCallback?.(100);
+      console.log(`[AtomicSoulNetService] ENHANCED: Batch translation completed, ${translations.size} total translations`);
+      
+      return translations;
+      
+    } catch (error) {
+      console.error('[AtomicSoulNetService] ENHANCED: Error in batch translation:', error);
+      
+      // Fallback: set all nodes to themselves
+      nodeIds.forEach(nodeId => {
+        if (!translations.has(nodeId)) {
+          translations.set(nodeId, nodeId);
+        }
+      });
+      
+      progressCallback?.(100);
+      return translations;
+    }
+  }
+
+  // ... keep existing code (translation state management, graph data methods, helper methods)
+
   static getTranslationState(stateKey: string) {
     const state = this.translationStates.get(stateKey);
     if (!state) {
