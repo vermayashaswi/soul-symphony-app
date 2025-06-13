@@ -58,7 +58,7 @@ export const useNodeBasedSoulNetData = (
       return;
     }
 
-    console.log(`[useNodeBasedSoulNetData] Loading data for ${userId}, ${timeRange}, ${currentLanguage}`);
+    console.log(`[useNodeBasedSoulNetData] IMPROVED: Loading data for ${userId}, ${timeRange}, ${currentLanguage}`);
     
     try {
       setError(null);
@@ -75,7 +75,7 @@ export const useNodeBasedSoulNetData = (
       );
 
       if (result) {
-        console.log(`[useNodeBasedSoulNetData] Data loaded: ${result.nodes.length} nodes, ${result.translations.size} translations`);
+        console.log(`[useNodeBasedSoulNetData] IMPROVED: Data loaded: ${result.nodes.length} nodes, ${result.translations.size} translations`);
         
         setGraphData({ nodes: result.nodes, links: result.links });
         setTranslations(result.translations);
@@ -84,7 +84,7 @@ export const useNodeBasedSoulNetData = (
         setIsTranslating(result.isTranslating);
         setTranslationProgress(result.translationProgress);
       } else {
-        console.log('[useNodeBasedSoulNetData] No data returned');
+        console.log('[useNodeBasedSoulNetData] IMPROVED: No data returned');
         setGraphData({ nodes: [], links: [] });
         setTranslations(new Map());
         setConnectionPercentages(new Map());
@@ -93,7 +93,7 @@ export const useNodeBasedSoulNetData = (
         setTranslationProgress(100);
       }
     } catch (err) {
-      console.error('[useNodeBasedSoulNetData] Error loading data:', err);
+      console.error('[useNodeBasedSoulNetData] IMPROVED: Error loading data:', err);
       setError(err instanceof Error ? err : new Error('Unknown error occurred'));
       setIsTranslating(false);
       setTranslationProgress(100);
@@ -107,19 +107,36 @@ export const useNodeBasedSoulNetData = (
     loadData();
   }, [loadData]);
 
-  // NODE-BASED: Get translation for a specific node (persistent across time ranges)
+  // IMPROVED: Listen for translation completion events
+  useEffect(() => {
+    const handleTranslationComplete = (event: CustomEvent) => {
+      if (event.detail.language === currentLanguage) {
+        console.log('[useNodeBasedSoulNetData] IMPROVED: Translation completed, reloading data');
+        loadData();
+      }
+    };
+
+    window.addEventListener('soulNetTranslationComplete', handleTranslationComplete as EventListener);
+    
+    return () => {
+      window.removeEventListener('soulNetTranslationComplete', handleTranslationComplete as EventListener);
+    };
+  }, [currentLanguage, loadData]);
+
+  // IMPROVED: Get translation for a specific node (guaranteed to be available)
   const getNodeTranslation = useCallback((nodeId: string): string => {
     if (currentLanguage === 'en') {
       return nodeId;
     }
 
-    // Use persistent node translation
+    // Use cached translation if available
     const translation = translations.get(nodeId);
     if (translation) {
       return translation;
     }
 
-    // If no translation found, return original (this maintains consistency)
+    // Fallback to original text (this should be rare with improved caching)
+    console.log(`[useNodeBasedSoulNetData] IMPROVED: No translation found for ${nodeId}, using original`);
     return nodeId;
   }, [currentLanguage, translations]);
 
@@ -138,7 +155,7 @@ export const useNodeBasedSoulNetData = (
     };
   }, [nodeConnectionData]);
 
-  console.log(`[useNodeBasedSoulNetData] State: nodes=${graphData.nodes.length}, translations=${translations.size}, loading=${loading}, translating=${isTranslating}, progress=${translationProgress}%`);
+  console.log(`[useNodeBasedSoulNetData] IMPROVED: State - nodes=${graphData.nodes.length}, translations=${translations.size}, loading=${loading}, translating=${isTranslating}, progress=${translationProgress}%`);
 
   return {
     graphData,

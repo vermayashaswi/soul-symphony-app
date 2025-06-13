@@ -46,7 +46,7 @@ interface NodeBasedSoulNetData {
 export class NodeBasedSoulNetService {
   private static readonly GRAPH_CACHE_KEY = 'soulnet-graph-cache';
   private static readonly CACHE_DURATION = 15 * 60 * 1000; // 15 minutes
-  private static readonly CACHE_VERSION = 1;
+  private static readonly CACHE_VERSION = 2;
   
   private static graphCache = new Map<string, GraphDataCache>();
   private static translationStates = new Map<string, {
@@ -55,16 +55,16 @@ export class NodeBasedSoulNetService {
     startedAt: number;
   }>();
 
-  // NODE-BASED: Get data with persistent node translations
+  // IMPROVED: Get data with separated graph and translation caching
   static async getNodeBasedData(
     userId: string,
     timeRange: string,
     language: string
   ): Promise<NodeBasedSoulNetData | null> {
-    console.log(`[NodeBasedSoulNetService] Getting node-based data for ${userId}, ${timeRange}, ${language}`);
+    console.log(`[NodeBasedSoulNetService] IMPROVED: Getting data for ${userId}, ${timeRange}, ${language}`);
 
     try {
-      // Step 1: Get graph data (time-range dependent)
+      // Step 1: Get graph data (time-range dependent, language independent)
       const graphData = await this.getGraphData(userId, timeRange);
       if (!graphData) {
         return null;
@@ -72,37 +72,33 @@ export class NodeBasedSoulNetService {
 
       // Step 2: Get node translations (node-ID based, persistent across time ranges)
       const nodeIds = [...new Set(graphData.nodes.map(node => node.id))];
-      const translations = await this.getNodeTranslations(nodeIds, language);
+      console.log(`[NodeBasedSoulNetService] IMPROVED: Found ${nodeIds.length} unique nodes`);
 
-      // Step 3: Calculate translation progress
-      const translationProgress = language === 'en' ? 100 : 
-        Math.round((translations.size / nodeIds.length) * 100);
-
-      const isTranslating = this.getTranslationState(`${userId}-${language}`).isTranslating;
+      const translationResult = await this.getNodeTranslations(nodeIds, language, userId);
 
       return {
         nodes: graphData.nodes,
         links: graphData.links,
-        translations,
+        translations: translationResult.translations,
         connectionPercentages: graphData.connectionPercentages,
         nodeConnectionData: graphData.nodeConnectionData,
-        translationProgress,
-        isTranslating
+        translationProgress: translationResult.progress,
+        isTranslating: translationResult.isTranslating
       };
     } catch (error) {
-      console.error('[NodeBasedSoulNetService] Error getting node-based data:', error);
+      console.error('[NodeBasedSoulNetService] IMPROVED: Error getting data:', error);
       return null;
     }
   }
 
-  // NODE-BASED: Get or fetch graph data (cached by time range only)
+  // IMPROVED: Get or fetch graph data (cached by time range only, language independent)
   private static async getGraphData(userId: string, timeRange: string): Promise<GraphDataCache | null> {
     const graphCacheKey = `${userId}-${timeRange}`;
     
     // Check memory cache
     const cached = this.graphCache.get(graphCacheKey);
     if (cached && this.isGraphCacheValid(cached)) {
-      console.log(`[NodeBasedSoulNetService] Using cached graph data for ${graphCacheKey}`);
+      console.log(`[NodeBasedSoulNetService] IMPROVED: Using cached graph data for ${graphCacheKey}`);
       return cached;
     }
 
@@ -110,12 +106,12 @@ export class NodeBasedSoulNetService {
     const storedGraph = this.getStoredGraphData(graphCacheKey);
     if (storedGraph) {
       this.graphCache.set(graphCacheKey, storedGraph);
-      console.log(`[NodeBasedSoulNetService] Loaded graph data from storage for ${graphCacheKey}`);
+      console.log(`[NodeBasedSoulNetService] IMPROVED: Loaded graph data from storage for ${graphCacheKey}`);
       return storedGraph;
     }
 
     // Fetch fresh graph data
-    console.log(`[NodeBasedSoulNetService] Fetching fresh graph data for ${graphCacheKey}`);
+    console.log(`[NodeBasedSoulNetService] IMPROVED: Fetching fresh graph data for ${graphCacheKey}`);
     const freshGraphData = await this.fetchGraphData(userId, timeRange);
     if (freshGraphData) {
       this.cacheGraphData(graphCacheKey, freshGraphData);
@@ -124,86 +120,138 @@ export class NodeBasedSoulNetService {
     return freshGraphData;
   }
 
-  // NODE-BASED: Get persistent node translations
-  private static async getNodeTranslations(nodeIds: string[], language: string): Promise<Map<string, string>> {
+  // IMPROVED: Get persistent node translations with better state management
+  private static async getNodeTranslations(
+    nodeIds: string[], 
+    language: string, 
+    userId: string
+  ): Promise<{ translations: Map<string, string>, progress: number, isTranslating: boolean }> {
     const translations = new Map<string, string>();
 
     if (language === 'en') {
       nodeIds.forEach(nodeId => translations.set(nodeId, nodeId));
-      return translations;
+      return { translations, progress: 100, isTranslating: false };
     }
 
-    console.log(`[NodeBasedSoulNetService] Getting persistent translations for ${nodeIds.length} nodes in ${language}`);
+    console.log(`[NodeBasedSoulNetService] IMPROVED: Getting translations for ${nodeIds.length} nodes in ${language}`);
 
-    // Get all cached translations
+    const stateKey = `${userId}-${language}`;
+
+    // Get all cached translations first
     const cachedTranslations = await NodeTranslationCacheService.getBatchCachedTranslations(nodeIds, language);
-    console.log(`[NodeBasedSoulNetService] Found ${cachedTranslations.size} cached translations`);
+    console.log(`[NodeBasedSoulNetService] IMPROVED: Found ${cachedTranslations.size} cached translations`);
 
     // Add cached translations
     cachedTranslations.forEach((translation, nodeId) => {
       translations.set(nodeId, translation);
     });
 
+    // Calculate current progress
+    const currentProgress = Math.round((translations.size / nodeIds.length) * 100);
+    
     // Identify nodes needing translation
     const uncachedNodes = nodeIds.filter(nodeId => !translations.has(nodeId));
     
-    if (uncachedNodes.length > 0) {
-      console.log(`[NodeBasedSoulNetService] Need to translate ${uncachedNodes.length} nodes`);
-      
-      // Set translation state
-      const stateKey = `${language}`;
-      this.translationStates.set(stateKey, {
-        isTranslating: true,
-        progress: Math.round((translations.size / nodeIds.length) * 100),
-        startedAt: Date.now()
+    if (uncachedNodes.length === 0) {
+      console.log('[NodeBasedSoulNetService] IMPROVED: All translations cached, returning complete data');
+      this.clearTranslationState(stateKey);
+      return { translations, progress: 100, isTranslating: false };
+    }
+
+    console.log(`[NodeBasedSoulNetService] IMPROVED: Need to translate ${uncachedNodes.length} nodes`);
+    
+    // Set translation state
+    this.translationStates.set(stateKey, {
+      isTranslating: true,
+      progress: currentProgress,
+      startedAt: Date.now()
+    });
+
+    // Start background translation (don't await)
+    this.performBackgroundTranslation(uncachedNodes, language, stateKey).catch(error => {
+      console.error('[NodeBasedSoulNetService] IMPROVED: Background translation error:', error);
+      this.clearTranslationState(stateKey);
+    });
+
+    // Return current state (with partial translations if any)
+    return { 
+      translations, 
+      progress: currentProgress, 
+      isTranslating: true 
+    };
+  }
+
+  // IMPROVED: Background translation with proper error handling
+  private static async performBackgroundTranslation(
+    nodeIds: string[], 
+    language: string, 
+    stateKey: string
+  ): Promise<void> {
+    try {
+      console.log(`[NodeBasedSoulNetService] IMPROVED: Starting background translation for ${nodeIds.length} nodes`);
+
+      const batchResults = await translationService.batchTranslate({
+        texts: nodeIds,
+        targetLanguage: language,
+        sourceLanguage: 'en'
       });
 
-      // Perform batch translation
-      try {
-        const batchResults = await translationService.batchTranslate({
-          texts: uncachedNodes,
-          targetLanguage: language,
-          sourceLanguage: 'en'
-        });
-
-        // Process results
-        const newTranslations = new Map<string, string>();
-        uncachedNodes.forEach(nodeId => {
-          const translatedText = batchResults.get(nodeId);
-          if (translatedText && translatedText.trim()) {
-            translations.set(nodeId, translatedText);
-            newTranslations.set(nodeId, translatedText);
-          } else {
-            translations.set(nodeId, nodeId); // Fallback to original
-          }
-        });
-
-        // Cache new translations
-        if (newTranslations.size > 0) {
-          await NodeTranslationCacheService.setBatchCachedTranslations(newTranslations, language);
-          console.log(`[NodeBasedSoulNetService] Cached ${newTranslations.size} new translations`);
+      // Process results and cache successful translations
+      const newTranslations = new Map<string, string>();
+      nodeIds.forEach(nodeId => {
+        const translatedText = batchResults.get(nodeId);
+        if (translatedText && translatedText.trim()) {
+          newTranslations.set(nodeId, translatedText);
+        } else {
+          newTranslations.set(nodeId, nodeId); // Fallback to original
         }
+      });
 
-      } catch (error) {
-        console.error('[NodeBasedSoulNetService] Error during batch translation:', error);
-        // Use original text for failed translations
-        uncachedNodes.forEach(nodeId => {
-          if (!translations.has(nodeId)) {
-            translations.set(nodeId, nodeId);
-          }
-        });
+      // Cache new translations
+      if (newTranslations.size > 0) {
+        await NodeTranslationCacheService.setBatchCachedTranslations(newTranslations, language);
+        console.log(`[NodeBasedSoulNetService] IMPROVED: Cached ${newTranslations.size} new translations`);
       }
 
-      // Clear translation state
+      // Update translation state
       this.translationStates.set(stateKey, {
         isTranslating: false,
         progress: 100,
         startedAt: 0
       });
+
+      console.log('[NodeBasedSoulNetService] IMPROVED: Background translation completed successfully');
+
+      // Emit custom event to notify components
+      window.dispatchEvent(new CustomEvent('soulNetTranslationComplete', {
+        detail: { language, nodeCount: nodeIds.length }
+      }));
+
+    } catch (error) {
+      console.error('[NodeBasedSoulNetService] IMPROVED: Background translation failed:', error);
+      this.clearTranslationState(stateKey);
+    }
+  }
+
+  // IMPROVED: Translation state management
+  static getTranslationState(stateKey: string) {
+    const state = this.translationStates.get(stateKey);
+    if (!state) {
+      return { isTranslating: false, progress: 100, startedAt: 0 };
     }
 
-    console.log(`[NodeBasedSoulNetService] Final translations: ${translations.size}/${nodeIds.length}`);
-    return translations;
+    // Check for timeout (30 seconds)
+    if (state.isTranslating && (Date.now() - state.startedAt) > 30000) {
+      console.log(`[NodeBasedSoulNetService] IMPROVED: Translation timeout for ${stateKey}`);
+      this.clearTranslationState(stateKey);
+      return { isTranslating: false, progress: 100, startedAt: 0 };
+    }
+
+    return state;
+  }
+
+  private static clearTranslationState(stateKey: string): void {
+    this.translationStates.delete(stateKey);
   }
 
   // Fetch graph data from database
@@ -218,12 +266,12 @@ export class NodeBasedSoulNetService {
         .order('created_at', { ascending: false });
 
       if (error) {
-        console.error('[NodeBasedSoulNetService] Error fetching entries:', error);
+        console.error('[NodeBasedSoulNetService] IMPROVED: Error fetching entries:', error);
         return null;
       }
 
       if (!entries || entries.length === 0) {
-        console.log('[NodeBasedSoulNetService] No entries found');
+        console.log('[NodeBasedSoulNetService] IMPROVED: No entries found');
         return {
           nodes: [],
           links: [],
@@ -235,7 +283,7 @@ export class NodeBasedSoulNetService {
         };
       }
 
-      console.log(`[NodeBasedSoulNetService] Processing ${entries.length} entries`);
+      console.log(`[NodeBasedSoulNetService] IMPROVED: Processing ${entries.length} entries`);
       const graphData = this.processEntities(entries);
       
       const connectionPercentages = new Map<string, number>();
@@ -254,7 +302,7 @@ export class NodeBasedSoulNetService {
         timeRange
       };
     } catch (error) {
-      console.error('[NodeBasedSoulNetService] Error fetching graph data:', error);
+      console.error('[NodeBasedSoulNetService] IMPROVED: Error fetching graph data:', error);
       return null;
     }
   }
@@ -273,7 +321,7 @@ export class NodeBasedSoulNetService {
       };
       localStorage.setItem(`${this.GRAPH_CACHE_KEY}-${cacheKey}`, JSON.stringify(storableData));
     } catch (error) {
-      console.error('[NodeBasedSoulNetService] Error saving graph cache:', error);
+      console.error('[NodeBasedSoulNetService] IMPROVED: Error saving graph cache:', error);
     }
   }
 
@@ -292,30 +340,13 @@ export class NodeBasedSoulNetService {
         }
       }
     } catch (error) {
-      console.error('[NodeBasedSoulNetService] Error loading stored graph data:', error);
+      console.error('[NodeBasedSoulNetService] IMPROVED: Error loading stored graph data:', error);
     }
     return null;
   }
 
   private static isGraphCacheValid(cache: GraphDataCache): boolean {
     return (Date.now() - cache.timestamp) < this.CACHE_DURATION;
-  }
-
-  // Translation state management
-  static getTranslationState(stateKey: string) {
-    const state = this.translationStates.get(stateKey);
-    if (!state) {
-      return { isTranslating: false, progress: 100, startedAt: 0 };
-    }
-
-    // Check for timeout
-    if (state.isTranslating && (Date.now() - state.startedAt) > 30000) {
-      console.log(`[NodeBasedSoulNetService] Translation timeout for ${stateKey}`);
-      this.translationStates.delete(stateKey);
-      return { isTranslating: false, progress: 100, startedAt: 0 };
-    }
-
-    return state;
   }
 
   // Clear caches
@@ -326,7 +357,7 @@ export class NodeBasedSoulNetService {
         this.graphCache.delete(key);
         localStorage.removeItem(`${this.GRAPH_CACHE_KEY}-${key}`);
       });
-      console.log(`[NodeBasedSoulNetService] Cleared graph cache for user ${userId}`);
+      console.log(`[NodeBasedSoulNetService] IMPROVED: Cleared graph cache for user ${userId}`);
     } else {
       this.graphCache.clear();
       Object.keys(localStorage).forEach(key => {
@@ -334,13 +365,13 @@ export class NodeBasedSoulNetService {
           localStorage.removeItem(key);
         }
       });
-      console.log('[NodeBasedSoulNetService] Cleared all graph cache');
+      console.log('[NodeBasedSoulNetService] IMPROVED: Cleared all graph cache');
     }
   }
 
   static clearTranslationStates(): void {
     this.translationStates.clear();
-    console.log('[NodeBasedSoulNetService] Cleared all translation states');
+    console.log('[NodeBasedSoulNetService] IMPROVED: Cleared all translation states');
   }
 
   // Helper methods
@@ -369,7 +400,7 @@ export class NodeBasedSoulNetService {
       percentageMap.set(`${link.target}-${link.source}`, targetPercentage);
     });
 
-    console.log(`[NodeBasedSoulNetService] Calculated ${percentageMap.size} connection percentages`);
+    console.log(`[NodeBasedSoulNetService] IMPROVED: Calculated ${percentageMap.size} connection percentages`);
   }
 
   private static calculateNodeConnections(
@@ -534,7 +565,7 @@ export class NodeBasedSoulNetService {
       });
     });
 
-    console.log(`[NodeBasedSoulNetService] Generated graph with ${nodes.length} nodes and ${links.length} links`);
+    console.log(`[NodeBasedSoulNetService] IMPROVED: Generated graph with ${nodes.length} nodes and ${links.length} links`);
     return { nodes, links };
   }
 }

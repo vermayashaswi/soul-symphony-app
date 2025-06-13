@@ -16,7 +16,7 @@ interface PersistentTranslatableText3DProps {
   enableWrapping?: boolean;
   maxCharsPerLine?: number;
   maxLines?: number;
-  // NODE-BASED: Use provided translation directly
+  // IMPROVED: Use provided translation directly for persistent display
   translatedText?: string;
 }
 
@@ -36,8 +36,10 @@ export const PersistentTranslatableText3D: React.FC<PersistentTranslatableText3D
   maxLines = 3,
   translatedText
 }) => {
-  // NODE-BASED: Use provided translation or fallback to original text
+  // IMPROVED: Use provided translation or fallback to original text
   const displayText = translatedText || text;
+
+  console.log(`[PersistentTranslatableText3D] IMPROVED: Rendering text: "${text}" -> "${displayText}"`);
 
   return (
     <SmartTextRenderer
