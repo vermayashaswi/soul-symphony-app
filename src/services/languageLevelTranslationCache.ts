@@ -1,3 +1,4 @@
+
 interface LanguageCacheEntry {
   translations: Map<string, string>;
   lastUpdated: number;
@@ -38,20 +39,6 @@ export class LanguageLevelTranslationCache {
     this.appTranslationService = service;
   }
   
-  // Helper method to safely convert translation results to string map
-  private static convertToStringMap(resultMap: Map<string, unknown>): Map<string, string> {
-    const stringMap = new Map<string, string>();
-    
-    resultMap.forEach((value, key) => {
-      // Safely convert to string, fallback to original key if conversion fails
-      const stringValue = typeof value === 'string' ? value : 
-                         (value != null ? String(value) : key);
-      stringMap.set(key, stringValue);
-    });
-    
-    return stringMap;
-  }
-  
   // Generate cache key for a language (not time-range specific)
   private static generateLanguageCacheKey(userId: string, language: string): string {
     return `${this.CACHE_KEY_PREFIX}-${userId}-${language}-v${this.CACHE_VERSION}`;
@@ -78,7 +65,15 @@ export class LanguageLevelTranslationCache {
       if (stored) {
         const parsed = JSON.parse(stored);
         if (this.isCacheValid(parsed)) {
-          const translations = new Map(Object.entries(parsed.translations || {}));
+          // Ensure we convert to Map<string, string> properly
+          const translationEntries = Object.entries(parsed.translations || {});
+          const translations = new Map<string, string>();
+          
+          translationEntries.forEach(([key, value]) => {
+            // Safely convert to string
+            const stringValue = typeof value === 'string' ? value : String(value || key);
+            translations.set(key, stringValue);
+          });
           
           const cacheEntry: LanguageCacheEntry = {
             translations,
