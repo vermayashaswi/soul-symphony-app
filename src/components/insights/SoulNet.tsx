@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import '@/types/three-reference';
 import { Canvas } from '@react-three/fiber';
@@ -20,18 +19,17 @@ interface SoulNetProps {
   timeRange: TimeRange;
 }
 
-// OPTIMIZED: Translation loading component with better UX
+// OPTIMIZED: Translation loading component for genuine translation needs only
 const OptimizedTranslationLoadingState: React.FC<{ 
   progress: number; 
   isComplete: boolean;
-  canRender: boolean;
-}> = ({ progress, isComplete, canRender }) => (
+}> = ({ progress, isComplete }) => (
   <div className="bg-background rounded-xl shadow-sm border w-full p-6">
     <div className="flex flex-col items-center justify-center py-12 space-y-4">
       <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
       <h3 className="text-lg font-medium">
         <TranslatableText 
-          text={canRender ? "Optimizing Soul-Net translations..." : "Loading Soul-Net translations..."} 
+          text="Loading Soul-Net translations..." 
           forceTranslate={true}
           enableFontScaling={true}
           scalingContext="general"
@@ -51,19 +49,9 @@ const OptimizedTranslationLoadingState: React.FC<{
           scalingContext="general"
         />
       </p>
-      {canRender && (
-        <p className="text-xs text-green-600 text-center max-w-sm">
-          <TranslatableText 
-            text="Sufficient translations loaded. Rendering visualization..."
-            forceTranslate={true}
-            enableFontScaling={true}
-            scalingContext="general"
-          />
-        </p>
-      )}
       <p className="text-xs text-muted-foreground text-center max-w-sm">
         <TranslatableText 
-          text="Translations are cached and will persist across time range changes."
+          text="Loading translations for new content. This will be cached for future visits."
           forceTranslate={true}
           enableFontScaling={true}
           scalingContext="general"
@@ -84,7 +72,7 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
   
   const renderingInitialized = useRef(false);
 
-  // OPTIMIZED: Use the enhanced hook with render control
+  // OPTIMIZED: Use the enhanced hook with cache-ready detection
   const { 
     graphData, 
     translations,
@@ -96,6 +84,7 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
     translationProgress,
     translationComplete,
     canRender,
+    isCacheReady,
     getNodeTranslation,
     getConnectionPercentage,
     getNodeConnections
@@ -111,6 +100,7 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
     translationProgress,
     translationComplete,
     canRender,
+    isCacheReady,
     renderingReady,
     initialized: renderingInitialized.current
   });
@@ -123,17 +113,18 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
     };
   }, []);
 
-  // OPTIMIZED: Initialize rendering only when we can properly render
+  // OPTIMIZED: Initialize rendering with cache-ready logic
   useEffect(() => {
     const shouldInitializeRendering = (
       !loading && 
       graphData.nodes.length > 0 && 
-      canRender &&  // NEW: Only render when translation coverage is sufficient
+      canRender &&
+      (isCacheReady || !isTranslating) && // NEW: Use cache readiness or no active translation
       !renderingInitialized.current
     );
 
     if (shouldInitializeRendering) {
-      console.log("[SoulNet] OPTIMIZED: Initializing rendering with sufficient translation coverage");
+      console.log("[SoulNet] OPTIMIZED: Initializing rendering - cache ready or no translation needed");
       setRenderingReady(true);
       renderingInitialized.current = true;
     }
@@ -146,11 +137,11 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
     );
 
     if (shouldResetRendering) {
-      console.log("[SoulNet] OPTIMIZED: Resetting rendering due to error, insufficient translations, or data loss");
+      console.log("[SoulNet] OPTIMIZED: Resetting rendering due to error or data loss");
       setRenderingReady(false);
       renderingInitialized.current = false;
     }
-  }, [loading, graphData.nodes.length, canRender, error]);
+  }, [loading, graphData.nodes.length, canRender, isCacheReady, isTranslating, error]);
 
   // Reset rendering when time range changes
   useEffect(() => {
@@ -196,14 +187,21 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
     renderingInitialized.current = false;
   }, []);
 
-  // OPTIMIZED: Show translation loading only when we have data but can't render yet
-  if (graphData.nodes.length > 0 && !canRender && (isTranslating || !translationComplete)) {
-    console.log("[SoulNet] OPTIMIZED: Showing translation loading state - insufficient coverage");
+  // OPTIMIZED: Show translation loading only for genuine missing translations
+  const shouldShowTranslationLoader = (
+    graphData.nodes.length > 0 && 
+    !canRender && 
+    !isCacheReady && 
+    isTranslating && 
+    !translationComplete
+  );
+
+  if (shouldShowTranslationLoader) {
+    console.log("[SoulNet] OPTIMIZED: Showing translation loading - genuine translation in progress");
     return (
       <OptimizedTranslationLoadingState 
         progress={translationProgress}
         isComplete={translationComplete}
-        canRender={canRender}
       />
     );
   }
@@ -320,7 +318,7 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
     );
   };
 
-  console.log(`[SoulNet] OPTIMIZED RENDER: ${graphData.nodes.length} nodes, ${graphData.links.length} links, renderingReady: ${renderingReady}, canRender: ${canRender}`);
+  console.log(`[SoulNet] OPTIMIZED RENDER: ${graphData.nodes.length} nodes, ${graphData.links.length} links, renderingReady: ${renderingReady}, canRender: ${canRender}, cacheReady: ${isCacheReady}`);
 
   return (
     <div className={cn(
@@ -369,8 +367,8 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
             </div>
           }
         >
-          {/* OPTIMIZED: Canvas renders only when we have sufficient translation coverage */}
-          {renderingReady && canRender && (
+          {/* OPTIMIZED: Canvas renders when ready with cache-aware logic */}
+          {renderingReady && canRender && (isCacheReady || !isTranslating) && (
             <Canvas
               style={{
                 width: '100%',
