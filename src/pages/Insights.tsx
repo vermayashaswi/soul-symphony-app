@@ -19,11 +19,10 @@ import { PremiumFeatureGuard } from '@/components/subscription/PremiumFeatureGua
 
 function InsightsContent() {
   const { user } = useAuth();
-  const { prefetchTranslationsForRoute, prefetchAllSoulNetTimeRanges, currentLanguage } = useTranslation();
+  const { prefetchTranslationsForRoute } = useTranslation();
   const [timeRange, setTimeRange] = useState<TimeRange>('week');
   const [isSticky, setIsSticky] = useState(false);
   const [selectedEmotion, setSelectedEmotion] = useState<string | null>(null);
-  const [soulNetPreloaded, setSoulNetPreloaded] = useState(false);
   const timeToggleRef = useRef<HTMLDivElement>(null);
   const scrollPositionRef = useRef<number>(0);
   const isMobile = useIsMobile();
@@ -49,30 +48,6 @@ function InsightsContent() {
       console.log("Insights page unmounted");
     };
   }, [prefetchTranslationsForRoute]);
-
-  // ENHANCED: Preload all SoulNet time ranges when language changes or user loads
-  useEffect(() => {
-    if (user?.id && prefetchAllSoulNetTimeRanges && currentLanguage !== 'en' && !soulNetPreloaded) {
-      console.log(`[Insights] ENHANCED: Preloading all SoulNet time ranges for language ${currentLanguage}`);
-      
-      prefetchAllSoulNetTimeRanges(user.id)
-        .then(() => {
-          console.log('[Insights] ENHANCED: SoulNet preloading completed');
-          setSoulNetPreloaded(true);
-        })
-        .catch(error => {
-          console.error('[Insights] ENHANCED: Error preloading SoulNet:', error);
-          setSoulNetPreloaded(true); // Continue even if preload fails
-        });
-    } else if (currentLanguage === 'en') {
-      setSoulNetPreloaded(true);
-    }
-  }, [user?.id, prefetchAllSoulNetTimeRanges, currentLanguage, soulNetPreloaded]);
-
-  // Reset preload state when language changes
-  useEffect(() => {
-    setSoulNetPreloaded(false);
-  }, [currentLanguage]);
 
   useEffect(() => {
     const handleScroll = () => {
@@ -170,31 +145,6 @@ function InsightsContent() {
         sentiment: parseFloat(entry.sentiment || 0) || 0
       }))
       .filter(item => !isNaN(item.sentiment) && !isNaN(item.date.getTime()));
-  };
-
-  // Helper functions to safely access data properties
-  const getDominantMood = () => {
-    const mood = insightsData.dominantMood;
-    return {
-      emoji: mood?.emoji || '😊',
-      name: mood?.emotion || 'Peaceful',
-      percentage: mood?.score || 0 // Use score instead of percentage
-    };
-  };
-
-  const getAverageSentiment = () => {
-    // Calculate average sentiment from entries since it's not in InsightsData
-    const entries = insightsData.entries || [];
-    if (entries.length === 0) return 0;
-    
-    const validSentiments = entries
-      .filter(entry => entry.sentiment !== undefined && entry.sentiment !== null)
-      .map(entry => parseFloat(entry.sentiment || 0) || 0);
-    
-    if (validSentiments.length === 0) return 0;
-    
-    const sum = validSentiments.reduce((acc, sentiment) => acc + sentiment, 0);
-    return sum / validSentiments.length;
   };
 
   return (
@@ -303,9 +253,9 @@ function InsightsContent() {
                       usePageTranslation={true}
                     />
                   </h2>
-                  <span className="px-2 py-1 bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 text-xs font-medium rounded-full">
+                  <span className="px-2 py-1 bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-200 rounded-full text-xs font-medium">
                     <EnhancedTranslatableText 
-                      text={timeRange} 
+                      text={`This ${timeRange}`} 
                       forceTranslate={true}
                       enableFontScaling={true}
                       scalingContext="compact"
@@ -313,31 +263,61 @@ function InsightsContent() {
                     />
                   </span>
                 </div>
-                <div className="text-center">
-                  <div className="text-3xl mb-2">
-                    {getDominantMood().emoji}
+                {insightsData.dominantMood ? (
+                  <div className="flex items-center gap-4">
+                    <div className="h-16 w-16 bg-blue-100 dark:bg-blue-900 rounded-full flex items-center justify-center">
+                      <span className="text-2xl">{insightsData.dominantMood.emoji}</span>
+                    </div>
+                    <div>
+                      <h3 className="text-2xl font-bold capitalize">
+                        <EnhancedTranslatableText 
+                          text={insightsData.dominantMood.emotion} 
+                          forceTranslate={true}
+                          enableFontScaling={true}
+                          scalingContext="general"
+                          usePageTranslation={true}
+                        />
+                      </h3>
+                      <p className="text-muted-foreground text-sm">
+                        <EnhancedTranslatableText 
+                          text="Appeared in most entries" 
+                          forceTranslate={true}
+                          enableFontScaling={true}
+                          scalingContext="compact"
+                          usePageTranslation={true}
+                        />
+                      </p>
+                    </div>
                   </div>
-                  <div className="text-lg font-medium mb-1">
-                    <EnhancedTranslatableText 
-                      text={getDominantMood().name} 
-                      forceTranslate={true}
-                      enableFontScaling={true}
-                      scalingContext="general"
-                      usePageTranslation={true}
-                    />
+                ) : (
+                  <div className="flex items-center gap-4">
+                    <div className="h-16 w-16 bg-blue-100 dark:bg-blue-900 rounded-full flex items-center justify-center">
+                      <span className="text-2xl">🤔</span>
+                    </div>
+                    <div>
+                      <h3 className="text-2xl font-bold">
+                        <EnhancedTranslatableText 
+                          text="Not enough data" 
+                          forceTranslate={true}
+                          enableFontScaling={true}
+                          scalingContext="general"
+                          usePageTranslation={true}
+                        />
+                      </h3>
+                      <p className="text-muted-foreground text-sm">
+                        <EnhancedTranslatableText 
+                          text="Add more journal entries" 
+                          forceTranslate={true}
+                          enableFontScaling={true}
+                          scalingContext="compact"
+                          usePageTranslation={true}
+                        />
+                      </p>
+                    </div>
                   </div>
-                  <div className="text-sm text-muted-foreground">
-                    {getDominantMood().percentage.toFixed(1)} <EnhancedTranslatableText 
-                      text="intensity score" 
-                      forceTranslate={true}
-                      enableFontScaling={true}
-                      scalingContext="compact"
-                      usePageTranslation={true}
-                    />
-                  </div>
-                </div>
+                )}
               </motion.div>
-
+              
               <motion.div
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
@@ -347,40 +327,101 @@ function InsightsContent() {
                 <div className="flex justify-between items-start mb-4">
                   <h2 className="font-semibold text-lg">
                     <EnhancedTranslatableText 
-                      text="Average Sentiment" 
+                      text="Biggest Change" 
                       forceTranslate={true}
                       enableFontScaling={true}
                       scalingContext="general"
                       usePageTranslation={true}
                     />
                   </h2>
-                  <span className="px-2 py-1 bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200 text-xs font-medium rounded-full flex items-center gap-1">
-                    <TrendingUp className="w-3 h-3" />
-                    <EnhancedTranslatableText 
-                      text="Positive" 
-                      forceTranslate={true}
-                      enableFontScaling={true}
-                      scalingContext="compact"
-                      usePageTranslation={true}
-                    />
-                  </span>
+                  {insightsData.biggestImprovement && (
+                    <span 
+                      className={cn(
+                        "px-2 py-1 rounded-full text-xs font-medium",
+                        insightsData.biggestImprovement.percentage >= 0 
+                          ? "bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-200" 
+                          : "bg-red-100 dark:bg-red-900 text-red-700 dark:text-red-200"
+                      )}
+                    >
+                      {insightsData.biggestImprovement.percentage >= 0 ? '+' : ''}
+                      {insightsData.biggestImprovement.percentage}%
+                    </span>
+                  )}
                 </div>
-                <div className="text-center">
-                  <div className="text-3xl font-bold mb-2 text-green-600">
-                    {(getAverageSentiment() * 100).toFixed(1)}%
+                {insightsData.biggestImprovement ? (
+                  <div className="flex items-center gap-4">
+                    <div 
+                      className={cn(
+                        "h-16 w-16 rounded-full flex items-center justify-center",
+                        insightsData.biggestImprovement.percentage >= 0 
+                          ? "bg-green-100 dark:bg-green-900" 
+                          : "bg-blue-100 dark:bg-blue-900"
+                      )}
+                    >
+                      {insightsData.biggestImprovement.percentage >= 0 ? (
+                        <ArrowUp className={cn(
+                          "h-8 w-8",
+                          insightsData.biggestImprovement.percentage >= 0 
+                            ? "text-green-600 dark:text-green-300" 
+                            : "text-blue-600 dark:text-blue-300"
+                        )} />
+                      ) : (
+                        <ArrowDown className="h-8 w-8 text-blue-600 dark:text-blue-300" />
+                      )}
+                    </div>
+                    <div>
+                      <h3 className="text-2xl font-bold capitalize">
+                        <EnhancedTranslatableText 
+                          text={insightsData.biggestImprovement.emotion} 
+                          forceTranslate={true}
+                          enableFontScaling={true}
+                          scalingContext="general"
+                          usePageTranslation={true}
+                        />
+                      </h3>
+                      <p className="text-muted-foreground text-sm">
+                        <EnhancedTranslatableText 
+                          text={insightsData.biggestImprovement.percentage >= 0 
+                            ? "Increased significantly" 
+                            : "Decreased significantly"
+                          } 
+                          forceTranslate={true}
+                          enableFontScaling={true}
+                          scalingContext="compact"
+                          usePageTranslation={true}
+                        />
+                      </p>
+                    </div>
                   </div>
-                  <div className="text-sm text-muted-foreground">
-                    <EnhancedTranslatableText 
-                      text="Overall positivity score" 
-                      forceTranslate={true}
-                      enableFontScaling={true}
-                      scalingContext="compact"
-                      usePageTranslation={true}
-                    />
+                ) : (
+                  <div className="flex items-center gap-4">
+                    <div className="h-16 w-16 bg-gray-100 dark:bg-gray-800 rounded-full flex items-center justify-center">
+                      <TrendingUp className="h-8 w-8 text-gray-500 dark:text-gray-400" />
+                    </div>
+                    <div>
+                      <h3 className="text-2xl font-bold">
+                        <EnhancedTranslatableText 
+                          text="Not enough data" 
+                          forceTranslate={true}
+                          enableFontScaling={true}
+                          scalingContext="general"
+                          usePageTranslation={true}
+                        />
+                      </h3>
+                      <p className="text-muted-foreground text-sm">
+                        <EnhancedTranslatableText 
+                          text="Need more entries to compare" 
+                          forceTranslate={true}
+                          enableFontScaling={true}
+                          scalingContext="compact"
+                          usePageTranslation={true}
+                        />
+                      </p>
+                    </div>
                   </div>
-                </div>
+                )}
               </motion.div>
-
+              
               <motion.div
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
@@ -390,85 +431,101 @@ function InsightsContent() {
                 <div className="flex justify-between items-start mb-4">
                   <h2 className="font-semibold text-lg">
                     <EnhancedTranslatableText 
-                      text="Journal Entries" 
+                      text="Journal Activity" 
                       forceTranslate={true}
                       enableFontScaling={true}
                       scalingContext="general"
                       usePageTranslation={true}
                     />
                   </h2>
-                  <span className="px-2 py-1 bg-purple-100 dark:bg-purple-900 text-purple-800 dark:text-purple-200 text-xs font-medium rounded-full flex items-center gap-1">
-                    <Activity className="w-3 h-3" />
-                    <EnhancedTranslatableText 
-                      text="Active" 
-                      forceTranslate={true}
-                      enableFontScaling={true}
-                      scalingContext="compact"
-                      usePageTranslation={true}
-                    />
-                  </span>
+                  {insightsData.journalActivity.maxStreak > 0 && (
+                    <span className="px-2 py-1 bg-purple-100 dark:bg-purple-900 text-purple-700 dark:text-purple-200 rounded-full text-xs font-medium">
+                      <EnhancedTranslatableText 
+                        text={`Max streak: ${insightsData.journalActivity.maxStreak} ${timeRange === 'today' ? 'entries' : 'days'}`}
+                        forceTranslate={true}
+                        enableFontScaling={true}
+                        scalingContext="compact"
+                        usePageTranslation={true}
+                      />
+                    </span>
+                  )}
                 </div>
-                <div className="text-center">
-                  <div className="text-3xl font-bold mb-2 text-purple-600">
-                    {insightsData.entries.length}
+                <div className="flex items-center gap-4">
+                  <div className="h-16 w-16 bg-purple-100 dark:bg-purple-900 rounded-full flex items-center justify-center">
+                    {insightsData.journalActivity.streak > 0 ? (
+                      <Award className="h-8 w-8 text-purple-600 dark:text-purple-300" />
+                    ) : (
+                      <Activity className="h-8 w-8 text-purple-600 dark:text-purple-300" />
+                    )}
                   </div>
-                  <div className="text-sm text-muted-foreground">
-                    <EnhancedTranslatableText 
-                      text="Total entries recorded" 
-                      forceTranslate={true}
-                      enableFontScaling={true}
-                      scalingContext="compact"
-                      usePageTranslation={true}
-                    />
+                  <div>
+                    <h3 className="text-2xl font-bold">
+                      <EnhancedTranslatableText 
+                        text={`${insightsData.journalActivity.entryCount} entries`} 
+                        forceTranslate={true}
+                        enableFontScaling={true}
+                        scalingContext="general"
+                        usePageTranslation={true}
+                      />
+                    </h3>
+                    <p className="text-muted-foreground text-sm capitalize">
+                      <EnhancedTranslatableText 
+                        text={`This ${timeRange}`} 
+                        forceTranslate={true}
+                        enableFontScaling={true}
+                        scalingContext="compact"
+                        usePageTranslation={true}
+                      />
+                    </p>
                   </div>
                 </div>
               </motion.div>
             </div>
-
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8 px-2 md:px-0">
-              <motion.div
-                initial={{ opacity: 0, x: -20 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ duration: 0.4, delay: 0.3 }}
-              >
-                <ErrorBoundary>
-                  <EmotionChart 
-                    aggregatedData={insightsData.aggregatedEmotionData} 
-                    timeframe={timeRange}
-                  />
-                </ErrorBoundary>
-              </motion.div>
-
-              <motion.div
-                initial={{ opacity: 0, x: 20 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ duration: 0.4, delay: 0.4 }}
-              >
-                <ErrorBoundary>
-                  <MoodCalendar 
-                    sentimentData={getSentimentData()}
-                    timeRange={timeRange}
-                  />
-                </ErrorBoundary>
-              </motion.div>
-            </div>
-
+            
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.4, delay: 0.3 }}
+              className={cn(
+                "bg-background rounded-xl shadow-sm mb-8 border w-full mx-auto",
+                isMobile ? "p-4 md:p-8" : "p-6 md:p-8"
+              )}
+              whileHover={{ boxShadow: "0 10px 25px -5px rgba(0, 0, 0, 0.1)" }}
+            >
+              <EmotionChart 
+                timeframe={timeRange}
+                aggregatedData={insightsData.aggregatedEmotionData}
+              />
+            </motion.div>
+            
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.4, delay: 0.4 }}
+              className={cn(
+                "mb-8",
+                isMobile ? "px-2" : "px-0"
+              )}
+            >
+              <MoodCalendar 
+                sentimentData={getSentimentData()}
+                timeRange={timeRange}
+              />
+            </motion.div>
+            
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.4, delay: 0.5 }}
               className={cn(
-                "px-2 md:px-0"
+                "mb-8",
+                isMobile ? "px-2" : "px-0"
               )}
             >
-              <ErrorBoundary>
-                <PremiumFeatureGuard feature="insights">
-                  <SoulNet 
-                    userId={user?.id} 
-                    timeRange={timeRange}
-                  />
-                </PremiumFeatureGuard>
-              </ErrorBoundary>
+              <SoulNet
+                userId={user?.id}
+                timeRange={timeRange}
+              />
             </motion.div>
           </>
         )}
@@ -479,8 +536,12 @@ function InsightsContent() {
 
 export default function Insights() {
   return (
-    <InsightsTranslationProvider>
-      <InsightsContent />
-    </InsightsTranslationProvider>
+    <PremiumFeatureGuard feature="insights">
+      <ErrorBoundary>
+        <InsightsTranslationProvider>
+          <InsightsContent />
+        </InsightsTranslationProvider>
+      </ErrorBoundary>
+    </PremiumFeatureGuard>
   );
 }

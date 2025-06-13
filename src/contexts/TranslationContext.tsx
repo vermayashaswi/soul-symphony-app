@@ -1,8 +1,8 @@
+
 import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react';
 import { onDemandTranslationCache } from '@/utils/website-translations';
 import { SoulNetPreloadService } from '@/services/soulnetPreloadService';
 import { EnhancedSoulNetPreloadService } from '@/services/enhancedSoulNetPreloadService';
-import { AtomicSoulNetService } from '@/services/atomicSoulNetService';
 import { translationService } from '@/services/translationService';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -17,7 +17,6 @@ interface TranslationContextType {
   translationProgress?: number;
   prefetchTranslationsForRoute?: (route: string) => Promise<void>;
   prefetchSoulNetTranslations: (userId: string, timeRange: string) => Promise<void>;
-  prefetchAllSoulNetTimeRanges: (userId: string) => Promise<void>;
   isSoulNetTranslating: boolean;
 }
 
@@ -67,40 +66,6 @@ export const TranslationProvider: React.FC<TranslationProviderProps> = ({ childr
     console.log('[TranslationContext] Initialized with language:', browserLanguage, 'supported:', supportedLanguages.includes(browserLanguage));
   }, []);
 
-  // ENHANCED: Preload translations for all SoulNet time ranges to prevent cache misses
-  const prefetchAllSoulNetTimeRanges = useCallback(async (userId: string): Promise<void> => {
-    if (currentLanguage === 'en') {
-      console.log('[TranslationContext] ENHANCED: Skipping SoulNet preload for English');
-      return;
-    }
-
-    console.log(`[TranslationContext] ENHANCED: Preloading all SoulNet time ranges for ${userId}, ${currentLanguage}`);
-    
-    try {
-      setIsSoulNetTranslating(true);
-      
-      const timeRanges = ['today', 'week', 'month', 'year'];
-      const preloadPromises = timeRanges.map(timeRange => 
-        AtomicSoulNetService.getAtomicData(userId, timeRange, currentLanguage)
-          .then(result => {
-            if (result) {
-              console.log(`[TranslationContext] ENHANCED: Preloaded ${timeRange} with ${result.translations.size} translations`);
-            }
-          })
-          .catch(error => {
-            console.error(`[TranslationContext] ENHANCED: Error preloading ${timeRange}:`, error);
-          })
-      );
-      
-      await Promise.allSettled(preloadPromises);
-      console.log('[TranslationContext] ENHANCED: All SoulNet time ranges preloaded');
-    } catch (error) {
-      console.error('[TranslationContext] ENHANCED: Error preloading all time ranges:', error);
-    } finally {
-      setIsSoulNetTranslating(false);
-    }
-  }, [currentLanguage]);
-
   const prefetchSoulNetTranslations = useCallback(async (userId: string, timeRange: string): Promise<void> => {
     if (currentLanguage === 'en') {
       console.log('[TranslationContext] Skipping SoulNet pre-translation for English');
@@ -112,11 +77,10 @@ export const TranslationProvider: React.FC<TranslationProviderProps> = ({ childr
     try {
       setIsSoulNetTranslating(true);
       
-      // ENHANCED: Use AtomicSoulNetService for better coordination
-      const result = await AtomicSoulNetService.getAtomicData(userId, timeRange, currentLanguage);
-      if (result) {
-        console.log(`[TranslationContext] APP-LEVEL: SoulNet pre-translation completed with ${result.translations.size} translations`);
-      }
+      // ENHANCED: Use enhanced preload service for better translation coordination
+      await EnhancedSoulNetPreloadService.preloadInstantData(userId, timeRange, currentLanguage);
+      
+      console.log('[TranslationContext] APP-LEVEL: SoulNet pre-translation completed successfully');
     } catch (error) {
       console.error('[TranslationContext] APP-LEVEL: Error pre-translating SoulNet data:', error);
     } finally {
@@ -125,7 +89,7 @@ export const TranslationProvider: React.FC<TranslationProviderProps> = ({ childr
   }, [currentLanguage]);
 
   const handleLanguageChange = useCallback(async (language: string) => {
-    console.log('[TranslationContext] ENHANCED: Changing language to:', language);
+    console.log('[TranslationContext] APP-LEVEL: Changing language to:', language);
     
     // Set loading state for SoulNet translations
     if (language !== 'en') {
@@ -137,17 +101,16 @@ export const TranslationProvider: React.FC<TranslationProviderProps> = ({ childr
     // Save to localStorage for persistence
     try {
       localStorage.setItem('soulo-language', language);
-      console.log('[TranslationContext] ENHANCED: Saved language to localStorage:', language);
+      console.log('[TranslationContext] APP-LEVEL: Saved language to localStorage:', language);
     } catch (error) {
-      console.error('[TranslationContext] ENHANCED: Error saving language to localStorage:', error);
+      console.error('[TranslationContext] APP-LEVEL: Error saving language to localStorage:', error);
     }
     
-    // ENHANCED: Clear all caches when language changes
+    // ENHANCED: Clear both enhanced and legacy SoulNet caches when language changes
     EnhancedSoulNetPreloadService.clearInstantCache();
     SoulNetPreloadService.clearCache();
-    AtomicSoulNetService.clearCache();
     
-    console.log('[TranslationContext] ENHANCED: Cleared all SoulNet caches for language change');
+    console.log('[TranslationContext] APP-LEVEL: Cleared all SoulNet caches for language change');
     
     // Dispatch custom event for components that need to know about language changes
     const event = new CustomEvent('languageChange', { 
@@ -159,6 +122,7 @@ export const TranslationProvider: React.FC<TranslationProviderProps> = ({ childr
     window.dispatchEvent(event);
     
     // If not English, indicate that SoulNet translations are ready
+    // (actual pre-translation will happen when SoulNet components mount)
     if (language === 'en') {
       setIsSoulNetTranslating(false);
     }
@@ -300,18 +264,16 @@ export const TranslationProvider: React.FC<TranslationProviderProps> = ({ childr
     translate,
     isTranslating,
     clearCache: useCallback(() => {
-      console.log('[TranslationContext] ENHANCED: Clearing all translation caches');
+      console.log('[TranslationContext] APP-LEVEL: Clearing all translation caches');
       setTranslationCache({});
       onDemandTranslationCache.clearAll();
       EnhancedSoulNetPreloadService.clearInstantCache();
       SoulNetPreloadService.clearCache();
-      AtomicSoulNetService.clearCache();
     }, []),
     getCachedTranslation,
     translationProgress: isTranslating ? 50 : 100,
     prefetchTranslationsForRoute,
     prefetchSoulNetTranslations,
-    prefetchAllSoulNetTimeRanges,
     isSoulNetTranslating
   };
 
