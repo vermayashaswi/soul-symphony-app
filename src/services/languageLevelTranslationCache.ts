@@ -1,3 +1,4 @@
+
 interface LanguageCacheEntry {
   translations: Map<string, string>;
   lastUpdated: number;
