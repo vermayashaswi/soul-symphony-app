@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useCallback } from 'react';
 import { AtomicSoulNetService } from '@/services/atomicSoulNetService';
 import { SimplifiedSoulNetTranslationService } from '@/services/simplifiedSoulNetTranslationService';
@@ -130,7 +129,7 @@ export const useAtomicSoulNetData = (
     }
   }, [userId, currentLanguage]);
 
-  // SIMPLIFIED: Load data when dependencies change
+  // Load data when dependencies change
   useEffect(() => {
     const loadData = async () => {
       setError(null);
@@ -147,7 +146,7 @@ export const useAtomicSoulNetData = (
     loadData();
   }, [loadGraphData, loadTranslations]);
 
-  // SIMPLIFIED: Listen for translation completion
+  // Listen for translation completion
   useEffect(() => {
     const handleTranslationComplete = (event: CustomEvent) => {
       const stateKey = `${userId}-${currentLanguage}`;
@@ -167,23 +166,23 @@ export const useAtomicSoulNetData = (
     };
   }, [userId, currentLanguage, graphData.nodes, loadTranslations]);
 
-  // SIMPLIFIED: Get node translation with fallback
+  // FIXED: Get node translation with immediate cached translation usage
   const getNodeTranslation = useCallback((nodeId: string): string => {
     if (currentLanguage === 'en') {
       return nodeId;
     }
 
-    // Use translations only when complete to maintain consistency
-    if (translationComplete) {
-      const translation = translations.get(nodeId);
-      if (translation) {
-        return translation;
-      }
+    // FIXED: Use cached translations immediately without waiting for completion
+    const translation = translations.get(nodeId);
+    if (translation && translation.trim()) {
+      console.log(`[useAtomicSoulNetData] FIXED: Using cached translation for "${nodeId}": "${translation}"`);
+      return translation;
     }
 
-    // Return original text for consistency
+    // Return original text as fallback
+    console.log(`[useAtomicSoulNetData] FIXED: No translation found for "${nodeId}", using original text`);
     return nodeId;
-  }, [currentLanguage, translations, translationComplete]);
+  }, [currentLanguage, translations]);
 
   const getConnectionPercentage = useCallback((selectedNode: string, targetNode: string): number => {
     if (!selectedNode || selectedNode === targetNode) return 0;
