@@ -33,18 +33,22 @@ export const SoulNetLink: React.FC<SoulNetLinkProps> = ({
     return new THREE.BufferGeometry().setFromPoints(points);
   }, [points]);
 
-  const color = isHighlighted ? '#ffffff' : '#666666';
-  const opacity = isHighlighted ? 0.8 : 0.3;
+  const lineMaterial = useMemo(() => {
+    const color = isHighlighted ? '#ffffff' : '#666666';
+    const opacity = isHighlighted ? 0.8 : 0.3;
+    
+    return new THREE.LineBasicMaterial({
+      color: color,
+      transparent: true,
+      opacity: opacity
+    });
+  }, [isHighlighted]);
 
   return (
-    <mesh>
-      <primitive object={lineGeometry} />
-      <lineBasicMaterial
-        color={color}
-        transparent
-        opacity={opacity}
-      />
-    </mesh>
+    <line>
+      <primitive object={lineGeometry} attach="geometry" />
+      <primitive object={lineMaterial} attach="material" />
+    </line>
   );
 };
 
