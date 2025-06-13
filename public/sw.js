@@ -1,35 +1,53 @@
+
 const CACHE_NAME = 'soulo-v1.0.0';
-const STATIC_ASSETS = [
+const STATIC_CACHE_NAME = 'soulo-static-v1.0.0';
+
+// Critical resources to cache immediately
+const CRITICAL_RESOURCES = [
   '/',
-  '/manifest.json',
+  '/src/main.tsx',
+  '/index.html',
   '/icons/icon-192x192.png',
-  '/icons/icon-512x512.png'
+  '/icons/icon-512x512.png',
+  '/manifest.json'
 ];
 
-// Install event - cache static assets
+// Font resources for caching
+const FONT_RESOURCES = [
+  'https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap',
+  'https://fonts.gstatic.com/s/inter/v13/UcCO3FwrK3iLTeHuS_fvQtMwCp50KnMw2boKoduKmMEVuLyfAZ9hiJ-Ek-_EeA.woff2'
+];
+
+// Install event - cache critical resources
 self.addEventListener('install', (event) => {
   console.log('[SW] Installing service worker');
+  
   event.waitUntil(
-    caches.open(CACHE_NAME)
-      .then((cache) => {
-        console.log('[SW] Caching static assets');
-        return cache.addAll(STATIC_ASSETS);
+    Promise.all([
+      caches.open(CACHE_NAME).then((cache) => {
+        console.log('[SW] Caching critical resources');
+        return cache.addAll(CRITICAL_RESOURCES);
+      }),
+      caches.open(STATIC_CACHE_NAME).then((cache) => {
+        console.log('[SW] Caching font resources');
+        return cache.addAll(FONT_RESOURCES.map(url => new Request(url, { mode: 'cors' })));
       })
-      .catch((error) => {
-        console.error('[SW] Failed to cache static assets:', error);
-      })
+    ])
   );
+  
+  // Skip waiting to activate immediately
   self.skipWaiting();
 });
 
 // Activate event - clean up old caches
 self.addEventListener('activate', (event) => {
   console.log('[SW] Activating service worker');
+  
   event.waitUntil(
     caches.keys().then((cacheNames) => {
       return Promise.all(
         cacheNames.map((cacheName) => {
-          if (cacheName !== CACHE_NAME) {
+          if (cacheName !== CACHE_NAME && cacheName !== STATIC_CACHE_NAME) {
             console.log('[SW] Deleting old cache:', cacheName);
             return caches.delete(cacheName);
           }
@@ -37,119 +55,93 @@ self.addEventListener('activate', (event) => {
       );
     })
   );
+  
+  // Take control immediately
   self.clients.claim();
 });
 
-// Fetch event - serve from cache when offline
+// Fetch event - serve from cache with network fallback
 self.addEventListener('fetch', (event) => {
-  // Only handle GET requests
-  if (event.request.method !== 'GET') {
+  const { request } = event;
+  const url = new URL(request.url);
+  
+  // Handle different types of requests
+  if (request.method !== 'GET') {
     return;
   }
-
-  // Skip non-http(s) requests
-  if (!event.request.url.startsWith('http')) {
+  
+  // Handle font requests
+  if (url.hostname === 'fonts.googleapis.com' || url.hostname === 'fonts.gstatic.com') {
+    event.respondWith(
+      caches.match(request).then((response) => {
+        return response || fetch(request).then((fetchResponse) => {
+          const responseClone = fetchResponse.clone();
+          caches.open(STATIC_CACHE_NAME).then((cache) => {
+            cache.put(request, responseClone);
+          });
+          return fetchResponse;
+        });
+      })
+    );
     return;
   }
-
-  event.respondWith(
-    caches.match(event.request)
-      .then((response) => {
-        // Return cached version if available
+  
+  // Handle app requests
+  if (url.origin === self.origin) {
+    event.respondWith(
+      caches.match(request).then((response) => {
         if (response) {
           return response;
         }
-
-        // Otherwise fetch from network
-        return fetch(event.request)
-          .then((response) => {
-            // Don't cache non-successful responses
-            if (!response || response.status !== 200 || response.type !== 'basic') {
-              return response;
-            }
-
-            // Clone the response before caching
-            const responseToCache = response.clone();
-
-            // Cache the response for future use
-            caches.open(CACHE_NAME)
-              .then((cache) => {
-                cache.put(event.request, responseToCache);
-              });
-
-            return response;
-          })
-          .catch(() => {
-            // Return offline page for navigation requests
-            if (event.request.destination === 'document') {
-              return caches.match('/');
-            }
-          });
+        
+        return fetch(request).then((fetchResponse) => {
+          // Don't cache API requests or large files
+          if (
+            !request.url.includes('/api/') && 
+            !request.url.includes('supabase') &&
+            fetchResponse.status === 200
+          ) {
+            const responseClone = fetchResponse.clone();
+            caches.open(CACHE_NAME).then((cache) => {
+              cache.put(request, responseClone);
+            });
+          }
+          return fetchResponse;
+        }).catch(() => {
+          // Return cached index.html for navigation requests when offline
+          if (request.mode === 'navigate') {
+            return caches.match('/');
+          }
+        });
       })
-  );
+    );
+  }
 });
 
-// Handle background sync for offline actions
+// Background sync for better offline experience
 self.addEventListener('sync', (event) => {
-  console.log('[SW] Background sync triggered:', event.tag);
-  
-  if (event.tag === 'journal-sync') {
-    event.waitUntil(
-      // Sync journal entries when back online
-      syncJournalEntries()
-    );
+  if (event.tag === 'background-sync') {
+    console.log('[SW] Background sync triggered');
+    // Handle background sync operations here
   }
 });
 
-// Handle push notifications
+// Push notification handling
 self.addEventListener('push', (event) => {
-  console.log('[SW] Push notification received');
-  
-  const options = {
-    body: 'Time for your daily reflection with SOULo',
-    icon: '/icons/icon-192x192.png',
-    badge: '/icons/icon-72x72.png',
-    tag: 'journal-reminder',
-    vibrate: [200, 100, 200],
-    actions: [
-      {
-        action: 'open',
-        title: 'Start Journaling'
-      },
-      {
-        action: 'close',
-        title: 'Later'
-      }
-    ]
-  };
-
-  event.waitUntil(
-    self.registration.showNotification('SOULo Reminder', options)
-  );
-});
-
-// Handle notification clicks
-self.addEventListener('notificationclick', (event) => {
-  console.log('[SW] Notification clicked:', event.action);
-  
-  event.notification.close();
-
-  if (event.action === 'open') {
+  if (event.data) {
+    const data = event.data.json();
+    console.log('[SW] Push notification received:', data);
+    
+    const options = {
+      body: data.body,
+      icon: '/icons/icon-192x192.png',
+      badge: '/icons/icon-192x192.png',
+      vibrate: [100, 50, 100],
+      tag: 'soulo-notification'
+    };
+    
     event.waitUntil(
-      clients.openWindow('/')
+      self.registration.showNotification(data.title || 'SOULo', options)
     );
   }
 });
-
-// Sync function for journal entries
-async function syncJournalEntries() {
-  try {
-    console.log('[SW] Syncing journal entries...');
-    // This would integrate with your existing journal service
-    // For now, just log the sync attempt
-    return Promise.resolve();
-  } catch (error) {
-    console.error('[SW] Failed to sync journal entries:', error);
-    throw error;
-  }
-}

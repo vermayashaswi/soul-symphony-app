@@ -34,7 +34,7 @@ const ButtonStateManager: React.FC<ButtonStateManagerProps> = ({
     });
 
     if (isInArrowTutorialStep) {
-      // Apply tutorial styling
+      // Apply tutorial styling with accessibility improvements
       if (buttonElement) {
         console.log('[ButtonStateManager] Applying tutorial styling');
         
@@ -45,6 +45,15 @@ const ButtonStateManager: React.FC<ButtonStateManagerProps> = ({
         buttonStyleEl.style.border = "2px solid white";
         buttonStyleEl.style.transform = "scale(1.05)";
         buttonStyleEl.style.zIndex = "10000";
+        
+        // Accessibility: Ensure button has proper labeling during tutorial
+        if (!buttonStyleEl.getAttribute('aria-label') && !buttonStyleEl.getAttribute('aria-labelledby')) {
+          buttonStyleEl.setAttribute('aria-label', 'Voice recording button - Click to start recording your journal entry');
+        }
+        
+        // Add focus management for tutorial
+        buttonStyleEl.setAttribute('aria-describedby', 'tutorial-instruction');
+        buttonStyleEl.focus();
       }
       
       if (glowDiv) {
@@ -71,6 +80,12 @@ const ButtonStateManager: React.FC<ButtonStateManagerProps> = ({
         buttonStyleEl.style.border = "";
         buttonStyleEl.style.transform = "";
         buttonStyleEl.style.zIndex = "";
+        
+        // Reset accessibility attributes
+        if (buttonStyleEl.getAttribute('aria-label') === 'Voice recording button - Click to start recording your journal entry') {
+          buttonStyleEl.removeAttribute('aria-label');
+        }
+        buttonStyleEl.removeAttribute('aria-describedby');
       }
       
       if (glowDiv) {
@@ -99,6 +114,12 @@ const ButtonStateManager: React.FC<ButtonStateManagerProps> = ({
         buttonStyleEl.style.border = "";
         buttonStyleEl.style.transform = "";
         buttonStyleEl.style.zIndex = "";
+        
+        // Clean up accessibility attributes
+        if (buttonStyleEl.getAttribute('aria-label') === 'Voice recording button - Click to start recording your journal entry') {
+          buttonStyleEl.removeAttribute('aria-label');
+        }
+        buttonStyleEl.removeAttribute('aria-describedby');
       }
       
       if (glowDiv) {
