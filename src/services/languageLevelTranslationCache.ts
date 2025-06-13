@@ -35,8 +35,12 @@ export class LanguageLevelTranslationCache {
   
   // APP-LEVEL: Set the translation service for coordination
   static setAppLevelTranslationService(service: AppLevelTranslationService) {
-    console.log('[LanguageLevelTranslationCache] APP-LEVEL: Setting translation service');
-    this.appTranslationService = service;
+    try {
+      console.log('[LanguageLevelTranslationCache] APP-LEVEL: Setting translation service');
+      this.appTranslationService = service;
+    } catch (error) {
+      console.error('[LanguageLevelTranslationCache] Error setting translation service:', error);
+    }
   }
   
   // Generate cache key for a language (not time-range specific)
@@ -46,54 +50,59 @@ export class LanguageLevelTranslationCache {
   
   // Get all translations for a language (across all time ranges)
   static getLanguageTranslations(userId: string, language: string): Map<string, string> {
-    if (language === 'en') {
-      console.log('[LanguageLevelTranslationCache] LANGUAGE-LEVEL: English detected, returning empty map');
+    try {
+      if (language === 'en') {
+        console.log('[LanguageLevelTranslationCache] LANGUAGE-LEVEL: English detected, returning empty map');
+        return new Map();
+      }
+      
+      const cacheKey = this.generateLanguageCacheKey(userId, language);
+      const cached = this.cache.get(cacheKey);
+      
+      if (cached && this.isCacheValid(cached)) {
+        console.log(`[LanguageLevelTranslationCache] LANGUAGE-LEVEL: Found ${cached.translations.size} cached translations for ${language}`);
+        return new Map(cached.translations);
+      }
+      
+      // Try localStorage
+      try {
+        const stored = localStorage.getItem(cacheKey);
+        if (stored) {
+          const parsed = JSON.parse(stored);
+          if (this.isCacheValid(parsed)) {
+            // Ensure we convert to Map<string, string> properly
+            const translationEntries = Object.entries(parsed.translations || {});
+            const translations = new Map<string, string>();
+            
+            translationEntries.forEach(([key, value]) => {
+              // Safely convert to string
+              const stringValue = typeof value === 'string' ? value : String(value || key);
+              translations.set(key, stringValue);
+            });
+            
+            const cacheEntry: LanguageCacheEntry = {
+              translations,
+              lastUpdated: parsed.lastUpdated,
+              isComplete: parsed.isComplete,
+              totalNodes: parsed.totalNodes,
+              translatedNodes: parsed.translatedNodes
+            };
+            
+            this.cache.set(cacheKey, cacheEntry);
+            console.log(`[LanguageLevelTranslationCache] LANGUAGE-LEVEL: Loaded ${translations.size} translations from localStorage for ${language}`);
+            return new Map(translations);
+          }
+        }
+      } catch (error) {
+        console.error('[LanguageLevelTranslationCache] Error loading from localStorage:', error);
+      }
+      
+      console.log(`[LanguageLevelTranslationCache] LANGUAGE-LEVEL: No cached translations found for ${language}`);
+      return new Map();
+    } catch (error) {
+      console.error('[LanguageLevelTranslationCache] Error in getLanguageTranslations:', error);
       return new Map();
     }
-    
-    const cacheKey = this.generateLanguageCacheKey(userId, language);
-    const cached = this.cache.get(cacheKey);
-    
-    if (cached && this.isCacheValid(cached)) {
-      console.log(`[LanguageLevelTranslationCache] LANGUAGE-LEVEL: Found ${cached.translations.size} cached translations for ${language}`);
-      return new Map(cached.translations);
-    }
-    
-    // Try localStorage
-    try {
-      const stored = localStorage.getItem(cacheKey);
-      if (stored) {
-        const parsed = JSON.parse(stored);
-        if (this.isCacheValid(parsed)) {
-          // Ensure we convert to Map<string, string> properly
-          const translationEntries = Object.entries(parsed.translations || {});
-          const translations = new Map<string, string>();
-          
-          translationEntries.forEach(([key, value]) => {
-            // Safely convert to string
-            const stringValue = typeof value === 'string' ? value : String(value || key);
-            translations.set(key, stringValue);
-          });
-          
-          const cacheEntry: LanguageCacheEntry = {
-            translations,
-            lastUpdated: parsed.lastUpdated,
-            isComplete: parsed.isComplete,
-            totalNodes: parsed.totalNodes,
-            translatedNodes: parsed.translatedNodes
-          };
-          
-          this.cache.set(cacheKey, cacheEntry);
-          console.log(`[LanguageLevelTranslationCache] LANGUAGE-LEVEL: Loaded ${translations.size} translations from localStorage for ${language}`);
-          return new Map(translations);
-        }
-      }
-    } catch (error) {
-      console.error('[LanguageLevelTranslationCache] Error loading from localStorage:', error);
-    }
-    
-    console.log(`[LanguageLevelTranslationCache] LANGUAGE-LEVEL: No cached translations found for ${language}`);
-    return new Map();
   }
   
   // Batch translate and cache at language level
@@ -102,53 +111,67 @@ export class LanguageLevelTranslationCache {
     language: string, 
     allNodeTexts: string[]
   ): Promise<BatchTranslationResult> {
-    if (language === 'en') {
-      const englishTranslations = new Map<string, string>();
-      allNodeTexts.forEach(text => englishTranslations.set(text, text));
+    try {
+      if (language === 'en') {
+        const englishTranslations = new Map<string, string>();
+        allNodeTexts.forEach(text => englishTranslations.set(text, text));
+        
+        return {
+          translations: englishTranslations,
+          isComplete: true,
+          progress: 100
+        };
+      }
+      
+      const cacheKey = this.generateLanguageCacheKey(userId, language);
+      
+      // Check if translation is already in progress
+      const activeTranslation = this.activeTranslations.get(cacheKey);
+      if (activeTranslation) {
+        console.log(`[LanguageLevelTranslationCache] LANGUAGE-LEVEL: Waiting for active translation for ${language}`);
+        return await activeTranslation;
+      }
+      
+      // Get existing translations
+      const existingTranslations = this.getLanguageTranslations(userId, language);
+      
+      // Find missing translations
+      const missingTexts = allNodeTexts.filter(text => !existingTranslations.has(text));
+      
+      if (missingTexts.length === 0) {
+        console.log(`[LanguageLevelTranslationCache] LANGUAGE-LEVEL: All ${allNodeTexts.length} texts already translated for ${language}`);
+        return {
+          translations: existingTranslations,
+          isComplete: true,
+          progress: 100
+        };
+      }
+      
+      console.log(`[LanguageLevelTranslationCache] LANGUAGE-LEVEL: Need to translate ${missingTexts.length} missing texts for ${language}`);
+      
+      // Start translation process
+      const translationPromise = this.performBatchTranslation(userId, language, missingTexts, existingTranslations);
+      this.activeTranslations.set(cacheKey, translationPromise);
+      
+      try {
+        const result = await translationPromise;
+        console.log(`[LanguageLevelTranslationCache] LANGUAGE-LEVEL: Completed batch translation for ${language}`);
+        return result;
+      } finally {
+        this.activeTranslations.delete(cacheKey);
+      }
+    } catch (error) {
+      console.error(`[LanguageLevelTranslationCache] Error in ensureLanguageTranslations for ${language}:`, error);
+      
+      // Fallback response
+      const fallbackTranslations = new Map<string, string>();
+      allNodeTexts.forEach(text => fallbackTranslations.set(text, text));
       
       return {
-        translations: englishTranslations,
+        translations: fallbackTranslations,
         isComplete: true,
         progress: 100
       };
-    }
-    
-    const cacheKey = this.generateLanguageCacheKey(userId, language);
-    
-    // Check if translation is already in progress
-    const activeTranslation = this.activeTranslations.get(cacheKey);
-    if (activeTranslation) {
-      console.log(`[LanguageLevelTranslationCache] LANGUAGE-LEVEL: Waiting for active translation for ${language}`);
-      return await activeTranslation;
-    }
-    
-    // Get existing translations
-    const existingTranslations = this.getLanguageTranslations(userId, language);
-    
-    // Find missing translations
-    const missingTexts = allNodeTexts.filter(text => !existingTranslations.has(text));
-    
-    if (missingTexts.length === 0) {
-      console.log(`[LanguageLevelTranslationCache] LANGUAGE-LEVEL: All ${allNodeTexts.length} texts already translated for ${language}`);
-      return {
-        translations: existingTranslations,
-        isComplete: true,
-        progress: 100
-      };
-    }
-    
-    console.log(`[LanguageLevelTranslationCache] LANGUAGE-LEVEL: Need to translate ${missingTexts.length} missing texts for ${language}`);
-    
-    // Start translation process
-    const translationPromise = this.performBatchTranslation(userId, language, missingTexts, existingTranslations);
-    this.activeTranslations.set(cacheKey, translationPromise);
-    
-    try {
-      const result = await translationPromise;
-      console.log(`[LanguageLevelTranslationCache] LANGUAGE-LEVEL: Completed batch translation for ${language}`);
-      return result;
-    } finally {
-      this.activeTranslations.delete(cacheKey);
     }
   }
   
@@ -255,47 +278,56 @@ export class LanguageLevelTranslationCache {
   
   // Check if a language has complete translations
   static hasCompleteTranslations(userId: string, language: string): boolean {
-    if (language === 'en') return true;
-    
-    const cacheKey = this.generateLanguageCacheKey(userId, language);
-    const cached = this.cache.get(cacheKey);
-    
-    if (cached && this.isCacheValid(cached)) {
-      return cached.isComplete;
+    try {
+      if (language === 'en') return true;
+      
+      const cacheKey = this.generateLanguageCacheKey(userId, language);
+      const cached = this.cache.get(cacheKey);
+      
+      if (cached && this.isCacheValid(cached)) {
+        return cached.isComplete;
+      }
+      
+      return false;
+    } catch (error) {
+      console.error('[LanguageLevelTranslationCache] Error checking translations:', error);
+      return false;
     }
-    
-    return false;
   }
   
   // Clear cache for a specific language
   static clearLanguageCache(userId: string, language?: string): void {
-    if (language) {
-      const cacheKey = this.generateLanguageCacheKey(userId, language);
-      this.cache.delete(cacheKey);
-      localStorage.removeItem(cacheKey);
-      this.activeTranslations.delete(cacheKey);
-      console.log(`[LanguageLevelTranslationCache] LANGUAGE-LEVEL: Cleared cache for ${language}`);
-    } else {
-      // Clear all languages for user
-      const keysToDelete = Array.from(this.cache.keys()).filter(key => 
-        key.includes(`-${userId}-`) && key.startsWith(this.CACHE_KEY_PREFIX)
-      );
-      
-      keysToDelete.forEach(key => {
-        this.cache.delete(key);
-        localStorage.removeItem(key);
-      });
-      
-      // Clear active translations
-      const activeKeysToDelete = Array.from(this.activeTranslations.keys()).filter(key => 
-        key.includes(`-${userId}-`) && key.startsWith(this.CACHE_KEY_PREFIX)
-      );
-      
-      activeKeysToDelete.forEach(key => {
-        this.activeTranslations.delete(key);
-      });
-      
-      console.log(`[LanguageLevelTranslationCache] LANGUAGE-LEVEL: Cleared all language caches for user ${userId}`);
+    try {
+      if (language) {
+        const cacheKey = this.generateLanguageCacheKey(userId, language);
+        this.cache.delete(cacheKey);
+        localStorage.removeItem(cacheKey);
+        this.activeTranslations.delete(cacheKey);
+        console.log(`[LanguageLevelTranslationCache] LANGUAGE-LEVEL: Cleared cache for ${language}`);
+      } else {
+        // Clear all languages for user
+        const keysToDelete = Array.from(this.cache.keys()).filter(key => 
+          key.includes(`-${userId}-`) && key.startsWith(this.CACHE_KEY_PREFIX)
+        );
+        
+        keysToDelete.forEach(key => {
+          this.cache.delete(key);
+          localStorage.removeItem(key);
+        });
+        
+        // Clear active translations
+        const activeKeysToDelete = Array.from(this.activeTranslations.keys()).filter(key => 
+          key.includes(`-${userId}-`) && key.startsWith(this.CACHE_KEY_PREFIX)
+        );
+        
+        activeKeysToDelete.forEach(key => {
+          this.activeTranslations.delete(key);
+        });
+        
+        console.log(`[LanguageLevelTranslationCache] LANGUAGE-LEVEL: Cleared all language caches for user ${userId}`);
+      }
+    } catch (error) {
+      console.error('[LanguageLevelTranslationCache] Error clearing cache:', error);
     }
   }
   
@@ -304,33 +336,42 @@ export class LanguageLevelTranslationCache {
   }
   
   private static setCacheEntry(cacheKey: string, entry: LanguageCacheEntry): void {
-    this.cache.set(cacheKey, entry);
-    
     try {
-      const storableEntry = {
-        ...entry,
-        translations: Object.fromEntries(entry.translations)
-      };
-      localStorage.setItem(cacheKey, JSON.stringify(storableEntry));
+      this.cache.set(cacheKey, entry);
+      
+      try {
+        const storableEntry = {
+          ...entry,
+          translations: Object.fromEntries(entry.translations)
+        };
+        localStorage.setItem(cacheKey, JSON.stringify(storableEntry));
+      } catch (error) {
+        console.error('[LanguageLevelTranslationCache] Error saving to localStorage:', error);
+      }
     } catch (error) {
-      console.error('[LanguageLevelTranslationCache] Error saving to localStorage:', error);
+      console.error('[LanguageLevelTranslationCache] Error setting cache entry:', error);
     }
   }
   
   // Get translation progress for UI
   static getTranslationProgress(userId: string, language: string): { progress: number; isComplete: boolean } {
-    if (language === 'en') {
-      return { progress: 100, isComplete: true };
+    try {
+      if (language === 'en') {
+        return { progress: 100, isComplete: true };
+      }
+      
+      const cacheKey = this.generateLanguageCacheKey(userId, language);
+      const cached = this.cache.get(cacheKey);
+      
+      if (cached && this.isCacheValid(cached)) {
+        const progress = cached.totalNodes > 0 ? Math.round((cached.translatedNodes / cached.totalNodes) * 100) : 100;
+        return { progress, isComplete: cached.isComplete };
+      }
+      
+      return { progress: 0, isComplete: false };
+    } catch (error) {
+      console.error('[LanguageLevelTranslationCache] Error getting progress:', error);
+      return { progress: 100, isComplete: true }; // Fallback to complete
     }
-    
-    const cacheKey = this.generateLanguageCacheKey(userId, language);
-    const cached = this.cache.get(cacheKey);
-    
-    if (cached && this.isCacheValid(cached)) {
-      const progress = cached.totalNodes > 0 ? Math.round((cached.translatedNodes / cached.totalNodes) * 100) : 100;
-      return { progress, isComplete: cached.isComplete };
-    }
-    
-    return { progress: 0, isComplete: false };
   }
 }

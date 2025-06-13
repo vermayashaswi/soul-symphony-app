@@ -1,9 +1,6 @@
 
 import React, { Component, ErrorInfo, ReactNode } from 'react';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { AlertTriangle, RefreshCw, Home } from 'lucide-react';
-import { TranslatableText } from '@/components/translation/TranslatableText';
+import { SimpleErrorBoundary } from '@/components/error-boundaries/SimpleErrorBoundary';
 
 interface Props {
   children: ReactNode;
@@ -14,7 +11,6 @@ interface Props {
 interface State {
   hasError: boolean;
   error?: Error;
-  errorInfo?: ErrorInfo;
 }
 
 export class SettingsErrorBoundary extends Component<Props, State> {
@@ -31,11 +27,6 @@ export class SettingsErrorBoundary extends Component<Props, State> {
   componentDidCatch(error: Error, errorInfo: ErrorInfo) {
     console.error('[SettingsErrorBoundary] Component stack:', errorInfo.componentStack);
     console.error('[SettingsErrorBoundary] Error details:', error.message, error.stack);
-    
-    this.setState({
-      error,
-      errorInfo
-    });
   }
 
   handleRetry = () => {
@@ -43,7 +34,7 @@ export class SettingsErrorBoundary extends Component<Props, State> {
     if (this.props.onReset) {
       this.props.onReset();
     }
-    this.setState({ hasError: false, error: undefined, errorInfo: undefined });
+    this.setState({ hasError: false, error: undefined });
   };
 
   handleGoHome = () => {
@@ -57,54 +48,130 @@ export class SettingsErrorBoundary extends Component<Props, State> {
       }
 
       return (
-        <div className="min-h-screen flex items-center justify-center p-4">
-          <Card className="w-full max-w-md">
-            <CardHeader className="text-center">
-              <AlertTriangle className="h-12 w-12 text-yellow-500 mx-auto mb-2" />
-              <CardTitle className="text-lg">
-                <TranslatableText text="Settings Error" />
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="text-center space-y-4">
-              <p className="text-sm text-muted-foreground">
-                <TranslatableText text="We encountered an error loading your settings. This might be due to a temporary issue." />
-              </p>
-              
-              <div className="flex flex-col gap-2">
-                <Button 
-                  onClick={this.handleRetry}
-                  className="w-full"
-                  variant="default"
-                >
-                  <RefreshCw className="h-4 w-4 mr-2" />
-                  <TranslatableText text="Try Again" />
-                </Button>
-                
-                <Button 
-                  onClick={this.handleGoHome}
-                  className="w-full"
-                  variant="outline"
-                >
-                  <Home className="h-4 w-4 mr-2" />
-                  <TranslatableText text="Go Home" />
-                </Button>
+        <div style={{
+          minHeight: '100vh',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          padding: '16px'
+        }}>
+          <div style={{
+            width: '100%',
+            maxWidth: '400px',
+            padding: '24px',
+            backgroundColor: 'white',
+            borderRadius: '8px',
+            boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)',
+            border: '1px solid #e5e7eb'
+          }}>
+            <div style={{ textAlign: 'center' }}>
+              <div style={{
+                fontSize: '48px',
+                marginBottom: '16px'
+              }}>
+                ⚠️
               </div>
+              <h1 style={{
+                fontSize: '18px',
+                fontWeight: '600',
+                margin: '0 0 16px 0',
+                color: '#1f2937'
+              }}>
+                Settings Error
+              </h1>
+            </div>
+            
+            <div style={{ textAlign: 'center', marginBottom: '24px' }}>
+              <p style={{
+                fontSize: '14px',
+                color: '#6b7280',
+                margin: 0
+              }}>
+                We encountered an error loading your settings. This might be due to a temporary issue.
+              </p>
+            </div>
+            
+            <div style={{
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '8px'
+            }}>
+              <button 
+                onClick={this.handleRetry}
+                style={{
+                  width: '100%',
+                  padding: '12px 16px',
+                  backgroundColor: '#3b82f6',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '6px',
+                  fontSize: '14px',
+                  fontWeight: '500',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '8px'
+                }}
+              >
+                🔄 Try Again
+              </button>
               
-              {process.env.NODE_ENV === 'development' && this.state.error && (
-                <details className="text-left mt-4">
-                  <summary className="text-xs cursor-pointer font-medium">Error Details</summary>
-                  <pre className="text-xs bg-muted p-2 rounded mt-2 overflow-auto max-h-40">
-                    {this.state.error.toString()}
-                    {this.state.errorInfo?.componentStack}
-                  </pre>
-                </details>
-              )}
-            </CardContent>
-          </Card>
+              <button 
+                onClick={this.handleGoHome}
+                style={{
+                  width: '100%',
+                  padding: '12px 16px',
+                  backgroundColor: 'transparent',
+                  color: '#6b7280',
+                  border: '1px solid #d1d5db',
+                  borderRadius: '6px',
+                  fontSize: '14px',
+                  fontWeight: '500',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '8px'
+                }}
+              >
+                🏠 Go Home
+              </button>
+            </div>
+            
+            {process.env.NODE_ENV === 'development' && this.state.error && (
+              <details style={{ marginTop: '16px' }}>
+                <summary style={{
+                  fontSize: '12px',
+                  cursor: 'pointer',
+                  fontWeight: '500',
+                  color: '#6b7280'
+                }}>
+                  Error Details
+                </summary>
+                <pre style={{
+                  fontSize: '11px',
+                  backgroundColor: '#f9fafb',
+                  padding: '8px',
+                  borderRadius: '4px',
+                  overflow: 'auto',
+                  maxHeight: '160px',
+                  marginTop: '8px',
+                  border: '1px solid #e5e7eb'
+                }}>
+                  {this.state.error.toString()}
+                </pre>
+              </details>
+            )}
+          </div>
         </div>
       );
     }
 
-    return this.props.children;
+    return (
+      <SimpleErrorBoundary onError={(error) => console.error('[SettingsErrorBoundary] Nested error:', error)}>
+        {this.props.children}
+      </SimpleErrorBoundary>
+    );
   }
 }

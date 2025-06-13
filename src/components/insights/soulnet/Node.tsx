@@ -57,6 +57,7 @@ const Node: React.FC<NodeProps> = ({
   // ANIMATION: Manual time tracking for pulsing effects
   const [animationTime, setAnimationTime] = useState(0);
   const [isReady, setIsReady] = useState(false);
+  const [hasError, setHasError] = useState(false);
   
   // Delayed initialization to prevent clock access issues
   useEffect(() => {
@@ -69,45 +70,55 @@ const Node: React.FC<NodeProps> = ({
 
   // ENHANCED COORDINATED TRANSLATION: Get coordinated translation for this node with better debugging
   const coordinatedTranslation = useMemo(() => {
-    if (getCoordinatedTranslation) {
-      const translation = getCoordinatedTranslation(node.id);
-      if (isInstantMode) {
-        console.log(`[Node] ENHANCED COORDINATED INSTANT: Got coordinated translation for ${node.id}: "${translation}" - NO LOADING DELAY`);
-      } else {
-        console.log(`[Node] ENHANCED COORDINATED: Got coordinated translation for ${node.id}: "${translation}"`);
+    try {
+      if (getCoordinatedTranslation) {
+        const translation = getCoordinatedTranslation(node.id);
+        if (isInstantMode) {
+          console.log(`[Node] ENHANCED COORDINATED INSTANT: Got coordinated translation for ${node.id}: "${translation}" - NO LOADING DELAY`);
+        } else {
+          console.log(`[Node] ENHANCED COORDINATED: Got coordinated translation for ${node.id}: "${translation}"`);
+        }
+        return translation;
       }
-      return translation;
+      if (isInstantMode) {
+        console.log(`[Node] ENHANCED COORDINATED INSTANT: No coordinated translation function available for ${node.id} - NO LOADING DELAY`);
+      } else {
+        console.log(`[Node] ENHANCED COORDINATED: No coordinated translation function available for ${node.id}`);
+      }
+      return undefined;
+    } catch (error) {
+      console.warn(`[Node] Error getting coordinated translation for ${node.id}:`, error);
+      return undefined;
     }
-    if (isInstantMode) {
-      console.log(`[Node] ENHANCED COORDINATED INSTANT: No coordinated translation function available for ${node.id} - NO LOADING DELAY`);
-    } else {
-      console.log(`[Node] ENHANCED COORDINATED: No coordinated translation function available for ${node.id}`);
-    }
-    return undefined;
   }, [node.id, getCoordinatedTranslation, isInstantMode]);
 
   // UPDATED: Fixed color scheme with proper default and selected states
   const color = useMemo(() => {
-    if (isSelected) {
-      // Selected state: Use darker/brighter shades
-      if (node.type === 'entity') {
-        return new THREE.Color('#16a34a'); // Darker green for selected entity nodes
-      } else {
-        return new THREE.Color('#d97706'); // Darker golden for selected emotion nodes
+    try {
+      if (isSelected) {
+        // Selected state: Use darker/brighter shades
+        if (node.type === 'entity') {
+          return new THREE.Color('#16a34a'); // Darker green for selected entity nodes
+        } else {
+          return new THREE.Color('#d97706'); // Darker golden for selected emotion nodes
+        }
       }
-    }
-    
-    if (isHighlighted || (!dimmed && !isSelected)) {
-      // Default state: Use the main colors for both highlighted and normal nodes
-      if (node.type === 'entity') {
-        return new THREE.Color('#22c55e'); // Green for entity nodes (spheres)
-      } else {
-        return new THREE.Color('#f59e0b'); // Golden for emotion nodes (cubes)
+      
+      if (isHighlighted || (!dimmed && !isSelected)) {
+        // Default state: Use the main colors for both highlighted and normal nodes
+        if (node.type === 'entity') {
+          return new THREE.Color('#22c55e'); // Green for entity nodes (spheres)
+        } else {
+          return new THREE.Color('#f59e0b'); // Golden for emotion nodes (cubes)
+        }
       }
+      
+      // ENHANCED: 20% lighter colors for dimmed nodes instead of very dark
+      return new THREE.Color(dimmed ? '#3a3a3a' : '#cccccc');
+    } catch (error) {
+      console.warn(`[Node] Error creating color for ${node.id}:`, error);
+      return new THREE.Color('#cccccc');
     }
-    
-    // ENHANCED: 20% lighter colors for dimmed nodes instead of very dark
-    return new THREE.Color(dimmed ? '#3a3a3a' : '#cccccc');
   }, [isSelected, isHighlighted, dimmed, node.type]);
 
   // ENHANCED: More dramatic scale differences for better hierarchy
@@ -129,7 +140,7 @@ const Node: React.FC<NodeProps> = ({
 
   // PULSATING ANIMATION: Enhanced frame animation with pulsing effects
   useFrame((state, delta) => {
-    if (!meshRef.current || !isReady) return;
+    if (!meshRef.current || !isReady || hasError) return;
     
     try {
       // Manual time tracking instead of clock access
@@ -163,18 +174,23 @@ const Node: React.FC<NodeProps> = ({
       }
       
       // Update material color and opacity
-      meshRef.current.material.color.lerp(color, 0.1);
       if (meshRef.current.material instanceof THREE.MeshStandardMaterial) {
+        meshRef.current.material.color.lerp(color, 0.1);
         meshRef.current.material.opacity = nodeOpacity;
       }
     } catch (error) {
       console.warn("Node pulsing animation error:", error);
+      setHasError(true);
     }
   });
 
   const handleNodeClick = (e: any) => {
-    e.stopPropagation();
-    onClick(node.id, e);
+    try {
+      e.stopPropagation();
+      onClick(node.id, e);
+    } catch (error) {
+      console.error(`[Node] Error handling click for ${node.id}:`, error);
+    }
   };
 
   // ENHANCED: Only show labels for highlighted/selected nodes or when forced
@@ -200,17 +216,28 @@ const Node: React.FC<NodeProps> = ({
 
   // ENHANCED: Improved geometry sizes to work with the enhanced scale differences
   const renderGeometry = () => {
-    if (node.type === 'emotion') {
-      // Cube for emotion nodes (golden)
-      return <boxGeometry args={[1.6, 1.6, 1.6]} />;
-    } else {
-      // Sphere for entity nodes (green)
-      return <sphereGeometry args={[0.8, 32, 32]} />;
+    try {
+      if (node.type === 'emotion') {
+        // Cube for emotion nodes (golden)
+        return <boxGeometry args={[1.6, 1.6, 1.6]} />;
+      } else {
+        // Sphere for entity nodes (green)
+        return <sphereGeometry args={[0.8, 32, 32]} />;
+      }
+    } catch (error) {
+      console.warn(`[Node] Error creating geometry for ${node.id}:`, error);
+      return <sphereGeometry args={[0.8, 16, 16]} />; // Fallback
     }
   };
 
   // Don't render until ready
-  if (!isReady) {
+  if (!isReady || hasError) {
+    return null;
+  }
+
+  // Validate node data
+  if (!node || !node.position || node.position.length !== 3) {
+    console.warn(`[Node] Invalid node data for ${node?.id}:`, node);
     return null;
   }
 

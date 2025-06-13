@@ -5,7 +5,7 @@ import { Canvas } from '@react-three/fiber';
 import { TimeRange } from '@/hooks/use-insights-data';
 import { useIsMobile } from '@/hooks/use-mobile';
 import SimplifiedSoulNetVisualization from './soulnet/SimplifiedSoulNetVisualization';
-import RenderingErrorBoundary from './soulnet/RenderingErrorBoundary';
+import { SimpleErrorBoundary } from '@/components/error-boundaries/SimpleErrorBoundary';
 import { LoadingState } from './soulnet/LoadingState';
 import { EmptyState } from './soulnet/EmptyState';
 import { FullscreenWrapper } from './soulnet/FullscreenWrapper';
@@ -71,11 +71,15 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
   // APP-LEVEL: Initialize the enhanced service with app-level translation service
   useEffect(() => {
     console.log("[SoulNet] APP-LEVEL: Setting up translation service integration");
-    EnhancedSoulNetPreloadService.setAppLevelTranslationService(translationService);
-    LanguageLevelTranslationCache.setAppLevelTranslationService(translationService);
+    try {
+      EnhancedSoulNetPreloadService.setAppLevelTranslationService(translationService);
+      LanguageLevelTranslationCache.setAppLevelTranslationService(translationService);
+    } catch (error) {
+      console.error("[SoulNet] Error setting up translation services:", error);
+    }
   }, []);
 
-  // ENHANCED: Use the instant data hook
+  // ENHANCED: Use the instant data hook with error handling
   const { 
     graphData, 
     loading, 
@@ -94,7 +98,7 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
     userId, 
     timeRange, 
     currentLanguage,
-    nodesCount: graphData.nodes.length,
+    nodesCount: graphData?.nodes?.length || 0,
     isInstantReady,
     loading,
     isTranslating,
@@ -118,7 +122,7 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
 
   // FIXED: Simplified rendering logic - only check for data availability
   useEffect(() => {
-    const hasData = graphData.nodes.length > 0;
+    const hasData = graphData?.nodes?.length > 0;
     const readyToRender = isInstantReady && !loading && !error;
     
     console.log("[SoulNet] FIXED RENDER LOGIC", {
@@ -137,7 +141,7 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
       setShouldRender(false);
       setSelectedEntity(null); // Clear selection if no data
     }
-  }, [graphData.nodes.length, isInstantReady, loading, error, translationComplete, shouldRender]);
+  }, [graphData?.nodes?.length, isInstantReady, loading, error, translationComplete, shouldRender]);
 
   // FIXED: Stabilized node selection handler - no dependencies on translation state
   const handleNodeSelect = useCallback((id: string) => {
@@ -190,7 +194,7 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
   }
 
   // FIXED: Show loading only when truly loading and no data available
-  if (loading && graphData.nodes.length === 0) {
+  if (loading && (!graphData?.nodes || graphData.nodes.length === 0)) {
     console.log("[SoulNet] FIXED: Showing general loading state");
     return <LoadingState />;
   }
@@ -220,7 +224,7 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
     </div>
   );
   
-  if (graphData.nodes.length === 0) return <EmptyState />;
+  if (!graphData?.nodes || graphData.nodes.length === 0) return <EmptyState />;
 
   // Show simplified error UI for canvas errors
   if (canvasError && retryCount > 2) {
@@ -301,7 +305,7 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
     );
   };
 
-  console.log(`[SoulNet] FIXED FINAL RENDER: ${graphData.nodes.length} nodes, shouldRender: ${shouldRender}, selectedEntity: ${selectedEntity}`);
+  console.log(`[SoulNet] FIXED FINAL RENDER: ${graphData?.nodes?.length || 0} nodes, shouldRender: ${shouldRender}, selectedEntity: ${selectedEntity}`);
 
   return (
     <div className={cn(
@@ -314,7 +318,7 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
         isFullScreen={isFullScreen}
         toggleFullScreen={toggleFullScreen}
       >
-        <RenderingErrorBoundary
+        <SimpleErrorBoundary
           onError={handleCanvasError}
           fallback={
             <div className="flex items-center justify-center p-10 bg-gray-100 dark:bg-gray-800 rounded-lg">
@@ -351,7 +355,7 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
           }
         >
           {/* FIXED: Canvas renders when we have data and should render */}
-          {shouldRender && graphData.nodes.length > 0 && (
+          {shouldRender && graphData?.nodes && graphData.nodes.length > 0 && (
             <Canvas
               style={{
                 width: '100%',
@@ -397,7 +401,7 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
               />
             </Canvas>
           )}
-        </RenderingErrorBoundary>
+        </SimpleErrorBoundary>
       </FullscreenWrapper>
       
       {!isFullScreen && (
