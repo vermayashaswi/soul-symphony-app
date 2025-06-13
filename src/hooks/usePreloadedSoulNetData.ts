@@ -32,29 +32,13 @@ export const usePreloadedSoulNetData = (
 ): UsePreloadedSoulNetDataReturn => {
   const { currentLanguage, prefetchSoulNetTranslations } = useTranslation();
   
-  // Optimistic initialization - check cache synchronously first
-  const getCachedDataSync = useCallback(() => {
-    if (!userId) return null;
-    const cacheKey = `${userId}-${timeRange}-${currentLanguage}`;
-    return SoulNetPreloadService.getCachedDataSync(cacheKey);
-  }, [userId, timeRange, currentLanguage]);
-
-  const initialCachedData = getCachedDataSync();
-  const hasInitialCache = initialCachedData !== null;
-
-  const [graphData, setGraphData] = useState<{ nodes: NodeData[], links: LinkData[] }>(
-    hasInitialCache ? { nodes: initialCachedData.nodes, links: initialCachedData.links } : { nodes: [], links: [] }
-  );
-  const [translations, setTranslations] = useState<Map<string, string>>(
-    hasInitialCache ? initialCachedData.translations : new Map()
-  );
-  const [connectionPercentages, setConnectionPercentages] = useState<Map<string, number>>(
-    hasInitialCache ? initialCachedData.connectionPercentages : new Map()
-  );
-  const [loading, setLoading] = useState(!hasInitialCache); // Only load if no cache
+  const [graphData, setGraphData] = useState<{ nodes: NodeData[], links: LinkData[] }>({ nodes: [], links: [] });
+  const [translations, setTranslations] = useState<Map<string, string>>(new Map());
+  const [connectionPercentages, setConnectionPercentages] = useState<Map<string, number>>(new Map());
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
 
-  console.log(`[usePreloadedSoulNetData] Initial state - hasCache: ${hasInitialCache}, loading: ${!hasInitialCache}, nodes: ${hasInitialCache ? initialCachedData.nodes.length : 0}`);
+  console.log(`[usePreloadedSoulNetData] Hook initialized for user: ${userId}, timeRange: ${timeRange}, language: ${currentLanguage}`);
 
   const preloadData = useCallback(async () => {
     if (!userId) {
@@ -65,13 +49,11 @@ export const usePreloadedSoulNetData = (
     console.log(`[usePreloadedSoulNetData] Preloading data for ${userId}, ${timeRange}, ${currentLanguage}`);
     
     try {
-      // Only set loading if we don't have cached data
-      if (!hasInitialCache) {
-        setLoading(true);
-      }
+      setLoading(true);
       setError(null);
 
-      const result = await SoulNetPreloadService.preloadSoulNetData(
+      // FIXED: Use the correct method name 'preloadData' instead of 'preloadSoulNetData'
+      const result = await SoulNetPreloadService.preloadData(
         userId,
         timeRange,
         currentLanguage
@@ -81,14 +63,15 @@ export const usePreloadedSoulNetData = (
         console.log(`[usePreloadedSoulNetData] Successfully loaded preloaded data with ${result.nodes.length} nodes`);
         setGraphData({ nodes: result.nodes, links: result.links });
         setTranslations(result.translations);
-        setConnectionPercentages(result.connectionPercentages);
+        
+        // For now, create empty connection percentages since the original service doesn't provide this
+        // This maintains compatibility with the hook interface
+        setConnectionPercentages(new Map());
       } else {
         console.log('[usePreloadedSoulNetData] No data returned from preload service');
-        if (!hasInitialCache) {
-          setGraphData({ nodes: [], links: [] });
-          setTranslations(new Map());
-          setConnectionPercentages(new Map());
-        }
+        setGraphData({ nodes: [], links: [] });
+        setTranslations(new Map());
+        setConnectionPercentages(new Map());
       }
     } catch (err) {
       console.error('[usePreloadedSoulNetData] Error preloading data:', err);
@@ -96,7 +79,7 @@ export const usePreloadedSoulNetData = (
     } finally {
       setLoading(false);
     }
-  }, [userId, timeRange, currentLanguage, hasInitialCache]);
+  }, [userId, timeRange, currentLanguage]);
 
   // Listen for language changes and trigger pre-translation
   useEffect(() => {
@@ -121,13 +104,8 @@ export const usePreloadedSoulNetData = (
   }, [userId, timeRange, prefetchSoulNetTranslations, preloadData]);
 
   useEffect(() => {
-    // Only preload if we don't have initial cached data
-    if (!hasInitialCache) {
-      preloadData();
-    } else {
-      console.log('[usePreloadedSoulNetData] Using initial cached data, skipping preload');
-    }
-  }, [preloadData, hasInitialCache]);
+    preloadData();
+  }, [preloadData]);
 
   // Clear cache when language changes to force refresh
   useEffect(() => {
