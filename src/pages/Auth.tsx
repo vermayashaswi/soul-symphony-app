@@ -9,6 +9,10 @@ import SouloLogo from '@/components/SouloLogo';
 import { signInWithGoogle } from '@/services/authService';
 import { useOnboarding } from '@/hooks/use-onboarding';
 import { TranslatableText } from '@/components/translation/TranslatableText';
+import { PhoneVerification } from '@/components/auth/PhoneVerification';
+import { Phone } from 'lucide-react';
+
+type AuthMode = 'signin' | 'phone';
 
 export default function Auth() {
   const location = useLocation();
@@ -16,6 +20,7 @@ export default function Auth() {
   const [searchParams] = useSearchParams();
   const [redirecting, setRedirecting] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [authMode, setAuthMode] = useState<AuthMode>('signin');
   const { user, isLoading: authLoading } = useAuth();
   const { onboardingComplete } = useOnboarding();
   const [authError, setAuthError] = useState<string | null>(null);
@@ -94,6 +99,15 @@ export default function Auth() {
     }
   };
 
+  const handlePhoneVerificationComplete = () => {
+    toast.success('Phone number verified successfully!');
+    // Navigate to the appropriate page after verification
+    const finalRedirect = !onboardingComplete && !redirectTo.includes('onboarding') 
+      ? '/app/onboarding'
+      : redirectTo;
+    navigate(finalRedirect, { replace: true });
+  };
+
   // If still checking auth state, show loading
   if (authLoading) {
     return (
@@ -115,6 +129,32 @@ export default function Auth() {
       originalRedirect: redirectTo
     });
     return <Navigate to={finalRedirect} replace />;
+  }
+
+  if (authMode === 'phone') {
+    return (
+      <div className="min-h-screen bg-background flex flex-col items-center justify-center px-4 py-12">
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.6 }}
+          className="max-w-md w-full relative z-10"
+        >
+          <div className="text-center mb-8">
+            <h1 className="text-3xl font-bold mb-2">
+              <TranslatableText text="Welcome to" forceTranslate={true} />{" "}
+              <SouloLogo size="large" className="text-blue-600" />
+            </h1>
+          </div>
+          
+          <PhoneVerification
+            onVerificationComplete={handlePhoneVerificationComplete}
+            onBack={() => setAuthMode('signin')}
+            showBackButton={true}
+          />
+        </motion.div>
+      </div>
+    );
   }
 
   return (
@@ -166,6 +206,27 @@ export default function Auth() {
               </svg>
             )}
             <TranslatableText text="Sign in with Google" forceTranslate={true} />
+          </Button>
+
+          <div className="relative">
+            <div className="absolute inset-0 flex items-center">
+              <span className="w-full border-t" />
+            </div>
+            <div className="relative flex justify-center text-xs uppercase">
+              <span className="bg-background px-2 text-muted-foreground">
+                <TranslatableText text="Or" forceTranslate={true} />
+              </span>
+            </div>
+          </div>
+
+          <Button 
+            variant="outline"
+            size="lg" 
+            className="w-full flex items-center justify-center gap-2"
+            onClick={() => setAuthMode('phone')}
+          >
+            <Phone className="h-5 w-5" />
+            <TranslatableText text="Sign in with Phone" forceTranslate={true} />
           </Button>
           
           <div className="text-center text-sm text-muted-foreground">
