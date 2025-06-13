@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
 import { Calendar, Filter, TrendingUp, ArrowUp, ArrowDown, Activity, Award } from 'lucide-react';
@@ -179,7 +178,7 @@ function InsightsContent() {
     return {
       emoji: mood?.emoji || '😊',
       name: mood?.emotion || 'Peaceful',
-      percentage: mood?.count || 0
+      percentage: mood?.percentage || 0
     };
   };
 
@@ -188,7 +187,7 @@ function InsightsContent() {
   };
 
   const getEmotionChartData = () => {
-    return insightsData.emotionDistribution || [];
+    return insightsData.emotions || [];
   };
 
   return (
@@ -427,7 +426,8 @@ function InsightsContent() {
               >
                 <ErrorBoundary>
                   <EmotionChart 
-                    emotions={getEmotionChartData()} 
+                    aggregatedData={insightsData.aggregatedData} 
+                    timeframe={timeRange}
                     onEmotionClick={handleEmotionClick}
                     selectedEmotion={selectedEmotion}
                   />
@@ -441,7 +441,7 @@ function InsightsContent() {
               >
                 <ErrorBoundary>
                   <MoodCalendar 
-                    sentiments={getSentimentData()}
+                    data={getSentimentData()}
                     timeRange={timeRange}
                   />
                 </ErrorBoundary>
@@ -457,41 +457,7 @@ function InsightsContent() {
               )}
             >
               <ErrorBoundary>
-                <PremiumFeatureGuard 
-                  feature="insights"
-                  fallback={
-                    <div className="bg-background rounded-xl p-8 text-center border">
-                      <h2 className="text-xl font-semibold mb-4">
-                        <EnhancedTranslatableText 
-                          text="Soul-Net Visualization" 
-                          forceTranslate={true}
-                          enableFontScaling={true}
-                          scalingContext="general"
-                          usePageTranslation={true}
-                        />
-                      </h2>
-                      <p className="text-muted-foreground mb-6">
-                        <EnhancedTranslatableText 
-                          text="Upgrade to Premium to see the 3D Soul-Net visualization of your emotional patterns." 
-                          forceTranslate={true}
-                          enableFontScaling={true}
-                          scalingContext="general"
-                          usePageTranslation={true}
-                        />
-                      </p>
-                      <Button onClick={() => window.location.href = '/app/subscription'}>
-                        <Award className="w-4 h-4 mr-2" />
-                        <EnhancedTranslatableText 
-                          text="Upgrade to Premium" 
-                          forceTranslate={true}
-                          enableFontScaling={true}
-                          scalingContext="compact"
-                          usePageTranslation={true}
-                        />
-                      </Button>
-                    </div>
-                  }
-                >
+                <PremiumFeatureGuard feature="insights">
                   <SoulNet 
                     userId={user?.id} 
                     timeRange={timeRange}
