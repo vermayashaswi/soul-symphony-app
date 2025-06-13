@@ -1,7 +1,6 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { SoulNetPreloadService } from '@/services/soulnetPreloadService';
-import { EnhancedSoulNetPreloadService } from '@/services/enhancedSoulNetPreloadService';
 import { NodeTranslationCacheService } from '@/services/nodeTranslationCache';
 import { useTranslation } from '@/contexts/TranslationContext';
 
@@ -34,32 +33,11 @@ export const usePreloadedSoulNetData = (
 ): UsePreloadedSoulNetDataReturn => {
   const { currentLanguage, prefetchSoulNetTranslations } = useTranslation();
   
-  // ENHANCED: Check enhanced cache first, fallback to legacy
+  // OPTIMIZED: Check cache with improved key strategy
   const getCachedDataSync = useCallback(() => {
     if (!userId) return null;
-    
-    // Try enhanced service first
-    const enhancedCacheKey = `${userId}-${timeRange}-${currentLanguage}`;
-    const enhancedCached = EnhancedSoulNetPreloadService.getInstantData(enhancedCacheKey);
-    if (enhancedCached && enhancedCached.data.translationComplete) {
-      console.log('[usePreloadedSoulNetData] ENHANCED: Using enhanced cached data');
-      return {
-        nodes: enhancedCached.data.nodes,
-        links: enhancedCached.data.links,
-        translations: enhancedCached.data.translations,
-        connectionPercentages: enhancedCached.data.connectionPercentages
-      };
-    }
-    
-    // Fallback to legacy cache
-    const legacyCacheKey = `${userId}-${timeRange}-${currentLanguage}`;
-    const legacyCached = SoulNetPreloadService.getCachedDataSync(legacyCacheKey);
-    if (legacyCached) {
-      console.log('[usePreloadedSoulNetData] ENHANCED: Using legacy cached data');
-      return legacyCached;
-    }
-    
-    return null;
+    const cacheKey = `${userId}-${timeRange}-${currentLanguage}`;
+    return SoulNetPreloadService.getCachedDataSync(cacheKey);
   }, [userId, timeRange, currentLanguage]);
 
   const initialCachedData = getCachedDataSync();
@@ -74,10 +52,10 @@ export const usePreloadedSoulNetData = (
   const [connectionPercentages, setConnectionPercentages] = useState<Map<string, number>>(
     hasInitialCache ? initialCachedData.connectionPercentages : new Map()
   );
-  const [loading, setLoading] = useState(!hasInitialCache);
+  const [loading, setLoading] = useState(!hasInitialCache); // Only load if no cache
   const [error, setError] = useState<Error | null>(null);
 
-  console.log(`[usePreloadedSoulNetData] ENHANCED: Initial state - hasCache: ${hasInitialCache}, loading: ${!hasInitialCache}, nodes: ${hasInitialCache ? initialCachedData.nodes.length : 0}`);
+  console.log(`[usePreloadedSoulNetData] OPTIMIZED: Initial state - hasCache: ${hasInitialCache}, loading: ${!hasInitialCache}, nodes: ${hasInitialCache ? initialCachedData.nodes.length : 0}`);
 
   const preloadData = useCallback(async () => {
     if (!userId) {
@@ -85,48 +63,28 @@ export const usePreloadedSoulNetData = (
       return;
     }
 
-    console.log(`[usePreloadedSoulNetData] ENHANCED: Preloading data for ${userId}, ${timeRange}, ${currentLanguage}`);
+    console.log(`[usePreloadedSoulNetData] OPTIMIZED: Preloading data for ${userId}, ${timeRange}, ${currentLanguage}`);
     
     try {
+      // Only set loading if we don't have cached data
       if (!hasInitialCache) {
         setLoading(true);
       }
       setError(null);
 
-      // ENHANCED: Try enhanced service first
-      try {
-        const enhancedResult = await EnhancedSoulNetPreloadService.preloadInstantData(
-          userId,
-          timeRange,
-          currentLanguage
-        );
-
-        if (enhancedResult && enhancedResult.translationComplete) {
-          console.log(`[usePreloadedSoulNetData] ENHANCED: Successfully loaded enhanced data with ${enhancedResult.nodes.length} nodes and ${enhancedResult.translations.size} translations`);
-          setGraphData({ nodes: enhancedResult.nodes, links: enhancedResult.links });
-          setTranslations(enhancedResult.translations);
-          setConnectionPercentages(enhancedResult.connectionPercentages);
-          setLoading(false);
-          return;
-        }
-      } catch (enhancedError) {
-        console.warn('[usePreloadedSoulNetData] ENHANCED: Enhanced service failed, falling back to legacy:', enhancedError);
-      }
-
-      // ENHANCED: Fallback to legacy service
-      const legacyResult = await SoulNetPreloadService.preloadSoulNetData(
+      const result = await SoulNetPreloadService.preloadSoulNetData(
         userId,
         timeRange,
         currentLanguage
       );
 
-      if (legacyResult) {
-        console.log(`[usePreloadedSoulNetData] ENHANCED: Successfully loaded legacy data with ${legacyResult.nodes.length} nodes and ${legacyResult.translations.size} translations`);
-        setGraphData({ nodes: legacyResult.nodes, links: legacyResult.links });
-        setTranslations(legacyResult.translations);
-        setConnectionPercentages(legacyResult.connectionPercentages);
+      if (result) {
+        console.log(`[usePreloadedSoulNetData] OPTIMIZED: Successfully loaded data with ${result.nodes.length} nodes and ${result.translations.size} translations`);
+        setGraphData({ nodes: result.nodes, links: result.links });
+        setTranslations(result.translations);
+        setConnectionPercentages(result.connectionPercentages);
       } else {
-        console.log('[usePreloadedSoulNetData] ENHANCED: No data returned from any preload service');
+        console.log('[usePreloadedSoulNetData] OPTIMIZED: No data returned from preload service');
         if (!hasInitialCache) {
           setGraphData({ nodes: [], links: [] });
           setTranslations(new Map());
@@ -134,24 +92,22 @@ export const usePreloadedSoulNetData = (
         }
       }
     } catch (err) {
-      console.error('[usePreloadedSoulNetData] ENHANCED: Error preloading data:', err);
+      console.error('[usePreloadedSoulNetData] OPTIMIZED: Error preloading data:', err);
       setError(err instanceof Error ? err : new Error('Unknown error occurred'));
     } finally {
       setLoading(false);
     }
   }, [userId, timeRange, currentLanguage, hasInitialCache]);
 
-  // ENHANCED: Enhanced language change handling with node cache
+  // OPTIMIZED: Enhanced language change handling with node cache
   useEffect(() => {
     const handleLanguageChange = async (event: CustomEvent) => {
       if (userId && event.detail.language !== 'en') {
-        console.log('[usePreloadedSoulNetData] ENHANCED: Language changed, checking node translation cache first');
+        console.log('[usePreloadedSoulNetData] OPTIMIZED: Language changed, checking node translation cache first');
         
         // Clear old cache for different language
         if (event.detail.previousLanguage && event.detail.previousLanguage !== event.detail.language) {
           NodeTranslationCacheService.clearCache(event.detail.previousLanguage);
-          // Also clear enhanced service cache
-          EnhancedSoulNetPreloadService.clearInstantCache(userId);
         }
         
         try {
@@ -159,7 +115,7 @@ export const usePreloadedSoulNetData = (
           // Refresh data after pre-translation
           await preloadData();
         } catch (error) {
-          console.error('[usePreloadedSoulNetData] ENHANCED: Error during language change pre-translation:', error);
+          console.error('[usePreloadedSoulNetData] OPTIMIZED: Error during language change pre-translation:', error);
         }
       }
     };
@@ -172,24 +128,23 @@ export const usePreloadedSoulNetData = (
   }, [userId, timeRange, prefetchSoulNetTranslations, preloadData]);
 
   useEffect(() => {
+    // Only preload if we don't have initial cached data
     if (!hasInitialCache) {
       preloadData();
     } else {
-      console.log('[usePreloadedSoulNetData] ENHANCED: Using initial cached data, skipping preload');
+      console.log('[usePreloadedSoulNetData] OPTIMIZED: Using initial cached data, skipping preload');
     }
   }, [preloadData, hasInitialCache]);
 
-  // ENHANCED: Selective cache clearing - only clear when language actually changes
+  // OPTIMIZED: Selective cache clearing - only clear when language actually changes
   useEffect(() => {
     if (userId) {
-      const enhancedCacheKey = `${userId}-${timeRange}-${currentLanguage}`;
-      const hasEnhancedCache = EnhancedSoulNetPreloadService.getInstantData(enhancedCacheKey);
+      // Only clear cache for the current combination if language changed
+      const currentCacheKey = `${userId}-${timeRange}-${currentLanguage}`;
+      const hasCurrentCache = SoulNetPreloadService.getCachedDataSync(currentCacheKey);
       
-      const legacyCacheKey = `${userId}-${timeRange}-${currentLanguage}`;
-      const hasLegacyCache = SoulNetPreloadService.getCachedDataSync(legacyCacheKey);
-      
-      if (!hasEnhancedCache && !hasLegacyCache) {
-        console.log(`[usePreloadedSoulNetData] ENHANCED: No cache for new language ${currentLanguage}, will fetch fresh data`);
+      if (!hasCurrentCache) {
+        console.log(`[usePreloadedSoulNetData] OPTIMIZED: No cache for new language ${currentLanguage}, will fetch fresh data`);
       }
     }
   }, [currentLanguage, userId, timeRange]);
