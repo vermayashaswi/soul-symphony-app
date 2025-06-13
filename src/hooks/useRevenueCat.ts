@@ -3,6 +3,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { revenueCatService, RevenueCatPurchaserInfo, RevenueCatProduct } from '@/services/revenuecat/revenueCatService';
 import { useToast } from '@/hooks/use-toast';
+import { REVENUECAT_CONFIG } from '@/config/revenueCatConfig';
 
 export interface UseRevenueCatReturn {
   isInitialized: boolean;
@@ -26,8 +27,6 @@ export const useRevenueCat = (): UseRevenueCatReturn => {
   const [purchaserInfo, setPurchaserInfo] = useState<RevenueCatPurchaserInfo | null>(null);
   const [products, setProducts] = useState<RevenueCatProduct[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [initializationAttempts, setInitializationAttempts] = useState(0);
-  const maxInitializationAttempts = 3;
 
   const initializeRevenueCat = useCallback(async () => {
     if (!user?.id) return;
@@ -35,88 +34,57 @@ export const useRevenueCat = (): UseRevenueCatReturn => {
     try {
       setIsLoading(true);
       
-      // Track initialization attempts
-      setInitializationAttempts(prev => prev + 1);
-      console.log(`[useRevenueCat] Initializing RevenueCat, attempt ${initializationAttempts + 1}/${maxInitializationAttempts}`);
-
-      // Initialize with timeout protection
-      await Promise.race([
-        revenueCatService.initialize(user.id),
-        new Promise((_, reject) => 
-          setTimeout(() => reject(new Error("RevenueCat initialization timeout")), 10000)
-        )
-      ]);
-
+      console.log('[useRevenueCat] Initializing RevenueCat service');
+      await revenueCatService.initialize(user.id);
       setIsInitialized(true);
-      setInitializationAttempts(0); // Reset counter on success
 
-      // Load products and purchaser info with timeouts
-      const productsPromise = Promise.race([
+      // Load products and purchaser info
+      const [productsData, purchaserData] = await Promise.allSettled([
         revenueCatService.getProducts(),
-        new Promise<RevenueCatProduct[]>((_, reject) => 
-          setTimeout(() => reject(new Error("Products fetch timeout")), 5000)
-        )
+        revenueCatService.getPurchaserInfo()
       ]);
 
-      const purchaserPromise = Promise.race([
-        revenueCatService.getPurchaserInfo(),
-        new Promise<RevenueCatPurchaserInfo | null>((resolve) => 
-          setTimeout(() => resolve(null), 5000) // Use null instead of rejection for purchaser info
-        )
-      ]);
+      if (productsData.status === 'fulfilled') {
+        setProducts(productsData.value);
+      } else {
+        console.warn('[useRevenueCat] Failed to load products:', productsData.reason);
+      }
 
-      const [productsData, purchaserData] = await Promise.all([
-        productsPromise.catch(() => [] as RevenueCatProduct[]), // Fallback to empty array
-        purchaserPromise
-      ]);
-
-      setProducts(productsData);
-      setPurchaserInfo(purchaserData);
+      if (purchaserData.status === 'fulfilled') {
+        setPurchaserInfo(purchaserData.value);
+      } else {
+        console.warn('[useRevenueCat] Failed to load purchaser info:', purchaserData.reason);
+      }
       
     } catch (error) {
       console.error('[useRevenueCat] Failed to initialize RevenueCat:', error);
       
-      if (initializationAttempts >= maxInitializationAttempts) {
-        console.warn('[useRevenueCat] Max initialization attempts reached, using fallback mode');
-        setIsInitialized(true); // Treat as initialized to prevent further attempts
-        
-        toast({
-          title: 'Subscription Services Limited',
-          description: 'Some premium features may not be available. Please check your connection.',
-          variant: 'default'
-        });
-      } else {
-        // Will retry on next render due to dependency change
-        console.log(`[useRevenueCat] Will retry initialization later, attempts so far: ${initializationAttempts + 1}/${maxInitializationAttempts}`);
-      }
+      toast({
+        title: 'Subscription Services Limited',
+        description: 'Some premium features may not be available. Please check your connection.',
+        variant: 'default'
+      });
+      
+      // Still mark as initialized to prevent blocking
+      setIsInitialized(true);
     } finally {
       setIsLoading(false);
     }
-  }, [user?.id, toast, initializationAttempts]);
+  }, [user?.id, toast]);
 
   useEffect(() => {
-    if (user?.id && !isInitialized && initializationAttempts < maxInitializationAttempts) {
+    if (user?.id && !isInitialized) {
       initializeRevenueCat();
     }
-  }, [user?.id, isInitialized, initializeRevenueCat, initializationAttempts]);
+  }, [user?.id, isInitialized, initializeRevenueCat]);
 
   const refreshPurchaserInfo = useCallback(async () => {
     if (!isInitialized) return;
 
     try {
       setIsLoading(true);
-      
-      const purchaserData = await Promise.race([
-        revenueCatService.getPurchaserInfo(),
-        new Promise<null>((resolve) => 
-          setTimeout(() => resolve(null), 5000)
-        )
-      ]);
-      
-      // Only update if we got actual data
-      if (purchaserData) {
-        setPurchaserInfo(purchaserData);
-      }
+      const purchaserData = await revenueCatService.getPurchaserInfo();
+      setPurchaserInfo(purchaserData);
     } catch (error) {
       console.error('[useRevenueCat] Failed to refresh purchaser info:', error);
     } finally {
@@ -136,25 +104,35 @@ export const useRevenueCat = (): UseRevenueCatReturn => {
 
     try {
       setIsLoading(true);
-      await revenueCatService.purchaseProduct(productId);
       
-      // Refresh purchaser info after successful purchase
-      await refreshPurchaserInfo();
+      console.log('[useRevenueCat] Starting purchase for product:', productId);
+      const transaction = await revenueCatService.purchaseProduct(productId);
       
-      toast({
-        title: 'Trial Started!',
-        description: 'Your 7-day free trial has begun. Enjoy premium features!',
-        variant: 'default'
-      });
+      if (transaction) {
+        // Refresh purchaser info after successful purchase
+        await refreshPurchaserInfo();
+        
+        toast({
+          title: 'Trial Started!',
+          description: 'Your 7-day free trial has begun. Enjoy premium features!',
+          variant: 'default'
+        });
+        
+        return true;
+      }
       
-      return true;
+      return false;
     } catch (error) {
       console.error('[useRevenueCat] Purchase failed:', error);
+      
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+      
       toast({
         title: 'Purchase Failed',
-        description: 'Failed to start your trial. Please try again later.',
+        description: `Failed to start your trial: ${errorMessage}`,
         variant: 'destructive'
       });
+      
       return false;
     } finally {
       setIsLoading(false);
@@ -168,7 +146,6 @@ export const useRevenueCat = (): UseRevenueCatReturn => {
       setIsLoading(true);
       const restored = await revenueCatService.restorePurchases();
       
-      // Only update if we got actual data
       if (restored) {
         setPurchaserInfo(restored);
         
@@ -177,6 +154,7 @@ export const useRevenueCat = (): UseRevenueCatReturn => {
           description: 'Your subscription has been restored successfully.',
           variant: 'default'
         });
+        
         return true;
       } else {
         toast({
@@ -184,15 +162,18 @@ export const useRevenueCat = (): UseRevenueCatReturn => {
           description: 'No previous purchases were found to restore.',
           variant: 'default'
         });
+        
         return false;
       }
     } catch (error) {
       console.error('[useRevenueCat] Restore failed:', error);
+      
       toast({
         title: 'Restore Failed',
         description: 'Failed to restore purchases. Please try again later.',
         variant: 'destructive'
       });
+      
       return false;
     } finally {
       setIsLoading(false);
@@ -210,7 +191,7 @@ export const useRevenueCat = (): UseRevenueCatReturn => {
     }
   }, [isInitialized]);
 
-  // Computed values with graceful degradation
+  // Computed values
   const isPremium = purchaserInfo ? revenueCatService.isUserPremium(purchaserInfo) : false;
   const trialEndDate = purchaserInfo ? revenueCatService.getTrialEndDate(purchaserInfo) : null;
   const isTrialActive = trialEndDate ? trialEndDate > new Date() : false;
