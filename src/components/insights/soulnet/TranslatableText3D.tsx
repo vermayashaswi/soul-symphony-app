@@ -1,6 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useTranslation } from '@/contexts/TranslationContext';
+import { NodeTranslationCacheService } from '@/services/nodeTranslationCache';
 import SmartTextRenderer from './SmartTextRenderer';
 
 interface TranslatableText3DProps {
@@ -19,7 +20,7 @@ interface TranslatableText3DProps {
   maxLines?: number;
   sourceLanguage?: string;
   onTranslationComplete?: (translatedText: string) => void;
-  // ENHANCED: Atomic coordinated translation props
+  // OPTIMIZED: Enhanced coordinated translation props
   coordinatedTranslation?: string;
   useCoordinatedTranslation?: boolean;
   isAtomicMode?: boolean;
@@ -52,9 +53,9 @@ export const TranslatableText3D: React.FC<TranslatableText3DProps> = ({
 
   useEffect(() => {
     const translateText = async () => {
-      // ENHANCED: Prioritize atomic coordinated translation for consistency
+      // OPTIMIZED: Prioritize atomic coordinated translation for consistency
       if (useCoordinatedTranslation && coordinatedTranslation && isAtomicMode) {
-        console.log(`[TranslatableText3D] ATOMIC: Using atomic coordinated translation for "${text}": "${coordinatedTranslation}"`);
+        console.log(`[TranslatableText3D] OPTIMIZED ATOMIC: Using coordinated translation for "${text}": "${coordinatedTranslation}"`);
         setTranslatedText(coordinatedTranslation);
         onTranslationComplete?.(coordinatedTranslation);
         setTranslationAttempted(true);
@@ -68,23 +69,32 @@ export const TranslatableText3D: React.FC<TranslatableText3DProps> = ({
         return;
       }
 
-      // ENHANCED: Atomic fallback handling with strict consistency
+      // OPTIMIZED: Check node translation cache first
+      if (isAtomicMode && currentLanguage !== 'en') {
+        const cachedNodeTranslation = await NodeTranslationCacheService.getCachedNodeTranslation(text, currentLanguage);
+        if (cachedNodeTranslation) {
+          console.log(`[TranslatableText3D] OPTIMIZED ATOMIC: Using node cache for "${text}": "${cachedNodeTranslation}"`);
+          setTranslatedText(cachedNodeTranslation);
+          onTranslationComplete?.(cachedNodeTranslation);
+          setTranslationAttempted(true);
+          return;
+        }
+      }
+
+      // OPTIMIZED: Fallback handling with strict consistency
       if (useCoordinatedTranslation && !coordinatedTranslation && isAtomicMode) {
-        console.log(`[TranslatableText3D] ATOMIC: No atomic coordinated translation available for "${text}", maintaining consistency`);
-        
-        // ENHANCED: In atomic mode, always use original text if no coordinated translation
-        console.log(`[TranslatableText3D] ATOMIC: Using original text for "${text}" to maintain atomic consistency`);
+        console.log(`[TranslatableText3D] OPTIMIZED ATOMIC: No coordinated translation available for "${text}", maintaining consistency`);
         setTranslatedText(text);
         onTranslationComplete?.(text);
         setTranslationAttempted(true);
         return;
       }
 
-      // ENHANCED: Standard translation flow only for non-atomic usage
+      // OPTIMIZED: Standard translation flow only for non-atomic usage
       if (!useCoordinatedTranslation && !isAtomicMode) {
         const cachedTranslation = getCachedTranslation(text);
         if (cachedTranslation) {
-          console.log(`[TranslatableText3D] STANDARD: Using app-level cached translation for "${text}": "${cachedTranslation}"`);
+          console.log(`[TranslatableText3D] OPTIMIZED STANDARD: Using app-level cached translation for "${text}": "${cachedTranslation}"`);
           setTranslatedText(cachedTranslation);
           onTranslationComplete?.(cachedTranslation);
           setTranslationAttempted(true);
@@ -93,37 +103,39 @@ export const TranslatableText3D: React.FC<TranslatableText3DProps> = ({
 
         // Skip translation if already attempted and failed
         if (translationAttempted) {
-          console.log(`[TranslatableText3D] STANDARD: Translation already attempted for "${text}", using original to avoid loops`);
+          console.log(`[TranslatableText3D] OPTIMIZED STANDARD: Translation already attempted for "${text}", using original to avoid loops`);
           setTranslatedText(text);
           onTranslationComplete?.(text);
           return;
         }
 
         if (!translate) {
-          console.log(`[TranslatableText3D] STANDARD: No translation function available, using original text for "${text}"`);
+          console.log(`[TranslatableText3D] OPTIMIZED STANDARD: No translation function available, using original text for "${text}"`);
           setTranslatedText(text);
           onTranslationComplete?.(text);
           setTranslationAttempted(true);
           return;
         }
 
-        console.log(`[TranslatableText3D] STANDARD: No cache found, translating "${text}" from ${sourceLanguage} to ${currentLanguage}`);
+        console.log(`[TranslatableText3D] OPTIMIZED STANDARD: No cache found, translating "${text}" from ${sourceLanguage} to ${currentLanguage}`);
         
         try {
           setIsTranslating(true);
           const result = await translate(text, sourceLanguage);
           
           if (result && result !== text) {
-            console.log(`[TranslatableText3D] STANDARD: Translation successful: "${text}" -> "${result}"`);
+            console.log(`[TranslatableText3D] OPTIMIZED STANDARD: Translation successful: "${text}" -> "${result}"`);
+            // Cache in node translation cache for future use
+            await NodeTranslationCacheService.setCachedNodeTranslation(text, result, currentLanguage);
             setTranslatedText(result);
             onTranslationComplete?.(result);
           } else {
-            console.log(`[TranslatableText3D] STANDARD: Using original text for "${text}" (same as result or null)`);
+            console.log(`[TranslatableText3D] OPTIMIZED STANDARD: Using original text for "${text}" (same as result or null)`);
             setTranslatedText(text);
             onTranslationComplete?.(text);
           }
         } catch (error) {
-          console.error(`[TranslatableText3D] STANDARD: Translation failed for "${text}":`, error);
+          console.error(`[TranslatableText3D] OPTIMIZED STANDARD: Translation failed for "${text}":`, error);
           setTranslatedText(text);
           onTranslationComplete?.(text);
         } finally {
@@ -131,8 +143,8 @@ export const TranslatableText3D: React.FC<TranslatableText3DProps> = ({
           setTranslationAttempted(true);
         }
       } else {
-        // ENHANCED: In atomic mode, always use original text to maintain consistency
-        console.log(`[TranslatableText3D] ATOMIC: Maintaining original text for "${text}" in atomic mode`);
+        // OPTIMIZED: In atomic mode, always use original text to maintain consistency
+        console.log(`[TranslatableText3D] OPTIMIZED ATOMIC: Maintaining original text for "${text}" in atomic mode`);
         setTranslatedText(text);
         onTranslationComplete?.(text);
         setTranslationAttempted(true);
@@ -142,7 +154,7 @@ export const TranslatableText3D: React.FC<TranslatableText3DProps> = ({
     translateText();
   }, [text, currentLanguage, sourceLanguage, translate, getCachedTranslation, onTranslationComplete, translationAttempted, coordinatedTranslation, useCoordinatedTranslation, isAtomicMode]);
 
-  // ENHANCED: Always render with current text - maintain atomic consistency
+  // OPTIMIZED: Always render with current text - maintain atomic consistency
   return (
     <SmartTextRenderer
       text={translatedText}
