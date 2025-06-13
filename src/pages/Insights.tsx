@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
 import { Calendar, Filter, TrendingUp, ArrowUp, ArrowDown, Activity, Award } from 'lucide-react';
@@ -178,16 +179,23 @@ function InsightsContent() {
     return {
       emoji: mood?.emoji || '😊',
       name: mood?.emotion || 'Peaceful',
-      percentage: mood?.percentage || 0
+      percentage: mood?.score || 0 // Use score instead of percentage
     };
   };
 
   const getAverageSentiment = () => {
-    return insightsData.averageSentiment || 0;
-  };
-
-  const getEmotionChartData = () => {
-    return insightsData.emotions || [];
+    // Calculate average sentiment from entries since it's not in InsightsData
+    const entries = insightsData.entries || [];
+    if (entries.length === 0) return 0;
+    
+    const validSentiments = entries
+      .filter(entry => entry.sentiment !== undefined && entry.sentiment !== null)
+      .map(entry => parseFloat(entry.sentiment || 0) || 0);
+    
+    if (validSentiments.length === 0) return 0;
+    
+    const sum = validSentiments.reduce((acc, sentiment) => acc + sentiment, 0);
+    return sum / validSentiments.length;
   };
 
   return (
@@ -320,8 +328,8 @@ function InsightsContent() {
                     />
                   </div>
                   <div className="text-sm text-muted-foreground">
-                    {getDominantMood().percentage}% <EnhancedTranslatableText 
-                      text="of entries" 
+                    {getDominantMood().percentage.toFixed(1)} <EnhancedTranslatableText 
+                      text="intensity score" 
                       forceTranslate={true}
                       enableFontScaling={true}
                       scalingContext="compact"
@@ -426,10 +434,8 @@ function InsightsContent() {
               >
                 <ErrorBoundary>
                   <EmotionChart 
-                    aggregatedData={insightsData.aggregatedData} 
+                    aggregatedData={insightsData.aggregatedEmotionData} 
                     timeframe={timeRange}
-                    onEmotionClick={handleEmotionClick}
-                    selectedEmotion={selectedEmotion}
                   />
                 </ErrorBoundary>
               </motion.div>
