@@ -1,4 +1,3 @@
-
 interface LanguageCacheEntry {
   translations: Map<string, string>;
   lastUpdated: number;
@@ -21,7 +20,7 @@ interface BatchTranslationResult {
 
 // APP-LEVEL: Translation service interface for coordination
 interface AppLevelTranslationService {
-  batchTranslate(options: BatchTranslationRequest): Promise<Map<string, unknown>>;
+  batchTranslate(options: BatchTranslationRequest): Promise<Map<string, string>>;
 }
 
 export class LanguageLevelTranslationCache {
@@ -192,14 +191,11 @@ export class LanguageLevelTranslationCache {
       
       console.log(`[LanguageLevelTranslationCache] LANGUAGE-LEVEL: Translating ${missingTexts.length} texts from 'en' to '${language}'`);
       
-      const rawBatchResults = await this.appTranslationService.batchTranslate({
+      const batchResults = await this.appTranslationService.batchTranslate({
         texts: missingTexts,
         targetLanguage: language,
         sourceLanguage: 'en'
       });
-      
-      // Convert the unknown map to string map safely
-      const batchResults = this.convertToStringMap(rawBatchResults);
       
       // Combine existing and new translations
       const allTranslations = new Map(existingTranslations);
