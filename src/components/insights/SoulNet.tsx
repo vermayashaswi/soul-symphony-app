@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import '@/types/three-reference';
 import { Canvas } from '@react-three/fiber';
@@ -13,15 +12,15 @@ import SoulNetDescription from './soulnet/SoulNetDescription';
 import { useUserColorThemeHex } from './soulnet/useUserColorThemeHex';
 import { cn } from '@/lib/utils';
 import { TranslatableText } from '@/components/translation/TranslatableText';
-import { useNodeBasedSoulNetData } from '@/hooks/useNodeBasedSoulNetData';
+import { useAtomicSoulNetData } from '@/hooks/useAtomicSoulNetData';
 
 interface SoulNetProps {
   userId: string | undefined;
   timeRange: TimeRange;
 }
 
-// IMPROVED: Translation Loading Component with better UX
-const ImprovedTranslationLoadingState: React.FC<{ progress: number }> = ({ progress }) => (
+// ATOMIC: Translation Loading Component for atomic operations
+const AtomicTranslationLoadingState: React.FC<{ progress: number }> = ({ progress }) => (
   <div className="bg-background rounded-xl shadow-sm border w-full p-6">
     <div className="flex flex-col items-center justify-center py-12 space-y-4">
       <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
@@ -68,10 +67,9 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
   const themeHex = useUserColorThemeHex();
   const [selectedEntity, setSelectedEntity] = useState<string | null>(null);
   
-  // Use ref to track rendering initialization
   const renderingInitialized = useRef(false);
 
-  // IMPROVED: Use the enhanced node-based hook
+  // ATOMIC: Use the new atomic hook
   const { 
     graphData, 
     translations,
@@ -81,12 +79,13 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
     error,
     isTranslating,
     translationProgress,
+    translationComplete,
     getNodeTranslation,
     getConnectionPercentage,
     getNodeConnections
-  } = useNodeBasedSoulNetData(userId, timeRange);
+  } = useAtomicSoulNetData(userId, timeRange);
 
-  console.log("[SoulNet] IMPROVED STATE", { 
+  console.log("[SoulNet] ATOMIC STATE", { 
     userId, 
     timeRange,
     nodesCount: graphData.nodes.length,
@@ -94,29 +93,30 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
     loading,
     isTranslating,
     translationProgress,
+    translationComplete,
     renderingReady,
     initialized: renderingInitialized.current
   });
 
   useEffect(() => {
-    console.log("[SoulNet] IMPROVED: Component mounted");
+    console.log("[SoulNet] ATOMIC: Component mounted");
     
     return () => {
-      console.log("[SoulNet] IMPROVED: Component unmounted");
+      console.log("[SoulNet] ATOMIC: Component unmounted");
     };
   }, []);
 
-  // IMPROVED: Initialize rendering when data is ready
+  // ATOMIC: Initialize rendering only when atomic translation is complete
   useEffect(() => {
     const shouldInitializeRendering = (
       !loading && 
       graphData.nodes.length > 0 && 
-      !isTranslating && 
+      translationComplete && 
       !renderingInitialized.current
     );
 
     if (shouldInitializeRendering) {
-      console.log("[SoulNet] IMPROVED: Initializing rendering");
+      console.log("[SoulNet] ATOMIC: Initializing rendering with complete translations");
       setRenderingReady(true);
       renderingInitialized.current = true;
     }
@@ -128,16 +128,16 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
     );
 
     if (shouldResetRendering) {
-      console.log("[SoulNet] IMPROVED: Resetting rendering due to error or data loss");
+      console.log("[SoulNet] ATOMIC: Resetting rendering due to error or data loss");
       setRenderingReady(false);
       renderingInitialized.current = false;
     }
-  }, [loading, graphData.nodes.length, isTranslating, error]);
+  }, [loading, graphData.nodes.length, translationComplete, error]);
 
-  // IMPROVED: Reset rendering when time range changes
+  // Reset rendering when time range changes
   useEffect(() => {
     if (renderingInitialized.current) {
-      console.log("[SoulNet] IMPROVED: Time range changed, resetting rendering");
+      console.log("[SoulNet] ATOMIC: Time range changed, resetting rendering");
       setRenderingReady(false);
       renderingInitialized.current = false;
     }
@@ -145,7 +145,7 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
 
   // Node selection with stable state management
   const handleNodeSelect = useCallback((id: string) => {
-    console.log(`[SoulNet] IMPROVED: Node selected: ${id}`);
+    console.log(`[SoulNet] ATOMIC: Node selected: ${id}`);
     if (selectedEntity === id) {
       setSelectedEntity(null);
     } else {
@@ -159,13 +159,13 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
   const toggleFullScreen = useCallback(() => {
     setIsFullScreen(prev => {
       if (!prev) setSelectedEntity(null);
-      console.log(`[SoulNet] IMPROVED: Toggling fullscreen: ${!prev}`);
+      console.log(`[SoulNet] ATOMIC: Toggling fullscreen: ${!prev}`);
       return !prev;
     });
   }, []);
 
   const handleCanvasError = useCallback((error: Error) => {
-    console.error('[SoulNet] IMPROVED: Canvas error:', error);
+    console.error('[SoulNet] ATOMIC: Canvas error:', error);
     setCanvasError(error);
     setRetryCount(prev => prev + 1);
     setRenderingReady(false);
@@ -178,15 +178,15 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
     renderingInitialized.current = false;
   }, []);
 
-  // IMPROVED: Show translation loading if translating (with better UX)
-  if (isTranslating && graphData.nodes.length > 0) {
-    console.log("[SoulNet] IMPROVED: Showing translation loading state");
-    return <ImprovedTranslationLoadingState progress={translationProgress} />;
+  // ATOMIC: Show translation loading if translating and not complete
+  if (isTranslating && !translationComplete) {
+    console.log("[SoulNet] ATOMIC: Showing atomic translation loading state");
+    return <AtomicTranslationLoadingState progress={translationProgress} />;
   }
 
   // Show general loading if we have no data and are still loading
   if (loading && graphData.nodes.length === 0) {
-    console.log("[SoulNet] IMPROVED: Showing general loading state");
+    console.log("[SoulNet] ATOMIC: Showing general loading state");
     return <LoadingState />;
   }
   
@@ -296,7 +296,7 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
     );
   };
 
-  console.log(`[SoulNet] IMPROVED RENDER: ${graphData.nodes.length} nodes, ${graphData.links.length} links, renderingReady: ${renderingReady}, initialized: ${renderingInitialized.current}`);
+  console.log(`[SoulNet] ATOMIC RENDER: ${graphData.nodes.length} nodes, ${graphData.links.length} links, renderingReady: ${renderingReady}, complete: ${translationComplete}`);
 
   return (
     <div className={cn(
@@ -345,8 +345,8 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
             </div>
           }
         >
-          {/* IMPROVED: Canvas renders when ready with stable data */}
-          {renderingReady && (
+          {/* ATOMIC: Canvas renders only when atomic translation is complete */}
+          {renderingReady && translationComplete && (
             <Canvas
               style={{
                 width: '100%',
