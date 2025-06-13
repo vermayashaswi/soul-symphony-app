@@ -38,7 +38,7 @@ interface TranslationState {
   complete: boolean;
 }
 
-class EnhancedSoulNetPreloadService {
+class EnhancedSoulNetPreloadServiceClass {
   private instantCache = new Map<string, InstantSoulNetData>();
   private translationStates = new Map<string, TranslationState>();
   private appLevelTranslationService: any = null;
@@ -255,4 +255,5 @@ class EnhancedSoulNetPreloadService {
   }
 }
 
-export const EnhancedSoulNetPreloadService = new EnhancedSoulNetPreloadService();
+// FIXED: Single export with unique name
+export const EnhancedSoulNetPreloadService = new EnhancedSoulNetPreloadServiceClass();

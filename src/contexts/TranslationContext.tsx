@@ -1,3 +1,4 @@
+
 import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react';
 import { onDemandTranslationCache } from '@/utils/website-translations';
 import { SoulNetPreloadService } from '@/services/soulnetPreloadService';
@@ -194,16 +195,14 @@ export const TranslationProvider: React.FC<TranslationProviderProps> = ({ childr
     }
   }, [currentLanguage, translationCache]);
 
-  const getCachedTranslation = useCallback(async (text: string): Promise<string | null> => {
+  // FIXED: Make getCachedTranslation synchronous by only checking local cache
+  const getCachedTranslation = useCallback((text: string): string | null => {
     const cacheKey = `${text}_en_${currentLanguage}`;
     const localCache = translationCache[cacheKey];
     
-    // ENHANCED: Check coordinated translation service cache
-    const coordinatedCache = await translationService.getCachedTranslation(text, currentLanguage);
-    
-    console.log('[TranslationContext] Checking coordinated cache for:', text.substring(0, 30), 
-      { localCache: !!localCache, coordinatedCache: !!coordinatedCache });
-    return localCache || coordinatedCache || null;
+    console.log('[TranslationContext] Checking local cache for:', text.substring(0, 30), 
+      { localCache: !!localCache });
+    return localCache || null;
   }, [currentLanguage, translationCache]);
 
   const prefetchTranslationsForRoute = useCallback(async (route: string): Promise<void> => {
