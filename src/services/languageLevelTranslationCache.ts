@@ -1,4 +1,3 @@
-
 interface LanguageCacheEntry {
   translations: Map<string, string>;
   lastUpdated: number;
@@ -21,7 +20,7 @@ interface BatchTranslationResult {
 
 // APP-LEVEL: Translation service interface for coordination
 interface AppLevelTranslationService {
-  batchTranslate(options: BatchTranslationRequest): Promise<Map<string, string>>;
+  batchTranslate(options: BatchTranslationRequest): Promise<Map<string, unknown>>;
 }
 
 export class LanguageLevelTranslationCache {
@@ -37,6 +36,20 @@ export class LanguageLevelTranslationCache {
   static setAppLevelTranslationService(service: AppLevelTranslationService) {
     console.log('[LanguageLevelTranslationCache] APP-LEVEL: Setting translation service');
     this.appTranslationService = service;
+  }
+  
+  // Helper method to safely convert translation results to string map
+  private static convertToStringMap(resultMap: Map<string, unknown>): Map<string, string> {
+    const stringMap = new Map<string, string>();
+    
+    resultMap.forEach((value, key) => {
+      // Safely convert to string, fallback to original key if conversion fails
+      const stringValue = typeof value === 'string' ? value : 
+                         (value != null ? String(value) : key);
+      stringMap.set(key, stringValue);
+    });
+    
+    return stringMap;
   }
   
   // Generate cache key for a language (not time-range specific)
@@ -178,11 +191,14 @@ export class LanguageLevelTranslationCache {
       
       console.log(`[LanguageLevelTranslationCache] LANGUAGE-LEVEL: Translating ${missingTexts.length} texts from 'en' to '${language}'`);
       
-      const batchResults = await this.appTranslationService.batchTranslate({
+      const rawBatchResults = await this.appTranslationService.batchTranslate({
         texts: missingTexts,
         targetLanguage: language,
         sourceLanguage: 'en'
       });
+      
+      // Convert the unknown map to string map safely
+      const batchResults = this.convertToStringMap(rawBatchResults);
       
       // Combine existing and new translations
       const allTranslations = new Map(existingTranslations);
