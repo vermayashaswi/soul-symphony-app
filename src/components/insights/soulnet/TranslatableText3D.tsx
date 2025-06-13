@@ -73,7 +73,7 @@ export const TranslatableText3D: React.FC<TranslatableText3DProps> = ({
       if (isAtomicMode && currentLanguage !== 'en') {
         const cachedNodeTranslation = await NodeTranslationCacheService.getCachedNodeTranslation(text, currentLanguage);
         if (cachedNodeTranslation && cachedNodeTranslation.trim()) {
-          console.log(`[TranslatableText3D] ENHANCED ATOMIC: Using node cache for "${text}": "${cachedNodeTranslation}"`);
+          console.log(`[TranslatableText3D]ATOMIC: Using node cache for "${text}": "${cachedNodeTranslation}"`);
           setTranslatedText(cachedNodeTranslation);
           onTranslationComplete?.(cachedNodeTranslation);
           setTranslationAttempted(true);
