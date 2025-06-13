@@ -16,9 +16,9 @@ interface PersistentTranslatableText3DProps {
   enableWrapping?: boolean;
   maxCharsPerLine?: number;
   maxLines?: number;
-  // ATOMIC: Use provided atomic translation for consistent display
-  atomicTranslation?: string;
-  translationComplete?: boolean;
+  // SIMPLIFIED: Use provided translation or original text
+  translation?: string;
+  useTranslation?: boolean;
 }
 
 export const PersistentTranslatableText3D: React.FC<PersistentTranslatableText3DProps> = ({
@@ -35,13 +35,13 @@ export const PersistentTranslatableText3D: React.FC<PersistentTranslatableText3D
   enableWrapping = false,
   maxCharsPerLine = 18,
   maxLines = 3,
-  atomicTranslation,
-  translationComplete = false
+  translation,
+  useTranslation = false
 }) => {
-  // ATOMIC: Use atomic translation only when complete, otherwise use original text
-  const displayText = (translationComplete && atomicTranslation) ? atomicTranslation : text;
+  // SIMPLIFIED: Use translation if provided and useTranslation is true, otherwise use original text
+  const displayText = (useTranslation && translation) ? translation : text;
 
-  console.log(`[PersistentTranslatableText3D] ATOMIC: Rendering "${text}" -> "${displayText}" (complete: ${translationComplete})`);
+  console.log(`[PersistentTranslatableText3D] SIMPLIFIED: Rendering "${text}" -> "${displayText}" (useTranslation: ${useTranslation})`);
 
   return (
     <SmartTextRenderer

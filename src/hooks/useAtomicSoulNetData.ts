@@ -1,6 +1,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { AtomicSoulNetService } from '@/services/atomicSoulNetService';
+import { SimplifiedSoulNetTranslationService } from '@/services/simplifiedSoulNetTranslationService';
 import { useTranslation } from '@/contexts/TranslationContext';
 
 interface NodeData {
@@ -54,90 +55,125 @@ export const useAtomicSoulNetData = (
   const [translationProgress, setTranslationProgress] = useState(100);
   const [translationComplete, setTranslationComplete] = useState(false);
 
-  const loadData = useCallback(async () => {
+  // SIMPLIFIED: Load graph data (language-independent)
+  const loadGraphData = useCallback(async () => {
     if (!userId) {
       setLoading(false);
-      return;
+      return null;
     }
 
-    console.log(`[useAtomicSoulNetData] ATOMIC: Loading data for ${userId}, ${timeRange}, ${currentLanguage}`);
+    console.log(`[useAtomicSoulNetData] SIMPLIFIED: Loading graph data for ${userId}, ${timeRange}`);
     
     try {
-      setError(null);
-      setLoading(true);
-
-      const result = await AtomicSoulNetService.getAtomicData(
-        userId,
-        timeRange,
-        currentLanguage
-      );
-
+      const result = await AtomicSoulNetService.getAtomicData(userId, timeRange, 'en');
+      
       if (result) {
-        console.log(`[useAtomicSoulNetData] ATOMIC: Data loaded successfully`, {
+        console.log(`[useAtomicSoulNetData] SIMPLIFIED: Graph data loaded`, {
           nodes: result.nodes.length,
-          translations: result.translations.size,
-          isTranslating: result.isTranslating,
-          translationComplete: result.translationComplete,
-          progress: result.translationProgress
+          links: result.links.length
         });
         
         setGraphData({ nodes: result.nodes, links: result.links });
-        setTranslations(result.translations);
         setConnectionPercentages(result.connectionPercentages);
         setNodeConnectionData(result.nodeConnectionData);
-        setIsTranslating(result.isTranslating);
-        setTranslationProgress(result.translationProgress);
-        setTranslationComplete(result.translationComplete);
+        return result.nodes.map(node => node.id);
       } else {
-        console.log('[useAtomicSoulNetData] ATOMIC: No data returned');
+        console.log('[useAtomicSoulNetData] SIMPLIFIED: No graph data');
         setGraphData({ nodes: [], links: [] });
-        setTranslations(new Map());
         setConnectionPercentages(new Map());
         setNodeConnectionData(new Map());
-        setIsTranslating(false);
-        setTranslationProgress(100);
-        setTranslationComplete(true);
+        return [];
       }
     } catch (err) {
-      console.error('[useAtomicSoulNetData] ATOMIC: Error loading data:', err);
+      console.error('[useAtomicSoulNetData] SIMPLIFIED: Error loading graph data:', err);
       setError(err instanceof Error ? err : new Error('Unknown error occurred'));
+      return null;
+    }
+  }, [userId, timeRange]);
+
+  // SIMPLIFIED: Load translations (language-dependent)
+  const loadTranslations = useCallback(async (nodeIds: string[]) => {
+    if (!userId || !nodeIds || nodeIds.length === 0) {
+      setTranslations(new Map());
+      setIsTranslating(false);
+      setTranslationProgress(100);
+      setTranslationComplete(true);
+      return;
+    }
+
+    console.log(`[useAtomicSoulNetData] SIMPLIFIED: Loading translations for ${nodeIds.length} nodes in ${currentLanguage}`);
+    
+    try {
+      const result = await SimplifiedSoulNetTranslationService.getTranslationsForLanguage(
+        nodeIds,
+        currentLanguage,
+        userId
+      );
+
+      console.log(`[useAtomicSoulNetData] SIMPLIFIED: Translation result`, {
+        translations: result.translations.size,
+        isTranslating: result.isTranslating,
+        complete: result.translationComplete,
+        progress: result.progress
+      });
+      
+      setTranslations(result.translations);
+      setIsTranslating(result.isTranslating);
+      setTranslationProgress(result.progress);
+      setTranslationComplete(result.translationComplete);
+    } catch (err) {
+      console.error('[useAtomicSoulNetData] SIMPLIFIED: Error loading translations:', err);
+      setTranslations(new Map());
       setIsTranslating(false);
       setTranslationProgress(100);
       setTranslationComplete(false);
-    } finally {
-      setLoading(false);
     }
-  }, [userId, timeRange, currentLanguage]);
+  }, [userId, currentLanguage]);
 
-  // Load data when dependencies change
+  // SIMPLIFIED: Load data when dependencies change
   useEffect(() => {
-    loadData();
-  }, [loadData]);
+    const loadData = async () => {
+      setError(null);
+      setLoading(true);
 
-  // Listen for atomic translation completion
+      const nodeIds = await loadGraphData();
+      if (nodeIds) {
+        await loadTranslations(nodeIds);
+      }
+      
+      setLoading(false);
+    };
+
+    loadData();
+  }, [loadGraphData, loadTranslations]);
+
+  // SIMPLIFIED: Listen for translation completion
   useEffect(() => {
     const handleTranslationComplete = (event: CustomEvent) => {
       const stateKey = `${userId}-${currentLanguage}`;
       if (event.detail.stateKey === stateKey) {
-        console.log('[useAtomicSoulNetData] ATOMIC: Translation completed, reloading data');
-        loadData();
+        console.log('[useAtomicSoulNetData] SIMPLIFIED: Translation completed, reloading translations');
+        const nodeIds = graphData.nodes.map(node => node.id);
+        if (nodeIds.length > 0) {
+          loadTranslations(nodeIds);
+        }
       }
     };
 
-    window.addEventListener('atomicSoulNetTranslationComplete', handleTranslationComplete as EventListener);
+    window.addEventListener('soulNetTranslationComplete', handleTranslationComplete as EventListener);
     
     return () => {
-      window.removeEventListener('atomicSoulNetTranslationComplete', handleTranslationComplete as EventListener);
+      window.removeEventListener('soulNetTranslationComplete', handleTranslationComplete as EventListener);
     };
-  }, [userId, currentLanguage, loadData]);
+  }, [userId, currentLanguage, graphData.nodes, loadTranslations]);
 
-  // Get node translation (guaranteed atomic consistency)
+  // SIMPLIFIED: Get node translation with fallback
   const getNodeTranslation = useCallback((nodeId: string): string => {
     if (currentLanguage === 'en') {
       return nodeId;
     }
 
-    // Only use translations if atomic translation is complete
+    // Use translations only when complete to maintain consistency
     if (translationComplete) {
       const translation = translations.get(nodeId);
       if (translation) {
@@ -145,7 +181,7 @@ export const useAtomicSoulNetData = (
       }
     }
 
-    // Return original text to maintain atomic consistency
+    // Return original text for consistency
     return nodeId;
   }, [currentLanguage, translations, translationComplete]);
 
@@ -164,7 +200,7 @@ export const useAtomicSoulNetData = (
     };
   }, [nodeConnectionData]);
 
-  console.log(`[useAtomicSoulNetData] ATOMIC STATE: nodes=${graphData.nodes.length}, translations=${translations.size}, loading=${loading}, translating=${isTranslating}, progress=${translationProgress}%, complete=${translationComplete}`);
+  console.log(`[useAtomicSoulNetData] SIMPLIFIED STATE: nodes=${graphData.nodes.length}, translations=${translations.size}, loading=${loading}, translating=${isTranslating}, progress=${translationProgress}%, complete=${translationComplete}`);
 
   return {
     graphData,
