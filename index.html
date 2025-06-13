@@ -142,38 +142,46 @@
     <div id="root"></div>
     <div id="google_translate_element" style="position: absolute; top: -9999px; left: -9999px;"></div>
     
-    <!-- Deferred scripts for better performance -->
+    <!-- Production-optimized scripts -->
     <script>
-      // Performance monitoring
-      if ('performance' in window && 'timing' in performance) {
-        window.addEventListener('load', function() {
-          setTimeout(function() {
-            const timing = performance.timing;
-            const loadTime = timing.loadEventEnd - timing.navigationStart;
-            console.log('[Perf] Total load time:', loadTime, 'ms');
-            
-            // Track LCP
-            if ('PerformanceObserver' in window) {
-              const observer = new PerformanceObserver(function(list) {
-                const entries = list.getEntries();
-                const lastEntry = entries[entries.length - 1];
-                console.log('[Perf] LCP:', lastEntry.startTime, 'ms');
-              });
-              observer.observe({ entryTypes: ['largest-contentful-paint'] });
-            }
-          }, 0);
-        });
-      }
+      // Production-safe error handling
+      window.addEventListener('error', function(event) {
+        // Only log errors in development
+        if (window.location.hostname === 'localhost' || 
+            window.location.hostname.includes('127.0.0.1') ||
+            window.location.hostname.includes('lovableproject.com')) {
+          console.error('Global error:', event.error);
+        }
+      });
+
+      window.addEventListener('unhandledrejection', function(event) {
+        // Only log errors in development
+        if (window.location.hostname === 'localhost' || 
+            window.location.hostname.includes('127.0.0.1') ||
+            window.location.hostname.includes('lovableproject.com')) {
+          console.error('Unhandled promise rejection:', event.reason);
+        }
+      });
       
       // Service worker registration for caching
       if ('serviceWorker' in navigator) {
         window.addEventListener('load', function() {
           navigator.serviceWorker.register('/sw.js')
             .then(function(registration) {
-              console.log('[SW] Registered:', registration.scope);
+              // Only log in development
+              if (window.location.hostname === 'localhost' || 
+                  window.location.hostname.includes('127.0.0.1') ||
+                  window.location.hostname.includes('lovableproject.com')) {
+                console.log('[SW] Registered:', registration.scope);
+              }
             })
             .catch(function(error) {
-              console.log('[SW] Registration failed:', error);
+              // Only log in development
+              if (window.location.hostname === 'localhost' || 
+                  window.location.hostname.includes('127.0.0.1') ||
+                  window.location.hostname.includes('lovableproject.com')) {
+                console.log('[SW] Registration failed:', error);
+              }
             });
         });
       }
@@ -181,6 +189,5 @@
     
     <script type="module" src="/src/main.tsx"></script>
     <script type="text/javascript" src="https://translate.google.com/translate_a/element.js?cb=googleTranslateElementInit" async defer></script>
-    <script src="https://cdn.gpteng.co/gptengineer.js" type="module"></script>
   </body>
 </html>

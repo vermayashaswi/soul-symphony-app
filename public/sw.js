@@ -2,6 +2,22 @@
 const CACHE_NAME = 'soulo-v1.0.0';
 const STATIC_CACHE_NAME = 'soulo-static-v1.0.0';
 
+// Production-safe logging function
+const log = (message, data = null) => {
+  // Only log in development (check for localhost or development domains)
+  const isDev = self.location.hostname === 'localhost' || 
+                self.location.hostname.includes('127.0.0.1') ||
+                self.location.hostname.includes('lovableproject.com');
+  
+  if (isDev) {
+    if (data) {
+      console.log(`[SW] ${message}`, data);
+    } else {
+      console.log(`[SW] ${message}`);
+    }
+  }
+};
+
 // Critical resources to cache immediately
 const CRITICAL_RESOURCES = [
   '/',
@@ -20,16 +36,16 @@ const FONT_RESOURCES = [
 
 // Install event - cache critical resources
 self.addEventListener('install', (event) => {
-  console.log('[SW] Installing service worker');
+  log('Installing service worker');
   
   event.waitUntil(
     Promise.all([
       caches.open(CACHE_NAME).then((cache) => {
-        console.log('[SW] Caching critical resources');
+        log('Caching critical resources');
         return cache.addAll(CRITICAL_RESOURCES);
       }),
       caches.open(STATIC_CACHE_NAME).then((cache) => {
-        console.log('[SW] Caching font resources');
+        log('Caching font resources');
         return cache.addAll(FONT_RESOURCES.map(url => new Request(url, { mode: 'cors' })));
       })
     ])
@@ -41,14 +57,14 @@ self.addEventListener('install', (event) => {
 
 // Activate event - clean up old caches
 self.addEventListener('activate', (event) => {
-  console.log('[SW] Activating service worker');
+  log('Activating service worker');
   
   event.waitUntil(
     caches.keys().then((cacheNames) => {
       return Promise.all(
         cacheNames.map((cacheName) => {
           if (cacheName !== CACHE_NAME && cacheName !== STATIC_CACHE_NAME) {
-            console.log('[SW] Deleting old cache:', cacheName);
+            log('Deleting old cache', cacheName);
             return caches.delete(cacheName);
           }
         })
@@ -121,7 +137,7 @@ self.addEventListener('fetch', (event) => {
 // Background sync for better offline experience
 self.addEventListener('sync', (event) => {
   if (event.tag === 'background-sync') {
-    console.log('[SW] Background sync triggered');
+    log('Background sync triggered');
     // Handle background sync operations here
   }
 });
@@ -130,7 +146,7 @@ self.addEventListener('sync', (event) => {
 self.addEventListener('push', (event) => {
   if (event.data) {
     const data = event.data.json();
-    console.log('[SW] Push notification received:', data);
+    log('Push notification received', data);
     
     const options = {
       body: data.body,

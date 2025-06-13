@@ -1,6 +1,9 @@
 
 import React, { useEffect, useRef } from 'react';
 import { useTutorial } from '@/contexts/TutorialContext';
+import { createLogger } from '@/utils/logger';
+
+const logger = createLogger('ButtonStateManager');
 
 interface ButtonStateManagerProps {
   buttonRef: React.RefObject<HTMLDivElement>;
@@ -25,7 +28,7 @@ const ButtonStateManager: React.FC<ButtonStateManagerProps> = ({
     const stateChanged = previousStateRef.current !== isInArrowTutorialStep;
     previousStateRef.current = isInArrowTutorialStep;
 
-    console.log('[ButtonStateManager] State change detected:', {
+    logger.debug('State change detected', {
       isInArrowTutorialStep,
       stateChanged,
       isActive,
@@ -36,7 +39,7 @@ const ButtonStateManager: React.FC<ButtonStateManagerProps> = ({
     if (isInArrowTutorialStep) {
       // Apply tutorial styling with accessibility improvements
       if (buttonElement) {
-        console.log('[ButtonStateManager] Applying tutorial styling');
+        logger.debug('Applying tutorial styling');
         
         buttonElement.classList.add('tutorial-button-highlight');
         const buttonStyleEl = buttonElement as HTMLElement;
@@ -70,7 +73,7 @@ const ButtonStateManager: React.FC<ButtonStateManagerProps> = ({
       containerEl.style.zIndex = '10000';
     } else {
       // Remove tutorial styling and reset to normal state
-      console.log('[ButtonStateManager] Removing tutorial styling and resetting');
+      logger.debug('Removing tutorial styling and resetting');
       
       if (buttonElement) {
         buttonElement.classList.remove('tutorial-button-highlight');

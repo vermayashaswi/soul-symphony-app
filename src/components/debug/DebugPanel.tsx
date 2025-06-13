@@ -2,6 +2,9 @@
 import React, { useState } from 'react';
 import { useLocation } from 'react-router-dom';
 import { useTutorial } from '@/contexts/TutorialContext';
+import { createLogger } from '@/utils/logger';
+
+const logger = createLogger('DebugPanel');
 
 const DebugPanel = () => {
   const [isExpanded, setIsExpanded] = useState(false);
@@ -9,7 +12,7 @@ const DebugPanel = () => {
   const { isActive, currentStep, steps } = useTutorial();
   
   // Only render in development environment
-  if (process.env.NODE_ENV !== 'development') {
+  if (!import.meta.env.DEV) {
     return null;
   }
 

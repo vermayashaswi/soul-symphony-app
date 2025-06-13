@@ -2,6 +2,9 @@
 import { useState, useEffect } from 'react';
 import { REVENUECAT_CONFIG } from '@/config/revenueCatConfig';
 import { revenueCatService } from '@/services/revenuecat/revenueCatService';
+import { createLogger } from '@/utils/logger';
+
+const logger = createLogger('LocationPricing');
 
 interface LocationPricing {
   country: string;
@@ -96,7 +99,7 @@ export const useLocationPricing = () => {
             throw fetchError;
           }
         } catch (geoError) {
-          console.log('[LocationPricing] Geolocation failed:', geoError);
+          logger.debug('Geolocation failed', geoError);
         }
 
         // Method 2: Fallback to IP-based detection
@@ -121,7 +124,7 @@ export const useLocationPricing = () => {
               throw fetchError;
             }
           } catch (ipError) {
-            console.log('[LocationPricing] IP geolocation failed:', ipError);
+            logger.debug('IP geolocation failed', ipError);
           }
         }
 
@@ -147,13 +150,13 @@ export const useLocationPricing = () => {
 
         setPricing(detectedPricing);
         
-        console.log('[LocationPricing] Location detected:', {
+        logger.debug('Location detected', {
           countryCode,
           pricing: detectedPricing
         });
 
       } catch (err) {
-        console.error('[LocationPricing] Error detecting location:', err);
+        logger.error('Error detecting location', err);
         setError('Failed to detect location');
         setPricing(DEFAULT_PRICING);
       } finally {
