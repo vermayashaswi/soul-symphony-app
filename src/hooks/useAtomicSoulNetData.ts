@@ -34,6 +34,7 @@ interface UseAtomicSoulNetDataReturn {
   isTranslating: boolean;
   translationProgress: number;
   translationComplete: boolean;
+  canRender: boolean; // NEW: Determines if visualization should render
   getNodeTranslation: (nodeId: string) => string;
   getConnectionPercentage: (selectedNode: string, targetNode: string) => number;
   getNodeConnections: (nodeId: string) => NodeConnectionData;
@@ -54,108 +55,141 @@ export const useAtomicSoulNetData = (
   const [isTranslating, setIsTranslating] = useState(false);
   const [translationProgress, setTranslationProgress] = useState(100);
   const [translationComplete, setTranslationComplete] = useState(false);
+  const [canRender, setCanRender] = useState(false);
 
-  // SIMPLIFIED: Load graph data (language-independent)
-  const loadGraphData = useCallback(async () => {
-    if (!userId) {
-      setLoading(false);
-      return null;
-    }
-
-    console.log(`[useAtomicSoulNetData] SIMPLIFIED: Loading graph data for ${userId}, ${timeRange}`);
-    
-    try {
-      const result = await AtomicSoulNetService.getAtomicData(userId, timeRange, 'en');
-      
-      if (result) {
-        console.log(`[useAtomicSoulNetData] SIMPLIFIED: Graph data loaded`, {
-          nodes: result.nodes.length,
-          links: result.links.length
-        });
-        
-        setGraphData({ nodes: result.nodes, links: result.links });
-        setConnectionPercentages(result.connectionPercentages);
-        setNodeConnectionData(result.nodeConnectionData);
-        return result.nodes.map(node => node.id);
-      } else {
-        console.log('[useAtomicSoulNetData] SIMPLIFIED: No graph data');
-        setGraphData({ nodes: [], links: [] });
-        setConnectionPercentages(new Map());
-        setNodeConnectionData(new Map());
-        return [];
-      }
-    } catch (err) {
-      console.error('[useAtomicSoulNetData] SIMPLIFIED: Error loading graph data:', err);
-      setError(err instanceof Error ? err : new Error('Unknown error occurred'));
-      return null;
-    }
-  }, [userId, timeRange]);
-
-  // SIMPLIFIED: Load translations (language-dependent)
-  const loadTranslations = useCallback(async (nodeIds: string[]) => {
-    if (!userId || !nodeIds || nodeIds.length === 0) {
+  // CACHE-FIRST: Pre-load cached translations immediately
+  const preloadCachedTranslations = useCallback(async (nodeIds: string[]) => {
+    if (!nodeIds || nodeIds.length === 0) {
       setTranslations(new Map());
-      setIsTranslating(false);
-      setTranslationProgress(100);
-      setTranslationComplete(true);
-      return;
+      return new Map<string, string>();
     }
 
-    console.log(`[useAtomicSoulNetData] SIMPLIFIED: Loading translations for ${nodeIds.length} nodes in ${currentLanguage}`);
+    console.log(`[useAtomicSoulNetData] CACHE-FIRST: Pre-loading cached translations for ${nodeIds.length} nodes in ${currentLanguage}`);
     
     try {
+      // For English, create immediate translations
+      if (currentLanguage === 'en') {
+        const englishTranslations = new Map<string, string>();
+        nodeIds.forEach(nodeId => englishTranslations.set(nodeId, nodeId));
+        setTranslations(englishTranslations);
+        return englishTranslations;
+      }
+
+      // For other languages, get all available cached translations
       const result = await SimplifiedSoulNetTranslationService.getTranslationsForLanguage(
         nodeIds,
         currentLanguage,
-        userId
+        userId!
       );
 
-      console.log(`[useAtomicSoulNetData] SIMPLIFIED: Translation result`, {
-        translations: result.translations.size,
-        isTranslating: result.isTranslating,
-        complete: result.translationComplete,
-        progress: result.progress
-      });
-      
+      console.log(`[useAtomicSoulNetData] CACHE-FIRST: Loaded ${result.translations.size}/${nodeIds.length} cached translations`);
       setTranslations(result.translations);
       setIsTranslating(result.isTranslating);
       setTranslationProgress(result.progress);
       setTranslationComplete(result.translationComplete);
+
+      return result.translations;
     } catch (err) {
-      console.error('[useAtomicSoulNetData] SIMPLIFIED: Error loading translations:', err);
-      setTranslations(new Map());
-      setIsTranslating(false);
-      setTranslationProgress(100);
-      setTranslationComplete(false);
+      console.error('[useAtomicSoulNetData] CACHE-FIRST: Error loading cached translations:', err);
+      const fallbackTranslations = new Map<string, string>();
+      nodeIds.forEach(nodeId => fallbackTranslations.set(nodeId, nodeId));
+      setTranslations(fallbackTranslations);
+      return fallbackTranslations;
     }
   }, [userId, currentLanguage]);
 
-  // SIMPLIFIED: Load data when dependencies change
-  useEffect(() => {
-    const loadData = async () => {
+  // OPTIMIZED: Single data loading function with proper sequencing
+  const loadAllData = useCallback(async () => {
+    if (!userId) {
+      setLoading(false);
+      setCanRender(false);
+      return;
+    }
+
+    console.log(`[useAtomicSoulNetData] OPTIMIZED: Loading all data for ${userId}, ${timeRange}, ${currentLanguage}`);
+    
+    try {
       setError(null);
       setLoading(true);
+      setCanRender(false);
 
-      const nodeIds = await loadGraphData();
-      if (nodeIds) {
-        await loadTranslations(nodeIds);
+      // Step 1: Load graph data (language-independent)
+      const result = await AtomicSoulNetService.getAtomicData(userId, timeRange, 'en');
+      
+      if (!result) {
+        console.log('[useAtomicSoulNetData] OPTIMIZED: No graph data available');
+        setGraphData({ nodes: [], links: [] });
+        setConnectionPercentages(new Map());
+        setNodeConnectionData(new Map());
+        setTranslations(new Map());
+        setCanRender(false);
+        setLoading(false);
+        return;
       }
+
+      // Set graph data immediately
+      setGraphData({ nodes: result.nodes, links: result.links });
+      setConnectionPercentages(result.connectionPercentages);
+      setNodeConnectionData(result.nodeConnectionData);
+
+      const nodeIds = result.nodes.map(node => node.id);
+      console.log(`[useAtomicSoulNetData] OPTIMIZED: Graph loaded with ${nodeIds.length} nodes`);
+
+      // Step 2: Load translations with cache-first strategy
+      const loadedTranslations = await preloadCachedTranslations(nodeIds);
+
+      // Step 3: Determine if we can render
+      const shouldRender = this.canRenderVisualization(nodeIds, loadedTranslations, currentLanguage);
+      setCanRender(shouldRender);
+
+      console.log(`[useAtomicSoulNetData] OPTIMIZED: Can render: ${shouldRender}, translations: ${loadedTranslations.size}/${nodeIds.length}`);
       
       setLoading(false);
-    };
+    } catch (err) {
+      console.error('[useAtomicSoulNetData] OPTIMIZED: Error loading data:', err);
+      setError(err instanceof Error ? err : new Error('Unknown error occurred'));
+      setCanRender(false);
+      setLoading(false);
+    }
+  }, [userId, timeRange, currentLanguage, preloadCachedTranslations]);
 
-    loadData();
-  }, [loadGraphData, loadTranslations]);
+  // RENDERING LOGIC: Determine if visualization can render
+  const canRenderVisualization = useCallback((
+    nodeIds: string[], 
+    currentTranslations: Map<string, string>, 
+    language: string
+  ): boolean => {
+    if (nodeIds.length === 0) return false;
+    
+    // For English, we can always render immediately
+    if (language === 'en') return true;
+    
+    // For other languages, check if we have enough translations
+    // We can render if we have at least 70% of translations available
+    const translationCoverage = currentTranslations.size / nodeIds.length;
+    const canRender = translationCoverage >= 0.7;
+    
+    console.log(`[useAtomicSoulNetData] RENDERING: Coverage ${Math.round(translationCoverage * 100)}%, can render: ${canRender}`);
+    return canRender;
+  }, []);
 
-  // SIMPLIFIED: Listen for translation completion
+  // Load data when dependencies change
   useEffect(() => {
-    const handleTranslationComplete = (event: CustomEvent) => {
+    loadAllData();
+  }, [loadAllData]);
+
+  // Listen for translation completion and update render status
+  useEffect(() => {
+    const handleTranslationComplete = async (event: CustomEvent) => {
       const stateKey = `${userId}-${currentLanguage}`;
       if (event.detail.stateKey === stateKey) {
-        console.log('[useAtomicSoulNetData] SIMPLIFIED: Translation completed, reloading translations');
+        console.log('[useAtomicSoulNetData] OPTIMIZED: Translation completed, updating translations and render status');
+        
         const nodeIds = graphData.nodes.map(node => node.id);
         if (nodeIds.length > 0) {
-          loadTranslations(nodeIds);
+          const updatedTranslations = await preloadCachedTranslations(nodeIds);
+          const shouldRender = canRenderVisualization(nodeIds, updatedTranslations, currentLanguage);
+          setCanRender(shouldRender);
         }
       }
     };
@@ -165,25 +199,19 @@ export const useAtomicSoulNetData = (
     return () => {
       window.removeEventListener('soulNetTranslationComplete', handleTranslationComplete as EventListener);
     };
-  }, [userId, currentLanguage, graphData.nodes, loadTranslations]);
+  }, [userId, currentLanguage, graphData.nodes, preloadCachedTranslations, canRenderVisualization]);
 
-  // SIMPLIFIED: Get node translation with fallback
+  // CACHE-FIRST: Get node translation with immediate cache lookup
   const getNodeTranslation = useCallback((nodeId: string): string => {
-    if (currentLanguage === 'en') {
-      return nodeId;
+    // Always prioritize cached translations for consistency
+    const cached = translations.get(nodeId);
+    if (cached) {
+      return cached;
     }
 
-    // Use translations only when complete to maintain consistency
-    if (translationComplete) {
-      const translation = translations.get(nodeId);
-      if (translation) {
-        return translation;
-      }
-    }
-
-    // Return original text for consistency
+    // For English or when no translation is available, return original
     return nodeId;
-  }, [currentLanguage, translations, translationComplete]);
+  }, [translations]);
 
   const getConnectionPercentage = useCallback((selectedNode: string, targetNode: string): number => {
     if (!selectedNode || selectedNode === targetNode) return 0;
@@ -200,7 +228,7 @@ export const useAtomicSoulNetData = (
     };
   }, [nodeConnectionData]);
 
-  console.log(`[useAtomicSoulNetData] SIMPLIFIED STATE: nodes=${graphData.nodes.length}, translations=${translations.size}, loading=${loading}, translating=${isTranslating}, progress=${translationProgress}%, complete=${translationComplete}`);
+  console.log(`[useAtomicSoulNetData] OPTIMIZED STATE: nodes=${graphData.nodes.length}, translations=${translations.size}, loading=${loading}, translating=${isTranslating}, progress=${translationProgress}%, complete=${translationComplete}, canRender=${canRender}`);
 
   return {
     graphData,
@@ -212,6 +240,7 @@ export const useAtomicSoulNetData = (
     isTranslating,
     translationProgress,
     translationComplete,
+    canRender,
     getNodeTranslation,
     getConnectionPercentage,
     getNodeConnections

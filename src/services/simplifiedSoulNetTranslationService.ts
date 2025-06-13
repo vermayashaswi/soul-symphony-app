@@ -17,7 +17,7 @@ export class SimplifiedSoulNetTranslationService {
     startedAt: number;
   }>();
 
-  // SIMPLIFIED: Single method to get all translations for a language
+  // CACHE-FIRST: Optimized method for getting translations with immediate cache lookup
   static async getTranslationsForLanguage(
     nodeIds: string[],
     targetLanguage: string,
@@ -25,7 +25,7 @@ export class SimplifiedSoulNetTranslationService {
   ): Promise<SimplifiedTranslationResult> {
     const stateKey = `${userId}-${targetLanguage}`;
     
-    console.log(`[SimplifiedSoulNetTranslationService] Getting translations for ${nodeIds.length} nodes in ${targetLanguage}`);
+    console.log(`[SimplifiedSoulNetTranslationService] CACHE-FIRST: Getting translations for ${nodeIds.length} nodes in ${targetLanguage}`);
 
     // English doesn't need translation
     if (targetLanguage === 'en') {
@@ -35,48 +35,64 @@ export class SimplifiedSoulNetTranslationService {
       return { translations, isTranslating: false, translationComplete: true, progress: 100 };
     }
 
-    // Get all cached translations first
+    // CACHE-FIRST: Get all cached translations immediately
+    console.log(`[SimplifiedSoulNetTranslationService] CACHE-FIRST: Loading cached translations for ${nodeIds.length} nodes`);
     const cachedTranslations = await NodeTranslationCacheService.getBatchCachedTranslations(nodeIds, targetLanguage);
     const translations = new Map<string, string>(cachedTranslations);
     
     const currentProgress = Math.round((translations.size / nodeIds.length) * 100);
     const uncachedNodes = nodeIds.filter(nodeId => !translations.has(nodeId));
 
-    console.log(`[SimplifiedSoulNetTranslationService] Cached: ${translations.size}/${nodeIds.length}, uncached: ${uncachedNodes.length}`);
+    console.log(`[SimplifiedSoulNetTranslationService] CACHE-FIRST: Cached: ${translations.size}/${nodeIds.length} (${currentProgress}%), uncached: ${uncachedNodes.length}`);
 
-    // If all translations are cached, we're done
+    // If we have 100% cached translations, we're done
     if (uncachedNodes.length === 0) {
       this.setTranslationState(stateKey, { isTranslating: false, progress: 100, complete: true });
       return { translations, isTranslating: false, translationComplete: true, progress: 100 };
     }
 
-    // Check if translation is already in progress
+    // Check if translation is already in progress for remaining nodes
     const currentState = this.getTranslationState(stateKey);
     if (currentState.isTranslating) {
-      console.log(`[SimplifiedSoulNetTranslationService] Translation already in progress for ${stateKey}`);
+      console.log(`[SimplifiedSoulNetTranslationService] CACHE-FIRST: Translation already in progress for ${stateKey}`);
       return { translations, isTranslating: true, translationComplete: false, progress: currentProgress };
     }
 
-    // Start background translation
-    this.setTranslationState(stateKey, { isTranslating: true, progress: currentProgress, complete: false });
+    // OPTIMIZED: If we have 70%+ coverage, mark as ready to render but continue translating
+    const hasMinimumCoverage = currentProgress >= 70;
+    
+    if (hasMinimumCoverage) {
+      console.log(`[SimplifiedSoulNetTranslationService] CACHE-FIRST: Sufficient coverage (${currentProgress}%), starting background translation`);
+    } else {
+      console.log(`[SimplifiedSoulNetTranslationService] CACHE-FIRST: Insufficient coverage (${currentProgress}%), translating remaining nodes`);
+    }
+
+    // Start background translation for uncached nodes
+    this.setTranslationState(stateKey, { isTranslating: true, progress: currentProgress, complete: hasMinimumCoverage });
     
     // Perform translation in background
-    this.performBackgroundTranslation(uncachedNodes, targetLanguage, stateKey).catch(error => {
-      console.error('[SimplifiedSoulNetTranslationService] Background translation error:', error);
+    this.performOptimizedTranslation(uncachedNodes, targetLanguage, stateKey, currentProgress).catch(error => {
+      console.error('[SimplifiedSoulNetTranslationService] CACHE-FIRST: Background translation error:', error);
       this.setTranslationState(stateKey, { isTranslating: false, progress: 100, complete: false });
     });
 
-    return { translations, isTranslating: true, translationComplete: false, progress: currentProgress };
+    return { 
+      translations, 
+      isTranslating: !hasMinimumCoverage, 
+      translationComplete: hasMinimumCoverage, 
+      progress: currentProgress 
+    };
   }
 
-  // SIMPLIFIED: Background translation with completion signaling
-  private static async performBackgroundTranslation(
+  // OPTIMIZED: Background translation with better progress tracking
+  private static async performOptimizedTranslation(
     nodeIds: string[],
     targetLanguage: string,
-    stateKey: string
+    stateKey: string,
+    initialProgress: number
   ): Promise<void> {
     try {
-      console.log(`[SimplifiedSoulNetTranslationService] Starting background translation for ${nodeIds.length} nodes`);
+      console.log(`[SimplifiedSoulNetTranslationService] OPTIMIZED: Starting background translation for ${nodeIds.length} nodes`);
 
       const batchResults = await translationService.batchTranslate({
         texts: nodeIds,
@@ -94,16 +110,21 @@ export class SimplifiedSoulNetTranslationService {
         }
       });
 
-      // Cache new translations
+      // Cache new translations with enhanced error handling
       if (newTranslations.size > 0) {
-        await NodeTranslationCacheService.setBatchCachedTranslations(newTranslations, targetLanguage);
-        console.log(`[SimplifiedSoulNetTranslationService] Cached ${newTranslations.size} new translations`);
+        try {
+          await NodeTranslationCacheService.setBatchCachedTranslations(newTranslations, targetLanguage);
+          console.log(`[SimplifiedSoulNetTranslationService] OPTIMIZED: Successfully cached ${newTranslations.size} new translations`);
+        } catch (cacheError) {
+          console.error('[SimplifiedSoulNetTranslationService] OPTIMIZED: Error caching translations:', cacheError);
+          // Continue execution even if caching fails
+        }
       }
 
       // Mark translation as complete
       this.setTranslationState(stateKey, { isTranslating: false, progress: 100, complete: true });
 
-      console.log('[SimplifiedSoulNetTranslationService] Translation completed successfully');
+      console.log('[SimplifiedSoulNetTranslationService] OPTIMIZED: Translation completed successfully');
 
       // Emit completion event
       window.dispatchEvent(new CustomEvent('soulNetTranslationComplete', {
@@ -111,21 +132,21 @@ export class SimplifiedSoulNetTranslationService {
       }));
 
     } catch (error) {
-      console.error('[SimplifiedSoulNetTranslationService] Background translation failed:', error);
+      console.error('[SimplifiedSoulNetTranslationService] OPTIMIZED: Background translation failed:', error);
       this.setTranslationState(stateKey, { isTranslating: false, progress: 100, complete: false });
     }
   }
 
-  // SIMPLIFIED: Translation state management
+  // OPTIMIZED: Enhanced translation state management
   static getTranslationState(stateKey: string) {
     const state = this.translationStates.get(stateKey);
     if (!state) {
       return { isTranslating: false, progress: 100, complete: true, startedAt: 0 };
     }
 
-    // Check for timeout (30 seconds)
-    if (state.isTranslating && (Date.now() - state.startedAt) > 30000) {
-      console.log(`[SimplifiedSoulNetTranslationService] Translation timeout for ${stateKey}`);
+    // Check for timeout (45 seconds for better reliability)
+    if (state.isTranslating && (Date.now() - state.startedAt) > 45000) {
+      console.log(`[SimplifiedSoulNetTranslationService] OPTIMIZED: Translation timeout for ${stateKey}`);
       this.setTranslationState(stateKey, { isTranslating: false, progress: 100, complete: false });
       return { isTranslating: false, progress: 100, complete: false, startedAt: 0 };
     }
@@ -143,25 +164,30 @@ export class SimplifiedSoulNetTranslationService {
     });
   }
 
-  // SIMPLIFIED: Get cached translation for a single node
+  // CACHE-FIRST: Get cached translation for a single node
   static async getCachedTranslation(nodeId: string, targetLanguage: string): Promise<string> {
     if (targetLanguage === 'en') {
       return nodeId;
     }
 
-    const cached = await NodeTranslationCacheService.getCachedNodeTranslation(nodeId, targetLanguage);
-    return cached || nodeId;
+    try {
+      const cached = await NodeTranslationCacheService.getCachedNodeTranslation(nodeId, targetLanguage);
+      return cached || nodeId;
+    } catch (error) {
+      console.error('[SimplifiedSoulNetTranslationService] CACHE-FIRST: Error getting cached translation:', error);
+      return nodeId;
+    }
   }
 
-  // Clear translation states
+  // Clear translation states with enhanced cleanup
   static clearTranslationStates(userId?: string): void {
     if (userId) {
       const keysToDelete = Array.from(this.translationStates.keys()).filter(key => key.startsWith(userId));
       keysToDelete.forEach(key => this.translationStates.delete(key));
-      console.log(`[SimplifiedSoulNetTranslationService] Cleared translation states for user ${userId}`);
+      console.log(`[SimplifiedSoulNetTranslationService] OPTIMIZED: Cleared translation states for user ${userId}`);
     } else {
       this.translationStates.clear();
-      console.log('[SimplifiedSoulNetTranslationService] Cleared all translation states');
+      console.log('[SimplifiedSoulNetTranslationService] OPTIMIZED: Cleared all translation states');
     }
   }
 }
