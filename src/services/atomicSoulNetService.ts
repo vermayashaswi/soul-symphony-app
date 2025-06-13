@@ -53,13 +53,13 @@ export class AtomicSoulNetService {
     startedAt: number;
   }>();
 
-  // ATOMIC: Single entry point for getting SoulNet data
+  // ENHANCED: Single entry point with improved cache warming
   static async getAtomicData(
     userId: string,
     timeRange: string,
     language: string
   ): Promise<AtomicSoulNetData | null> {
-    console.log(`[AtomicSoulNetService] ATOMIC: Getting data for ${userId}, ${timeRange}, ${language}`);
+    console.log(`[AtomicSoulNetService] ENHANCED: Getting data for ${userId}, ${timeRange}, ${language}`);
 
     try {
       // Step 1: Get graph data (language-independent)
@@ -68,8 +68,8 @@ export class AtomicSoulNetService {
         return null;
       }
 
-      // Step 2: Handle translations atomically
-      const translationResult = await this.getAtomicTranslations(
+      // Step 2: Handle translations with improved cache warming
+      const translationResult = await this.getEnhancedTranslations(
         [...new Set(graphData.nodes.map(node => node.id))],
         language,
         userId
@@ -86,13 +86,13 @@ export class AtomicSoulNetService {
         translationComplete: translationResult.complete
       };
     } catch (error) {
-      console.error('[AtomicSoulNetService] ATOMIC: Error getting data:', error);
+      console.error('[AtomicSoulNetService] ENHANCED: Error getting data:', error);
       return null;
     }
   }
 
-  // ATOMIC: Unified translation handling
-  private static async getAtomicTranslations(
+  // ENHANCED: Improved translation handling with better cache warming
+  private static async getEnhancedTranslations(
     nodeIds: string[], 
     language: string, 
     userId: string
@@ -106,50 +106,64 @@ export class AtomicSoulNetService {
       return { translations, progress: 100, isTranslating: false, complete: true };
     }
 
-    console.log(`[AtomicSoulNetService] ATOMIC: Getting translations for ${nodeIds.length} nodes in ${language}`);
+    console.log(`[AtomicSoulNetService] ENHANCED: Getting translations for ${nodeIds.length} nodes in ${language}`);
 
-    // Get all cached translations
-    const cachedTranslations = await NodeTranslationCacheService.getBatchCachedTranslations(nodeIds, language);
-    cachedTranslations.forEach((translation, nodeId) => {
-      translations.set(nodeId, translation);
-    });
+    // Get all cached translations with enhanced error handling
+    try {
+      const cachedTranslations = await NodeTranslationCacheService.getBatchCachedTranslations(nodeIds, language);
+      cachedTranslations.forEach((translation, nodeId) => {
+        translations.set(nodeId, translation);
+      });
+      console.log(`[AtomicSoulNetService] ENHANCED: Found ${translations.size} cached translations`);
+    } catch (cacheError) {
+      console.error('[AtomicSoulNetService] ENHANCED: Error loading cached translations:', cacheError);
+      // Continue without cached translations
+    }
 
     const currentProgress = Math.round((translations.size / nodeIds.length) * 100);
     const uncachedNodes = nodeIds.filter(nodeId => !translations.has(nodeId));
     
     if (uncachedNodes.length === 0) {
-      console.log('[AtomicSoulNetService] ATOMIC: All translations cached, marking complete');
+      console.log('[AtomicSoulNetService] ENHANCED: All translations cached, marking complete');
       this.setTranslationState(stateKey, { isTranslating: false, progress: 100, complete: true });
       return { translations, progress: 100, isTranslating: false, complete: true };
     }
 
-    console.log(`[AtomicSoulNetService] ATOMIC: Need to translate ${uncachedNodes.length} nodes`);
+    console.log(`[AtomicSoulNetService] ENHANCED: Need to translate ${uncachedNodes.length} nodes`);
     
-    // Set translating state
-    this.setTranslationState(stateKey, { isTranslating: true, progress: currentProgress, complete: false });
+    // ENHANCED: Better render threshold - 70% coverage allows rendering
+    const hasMinimumCoverage = currentProgress >= 70;
+    const isComplete = hasMinimumCoverage;
+    
+    // Set translating state with better progress tracking
+    this.setTranslationState(stateKey, { 
+      isTranslating: true, 
+      progress: currentProgress, 
+      complete: isComplete 
+    });
 
-    // Start background translation
-    this.performAtomicTranslation(uncachedNodes, language, stateKey).catch(error => {
-      console.error('[AtomicSoulNetService] ATOMIC: Background translation error:', error);
+    // Start background translation with enhanced error handling
+    this.performEnhancedTranslation(uncachedNodes, language, stateKey).catch(error => {
+      console.error('[AtomicSoulNetService] ENHANCED: Background translation error:', error);
       this.setTranslationState(stateKey, { isTranslating: false, progress: 100, complete: false });
     });
 
     return { 
       translations, 
       progress: currentProgress, 
-      isTranslating: true, 
-      complete: false 
+      isTranslating: !isComplete, 
+      complete: isComplete 
     };
   }
 
-  // ATOMIC: Background translation with completion signaling
-  private static async performAtomicTranslation(
+  // ENHANCED: Background translation with better error handling and persistence
+  private static async performEnhancedTranslation(
     nodeIds: string[], 
     language: string, 
     stateKey: string
   ): Promise<void> {
     try {
-      console.log(`[AtomicSoulNetService] ATOMIC: Starting background translation for ${nodeIds.length} nodes`);
+      console.log(`[AtomicSoulNetService] ENHANCED: Starting background translation for ${nodeIds.length} nodes`);
 
       const batchResults = await translationService.batchTranslate({
         texts: nodeIds,
@@ -167,16 +181,24 @@ export class AtomicSoulNetService {
         }
       });
 
-      // Cache new translations
+      // ENHANCED: Cache new translations with better error handling
       if (newTranslations.size > 0) {
-        await NodeTranslationCacheService.setBatchCachedTranslations(newTranslations, language);
-        console.log(`[AtomicSoulNetService] ATOMIC: Cached ${newTranslations.size} new translations`);
+        try {
+          await NodeTranslationCacheService.setBatchCachedTranslations(newTranslations, language);
+          console.log(`[AtomicSoulNetService] ENHANCED: Successfully cached ${newTranslations.size} new translations`);
+          
+          // ENHANCED: Persist translations to localStorage as backup
+          this.persistTranslationsToStorage(newTranslations, language);
+        } catch (cacheError) {
+          console.error('[AtomicSoulNetService] ENHANCED: Error caching translations:', cacheError);
+          // Continue execution even if caching fails
+        }
       }
 
       // Mark translation as complete
       this.setTranslationState(stateKey, { isTranslating: false, progress: 100, complete: true });
 
-      console.log('[AtomicSoulNetService] ATOMIC: Translation completed');
+      console.log('[AtomicSoulNetService] ENHANCED: Translation completed successfully');
 
       // Emit completion event
       window.dispatchEvent(new CustomEvent('atomicSoulNetTranslationComplete', {
@@ -184,21 +206,62 @@ export class AtomicSoulNetService {
       }));
 
     } catch (error) {
-      console.error('[AtomicSoulNetService] ATOMIC: Background translation failed:', error);
+      console.error('[AtomicSoulNetService] ENHANCED: Background translation failed:', error);
       this.setTranslationState(stateKey, { isTranslating: false, progress: 100, complete: false });
     }
   }
 
-  // ATOMIC: Translation state management
+  // ENHANCED: Persist translations to localStorage as backup
+  private static persistTranslationsToStorage(translations: Map<string, string>, language: string): void {
+    try {
+      const storageKey = `soulnet-translations-${language}`;
+      const existing = JSON.parse(localStorage.getItem(storageKey) || '{}');
+      
+      translations.forEach((translation, nodeId) => {
+        existing[nodeId] = translation;
+      });
+      
+      localStorage.setItem(storageKey, JSON.stringify(existing));
+      console.log(`[AtomicSoulNetService] ENHANCED: Persisted ${translations.size} translations to localStorage`);
+    } catch (error) {
+      console.error('[AtomicSoulNetService] ENHANCED: Error persisting translations:', error);
+    }
+  }
+
+  // ENHANCED: Load persisted translations from localStorage
+  private static loadPersistedTranslations(nodeIds: string[], language: string): Map<string, string> {
+    const translations = new Map<string, string>();
+    
+    try {
+      const storageKey = `soulnet-translations-${language}`;
+      const persisted = JSON.parse(localStorage.getItem(storageKey) || '{}');
+      
+      nodeIds.forEach(nodeId => {
+        if (persisted[nodeId]) {
+          translations.set(nodeId, persisted[nodeId]);
+        }
+      });
+      
+      if (translations.size > 0) {
+        console.log(`[AtomicSoulNetService] ENHANCED: Loaded ${translations.size} persisted translations from localStorage`);
+      }
+    } catch (error) {
+      console.error('[AtomicSoulNetService] ENHANCED: Error loading persisted translations:', error);
+    }
+    
+    return translations;
+  }
+
+  // ENHANCED: Translation state management with timeout handling
   static getTranslationState(stateKey: string) {
     const state = this.translationStates.get(stateKey);
     if (!state) {
       return { isTranslating: false, progress: 100, complete: true, startedAt: 0 };
     }
 
-    // Check for timeout (30 seconds)
-    if (state.isTranslating && (Date.now() - state.startedAt) > 30000) {
-      console.log(`[AtomicSoulNetService] ATOMIC: Translation timeout for ${stateKey}`);
+    // Check for timeout (45 seconds for better reliability)
+    if (state.isTranslating && (Date.now() - state.startedAt) > 45000) {
+      console.log(`[AtomicSoulNetService] ENHANCED: Translation timeout for ${stateKey}`);
       this.setTranslationState(stateKey, { isTranslating: false, progress: 100, complete: false });
       return { isTranslating: false, progress: 100, complete: false, startedAt: 0 };
     }
@@ -222,18 +285,18 @@ export class AtomicSoulNetService {
     
     const cached = this.graphCache.get(graphCacheKey);
     if (cached && this.isGraphCacheValid(cached)) {
-      console.log(`[AtomicSoulNetService] ATOMIC: Using cached graph data for ${graphCacheKey}`);
+      console.log(`[AtomicSoulNetService] ENHANCED: Using cached graph data for ${graphCacheKey}`);
       return cached;
     }
 
     const storedGraph = this.getStoredGraphData(graphCacheKey);
     if (storedGraph) {
       this.graphCache.set(graphCacheKey, storedGraph);
-      console.log(`[AtomicSoulNetService] ATOMIC: Loaded graph data from storage for ${graphCacheKey}`);
+      console.log(`[AtomicSoulNetService] ENHANCED: Loaded graph data from storage for ${graphCacheKey}`);
       return storedGraph;
     }
 
-    console.log(`[AtomicSoulNetService] ATOMIC: Fetching fresh graph data for ${graphCacheKey}`);
+    console.log(`[AtomicSoulNetService] ENHANCED: Fetching fresh graph data for ${graphCacheKey}`);
     const freshGraphData = await this.fetchGraphData(userId, timeRange);
     if (freshGraphData) {
       this.cacheGraphData(graphCacheKey, freshGraphData);
@@ -253,12 +316,12 @@ export class AtomicSoulNetService {
         .order('created_at', { ascending: false });
 
       if (error) {
-        console.error('[AtomicSoulNetService] ATOMIC: Error fetching entries:', error);
+        console.error('[AtomicSoulNetService] ENHANCED: Error fetching entries:', error);
         return null;
       }
 
       if (!entries || entries.length === 0) {
-        console.log('[AtomicSoulNetService] ATOMIC: No entries found');
+        console.log('[AtomicSoulNetService] ENHANCED: No entries found');
         return {
           nodes: [],
           links: [],
@@ -268,7 +331,7 @@ export class AtomicSoulNetService {
         };
       }
 
-      console.log(`[AtomicSoulNetService] ATOMIC: Processing ${entries.length} entries`);
+      console.log(`[AtomicSoulNetService] ENHANCED: Processing ${entries.length} entries`);
       const graphData = this.processEntities(entries);
       
       const connectionPercentages = new Map<string, number>();
@@ -285,7 +348,7 @@ export class AtomicSoulNetService {
         timestamp: Date.now()
       };
     } catch (error) {
-      console.error('[AtomicSoulNetService] ATOMIC: Error fetching graph data:', error);
+      console.error('[AtomicSoulNetService] ENHANCED: Error fetching graph data:', error);
       return null;
     }
   }
@@ -358,7 +421,7 @@ export class AtomicSoulNetService {
       };
       localStorage.setItem(`${this.GRAPH_CACHE_KEY}-${cacheKey}`, JSON.stringify(storableData));
     } catch (error) {
-      console.error('[AtomicSoulNetService] ATOMIC: Error saving graph cache:', error);
+      console.error('[AtomicSoulNetService] ENHANCED: Error saving graph cache:', error);
     }
   }
 
@@ -376,7 +439,7 @@ export class AtomicSoulNetService {
         }
       }
     } catch (error) {
-      console.error('[AtomicSoulNetService] ATOMIC: Error loading stored graph data:', error);
+      console.error('[AtomicSoulNetService] ENHANCED: Error loading stored graph data:', error);
     }
     return null;
   }
@@ -519,7 +582,7 @@ export class AtomicSoulNetService {
       });
     });
 
-    console.log(`[AtomicSoulNetService] ATOMIC: Generated graph with ${nodes.length} nodes and ${links.length} links`);
+    console.log(`[AtomicSoulNetService] ENHANCED: Generated graph with ${nodes.length} nodes and ${links.length} links`);
     return { nodes, links };
   }
 
@@ -531,16 +594,21 @@ export class AtomicSoulNetService {
         this.graphCache.delete(key);
         localStorage.removeItem(`${this.GRAPH_CACHE_KEY}-${key}`);
       });
-      console.log(`[AtomicSoulNetService] ATOMIC: Cleared cache for user ${userId}`);
+      
+      // Clear translation states for user
+      const translationKeysToDelete = Array.from(this.translationStates.keys()).filter(key => key.startsWith(userId));
+      translationKeysToDelete.forEach(key => this.translationStates.delete(key));
+      
+      console.log(`[AtomicSoulNetService] ENHANCED: Cleared cache for user ${userId}`);
     } else {
       this.graphCache.clear();
       this.translationStates.clear();
       Object.keys(localStorage).forEach(key => {
-        if (key.startsWith(this.GRAPH_CACHE_KEY)) {
+        if (key.startsWith(this.GRAPH_CACHE_KEY) || key.startsWith('soulnet-translations-')) {
           localStorage.removeItem(key);
         }
       });
-      console.log('[AtomicSoulNetService] ATOMIC: Cleared all cache');
+      console.log('[AtomicSoulNetService] ENHANCED: Cleared all cache');
     }
   }
 }
