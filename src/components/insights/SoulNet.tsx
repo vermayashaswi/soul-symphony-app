@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import '@/types/three-reference';
 import { Canvas } from '@react-three/fiber';
@@ -12,24 +13,21 @@ import SoulNetDescription from './soulnet/SoulNetDescription';
 import { useUserColorThemeHex } from './soulnet/useUserColorThemeHex';
 import { cn } from '@/lib/utils';
 import { TranslatableText } from '@/components/translation/TranslatableText';
-import { useTranslation } from '@/contexts/TranslationContext';
-import { useInstantSoulNetData } from '@/hooks/useInstantSoulNetData';
-import { EnhancedSoulNetPreloadService } from '@/services/enhancedSoulNetPreloadService';
-import { translationService } from '@/services/translationService';
+import { useNodeBasedSoulNetData } from '@/hooks/useNodeBasedSoulNetData';
 
 interface SoulNetProps {
   userId: string | undefined;
   timeRange: TimeRange;
 }
 
-// ENHANCED: Atomic Translation Loading Component
-const AtomicTranslationLoadingState: React.FC<{ progress: number }> = ({ progress }) => (
+// NODE-BASED: Translation Loading Component
+const NodeBasedTranslationLoadingState: React.FC<{ progress: number }> = ({ progress }) => (
   <div className="bg-background rounded-xl shadow-sm border w-full p-6">
     <div className="flex flex-col items-center justify-center py-12 space-y-4">
       <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
       <h3 className="text-lg font-medium">
         <TranslatableText 
-          text="Preparing Soul-Net with atomic translations..." 
+          text="Translating Soul-Net labels..." 
           forceTranslate={true}
           enableFontScaling={true}
           scalingContext="general"
@@ -61,75 +59,64 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
   const isMobile = useIsMobile();
   const themeHex = useUserColorThemeHex();
   const [selectedEntity, setSelectedEntity] = useState<string | null>(null);
-  const { currentLanguage } = useTranslation();
   
-  // ENHANCED: Use ref to track atomic rendering initialization
-  const atomicRenderingInitialized = useRef(false);
+  // Use ref to track rendering initialization
+  const renderingInitialized = useRef(false);
 
-  // APP-LEVEL: Initialize the enhanced service with app-level translation service
-  useEffect(() => {
-    console.log("[SoulNet] ATOMIC: Setting up atomic app-level translation service integration");
-    EnhancedSoulNetPreloadService.setAppLevelTranslationService(translationService);
-  }, []);
-
-  // ENHANCED: Use the atomic instant data hook
+  // NODE-BASED: Use the new node-based hook
   const { 
     graphData, 
+    translations,
+    connectionPercentages,
+    nodeConnectionData,
     loading, 
     error,
-    isInstantReady,
     isTranslating,
     translationProgress,
-    translationComplete,
-    isAtomicMode,
-    getInstantConnectionPercentage,
-    getInstantTranslation,
-    getInstantNodeConnections
-  } = useInstantSoulNetData(userId, timeRange);
+    getNodeTranslation,
+    getConnectionPercentage,
+    getNodeConnections
+  } = useNodeBasedSoulNetData(userId, timeRange);
 
-  console.log("[SoulNet] ATOMIC TRANSLATION STATE", { 
+  console.log("[SoulNet] NODE-BASED STATE", { 
     userId, 
-    timeRange, 
-    currentLanguage,
+    timeRange,
     nodesCount: graphData.nodes.length,
-    isInstantReady,
+    translationsCount: translations.size,
     loading,
     isTranslating,
     translationProgress,
-    translationComplete,
-    isAtomicMode,
     renderingReady,
-    atomicInitialized: atomicRenderingInitialized.current
+    initialized: renderingInitialized.current
   });
 
   useEffect(() => {
-    console.log("[SoulNet] ATOMIC: Component mounted - Atomic translation mode enabled");
+    console.log("[SoulNet] NODE-BASED: Component mounted");
     
     return () => {
-      console.log("[SoulNet] ATOMIC: Component unmounted");
+      console.log("[SoulNet] NODE-BASED: Component unmounted");
     };
   }, []);
 
-  // ENHANCED: Atomic rendering initialization that waits for complete translation
+  // NODE-BASED: Initialize rendering when we have data and translations are complete or not needed
   useEffect(() => {
-    // ENHANCED: Only initialize rendering if we have data, atomic translation is complete, and haven't already initialized
-    if (isInstantReady && translationComplete && isAtomicMode && graphData.nodes.length > 0 && !atomicRenderingInitialized.current) {
-      console.log("[SoulNet] ATOMIC: Initializing rendering after atomic translation completion");
+    if (!loading && graphData.nodes.length > 0 && !isTranslating && !renderingInitialized.current) {
+      console.log("[SoulNet] NODE-BASED: Initializing rendering");
       setRenderingReady(true);
-      atomicRenderingInitialized.current = true;
+      renderingInitialized.current = true;
     }
     
-    // ENHANCED: Reset rendering if there's an error or complete data loss
-    if (error || (graphData.nodes.length === 0 && !loading && !isTranslating && atomicRenderingInitialized.current)) {
-      console.log("[SoulNet] ATOMIC: Resetting rendering due to error or data loss", { error: !!error, nodesCount: graphData.nodes.length });
+    // Reset rendering if there's an error or data loss
+    if (error || (graphData.nodes.length === 0 && !loading && renderingInitialized.current)) {
+      console.log("[SoulNet] NODE-BASED: Resetting rendering due to error or data loss");
       setRenderingReady(false);
-      atomicRenderingInitialized.current = false;
+      renderingInitialized.current = false;
     }
-  }, [isInstantReady, translationComplete, isAtomicMode, graphData.nodes.length, loading, error, isTranslating]);
+  }, [loading, graphData.nodes.length, isTranslating, error]);
 
-  // OPTIMIZED: Node selection with stable state management
+  // Node selection with stable state management
   const handleNodeSelect = useCallback((id: string) => {
-    console.log(`[SoulNet] APP-LEVEL STABLE: Node selected: ${id} - no re-render triggers`);
+    console.log(`[SoulNet] NODE-BASED: Node selected: ${id}`);
     if (selectedEntity === id) {
       setSelectedEntity(null);
     } else {
@@ -143,36 +130,34 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
   const toggleFullScreen = useCallback(() => {
     setIsFullScreen(prev => {
       if (!prev) setSelectedEntity(null);
-      console.log(`[SoulNet] APP-LEVEL: Toggling fullscreen: ${!prev}`);
+      console.log(`[SoulNet] NODE-BASED: Toggling fullscreen: ${!prev}`);
       return !prev;
     });
   }, []);
 
   const handleCanvasError = useCallback((error: Error) => {
-    console.error('[SoulNet] APP-LEVEL: Canvas error:', error);
+    console.error('[SoulNet] NODE-BASED: Canvas error:', error);
     setCanvasError(error);
     setRetryCount(prev => prev + 1);
-    // DEFENSIVE: Reset rendering state on canvas errors
     setRenderingReady(false);
-    atomicRenderingInitialized.current = false;
+    renderingInitialized.current = false;
   }, []);
 
   const handleRetry = useCallback(() => {
     setCanvasError(null);
     setRetryCount(0);
-    // Allow re-initialization after retry
-    atomicRenderingInitialized.current = false;
+    renderingInitialized.current = false;
   }, []);
 
-  // ENHANCED: Show atomic translation loading if translation is in progress
-  if (isTranslating && !translationComplete && isAtomicMode) {
-    console.log("[SoulNet] ATOMIC: Showing atomic translation loading state");
-    return <AtomicTranslationLoadingState progress={translationProgress} />;
+  // NODE-BASED: Show translation loading if translating
+  if (isTranslating && graphData.nodes.length > 0) {
+    console.log("[SoulNet] NODE-BASED: Showing translation loading state");
+    return <NodeBasedTranslationLoadingState progress={translationProgress} />;
   }
 
-  // ENHANCED: Only show general loading if we truly have no data and are still loading
-  if (loading && !isInstantReady && graphData.nodes.length === 0) {
-    console.log("[SoulNet] ATOMIC: Showing general loading state - no atomic instant data available");
+  // Show general loading if we have no data and are still loading
+  if (loading && graphData.nodes.length === 0) {
+    console.log("[SoulNet] NODE-BASED: Showing general loading state");
     return <LoadingState />;
   }
   
@@ -282,7 +267,7 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
     );
   };
 
-  console.log(`[SoulNet] ATOMIC RENDER: ${graphData.nodes.length} nodes, ${graphData.links.length} links, renderingReady: ${renderingReady}, atomicInitialized: ${atomicRenderingInitialized.current}, translationComplete: ${translationComplete}, atomicMode: ${isAtomicMode}`);
+  console.log(`[SoulNet] NODE-BASED RENDER: ${graphData.nodes.length} nodes, ${graphData.links.length} links, renderingReady: ${renderingReady}, initialized: ${renderingInitialized.current}`);
 
   return (
     <div className={cn(
@@ -331,8 +316,8 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
             </div>
           }
         >
-          {/* ENHANCED: Canvas only renders when atomic translation is complete and rendering is ready */}
-          {renderingReady && translationComplete && isAtomicMode && (
+          {/* NODE-BASED: Canvas renders when ready */}
+          {renderingReady && (
             <Canvas
               style={{
                 width: '100%',
@@ -367,11 +352,11 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
                 themeHex={themeHex}
                 isFullScreen={isFullScreen}
                 shouldShowLabels={true}
-                getInstantConnectionPercentage={getInstantConnectionPercentage}
-                getInstantTranslation={getInstantTranslation}
-                getInstantNodeConnections={getInstantNodeConnections}
-                isInstantReady={isInstantReady}
-                isAtomicMode={isAtomicMode}
+                getInstantConnectionPercentage={getConnectionPercentage}
+                getInstantTranslation={getNodeTranslation}
+                getInstantNodeConnections={getNodeConnections}
+                isInstantReady={true}
+                isAtomicMode={false}
               />
             </Canvas>
           )}
