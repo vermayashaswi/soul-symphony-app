@@ -42,7 +42,7 @@ export class SoulNetPreloadService {
     timeRange: string, 
     language: string
   ): Promise<ProcessedSoulNetData | null> {
-    console.log(`[SoulNetPreloadService] OPTIMIZED: Preloading data for user ${userId}, range ${timeRange}, language ${language}`);
+    console.log(`[SoulNetPreloadService] ENHANCED: Preloading data for user ${userId}, range ${timeRange}, language ${language}`);
     
     // Generate cache key without language for graph data
     const graphCacheKey = `${userId}-${timeRange}-graph`;
@@ -53,7 +53,7 @@ export class SoulNetPreloadService {
     const cachedGraphData = this.getCachedData(graphCacheKey);
     
     if (cachedGraphData) {
-      console.log(`[SoulNetPreloadService] OPTIMIZED: Using cached graph data for ${graphCacheKey}`);
+      console.log(`[SoulNetPreloadService] ENHANCED: Using cached graph data for ${graphCacheKey}`);
       graphData = { nodes: cachedGraphData.data.nodes, links: cachedGraphData.data.links };
     } else {
       // Fetch and process raw journal data
@@ -77,12 +77,12 @@ export class SoulNetPreloadService {
       });
     }
 
-    // Now handle translations optimally
+    // Now handle translations with enhanced reliability
     const translations = new Map<string, string>();
     const connectionPercentages = new Map<string, number>();
     
     if (language !== 'en' && graphData.nodes.length > 0) {
-      console.log(`[SoulNetPreloadService] OPTIMIZED: Processing node translations for ${language}`);
+      console.log(`[SoulNetPreloadService] ENHANCED: Processing node translations for ${language}`);
       
       // Get unique node IDs
       const nodeIds = [...new Set(graphData.nodes.map(node => node.id))];
@@ -93,33 +93,65 @@ export class SoulNetPreloadService {
       // Identify nodes that need translation
       const uncachedNodes = nodeIds.filter(nodeId => !cachedTranslations.has(nodeId));
       
-      console.log(`[SoulNetPreloadService] OPTIMIZED: Found ${cachedTranslations.size} cached translations, need to translate ${uncachedNodes.length} nodes`);
+      console.log(`[SoulNetPreloadService] ENHANCED: Found ${cachedTranslations.size} cached translations, need to translate ${uncachedNodes.length} nodes`);
       
       // Add cached translations to results
       cachedTranslations.forEach((translation, nodeId) => {
         translations.set(nodeId, translation);
       });
       
-      // Translate uncached nodes if any
+      // NEW: Enhanced translation processing with verification
       if (uncachedNodes.length > 0) {
         try {
+          console.log(`[SoulNetPreloadService] ENHANCED: Starting batch translation for ${uncachedNodes.length} nodes`);
+          
           const batchResults = await translationService.batchTranslate({
             texts: uncachedNodes,
             targetLanguage: language
           });
           
-          console.log(`[SoulNetPreloadService] OPTIMIZED: Successfully translated ${batchResults.size}/${uncachedNodes.length} new nodes`);
+          console.log(`[SoulNetPreloadService] ENHANCED: Batch translation completed, got ${batchResults.size} results`);
           
-          // Store new translations in cache and results
-          await NodeTranslationCacheService.setBatchCachedTranslations(batchResults, language);
+          // NEW: Verify all requested nodes got translations
+          const translatedNodes: string[] = [];
+          const failedNodes: string[] = [];
           
-          batchResults.forEach((translatedText, originalText) => {
-            translations.set(originalText, translatedText);
-            // Also cache in on-demand cache for immediate access
-            onDemandTranslationCache.set(language, originalText, translatedText);
+          uncachedNodes.forEach(nodeId => {
+            const translatedText = batchResults.get(nodeId);
+            if (translatedText) {
+              translations.set(nodeId, translatedText);
+              translatedNodes.push(nodeId);
+              // Also cache in on-demand cache for immediate access
+              onDemandTranslationCache.set(language, nodeId, translatedText);
+            } else {
+              translations.set(nodeId, nodeId); // Use original as fallback
+              failedNodes.push(nodeId);
+            }
           });
+          
+          console.log(`[SoulNetPreloadService] ENHANCED: Translation results - successful: ${translatedNodes.length}, failed: ${failedNodes.length}`);
+          
+          // Store successful translations in cache
+          if (translatedNodes.length > 0) {
+            const successfulTranslations = new Map<string, string>();
+            translatedNodes.forEach(nodeId => {
+              const translation = batchResults.get(nodeId);
+              if (translation) {
+                successfulTranslations.set(nodeId, translation);
+              }
+            });
+            
+            await NodeTranslationCacheService.setBatchCachedTranslations(successfulTranslations, language);
+            console.log(`[SoulNetPreloadService] ENHANCED: Cached ${successfulTranslations.size} successful translations`);
+          }
+          
+          // NEW: Log failed translations for debugging
+          if (failedNodes.length > 0) {
+            console.warn(`[SoulNetPreloadService] ENHANCED: Failed to translate ${failedNodes.length} nodes:`, failedNodes.slice(0, 5));
+          }
+          
         } catch (error) {
-          console.error('[SoulNetPreloadService] OPTIMIZED: Error during batch translation:', error);
+          console.error('[SoulNetPreloadService] ENHANCED: Error during batch translation:', error);
           // Use original text for failed translations
           uncachedNodes.forEach(nodeId => {
             translations.set(nodeId, nodeId);
@@ -127,13 +159,16 @@ export class SoulNetPreloadService {
         }
       }
 
-      // Ensure all nodes have translations
-      nodeIds.forEach(nodeId => {
-        if (!translations.has(nodeId)) {
-          console.warn(`[SoulNetPreloadService] OPTIMIZED: No translation found for node: ${nodeId}, using original`);
+      // NEW: Final verification - ensure all nodes have translations
+      const missingTranslations = nodeIds.filter(nodeId => !translations.has(nodeId));
+      if (missingTranslations.length > 0) {
+        console.warn(`[SoulNetPreloadService] ENHANCED: ${missingTranslations.length} nodes missing translations, using original text`);
+        missingTranslations.forEach(nodeId => {
           translations.set(nodeId, nodeId);
-        }
-      });
+        });
+      }
+
+      console.log(`[SoulNetPreloadService] ENHANCED: Final translation map size: ${translations.size}/${nodeIds.length}`);
     }
 
     // Pre-calculate connection percentages
@@ -155,7 +190,7 @@ export class SoulNetPreloadService {
       language
     });
 
-    console.log(`[SoulNetPreloadService] OPTIMIZED: Successfully processed data with ${processedData.nodes.length} nodes and ${processedData.translations.size} translations`);
+    console.log(`[SoulNetPreloadService] ENHANCED: Successfully processed data with ${processedData.nodes.length} nodes and ${processedData.translations.size} translations`);
     return processedData;
   }
 
@@ -174,21 +209,21 @@ export class SoulNetPreloadService {
         .order('created_at', { ascending: false });
 
       if (error) {
-        console.error('[SoulNetPreloadService] OPTIMIZED: Error fetching journal entries:', error);
+        console.error('[SoulNetPreloadService] ENHANCED: Error fetching journal entries:', error);
         return null;
       }
 
       if (!entries || entries.length === 0) {
-        console.log('[SoulNetPreloadService] OPTIMIZED: No entries found');
+        console.log('[SoulNetPreloadService] ENHANCED: No entries found');
         return { nodes: [], links: [] };
       }
 
-      console.log(`[SoulNetPreloadService] OPTIMIZED: Found ${entries.length} entries for processing`);
+      console.log(`[SoulNetPreloadService] ENHANCED: Found ${entries.length} entries for processing`);
 
       // Process the raw data
       return this.processEntities(entries);
     } catch (error) {
-      console.error('[SoulNetPreloadService] OPTIMIZED: Error fetching graph data:', error);
+      console.error('[SoulNetPreloadService] ENHANCED: Error fetching graph data:', error);
       return null;
     }
   }
@@ -196,7 +231,7 @@ export class SoulNetPreloadService {
   static getCachedDataSync(cacheKey: string): ProcessedSoulNetData | null {
     const cached = this.cache.get(cacheKey);
     if (cached && (Date.now() - cached.timestamp) < this.CACHE_DURATION) {
-      console.log(`[SoulNetPreloadService] OPTIMIZED: Found valid cache for ${cacheKey}`);
+      console.log(`[SoulNetPreloadService] ENHANCED: Found valid cache for ${cacheKey}`);
       return cached.data;
     }
     
@@ -210,15 +245,15 @@ export class SoulNetPreloadService {
           parsed.data.translations = new Map(Object.entries(parsed.data.translations || {}));
           parsed.data.connectionPercentages = new Map(Object.entries(parsed.data.connectionPercentages || {}));
           this.cache.set(cacheKey, parsed);
-          console.log(`[SoulNetPreloadService] OPTIMIZED: Found valid localStorage cache for ${cacheKey}`);
+          console.log(`[SoulNetPreloadService] ENHANCED: Found valid localStorage cache for ${cacheKey}`);
           return parsed.data;
         }
       }
     } catch (error) {
-      console.error('[SoulNetPreloadService] OPTIMIZED: Error loading from localStorage:', error);
+      console.error('[SoulNetPreloadService] ENHANCED: Error loading from localStorage:', error);
     }
     
-    console.log(`[SoulNetPreloadService] OPTIMIZED: No valid cache found for ${cacheKey}`);
+    console.log(`[SoulNetPreloadService] ENHANCED: No valid cache found for ${cacheKey}`);
     return null;
   }
 
@@ -245,7 +280,7 @@ export class SoulNetPreloadService {
       };
       localStorage.setItem(`${this.CACHE_KEY}-${cacheKey}`, JSON.stringify(storableData));
     } catch (error) {
-      console.error('[SoulNetPreloadService] OPTIMIZED: Error saving to localStorage:', error);
+      console.error('[SoulNetPreloadService] ENHANCED: Error saving to localStorage:', error);
     }
   }
 
@@ -410,7 +445,7 @@ export class SoulNetPreloadService {
       // Also clear node translation cache
       NodeTranslationCacheService.clearCache();
       
-      console.log(`[SoulNetPreloadService] OPTIMIZED: Cleared cache for user ${userId}`);
+      console.log(`[SoulNetPreloadService] ENHANCED: Cleared cache for user ${userId}`);
     } else {
       // Clear all cache
       this.cache.clear();
@@ -423,7 +458,7 @@ export class SoulNetPreloadService {
       // Also clear node translation cache
       NodeTranslationCacheService.clearCache();
       
-      console.log('[SoulNetPreloadService] OPTIMIZED: Cleared all cache');
+      console.log('[SoulNetPreloadService] ENHANCED: Cleared all cache');
     }
   }
 }
