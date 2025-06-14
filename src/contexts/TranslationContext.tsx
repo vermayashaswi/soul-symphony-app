@@ -232,7 +232,8 @@ export const TranslationProvider: React.FC<TranslationProviderProps> = ({ childr
       SoulNetPreloadService.clearCache();
     }, []),
     getCachedTranslation,
-    translationProgress: isTranslating ? 50 : 100,
+    // Fix: translationProgress is always 100 to disable global overlay
+    translationProgress: 100,
     prefetchTranslationsForRoute,
     prefetchSoulNetTranslations,
     isSoulNetTranslating

@@ -1,12 +1,9 @@
-
 import React, { useEffect, useState } from 'react';
 import AppRoutes from './routes/AppRoutes';
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as SonnerToaster } from "sonner";
 import { TranslationProvider } from '@/contexts/TranslationContext';
 import { SubscriptionProvider } from '@/contexts/SubscriptionContext';
-import { TranslationLoadingOverlay } from '@/components/translation/TranslationLoadingOverlay';
-import { JournalProcessingInitializer } from './app/journal-processing-init';
 import { TutorialProvider } from './contexts/TutorialContext';
 import TutorialOverlay from './components/tutorial/TutorialOverlay';
 import ErrorBoundary from './components/insights/ErrorBoundary';
@@ -75,7 +72,6 @@ const App: React.FC = () => {
       <TranslationProvider>
         <SubscriptionProvider>
           <TutorialProvider>
-            <TranslationLoadingOverlay />
             <JournalProcessingInitializer />
             <AppRoutes key={isInitialized ? 'initialized' : 'initializing'} />
             <TutorialOverlay />
