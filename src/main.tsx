@@ -1,4 +1,3 @@
-
 import React from 'react'
 import ReactDOM from 'react-dom/client'
 import App from './App.tsx'
@@ -7,9 +6,23 @@ import './styles/mobile.css' // Import mobile-specific styles
 import './styles/tutorial.css' // Import tutorial-specific styles
 import { AuthProvider } from './contexts/AuthContext'
 import { ThemeProvider } from './hooks/use-theme'
-import { BrowserRouter } from 'react-router-dom'
+import { BrowserRouter, useLocation } from 'react-router-dom'
 import { TranslationProvider } from './contexts/TranslationContext'
 import { pwaService } from './services/pwaService'
+import { MarketingProviders } from './MarketingProviders'
+
+// Helper: decide if current path is a marketing or app route
+const isMarketingRoute = (pathname: string) => {
+  // Only "/" and the first-level marketing pages
+  return (
+    pathname === "/" ||
+    pathname.startsWith("/privacy-policy") ||
+    pathname.startsWith("/faq") ||
+    pathname.startsWith("/blog") ||
+    pathname.startsWith("/download") ||
+    pathname.startsWith("/terms")
+  );
+};
 
 // Enhanced Font Loading System
 const initializeFontSystem = async () => {
@@ -200,9 +213,23 @@ const initializeApp = async () => {
 // Start initialization
 initializeApp();
 
-ReactDOM.createRoot(document.getElementById('root')!).render(
-  <React.StrictMode>
-    <BrowserRouter>
+const RootRouter: React.FC = () => {
+  const location = useLocation();
+  const isMarketing = isMarketingRoute(location.pathname);
+
+  // For debugging
+  // console.log("[RootRouter] Path:", location.pathname, "isMarketing:", isMarketing);
+
+  if (isMarketing) {
+    // Minimal providers for marketing – no Auth, no heavy app logic
+    return (
+      <MarketingProviders>
+        <App /> {/* App.tsx will be marketing-safe since marketing Index/HomePage don't use Auth, etc. */}
+      </MarketingProviders>
+    );
+  } else {
+    // Full set of providers for `/app` and anything else
+    return (
       <ThemeProvider>
         <TranslationProvider>
           <AuthProvider>
@@ -210,6 +237,16 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
           </AuthProvider>
         </TranslationProvider>
       </ThemeProvider>
+    );
+  }
+};
+
+ReactDOM.createRoot(document.getElementById('root')!).render(
+  <React.StrictMode>
+    <BrowserRouter>
+      <RootRouter />
     </BrowserRouter>
-  </React.StrictMode>,
+  </React.StrictMode>
 )
+
+// NOTE: This file is now quite long (~200+ lines). Consider refactoring it into smaller modules!
