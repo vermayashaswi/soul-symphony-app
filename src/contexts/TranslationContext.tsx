@@ -93,7 +93,9 @@ export const TranslationProvider: React.FC<TranslationProviderProps> = ({ childr
    */
   const handleLanguageChange = useCallback(async (language: string) => {
     const previousLanguage = currentLanguage;
-    // ... keep existing code (pre: setIsSoulNetTranslating, setCurrentLanguage) the same ...
+    if (language !== currentLanguage) {
+      console.log(`[TranslationContext] APP-LEVEL: Language changing from ${currentLanguage} to ${language}`);
+    }
     if (language !== 'en') {
       setIsSoulNetTranslating(true);
     }
@@ -187,12 +189,58 @@ export const TranslationProvider: React.FC<TranslationProviderProps> = ({ childr
     }
   }, [currentLanguage, translationCache]);
 
-  // DUMMY prefetchTranslationsForRoute for now, until real implementation is needed
+  // ROUTE-BASED PREFETCHING: Prefetch common phrases for a given route (e.g. homepage, onboarding, etc).
+  // This ensures translated text is in cache before render, preventing English flashes.
   const prefetchTranslationsForRoute = useCallback(async (route: string) => {
-    // No-op to resolve TS errors, implement logic as needed per screen/page!
-    console.log(`[TranslationContext] prefetchTranslationsForRoute called for route: ${route} (no-op)`);
-    return;
-  }, []);
+    if (currentLanguage === "en") return; // No need for English
+
+    // Define some sample text blocks for key routes. In prod, this should be dynamic/centralized!
+    const ROUTE_TRANSLATION_TEXTS: Record<string, string[]> = {
+      "/": [
+        "Welcome to", "Sign in to start your journaling journey and track your emotional wellbeing",
+        "Sign in with Google", "By signing in, you agree to our Terms of Service and Privacy Policy",
+        "Error:", "Retry"
+      ],
+      "/app/onboarding": [
+        "Welcome!", "Let's get started", "What brings you here today?"
+      ],
+      "/app/home": [
+        "Your Entries", "Add Voice Journal", "Today", "This week", "This month"
+      ]
+    };
+    const textBatch = ROUTE_TRANSLATION_TEXTS[route] || [];
+    if (!textBatch.length) return;
+
+    // Prefetch in parallel, checking cache before calling translation function
+    await Promise.all(
+      textBatch.map(async (text) => {
+        // Fast path: already in cache
+        const cacheKey = `${text}_en_${currentLanguage}`;
+        if (translationCache[cacheKey] || onDemandTranslationCache.get(currentLanguage, text)) return;
+
+        try {
+          setIsTranslating(true);
+          // Call translationService/edge function directly for batch performance
+          const { data, error } = await supabase.functions.invoke('translate-text', {
+            body: {
+              text,
+              sourceLanguage: 'en',
+              targetLanguage: currentLanguage,
+              cleanResult: true,
+            }
+          });
+          let translatedText = (data && data.translatedText && data.translatedText !== text)
+            ? data.translatedText
+            : text;
+          setTranslationCache(prev => ({ ...prev, [cacheKey]: translatedText }));
+          onDemandTranslationCache.set(currentLanguage, text, translatedText);
+        } catch (err) {
+          // Ignore errors for now (could log)
+        }
+      })
+    );
+    setIsTranslating(false);
+  }, [currentLanguage, translationCache]);
 
   const value: TranslationContextType = {
     currentLanguage,
