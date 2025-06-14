@@ -3,8 +3,6 @@ import React, { createContext, useContext, useState, useEffect, ReactNode } from
 import { useAuth } from './AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { subscriptionErrorHandler } from '@/services/subscriptionErrorHandler';
-import { revenueCatService } from '@/services/revenuecat/revenueCatService';
-import { REVENUECAT_CONFIG } from '@/config/revenueCatConfig';
 
 export type SubscriptionTier = 'free' | 'premium';
 export type SubscriptionStatus = 'active' | 'canceled' | 'expired' | 'trial' | 'free' | 'unknown';
@@ -26,9 +24,6 @@ export interface SubscriptionContextType {
   refreshSubscriptionStatus: () => Promise<void>;
   hasInitialLoadCompleted: boolean;
   isTrialEligible: boolean;
-  
-  // RevenueCat integration
-  revenueCatInitialized: boolean;
 }
 
 const SubscriptionContext = createContext<SubscriptionContextType | undefined>(undefined);
@@ -42,27 +37,6 @@ export const SubscriptionProvider: React.FC<{ children: ReactNode }> = ({ childr
   const [hasInitialLoadCompleted, setHasInitialLoadCompleted] = useState(false);
   const [trialEndDate, setTrialEndDate] = useState<Date | null>(null);
   const [isTrialEligible, setIsTrialEligible] = useState(false);
-  const [revenueCatInitialized, setRevenueCatInitialized] = useState(false);
-
-  // Initialize RevenueCat when user is available
-  useEffect(() => {
-    const initializeRevenueCat = async () => {
-      if (!user?.id || revenueCatInitialized) return;
-      
-      try {
-        console.log('[SubscriptionContext] Initializing RevenueCat for user:', user.id);
-        await revenueCatService.initialize(user.id);
-        setRevenueCatInitialized(true);
-        console.log('[SubscriptionContext] RevenueCat initialized successfully');
-      } catch (error) {
-        console.error('[SubscriptionContext] RevenueCat initialization failed:', error);
-        // Don't block the app if RevenueCat fails to initialize
-        setRevenueCatInitialized(false);
-      }
-    };
-
-    initializeRevenueCat();
-  }, [user?.id, revenueCatInitialized]);
 
   const fetchSubscriptionData = async (): Promise<void> => {
     if (!user) {
@@ -82,38 +56,13 @@ export const SubscriptionProvider: React.FC<{ children: ReactNode }> = ({ childr
       
       console.log('[SubscriptionContext] Fetching subscription data for user:', user.id);
       
-      // First check RevenueCat if initialized
-      if (revenueCatInitialized) {
-        try {
-          const purchaserInfo = await revenueCatService.getPurchaserInfo();
-          
-          if (purchaserInfo) {
-            const isPremiumFromRC = revenueCatService.isUserPremium(purchaserInfo);
-            const trialEndFromRC = revenueCatService.getTrialEndDate(purchaserInfo);
-            
-            console.log('[SubscriptionContext] RevenueCat data:', {
-              isPremium: isPremiumFromRC,
-              trialEnd: trialEndFromRC
-            });
-            
-            // Update based on RevenueCat data
-            if (isPremiumFromRC) {
-              setTier('premium');
-              setStatus(trialEndFromRC && trialEndFromRC > new Date() ? 'trial' : 'active');
-              setTrialEndDate(trialEndFromRC);
-            }
-          }
-        } catch (rcError) {
-          console.warn('[SubscriptionContext] RevenueCat fetch failed, falling back to database:', rcError);
-        }
-      }
-      
-      // Always sync with our database as source of truth
+      // First call the cleanup function to ensure expired trials are processed
       const { error: cleanupError } = await supabase.rpc('cleanup_expired_trials');
       if (cleanupError) {
         console.warn('[SubscriptionContext] Cleanup function error:', cleanupError);
       }
       
+      // Use the comprehensive subscription status function
       const { data: statusData, error: statusError } = await supabase
         .rpc('get_user_subscription_status', {
           user_id_param: user.id
@@ -126,22 +75,25 @@ export const SubscriptionProvider: React.FC<{ children: ReactNode }> = ({ childr
       if (statusData && statusData.length > 0) {
         const subscriptionData = statusData[0];
         
+        // Map subscription tier - ensure only 'free' or 'premium'
         const userTier = (subscriptionData.current_tier === 'premium') ? 'premium' : 'free';
         const userStatus = (subscriptionData.current_status as SubscriptionStatus) || 'free';
         const userTrialEndDate = subscriptionData.trial_end_date ? new Date(subscriptionData.trial_end_date) : null;
+        const userIsTrialActive = subscriptionData.is_trial_active || false;
         
         setTier(userTier);
         setStatus(userStatus);
         setTrialEndDate(userTrialEndDate);
         
-        console.log('[SubscriptionContext] Database subscription status:', {
+        console.log('[SubscriptionContext] Updated subscription from function:', {
           tier: userTier,
           status: userStatus,
           trialEndDate: userTrialEndDate,
+          isTrialActive: userIsTrialActive,
           isPremium: subscriptionData.is_premium_access
         });
       } else {
-        // Fallback to profile data
+        // Fallback to direct profile query if function fails
         const { data: profileData, error: profileError } = await supabase
           .from('profiles')
           .select('subscription_tier, subscription_status, trial_ends_at, is_premium')
@@ -153,6 +105,7 @@ export const SubscriptionProvider: React.FC<{ children: ReactNode }> = ({ childr
         }
 
         if (profileData) {
+          // Map subscription tier - ensure only 'free' or 'premium'
           const userTier = (profileData.subscription_tier === 'premium') ? 'premium' : 'free';
           const userStatus = (profileData.subscription_status as SubscriptionStatus) || 'free';
           const userTrialEndDate = profileData.trial_ends_at ? new Date(profileData.trial_ends_at) : null;
@@ -160,35 +113,46 @@ export const SubscriptionProvider: React.FC<{ children: ReactNode }> = ({ childr
           setTier(userTier);
           setStatus(userStatus);
           setTrialEndDate(userTrialEndDate);
+          
+          console.log('[SubscriptionContext] Updated subscription from fallback:', {
+            tier: userTier,
+            status: userStatus,
+            trialEndDate: userTrialEndDate,
+            isPremium: profileData.is_premium
+          });
         } else {
+          // User profile doesn't exist yet, default to free
           setTier('free');
           setStatus('free');
           setTrialEndDate(null);
+          console.log('[SubscriptionContext] No profile found, defaulting to free tier');
         }
       }
 
-      // Check trial eligibility if RevenueCat is available
-      if (revenueCatInitialized && user.id) {
-        try {
-          const eligible = await revenueCatService.checkTrialEligibility(
-            REVENUECAT_CONFIG.PRODUCTS.PREMIUM_MONTHLY_DEFAULT
-          );
-          setIsTrialEligible(eligible);
-        } catch (error) {
-          console.warn('[SubscriptionContext] Trial eligibility check failed:', error);
-          setIsTrialEligible(false);
+      // Check trial eligibility
+      if (user.id) {
+        const { data: eligibilityData, error: eligibilityError } = await supabase
+          .rpc('is_trial_eligible', {
+            user_id_param: user.id
+          });
+
+        if (!eligibilityError && eligibilityData !== null) {
+          setIsTrialEligible(eligibilityData);
         }
       }
       
     } catch (err) {
       console.error('[SubscriptionContext] Error fetching subscription:', err);
       
+      // Use the error handler to categorize and potentially show the error
       const handledError = subscriptionErrorHandler.handleError(err, 'Subscription');
       
+      // Only set error state for critical errors that aren't silenced
       if (!handledError.silent && handledError.type !== 'network') {
         setError(handledError.message);
       }
       
+      // Default to free tier on error
       setTier('free');
       setStatus('free');
       setTrialEndDate(null);
@@ -207,18 +171,23 @@ export const SubscriptionProvider: React.FC<{ children: ReactNode }> = ({ childr
     await fetchSubscriptionData();
   };
 
-  // Fetch subscription data when user changes or RevenueCat initializes
+  // Fetch subscription data when user changes
   useEffect(() => {
     fetchSubscriptionData();
     
+    // Reset error handler when user changes
     if (user) {
       subscriptionErrorHandler.reset();
     }
-  }, [user, revenueCatInitialized]);
+  }, [user]);
 
-  // Computed properties
+  // Computed properties with proper trial logic
   const isPremium = tier === 'premium';
+  
+  // Check if trial is actually active (not expired) - more robust check
   const isTrialActive = status === 'trial' && trialEndDate && trialEndDate > new Date();
+  
+  // Has active subscription means either active subscription OR active (non-expired) trial
   const hasActiveSubscription = status === 'active' || isTrialActive;
   
   const daysRemainingInTrial = trialEndDate && isTrialActive
@@ -233,14 +202,15 @@ export const SubscriptionProvider: React.FC<{ children: ReactNode }> = ({ childr
     refreshSubscription,
     isPremium,
     hasActiveSubscription,
+    
+    // Additional properties
     isTrialActive,
     trialEndDate,
     daysRemainingInTrial,
-    subscriptionStatus: status,
+    subscriptionStatus: status, // Alias for status
     refreshSubscriptionStatus,
     hasInitialLoadCompleted,
-    isTrialEligible,
-    revenueCatInitialized
+    isTrialEligible
   };
 
   return (

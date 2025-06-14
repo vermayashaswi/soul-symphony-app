@@ -7,19 +7,6 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-// RevenueCat configuration constants
-const REVENUECAT_CONFIG = {
-  ENTITLEMENTS: {
-    PREMIUM_ACCESS: 'entl9730aa8da2'
-  },
-  PRODUCTS: {
-    PREMIUM_MONTHLY_US: 'premium_monthly_us',
-    PREMIUM_MONTHLY_IN: 'premium_monthly_in',
-    PREMIUM_MONTHLY_GB: 'premium_monthly_gb',
-    PREMIUM_MONTHLY_DEFAULT: 'premium_monthly_default'
-  }
-};
-
 interface RevenueCatWebhookEvent {
   event: {
     type: string;
@@ -66,28 +53,15 @@ serve(async (req) => {
     
     console.log('Received RevenueCat webhook:', JSON.stringify(webhookData, null, 2));
 
-    // Validate the webhook is for our premium access entitlement
-    const event = webhookData.event;
-    const isPremiumEntitlement = event.entitlement_ids?.includes(REVENUECAT_CONFIG.ENTITLEMENTS.PREMIUM_ACCESS) ||
-                                event.entitlement_id === REVENUECAT_CONFIG.ENTITLEMENTS.PREMIUM_ACCESS;
-
-    if (!isPremiumEntitlement) {
-      console.log('Webhook event not for premium entitlement, ignoring');
-      return new Response(
-        JSON.stringify({ success: true, message: 'Event not for premium entitlement' }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
     // Log the webhook event
     const { error: logError } = await supabase
       .from('revenuecat_webhook_events')
       .insert({
-        event_type: event.type,
-        revenuecat_user_id: event.original_app_user_id,
-        app_user_id: event.app_user_id,
-        product_id: event.product_id,
-        event_timestamp: new Date(event.purchased_at_ms).toISOString(),
+        event_type: webhookData.event.type,
+        revenuecat_user_id: webhookData.event.original_app_user_id,
+        app_user_id: webhookData.event.app_user_id,
+        product_id: webhookData.event.product_id,
+        event_timestamp: new Date(webhookData.event.purchased_at_ms).toISOString(),
         raw_payload: webhookData,
         processed: false
       });
@@ -100,56 +74,19 @@ serve(async (req) => {
     const { data: customer, error: customerError } = await supabase
       .from('revenuecat_customers')
       .select('*')
-      .eq('revenuecat_user_id', event.original_app_user_id)
+      .eq('revenuecat_user_id', webhookData.event.original_app_user_id)
       .single();
 
     if (customerError || !customer) {
       console.error('Customer not found for webhook event:', customerError);
-      
-      // Try to create customer if not found
-      if (customerError?.code === 'PGRST116') {
-        const { error: createError } = await supabase
-          .from('revenuecat_customers')
-          .insert({
-            user_id: event.app_user_id,
-            revenuecat_user_id: event.original_app_user_id,
-            revenuecat_app_user_id: event.app_user_id
-          });
-
-        if (createError) {
-          console.error('Failed to create customer:', createError);
-          return new Response(
-            JSON.stringify({ error: 'Failed to create customer' }),
-            { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-          );
-        }
-
-        // Retry fetching the customer
-        const { data: newCustomer, error: retryError } = await supabase
-          .from('revenuecat_customers')
-          .select('*')
-          .eq('revenuecat_user_id', event.original_app_user_id)
-          .single();
-
-        if (retryError || !newCustomer) {
-          console.error('Still cannot find customer after creation:', retryError);
-          return new Response(
-            JSON.stringify({ error: 'Customer creation failed' }),
-            { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-          );
-        }
-
-        console.log('Successfully created customer for webhook');
-      } else {
-        return new Response(
-          JSON.stringify({ error: 'Customer not found' }),
-          { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
-      }
+      return new Response(
+        JSON.stringify({ error: 'Customer not found' }),
+        { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
     }
 
     // Process different event types
-    switch (event.type) {
+    switch (webhookData.event.type) {
       case 'INITIAL_PURCHASE':
       case 'RENEWAL':
       case 'PRODUCT_CHANGE':
@@ -168,12 +105,8 @@ serve(async (req) => {
         await handleSubscriptionEvent(supabase, customer, webhookData, 'billing_retry_period');
         break;
         
-      case 'NON_RENEWING_PURCHASE':
-        await handleSubscriptionEvent(supabase, customer, webhookData, 'in_trial');
-        break;
-        
       default:
-        console.log('Unhandled event type:', event.type);
+        console.log('Unhandled event type:', webhookData.event.type);
     }
 
     // Mark webhook as processed
@@ -183,8 +116,8 @@ serve(async (req) => {
         processed: true, 
         processed_at: new Date().toISOString() 
       })
-      .eq('revenuecat_user_id', event.original_app_user_id)
-      .eq('event_type', event.type)
+      .eq('revenuecat_user_id', webhookData.event.original_app_user_id)
+      .eq('event_type', webhookData.event.type)
       .eq('processed', false);
 
     return new Response(
@@ -208,13 +141,6 @@ async function handleSubscriptionEvent(
   status: string
 ) {
   const event = webhookData.event;
-  
-  // Determine subscription tier and status based on entitlement
-  const isPremiumEvent = event.entitlement_ids?.includes(REVENUECAT_CONFIG.ENTITLEMENTS.PREMIUM_ACCESS) ||
-                        event.entitlement_id === REVENUECAT_CONFIG.ENTITLEMENTS.PREMIUM_ACCESS;
-  
-  const subscriptionTier = isPremiumEvent ? 'premium' : 'free';
-  const subscriptionStatus = status === 'active' || status === 'in_trial' ? status : 'expired';
   
   // Check if subscription already exists
   const { data: existingSub } = await supabase
@@ -270,34 +196,6 @@ async function handleSubscriptionEvent(
       console.error('Error creating subscription:', error);
       throw error;
     }
-  }
-
-  // Update user profile with subscription information
-  const profileUpdate: any = {
-    subscription_tier: subscriptionTier,
-    subscription_status: subscriptionStatus,
-    is_premium: subscriptionTier === 'premium' && (status === 'active' || status === 'in_trial'),
-    updated_at: new Date().toISOString()
-  };
-
-  // Set trial end date for trial subscriptions
-  if (event.period_type === 'TRIAL' && event.expiration_at_ms) {
-    profileUpdate.trial_ends_at = new Date(event.expiration_at_ms).toISOString();
-  }
-
-  // Clear trial end date for non-trial subscriptions
-  if (event.period_type !== 'TRIAL') {
-    profileUpdate.trial_ends_at = null;
-  }
-
-  const { error: profileError } = await supabase
-    .from('profiles')
-    .update(profileUpdate)
-    .eq('id', customer.user_id);
-
-  if (profileError) {
-    console.error('Error updating user profile:', profileError);
-    // Don't throw here as the subscription was processed successfully
   }
 
   console.log(`Successfully processed ${event.type} event for customer ${customer.id}`);

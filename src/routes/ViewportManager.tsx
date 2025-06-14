@@ -18,7 +18,6 @@ const ViewportManager: React.FC = () => {
   const onboardingOrAuthPaths = [
     '/app/onboarding',
     '/app/auth',
-    '/app/splash', // Added splash route to hide navigation
     '/onboarding',
     '/auth',
     '/' // Also hide on root path
@@ -87,7 +86,7 @@ const ViewportManager: React.FC = () => {
       {/* Only display mobile navigation when:
           1. We're on an app route
           2. User is logged in
-          3. We're not on onboarding/auth/splash screens
+          3. We're not on onboarding/auth screens
           4. If we're on /app, we also check if onboarding is complete */}
       {isAppRoute(location.pathname) && 
        user && 

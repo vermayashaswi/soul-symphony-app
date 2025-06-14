@@ -1,7 +1,6 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { SoulNetPreloadService } from '@/services/soulnetPreloadService';
-import { NodeTranslationCacheService } from '@/services/nodeTranslationCache';
 import { useTranslation } from '@/contexts/TranslationContext';
 
 interface NodeData {
@@ -33,7 +32,7 @@ export const usePreloadedSoulNetData = (
 ): UsePreloadedSoulNetDataReturn => {
   const { currentLanguage, prefetchSoulNetTranslations } = useTranslation();
   
-  // OPTIMIZED: Check cache with improved key strategy
+  // Optimistic initialization - check cache synchronously first
   const getCachedDataSync = useCallback(() => {
     if (!userId) return null;
     const cacheKey = `${userId}-${timeRange}-${currentLanguage}`;
@@ -55,7 +54,7 @@ export const usePreloadedSoulNetData = (
   const [loading, setLoading] = useState(!hasInitialCache); // Only load if no cache
   const [error, setError] = useState<Error | null>(null);
 
-  console.log(`[usePreloadedSoulNetData] OPTIMIZED: Initial state - hasCache: ${hasInitialCache}, loading: ${!hasInitialCache}, nodes: ${hasInitialCache ? initialCachedData.nodes.length : 0}`);
+  console.log(`[usePreloadedSoulNetData] Initial state - hasCache: ${hasInitialCache}, loading: ${!hasInitialCache}, nodes: ${hasInitialCache ? initialCachedData.nodes.length : 0}`);
 
   const preloadData = useCallback(async () => {
     if (!userId) {
@@ -63,7 +62,7 @@ export const usePreloadedSoulNetData = (
       return;
     }
 
-    console.log(`[usePreloadedSoulNetData] OPTIMIZED: Preloading data for ${userId}, ${timeRange}, ${currentLanguage}`);
+    console.log(`[usePreloadedSoulNetData] Preloading data for ${userId}, ${timeRange}, ${currentLanguage}`);
     
     try {
       // Only set loading if we don't have cached data
@@ -79,12 +78,12 @@ export const usePreloadedSoulNetData = (
       );
 
       if (result) {
-        console.log(`[usePreloadedSoulNetData] OPTIMIZED: Successfully loaded data with ${result.nodes.length} nodes and ${result.translations.size} translations`);
+        console.log(`[usePreloadedSoulNetData] Successfully loaded preloaded data with ${result.nodes.length} nodes`);
         setGraphData({ nodes: result.nodes, links: result.links });
         setTranslations(result.translations);
         setConnectionPercentages(result.connectionPercentages);
       } else {
-        console.log('[usePreloadedSoulNetData] OPTIMIZED: No data returned from preload service');
+        console.log('[usePreloadedSoulNetData] No data returned from preload service');
         if (!hasInitialCache) {
           setGraphData({ nodes: [], links: [] });
           setTranslations(new Map());
@@ -92,30 +91,24 @@ export const usePreloadedSoulNetData = (
         }
       }
     } catch (err) {
-      console.error('[usePreloadedSoulNetData] OPTIMIZED: Error preloading data:', err);
+      console.error('[usePreloadedSoulNetData] Error preloading data:', err);
       setError(err instanceof Error ? err : new Error('Unknown error occurred'));
     } finally {
       setLoading(false);
     }
   }, [userId, timeRange, currentLanguage, hasInitialCache]);
 
-  // OPTIMIZED: Enhanced language change handling with node cache
+  // Listen for language changes and trigger pre-translation
   useEffect(() => {
     const handleLanguageChange = async (event: CustomEvent) => {
       if (userId && event.detail.language !== 'en') {
-        console.log('[usePreloadedSoulNetData] OPTIMIZED: Language changed, checking node translation cache first');
-        
-        // Clear old cache for different language
-        if (event.detail.previousLanguage && event.detail.previousLanguage !== event.detail.language) {
-          NodeTranslationCacheService.clearCache(event.detail.previousLanguage);
-        }
-        
+        console.log('[usePreloadedSoulNetData] Language changed, triggering pre-translation');
         try {
           await prefetchSoulNetTranslations(userId, timeRange);
           // Refresh data after pre-translation
           await preloadData();
         } catch (error) {
-          console.error('[usePreloadedSoulNetData] OPTIMIZED: Error during language change pre-translation:', error);
+          console.error('[usePreloadedSoulNetData] Error during language change pre-translation:', error);
         }
       }
     };
@@ -132,22 +125,16 @@ export const usePreloadedSoulNetData = (
     if (!hasInitialCache) {
       preloadData();
     } else {
-      console.log('[usePreloadedSoulNetData] OPTIMIZED: Using initial cached data, skipping preload');
+      console.log('[usePreloadedSoulNetData] Using initial cached data, skipping preload');
     }
   }, [preloadData, hasInitialCache]);
 
-  // OPTIMIZED: Selective cache clearing - only clear when language actually changes
+  // Clear cache when language changes to force refresh
   useEffect(() => {
     if (userId) {
-      // Only clear cache for the current combination if language changed
-      const currentCacheKey = `${userId}-${timeRange}-${currentLanguage}`;
-      const hasCurrentCache = SoulNetPreloadService.getCachedDataSync(currentCacheKey);
-      
-      if (!hasCurrentCache) {
-        console.log(`[usePreloadedSoulNetData] OPTIMIZED: No cache for new language ${currentLanguage}, will fetch fresh data`);
-      }
+      SoulNetPreloadService.clearCache(userId);
     }
-  }, [currentLanguage, userId, timeRange]);
+  }, [currentLanguage, userId]);
 
   return {
     graphData,

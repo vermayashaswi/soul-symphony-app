@@ -371,9 +371,6 @@ export type Database = {
           is_premium: boolean | null
           journal_focus_areas: string[] | null
           onboarding_completed: boolean | null
-          phone_number: string | null
-          phone_verified: boolean | null
-          phone_verified_at: string | null
           reminder_settings: Json | null
           revenuecat_entitlements: Json | null
           subscription_status: string | null
@@ -394,9 +391,6 @@ export type Database = {
           is_premium?: boolean | null
           journal_focus_areas?: string[] | null
           onboarding_completed?: boolean | null
-          phone_number?: string | null
-          phone_verified?: boolean | null
-          phone_verified_at?: string | null
           reminder_settings?: Json | null
           revenuecat_entitlements?: Json | null
           subscription_status?: string | null
@@ -417,9 +411,6 @@ export type Database = {
           is_premium?: boolean | null
           journal_focus_areas?: string[] | null
           onboarding_completed?: boolean | null
-          phone_number?: string | null
-          phone_verified?: boolean | null
-          phone_verified_at?: string | null
           reminder_settings?: Json | null
           revenuecat_entitlements?: Json | null
           subscription_status?: string | null
@@ -863,10 +854,6 @@ export type Database = {
         }
         Returns: Json
       }
-      check_sms_rate_limit: {
-        Args: { p_phone_number: string; p_user_id?: string }
-        Returns: Json
-      }
       check_table_columns: {
         Args: { table_name: string }
         Returns: {
@@ -879,10 +866,6 @@ export type Database = {
         Returns: boolean
       }
       check_trial_expiry: {
-        Args: Record<PropertyKey, never>
-        Returns: undefined
-      }
-      cleanup_expired_phone_verifications: {
         Args: Record<PropertyKey, never>
         Returns: undefined
       }
@@ -1392,10 +1375,6 @@ export type Database = {
       upsert_journal_embedding: {
         Args: { entry_id: number; embedding_vector: string }
         Returns: undefined
-      }
-      verify_phone_code: {
-        Args: { p_phone_number: string; p_code: string; p_user_id?: string }
-        Returns: Json
       }
     }
     Enums: {

@@ -1,28 +1,17 @@
+
 import React from 'react'
 import ReactDOM from 'react-dom/client'
 import App from './App.tsx'
 import './index.css'
 import './styles/mobile.css' // Import mobile-specific styles
 import './styles/tutorial.css' // Import tutorial-specific styles
-import './styles/marketing.css' // Import marketing-specific styles
 import { AuthProvider } from './contexts/AuthContext'
 import { ThemeProvider } from './hooks/use-theme'
-import { ThemeErrorBoundary } from './components/theme/ThemeErrorBoundary'
-import { SafeThemeWrapper } from './components/theme/SafeThemeWrapper'
 import { BrowserRouter } from 'react-router-dom'
 import { TranslationProvider } from './contexts/TranslationContext'
 import { pwaService } from './services/pwaService'
-import { waitForReactReadiness } from './utils/react-readiness'
 
-/**
- * Extremely clear, strict route split:
- * - "/" route: Only render minimal marketing homepage, NO theme/provider logic at all.
- * - Any other route: Full provider/app logic.
- * 
- * This is to fully isolate app provider system from marketing page, avoiding all theme/context/mount errors on route "/".
- */
-
-// Font loading etc (unchanged)
+// Enhanced Font Loading System
 const initializeFontSystem = async () => {
   console.log('[FontSystem] Starting font initialization...');
   
@@ -39,8 +28,8 @@ const initializeFontSystem = async () => {
     'Noto Sans Thai'
   ];
   
-  // Font loading with timeout and graceful degradation
-  const loadFontWithRetry = async (fontFamily: string, retries = 2): Promise<boolean> => {
+  // Font loading with timeout and retry
+  const loadFontWithRetry = async (fontFamily: string, retries = 3): Promise<boolean> => {
     for (let i = 0; i < retries; i++) {
       try {
         if (document.fonts && document.fonts.check) {
@@ -50,38 +39,38 @@ const initializeFontSystem = async () => {
             return true;
           }
           
-          // Wait for font to load with shorter timeout for better UX
+          // Wait for font to load with timeout
           const fontFace = new FontFace(fontFamily, `local("${fontFamily}")`);
           await Promise.race([
             fontFace.load(),
-            new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout')), 2000))
+            new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout')), 3000))
           ]);
           
           console.log(`[FontSystem] ${fontFamily} loaded successfully`);
           return true;
         }
       } catch (error) {
-        console.warn(`[FontSystem] Attempt ${i + 1} failed for ${fontFamily}:`, error.message);
+        console.warn(`[FontSystem] Attempt ${i + 1} failed for ${fontFamily}:`, error);
         if (i < retries - 1) {
-          await new Promise(resolve => setTimeout(resolve, 300));
+          await new Promise(resolve => setTimeout(resolve, 500));
         }
       }
     }
     
-    console.warn(`[FontSystem] ${fontFamily} failed to load, falling back to system fonts`);
+    console.error(`[FontSystem] Failed to load ${fontFamily} after ${retries} attempts`);
     return false;
   };
   
-  // Load fonts with graceful degradation
+  // Load core fonts
+  const fontPromises = coreFonts.map(font => loadFontWithRetry(font));
+  
   try {
     // Wait for document fonts ready with timeout
     await Promise.race([
       document.fonts ? document.fonts.ready : Promise.resolve(),
-      new Promise(resolve => setTimeout(resolve, 3000))
+      new Promise(resolve => setTimeout(resolve, 5000))
     ]);
     
-    // Load fonts in parallel but don't block app initialization
-    const fontPromises = coreFonts.map(font => loadFontWithRetry(font));
     const results = await Promise.allSettled(fontPromises);
     const loadedCount = results.filter(result => result.status === 'fulfilled' && result.value).length;
     
@@ -99,14 +88,11 @@ const initializeFontSystem = async () => {
       } 
     }));
     
-    return true;
-    
   } catch (error) {
-    console.warn('[FontSystem] Font initialization had issues, continuing with fallbacks:', error);
+    console.error('[FontSystem] Font initialization error:', error);
     // Set ready flag anyway to prevent hanging
     (window as any).__SOULO_FONTS_READY__ = true;
-    window.dispatchEvent(new CustomEvent('fontsReady', { detail: { error: error.message } }));
-    return false;
+    window.dispatchEvent(new CustomEvent('fontsReady', { detail: { error } }));
   }
 };
 
@@ -191,144 +177,39 @@ const initializePWA = () => {
   }
 };
 
-// Safer React rendering with better error handling
-const renderMarketingPage = async () => {
-  const rootElem = document.getElementById('root');
-  if (!rootElem) return;
-
-  try {
-    console.log('[Main] Rendering marketing page for route "/"');
-    const { default: MarketingHomePage } = await import('@/components/website/MarketingHomePage');
-    
-    ReactDOM.createRoot(rootElem).render(
-      <React.StrictMode>
-        <MarketingHomePage />
-      </React.StrictMode>
-    );
-  } catch (error) {
-    console.error('[Main] Error loading marketing page:', error);
-    
-    // Fallback to simple marketing page
-    try {
-      const { default: MarketingFallback } = await import('@/components/website/MarketingFallback');
-      ReactDOM.createRoot(rootElem).render(
-        <React.StrictMode>
-          <MarketingFallback />
-        </React.StrictMode>
-      );
-    } catch (fallbackError) {
-      console.error('[Main] Error loading marketing fallback:', fallbackError);
-      
-      // Ultimate fallback - inline HTML
-      rootElem.innerHTML = `
-        <div style="min-height:100vh;background:white;display:flex;align-items:center;justify-content:center;padding:20px;">
-          <div style="text-align:center;max-width:500px;">
-            <h1 style="font-size:2.5rem;font-weight:bold;color:#111827;margin-bottom:1rem;">SOULo</h1>
-            <p style="font-size:1.125rem;color:#6b7280;margin-bottom:2rem;">
-              Your personal AI companion for emotional wellness and self-reflection using voice journaling.
-            </p>
-            <div style="display:flex;flex-direction:column;gap:1rem;align-items:center;">
-              <button onclick="window.open('https://apps.apple.com/app/soulo', '_blank')" 
-                      style="background:#000;color:white;padding:12px 24px;border-radius:8px;border:none;cursor:pointer;">
-                Download on App Store
-              </button>
-              <button onclick="window.open('https://play.google.com/store/apps/details?id=com.soulo.app', '_blank')" 
-                      style="background:#3b82f6;color:white;padding:12px 24px;border-radius:8px;border:none;cursor:pointer;">
-                Get it on Google Play
-              </button>
-            </div>
-          </div>
-        </div>`;
-    }
-  }
-};
-
-const renderAppRoutes = async () => {
-  const rootElem = document.getElementById('root');
-  if (!rootElem) return;
-
-  try {
-    console.log('[Main] Rendering full app for non-marketing routes');
-    
-    // Wait for React readiness
-    await waitForReactReadiness(3000);
-
-    ReactDOM.createRoot(rootElem).render(
-      <React.StrictMode>
-        <BrowserRouter>
-          <ThemeErrorBoundary>
-            <ThemeProvider>
-              <TranslationProvider>
-                <AuthProvider>
-                  <App />
-                </AuthProvider>
-              </TranslationProvider>
-            </ThemeProvider>
-          </ThemeErrorBoundary>
-        </BrowserRouter>
-      </React.StrictMode>
-    );
-  } catch (error) {
-    console.error('[Main] Error rendering app routes:', error);
-    
-    // Emergency fallback for app routes
-    rootElem.innerHTML = `
-      <div style="padding:20px;text-align:center;font-family:system-ui,sans-serif;">
-        <h1>App Loading Error</h1>
-        <p>Please refresh the page to try again.</p>
-        <button onclick="window.location.reload()" style="padding:10px 20px;margin-top:10px;">
-          Refresh Page
-        </button>
-      </div>`;
-  }
-};
-
-// Determine which renderer to use based on route
-const renderProperRoot = async () => {
-  const path = window.location.pathname;
-  console.log('[Main] Current path:', path);
-
-  if (path === '/') {
-    await renderMarketingPage();
-  } else {
-    await renderAppRoutes();
-  }
-};
-
-// Initialize systems with better error handling
+// Initialize systems
 const initializeApp = async () => {
-  try {
-    console.log('[Main] Starting app initialization...');
-    
-    // Initialize font system (non-blocking)
-    initializeFontSystem().catch(() => {});
-    
-    // Initialize viewport fix
-    fixViewportHeight();
-    
-    // Initialize PWA functionality
-    initializePWA();
-    
-    // Detect iOS and set class
-    if (/iPad|iPhone|iPod/.test(navigator.userAgent) || 
-        (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)) {
-      document.documentElement.classList.add('ios-device');
-    }
-    
-    console.log('[Main] App initialization complete');
-    
-    // Render the React app with safer theme handling
-    await renderProperRoot();
-    
-  } catch (error) {
-    console.error('[Main] Critical error during app initialization:', error);
-    
-    // Still try to render the app even if initialization fails
-    await renderProperRoot();
+  // Initialize font system first
+  await initializeFontSystem();
+  
+  // Initialize viewport fix
+  fixViewportHeight();
+  
+  // Initialize PWA functionality
+  initializePWA();
+  
+  // Detect iOS and set a class on the HTML element
+  if (/iPad|iPhone|iPod/.test(navigator.userAgent) || 
+      (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)) {
+    document.documentElement.classList.add('ios-device');
   }
+  
+  console.log('[App] Initialization complete');
 };
 
 // Start initialization
 initializeApp();
 
-// REMINDER: This file is now ~300 lines. Please consider asking me to refactor it into smaller utility or renderer files for clarity and maintainability!
+ReactDOM.createRoot(document.getElementById('root')!).render(
+  <React.StrictMode>
+    <BrowserRouter>
+      <ThemeProvider>
+        <TranslationProvider>
+          <AuthProvider>
+            <App />
+          </AuthProvider>
+        </TranslationProvider>
+      </ThemeProvider>
+    </BrowserRouter>
+  </React.StrictMode>,
+)

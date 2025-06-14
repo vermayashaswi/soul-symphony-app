@@ -1,13 +1,12 @@
 
 import React from 'react';
-import { Routes, Route, Navigate } from 'react-router-dom';
+import { Routes, Route, Navigate, Outlet } from 'react-router-dom';
 import Index from '@/pages/Index';
 import Home from '@/pages/Home';
 import Journal from '@/pages/Journal';
 import Insights from '@/pages/Insights';
 import SmartChat from '@/pages/SmartChat';
 import Chat from '@/pages/Chat';
-import Splash from '@/pages/Splash';
 import ProtectedRoute from './ProtectedRoute';
 import Auth from '@/pages/Auth';
 import Settings from '@/pages/Settings';
@@ -27,24 +26,27 @@ const AppRoutes = () => {
   const { user } = useAuth();
   const { onboardingComplete } = useOnboarding();
   
-  // App root redirect logic - only for /app route, not for marketing homepage
+  // This will be used for conditional rendering of the /app route
   const AppRootRedirect = () => {
     console.log('AppRootRedirect - Auth status:', { 
       user: !!user, 
-      onboardingComplete
+      onboardingComplete 
     });
     
     if (user) {
       if (onboardingComplete) {
+        // If user is logged in and onboarding is complete, go to home
         console.log('User logged in and onboarding complete, redirecting to /app/home');
         return <Navigate to="/app/home" replace />;
       } else {
+        // If user is logged in but onboarding is not complete, go to onboarding
         console.log('User logged in but onboarding not complete, redirecting to /app/onboarding');
         return <Navigate to="/app/onboarding" replace />;
       }
     } else {
-      console.log('User not logged in, redirecting to /app/auth');
-      return <Navigate to="/app/auth" replace />;
+      // If user is not logged in, go to onboarding
+      console.log('User not logged in, redirecting to /app/onboarding');
+      return <Navigate to="/app/onboarding" replace />;
     }
   };
   
@@ -52,7 +54,7 @@ const AppRoutes = () => {
     <Routes>
       {/* Wrap all routes that need ViewportManager in a parent Route */}
       <Route element={<ViewportManager />}>
-        {/* Marketing Website Routes - Now properly renders HomePage */}
+        {/* Website Routes - Now properly wrapped in translation context */}
         <Route path="/" element={<Index />} />
         <Route path="/privacy-policy" element={<PrivacyPolicyPage />} />
         <Route path="/faq" element={<FAQPage />} />
@@ -60,8 +62,7 @@ const AppRoutes = () => {
         <Route path="/blog" element={<BlogPage />} />
         <Route path="/blog/:slug" element={<BlogPostPage />} />
         
-        {/* App Routes - Mobile-first priority */}
-        <Route path="/app/splash" element={<Splash />} />
+        {/* App Routes - reordered to fix routing issue */}
         <Route path="/app/onboarding" element={<OnboardingScreen />} />
         <Route path="/app/auth" element={<Auth />} />
         
@@ -71,14 +72,7 @@ const AppRoutes = () => {
           <Route path="home" element={<Home />} />
           <Route path="journal" element={<Journal />} />
           <Route path="insights" element={
-            <React.Suspense fallback={
-              <div className="flex items-center justify-center h-screen">
-                <div className="text-center">
-                  <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-2"></div>
-                  <p>Loading Insights...</p>
-                </div>
-              </div>
-            }>
+            <React.Suspense fallback={<div className="flex items-center justify-center h-screen">Loading...</div>}>
               <Insights />
             </React.Suspense>
           } />
@@ -87,7 +81,7 @@ const AppRoutes = () => {
           <Route path="settings" element={<Settings />} />
         </Route>
         
-        {/* Legacy Route Redirects - Enhanced for mobile */}
+        {/* Legacy Route Redirects - all app features redirect to /app/ routes */}
         <Route path="/auth" element={<Navigate to="/app/auth" replace />} />
         <Route path="/onboarding" element={<Navigate to="/app/onboarding" replace />} />
         <Route path="/home" element={<Navigate to="/app/home" replace />} />
@@ -96,11 +90,6 @@ const AppRoutes = () => {
         <Route path="/chat" element={<Navigate to="/app/chat" replace />} />
         <Route path="/smart-chat" element={<Navigate to="/app/smart-chat" replace />} />
         <Route path="/settings" element={<Navigate to="/app/settings" replace />} />
-        
-        {/* Mobile app shortcuts - direct access routes */}
-        <Route path="/record" element={<Navigate to="/app/home" replace />} />
-        <Route path="/voice" element={<Navigate to="/app/home" replace />} />
-        <Route path="/soulnet" element={<Navigate to="/app/insights" replace />} />
         
         {/* Catch-all route */}
         <Route path="*" element={<NotFound />} />
