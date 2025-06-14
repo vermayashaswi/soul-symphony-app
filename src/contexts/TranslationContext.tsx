@@ -14,7 +14,6 @@ interface TranslationContextType {
   clearCache: () => void;
   getCachedTranslation: (text: string) => string | null;
   translationProgress?: number;
-  prefetchTranslationsForRoute?: (route: string) => Promise<void>;
   prefetchSoulNetTranslations: (userId: string, timeRange: string) => Promise<void>;
   isSoulNetTranslating: boolean;
 }
@@ -187,7 +186,6 @@ export const TranslationProvider: React.FC<TranslationProviderProps> = ({ childr
     }
   }, [currentLanguage, translationCache]);
 
-  // ... keep rest of provider setup (value, return, useTranslation) the same ...
   const value: TranslationContextType = {
     currentLanguage,
     setCurrentLanguage: handleLanguageChange,
@@ -202,7 +200,6 @@ export const TranslationProvider: React.FC<TranslationProviderProps> = ({ childr
     }, []),
     getCachedTranslation,
     translationProgress: isTranslating ? 50 : 100,
-    prefetchTranslationsForRoute,
     prefetchSoulNetTranslations,
     isSoulNetTranslating
   };
@@ -214,7 +211,6 @@ export const TranslationProvider: React.FC<TranslationProviderProps> = ({ childr
   );
 };
 
-// ... keep export useTranslation ...
 export const useTranslation = (): TranslationContextType => {
   const context = useContext(TranslationContext);
   if (context === undefined) {
@@ -222,4 +218,3 @@ export const useTranslation = (): TranslationContextType => {
   }
   return context;
 };
-// ... keep rest of file ...
