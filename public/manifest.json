@@ -3,32 +3,14 @@
   "name": "SOULo - Voice Journaling with AI",
   "short_name": "SOULo",
   "description": "Express your thoughts through voice, reflect on your emotions with AI insights, and grow through personalized guidance.",
-  "start_url": "/app/splash",
+  "start_url": "/",
   "display": "standalone",
-  "orientation": "portrait-primary",
   "background_color": "#8b5cf6",
   "theme_color": "#8b5cf6",
+  "orientation": "portrait-primary",
   "scope": "/",
   "lang": "en",
   "categories": ["health", "lifestyle", "productivity"],
-  "prefer_related_applications": false,
-  "launch_handler": {
-    "client_mode": "focus-existing"
-  },
-  "edge_side_panel": {
-    "preferred_width": 400
-  },
-  "protocol_handlers": [],
-  "file_handlers": [],
-  "share_target": {
-    "action": "/app/home",
-    "method": "GET",
-    "params": {
-      "title": "title",
-      "text": "text",
-      "url": "url"
-    }
-  },
   "icons": [
     {
       "src": "/icons/icon-72x72.png",
@@ -84,7 +66,7 @@
       "name": "New Voice Entry",
       "short_name": "Record",
       "description": "Start a new voice journal entry",
-      "url": "/app/home",
+      "url": "/",
       "icons": [
         {
           "src": "/icons/icon-96x96.png",
@@ -96,7 +78,7 @@
       "name": "View Insights",
       "short_name": "Insights",
       "description": "View your emotional insights and SoulNet",
-      "url": "/app/insights",
+      "url": "/insights",
       "icons": [
         {
           "src": "/icons/icon-96x96.png",
@@ -108,7 +90,7 @@
       "name": "Journal Entries",
       "short_name": "Journal",
       "description": "Browse your journal entries",
-      "url": "/app/journal",
+      "url": "/journal",
       "icons": [
         {
           "src": "/icons/icon-96x96.png",
