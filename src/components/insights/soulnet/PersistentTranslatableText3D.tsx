@@ -16,10 +16,9 @@ interface PersistentTranslatableText3DProps {
   enableWrapping?: boolean;
   maxCharsPerLine?: number;
   maxLines?: number;
-  // CACHE-FIRST: Direct translation with immediate fallback
+  // SIMPLIFIED: Use provided translation or original text
   translation?: string;
   useTranslation?: boolean;
-  cacheFirst?: boolean;
 }
 
 export const PersistentTranslatableText3D: React.FC<PersistentTranslatableText3DProps> = ({
@@ -37,18 +36,12 @@ export const PersistentTranslatableText3D: React.FC<PersistentTranslatableText3D
   maxCharsPerLine = 18,
   maxLines = 3,
   translation,
-  useTranslation = false,
-  cacheFirst = true
+  useTranslation = false
 }) => {
-  // CACHE-FIRST: Prioritize translation if available, fallback to original
-  const displayText = React.useMemo(() => {
-    if (useTranslation && translation && cacheFirst) {
-      return translation;
-    }
-    return text;
-  }, [text, translation, useTranslation, cacheFirst]);
+  // SIMPLIFIED: Use translation if provided and useTranslation is true, otherwise use original text
+  const displayText = (useTranslation && translation) ? translation : text;
 
-  console.log(`[PersistentTranslatableText3D] CACHE-FIRST: Rendering "${text}" -> "${displayText}" (useTranslation: ${useTranslation}, cacheFirst: ${cacheFirst})`);
+  console.log(`[PersistentTranslatableText3D] SIMPLIFIED: Rendering "${text}" -> "${displayText}" (useTranslation: ${useTranslation})`);
 
   return (
     <SmartTextRenderer
