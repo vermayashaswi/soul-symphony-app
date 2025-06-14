@@ -14,6 +14,7 @@ interface TranslationContextType {
   clearCache: () => void;
   getCachedTranslation: (text: string) => string | null;
   translationProgress?: number;
+  prefetchTranslationsForRoute: (route: string) => Promise<void>;
   prefetchSoulNetTranslations: (userId: string, timeRange: string) => Promise<void>;
   isSoulNetTranslating: boolean;
 }
@@ -186,6 +187,13 @@ export const TranslationProvider: React.FC<TranslationProviderProps> = ({ childr
     }
   }, [currentLanguage, translationCache]);
 
+  // DUMMY prefetchTranslationsForRoute for now, until real implementation is needed
+  const prefetchTranslationsForRoute = useCallback(async (route: string) => {
+    // No-op to resolve TS errors, implement logic as needed per screen/page!
+    console.log(`[TranslationContext] prefetchTranslationsForRoute called for route: ${route} (no-op)`);
+    return;
+  }, []);
+
   const value: TranslationContextType = {
     currentLanguage,
     setCurrentLanguage: handleLanguageChange,
@@ -200,6 +208,7 @@ export const TranslationProvider: React.FC<TranslationProviderProps> = ({ childr
     }, []),
     getCachedTranslation,
     translationProgress: isTranslating ? 50 : 100,
+    prefetchTranslationsForRoute,
     prefetchSoulNetTranslations,
     isSoulNetTranslating
   };
