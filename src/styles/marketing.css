@@ -1,0 +1,54 @@
+
+/* Marketing page specific styles that don't rely on theme system */
+.marketing-page {
+  --marketing-bg: #ffffff;
+  --marketing-text: #1f2937;
+  --marketing-primary: #3b82f6;
+  --marketing-secondary: #8b5cf6;
+  --marketing-accent: #10b981;
+}
+
+.marketing-page.dark {
+  --marketing-bg: #111827;
+  --marketing-text: #f9fafb;
+  --marketing-primary: #60a5fa;
+  --marketing-secondary: #a78bfa;
+  --marketing-accent: #34d399;
+}
+
+/* Ensure basic styling works without theme provider */
+.marketing-page body {
+  background-color: var(--marketing-bg);
+  color: var(--marketing-text);
+}
+
+/* Fallback button styles for marketing pages */
+.marketing-page .btn-primary {
+  background-color: var(--marketing-primary);
+  color: white;
+  border: none;
+  padding: 0.75rem 1.5rem;
+  border-radius: 0.5rem;
+  font-weight: 500;
+  transition: all 0.2s ease;
+}
+
+.marketing-page .btn-primary:hover {
+  opacity: 0.9;
+  transform: translateY(-1px);
+}
+
+.marketing-page .btn-secondary {
+  background-color: var(--marketing-secondary);
+  color: white;
+  border: none;
+  padding: 0.75rem 1.5rem;
+  border-radius: 0.5rem;
+  font-weight: 500;
+  transition: all 0.2s ease;
+}
+
+.marketing-page .btn-secondary:hover {
+  opacity: 0.9;
+  transform: translateY(-1px);
+}

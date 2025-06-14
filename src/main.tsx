@@ -4,12 +4,15 @@ import App from './App.tsx'
 import './index.css'
 import './styles/mobile.css' // Import mobile-specific styles
 import './styles/tutorial.css' // Import tutorial-specific styles
+import './styles/marketing.css' // Import marketing-specific styles
 import { AuthProvider } from './contexts/AuthContext'
 import { ThemeProvider } from './hooks/use-theme'
 import { ThemeErrorBoundary } from './components/theme/ThemeErrorBoundary'
+import { SafeThemeWrapper } from './components/theme/SafeThemeWrapper'
 import { BrowserRouter } from 'react-router-dom'
 import { TranslationProvider } from './contexts/TranslationContext'
 import { pwaService } from './services/pwaService'
+import { waitForReactReadiness } from './utils/react-readiness'
 
 // Enhanced Font Loading System with Graceful Degradation
 const initializeFontSystem = async () => {
@@ -180,32 +183,64 @@ const initializePWA = () => {
   }
 };
 
-// Error boundary for React rendering issues
-const renderWithErrorBoundary = () => {
+// Safer React rendering with readiness check
+const renderWithSafeTheme = async () => {
   try {
+    console.log('[Main] Waiting for React readiness...');
+    
+    // Wait for React to be ready before attempting to render
+    const isReady = await waitForReactReadiness(3000);
+    
+    if (!isReady) {
+      console.warn('[Main] React readiness timeout, attempting render anyway');
+    }
+    
     console.log('[Main] Starting React app render...');
     
-    ReactDOM.createRoot(document.getElementById('root')!).render(
-      <React.StrictMode>
-        <BrowserRouter>
-          <ThemeErrorBoundary>
-            <ThemeProvider>
+    // Check if we're on a marketing page (root path)
+    const isMarketingPage = window.location.pathname === '/';
+    
+    const root = ReactDOM.createRoot(document.getElementById('root')!);
+    
+    if (isMarketingPage) {
+      // For marketing pages, use minimal theme wrapper
+      root.render(
+        <React.StrictMode>
+          <BrowserRouter>
+            <SafeThemeWrapper isMarketingPage={true}>
               <TranslationProvider>
                 <AuthProvider>
                   <App />
                 </AuthProvider>
               </TranslationProvider>
-            </ThemeProvider>
-          </ThemeErrorBoundary>
-        </BrowserRouter>
-      </React.StrictMode>,
-    );
+            </SafeThemeWrapper>
+          </BrowserRouter>
+        </React.StrictMode>
+      );
+    } else {
+      // For app pages, use full theme system
+      root.render(
+        <React.StrictMode>
+          <BrowserRouter>
+            <ThemeErrorBoundary>
+              <ThemeProvider>
+                <TranslationProvider>
+                  <AuthProvider>
+                    <App />
+                  </AuthProvider>
+                </TranslationProvider>
+              </ThemeProvider>
+            </ThemeErrorBoundary>
+          </BrowserRouter>
+        </React.StrictMode>
+      );
+    }
     
     console.log('[Main] React app rendered successfully');
   } catch (error) {
     console.error('[Main] Critical error during React render:', error);
     
-    // Fallback: try to render a basic error message
+    // Emergency fallback
     const root = document.getElementById('root');
     if (root) {
       root.innerHTML = `
@@ -237,7 +272,7 @@ const initializeApp = async () => {
     // Initialize PWA functionality
     initializePWA();
     
-    // Detect iOS and set a class on the HTML element
+    // Detect iOS and set class
     if (/iPad|iPhone|iPod/.test(navigator.userAgent) || 
         (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)) {
       document.documentElement.classList.add('ios-device');
@@ -245,14 +280,14 @@ const initializeApp = async () => {
     
     console.log('[Main] App initialization complete');
     
-    // Render the React app
-    renderWithErrorBoundary();
+    // Render the React app with safer theme handling
+    await renderWithSafeTheme();
     
   } catch (error) {
     console.error('[Main] Critical error during app initialization:', error);
     
     // Still try to render the app even if initialization fails
-    renderWithErrorBoundary();
+    await renderWithSafeTheme();
   }
 };
 

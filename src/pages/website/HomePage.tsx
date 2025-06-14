@@ -20,6 +20,13 @@ const HomePage = () => {
     document.body.style.height = '';
     document.body.style.top = '';
     document.body.style.left = '';
+    
+    // Apply basic marketing page styling
+    document.documentElement.classList.add('marketing-page');
+    
+    return () => {
+      document.documentElement.classList.remove('marketing-page');
+    };
   }, []);
 
   const openAppStore = () => {
@@ -50,14 +57,12 @@ const HomePage = () => {
     }
   };
 
-  // Log the route to help with debugging
   console.log('HomePage: Rendering the website home page at route "/"');
 
   return (
     <div className="min-h-screen bg-white overflow-x-hidden">
       <Navbar />
       
-      {/* SoulNet Translation Indicator */}
       <SoulNetTranslationIndicator className="fixed top-20 right-4 z-50 bg-background/90 backdrop-blur-sm px-3 py-2 rounded-lg border" />
       
       <HeroSection 
