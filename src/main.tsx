@@ -1,3 +1,4 @@
+
 import React from 'react'
 import ReactDOM from 'react-dom/client'
 import App from './App.tsx'
@@ -217,18 +218,19 @@ const RootRouter: React.FC = () => {
   const location = useLocation();
   const isMarketing = isMarketingRoute(location.pathname);
 
-  // For debugging
-  // console.log("[RootRouter] Path:", location.pathname, "isMarketing:", isMarketing);
+  console.log("[RootRouter] Path:", location.pathname, "isMarketing:", isMarketing);
 
   if (isMarketing) {
-    // Minimal providers for marketing – no Auth, no heavy app logic
+    // MARKETING ONLY: Minimal providers for marketing – no Auth, no app-level Translation
+    console.log("[RootRouter] Rendering marketing page with MarketingProviders only");
     return (
       <MarketingProviders>
-        <App /> {/* App.tsx will be marketing-safe since marketing Index/HomePage don't use Auth, etc. */}
+        <App />
       </MarketingProviders>
     );
   } else {
-    // Full set of providers for `/app` and anything else
+    // APP ONLY: Full set of providers for `/app` and anything else
+    console.log("[RootRouter] Rendering app page with full providers");
     return (
       <ThemeProvider>
         <TranslationProvider>
@@ -248,5 +250,3 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
     </BrowserRouter>
   </React.StrictMode>
 )
-
-// NOTE: This file is now quite long (~200+ lines). Consider refactoring it into smaller modules!

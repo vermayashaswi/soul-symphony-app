@@ -36,13 +36,15 @@ const Index = () => {
     document.body.style.left = '';
   }, []);
 
+  console.log('[Index] Rendering marketing homepage');
+
   return (
     <>
       <NetworkAwareContent
         lowBandwidthFallback={
           <div className="flex flex-col items-center justify-center min-h-screen p-4">
             <h1 className="text-2xl font-bold mb-4">
-              <MarketingTranslatableText text="Welcome to Soul Symphony" />
+              <MarketingTranslatableText text="Welcome to SOULo" />
             </h1>
             <p className="text-center mb-6">
               <MarketingTranslatableText 
