@@ -20,6 +20,32 @@ import BlogPostPage from '@/pages/website/BlogPostPage';
 import OnboardingScreen from '@/components/onboarding/OnboardingScreen';
 import { useAuth } from '@/contexts/AuthContext';
 import { useOnboarding } from '@/hooks/use-onboarding';
+import { ThemeProvider } from '@/hooks/use-theme';
+import { SubscriptionProvider } from '@/contexts/SubscriptionContext';
+import { TutorialProvider } from '@/contexts/TutorialContext';
+import { Toaster } from "@/components/ui/toaster";
+import { Toaster as SonnerToaster } from "sonner";
+import { TranslationLoadingOverlay } from '@/components/translation/TranslationLoadingOverlay';
+import { JournalProcessingInitializer } from '@/app/journal-processing-init';
+import TutorialOverlay from '@/components/tutorial/TutorialOverlay';
+
+// This component wraps all /app routes with necessary providers.
+const AppLayout = () => {
+  return (
+    <SubscriptionProvider>
+      <TutorialProvider>
+        <ThemeProvider>
+          <TranslationLoadingOverlay />
+          <JournalProcessingInitializer />
+          <Outlet />
+          <TutorialOverlay />
+          <Toaster />
+          <SonnerToaster position="top-right" />
+        </ThemeProvider>
+      </TutorialProvider>
+    </SubscriptionProvider>
+  );
+};
 
 const AppRoutes = () => {
   console.log('Rendering AppRoutes component');
@@ -54,7 +80,7 @@ const AppRoutes = () => {
     <Routes>
       {/* Wrap all routes that need ViewportManager in a parent Route */}
       <Route element={<ViewportManager />}>
-        {/* Website Routes - Now properly wrapped in translation context */}
+        {/* Website Routes - no app providers */}
         <Route path="/" element={<Index />} />
         <Route path="/privacy-policy" element={<PrivacyPolicyPage />} />
         <Route path="/faq" element={<FAQPage />} />
@@ -62,23 +88,25 @@ const AppRoutes = () => {
         <Route path="/blog" element={<BlogPage />} />
         <Route path="/blog/:slug" element={<BlogPostPage />} />
         
-        {/* App Routes - reordered to fix routing issue */}
-        <Route path="/app/onboarding" element={<OnboardingScreen />} />
-        <Route path="/app/auth" element={<Auth />} />
-        
-        {/* Protected App Routes */}
-        <Route path="/app" element={<ProtectedRoute />}>
-          <Route index element={<AppRootRedirect />} />
-          <Route path="home" element={<Home />} />
-          <Route path="journal" element={<Journal />} />
-          <Route path="insights" element={
-            <React.Suspense fallback={<div className="flex items-center justify-center h-screen">Loading...</div>}>
-              <Insights />
-            </React.Suspense>
-          } />
-          <Route path="chat" element={<Chat />} />
-          <Route path="smart-chat" element={<SmartChat />} />
-          <Route path="settings" element={<Settings />} />
+        {/* App Routes - wrapped with AppLayout */}
+        <Route element={<AppLayout />}>
+          <Route path="/app/onboarding" element={<OnboardingScreen />} />
+          <Route path="/app/auth" element={<Auth />} />
+          
+          {/* Protected App Routes */}
+          <Route path="/app" element={<ProtectedRoute />}>
+            <Route index element={<AppRootRedirect />} />
+            <Route path="home" element={<Home />} />
+            <Route path="journal" element={<Journal />} />
+            <Route path="insights" element={
+              <React.Suspense fallback={<div className="flex items-center justify-center h-screen">Loading...</div>}>
+                <Insights />
+              </React.Suspense>
+            } />
+            <Route path="chat" element={<Chat />} />
+            <Route path="smart-chat" element={<SmartChat />} />
+            <Route path="settings" element={<Settings />} />
+          </Route>
         </Route>
         
         {/* Legacy Route Redirects - all app features redirect to /app/ routes */}
