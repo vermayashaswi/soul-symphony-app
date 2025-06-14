@@ -21,7 +21,6 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { PremiumBadge } from "@/components/onboarding/PremiumBadge";
-import { useDeviceType } from "@/hooks/use-device-type";
 
 interface OnboardingScreenProps {
   onComplete?: () => void;
@@ -774,9 +773,7 @@ const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ onComplete }) => {
   const { setColorTheme } = useTheme();
   const contentRef = useRef<HTMLDivElement>(null);
   const { user } = useAuth();
-  const deviceTypeObj = useDeviceType();
-  const { currentLanguage, setLanguage } = useTranslation();
-
+  
   // Define isNameStep before it's used in useSwipeGesture
   const isFirstStep = currentStep === 0;
   const isNameStep = currentStep === 6;
@@ -786,26 +783,21 @@ const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ onComplete }) => {
     setColorTheme('Calm');
   }, [setColorTheme]);
   
-  // enhanced next handler (step 0 should require explicit language selection)
   const handleNext = () => {
-    const isFirstStep = currentStep === 0;
-    const isNameStep = currentStep === 6;
-    // Require language selection at step 0 (and block skip if not chosen)
-    if (isFirstStep && (!currentLanguage || currentLanguage === "")) {
-      toast.error("Please select a language to continue");
-      return;
-    }
     if (currentStep < ONBOARDING_STEPS.length - 1) {
-      if (isNameStep && !name.trim()) {
+      if (currentStep === 6 && !name.trim()) {
         toast.error("Please enter your name to continue");
         return;
       }
+      
       setCurrentStep(prev => prev + 1);
     } else {
       if (name) {
         localStorage.setItem("user_display_name", name.trim());
       }
+      
       localStorage.setItem("onboardingComplete", "true");
+      
       if (onComplete) {
         onComplete();
       } else {
@@ -845,11 +837,6 @@ const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ onComplete }) => {
 
   useSwipeGesture(contentRef, {
     onSwipeLeft: () => {
-      const isFirstStep = currentStep === 0;
-      if (isFirstStep && (!currentLanguage || currentLanguage === "")) {
-        toast.error("Please select a language to continue");
-        return;
-      }
       if (currentStep < ONBOARDING_STEPS.length - 1) {
         handleNext();
       }

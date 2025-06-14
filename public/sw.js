@@ -1,163 +1,155 @@
-
 const CACHE_NAME = 'soulo-v1.0.0';
-const STATIC_CACHE_NAME = 'soulo-static-v1.0.0';
-
-// Production-safe logging function
-const log = (message, data = null) => {
-  // Only log in development (check for localhost or development domains)
-  const isDev = self.location.hostname === 'localhost' || 
-                self.location.hostname.includes('127.0.0.1') ||
-                self.location.hostname.includes('lovableproject.com');
-  
-  if (isDev) {
-    if (data) {
-      console.log(`[SW] ${message}`, data);
-    } else {
-      console.log(`[SW] ${message}`);
-    }
-  }
-};
-
-// Critical resources to cache immediately
-const CRITICAL_RESOURCES = [
+const STATIC_ASSETS = [
   '/',
-  '/src/main.tsx',
-  '/index.html',
+  '/manifest.json',
   '/icons/icon-192x192.png',
-  '/icons/icon-512x512.png',
-  '/manifest.json'
+  '/icons/icon-512x512.png'
 ];
 
-// Font resources for caching
-const FONT_RESOURCES = [
-  'https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap',
-  'https://fonts.gstatic.com/s/inter/v13/UcCO3FwrK3iLTeHuS_fvQtMwCp50KnMw2boKoduKmMEVuLyfAZ9hiJ-Ek-_EeA.woff2'
-];
-
-// Install event - cache critical resources
+// Install event - cache static assets
 self.addEventListener('install', (event) => {
-  log('Installing service worker');
-  
+  console.log('[SW] Installing service worker');
   event.waitUntil(
-    Promise.all([
-      caches.open(CACHE_NAME).then((cache) => {
-        log('Caching critical resources');
-        return cache.addAll(CRITICAL_RESOURCES);
-      }),
-      caches.open(STATIC_CACHE_NAME).then((cache) => {
-        log('Caching font resources');
-        return cache.addAll(FONT_RESOURCES.map(url => new Request(url, { mode: 'cors' })));
+    caches.open(CACHE_NAME)
+      .then((cache) => {
+        console.log('[SW] Caching static assets');
+        return cache.addAll(STATIC_ASSETS);
       })
-    ])
+      .catch((error) => {
+        console.error('[SW] Failed to cache static assets:', error);
+      })
   );
-  
-  // Skip waiting to activate immediately
   self.skipWaiting();
 });
 
 // Activate event - clean up old caches
 self.addEventListener('activate', (event) => {
-  log('Activating service worker');
-  
+  console.log('[SW] Activating service worker');
   event.waitUntil(
     caches.keys().then((cacheNames) => {
       return Promise.all(
         cacheNames.map((cacheName) => {
-          if (cacheName !== CACHE_NAME && cacheName !== STATIC_CACHE_NAME) {
-            log('Deleting old cache', cacheName);
+          if (cacheName !== CACHE_NAME) {
+            console.log('[SW] Deleting old cache:', cacheName);
             return caches.delete(cacheName);
           }
         })
       );
     })
   );
-  
-  // Take control immediately
   self.clients.claim();
 });
 
-// Fetch event - serve from cache with network fallback
+// Fetch event - serve from cache when offline
 self.addEventListener('fetch', (event) => {
-  const { request } = event;
-  const url = new URL(request.url);
-  
-  // Handle different types of requests
-  if (request.method !== 'GET') {
+  // Only handle GET requests
+  if (event.request.method !== 'GET') {
     return;
   }
-  
-  // Handle font requests
-  if (url.hostname === 'fonts.googleapis.com' || url.hostname === 'fonts.gstatic.com') {
-    event.respondWith(
-      caches.match(request).then((response) => {
-        return response || fetch(request).then((fetchResponse) => {
-          const responseClone = fetchResponse.clone();
-          caches.open(STATIC_CACHE_NAME).then((cache) => {
-            cache.put(request, responseClone);
-          });
-          return fetchResponse;
-        });
-      })
-    );
+
+  // Skip non-http(s) requests
+  if (!event.request.url.startsWith('http')) {
     return;
   }
-  
-  // Handle app requests
-  if (url.origin === self.origin) {
-    event.respondWith(
-      caches.match(request).then((response) => {
+
+  event.respondWith(
+    caches.match(event.request)
+      .then((response) => {
+        // Return cached version if available
         if (response) {
           return response;
         }
-        
-        return fetch(request).then((fetchResponse) => {
-          // Don't cache API requests or large files
-          if (
-            !request.url.includes('/api/') && 
-            !request.url.includes('supabase') &&
-            fetchResponse.status === 200
-          ) {
-            const responseClone = fetchResponse.clone();
-            caches.open(CACHE_NAME).then((cache) => {
-              cache.put(request, responseClone);
-            });
-          }
-          return fetchResponse;
-        }).catch(() => {
-          // Return cached index.html for navigation requests when offline
-          if (request.mode === 'navigate') {
-            return caches.match('/');
-          }
-        });
+
+        // Otherwise fetch from network
+        return fetch(event.request)
+          .then((response) => {
+            // Don't cache non-successful responses
+            if (!response || response.status !== 200 || response.type !== 'basic') {
+              return response;
+            }
+
+            // Clone the response before caching
+            const responseToCache = response.clone();
+
+            // Cache the response for future use
+            caches.open(CACHE_NAME)
+              .then((cache) => {
+                cache.put(event.request, responseToCache);
+              });
+
+            return response;
+          })
+          .catch(() => {
+            // Return offline page for navigation requests
+            if (event.request.destination === 'document') {
+              return caches.match('/');
+            }
+          });
       })
-    );
-  }
+  );
 });
 
-// Background sync for better offline experience
+// Handle background sync for offline actions
 self.addEventListener('sync', (event) => {
-  if (event.tag === 'background-sync') {
-    log('Background sync triggered');
-    // Handle background sync operations here
-  }
-});
-
-// Push notification handling
-self.addEventListener('push', (event) => {
-  if (event.data) {
-    const data = event.data.json();
-    log('Push notification received', data);
-    
-    const options = {
-      body: data.body,
-      icon: '/icons/icon-192x192.png',
-      badge: '/icons/icon-192x192.png',
-      vibrate: [100, 50, 100],
-      tag: 'soulo-notification'
-    };
-    
+  console.log('[SW] Background sync triggered:', event.tag);
+  
+  if (event.tag === 'journal-sync') {
     event.waitUntil(
-      self.registration.showNotification(data.title || 'SOULo', options)
+      // Sync journal entries when back online
+      syncJournalEntries()
     );
   }
 });
+
+// Handle push notifications
+self.addEventListener('push', (event) => {
+  console.log('[SW] Push notification received');
+  
+  const options = {
+    body: 'Time for your daily reflection with SOULo',
+    icon: '/icons/icon-192x192.png',
+    badge: '/icons/icon-72x72.png',
+    tag: 'journal-reminder',
+    vibrate: [200, 100, 200],
+    actions: [
+      {
+        action: 'open',
+        title: 'Start Journaling'
+      },
+      {
+        action: 'close',
+        title: 'Later'
+      }
+    ]
+  };
+
+  event.waitUntil(
+    self.registration.showNotification('SOULo Reminder', options)
+  );
+});
+
+// Handle notification clicks
+self.addEventListener('notificationclick', (event) => {
+  console.log('[SW] Notification clicked:', event.action);
+  
+  event.notification.close();
+
+  if (event.action === 'open') {
+    event.waitUntil(
+      clients.openWindow('/')
+    );
+  }
+});
+
+// Sync function for journal entries
+async function syncJournalEntries() {
+  try {
+    console.log('[SW] Syncing journal entries...');
+    // This would integrate with your existing journal service
+    // For now, just log the sync attempt
+    return Promise.resolve();
+  } catch (error) {
+    console.error('[SW] Failed to sync journal entries:', error);
+    throw error;
+  }
+}

@@ -1,22 +1,10 @@
+
 import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react';
 import { onDemandTranslationCache } from '@/utils/website-translations';
 import { SoulNetPreloadService } from '@/services/soulnetPreloadService';
 import { EnhancedSoulNetPreloadService } from '@/services/enhancedSoulNetPreloadService';
 import { translationService } from '@/services/translationService';
 import { supabase } from '@/integrations/supabase/client';
-import { useLocation } from 'react-router-dom';
-import { useDeviceType } from '@/hooks/use-device-type';
-
-// INJECTED: Helper to detect if a route is a marketing page
-const websitePrefixes = [
-  '/', '/about', '/pricing', '/terms', '/privacy', '/blog', '/contact', '/faq', '/download'
-];
-export function isWebsiteRoute(pathname: string): boolean {
-  // '/' is marketing, '/app' is not; everything else in websitePrefixes is marketing.
-  if (pathname.startsWith('/app')) return false;
-  if (pathname === '/') return true;
-  return websitePrefixes.some(prefix => pathname === prefix || pathname.startsWith(`${prefix}/`));
-}
 
 interface TranslationContextType {
   currentLanguage: string;
@@ -30,7 +18,6 @@ interface TranslationContextType {
   prefetchTranslationsForRoute?: (route: string) => Promise<void>;
   prefetchSoulNetTranslations: (userId: string, timeRange: string) => Promise<void>;
   isSoulNetTranslating: boolean;
-  deviceType: "mobile" | "tablet" | "desktop";
 }
 
 const TranslationContext = createContext<TranslationContextType | undefined>(undefined);
@@ -40,177 +27,147 @@ interface TranslationProviderProps {
 }
 
 export const TranslationProvider: React.FC<TranslationProviderProps> = ({ children }) => {
-  // ENHANCED: Context now always tracks current pathname to trigger correct language behavior
-  const location = typeof window !== "undefined" ? window.location : { pathname: "/" };
-  const [currentPath, setCurrentPath] = useState<string>(location.pathname);
-  // State determining if we are currently in the website (marketing)
-  const [onMarketing, setOnMarketing] = useState<boolean>(isWebsiteRoute(location.pathname));
-  const device = useDeviceType();
-
-  // Save if we're in onboarding so language is always selectable
-  const [onOnboarding, setOnOnboarding] = useState<boolean>(
-    typeof window !== "undefined"
-      ? window.location.pathname.includes("onboarding")
-      : false
-  );
-
-  useEffect(() => {
-    const handlePathChange = () => {
-      const path = typeof window !== "undefined" ? window.location.pathname : "";
-      setOnOnboarding(path.includes("onboarding"));
-      if (process.env.NODE_ENV !== "production") {
-        console.log("[TranslationContext] Path changed:", path, { onOnboarding: path.includes("onboarding") });
-      }
-    };
-    window.addEventListener("popstate", handlePathChange);
-    window.addEventListener("pushstate", handlePathChange);
-    window.addEventListener("replacestate", handlePathChange);
-    window.addEventListener("locationchange", handlePathChange);
-    const interval = setInterval(handlePathChange, 333);
-    return () => {
-      window.removeEventListener("popstate", handlePathChange);
-      window.removeEventListener("pushstate", handlePathChange);
-      window.removeEventListener("replacestate", handlePathChange);
-      window.removeEventListener("locationchange", handlePathChange);
-      clearInterval(interval);
-    };
-  }, []);
-
-  // Force language to 'en' if on marketing
-  const [currentLanguage, setCurrentLanguageState] = useState<string>('en');
+  const [currentLanguage, setCurrentLanguage] = useState<string>('en');
   const [isTranslating, setIsTranslating] = useState<boolean>(false);
   const [isSoulNetTranslating, setIsSoulNetTranslating] = useState<boolean>(false);
   const [translationCache, setTranslationCache] = useState<Record<string, string>>({});
 
-  // This ensures that any attempt to set language on homepage will revert to English
+  // APP-LEVEL: Set up translation service integration on context initialization
   useEffect(() => {
-    // Listen for path changes and update marketing/app status
-    const syncMarketingMode = () => {
-      const newPath = window.location.pathname;
-      setCurrentPath(newPath);
-      const nowMarketing = isWebsiteRoute(newPath);
-      setOnMarketing(nowMarketing);
+    console.log('[TranslationContext] APP-LEVEL: Setting up translation service integration');
+    
+    // Register translation service with EnhancedSoulNetPreloadService
+    EnhancedSoulNetPreloadService.setAppLevelTranslationService(translationService);
+    
+    console.log('[TranslationContext] APP-LEVEL: Translation service integration complete');
+  }, []);
 
-      // IF ON MARKETING, always set to English. If on app, restore saved or browser language.
-      if (nowMarketing) {
-        setCurrentLanguageState('en');
-      } else {
-        let loadedLang = 'en';
-        try {
-          const savedLanguage = localStorage.getItem('soulo-language');
-          if (savedLanguage) loadedLang = savedLanguage;
-        } catch { }
-        // Fallback to browser on first visit to app section
-        if (!loadedLang || loadedLang === 'en') {
-          const browserLanguage = navigator.language?.split('-')[0] ?? 'en';
-          const supportedLanguages = [
-            'en', 'es', 'fr', 'de', 'it', 'pt', 'ru', 'ja', 'ko', 'zh', 'hi', 'ar', 'bn',
-            'gu', 'kn', 'ml', 'mr', 'or', 'pa', 'ta', 'te'
-          ];
-          if (supportedLanguages.includes(browserLanguage)) {
-            loadedLang = browserLanguage;
-          }
-        }
-        setCurrentLanguageState(loadedLang);
-      }
-    };
-
-    // Handle popstate/navigation events (also works with react-router, but is bulletproof for preview)
-    window.addEventListener('popstate', syncMarketingMode);
-    window.addEventListener('pushstate', syncMarketingMode); // Custom events, may not always fire
-    window.addEventListener('replacestate', syncMarketingMode);
-    window.addEventListener('locationchange', syncMarketingMode);
-
-    // React-router v6 workaround: observe path with polling
-    const interval = setInterval(() => {
-      if (window.location.pathname !== currentPath) {
-        syncMarketingMode();
-      }
-    }, 300);
-
-    syncMarketingMode();
-
-    return () => {
-      window.removeEventListener('popstate', syncMarketingMode);
-      window.removeEventListener('pushstate', syncMarketingMode);
-      window.removeEventListener('replacestate', syncMarketingMode);
-      window.removeEventListener('locationchange', syncMarketingMode);
-      clearInterval(interval);
-    };
-  // Only depend on actual window location, not react-router location
-  // eslint-disable-next-line
-  }, [typeof window !== "undefined" ? window.location.pathname : "/", currentPath]);
-
-  // Setup: language should NEVER auto-select Indian (or other non-English) on tablets during onboarding
+  // Load language from localStorage or browser default
   useEffect(() => {
-    // When first loading the app, and on onboarding, always default to EN
-    if (onOnboarding) {
-      setCurrentLanguageState("en");
-      localStorage.setItem("soulo-language", "en");
-      if (process.env.NODE_ENV !== "production") {
-        console.log("[TranslationContext] Onboarding - language forced to EN on onboarding route.");
+    try {
+      const savedLanguage = localStorage.getItem('soulo-language');
+      if (savedLanguage) {
+        console.log('[TranslationContext] Loading saved language:', savedLanguage);
+        setCurrentLanguage(savedLanguage);
+        return;
       }
+    } catch (error) {
+      console.error('[TranslationContext] Error loading saved language:', error);
     }
-  }, [onOnboarding, device.deviceType]);
 
-  // The only way to change the language via selection, only possible in the app
+    // Fallback to browser language
+    const browserLanguage = navigator.language.split('-')[0];
+    const supportedLanguages = ['en', 'es', 'fr', 'de', 'it', 'pt', 'ru', 'ja', 'ko', 'zh', 'hi', 'ar', 'bn', 'gu', 'kn', 'ml', 'mr', 'or', 'pa', 'ta', 'te'];
+    
+    if (supportedLanguages.includes(browserLanguage)) {
+      setCurrentLanguage(browserLanguage);
+    }
+    
+    console.log('[TranslationContext] Initialized with language:', browserLanguage, 'supported:', supportedLanguages.includes(browserLanguage));
+  }, []);
+
+  const prefetchSoulNetTranslations = useCallback(async (userId: string, timeRange: string): Promise<void> => {
+    if (currentLanguage === 'en') {
+      console.log('[TranslationContext] Skipping SoulNet pre-translation for English');
+      return;
+    }
+
+    console.log(`[TranslationContext] APP-LEVEL: Pre-translating SoulNet data for ${userId}, ${timeRange}, ${currentLanguage}`);
+    
+    try {
+      setIsSoulNetTranslating(true);
+      
+      // ENHANCED: Use enhanced preload service for better translation coordination
+      await EnhancedSoulNetPreloadService.preloadInstantData(userId, timeRange, currentLanguage);
+      
+      console.log('[TranslationContext] APP-LEVEL: SoulNet pre-translation completed successfully');
+    } catch (error) {
+      console.error('[TranslationContext] APP-LEVEL: Error pre-translating SoulNet data:', error);
+    } finally {
+      setIsSoulNetTranslating(false);
+    }
+  }, [currentLanguage]);
+
   const handleLanguageChange = useCallback(async (language: string) => {
-    if (onOnboarding) {
-      setCurrentLanguageState(language);
-      localStorage.setItem("soulo-language", language);
-      if (process.env.NODE_ENV !== "production") {
-        console.log("[TranslationContext] Onboarding - language set via selector:", language);
-      }
-      return;
+    console.log('[TranslationContext] APP-LEVEL: Changing language to:', language);
+    
+    // Set loading state for SoulNet translations
+    if (language !== 'en') {
+      setIsSoulNetTranslating(true);
     }
-    if (onMarketing) {
-      setCurrentLanguageState('en');
-      localStorage.setItem('soulo-language', 'en');
-      return;
+    
+    setCurrentLanguage(language);
+    
+    // Save to localStorage for persistence
+    try {
+      localStorage.setItem('soulo-language', language);
+      console.log('[TranslationContext] APP-LEVEL: Saved language to localStorage:', language);
+    } catch (error) {
+      console.error('[TranslationContext] APP-LEVEL: Error saving language to localStorage:', error);
     }
-    setCurrentLanguageState(language);
-    localStorage.setItem('soulo-language', language);
-
-    // Translation caches always cleared as before
+    
+    // ENHANCED: Clear both enhanced and legacy SoulNet caches when language changes
     EnhancedSoulNetPreloadService.clearInstantCache();
     SoulNetPreloadService.clearCache();
+    
+    console.log('[TranslationContext] APP-LEVEL: Cleared all SoulNet caches for language change');
+    
+    // Dispatch custom event for components that need to know about language changes
     const event = new CustomEvent('languageChange', { 
-      detail: { language, isSoulNetTranslating: language !== 'en' }
+      detail: { 
+        language,
+        isSoulNetTranslating: language !== 'en'
+      } 
     });
     window.dispatchEvent(event);
-    setIsSoulNetTranslating(language !== 'en');
-  }, [onMarketing, onOnboarding]);
-
-  // Shorter prefetch for SoulNet
-  const prefetchSoulNetTranslations = useCallback(async (userId: string, timeRange: string): Promise<void> => {
-    if (onMarketing || currentLanguage === 'en') return;
-    setIsSoulNetTranslating(true);
-    try {
-      await EnhancedSoulNetPreloadService.preloadInstantData(userId, timeRange, currentLanguage);
-    } catch {}
-    setIsSoulNetTranslating(false);
-  }, [currentLanguage, onMarketing]);
-
-  // Critically, translation requests should return immediately if on marketing or English
-  const translate = useCallback(async (text: string, sourceLanguage: string = 'en', entryId?: number): Promise<string | null> => {
-    if (!text || typeof text !== 'string') return text || '';
-    if (process.env.NODE_ENV !== "production") {
-      console.log("[TranslationContext:translate] language", currentLanguage, "device", device.deviceType, "onOnboarding", onOnboarding, "onMarketing", onMarketing);
+    
+    // If not English, indicate that SoulNet translations are ready
+    // (actual pre-translation will happen when SoulNet components mount)
+    if (language === 'en') {
+      setIsSoulNetTranslating(false);
     }
-    // On marketing pages, always return English text -- DO NOT TRANSLATE.
-    if (onMarketing || currentLanguage === 'en') {
+  }, []);
+
+  const translate = useCallback(async (text: string, sourceLanguage: string = 'en', entryId?: number): Promise<string | null> => {
+    if (!text || typeof text !== 'string') {
+      console.warn('[TranslationContext] Invalid text provided for translation:', text);
+      return text || '';
+    }
+
+    if (currentLanguage === sourceLanguage) {
+      console.log('[TranslationContext] Text already in target language, skipping translation:', { text, currentLanguage });
       return text;
     }
-    // App routes only:
+
+    console.log('[TranslationContext] SUPABASE EDGE FUNCTION - Attempting to translate:', { 
+      text: text.substring(0, 30) + (text.length > 30 ? '...' : ''), 
+      from: sourceLanguage, 
+      to: currentLanguage,
+      entryId
+    });
+
     const cacheKey = `${text}_${sourceLanguage}_${currentLanguage}`;
-    if (translationCache[cacheKey]) return translationCache[cacheKey];
+    
+    // Check local cache first
+    if (translationCache[cacheKey]) {
+      console.log('[TranslationContext] Using local cache for:', text.substring(0, 30));
+      return translationCache[cacheKey];
+    }
+
+    // Check on-demand cache
     const cachedTranslation = onDemandTranslationCache.get(currentLanguage, text);
     if (cachedTranslation) {
+      console.log('[TranslationContext] Using on-demand cache for:', text.substring(0, 30));
       setTranslationCache(prev => ({ ...prev, [cacheKey]: cachedTranslation }));
       return cachedTranslation;
     }
-    setIsTranslating(true);
+
     try {
+      setIsTranslating(true);
+      
+      console.log('[TranslationContext] Using Supabase edge function for translation');
+      
+      // ENHANCED: Use Supabase edge function with proper source language handling
       const { data, error } = await supabase.functions.invoke('translate-text', {
         body: {
           text,
@@ -220,37 +177,58 @@ export const TranslationProvider: React.FC<TranslationProviderProps> = ({ childr
           cleanResult: true
         }
       });
-      if (!error && data && data.translatedText && data.translatedText !== text) {
-        setTranslationCache(prev => ({ ...prev, [cacheKey]: data.translatedText }));
-        onDemandTranslationCache.set(currentLanguage, text, data.translatedText);
-        return data.translatedText;
+
+      if (error) {
+        console.error('[TranslationContext] Edge function error:', error);
+        return text;
       }
+
+      if (data && data.translatedText && data.translatedText !== text) {
+        const translatedText = data.translatedText;
+        console.log('[TranslationContext] Translation successful:', { 
+          original: text.substring(0, 30), 
+          translated: translatedText.substring(0, 30) 
+        });
+        
+        // Cache both locally and in on-demand cache
+        setTranslationCache(prev => ({ ...prev, [cacheKey]: translatedText }));
+        onDemandTranslationCache.set(currentLanguage, text, translatedText);
+        
+        return translatedText;
+      }
+      
+      console.log('[TranslationContext] Translation returned same text, using original');
       return text;
     } catch (error) {
+      console.error('[TranslationContext] Translation failed:', error);
       return text;
     } finally {
       setIsTranslating(false);
     }
-  }, [currentLanguage, translationCache, onMarketing, onOnboarding, device.deviceType]);
+  }, [currentLanguage, translationCache]);
 
   const getCachedTranslation = useCallback((text: string): string | null => {
-    if (onMarketing || currentLanguage === 'en') return null;
     const cacheKey = `${text}_en_${currentLanguage}`;
     const localCache = translationCache[cacheKey];
     const onDemandCache = onDemandTranslationCache.get(currentLanguage, text);
+    console.log('[TranslationContext] Checking cache for:', text.substring(0, 30), 
+      { localCache: !!localCache, onDemandCache: !!onDemandCache });
     return localCache || onDemandCache || null;
-  }, [currentLanguage, translationCache, onMarketing]);
-  
+  }, [currentLanguage, translationCache]);
+
   const prefetchTranslationsForRoute = useCallback(async (route: string): Promise<void> => {
-    if (onMarketing || currentLanguage === 'en') return;
+    console.log(`[TranslationContext] Prefetching translations for route: ${route}`);
+    // Get common route texts for prefetching - can be expanded
     const routeTexts = {
       '/': ['Home', 'Download on App Store', 'Your Voice, Your Journey'],
       '/insights': ['Insights', 'Discover patterns', 'Soul-Net Visualization', 'Dominant Mood'],
       '/journal': ['Journal', 'New Entry', 'Search', 'Recent Entries']
     };
+    
     const textsToTranslate = routeTexts[route] || [];
-    if (textsToTranslate.length > 0) {
+    if (textsToTranslate.length > 0 && currentLanguage !== 'en') {
       try {
+        // ENHANCED: Use Supabase edge function with proper source language
         const { data, error } = await supabase.functions.invoke('translate-text', {
           body: {
             texts: textsToTranslate,
@@ -259,7 +237,11 @@ export const TranslationProvider: React.FC<TranslationProviderProps> = ({ childr
             cleanResult: true
           }
         });
+
         if (!error && data && data.translatedTexts) {
+          console.log(`[TranslationContext] Prefetched ${data.translatedTexts.length} translations for route ${route}`);
+          
+          // Cache the results
           textsToTranslate.forEach((originalText, index) => {
             const translatedText = data.translatedTexts[index];
             if (translatedText) {
@@ -269,29 +251,30 @@ export const TranslationProvider: React.FC<TranslationProviderProps> = ({ childr
             }
           });
         }
-      } catch {}
+      } catch (error) {
+        console.error('[TranslationContext] Error prefetching translations:', error);
+      }
     }
-  }, [currentLanguage, onMarketing]);
+  }, [currentLanguage]);
 
   const value: TranslationContextType = {
     currentLanguage,
     setCurrentLanguage: handleLanguageChange,
-    setLanguage: handleLanguageChange,
+    setLanguage: handleLanguageChange, // Alias for backwards compatibility
     translate,
     isTranslating,
     clearCache: useCallback(() => {
+      console.log('[TranslationContext] APP-LEVEL: Clearing all translation caches');
       setTranslationCache({});
       onDemandTranslationCache.clearAll();
       EnhancedSoulNetPreloadService.clearInstantCache();
       SoulNetPreloadService.clearCache();
     }, []),
     getCachedTranslation,
-    // Fix: translationProgress is always 100 to disable global overlay
-    translationProgress: 100,
+    translationProgress: isTranslating ? 50 : 100,
     prefetchTranslationsForRoute,
     prefetchSoulNetTranslations,
-    isSoulNetTranslating,
-    deviceType: device.deviceType,
+    isSoulNetTranslating
   };
 
   return (

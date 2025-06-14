@@ -21,32 +21,29 @@ import BlogPostPage from '@/pages/website/BlogPostPage';
 import OnboardingScreen from '@/components/onboarding/OnboardingScreen';
 import { useAuth } from '@/contexts/AuthContext';
 import { useOnboarding } from '@/hooks/use-onboarding';
-import { createLogger } from '@/utils/logger';
-
-const logger = createLogger('AppRoutes');
 
 const AppRoutes = () => {
-  logger.debug('Rendering AppRoutes component');
+  console.log('Rendering AppRoutes component');
   const { user } = useAuth();
   const { onboardingComplete } = useOnboarding();
   
   // App root redirect logic - only for /app route, not for marketing homepage
   const AppRootRedirect = () => {
-    logger.debug('AppRootRedirect - Auth status', { 
+    console.log('AppRootRedirect - Auth status:', { 
       user: !!user, 
       onboardingComplete
     });
     
     if (user) {
       if (onboardingComplete) {
-        logger.debug('User logged in and onboarding complete, redirecting to /app/home');
+        console.log('User logged in and onboarding complete, redirecting to /app/home');
         return <Navigate to="/app/home" replace />;
       } else {
-        logger.debug('User logged in but onboarding not complete, redirecting to /app/onboarding');
+        console.log('User logged in but onboarding not complete, redirecting to /app/onboarding');
         return <Navigate to="/app/onboarding" replace />;
       }
     } else {
-      logger.debug('User not logged in, redirecting to /app/auth');
+      console.log('User not logged in, redirecting to /app/auth');
       return <Navigate to="/app/auth" replace />;
     }
   };

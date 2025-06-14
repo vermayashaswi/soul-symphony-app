@@ -1,4 +1,3 @@
-
 import type { Config } from "tailwindcss";
 
 export default {
@@ -160,48 +159,15 @@ export default {
 			animation: {
 				'accordion-down': 'accordion-down 0.2s ease-out',
 				'accordion-up': 'accordion-up 0.2s ease-out',
-				'fade-in': 'fade-in 0.5s ease-out forwards',
-				'slide-up': 'slide-up 0.5s ease-out forwards',
-				'slide-down': 'slide-down 0.5s ease-out forwards',
-				'slide-in-right': 'slide-in-right 0.5s ease-out forwards',
-				'pulsate': 'pulsate 2s ease-in-out infinite',
-				'float': 'float 4s ease-in-out infinite',
-				'ripple': 'ripple 0.8s ease-out'
-			},
-			// Performance optimizations
-			willChange: {
-				'transform-opacity': 'transform, opacity',
-				'transform': 'transform',
-				'opacity': 'opacity'
+				'fade-in': 'fade-in 0.7s ease-out forwards',
+				'slide-up': 'slide-up 0.7s ease-out forwards',
+				'slide-down': 'slide-down 0.7s ease-out forwards',
+				'slide-in-right': 'slide-in-right 0.7s ease-out forwards',
+				'pulsate': 'pulsate 3s ease-in-out infinite',
+				'float': 'float 5s ease-in-out infinite',
+				'ripple': 'ripple 1s ease-out'
 			}
 		}
 	},
-	plugins: [
-		require("tailwindcss-animate"),
-		// Custom plugin for performance optimizations
-		function({ addUtilities }) {
-			const newUtilities = {
-				'.will-change-transform-opacity': {
-					'will-change': 'transform, opacity'
-				},
-				'.will-change-transform': {
-					'will-change': 'transform'
-				},
-				'.will-change-opacity': {
-					'will-change': 'opacity'
-				},
-				'.gpu-accelerated': {
-					'transform': 'translateZ(0)',
-					'backface-visibility': 'hidden',
-					'perspective': '1000px'
-				},
-				'.optimize-text': {
-					'text-rendering': 'optimizeLegibility',
-					'-webkit-font-smoothing': 'antialiased',
-					'-moz-osx-font-smoothing': 'grayscale'
-				}
-			}
-			addUtilities(newUtilities)
-		}
-	],
+	plugins: [require("tailwindcss-animate")],
 } satisfies Config;
