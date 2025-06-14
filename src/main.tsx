@@ -1,4 +1,3 @@
-
 import React from 'react'
 import ReactDOM from 'react-dom/client'
 import App from './App.tsx'
@@ -8,7 +7,6 @@ import './styles/tutorial.css' // Import tutorial-specific styles
 import { AuthProvider } from './contexts/AuthContext'
 import { ThemeProvider } from './hooks/use-theme'
 import { BrowserRouter } from 'react-router-dom'
-import { TranslationProvider } from './contexts/TranslationContext'
 import { pwaService } from './services/pwaService'
 
 // Enhanced Font Loading System
@@ -204,11 +202,9 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
     <BrowserRouter>
       <ThemeProvider>
-        <TranslationProvider>
-          <AuthProvider>
-            <App />
-          </AuthProvider>
-        </TranslationProvider>
+        <AuthProvider>
+          <App />
+        </AuthProvider>
       </ThemeProvider>
     </BrowserRouter>
   </React.StrictMode>,
