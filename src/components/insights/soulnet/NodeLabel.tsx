@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useMemo } from 'react';
 import { Text } from '@react-three/drei';
 import { useLoader } from '@react-three/fiber';
@@ -29,12 +28,18 @@ export const NodeLabel: React.FC<NodeLabelProps> = ({
   themeHex,
   nodeScale = 1
 }) => {
-  const { currentLanguage, translate } = useTranslation();
+  const { currentLanguage, getCachedTranslation, translate } = useTranslation();
   const [displayText, setDisplayText] = useState<string>(id);
 
-  // Handle translation
   useEffect(() => {
     if (!shouldShowLabel) return;
+
+    // ENHANCED: Always check caches first before calling translate (and use last translation as fallback)
+    const cached = getCachedTranslation(id);
+    if (cached && cached.trim() && cached !== id) {
+      setDisplayText(cached);
+      return;
+    }
 
     const translateText = async () => {
       try {
@@ -42,21 +47,18 @@ export const NodeLabel: React.FC<NodeLabelProps> = ({
           setDisplayText(id);
           return;
         }
-
         const translated = await translate(id);
-        if (translated && typeof translated === 'string') {
+        if (translated && typeof translated === 'string' && translated !== id) {
           setDisplayText(translated);
         } else {
           setDisplayText(id);
         }
       } catch (error) {
-        console.warn(`[NodeLabel] Translation failed for ${id}:`, error);
         setDisplayText(id);
       }
     };
-
     translateText();
-  }, [id, currentLanguage, translate, shouldShowLabel]);
+  }, [id, currentLanguage, translate, shouldShowLabel, getCachedTranslation]);
 
   // Get font URL based on text content
   const fontUrl = simplifiedFontService.getFontUrl(displayText);

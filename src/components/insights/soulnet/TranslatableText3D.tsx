@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useTranslation } from '@/contexts/TranslationContext';
 import { NodeTranslationCacheService } from '@/services/nodeTranslationCache';
@@ -47,15 +46,27 @@ export const TranslatableText3D: React.FC<TranslatableText3DProps> = ({
   isAtomicMode = true
 }) => {
   const { currentLanguage, getCachedTranslation, translate } = useTranslation();
-  const [translatedText, setTranslatedText] = useState<string>(text);
+  // Remember the last translation or English fallback (never regress to English if cache existed)
+  const [translatedText, setTranslatedText] = useState<string>(getCachedTranslation(text) || text);
   const [isTranslating, setIsTranslating] = useState(false);
   const [translationAttempted, setTranslationAttempted] = useState(false);
 
   useEffect(() => {
+    let mounted = true; // avoid setState on unmounted
+
+    // First: always prefer any **currently cached translation**, even on prop/language change!
+    const cached = getCachedTranslation(text);
+    if (cached && cached.trim()) {
+      setTranslatedText(cached);
+      setTranslationAttempted(true);
+      if (onTranslationComplete) onTranslationComplete(cached);
+      // No need to try translation since cache is valid
+      return;
+    }
+
     const translateText = async () => {
       // ENHANCED: Prioritize atomic coordinated translation for consistency
       if (useCoordinatedTranslation && coordinatedTranslation && isAtomicMode) {
-        console.log(`[TranslatableText3D] ENHANCED ATOMIC: Using coordinated translation for "${text}": "${coordinatedTranslation}"`);
         setTranslatedText(coordinatedTranslation);
         onTranslationComplete?.(coordinatedTranslation);
         setTranslationAttempted(true);
@@ -90,6 +101,9 @@ export const TranslatableText3D: React.FC<TranslatableText3DProps> = ({
         return;
       }
 
+      // If translation already attempted and failed, keep the last translation
+      if (translationAttempted) return;
+
       // ENHANCED: Standard translation flow with better error handling
       if (!useCoordinatedTranslation && !isAtomicMode) {
         const cachedTranslation = getCachedTranslation(text);
@@ -123,24 +137,26 @@ export const TranslatableText3D: React.FC<TranslatableText3DProps> = ({
           setIsTranslating(true);
           const result = await translate(text, sourceLanguage);
           
-          if (result && result.trim() && result !== text) {
+          if (mounted && result && result.trim() && result !== text) {
             console.log(`[TranslatableText3D] ENHANCED STANDARD: Translation successful: "${text}" -> "${result}"`);
             // Cache in node translation cache for future use
             await NodeTranslationCacheService.setCachedNodeTranslation(text, result, currentLanguage);
             setTranslatedText(result);
             onTranslationComplete?.(result);
-          } else {
+          } else if (mounted) {
             console.log(`[TranslatableText3D] ENHANCED STANDARD: Using original text for "${text}" (same as result or empty)`);
             setTranslatedText(text);
             onTranslationComplete?.(text);
           }
         } catch (error) {
           console.error(`[TranslatableText3D] ENHANCED STANDARD: Translation failed for "${text}":`, error);
-          setTranslatedText(text);
+          if (mounted) setTranslatedText(text);
           onTranslationComplete?.(text);
         } finally {
-          setIsTranslating(false);
-          setTranslationAttempted(true);
+          if (mounted) {
+            setIsTranslating(false);
+            setTranslationAttempted(true);
+          }
         }
       } else {
         // ENHANCED: In atomic mode, always use original text to maintain consistency
@@ -152,6 +168,8 @@ export const TranslatableText3D: React.FC<TranslatableText3DProps> = ({
     };
 
     translateText();
+    return () => { mounted = false; };
+  // Also include getCachedTranslation in dep to auto-refresh if cache updates
   }, [text, currentLanguage, sourceLanguage, translate, getCachedTranslation, onTranslationComplete, translationAttempted, coordinatedTranslation, useCoordinatedTranslation, isAtomicMode]);
 
   // ENHANCED: Always render with current text - maintain atomic consistency

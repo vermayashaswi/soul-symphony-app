@@ -360,6 +360,42 @@ export type Database = {
         }
         Relationships: []
       }
+      phone_verifications: {
+        Row: {
+          attempts: number
+          created_at: string
+          expires_at: string
+          id: string
+          max_attempts: number
+          phone_number: string
+          user_id: string | null
+          verification_code: string
+          verified: boolean
+        }
+        Insert: {
+          attempts?: number
+          created_at?: string
+          expires_at: string
+          id?: string
+          max_attempts?: number
+          phone_number: string
+          user_id?: string | null
+          verification_code: string
+          verified?: boolean
+        }
+        Update: {
+          attempts?: number
+          created_at?: string
+          expires_at?: string
+          id?: string
+          max_attempts?: number
+          phone_number?: string
+          user_id?: string | null
+          verification_code?: string
+          verified?: boolean
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           avatar_url: string | null
@@ -371,6 +407,9 @@ export type Database = {
           is_premium: boolean | null
           journal_focus_areas: string[] | null
           onboarding_completed: boolean | null
+          phone_number: string | null
+          phone_verified: boolean | null
+          phone_verified_at: string | null
           reminder_settings: Json | null
           revenuecat_entitlements: Json | null
           subscription_status: string | null
@@ -391,6 +430,9 @@ export type Database = {
           is_premium?: boolean | null
           journal_focus_areas?: string[] | null
           onboarding_completed?: boolean | null
+          phone_number?: string | null
+          phone_verified?: boolean | null
+          phone_verified_at?: string | null
           reminder_settings?: Json | null
           revenuecat_entitlements?: Json | null
           subscription_status?: string | null
@@ -411,6 +453,9 @@ export type Database = {
           is_premium?: boolean | null
           journal_focus_areas?: string[] | null
           onboarding_completed?: boolean | null
+          phone_number?: string | null
+          phone_verified?: boolean | null
+          phone_verified_at?: string | null
           reminder_settings?: Json | null
           revenuecat_entitlements?: Json | null
           subscription_status?: string | null
@@ -854,6 +899,10 @@ export type Database = {
         }
         Returns: Json
       }
+      check_sms_rate_limit: {
+        Args: { p_phone_number: string; p_user_id?: string }
+        Returns: Json
+      }
       check_table_columns: {
         Args: { table_name: string }
         Returns: {
@@ -866,6 +915,10 @@ export type Database = {
         Returns: boolean
       }
       check_trial_expiry: {
+        Args: Record<PropertyKey, never>
+        Returns: undefined
+      }
+      cleanup_expired_phone_verifications: {
         Args: Record<PropertyKey, never>
         Returns: undefined
       }
@@ -1375,6 +1428,10 @@ export type Database = {
       upsert_journal_embedding: {
         Args: { entry_id: number; embedding_vector: string }
         Returns: undefined
+      }
+      verify_phone_code: {
+        Args: { p_phone_number: string; p_code: string; p_user_id?: string }
+        Returns: Json
       }
     }
     Enums: {
