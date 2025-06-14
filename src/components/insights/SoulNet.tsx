@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import '@/types/three-reference';
 import { Canvas } from '@react-three/fiber';
@@ -14,6 +13,7 @@ import { useUserColorThemeHex } from './soulnet/useUserColorThemeHex';
 import { cn } from '@/lib/utils';
 import { TranslatableText } from '@/components/translation/TranslatableText';
 import { useAtomicSoulNetData } from '@/hooks/useAtomicSoulNetData';
+import { useSoulNetNodeTranslations } from "@/hooks/useSoulNetNodeTranslations";
 
 interface SoulNetProps {
   userId: string | undefined;
@@ -87,7 +87,6 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
   // OPTIMIZED: Use the enhanced hook with render control
   const { 
     graphData, 
-    translations,
     connectionPercentages,
     nodeConnectionData,
     loading, 
@@ -98,8 +97,26 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
     canRender,
     getNodeTranslation,
     getConnectionPercentage,
-    getNodeConnections
+    getNodeConnections,
+    setNodeTranslations // << new in hook
   } = useAtomicSoulNetData(userId, timeRange);
+
+  // --- NEW: atomic node label translation, stable across time range ---
+  import { useSoulNetNodeTranslations } from "@/hooks/useSoulNetNodeTranslations";
+  const nodeIds = graphData.nodes.map(n => n.id);
+  const {
+    translations: stableTranslations,
+    isLoading: transLoading,
+    progress: transProgress,
+    translationsReady,
+    getTranslation,
+    refresh
+  } = useSoulNetNodeTranslations(nodeIds);
+
+  // Sync persistent cache down into main data hook for getNodeTranslation to work everywhere
+  useEffect(() => {
+    setNodeTranslations(stableTranslations);
+  }, [stableTranslations, setNodeTranslations]);
 
   console.log("[SoulNet] OPTIMIZED STATE", { 
     userId, 
@@ -197,13 +214,13 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
   }, []);
 
   // OPTIMIZED: Show translation loading only when we have data but can't render yet
-  if (graphData.nodes.length > 0 && !canRender && (isTranslating || !translationComplete)) {
-    console.log("[SoulNet] OPTIMIZED: Showing translation loading state - insufficient coverage");
+  if (graphData.nodes.length > 0 && !translationsReady && transLoading) {
+    // Show translation progress only for new language or first mount
     return (
       <OptimizedTranslationLoadingState 
-        progress={translationProgress}
-        isComplete={translationComplete}
-        canRender={canRender}
+        progress={transProgress}
+        isComplete={translationsReady}
+        canRender={translationsReady}
       />
     );
   }
@@ -406,9 +423,9 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
                 isFullScreen={isFullScreen}
                 shouldShowLabels={true}
                 getInstantConnectionPercentage={getConnectionPercentage}
-                getInstantTranslation={getNodeTranslation}
+                getInstantTranslation={getTranslation} {/* <--- always from new atomic cache, never flashes */}
                 getInstantNodeConnections={getNodeConnections}
-                isInstantReady={true}
+                isInstantReady={translationsReady}
                 isAtomicMode={true}
               />
             </Canvas>
