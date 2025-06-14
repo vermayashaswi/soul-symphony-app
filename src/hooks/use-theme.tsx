@@ -1,8 +1,11 @@
-
 import React, { 
+  useState, 
+  useEffect, 
   createContext, 
-  // Removed useState, useEffect, useContext, useMemo, useCallback from named imports
-  type ReactNode
+  useContext, 
+  useMemo, 
+  useCallback, 
+  type ReactNode 
 } from 'react'; 
 
 type Theme = 'light' | 'dark' | 'system';
@@ -22,7 +25,7 @@ interface ThemeContextType {
   systemTheme: 'light' | 'dark';
 }
 
-const ThemeContext = React.createContext<ThemeContextType | undefined>(undefined);
+const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 
 // Helper functions to get initial values safely
 const getInitialTheme = (): Theme => {
@@ -65,19 +68,19 @@ const getInitialCustomColor = (): string => {
 };
 
 export function ThemeProvider({ children }: ThemeProviderProps) {
-  const [theme, setTheme] = React.useState<Theme>(getInitialTheme);
-  const [systemTheme, setSystemTheme] = React.useState<'light' | 'dark'>(getInitialSystemTheme);
-  const [colorTheme, setColorTheme] = React.useState<ColorTheme>(getInitialColorTheme);
-  const [customColor, setCustomColor] = React.useState<string>(getInitialCustomColor);
+  const [theme, setThemeInternal] = useState<Theme>(getInitialTheme);
+  const [systemTheme, setSystemThemeInternal] = useState<'light' | 'dark'>(getInitialSystemTheme);
+  const [colorTheme, setColorThemeInternal] = useState<ColorTheme>(getInitialColorTheme);
+  const [customColor, setCustomColorInternal] = useState<string>(getInitialCustomColor);
 
-  React.useEffect(() => {
+  useEffect(() => {
     if (typeof window === 'undefined') return;
     
     const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
     
     const handleChange = (e: MediaQueryListEvent) => {
       const newSystemTheme = e.matches ? 'dark' : 'light';
-      setSystemTheme(newSystemTheme);
+      setSystemThemeInternal(newSystemTheme);
       
       if (theme === 'system') {
         const root = window.document.documentElement;
@@ -86,7 +89,7 @@ export function ThemeProvider({ children }: ThemeProviderProps) {
       }
     };
     
-    setSystemTheme(mediaQuery.matches ? 'dark' : 'light');
+    setSystemThemeInternal(mediaQuery.matches ? 'dark' : 'light');
     
     if (theme === 'system') {
       const root = window.document.documentElement;
@@ -101,7 +104,7 @@ export function ThemeProvider({ children }: ThemeProviderProps) {
     };
   }, [theme]);
 
-  React.useEffect(() => {
+  useEffect(() => {
     if (typeof window === 'undefined') return;
     
     const root = window.document.documentElement;
@@ -116,7 +119,7 @@ export function ThemeProvider({ children }: ThemeProviderProps) {
     localStorage.setItem('feelosophy-theme', theme);
   }, [theme, systemTheme]);
   
-  const getColorHex = React.useCallback((selectedColorTheme: ColorTheme): string => {
+  const getColorHex = useCallback((selectedColorTheme: ColorTheme): string => {
     switch (selectedColorTheme) {
       case 'Default':
         return '#3b82f6';
@@ -135,7 +138,7 @@ export function ThemeProvider({ children }: ThemeProviderProps) {
     }
   }, [customColor]);
   
-  const hexToRgb = React.useCallback((hex: string): { r: number, g: number, b: number } | null => {
+  const hexToRgb = useCallback((hex: string): { r: number, g: number, b: number } | null => {
     const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
     return result ? {
       r: parseInt(result[1], 16),
@@ -144,7 +147,7 @@ export function ThemeProvider({ children }: ThemeProviderProps) {
     } : null;
   }, []);
   
-  const rgbToHsl = React.useCallback((r: number, g: number, b: number): [number, number, number] => {
+  const rgbToHsl = useCallback((r: number, g: number, b: number): [number, number, number] => {
     r /= 255;
     g /= 255;
     b /= 255;
@@ -170,7 +173,7 @@ export function ThemeProvider({ children }: ThemeProviderProps) {
     return [Math.round(h * 360), Math.round(s * 100), Math.round(l * 100)];
   }, []);
 
-  React.useEffect(() => {
+  useEffect(() => {
     if (typeof window === 'undefined') return;
     
     localStorage.setItem('feelosophy-color-theme', colorTheme);
@@ -255,7 +258,7 @@ export function ThemeProvider({ children }: ThemeProviderProps) {
   }, [colorTheme, customColor, getColorHex, hexToRgb, rgbToHsl]);
 
   // This effect specifically handles when custom color changes
-  React.useEffect(() => {
+  useEffect(() => {
     if (typeof window === 'undefined') return;
     
     localStorage.setItem('feelosophy-custom-color', customColor);
@@ -277,15 +280,15 @@ export function ThemeProvider({ children }: ThemeProviderProps) {
     }
   }, [customColor, colorTheme, hexToRgb, rgbToHsl]);
 
-  const contextValue = React.useMemo(() => ({
+  const contextValue = useMemo(() => ({
     theme, 
-    setTheme, 
+    setTheme: setThemeInternal, 
     colorTheme, 
-    setColorTheme, 
+    setColorTheme: setColorThemeInternal, 
     customColor, 
-    setCustomColor,
+    setCustomColor: setCustomColorInternal,
     systemTheme 
-  }), [theme, colorTheme, customColor, systemTheme, setTheme, setColorTheme, setCustomColor]);
+  }), [theme, colorTheme, customColor, systemTheme, setThemeInternal, setColorThemeInternal, setCustomColorInternal]);
 
   return (
     <ThemeContext.Provider value={contextValue}>
@@ -295,10 +298,9 @@ export function ThemeProvider({ children }: ThemeProviderProps) {
 }
 
 export function useTheme() {
-  const context = React.useContext(ThemeContext); // Changed to React.useContext
+  const context = useContext(ThemeContext);
   if (context === undefined) {
     throw new Error("useTheme must be used within a ThemeProvider");
   }
   return context;
 }
-
