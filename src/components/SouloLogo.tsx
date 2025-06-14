@@ -3,6 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { cn } from '@/lib/utils';
 import { useTheme } from '@/hooks/use-theme';
 import { Mic } from 'lucide-react';
+import { useNavigate, useLocation } from 'react-router-dom';
 
 export type LogoSize = "small" | "normal" | "large" | "medium";
 
@@ -14,6 +15,7 @@ interface SouloLogoProps {
   useColorTheme?: boolean;
   animate?: boolean;
   utteringWords?: boolean;
+  clickable?: boolean;
 }
 
 const SouloLogo = ({
@@ -23,11 +25,14 @@ const SouloLogo = ({
   smileyClassName = "",
   useColorTheme = true,
   animate = false,
-  utteringWords = false
+  utteringWords = false,
+  clickable = true
 }: SouloLogoProps) => {
   const { colorTheme } = useTheme();
   const [animationState, setAnimationState] = useState<'full' | 'soul' | 'none'>('full');
   const [micScale, setMicScale] = useState<number>(1);
+  const navigate = useNavigate();
+  const location = useLocation();
   
   // Size classes for the smiley
   const sizeClasses = {
@@ -65,8 +70,39 @@ const SouloLogo = ({
     return () => clearInterval(micInterval);
   }, [utteringWords]);
   
+  const handleClick = () => {
+    if (!clickable) return;
+    
+    const currentPath = location.pathname;
+    
+    // If on app routes, go to app home
+    if (currentPath.startsWith('/app/')) {
+      navigate('/app/home');
+    } else {
+      // If on marketing routes, go to homepage
+      navigate('/');
+    }
+  };
+  
   return (
-    <span className={cn("font-bold inline-flex items-center", themeTextClass, textClassName, className)}>
+    <span 
+      className={cn(
+        "font-bold inline-flex items-center",
+        themeTextClass,
+        textClassName,
+        className,
+        clickable && "cursor-pointer hover:opacity-80 transition-opacity"
+      )}
+      onClick={handleClick}
+      role={clickable ? "button" : undefined}
+      tabIndex={clickable ? 0 : undefined}
+      onKeyDown={clickable ? (e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          handleClick();
+        }
+      } : undefined}
+    >
       <span className={animationState === 'none' ? "opacity-0" : "opacity-100 transition-opacity duration-300"}>S</span>
       <span className={animationState === 'none' ? "opacity-0" : "opacity-100 transition-opacity duration-300"}>O</span>
       <span className={cn("relative inline-block", sizeClasses[size], smileyClassName)}>

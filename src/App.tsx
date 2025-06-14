@@ -1,91 +1,99 @@
 
-import React, { useEffect, useState } from 'react';
-import AppRoutes from './routes/AppRoutes';
-import { Toaster } from "@/components/ui/toaster";
-import { Toaster as SonnerToaster } from "sonner";
-import { TranslationProvider } from '@/contexts/TranslationContext';
-import { SubscriptionProvider } from '@/contexts/SubscriptionContext';
-import { TranslationLoadingOverlay } from '@/components/translation/TranslationLoadingOverlay';
-import { JournalProcessingInitializer } from './app/journal-processing-init';
-import { TutorialProvider } from './contexts/TutorialContext';
-import TutorialOverlay from './components/tutorial/TutorialOverlay';
-import ErrorBoundary from './components/insights/ErrorBoundary';
-import { preloadCriticalImages } from './utils/imagePreloader';
-import { toast } from 'sonner';
-import './styles/emoji.css';
-import './styles/tutorial.css';
+import React, { Suspense } from "react";
+import { Toaster } from "@/components/ui/sonner";
+import { TooltipProvider } from "@/components/ui/tooltip";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { AuthProvider } from "@/contexts/AuthContext";
+import { SubscriptionProvider } from "@/contexts/SubscriptionContext";
+import { LocationProvider } from "@/contexts/LocationContext";
+import { TranslationProvider } from "@/contexts/TranslationContext";
+import { TutorialProvider } from "@/contexts/TutorialContext";
+import { ThemeProvider } from "@/hooks/use-theme";
+import { JournalProcessingInitializer } from '@/app/journal-processing-init';
+import { SplashScreenWrapper } from '@/components/splash/SplashScreenWrapper';
+import { EmergencyFallback } from '@/components/EmergencyFallback';
+import AppRoutes from "./routes/AppRoutes";
+import "./App.css";
 
-const App: React.FC = () => {
-  const [isInitialized, setIsInitialized] = useState(false);
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      retry: 1,
+      staleTime: 5 * 60 * 1000, // 5 minutes
+    },
+  },
+});
 
-  useEffect(() => {
-    console.log('[App] App mounted, current path:', window.location.pathname);
-    
-    // Clean up any malformed paths
-    const currentPath = window.location.pathname;
-    
-    // Fix incorrectly formatted URLs that have domains or https in the path
-    if (currentPath.includes('https://') || currentPath.includes('soulo.online')) {
-      console.log('[App] Fixing malformed URL path:', currentPath);
-      window.history.replaceState(null, '', '/');
+// Error Boundary Component
+class AppErrorBoundary extends React.Component<
+  { children: React.ReactNode },
+  { hasError: boolean; error?: Error }
+> {
+  constructor(props: { children: React.ReactNode }) {
+    super(props);
+    this.state = { hasError: false };
+  }
+
+  static getDerivedStateFromError(error: Error) {
+    console.error('[AppErrorBoundary] Error caught:', error);
+    return { hasError: true, error };
+  }
+
+  componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
+    console.error('[AppErrorBoundary] Error details:', error, errorInfo);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return <EmergencyFallback error={this.state.error} resetError={() => this.setState({ hasError: false, error: undefined })} />;
     }
-    
-    // Apply a CSS class to the document body for theme-specific overrides
-    document.body.classList.add('app-initialized');
-    
-    // Preload critical images including the chat avatar
-    try {
-      preloadCriticalImages();
-      console.log('[App] Critical images preloaded successfully');
-    } catch (error) {
-      console.warn('[App] Failed to preload some images:', error);
-      // Non-critical error, continue app initialization
-    }
 
-    // Mark app as initialized after a brief delay to ensure smooth startup
-    setTimeout(() => {
-      setIsInitialized(true);
-      console.log('[App] App marked as fully initialized');
-    }, 500);
-  }, []);
+    return this.props.children;
+  }
+}
 
-  const handleAppError = (error: Error, errorInfo: any) => {
-    console.error('[App] Application-level error:', error, errorInfo);
-    
-    // Log critical app errors for debugging
-    const errorData = {
-      message: error.message,
-      stack: error.stack,
-      componentStack: errorInfo.componentStack,
-      timestamp: new Date().toISOString(),
-      userAgent: navigator.userAgent,
-      url: window.location.href
-    };
-    
-    console.error('[App] Detailed error info:', errorData);
-
-    // Show user-friendly error notification
-    toast.error('Something went wrong. The app will try to recover automatically.');
-
-    // Allow the app to continue functioning despite errors
-  };
+function App() {
+  console.log('[App] Rendering App component');
+  
+  // Simple loading fallback
+  const LoadingFallback = () => (
+    <div className="min-h-screen flex items-center justify-center bg-background">
+      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+    </div>
+  );
 
   return (
-    <ErrorBoundary onError={handleAppError}>
-      <TranslationProvider>
-        <SubscriptionProvider>
-          <TutorialProvider>
-            <TranslationLoadingOverlay />
-            <JournalProcessingInitializer />
-            <AppRoutes key={isInitialized ? 'initialized' : 'initializing'} />
-            <TutorialOverlay />
-            <Toaster />
-            <SonnerToaster position="top-right" />
-          </TutorialProvider>
-        </SubscriptionProvider>
-      </TranslationProvider>
-    </ErrorBoundary>
+    <AppErrorBoundary>
+      <QueryClientProvider client={queryClient}>
+        <ThemeProvider>
+          <TooltipProvider>
+            <AuthProvider>
+              <SubscriptionProvider>
+                <LocationProvider>
+                  <TranslationProvider>
+                    <TutorialProvider>
+                      <JournalProcessingInitializer />
+                      
+                      <SplashScreenWrapper 
+                        enabledInDev={false}
+                        minDisplayTime={1000}
+                      >
+                        <Suspense fallback={<LoadingFallback />}>
+                          <AppRoutes />
+                        </Suspense>
+                      </SplashScreenWrapper>
+                      
+                      <Toaster />
+                    </TutorialProvider>
+                  </TranslationProvider>
+                </LocationProvider>
+              </SubscriptionProvider>
+            </AuthProvider>
+          </TooltipProvider>
+        </ThemeProvider>
+      </QueryClientProvider>
+    </AppErrorBoundary>
   );
-};
+}
 
 export default App;
