@@ -1,87 +1,37 @@
 
-import React, { useState, useEffect } from 'react';
-import { Link, useLocation } from 'react-router-dom';
-import { Menu, X } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import SouloLogo from '@/components/SouloLogo';
-import { TranslatableText } from '@/components/translation/TranslatableText';
-import { LanguageSelector } from '@/components/translation/LanguageSelector';
-import { useTranslation } from '@/contexts/TranslationContext';
+import React from 'react';
 
-const Navbar = () => {
-  const [isMenuOpen, setIsMenuOpen] = useState(false);
-  const location = useLocation();
-  const { prefetchTranslationsForRoute } = useTranslation();
-
-  const toggleMenu = () => {
-    setIsMenuOpen(!isMenuOpen);
-  };
-  
-  // Prefetch translations for navbar items on mount and route change
-  useEffect(() => {
-    const route = location.pathname;
-    
-    if (prefetchTranslationsForRoute) {
-      prefetchTranslationsForRoute(route);
-    }
-  }, [location.pathname, prefetchTranslationsForRoute]);
-
+const Navbar: React.FC = () => {
   return (
-    <nav className="fixed top-0 left-0 right-0 z-50 bg-white/90 backdrop-blur-md border-b border-gray-100 px-4 py-3 shadow-sm">
-      <div className="container mx-auto flex justify-between items-center">
-        <Link to="/" className="flex items-center">
-          <SouloLogo size="normal" useColorTheme={true} />
-        </Link>
-
-        {/* Desktop Navigation */}
-        <div className="hidden md:flex items-center space-x-6">
-          <Link to="/" className="text-gray-600 hover:text-primary text-sm">
-            <TranslatableText text="Home" />
-          </Link>
-          <Link to="/blog" className="text-gray-600 hover:text-primary text-sm">
-            <TranslatableText text="Blog" />
-          </Link>
-          <Link to="/faq" className="text-gray-600 hover:text-primary text-sm">
-            <TranslatableText text="FAQ" />
-          </Link>
-          <Button size="sm" asChild>
-            <a href="https://apps.apple.com/app/soulo" target="_blank" rel="noopener noreferrer">
-              <TranslatableText text="Download on App Store" />
+    <nav className="fixed top-0 left-0 right-0 bg-white/90 backdrop-blur-sm border-b border-gray-200 z-50">
+      <div className="max-w-6xl mx-auto px-4">
+        <div className="flex items-center justify-between h-16">
+          <div className="flex items-center">
+            <h1 className="text-2xl font-bold text-gray-900">SOULo</h1>
+          </div>
+          
+          <div className="hidden md:flex items-center space-x-6">
+            <a href="#features" className="text-gray-600 hover:text-blue-500 transition-colors">
+              Features
             </a>
-          </Button>
-          <LanguageSelector />
-        </div>
-
-        {/* Mobile Navigation Toggle */}
-        <div className="md:hidden flex items-center">
-          <Button variant="ghost" size="sm" className="ml-2" onClick={toggleMenu}>
-            {isMenuOpen ? <X size={20} /> : <Menu size={20} />}
-          </Button>
-        </div>
-      </div>
-
-      {/* Mobile Menu */}
-      {isMenuOpen && (
-        <div className="md:hidden bg-white border-t border-gray-100 py-4">
-          <div className="container mx-auto flex flex-col space-y-4 px-4">
-            <Link to="/" className="text-gray-600 hover:text-primary" onClick={toggleMenu}>
-              <TranslatableText text="Home" />
-            </Link>
-            <Link to="/blog" className="text-gray-600 hover:text-primary" onClick={toggleMenu}>
-              <TranslatableText text="Blog" />
-            </Link>
-            <Link to="/faq" className="text-gray-600 hover:text-primary" onClick={toggleMenu}>
-              <TranslatableText text="FAQ" />
-            </Link>
-            <Button size="sm" className="w-full" asChild>
-              <a href="https://apps.apple.com/app/soulo" target="_blank" rel="noopener noreferrer">
-                <TranslatableText text="Download on App Store" />
-              </a>
-            </Button>
-            <LanguageSelector />
+            <a href="#pricing" className="text-gray-600 hover:text-blue-500 transition-colors">
+              Pricing
+            </a>
+            <a href="#support" className="text-gray-600 hover:text-blue-500 transition-colors">
+              Support
+            </a>
+          </div>
+          
+          <div className="flex items-center space-x-4">
+            <button 
+              onClick={() => window.open('https://apps.apple.com/app/soulo', '_blank')}
+              className="bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600 transition-colors"
+            >
+              Download App
+            </button>
           </div>
         </div>
-      )}
+      </div>
     </nav>
   );
 };
