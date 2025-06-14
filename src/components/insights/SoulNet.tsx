@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import '@/types/three-reference';
 import { Canvas } from '@react-three/fiber';
@@ -13,7 +14,6 @@ import { useUserColorThemeHex } from './soulnet/useUserColorThemeHex';
 import { cn } from '@/lib/utils';
 import { TranslatableText } from '@/components/translation/TranslatableText';
 import { useAtomicSoulNetData } from '@/hooks/useAtomicSoulNetData';
-import { useTranslation } from '@/contexts/TranslationContext';
 
 interface SoulNetProps {
   userId: string | undefined;
@@ -100,8 +100,6 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
     getConnectionPercentage,
     getNodeConnections
   } = useAtomicSoulNetData(userId, timeRange);
-
-  const { prefetchSoulNetTranslations, prefetchTranslationsForRoute, currentLanguage, isSoulNetTranslating } = useTranslation();
 
   console.log("[SoulNet] OPTIMIZED STATE", { 
     userId, 
@@ -323,36 +321,6 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
   };
 
   console.log(`[SoulNet] OPTIMIZED RENDER: ${graphData.nodes.length} nodes, ${graphData.links.length} links, renderingReady: ${renderingReady}, canRender: ${canRender}`);
-
-  // 1. Prefetch translations for SoulNet content & labels (one-time when userId, timeRange, or language changes)
-  useEffect(() => {
-    if (!userId || !timeRange) return;
-    const go = async () => {
-      // Prefetch common SoulNet related content or graph labels—extend this as needed
-      await prefetchTranslationsForRoute('/app/insights/soulnet');
-      await prefetchSoulNetTranslations(userId, timeRange);
-    };
-    go();
-  }, [userId, timeRange, currentLanguage, prefetchTranslationsForRoute, prefetchSoulNetTranslations]);
-
-  // Block rendering if translation prefetching/soul net translating isn't done for non-English.
-  if ((currentLanguage !== "en") && isSoulNetTranslating) {
-    return (
-      <div className="bg-background rounded-xl shadow-sm border w-full p-6">
-        <div className="flex flex-col items-center justify-center py-12 space-y-4">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
-          <h3 className="text-lg font-medium">
-            <TranslatableText 
-              text="Loading Soul-Net translations..."
-              forceTranslate={true}
-              enableFontScaling={true}
-              scalingContext="general"
-            />
-          </h3>
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div className={cn(

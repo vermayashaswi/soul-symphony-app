@@ -10,8 +10,6 @@ import {
 } from "@/components/ui/toast"
 import { useTheme } from "@/hooks/use-theme"
 
-console.log("[Toaster] src/components/ui/toaster.tsx successfully imported.");
-
 export function Toaster() {
   const { toasts } = useToast()
   const { theme, systemTheme } = useTheme()
@@ -65,6 +63,3 @@ export function Toaster() {
     </ToastProvider>
   )
 }
-
-// Verify file is found by the build system
-export default Toaster;

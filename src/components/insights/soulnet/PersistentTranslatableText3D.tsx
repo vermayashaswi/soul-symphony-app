@@ -1,7 +1,6 @@
 
 import React from 'react';
 import SmartTextRenderer from './SmartTextRenderer';
-import { useTranslation } from '@/contexts/TranslationContext';
 
 interface PersistentTranslatableText3DProps {
   text: string;
@@ -38,29 +37,18 @@ export const PersistentTranslatableText3D: React.FC<PersistentTranslatableText3D
   maxCharsPerLine = 18,
   maxLines = 3,
   translation,
-  useTranslation: shouldUseTranslation = false,
+  useTranslation = false,
   cacheFirst = true
 }) => {
-  // Use the useTranslation hook directly at the top level
-  const { getCachedTranslation, currentLanguage } = useTranslation();
-
+  // CACHE-FIRST: Prioritize translation if available, fallback to original
   const displayText = React.useMemo(() => {
-    if (shouldUseTranslation) {
-      // Absolute best: always use translation prop (pre-provided) if it matches cache
-      if (translation && cacheFirst) return translation;
-      // Otherwise: always check context cache in user's language for instant match
-      if (getCachedTranslation) {
-        const cached = getCachedTranslation(text);
-        if (cached && cached.trim() && cached !== text) {
-          return cached;
-        }
-      }
+    if (useTranslation && translation && cacheFirst) {
+      return translation;
     }
-    // Fallback: original text
     return text;
-  }, [text, translation, shouldUseTranslation, cacheFirst, getCachedTranslation, currentLanguage]);
+  }, [text, translation, useTranslation, cacheFirst]);
 
-  console.log(`[PersistentTranslatableText3D] CACHE-FIRST: Rendering "${text}" -> "${displayText}" (useTranslation: ${shouldUseTranslation}, cacheFirst: ${cacheFirst})`);
+  console.log(`[PersistentTranslatableText3D] CACHE-FIRST: Rendering "${text}" -> "${displayText}" (useTranslation: ${useTranslation}, cacheFirst: ${cacheFirst})`);
 
   return (
     <SmartTextRenderer

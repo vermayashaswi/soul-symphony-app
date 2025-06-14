@@ -1,4 +1,5 @@
-import * as React from 'react'
+
+import React from 'react'
 import ReactDOM from 'react-dom/client'
 import App from './App.tsx'
 import './index.css'
@@ -7,26 +8,8 @@ import './styles/tutorial.css' // Import tutorial-specific styles
 import { AuthProvider } from './contexts/AuthContext'
 import { ThemeProvider } from './hooks/use-theme'
 import { BrowserRouter } from 'react-router-dom'
+import { TranslationProvider } from './contexts/TranslationContext'
 import { pwaService } from './services/pwaService'
-
-// AGGRESSIVE DIAGNOSTICS: React global State debug
-console.log('[main.tsx][DIAG] typeof React:', typeof React, '| React object:', React);
-console.log('[main.tsx][DIAG] typeof React.useState:', typeof React.useState, '| value:', React.useState);
-if (!React || typeof React.useState !== 'function') {
-  throw new Error("[main.tsx][CRITICAL] React.useState is not a function! There's a critical React instance conflict.");
-}
-
-// LOG React for multiple instance detection (to match use-theme.tsx debug)
-console.log('[main.tsx] React version:', React.version, 'useState:', React.useState, 'object:', React);
-
-// EXTRA DEBUG: Assign React to window for explicit singleton detection
-if (typeof window !== 'undefined') {
-  // @ts-ignore
-  window.React = React;
-  // Extra: log window.React and check if object is the same as the imported one
-  // @ts-ignore
-  console.log('[main.tsx] window.React assigned and checked:', window.React === React, window.React);
-}
 
 // Enhanced Font Loading System
 const initializeFontSystem = async () => {
@@ -221,9 +204,11 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
     <BrowserRouter>
       <ThemeProvider>
-        <AuthProvider>
-          <App />
-        </AuthProvider>
+        <TranslationProvider>
+          <AuthProvider>
+            <App />
+          </AuthProvider>
+        </TranslationProvider>
       </ThemeProvider>
     </BrowserRouter>
   </React.StrictMode>,

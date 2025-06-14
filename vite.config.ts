@@ -1,43 +1,35 @@
 
-import { defineConfig } from 'vite';
-import react from '@vitejs/plugin-react';
-import path from 'path';
-// Import the Lovable componentTagger plugin
-import { componentTagger } from 'lovable-tagger';
+import { defineConfig } from "vite";
+import react from "@vitejs/plugin-react-swc";
+import path from "path";
+import { componentTagger } from "lovable-tagger";
 
+// https://vitejs.dev/config/
 export default defineConfig(({ mode }) => ({
+  server: {
+    host: "::",
+    port: 8080,
+    allowedHosts: [
+      "571d731e-b54b-453e-9f48-a2c79a572930.lovableproject.com",
+    ],
+  },
   plugins: [
     react(),
-    // Enable componentTagger only during development
-    mode === 'development' && componentTagger()
+    mode === 'development' &&
+    componentTagger(),
   ].filter(Boolean),
   resolve: {
     alias: {
-      '@': path.resolve(__dirname, './src'),
-      // Force all React imports (including deep imports) to use exactly one instance
-      react: path.resolve(__dirname, './node_modules/react'),
-      'react-dom': path.resolve(__dirname, './node_modules/react-dom'),
-      'react/jsx-runtime': path.resolve(__dirname, './node_modules/react/jsx-runtime'),
+      "@": path.resolve(__dirname, "./src"),
     },
-    dedupe: ['react', 'react-dom'], // <- Ensure Vite always uses one copy!
   },
   optimizeDeps: {
-    include: ['react', 'react-dom', 'react/jsx-runtime'],
-    dedupe: ['react', 'react-dom'], // <- Extra dedupe for fast-refresh
+    exclude: ['lovable-tagger'],
   },
-  server: {
-    host: '::',
-    port: 8080,
-    proxy: {
-      '/api': {
-        target: 'http://localhost:3001',
-        changeOrigin: true,
-        rewrite: path => path.replace(/^\/api/, ''),
-      },
+  // Ensure that Vite correctly resolves Node.js built-in modules
+  build: {
+    commonjsOptions: {
+      transformMixedEsModules: true,
     },
   },
-  build: {
-    sourcemap: true,
-  },
 }));
-
