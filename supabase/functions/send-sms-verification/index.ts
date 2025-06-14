@@ -7,7 +7,7 @@ const supabaseUrl = Deno.env.get('SUPABASE_URL')!
 const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
 const twilioAccountSid = Deno.env.get('TWILIO_ACCOUNT_SID')!
 const twilioAuthToken = Deno.env.get('TWILIO_AUTH_TOKEN')!
-const twilioPhoneNumber = Deno.env.get('TWILIO_PHONE_NUMBER')!
+const twilioServiceSid = Deno.env.get('TWILIO_SERVICE_SID')!
 
 const supabase = createClient(supabaseUrl, supabaseKey)
 
@@ -17,7 +17,9 @@ serve(async (req) => {
   }
 
   try {
-    const { phoneNumber, userId } = await req.json()
+    const { phoneNumber, userId, countryCode } = await req.json()
+
+    console.log('SMS verification request:', { phoneNumber, userId, countryCode })
 
     if (!phoneNumber) {
       return new Response(
@@ -29,11 +31,25 @@ serve(async (req) => {
       )
     }
 
-    // Validate phone number format (basic E.164 format check)
+    // Enhanced phone number validation with country code support
+    let formattedPhone = phoneNumber.trim()
+    if (!formattedPhone.startsWith('+')) {
+      // Add country code if provided
+      if (countryCode) {
+        formattedPhone = `+${countryCode}${formattedPhone}`
+      } else {
+        formattedPhone = `+${formattedPhone}`
+      }
+    }
+
+    // More comprehensive E.164 format validation
     const phoneRegex = /^\+[1-9]\d{1,14}$/
-    if (!phoneRegex.test(phoneNumber)) {
+    if (!phoneRegex.test(formattedPhone)) {
       return new Response(
-        JSON.stringify({ error: 'Invalid phone number format. Use E.164 format (e.g., +1234567890)' }),
+        JSON.stringify({ 
+          error: 'Invalid phone number format. Please use international format (e.g., +1234567890)',
+          suggestion: 'Make sure to include country code'
+        }),
         { 
           status: 400, 
           headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
@@ -44,7 +60,7 @@ serve(async (req) => {
     // Check rate limiting
     const { data: rateLimitResult, error: rateLimitError } = await supabase
       .rpc('check_sms_rate_limit', {
-        p_phone_number: phoneNumber,
+        p_phone_number: formattedPhone,
         p_user_id: userId
       })
 
@@ -62,8 +78,9 @@ serve(async (req) => {
     if (!rateLimitResult.allowed) {
       return new Response(
         JSON.stringify({ 
-          error: 'Rate limited. Please try again later.',
-          retryAfter: rateLimitResult.retry_after 
+          error: 'Too many SMS requests. Please try again later.',
+          retryAfter: rateLimitResult.retry_after,
+          isRateLimited: true
         }),
         { 
           status: 429, 
@@ -79,7 +96,7 @@ serve(async (req) => {
     const { error: dbError } = await supabase
       .from('phone_verifications')
       .insert({
-        phone_number: phoneNumber,
+        phone_number: formattedPhone,
         verification_code: verificationCode,
         user_id: userId,
         expires_at: new Date(Date.now() + 10 * 60 * 1000).toISOString() // 10 minutes
@@ -96,8 +113,8 @@ serve(async (req) => {
       )
     }
 
-    // Send SMS via Twilio
-    const twilioUrl = `https://api.twilio.com/2010-04-01/Accounts/${twilioAccountSid}/Messages.json`
+    // Send SMS via Twilio using Verify Service for better deliverability
+    const twilioUrl = `https://verify.twilio.com/v2/Services/${twilioServiceSid}/Verifications`
     const twilioAuth = btoa(`${twilioAccountSid}:${twilioAuthToken}`)
 
     const twilioResponse = await fetch(twilioUrl, {
@@ -107,17 +124,25 @@ serve(async (req) => {
         'Content-Type': 'application/x-www-form-urlencoded',
       },
       body: new URLSearchParams({
-        From: twilioPhoneNumber,
-        To: phoneNumber,
-        Body: `Your Soulo verification code is: ${verificationCode}. This code expires in 10 minutes.`
+        To: formattedPhone,
+        Channel: 'sms'
       })
     })
 
     if (!twilioResponse.ok) {
       const twilioError = await twilioResponse.text()
       console.error('Twilio error:', twilioError)
+      
+      // Parse Twilio error for better user feedback
+      let errorMessage = 'Failed to send SMS'
+      if (twilioError.includes('phone number')) {
+        errorMessage = 'Invalid phone number. Please check the number and try again.'
+      } else if (twilioError.includes('rate limit')) {
+        errorMessage = 'Too many requests. Please wait before trying again.'
+      }
+      
       return new Response(
-        JSON.stringify({ error: 'Failed to send SMS' }),
+        JSON.stringify({ error: errorMessage }),
         { 
           status: 500, 
           headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
@@ -125,11 +150,16 @@ serve(async (req) => {
       )
     }
 
+    const twilioResult = await twilioResponse.json()
+    console.log('Twilio verification sent:', twilioResult.status)
+
     return new Response(
       JSON.stringify({ 
         success: true, 
         message: 'Verification code sent successfully',
-        expiresIn: 600 // 10 minutes in seconds
+        expiresIn: 600, // 10 minutes in seconds
+        phoneNumber: formattedPhone,
+        status: twilioResult.status
       }),
       { 
         headers: { ...corsHeaders, 'Content-Type': 'application/json' } 

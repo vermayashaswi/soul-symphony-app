@@ -1,13 +1,14 @@
 
 import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { InputOTP, InputOTPGroup, InputOTPSlot } from '@/components/ui/input-otp';
 import { usePhoneVerification } from '@/hooks/usePhoneVerification';
 import { TranslatableText } from '@/components/translation/TranslatableText';
-import { Phone, MessageSquare, ArrowLeft } from 'lucide-react';
+import { EnhancedPhoneInput } from './EnhancedPhoneInput';
+import { Phone, MessageSquare, ArrowLeft, RefreshCw, AlertCircle } from 'lucide-react';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Progress } from '@/components/ui/progress';
 
 interface PhoneVerificationProps {
   onVerificationComplete?: () => void;
@@ -21,14 +22,18 @@ export const PhoneVerification: React.FC<PhoneVerificationProps> = ({
   showBackButton = false
 }) => {
   const [phoneNumber, setPhoneNumber] = useState('');
+  const [countryCode, setCountryCode] = useState('1');
   const [verificationCode, setVerificationCode] = useState('');
   const [timeLeft, setTimeLeft] = useState(0);
+  const [isPhoneValid, setIsPhoneValid] = useState(false);
 
   const {
     isLoading,
     codeSent,
     isVerifying,
     expiresAt,
+    attempts,
+    maxAttempts,
     sendVerificationCode,
     verifyCode,
     resetState
@@ -54,20 +59,19 @@ export const PhoneVerification: React.FC<PhoneVerificationProps> = ({
     return () => clearInterval(interval);
   }, [expiresAt]);
 
+  const handlePhoneChange = (value: string, country: string) => {
+    setPhoneNumber(value);
+    setCountryCode(country);
+  };
+
   const handleSendCode = async () => {
-    if (!phoneNumber.trim()) {
+    if (!phoneNumber.trim() || !isPhoneValid) {
       return;
     }
 
-    // Add + if not present and format phone number
-    let formattedPhone = phoneNumber.trim();
-    if (!formattedPhone.startsWith('+')) {
-      formattedPhone = '+' + formattedPhone;
-    }
-
-    const result = await sendVerificationCode(formattedPhone);
-    if (result.success) {
-      setPhoneNumber(formattedPhone);
+    const result = await sendVerificationCode(phoneNumber, countryCode);
+    if (!result.success && result.isRateLimited) {
+      // Handle rate limiting UI feedback if needed
     }
   };
 
@@ -79,12 +83,15 @@ export const PhoneVerification: React.FC<PhoneVerificationProps> = ({
     const result = await verifyCode(verificationCode);
     if (result.success) {
       onVerificationComplete?.();
+    } else {
+      // Clear the code input on failed verification
+      setVerificationCode('');
     }
   };
 
   const handleResendCode = async () => {
     setVerificationCode('');
-    await sendVerificationCode(phoneNumber);
+    await sendVerificationCode(phoneNumber, countryCode);
   };
 
   const formatTime = (seconds: number) => {
@@ -107,7 +114,7 @@ export const PhoneVerification: React.FC<PhoneVerificationProps> = ({
             <TranslatableText text="Enter your phone number to receive a verification code" />
           </CardDescription>
         </CardHeader>
-        <CardContent className="space-y-4">
+        <CardContent className="space-y-6">
           {showBackButton && (
             <Button
               variant="ghost"
@@ -119,26 +126,23 @@ export const PhoneVerification: React.FC<PhoneVerificationProps> = ({
             </Button>
           )}
           
-          <div className="space-y-2">
-            <Label htmlFor="phone">
-              <TranslatableText text="Phone Number" />
-            </Label>
-            <Input
-              id="phone"
-              type="tel"
-              placeholder="+1234567890"
-              value={phoneNumber}
-              onChange={(e) => setPhoneNumber(e.target.value)}
-              className="text-center"
-            />
-            <p className="text-sm text-muted-foreground text-center">
-              <TranslatableText text="Use international format (e.g., +1234567890)" />
-            </p>
-          </div>
+          <EnhancedPhoneInput
+            value={phoneNumber}
+            onChange={handlePhoneChange}
+            onValidityChange={setIsPhoneValid}
+            placeholder="Enter your phone number"
+          />
+
+          <Alert>
+            <AlertCircle className="h-4 w-4" />
+            <AlertDescription>
+              <TranslatableText text="Standard SMS rates may apply. We'll only use your number for verification." />
+            </AlertDescription>
+          </Alert>
 
           <Button
             onClick={handleSendCode}
-            disabled={isLoading || !phoneNumber.trim()}
+            disabled={isLoading || !phoneNumber.trim() || !isPhoneValid}
             className="w-full"
           >
             {isLoading ? (
@@ -168,15 +172,12 @@ export const PhoneVerification: React.FC<PhoneVerificationProps> = ({
           <TranslatableText text="Enter Verification Code" />
         </CardTitle>
         <CardDescription>
-          <TranslatableText text={`We sent a code to ${phoneNumber}`} />
+          <TranslatableText text={`We sent a 6-digit code to ${phoneNumber}`} />
         </CardDescription>
       </CardHeader>
-      <CardContent className="space-y-4">
-        <div className="space-y-2">
-          <Label htmlFor="code" className="text-center block">
-            <TranslatableText text="6-Digit Code" />
-          </Label>
-          <div className="flex justify-center">
+      <CardContent className="space-y-6">
+        <div className="space-y-4">
+          <div className="text-center">
             <InputOTP 
               value={verificationCode} 
               onChange={setVerificationCode}
@@ -192,13 +193,33 @@ export const PhoneVerification: React.FC<PhoneVerificationProps> = ({
               </InputOTPGroup>
             </InputOTP>
           </div>
-        </div>
 
-        {timeLeft > 0 && (
-          <div className="text-center text-sm text-muted-foreground">
-            <TranslatableText text={`Code expires in ${formatTime(timeLeft)}`} />
-          </div>
-        )}
+          {attempts > 0 && attempts < maxAttempts && (
+            <div className="space-y-2">
+              <div className="flex justify-between text-sm">
+                <span className="text-muted-foreground">
+                  <TranslatableText text="Verification attempts" />
+                </span>
+                <span className="text-muted-foreground">
+                  {attempts}/{maxAttempts}
+                </span>
+              </div>
+              <Progress value={(attempts / maxAttempts) * 100} className="h-1" />
+            </div>
+          )}
+
+          {timeLeft > 0 && (
+            <div className="text-center">
+              <p className="text-sm text-muted-foreground">
+                <TranslatableText text={`Code expires in ${formatTime(timeLeft)}`} />
+              </p>
+              <Progress 
+                value={(timeLeft / 600) * 100} 
+                className="h-1 mt-2" 
+              />
+            </div>
+          )}
+        </div>
 
         <Button
           onClick={handleVerifyCode}
@@ -215,14 +236,15 @@ export const PhoneVerification: React.FC<PhoneVerificationProps> = ({
           )}
         </Button>
 
-        <div className="flex flex-col space-y-2">
+        <div className="space-y-2">
           <Button
             variant="ghost"
             onClick={handleResendCode}
             disabled={isLoading || timeLeft > 0}
             className="w-full"
           >
-            <TranslatableText text="Resend Code" />
+            <RefreshCw className="h-4 w-4 mr-2" />
+            <TranslatableText text={timeLeft > 0 ? `Resend in ${formatTime(timeLeft)}` : "Resend Code"} />
           </Button>
 
           <Button
@@ -237,6 +259,15 @@ export const PhoneVerification: React.FC<PhoneVerificationProps> = ({
             <TranslatableText text="Use Different Phone Number" />
           </Button>
         </div>
+
+        {attempts >= maxAttempts && (
+          <Alert variant="destructive">
+            <AlertCircle className="h-4 w-4" />
+            <AlertDescription>
+              <TranslatableText text="Maximum verification attempts reached. Please request a new code." />
+            </AlertDescription>
+          </Alert>
+        )}
       </CardContent>
     </Card>
   );
