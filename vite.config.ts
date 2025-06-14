@@ -19,6 +19,11 @@ export default defineConfig(({ mode }) => ({
       'react-dom': path.resolve(__dirname, './node_modules/react-dom'),
       'react/jsx-runtime': path.resolve(__dirname, './node_modules/react/jsx-runtime'),
     },
+    dedupe: ['react', 'react-dom'], // <- Ensure Vite always uses one copy!
+  },
+  optimizeDeps: {
+    include: ['react', 'react-dom', 'react/jsx-runtime'],
+    dedupe: ['react', 'react-dom'], // <- Extra dedupe for fast-refresh
   },
   server: {
     host: '::',
@@ -35,3 +40,4 @@ export default defineConfig(({ mode }) => ({
     sourcemap: true,
   },
 }));
+

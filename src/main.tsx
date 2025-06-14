@@ -12,6 +12,15 @@ import { pwaService } from './services/pwaService'
 // LOG React for multiple instance detection (to match use-theme.tsx debug)
 console.log('[main.tsx] React version:', React.version, 'useState:', React.useState, 'object:', React);
 
+// EXTRA DEBUG: Assign React to window for explicit singleton detection
+if (typeof window !== 'undefined') {
+  // @ts-ignore
+  window.React = React;
+  // Extra: log window.React and check if object is the same as the imported one
+  // @ts-ignore
+  console.log('[main.tsx] window.React assigned and checked:', window.React === React, window.React);
+}
+
 // Enhanced Font Loading System
 const initializeFontSystem = async () => {
   console.log('[FontSystem] Starting font initialization...');
