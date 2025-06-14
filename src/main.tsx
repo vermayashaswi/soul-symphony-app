@@ -191,31 +191,65 @@ const initializePWA = () => {
   }
 };
 
-// Safer React rendering with readiness check
-const renderProperRoot = async () => {
-  const path = window.location.pathname;
+// Safer React rendering with better error handling
+const renderMarketingPage = async () => {
   const rootElem = document.getElementById('root');
   if (!rootElem) return;
 
-  // Wait for React readiness if possible, but do not block for "/" route
-  if (path === '/') {
-    // Minimal fallback: only minimal styling for marketing homepage
-    const { default: HomePage } = await import('@/pages/website/HomePage');
-    const SafeOnlyMinimal = () => (
-      <div className="min-h-screen bg-white text-gray-900">
-        <HomePage />
-      </div>
-    );
+  try {
+    console.log('[Main] Rendering marketing page for route "/"');
+    const { default: MarketingHomePage } = await import('@/components/website/MarketingHomePage');
+    
     ReactDOM.createRoot(rootElem).render(
       <React.StrictMode>
-        <SafeOnlyMinimal />
+        <MarketingHomePage />
       </React.StrictMode>
     );
-    return;
+  } catch (error) {
+    console.error('[Main] Error loading marketing page:', error);
+    
+    // Fallback to simple marketing page
+    try {
+      const { default: MarketingFallback } = await import('@/components/website/MarketingFallback');
+      ReactDOM.createRoot(rootElem).render(
+        <React.StrictMode>
+          <MarketingFallback />
+        </React.StrictMode>
+      );
+    } catch (fallbackError) {
+      console.error('[Main] Error loading marketing fallback:', fallbackError);
+      
+      // Ultimate fallback - inline HTML
+      rootElem.innerHTML = `
+        <div style="min-height:100vh;background:white;display:flex;align-items:center;justify-content:center;padding:20px;">
+          <div style="text-align:center;max-width:500px;">
+            <h1 style="font-size:2.5rem;font-weight:bold;color:#111827;margin-bottom:1rem;">SOULo</h1>
+            <p style="font-size:1.125rem;color:#6b7280;margin-bottom:2rem;">
+              Your personal AI companion for emotional wellness and self-reflection using voice journaling.
+            </p>
+            <div style="display:flex;flex-direction:column;gap:1rem;align-items:center;">
+              <button onclick="window.open('https://apps.apple.com/app/soulo', '_blank')" 
+                      style="background:#000;color:white;padding:12px 24px;border-radius:8px;border:none;cursor:pointer;">
+                Download on App Store
+              </button>
+              <button onclick="window.open('https://play.google.com/store/apps/details?id=com.soulo.app', '_blank')" 
+                      style="background:#3b82f6;color:white;padding:12px 24px;border-radius:8px;border:none;cursor:pointer;">
+                Get it on Google Play
+              </button>
+            </div>
+          </div>
+        </div>`;
+    }
   }
+};
 
-  // For all other routes, render full app as before
+const renderAppRoutes = async () => {
+  const rootElem = document.getElementById('root');
+  if (!rootElem) return;
+
   try {
+    console.log('[Main] Rendering full app for non-marketing routes');
+    
     // Wait for React readiness
     await waitForReactReadiness(3000);
 
@@ -235,7 +269,9 @@ const renderProperRoot = async () => {
       </React.StrictMode>
     );
   } catch (error) {
-    // Emergency fallback in case providers/theme crashes
+    console.error('[Main] Error rendering app routes:', error);
+    
+    // Emergency fallback for app routes
     rootElem.innerHTML = `
       <div style="padding:20px;text-align:center;font-family:system-ui,sans-serif;">
         <h1>App Loading Error</h1>
@@ -244,6 +280,18 @@ const renderProperRoot = async () => {
           Refresh Page
         </button>
       </div>`;
+  }
+};
+
+// Determine which renderer to use based on route
+const renderProperRoot = async () => {
+  const path = window.location.pathname;
+  console.log('[Main] Current path:', path);
+
+  if (path === '/') {
+    await renderMarketingPage();
+  } else {
+    await renderAppRoutes();
   }
 };
 
