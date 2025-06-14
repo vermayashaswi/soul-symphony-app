@@ -14,7 +14,15 @@ import { TranslationProvider } from './contexts/TranslationContext'
 import { pwaService } from './services/pwaService'
 import { waitForReactReadiness } from './utils/react-readiness'
 
-// Enhanced Font Loading System with Graceful Degradation
+/**
+ * Extremely clear, strict route split:
+ * - "/" route: Only render minimal marketing homepage, NO theme/provider logic at all.
+ * - Any other route: Full provider/app logic.
+ * 
+ * This is to fully isolate app provider system from marketing page, avoiding all theme/context/mount errors on route "/".
+ */
+
+// Font loading etc (unchanged)
 const initializeFontSystem = async () => {
   console.log('[FontSystem] Starting font initialization...');
   
@@ -184,75 +192,58 @@ const initializePWA = () => {
 };
 
 // Safer React rendering with readiness check
-const renderWithSafeTheme = async () => {
+const renderProperRoot = async () => {
+  const path = window.location.pathname;
+  const rootElem = document.getElementById('root');
+  if (!rootElem) return;
+
+  // Wait for React readiness if possible, but do not block for "/" route
+  if (path === '/') {
+    // Minimal fallback: only minimal styling for marketing homepage
+    const { default: HomePage } = await import('@/pages/website/HomePage');
+    const SafeOnlyMinimal = () => (
+      <div className="min-h-screen bg-white text-gray-900">
+        <HomePage />
+      </div>
+    );
+    ReactDOM.createRoot(rootElem).render(
+      <React.StrictMode>
+        <SafeOnlyMinimal />
+      </React.StrictMode>
+    );
+    return;
+  }
+
+  // For all other routes, render full app as before
   try {
-    console.log('[Main] Waiting for React readiness...');
-    
-    // Wait for React to be ready before attempting to render
-    const isReady = await waitForReactReadiness(3000);
-    
-    if (!isReady) {
-      console.warn('[Main] React readiness timeout, attempting render anyway');
-    }
-    
-    console.log('[Main] Starting React app render...');
-    
-    // Check if we're on a marketing page (root path)
-    const isMarketingPage = window.location.pathname === '/';
-    
-    const root = ReactDOM.createRoot(document.getElementById('root')!);
-    
-    if (isMarketingPage) {
-      // For marketing pages, use minimal theme wrapper
-      root.render(
-        <React.StrictMode>
-          <BrowserRouter>
-            <SafeThemeWrapper isMarketingPage={true}>
+    // Wait for React readiness
+    await waitForReactReadiness(3000);
+
+    ReactDOM.createRoot(rootElem).render(
+      <React.StrictMode>
+        <BrowserRouter>
+          <ThemeErrorBoundary>
+            <ThemeProvider>
               <TranslationProvider>
                 <AuthProvider>
                   <App />
                 </AuthProvider>
               </TranslationProvider>
-            </SafeThemeWrapper>
-          </BrowserRouter>
-        </React.StrictMode>
-      );
-    } else {
-      // For app pages, use full theme system
-      root.render(
-        <React.StrictMode>
-          <BrowserRouter>
-            <ThemeErrorBoundary>
-              <ThemeProvider>
-                <TranslationProvider>
-                  <AuthProvider>
-                    <App />
-                  </AuthProvider>
-                </TranslationProvider>
-              </ThemeProvider>
-            </ThemeErrorBoundary>
-          </BrowserRouter>
-        </React.StrictMode>
-      );
-    }
-    
-    console.log('[Main] React app rendered successfully');
+            </ThemeProvider>
+          </ThemeErrorBoundary>
+        </BrowserRouter>
+      </React.StrictMode>
+    );
   } catch (error) {
-    console.error('[Main] Critical error during React render:', error);
-    
-    // Emergency fallback
-    const root = document.getElementById('root');
-    if (root) {
-      root.innerHTML = `
-        <div style="padding: 20px; text-align: center; font-family: system-ui, sans-serif;">
-          <h1>App Loading Error</h1>
-          <p>Please refresh the page to try again.</p>
-          <button onclick="window.location.reload()" style="padding: 10px 20px; margin-top: 10px;">
-            Refresh Page
-          </button>
-        </div>
-      `;
-    }
+    // Emergency fallback in case providers/theme crashes
+    rootElem.innerHTML = `
+      <div style="padding:20px;text-align:center;font-family:system-ui,sans-serif;">
+        <h1>App Loading Error</h1>
+        <p>Please refresh the page to try again.</p>
+        <button onclick="window.location.reload()" style="padding:10px 20px;margin-top:10px;">
+          Refresh Page
+        </button>
+      </div>`;
   }
 };
 
@@ -262,9 +253,7 @@ const initializeApp = async () => {
     console.log('[Main] Starting app initialization...');
     
     // Initialize font system (non-blocking)
-    initializeFontSystem().catch(error => {
-      console.warn('[Main] Font system initialization failed, continuing:', error);
-    });
+    initializeFontSystem().catch(() => {});
     
     // Initialize viewport fix
     fixViewportHeight();
@@ -281,15 +270,17 @@ const initializeApp = async () => {
     console.log('[Main] App initialization complete');
     
     // Render the React app with safer theme handling
-    await renderWithSafeTheme();
+    await renderProperRoot();
     
   } catch (error) {
     console.error('[Main] Critical error during app initialization:', error);
     
     // Still try to render the app even if initialization fails
-    await renderWithSafeTheme();
+    await renderProperRoot();
   }
 };
 
 // Start initialization
 initializeApp();
+
+// REMINDER: This file is now ~300 lines. Please consider asking me to refactor it into smaller utility or renderer files for clarity and maintainability!
