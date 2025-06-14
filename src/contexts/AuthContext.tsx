@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import * as React from 'react';
 import { Session, User } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
@@ -18,24 +18,24 @@ import { useLocation } from 'react-router-dom';
 import { SessionTrackingService } from '@/services/sessionTrackingService';
 import { LocationProvider } from '@/contexts/LocationContext';
 
-const AuthContext = createContext<AuthContextType | undefined>(undefined);
+const AuthContext = React.createContext<AuthContextType | undefined>(undefined);
 
 const MAX_AUTO_PROFILE_ATTEMPTS = 5;
 const BASE_RETRY_DELAY = 500;
 
-function AuthProviderCore({ children }: { children: ReactNode }) {
-  const [session, setSession] = useState<Session | null>(null);
-  const [user, setUser] = useState<User | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [profileCreationInProgress, setProfileCreationInProgress] = useState(false);
-  const [profileCreationAttempts, setProfileCreationAttempts] = useState(0);
-  const [lastProfileAttemptTime, setLastProfileAttemptTime] = useState<number>(0);
-  const [isMobileDevice, setIsMobileDevice] = useState(false);
-  const [profileExistsStatus, setProfileExistsStatus] = useState<boolean | null>(null);
-  const [profileCreationComplete, setProfileCreationComplete] = useState(false);
-  const [autoRetryTimeoutId, setAutoRetryTimeoutId] = useState<NodeJS.Timeout | null>(null);
-  const [sessionCreated, setSessionCreated] = useState(false);
-  const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
+function AuthProviderCore({ children }: { children: React.ReactNode }) {
+  const [session, setSession] = React.useState<Session | null>(null);
+  const [user, setUser] = React.useState<User | null>(null);
+  const [isLoading, setIsLoading] = React.useState(true);
+  const [profileCreationInProgress, setProfileCreationInProgress] = React.useState(false);
+  const [profileCreationAttempts, setProfileCreationAttempts] = React.useState(0);
+  const [lastProfileAttemptTime, setLastProfileAttemptTime] = React.useState<number>(0);
+  const [isMobileDevice, setIsMobileDevice] = React.useState(false);
+  const [profileExistsStatus, setProfileExistsStatus] = React.useState<boolean | null>(null);
+  const [profileCreationComplete, setProfileCreationComplete] = React.useState(false);
+  const [autoRetryTimeoutId, setAutoRetryTimeoutId] = React.useState<NodeJS.Timeout | null>(null);
+  const [sessionCreated, setSessionCreated] = React.useState(false);
+  const [currentSessionId, setCurrentSessionId] = React.useState<string | null>(null);
   const location = useLocation();
 
   const detectUserLanguage = (): string => {
@@ -166,7 +166,7 @@ function AuthProviderCore({ children }: { children: ReactNode }) {
     }
   };
 
-  useEffect(() => {
+  React.useEffect(() => {
     const checkMobile = () => {
       const userAgent = navigator.userAgent || navigator.vendor || (window as any).opera;
       const isMobile = /android|webos|iphone|ipad|ipod|blackberry|iemobile|opera mini/i.test(userAgent.toLowerCase());
@@ -525,7 +525,7 @@ function AuthProviderCore({ children }: { children: ReactNode }) {
     }
   };
 
-  useEffect(() => {
+  React.useEffect(() => {
     logInfo("Setting up auth state listener", 'AuthContext');
     
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
@@ -631,7 +631,7 @@ function AuthProviderCore({ children }: { children: ReactNode }) {
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
 
-export function AuthProvider({ children }: { children: ReactNode }) {
+export function AuthProvider({ children }: { children: React.ReactNode }) {
   return (
     <LocationProvider>
       <AuthProviderCore>{children}</AuthProviderCore>
@@ -640,7 +640,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 }
 
 export function useAuth() {
-  const context = useContext(AuthContext);
+  const context = React.useContext(AuthContext);
   if (context === undefined) {
     throw new Error('useAuth must be used within an AuthProvider');
   }

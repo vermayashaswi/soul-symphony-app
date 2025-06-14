@@ -1,5 +1,5 @@
 
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import * as React from 'react';
 import { SessionTrackingService } from '@/services/sessionTrackingService';
 
 interface LocationData {
@@ -15,7 +15,7 @@ interface LocationContextType {
   refreshLocation: () => Promise<void>;
 }
 
-const LocationContext = createContext<LocationContextType | undefined>(undefined);
+const LocationContext = React.createContext<LocationContextType | undefined>(undefined);
 
 const DEFAULT_LOCATION: LocationData = {
   country: 'DEFAULT',
@@ -23,10 +23,10 @@ const DEFAULT_LOCATION: LocationData = {
   timezone: 'UTC'
 };
 
-export function LocationProvider({ children }: { children: ReactNode }) {
-  const [locationData, setLocationData] = useState<LocationData | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+export function LocationProvider({ children }: { children: React.ReactNode }) {
+  const [locationData, setLocationData] = React.useState<LocationData | null>(null);
+  const [isLoading, setIsLoading] = React.useState(true);
+  const [error, setError] = React.useState<string | null>(null);
 
   const detectLocation = async (): Promise<void> => {
     try {
@@ -58,7 +58,7 @@ export function LocationProvider({ children }: { children: ReactNode }) {
     await detectLocation();
   };
 
-  useEffect(() => {
+  React.useEffect(() => {
     detectLocation();
   }, []);
 
@@ -77,7 +77,7 @@ export function LocationProvider({ children }: { children: ReactNode }) {
 }
 
 export function useLocation() {
-  const context = useContext(LocationContext);
+  const context = React.useContext(LocationContext);
   if (context === undefined) {
     throw new Error('useLocation must be used within a LocationProvider');
   }
