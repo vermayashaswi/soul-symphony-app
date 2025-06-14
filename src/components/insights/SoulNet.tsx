@@ -102,7 +102,6 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
   } = useAtomicSoulNetData(userId, timeRange);
 
   // --- NEW: atomic node label translation, stable across time range ---
-  import { useSoulNetNodeTranslations } from "@/hooks/useSoulNetNodeTranslations";
   const nodeIds = graphData.nodes.map(n => n.id);
   const {
     translations: stableTranslations,
@@ -122,7 +121,7 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
     userId, 
     timeRange,
     nodesCount: graphData.nodes.length,
-    translationsCount: translations.size,
+    translationsCount: stableTranslations.size,
     loading,
     isTranslating,
     translationProgress,
