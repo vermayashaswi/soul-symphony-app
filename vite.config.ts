@@ -14,10 +14,10 @@ export default defineConfig(({ mode }) => ({
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src'),
-      // The following aliases are no longer needed if using '@'
-      // react: path.resolve(__dirname, 'node_modules/react'),
-      // 'react/jsx-runtime': path.resolve(__dirname, 'node_modules/react/jsx-runtime'),
-      // 'react-dom': path.resolve(__dirname, 'node_modules/react-dom'),
+      // Force all React imports (including deep imports) to use exactly one instance
+      react: path.resolve(__dirname, './node_modules/react'),
+      'react-dom': path.resolve(__dirname, './node_modules/react-dom'),
+      'react/jsx-runtime': path.resolve(__dirname, './node_modules/react/jsx-runtime'),
     },
   },
   server: {

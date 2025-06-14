@@ -1,4 +1,3 @@
-
 import * as React from "react";
 
 type Theme = 'light' | 'dark' | 'system';
@@ -25,6 +24,9 @@ export function ThemeProvider({ children }: ThemeProviderProps) {
   if (typeof React !== "undefined") {
     // @ts-ignore
     console.log("[ThemeProvider] React version:", React.version, "useState:", React.useState, "this React object:", React);
+    // Add extra debug: show where React.useState comes from
+    // @ts-ignore
+    console.log("[ThemeProvider] typeof React.useState:", typeof React.useState, "React.useState.toString():", React.useState && React.useState.toString());
   } else {
     console.error("[ThemeProvider] React is undefined at runtime!");
   }
@@ -269,4 +271,3 @@ export function useTheme() {
   }
   return context;
 }
-
