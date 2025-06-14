@@ -1,5 +1,4 @@
-
-import React, { useEffect, useState } from 'react';
+import * as React from 'react';
 import AppRoutes from './routes/AppRoutes';
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as SonnerToaster } from "sonner";
@@ -16,9 +15,9 @@ import './styles/emoji.css';
 import './styles/tutorial.css';
 
 const App: React.FC = () => {
-  const [isInitialized, setIsInitialized] = useState(false);
+  const [isInitialized, setIsInitialized] = React.useState(false);
 
-  useEffect(() => {
+  React.useEffect(() => {
     console.log('[App] App mounted, current path:', window.location.pathname);
     
     // Clean up any malformed paths

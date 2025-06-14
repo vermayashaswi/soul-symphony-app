@@ -1,4 +1,4 @@
-import React from 'react'
+import * as React from 'react'
 import ReactDOM from 'react-dom/client'
 import App from './App.tsx'
 import './index.css'
@@ -8,6 +8,9 @@ import { AuthProvider } from './contexts/AuthContext'
 import { ThemeProvider } from './hooks/use-theme'
 import { BrowserRouter } from 'react-router-dom'
 import { pwaService } from './services/pwaService'
+
+// LOG React for multiple instance detection (to match use-theme.tsx debug)
+console.log('[main.tsx] React version:', React.version, 'useState:', React.useState, 'object:', React);
 
 // Enhanced Font Loading System
 const initializeFontSystem = async () => {
