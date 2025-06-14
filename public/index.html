@@ -4,6 +4,15 @@
 <head>
   <meta charset="UTF-8" />
   
+  <!-- Enhanced Mobile Viewport and PWA Meta Tags -->
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover, shrink-to-fit=no" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="SOULo" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="format-detection" content="telephone=no" />
+  <meta name="msapplication-tap-highlight" content="no" />
+  
   <!-- Favicons and Icons -->
   <link rel="icon" type="image/png" sizes="32x32" href="/icons/favicon-32x32.png">
   <link rel="icon" type="image/png" sizes="16x16" href="/icons/favicon-16x16.png">
@@ -26,19 +35,11 @@
   <!-- PWA Manifest -->
   <link rel="manifest" href="/manifest.json">
   
-  <!-- Mobile Viewport and PWA Meta Tags -->
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
-  <meta name="apple-mobile-web-app-capable" content="yes" />
-  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-  <meta name="apple-mobile-web-app-title" content="SOULo" />
-  <meta name="mobile-web-app-capable" content="yes" />
-  
   <!-- Theme Colors -->
   <meta name="theme-color" content="#8b5cf6" />
   <meta name="msapplication-TileColor" content="#8b5cf6" />
   <meta name="msapplication-TileImage" content="/icons/android-icon-144x144.png" />
   <meta name="msapplication-navbutton-color" content="#8b5cf6" />
-  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   
   <!-- Primary Meta Tags -->
   <title>SOULo - Express. Reflect. Grow | Voice Journaling with AI</title>
@@ -68,8 +69,9 @@
   <!-- Canonical -->
   <link rel="canonical" href="https://soulo.online">
   
+  <!-- Critical CSS for Mobile Performance -->
   <style>
-    /* Ensure the body doesn't have any margin or padding by default */
+    /* Enhanced mobile-first styles */
     body, html {
       margin: 0;
       padding: 0;
@@ -79,8 +81,19 @@
       -webkit-tap-highlight-color: transparent;
       font-family: 'Inter', sans-serif;
       background-color: #8b5cf6;
+      /* Mobile optimizations */
+      -webkit-touch-callout: none;
+      -webkit-user-select: none;
+      -khtml-user-select: none;
+      -moz-user-select: none;
+      -ms-user-select: none;
+      user-select: none;
+      /* Prevent bounce scrolling */
+      overscroll-behavior: none;
+      -webkit-overflow-scrolling: touch;
     }
-    /* Add a simple loading state */
+    
+    /* Enhanced loading state */
     #root:empty:before {
       content: "";
       display: block;
@@ -95,24 +108,62 @@
       border-top-color: #ffffff;
       animation: spin 1s linear infinite;
     }
+    
     @keyframes spin {
       0% { transform: rotate(0deg); }
       100% { transform: rotate(360deg); }
     }
-    /* Fix for iOS overscroll effect */
-    body {
-      -webkit-overflow-scrolling: touch;
-      overscroll-behavior-y: none;
+    
+    /* Safe area support for native apps */
+    .safe-area-inset {
+      padding-top: env(safe-area-inset-top);
+      padding-bottom: env(safe-area-inset-bottom);
+      padding-left: env(safe-area-inset-left);
+      padding-right: env(safe-area-inset-right);
     }
+    
     /* Prevent text size adjustment on orientation change */
     html {
       -webkit-text-size-adjust: 100%;
+      -ms-text-size-adjust: 100%;
     }
-    /* PWA display mode detection */
+    
+    /* PWA and Native App specific styles */
     @media (display-mode: standalone) {
       body {
         padding-top: env(safe-area-inset-top);
         padding-bottom: env(safe-area-inset-bottom);
+      }
+    }
+    
+    /* Mobile-specific optimizations */
+    @media (max-width: 768px) {
+      body {
+        touch-action: manipulation;
+      }
+      
+      /* Faster animations on mobile */
+      *, *::before, *::after {
+        animation-duration: 0.8s !important;
+        transition-duration: 0.3s !important;
+      }
+    }
+    
+    /* High contrast mode support */
+    @media (prefers-contrast: high) {
+      body {
+        background-color: #000000;
+        color: #ffffff;
+      }
+    }
+    
+    /* Reduced motion support */
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+        scroll-behavior: auto !important;
       }
     }
   </style>
@@ -122,17 +173,85 @@
   <script src="https://cdn.gpteng.co/gptengineer.js" type="module"></script>
   <script type="module" src="/src/main.tsx"></script>
   
-  <!-- PWA Service Worker Registration -->
+  <!-- Enhanced PWA Service Worker Registration -->
   <script>
+    // Enhanced service worker registration with error handling
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', function() {
         navigator.serviceWorker.register('/sw.js')
           .then(function(registration) {
             console.log('[PWA] Service Worker registered successfully:', registration.scope);
+            
+            // Check for updates
+            registration.addEventListener('updatefound', () => {
+              const newWorker = registration.installing;
+              newWorker.addEventListener('statechange', () => {
+                if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                  console.log('[PWA] New content is available; please refresh.');
+                  // Optionally show update notification
+                }
+              });
+            });
           })
           .catch(function(error) {
             console.log('[PWA] Service Worker registration failed:', error);
           });
+      });
+    }
+    
+    // Mobile app initialization
+    window.addEventListener('DOMContentLoaded', function() {
+      // Detect native app context
+      const isNativeApp = window.ReactNativeWebView !== undefined ||
+                         navigator.userAgent.includes('wv') ||
+                         window.webkit?.messageHandlers !== undefined;
+      
+      if (isNativeApp) {
+        console.log('[App] Native app context detected');
+        document.body.classList.add('native-app');
+        
+        // Disable context menu in native app
+        document.addEventListener('contextmenu', function(e) {
+          e.preventDefault();
+        });
+        
+        // Optimize for native performance
+        document.body.style.touchAction = 'manipulation';
+      }
+      
+      // Mobile-specific optimizations
+      if (window.innerWidth <= 768) {
+        console.log('[App] Mobile device detected');
+        document.body.classList.add('mobile-device');
+        
+        // Prevent zoom on input focus
+        const inputs = document.querySelectorAll('input, textarea, select');
+        inputs.forEach(input => {
+          input.addEventListener('focus', function() {
+            document.querySelector('meta[name="viewport"]').setAttribute(
+              'content', 
+              'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no'
+            );
+          });
+        });
+      }
+    });
+    
+    // Performance monitoring for mobile
+    if ('performance' in window && 'getEntriesByType' in performance) {
+      window.addEventListener('load', function() {
+        setTimeout(function() {
+          const loadTime = performance.timing.loadEventEnd - performance.timing.navigationStart;
+          console.log('[Perf] Page load time:', loadTime, 'ms');
+          
+          // Send to analytics if available
+          if (typeof gtag !== 'undefined') {
+            gtag('event', 'page_load_time', {
+              value: loadTime,
+              custom_parameter: 'mobile_app'
+            });
+          }
+        }, 1000);
       });
     }
   </script>

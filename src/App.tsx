@@ -1,9 +1,8 @@
+
 import React, { useEffect, useState } from 'react';
 import AppRoutes from './routes/AppRoutes';
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as SonnerToaster } from "sonner";
-import { AuthProvider } from '@/contexts/AuthContext';
-import { TranslationProvider } from '@/contexts/TranslationContext';
 import { SubscriptionProvider } from '@/contexts/SubscriptionContext';
 import { TranslationLoadingOverlay } from '@/components/translation/TranslationLoadingOverlay';
 import { JournalProcessingInitializer } from './app/journal-processing-init';
@@ -72,11 +71,16 @@ const App: React.FC = () => {
 
   return (
     <ErrorBoundary onError={handleAppError}>
-      <TranslationProvider>
-        <AuthProvider>
+      <SubscriptionProvider>
+        <TutorialProvider>
+          <TranslationLoadingOverlay />
+          <JournalProcessingInitializer />
           <AppRoutes key={isInitialized ? 'initialized' : 'initializing'} />
-        </AuthProvider>
-      </TranslationProvider>
+          <TutorialOverlay />
+          <Toaster />
+          <SonnerToaster position="top-right" />
+        </TutorialProvider>
+      </SubscriptionProvider>
     </ErrorBoundary>
   );
 };

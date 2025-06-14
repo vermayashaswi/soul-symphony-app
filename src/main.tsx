@@ -4,10 +4,14 @@ import App from './App.tsx'
 import './index.css'
 import './styles/mobile.css' // Import mobile-specific styles
 import './styles/tutorial.css' // Import tutorial-specific styles
+import { AuthProvider } from './contexts/AuthContext'
+import { ThemeProvider } from './hooks/use-theme'
+import { ThemeErrorBoundary } from './components/theme/ThemeErrorBoundary'
 import { BrowserRouter } from 'react-router-dom'
+import { TranslationProvider } from './contexts/TranslationContext'
 import { pwaService } from './services/pwaService'
 
-// Enhanced Font Loading System
+// Enhanced Font Loading System with Graceful Degradation
 const initializeFontSystem = async () => {
   console.log('[FontSystem] Starting font initialization...');
   
@@ -24,8 +28,8 @@ const initializeFontSystem = async () => {
     'Noto Sans Thai'
   ];
   
-  // Font loading with timeout and retry
-  const loadFontWithRetry = async (fontFamily: string, retries = 3): Promise<boolean> => {
+  // Font loading with timeout and graceful degradation
+  const loadFontWithRetry = async (fontFamily: string, retries = 2): Promise<boolean> => {
     for (let i = 0; i < retries; i++) {
       try {
         if (document.fonts && document.fonts.check) {
@@ -35,38 +39,38 @@ const initializeFontSystem = async () => {
             return true;
           }
           
-          // Wait for font to load with timeout
+          // Wait for font to load with shorter timeout for better UX
           const fontFace = new FontFace(fontFamily, `local("${fontFamily}")`);
           await Promise.race([
             fontFace.load(),
-            new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout')), 3000))
+            new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout')), 2000))
           ]);
           
           console.log(`[FontSystem] ${fontFamily} loaded successfully`);
           return true;
         }
       } catch (error) {
-        console.warn(`[FontSystem] Attempt ${i + 1} failed for ${fontFamily}:`, error);
+        console.warn(`[FontSystem] Attempt ${i + 1} failed for ${fontFamily}:`, error.message);
         if (i < retries - 1) {
-          await new Promise(resolve => setTimeout(resolve, 500));
+          await new Promise(resolve => setTimeout(resolve, 300));
         }
       }
     }
     
-    console.error(`[FontSystem] Failed to load ${fontFamily} after ${retries} attempts`);
+    console.warn(`[FontSystem] ${fontFamily} failed to load, falling back to system fonts`);
     return false;
   };
   
-  // Load core fonts
-  const fontPromises = coreFonts.map(font => loadFontWithRetry(font));
-  
+  // Load fonts with graceful degradation
   try {
     // Wait for document fonts ready with timeout
     await Promise.race([
       document.fonts ? document.fonts.ready : Promise.resolve(),
-      new Promise(resolve => setTimeout(resolve, 5000))
+      new Promise(resolve => setTimeout(resolve, 3000))
     ]);
     
+    // Load fonts in parallel but don't block app initialization
+    const fontPromises = coreFonts.map(font => loadFontWithRetry(font));
     const results = await Promise.allSettled(fontPromises);
     const loadedCount = results.filter(result => result.status === 'fulfilled' && result.value).length;
     
@@ -84,11 +88,14 @@ const initializeFontSystem = async () => {
       } 
     }));
     
+    return true;
+    
   } catch (error) {
-    console.error('[FontSystem] Font initialization error:', error);
+    console.warn('[FontSystem] Font initialization had issues, continuing with fallbacks:', error);
     // Set ready flag anyway to prevent hanging
     (window as any).__SOULO_FONTS_READY__ = true;
-    window.dispatchEvent(new CustomEvent('fontsReady', { detail: { error } }));
+    window.dispatchEvent(new CustomEvent('fontsReady', { detail: { error: error.message } }));
+    return false;
   }
 };
 
@@ -173,33 +180,81 @@ const initializePWA = () => {
   }
 };
 
-// Initialize systems
-const initializeApp = async () => {
-  // Initialize font system first
-  await initializeFontSystem();
-  
-  // Initialize viewport fix
-  fixViewportHeight();
-  
-  // Initialize PWA functionality
-  initializePWA();
-  
-  // Detect iOS and set a class on the HTML element
-  if (/iPad|iPhone|iPod/.test(navigator.userAgent) || 
-      (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)) {
-    document.documentElement.classList.add('ios-device');
+// Error boundary for React rendering issues
+const renderWithErrorBoundary = () => {
+  try {
+    console.log('[Main] Starting React app render...');
+    
+    ReactDOM.createRoot(document.getElementById('root')!).render(
+      <React.StrictMode>
+        <BrowserRouter>
+          <ThemeErrorBoundary>
+            <ThemeProvider>
+              <TranslationProvider>
+                <AuthProvider>
+                  <App />
+                </AuthProvider>
+              </TranslationProvider>
+            </ThemeProvider>
+          </ThemeErrorBoundary>
+        </BrowserRouter>
+      </React.StrictMode>,
+    );
+    
+    console.log('[Main] React app rendered successfully');
+  } catch (error) {
+    console.error('[Main] Critical error during React render:', error);
+    
+    // Fallback: try to render a basic error message
+    const root = document.getElementById('root');
+    if (root) {
+      root.innerHTML = `
+        <div style="padding: 20px; text-align: center; font-family: system-ui, sans-serif;">
+          <h1>App Loading Error</h1>
+          <p>Please refresh the page to try again.</p>
+          <button onclick="window.location.reload()" style="padding: 10px 20px; margin-top: 10px;">
+            Refresh Page
+          </button>
+        </div>
+      `;
+    }
   }
-  
-  console.log('[App] Initialization complete');
+};
+
+// Initialize systems with better error handling
+const initializeApp = async () => {
+  try {
+    console.log('[Main] Starting app initialization...');
+    
+    // Initialize font system (non-blocking)
+    initializeFontSystem().catch(error => {
+      console.warn('[Main] Font system initialization failed, continuing:', error);
+    });
+    
+    // Initialize viewport fix
+    fixViewportHeight();
+    
+    // Initialize PWA functionality
+    initializePWA();
+    
+    // Detect iOS and set a class on the HTML element
+    if (/iPad|iPhone|iPod/.test(navigator.userAgent) || 
+        (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)) {
+      document.documentElement.classList.add('ios-device');
+    }
+    
+    console.log('[Main] App initialization complete');
+    
+    // Render the React app
+    renderWithErrorBoundary();
+    
+  } catch (error) {
+    console.error('[Main] Critical error during app initialization:', error);
+    
+    // Still try to render the app even if initialization fails
+    renderWithErrorBoundary();
+  }
 };
 
 // Start initialization
 initializeApp();
-
-ReactDOM.createRoot(document.getElementById('root')!).render(
-  <React.StrictMode>
-    <BrowserRouter>
-      <App />
-    </BrowserRouter>
-  </React.StrictMode>,
-)
