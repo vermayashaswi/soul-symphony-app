@@ -291,7 +291,6 @@ export const TranslationProvider: React.FC<TranslationProviderProps> = ({ childr
     prefetchTranslationsForRoute,
     prefetchSoulNetTranslations,
     isSoulNetTranslating,
-    // @ts-expect-error - Nonstandard, used for debugging/device-aware consumers
     deviceType: device.deviceType,
   };
 
