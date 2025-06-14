@@ -1,35 +1,26 @@
+import { defineConfig } from 'vite';
+import react from '@vitejs/plugin-react';
+import path from 'path';
 
-import { defineConfig } from "vite";
-import react from "@vitejs/plugin-react-swc";
-import path from "path";
-import { componentTagger } from "lovable-tagger";
-
-// https://vitejs.dev/config/
-export default defineConfig(({ mode }) => ({
-  server: {
-    host: "::",
-    port: 8080,
-    allowedHosts: [
-      "571d731e-b54b-453e-9f48-a2c79a572930.lovableproject.com",
-    ],
-  },
-  plugins: [
-    react(),
-    mode === 'development' &&
-    componentTagger(),
-  ].filter(Boolean),
+export default defineConfig({
+  plugins: [react()],
   resolve: {
     alias: {
-      "@": path.resolve(__dirname, "./src"),
+      react: path.resolve(__dirname, 'node_modules/react'),
+      'react/jsx-runtime': path.resolve(__dirname, 'node_modules/react/jsx-runtime'),
+      'react-dom': path.resolve(__dirname, 'node_modules/react-dom'),
+    }
+  },
+  server: {
+    proxy: {
+      '/api': {
+        target: 'http://localhost:3001',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/api/, ''),
+      },
     },
   },
-  optimizeDeps: {
-    exclude: ['lovable-tagger'],
-  },
-  // Ensure that Vite correctly resolves Node.js built-in modules
   build: {
-    commonjsOptions: {
-      transformMixedEsModules: true,
-    },
+    sourcemap: true,
   },
-}));
+});
