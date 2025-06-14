@@ -423,7 +423,8 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
                 isFullScreen={isFullScreen}
                 shouldShowLabels={true}
                 getInstantConnectionPercentage={getConnectionPercentage}
-                getInstantTranslation={getTranslation} {/* <--- always from new atomic cache, never flashes */}
+                // always from new atomic cache, never flashes
+                getInstantTranslation={getTranslation}
                 getInstantNodeConnections={getNodeConnections}
                 isInstantReady={translationsReady}
                 isAtomicMode={true}
