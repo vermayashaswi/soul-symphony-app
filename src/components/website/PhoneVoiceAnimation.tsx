@@ -2,10 +2,10 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Brain, Mic, MessageSquare, LineChart, ArrowRight, TrendingUp } from 'lucide-react';
-import MarketingSouloLogo from '@/components/marketing/MarketingSouloLogo';
+import SouloLogo from '@/components/SouloLogo';
 import EmotionBubblesDemo from '@/components/website/EmotionBubblesDemo';
 import SentimentChartDemo from '@/components/website/SentimentChartDemo';
-import { MarketingTranslatableText } from '@/components/marketing/MarketingTranslatableText';
+import { TranslatableText } from '@/components/translation/TranslatableText';
 
 export const PhoneVoiceAnimation = () => {
   const [animationStage, setAnimationStage] = useState(0);
@@ -39,7 +39,7 @@ export const PhoneVoiceAnimation = () => {
         <div className="absolute top-0 left-1/2 transform -translate-x-1/2 w-32 h-6 bg-black rounded-b-xl z-10"></div>
         <div className="absolute inset-0 bg-gradient-to-br from-gray-900 to-gray-800 flex flex-col">
           <div className="h-14 bg-gradient-to-r from-primary/80 to-purple-600/80 flex items-center justify-center">
-            <MarketingSouloLogo size="small" />
+            <SouloLogo size="small" useColorTheme={true} />
           </div>
           <div className="flex-1 p-4 flex flex-col">
             {animationStage === 0 && (
@@ -51,7 +51,7 @@ export const PhoneVoiceAnimation = () => {
               >
                 <div className="text-white text-center mb-6">
                   <span className="text-sm mb-2">
-                    <MarketingTranslatableText text="Recording your journal..." />
+                    <TranslatableText text="Recording your journal..." />
                   </span>
                 </div>
                 <div className="w-full h-24 flex items-center justify-center gap-1 mb-8">
@@ -95,7 +95,7 @@ export const PhoneVoiceAnimation = () => {
               >
                 <div className="text-white text-center mb-8">
                   <span className="text-sm mb-2">
-                    <MarketingTranslatableText text="Processing your entry..." />
+                    <TranslatableText text="Processing your entry..." />
                   </span>
                 </div>
                 <motion.div 
@@ -155,7 +155,7 @@ export const PhoneVoiceAnimation = () => {
                 className="flex-1 flex flex-col"
               >
                 <h3 className="text-white text-center mb-3 text-sm">
-                  <MarketingTranslatableText text="Your Journal Insights" />
+                  <TranslatableText text="Your Journal Insights" />
                 </h3>
                 
                 {/* Enhanced Insights with Visualizations */}
@@ -172,7 +172,7 @@ export const PhoneVoiceAnimation = () => {
                         <LineChart className="h-3 w-3 text-primary" />
                       </div>
                       <p className="text-white text-xs">
-                        <MarketingTranslatableText text="Emotional patterns" />
+                        <TranslatableText text="Emotional patterns" />
                       </p>
                     </div>
                     <div className="h-[60px] mt-2">
@@ -192,7 +192,7 @@ export const PhoneVoiceAnimation = () => {
                         <TrendingUp className="h-3 w-3 text-primary" />
                       </div>
                       <p className="text-white text-xs">
-                        <MarketingTranslatableText text="Sentiment trending up" />
+                        <TranslatableText text="Sentiment trending up" />
                       </p>
                     </div>
                     <div className="h-[60px] mt-1">
@@ -212,7 +212,7 @@ export const PhoneVoiceAnimation = () => {
                         <LineChart className="h-3 w-3 text-primary" />
                       </div>
                       <p className="text-white text-xs">
-                        <MarketingTranslatableText text="Sleep pattern improving since last week" />
+                        <TranslatableText text="Sleep pattern improving since last week" />
                       </p>
                     </div>
                   </motion.div>
@@ -225,7 +225,7 @@ export const PhoneVoiceAnimation = () => {
                   transition={{ delay: 0.8 }}
                 >
                   <span className="text-primary text-xs">
-                    <MarketingTranslatableText text="View full analysis" />
+                    <TranslatableText text="View full analysis" />
                   </span>
                   <ArrowRight className="h-4 w-4 text-primary" />
                 </motion.div>

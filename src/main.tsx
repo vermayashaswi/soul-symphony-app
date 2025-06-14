@@ -7,23 +7,9 @@ import './styles/mobile.css' // Import mobile-specific styles
 import './styles/tutorial.css' // Import tutorial-specific styles
 import { AuthProvider } from './contexts/AuthContext'
 import { ThemeProvider } from './hooks/use-theme'
-import { BrowserRouter, useLocation } from 'react-router-dom'
+import { BrowserRouter } from 'react-router-dom'
 import { TranslationProvider } from './contexts/TranslationContext'
 import { pwaService } from './services/pwaService'
-import { MarketingProviders } from './MarketingProviders'
-
-// Helper: decide if current path is a marketing or app route
-const isMarketingRoute = (pathname: string) => {
-  // Only "/" and the first-level marketing pages
-  return (
-    pathname === "/" ||
-    pathname.startsWith("/privacy-policy") ||
-    pathname.startsWith("/faq") ||
-    pathname.startsWith("/blog") ||
-    pathname.startsWith("/download") ||
-    pathname.startsWith("/terms")
-  );
-};
 
 // Enhanced Font Loading System
 const initializeFontSystem = async () => {
@@ -214,24 +200,9 @@ const initializeApp = async () => {
 // Start initialization
 initializeApp();
 
-const RootRouter: React.FC = () => {
-  const location = useLocation();
-  const isMarketing = isMarketingRoute(location.pathname);
-
-  console.log("[RootRouter] Path:", location.pathname, "isMarketing:", isMarketing);
-
-  if (isMarketing) {
-    // MARKETING ONLY: Minimal providers for marketing – no Auth, no app-level Translation
-    console.log("[RootRouter] Rendering marketing page with MarketingProviders only");
-    return (
-      <MarketingProviders>
-        <App />
-      </MarketingProviders>
-    );
-  } else {
-    // APP ONLY: Full set of providers for `/app` and anything else
-    console.log("[RootRouter] Rendering app page with full providers");
-    return (
+ReactDOM.createRoot(document.getElementById('root')!).render(
+  <React.StrictMode>
+    <BrowserRouter>
       <ThemeProvider>
         <TranslationProvider>
           <AuthProvider>
@@ -239,14 +210,6 @@ const RootRouter: React.FC = () => {
           </AuthProvider>
         </TranslationProvider>
       </ThemeProvider>
-    );
-  }
-};
-
-ReactDOM.createRoot(document.getElementById('root')!).render(
-  <React.StrictMode>
-    <BrowserRouter>
-      <RootRouter />
     </BrowserRouter>
-  </React.StrictMode>
+  </React.StrictMode>,
 )

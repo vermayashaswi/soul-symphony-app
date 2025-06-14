@@ -7,7 +7,6 @@ import Journal from '@/pages/Journal';
 import Insights from '@/pages/Insights';
 import SmartChat from '@/pages/SmartChat';
 import Chat from '@/pages/Chat';
-import Splash from '@/pages/Splash';
 import ProtectedRoute from './ProtectedRoute';
 import Auth from '@/pages/Auth';
 import Settings from '@/pages/Settings';
@@ -64,7 +63,6 @@ const AppRoutes = () => {
         <Route path="/blog/:slug" element={<BlogPostPage />} />
         
         {/* App Routes - reordered to fix routing issue */}
-        <Route path="/app/splash" element={<Splash />} />
         <Route path="/app/onboarding" element={<OnboardingScreen />} />
         <Route path="/app/auth" element={<Auth />} />
         

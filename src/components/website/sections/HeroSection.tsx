@@ -2,11 +2,11 @@
 import React, { Suspense, lazy } from 'react';
 import { Apple, Play, Shield, Check } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import MarketingSouloLogo from '@/components/marketing/MarketingSouloLogo';
+import SouloLogo from '@/components/SouloLogo';
 import { motion } from 'framer-motion';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { PhoneVoiceAnimation } from '@/components/website/PhoneVoiceAnimation';
-import { MarketingTranslatableText } from '@/components/marketing/MarketingTranslatableText';
+import { TranslatableText } from '@/components/translation/TranslatableText';
 import { AspectRatio } from '@/components/ui/aspect-ratio';
 
 // Lazy load the 3D background to improve initial load performance
@@ -31,6 +31,13 @@ const HeroSection: React.FC<HeroSectionProps> = ({ openAppStore, openPlayStore }
         style={{ backgroundImage: "url('/lovable-uploads/32abc730-009c-4901-912c-a16e7c2c1ec6.png')" }}
       ></div>
       
+      {/* 3D Background animation - Removed the bubble animation by commenting it out */}
+      {/* <Suspense fallback={null}>
+        <div className="absolute inset-0 z-0 opacity-30">
+          <ThreeDBackground />
+        </div>
+      </Suspense> */}
+      
       <div className="container mx-auto px-4 relative z-10">
         <div className="flex flex-col lg:flex-row items-center gap-8 lg:gap-12">
           <motion.div
@@ -40,10 +47,10 @@ const HeroSection: React.FC<HeroSectionProps> = ({ openAppStore, openPlayStore }
             className="w-full lg:w-1/2 text-center lg:text-left"
           >
             <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold mb-6 text-primary">
-              <MarketingTranslatableText text="Express. Reflect. Grow." />
+              <TranslatableText text="Express. Reflect. Grow." />
             </h1>
             <p className="text-xl md:text-2xl text-gray-700 mb-8 max-w-2xl mx-auto lg:mx-0">
-              <MarketingTranslatableText text="Journaling should be as simple as talking. Use voice and leave the rest to us." />
+              <TranslatableText text="Journaling should be as simple as talking. Use voice and leave the rest to us." />
             </p>
             
             <div className="flex flex-col sm:flex-row gap-4 justify-center lg:justify-start mb-8">
@@ -53,7 +60,7 @@ const HeroSection: React.FC<HeroSectionProps> = ({ openAppStore, openPlayStore }
                 onClick={openAppStore}
               >
                 <Apple className="h-5 w-5" />
-                <MarketingTranslatableText text="App Store" />
+                <TranslatableText text="App Store" />
               </Button>
               <Button 
                 size="lg" 
@@ -61,18 +68,18 @@ const HeroSection: React.FC<HeroSectionProps> = ({ openAppStore, openPlayStore }
                 onClick={openPlayStore}
               >
                 <Play className="h-5 w-5" />
-                <MarketingTranslatableText text="Google Play" />
+                <TranslatableText text="Google Play" />
               </Button>
             </div>
             
             <div className="flex items-center justify-center lg:justify-start gap-8 text-sm text-gray-500">
               <div className="flex items-center gap-1">
                 <Shield className="h-4 w-4 text-primary" />
-                <MarketingTranslatableText text="Privacy-Focused" />
+                <TranslatableText text="Privacy-Focused" />
               </div>
               <div className="flex items-center gap-1">
                 <Check className="h-4 w-4 text-primary" />
-                <MarketingTranslatableText text="14-Day Free Trial" />
+                <TranslatableText text="14-Day Free Trial" />
               </div>
             </div>
           </motion.div>

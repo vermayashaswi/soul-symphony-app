@@ -3,8 +3,8 @@ import React from 'react';
 import { Link } from 'react-router-dom';
 import { Apple, Play } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import MarketingSouloLogo from '@/components/marketing/MarketingSouloLogo';
-import { MarketingTranslatableText } from '@/components/marketing/MarketingTranslatableText';
+import SouloLogo from '@/components/SouloLogo';
+import { TranslatableText } from '@/components/translation/TranslatableText';
 
 const Footer = () => {
   const openAppStore = () => {
@@ -38,7 +38,7 @@ const Footer = () => {
   return (
     <footer className="bg-white py-16 border-t border-gray-100">
       <div className="container mx-auto px-4 text-center">
-        <MarketingSouloLogo size="large" className="mx-auto mb-8" />
+        <SouloLogo size="large" useColorTheme={true} className="mx-auto mb-8" />
         
         <div className="flex flex-col sm:flex-row gap-4 justify-center max-w-md mx-auto mb-12">
           <Button 
@@ -46,39 +46,39 @@ const Footer = () => {
             onClick={openAppStore}
           >
             <Apple className="h-5 w-5" />
-            <MarketingTranslatableText text="Download on App Store" />
+            <TranslatableText text="Download on App Store" />
           </Button>
           <Button 
             className="gap-2 bg-primary hover:bg-primary/90" 
             onClick={openPlayStore}
           >
             <Play className="h-5 w-5" />
-            <MarketingTranslatableText text="Get it on Google Play" />
+            <TranslatableText text="Get it on Google Play" />
           </Button>
         </div>
         
         <p className="text-muted-foreground mb-8">
-          <MarketingTranslatableText text="Contact us at" />{" "}
+          <TranslatableText text="Contact us at" />{" "}
           <a href="mailto:support@soulo.online" className="text-primary hover:underline">support@soulo.online</a>
         </p>
         
         <div className="flex justify-center gap-8 text-sm text-muted-foreground">
           <Link to="/privacy-policy" className="hover:text-primary">
-            <MarketingTranslatableText text="Privacy Policy" />
+            <TranslatableText text="Privacy Policy" />
           </Link>
           <Link to="/terms" className="hover:text-primary">
-            <MarketingTranslatableText text="Terms of Service" />
+            <TranslatableText text="Terms of Service" />
           </Link>
           <Link to="/blog" className="hover:text-primary">
-            <MarketingTranslatableText text="Blog" />
+            <TranslatableText text="Blog" />
           </Link>
           <Link to="/faq" className="hover:text-primary">
-            <MarketingTranslatableText text="FAQ" />
+            <TranslatableText text="FAQ" />
           </Link>
         </div>
         
         <p className="text-xs text-muted-foreground mt-8">
-          &copy; {new Date().getFullYear()} SOULo. <MarketingTranslatableText text="All rights reserved." />
+          &copy; {new Date().getFullYear()} SOULo. <TranslatableText text="All rights reserved." />
         </p>
       </div>
     </footer>
