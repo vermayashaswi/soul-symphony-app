@@ -3,7 +3,7 @@ import React from 'react';
 import { Link } from 'react-router-dom';
 import { Apple, Play } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import SouloLogo from '@/components/SouloLogo';
+import MarketingSouloLogo from '@/components/marketing/MarketingSouloLogo';
 import { MarketingTranslatableText } from '@/components/marketing/MarketingTranslatableText';
 
 const Footer = () => {
@@ -38,7 +38,7 @@ const Footer = () => {
   return (
     <footer className="bg-white py-16 border-t border-gray-100">
       <div className="container mx-auto px-4 text-center">
-        <SouloLogo size="large" useColorTheme={true} className="mx-auto mb-8" />
+        <MarketingSouloLogo size="large" className="mx-auto mb-8" />
         
         <div className="flex flex-col sm:flex-row gap-4 justify-center max-w-md mx-auto mb-12">
           <Button 

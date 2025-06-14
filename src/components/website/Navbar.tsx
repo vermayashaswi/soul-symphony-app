@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { Menu, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import SouloLogo from '@/components/SouloLogo';
+import MarketingSouloLogo from '@/components/marketing/MarketingSouloLogo';
 import { MarketingTranslatableText } from '@/components/marketing/MarketingTranslatableText';
 import { MarketingLanguageSelector } from '@/components/marketing/MarketingLanguageSelector';
 
@@ -19,7 +19,7 @@ const Navbar = () => {
     <nav className="fixed top-0 left-0 right-0 z-50 bg-white/90 backdrop-blur-md border-b border-gray-100 px-4 py-3 shadow-sm">
       <div className="container mx-auto flex justify-between items-center">
         <Link to="/" className="flex items-center">
-          <SouloLogo size="normal" useColorTheme={true} />
+          <MarketingSouloLogo size="normal" />
         </Link>
 
         {/* Desktop Navigation */}
