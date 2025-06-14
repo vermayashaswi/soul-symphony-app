@@ -1,5 +1,12 @@
 import * as React from "react";
 
+// AGGRESSIVE DIAGNOSTICS at module scope BEFORE anything else
+console.log('[use-theme.tsx][DIAG] typeof React:', typeof React, '| React object:', React);
+console.log('[use-theme.tsx][DIAG] typeof React.useState:', typeof React.useState, '| value:', React.useState);
+if (!React || typeof React.useState !== 'function') {
+  throw new Error("[use-theme.tsx][CRITICAL] React.useState is not a function! This indicates multiple conflicting React versions or broken build.");
+}
+
 type Theme = 'light' | 'dark' | 'system';
 type ColorTheme = 'Default' | 'Calm' | 'Soothing' | 'Energy' | 'Focus' | 'Custom';
 

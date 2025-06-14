@@ -9,6 +9,13 @@ import { ThemeProvider } from './hooks/use-theme'
 import { BrowserRouter } from 'react-router-dom'
 import { pwaService } from './services/pwaService'
 
+// AGGRESSIVE DIAGNOSTICS: React global State debug
+console.log('[main.tsx][DIAG] typeof React:', typeof React, '| React object:', React);
+console.log('[main.tsx][DIAG] typeof React.useState:', typeof React.useState, '| value:', React.useState);
+if (!React || typeof React.useState !== 'function') {
+  throw new Error("[main.tsx][CRITICAL] React.useState is not a function! There's a critical React instance conflict.");
+}
+
 // LOG React for multiple instance detection (to match use-theme.tsx debug)
 console.log('[main.tsx] React version:', React.version, 'useState:', React.useState, 'object:', React);
 
