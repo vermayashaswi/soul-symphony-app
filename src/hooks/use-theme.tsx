@@ -1,4 +1,5 @@
-import React, { createContext, useContext, useEffect, useState, ReactNode } from "react";
+
+import React, { createContext, useContext, useEffect, ReactNode } from "react";
 
 type Theme = 'light' | 'dark' | 'system';
 type ColorTheme = 'Default' | 'Calm' | 'Soothing' | 'Energy' | 'Focus' | 'Custom';
@@ -20,21 +21,21 @@ interface ThemeContextType {
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 
 export function ThemeProvider({ children }: ThemeProviderProps) {
-  const [theme, setTheme] = useState<Theme>(() => {
+  const [theme, setTheme] = React.useState<Theme>(() => {
     const savedTheme = localStorage.getItem('feelosophy-theme');
     return (savedTheme as Theme) || 'system';
   });
   
-  const [systemTheme, setSystemTheme] = useState<'light' | 'dark'>(
+  const [systemTheme, setSystemTheme] = React.useState<'light' | 'dark'>(
     window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
   );
   
-  const [colorTheme, setColorTheme] = useState<ColorTheme>(() => {
+  const [colorTheme, setColorTheme] = React.useState<ColorTheme>(() => {
     const savedColorTheme = localStorage.getItem('feelosophy-color-theme');
     return (savedColorTheme as ColorTheme) || 'Calm';
   });
 
-  const [customColor, setCustomColor] = useState<string>(() => {
+  const [customColor, setCustomColor] = React.useState<string>(() => {
     const savedCustomColor = localStorage.getItem('feelosophy-custom-color');
     return savedCustomColor || '#3b82f6';
   });
