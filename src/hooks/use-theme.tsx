@@ -20,29 +20,51 @@ interface ThemeContextType {
 
 const ThemeContext = React.createContext<ThemeContextType | undefined>(undefined);
 
-export function ThemeProvider({ children }: ThemeProviderProps) {
-  const [theme, setTheme] = React.useState<Theme>(() => {
-    if (typeof window === 'undefined') return 'system';
+// Helper functions to get initial values safely
+const getInitialTheme = (): Theme => {
+  if (typeof window === 'undefined') return 'system';
+  try {
     const savedTheme = localStorage.getItem('feelosophy-theme');
     return (savedTheme as Theme) || 'system';
-  });
-  
-  const [systemTheme, setSystemTheme] = React.useState<'light' | 'dark'>(() => {
-    if (typeof window === 'undefined') return 'light';
+  } catch {
+    return 'system';
+  }
+};
+
+const getInitialSystemTheme = (): 'light' | 'dark' => {
+  if (typeof window === 'undefined') return 'light';
+  try {
     return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
-  });
-  
-  const [colorTheme, setColorTheme] = React.useState<ColorTheme>(() => {
-    if (typeof window === 'undefined') return 'Calm';
+  } catch {
+    return 'light';
+  }
+};
+
+const getInitialColorTheme = (): ColorTheme => {
+  if (typeof window === 'undefined') return 'Calm';
+  try {
     const savedColorTheme = localStorage.getItem('feelosophy-color-theme');
     return (savedColorTheme as ColorTheme) || 'Calm';
-  });
+  } catch {
+    return 'Calm';
+  }
+};
 
-  const [customColor, setCustomColor] = React.useState<string>(() => {
-    if (typeof window === 'undefined') return '#3b82f6';
+const getInitialCustomColor = (): string => {
+  if (typeof window === 'undefined') return '#3b82f6';
+  try {
     const savedCustomColor = localStorage.getItem('feelosophy-custom-color');
     return savedCustomColor || '#3b82f6';
-  });
+  } catch {
+    return '#3b82f6';
+  }
+};
+
+export function ThemeProvider({ children }: ThemeProviderProps) {
+  const [theme, setTheme] = React.useState<Theme>(getInitialTheme);
+  const [systemTheme, setSystemTheme] = React.useState<'light' | 'dark'>(getInitialSystemTheme);
+  const [colorTheme, setColorTheme] = React.useState<ColorTheme>(getInitialColorTheme);
+  const [customColor, setCustomColor] = React.useState<string>(getInitialCustomColor);
 
   React.useEffect(() => {
     if (typeof window === 'undefined') return;
