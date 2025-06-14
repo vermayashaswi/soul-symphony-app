@@ -5,6 +5,7 @@ import { Toaster as SonnerToaster } from "sonner";
 import { TranslationProvider } from '@/contexts/TranslationContext';
 import { SubscriptionProvider } from '@/contexts/SubscriptionContext';
 import { TutorialProvider } from './contexts/TutorialContext';
+import { JournalProcessingInitializer } from './app/journal-processing-init';
 import TutorialOverlay from './components/tutorial/TutorialOverlay';
 import ErrorBoundary from './components/insights/ErrorBoundary';
 import { preloadCriticalImages } from './utils/imagePreloader';
