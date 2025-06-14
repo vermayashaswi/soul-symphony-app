@@ -1,8 +1,12 @@
 
 import React from "react";
+import { MarketingTranslationProvider } from './contexts/MarketingTranslationContext';
 
-// In the future you can add e.g. a marketing-only translation, analytics, or theme provider
-// For now it just provides a React Fragment to wrap children
+// Marketing-only providers that don't require app-level contexts
 export const MarketingProviders: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  return <>{children}</>;
+  return (
+    <MarketingTranslationProvider>
+      {children}
+    </MarketingTranslationProvider>
+  );
 };

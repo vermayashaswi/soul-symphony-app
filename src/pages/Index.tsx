@@ -1,27 +1,15 @@
 
 import React, { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-// DO NOT import useAuth, useTheme, useOnboarding except on /app pages
-// import { useAuth } from '@/contexts/AuthContext';
-// import { useTheme } from '@/hooks/use-theme';
-// import { useOnboarding } from '@/hooks/use-onboarding';
 import NetworkAwareContent from '@/components/NetworkAwareContent';
 import { useNetworkStatus } from '@/utils/network';
 import HomePage from '@/pages/website/HomePage';
-import { TranslatableText } from '@/components/translation/TranslatableText';
-// import { useTranslation } from '@/contexts/TranslationContext';
-// import { supabase } from '@/integrations/supabase/client';
-
-// No contexts, so all hooks must be safe to run outside app context
+import { MarketingTranslatableText } from '@/components/marketing/MarketingTranslatableText';
+import { forceEnableScrolling } from '@/hooks/use-scroll-restoration';
 
 const Index = () => {
   const navigate = useNavigate();
-  // const { user } = useAuth(); // NOT USED on marketing page
-  // const { colorTheme } = useTheme();
-  // const isMobile = useIsMobile();
-  // const { onboardingComplete, checkOnboardingStatus } = useOnboarding();
   const networkStatus = useNetworkStatus();
-  // const { translate } = useTranslation();
 
   // Only demo: allow ?mobileDemo for HomePage
   const urlParams = new URLSearchParams(window.location.search);
@@ -37,7 +25,16 @@ const Index = () => {
     }
   }, [navigate, urlParams]);
 
-  // No translation or onboarding logic – all must go through app routes
+  useEffect(() => {
+    // Ensure scrolling is always enabled on marketing
+    forceEnableScrolling();
+    document.body.style.overflow = '';
+    document.body.style.position = '';
+    document.body.style.width = '';
+    document.body.style.height = '';
+    document.body.style.top = '';
+    document.body.style.left = '';
+  }, []);
 
   return (
     <>
@@ -45,28 +42,26 @@ const Index = () => {
         lowBandwidthFallback={
           <div className="flex flex-col items-center justify-center min-h-screen p-4">
             <h1 className="text-2xl font-bold mb-4">
-              <TranslatableText text="Welcome to Soul Symphony" forceTranslate={true} />
+              <MarketingTranslatableText text="Welcome to Soul Symphony" />
             </h1>
             <p className="text-center mb-6">
-              <TranslatableText 
+              <MarketingTranslatableText 
                 text="We've detected you're on a slow connection. We're loading a lightweight version of our site for better performance." 
-                forceTranslate={true}
               />
             </p>
             <div className="animate-pulse">
-              <TranslatableText text="Loading optimized content..." forceTranslate={true} />
+              <MarketingTranslatableText text="Loading optimized content..." />
             </div>
           </div>
         }
         offlineFallback={
           <div className="flex flex-col items-center justify-center min-h-screen p-4">
             <h1 className="text-2xl font-bold mb-4">
-              <TranslatableText text="You're currently offline" forceTranslate={true} />
+              <MarketingTranslatableText text="You're currently offline" />
             </h1>
             <p className="text-center mb-6">
-              <TranslatableText 
+              <MarketingTranslatableText 
                 text="Please check your connection to access all features. Some content may still be available from cache." 
-                forceTranslate={true}
               />
             </p>
           </div>
