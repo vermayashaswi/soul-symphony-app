@@ -1,7 +1,5 @@
 
-"use client";
-
-import * as React from "react";
+import React, { useState, useEffect, useContext, createContext, useMemo, useCallback } from 'react';
 
 type Theme = 'light' | 'dark' | 'system';
 type ColorTheme = 'Default' | 'Calm' | 'Soothing' | 'Energy' | 'Focus' | 'Custom';
@@ -20,33 +18,33 @@ interface ThemeContextType {
   systemTheme: 'light' | 'dark';
 }
 
-const ThemeContext = React.createContext<ThemeContextType | undefined>(undefined);
+const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 
 export function ThemeProvider({ children }: ThemeProviderProps) {
-  const [theme, setTheme] = React.useState<Theme>(() => {
+  const [theme, setTheme] = useState<Theme>(() => {
     if (typeof window === 'undefined') return 'system';
     const savedTheme = localStorage.getItem('feelosophy-theme');
     return (savedTheme as Theme) || 'system';
   });
   
-  const [systemTheme, setSystemTheme] = React.useState<'light' | 'dark'>(() => {
+  const [systemTheme, setSystemTheme] = useState<'light' | 'dark'>(() => {
     if (typeof window === 'undefined') return 'light';
     return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
   });
   
-  const [colorTheme, setColorTheme] = React.useState<ColorTheme>(() => {
+  const [colorTheme, setColorTheme] = useState<ColorTheme>(() => {
     if (typeof window === 'undefined') return 'Calm';
     const savedColorTheme = localStorage.getItem('feelosophy-color-theme');
     return (savedColorTheme as ColorTheme) || 'Calm';
   });
 
-  const [customColor, setCustomColor] = React.useState<string>(() => {
+  const [customColor, setCustomColor] = useState<string>(() => {
     if (typeof window === 'undefined') return '#3b82f6';
     const savedCustomColor = localStorage.getItem('feelosophy-custom-color');
     return savedCustomColor || '#3b82f6';
   });
 
-  React.useEffect(() => {
+  useEffect(() => {
     if (typeof window === 'undefined') return;
     
     const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
@@ -77,7 +75,7 @@ export function ThemeProvider({ children }: ThemeProviderProps) {
     };
   }, [theme]);
 
-  React.useEffect(() => {
+  useEffect(() => {
     if (typeof window === 'undefined') return;
     
     const root = window.document.documentElement;
@@ -92,7 +90,7 @@ export function ThemeProvider({ children }: ThemeProviderProps) {
     localStorage.setItem('feelosophy-theme', theme);
   }, [theme, systemTheme]);
   
-  const getColorHex = React.useCallback((theme: ColorTheme): string => {
+  const getColorHex = useCallback((theme: ColorTheme): string => {
     switch (theme) {
       case 'Default':
         return '#3b82f6';
@@ -111,7 +109,7 @@ export function ThemeProvider({ children }: ThemeProviderProps) {
     }
   }, [customColor]);
   
-  const hexToRgb = React.useCallback((hex: string): { r: number, g: number, b: number } | null => {
+  const hexToRgb = useCallback((hex: string): { r: number, g: number, b: number } | null => {
     const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
     return result ? {
       r: parseInt(result[1], 16),
@@ -120,7 +118,7 @@ export function ThemeProvider({ children }: ThemeProviderProps) {
     } : null;
   }, []);
   
-  const rgbToHsl = React.useCallback((r: number, g: number, b: number): [number, number, number] => {
+  const rgbToHsl = useCallback((r: number, g: number, b: number): [number, number, number] => {
     r /= 255;
     g /= 255;
     b /= 255;
@@ -146,7 +144,7 @@ export function ThemeProvider({ children }: ThemeProviderProps) {
     return [Math.round(h * 360), Math.round(s * 100), Math.round(l * 100)];
   }, []);
 
-  React.useEffect(() => {
+  useEffect(() => {
     if (typeof window === 'undefined') return;
     
     localStorage.setItem('feelosophy-color-theme', colorTheme);
@@ -231,7 +229,7 @@ export function ThemeProvider({ children }: ThemeProviderProps) {
   }, [colorTheme, customColor, getColorHex, hexToRgb, rgbToHsl]);
 
   // This effect specifically handles when custom color changes
-  React.useEffect(() => {
+  useEffect(() => {
     if (typeof window === 'undefined') return;
     
     localStorage.setItem('feelosophy-custom-color', customColor);
@@ -253,7 +251,7 @@ export function ThemeProvider({ children }: ThemeProviderProps) {
     }
   }, [customColor, colorTheme, hexToRgb, rgbToHsl]);
 
-  const contextValue = React.useMemo(() => ({
+  const contextValue = useMemo(() => ({
     theme, 
     setTheme, 
     colorTheme, 
@@ -271,7 +269,7 @@ export function ThemeProvider({ children }: ThemeProviderProps) {
 }
 
 export function useTheme() {
-  const context = React.useContext(ThemeContext);
+  const context = useContext(ThemeContext);
   if (context === undefined) {
     throw new Error("useTheme must be used within a ThemeProvider");
   }
