@@ -1,4 +1,3 @@
-
 import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react';
 import { onDemandTranslationCache } from '@/utils/website-translations';
 import { SoulNetPreloadService } from '@/services/soulnetPreloadService';
@@ -6,6 +5,7 @@ import { EnhancedSoulNetPreloadService } from '@/services/enhancedSoulNetPreload
 import { translationService } from '@/services/translationService';
 import { supabase } from '@/integrations/supabase/client';
 import { useLocation } from 'react-router-dom';
+import { useDeviceType } from '@/hooks/use-device-type';
 
 // INJECTED: Helper to detect if a route is a marketing page
 const websitePrefixes = [
@@ -30,6 +30,7 @@ interface TranslationContextType {
   prefetchTranslationsForRoute?: (route: string) => Promise<void>;
   prefetchSoulNetTranslations: (userId: string, timeRange: string) => Promise<void>;
   isSoulNetTranslating: boolean;
+  deviceType: "mobile" | "tablet" | "desktop";
 }
 
 const TranslationContext = createContext<TranslationContextType | undefined>(undefined);
@@ -44,6 +45,36 @@ export const TranslationProvider: React.FC<TranslationProviderProps> = ({ childr
   const [currentPath, setCurrentPath] = useState<string>(location.pathname);
   // State determining if we are currently in the website (marketing)
   const [onMarketing, setOnMarketing] = useState<boolean>(isWebsiteRoute(location.pathname));
+  const device = useDeviceType();
+
+  // Save if we're in onboarding so language is always selectable
+  const [onOnboarding, setOnOnboarding] = useState<boolean>(
+    typeof window !== "undefined"
+      ? window.location.pathname.includes("onboarding")
+      : false
+  );
+
+  useEffect(() => {
+    const handlePathChange = () => {
+      const path = typeof window !== "undefined" ? window.location.pathname : "";
+      setOnOnboarding(path.includes("onboarding"));
+      if (process.env.NODE_ENV !== "production") {
+        console.log("[TranslationContext] Path changed:", path, { onOnboarding: path.includes("onboarding") });
+      }
+    };
+    window.addEventListener("popstate", handlePathChange);
+    window.addEventListener("pushstate", handlePathChange);
+    window.addEventListener("replacestate", handlePathChange);
+    window.addEventListener("locationchange", handlePathChange);
+    const interval = setInterval(handlePathChange, 333);
+    return () => {
+      window.removeEventListener("popstate", handlePathChange);
+      window.removeEventListener("pushstate", handlePathChange);
+      window.removeEventListener("replacestate", handlePathChange);
+      window.removeEventListener("locationchange", handlePathChange);
+      clearInterval(interval);
+    };
+  }, []);
 
   // Force language to 'en' if on marketing
   const [currentLanguage, setCurrentLanguageState] = useState<string>('en');
@@ -110,8 +141,28 @@ export const TranslationProvider: React.FC<TranslationProviderProps> = ({ childr
   // eslint-disable-next-line
   }, [typeof window !== "undefined" ? window.location.pathname : "/", currentPath]);
 
+  // Setup: language should NEVER auto-select Indian (or other non-English) on tablets during onboarding
+  useEffect(() => {
+    // When first loading the app, and on onboarding, always default to EN
+    if (onOnboarding) {
+      setCurrentLanguageState("en");
+      localStorage.setItem("soulo-language", "en");
+      if (process.env.NODE_ENV !== "production") {
+        console.log("[TranslationContext] Onboarding - language forced to EN on onboarding route.");
+      }
+    }
+  }, [onOnboarding, device.deviceType]);
+
   // The only way to change the language via selection, only possible in the app
   const handleLanguageChange = useCallback(async (language: string) => {
+    if (onOnboarding) {
+      setCurrentLanguageState(language);
+      localStorage.setItem("soulo-language", language);
+      if (process.env.NODE_ENV !== "production") {
+        console.log("[TranslationContext] Onboarding - language set via selector:", language);
+      }
+      return;
+    }
     if (onMarketing) {
       setCurrentLanguageState('en');
       localStorage.setItem('soulo-language', 'en');
@@ -128,7 +179,7 @@ export const TranslationProvider: React.FC<TranslationProviderProps> = ({ childr
     });
     window.dispatchEvent(event);
     setIsSoulNetTranslating(language !== 'en');
-  }, [onMarketing]);
+  }, [onMarketing, onOnboarding]);
 
   // Shorter prefetch for SoulNet
   const prefetchSoulNetTranslations = useCallback(async (userId: string, timeRange: string): Promise<void> => {
@@ -143,6 +194,9 @@ export const TranslationProvider: React.FC<TranslationProviderProps> = ({ childr
   // Critically, translation requests should return immediately if on marketing or English
   const translate = useCallback(async (text: string, sourceLanguage: string = 'en', entryId?: number): Promise<string | null> => {
     if (!text || typeof text !== 'string') return text || '';
+    if (process.env.NODE_ENV !== "production") {
+      console.log("[TranslationContext:translate] language", currentLanguage, "device", device.deviceType, "onOnboarding", onOnboarding, "onMarketing", onMarketing);
+    }
     // On marketing pages, always return English text -- DO NOT TRANSLATE.
     if (onMarketing || currentLanguage === 'en') {
       return text;
@@ -177,7 +231,7 @@ export const TranslationProvider: React.FC<TranslationProviderProps> = ({ childr
     } finally {
       setIsTranslating(false);
     }
-  }, [currentLanguage, translationCache, onMarketing]);
+  }, [currentLanguage, translationCache, onMarketing, onOnboarding, device.deviceType]);
 
   const getCachedTranslation = useCallback((text: string): string | null => {
     if (onMarketing || currentLanguage === 'en') return null;
@@ -236,7 +290,9 @@ export const TranslationProvider: React.FC<TranslationProviderProps> = ({ childr
     translationProgress: 100,
     prefetchTranslationsForRoute,
     prefetchSoulNetTranslations,
-    isSoulNetTranslating
+    isSoulNetTranslating,
+    // @ts-expect-error - Nonstandard, used for debugging/device-aware consumers
+    deviceType: device.deviceType,
   };
 
   return (
@@ -253,4 +309,3 @@ export const useTranslation = (): TranslationContextType => {
   }
   return context;
 };
-
