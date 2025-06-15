@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
@@ -5,8 +6,10 @@ import EmotionChart from '@/components/EmotionChart';
 import MoodCalendar from '@/components/insights/MoodCalendar';
 import SoulNet from '@/components/insights/SoulNet';
 import { Button } from '@/components/ui/button';
+import { RefreshCw } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { useInsightsData, TimeRange } from '@/hooks/use-insights-data';
+import { useInsightsCacheData } from '@/hooks/use-insights-cache-data';
+import { TimeRange } from '@/hooks/use-insights-data';
 import { useAuth } from '@/contexts/AuthContext';
 import { useIsMobile } from '@/hooks/use-mobile';
 import ErrorBoundary from '@/components/insights/ErrorBoundary';
@@ -28,8 +31,14 @@ function InsightsContent() {
   const scrollPositionRef = useRef<number>(0);
   const isMobile = useIsMobile();
 
-  // FETCH INSIGHTS DATA: Now includes emotionChartDate for emotion chart data
-  const { insightsData, loading } = useInsightsData(user?.id, timeRange, emotionChartDate);
+  // FETCH INSIGHTS DATA: Now uses cached data for instant navigation
+  const { 
+    insightsData, 
+    loading, 
+    refreshing, 
+    refreshCache, 
+    isCacheHit 
+  } = useInsightsCacheData(user?.id, timeRange, emotionChartDate);
   
   const timeRanges = [
     { value: 'today', label: 'Day' },
@@ -128,6 +137,21 @@ function InsightsContent() {
           </ToggleGroupItem>
         ))}
       </ToggleGroup>
+      
+      {/* Cache refresh button */}
+      <Button
+        variant="ghost"
+        size="sm"
+        onClick={refreshCache}
+        disabled={refreshing}
+        className={cn(
+          "ml-2 h-8 w-8 p-0",
+          refreshing && "animate-spin"
+        )}
+        title="Refresh data"
+      >
+        <RefreshCw className="h-4 w-4" />
+      </Button>
     </div>
   );
 
@@ -158,6 +182,19 @@ function InsightsContent() {
   return (
     <div className="min-h-screen pb-20 insights-container">
       <TranslationProgressIndicator />
+      
+      {/* Cache status indicator */}
+      {isCacheHit && !loading && (
+        <div className="fixed top-20 right-4 z-40 bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200 px-3 py-1 rounded-full text-xs font-medium opacity-80">
+          <EnhancedTranslatableText 
+            text="Instant view" 
+            forceTranslate={true}
+            enableFontScaling={true}
+            scalingContext="compact"
+            usePageTranslation={true}
+          />
+        </div>
+      )}
       
       {isSticky && (
         <div className="fixed top-0 left-0 right-0 z-50 py-3 px-4 bg-background border-b shadow-sm flex justify-center insights-sticky-header">

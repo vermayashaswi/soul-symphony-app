@@ -64,14 +64,15 @@ export function EmotionChart({
     { id: 'bubble', label: 'Life Areas' },
   ];
   
-  // Navigation handlers with loading state
+  // Navigation handlers with reduced loading state (since data is cached)
   const goToPrevious = () => {
     setIsNavigating(true);
     const newDate = getPreviousDate(timeframe, activeDate);
     if (onTimeRangeNavigate) onTimeRangeNavigate(newDate);
     else setInternalDate(newDate);
     
-    setTimeout(() => setIsNavigating(false), 300);
+    // Shorter timeout since navigation should be instant with cached data
+    setTimeout(() => setIsNavigating(false), 100);
   };
   
   const goToNext = () => {
@@ -80,7 +81,8 @@ export function EmotionChart({
     if (onTimeRangeNavigate) onTimeRangeNavigate(newDate);
     else setInternalDate(newDate);
     
-    setTimeout(() => setIsNavigating(false), 300);
+    // Shorter timeout since navigation should be instant with cached data
+    setTimeout(() => setIsNavigating(false), 100);
   };
   
   // Reset period on timeframe change (keep currentDate prop precedence)
@@ -270,7 +272,7 @@ export function EmotionChart({
               key={type.id}
               onClick={() => setChartType(type.id as ChartType)}
               className={cn(
-                "px-3 py-1 rounded-full text-sm",
+                "px-3 py-1 rounded-full text-sm transition-all",
                 chartType === type.id
                   ? "bg-primary text-white"
                   : "bg-secondary text-muted-foreground hover:text-foreground"
@@ -287,9 +289,10 @@ export function EmotionChart({
         </div>
       </div>
       <div className="bg-card p-4 rounded-xl shadow-sm relative">
+        {/* Reduced loading overlay since navigation should be instant */}
         {isNavigating && (
-          <div className="absolute inset-0 bg-background/50 backdrop-blur-sm flex items-center justify-center z-10 rounded-xl">
-            <Loader2 className="h-8 w-8 animate-spin text-primary" />
+          <div className="absolute inset-0 bg-background/30 backdrop-blur-sm flex items-center justify-center z-10 rounded-xl">
+            <Loader2 className="h-6 w-6 animate-spin text-primary" />
           </div>
         )}
         {chartType === 'line' && renderLineChart()}
