@@ -1,19 +1,18 @@
 
 import React, { ReactNode } from 'react';
 import { Navigate } from 'react-router-dom';
-import type { User } from '@supabase/supabase-js';
+import { useAuth } from '@/contexts/AuthContext';
+import { useOnboarding } from '@/hooks/use-onboarding';
 
-type OnboardingCheckProps = {
-  onboardingComplete: boolean;
-  onboardingLoading: boolean;
-  user: User | null;
+interface OnboardingCheckProps {
   children: ReactNode;
-};
+}
 
-function OnboardingCheck(props: OnboardingCheckProps) {
-  const { onboardingComplete, onboardingLoading, user, children } = props;
+const OnboardingCheck: React.FC<OnboardingCheckProps> = ({ children }) => {
+  const { user, isLoading: authLoading } = useAuth();
+  const { onboardingComplete, loading: onboardingLoading } = useOnboarding();
 
-  if (onboardingLoading) {
+  if (authLoading || onboardingLoading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
@@ -30,6 +29,6 @@ function OnboardingCheck(props: OnboardingCheckProps) {
   }
 
   return <>{children}</>;
-}
+};
 
 export default OnboardingCheck;

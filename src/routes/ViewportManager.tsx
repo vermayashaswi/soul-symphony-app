@@ -1,14 +1,17 @@
 
-import React from 'react';
-import { Outlet } from 'react-router-dom';
+import React, { ReactNode } from 'react';
 import { useIsMobile } from '@/hooks/use-mobile';
 
-const ViewportManager: React.FC = () => {
+interface ViewportManagerProps {
+  children: ReactNode;
+}
+
+const ViewportManager: React.FC<ViewportManagerProps> = ({ children }) => {
   const isMobile = useIsMobile();
 
   return (
     <div className={`app-container ${isMobile ? 'mobile-view' : 'desktop-view'} min-h-screen`}>
-      <Outlet />
+      {children}
     </div>
   );
 };
