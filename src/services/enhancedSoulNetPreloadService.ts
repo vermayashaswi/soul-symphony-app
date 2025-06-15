@@ -46,7 +46,7 @@ interface AppLevelTranslationService {
 export class EnhancedSoulNetPreloadService {
   private static readonly CACHE_KEY = 'enhanced-soulnet-data';
   private static readonly CACHE_DURATION = 15 * 60 * 1000; // 15 minutes
-  private static readonly CACHE_VERSION = 9; // INCREMENTED: For correct week calculation fix
+  private static readonly CACHE_VERSION = 10; // INCREMENTED: For comprehensive cache fix
   private static cache = new Map<string, CachedEnhancedData>();
   private static translationCoordinator = new Map<string, Promise<Map<string, string>>>();
   
@@ -64,46 +64,71 @@ export class EnhancedSoulNetPreloadService {
     this.appTranslationService = service;
   }
 
-  // FIXED: Enhanced cache clearing with comprehensive logging
-  static clearTimeRangeCache(userId: string, currentTimeRange: string, currentLanguage: string): void {
-    const currentCacheKey = this.generateCacheKey(userId, currentTimeRange, currentLanguage);
-    console.log(`[EnhancedSoulNetPreloadService] CACHE CLEAR START: Current key: ${currentCacheKey}`);
+  // ENHANCED: Comprehensive cache clearing with better logic
+  static clearTimeRangeCache(userId: string, keepTimeRange: string, keepLanguage: string): void {
+    const keepCacheKey = this.generateCacheKey(userId, keepTimeRange, keepLanguage);
+    console.log(`[EnhancedSoulNetPreloadService] COMPREHENSIVE CACHE CLEAR: userId=${userId}, keeping=${keepCacheKey}`);
     
-    let clearedCount = 0;
-    let storageKeysCleared = 0;
+    let clearedMemoryCount = 0;
+    let clearedStorageCount = 0;
     
-    // Clear in-memory cache
-    const userPrefix = `${userId}-`;
-    for (const key of Array.from(this.cache.keys())) {
-      if (key.startsWith(userPrefix) && key !== currentCacheKey) {
-        console.log(`[EnhancedSoulNetPreloadService] CLEARING IN-MEMORY: ${key}`);
-        this.cache.delete(key);
-        this.translationStates.delete(key);
-        this.translationCoordinator.delete(key);
-        clearedCount++;
-      }
-    }
+    // Clear in-memory cache - keep only the current combination
+    const memoryKeysToDelete = Array.from(this.cache.keys()).filter(key => {
+      const shouldKeep = key === keepCacheKey;
+      const isUserKey = key.startsWith(`${userId}-`);
+      return isUserKey && !shouldKeep;
+    });
+    
+    memoryKeysToDelete.forEach(key => {
+      console.log(`[EnhancedSoulNetPreloadService] CLEARING MEMORY: ${key}`);
+      this.cache.delete(key);
+      this.translationStates.delete(key);
+      this.translationCoordinator.delete(key);
+      clearedMemoryCount++;
+    });
 
-    // Clear localStorage with enhanced logging
+    // Clear localStorage - keep only the current combination
     try {
-      const storagePrefix = `${this.CACHE_KEY}-${userId}-`;
-      const allStorageKeys = Object.keys(localStorage);
+      const userStoragePrefix = `${this.CACHE_KEY}-${userId}-`;
+      const keepStorageKey = `${this.CACHE_KEY}-${keepCacheKey}`;
       
-      for (const storageKey of allStorageKeys) {
-        if (storageKey.startsWith(storagePrefix)) {
-          const extractedCacheKey = storageKey.replace(`${this.CACHE_KEY}-`, '');
-          if (extractedCacheKey !== currentCacheKey) {
-            console.log(`[EnhancedSoulNetPreloadService] CLEARING STORAGE: ${storageKey} (extracted: ${extractedCacheKey})`);
-            localStorage.removeItem(storageKey);
-            storageKeysCleared++;
-          }
-        }
-      }
+      const allStorageKeys = Object.keys(localStorage);
+      const storageKeysToDelete = allStorageKeys.filter(storageKey => {
+        const isUserKey = storageKey.startsWith(userStoragePrefix);
+        const shouldKeep = storageKey === keepStorageKey;
+        return isUserKey && !shouldKeep;
+      });
+      
+      storageKeysToDelete.forEach(storageKey => {
+        console.log(`[EnhancedSoulNetPreloadService] CLEARING STORAGE: ${storageKey}`);
+        localStorage.removeItem(storageKey);
+        clearedStorageCount++;
+      });
     } catch (error) {
       console.error('[EnhancedSoulNetPreloadService] STORAGE CLEAR ERROR:', error);
     }
     
-    console.log(`[EnhancedSoulNetPreloadService] CACHE CLEAR COMPLETE: In-memory: ${clearedCount}, Storage: ${storageKeysCleared}`);
+    console.log(`[EnhancedSoulNetPreloadService] CACHE CLEAR COMPLETE: Memory cleared: ${clearedMemoryCount}, Storage cleared: ${clearedStorageCount}`);
+  }
+
+  // ENHANCED: Manual cache invalidation for specific scenarios
+  static forceInvalidateCache(userId: string, timeRange: string, language: string): void {
+    const cacheKey = this.generateCacheKey(userId, timeRange, language);
+    console.log(`[EnhancedSoulNetPreloadService] FORCE INVALIDATING: ${cacheKey}`);
+    
+    // Remove from memory
+    this.cache.delete(cacheKey);
+    this.translationStates.delete(cacheKey);
+    this.translationCoordinator.delete(cacheKey);
+    
+    // Remove from storage
+    try {
+      const storageKey = `${this.CACHE_KEY}-${cacheKey}`;
+      localStorage.removeItem(storageKey);
+      console.log(`[EnhancedSoulNetPreloadService] FORCE INVALIDATED: ${cacheKey}`);
+    } catch (error) {
+      console.error('[EnhancedSoulNetPreloadService] FORCE INVALIDATION ERROR:', error);
+    }
   }
 
   static getTranslationState(cacheKey: string) {
@@ -124,19 +149,21 @@ export class EnhancedSoulNetPreloadService {
     
     const cacheKey = this.generateCacheKey(userId, timeRange, language);
     
-    // DEFENSIVE: Check cache one more time
+    // STEP 1: Check cache with strict validation
     const cached = this.getInstantData(cacheKey);
     if (cached && cached.data.translationComplete) {
-      console.log(`[EnhancedSoulNetPreloadService] PRELOAD USING CACHE: ${cacheKey}`);
+      console.log(`[EnhancedSoulNetPreloadService] USING VALID CACHE: ${cacheKey}`);
       return cached.data;
+    } else if (cached) {
+      console.log(`[EnhancedSoulNetPreloadService] CACHE INCOMPLETE: ${cacheKey}, translation: ${cached.data.translationComplete}`);
     }
 
     try {
-      // FIXED: Enhanced date range fetching with corrected week calculation
+      // STEP 2: Calculate correct date range
       const startDate = this.getStartDate(timeRange);
-      console.log(`[EnhancedSoulNetPreloadService] FETCHING DATA: startDate=${startDate.toISOString()}, timeRange=${timeRange}`);
-      console.log(`[EnhancedSoulNetPreloadService] DATE CALCULATION DEBUG: Current time=${new Date().toISOString()}, Calculated start=${startDate.toISOString()}, Range=${timeRange}`);
+      console.log(`[EnhancedSoulNetPreloadService] DATE CALCULATION: timeRange=${timeRange}, startDate=${startDate.toISOString()}`);
       
+      // STEP 3: Fetch fresh data from database
       const { data: entries, error } = await supabase
         .from('Journal Entries')
         .select('id, themeemotion, "refined text", "transcription text"')
@@ -149,10 +176,11 @@ export class EnhancedSoulNetPreloadService {
         return null;
       }
 
-      console.log(`[EnhancedSoulNetPreloadService] DATABASE RESULT: ${entries?.length || 0} entries found for timeRange=${timeRange}`);
+      console.log(`[EnhancedSoulNetPreloadService] FRESH DATA FETCHED: ${entries?.length || 0} entries for ${timeRange}`);
 
+      // STEP 4: Handle empty results
       if (!entries || entries.length === 0) {
-        console.log(`[EnhancedSoulNetPreloadService] NO ENTRIES FOUND for timeRange=${timeRange} - returning empty data`);
+        console.log(`[EnhancedSoulNetPreloadService] NO ENTRIES: Creating empty data for ${timeRange}`);
         const emptyData: EnhancedSoulNetData = {
           nodes: [], 
           links: [], 
@@ -163,7 +191,6 @@ export class EnhancedSoulNetPreloadService {
           translationProgress: 100
         };
         
-        // FIXED: Cache empty data to prevent repeated fetching
         this.setCachedData(cacheKey, {
           data: emptyData,
           timestamp: Date.now(),
@@ -176,11 +203,11 @@ export class EnhancedSoulNetPreloadService {
         return emptyData;
       }
 
-      // Process the data
+      // STEP 5: Process the data
       const graphData = this.processEntities(entries);
-      console.log(`[EnhancedSoulNetPreloadService] PROCESSED DATA: ${graphData.nodes.length} nodes, ${graphData.links.length} links`);
+      console.log(`[EnhancedSoulNetPreloadService] DATA PROCESSED: ${graphData.nodes.length} nodes, ${graphData.links.length} links`);
       
-      // Handle translations
+      // STEP 6: Handle translations
       const uniqueNodes = [...new Set(graphData.nodes.map(node => node.id))];
       this.translationStates.set(cacheKey, {
         isTranslating: language !== 'en' && uniqueNodes.length > 0,
@@ -216,7 +243,7 @@ export class EnhancedSoulNetPreloadService {
         translationProgress
       };
 
-      // Cache the result
+      // STEP 7: Cache complete data only
       if (isTranslationComplete) {
         this.setCachedData(cacheKey, {
           data: enhancedData,
@@ -226,7 +253,7 @@ export class EnhancedSoulNetPreloadService {
           language,
           version: this.CACHE_VERSION
         });
-        console.log(`[EnhancedSoulNetPreloadService] CACHED COMPLETE DATA: ${cacheKey}`);
+        console.log(`[EnhancedSoulNetPreloadService] DATA CACHED: ${cacheKey}`);
       }
 
       return enhancedData;
@@ -237,20 +264,20 @@ export class EnhancedSoulNetPreloadService {
     }
   }
 
-  // ENHANCED: Cache retrieval with version checking
+  // ENHANCED: Stricter cache validation
   static getInstantData(cacheKey: string): CachedEnhancedData | null {
     if (!cacheKey) {
-      console.log('[EnhancedSoulNetPreloadService] GET CACHE: Empty cache key');
+      console.log('[EnhancedSoulNetPreloadService] INVALID CACHE KEY');
       return null;
     }
     
-    // Check in-memory cache first
+    // Check memory cache first
     const memoryCache = this.cache.get(cacheKey);
     if (memoryCache && this.isCacheValid(memoryCache)) {
-      console.log(`[EnhancedSoulNetPreloadService] GET CACHE HIT (MEMORY): ${cacheKey}`);
+      console.log(`[EnhancedSoulNetPreloadService] MEMORY CACHE HIT: ${cacheKey}`);
       return memoryCache;
     } else if (memoryCache) {
-      console.log(`[EnhancedSoulNetPreloadService] GET CACHE INVALID (MEMORY): ${cacheKey}, removing`);
+      console.log(`[EnhancedSoulNetPreloadService] MEMORY CACHE INVALID: ${cacheKey}`);
       this.cache.delete(cacheKey);
     }
     
@@ -261,7 +288,7 @@ export class EnhancedSoulNetPreloadService {
       if (storedData) {
         const parsed = JSON.parse(storedData);
         if (this.isCacheValid(parsed)) {
-          // Restore Maps
+          // Restore Maps from stored objects
           parsed.data.translations = new Map(Object.entries(parsed.data.translations || {}));
           parsed.data.connectionPercentages = new Map(Object.entries(parsed.data.connectionPercentages || {}));
           parsed.data.nodeConnectionData = new Map(
@@ -271,18 +298,18 @@ export class EnhancedSoulNetPreloadService {
           parsed.data.translationProgress = parsed.data.translationProgress ?? 100;
           
           this.cache.set(cacheKey, parsed);
-          console.log(`[EnhancedSoulNetPreloadService] GET CACHE HIT (STORAGE): ${cacheKey}`);
+          console.log(`[EnhancedSoulNetPreloadService] STORAGE CACHE HIT: ${cacheKey}`);
           return parsed;
         } else {
-          console.log(`[EnhancedSoulNetPreloadService] GET CACHE INVALID (STORAGE): ${cacheKey}, removing`);
+          console.log(`[EnhancedSoulNetPreloadService] STORAGE CACHE INVALID: ${cacheKey}`);
           localStorage.removeItem(storageKey);
         }
       }
     } catch (error) {
-      console.error('[EnhancedSoulNetPreloadService] GET CACHE ERROR:', error);
+      console.error('[EnhancedSoulNetPreloadService] CACHE RETRIEVAL ERROR:', error);
     }
     
-    console.log(`[EnhancedSoulNetPreloadService] GET CACHE MISS: ${cacheKey}`);
+    console.log(`[EnhancedSoulNetPreloadService] CACHE MISS: ${cacheKey}`);
     return null;
   }
 
@@ -440,24 +467,24 @@ export class EnhancedSoulNetPreloadService {
     });
   }
 
-  // SYNCHRONIZED CACHE KEY GENERATION
-  private static generateCacheKey(userId: string, timeRange: string, language: string): string {
-    return `${userId}-${timeRange}-${language}-v${this.CACHE_VERSION}`;
+  // ENHANCED: Stricter cache validation
+  private static isCacheValid(cached: CachedEnhancedData): boolean {
+    const now = Date.now();
+    const age = now - cached.timestamp;
+    const isWithinDuration = age < this.CACHE_DURATION;
+    const isCorrectVersion = cached.version === this.CACHE_VERSION;
+    const hasValidData = cached.data && cached.data.nodes && cached.data.links;
+    
+    console.log(`[EnhancedSoulNetPreloadService] CACHE VALIDATION: age=${age}ms, version=${cached.version}/${this.CACHE_VERSION}, hasData=${!!hasValidData}, withinDuration=${isWithinDuration}`);
+    
+    return isWithinDuration && isCorrectVersion && hasValidData;
   }
 
-  // Defensive cache version and duration checking at time of retrieval
-  private static isCacheValid(cached: CachedEnhancedData): boolean {
-    const isWithinDuration = (Date.now() - cached.timestamp) < this.CACHE_DURATION;
-    const isCorrectVersion = cached.version === this.CACHE_VERSION;
-    
-    if (!isWithinDuration) {
-      console.log(`[EnhancedSoulNetPreloadService] CACHE INVALID (expired): age=${Date.now() - cached.timestamp}ms`);
-    }
-    if (!isCorrectVersion) {
-      console.log(`[EnhancedSoulNetPreloadService] CACHE INVALID (version): ${cached.version} !== ${this.CACHE_VERSION}`);
-    }
-    
-    return isWithinDuration && isCorrectVersion;
+  // ENHANCED: Better cache key generation
+  private static generateCacheKey(userId: string, timeRange: string, language: string): string {
+    const key = `${userId}-${timeRange}-${language}-v${this.CACHE_VERSION}`;
+    console.log(`[EnhancedSoulNetPreloadService] CACHE KEY GENERATED: ${key}`);
+    return key;
   }
 
   private static setCachedData(cacheKey: string, data: CachedEnhancedData): void {
@@ -482,71 +509,44 @@ export class EnhancedSoulNetPreloadService {
     }
   }
 
-  // ENHANCED CACHE CLEARING with proper invalidation
-  static clearInstantCache(userId?: string): void {
-    if (userId) {
-      const keysToDelete = Array.from(this.cache.keys()).filter(key => key.startsWith(userId));
-      keysToDelete.forEach(key => {
-        this.cache.delete(key);
-        localStorage.removeItem(`${this.CACHE_KEY}-${key}`);
-        this.translationStates.delete(key);
-      });
-      
-      const coordinatorKeysToDelete = Array.from(this.translationCoordinator.keys()).filter(key => key.startsWith(userId));
-      coordinatorKeysToDelete.forEach(key => {
-        this.translationCoordinator.delete(key);
-      });
-    } else {
-      this.cache.clear();
-      this.translationCoordinator.clear();
-      this.translationStates.clear();
-      Object.keys(localStorage).forEach(key => {
-        if (key.startsWith(this.CACHE_KEY)) {
-          localStorage.removeItem(key);
-        }
-      });
-    }
-  }
-
-  // FIXED: Corrected date calculation logic for proper week calculation
+  // FIXED: Corrected week calculation
   private static getStartDate(timeRange: string): Date {
     const now = new Date();
-    console.log(`[EnhancedSoulNetPreloadService] DATE CALC: Current time: ${now.toISOString()}, Time range: ${timeRange}`);
+    console.log(`[EnhancedSoulNetPreloadService] DATE CALCULATION START: ${timeRange} at ${now.toISOString()}`);
     
     switch (timeRange) {
       case 'today':
         const todayStart = new Date(now);
         todayStart.setHours(0, 0, 0, 0);
-        console.log(`[EnhancedSoulNetPreloadService] DATE CALC (today): Start of today: ${todayStart.toISOString()}`);
+        console.log(`[EnhancedSoulNetPreloadService] TODAY START: ${todayStart.toISOString()}`);
         return todayStart;
         
       case 'week':
-        // FIXED: Calculate start of current week (Monday 00:00:00)
+        // Calculate start of current week (Monday 00:00:00)
         const currentWeekStart = new Date(now);
         const dayOfWeek = currentWeekStart.getDay(); // 0 = Sunday, 1 = Monday, etc.
         const daysToSubtract = dayOfWeek === 0 ? 6 : dayOfWeek - 1; // If Sunday, go back 6 days to Monday
         currentWeekStart.setDate(currentWeekStart.getDate() - daysToSubtract);
         currentWeekStart.setHours(0, 0, 0, 0);
-        console.log(`[EnhancedSoulNetPreloadService] DATE CALC (week): Day of week: ${dayOfWeek}, Days to subtract: ${daysToSubtract}, Week start: ${currentWeekStart.toISOString()}`);
+        console.log(`[EnhancedSoulNetPreloadService] WEEK START: dayOfWeek=${dayOfWeek}, subtract=${daysToSubtract}, result=${currentWeekStart.toISOString()}`);
         return currentWeekStart;
         
       case 'month':
         const monthStart = new Date(now);
         monthStart.setMonth(monthStart.getMonth() - 1);
-        console.log(`[EnhancedSoulNetPreloadService] DATE CALC (month): One month ago: ${monthStart.toISOString()}`);
+        console.log(`[EnhancedSoulNetPreloadService] MONTH START: ${monthStart.toISOString()}`);
         return monthStart;
         
       case 'year':
         const yearStart = new Date(now);
         yearStart.setFullYear(yearStart.getFullYear() - 1);
-        console.log(`[EnhancedSoulNetPreloadService] DATE CALC (year): One year ago: ${yearStart.toISOString()}`);
+        console.log(`[EnhancedSoulNetPreloadService] YEAR START: ${yearStart.toISOString()}`);
         return yearStart;
         
       default:
-        // Default to last 7 days for unknown time ranges
         const defaultStart = new Date(now);
         defaultStart.setDate(defaultStart.getDate() - 7);
-        console.log(`[EnhancedSoulNetPreloadService] DATE CALC (default): Last 7 days: ${defaultStart.toISOString()}`);
+        console.log(`[EnhancedSoulNetPreloadService] DEFAULT START: ${defaultStart.toISOString()}`);
         return defaultStart;
     }
   }
@@ -644,5 +644,30 @@ export class EnhancedSoulNetPreloadService {
     });
 
     return { nodes, links };
+  }
+
+  static clearInstantCache(userId?: string): void {
+    if (userId) {
+      const keysToDelete = Array.from(this.cache.keys()).filter(key => key.startsWith(userId));
+      keysToDelete.forEach(key => {
+        this.cache.delete(key);
+        localStorage.removeItem(`${this.CACHE_KEY}-${key}`);
+        this.translationStates.delete(key);
+      });
+      
+      const coordinatorKeysToDelete = Array.from(this.translationCoordinator.keys()).filter(key => key.startsWith(userId));
+      coordinatorKeysToDelete.forEach(key => {
+        this.translationCoordinator.delete(key);
+      });
+    } else {
+      this.cache.clear();
+      this.translationCoordinator.clear();
+      this.translationStates.clear();
+      Object.keys(localStorage).forEach(key => {
+        if (key.startsWith(this.CACHE_KEY)) {
+          localStorage.removeItem(key);
+        }
+      });
+    }
   }
 }
