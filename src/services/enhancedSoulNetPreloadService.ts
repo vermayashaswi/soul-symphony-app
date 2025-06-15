@@ -46,7 +46,7 @@ interface AppLevelTranslationService {
 export class EnhancedSoulNetPreloadService {
   private static readonly CACHE_KEY = 'enhanced-soulnet-data';
   private static readonly CACHE_DURATION = 15 * 60 * 1000; // 15 minutes
-  private static readonly CACHE_VERSION = 8; // INCREMENTED: For stale data fix
+  private static readonly CACHE_VERSION = 9; // INCREMENTED: For correct week calculation fix
   private static cache = new Map<string, CachedEnhancedData>();
   private static translationCoordinator = new Map<string, Promise<Map<string, string>>>();
   
@@ -132,9 +132,10 @@ export class EnhancedSoulNetPreloadService {
     }
 
     try {
-      // FIXED: Enhanced date range fetching with logging
+      // FIXED: Enhanced date range fetching with corrected week calculation
       const startDate = this.getStartDate(timeRange);
       console.log(`[EnhancedSoulNetPreloadService] FETCHING DATA: startDate=${startDate.toISOString()}, timeRange=${timeRange}`);
+      console.log(`[EnhancedSoulNetPreloadService] DATE CALCULATION DEBUG: Current time=${new Date().toISOString()}, Calculated start=${startDate.toISOString()}, Range=${timeRange}`);
       
       const { data: entries, error } = await supabase
         .from('Journal Entries')
@@ -507,26 +508,45 @@ export class EnhancedSoulNetPreloadService {
     }
   }
 
+  // FIXED: Corrected date calculation logic for proper week calculation
   private static getStartDate(timeRange: string): Date {
     const now = new Date();
+    console.log(`[EnhancedSoulNetPreloadService] DATE CALC: Current time: ${now.toISOString()}, Time range: ${timeRange}`);
+    
     switch (timeRange) {
       case 'today':
-        return new Date(now.setHours(0, 0, 0, 0));
+        const todayStart = new Date(now);
+        todayStart.setHours(0, 0, 0, 0);
+        console.log(`[EnhancedSoulNetPreloadService] DATE CALC (today): Start of today: ${todayStart.toISOString()}`);
+        return todayStart;
+        
       case 'week':
-        const weekStart = new Date(now);
-        weekStart.setDate(weekStart.getDate() - 7);
-        return weekStart;
+        // FIXED: Calculate start of current week (Monday 00:00:00)
+        const currentWeekStart = new Date(now);
+        const dayOfWeek = currentWeekStart.getDay(); // 0 = Sunday, 1 = Monday, etc.
+        const daysToSubtract = dayOfWeek === 0 ? 6 : dayOfWeek - 1; // If Sunday, go back 6 days to Monday
+        currentWeekStart.setDate(currentWeekStart.getDate() - daysToSubtract);
+        currentWeekStart.setHours(0, 0, 0, 0);
+        console.log(`[EnhancedSoulNetPreloadService] DATE CALC (week): Day of week: ${dayOfWeek}, Days to subtract: ${daysToSubtract}, Week start: ${currentWeekStart.toISOString()}`);
+        return currentWeekStart;
+        
       case 'month':
         const monthStart = new Date(now);
         monthStart.setMonth(monthStart.getMonth() - 1);
+        console.log(`[EnhancedSoulNetPreloadService] DATE CALC (month): One month ago: ${monthStart.toISOString()}`);
         return monthStart;
+        
       case 'year':
         const yearStart = new Date(now);
         yearStart.setFullYear(yearStart.getFullYear() - 1);
+        console.log(`[EnhancedSoulNetPreloadService] DATE CALC (year): One year ago: ${yearStart.toISOString()}`);
         return yearStart;
+        
       default:
+        // Default to last 7 days for unknown time ranges
         const defaultStart = new Date(now);
         defaultStart.setDate(defaultStart.getDate() - 7);
+        console.log(`[EnhancedSoulNetPreloadService] DATE CALC (default): Last 7 days: ${defaultStart.toISOString()}`);
         return defaultStart;
     }
   }
