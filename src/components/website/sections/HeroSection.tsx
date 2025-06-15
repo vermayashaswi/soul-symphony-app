@@ -65,7 +65,13 @@ const HeroSection: React.FC<HeroSectionProps> = ({ openAppStore, openPlayStore }
               </Button>
             </div>
             
-            <div className="flex items-center justify-center lg:justify-start gap-4 md:gap-6 text-xs md:text-sm text-gray-500">
+            <div
+              className={
+                // Halve the bottom margin below info lines on mobile and desktop separately
+                "flex items-center justify-center lg:justify-start gap-4 md:gap-6 text-xs md:text-sm text-gray-500 " +
+                "mb-3 md:mb-5" // NEW: reduce mb-4/md:mb-6 to mb-3/md:mb-5 for tighter vertical space before phone
+              }
+            >
               <div className="flex items-center gap-1">
                 <Shield className="h-3 w-3 md:h-4 md:w-4 text-primary" />
                 <TranslatableText text="Privacy-Focused" />
@@ -81,7 +87,11 @@ const HeroSection: React.FC<HeroSectionProps> = ({ openAppStore, openPlayStore }
             initial={{ opacity: 0, scale: 0.9 }}
             animate={{ opacity: 1, scale: 1 }}
             transition={{ duration: 1, delay: 0.3 }}
-            className="w-full lg:w-1/2 flex items-center justify-center"
+            // Reduce top margin on desktop for phone animation
+            className={
+              "w-full lg:w-1/2 flex items-center justify-center " +
+              "mt-2 lg:mt-0" // Add small margin-top for mobile, none for desktop to reduce vertical gap
+            }
           >
             <div className="w-full max-w-[280px] md:max-w-xs lg:max-w-sm">
               <AspectRatio ratio={9/16} className="w-full">
@@ -96,3 +106,4 @@ const HeroSection: React.FC<HeroSectionProps> = ({ openAppStore, openPlayStore }
 };
 
 export default HeroSection;
+
