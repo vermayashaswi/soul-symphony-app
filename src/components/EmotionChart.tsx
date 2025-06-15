@@ -12,7 +12,7 @@ import {
   ReferenceLine,
   Text
 } from 'recharts';
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { ChevronLeft, ChevronRight, Loader2 } from "lucide-react";
 import { cn } from '@/lib/utils';
 import { AggregatedEmotionData, TimeRange } from '@/hooks/use-insights-data';
 import EmotionBubbles from './EmotionBubbles';
@@ -49,73 +49,6 @@ interface EmotionChartProps {
 
 // ... keep existing code (EMOTION_COLORS, getEmotionColor function)
 
-const EMOTION_COLORS: Record<string, string> = {
-  joy: '#FF6B6B',           // Coral Red
-  happiness: '#4ECDC4',     // Teal
-  gratitude: '#45B7D1',     // Sky Blue
-  calm: '#96CEB4',          // Mint Green
-  anxiety: '#FFEAA7',       // Light Yellow
-  sadness: '#DDA0DD',       // Plum
-  anger: '#FF7675',         // Light Red
-  fear: '#FD79A8',          // Pink
-  excitement: '#FDCB6E',    // Orange
-  love: '#E84393',          // Magenta
-  stress: '#A29BFE',        // Lavender
-  surprise: '#F39C12',      // Orange
-  confusion: '#6C5CE7',     // Purple
-  disappointment: '#74B9FF', // Light Blue
-  pride: '#00B894',         // Emerald
-  shame: '#E17055',         // Salmon
-  guilt: '#D63031',         // Dark Red
-  hope: '#00CEC9',          // Turquoise
-  boredom: '#636E72',       // Gray
-  disgust: '#A4B0BE',       // Light Gray
-  contentment: '#55A3FF',   // Bright Blue
-  trust: '#81ECEC',         // Cyan
-  anticipation: '#FAB1A0',  // Peach
-  pensiveness: '#00B894',   // Green
-  serenity: '#74B9FF',      // Periwinkle
-  annoyance: '#FDCB6E',     // Gold
-  vigilance: '#E84393',     // Hot Pink
-  interest: '#6C5CE7',      // Violet
-  apprehension: '#FD79A8',  // Rose
-  distraction: '#A29BFE',   // Lilac
-  admiration: '#FDCB6E'     // Amber
-};
-
-const getEmotionColor = (emotion: string, index: number): string => {
-  const normalized = emotion.toLowerCase();
-  if (EMOTION_COLORS[normalized]) {
-    return EMOTION_COLORS[normalized];
-  }
-  
-  // More diverse fallback colors - completely different hues
-  const fallbackColors = [
-    '#FF6B6B', // Coral Red
-    '#4ECDC4', // Teal
-    '#45B7D1', // Sky Blue
-    '#96CEB4', // Mint Green
-    '#FFEAA7', // Light Yellow
-    '#DDA0DD', // Plum
-    '#FF7675', // Light Red
-    '#FD79A8', // Pink
-    '#FDCB6E', // Orange
-    '#E84393', // Magenta
-    '#A29BFE', // Lavender
-    '#00B894', // Emerald
-    '#6C5CE7', // Purple
-    '#74B9FF', // Light Blue
-    '#E17055', // Salmon
-    '#00CEC9', // Turquoise
-    '#81ECEC', // Cyan
-    '#FAB1A0', // Peach
-    '#636E72', // Gray
-    '#55A3FF'  // Bright Blue
-  ];
-  
-  return fallbackColors[index % fallbackColors.length];
-};
-
 // Persist chartType via local storage so that navigation doesn't reset chart type for user UX continuity
 function usePersistedState<T>(key: string, defaultValue: T): [T, (val: T) => void] {
   const [state, setState] = useState<T>(() => {
@@ -149,6 +82,8 @@ export function EmotionChart({
     emotion: string;
     percentage: number;
   } | null>(null);
+  // Add local loading state for navigation
+  const [isNavigating, setIsNavigating] = useState(false);
   const { theme } = useTheme();
   const isMobile = useIsMobile();
   const initialRenderRef = useRef(true);
@@ -162,8 +97,6 @@ export function EmotionChart({
   useEffect(() => {
     // On timeframe change, always reset visibleEmotions
     setVisibleEmotions([]);
-    // Only reset chartType if not persisted
-    // setChartType('bubble'); // No longer reset, since we want to persist it!
     if (!currentDate) setInternalDate(new Date());
   }, [timeframe]);
 
@@ -173,8 +106,9 @@ export function EmotionChart({
     { id: 'bubble', label: 'Life Areas' },
   ];
   
-  // Navigation handlers (now always use the correct handler)
+  // Navigation handlers with loading state
   const goToPrevious = () => {
+    setIsNavigating(true);
     let newDate: Date;
     switch (timeframe) {
       case 'today':
@@ -194,8 +128,13 @@ export function EmotionChart({
     }
     if (onTimeRangeNavigate) onTimeRangeNavigate(newDate);
     else setInternalDate(newDate);
+    
+    // Reset loading after a short delay to allow for data filtering
+    setTimeout(() => setIsNavigating(false), 300);
   };
+  
   const goToNext = () => {
+    setIsNavigating(true);
     let newDate: Date;
     switch (timeframe) {
       case 'today':
@@ -215,11 +154,16 @@ export function EmotionChart({
     }
     if (onTimeRangeNavigate) onTimeRangeNavigate(newDate);
     else setInternalDate(newDate);
+    
+    // Reset loading after a short delay to allow for data filtering
+    setTimeout(() => setIsNavigating(false), 300);
   };
+  
   // Reset period on timeframe change (keep currentDate prop precedence)
   useEffect(() => {
     if (!currentDate) setInternalDate(new Date());
   }, [timeframe, currentDate]);
+  
   // Period label
   const getPeriodLabel = () => {
     const now = activeDate;
@@ -549,10 +493,15 @@ export function EmotionChart({
         variant="ghost" 
         size="icon" 
         onClick={goToPrevious}
+        disabled={isNavigating}
         className="text-muted-foreground hover:text-foreground"
         title="Previous period"
       >
-        <ChevronLeft className="h-5 w-5" />
+        {isNavigating ? (
+          <Loader2 className="h-5 w-5 animate-spin" />
+        ) : (
+          <ChevronLeft className="h-5 w-5" />
+        )}
       </Button>
       <div className="text-center font-medium text-base">
         <TranslatableText 
@@ -566,10 +515,15 @@ export function EmotionChart({
         variant="ghost" 
         size="icon" 
         onClick={goToNext}
+        disabled={isNavigating}
         className="text-muted-foreground hover:text-foreground"
         title="Next period"
       >
-        <ChevronRight className="h-5 w-5" />
+        {isNavigating ? (
+          <Loader2 className="h-5 w-5 animate-spin" />
+        ) : (
+          <ChevronRight className="h-5 w-5" />
+        )}
       </Button>
     </div>
   );
@@ -760,6 +714,11 @@ export function EmotionChart({
         </div>
       </div>
       <div className="bg-card p-4 rounded-xl shadow-sm relative">
+        {isNavigating && (
+          <div className="absolute inset-0 bg-background/50 backdrop-blur-sm flex items-center justify-center z-10 rounded-xl">
+            <Loader2 className="h-8 w-8 animate-spin text-primary" />
+          </div>
+        )}
         {chartType === 'line' && renderLineChart()}
         {chartType === 'bubble' && renderBubbleChart()}
       </div>

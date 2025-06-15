@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { format, subDays, startOfDay, endOfDay, startOfWeek, endOfWeek, startOfMonth, endOfMonth, startOfYear, endOfYear } from 'date-fns';
@@ -42,8 +43,7 @@ interface InsightsData {
 
 export const useInsightsData = (
   userId: string | undefined,
-  timeRange: TimeRange,
-  currentDate?: Date
+  timeRange: TimeRange
 ) => {
   const [insightsData, setInsightsData] = useState<InsightsData>({
     entries: [],
@@ -108,7 +108,7 @@ export const useInsightsData = (
       console.log(`Found ${allEntries?.length || 0} total entries for user`);
       console.log('Sample entry data:', allEntries?.[0] || 'No entries found');
 
-      const effectiveBaseDate = currentDate ?? new Date();
+      const effectiveBaseDate = new Date();
       const { startDate, endDate } = getDateRange(timeRange, effectiveBaseDate);
       
       console.log(`Fetching entries for ${timeRange}:`, {
@@ -211,7 +211,7 @@ export const useInsightsData = (
     } finally {
       setLoading(false);
     }
-  }, [userId, timeRange, currentDate]);
+  }, [userId, timeRange]);
 
   useEffect(() => {
     if (timeRange !== lastTimeRange) {

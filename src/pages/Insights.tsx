@@ -25,7 +25,7 @@ function InsightsContent() {
   const { user } = useAuth();
   const { prefetchTranslationsForRoute } = useTranslation();
   const [timeRange, setTimeRange] = useState<TimeRange>('week');
-  // Remove emotionChartDate from use-insights-data dependency
+  // Remove emotionChartDate from use-insights-data dependency - now only used for client-side filtering
   const [emotionChartDate, setEmotionChartDate] = useState<Date>(new Date());
   const [moodCalendarDate, setMoodCalendarDate] = useState<Date>(new Date());
   const [isSticky, setIsSticky] = useState(false);
@@ -34,8 +34,8 @@ function InsightsContent() {
   const scrollPositionRef = useRef<number>(0);
   const isMobile = useIsMobile();
 
-  // FETCH INSIGHTS DATA: key it by user, timeRange, and emotionChartDate (currentDate)
-  const { insightsData, loading } = useInsightsData(user?.id, timeRange, emotionChartDate);
+  // FETCH INSIGHTS DATA: Only keyed by user and timeRange (not emotionChartDate)
+  const { insightsData, loading } = useInsightsData(user?.id, timeRange);
   
   const timeRanges = [
     { value: 'today', label: 'Day' },
@@ -511,7 +511,7 @@ function InsightsContent() {
               </motion.div>
             </div>
             
-            {/* --- MAIN: Only pass the *parent* timeRange (not emotionChartDate) to insightsData. Pass emotionChartDate to EmotionChart only --- */}
+            {/* --- MAIN: Pass aggregatedData to EmotionChart with emotionChartDate for client-side filtering --- */}
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
