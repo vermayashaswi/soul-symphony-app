@@ -54,38 +54,15 @@ const AppRoutesWithAuth = () => {
   const { user } = useAuth();
   const { onboardingComplete, loading: onboardingLoading } = useOnboarding();
 
+  // FIX: Only put <Routes/>, <Navbar/>, etc. inside the ViewportManager so they render using React Router's Outlet system correctly. Do NOT pass children directly to ViewportManager.
   return (
-    <ViewportManager>
-      {/* ViewportManager now only wraps <Outlet /> per its definition - so don't pass children here */}
-      {/* Instead, use a Routes tree and let Outlets render content */}
+    <>
       <Navbar />
-      <Routes>
-        <Route path="/app/auth" element={<Auth />} />
-        <Route path="/app/*" element={<ProtectedRoute />}>
-          <Route
-            index
-            element={
-              <OnboardingCheck
-                onboardingComplete={onboardingComplete}
-                onboardingLoading={onboardingLoading}
-                user={user as User | null}
-              >
-                <Home />
-              </OnboardingCheck>
-            }
-          />
-          <Route path="journal" element={<Journal />} />
-          <Route path="chat" element={<Chat />} />
-          <Route path="smart-chat" element={<SmartChat />} />
-          <Route path="insights" element={<Insights />} />
-          <Route path="settings" element={<Settings />} />
-          <Route path="themes" element={<ThemesManagement />} />
-        </Route>
-      </Routes>
+      <ViewportManager />
       <MobileNavigation onboardingComplete={onboardingComplete} />
       <Toaster />
       <ShadcnToaster />
-    </ViewportManager>
+    </>
   );
 };
 
@@ -93,7 +70,35 @@ const AppRoutes = () => (
   <ThemeProvider>
     <TranslationProvider>
       <AuthProvider>
-        <AppRoutesWithAuth />
+        <Routes>
+          {/* All /app routes wrapped in ViewportManager */}
+          <Route
+            path="/app/*"
+            element={<AppRoutesWithAuth />}
+          >
+            <Route path="auth" element={<Auth />} />
+            <Route element={<ProtectedRoute />}>
+              <Route
+                index
+                element={
+                  <OnboardingCheck
+                    onboardingComplete={useOnboarding().onboardingComplete}
+                    onboardingLoading={useOnboarding().loading}
+                    user={useAuth().user as User | null}
+                  >
+                    <Home />
+                  </OnboardingCheck>
+                }
+              />
+              <Route path="journal" element={<Journal />} />
+              <Route path="chat" element={<Chat />} />
+              <Route path="smart-chat" element={<SmartChat />} />
+              <Route path="insights" element={<Insights />} />
+              <Route path="settings" element={<Settings />} />
+              <Route path="themes" element={<ThemesManagement />} />
+            </Route>
+          </Route>
+        </Routes>
       </AuthProvider>
     </TranslationProvider>
   </ThemeProvider>
