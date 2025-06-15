@@ -34,8 +34,8 @@ const OnboardingCheck: React.FC<OnboardingCheckProps> = ({ children }) => {
     }
 
     if (!user) {
-      console.log('[OnboardingCheck] No user, redirecting to auth');
-      return <Navigate to="/app/auth" replace />;
+      console.log('[OnboardingCheck] No user, redirecting to onboarding');
+      return <Navigate to="/app/onboarding" replace />;
     }
 
     if (!onboardingComplete) {
@@ -53,10 +53,10 @@ const OnboardingCheck: React.FC<OnboardingCheckProps> = ({ children }) => {
           <h2 className="text-xl font-bold mb-2">Onboarding Check Error</h2>
           <p className="text-gray-600">{error instanceof Error ? error.message : 'Unknown error'}</p>
           <button 
-            onClick={() => window.location.href = '/app/auth'} 
+            onClick={() => window.location.href = '/app/onboarding'} 
             className="mt-4 px-4 py-2 bg-blue-600 text-white rounded"
           >
-            Go to Auth
+            Go to Onboarding
           </button>
         </div>
       </div>

@@ -109,13 +109,62 @@ const AppRoutesWithNavigation = () => {
                 </OnboardingCheck>
               } 
             />
-            <Route path="/app/home" element={<Home />} />
-            <Route path="/app/journal" element={<Journal />} />
-            <Route path="/app/chat" element={<Chat />} />
-            <Route path="/app/smart-chat" element={<SmartChat />} />
-            <Route path="/app/insights" element={<Insights />} />
-            <Route path="/app/settings" element={<Settings />} />
-            <Route path="/app/themes" element={<ThemesManagement />} />
+            <Route 
+              path="/app/home" 
+              element={
+                <OnboardingCheck>
+                  <Home />
+                </OnboardingCheck>
+              } 
+            />
+            <Route 
+              path="/app/journal" 
+              element={
+                <OnboardingCheck>
+                  <Journal />
+                </OnboardingCheck>
+              } 
+            />
+            <Route 
+              path="/app/chat" 
+              element={
+                <OnboardingCheck>
+                  <Chat />
+                </OnboardingCheck>
+              } 
+            />
+            <Route 
+              path="/app/smart-chat" 
+              element={
+                <OnboardingCheck>
+                  <SmartChat />
+                </OnboardingCheck>
+              } 
+            />
+            <Route 
+              path="/app/insights" 
+              element={
+                <OnboardingCheck>
+                  <Insights />
+                </OnboardingCheck>
+              } 
+            />
+            <Route 
+              path="/app/settings" 
+              element={
+                <OnboardingCheck>
+                  <Settings />
+                </OnboardingCheck>
+              } 
+            />
+            <Route 
+              path="/app/themes" 
+              element={
+                <OnboardingCheck>
+                  <ThemesManagement />
+                </OnboardingCheck>
+              } 
+            />
           </Route>
         </Routes>
         <MobileNavigation onboardingComplete={onboardingComplete} />

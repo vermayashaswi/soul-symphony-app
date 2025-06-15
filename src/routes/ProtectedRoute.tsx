@@ -27,8 +27,8 @@ const ProtectedRoute = () => {
     }
 
     if (!user) {
-      console.log('[ProtectedRoute] No user found, redirecting to /app/auth');
-      return <Navigate to="/app/auth" replace />;
+      console.log('[ProtectedRoute] No user found, redirecting to /app/onboarding');
+      return <Navigate to="/app/onboarding" replace />;
     }
 
     console.log('[ProtectedRoute] User authenticated, rendering protected content');
@@ -41,10 +41,10 @@ const ProtectedRoute = () => {
           <h2 className="text-xl font-bold mb-2">Authentication Error</h2>
           <p className="text-gray-600 mb-4">{error instanceof Error ? error.message : 'Unknown error'}</p>
           <button 
-            onClick={() => window.location.href = '/app/auth'} 
+            onClick={() => window.location.href = '/app/onboarding'} 
             className="px-4 py-2 bg-blue-600 text-white rounded"
           >
-            Go to Auth
+            Go to Onboarding
           </button>
         </div>
       </div>
