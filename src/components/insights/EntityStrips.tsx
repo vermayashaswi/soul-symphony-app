@@ -7,6 +7,11 @@ import { supabase } from '@/integrations/supabase/client';
 import { TimeRange } from '@/hooks/use-insights-data';
 import { toast } from 'sonner';
 import { TranslatableText } from '@/components/translation/TranslatableText';
+import {
+  addDays, addWeeks, addMonths, addYears,
+  subDays, subWeeks, subMonths, subYears,
+  startOfDay, startOfWeek, startOfMonth, startOfYear
+} from 'date-fns';
 
 type Entity = {
   name: string;
@@ -17,6 +22,7 @@ type Entity = {
 interface EntityStripsProps {
   userId?: string;
   timeRange: TimeRange;
+  currentDate?: Date; // Add currentDate prop
   onEntityClick?: (entity: string, sentiment: number) => void;
   className?: string;
 }
@@ -24,6 +30,7 @@ interface EntityStripsProps {
 const EntityStrips: React.FC<EntityStripsProps> = ({
   userId,
   timeRange,
+  currentDate = new Date(), // Default to current date if not provided
   onEntityClick,
   className
 }) => {
@@ -35,36 +42,38 @@ const EntityStrips: React.FC<EntityStripsProps> = ({
   const { theme } = useTheme();
   const isMobile = useIsMobile();
   
-  // Calculate date range based on timeRange
+  // Calculate date range based on timeRange and currentDate
   const getDateRange = () => {
-    const now = new Date();
+    // Use the provided currentDate instead of always using 'now'
+    const baseDate = currentDate;
     let startDate: Date;
+    let endDate: Date;
     
     switch (timeRange) {
       case 'today':
-        startDate = new Date(now);
-        startDate.setHours(0, 0, 0, 0);
+        startDate = startOfDay(baseDate);
+        endDate = addDays(startDate, 1);
         break;
       case 'week':
-        startDate = new Date(now);
-        startDate.setDate(now.getDate() - 7);
+        startDate = startOfWeek(baseDate, { weekStartsOn: 1 });
+        endDate = addWeeks(startDate, 1);
         break;
       case 'month':
-        startDate = new Date(now);
-        startDate.setMonth(now.getMonth() - 1);
+        startDate = startOfMonth(baseDate);
+        endDate = addMonths(startDate, 1);
         break;
       case 'year':
-        startDate = new Date(now);
-        startDate.setFullYear(now.getFullYear() - 1);
+        startDate = startOfYear(baseDate);
+        endDate = addYears(startDate, 1);
         break;
       default:
-        startDate = new Date(now);
-        startDate.setDate(now.getDate() - 7);
+        startDate = startOfDay(baseDate);
+        endDate = addDays(startDate, 1);
     }
     
     return {
       startDate: startDate.toISOString(),
-      endDate: now.toISOString()
+      endDate: endDate.toISOString()
     };
   };
   
@@ -89,7 +98,7 @@ const EntityStrips: React.FC<EntityStripsProps> = ({
       
       setLoading(true);
       try {
-        console.log(`Fetching themes for timeRange: ${timeRange}, userId: ${userId}`);
+        console.log(`Fetching themes for timeRange: ${timeRange}, userId: ${userId}, currentDate: ${currentDate.toISOString()}`);
         const { startDate, endDate } = getDateRange();
         
         // Query journal entries within the time range
@@ -106,7 +115,7 @@ const EntityStrips: React.FC<EntityStripsProps> = ({
           throw error;
         }
         
-        console.log(`Found ${entries?.length || 0} entries with themes`);
+        console.log(`Found ${entries?.length || 0} entries with themes for date range ${startDate} to ${endDate}`);
         
         // Process entries to extract themes and calculate sentiments
         const themeMap = new Map<string, { count: number, totalSentiment: number }>();
@@ -155,7 +164,7 @@ const EntityStrips: React.FC<EntityStripsProps> = ({
           .sort((a, b) => b.count - a.count)
           .slice(0, 7);
         
-        console.log('Top themes:', topEntities);
+        console.log('Top themes for current period:', topEntities);
         setEntities(topEntities);
       } catch (error) {
         console.error('Error fetching theme data:', error);
@@ -166,7 +175,7 @@ const EntityStrips: React.FC<EntityStripsProps> = ({
     };
     
     fetchEntities();
-  }, [userId, timeRange]);
+  }, [userId, timeRange, currentDate]); // Add currentDate to dependency array
   
   // Update dimensions when the component mounts and on resize
   useEffect(() => {

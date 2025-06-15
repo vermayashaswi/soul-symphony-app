@@ -47,6 +47,8 @@ interface EmotionChartProps {
   onTimeRangeNavigate?: (nextDate: Date) => void;
 }
 
+// ... keep existing code (EMOTION_COLORS, getEmotionColor function)
+
 const EMOTION_COLORS: Record<string, string> = {
   joy: '#FF6B6B',           // Coral Red
   happiness: '#4ECDC4',     // Teal
@@ -691,6 +693,7 @@ export function EmotionChart({
         <EntityStrips
           userId={user?.id}
           timeRange={timeframe}
+          currentDate={activeDate}
           onEntityClick={handleEntityClick}
           className="w-full h-full"
         />
