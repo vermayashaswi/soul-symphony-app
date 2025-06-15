@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
@@ -29,8 +28,8 @@ function InsightsContent() {
   const scrollPositionRef = useRef<number>(0);
   const isMobile = useIsMobile();
 
-  // FETCH INSIGHTS DATA: Only keyed by user and timeRange (not emotionChartDate)
-  const { insightsData, loading } = useInsightsData(user?.id, timeRange);
+  // FETCH INSIGHTS DATA: Now includes emotionChartDate for emotion chart data
+  const { insightsData, loading } = useInsightsData(user?.id, timeRange, emotionChartDate);
   
   const timeRanges = [
     { value: 'today', label: 'Day' },
