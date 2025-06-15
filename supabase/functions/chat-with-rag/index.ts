@@ -6,6 +6,7 @@ import { OptimizedApiClient } from './utils/optimizedApiClient.ts';
 import { DualSearchOrchestrator } from './utils/dualSearchOrchestrator.ts';
 import { generateResponse, generateSystemPrompt, generateUserPrompt } from './utils/responseGenerator.ts';
 import { planQuery } from './utils/queryPlanner.ts';
+import { RateLimitManager } from '../_shared/rateLimitUtils.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -17,9 +18,33 @@ serve(async (req) => {
     return new Response(null, { headers: corsHeaders });
   }
 
+  const startTime = Date.now();
+  let processingTime = 0;
+  let statusCode = 200;
+  let errorMessage: string | undefined;
+
   try {
     console.log('[chat-with-rag] Starting enhanced dual search RAG processing');
-    const startTime = Date.now();
+
+    // Initialize rate limiting
+    const rateLimitManager = new RateLimitManager(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+    );
+
+    const { userId, ipAddress } = RateLimitManager.getClientInfo(req);
+
+    // Check rate limits
+    const rateLimitCheck = await rateLimitManager.checkRateLimit({
+      userId,
+      ipAddress,
+      functionName: 'chat-with-rag'
+    });
+
+    if (!rateLimitCheck.allowed) {
+      console.log(`[chat-with-rag] Rate limit exceeded for user ${userId || 'anonymous'} from IP ${ipAddress}`);
+      return rateLimitManager.createRateLimitResponse(rateLimitCheck);
+    }
 
     const supabaseClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
@@ -39,13 +64,13 @@ serve(async (req) => {
     const requestBody = await req.json();
     const { 
       message, 
-      userId, 
+      userId: requestUserId, 
       conversationContext = [], 
       userProfile = {},
       queryPlan = null
     } = requestBody;
 
-    console.log(`[chat-with-rag] Processing query: "${message}" for user: ${userId}`);
+    console.log(`[chat-with-rag] Processing query: "${message}" for user: ${requestUserId}`);
 
     // Enhanced query planning with dual search support
     const enhancedQueryPlan = queryPlan || planQuery(message, userProfile.timezone);
@@ -64,14 +89,14 @@ serve(async (req) => {
     const searchResults = searchMethod === 'parallel' ?
       await DualSearchOrchestrator.executeParallelSearch(
         supabaseClient,
-        userId,
+        requestUserId,
         queryEmbedding,
         enhancedQueryPlan,
         message
       ) :
       await DualSearchOrchestrator.executeSequentialSearch(
         supabaseClient,
-        userId,
+        requestUserId,
         queryEmbedding,
         enhancedQueryPlan,
         message
@@ -113,9 +138,18 @@ serve(async (req) => {
       isAnalyticalQuery
     );
 
-    const totalTime = Date.now() - startTime;
+    processingTime = Date.now() - startTime;
 
-    console.log(`[chat-with-rag] Enhanced dual search RAG completed in ${totalTime}ms`);
+    // Log successful API usage
+    await rateLimitManager.logApiUsage({
+      userId,
+      ipAddress,
+      functionName: 'chat-with-rag',
+      statusCode,
+      responseTimeMs: processingTime
+    });
+
+    console.log(`[chat-with-rag] Enhanced dual search RAG completed in ${processingTime}ms`);
 
     return new Response(JSON.stringify({
       response: aiResponse,
@@ -128,7 +162,7 @@ serve(async (req) => {
           combined: combinedResults.length
         },
         isAnalyticalQuery,
-        processingTime: totalTime,
+        processingTime,
         enhancedFormatting: isAnalyticalQuery,
         dualSearchEnabled: true
       },
@@ -146,6 +180,30 @@ serve(async (req) => {
 
   } catch (error) {
     console.error('[chat-with-rag] Error in enhanced dual search RAG:', error);
+    statusCode = 500;
+    errorMessage = error.message;
+    processingTime = Date.now() - startTime;
+
+    // Log failed API usage
+    try {
+      const rateLimitManager = new RateLimitManager(
+        Deno.env.get('SUPABASE_URL') ?? '',
+        Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+      );
+      const { userId, ipAddress } = RateLimitManager.getClientInfo(req);
+      
+      await rateLimitManager.logApiUsage({
+        userId,
+        ipAddress,
+        functionName: 'chat-with-rag',
+        statusCode,
+        responseTimeMs: processingTime,
+        errorMessage
+      });
+    } catch (logError) {
+      console.error('[chat-with-rag] Failed to log error usage:', logError);
+    }
+
     return new Response(JSON.stringify({
       error: error.message,
       response: "I apologize, but I encountered an error while analyzing your journal entries. Please try again.",
@@ -155,7 +213,7 @@ serve(async (req) => {
         timestamp: new Date().toISOString()
       }
     }), {
-      status: 500,
+      status: statusCode,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   }

@@ -1,4 +1,3 @@
-
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.7.1';
@@ -7,6 +6,7 @@ import { transcribeAudioWithWhisper, translateAndRefineText, analyzeEmotions, ge
 import { createSupabaseAdmin, createProfileIfNeeded, extractThemes, storeJournalEntry, storeEmbedding } from './databaseOperations.ts';
 import { storeAudioFile } from './storageOperations.ts';
 import { processBase64Chunks, detectFileType, isValidAudioData } from './audioProcessing.ts';
+import { RateLimitManager } from '../_shared/rateLimitUtils.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -114,25 +114,42 @@ serve(async (req) => {
 
   const startTime = Date.now();
   let processingStage = 'initialization';
+  let statusCode = 200;
+  let errorMessage: string | undefined;
   
   try {
     console.log("=== FIXED TRANSCRIBE-AUDIO PIPELINE START ===");
     logMemoryUsage('pipeline-start');
     
+    // Initialize rate limiting
+    const rateLimitManager = new RateLimitManager(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+    );
+
+    const { userId, ipAddress } = RateLimitManager.getClientInfo(req);
+
+    // Check rate limits - transcription is resource intensive so we check early
+    const rateLimitCheck = await rateLimitManager.checkRateLimit({
+      userId,
+      ipAddress,
+      functionName: 'transcribe-audio'
+    });
+
+    if (!rateLimitCheck.allowed) {
+      console.log(`[transcribe-audio] Rate limit exceeded for user ${userId || 'anonymous'} from IP ${ipAddress}`);
+      return rateLimitManager.createRateLimitResponse(rateLimitCheck);
+    }
+
     // Step 1: Enhanced environment validation
     console.log("FIXED: Validating environment configuration");
     const envValidation = validateEnvironment();
     
     if (!envValidation.valid) {
       console.error("FIXED: Environment validation failed:", envValidation.errors);
-      return new Response(JSON.stringify({
-        error: `Configuration error: ${envValidation.errors.join(', ')}`,
-        timestamp: new Date().toISOString(),
-        success: false
-      }), {
-        status: 500,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
+      statusCode = 500;
+      errorMessage = `Configuration error: ${envValidation.errors.join(', ')}`;
+      throw new Error(errorMessage);
     }
     
     console.log("FIXED: Environment validation passed");
@@ -173,7 +190,9 @@ serve(async (req) => {
       ]);
     } catch (error) {
       console.error("FIXED: Request parsing failed:", error);
-      throw new Error(`Request parsing failed: ${error.message}`);
+      statusCode = 400;
+      errorMessage = `Request parsing failed: ${error.message}`;
+      throw new Error(errorMessage);
     }
     
     // Step 4: Enhanced request validation
@@ -526,29 +545,49 @@ serve(async (req) => {
     console.error(`FIXED: Error in ${processingStage}:`, error);
     console.error(`FIXED: Processing failed after: ${totalTime}ms`);
     
+    if (!statusCode || statusCode === 200) {
+      statusCode = 500;
+    }
+    if (!errorMessage) {
+      errorMessage = error.message;
+    }
+
+    // Log failed API usage
+    try {
+      const rateLimitManager = new RateLimitManager(
+        Deno.env.get('SUPABASE_URL') ?? '',
+        Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+      );
+      const { userId, ipAddress } = RateLimitManager.getClientInfo(req);
+      
+      await rateLimitManager.logApiUsage({
+        userId,
+        ipAddress,
+        functionName: 'transcribe-audio',
+        statusCode,
+        responseTimeMs: totalTime,
+        errorMessage
+      });
+    } catch (logError) {
+      console.error('[transcribe-audio] Failed to log error usage:', logError);
+    }
+
     logMemoryUsage('error-state');
     
     // Enhanced error classification
-    let statusCode = 500;
-    let errorType = 'internal_error';
-    
     if (error.message.includes('timeout')) {
       statusCode = 408;
-      errorType = 'timeout';
     } else if (error.message.includes('validation')) {
       statusCode = 400;
-      errorType = 'validation_error';
     } else if (error.message.includes('authentication') || error.message.includes('authorization')) {
       statusCode = 401;
-      errorType = 'auth_error';
     } else if (error.message.includes('size') || error.message.includes('large')) {
       statusCode = 413;
-      errorType = 'payload_too_large';
     }
     
     return new Response(JSON.stringify({
       error: error.message,
-      errorType,
+      errorType: statusCode === 408 ? 'timeout' : statusCode === 400 ? 'validation_error' : 'internal_error',
       stage: processingStage,
       processingTime: totalTime,
       timestamp: new Date().toISOString(),
