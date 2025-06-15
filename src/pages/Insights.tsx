@@ -183,19 +183,6 @@ function InsightsContent() {
     <div className="min-h-screen pb-20 insights-container">
       <TranslationProgressIndicator />
       
-      {/* Cache status indicator */}
-      {isCacheHit && !loading && (
-        <div className="fixed top-20 right-4 z-40 bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200 px-3 py-1 rounded-full text-xs font-medium opacity-80">
-          <EnhancedTranslatableText 
-            text="Instant view" 
-            forceTranslate={true}
-            enableFontScaling={true}
-            scalingContext="compact"
-            usePageTranslation={true}
-          />
-        </div>
-      )}
-      
       {isSticky && (
         <div className="fixed top-0 left-0 right-0 z-50 py-3 px-4 bg-background border-b shadow-sm flex justify-center insights-sticky-header">
           <div className={cn(
