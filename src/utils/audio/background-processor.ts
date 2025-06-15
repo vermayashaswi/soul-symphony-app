@@ -18,8 +18,11 @@ export const processAudioInBackground = async (
   try {
     console.log('Starting background audio processing...');
     
+    // Get the Supabase URL from the client configuration
+    const supabaseUrl = "https://kwnwhgucnzqxndzjayyq.supabase.co";
+    
     const transcriptionService = new TranscriptionService(
-      supabase.supabaseUrl,
+      supabaseUrl,
       userId,
       authToken
     );
