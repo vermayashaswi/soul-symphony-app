@@ -13,41 +13,56 @@ import { useUserColorThemeHex } from './soulnet/useUserColorThemeHex';
 import { cn } from '@/lib/utils';
 import { TranslatableText } from '@/components/translation/TranslatableText';
 import { useAtomicSoulNetData } from '@/hooks/useAtomicSoulNetData';
-import { useTranslation } from '@/contexts/TranslationContext';
+import { useSoulNetNodeTranslations } from "@/hooks/useSoulNetNodeTranslations";
 
-// Translation loader component using status from hook
-const SoulNetTranslationLoader: React.FC<{
-  progress: number;
-  isTranslating: boolean;
-  error?: string | null;
-}> = ({ progress, isTranslating, error }) => (
+interface SoulNetProps {
+  userId: string | undefined;
+  timeRange: TimeRange;
+}
+
+// OPTIMIZED: Translation loading component with better UX
+const OptimizedTranslationLoadingState: React.FC<{ 
+  progress: number; 
+  isComplete: boolean;
+  canRender: boolean;
+}> = ({ progress, isComplete, canRender }) => (
   <div className="bg-background rounded-xl shadow-sm border w-full p-6">
     <div className="flex flex-col items-center justify-center py-12 space-y-4">
       <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
       <h3 className="text-lg font-medium">
-        <TranslatableText
-          text={error ? "Translation Error" : "Translating Soul-Net..."}
+        <TranslatableText 
+          text={canRender ? "Optimizing Soul-Net translations..." : "Loading Soul-Net translations..."} 
           forceTranslate={true}
           enableFontScaling={true}
           scalingContext="general"
         />
       </h3>
       <div className="w-64 bg-gray-200 rounded-full h-2">
-        <div
-          className="bg-primary h-2 rounded-full transition-all duration-300"
-          style={{ width: `${progress ?? 0}%` }}
+        <div 
+          className="bg-primary h-2 rounded-full transition-all duration-300" 
+          style={{ width: `${progress}%` }}
         ></div>
       </div>
       <p className="text-sm text-muted-foreground">
-        <TranslatableText
-          text={error ?? `${Math.round(progress ?? 0)}% complete`}
+        <TranslatableText 
+          text={`${progress}% complete`}
           forceTranslate={false}
           enableFontScaling={true}
           scalingContext="general"
         />
       </p>
+      {canRender && (
+        <p className="text-xs text-green-600 text-center max-w-sm">
+          <TranslatableText 
+            text="Sufficient translations loaded. Rendering visualization..."
+            forceTranslate={true}
+            enableFontScaling={true}
+            scalingContext="general"
+          />
+        </p>
+      )}
       <p className="text-xs text-muted-foreground text-center max-w-sm">
-        <TranslatableText
+        <TranslatableText 
           text="Translations are cached and will persist across time range changes."
           forceTranslate={true}
           enableFontScaling={true}
@@ -58,11 +73,6 @@ const SoulNetTranslationLoader: React.FC<{
   </div>
 );
 
-interface SoulNetProps {
-  userId: string | undefined;
-  timeRange: TimeRange;
-}
-
 const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
   const [isFullScreen, setIsFullScreen] = useState(false);
   const [canvasError, setCanvasError] = useState<Error | null>(null);
@@ -71,94 +81,127 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
   const isMobile = useIsMobile();
   const themeHex = useUserColorThemeHex();
   const [selectedEntity, setSelectedEntity] = useState<string | null>(null);
+  
   const renderingInitialized = useRef(false);
 
-  // Rely fully on the atomic data hook for translations, readiness, and progress
-  const {
-    graphData,
+  // OPTIMIZED: Use the enhanced hook with render control
+  const { 
+    graphData, 
     connectionPercentages,
     nodeConnectionData,
-    loading,
+    loading, 
     error,
     isTranslating,
     translationProgress,
     translationComplete,
     canRender,
-    translations,
     getNodeTranslation,
     getConnectionPercentage,
     getNodeConnections,
-    setNodeTranslations
+    setNodeTranslations // << new in hook
   } = useAtomicSoulNetData(userId, timeRange);
 
-  const { currentLanguage } = useTranslation();
+  // --- NEW: atomic node label translation, stable across time range ---
+  const nodeIds = graphData.nodes.map(n => n.id);
+  const {
+    translations: stableTranslations,
+    isLoading: transLoading,
+    progress: transProgress,
+    translationsReady,
+    getTranslation,
+    refresh
+  } = useSoulNetNodeTranslations(nodeIds);
 
-  // Rendering logic: ready if data is loaded, translation is done, no error, canRender
+  // Sync persistent cache down into main data hook for getNodeTranslation to work everywhere
   useEffect(() => {
-    if (
-      !loading &&
-      graphData.nodes.length > 0 &&
-      canRender &&
-      !isTranslating &&
-      translationComplete &&
-      !error &&
+    setNodeTranslations(stableTranslations);
+  }, [stableTranslations, setNodeTranslations]);
+
+  console.log("[SoulNet] OPTIMIZED STATE", { 
+    userId, 
+    timeRange,
+    nodesCount: graphData.nodes.length,
+    translationsCount: stableTranslations.size,
+    loading,
+    isTranslating,
+    translationProgress,
+    translationComplete,
+    canRender,
+    renderingReady,
+    initialized: renderingInitialized.current
+  });
+
+  useEffect(() => {
+    console.log("[SoulNet] OPTIMIZED: Component mounted");
+    
+    return () => {
+      console.log("[SoulNet] OPTIMIZED: Component unmounted");
+    };
+  }, []);
+
+  // OPTIMIZED: Initialize rendering only when we can properly render
+  useEffect(() => {
+    const shouldInitializeRendering = (
+      !loading && 
+      graphData.nodes.length > 0 && 
+      canRender &&  // NEW: Only render when translation coverage is sufficient
       !renderingInitialized.current
-    ) {
+    );
+
+    if (shouldInitializeRendering) {
+      console.log("[SoulNet] OPTIMIZED: Initializing rendering with sufficient translation coverage");
       setRenderingReady(true);
       renderingInitialized.current = true;
     }
+    
+    // Reset rendering on error or data loss
+    const shouldResetRendering = (
+      error || 
+      (!canRender && renderingInitialized.current) ||
+      (graphData.nodes.length === 0 && !loading && renderingInitialized.current)
+    );
 
-    // Reset if error or data cleared or translation not ready
-    if (
-      error ||
-      !canRender ||
-      isTranslating ||
-      !translationComplete ||
-      graphData.nodes.length === 0
-    ) {
+    if (shouldResetRendering) {
+      console.log("[SoulNet] OPTIMIZED: Resetting rendering due to error, insufficient translations, or data loss");
       setRenderingReady(false);
       renderingInitialized.current = false;
     }
-  }, [
-    loading,
-    graphData.nodes.length,
-    canRender,
-    isTranslating,
-    translationComplete,
-    error
-  ]);
+  }, [loading, graphData.nodes.length, canRender, error]);
 
-  // Reset rendering when timeRange changes
+  // Reset rendering when time range changes
   useEffect(() => {
     if (renderingInitialized.current) {
+      console.log("[SoulNet] OPTIMIZED: Time range changed, resetting rendering");
       setRenderingReady(false);
       renderingInitialized.current = false;
     }
   }, [timeRange]);
 
-  // Node selection
-  const handleNodeSelect = useCallback(
-    (id: string) => {
-      if (selectedEntity === id) {
-        setSelectedEntity(null);
-      } else {
-        setSelectedEntity(id);
-        if (navigator.vibrate) navigator.vibrate(50);
+  // Node selection with stable state management
+  const handleNodeSelect = useCallback((id: string) => {
+    console.log(`[SoulNet] OPTIMIZED: Node selected: ${id}`);
+    if (selectedEntity === id) {
+      setSelectedEntity(null);
+    } else {
+      setSelectedEntity(id);
+      if (navigator.vibrate) {
+        navigator.vibrate(50);
       }
-    },
-    [selectedEntity]
-  );
+    }
+  }, [selectedEntity]);
 
   const toggleFullScreen = useCallback(() => {
-    setIsFullScreen((prev) => {
+    setIsFullScreen(prev => {
       if (!prev) setSelectedEntity(null);
+      console.log(`[SoulNet] OPTIMIZED: Toggling fullscreen: ${!prev}`);
       return !prev;
     });
   }, []);
 
   const handleCanvasError = useCallback((error: Error) => {
+    console.error('[SoulNet] OPTIMIZED: Canvas error:', error);
     setCanvasError(error);
-    setRetryCount((prev) => prev + 1);
+    setRetryCount(prev => prev + 1);
     setRenderingReady(false);
     renderingInitialized.current = false;
   }, []);
@@ -169,58 +212,58 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
     renderingInitialized.current = false;
   }, []);
 
-  // Show loading states based on atomic translation state
-  if (graphData.nodes.length > 0 && (isTranslating || !translationComplete)) {
+  // OPTIMIZED: Show translation loading only when we have data but can't render yet
+  if (graphData.nodes.length > 0 && !translationsReady && transLoading) {
+    // Show translation progress only for new language or first mount
     return (
-      <SoulNetTranslationLoader
-        progress={translationProgress ?? 0}
-        isTranslating={isTranslating}
-        error={error?.message}
+      <OptimizedTranslationLoadingState 
+        progress={transProgress}
+        isComplete={translationsReady}
+        canRender={translationsReady}
       />
     );
   }
 
   // Show general loading if we have no data and are still loading
   if (loading && graphData.nodes.length === 0) {
+    console.log("[SoulNet] OPTIMIZED: Showing general loading state");
     return <LoadingState />;
   }
-
-  if (error) {
-    return (
-      <div className="bg-background rounded-xl shadow-sm border w-full p-6">
-        <h2 className="text-xl font-semibold text-red-600 mb-4">
-          <TranslatableText
-            text="Error Loading Soul-Net"
-            forceTranslate={true}
-            enableFontScaling={true}
-            scalingContext="general"
-          />
-        </h2>
-        <p className="text-muted-foreground mb-4">{error.message}</p>
-        <button
-          className="px-4 py-2 bg-primary text-white rounded-md"
-          onClick={() => window.location.reload()}
-        >
-          <TranslatableText
-            text="Retry"
-            forceTranslate={true}
-            enableFontScaling={true}
-            scalingContext="general"
-          />
-        </button>
-      </div>
-    );
-  }
-
+  
+  if (error) return (
+    <div className="bg-background rounded-xl shadow-sm border w-full p-6">
+      <h2 className="text-xl font-semibold text-red-600 mb-4">
+        <TranslatableText 
+          text="Error Loading Soul-Net" 
+          forceTranslate={true}
+          enableFontScaling={true}
+          scalingContext="general"
+        />
+      </h2>
+      <p className="text-muted-foreground mb-4">{error.message}</p>
+      <button 
+        className="px-4 py-2 bg-primary text-white rounded-md" 
+        onClick={() => window.location.reload()}
+      >
+        <TranslatableText 
+          text="Retry" 
+          forceTranslate={true}
+          enableFontScaling={true}
+          scalingContext="general"
+        />
+      </button>
+    </div>
+  );
+  
   if (graphData.nodes.length === 0) return <EmptyState />;
 
-  // Canvas error fallback, unchanged
+  // Show simplified error UI for canvas errors
   if (canvasError && retryCount > 2) {
     return (
       <div className="bg-background rounded-xl shadow-sm border w-full p-6">
         <h2 className="text-xl font-semibold mb-4">
-          <TranslatableText
-            text="Soul-Net Visualization"
+          <TranslatableText 
+            text="Soul-Net Visualization" 
             forceTranslate={true}
             enableFontScaling={true}
             scalingContext="general"
@@ -228,16 +271,16 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
         </h2>
         <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-4">
           <h3 className="font-medium text-yellow-800 dark:text-yellow-300 mb-2">
-            <TranslatableText
-              text="3D Visualization Unavailable"
+            <TranslatableText 
+              text="3D Visualization Unavailable" 
               forceTranslate={true}
               enableFontScaling={true}
               scalingContext="general"
             />
           </h3>
           <p className="text-yellow-700 dark:text-yellow-400 mb-3">
-            <TranslatableText
-              text="The 3D visualization is experiencing technical difficulties. Your data is safe and you can try again."
+            <TranslatableText 
+              text="The 3D visualization is experiencing technical difficulties. Your data is safe and you can try again." 
               forceTranslate={true}
               enableFontScaling={true}
               scalingContext="general"
@@ -248,8 +291,8 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
               className="px-4 py-2 bg-yellow-600 text-white rounded hover:bg-yellow-700"
               onClick={handleRetry}
             >
-              <TranslatableText
-                text="Try Again"
+              <TranslatableText 
+                text="Try Again" 
                 forceTranslate={true}
                 enableFontScaling={true}
                 scalingContext="general"
@@ -259,8 +302,8 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
               className="px-4 py-2 bg-gray-600 text-white rounded hover:bg-gray-700"
               onClick={() => window.location.reload()}
             >
-              <TranslatableText
-                text="Reload Page"
+              <TranslatableText 
+                text="Reload Page" 
                 forceTranslate={true}
                 enableFontScaling={true}
                 scalingContext="general"
@@ -275,8 +318,8 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
   const getInstructions = () => {
     if (isMobile) {
       return (
-        <TranslatableText
-          text="Drag to rotate • Pinch to zoom • Tap a node to highlight connections"
+        <TranslatableText 
+          text="Drag to rotate • Pinch to zoom • Tap a node to highlight connections" 
           forceTranslate={true}
           enableFontScaling={true}
           scalingContext="general"
@@ -284,8 +327,8 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
       );
     }
     return (
-      <TranslatableText
-        text="Drag to rotate • Scroll to zoom • Click a node to highlight connections"
+      <TranslatableText 
+        text="Drag to rotate • Scroll to zoom • Click a node to highlight connections" 
         forceTranslate={true}
         enableFontScaling={true}
         scalingContext="general"
@@ -293,46 +336,46 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
     );
   };
 
-  // Console log for diagnostics (optional, comment out in prod)
-  // console.log(`[SoulNet] RENDER: ${graphData.nodes.length} nodes, ${graphData.links.length} links, ready: ${renderingReady}, canRender: ${canRender}, translationComplete: ${translationComplete}`);
+  console.log(`[SoulNet] OPTIMIZED RENDER: ${graphData.nodes.length} nodes, ${graphData.links.length} links, renderingReady: ${renderingReady}, canRender: ${canRender}`);
 
   return (
-    <div
-      className={cn(
-        "bg-background rounded-xl shadow-sm border w-full",
-        isMobile ? "p-0" : "p-6 md:p-8"
-      )}
-    >
+    <div className={cn(
+      "bg-background rounded-xl shadow-sm border w-full",
+      isMobile ? "p-0" : "p-6 md:p-8"
+    )}>
       {!isFullScreen && <SoulNetDescription />}
-
-      <FullscreenWrapper isFullScreen={isFullScreen} toggleFullScreen={toggleFullScreen}>
+      
+      <FullscreenWrapper
+        isFullScreen={isFullScreen}
+        toggleFullScreen={toggleFullScreen}
+      >
         <RenderingErrorBoundary
           onError={handleCanvasError}
           fallback={
             <div className="flex items-center justify-center p-10 bg-gray-100 dark:bg-gray-800 rounded-lg">
               <div className="text-center">
                 <h3 className="text-lg font-medium">
-                  <TranslatableText
-                    text="Visualization Error"
+                  <TranslatableText 
+                    text="Visualization Error" 
                     forceTranslate={true}
                     enableFontScaling={true}
                     scalingContext="general"
                   />
                 </h3>
                 <p className="text-muted-foreground mt-2">
-                  <TranslatableText
-                    text="The 3D visualization encountered an error."
+                  <TranslatableText 
+                    text="The 3D visualization encountered an error." 
                     forceTranslate={true}
                     enableFontScaling={true}
                     scalingContext="general"
                   />
                 </p>
-                <button
+                <button 
                   className="mt-4 px-4 py-2 bg-primary text-white rounded-lg"
                   onClick={handleRetry}
                 >
-                  <TranslatableText
-                    text="Retry"
+                  <TranslatableText 
+                    text="Retry" 
                     forceTranslate={true}
                     enableFontScaling={true}
                     scalingContext="general"
@@ -342,7 +385,7 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
             </div>
           }
         >
-          {/* Render Canvas only if data and translations are ready */}
+          {/* OPTIMIZED: Canvas renders only when we have sufficient translation coverage */}
           {renderingReady && canRender && (
             <Canvas
               style={{
@@ -354,14 +397,14 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
                 zIndex: 5,
                 transition: 'all 0.3s ease-in-out',
               }}
-              camera={{
+              camera={{ 
                 position: [0, 0, isFullScreen ? 40 : 45],
-                near: 1,
+                near: 1, 
                 far: 1000,
                 fov: isFullScreen ? 60 : 50
               }}
               onPointerMissed={() => setSelectedEntity(null)}
-              gl={{
+              gl={{ 
                 preserveDrawingBuffer: true,
                 antialias: !isMobile,
                 powerPreference: 'high-performance',
@@ -379,20 +422,22 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
                 isFullScreen={isFullScreen}
                 shouldShowLabels={true}
                 getInstantConnectionPercentage={getConnectionPercentage}
-                // Node label translation provided by data hook (up-to-date)
-                getInstantTranslation={getNodeTranslation}
+                // always from new atomic cache, never flashes
+                getInstantTranslation={getTranslation}
                 getInstantNodeConnections={getNodeConnections}
-                isInstantReady={translationComplete && !isTranslating}
+                isInstantReady={translationsReady}
                 isAtomicMode={true}
               />
             </Canvas>
           )}
         </RenderingErrorBoundary>
       </FullscreenWrapper>
-
+      
       {!isFullScreen && (
         <div className="w-full text-center mt-2 px-4 md:px-8">
-          <p className="text-xs text-muted-foreground">{getInstructions()}</p>
+          <p className="text-xs text-muted-foreground">
+            {getInstructions()}
+          </p>
         </div>
       )}
     </div>
@@ -400,5 +445,3 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
 };
 
 export default SoulNet;
-
-// ⚡️ WARNING: This file is nearly 500 lines. Please consider asking for a refactor to split this into smaller components!
