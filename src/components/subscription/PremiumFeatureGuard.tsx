@@ -1,9 +1,8 @@
-
 import React, { useState } from 'react';
 import { useSubscription } from '@/contexts/SubscriptionContext';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Crown, Clock, ArrowRight } from 'lucide-react';
+import { Crown, Clock, ArrowRight, AlertTriangle } from 'lucide-react';
 import { TranslatableText } from '@/components/translation/TranslatableText';
 import { useNavigate } from 'react-router-dom';
 import { format } from 'date-fns';
@@ -22,20 +21,21 @@ export const PremiumFeatureGuard: React.FC<PremiumFeatureGuardProps> = ({
   fallbackTitle,
   fallbackDescription
 }) => {
-  const { 
-    hasActiveSubscription, 
-    isTrialActive, 
-    trialEndDate, 
+  const {
+    hasActiveSubscription,
+    isTrialActive,
+    trialEndDate,
     daysRemainingInTrial,
     isLoading,
     tier,
     status,
-    isTrialEligible
+    isTrialEligible,
+    isPremium,
   } = useSubscription();
   const navigate = useNavigate();
   const [isSubscriptionModalOpen, setIsSubscriptionModalOpen] = useState(false);
 
-  // Show loading state while subscription data is being fetched
+  // Handle loading state
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -44,25 +44,31 @@ export const PremiumFeatureGuard: React.FC<PremiumFeatureGuardProps> = ({
     );
   }
 
-  // Debug logging for troubleshooting
-  console.log('[PremiumFeatureGuard] Subscription check:', {
-    feature,
-    hasActiveSubscription,
-    isTrialActive,
-    tier,
-    status,
-    trialEndDate: trialEndDate?.toISOString(),
-    daysRemaining: daysRemainingInTrial,
-    isTrialEligible
-  });
+  // Fallback: If backend flags are inconsistent, allow premium access if any premium flag is set
+  if (!hasActiveSubscription && (tier === 'premium' || isPremium)) {
+    console.warn('[PremiumFeatureGuard] Fallback: Tier is premium or isPremium=true, but hasActiveSubscription is false. Granting access as premium (dev fallback).', {
+      tier, isPremium, hasActiveSubscription, status,
+    });
+    // You could also show a banner here for debugging if needed.
+    return (
+      <div>
+        <div className="mb-4 flex items-center gap-2 bg-yellow-100 border border-yellow-300 text-yellow-700 px-4 py-2 rounded">
+          <AlertTriangle className="w-4 h-4" />
+          <span>
+            <TranslatableText text="You are being granted premium access due to a subscription status mismatch. Please report if features are missing." />
+          </span>
+        </div>
+        {children}
+      </div>
+    );
+  }
 
   // Allow access if user has active subscription or active trial
   if (hasActiveSubscription) {
-    console.log('[PremiumFeatureGuard] Access granted - user has active subscription or trial');
     return <>{children}</>;
   }
 
-  // Block access and show upgrade prompt
+  // Show upgrade prompt if access is blocked
   const getFeatureTitle = () => {
     if (fallbackTitle) return fallbackTitle;
     return feature === 'chat' ? 'AI Chat Assistant' : 'Advanced Insights';
@@ -70,7 +76,7 @@ export const PremiumFeatureGuard: React.FC<PremiumFeatureGuardProps> = ({
 
   const getFeatureDescription = () => {
     if (fallbackDescription) return fallbackDescription;
-    return feature === 'chat' 
+    return feature === 'chat'
       ? 'Get personalized insights and guidance from your AI companion'
       : 'Discover deep patterns and trends in your emotional journey';
   };
@@ -82,8 +88,6 @@ export const PremiumFeatureGuard: React.FC<PremiumFeatureGuardProps> = ({
   const handleStartTrial = () => {
     setIsSubscriptionModalOpen(true);
   };
-
-  console.log('[PremiumFeatureGuard] Access blocked - showing upgrade prompt');
 
   return (
     <>
@@ -101,7 +105,6 @@ export const PremiumFeatureGuard: React.FC<PremiumFeatureGuardProps> = ({
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            {/* Trial Status Information - show if trial has ended or if eligible for trial */}
             {trialEndDate && !isTrialActive && (
               <div className="bg-muted/50 rounded-lg p-4 space-y-2">
                 <div className="flex items-center gap-2 text-sm text-muted-foreground">
@@ -117,7 +120,6 @@ export const PremiumFeatureGuard: React.FC<PremiumFeatureGuardProps> = ({
               </div>
             )}
 
-            {/* Trial Eligibility Information */}
             {isTrialEligible && !trialEndDate && (
               <div className="bg-blue-50 dark:bg-blue-950/20 rounded-lg p-4 space-y-2">
                 <div className="flex items-center gap-2 text-sm text-blue-700 dark:text-blue-300">
@@ -130,7 +132,6 @@ export const PremiumFeatureGuard: React.FC<PremiumFeatureGuardProps> = ({
               </div>
             )}
 
-            {/* Premium Features List */}
             <div className="space-y-2">
               <h4 className="font-medium text-sm">
                 <TranslatableText text="Premium features include:" />
@@ -143,11 +144,9 @@ export const PremiumFeatureGuard: React.FC<PremiumFeatureGuardProps> = ({
               </ul>
             </div>
 
-            {/* Action Buttons */}
             <div className="space-y-3">
-              {/* Start Trial Button (if eligible) */}
               {isTrialEligible && !trialEndDate && (
-                <Button 
+                <Button
                   onClick={handleStartTrial}
                   className="w-full bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700"
                 >
@@ -156,8 +155,7 @@ export const PremiumFeatureGuard: React.FC<PremiumFeatureGuardProps> = ({
                 </Button>
               )}
 
-              {/* Upgrade Button */}
-              <Button 
+              <Button
                 onClick={handleUpgrade}
                 className="w-full bg-gradient-to-r from-orange-500 to-pink-600 hover:from-orange-600 hover:to-pink-700"
                 variant={isTrialEligible && !trialEndDate ? "outline" : "default"}
@@ -167,7 +165,6 @@ export const PremiumFeatureGuard: React.FC<PremiumFeatureGuardProps> = ({
                 <ArrowRight className="ml-2 h-4 w-4" />
               </Button>
 
-              {/* Alternative: Continue with free features */}
               <Button
                 variant="outline"
                 onClick={() => navigate('/app/journal')}
@@ -180,7 +177,6 @@ export const PremiumFeatureGuard: React.FC<PremiumFeatureGuardProps> = ({
         </Card>
       </div>
 
-      {/* Subscription Modal */}
       <SubscriptionModal
         isOpen={isSubscriptionModalOpen}
         onClose={() => setIsSubscriptionModalOpen(false)}
