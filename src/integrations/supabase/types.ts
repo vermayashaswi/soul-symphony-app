@@ -189,42 +189,30 @@ export type Database = {
         Row: {
           created_at: string
           description: string | null
-          enabled: boolean | null
           id: string
           is_enabled: boolean
-          key: string | null
           name: string
           target_percentage: number
-          target_type: string | null
-          target_value: string | null
           updated_at: string
           user_criteria: Json | null
         }
         Insert: {
           created_at?: string
           description?: string | null
-          enabled?: boolean | null
           id?: string
           is_enabled?: boolean
-          key?: string | null
           name: string
           target_percentage?: number
-          target_type?: string | null
-          target_value?: string | null
           updated_at?: string
           user_criteria?: Json | null
         }
         Update: {
           created_at?: string
           description?: string | null
-          enabled?: boolean | null
           id?: string
           is_enabled?: boolean
-          key?: string | null
           name?: string
           target_percentage?: number
-          target_type?: string | null
-          target_value?: string | null
           updated_at?: string
           user_criteria?: Json | null
         }
@@ -951,7 +939,15 @@ export type Database = {
       }
       get_attribution_analytics: {
         Args: { p_start_date?: string; p_end_date?: string }
-        Returns: Json
+        Returns: {
+          utm_source: string
+          utm_medium: string
+          utm_campaign: string
+          sessions_count: number
+          unique_users_count: number
+          conversions_count: number
+          top_countries: Json
+        }[]
       }
       get_entity_emotion_statistics: {
         Args: {

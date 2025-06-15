@@ -14,20 +14,9 @@ import { preloadCriticalImages } from './utils/imagePreloader';
 import { toast } from 'sonner';
 import './styles/emoji.css';
 import './styles/tutorial.css';
-import { FeatureFlagsProvider } from '@/contexts/FeatureFlagsContext';
-import { useUserSession } from '@/hooks/useUserSession';
 
-// Import React Query client
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-
-// Initialize QueryClient outside component to avoid recreation on every render
-const queryClient = new QueryClient();
-
-const AppContent: React.FC = () => {
+const App: React.FC = () => {
   const [isInitialized, setIsInitialized] = useState(false);
-  
-  // Initialize user session tracking
-  useUserSession();
 
   useEffect(() => {
     // Clean up any malformed paths
@@ -81,26 +70,16 @@ const AppContent: React.FC = () => {
       <TranslationProvider>
         <SubscriptionProvider>
           <TutorialProvider>
-            <FeatureFlagsProvider>
-              <TranslationLoadingOverlay />
-              <JournalProcessingInitializer />
-              <AppRoutes key={isInitialized ? 'initialized' : 'initializing'} />
-              <TutorialOverlay />
-              <Toaster />
-              <SonnerToaster position="top-right" />
-            </FeatureFlagsProvider>
+            <TranslationLoadingOverlay />
+            <JournalProcessingInitializer />
+            <AppRoutes key={isInitialized ? 'initialized' : 'initializing'} />
+            <TutorialOverlay />
+            <Toaster />
+            <SonnerToaster position="top-right" />
           </TutorialProvider>
         </SubscriptionProvider>
       </TranslationProvider>
     </ErrorBoundary>
-  );
-};
-
-const App: React.FC = () => {
-  return (
-    <QueryClientProvider client={queryClient}>
-      <AppContent />
-    </QueryClientProvider>
   );
 };
 
