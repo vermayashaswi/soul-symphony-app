@@ -3,7 +3,7 @@ import { CapacitorConfig } from '@capacitor/cli';
 
 const config: CapacitorConfig = {
   appId: 'app.soulo.online',
-  appName: 'SOULo',
+  appName: 'soul-symphony-app',
   webDir: 'dist',
   server: {
     url: 'https://soulo.online?forceHideBadge=true',
@@ -14,11 +14,11 @@ const config: CapacitorConfig = {
     // Add specific iOS-related configurations
     SplashScreen: {
       launchAutoHide: false,
-      backgroundColor: "#8b5cf6",
+      backgroundColor: "#FFFFFF",
       showSpinner: true,
       androidSpinnerStyle: "large",
       iosSpinnerStyle: "small",
-      spinnerColor: "#ffffff",
+      spinnerColor: "#8b5cf6",
       splashFullScreen: true,
       splashImmersive: true
     },
@@ -27,11 +27,6 @@ const config: CapacitorConfig = {
       resize: "body",
       style: "dark",
       resizeOnFullScreen: true
-    },
-    // Add status bar configuration
-    StatusBar: {
-      backgroundColor: "#8b5cf6",
-      style: "light"
     }
   },
   // iOS-specific configuration
@@ -41,14 +36,13 @@ const config: CapacitorConfig = {
     scrollEnabled: true,
     useUserAgentString: false,
     limitsNavigationsToAppBoundDomains: true,
-    backgroundColor: "#8b5cf6"
+    backgroundColor: "#FFFFFF"
   },
   // Android-specific configuration
   android: {
     allowMixedContent: true,
     captureInput: true,
-    webContentsDebuggingEnabled: true,
-    backgroundColor: "#8b5cf6"
+    webContentsDebuggingEnabled: true
   }
 };
 
