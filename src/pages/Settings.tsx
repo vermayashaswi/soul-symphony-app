@@ -363,17 +363,20 @@ function SettingsContent() {
   };
 
   const cancelNotificationSettings = () => {
-    // Reset to previous state
-    const enabled = localStorage.getItem('notification_enabled') === 'true';
-    const times = localStorage.getItem('notification_times');
+    // Get the current state from localStorage to determine what to reset to
+    const storedEnabled = localStorage.getItem('notification_enabled') === 'true';
+    const storedTimes = localStorage.getItem('notification_times');
     
-    setNotificationsEnabled(enabled);
+    // Reset to the stored state
+    setNotificationsEnabled(storedEnabled);
     
-    if (times) {
+    if (storedTimes) {
       try {
-        const parsedTimes = JSON.parse(times) as NotificationTime[];
+        const parsedTimes = JSON.parse(storedTimes) as NotificationTime[];
         if (Array.isArray(parsedTimes) && parsedTimes.length > 0) {
           setNotificationTimes(parsedTimes);
+        } else {
+          setNotificationTimes(['evening']);
         }
       } catch (e) {
         setNotificationTimes(['evening']);
@@ -426,7 +429,7 @@ function SettingsContent() {
         <div className={cn("max-w-3xl mx-auto px-4", isMobile ? "pt-0" : "pt-2")}>
           <div className="mb-6">
             <h1 className="text-3xl font-bold mb-2 text-theme-color">
-              <TranslatableText text="settings" forceTranslate={true} />
+              <TranslatableText text="Settings" forceTranslate={true} />
             </h1>
             <p className="text-muted-foreground">
               <TranslatableText text="Personalize your SOuLO experience" />
