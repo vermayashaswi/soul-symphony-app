@@ -24,36 +24,29 @@ const HeroSection: React.FC<HeroSectionProps> = ({ openAppStore, openPlayStore }
   const shouldRenderMobile = isMobile.isMobile || mobileDemo;
 
   return (
-    <div className="relative w-full bg-gradient-to-br from-blue-50 to-purple-50 pt-24 md:pt-32 pb-16 md:pb-24 overflow-hidden">
+    <div className="relative w-full bg-gradient-to-br from-blue-50 to-purple-50 pt-16 md:pt-20 pb-8 md:pb-12 overflow-hidden min-h-[85vh] flex items-center">
       {/* Background image */}
       <div 
         className="absolute inset-0 z-0 bg-cover bg-center opacity-20"
         style={{ backgroundImage: "url('/lovable-uploads/32abc730-009c-4901-912c-a16e7c2c1ec6.png')" }}
       ></div>
       
-      {/* 3D Background animation - Removed the bubble animation by commenting it out */}
-      {/* <Suspense fallback={null}>
-        <div className="absolute inset-0 z-0 opacity-30">
-          <ThreeDBackground />
-        </div>
-      </Suspense> */}
-      
       <div className="container mx-auto px-4 relative z-10">
-        <div className="flex flex-col lg:flex-row items-center gap-8 lg:gap-12">
+        <div className="flex flex-col lg:flex-row items-center gap-6 lg:gap-8">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.8 }}
             className="w-full lg:w-1/2 text-center lg:text-left"
           >
-            <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold mb-6 text-primary">
+            <h1 className="text-3xl md:text-4xl lg:text-5xl font-bold mb-4 text-primary leading-tight">
               <TranslatableText text="Express. Reflect. Grow." />
             </h1>
-            <p className="text-xl md:text-2xl text-gray-700 mb-8 max-w-2xl mx-auto lg:mx-0">
+            <p className="text-lg md:text-xl text-gray-700 mb-6 max-w-2xl mx-auto lg:mx-0 leading-relaxed">
               <TranslatableText text="Journaling should be as simple as talking. Use voice and leave the rest to us." />
             </p>
             
-            <div className="flex flex-col sm:flex-row gap-4 justify-center lg:justify-start mb-8">
+            <div className="flex flex-col sm:flex-row gap-3 justify-center lg:justify-start mb-6">
               <Button 
                 size="lg" 
                 className="gap-2 bg-black text-white hover:bg-gray-800" 
@@ -72,7 +65,7 @@ const HeroSection: React.FC<HeroSectionProps> = ({ openAppStore, openPlayStore }
               </Button>
             </div>
             
-            <div className="flex items-center justify-center lg:justify-start gap-8 text-sm text-gray-500">
+            <div className="flex items-center justify-center lg:justify-start gap-6 text-sm text-gray-500">
               <div className="flex items-center gap-1">
                 <Shield className="h-4 w-4 text-primary" />
                 <TranslatableText text="Privacy-Focused" />
@@ -90,9 +83,11 @@ const HeroSection: React.FC<HeroSectionProps> = ({ openAppStore, openPlayStore }
             transition={{ duration: 1, delay: 0.3 }}
             className="w-full lg:w-1/2 flex items-center justify-center"
           >
-            <AspectRatio ratio={9/16} className="w-full max-w-sm">
-              <PhoneVoiceAnimation />
-            </AspectRatio>
+            <div className="w-full max-w-xs lg:max-w-sm">
+              <AspectRatio ratio={9/16} className="w-full">
+                <PhoneVoiceAnimation />
+              </AspectRatio>
+            </div>
           </motion.div>
         </div>
       </div>
