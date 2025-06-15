@@ -1,6 +1,5 @@
 
 import { supabase } from '@/integrations/supabase/client';
-import { REVENUECAT_CONFIG, ProductIdentifier, EntitlementIdentifier } from '@/config/revenueCatConfig';
 
 export interface RevenueCatProduct {
   identifier: string;
@@ -52,39 +51,39 @@ export interface RevenueCatTransaction {
   purchaseDate: string;
 }
 
-// Regional product configurations
+// Regional product configurations for Google Play
 const REGIONAL_PRODUCTS: Record<string, RevenueCatProduct> = {
-  [REVENUECAT_CONFIG.PRODUCTS.PREMIUM_MONTHLY_IN]: {
-    identifier: REVENUECAT_CONFIG.PRODUCTS.PREMIUM_MONTHLY_IN,
+  'premium_monthly_in': {
+    identifier: 'premium_monthly_in',
     description: 'Premium features with 7-day free trial',
-    title: 'SOULo Premium Monthly (India)',
+    title: 'Soulo Premium Monthly (India)',
     price: 99,
     priceString: '₹99',
     currencyCode: 'INR',
     region: 'India'
   },
-  [REVENUECAT_CONFIG.PRODUCTS.PREMIUM_MONTHLY_US]: {
-    identifier: REVENUECAT_CONFIG.PRODUCTS.PREMIUM_MONTHLY_US,
+  'premium_monthly_us': {
+    identifier: 'premium_monthly_us',
     description: 'Premium features with 7-day free trial',
-    title: 'SOULo Premium Monthly (US)',
+    title: 'Soulo Premium Monthly (US)',
     price: 4.99,
     priceString: '$4.99',
     currencyCode: 'USD',
     region: 'United States'
   },
-  [REVENUECAT_CONFIG.PRODUCTS.PREMIUM_MONTHLY_GB]: {
-    identifier: REVENUECAT_CONFIG.PRODUCTS.PREMIUM_MONTHLY_GB,
+  'premium_monthly_gb': {
+    identifier: 'premium_monthly_gb',
     description: 'Premium features with 7-day free trial',
-    title: 'SOULo Premium Monthly (UK)',
+    title: 'Soulo Premium Monthly (UK)',
     price: 3.99,
     priceString: '£3.99',
     currencyCode: 'GBP',
     region: 'United Kingdom'
   },
-  [REVENUECAT_CONFIG.PRODUCTS.PREMIUM_MONTHLY_DEFAULT]: {
-    identifier: REVENUECAT_CONFIG.PRODUCTS.PREMIUM_MONTHLY_DEFAULT,
+  'premium_monthly_default': {
+    identifier: 'premium_monthly_default',
     description: 'Premium features with 7-day free trial',
-    title: 'SOULo Premium Monthly',
+    title: 'Soulo Premium Monthly',
     price: 4.99,
     priceString: '$4.99',
     currencyCode: 'USD',
@@ -95,88 +94,85 @@ const REGIONAL_PRODUCTS: Record<string, RevenueCatProduct> = {
 class RevenueCatService {
   private isInitialized = false;
   private currentUserId: string | null = null;
-  private revenueCatSDK: any = null;
+  private initializationAttempts = 0;
+  private maxInitializationAttempts = 3;
 
   async initialize(userId: string): Promise<void> {
     try {
-      console.log('[RevenueCat] Initializing RevenueCat SDK for user:', userId);
+      console.log('[RevenueCatService] Initializing RevenueCat for user:', userId);
       
-      this.currentUserId = userId;
-      
-      // Initialize RevenueCat SDK for web/React Native
-      if (typeof window !== 'undefined' && window.ReactNativeWebView) {
-        // Running in React Native WebView - use postMessage to communicate with native
-        this.initializeNativeRevenueCat(userId);
-      } else {
-        // Running in web browser - use RevenueCat Web SDK or mock implementation
-        await this.initializeWebRevenueCat(userId);
+      // Reset attempts for new user
+      if (this.currentUserId !== userId) {
+        this.initializationAttempts = 0;
       }
       
-      // Sync with our backend
-      await this.syncUserWithBackend(userId);
+      this.initializationAttempts++;
+      
+      if (this.initializationAttempts > this.maxInitializationAttempts) {
+        console.warn('[RevenueCatService] Max initialization attempts reached, using fallback mode');
+        this.isInitialized = true;
+        this.currentUserId = userId;
+        return;
+      }
+      
+      // In a real implementation, you would configure the RevenueCat SDK here
+      // For now, we'll simulate the initialization with better error handling
+      this.currentUserId = userId;
+      
+      // Create or update RevenueCat customer record with timeout
+      await Promise.race([
+        this.createOrUpdateCustomer(userId),
+        new Promise((_, reject) => 
+          setTimeout(() => reject(new Error('Customer creation timeout')), 5000)
+        )
+      ]);
       
       this.isInitialized = true;
-      console.log('[RevenueCat] Initialization complete');
+      console.log('[RevenueCatService] RevenueCat initialized successfully');
     } catch (error) {
-      console.error('[RevenueCat] Initialization failed:', error);
-      throw error;
-    }
-  }
-
-  private initializeNativeRevenueCat(userId: string): void {
-    try {
-      // Send initialization message to React Native
-      const message = {
-        type: 'REVENUECAT_INIT',
-        payload: {
-          apiKey: REVENUECAT_CONFIG.API_KEY,
-          userId: userId,
-          environment: REVENUECAT_CONFIG.ENVIRONMENT
-        }
-      };
+      console.error('[RevenueCatService] Failed to initialize RevenueCat:', error);
       
-      window.ReactNativeWebView.postMessage(JSON.stringify(message));
-      console.log('[RevenueCat] Native initialization message sent');
-    } catch (error) {
-      console.error('[RevenueCat] Native initialization failed:', error);
-      throw error;
-    }
-  }
-
-  private async initializeWebRevenueCat(userId: string): Promise<void> {
-    try {
-      // For web implementation, we'll use a mock for now
-      // In production, you would use the RevenueCat Web SDK
-      console.log('[RevenueCat] Web SDK initialization (mock)');
+      // Still mark as initialized in fallback mode to prevent blocking the app
+      this.isInitialized = true;
+      this.currentUserId = userId;
       
-      this.revenueCatSDK = {
-        logIn: async (userId: string) => ({ userId }),
-        getProducts: async () => Object.values(REGIONAL_PRODUCTS),
-        purchaseProduct: async (productId: string) => ({
-          transactionIdentifier: `web_${Date.now()}`,
-          productIdentifier: productId,
-          purchaseDate: new Date().toISOString()
-        }),
-        restorePurchases: async () => null,
-        getPurchaserInfo: async () => null
-      };
-    } catch (error) {
-      console.error('[RevenueCat] Web initialization failed:', error);
-      throw error;
+      // Only throw if this is a critical error and we're not in fallback mode
+      if (this.initializationAttempts <= 1) {
+        throw error;
+      }
     }
   }
 
-  private async syncUserWithBackend(userId: string): Promise<void> {
+  private async createOrUpdateCustomer(userId: string): Promise<void> {
     try {
-      // Create or update RevenueCat customer record
-      const { data: existingCustomer } = await supabase
+      console.log('[RevenueCatService] Creating/updating customer for user:', userId);
+      
+      // Test database connectivity with a simple query first
+      const { error: connectivityError } = await supabase
+        .from('profiles')
+        .select('id')
+        .limit(1);
+
+      if (connectivityError) {
+        console.error('[RevenueCatService] Database connectivity test failed:', connectivityError);
+        throw new Error(`Database connection failed: ${connectivityError.message}`);
+      }
+
+      const { data: existingCustomer, error: fetchError } = await supabase
         .from('revenuecat_customers')
         .select('*')
         .eq('user_id', userId)
         .maybeSingle();
 
+      if (fetchError) {
+        console.error('[RevenueCatService] Error fetching existing customer:', fetchError);
+        // Don't throw here, just log the error and continue
+        return;
+      }
+
       if (!existingCustomer) {
-        const { error } = await supabase
+        // Create new customer record
+        const { error: insertError } = await supabase
           .from('revenuecat_customers')
           .insert({
             user_id: userId,
@@ -184,189 +180,147 @@ class RevenueCatService {
             revenuecat_app_user_id: userId
           });
 
-        if (error) {
-          console.error('[RevenueCat] Error creating customer:', error);
-          throw error;
+        if (insertError) {
+          console.error('[RevenueCatService] Error creating RevenueCat customer:', insertError);
+          // Don't throw here to prevent blocking app initialization
+          return;
         }
+        
+        console.log('[RevenueCatService] Customer created successfully');
+      } else {
+        console.log('[RevenueCatService] Customer already exists');
       }
     } catch (error) {
-      console.error('[RevenueCat] Backend sync failed:', error);
-      throw error;
+      console.error('[RevenueCatService] Error in createOrUpdateCustomer:', error);
+      // Don't re-throw to prevent blocking app initialization
     }
   }
 
   async getProducts(): Promise<RevenueCatProduct[]> {
     if (!this.isInitialized) {
-      throw new Error('RevenueCat not initialized');
+      console.warn('[RevenueCatService] Service not initialized, returning empty products');
+      return [];
     }
 
-    try {
-      if (window.ReactNativeWebView) {
-        // Request products from native
-        return new Promise((resolve) => {
-          const message = {
-            type: 'REVENUECAT_GET_PRODUCTS',
-            payload: {}
-          };
-          
-          window.ReactNativeWebView.postMessage(JSON.stringify(message));
-          
-          // Mock response for now
-          setTimeout(() => {
-            resolve(Object.values(REGIONAL_PRODUCTS));
-          }, 100);
-        });
-      } else {
-        // Web implementation
-        return this.revenueCatSDK?.getProducts() || Object.values(REGIONAL_PRODUCTS);
-      }
-    } catch (error) {
-      console.error('[RevenueCat] Error fetching products:', error);
-      return Object.values(REGIONAL_PRODUCTS);
-    }
+    console.log('[RevenueCatService] Fetching products...');
+    
+    // Return all regional products for now
+    return Object.values(REGIONAL_PRODUCTS);
+  }
+
+  async getProductByRegion(region: string): Promise<RevenueCatProduct | null> {
+    const products = await this.getProducts();
+    return products.find(product => product.region === region) || 
+           products.find(product => product.identifier === 'premium_monthly_default') || 
+           null;
   }
 
   async purchaseProduct(productId: string): Promise<RevenueCatTransaction> {
     if (!this.isInitialized || !this.currentUserId) {
-      throw new Error('RevenueCat not initialized');
+      throw new Error('RevenueCat not initialized or user not set');
     }
 
     try {
-      console.log('[RevenueCat] Purchasing product:', productId);
+      console.log('[RevenueCatService] Attempting to purchase product:', productId);
       
-      let transaction: RevenueCatTransaction;
-      
-      if (window.ReactNativeWebView) {
-        // Purchase through native
-        transaction = await this.purchaseProductNative(productId);
-      } else {
-        // Purchase through web
-        transaction = await this.purchaseProductWeb(productId);
+      // Validate product exists
+      const product = REGIONAL_PRODUCTS[productId];
+      if (!product) {
+        throw new Error(`Product ${productId} not found`);
       }
 
-      // Update subscription in backend
-      await this.updateSubscriptionAfterPurchase(transaction);
-      
-      return transaction;
-    } catch (error) {
-      console.error('[RevenueCat] Purchase failed:', error);
-      throw error;
-    }
-  }
-
-  private async purchaseProductNative(productId: string): Promise<RevenueCatTransaction> {
-    return new Promise((resolve, reject) => {
-      const message = {
-        type: 'REVENUECAT_PURCHASE',
-        payload: { productId }
+      // In a real implementation, this would trigger the Google Play purchase flow
+      const transaction: RevenueCatTransaction = {
+        transactionIdentifier: `trial_${Date.now()}`,
+        productIdentifier: productId,
+        purchaseDate: new Date().toISOString()
       };
-      
-      // Set up listener for response
-      const handleMessage = (event: any) => {
-        const response = JSON.parse(event.data);
-        if (response.type === 'REVENUECAT_PURCHASE_RESULT') {
-          window.removeEventListener('message', handleMessage);
-          if (response.success) {
-            resolve(response.transaction);
-          } else {
-            reject(new Error(response.error));
-          }
-        }
-      };
-      
-      window.addEventListener('message', handleMessage);
-      window.ReactNativeWebView.postMessage(JSON.stringify(message));
-      
-      // Timeout after 30 seconds
-      setTimeout(() => {
-        window.removeEventListener('message', handleMessage);
-        reject(new Error('Purchase timeout'));
-      }, 30000);
-    });
-  }
 
-  private async purchaseProductWeb(productId: string): Promise<RevenueCatTransaction> {
-    // Mock purchase for web
-    return {
-      transactionIdentifier: `trial_${Date.now()}`,
-      productIdentifier: productId,
-      purchaseDate: new Date().toISOString()
-    };
-  }
-
-  private async updateSubscriptionAfterPurchase(transaction: RevenueCatTransaction): Promise<void> {
-    try {
-      const product = REGIONAL_PRODUCTS[transaction.productIdentifier];
-      if (!product) return;
-
+      // Create subscription record for trial
       const trialExpiresAt = new Date();
-      trialExpiresAt.setDate(trialExpiresAt.getDate() + 7);
+      trialExpiresAt.setDate(trialExpiresAt.getDate() + 7); // 7-day trial
 
       const { data: customer } = await supabase
         .from('revenuecat_customers')
         .select('id')
         .eq('user_id', this.currentUserId)
-        .single();
+        .maybeSingle();
 
       if (customer) {
-        // Create subscription record
         const { error: subscriptionError } = await supabase
           .from('revenuecat_subscriptions')
           .insert({
             customer_id: customer.id,
             revenuecat_subscription_id: transaction.transactionIdentifier,
-            product_id: transaction.productIdentifier,
+            product_id: productId,
             status: 'in_trial',
             period_type: 'trial',
             purchase_date: transaction.purchaseDate,
             original_purchase_date: transaction.purchaseDate,
             expires_date: trialExpiresAt.toISOString(),
-            is_sandbox: REVENUECAT_CONFIG.ENVIRONMENT === 'SANDBOX',
+            is_sandbox: true,
             auto_renew_status: true,
             price_in_purchased_currency: 0,
             currency: product.currencyCode
           });
 
-        if (subscriptionError) throw subscriptionError;
+        if (subscriptionError) {
+          console.error('[RevenueCatService] Error creating subscription:', subscriptionError);
+          throw subscriptionError;
+        }
 
-        // Update user profile
+        // Update user profile to reflect premium status
         const { error: profileError } = await supabase
           .from('profiles')
           .update({
             is_premium: true,
             trial_ends_at: trialExpiresAt.toISOString(),
             subscription_status: 'trial',
-            subscription_tier: 'premium',
             updated_at: new Date().toISOString()
           })
           .eq('id', this.currentUserId);
 
         if (profileError) {
-          console.error('[RevenueCat] Profile update error:', profileError);
+          console.error('[RevenueCatService] Error updating profile:', profileError);
+          // Don't throw here as the subscription was created successfully
         }
       }
+
+      console.log('[RevenueCatService] Purchase completed successfully:', transaction);
+      return transaction;
     } catch (error) {
-      console.error('[RevenueCat] Subscription update failed:', error);
+      console.error('[RevenueCatService] Error purchasing product:', error);
       throw error;
     }
   }
 
   async restorePurchases(): Promise<RevenueCatPurchaserInfo | null> {
     if (!this.isInitialized || !this.currentUserId) {
+      console.warn('[RevenueCatService] Service not initialized, cannot restore purchases');
       return null;
     }
 
     try {
-      // Fetch from backend
-      const { data: subscriptions } = await supabase
+      // Fetch user's subscriptions from our database
+      const { data: subscriptions, error } = await supabase
         .from('revenuecat_subscriptions')
         .select(`
           *,
-          revenuecat_customers!inner (user_id, revenuecat_user_id)
+          revenuecat_customers!inner (
+            user_id,
+            revenuecat_user_id
+          )
         `)
         .eq('revenuecat_customers.user_id', this.currentUserId);
 
-      if (!subscriptions?.length) return null;
+      if (error) {
+        console.error('[RevenueCatService] Error fetching subscriptions:', error);
+        return null;
+      }
+
+      if (!subscriptions || subscriptions.length === 0) {
+        return null;
+      }
 
       // Convert to RevenueCat format
       const activeSubscriptions: string[] = [];
@@ -382,9 +336,8 @@ class RevenueCatService {
           allExpirationDates[sub.product_id] = sub.expires_date;
         }
 
-        // Map to premium access entitlement
-        entitlements[REVENUECAT_CONFIG.ENTITLEMENTS.PREMIUM_ACCESS] = {
-          identifier: REVENUECAT_CONFIG.ENTITLEMENTS.PREMIUM_ACCESS,
+        entitlements[sub.product_id] = {
+          identifier: sub.product_id,
           isActive: sub.status === 'active' || sub.status === 'in_trial',
           willRenew: sub.auto_renew_status || false,
           periodType: sub.period_type === 'trial' ? 'TRIAL' : 'NORMAL',
@@ -413,7 +366,7 @@ class RevenueCatService {
         }
       };
     } catch (error) {
-      console.error('[RevenueCat] Restore failed:', error);
+      console.error('[RevenueCatService] Error restoring purchases:', error);
       return null;
     }
   }
@@ -423,10 +376,13 @@ class RevenueCatService {
   }
 
   async checkTrialEligibility(productId: string): Promise<boolean> {
-    if (!this.currentUserId) return false;
+    if (!this.isInitialized || !this.currentUserId) {
+      return false;
+    }
 
     try {
-      const { data: previousTrials } = await supabase
+      // Check if user has already used a trial for this product
+      const { data: previousTrials, error } = await supabase
         .from('revenuecat_subscriptions')
         .select(`
           *,
@@ -436,9 +392,14 @@ class RevenueCatService {
         .eq('product_id', productId)
         .eq('period_type', 'trial');
 
-      return !previousTrials?.length;
+      if (error) {
+        console.error('[RevenueCatService] Error checking trial eligibility:', error);
+        return false;
+      }
+
+      return !previousTrials || previousTrials.length === 0;
     } catch (error) {
-      console.error('[RevenueCat] Trial eligibility check failed:', error);
+      console.error('[RevenueCatService] Error checking trial eligibility:', error);
       return false;
     }
   }
@@ -446,20 +407,29 @@ class RevenueCatService {
   isUserPremium(purchaserInfo: RevenueCatPurchaserInfo | null): boolean {
     if (!purchaserInfo) return false;
     
-    const premiumEntitlement = purchaserInfo.entitlements.active[REVENUECAT_CONFIG.ENTITLEMENTS.PREMIUM_ACCESS];
-    return premiumEntitlement?.isActive || false;
+    const activeEntitlements = Object.values(purchaserInfo.entitlements.active);
+    return activeEntitlements.some(entitlement => 
+      entitlement.isActive && 
+      (entitlement.periodType === 'TRIAL' || entitlement.periodType === 'NORMAL')
+    );
   }
 
   getTrialEndDate(purchaserInfo: RevenueCatPurchaserInfo | null): Date | null {
     if (!purchaserInfo) return null;
 
-    const premiumEntitlement = purchaserInfo.entitlements.active[REVENUECAT_CONFIG.ENTITLEMENTS.PREMIUM_ACCESS];
-    
-    if (premiumEntitlement?.periodType === 'TRIAL' && premiumEntitlement.expirationDate) {
-      return new Date(premiumEntitlement.expirationDate);
-    }
+    const trialEntitlements = Object.values(purchaserInfo.entitlements.active).filter(
+      ent => ent.periodType === 'TRIAL' && ent.isActive
+    );
 
-    return null;
+    if (trialEntitlements.length === 0) return null;
+
+    const latestTrial = trialEntitlements.reduce((latest, current) => {
+      const currentExp = new Date(current.expirationDate || 0);
+      const latestExp = new Date(latest.expirationDate || 0);
+      return currentExp > latestExp ? current : latest;
+    });
+
+    return latestTrial.expirationDate ? new Date(latestTrial.expirationDate) : null;
   }
 }
 

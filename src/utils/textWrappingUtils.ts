@@ -1,3 +1,4 @@
+
 /**
  * Text wrapping utilities for intelligent text splitting
  */
@@ -13,7 +14,7 @@ export interface WrappedTextResult {
  */
 export const wrapTextIntelligently = (
   text: string, 
-  maxCharsPerLine: number = 13,
+  maxCharsPerLine: number = 18,
   maxLines: number = 3
 ): WrappedTextResult => {
   if (!text || typeof text !== 'string') {

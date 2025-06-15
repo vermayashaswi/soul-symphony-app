@@ -42,47 +42,48 @@ export function TranslatableText({
   const textRef = useRef<string>(text);
   const mountedRef = useRef<boolean>(true);
   const translationAttemptRef = useRef<number>(0);
-
+  
   // Language font scaling configuration
   const fontConfig = useLanguageFontConfig(currentLanguage);
-
+  
   const pathname = location.pathname;
   const isOnWebsite = isWebsiteRoute(pathname);
-
+  
   const cleanTranslationResult = (result: string): string => {
     if (!result) return '';
     const languageCodeRegex = /\s*[\(\[]([a-z]{2})[\)\]]\s*$/i;
     return result.replace(languageCodeRegex, '').trim();
   };
-
-  // FORCED: If on marketing (website) routes or currentLanguage is 'en', skip translation logic
-  const shouldTranslate = !isOnWebsite && currentLanguage !== 'en';
-
+  
   const translateText = async () => {
     if (!text?.trim()) {
       setTranslatedText('');
       return;
     }
-    // If on website or English: skip translation logic, always show the original
-    if (!shouldTranslate) {
+
+    // Don't translate if already in the target language
+    if (currentLanguage === sourceLanguage) {
+      console.log(`TranslatableText: Text already in ${currentLanguage}, skipping translation`);
       setTranslatedText(text);
       return;
     }
 
-    if (currentLanguage === sourceLanguage) {
-      setTranslatedText(text);
-      return;
-    }
+    console.log(`TranslatableText: Translation check for "${text.substring(0, 30)}" - forceTranslate: ${forceTranslate}, isOnWebsite: ${isOnWebsite}, currentLanguage: ${currentLanguage}`);
 
     // Check cache first
     const cachedResult = getCachedTranslation(text);
     if (cachedResult) {
+      console.log(`TranslatableText: Using cached translation for "${text.substring(0, 30)}": "${cachedResult.substring(0, 30)}"`);
       setTranslatedText(cachedResult);
       return;
     }
     
+    // Increment attempt counter for debugging
     translationAttemptRef.current += 1;
     const attemptNumber = translationAttemptRef.current;
+    
+    console.log(`TranslatableText: Starting translation attempt #${attemptNumber} for "${text.substring(0, 30)}" to ${currentLanguage}`);
+    
     if (!isLoading) {
       setIsLoading(true);
       if (onTranslationStart) {
@@ -91,16 +92,23 @@ export function TranslatableText({
     }
       
     try {
+      console.log(`TranslatableText: Calling translate service for "${text.substring(0, 30)}..." to ${currentLanguage}`);
       const result = await translate(text, sourceLanguage, entryId);
+      
+      console.log(`TranslatableText: Translation service returned for "${text.substring(0, 30)}...": "${result?.substring(0, 30) || 'null'}..."`);
+      
       if (mountedRef.current && prevLangRef.current === currentLanguage && textRef.current === text) {
         if (result) {
           const cleanedResult = cleanTranslationResult(result);
+          console.log(`TranslatableText: Setting translated text for "${text.substring(0, 30)}...": "${cleanedResult.substring(0, 30)}..."`);
           setTranslatedText(cleanedResult || text);
         } else {
+          console.log(`TranslatableText: Empty translation result for "${text.substring(0, 30)}...", using original`);
           setTranslatedText(text);
         }
       }
     } catch (error) {
+      console.error(`TranslatableText: Translation error for "${text.substring(0, 30)}..."`, error);
       if (mountedRef.current && prevLangRef.current === currentLanguage && textRef.current === text) {
         setTranslatedText(text);
       }
@@ -118,7 +126,7 @@ export function TranslatableText({
     mountedRef.current = true;
     prevLangRef.current = currentLanguage;
     textRef.current = text;
-    translationAttemptRef.current = 0;
+    translationAttemptRef.current = 0; // Reset attempt counter
 
     const handleTranslation = async () => {
       if (mountedRef.current) {
@@ -134,13 +142,14 @@ export function TranslatableText({
     return () => {
       mountedRef.current = false;
     };
-  }, [text, currentLanguage, sourceLanguage, entryId, forceTranslate, shouldTranslate]);
+  }, [text, currentLanguage, sourceLanguage, entryId, forceTranslate]);
   
   useEffect(() => {
     const handleLanguageChange = () => {
+      console.log(`TranslatableText: Language change event detected - new language: ${currentLanguage}`);
       prevLangRef.current = currentLanguage;
       textRef.current = text;
-      translationAttemptRef.current = 0;
+      translationAttemptRef.current = 0; // Reset attempt counter
       translateText();
     };
     
@@ -149,7 +158,7 @@ export function TranslatableText({
     return () => {
       window.removeEventListener('languageChange', handleLanguageChange as EventListener);
     };
-  }, [text, sourceLanguage, entryId, currentLanguage, forceTranslate, shouldTranslate]);
+  }, [text, sourceLanguage, entryId, currentLanguage, forceTranslate]);
 
   // Generate language-aware styling
   const languageAwareClassName = enableFontScaling
@@ -195,6 +204,3 @@ export function TranslatableText({
 }
 
 export default TranslatableText;
-
-// NOTE: This file is now quite long (over 200 lines).
-// After verifying these fixes, consider asking Lovable to help refactor this file into smaller components/hooks for maintainability.

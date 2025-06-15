@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useMemo } from 'react';
 import { Text } from '@react-three/drei';
 import { useLoader } from '@react-three/fiber';
@@ -15,7 +16,6 @@ interface NodeLabelProps {
   cameraZoom?: number;
   themeHex: string;
   nodeScale?: number;
-  displayText?: string; // <-- Optional override for label (from stable translation)
 }
 
 export const NodeLabel: React.FC<NodeLabelProps> = ({
@@ -27,14 +27,39 @@ export const NodeLabel: React.FC<NodeLabelProps> = ({
   shouldShowLabel,
   cameraZoom = 45,
   themeHex,
-  nodeScale = 1,
-  displayText // <-- From visualization directly
+  nodeScale = 1
 }) => {
-  // Translation now handled upstream, fallback to id if not provided
-  const labelText = displayText || id;
+  const { currentLanguage, translate } = useTranslation();
+  const [displayText, setDisplayText] = useState<string>(id);
+
+  // Handle translation
+  useEffect(() => {
+    if (!shouldShowLabel) return;
+
+    const translateText = async () => {
+      try {
+        if (currentLanguage === 'en' || !translate) {
+          setDisplayText(id);
+          return;
+        }
+
+        const translated = await translate(id);
+        if (translated && typeof translated === 'string') {
+          setDisplayText(translated);
+        } else {
+          setDisplayText(id);
+        }
+      } catch (error) {
+        console.warn(`[NodeLabel] Translation failed for ${id}:`, error);
+        setDisplayText(id);
+      }
+    };
+
+    translateText();
+  }, [id, currentLanguage, translate, shouldShowLabel]);
 
   // Get font URL based on text content
-  const fontUrl = simplifiedFontService.getFontUrl(labelText);
+  const fontUrl = simplifiedFontService.getFontUrl(displayText);
   
   // Load font using React Three Fiber's useLoader
   const font = useLoader(FontLoader, fontUrl);
@@ -66,7 +91,7 @@ export const NodeLabel: React.FC<NodeLabelProps> = ({
     position[2] + labelOffset[2]
   ];
 
-  if (!shouldShowLabel || !labelText || !font) {
+  if (!shouldShowLabel || !displayText || !font) {
     return null;
   }
 
@@ -87,7 +112,7 @@ export const NodeLabel: React.FC<NodeLabelProps> = ({
       outlineWidth={isSelected ? 0.04 : 0.02}
       outlineColor={isSelected ? '#000000' : '#333333'}
     >
-      {labelText}
+      {displayText}
     </Text>
   );
 };

@@ -7,7 +7,7 @@ import { Separator } from "@/components/ui/separator";
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import { useTheme } from '@/hooks/use-theme';
-import { setupJournalReminder, initializeCapacitorNotifications, NotificationFrequency, NotificationTime, getNotificationSettings } from '@/services/notificationService';
+import { setupJournalReminder, initializeCapacitorNotifications, NotificationFrequency, NotificationTime } from '@/services/notificationService';
 import { useAuth } from '@/contexts/AuthContext';
 import { useSubscription } from '@/contexts/SubscriptionContext';
 import { supabase } from '@/integrations/supabase/client';
@@ -32,7 +32,6 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { TranslatableText } from '@/components/translation/TranslatableText';
 import { useTranslation } from '@/contexts/TranslationContext';
 import { useTutorial } from '@/contexts/TutorialContext';
-import { useNotificationPermission } from '@/hooks/use-notification-permission';
 
 interface SettingItemProps {
   icon: React.ElementType;
@@ -94,23 +93,7 @@ function SettingsContent() {
   const [isLoadingProfile, setIsLoadingProfile] = useState(true);
   const [nameError, setNameError] = useState<string | null>(null);
   
-  // Store original notification settings to restore on cancel
-  const [originalNotificationSettings, setOriginalNotificationSettings] = useState<{
-    enabled: boolean;
-    times: NotificationTime[];
-  }>({ enabled: false, times: [] });
-  
   const MAX_NAME_LENGTH = 25;
-  
-  // Use the notification permission hook
-  const { 
-    permission, 
-    isSupported, 
-    isGranted, 
-    isDenied, 
-    isDefault, 
-    requestPermission 
-  } = useNotificationPermission();
   
   const colorThemes = [
     { name: 'Default', color: 'bg-blue-500' },
@@ -234,15 +217,23 @@ function SettingsContent() {
   }, [user]);
 
   useEffect(() => {
-    const settings = getNotificationSettings();
-    setNotificationsEnabled(settings.enabled);
-    setNotificationTimes(settings.times.length > 0 ? settings.times : ['evening']);
+    const enabled = localStorage.getItem('notification_enabled') === 'true';
+    const times = localStorage.getItem('notification_times');
     
-    // Store original settings for potential restoration
-    setOriginalNotificationSettings({
-      enabled: settings.enabled,
-      times: settings.times.length > 0 ? settings.times : ['evening']
-    });
+    if (enabled) {
+      setNotificationsEnabled(true);
+    }
+    
+    if (times) {
+      try {
+        const parsedTimes = JSON.parse(times) as NotificationTime[];
+        if (Array.isArray(parsedTimes) && parsedTimes.length > 0) {
+          setNotificationTimes(parsedTimes);
+        }
+      } catch (e) {
+        console.error('Error parsing notification times from localStorage', e);
+      }
+    }
   }, []);
 
   useEffect(() => {
@@ -324,42 +315,25 @@ function SettingsContent() {
   };
   
   const handleToggleNotifications = async (checked: boolean) => {
+    setNotificationsEnabled(checked);
+    
     if (checked) {
-      // Store current settings before attempting to enable
-      setOriginalNotificationSettings({
-        enabled: notificationsEnabled,
-        times: notificationTimes
-      });
-      
-      if (!isSupported) {
-        toast.error(<TranslatableText text="Notifications are not supported on this device" forceTranslate={true} />);
-        return;
-      }
-      
-      if (isDenied) {
-        toast.error(<TranslatableText text="Notifications are blocked. Please enable them in your browser settings." forceTranslate={true} />);
-        return;
-      }
-      
-      if (isDefault || !isGranted) {
-        // Request permission
-        const granted = await requestPermission();
-        if (granted) {
-          setNotificationsEnabled(true);
+      // Request permission first
+      if ('Notification' in window) {
+        const permission = await Notification.requestPermission();
+        if (permission === 'granted') {
           setShowNotificationSettings(true);
           toast.success(<TranslatableText text="Notifications enabled! Set your preferences." forceTranslate={true} />);
         } else {
+          setNotificationsEnabled(false);
           toast.error(<TranslatableText text="Notification permission denied" forceTranslate={true} />);
-          return;
         }
       } else {
-        // Permission already granted
-        setNotificationsEnabled(true);
+        // For mobile/capacitor
         setShowNotificationSettings(true);
         toast.success(<TranslatableText text="Customize your notification settings" forceTranslate={true} />);
       }
     } else {
-      setNotificationsEnabled(false);
       toast.info(<TranslatableText text="Notifications disabled" forceTranslate={true} />);
       if (typeof window !== 'undefined') {
         localStorage.removeItem('notification_enabled');
@@ -386,18 +360,28 @@ function SettingsContent() {
     setupJournalReminder(true, 'once', notificationTimes);
     toast.success(<TranslatableText text="Notification settings saved" forceTranslate={true} />);
     setShowNotificationSettings(false);
-    
-    // Update the original settings after successful save
-    setOriginalNotificationSettings({
-      enabled: true,
-      times: notificationTimes
-    });
   };
 
   const cancelNotificationSettings = () => {
-    // Restore to original state
-    setNotificationsEnabled(originalNotificationSettings.enabled);
-    setNotificationTimes(originalNotificationSettings.times);
+    // Reset to previous state
+    const enabled = localStorage.getItem('notification_enabled') === 'true';
+    const times = localStorage.getItem('notification_times');
+    
+    setNotificationsEnabled(enabled);
+    
+    if (times) {
+      try {
+        const parsedTimes = JSON.parse(times) as NotificationTime[];
+        if (Array.isArray(parsedTimes) && parsedTimes.length > 0) {
+          setNotificationTimes(parsedTimes);
+        }
+      } catch (e) {
+        setNotificationTimes(['evening']);
+      }
+    } else {
+      setNotificationTimes(['evening']);
+    }
+    
     setShowNotificationSettings(false);
   };
   
@@ -442,7 +426,7 @@ function SettingsContent() {
         <div className={cn("max-w-3xl mx-auto px-4", isMobile ? "pt-0" : "pt-2")}>
           <div className="mb-6">
             <h1 className="text-3xl font-bold mb-2 text-theme-color">
-              <TranslatableText text="Settings" forceTranslate={true} />
+              <TranslatableText text="settings" forceTranslate={true} />
             </h1>
             <p className="text-muted-foreground">
               <TranslatableText text="Personalize your SOuLO experience" />
