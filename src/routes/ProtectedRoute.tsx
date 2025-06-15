@@ -1,57 +1,23 @@
 
-import React, { useState, useEffect } from 'react';
-import { Navigate, useLocation, Outlet } from 'react-router-dom';
-import { supabase } from '@/integrations/supabase/client';
+import React from 'react';
+import { Navigate, Outlet } from 'react-router-dom';
+import { useAuth } from '@/contexts/AuthContext';
 
-const ProtectedRoute: React.FC = () => {
-  const [isLoading, setIsLoading] = useState(true);
-  const [user, setUser] = useState<any>(null);
-  const location = useLocation();
-  
-  useEffect(() => {
-    const checkAuth = async () => {
-      try {
-        const { data } = await supabase.auth.getSession();
-        setUser(data.session?.user || null);
-        setIsLoading(false);
-      } catch (error) {
-        console.error('Error checking authentication in ProtectedRoute:', error);
-        setIsLoading(false);
-      }
-    };
-    
-    checkAuth();
-    
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      setUser(session?.user || null);
-      setIsLoading(false);
-    });
-    
-    return () => subscription.unsubscribe();
-  }, []);
-  
-  useEffect(() => {
-    if (!isLoading && !user) {
-      console.log("Protected route: No user, should redirect to /app/onboarding", {
-        path: location.pathname
-      });
-    }
-  }, [user, isLoading, location]);
-  
-  if (isLoading) {
+const ProtectedRoute = () => {
+  const { user, loading } = useAuth();
+
+  if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
       </div>
     );
   }
-  
+
   if (!user) {
-    console.log("Redirecting to onboarding from protected route:", location.pathname);
-    return <Navigate to={`/app/onboarding?redirectTo=${location.pathname}`} replace />;
+    return <Navigate to="/app/auth" replace />;
   }
-  
-  // Use Outlet to render child routes
+
   return <Outlet />;
 };
 
