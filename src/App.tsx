@@ -46,7 +46,7 @@ const AppRoutesWithAuth = () => {
         <Navbar />
         <Routes>
           <Route path="/app/auth" element={<Auth />} />
-          <Route path="/app" element={<ProtectedRoute />}>
+          <Route path="/app/*" element={<ProtectedRoute />}>
             <Route index element={
               <OnboardingCheck
                 onboardingComplete={onboardingComplete}
