@@ -25,6 +25,7 @@ function InsightsContent() {
   const { user } = useAuth();
   const { prefetchTranslationsForRoute } = useTranslation();
   const [timeRange, setTimeRange] = useState<TimeRange>('week');
+  // Remove emotionChartDate from use-insights-data dependency
   const [emotionChartDate, setEmotionChartDate] = useState<Date>(new Date());
   const [moodCalendarDate, setMoodCalendarDate] = useState<Date>(new Date());
   const [isSticky, setIsSticky] = useState(false);
@@ -32,9 +33,9 @@ function InsightsContent() {
   const timeToggleRef = useRef<HTMLDivElement>(null);
   const scrollPositionRef = useRef<number>(0);
   const isMobile = useIsMobile();
-  
-  // Pass emotionChartDate to useInsightsData for correct filtering!
-  const { insightsData, loading } = useInsightsData(user?.id, timeRange, emotionChartDate);
+
+  // Fetch insights data ONLY keyed by timeRange and user
+  const { insightsData, loading } = useInsightsData(user?.id, timeRange);
   
   const timeRanges = [
     { value: 'today', label: 'Day' },
@@ -84,7 +85,7 @@ function InsightsContent() {
     setMoodCalendarDate(new Date());
   }, [timeRange]);
 
-  // Handlers to navigate up/down the timeframe (for EmotionChart and MoodCalendar)
+  // Handlers to navigate up/down the timeframe (for EmotionChart)
   const handleEmotionChartNavigate = (nextDate: Date) => {
     setEmotionChartDate(nextDate);
   };
@@ -154,7 +155,7 @@ function InsightsContent() {
     }
   }, [loading, insightsData]);
 
-  // Filter sentimentData for MoodCalendar
+  // Filter sentimentData for MoodCalendar (NO CHANGE)
   const getSentimentData = () => {
     const entries = insightsData.allEntries || [];
     if (entries.length === 0) return [];
@@ -167,6 +168,12 @@ function InsightsContent() {
       }))
       .filter(item => !isNaN(item.sentiment) && !isNaN(item.date.getTime()));
   };
+
+  // THIS IS THE MAIN UX FIX: Do *not* show full page "no journal data available"
+  // unless there are literally ZERO entries in the insightsData for the current *timeRange*.
+  // If we have entries, but just no chart data for a certain period, the EmotionChart handles its own empty state.
+
+  const hasAnyEntries = insightsData.entries.length > 0 || insightsData.allEntries.length > 0;
 
   return (
     <div className="min-h-screen pb-20 insights-container">
@@ -223,7 +230,8 @@ function InsightsContent() {
           <div className="flex justify-center py-20">
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
           </div>
-        ) : insightsData.entries.length === 0 ? (
+        ) : !hasAnyEntries ? (
+          // Only show this if there are literally no entries for the selected timeRange
           <div className="bg-background rounded-xl p-8 text-center border mx-2">
             <h2 className="text-xl font-semibold mb-4">
               <EnhancedTranslatableText 
@@ -503,6 +511,7 @@ function InsightsContent() {
               </motion.div>
             </div>
             
+            {/* --- MAIN: Only pass the *parent* timeRange (not emotionChartDate) to insightsData. Pass emotionChartDate to EmotionChart only --- */}
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}

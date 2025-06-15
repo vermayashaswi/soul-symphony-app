@@ -116,6 +116,23 @@ const getEmotionColor = (emotion: string, index: number): string => {
   return fallbackColors[index % fallbackColors.length];
 };
 
+// Persist chartType via local storage so that navigation doesn't reset chart type for user UX continuity
+function usePersistedState<T>(key: string, defaultValue: T): [T, (val: T) => void] {
+  const [state, setState] = useState<T>(() => {
+    if (typeof window !== 'undefined') {
+      const stored = window.localStorage.getItem(key);
+      if (stored !== null) return JSON.parse(stored);
+    }
+    return defaultValue;
+  });
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      window.localStorage.setItem(key, JSON.stringify(state));
+    }
+  }, [state, key]);
+  return [state, setState];
+}
+
 export function EmotionChart({ 
   className, 
   timeframe = 'week',
@@ -123,8 +140,8 @@ export function EmotionChart({
   currentDate,
   onTimeRangeNavigate,
 }: EmotionChartProps) {
-  // Chart type and UI state
-  const [chartType, setChartType] = useState<ChartType>('bubble');
+  // Chart type (persisted per device!)
+  const [chartType, setChartType] = usePersistedState<ChartType>('emotion-chart-type', 'bubble');
   const [bubbleKey, setBubbleKey] = useState(0); 
   const [selectedEmotionInfo, setSelectedEmotionInfo] = useState<{name: string, percentage: number} | null>(null);
   const [visibleEmotions, setVisibleEmotions] = useState<string[]>([]);
@@ -137,10 +154,18 @@ export function EmotionChart({
   const initialRenderRef = useRef(true);
   const { user } = useAuth();
 
-  // Navigation state
+  // Chart period navigation: Use controlled prop from above or local state if not present
   const [internalDate, setInternalDate] = useState<Date>(new Date());
-  // Internal logic: Use provided date prop or local state if not passed
-  const activeDate = currentDate ?? internalDate;
+  // If parent passes a controlled currentDate, use it; otherwise use internal
+  const activeDate = typeof currentDate === 'object' ? currentDate : internalDate;
+
+  useEffect(() => {
+    // On timeframe change, always reset visibleEmotions
+    setVisibleEmotions([]);
+    // Only reset chartType if not persisted
+    // setChartType('bubble'); // No longer reset, since we want to persist it!
+    if (!currentDate) setInternalDate(new Date());
+  }, [timeframe]);
 
   // Bubble and Line chart base
   const chartTypes = [
