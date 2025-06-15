@@ -46,8 +46,8 @@ const AppRoutesWithAuth = () => {
         <Navbar />
         <Routes>
           <Route path="/app/auth" element={<Auth />} />
-          <Route path="/app" element={
-            <ProtectedRoute>
+          <Route path="/app" element={<ProtectedRoute />}>
+            <Route index element={
               <OnboardingCheck
                 onboardingComplete={onboardingComplete}
                 onboardingLoading={onboardingLoading}
@@ -55,38 +55,14 @@ const AppRoutesWithAuth = () => {
               >
                 <Home />
               </OnboardingCheck>
-            </ProtectedRoute>
-          } />
-          <Route path="/app/journal" element={
-            <ProtectedRoute>
-              <Journal />
-            </ProtectedRoute>
-          } />
-          <Route path="/app/chat" element={
-            <ProtectedRoute>
-              <Chat />
-            </ProtectedRoute>
-          } />
-          <Route path="/app/smart-chat" element={
-            <ProtectedRoute>
-              <SmartChat />
-            </ProtectedRoute>
-          } />
-          <Route path="/app/insights" element={
-            <ProtectedRoute>
-              <Insights />
-            </ProtectedRoute>
-          } />
-          <Route path="/app/settings" element={
-            <ProtectedRoute>
-              <Settings />
-            </ProtectedRoute>
-          } />
-          <Route path="/app/themes" element={
-            <ProtectedRoute>
-              <ThemesManagement />
-            </ProtectedRoute>
-          } />
+            } />
+            <Route path="journal" element={<Journal />} />
+            <Route path="chat" element={<Chat />} />
+            <Route path="smart-chat" element={<SmartChat />} />
+            <Route path="insights" element={<Insights />} />
+            <Route path="settings" element={<Settings />} />
+            <Route path="themes" element={<ThemesManagement />} />
+          </Route>
         </Routes>
         <MobileNavigation onboardingComplete={onboardingComplete} />
         <Toaster />
