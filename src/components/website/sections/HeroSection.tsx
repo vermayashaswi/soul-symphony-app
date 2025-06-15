@@ -24,7 +24,7 @@ const HeroSection: React.FC<HeroSectionProps> = ({ openAppStore, openPlayStore }
   const shouldRenderMobile = isMobile.isMobile || mobileDemo;
 
   return (
-    <div className="relative w-full bg-gradient-to-br from-blue-50 to-purple-50 pt-16 md:pt-20 pb-8 md:pb-12 overflow-hidden min-h-[85vh] flex items-center">
+    <div className="relative w-full bg-gradient-to-br from-blue-50 to-purple-50 pt-12 md:pt-16 pb-4 md:pb-6 overflow-hidden min-h-[80vh] md:min-h-[85vh] flex items-center">
       {/* Background image */}
       <div 
         className="absolute inset-0 z-0 bg-cover bg-center opacity-20"
@@ -32,46 +32,46 @@ const HeroSection: React.FC<HeroSectionProps> = ({ openAppStore, openPlayStore }
       ></div>
       
       <div className="container mx-auto px-4 relative z-10">
-        <div className="flex flex-col lg:flex-row items-center gap-6 lg:gap-8">
+        <div className="flex flex-col lg:flex-row items-center gap-4 lg:gap-6">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.8 }}
             className="w-full lg:w-1/2 text-center lg:text-left"
           >
-            <h1 className="text-3xl md:text-4xl lg:text-5xl font-bold mb-4 text-primary leading-tight">
+            <h1 className="text-2xl md:text-3xl lg:text-4xl xl:text-5xl font-bold mb-3 md:mb-4 text-primary leading-tight">
               <TranslatableText text="Express. Reflect. Grow." />
             </h1>
-            <p className="text-lg md:text-xl text-gray-700 mb-6 max-w-2xl mx-auto lg:mx-0 leading-relaxed">
+            <p className="text-base md:text-lg lg:text-xl text-gray-700 mb-4 md:mb-6 max-w-2xl mx-auto lg:mx-0 leading-relaxed">
               <TranslatableText text="Journaling should be as simple as talking. Use voice and leave the rest to us." />
             </p>
             
-            <div className="flex flex-col sm:flex-row gap-3 justify-center lg:justify-start mb-6">
+            <div className="flex flex-col sm:flex-row gap-2 md:gap-3 justify-center lg:justify-start mb-4 md:mb-6">
               <Button 
                 size="lg" 
-                className="gap-2 bg-black text-white hover:bg-gray-800" 
+                className="gap-2 bg-black text-white hover:bg-gray-800 text-sm md:text-base" 
                 onClick={openAppStore}
               >
-                <Apple className="h-5 w-5" />
+                <Apple className="h-4 w-4 md:h-5 md:w-5" />
                 <TranslatableText text="App Store" />
               </Button>
               <Button 
                 size="lg" 
-                className="gap-2 bg-primary hover:bg-primary/90" 
+                className="gap-2 bg-primary hover:bg-primary/90 text-sm md:text-base" 
                 onClick={openPlayStore}
               >
-                <Play className="h-5 w-5" />
+                <Play className="h-4 w-4 md:h-5 md:w-5" />
                 <TranslatableText text="Google Play" />
               </Button>
             </div>
             
-            <div className="flex items-center justify-center lg:justify-start gap-6 text-sm text-gray-500">
+            <div className="flex items-center justify-center lg:justify-start gap-4 md:gap-6 text-xs md:text-sm text-gray-500">
               <div className="flex items-center gap-1">
-                <Shield className="h-4 w-4 text-primary" />
+                <Shield className="h-3 w-3 md:h-4 md:w-4 text-primary" />
                 <TranslatableText text="Privacy-Focused" />
               </div>
               <div className="flex items-center gap-1">
-                <Check className="h-4 w-4 text-primary" />
+                <Check className="h-3 w-3 md:h-4 md:w-4 text-primary" />
                 <TranslatableText text="14-Day Free Trial" />
               </div>
             </div>
@@ -83,7 +83,7 @@ const HeroSection: React.FC<HeroSectionProps> = ({ openAppStore, openPlayStore }
             transition={{ duration: 1, delay: 0.3 }}
             className="w-full lg:w-1/2 flex items-center justify-center"
           >
-            <div className="w-full max-w-xs lg:max-w-sm">
+            <div className="w-full max-w-[280px] md:max-w-xs lg:max-w-sm">
               <AspectRatio ratio={9/16} className="w-full">
                 <PhoneVoiceAnimation />
               </AspectRatio>
