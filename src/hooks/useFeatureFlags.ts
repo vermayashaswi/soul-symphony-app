@@ -14,7 +14,8 @@ export function useFeatureFlags() {
     queryKey: ['feature-flags', userId, tier],
     queryFn: () => fetchFeatureFlags({ userId, tier }),
     refetchOnWindowFocus: false,
-    staleTime: 10 * 60 * 1000,
+    staleTime: 10 * 60 * 1000, // 10 minutes
+    enabled: !!user, // Only fetch when user is available
   });
 
   return {

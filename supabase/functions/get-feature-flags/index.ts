@@ -29,7 +29,7 @@ serve(async (req: Request) => {
         "target_type.eq.global",
         ...(userId ? [`and(target_type.eq.user,target_value.eq.${userId})`] : []),
         ...(tier ? [`and(target_type.eq.tier,target_value.eq.${tier})`] : [])
-      ].join(','))
+      ].join(','));
 
     if (error) {
       return new Response(JSON.stringify({ error: error.message }), {

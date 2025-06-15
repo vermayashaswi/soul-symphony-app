@@ -15,6 +15,7 @@ import { toast } from 'sonner';
 import './styles/emoji.css';
 import './styles/tutorial.css';
 import { FeatureFlagsProvider } from '@/contexts/FeatureFlagsContext';
+import { useUserSession } from '@/hooks/useUserSession';
 
 // Import React Query client
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -22,8 +23,11 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 // Initialize QueryClient outside component to avoid recreation on every render
 const queryClient = new QueryClient();
 
-const App: React.FC = () => {
+const AppContent: React.FC = () => {
   const [isInitialized, setIsInitialized] = useState(false);
+  
+  // Initialize user session tracking
+  useUserSession();
 
   useEffect(() => {
     // Clean up any malformed paths
@@ -73,26 +77,31 @@ const App: React.FC = () => {
   };
 
   return (
+    <ErrorBoundary onError={handleAppError}>
+      <TranslationProvider>
+        <SubscriptionProvider>
+          <TutorialProvider>
+            <FeatureFlagsProvider>
+              <TranslationLoadingOverlay />
+              <JournalProcessingInitializer />
+              <AppRoutes key={isInitialized ? 'initialized' : 'initializing'} />
+              <TutorialOverlay />
+              <Toaster />
+              <SonnerToaster position="top-right" />
+            </FeatureFlagsProvider>
+          </TutorialProvider>
+        </SubscriptionProvider>
+      </TranslationProvider>
+    </ErrorBoundary>
+  );
+};
+
+const App: React.FC = () => {
+  return (
     <QueryClientProvider client={queryClient}>
-      <ErrorBoundary onError={handleAppError}>
-        <TranslationProvider>
-          <SubscriptionProvider>
-            <TutorialProvider>
-              <FeatureFlagsProvider>
-                <TranslationLoadingOverlay />
-                <JournalProcessingInitializer />
-                <AppRoutes key={isInitialized ? 'initialized' : 'initializing'} />
-                <TutorialOverlay />
-                <Toaster />
-                <SonnerToaster position="top-right" />
-              </FeatureFlagsProvider>
-            </TutorialProvider>
-          </SubscriptionProvider>
-        </TranslationProvider>
-      </ErrorBoundary>
+      <AppContent />
     </QueryClientProvider>
   );
 };
 
 export default App;
-

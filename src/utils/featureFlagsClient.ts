@@ -1,7 +1,7 @@
 
 import { supabase } from '@/integrations/supabase/client';
 
-const EDGE_FUNCTION_URL = `${import.meta.env.VITE_SUPABASE_EDGE_FUNCTION_URL || "https://kwnwhgucnzqxndzjayyq.supabase.co"}/functions/v1/get-feature-flags`;
+const EDGE_FUNCTION_URL = "https://kwnwhgucnzqxndzjayyq.supabase.co/functions/v1/get-feature-flags";
 
 export async function fetchFeatureFlags({ userId, tier }: { userId?: string; tier?: string }) {
   const url = new URL(EDGE_FUNCTION_URL);
