@@ -1,4 +1,3 @@
-
 // Provides a 6-month cache of entries with UI API compatible with useInsightsData
 
 import { useState, useEffect, useRef, useCallback } from "react";
@@ -595,5 +594,7 @@ export function useInsightsCacheData(
     invalidateCache,
   };
 }
+
+export type { TimeRange } from "./use-insights-data";
 
 export default useInsightsCacheData;
