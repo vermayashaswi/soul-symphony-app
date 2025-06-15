@@ -25,7 +25,8 @@ function InsightsContent() {
   const { user } = useAuth();
   const { prefetchTranslationsForRoute } = useTranslation();
   const [timeRange, setTimeRange] = useState<TimeRange>('week');
-  const [currentDate, setCurrentDate] = useState<Date>(new Date());
+  const [emotionChartDate, setEmotionChartDate] = useState<Date>(new Date());
+  const [moodCalendarDate, setMoodCalendarDate] = useState<Date>(new Date());
   const [isSticky, setIsSticky] = useState(false);
   const [selectedEmotion, setSelectedEmotion] = useState<string | null>(null);
   const timeToggleRef = useRef<HTMLDivElement>(null);
@@ -76,21 +77,26 @@ function InsightsContent() {
     setSelectedEmotion(emotion);
   };
 
-  // CurrentDate changes with timeRange: when timeRange changes, reset currentDate to today.
+  // When timeRange changes, reset both independently-scoped dates to today
   useEffect(() => {
-    setCurrentDate(new Date());
+    setEmotionChartDate(new Date());
+    setMoodCalendarDate(new Date());
   }, [timeRange]);
 
-  // Handler to navigate up/down the timeframe
-  const handlePeriodNavigate = (nextDate: Date) => {
-    setCurrentDate(nextDate);
+  // Handlers to navigate up/down the timeframe (for EmotionChart and MoodCalendar)
+  const handleEmotionChartNavigate = (nextDate: Date) => {
+    setEmotionChartDate(nextDate);
+  };
+  const handleMoodCalendarNavigate = (nextDate: Date) => {
+    setMoodCalendarDate(nextDate);
   };
 
   const handleTimeRangeChange = (value: string) => {
     if (value) {
       scrollPositionRef.current = window.scrollY;
       setTimeRange(value as TimeRange);
-      setCurrentDate(new Date()); // << reset period
+      setEmotionChartDate(new Date());
+      setMoodCalendarDate(new Date());
       setTimeout(() => {
         window.scrollTo({ top: scrollPositionRef.current });
       }, 10);
@@ -509,8 +515,8 @@ function InsightsContent() {
               <EmotionChart 
                 timeframe={timeRange}
                 aggregatedData={insightsData.aggregatedEmotionData}
-                currentDate={currentDate}
-                onTimeRangeNavigate={handlePeriodNavigate}
+                currentDate={emotionChartDate}
+                onTimeRangeNavigate={handleEmotionChartNavigate}
               />
             </motion.div>
             
@@ -526,7 +532,8 @@ function InsightsContent() {
               <MoodCalendar 
                 sentimentData={getSentimentData()}
                 timeRange={timeRange}
-                currentDate={currentDate}
+                currentDate={moodCalendarDate}
+                onTimeRangeNavigate={handleMoodCalendarNavigate}
               />
             </motion.div>
             

@@ -137,8 +137,8 @@ export function EmotionChart({
 
   // Navigation state
   const [internalDate, setInternalDate] = useState<Date>(new Date());
-  // Use internal date if not receiving via props
-  const activeDate: Date = currentDate || internalDate;
+  // Internal logic: Use provided date prop or local state if not passed
+  const activeDate = currentDate ?? internalDate;
 
   // Bubble and Line chart base
   const chartTypes = [
@@ -146,7 +146,7 @@ export function EmotionChart({
     { id: 'bubble', label: 'Life Areas' },
   ];
   
-  // Navigation handlers
+  // Navigation handlers (now always use the correct handler)
   const goToPrevious = () => {
     let newDate: Date;
     switch (timeframe) {
@@ -189,7 +189,7 @@ export function EmotionChart({
     if (onTimeRangeNavigate) onTimeRangeNavigate(newDate);
     else setInternalDate(newDate);
   };
-  // Reset period on timeframe change
+  // Reset period on timeframe change (keep currentDate prop precedence)
   useEffect(() => {
     if (!currentDate) setInternalDate(new Date());
   }, [timeframe, currentDate]);
@@ -515,20 +515,54 @@ export function EmotionChart({
     return null;
   };
 
-  // -- Inline chevron header and period label as requested --
+  // Always show period label and navigation header, even with no data
+  const ChevronHeader = () => (
+    <div className="flex items-center justify-between mb-2">
+      <Button 
+        variant="ghost" 
+        size="icon" 
+        onClick={goToPrevious}
+        className="text-muted-foreground hover:text-foreground"
+        title="Previous period"
+      >
+        <ChevronLeft className="h-5 w-5" />
+      </Button>
+      <div className="text-center font-medium text-base">
+        <TranslatableText 
+          text={getPeriodLabel()}
+          forceTranslate={true}
+          enableFontScaling={true}
+          scalingContext="compact"
+        />
+      </div>
+      <Button 
+        variant="ghost" 
+        size="icon" 
+        onClick={goToNext}
+        className="text-muted-foreground hover:text-foreground"
+        title="Next period"
+      >
+        <ChevronRight className="h-5 w-5" />
+      </Button>
+    </div>
+  );
 
   const renderLineChart = () => {
     if (lineData.length === 0) {
+      // Always show header
       return (
-        <div className="flex items-center justify-center h-full">
-          <p className="text-muted-foreground">
-            <TranslatableText 
-              text="No data available for this timeframe" 
-              forceTranslate={true}
-              enableFontScaling={true}
-              scalingContext="general"
-            />
-          </p>
+        <div className="flex flex-col h-full">
+          <ChevronHeader />
+          <div className="flex items-center justify-center h-full">
+            <p className="text-muted-foreground">
+              <TranslatableText 
+                text="No data available for this timeframe" 
+                forceTranslate={true}
+                enableFontScaling={true}
+                scalingContext="general"
+              />
+            </p>
+          </div>
         </div>
       );
     }
@@ -551,35 +585,7 @@ export function EmotionChart({
     }
     return (
       <div className="flex flex-col h-full">
-        {/* Chevron navigation and period label */}
-        <div className="flex items-center justify-between mb-2">
-          <Button 
-            variant="ghost" 
-            size="icon" 
-            onClick={goToPrevious}
-            className="text-muted-foreground hover:text-foreground"
-            title="Previous period"
-          >
-            <ChevronLeft className="h-5 w-5" />
-          </Button>
-          <div className="text-center font-medium text-base">
-            <TranslatableText 
-              text={getPeriodLabel()}
-              forceTranslate={true}
-              enableFontScaling={true}
-              scalingContext="compact"
-            />
-          </div>
-          <Button 
-            variant="ghost" 
-            size="icon" 
-            onClick={goToNext}
-            className="text-muted-foreground hover:text-foreground"
-            title="Next period"
-          >
-            <ChevronRight className="h-5 w-5" />
-          </Button>
-        </div>
+        <ChevronHeader />
         <ResponsiveContainer width="100%" height={isMobile ? 250 : 300}>
           <LineChart
             data={lineData}
@@ -668,9 +674,29 @@ export function EmotionChart({
     );
   };
 
-  const renderBubbleLegend = () => {
-    return null;
-  };
+  const renderBubbleChart = () => (
+    <div className="w-full h-full flex flex-col">
+      <ChevronHeader />
+      {topRightPercentage && (
+        <div className="absolute top-2 right-2 bg-background/90 py-1 px-3 rounded-lg shadow-lg text-primary font-medium z-20">
+          <TranslatableText 
+            text={topRightPercentage.emotion} 
+            forceTranslate={true}
+            enableFontScaling={true}
+            scalingContext="compact"
+          />: {topRightPercentage.percentage}
+        </div>
+      )}
+      <div className="h-[300px] w-full" key={bubbleKey}>
+        <EntityStrips
+          userId={user?.id}
+          timeRange={timeframe}
+          onEntityClick={handleEntityClick}
+          className="w-full h-full"
+        />
+      </div>
+    </div>
+  );
 
   return (
     <div className={cn("w-full", className)}>
@@ -707,30 +733,7 @@ export function EmotionChart({
       </div>
       <div className="bg-card p-4 rounded-xl shadow-sm relative">
         {chartType === 'line' && renderLineChart()}
-        {chartType === 'bubble' && (
-          <div className="w-full">
-            {topRightPercentage && (
-              <div className="absolute top-2 right-2 bg-background/90 py-1 px-3 rounded-lg shadow-lg text-primary font-medium z-20">
-                <TranslatableText 
-                  text={topRightPercentage.emotion} 
-                  forceTranslate={true}
-                  enableFontScaling={true}
-                  scalingContext="compact"
-                />: {topRightPercentage.percentage}
-              </div>
-            )}
-            <div className="h-[300px]" key={bubbleKey}>
-              {chartType === 'bubble' && (
-                <EntityStrips
-                  userId={user?.id}
-                  timeRange={timeframe}
-                  onEntityClick={handleEntityClick}
-                  className="w-full h-full"
-                />
-              )}
-            </div>
-          </div>
-        )}
+        {chartType === 'bubble' && renderBubbleChart()}
       </div>
     </div>
   );
