@@ -83,25 +83,6 @@ class AppErrorBoundary extends React.Component<
   }
 }
 
-// --- Pure Marketing Routes ---
-const MarketingRoutes = () => (
-  <MarketingErrorBoundary>
-    <MarketingThemeProvider>
-      <div className="min-h-screen bg-white text-gray-900">
-        <Routes>
-          <Route path="/" element={<Index />} />
-          <Route path="/faq" element={<FAQPage />} />
-          <Route path="/blog" element={<BlogPage />} />
-          <Route path="/blog/:slug" element={<BlogPostPage />} />
-          <Route path="/privacy-policy" element={<PrivacyPolicyPage />} />
-          <Route path="/terms" element={<PrivacyPolicyPage />} />
-          <Route path="*" element={<NotFound />} />
-        </Routes>
-      </div>
-    </MarketingThemeProvider>
-  </MarketingErrorBoundary>
-);
-
 // --- App Routes with Mobile Navigation ---
 const AppRoutesWithNavigation = () => {
   const { onboardingComplete } = useOnboarding();
@@ -136,27 +117,6 @@ const AppRoutesWithNavigation = () => {
   );
 };
 
-// --- App Routes Component ---
-const AppRoutesComponent = () => {
-  return (
-    <AppErrorBoundary>
-      <ThemeProvider>
-        <TranslationProvider>
-          <AuthProvider>
-            <TutorialProvider>
-              <ViewportManager>
-                <AppRoutesWithNavigation />
-              </ViewportManager>
-              <Toaster />
-              <ShadcnToaster />
-            </TutorialProvider>
-          </AuthProvider>
-        </TranslationProvider>
-      </ThemeProvider>
-    </AppErrorBoundary>
-  );
-};
-
 // --- Main App Component ---
 const App = () => {
   const location = useLocation();
@@ -164,10 +124,44 @@ const App = () => {
   
   console.log('[App] Current route:', location.pathname, 'isAppRoute:', isOnAppRoute);
   
+  // Render app routes with full context providers
+  if (isOnAppRoute) {
+    return (
+      <AppErrorBoundary>
+        <ThemeProvider>
+          <TranslationProvider>
+            <AuthProvider>
+              <TutorialProvider>
+                <ViewportManager>
+                  <AppRoutesWithNavigation />
+                </ViewportManager>
+                <Toaster />
+                <ShadcnToaster />
+              </TutorialProvider>
+            </AuthProvider>
+          </TranslationProvider>
+        </ThemeProvider>
+      </AppErrorBoundary>
+    );
+  }
+
+  // Render marketing routes with minimal context
   return (
-    <>
-      {isOnAppRoute ? <AppRoutesComponent /> : <MarketingRoutes />}
-    </>
+    <MarketingErrorBoundary>
+      <MarketingThemeProvider>
+        <div className="min-h-screen bg-white text-gray-900">
+          <Routes>
+            <Route path="/" element={<Index />} />
+            <Route path="/faq" element={<FAQPage />} />
+            <Route path="/blog" element={<BlogPage />} />
+            <Route path="/blog/:slug" element={<BlogPostPage />} />
+            <Route path="/privacy-policy" element={<PrivacyPolicyPage />} />
+            <Route path="/terms" element={<PrivacyPolicyPage />} />
+            <Route path="*" element={<NotFound />} />
+          </Routes>
+        </div>
+      </MarketingThemeProvider>
+    </MarketingErrorBoundary>
   );
 };
 
