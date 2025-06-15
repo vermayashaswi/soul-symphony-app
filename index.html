@@ -1,28 +1,193 @@
 
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>SOuLO - Your Voice Journaling Companion</title>
+    <title>SOULo - Your Mental Wellness Companion</title>
+    <meta name="description" content="SOULo helps you understand your emotions through AI-powered voice journaling." />
+    <meta name="author" content="SOULo" />
+
+    <meta property="og:title" content="SOULo - Mental Wellness Companion" />
+    <meta property="og:description" content="Track your emotions and gain insights with AI-powered voice journaling" />
+    <meta property="og:type" content="website" />
+    <meta property="og:image" content="https://soulo.online/opengraph-image.png" />
+    <meta property="og:url" content="https://soulo.online" />
+
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:site" content="@soulo_online" />
+    <meta name="twitter:image" content="https://soulo.online/opengraph-image.png" />
     
-    <!-- Preconnect to external font domains for better performance -->
+    <!-- Critical font preloading for performance -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     
-    <!-- Load fonts with font-display: swap for better performance -->
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Critical Inter font - only load essential weights immediately -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet">
     
-    <!-- Meta tags for SEO and social sharing -->
-    <meta name="description" content="SOuLO - Transform your voice into meaningful insights with AI-powered journaling">
-    <meta name="theme-color" content="#000000" />
+    <!-- Critical inline CSS for above-the-fold content -->
+    <style>
+      /* Critical CSS for immediate render */
+      :root {
+        --font-primary: 'Inter', system-ui, -apple-system, sans-serif;
+        --color-primary: #8b5cf6;
+        --color-background: #ffffff;
+        --color-text: #1f2937;
+      }
+      
+      body {
+        font-family: var(--font-primary);
+        margin: 0;
+        padding: 0;
+        background-color: var(--color-background);
+        color: var(--color-text);
+        line-height: 1.6;
+        overflow-x: hidden;
+        -webkit-font-smoothing: antialiased;
+        -moz-osx-font-smoothing: grayscale;
+      }
+      
+      /* Critical loading state */
+      #root:empty:before {
+        content: "";
+        display: block;
+        width: 40px;
+        height: 40px;
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        margin: -20px 0 0 -20px;
+        border-radius: 50%;
+        border: 3px solid rgba(139, 92, 246, 0.3);
+        border-top-color: var(--color-primary);
+        animation: spin 1s linear infinite;
+      }
+      
+      @keyframes spin {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
+      }
+      
+      /* LCP optimization - ensure hero text renders immediately */
+      .hero-text {
+        font-size: 2.5rem;
+        font-weight: 600;
+        line-height: 1.2;
+        color: var(--color-primary);
+        font-display: swap;
+        text-rendering: optimizeLegibility;
+      }
+      
+      @media (max-width: 768px) {
+        .hero-text {
+          font-size: 2rem;
+        }
+      }
+      
+      /* Prevent layout shifts */
+      .button-loading {
+        min-height: 44px;
+        min-width: 44px;
+      }
+      
+      /* Accessibility improvements */
+      .sr-only {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        padding: 0;
+        margin: -1px;
+        overflow: hidden;
+        clip: rect(0, 0, 0, 0);
+        white-space: nowrap;
+        border: 0;
+      }
+      
+      /* Focus management */
+      *:focus {
+        outline: 2px solid var(--color-primary);
+        outline-offset: 2px;
+      }
+    </style>
     
-    <!-- Disable zoom on mobile for better UX -->
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <!-- Deferred font loading script -->
+    <script>
+      (function() {
+        // Load additional font weights after critical render
+        function loadDeferredFonts() {
+          const link = document.createElement('link');
+          link.href = 'https://fonts.googleapis.com/css2?family=Inter:wght@500;700&display=swap';
+          link.rel = 'stylesheet';
+          document.head.appendChild(link);
+          
+          // Load extended font sets for internationalization
+          const multilingualLink = document.createElement('link');
+          multilingualLink.href = 'https://fonts.googleapis.com/css2?family=Noto+Sans+Devanagari:wght@400;600&family=Noto+Sans:wght@400;600&display=swap';
+          multilingualLink.rel = 'stylesheet';
+          document.head.appendChild(multilingualLink);
+        }
+        
+        // Load after initial paint
+        if (document.readyState === 'loading') {
+          document.addEventListener('DOMContentLoaded', function() {
+            setTimeout(loadDeferredFonts, 100);
+          });
+        } else {
+          setTimeout(loadDeferredFonts, 100);
+        }
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>
+    <div id="google_translate_element" style="position: absolute; top: -9999px; left: -9999px;"></div>
+    
+    <!-- Production-optimized scripts -->
+    <script>
+      // Production-safe error handling
+      window.addEventListener('error', function(event) {
+        // Only log errors in development
+        if (window.location.hostname === 'localhost' || 
+            window.location.hostname.includes('127.0.0.1') ||
+            window.location.hostname.includes('lovableproject.com')) {
+          console.error('Global error:', event.error);
+        }
+      });
+
+      window.addEventListener('unhandledrejection', function(event) {
+        // Only log errors in development
+        if (window.location.hostname === 'localhost' || 
+            window.location.hostname.includes('127.0.0.1') ||
+            window.location.hostname.includes('lovableproject.com')) {
+          console.error('Unhandled promise rejection:', event.reason);
+        }
+      });
+      
+      // Service worker registration for caching
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', function() {
+          navigator.serviceWorker.register('/sw.js')
+            .then(function(registration) {
+              // Only log in development
+              if (window.location.hostname === 'localhost' || 
+                  window.location.hostname.includes('127.0.0.1') ||
+                  window.location.hostname.includes('lovableproject.com')) {
+                console.log('[SW] Registered:', registration.scope);
+              }
+            })
+            .catch(function(error) {
+              // Only log in development
+              if (window.location.hostname === 'localhost' || 
+                  window.location.hostname.includes('127.0.0.1') ||
+                  window.location.hostname.includes('lovableproject.com')) {
+                console.log('[SW] Registration failed:', error);
+              }
+            });
+        });
+      }
+    </script>
+    
     <script type="module" src="/src/main.tsx"></script>
+    <script type="text/javascript" src="https://translate.google.com/translate_a/element.js?cb=googleTranslateElementInit" async defer></script>
   </body>
 </html>

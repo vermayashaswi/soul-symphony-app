@@ -37,13 +37,11 @@ export const SubscriptionModal: React.FC<SubscriptionModalProps> = ({
 }) => {
   const { purchaseProduct, isLoading: revenueCatLoading } = useRevenueCat();
   const { isPremium, isTrialActive } = useSubscription();
-  const { monthlyPrice, currency, countryCode, isLoading: pricingLoading, error: pricingError } = useLocationPricing();
+  const { pricing, isLoading: pricingLoading, error: pricingError } = useLocationPricing();
   const [isPurchasing, setIsPurchasing] = useState(false);
 
   console.log('[SubscriptionModal] Current pricing state:', {
-    monthlyPrice,
-    currency,
-    countryCode,
+    pricing,
     isLoading: pricingLoading,
     error: pricingError
   });
@@ -52,11 +50,9 @@ export const SubscriptionModal: React.FC<SubscriptionModalProps> = ({
     try {
       setIsPurchasing(true);
       
-      // For now, we'll use a default product ID since we don't have it from pricing
-      const productId = 'monthly_premium'; // This should come from your RevenueCat configuration
-      console.log('[SubscriptionModal] Starting subscription for product:', productId);
+      console.log('[SubscriptionModal] Starting subscription for product:', pricing.productId);
       
-      const success = await purchaseProduct(productId);
+      const success = await purchaseProduct(pricing.productId);
       
       if (success) {
         toast.success(
@@ -144,10 +140,10 @@ export const SubscriptionModal: React.FC<SubscriptionModalProps> = ({
                 ) : (
                   <>
                     <Badge variant="secondary" className="mb-2">
-                      {countryCode}
+                      {pricing.country}
                     </Badge>
                     <div className="text-3xl font-bold text-primary">
-                      {monthlyPrice}
+                      {pricing.price}
                     </div>
                     <div className="text-sm text-muted-foreground">
                       <TranslatableText text="per month" />

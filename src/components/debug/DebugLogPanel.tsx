@@ -1,5 +1,6 @@
 
 import React, { useState, useEffect, useRef } from 'react';
+import { logger } from '@/utils/logger';
 
 const DebugLogPanel = () => {
   const [logs, setLogs] = useState<{type: string; message: string}[]>([]);
@@ -7,7 +8,7 @@ const DebugLogPanel = () => {
   const logContainerRef = useRef<HTMLDivElement>(null);
   
   // Only render in development environment
-  if (process.env.NODE_ENV !== 'development') {
+  if (!import.meta.env.DEV) {
     return null;
   }
 
@@ -16,6 +17,7 @@ const DebugLogPanel = () => {
     const originalConsoleWarn = console.warn;
     const originalConsoleError = console.error;
     
+    // Intercept console calls and use our logger instead
     console.log = (...args) => {
       originalConsoleLog(...args);
       const message = args.map(arg => 
@@ -23,6 +25,7 @@ const DebugLogPanel = () => {
       ).join(' ');
       
       setLogs(prev => [...prev, { type: 'log', message }]);
+      logger.debug(message);
     };
     
     console.warn = (...args) => {
@@ -32,6 +35,7 @@ const DebugLogPanel = () => {
       ).join(' ');
       
       setLogs(prev => [...prev, { type: 'warn', message }]);
+      logger.warn(message);
     };
     
     console.error = (...args) => {
@@ -41,6 +45,7 @@ const DebugLogPanel = () => {
       ).join(' ');
       
       setLogs(prev => [...prev, { type: 'error', message }]);
+      logger.error(message);
     };
     
     return () => {

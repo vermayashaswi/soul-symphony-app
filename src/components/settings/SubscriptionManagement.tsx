@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -25,7 +26,7 @@ export const SubscriptionManagement: React.FC = () => {
     hasInitialLoadCompleted
   } = useSubscription();
 
-  const { monthlyPrice, currency, countryCode, isLoading: pricingLoading } = useLocationPricing();
+  const { pricing, isLoading: pricingLoading } = useLocationPricing();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
 
@@ -36,7 +37,7 @@ export const SubscriptionManagement: React.FC = () => {
     isLoading,
     error,
     hasInitialLoadCompleted,
-    pricing: { monthlyPrice, currency, countryCode }
+    pricing
   });
 
   const handleRefreshStatus = async () => {
@@ -195,7 +196,7 @@ export const SubscriptionManagement: React.FC = () => {
                   </p>
                   {!pricingLoading && (
                     <div className="text-xs text-muted-foreground mb-2">
-                      {countryCode} - {monthlyPrice}/month
+                      {pricing.country} - {pricing.price}/month
                     </div>
                   )}
                   <Button 

@@ -1,6 +1,9 @@
 
 import React, { useEffect, useRef } from 'react';
 import { useTutorial } from '@/contexts/TutorialContext';
+import { createLogger } from '@/utils/logger';
+
+const logger = createLogger('ButtonStateManager');
 
 interface ButtonStateManagerProps {
   buttonRef: React.RefObject<HTMLDivElement>;
@@ -25,7 +28,7 @@ const ButtonStateManager: React.FC<ButtonStateManagerProps> = ({
     const stateChanged = previousStateRef.current !== isInArrowTutorialStep;
     previousStateRef.current = isInArrowTutorialStep;
 
-    console.log('[ButtonStateManager] State change detected:', {
+    logger.debug('State change detected', {
       isInArrowTutorialStep,
       stateChanged,
       isActive,
@@ -34,9 +37,9 @@ const ButtonStateManager: React.FC<ButtonStateManagerProps> = ({
     });
 
     if (isInArrowTutorialStep) {
-      // Apply tutorial styling
+      // Apply tutorial styling with accessibility improvements
       if (buttonElement) {
-        console.log('[ButtonStateManager] Applying tutorial styling');
+        logger.debug('Applying tutorial styling');
         
         buttonElement.classList.add('tutorial-button-highlight');
         const buttonStyleEl = buttonElement as HTMLElement;
@@ -45,6 +48,15 @@ const ButtonStateManager: React.FC<ButtonStateManagerProps> = ({
         buttonStyleEl.style.border = "2px solid white";
         buttonStyleEl.style.transform = "scale(1.05)";
         buttonStyleEl.style.zIndex = "10000";
+        
+        // Accessibility: Ensure button has proper labeling during tutorial
+        if (!buttonStyleEl.getAttribute('aria-label') && !buttonStyleEl.getAttribute('aria-labelledby')) {
+          buttonStyleEl.setAttribute('aria-label', 'Voice recording button - Click to start recording your journal entry');
+        }
+        
+        // Add focus management for tutorial
+        buttonStyleEl.setAttribute('aria-describedby', 'tutorial-instruction');
+        buttonStyleEl.focus();
       }
       
       if (glowDiv) {
@@ -61,7 +73,7 @@ const ButtonStateManager: React.FC<ButtonStateManagerProps> = ({
       containerEl.style.zIndex = '10000';
     } else {
       // Remove tutorial styling and reset to normal state
-      console.log('[ButtonStateManager] Removing tutorial styling and resetting');
+      logger.debug('Removing tutorial styling and resetting');
       
       if (buttonElement) {
         buttonElement.classList.remove('tutorial-button-highlight');
@@ -71,6 +83,12 @@ const ButtonStateManager: React.FC<ButtonStateManagerProps> = ({
         buttonStyleEl.style.border = "";
         buttonStyleEl.style.transform = "";
         buttonStyleEl.style.zIndex = "";
+        
+        // Reset accessibility attributes
+        if (buttonStyleEl.getAttribute('aria-label') === 'Voice recording button - Click to start recording your journal entry') {
+          buttonStyleEl.removeAttribute('aria-label');
+        }
+        buttonStyleEl.removeAttribute('aria-describedby');
       }
       
       if (glowDiv) {
@@ -99,6 +117,12 @@ const ButtonStateManager: React.FC<ButtonStateManagerProps> = ({
         buttonStyleEl.style.border = "";
         buttonStyleEl.style.transform = "";
         buttonStyleEl.style.zIndex = "";
+        
+        // Clean up accessibility attributes
+        if (buttonStyleEl.getAttribute('aria-label') === 'Voice recording button - Click to start recording your journal entry') {
+          buttonStyleEl.removeAttribute('aria-label');
+        }
+        buttonStyleEl.removeAttribute('aria-describedby');
       }
       
       if (glowDiv) {

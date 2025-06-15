@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { enhancedFontService } from '@/services/enhancedFontService';
 import CanvasTextRenderer from './CanvasTextRenderer';
@@ -33,7 +32,7 @@ export const SmartTextRenderer: React.FC<SmartTextRendererProps> = ({
   outlineColor,
   maxWidth = 25,
   enableWrapping = false,
-  maxCharsPerLine = 18,
+  maxCharsPerLine = 13,
   maxLines = 3
 }) => {
   const [useCanvasRenderer, setUseCanvasRenderer] = useState(false);

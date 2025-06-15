@@ -1,6 +1,8 @@
-import React, { createContext, useContext, useState } from 'react';
 
-// Provide a context with debugging functionality
+import React, { createContext, useContext, useState } from 'react';
+import { logger } from '@/utils/logger';
+
+// Production-safe debug context
 export type DebugStep = {
   id: string;
   name: string;
@@ -25,7 +27,6 @@ interface DebugContextType {
   toggleRecorderDebug: () => void;
 }
 
-// Create a debugging context
 const DebugContext = createContext<DebugContextType>({
   logs: [],
   addLog: () => {},
@@ -43,22 +44,25 @@ const DebugContext = createContext<DebugContextType>({
 
 export const DebugProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [logs, setLogs] = useState<any[]>([]);
-  const [isEnabled, setIsEnabled] = useState<boolean>(false);
+  const [isEnabled, setIsEnabled] = useState<boolean>(import.meta.env.DEV);
   const [recorderSteps, setRecorderSteps] = useState<DebugStep[]>([]);
   const [showRecorderDebug, setShowRecorderDebug] = useState<boolean>(false);
 
   const addLog = (...args: any[]) => {
-    setLogs(prevLogs => [...prevLogs, ...args]);
-    console.log(...args);
+    const logEntry = args.join(' ');
+    setLogs(prevLogs => [...prevLogs, logEntry]);
+    logger.debug(logEntry, undefined, 'DebugContext');
   };
 
   const addEvent = (...args: any[]) => {
-    setLogs(prevLogs => [...prevLogs, { event: args }]);
-    console.debug('Event:', ...args);
+    const eventData = { event: args };
+    setLogs(prevLogs => [...prevLogs, eventData]);
+    logger.debug('Event:', args, 'DebugContext');
   };
 
   const clearLogs = () => {
     setLogs([]);
+    logger.clearLogs();
   };
 
   const toggleEnabled = () => {
@@ -67,16 +71,19 @@ export const DebugProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
   const addRecorderStep = (step: DebugStep) => {
     setRecorderSteps(prevSteps => [...prevSteps, { ...step, timestamp: Date.now() }]);
+    logger.debug('Recorder step added', step, 'Recorder');
   };
 
   const updateRecorderStep = (id: string, updates: Partial<DebugStep>) => {
     setRecorderSteps(prevSteps =>
       prevSteps.map(step => (step.id === id ? { ...step, ...updates, duration: Date.now() - (step.timestamp || Date.now()) } : step))
     );
+    logger.debug('Recorder step updated', { id, updates }, 'Recorder');
   };
 
   const resetRecorderSteps = () => {
     setRecorderSteps([]);
+    logger.debug('Recorder steps reset', undefined, 'Recorder');
   };
 
   const toggleRecorderDebug = () => {

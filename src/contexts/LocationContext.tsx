@@ -1,9 +1,15 @@
 
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { SessionTrackingService } from '@/services/sessionTrackingService';
 
-export interface LocationContextType {
-  country: string | null;
-  currency: string | null;
+interface LocationData {
+  country: string;
+  currency: string;
+  timezone: string;
+}
+
+interface LocationContextType {
+  locationData: LocationData | null;
   isLoading: boolean;
   error: string | null;
   refreshLocation: () => Promise<void>;
@@ -11,70 +17,69 @@ export interface LocationContextType {
 
 const LocationContext = createContext<LocationContextType | undefined>(undefined);
 
-export const LocationProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-  const [country, setCountry] = useState<string | null>(null);
-  const [currency, setCurrency] = useState<string | null>(null);
+const DEFAULT_LOCATION: LocationData = {
+  country: 'DEFAULT',
+  currency: 'USD',
+  timezone: 'UTC'
+};
+
+export function LocationProvider({ children }: { children: ReactNode }) {
+  const [locationData, setLocationData] = useState<LocationData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const fetchLocationData = async (): Promise<void> => {
+  const detectLocation = async (): Promise<void> => {
     try {
       setIsLoading(true);
       setError(null);
       
-      // Try to get location from IP
-      const response = await fetch('https://ipapi.co/json/');
-      if (!response.ok) {
-        throw new Error('Failed to fetch location data');
+      console.log('[LocationContext] Starting location detection');
+      
+      // Use the existing SessionTrackingService for consistent detection
+      const detectedLocation = await SessionTrackingService.detectLocation();
+      
+      if (detectedLocation) {
+        console.log('[LocationContext] Location detected:', detectedLocation);
+        setLocationData(detectedLocation);
+      } else {
+        console.log('[LocationContext] Using default location');
+        setLocationData(DEFAULT_LOCATION);
       }
-      
-      const data = await response.json();
-      setCountry(data.country_code || 'US');
-      setCurrency(data.currency || 'USD');
-      
-      console.log('[LocationContext] Location data fetched:', {
-        country: data.country_code,
-        currency: data.currency
-      });
     } catch (err) {
-      console.error('[LocationContext] Error fetching location:', err);
-      setError(err instanceof Error ? err.message : 'Unknown error');
-      
-      // Default to US if location fetch fails
-      setCountry('US');
-      setCurrency('USD');
+      console.error('[LocationContext] Location detection failed:', err);
+      setError(err instanceof Error ? err.message : 'Location detection failed');
+      setLocationData(DEFAULT_LOCATION);
     } finally {
       setIsLoading(false);
     }
   };
 
   const refreshLocation = async (): Promise<void> => {
-    await fetchLocationData();
+    await detectLocation();
   };
 
   useEffect(() => {
-    fetchLocationData();
+    detectLocation();
   }, []);
 
-  const contextValue: LocationContextType = {
-    country,
-    currency,
+  const value = {
+    locationData,
     isLoading,
     error,
-    refreshLocation
+    refreshLocation,
   };
 
   return (
-    <LocationContext.Provider value={contextValue}>
+    <LocationContext.Provider value={value}>
       {children}
     </LocationContext.Provider>
   );
-};
+}
 
-export const useLocation = (): LocationContextType => {
+export function useLocation() {
   const context = useContext(LocationContext);
   if (context === undefined) {
     throw new Error('useLocation must be used within a LocationProvider');
   }
   return context;
-};
+}

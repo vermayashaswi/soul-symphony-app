@@ -1,7 +1,9 @@
+
 import React, { useState, useEffect, useRef } from 'react';
 import { useTranslation } from '@/contexts/TranslationContext';
 import { useInsightsTranslation } from '@/components/insights/InsightsTranslationProvider';
 import { useLocation } from 'react-router-dom';
+import { isWebsiteRoute } from '@/routes/RouteHelpers';
 import { useLanguageFontConfig } from '@/utils/languageFontScaling';
 import { createLanguageAwareStyle, getLanguageAwareClasses } from '@/utils/languageAwareCSS';
 
@@ -19,9 +21,6 @@ interface EnhancedTranslatableTextProps {
   scalingContext?: 'mobile-nav' | 'general' | 'compact';
   usePageTranslation?: boolean;
 }
-
-// Implement isWebsiteRoute locally for now:
-const isWebsiteRoute = (pathname: string) => !pathname.startsWith('/app');
 
 export function EnhancedTranslatableText({ 
   text, 

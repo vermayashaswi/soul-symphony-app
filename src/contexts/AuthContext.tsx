@@ -13,9 +13,7 @@ import {
   refreshSession as refreshSessionService
 } from '@/services/authService';
 import { debugLogger, logInfo, logError, logAuthError, logProfile, logAuth } from '@/components/debug/DebugPanel';
-// Remove import of RouteHelpers
-// import { isAppRoute } from '@/routes/RouteHelpers';
-const isAppRoute = (pathname: string) => pathname.startsWith('/app');
+import { isAppRoute } from '@/routes/RouteHelpers';
 import { useLocation } from 'react-router-dom';
 import { SessionTrackingService } from '@/services/sessionTrackingService';
 import { LocationProvider } from '@/contexts/LocationContext';

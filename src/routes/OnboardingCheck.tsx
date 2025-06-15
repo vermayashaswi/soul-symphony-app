@@ -1,67 +1,99 @@
 
-import React, { ReactNode } from 'react';
-import { Navigate } from 'react-router-dom';
-import { useAuth } from '@/contexts/AuthContext';
-import { useOnboarding } from '@/hooks/use-onboarding';
+import React from 'react';
+import { useLocation, Navigate } from 'react-router-dom';
+import { User } from '@supabase/supabase-js';
+import { isAppRoute, isWebsiteRoute } from './RouteHelpers';
+import { useTranslation } from '@/contexts/TranslationContext';
 
 interface OnboardingCheckProps {
-  children: ReactNode;
+  onboardingComplete: boolean | null;
+  onboardingLoading: boolean;
+  user: User | null;
+  children: React.ReactNode;
 }
 
-const OnboardingCheck: React.FC<OnboardingCheckProps> = ({ children }) => {
-  console.log('[OnboardingCheck] Component mounting...');
+const OnboardingCheck: React.FC<OnboardingCheckProps> = ({ 
+  onboardingComplete, 
+  onboardingLoading, 
+  user,
+  children 
+}) => {
+  const location = useLocation();
+  const { currentLanguage } = useTranslation();
   
-  try {
-    const { user, isLoading: authLoading } = useAuth();
-    const { onboardingComplete, loading: onboardingLoading } = useOnboarding();
-
-    console.log('[OnboardingCheck] State:', {
-      hasUser: !!user,
-      userId: user?.id,
-      authLoading,
-      onboardingComplete,
-      onboardingLoading,
-      currentPath: window.location.pathname
-    });
-
-    if (authLoading || onboardingLoading) {
-      console.log('[OnboardingCheck] Still loading, showing spinner');
-      return (
-        <div className="flex items-center justify-center min-h-screen">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-        </div>
-      );
-    }
-
-    if (!user) {
-      console.log('[OnboardingCheck] No user, redirecting to onboarding');
-      return <Navigate to="/app/onboarding" replace />;
-    }
-
-    if (!onboardingComplete) {
-      console.log('[OnboardingCheck] Onboarding not complete, redirecting to onboarding');
-      return <Navigate to="/app/onboarding" replace />;
-    }
-
-    console.log('[OnboardingCheck] All checks passed, rendering children');
+  // Expanded list of onboarding/auth paths
+  const onboardingOrAuthPaths = [
+    '/app/onboarding',
+    '/app/auth',
+    '/onboarding',
+    '/auth',
+    '/app',
+    '/' // Also consider root path
+  ];
+  
+  // Check if current path is in the list
+  const isOnboardingOrAuth = onboardingOrAuthPaths.includes(location.pathname);
+  
+  console.log('OnboardingCheck rendering at path:', location.pathname, {
+    user: !!user, 
+    onboardingComplete,
+    isAppRoute: isAppRoute(location.pathname),
+    isWebsiteRoute: isWebsiteRoute(location.pathname),
+    isOnboardingOrAuth,
+    language: currentLanguage
+  });
+  
+  // For website routes, no checks needed - just render children
+  if (isWebsiteRoute(location.pathname)) {
+    console.log('Website route detected, no onboarding check needed');
     return <>{children}</>;
-  } catch (error) {
-    console.error('[OnboardingCheck] Error in component:', error);
+  }
+  
+  const isAuthRoute = location.pathname === '/app/auth' || location.pathname === '/auth';
+  const isOnboardingRoute = location.pathname === '/app/onboarding' || location.pathname === '/onboarding';
+  const isRootAppRoute = location.pathname === '/app';
+  
+  // Do not run checks on special routes
+  const isOnboardingBypassedRoute = isAuthRoute || isOnboardingRoute ||
+    location.pathname.includes('debug') || 
+    location.pathname.includes('admin');
+    
+  if (onboardingLoading) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="text-center">
-          <h2 className="text-xl font-bold mb-2">Onboarding Check Error</h2>
-          <p className="text-gray-600">{error instanceof Error ? error.message : 'Unknown error'}</p>
-          <button 
-            onClick={() => window.location.href = '/app/onboarding'} 
-            className="mt-4 px-4 py-2 bg-blue-600 text-white rounded"
-          >
-            Go to Onboarding
-          </button>
-        </div>
+      <div className="flex items-center justify-center h-screen w-screen">
+        <div className="animate-spin w-8 h-8 border-4 border-theme border-t-transparent rounded-full"></div>
       </div>
     );
   }
+
+  // Special handling for the root /app route
+  if (isRootAppRoute) {
+    console.log('Root app route detected, user:', !!user);
+    // If user is logged in, redirect to home
+    if (user) {
+      console.log('User is logged in, redirecting to /app/home');
+      return <Navigate to="/app/home" replace />;
+    } else {
+      // If user is not logged in, redirect to onboarding
+      console.log('User not logged in, redirecting to /app/onboarding');
+      return <Navigate to="/app/onboarding" replace />;
+    }
+  }
+  
+  // For other app routes, check if user should be redirected to auth
+  if (isAppRoute(location.pathname)) {
+    const shouldRedirectToAuth = 
+      !user && 
+      !isOnboardingBypassedRoute;
+    
+    // If user is not logged in and it's a protected route (not auth or onboarding)
+    if (shouldRedirectToAuth) {
+      console.log('Redirecting to auth from:', location.pathname);
+      return <Navigate to="/app/auth" replace />;
+    }
+  }
+  
+  return <>{children}</>;
 };
 
 export default OnboardingCheck;

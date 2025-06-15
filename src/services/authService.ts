@@ -1,6 +1,7 @@
+
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-const isAppRoute = (pathname: string) => pathname.startsWith('/app');
+import { isAppRoute } from '@/routes/RouteHelpers';
 
 /**
  * Gets the redirect URL for authentication

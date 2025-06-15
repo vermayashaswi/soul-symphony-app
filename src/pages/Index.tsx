@@ -1,21 +1,79 @@
 
-import React from "react";
-import MarketingNavbar from "@/components/website/MarketingNavbar";
-import MarketingHero from "@/components/website/MarketingHero";
-import MarketingFeatures from "@/components/website/MarketingFeatures";
-import MarketingPrivacy from "@/components/website/MarketingPrivacy";
-import MarketingFooter from "@/components/website/MarketingFooter";
+import React, { useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { useAuth } from '@/contexts/AuthContext';
+import { useIsMobile } from '@/hooks/use-mobile';
+import { pwaService } from '@/services/pwaService';
+import HomePage from '@/pages/website/HomePage';
+import { createLogger } from '@/utils/logger';
+
+const logger = createLogger('Index');
 
 const Index = () => {
-  return (
-    <main className="min-h-screen flex flex-col bg-white text-neutral-900">
-      <MarketingNavbar />
-      <MarketingHero />
-      <MarketingFeatures />
-      <MarketingPrivacy />
-      <MarketingFooter />
-    </main>
-  );
+  const navigate = useNavigate();
+  const { user } = useAuth();
+  const isMobile = useIsMobile();
+
+  useEffect(() => {
+    // Only redirect to app routes if explicitly requested or in standalone PWA mode
+    const handleAppRedirection = async () => {
+      logger.debug('Checking for app redirection needs');
+      
+      // Check if this is a PWA standalone mode (actual app installation)
+      const pwaInfo = pwaService.getPWAInfo();
+      const isStandaloneApp = pwaInfo.isStandalone;
+      
+      logger.debug('App context detection', {
+        isStandalone: isStandaloneApp,
+        platform: pwaInfo.platform,
+        userAgent: navigator.userAgent.slice(0, 100)
+      });
+
+      // Only redirect to app if in standalone PWA mode
+      if (isStandaloneApp) {
+        logger.debug('Standalone PWA detected, redirecting to app splash');
+        navigate('/app/splash', { replace: true });
+        return;
+      }
+
+      // Check URL parameters for explicit app access
+      const urlParams = new URLSearchParams(window.location.search);
+      if (urlParams.has('app') || urlParams.has('mobile')) {
+        logger.debug('Explicit app access requested via URL params');
+        navigate('/app/splash', { replace: true });
+        return;
+      }
+
+      // For all other cases (including mobile web), stay on marketing homepage
+      logger.debug('Rendering marketing homepage for route "/"');
+    };
+
+    handleAppRedirection();
+  }, [navigate]);
+
+  // Enhanced performance optimization for mobile web users
+  useEffect(() => {
+    if (isMobile.isMobile) {
+      logger.debug('Mobile web user detected, optimizing for mobile experience');
+      
+      // Set mobile-specific optimizations for the marketing page
+      document.documentElement.style.setProperty('--mobile-viewport-height', '100vh');
+      document.body.style.touchAction = 'manipulation';
+      
+      // Preload app assets for potential future navigation
+      const preloadImage = (src: string) => {
+        const img = new Image();
+        img.src = src;
+      };
+      
+      // Preload key app icons in case user navigates to app later
+      preloadImage('/icons/icon-192x192.png');
+      preloadImage('/icons/icon-512x512.png');
+    }
+  }, [isMobile.isMobile]);
+
+  // Render the marketing homepage directly
+  return <HomePage />;
 };
 
 export default Index;

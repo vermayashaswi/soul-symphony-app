@@ -1,55 +1,58 @@
 
-import React from 'react';
-import { Navigate, Outlet } from 'react-router-dom';
-import { useAuth } from '@/contexts/AuthContext';
+import React, { useState, useEffect } from 'react';
+import { Navigate, useLocation, Outlet } from 'react-router-dom';
+import { supabase } from '@/integrations/supabase/client';
 
-const ProtectedRoute = () => {
-  console.log('[ProtectedRoute] Component mounting...');
+const ProtectedRoute: React.FC = () => {
+  const [isLoading, setIsLoading] = useState(true);
+  const [user, setUser] = useState<any>(null);
+  const location = useLocation();
   
-  try {
-    const { user, isLoading } = useAuth();
+  useEffect(() => {
+    const checkAuth = async () => {
+      try {
+        const { data } = await supabase.auth.getSession();
+        setUser(data.session?.user || null);
+        setIsLoading(false);
+      } catch (error) {
+        console.error('Error checking authentication in ProtectedRoute:', error);
+        setIsLoading(false);
+      }
+    };
     
-    console.log('[ProtectedRoute] Auth state:', { 
-      hasUser: !!user, 
-      userId: user?.id, 
-      isLoading,
-      userEmail: user?.email,
-      currentPath: window.location.pathname
+    checkAuth();
+    
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      setUser(session?.user || null);
+      setIsLoading(false);
     });
-
-    if (isLoading) {
-      console.log('[ProtectedRoute] Still loading auth state, showing spinner');
-      return (
-        <div className="flex items-center justify-center min-h-screen">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-        </div>
-      );
+    
+    return () => subscription.unsubscribe();
+  }, []);
+  
+  useEffect(() => {
+    if (!isLoading && !user) {
+      console.log("Protected route: No user, should redirect to /app/onboarding", {
+        path: location.pathname
+      });
     }
-
-    if (!user) {
-      console.log('[ProtectedRoute] No user found, redirecting to /app/onboarding');
-      return <Navigate to="/app/onboarding" replace />;
-    }
-
-    console.log('[ProtectedRoute] User authenticated, rendering protected content');
-    return <Outlet />;
-  } catch (error) {
-    console.error('[ProtectedRoute] Error in component:', error);
+  }, [user, isLoading, location]);
+  
+  if (isLoading) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="text-center">
-          <h2 className="text-xl font-bold mb-2">Authentication Error</h2>
-          <p className="text-gray-600 mb-4">{error instanceof Error ? error.message : 'Unknown error'}</p>
-          <button 
-            onClick={() => window.location.href = '/app/onboarding'} 
-            className="px-4 py-2 bg-blue-600 text-white rounded"
-          >
-            Go to Onboarding
-          </button>
-        </div>
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
       </div>
     );
   }
+  
+  if (!user) {
+    console.log("Redirecting to onboarding from protected route:", location.pathname);
+    return <Navigate to={`/app/onboarding?redirectTo=${location.pathname}`} replace />;
+  }
+  
+  // Use Outlet to render child routes
+  return <Outlet />;
 };
 
 export default ProtectedRoute;

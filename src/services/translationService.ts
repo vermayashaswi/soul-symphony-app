@@ -8,12 +8,21 @@ class TranslationService {
   // NEW: Batch operation tracking
   private batchOperations = new Map<string, Promise<Map<string, string>>>();
 
+  // NEW: Retry configuration
+  private readonly MAX_RETRIES = 3;
+  private readonly RETRY_DELAY = 1000; // 1 second
+
   async setApiKey(apiKey: string) {
     this.apiKey = apiKey;
   }
 
   private hasApiKey(): boolean {
     return !!this.apiKey;
+  }
+
+  // NEW: Helper method for exponential backoff delay
+  private async delay(ms: number): Promise<void> {
+    return new Promise(resolve => setTimeout(resolve, ms));
   }
 
   async translate(text: string, sourceLanguage: string = 'en', targetLanguage?: string): Promise<string | null> {
@@ -40,7 +49,7 @@ class TranslationService {
       const { data, error } = await supabase.functions.invoke('translate-text', {
         body: {
           text,
-          sourceLanguage: sourceLanguage === 'auto' ? 'en' : sourceLanguage, // Fix: Convert auto to en
+          sourceLanguage: sourceLanguage === 'auto' ? 'en' : sourceLanguage,
           targetLanguage,
           cleanResult: true
         }
@@ -74,20 +83,20 @@ class TranslationService {
     }
   }
 
-  // ENHANCED: Fixed batch translate with proper source language handling
+  // ENHANCED: Robust batch translate with retry logic and individual fallback
   async batchTranslate(options: { texts: string[], targetLanguage: string, sourceLanguage?: string }): Promise<Map<string, string>> {
-    const { texts, targetLanguage, sourceLanguage = 'en' } = options; // Fix: Default to 'en' instead of 'auto'
+    const { texts, targetLanguage, sourceLanguage = 'en' } = options;
     const batchKey = `${texts.join('|')}-${sourceLanguage}-${targetLanguage}`;
     
     // Check if this exact batch is already being processed
     const existingBatch = this.batchOperations.get(batchKey);
     if (existingBatch) {
-      console.log('[TranslationService] APP-LEVEL: Reusing existing batch operation');
+      console.log('[TranslationService] ENHANCED: Reusing existing batch operation');
       return existingBatch;
     }
 
     // Create new batch operation
-    const batchPromise = this.performBatchTranslation(texts, sourceLanguage, targetLanguage);
+    const batchPromise = this.performEnhancedBatchTranslation(texts, sourceLanguage, targetLanguage);
     this.batchOperations.set(batchKey, batchPromise);
 
     try {
@@ -99,7 +108,7 @@ class TranslationService {
     }
   }
 
-  private async performBatchTranslation(texts: string[], sourceLanguage: string, targetLanguage: string): Promise<Map<string, string>> {
+  private async performEnhancedBatchTranslation(texts: string[], sourceLanguage: string, targetLanguage: string): Promise<Map<string, string>> {
     const results = new Map<string, string>();
     
     if (sourceLanguage === targetLanguage) {
@@ -107,9 +116,9 @@ class TranslationService {
       return results;
     }
 
-    console.log(`[TranslationService] APP-LEVEL: Starting atomic batch translation for ${texts.length} texts`);
+    console.log(`[TranslationService] ENHANCED: Starting robust batch translation for ${texts.length} texts`);
 
-    // Check cache for all texts first using correct method names
+    // Check cache for all texts first
     const uncachedTexts: string[] = [];
     const cacheHits = new Map<string, string>();
     
@@ -122,57 +131,139 @@ class TranslationService {
       }
     }
 
-    console.log(`[TranslationService] APP-LEVEL: Cache hits: ${cacheHits.size}, need translation: ${uncachedTexts.length}`);
+    console.log(`[TranslationService] ENHANCED: Cache hits: ${cacheHits.size}, need translation: ${uncachedTexts.length}`);
 
     // Add cache hits to results
     cacheHits.forEach((translated, original) => {
       results.set(original, translated);
     });
 
-    // Use Supabase edge function for batch translation
+    // NEW: Enhanced batch translation with retry logic
     if (uncachedTexts.length > 0) {
+      const batchResults = await this.performBatchTranslationWithRetry(uncachedTexts, sourceLanguage, targetLanguage);
+      
+      // Add batch results to final results
+      batchResults.forEach((translated, original) => {
+        results.set(original, translated);
+      });
+    }
+
+    // NEW: Verification step - ensure all requested texts have translations
+    const missingTranslations = texts.filter(text => !results.has(text));
+    if (missingTranslations.length > 0) {
+      console.warn(`[TranslationService] ENHANCED: ${missingTranslations.length} texts still missing translations, using original text`);
+      missingTranslations.forEach(text => {
+        results.set(text, text);
+      });
+    }
+
+    console.log(`[TranslationService] ENHANCED: Batch translation complete: ${results.size}/${texts.length} texts processed`);
+    return results;
+  }
+
+  // NEW: Batch translation with retry and individual fallback
+  private async performBatchTranslationWithRetry(
+    texts: string[], 
+    sourceLanguage: string, 
+    targetLanguage: string
+  ): Promise<Map<string, string>> {
+    const results = new Map<string, string>();
+    let remainingTexts = [...texts];
+    
+    // Try batch translation with retries
+    for (let attempt = 1; attempt <= this.MAX_RETRIES; attempt++) {
+      if (remainingTexts.length === 0) break;
+      
+      console.log(`[TranslationService] ENHANCED: Batch attempt ${attempt}/${this.MAX_RETRIES} for ${remainingTexts.length} texts`);
+      
       try {
         const { data, error } = await supabase.functions.invoke('translate-text', {
           body: {
-            texts: uncachedTexts,
-            sourceLanguage: sourceLanguage === 'auto' ? 'en' : sourceLanguage, // Fix: Convert auto to en
+            texts: remainingTexts,
+            sourceLanguage: sourceLanguage === 'auto' ? 'en' : sourceLanguage,
             targetLanguage,
             cleanResult: true
           }
         });
 
-        if (error) {
-          console.error('[TranslationService] APP-LEVEL: Batch translation error:', error);
-          // Use original texts for failed batch
-          uncachedTexts.forEach(text => results.set(text, text));
-        } else if (data && data.translatedTexts) {
+        if (!error && data && data.translatedTexts && Array.isArray(data.translatedTexts)) {
           const translations = data.translatedTexts;
+          const successfulTranslations: string[] = [];
           
-          for (let i = 0; i < uncachedTexts.length; i++) {
-            const originalText = uncachedTexts[i];
-            const translatedText = translations[i] || originalText;
-            results.set(originalText, translatedText);
+          // Process successful translations
+          for (let i = 0; i < Math.min(remainingTexts.length, translations.length); i++) {
+            const originalText = remainingTexts[i];
+            const translatedText = translations[i];
             
-            // Cache individual results using correct method name
-            await translationCache.setTranslation({
-              originalText,
-              translatedText,
-              language: targetLanguage,
-              timestamp: Date.now(),
-              version: 1
-            });
+            if (translatedText && translatedText.trim() && translatedText !== originalText) {
+              results.set(originalText, translatedText);
+              successfulTranslations.push(originalText);
+              
+              // Cache individual results
+              await translationCache.setTranslation({
+                originalText,
+                translatedText,
+                language: targetLanguage,
+                timestamp: Date.now(),
+                version: 1
+              });
+            }
           }
-
-          console.log(`[TranslationService] APP-LEVEL: Batch translation complete: ${translations.length} texts translated`);
+          
+          // Remove successfully translated texts from remaining list
+          remainingTexts = remainingTexts.filter(text => !successfulTranslations.includes(text));
+          
+          console.log(`[TranslationService] ENHANCED: Batch attempt ${attempt} successful: ${successfulTranslations.length}/${texts.length}, remaining: ${remainingTexts.length}`);
+          
+          // If we got all translations, we're done
+          if (remainingTexts.length === 0) {
+            break;
+          }
+        } else {
+          console.error(`[TranslationService] ENHANCED: Batch attempt ${attempt} failed:`, error);
+        }
+        
+        // Wait before retry (exponential backoff)
+        if (attempt < this.MAX_RETRIES && remainingTexts.length > 0) {
+          await this.delay(this.RETRY_DELAY * Math.pow(2, attempt - 1));
         }
       } catch (error) {
-        console.error(`[TranslationService] APP-LEVEL: Error in batch translation:`, error);
-        // Use original texts for failed batch
-        uncachedTexts.forEach(text => results.set(text, text));
+        console.error(`[TranslationService] ENHANCED: Batch attempt ${attempt} exception:`, error);
+        
+        // Wait before retry
+        if (attempt < this.MAX_RETRIES && remainingTexts.length > 0) {
+          await this.delay(this.RETRY_DELAY * Math.pow(2, attempt - 1));
+        }
       }
     }
-
-    console.log(`[TranslationService] APP-LEVEL: Atomic batch translation complete: ${results.size}/${texts.length} texts processed`);
+    
+    // NEW: Individual translation fallback for remaining texts
+    if (remainingTexts.length > 0) {
+      console.log(`[TranslationService] ENHANCED: Falling back to individual translation for ${remainingTexts.length} texts`);
+      
+      const individualPromises = remainingTexts.map(async (text) => {
+        try {
+          const translated = await this.translate(text, sourceLanguage, targetLanguage);
+          if (translated && translated !== text) {
+            results.set(text, translated);
+            return { text, success: true };
+          } else {
+            results.set(text, text); // Use original if translation fails
+            return { text, success: false };
+          }
+        } catch (error) {
+          console.error(`[TranslationService] ENHANCED: Individual translation failed for "${text}":`, error);
+          results.set(text, text); // Use original on error
+          return { text, success: false };
+        }
+      });
+      
+      const individualResults = await Promise.all(individualPromises);
+      const individualSuccesses = individualResults.filter(r => r.success).length;
+      
+      console.log(`[TranslationService] ENHANCED: Individual fallback complete: ${individualSuccesses}/${remainingTexts.length} successful`);
+    }
+    
     return results;
   }
 

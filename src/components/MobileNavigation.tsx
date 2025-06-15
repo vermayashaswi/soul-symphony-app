@@ -1,18 +1,16 @@
+
 import React, { useEffect, useState } from 'react';
 import { useLocation, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Home, MessageCircle, BookOpen, BarChart2, Settings, Crown } from 'lucide-react';
 import { cn } from '@/lib/utils';
-// Remove the following import as RouteHelpers has been deleted
-// import { isNativeApp, isAppRoute } from '@/routes/RouteHelpers';
-// Replace isNativeApp with a simple check for running in a mobile app, fallback to false
-const isNativeApp = () => false; // Simple stub, implement fully if needed
+import { isNativeApp, isAppRoute } from '@/routes/RouteHelpers';
+import { useIsMobile } from '@/hooks/use-mobile';
 import { TranslatableText } from '@/components/translation/TranslatableText';
 import { useTutorial } from '@/contexts/TutorialContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTranslation } from '@/contexts/TranslationContext';
 import { useSubscription } from '@/contexts/SubscriptionContext';
-import { useIsMobile } from '@/hooks/use-mobile';
 
 interface MobileNavigationProps {
   onboardingComplete: boolean | null;

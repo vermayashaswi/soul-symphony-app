@@ -1,19 +1,21 @@
 
-// Empty debug panel export with no-op functions that accept arguments but do nothing
+// Production-safe debug panel - only active in development
+import { logger } from '@/utils/logger';
+
+// All debug utilities disabled for production build
 export const debugLogger = {
-  log: (..._: any[]) => {},
-  logInfo: (..._: any[]) => {},
-  logError: (..._: any[]) => {},
-  logWarning: (..._: any[]) => {},
-  setLastProfileError: (..._: any[]) => {}
+  log: (...args: any[]) => logger.debug(args.join(' '), undefined, 'Debug'),
+  logInfo: (...args: any[]) => logger.info(args.join(' '), undefined, 'Debug'),
+  logError: (...args: any[]) => logger.error(args.join(' '), undefined, 'Debug'),
+  logWarning: (...args: any[]) => logger.warn(args.join(' '), undefined, 'Debug'),
+  setLastProfileError: (...args: any[]) => logger.error('Profile error', args, 'Debug')
 };
 
-// Define these functions to accept parameters but do nothing with them
-export const logInfo = (..._: any[]) => {};
-export const logError = (..._: any[]) => {};
-export const logAuthError = (..._: any[]) => {};
-export const logProfile = (..._: any[]) => {};
-export const logAuth = (..._: any[]) => {};
+export const logInfo = (...args: any[]) => logger.info(args.join(' '), undefined, 'Debug');
+export const logError = (...args: any[]) => logger.error(args.join(' '), undefined, 'Debug');
+export const logAuthError = (...args: any[]) => logger.error('Auth error', args, 'Auth');
+export const logProfile = (...args: any[]) => logger.debug('Profile', args, 'Profile');
+export const logAuth = (...args: any[]) => logger.debug('Auth', args, 'Auth');
 
 const DebugPanel = () => null;
 export default DebugPanel;
