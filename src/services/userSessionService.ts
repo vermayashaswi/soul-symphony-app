@@ -85,12 +85,27 @@ export class UserSessionService {
     if (!this.sessionId) return;
 
     try {
+      // First, get the current page_views count
+      const { data: currentSession, error: fetchError } = await supabase
+        .from('user_sessions')
+        .select('page_views')
+        .eq('id', this.sessionId)
+        .single();
+
+      if (fetchError) {
+        console.error('Error fetching current session:', fetchError);
+        return;
+      }
+
+      const currentPageViews = currentSession?.page_views || 0;
+      
+      // Now update with incremented page_views
       const { error } = await supabase
         .from('user_sessions')
         .update({ 
           last_active_page: lastActivePage,
           last_activity: new Date().toISOString(),
-          page_views: supabase.raw('page_views + 1')
+          page_views: currentPageViews + 1
         })
         .eq('id', this.sessionId);
 
