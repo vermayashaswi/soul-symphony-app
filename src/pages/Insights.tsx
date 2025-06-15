@@ -34,8 +34,8 @@ function InsightsContent() {
   const scrollPositionRef = useRef<number>(0);
   const isMobile = useIsMobile();
 
-  // Fetch insights data ONLY keyed by timeRange and user
-  const { insightsData, loading } = useInsightsData(user?.id, timeRange);
+  // FETCH INSIGHTS DATA: key it by user, timeRange, and emotionChartDate (currentDate)
+  const { insightsData, loading } = useInsightsData(user?.id, timeRange, emotionChartDate);
   
   const timeRanges = [
     { value: 'today', label: 'Day' },
