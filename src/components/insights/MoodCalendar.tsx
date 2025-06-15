@@ -28,9 +28,12 @@ interface SentimentData {
   sentiment: number;
 }
 
+// Added currentDate and onTimeRangeNavigate as optional props
 interface MoodCalendarProps {
   sentimentData: SentimentData[];
   timeRange: TimeRange;
+  currentDate?: Date;
+  onTimeRangeNavigate?: (nextDate: Date) => void;
 }
 
 type ViewMode = 'chart' | 'calendar';
@@ -91,53 +94,68 @@ const CustomTooltip = ({ active, payload, label }: any) => {
   return null;
 };
 
-const MoodCalendar: React.FC<MoodCalendarProps> = ({ sentimentData, timeRange }) => {
+// Accepts currentDate and onTimeRangeNavigate from props
+const MoodCalendar: React.FC<MoodCalendarProps> = ({ sentimentData, timeRange, currentDate: propCurrentDate, onTimeRangeNavigate }) => {
   const { theme } = useTheme();
   const isMobile = useIsMobile();
   const { currentLanguage } = useTranslation();
   const [viewMode, setViewMode] = useState<ViewMode>('chart');
-  const [currentDate, setCurrentDate] = useState<Date>(new Date());
+  // Internal currentDate state for uncontrolled usage
+  const [internalDate, setInternalDate] = useState<Date>(new Date());
+
+  // Always use prop if passed, else local state
+  const currentDate = propCurrentDate ?? internalDate;
   
   // Function to navigate to previous time period
   const goToPrevious = () => {
+    let nextDate: Date;
     switch (timeRange) {
       case 'today':
-        setCurrentDate(prevDate => subDays(prevDate, 1));
+        nextDate = subDays(currentDate, 1);
         break;
       case 'week':
-        setCurrentDate(prevDate => subWeeks(prevDate, 1));
+        nextDate = subWeeks(currentDate, 1);
         break;
       case 'month':
-        setCurrentDate(prevDate => subMonths(prevDate, 1));
+        nextDate = subMonths(currentDate, 1);
         break;
       case 'year':
-        setCurrentDate(prevDate => subYears(prevDate, 1));
+        nextDate = subYears(currentDate, 1);
         break;
+      default:
+        nextDate = currentDate;
     }
+    if (onTimeRangeNavigate) onTimeRangeNavigate(nextDate);
+    else setInternalDate(nextDate);
   };
 
   // Function to navigate to next time period
   const goToNext = () => {
+    let nextDate: Date;
     switch (timeRange) {
       case 'today':
-        setCurrentDate(prevDate => addDays(prevDate, 1));
+        nextDate = addDays(currentDate, 1);
         break;
       case 'week':
-        setCurrentDate(prevDate => addWeeks(prevDate, 1));
+        nextDate = addWeeks(currentDate, 1);
         break;
       case 'month':
-        setCurrentDate(prevDate => addMonths(prevDate, 1));
+        nextDate = addMonths(currentDate, 1);
         break;
       case 'year':
-        setCurrentDate(prevDate => addYears(prevDate, 1));
+        nextDate = addYears(currentDate, 1);
         break;
+      default:
+        nextDate = currentDate;
     }
+    if (onTimeRangeNavigate) onTimeRangeNavigate(nextDate);
+    else setInternalDate(nextDate);
   };
 
-  // Reset current date when time range changes
+  // Sync to today when timeRange changes (if uncontrolled)
   useEffect(() => {
-    setCurrentDate(new Date());
-  }, [timeRange]);
+    if (!propCurrentDate) setInternalDate(new Date());
+  }, [timeRange, propCurrentDate]);
   
   // Get the period label based on timeRange and current date
   const getPeriodLabel = () => {
@@ -212,7 +230,6 @@ const MoodCalendar: React.FC<MoodCalendarProps> = ({ sentimentData, timeRange })
     const groupedData = new Map();
     
     filteredData.forEach(item => {
-      // ---- CHANGE STARTS HERE ----
       // For "month", group by day-level ("short" formatting). Other timeRanges stay unchanged.
       let formattedDate: string;
       if (timeRange === "month") {
@@ -220,7 +237,6 @@ const MoodCalendar: React.FC<MoodCalendarProps> = ({ sentimentData, timeRange })
       } else {
         formattedDate = formatDateForTimeRange(item.date, timeRange, currentLanguage);
       }
-      // ---- CHANGE ENDS HERE ----
       const dateKey = formattedDate;
       
       if (!groupedData.has(dateKey)) {
@@ -286,7 +302,6 @@ const MoodCalendar: React.FC<MoodCalendarProps> = ({ sentimentData, timeRange })
             data={lineData}
             margin={{ top: 20, right: isMobile ? 10 : 60, left: 0, bottom: 10 }}
           >
-            {/* Gradient defs remain for line or dot usage if you want */}
             <defs>
               <linearGradient id="line-gradient" x1="0" y1="0" x2="0" y2="1">
                 <stop offset="0%" stopColor="#8b5cf6" stopOpacity="0.8" />
@@ -311,8 +326,6 @@ const MoodCalendar: React.FC<MoodCalendarProps> = ({ sentimentData, timeRange })
               ticks={[-1, -0.5, 0, 0.5, 1]}
             />
             <Tooltip content={<CustomTooltip />} />
-
-            {/* ReferenceAreas for coloring the bands */}
             <ReferenceArea y1={0.2} y2={1} fill="#4ade80" fillOpacity={0.18} ifOverflow="visible" />
             <ReferenceArea y1={-0.2} y2={0.2} fill="#facc15" fillOpacity={0.20} ifOverflow="visible" />
             <ReferenceArea y1={-1} y2={-0.2} fill="#ea384c" fillOpacity={0.18} ifOverflow="visible" />
@@ -320,7 +333,7 @@ const MoodCalendar: React.FC<MoodCalendarProps> = ({ sentimentData, timeRange })
             <Line 
               type="monotone"
               dataKey="sentiment"
-              stroke="#3b82f6" // blue-500 for bright line as in screenshot
+              stroke="#3b82f6"
               strokeWidth={2}
               dot={(props) => <CustomDot cx={props.cx} cy={props.cy} payload={props.payload} />}
               activeDot={{ r: 6 }}
