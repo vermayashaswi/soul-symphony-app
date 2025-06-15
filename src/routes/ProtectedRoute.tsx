@@ -13,7 +13,8 @@ const ProtectedRoute = () => {
       hasUser: !!user, 
       userId: user?.id, 
       isLoading,
-      userEmail: user?.email 
+      userEmail: user?.email,
+      currentPath: window.location.pathname
     });
 
     if (isLoading) {
@@ -38,7 +39,13 @@ const ProtectedRoute = () => {
       <div className="flex items-center justify-center min-h-screen">
         <div className="text-center">
           <h2 className="text-xl font-bold mb-2">Authentication Error</h2>
-          <p className="text-gray-600">{error instanceof Error ? error.message : 'Unknown error'}</p>
+          <p className="text-gray-600 mb-4">{error instanceof Error ? error.message : 'Unknown error'}</p>
+          <button 
+            onClick={() => window.location.href = '/app/auth'} 
+            className="px-4 py-2 bg-blue-600 text-white rounded"
+          >
+            Go to Auth
+          </button>
         </div>
       </div>
     );

@@ -35,7 +35,13 @@ export function useOnboarding() {
 
   useEffect(() => {
     console.log('[useOnboarding] Hook initializing...');
-    checkOnboardingStatus();
+    
+    // Add a small delay to ensure the component is properly mounted
+    const timer = setTimeout(() => {
+      checkOnboardingStatus();
+    }, 100);
+    
+    return () => clearTimeout(timer);
   }, [checkOnboardingStatus]);
 
   const completeOnboarding = useCallback(() => {

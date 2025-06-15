@@ -17,9 +17,11 @@ const OnboardingCheck: React.FC<OnboardingCheckProps> = ({ children }) => {
 
     console.log('[OnboardingCheck] State:', {
       hasUser: !!user,
+      userId: user?.id,
       authLoading,
       onboardingComplete,
-      onboardingLoading
+      onboardingLoading,
+      currentPath: window.location.pathname
     });
 
     if (authLoading || onboardingLoading) {
@@ -50,6 +52,12 @@ const OnboardingCheck: React.FC<OnboardingCheckProps> = ({ children }) => {
         <div className="text-center">
           <h2 className="text-xl font-bold mb-2">Onboarding Check Error</h2>
           <p className="text-gray-600">{error instanceof Error ? error.message : 'Unknown error'}</p>
+          <button 
+            onClick={() => window.location.href = '/app/auth'} 
+            className="mt-4 px-4 py-2 bg-blue-600 text-white rounded"
+          >
+            Go to Auth
+          </button>
         </div>
       </div>
     );
