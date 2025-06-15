@@ -16,11 +16,16 @@ import { InsightsTranslationProvider } from '@/components/insights/InsightsTrans
 import { TranslationProgressIndicator } from '@/components/insights/TranslationProgressIndicator';
 import { useTranslation } from '@/contexts/TranslationContext';
 import { PremiumFeatureGuard } from '@/components/subscription/PremiumFeatureGuard';
+import { addDays, addWeeks, addMonths, addYears,
+  subDays, subWeeks, subMonths, subYears,
+  startOfDay, startOfWeek, startOfMonth, startOfYear
+} from 'date-fns';
 
 function InsightsContent() {
   const { user } = useAuth();
   const { prefetchTranslationsForRoute } = useTranslation();
   const [timeRange, setTimeRange] = useState<TimeRange>('week');
+  const [currentDate, setCurrentDate] = useState<Date>(new Date());
   const [isSticky, setIsSticky] = useState(false);
   const [selectedEmotion, setSelectedEmotion] = useState<string | null>(null);
   const timeToggleRef = useRef<HTMLDivElement>(null);
@@ -71,15 +76,23 @@ function InsightsContent() {
     setSelectedEmotion(emotion);
   };
 
+  // CurrentDate changes with timeRange: when timeRange changes, reset currentDate to today.
+  useEffect(() => {
+    setCurrentDate(new Date());
+  }, [timeRange]);
+
+  // Handler to navigate up/down the timeframe
+  const handlePeriodNavigate = (nextDate: Date) => {
+    setCurrentDate(nextDate);
+  };
+
   const handleTimeRangeChange = (value: string) => {
     if (value) {
-      const currentScrollPosition = window.scrollY;
-      scrollPositionRef.current = currentScrollPosition;
-      
+      scrollPositionRef.current = window.scrollY;
       setTimeRange(value as TimeRange);
-      
+      setCurrentDate(new Date()); // << reset period
       setTimeout(() => {
-        window.scrollTo({ top: currentScrollPosition });
+        window.scrollTo({ top: scrollPositionRef.current });
       }, 10);
     }
   };
@@ -134,6 +147,7 @@ function InsightsContent() {
     }
   }, [loading, insightsData]);
 
+  // Filter sentimentData for MoodCalendar
   const getSentimentData = () => {
     const entries = insightsData.allEntries || [];
     if (entries.length === 0) return [];
@@ -495,6 +509,8 @@ function InsightsContent() {
               <EmotionChart 
                 timeframe={timeRange}
                 aggregatedData={insightsData.aggregatedEmotionData}
+                currentDate={currentDate}
+                onTimeRangeNavigate={handlePeriodNavigate}
               />
             </motion.div>
             
@@ -510,6 +526,7 @@ function InsightsContent() {
               <MoodCalendar 
                 sentimentData={getSentimentData()}
                 timeRange={timeRange}
+                currentDate={currentDate}
               />
             </motion.div>
             

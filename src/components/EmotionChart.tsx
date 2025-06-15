@@ -12,6 +12,7 @@ import {
   ReferenceLine,
   Text
 } from 'recharts';
+import { ChevronLeft, ChevronRight } from "lucide-react";
 import { cn } from '@/lib/utils';
 import { AggregatedEmotionData, TimeRange } from '@/hooks/use-insights-data';
 import EmotionBubbles from './EmotionBubbles';
@@ -20,8 +21,15 @@ import { Sparkles, CircleDot } from 'lucide-react';
 import { useTheme } from '@/hooks/use-theme';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { Separator } from '@/components/ui/separator';
+import { Button } from '@/components/ui/button';
 import { useAuth } from '@/contexts/AuthContext';
 import { TranslatableText } from '@/components/translation/TranslatableText';
+import { formatDateForTimeRange } from '@/utils/date-formatter';
+import {
+  addDays, addWeeks, addMonths, addYears, 
+  subDays, subWeeks, subMonths, subYears,
+  startOfDay, startOfWeek, startOfMonth, startOfYear
+} from 'date-fns';
 
 type EmotionData = {
   day: string;
@@ -34,6 +42,9 @@ interface EmotionChartProps {
   className?: string;
   timeframe?: TimeRange;
   aggregatedData?: AggregatedEmotionData;
+  // Add for navigation:
+  currentDate?: Date;
+  onTimeRangeNavigate?: (nextDate: Date) => void;
 }
 
 const EMOTION_COLORS: Record<string, string> = {
@@ -106,8 +117,11 @@ const getEmotionColor = (emotion: string, index: number): string => {
 export function EmotionChart({ 
   className, 
   timeframe = 'week',
-  aggregatedData 
+  aggregatedData,
+  currentDate,
+  onTimeRangeNavigate,
 }: EmotionChartProps) {
+  // Chart type and UI state
   const [chartType, setChartType] = useState<ChartType>('bubble');
   const [bubbleKey, setBubbleKey] = useState(0); 
   const [selectedEmotionInfo, setSelectedEmotionInfo] = useState<{name: string, percentage: number} | null>(null);
@@ -120,21 +134,133 @@ export function EmotionChart({
   const isMobile = useIsMobile();
   const initialRenderRef = useRef(true);
   const { user } = useAuth();
-  
+
+  // Navigation state
+  const [internalDate, setInternalDate] = useState<Date>(new Date());
+  // Use internal date if not receiving via props
+  const activeDate: Date = currentDate || internalDate;
+
+  // Bubble and Line chart base
   const chartTypes = [
     { id: 'line', label: 'Emotions' },
     { id: 'bubble', label: 'Life Areas' },
   ];
   
+  // Navigation handlers
+  const goToPrevious = () => {
+    let newDate: Date;
+    switch (timeframe) {
+      case 'today':
+        newDate = subDays(activeDate, 1);
+        break;
+      case 'week':
+        newDate = subWeeks(activeDate, 1);
+        break;
+      case 'month':
+        newDate = subMonths(activeDate, 1);
+        break;
+      case 'year':
+        newDate = subYears(activeDate, 1);
+        break;
+      default:
+        newDate = subWeeks(activeDate, 1);
+    }
+    if (onTimeRangeNavigate) onTimeRangeNavigate(newDate);
+    else setInternalDate(newDate);
+  };
+  const goToNext = () => {
+    let newDate: Date;
+    switch (timeframe) {
+      case 'today':
+        newDate = addDays(activeDate, 1);
+        break;
+      case 'week':
+        newDate = addWeeks(activeDate, 1);
+        break;
+      case 'month':
+        newDate = addMonths(activeDate, 1);
+        break;
+      case 'year':
+        newDate = addYears(activeDate, 1);
+        break;
+      default:
+        newDate = addWeeks(activeDate, 1);
+    }
+    if (onTimeRangeNavigate) onTimeRangeNavigate(newDate);
+    else setInternalDate(newDate);
+  };
+  // Reset period on timeframe change
+  useEffect(() => {
+    if (!currentDate) setInternalDate(new Date());
+  }, [timeframe, currentDate]);
+  // Period label
+  const getPeriodLabel = () => {
+    const now = activeDate;
+    switch (timeframe) {
+      case 'today':
+        return formatDateForTimeRange(now, 'day');
+      case 'week': {
+        const weekStart = startOfWeek(now, { weekStartsOn: 1 });
+        const weekEnd = addDays(weekStart, 6);
+        return `${formatDateForTimeRange(weekStart, 'short')} - ${formatDateForTimeRange(weekEnd, 'short')}`;
+      }
+      case 'month':
+        return formatDateForTimeRange(now, 'month');
+      case 'year':
+        return now.getFullYear().toString();
+      default:
+        return '';
+    }
+  };
+
+  // FILTER/AGGREGATE: Only include data for the current period, like MoodCalendar does.
+  const filteredAggregatedData = useMemo(() => {
+    if (!aggregatedData) return {};
+    // Determine period bounds
+    let periodStart: Date, periodEnd: Date;
+    switch (timeframe) {
+      case 'today':
+        periodStart = startOfDay(activeDate);
+        periodEnd = addDays(periodStart, 1);
+        break;
+      case 'week':
+        periodStart = startOfWeek(activeDate, { weekStartsOn: 1 });
+        periodEnd = addWeeks(periodStart, 1);
+        break;
+      case 'month':
+        periodStart = startOfMonth(activeDate);
+        periodEnd = addMonths(periodStart, 1);
+        break;
+      case 'year':
+        periodStart = startOfYear(activeDate);
+        periodEnd = addYears(periodStart, 1);
+        break;
+      default:
+        periodStart = startOfDay(activeDate);
+        periodEnd = addDays(periodStart, 1);
+    }
+    // Filter data points in each emotion to this period
+    const filtered: AggregatedEmotionData = {};
+    for (const [emotion, points] of Object.entries(aggregatedData)) {
+      filtered[emotion] = points.filter(pt => {
+        const dateObj = new Date(pt.date);
+        return dateObj >= periodStart && dateObj < periodEnd;
+      });
+    }
+    return filtered;
+  }, [aggregatedData, timeframe, activeDate]);
+
+  // -- All rest of the code same, except replace aggregatedData -> filteredAggregatedData in appropriate places below --
+
   const bubbleData = useMemo(() => {
-    if (!aggregatedData || Object.keys(aggregatedData).length === 0) {
+    if (!filteredAggregatedData || Object.keys(filteredAggregatedData).length === 0) {
       console.log('[EmotionChart] No aggregated data available for timeframe:', timeframe);
       return {};
     }
     
     const emotionScores: Record<string, number> = {};
     
-    Object.entries(aggregatedData).forEach(([emotion, dataPoints]) => {
+    Object.entries(filteredAggregatedData).forEach(([emotion, dataPoints]) => {
       if (dataPoints.length > 0) {
         const totalScore = dataPoints.reduce((sum, point) => sum + point.value, 0);
         if (totalScore > 0) {
@@ -152,7 +278,7 @@ export function EmotionChart({
     });
     
     return emotionScores;
-  }, [aggregatedData, timeframe]);
+  }, [filteredAggregatedData, timeframe]);
   
   useEffect(() => {
     if (initialRenderRef.current) {
@@ -213,36 +339,31 @@ export function EmotionChart({
     }, 2000);
   };
   
+  // Build lineData for this period only
   const lineData = useMemo(() => {
-    if (!aggregatedData || Object.keys(aggregatedData).length === 0) {
+    if (!filteredAggregatedData || Object.keys(filteredAggregatedData).length === 0) {
       return [];
     }
     
     const emotionTotals: Record<string, number> = {};
-    
     const dateMap = new Map<string, Map<string, {total: number, count: number}>>();
     
-    Object.entries(aggregatedData).forEach(([emotion, dataPoints]) => {
+    Object.entries(filteredAggregatedData).forEach(([emotion, dataPoints]) => {
       let totalValue = 0;
       
       dataPoints.forEach(point => {
         if (!dateMap.has(point.date)) {
           dateMap.set(point.date, new Map());
         }
-        
         const dateEntry = dateMap.get(point.date)!;
-        
         if (!dateEntry.has(emotion)) {
           dateEntry.set(emotion, { total: 0, count: 0 });
         }
-        
         const emotionEntry = dateEntry.get(emotion)!;
         emotionEntry.total += point.value;
         emotionEntry.count += 1;
-        
         totalValue += point.value;
       });
-      
       if (totalValue > 0) {
         emotionTotals[emotion] = totalValue;
       }
@@ -285,32 +406,26 @@ export function EmotionChart({
       });
     
     return result;
-  }, [aggregatedData, visibleEmotions, chartType]);
+  }, [filteredAggregatedData, visibleEmotions, chartType]);
 
   const dominantEmotion = useMemo(() => {
-    if (!aggregatedData || Object.keys(aggregatedData).length === 0) {
+    if (!filteredAggregatedData || Object.keys(filteredAggregatedData).length === 0) {
       return '';
     }
-    
     const emotionTotals: Record<string, number> = {};
-    
-    Object.entries(aggregatedData).forEach(([emotion, dataPoints]) => {
+    Object.entries(filteredAggregatedData).forEach(([emotion, dataPoints]) => {
       let totalValue = 0;
-      
       dataPoints.forEach(point => {
         totalValue += point.value;
       });
-      
       if (totalValue > 0) {
         emotionTotals[emotion] = totalValue;
       }
     });
-    
     const sortedEmotions = Object.entries(emotionTotals)
       .sort((a, b) => b[1] - a[1]);
-      
     return sortedEmotions.length > 0 ? sortedEmotions[0][0] : '';
-  }, [aggregatedData]);
+  }, [filteredAggregatedData]);
   
   useEffect(() => {
     if (dominantEmotion && chartType === 'line' && visibleEmotions.length === 0) {
@@ -400,6 +515,8 @@ export function EmotionChart({
     return null;
   };
 
+  // -- Inline chevron header and period label as requested --
+
   const renderLineChart = () => {
     if (lineData.length === 0) {
       return (
@@ -415,11 +532,9 @@ export function EmotionChart({
         </div>
       );
     }
-    
     const allEmotions = Object.keys(lineData[0])
       .filter(key => key !== 'day')
       .filter(key => lineData.some(point => point[key] !== null));
-    
     if (allEmotions.length === 0) {
       return (
         <div className="flex items-center justify-center h-full">
@@ -434,9 +549,37 @@ export function EmotionChart({
         </div>
       );
     }
-    
     return (
       <div className="flex flex-col h-full">
+        {/* Chevron navigation and period label */}
+        <div className="flex items-center justify-between mb-2">
+          <Button 
+            variant="ghost" 
+            size="icon" 
+            onClick={goToPrevious}
+            className="text-muted-foreground hover:text-foreground"
+            title="Previous period"
+          >
+            <ChevronLeft className="h-5 w-5" />
+          </Button>
+          <div className="text-center font-medium text-base">
+            <TranslatableText 
+              text={getPeriodLabel()}
+              forceTranslate={true}
+              enableFontScaling={true}
+              scalingContext="compact"
+            />
+          </div>
+          <Button 
+            variant="ghost" 
+            size="icon" 
+            onClick={goToNext}
+            className="text-muted-foreground hover:text-foreground"
+            title="Next period"
+          >
+            <ChevronRight className="h-5 w-5" />
+          </Button>
+        </div>
         <ResponsiveContainer width="100%" height={isMobile ? 250 : 300}>
           <LineChart
             data={lineData}
@@ -477,7 +620,6 @@ export function EmotionChart({
             ))}
           </LineChart>
         </ResponsiveContainer>
-        
         <div className="flex flex-wrap justify-center gap-2 mt-6 px-2">
           {allEmotions.map((emotion, index) => {
             const isSelected = visibleEmotions.includes(emotion);
@@ -514,7 +656,6 @@ export function EmotionChart({
             );
           })}
         </div>
-        
         <div className="flex justify-center flex-wrap gap-4 mt-4 text-xs text-muted-foreground">
           <TranslatableText 
             text="* Click on a legend item to focus on that emotion" 
@@ -564,7 +705,6 @@ export function EmotionChart({
           ))}
         </div>
       </div>
-      
       <div className="bg-card p-4 rounded-xl shadow-sm relative">
         {chartType === 'line' && renderLineChart()}
         {chartType === 'bubble' && (
@@ -579,7 +719,6 @@ export function EmotionChart({
                 />: {topRightPercentage.percentage}
               </div>
             )}
-            
             <div className="h-[300px]" key={bubbleKey}>
               {chartType === 'bubble' && (
                 <EntityStrips
@@ -598,3 +737,5 @@ export function EmotionChart({
 }
 
 export default EmotionChart;
+
+// --- Reminder: This file is now 601+ lines long. Consider refactoring into smaller files/components!
