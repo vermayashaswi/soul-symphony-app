@@ -3,6 +3,8 @@ import React from 'react';
 import { Routes, Route, useLocation } from 'react-router-dom';
 import { AuthProvider } from './contexts/AuthContext';
 import { ThemeProvider } from './hooks/use-theme';
+import { MarketingThemeProvider } from './contexts/MarketingThemeProvider';
+import { MarketingErrorBoundary } from './components/marketing/MarketingErrorBoundary';
 import { TranslationProvider } from './contexts/TranslationContext';
 import { TutorialProvider } from './contexts/TutorialContext';
 
@@ -41,7 +43,7 @@ import { useOnboarding } from './hooks/use-onboarding';
 // Helper function to check if route is app route
 const isAppRoute = (pathname: string) => pathname.startsWith('/app');
 
-// Error Boundary Component
+// Error Boundary Component for App Routes
 class AppErrorBoundary extends React.Component<
   { children: React.ReactNode; fallback?: React.ReactNode },
   { hasError: boolean; error?: Error }
@@ -83,17 +85,21 @@ class AppErrorBoundary extends React.Component<
 
 // --- Pure Marketing Routes ---
 const MarketingRoutes = () => (
-  <div className="min-h-screen bg-background text-foreground">
-    <Routes>
-      <Route path="/" element={<Index />} />
-      <Route path="/faq" element={<FAQPage />} />
-      <Route path="/blog" element={<BlogPage />} />
-      <Route path="/blog/:slug" element={<BlogPostPage />} />
-      <Route path="/privacy-policy" element={<PrivacyPolicyPage />} />
-      <Route path="/terms" element={<PrivacyPolicyPage />} />
-      <Route path="*" element={<NotFound />} />
-    </Routes>
-  </div>
+  <MarketingErrorBoundary>
+    <MarketingThemeProvider>
+      <div className="min-h-screen bg-white text-gray-900">
+        <Routes>
+          <Route path="/" element={<Index />} />
+          <Route path="/faq" element={<FAQPage />} />
+          <Route path="/blog" element={<BlogPage />} />
+          <Route path="/blog/:slug" element={<BlogPostPage />} />
+          <Route path="/privacy-policy" element={<PrivacyPolicyPage />} />
+          <Route path="/terms" element={<PrivacyPolicyPage />} />
+          <Route path="*" element={<NotFound />} />
+        </Routes>
+      </div>
+    </MarketingThemeProvider>
+  </MarketingErrorBoundary>
 );
 
 // --- App Routes with Mobile Navigation ---
@@ -157,9 +163,9 @@ const App = () => {
   const isOnAppRoute = isAppRoute(location.pathname);
   
   return (
-    <AppErrorBoundary>
+    <>
       {isOnAppRoute ? <AppRoutesComponent /> : <MarketingRoutes />}
-    </AppErrorBoundary>
+    </>
   );
 };
 
