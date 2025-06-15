@@ -1,4 +1,3 @@
-
 import { motion } from 'framer-motion';
 import { ArrowUp, ArrowDown, TrendingUp, Activity, Award } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -26,6 +25,7 @@ interface BiggestChangeCardProps extends BaseInsightCardProps {
     emotion: string;
     percentage: number;
   } | null;
+  timeRange: string;
 }
 
 interface JournalActivityCardProps extends BaseInsightCardProps {
