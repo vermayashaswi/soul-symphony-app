@@ -35,6 +35,9 @@ import Navbar from './components/Navbar';
 import MobileNavigation from './components/MobileNavigation';
 import TutorialOverlay from './components/tutorial/TutorialOverlay';
 
+// Import onboarding hook
+import { useOnboarding } from './hooks/use-onboarding';
+
 // Helper function to check if route is app route
 const isAppRoute = (pathname: string) => pathname.startsWith('/app');
 
@@ -55,6 +58,8 @@ const MarketingRoutes = () => (
 
 // --- App Routes Component ---
 const AppRoutesComponent = () => {
+  const { onboardingComplete } = useOnboarding();
+
   return (
     <ThemeProvider>
       <TranslationProvider>
@@ -83,7 +88,7 @@ const AppRoutesComponent = () => {
                   <Route path="/app/themes" element={<ThemesManagement />} />
                 </Route>
               </Routes>
-              <MobileNavigation />
+              <MobileNavigation onboardingComplete={onboardingComplete} />
               <TutorialOverlay />
             </ViewportManager>
             <Toaster />
