@@ -146,24 +146,18 @@ const App = () => {
     );
   }
 
-  // Render marketing routes with minimal context
-  console.log('[App] Rendering marketing routes with MarketingThemeProvider');
+  // Render marketing routes with simple purple background - NO CONTEXT PROVIDERS
+  console.log('[App] Rendering marketing routes with simple purple background');
   return (
-    <MarketingErrorBoundary>
-      <MarketingThemeProvider>
-        <div className="min-h-screen bg-white text-gray-900">
-          <Routes>
-            <Route path="/" element={<Index />} />
-            <Route path="/faq" element={<FAQPage />} />
-            <Route path="/blog" element={<BlogPage />} />
-            <Route path="/blog/:slug" element={<BlogPostPage />} />
-            <Route path="/privacy-policy" element={<PrivacyPolicyPage />} />
-            <Route path="/terms" element={<PrivacyPolicyPage />} />
-            <Route path="*" element={<NotFound />} />
-          </Routes>
+    <div className="min-h-screen w-full" style={{ backgroundColor: '#8b5cf6' }}>
+      <div className="flex items-center justify-center h-screen">
+        <div className="text-center text-white p-8">
+          <h1 className="text-4xl font-bold mb-4">SOULo</h1>
+          <p className="text-xl mb-6">Voice Journaling for Your Soul</p>
+          <p className="text-lg">Coming Soon</p>
         </div>
-      </MarketingThemeProvider>
-    </MarketingErrorBoundary>
+      </div>
+    </div>
   );
 };
 
