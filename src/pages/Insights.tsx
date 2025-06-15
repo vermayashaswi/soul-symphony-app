@@ -1,6 +1,6 @@
+
 import { useState, useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
-import { Calendar, Filter, TrendingUp, ArrowUp, ArrowDown, Activity, Award } from 'lucide-react';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import EmotionChart from '@/components/EmotionChart';
 import MoodCalendar from '@/components/insights/MoodCalendar';
@@ -16,20 +16,15 @@ import { InsightsTranslationProvider } from '@/components/insights/InsightsTrans
 import { TranslationProgressIndicator } from '@/components/insights/TranslationProgressIndicator';
 import { useTranslation } from '@/contexts/TranslationContext';
 import { PremiumFeatureGuard } from '@/components/subscription/PremiumFeatureGuard';
-import { addDays, addWeeks, addMonths, addYears,
-  subDays, subWeeks, subMonths, subYears,
-  startOfDay, startOfWeek, startOfMonth, startOfYear
-} from 'date-fns';
+import { InsightCard } from '@/components/insights/InsightCard';
 
 function InsightsContent() {
   const { user } = useAuth();
   const { prefetchTranslationsForRoute } = useTranslation();
   const [timeRange, setTimeRange] = useState<TimeRange>('week');
-  // Remove emotionChartDate from use-insights-data dependency - now only used for client-side filtering
   const [emotionChartDate, setEmotionChartDate] = useState<Date>(new Date());
   const [moodCalendarDate, setMoodCalendarDate] = useState<Date>(new Date());
   const [isSticky, setIsSticky] = useState(false);
-  const [selectedEmotion, setSelectedEmotion] = useState<string | null>(null);
   const timeToggleRef = useRef<HTMLDivElement>(null);
   const scrollPositionRef = useRef<number>(0);
   const isMobile = useIsMobile();
@@ -45,16 +40,10 @@ function InsightsContent() {
   ];
 
   useEffect(() => {
-    console.log("Insights page mounted");
-    
     // Prefetch translations for the insights route
     if (prefetchTranslationsForRoute) {
       prefetchTranslationsForRoute('/insights').catch(console.error);
     }
-    
-    return () => {
-      console.log("Insights page unmounted");
-    };
   }, [prefetchTranslationsForRoute]);
 
   useEffect(() => {
@@ -75,17 +64,13 @@ function InsightsContent() {
     return () => window.removeEventListener('scroll', handleScroll);
   }, [isMobile, isSticky]); 
 
-  const handleEmotionClick = (emotion: string) => {
-    setSelectedEmotion(emotion);
-  };
-
   // When timeRange changes, reset both independently-scoped dates to today
   useEffect(() => {
     setEmotionChartDate(new Date());
     setMoodCalendarDate(new Date());
   }, [timeRange]);
 
-  // Handlers to navigate up/down the timeframe (for EmotionChart)
+  // Handlers to navigate up/down the timeframe
   const handleEmotionChartNavigate = (nextDate: Date) => {
     setEmotionChartDate(nextDate);
   };
@@ -155,7 +140,7 @@ function InsightsContent() {
     }
   }, [loading, insightsData]);
 
-  // Filter sentimentData for MoodCalendar (NO CHANGE)
+  // Filter sentimentData for MoodCalendar
   const getSentimentData = () => {
     const entries = insightsData.allEntries || [];
     if (entries.length === 0) return [];
@@ -168,10 +153,6 @@ function InsightsContent() {
       }))
       .filter(item => !isNaN(item.sentiment) && !isNaN(item.date.getTime()));
   };
-
-  // THIS IS THE MAIN UX FIX: Do *not* show full page "no journal data available"
-  // unless there are literally ZERO entries in the insightsData for the current *timeRange*.
-  // If we have entries, but just no chart data for a certain period, the EmotionChart handles its own empty state.
 
   const hasAnyEntries = insightsData.entries.length > 0 || insightsData.allEntries.length > 0;
 
@@ -231,7 +212,6 @@ function InsightsContent() {
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
           </div>
         ) : !hasAnyEntries ? (
-          // Only show this if there are literally no entries for the selected timeRange
           <div className="bg-background rounded-xl p-8 text-center border mx-2">
             <h2 className="text-xl font-semibold mb-4">
               <EnhancedTranslatableText 
@@ -266,252 +246,50 @@ function InsightsContent() {
             <div className={cn(
               "grid grid-cols-1 md:grid-cols-3 gap-6 mb-8 px-2 md:px-0"
             )}>
-              <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.4 }}
-                className="bg-background p-6 rounded-xl shadow-sm border w-full"
-              >
-                <div className="flex justify-between items-start mb-4">
-                  <h2 className="font-semibold text-lg">
-                    <EnhancedTranslatableText 
-                      text="Dominant Mood" 
-                      forceTranslate={true}
-                      enableFontScaling={true}
-                      scalingContext="general"
-                      usePageTranslation={true}
-                    />
-                  </h2>
-                  <span className="px-2 py-1 bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-200 rounded-full text-xs font-medium">
-                    <EnhancedTranslatableText 
-                      text={`This ${timeRange}`} 
-                      forceTranslate={true}
-                      enableFontScaling={true}
-                      scalingContext="compact"
-                      usePageTranslation={true}
-                    />
-                  </span>
-                </div>
-                {insightsData.dominantMood ? (
-                  <div className="flex items-center gap-4">
-                    <div className="h-16 w-16 bg-blue-100 dark:bg-blue-900 rounded-full flex items-center justify-center">
-                      <span className="text-2xl">{insightsData.dominantMood.emoji}</span>
-                    </div>
-                    <div>
-                      <h3 className="text-2xl font-bold capitalize">
-                        <EnhancedTranslatableText 
-                          text={insightsData.dominantMood.emotion} 
-                          forceTranslate={true}
-                          enableFontScaling={true}
-                          scalingContext="general"
-                          usePageTranslation={true}
-                        />
-                      </h3>
-                      <p className="text-muted-foreground text-sm">
-                        <EnhancedTranslatableText 
-                          text="Appeared in most entries" 
-                          forceTranslate={true}
-                          enableFontScaling={true}
-                          scalingContext="compact"
-                          usePageTranslation={true}
-                        />
-                      </p>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="flex items-center gap-4">
-                    <div className="h-16 w-16 bg-blue-100 dark:bg-blue-900 rounded-full flex items-center justify-center">
-                      <span className="text-2xl">🤔</span>
-                    </div>
-                    <div>
-                      <h3 className="text-2xl font-bold">
-                        <EnhancedTranslatableText 
-                          text="Not enough data" 
-                          forceTranslate={true}
-                          enableFontScaling={true}
-                          scalingContext="general"
-                          usePageTranslation={true}
-                        />
-                      </h3>
-                      <p className="text-muted-foreground text-sm">
-                        <EnhancedTranslatableText 
-                          text="Add more journal entries" 
-                          forceTranslate={true}
-                          enableFontScaling={true}
-                          scalingContext="compact"
-                          usePageTranslation={true}
-                        />
-                      </p>
-                    </div>
-                  </div>
-                )}
-              </motion.div>
+              <InsightCard
+                type="mood"
+                title="Dominant Mood"
+                delay={0}
+                badge={`This ${timeRange}`}
+                badgeColor="bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-200"
+                data={insightsData.dominantMood}
+                timeRange={timeRange}
+              />
               
-              <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.4, delay: 0.1 }}
-                className="bg-background p-6 rounded-xl shadow-sm border w-full"
-              >
-                <div className="flex justify-between items-start mb-4">
-                  <h2 className="font-semibold text-lg">
-                    <EnhancedTranslatableText 
-                      text="Biggest Change" 
-                      forceTranslate={true}
-                      enableFontScaling={true}
-                      scalingContext="general"
-                      usePageTranslation={true}
-                    />
-                  </h2>
-                  {insightsData.biggestImprovement && (
-                    <span 
-                      className={cn(
-                        "px-2 py-1 rounded-full text-xs font-medium",
-                        insightsData.biggestImprovement.percentage >= 0 
-                          ? "bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-200" 
-                          : "bg-red-100 dark:bg-red-900 text-red-700 dark:text-red-200"
-                      )}
-                    >
-                      {insightsData.biggestImprovement.percentage >= 0 ? '+' : ''}
-                      {insightsData.biggestImprovement.percentage}%
-                    </span>
-                  )}
-                </div>
-                {insightsData.biggestImprovement ? (
-                  <div className="flex items-center gap-4">
-                    <div 
-                      className={cn(
-                        "h-16 w-16 rounded-full flex items-center justify-center",
-                        insightsData.biggestImprovement.percentage >= 0 
-                          ? "bg-green-100 dark:bg-green-900" 
-                          : "bg-blue-100 dark:bg-blue-900"
-                      )}
-                    >
-                      {insightsData.biggestImprovement.percentage >= 0 ? (
-                        <ArrowUp className={cn(
-                          "h-8 w-8",
-                          insightsData.biggestImprovement.percentage >= 0 
-                            ? "text-green-600 dark:text-green-300" 
-                            : "text-blue-600 dark:text-blue-300"
-                        )} />
-                      ) : (
-                        <ArrowDown className="h-8 w-8 text-blue-600 dark:text-blue-300" />
-                      )}
-                    </div>
-                    <div>
-                      <h3 className="text-2xl font-bold capitalize">
-                        <EnhancedTranslatableText 
-                          text={insightsData.biggestImprovement.emotion} 
-                          forceTranslate={true}
-                          enableFontScaling={true}
-                          scalingContext="general"
-                          usePageTranslation={true}
-                        />
-                      </h3>
-                      <p className="text-muted-foreground text-sm">
-                        <EnhancedTranslatableText 
-                          text={insightsData.biggestImprovement.percentage >= 0 
-                            ? "Increased significantly" 
-                            : "Decreased significantly"
-                          } 
-                          forceTranslate={true}
-                          enableFontScaling={true}
-                          scalingContext="compact"
-                          usePageTranslation={true}
-                        />
-                      </p>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="flex items-center gap-4">
-                    <div className="h-16 w-16 bg-gray-100 dark:bg-gray-800 rounded-full flex items-center justify-center">
-                      <TrendingUp className="h-8 w-8 text-gray-500 dark:text-gray-400" />
-                    </div>
-                    <div>
-                      <h3 className="text-2xl font-bold">
-                        <EnhancedTranslatableText 
-                          text="Not enough data" 
-                          forceTranslate={true}
-                          enableFontScaling={true}
-                          scalingContext="general"
-                          usePageTranslation={true}
-                        />
-                      </h3>
-                      <p className="text-muted-foreground text-sm">
-                        <EnhancedTranslatableText 
-                          text="Need more entries to compare" 
-                          forceTranslate={true}
-                          enableFontScaling={true}
-                          scalingContext="compact"
-                          usePageTranslation={true}
-                        />
-                      </p>
-                    </div>
-                  </div>
-                )}
-              </motion.div>
+              <InsightCard
+                type="change"
+                title="Biggest Change"
+                delay={0.1}
+                badge={insightsData.biggestImprovement ? 
+                  `${insightsData.biggestImprovement.percentage >= 0 ? '+' : ''}${insightsData.biggestImprovement.percentage}%` : 
+                  undefined
+                }
+                badgeColor={insightsData.biggestImprovement ? 
+                  cn(
+                    "px-2 py-1 rounded-full text-xs font-medium",
+                    insightsData.biggestImprovement.percentage >= 0 
+                      ? "bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-200" 
+                      : "bg-red-100 dark:bg-red-900 text-red-700 dark:text-red-200"
+                  ) : undefined
+                }
+                data={insightsData.biggestImprovement}
+                timeRange={timeRange}
+              />
               
-              <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.4, delay: 0.2 }}
-                className="bg-background p-6 rounded-xl shadow-sm border w-full"
-              >
-                <div className="flex justify-between items-start mb-4">
-                  <h2 className="font-semibold text-lg">
-                    <EnhancedTranslatableText 
-                      text="Journal Activity" 
-                      forceTranslate={true}
-                      enableFontScaling={true}
-                      scalingContext="general"
-                      usePageTranslation={true}
-                    />
-                  </h2>
-                  {insightsData.journalActivity.maxStreak > 0 && (
-                    <span className="px-2 py-1 bg-purple-100 dark:bg-purple-900 text-purple-700 dark:text-purple-200 rounded-full text-xs font-medium">
-                      <EnhancedTranslatableText 
-                        text={`Max streak: ${insightsData.journalActivity.maxStreak} ${timeRange === 'today' ? 'entries' : 'days'}`}
-                        forceTranslate={true}
-                        enableFontScaling={true}
-                        scalingContext="compact"
-                        usePageTranslation={true}
-                      />
-                    </span>
-                  )}
-                </div>
-                <div className="flex items-center gap-4">
-                  <div className="h-16 w-16 bg-purple-100 dark:bg-purple-900 rounded-full flex items-center justify-center">
-                    {insightsData.journalActivity.streak > 0 ? (
-                      <Award className="h-8 w-8 text-purple-600 dark:text-purple-300" />
-                    ) : (
-                      <Activity className="h-8 w-8 text-purple-600 dark:text-purple-300" />
-                    )}
-                  </div>
-                  <div>
-                    <h3 className="text-2xl font-bold">
-                      <EnhancedTranslatableText 
-                        text={`${insightsData.journalActivity.entryCount} entries`} 
-                        forceTranslate={true}
-                        enableFontScaling={true}
-                        scalingContext="general"
-                        usePageTranslation={true}
-                      />
-                    </h3>
-                    <p className="text-muted-foreground text-sm capitalize">
-                      <EnhancedTranslatableText 
-                        text={`This ${timeRange}`} 
-                        forceTranslate={true}
-                        enableFontScaling={true}
-                        scalingContext="compact"
-                        usePageTranslation={true}
-                      />
-                    </p>
-                  </div>
-                </div>
-              </motion.div>
+              <InsightCard
+                type="activity"
+                title="Journal Activity"
+                delay={0.2}
+                badge={insightsData.journalActivity.maxStreak > 0 ? 
+                  `Max streak: ${insightsData.journalActivity.maxStreak} ${timeRange === 'today' ? 'entries' : 'days'}` : 
+                  undefined
+                }
+                badgeColor="bg-purple-100 dark:bg-purple-900 text-purple-700 dark:text-purple-200"
+                data={insightsData.journalActivity}
+                timeRange={timeRange}
+              />
             </div>
             
-            {/* --- MAIN: Pass aggregatedData to EmotionChart with emotionChartDate for client-side filtering --- */}
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
