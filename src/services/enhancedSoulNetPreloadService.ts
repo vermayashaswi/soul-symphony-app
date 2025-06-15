@@ -473,9 +473,11 @@ export class EnhancedSoulNetPreloadService {
     const age = now - cached.timestamp;
     const isWithinDuration = age < this.CACHE_DURATION;
     const isCorrectVersion = cached.version === this.CACHE_VERSION;
-    const hasValidData = cached.data && cached.data.nodes && cached.data.links;
+    const hasValidData = cached.data && 
+                        Array.isArray(cached.data.nodes) && 
+                        Array.isArray(cached.data.links);
     
-    console.log(`[EnhancedSoulNetPreloadService] CACHE VALIDATION: age=${age}ms, version=${cached.version}/${this.CACHE_VERSION}, hasData=${!!hasValidData}, withinDuration=${isWithinDuration}`);
+    console.log(`[EnhancedSoulNetPreloadService] CACHE VALIDATION: age=${age}ms, version=${cached.version}/${this.CACHE_VERSION}, hasData=${hasValidData}, withinDuration=${isWithinDuration}`);
     
     return isWithinDuration && isCorrectVersion && hasValidData;
   }
