@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { format, subDays, startOfDay, endOfDay, startOfWeek, endOfWeek, startOfMonth, endOfMonth, startOfYear, endOfYear } from 'date-fns';
@@ -43,7 +42,8 @@ interface InsightsData {
 
 export const useInsightsData = (
   userId: string | undefined,
-  timeRange: TimeRange
+  timeRange: TimeRange,
+  currentDate?: Date
 ) => {
   const [insightsData, setInsightsData] = useState<InsightsData>({
     entries: [],
@@ -108,12 +108,13 @@ export const useInsightsData = (
       console.log(`Found ${allEntries?.length || 0} total entries for user`);
       console.log('Sample entry data:', allEntries?.[0] || 'No entries found');
 
-      const effectiveBaseDate = new Date();
+      const effectiveBaseDate = currentDate || new Date();
       const { startDate, endDate } = getDateRange(timeRange, effectiveBaseDate);
       
       console.log(`Fetching entries for ${timeRange}:`, {
         startDate: startDate.toISOString(),
         endDate: endDate.toISOString(),
+        currentDate: effectiveBaseDate.toISOString(),
         userId
       });
 
@@ -123,7 +124,7 @@ export const useInsightsData = (
         return entryDate >= startDate && entryDate <= endDate;
       }) || [];
 
-      console.log(`Filtered ${entries.length} entries for ${timeRange}`);
+      console.log(`Filtered ${entries.length} entries for ${timeRange} with currentDate ${effectiveBaseDate.toISOString()}`);
 
       const processedEntries = entries.map(entry => {
         if (entry.emotions && typeof entry.emotions === 'string') {
@@ -211,7 +212,7 @@ export const useInsightsData = (
     } finally {
       setLoading(false);
     }
-  }, [userId, timeRange]);
+  }, [userId, timeRange, currentDate]);
 
   useEffect(() => {
     if (timeRange !== lastTimeRange) {
@@ -220,7 +221,7 @@ export const useInsightsData = (
     }
     
     fetchInsightsData();
-  }, [userId, timeRange, fetchInsightsData]);
+  }, [userId, timeRange, currentDate, fetchInsightsData]);
 
   return { insightsData, loading };
 };
