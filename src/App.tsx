@@ -88,15 +88,17 @@ const AppRoutes = () => {
 // Marketing Routes Component (no providers needed)
 const MarketingRoutes = () => {
   return (
-    <Routes>
-      <Route path="/" element={<Index />} />
-      <Route path="/faq" element={<FAQPage />} />
-      <Route path="/blog" element={<BlogPage />} />
-      <Route path="/blog/:slug" element={<BlogPostPage />} />
-      <Route path="/privacy-policy" element={<PrivacyPolicyPage />} />
-      <Route path="/terms" element={<PrivacyPolicyPage />} />
-      <Route path="*" element={<NotFound />} />
-    </Routes>
+    <div className="min-h-screen bg-background text-foreground">
+      <Routes>
+        <Route path="/" element={<Index />} />
+        <Route path="/faq" element={<FAQPage />} />
+        <Route path="/blog" element={<BlogPage />} />
+        <Route path="/blog/:slug" element={<BlogPostPage />} />
+        <Route path="/privacy-policy" element={<PrivacyPolicyPage />} />
+        <Route path="/terms" element={<PrivacyPolicyPage />} />
+        <Route path="*" element={<NotFound />} />
+      </Routes>
+    </div>
   );
 };
 
