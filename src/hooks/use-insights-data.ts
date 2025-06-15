@@ -40,7 +40,11 @@ interface InsightsData {
   aggregatedEmotionData: AggregatedEmotionData;
 }
 
-export const useInsightsData = (userId: string | undefined, timeRange: TimeRange) => {
+export const useInsightsData = (
+  userId: string | undefined,
+  timeRange: TimeRange,
+  currentDate?: Date
+) => {
   const [insightsData, setInsightsData] = useState<InsightsData>({
     entries: [],
     allEntries: [],
@@ -55,6 +59,32 @@ export const useInsightsData = (userId: string | undefined, timeRange: TimeRange
   });
   const [loading, setLoading] = useState(true);
   const [lastTimeRange, setLastTimeRange] = useState<TimeRange>(timeRange);
+
+  const getDateRange = (timeRange: TimeRange, baseDate: Date = new Date()) => {
+    let startDate, endDate;
+    switch (timeRange) {
+      case 'today':
+        startDate = startOfDay(baseDate);
+        endDate = endOfDay(baseDate);
+        break;
+      case 'week':
+        startDate = startOfWeek(baseDate, { weekStartsOn: 1 });
+        endDate = endOfWeek(baseDate, { weekStartsOn: 1 });
+        break;
+      case 'month':
+        startDate = startOfMonth(baseDate);
+        endDate = endOfMonth(baseDate);
+        break;
+      case 'year':
+        startDate = startOfYear(baseDate);
+        endDate = endOfYear(baseDate);
+        break;
+      default:
+        startDate = startOfWeek(baseDate, { weekStartsOn: 1 });
+        endDate = endOfWeek(baseDate, { weekStartsOn: 1 });
+    }
+    return { startDate, endDate };
+  };
 
   const fetchInsightsData = useCallback(async () => {
     if (!userId) {
@@ -78,7 +108,8 @@ export const useInsightsData = (userId: string | undefined, timeRange: TimeRange
       console.log(`Found ${allEntries?.length || 0} total entries for user`);
       console.log('Sample entry data:', allEntries?.[0] || 'No entries found');
 
-      const { startDate, endDate } = getDateRange(timeRange);
+      const effectiveBaseDate = currentDate ?? new Date();
+      const { startDate, endDate } = getDateRange(timeRange, effectiveBaseDate);
       
       console.log(`Fetching entries for ${timeRange}:`, {
         startDate: startDate.toISOString(),
@@ -180,7 +211,7 @@ export const useInsightsData = (userId: string | undefined, timeRange: TimeRange
     } finally {
       setLoading(false);
     }
-  }, [userId, timeRange]);
+  }, [userId, timeRange, currentDate]);
 
   useEffect(() => {
     if (timeRange !== lastTimeRange) {
@@ -192,35 +223,6 @@ export const useInsightsData = (userId: string | undefined, timeRange: TimeRange
   }, [userId, timeRange, fetchInsightsData]);
 
   return { insightsData, loading };
-};
-
-const getDateRange = (timeRange: TimeRange) => {
-  const now = new Date();
-  let startDate, endDate;
-
-  switch (timeRange) {
-    case 'today':
-      startDate = startOfDay(now);
-      endDate = endOfDay(now);
-      break;
-    case 'week':
-      startDate = startOfWeek(now, { weekStartsOn: 1 }); // Monday as week start
-      endDate = endOfWeek(now, { weekStartsOn: 1 });
-      break;
-    case 'month':
-      startDate = startOfMonth(now);
-      endDate = endOfMonth(now);
-      break;
-    case 'year':
-      startDate = startOfYear(now);
-      endDate = endOfYear(now);
-      break;
-    default:
-      startDate = startOfWeek(now, { weekStartsOn: 1 });
-      endDate = endOfWeek(now, { weekStartsOn: 1 });
-  }
-
-  return { startDate, endDate };
 };
 
 const calculateDominantMood = (entries: any[]): DominantMood | null => {

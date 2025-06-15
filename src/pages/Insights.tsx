@@ -33,7 +33,8 @@ function InsightsContent() {
   const scrollPositionRef = useRef<number>(0);
   const isMobile = useIsMobile();
   
-  const { insightsData, loading } = useInsightsData(user?.id, timeRange);
+  // Pass emotionChartDate to useInsightsData for correct filtering!
+  const { insightsData, loading } = useInsightsData(user?.id, timeRange, emotionChartDate);
   
   const timeRanges = [
     { value: 'today', label: 'Day' },
