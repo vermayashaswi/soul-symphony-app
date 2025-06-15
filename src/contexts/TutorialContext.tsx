@@ -2,7 +2,7 @@ import React, { createContext, useContext, useState, useEffect, ReactNode } from
 import { useAuth } from './AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { isAppRoute } from '@/routes/RouteHelpers';
+const isAppRoute = (pathname: string) => pathname.startsWith('/app');
 import { 
   RECORD_ENTRY_SELECTORS, 
   ENTRIES_TAB_SELECTORS,

@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useTutorial } from '@/contexts/TutorialContext';
 import TutorialStep from './TutorialStep';
 import { useLocation } from 'react-router-dom';
-import { isAppRoute } from '@/routes/RouteHelpers';
+const isAppRoute = (pathname: string) => pathname.startsWith('/app');
 import { 
   RECORD_ENTRY_SELECTORS, 
   ENTRIES_TAB_SELECTORS,
