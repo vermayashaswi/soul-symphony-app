@@ -1,91 +1,120 @@
 
-import React, { useEffect, useState } from 'react';
-import AppRoutes from './routes/AppRoutes';
-import { Toaster } from "@/components/ui/toaster";
-import { Toaster as SonnerToaster } from "sonner";
-import { TranslationProvider } from '@/contexts/TranslationContext';
-import { SubscriptionProvider } from '@/contexts/SubscriptionContext';
-import { TranslationLoadingOverlay } from '@/components/translation/TranslationLoadingOverlay';
-import { JournalProcessingInitializer } from './app/journal-processing-init';
-import { TutorialProvider } from './contexts/TutorialContext';
-import TutorialOverlay from './components/tutorial/TutorialOverlay';
-import ErrorBoundary from './components/insights/ErrorBoundary';
-import { preloadCriticalImages } from './utils/imagePreloader';
-import { toast } from 'sonner';
-import './styles/emoji.css';
-import './styles/tutorial.css';
+import React from 'react';
+import { Routes, Route, useLocation } from 'react-router-dom';
+import { AuthProvider } from './contexts/AuthContext';
+import { ThemeProvider } from './hooks/use-theme';
+import { TranslationProvider } from './contexts/TranslationContext';
 
-const App: React.FC = () => {
-  const [isInitialized, setIsInitialized] = useState(false);
+// Marketing pages
+import Index from './pages/Index';
+import FAQPage from './pages/website/FAQPage';
+import BlogPage from './pages/website/BlogPage';
+import BlogPostPage from './pages/website/BlogPostPage';
+import PrivacyPolicyPage from './pages/legal/PrivacyPolicyPage';
 
-  useEffect(() => {
-    console.log('[App] App mounted, current path:', window.location.pathname);
-    
-    // Clean up any malformed paths
-    const currentPath = window.location.pathname;
-    
-    // Fix incorrectly formatted URLs that have domains or https in the path
-    if (currentPath.includes('https://') || currentPath.includes('soulo.online')) {
-      console.log('[App] Fixing malformed URL path:', currentPath);
-      window.history.replaceState(null, '', '/');
-    }
-    
-    // Apply a CSS class to the document body for theme-specific overrides
-    document.body.classList.add('app-initialized');
-    
-    // Preload critical images including the chat avatar
-    try {
-      preloadCriticalImages();
-      console.log('[App] Critical images preloaded successfully');
-    } catch (error) {
-      console.warn('[App] Failed to preload some images:', error);
-      // Non-critical error, continue app initialization
-    }
+// App pages  
+import Home from './pages/Home';
+import Auth from './pages/Auth';
+import Journal from './pages/Journal';
+import Chat from './pages/Chat';
+import SmartChat from './pages/SmartChat';
+import Insights from './pages/Insights';
+import Settings from './pages/Settings';
+import ThemesManagement from './pages/ThemesManagement';
+import NotFound from './pages/NotFound';
 
-    // Mark app as initialized after a brief delay to ensure smooth startup
-    setTimeout(() => {
-      setIsInitialized(true);
-      console.log('[App] App marked as fully initialized');
-    }, 500);
-  }, []);
+// Route components
+import ProtectedRoute from './routes/ProtectedRoute';
+import OnboardingCheck from './routes/OnboardingCheck';
+import ViewportManager from './routes/ViewportManager';
 
-  const handleAppError = (error: Error, errorInfo: any) => {
-    console.error('[App] Application-level error:', error, errorInfo);
-    
-    // Log critical app errors for debugging
-    const errorData = {
-      message: error.message,
-      stack: error.stack,
-      componentStack: errorInfo.componentStack,
-      timestamp: new Date().toISOString(),
-      userAgent: navigator.userAgent,
-      url: window.location.href
-    };
-    
-    console.error('[App] Detailed error info:', errorData);
+// UI components
+import { Toaster } from './components/ui/sonner';
+import { Toaster as ShadcnToaster } from './components/ui/toaster';
+import Navbar from './components/Navbar';
+import MobileNavigation from './routes/MobileNavigation';
 
-    // Show user-friendly error notification
-    toast.error('Something went wrong. The app will try to recover automatically.');
-
-    // Allow the app to continue functioning despite errors
-  };
-
+// App Routes Component (wrapped with all providers)
+const AppRoutes = () => {
   return (
-    <ErrorBoundary onError={handleAppError}>
+    <ThemeProvider>
       <TranslationProvider>
-        <SubscriptionProvider>
-          <TutorialProvider>
-            <TranslationLoadingOverlay />
-            <JournalProcessingInitializer />
-            <AppRoutes key={isInitialized ? 'initialized' : 'initializing'} />
-            <TutorialOverlay />
-            <Toaster />
-            <SonnerToaster position="top-right" />
-          </TutorialProvider>
-        </SubscriptionProvider>
+        <AuthProvider>
+          <ViewportManager>
+            <div className="min-h-screen bg-background text-foreground">
+              <Navbar />
+              <Routes>
+                <Route path="/app/auth" element={<Auth />} />
+                <Route path="/app" element={
+                  <ProtectedRoute>
+                    <OnboardingCheck>
+                      <Home />
+                    </OnboardingCheck>
+                  </ProtectedRoute>
+                } />
+                <Route path="/app/journal" element={
+                  <ProtectedRoute>
+                    <Journal />
+                  </ProtectedRoute>
+                } />
+                <Route path="/app/chat" element={
+                  <ProtectedRoute>
+                    <Chat />
+                  </ProtectedRoute>
+                } />
+                <Route path="/app/smart-chat" element={
+                  <ProtectedRoute>
+                    <SmartChat />
+                  </ProtectedRoute>
+                } />
+                <Route path="/app/insights" element={
+                  <ProtectedRoute>
+                    <Insights />
+                  </ProtectedRoute>
+                } />
+                <Route path="/app/settings" element={
+                  <ProtectedRoute>
+                    <Settings />
+                  </ProtectedRoute>
+                } />
+                <Route path="/app/themes" element={
+                  <ProtectedRoute>
+                    <ThemesManagement />
+                  </ProtectedRoute>
+                } />
+              </Routes>
+              <MobileNavigation />
+              <Toaster />
+              <ShadcnToaster />
+            </div>
+          </ViewportManager>
+        </AuthProvider>
       </TranslationProvider>
-    </ErrorBoundary>
+    </ThemeProvider>
   );
+};
+
+// Marketing Routes Component (no providers needed)
+const MarketingRoutes = () => {
+  return (
+    <Routes>
+      <Route path="/" element={<Index />} />
+      <Route path="/faq" element={<FAQPage />} />
+      <Route path="/blog" element={<BlogPage />} />
+      <Route path="/blog/:slug" element={<BlogPostPage />} />
+      <Route path="/privacy-policy" element={<PrivacyPolicyPage />} />
+      <Route path="/terms" element={<PrivacyPolicyPage />} />
+      <Route path="*" element={<NotFound />} />
+    </Routes>
+  );
+};
+
+// Main App Component
+const App = () => {
+  const location = useLocation();
+  const isAppRoute = location.pathname.startsWith('/app');
+
+  return isAppRoute ? <AppRoutes /> : <MarketingRoutes />;
 };
 
 export default App;
