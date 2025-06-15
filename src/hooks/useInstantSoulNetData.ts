@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { EnhancedSoulNetPreloadService } from '@/services/enhancedSoulNetPreloadService';
 import { useTranslation } from '@/contexts/TranslationContext';
@@ -52,62 +51,90 @@ export const useInstantSoulNetData = (
     userId ? `${userId}-${timeRange}-${currentLanguage}` : '', 
     [userId, timeRange, currentLanguage]
   );
-  
+
+  // Defensive: Always read from cache after reset, so define a getter
   const instantCached = useMemo(() => {
     if (!cacheKey) return null;
     return EnhancedSoulNetPreloadService.getInstantData(cacheKey);
   }, [cacheKey]);
 
-  const [graphData, setGraphData] = useState<{ nodes: NodeData[], links: LinkData[] }>(() => {
-    if (instantCached && instantCached.data.translationComplete) {
-      console.log('[useInstantSoulNetData] APP-LEVEL: Using complete cached data immediately');
-      return { nodes: instantCached.data.nodes, links: instantCached.data.links };
-    }
-    return { nodes: [], links: [] };
-  });
-
-  const [translations, setTranslations] = useState<Map<string, string>>(() => {
-    return (instantCached && instantCached.data.translationComplete) ? instantCached.data.translations : new Map();
-  });
-
-  const [connectionPercentages, setConnectionPercentages] = useState<Map<string, number>>(() => {
-    return (instantCached && instantCached.data.translationComplete) ? instantCached.data.connectionPercentages : new Map();
-  });
-
-  const [nodeConnectionData, setNodeConnectionData] = useState<Map<string, NodeConnectionData>>(() => {
-    return (instantCached && instantCached.data.translationComplete) ? instantCached.data.nodeConnectionData : new Map();
-  });
-
+  // ------------------
+  // ENHANCED: manage resetting state and cache clearing order/logic
+  // ------------------
+  // Defensive: Use state AND ensure initial state doesn't reflect any old cache after reset
+  const [graphData, setGraphData] = useState<{ nodes: NodeData[], links: LinkData[] }>(
+    () => (instantCached && instantCached.data.translationComplete)
+      ? { nodes: instantCached.data.nodes, links: instantCached.data.links }
+      : { nodes: [], links: [] }
+  );
+  const [translations, setTranslations] = useState<Map<string, string>>(
+    () => (instantCached && instantCached.data.translationComplete)
+      ? instantCached.data.translations : new Map()
+  );
+  const [connectionPercentages, setConnectionPercentages] = useState<Map<string, number>>(
+    () => (instantCached && instantCached.data.translationComplete)
+      ? instantCached.data.connectionPercentages : new Map()
+  );
+  const [nodeConnectionData, setNodeConnectionData] = useState<Map<string, NodeConnectionData>>(
+    () => (instantCached && instantCached.data.translationComplete)
+      ? instantCached.data.nodeConnectionData : new Map()
+  );
   const [loading, setLoading] = useState(!instantCached || !instantCached.data.translationComplete);
   const [error, setError] = useState<Error | null>(null);
   const [isInstantReady, setIsInstantReady] = useState(!!(instantCached && instantCached.data.translationComplete));
-  
-  // NEW: Translation state tracking
+  // Translation state tracking
   const [isTranslating, setIsTranslating] = useState(false);
   const [translationProgress, setTranslationProgress] = useState(100);
   const [translationComplete, setTranslationComplete] = useState(!!(instantCached && instantCached.data.translationComplete));
 
-  // FIXED: Clear cache and reset state when time range changes
+  // Manual state reset tracking (to block race)
+  const [cacheResetFlag, setCacheResetFlag] = useState(0);
+
+  // ENHANCED EFFECT: Instead of resetting state before, clear cache FIRST, then reset; then update the cache key
   useEffect(() => {
-    console.log('[useInstantSoulNetData] APP-LEVEL: Time range or language changed, clearing cache and resetting state');
-    
-    // Clear cache for old time ranges when current time range changes
-    if (userId) {
-      EnhancedSoulNetPreloadService.clearTimeRangeCache(userId, timeRange, currentLanguage);
-    }
-    
-    // Reset all state when time range changes
-    setGraphData({ nodes: [], links: [] });
-    setTranslations(new Map());
-    setConnectionPercentages(new Map());
-    setNodeConnectionData(new Map());
-    setIsInstantReady(false);
-    setTranslationComplete(false);
-    setIsTranslating(false);
-    setTranslationProgress(0);
-    setLoading(true);
-    setError(null);
+    if (!userId) return; // nothing to clear/reset without userId
+    // Step 1: clear cache for old (stale) time ranges before changing state
+    EnhancedSoulNetPreloadService.clearTimeRangeCache(userId, timeRange, currentLanguage);
+    // Step 2: once cleared (synchronous), reset flag to force below effect
+    setCacheResetFlag(flag => flag + 1);
+    // This will re-populate state from new cache, if any
+    console.log('[useInstantSoulNetData] ENHANCED: Cleared cache and triggered reset for', cacheKey);
+  // Only run if any of these key routing state changes
   }, [timeRange, currentLanguage, userId]);
+
+  // ENHANCED: after cache is cleared, reset state in a controlled effect so there's no race
+  useEffect(() => {
+    // Always validate immediately after cache clearing. This effect is triggered by cacheResetFlag changing.
+    const recached = cacheKey ? EnhancedSoulNetPreloadService.getInstantData(cacheKey) : null;
+    if (recached && recached.data.translationComplete) {
+      // Valid cache found, hydrate state from it
+      setGraphData({ nodes: recached.data.nodes, links: recached.data.links });
+      setTranslations(recached.data.translations);
+      setConnectionPercentages(recached.data.connectionPercentages);
+      setNodeConnectionData(recached.data.nodeConnectionData);
+      setIsInstantReady(true);
+      setTranslationComplete(true);
+      setIsTranslating(false);
+      setTranslationProgress(100);
+      setLoading(false);
+      setError(null);
+      console.log('[useInstantSoulNetData] ENHANCED: Immediately hydrated state from valid cache after reset', cacheKey);
+    } else {
+      // No valid cache, wipe state
+      setGraphData({ nodes: [], links: [] });
+      setTranslations(new Map());
+      setConnectionPercentages(new Map());
+      setNodeConnectionData(new Map());
+      setIsInstantReady(false);
+      setTranslationComplete(false);
+      setIsTranslating(false);
+      setTranslationProgress(0);
+      setLoading(true);
+      setError(null);
+      console.log('[useInstantSoulNetData] ENHANCED: State cleared (no valid cache after reset)', cacheKey);
+    }
+  // Only run after cacheResetFlag changes (decoupled from timeRange/userId directly)
+  }, [cacheResetFlag, cacheKey]);
 
   // APP-LEVEL: Enhanced instant data getter functions using app-level translation service
   const getInstantConnectionPercentage = useCallback((selectedNode: string, targetNode: string): number => {
@@ -167,10 +194,9 @@ export const useInstantSoulNetData = (
       return;
     }
 
-    // Check if we already have complete data for current cache key
+    // Defensive: Always check for valid cache after state reset and before loading
     const currentCached = EnhancedSoulNetPreloadService.getInstantData(cacheKey);
     if (currentCached && currentCached.data.translationComplete) {
-      console.log('[useInstantSoulNetData] APP-LEVEL: Using existing complete cache data');
       setGraphData({ nodes: currentCached.data.nodes, links: currentCached.data.links });
       setTranslations(currentCached.data.translations);
       setConnectionPercentages(currentCached.data.connectionPercentages);
@@ -180,6 +206,8 @@ export const useInstantSoulNetData = (
       setIsTranslating(false);
       setTranslationProgress(100);
       setLoading(false);
+      setError(null);
+      console.log('[useInstantSoulNetData] APP-LEVEL: preloadData found new valid cache after reset', cacheKey);
       return;
     }
 
@@ -242,10 +270,10 @@ export const useInstantSoulNetData = (
     }
   }, [userId, timeRange, currentLanguage, cacheKey]);
 
-  // Background preload effect
+  // Background preload effect after cache and state are initialized
   useEffect(() => {
     preloadData();
-  }, [preloadData]);
+  }, [preloadData, cacheResetFlag]);
 
   console.log(`[useInstantSoulNetData] APP-LEVEL STATE: nodes=${graphData.nodes.length}, translations=${translations.size}, percentages=${connectionPercentages.size}, instantReady=${isInstantReady}, loading=${loading}, translating=${isTranslating}, progress=${translationProgress}%, complete=${translationComplete}`);
 
