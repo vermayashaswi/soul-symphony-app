@@ -24,7 +24,7 @@ const HeroSection: React.FC<HeroSectionProps> = ({ openAppStore, openPlayStore }
   const shouldRenderMobile = isMobile.isMobile || mobileDemo;
 
   return (
-    <div className="relative w-full bg-gradient-to-br from-blue-50 to-purple-50 pt-20 pb-6 md:pt-6 md:pb-2 overflow-hidden min-h-[80vh] md:min-h-[85vh] flex items-center">
+    <div className="relative w-full bg-gradient-to-br from-blue-50 to-purple-50 pt-16 pb-2 md:pt-4 md:pb-1 overflow-hidden min-h-[75vh] md:min-h-[78vh] lg:min-h-[82vh] flex items-center">
       {/* Background image */}
       <div 
         className="absolute inset-0 z-0 bg-cover bg-center opacity-20"
@@ -32,21 +32,21 @@ const HeroSection: React.FC<HeroSectionProps> = ({ openAppStore, openPlayStore }
       ></div>
       
       <div className="container mx-auto px-4 relative z-10">
-        <div className="flex flex-col lg:flex-row items-center gap-4 lg:gap-6">
+        <div className="flex flex-col lg:flex-row items-center gap-2 lg:gap-4">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.8 }}
             className="w-full lg:w-1/2 text-center lg:text-left"
           >
-            <h1 className="text-2xl md:text-3xl lg:text-4xl xl:text-5xl font-bold mb-3 md:mb-4 text-primary leading-tight">
+            <h1 className="text-2xl md:text-3xl lg:text-4xl xl:text-5xl font-bold mb-2 md:mb-3 text-primary leading-tight">
               <TranslatableText text="Express. Reflect. Grow." />
             </h1>
-            <p className="text-base md:text-lg lg:text-xl text-gray-700 mb-4 md:mb-6 max-w-2xl mx-auto lg:mx-0 leading-relaxed">
+            <p className="text-base md:text-lg lg:text-xl text-gray-700 mb-3 md:mb-4 max-w-2xl mx-auto lg:mx-0 leading-relaxed">
               <TranslatableText text="Journaling should be as simple as talking. Use voice and leave the rest to us." />
             </p>
             
-            <div className="flex flex-col sm:flex-row gap-2 md:gap-3 justify-center lg:justify-start mb-4 md:mb-6">
+            <div className="flex flex-col sm:flex-row gap-2 justify-center lg:justify-start mb-2 md:mb-3">
               <Button 
                 size="lg" 
                 className="gap-2 bg-black text-white hover:bg-gray-800 text-sm md:text-base" 
@@ -65,13 +65,7 @@ const HeroSection: React.FC<HeroSectionProps> = ({ openAppStore, openPlayStore }
               </Button>
             </div>
             
-            <div
-              className={
-                // Halve the bottom margin below info lines on mobile and desktop separately
-                "flex items-center justify-center lg:justify-start gap-4 md:gap-6 text-xs md:text-sm text-gray-500 " +
-                "mb-3 md:mb-5" // NEW: reduce mb-4/md:mb-6 to mb-3/md:mb-5 for tighter vertical space before phone
-              }
-            >
+            <div className="flex items-center justify-center lg:justify-start gap-4 md:gap-6 text-xs md:text-sm text-gray-500">
               <div className="flex items-center gap-1">
                 <Shield className="h-3 w-3 md:h-4 md:w-4 text-primary" />
                 <TranslatableText text="Privacy-Focused" />
@@ -87,13 +81,9 @@ const HeroSection: React.FC<HeroSectionProps> = ({ openAppStore, openPlayStore }
             initial={{ opacity: 0, scale: 0.9 }}
             animate={{ opacity: 1, scale: 1 }}
             transition={{ duration: 1, delay: 0.3 }}
-            // Reduce top margin on desktop for phone animation
-            className={
-              "w-full lg:w-1/2 flex items-center justify-center " +
-              "mt-2 lg:mt-0" // Add small margin-top for mobile, none for desktop to reduce vertical gap
-            }
+            className="w-full lg:w-1/2 flex items-center justify-center mt-1 lg:mt-0"
           >
-            <div className="w-full max-w-[280px] md:max-w-xs lg:max-w-sm">
+            <div className="w-full max-w-[260px] md:max-w-[300px] lg:max-w-sm">
               <AspectRatio ratio={9/16} className="w-full">
                 <PhoneVoiceAnimation />
               </AspectRatio>
@@ -106,4 +96,3 @@ const HeroSection: React.FC<HeroSectionProps> = ({ openAppStore, openPlayStore }
 };
 
 export default HeroSection;
-
