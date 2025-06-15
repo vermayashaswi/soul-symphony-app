@@ -1,4 +1,3 @@
-
 import React, { Suspense, lazy } from 'react';
 import { Apple, Play, Shield, Check } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -24,7 +23,14 @@ const HeroSection: React.FC<HeroSectionProps> = ({ openAppStore, openPlayStore }
   const shouldRenderMobile = isMobile.isMobile || mobileDemo;
 
   return (
-    <div className="relative w-full bg-gradient-to-br from-blue-50 to-purple-50 pt-16 pb-2 md:pt-4 md:pb-1 overflow-hidden min-h-[75vh] md:min-h-[78vh] lg:min-h-[82vh] flex items-center">
+    <div
+      className={`
+        relative w-full bg-gradient-to-br from-blue-50 to-purple-50 
+        pt-32 pb-2 md:pt-4 md:pb-1 
+        overflow-hidden min-h-[75vh] md:min-h-[78vh] lg:min-h-[82vh] flex items-center
+      `}
+      // ↑ pt-32 for mobile triples the spacing, default is 8rem, md:pt-4 keeps current for tablets/desktops
+    >
       {/* Background image */}
       <div 
         className="absolute inset-0 z-0 bg-cover bg-center opacity-20"

@@ -54,8 +54,17 @@ const Navbar = () => {
 
         {/* Mobile Navigation Toggle */}
         <div className="md:hidden flex items-center">
-          <Button variant="ghost" size="sm" className="ml-2" onClick={toggleMenu}>
-            {isMenuOpen ? <X size={20} /> : <Menu size={20} />}
+          <Button
+            size="icon"
+            className={`
+              ml-2 rounded-full bg-primary/80 text-white shadow-lg 
+              hover:bg-primary/95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60 
+              transition-colors duration-200
+            `}
+            aria-label={isMenuOpen ? "Close menu" : "Open menu"}
+            onClick={toggleMenu}
+          >
+            {isMenuOpen ? <X size={24} /> : <Menu size={24} />}
           </Button>
         </div>
       </div>
