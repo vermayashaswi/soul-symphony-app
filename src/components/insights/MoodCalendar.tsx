@@ -212,7 +212,15 @@ const MoodCalendar: React.FC<MoodCalendarProps> = ({ sentimentData, timeRange })
     const groupedData = new Map();
     
     filteredData.forEach(item => {
-      const formattedDate = formatDateForTimeRange(item.date, timeRange, currentLanguage);
+      // ---- CHANGE STARTS HERE ----
+      // For "month", group by day-level ("short" formatting). Other timeRanges stay unchanged.
+      let formattedDate: string;
+      if (timeRange === "month") {
+        formattedDate = formatDateForTimeRange(item.date, "short", currentLanguage);
+      } else {
+        formattedDate = formatDateForTimeRange(item.date, timeRange, currentLanguage);
+      }
+      // ---- CHANGE ENDS HERE ----
       const dateKey = formattedDate;
       
       if (!groupedData.has(dateKey)) {
