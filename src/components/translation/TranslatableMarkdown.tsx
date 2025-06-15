@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import ReactMarkdown from 'react-markdown';
 import { useTranslation } from '@/contexts/TranslationContext';
@@ -6,6 +5,8 @@ import { useLocation } from 'react-router-dom';
 import { isWebsiteRoute } from '@/routes/RouteHelpers';
 import { useLanguageFontConfig } from '@/utils/languageFontScaling';
 import { createLanguageAwareStyle, getLanguageAwareClasses } from '@/utils/languageAwareCSS';
+
+const isWebsiteRoute = (pathname: string) => !pathname.startsWith('/app');
 
 interface TranslatableMarkdownProps {
   children: string;

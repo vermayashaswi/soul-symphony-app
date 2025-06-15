@@ -1,4 +1,3 @@
-
 import { useEffect } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { ArrowLeft } from "lucide-react";
@@ -9,6 +8,8 @@ import { isAppRoute } from "@/routes/RouteHelpers";
 interface NotFoundProps {
   isAppSubdomain?: boolean;
 }
+
+const isAppRoute = (pathname: string) => pathname.startsWith('/app');
 
 const NotFound = ({ isAppSubdomain }: NotFoundProps = {}) => {
   const location = useLocation();

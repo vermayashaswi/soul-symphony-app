@@ -1,7 +1,7 @@
 
 import React from 'react';
 import { Routes, Route, useLocation } from 'react-router-dom';
-import { AuthProvider } from './contexts/AuthContext';
+import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { ThemeProvider } from './hooks/use-theme';
 import { TranslationProvider } from './contexts/TranslationContext';
 import { useOnboarding } from './hooks/use-onboarding';
@@ -51,7 +51,7 @@ const MarketingRoutes = () => (
 
 // --- All /app pages with providers and app layout ---
 const AppRoutesWithAuth = () => {
-  const { user } = React.useContext(AuthProvider.Context);
+  const { user } = useAuth();
   const { onboardingComplete, loading: onboardingLoading } = useOnboarding();
 
   return (
