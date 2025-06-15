@@ -16,29 +16,39 @@ interface MarketingThemeProviderProps {
 }
 
 export function MarketingThemeProvider({ children }: MarketingThemeProviderProps) {
+  console.log('[MarketingThemeProvider] Initializing...');
+  
   const [theme, setTheme] = useState<Theme>(() => {
     try {
-      const savedTheme = localStorage.getItem('feelosophy-theme');
-      return (savedTheme as Theme) || 'system';
-    } catch {
-      return 'system';
+      const savedTheme = localStorage.getItem('marketing-theme');
+      const result = (savedTheme as Theme) || 'light';
+      console.log('[MarketingThemeProvider] Initial theme:', result);
+      return result;
+    } catch (error) {
+      console.warn('[MarketingThemeProvider] Error reading theme from localStorage:', error);
+      return 'light';
     }
   });
   
   const [systemTheme, setSystemTheme] = useState<'light' | 'dark'>(() => {
     try {
-      return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
-    } catch {
+      const result = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+      console.log('[MarketingThemeProvider] Initial system theme:', result);
+      return result;
+    } catch (error) {
+      console.warn('[MarketingThemeProvider] Error detecting system theme:', error);
       return 'light';
     }
   });
 
   useEffect(() => {
+    console.log('[MarketingThemeProvider] Setting up media query listener...');
     try {
       const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
       
       const handleChange = (e: MediaQueryListEvent) => {
         const newSystemTheme = e.matches ? 'dark' : 'light';
+        console.log('[MarketingThemeProvider] System theme changed to:', newSystemTheme);
         setSystemTheme(newSystemTheme);
         
         if (theme === 'system') {
@@ -62,11 +72,12 @@ export function MarketingThemeProvider({ children }: MarketingThemeProviderProps
         mediaQuery.removeEventListener('change', handleChange);
       };
     } catch (error) {
-      console.warn('Error setting up media query listener:', error);
+      console.warn('[MarketingThemeProvider] Error setting up media query listener:', error);
     }
   }, [theme]);
 
   useEffect(() => {
+    console.log('[MarketingThemeProvider] Applying theme:', theme, 'systemTheme:', systemTheme);
     try {
       const root = window.document.documentElement;
       root.classList.remove('light', 'dark');
@@ -77,9 +88,9 @@ export function MarketingThemeProvider({ children }: MarketingThemeProviderProps
         root.classList.add(theme);
       }
       
-      localStorage.setItem('feelosophy-theme', theme);
+      localStorage.setItem('marketing-theme', theme);
     } catch (error) {
-      console.warn('Error applying theme:', error);
+      console.warn('[MarketingThemeProvider] Error applying theme:', error);
     }
   }, [theme, systemTheme]);
 
@@ -88,6 +99,8 @@ export function MarketingThemeProvider({ children }: MarketingThemeProviderProps
     setTheme,
     systemTheme
   };
+
+  console.log('[MarketingThemeProvider] Providing context value:', contextValue);
 
   return (
     <MarketingThemeContext.Provider value={contextValue}>
@@ -99,6 +112,7 @@ export function MarketingThemeProvider({ children }: MarketingThemeProviderProps
 export function useMarketingTheme() {
   const context = useContext(MarketingThemeContext);
   if (context === undefined) {
+    console.warn('[useMarketingTheme] Called outside of MarketingThemeProvider, returning defaults');
     // Return safe defaults if called outside provider
     return {
       theme: 'light' as Theme,

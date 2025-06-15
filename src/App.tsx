@@ -162,6 +162,8 @@ const App = () => {
   const location = useLocation();
   const isOnAppRoute = isAppRoute(location.pathname);
   
+  console.log('[App] Current route:', location.pathname, 'isAppRoute:', isOnAppRoute);
+  
   return (
     <>
       {isOnAppRoute ? <AppRoutesComponent /> : <MarketingRoutes />}
