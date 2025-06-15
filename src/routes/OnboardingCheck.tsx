@@ -1,21 +1,18 @@
 
-import React from 'react';
+import React, { ReactNode } from 'react';
 import { Navigate } from 'react-router-dom';
-import OnboardingScreen from '@/components/onboarding/OnboardingScreen';
+import type { User } from '@supabase/supabase-js';
 
-interface OnboardingCheckProps {
+type OnboardingCheckProps = {
   onboardingComplete: boolean;
   onboardingLoading: boolean;
-  user: any;
-  children: React.ReactNode;
-}
+  user: User | null;
+  children: ReactNode;
+};
 
-const OnboardingCheck: React.FC<OnboardingCheckProps> = ({ 
-  onboardingComplete, 
-  onboardingLoading, 
-  user, 
-  children 
-}) => {
+function OnboardingCheck(props: OnboardingCheckProps) {
+  const { onboardingComplete, onboardingLoading, user, children } = props;
+
   if (onboardingLoading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -33,6 +30,6 @@ const OnboardingCheck: React.FC<OnboardingCheckProps> = ({
   }
 
   return <>{children}</>;
-};
+}
 
 export default OnboardingCheck;

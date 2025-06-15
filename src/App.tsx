@@ -1,10 +1,10 @@
-
 import React from 'react';
 import { Routes, Route, useLocation } from 'react-router-dom';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { ThemeProvider } from './hooks/use-theme';
 import { TranslationProvider } from './contexts/TranslationContext';
 import { useOnboarding } from './hooks/use-onboarding';
+import { User } from '@supabase/supabase-js';
 
 // Marketing pages
 import Index from './pages/Index';
@@ -51,7 +51,7 @@ const AppRoutesWithAuth = () => {
               <OnboardingCheck
                 onboardingComplete={onboardingComplete}
                 onboardingLoading={onboardingLoading}
-                user={user}
+                user={user as User | null}
               >
                 <Home />
               </OnboardingCheck>
