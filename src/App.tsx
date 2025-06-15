@@ -1,9 +1,10 @@
 
 import React from 'react';
 import { Routes, Route, useLocation } from 'react-router-dom';
-import { AuthProvider } from './contexts/AuthContext';
+import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { ThemeProvider } from './hooks/use-theme';
 import { TranslationProvider } from './contexts/TranslationContext';
+import { useOnboarding } from './hooks/use-onboarding';
 
 // Marketing pages
 import Index from './pages/Index';
@@ -32,7 +33,68 @@ import ViewportManager from './routes/ViewportManager';
 import { Toaster } from './components/ui/sonner';
 import { Toaster as ShadcnToaster } from './components/ui/toaster';
 import Navbar from './components/Navbar';
-import MobileNavigation from './routes/MobileNavigation';
+import MobileNavigation from './components/MobileNavigation';
+
+// Inner App Component with access to Auth context
+const AppRoutesWithAuth = () => {
+  const { user } = useAuth();
+  const { onboardingComplete, loading: onboardingLoading } = useOnboarding();
+
+  return (
+    <ViewportManager>
+      <div className="min-h-screen bg-background text-foreground">
+        <Navbar />
+        <Routes>
+          <Route path="/app/auth" element={<Auth />} />
+          <Route path="/app" element={
+            <ProtectedRoute>
+              <OnboardingCheck
+                onboardingComplete={onboardingComplete}
+                onboardingLoading={onboardingLoading}
+                user={user}
+              >
+                <Home />
+              </OnboardingCheck>
+            </ProtectedRoute>
+          } />
+          <Route path="/app/journal" element={
+            <ProtectedRoute>
+              <Journal />
+            </ProtectedRoute>
+          } />
+          <Route path="/app/chat" element={
+            <ProtectedRoute>
+              <Chat />
+            </ProtectedRoute>
+          } />
+          <Route path="/app/smart-chat" element={
+            <ProtectedRoute>
+              <SmartChat />
+            </ProtectedRoute>
+          } />
+          <Route path="/app/insights" element={
+            <ProtectedRoute>
+              <Insights />
+            </ProtectedRoute>
+          } />
+          <Route path="/app/settings" element={
+            <ProtectedRoute>
+              <Settings />
+            </ProtectedRoute>
+          } />
+          <Route path="/app/themes" element={
+            <ProtectedRoute>
+              <ThemesManagement />
+            </ProtectedRoute>
+          } />
+        </Routes>
+        <MobileNavigation onboardingComplete={onboardingComplete} />
+        <Toaster />
+        <ShadcnToaster />
+      </div>
+    </ViewportManager>
+  );
+};
 
 // App Routes Component (wrapped with all providers)
 const AppRoutes = () => {
@@ -40,54 +102,7 @@ const AppRoutes = () => {
     <ThemeProvider>
       <TranslationProvider>
         <AuthProvider>
-          <ViewportManager>
-            <div className="min-h-screen bg-background text-foreground">
-              <Navbar />
-              <Routes>
-                <Route path="/app/auth" element={<Auth />} />
-                <Route path="/app" element={
-                  <ProtectedRoute>
-                    <OnboardingCheck>
-                      <Home />
-                    </OnboardingCheck>
-                  </ProtectedRoute>
-                } />
-                <Route path="/app/journal" element={
-                  <ProtectedRoute>
-                    <Journal />
-                  </ProtectedRoute>
-                } />
-                <Route path="/app/chat" element={
-                  <ProtectedRoute>
-                    <Chat />
-                  </ProtectedRoute>
-                } />
-                <Route path="/app/smart-chat" element={
-                  <ProtectedRoute>
-                    <SmartChat />
-                  </ProtectedRoute>
-                } />
-                <Route path="/app/insights" element={
-                  <ProtectedRoute>
-                    <Insights />
-                  </ProtectedRoute>
-                } />
-                <Route path="/app/settings" element={
-                  <ProtectedRoute>
-                    <Settings />
-                  </ProtectedRoute>
-                } />
-                <Route path="/app/themes" element={
-                  <ProtectedRoute>
-                    <ThemesManagement />
-                  </ProtectedRoute>
-                } />
-              </Routes>
-              <MobileNavigation />
-              <Toaster />
-              <ShadcnToaster />
-            </div>
-          </ViewportManager>
+          <AppRoutesWithAuth />
         </AuthProvider>
       </TranslationProvider>
     </ThemeProvider>
