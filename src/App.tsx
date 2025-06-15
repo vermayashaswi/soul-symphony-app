@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from 'react';
 import AppRoutes from './routes/AppRoutes';
 import { Toaster } from "@/components/ui/toaster";
@@ -14,6 +15,12 @@ import { toast } from 'sonner';
 import './styles/emoji.css';
 import './styles/tutorial.css';
 import { FeatureFlagsProvider } from '@/contexts/FeatureFlagsContext';
+
+// Import React Query client
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+
+// Initialize QueryClient outside component to avoid recreation on every render
+const queryClient = new QueryClient();
 
 const App: React.FC = () => {
   const [isInitialized, setIsInitialized] = useState(false);
@@ -66,23 +73,26 @@ const App: React.FC = () => {
   };
 
   return (
-    <ErrorBoundary onError={handleAppError}>
-      <TranslationProvider>
-        <SubscriptionProvider>
-          <TutorialProvider>
-            <FeatureFlagsProvider>
-              <TranslationLoadingOverlay />
-              <JournalProcessingInitializer />
-              <AppRoutes key={isInitialized ? 'initialized' : 'initializing'} />
-              <TutorialOverlay />
-              <Toaster />
-              <SonnerToaster position="top-right" />
-            </FeatureFlagsProvider>
-          </TutorialProvider>
-        </SubscriptionProvider>
-      </TranslationProvider>
-    </ErrorBoundary>
+    <QueryClientProvider client={queryClient}>
+      <ErrorBoundary onError={handleAppError}>
+        <TranslationProvider>
+          <SubscriptionProvider>
+            <TutorialProvider>
+              <FeatureFlagsProvider>
+                <TranslationLoadingOverlay />
+                <JournalProcessingInitializer />
+                <AppRoutes key={isInitialized ? 'initialized' : 'initializing'} />
+                <TutorialOverlay />
+                <Toaster />
+                <SonnerToaster position="top-right" />
+              </FeatureFlagsProvider>
+            </TutorialProvider>
+          </SubscriptionProvider>
+        </TranslationProvider>
+      </ErrorBoundary>
+    </QueryClientProvider>
   );
 };
 
 export default App;
+
