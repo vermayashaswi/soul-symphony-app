@@ -1,3 +1,4 @@
+
 import { fetchWithRetry, parseRateLimitInfo } from '@/utils/api-client';
 
 export type TranscriptionOptions = {
@@ -69,8 +70,6 @@ export class TranscriptionService {
       const arrayBuffer = await audioBlob.arrayBuffer();
       const uint8Array = new Uint8Array(arrayBuffer);
       const base64Data = btoa(String.fromCharCode(...uint8Array));
-
-      console.log('Starting transcription process...');
       
       const formData = new FormData();
       formData.append('audio', base64Data);

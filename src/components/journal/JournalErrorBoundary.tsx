@@ -28,7 +28,9 @@ export class JournalErrorBoundary extends Component<Props, State> {
   }
 
   public componentDidCatch(error: Error, errorInfo: ErrorInfo): void {
-    console.error('Journal component error:', error, errorInfo);
+    if (process.env.NODE_ENV === 'development') {
+      console.error('Journal component error:', error, errorInfo);
+    }
     this.setState({
       error,
       errorInfo
@@ -68,13 +70,15 @@ export class JournalErrorBoundary extends Component<Props, State> {
           >
             Reset and try again
           </Button>
-          <details className="mt-4 text-xs text-left">
-            <summary className="text-muted-foreground cursor-pointer">Error details</summary>
-            <pre className="p-2 bg-background/80 rounded mt-2 overflow-auto max-h-[200px]">
-              {this.state.error?.toString()}
-              {this.state.errorInfo?.componentStack}
-            </pre>
-          </details>
+          {process.env.NODE_ENV === 'development' && (
+            <details className="mt-4 text-xs text-left">
+              <summary className="text-muted-foreground cursor-pointer">Error details</summary>
+              <pre className="p-2 bg-background/80 rounded mt-2 overflow-auto max-h-[200px]">
+                {this.state.error?.toString()}
+                {this.state.errorInfo?.componentStack}
+              </pre>
+            </details>
+          )}
         </div>
       );
     }

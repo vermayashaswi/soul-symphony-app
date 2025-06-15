@@ -19,14 +19,11 @@ const App: React.FC = () => {
   const [isInitialized, setIsInitialized] = useState(false);
 
   useEffect(() => {
-    console.log('[App] App mounted, current path:', window.location.pathname);
-    
     // Clean up any malformed paths
     const currentPath = window.location.pathname;
     
     // Fix incorrectly formatted URLs that have domains or https in the path
     if (currentPath.includes('https://') || currentPath.includes('soulo.online')) {
-      console.log('[App] Fixing malformed URL path:', currentPath);
       window.history.replaceState(null, '', '/');
     }
     
@@ -36,21 +33,19 @@ const App: React.FC = () => {
     // Preload critical images including the chat avatar
     try {
       preloadCriticalImages();
-      console.log('[App] Critical images preloaded successfully');
     } catch (error) {
-      console.warn('[App] Failed to preload some images:', error);
+      console.warn('Failed to preload some images:', error);
       // Non-critical error, continue app initialization
     }
 
     // Mark app as initialized after a brief delay to ensure smooth startup
     setTimeout(() => {
       setIsInitialized(true);
-      console.log('[App] App marked as fully initialized');
     }, 500);
   }, []);
 
   const handleAppError = (error: Error, errorInfo: any) => {
-    console.error('[App] Application-level error:', error, errorInfo);
+    console.error('Application-level error:', error, errorInfo);
     
     // Log critical app errors for debugging
     const errorData = {
@@ -62,7 +57,7 @@ const App: React.FC = () => {
       url: window.location.href
     };
     
-    console.error('[App] Detailed error info:', errorData);
+    console.error('Detailed error info:', errorData);
 
     // Show user-friendly error notification
     toast.error('Something went wrong. The app will try to recover automatically.');

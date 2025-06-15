@@ -16,8 +16,6 @@ export const processAudioInBackground = async (
   } = {}
 ) => {
   try {
-    console.log('Starting background audio processing...');
-    
     // Get the Supabase URL from the client configuration
     const supabaseUrl = "https://kwnwhgucnzqxndzjayyq.supabase.co";
     
@@ -28,8 +26,6 @@ export const processAudioInBackground = async (
     );
 
     const result = await transcriptionService.transcribeAudio(audioBlob, options);
-    
-    console.log('Background processing completed successfully:', result);
     
     // Show success toast
     toast.success('Voice journal entry saved successfully!', {

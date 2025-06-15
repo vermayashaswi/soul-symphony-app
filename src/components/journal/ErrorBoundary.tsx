@@ -28,8 +28,10 @@ export class JournalErrorBoundary extends Component<Props, State> {
   }
 
   componentDidCatch(error: Error, errorInfo: ErrorInfo) {
-    // Log the error for debugging
-    console.error('[JournalErrorBoundary] Caught error:', error, errorInfo);
+    // Log the error for debugging in development only
+    if (process.env.NODE_ENV === 'development') {
+      console.error('[JournalErrorBoundary] Caught error:', error, errorInfo);
+    }
     
     this.setState({
       error,

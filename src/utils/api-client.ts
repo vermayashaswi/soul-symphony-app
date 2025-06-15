@@ -43,7 +43,6 @@ export async function fetchWithRetry(
     // Handle rate limiting
     if (response.status === 429 && respectRateLimit) {
       const retryAfter = parseInt(response.headers.get('Retry-After') || '60');
-      console.log(`Rate limited. Retry after ${retryAfter} seconds`);
       
       // For rate limiting, don't retry automatically to respect the limits
       // The calling code should handle this with the rate limit hook
@@ -57,8 +56,6 @@ export async function fetchWithRetry(
     
     // If we have retries left and the error is retryable (but not rate limited), retry
     if (retries > 0 && isRetryableError(response.status) && response.status !== 429) {
-      console.log(`Retrying request to ${url} (${retries} retries left)`);
-      
       // Wait for the specified delay
       await new Promise(resolve => setTimeout(resolve, retryDelay));
       
@@ -78,8 +75,6 @@ export async function fetchWithRetry(
     }
     
     if (retries > 0 && isNetworkError(error)) {
-      console.log(`Network error for ${url}, retrying (${retries} retries left)`);
-      
       // Wait for the specified delay
       await new Promise(resolve => setTimeout(resolve, retryDelay));
       
