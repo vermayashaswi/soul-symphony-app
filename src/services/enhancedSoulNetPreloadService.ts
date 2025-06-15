@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 
 interface NodeData {
@@ -48,7 +47,7 @@ interface AppLevelTranslationService {
 export class EnhancedSoulNetPreloadService {
   private static readonly CACHE_KEY = 'enhanced-soulnet-data';
   private static readonly CACHE_DURATION = 15 * 60 * 1000; // 15 minutes
-  private static readonly CACHE_VERSION = 6; // Increment for themeemotion fix
+  private static readonly CACHE_VERSION = 7; // FIXED: Increment for time range fix
   private static cache = new Map<string, CachedEnhancedData>();
   private static translationCoordinator = new Map<string, Promise<Map<string, string>>>();
   
@@ -56,6 +55,8 @@ export class EnhancedSoulNetPreloadService {
   private static translationStates = new Map<string, {
     isTranslating: boolean;
     progress: number;
+    totalNodes: number;
+    translatedNodes: number;
     totalNodes: number;
     translatedNodes: number;
   }>();
@@ -67,6 +68,38 @@ export class EnhancedSoulNetPreloadService {
   static setAppLevelTranslationService(service: AppLevelTranslationService) {
     console.log('[EnhancedSoulNetPreloadService] APP-LEVEL: Setting app-level translation service');
     this.appTranslationService = service;
+  }
+
+  // FIXED: New method to clear cache for old time ranges when current time range changes
+  static clearTimeRangeCache(userId: string, currentTimeRange: string, currentLanguage: string): void {
+    console.log(`[EnhancedSoulNetPreloadService] FIXED: Clearing cache for user ${userId} except current time range ${currentTimeRange}`);
+    
+    const currentCacheKey = this.generateCacheKey(userId, currentTimeRange, currentLanguage);
+    
+    // Clear in-memory cache
+    const keysToDelete = Array.from(this.cache.keys()).filter(key => 
+      key.startsWith(userId) && key !== currentCacheKey
+    );
+    keysToDelete.forEach(key => {
+      console.log(`[EnhancedSoulNetPreloadService] FIXED: Clearing cache for key: ${key}`);
+      this.cache.delete(key);
+      this.translationStates.delete(key);
+      this.translationCoordinator.delete(key);
+    });
+    
+    // Clear localStorage cache
+    try {
+      Object.keys(localStorage).forEach(key => {
+        if (key.startsWith(`${this.CACHE_KEY}-${userId}`) && key !== `${this.CACHE_KEY}-${currentCacheKey}`) {
+          console.log(`[EnhancedSoulNetPreloadService] FIXED: Clearing localStorage for key: ${key}`);
+          localStorage.removeItem(key);
+        }
+      });
+    } catch (error) {
+      console.error('[EnhancedSoulNetPreloadService] Error clearing localStorage:', error);
+    }
+    
+    console.log(`[EnhancedSoulNetPreloadService] FIXED: Cache cleared for all time ranges except current: ${currentTimeRange}`);
   }
 
   // Get translation state for a cache key
@@ -87,13 +120,6 @@ export class EnhancedSoulNetPreloadService {
     console.log(`[EnhancedSoulNetPreloadService] APP-LEVEL: Preloading instant data for ${userId}, ${timeRange}, ${language}`);
     
     const cacheKey = this.generateCacheKey(userId, timeRange, language);
-    
-    // Clear cache if language changed to force fresh translation
-    const existingCache = this.cache.get(cacheKey);
-    if (existingCache && existingCache.language !== language) {
-      console.log(`[EnhancedSoulNetPreloadService] Language changed, clearing cache for fresh translation`);
-      this.clearInstantCache(userId);
-    }
     
     const cached = this.getInstantData(cacheKey);
     

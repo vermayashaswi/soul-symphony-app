@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { EnhancedSoulNetPreloadService } from '@/services/enhancedSoulNetPreloadService';
 import { useTranslation } from '@/contexts/TranslationContext';
@@ -86,6 +87,28 @@ export const useInstantSoulNetData = (
   const [translationProgress, setTranslationProgress] = useState(100);
   const [translationComplete, setTranslationComplete] = useState(!!(instantCached && instantCached.data.translationComplete));
 
+  // FIXED: Clear cache and reset state when time range changes
+  useEffect(() => {
+    console.log('[useInstantSoulNetData] APP-LEVEL: Time range or language changed, clearing cache and resetting state');
+    
+    // Clear cache for old time ranges when current time range changes
+    if (userId) {
+      EnhancedSoulNetPreloadService.clearTimeRangeCache(userId, timeRange, currentLanguage);
+    }
+    
+    // Reset all state when time range changes
+    setGraphData({ nodes: [], links: [] });
+    setTranslations(new Map());
+    setConnectionPercentages(new Map());
+    setNodeConnectionData(new Map());
+    setIsInstantReady(false);
+    setTranslationComplete(false);
+    setIsTranslating(false);
+    setTranslationProgress(0);
+    setLoading(true);
+    setError(null);
+  }, [timeRange, currentLanguage, userId]);
+
   // APP-LEVEL: Enhanced instant data getter functions using app-level translation service
   const getInstantConnectionPercentage = useCallback((selectedNode: string, targetNode: string): number => {
     if (!selectedNode || selectedNode === targetNode) return 0;
@@ -144,9 +167,18 @@ export const useInstantSoulNetData = (
       return;
     }
 
-    // Check if we already have complete data
-    if (isInstantReady && translationComplete) {
-      console.log('[useInstantSoulNetData] APP-LEVEL: Skipping preload - already have complete data');
+    // Check if we already have complete data for current cache key
+    const currentCached = EnhancedSoulNetPreloadService.getInstantData(cacheKey);
+    if (currentCached && currentCached.data.translationComplete) {
+      console.log('[useInstantSoulNetData] APP-LEVEL: Using existing complete cache data');
+      setGraphData({ nodes: currentCached.data.nodes, links: currentCached.data.links });
+      setTranslations(currentCached.data.translations);
+      setConnectionPercentages(currentCached.data.connectionPercentages);
+      setNodeConnectionData(currentCached.data.nodeConnectionData);
+      setIsInstantReady(true);
+      setTranslationComplete(true);
+      setIsTranslating(false);
+      setTranslationProgress(100);
       setLoading(false);
       return;
     }
@@ -208,28 +240,12 @@ export const useInstantSoulNetData = (
     } finally {
       setLoading(false);
     }
-  }, [userId, timeRange, currentLanguage, isInstantReady, translationComplete, cacheKey]);
+  }, [userId, timeRange, currentLanguage, cacheKey]);
 
   // Background preload effect
   useEffect(() => {
-    if (!isInstantReady || !translationComplete) {
-      preloadData();
-    } else {
-      setLoading(false);
-    }
-  }, [preloadData, isInstantReady, translationComplete]);
-
-  // Clear cache when language changes
-  useEffect(() => {
-    if (userId) {
-      console.log('[useInstantSoulNetData] APP-LEVEL: Language changed, clearing cache and resetting state');
-      EnhancedSoulNetPreloadService.clearInstantCache(userId);
-      setIsInstantReady(false);
-      setTranslationComplete(false);
-      setIsTranslating(false);
-      setTranslationProgress(0);
-    }
-  }, [currentLanguage, userId]);
+    preloadData();
+  }, [preloadData]);
 
   console.log(`[useInstantSoulNetData] APP-LEVEL STATE: nodes=${graphData.nodes.length}, translations=${translations.size}, percentages=${connectionPercentages.size}, instantReady=${isInstantReady}, loading=${loading}, translating=${isTranslating}, progress=${translationProgress}%, complete=${translationComplete}`);
 
