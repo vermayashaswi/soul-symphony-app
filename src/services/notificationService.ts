@@ -1,4 +1,3 @@
-
 import { toast } from '@/hooks/use-toast';
 
 // Component mount tracking for safe DOM operations
@@ -174,8 +173,8 @@ export function showNotification(title: string, body: string, options?: Notifica
 
   const notification = new Notification(title, {
     body,
-    icon: '/favicon.ico',
-    badge: '/favicon.ico',
+    icon: '/lovable-uploads/a07b91eb-274a-47b6-8180-fb4c9c0bc8a5.png',
+    badge: '/lovable-uploads/a07b91eb-274a-47b6-8180-fb4c9c0bc8a5.png',
     tag: 'journal-reminder',
     requireInteraction: false,
     silent: false,
