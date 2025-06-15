@@ -1,3 +1,4 @@
+
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { useAuth } from './AuthContext';
 import { supabase } from '@/integrations/supabase/client';
@@ -14,7 +15,8 @@ export interface SubscriptionContextType {
   refreshSubscription: () => Promise<void>;
   isPremium: boolean;
   hasActiveSubscription: boolean;
-
+  
+  // Additional properties for trial and subscription management
   isTrialActive: boolean;
   trialEndDate: Date | null;
   daysRemainingInTrial: number;
@@ -35,14 +37,6 @@ export const SubscriptionProvider: React.FC<{ children: ReactNode }> = ({ childr
   const [hasInitialLoadCompleted, setHasInitialLoadCompleted] = useState(false);
   const [trialEndDate, setTrialEndDate] = useState<Date | null>(null);
   const [isTrialEligible, setIsTrialEligible] = useState(false);
-  const [isPremiumFlag, setIsPremiumFlag] = useState<boolean>(false);
-
-  // ---- Utils for robust mapping
-  // Maps backend/fallback tier/status/flags to premium/free
-  const isDbTierPremium = (t: unknown) => (t === 'premium' || t === true);
-  const isDbStatusTrial = (s: unknown) => (s === 'trial' || s === 'in_trial');
-  const isDbStatusActive = (s: unknown) => (s === 'active' || s === true);
-  const isDbStatusKnownPremium = (s: unknown) => (isDbStatusActive(s) || isDbStatusTrial(s));
 
   const fetchSubscriptionData = async (): Promise<void> => {
     if (!user) {
@@ -53,49 +47,53 @@ export const SubscriptionProvider: React.FC<{ children: ReactNode }> = ({ childr
       setHasInitialLoadCompleted(true);
       setTrialEndDate(null);
       setIsTrialEligible(false);
-      setIsPremiumFlag(false);
       return;
     }
 
     try {
       setIsLoading(true);
       setError(null);
-
-      // --- [1] Cleanup expired trials before anything else.
+      
+      console.log('[SubscriptionContext] Fetching subscription data for user:', user.id);
+      
+      // First call the cleanup function to ensure expired trials are processed
       const { error: cleanupError } = await supabase.rpc('cleanup_expired_trials');
       if (cleanupError) {
         console.warn('[SubscriptionContext] Cleanup function error:', cleanupError);
       }
       
-      // --- [2] Use the main function to get status.
+      // Use the comprehensive subscription status function
       const { data: statusData, error: statusError } = await supabase
-        .rpc('get_user_subscription_status', { user_id_param: user.id });
-
-      let userTier: SubscriptionTier = 'free';
-      let userStatus: SubscriptionStatus = 'free';
-      let userTrialEndDate: Date | null = null;
-      let userPremiumFlag = false;
-      let userIsTrialActive = false;
+        .rpc('get_user_subscription_status', {
+          user_id_param: user.id
+        });
 
       if (statusError) {
-        console.log('[SubscriptionContext] get_user_subscription_status error, falling back:', statusError);
+        throw statusError;
       }
 
       if (statusData && statusData.length > 0) {
-        const sub = statusData[0];
-
-        userTier = isDbTierPremium(sub.current_tier) ? 'premium' : 'free';
-        userStatus = (sub.current_status as SubscriptionStatus) || 'free';
-        userTrialEndDate = sub.trial_end_date ? new Date(sub.trial_end_date) : null;
-        userPremiumFlag = !!sub.is_premium_access || isDbTierPremium(sub.current_tier) || isDbStatusKnownPremium(sub.current_status);
-        userIsTrialActive = !!sub.is_trial_active || isDbStatusTrial(sub.current_status);
-
-        console.log('[SubscriptionContext] get_user_subscription_status success:', {
-          userTier, userStatus, userTrialEndDate, userPremiumFlag, userIsTrialActive,
-          backend: sub,
+        const subscriptionData = statusData[0];
+        
+        // Map subscription tier - ensure only 'free' or 'premium'
+        const userTier = (subscriptionData.current_tier === 'premium') ? 'premium' : 'free';
+        const userStatus = (subscriptionData.current_status as SubscriptionStatus) || 'free';
+        const userTrialEndDate = subscriptionData.trial_end_date ? new Date(subscriptionData.trial_end_date) : null;
+        const userIsTrialActive = subscriptionData.is_trial_active || false;
+        
+        setTier(userTier);
+        setStatus(userStatus);
+        setTrialEndDate(userTrialEndDate);
+        
+        console.log('[SubscriptionContext] Updated subscription from function:', {
+          tier: userTier,
+          status: userStatus,
+          trialEndDate: userTrialEndDate,
+          isTrialActive: userIsTrialActive,
+          isPremium: subscriptionData.is_premium_access
         });
       } else {
-        // --- [3] Fallback to the profile if no function result.
+        // Fallback to direct profile query if function fails
         const { data: profileData, error: profileError } = await supabase
           .from('profiles')
           .select('subscription_tier, subscription_status, trial_ends_at, is_premium')
@@ -107,50 +105,58 @@ export const SubscriptionProvider: React.FC<{ children: ReactNode }> = ({ childr
         }
 
         if (profileData) {
-          userTier = isDbTierPremium(profileData.subscription_tier) ? 'premium' : 'free';
-          userStatus = (profileData.subscription_status as SubscriptionStatus) || 'free';
-          userTrialEndDate = profileData.trial_ends_at ? new Date(profileData.trial_ends_at) : null;
-          userPremiumFlag = !!profileData.is_premium || isDbTierPremium(profileData.subscription_tier) || isDbStatusKnownPremium(profileData.subscription_status);
-
-          if (userTrialEndDate && userTrialEndDate > new Date()) {
-            userIsTrialActive = true;
-          } else if (isDbStatusTrial(userStatus)) {
-            userIsTrialActive = true;
-          }
-          console.log('[SubscriptionContext] Used profile fallback:', {
-            userTier, userStatus, userTrialEndDate, userPremiumFlag, userIsTrialActive, backend: profileData,
+          // Map subscription tier - ensure only 'free' or 'premium'
+          const userTier = (profileData.subscription_tier === 'premium') ? 'premium' : 'free';
+          const userStatus = (profileData.subscription_status as SubscriptionStatus) || 'free';
+          const userTrialEndDate = profileData.trial_ends_at ? new Date(profileData.trial_ends_at) : null;
+          
+          setTier(userTier);
+          setStatus(userStatus);
+          setTrialEndDate(userTrialEndDate);
+          
+          console.log('[SubscriptionContext] Updated subscription from fallback:', {
+            tier: userTier,
+            status: userStatus,
+            trialEndDate: userTrialEndDate,
+            isPremium: profileData.is_premium
           });
+        } else {
+          // User profile doesn't exist yet, default to free
+          setTier('free');
+          setStatus('free');
+          setTrialEndDate(null);
+          console.log('[SubscriptionContext] No profile found, defaulting to free tier');
         }
       }
 
-      setTier(userTier);
-      setStatus(userStatus);
-      setTrialEndDate(userTrialEndDate);
-      setIsPremiumFlag(userPremiumFlag);
-
-      // --- [4] Always check trial eligibility
-      let trialEligibleFlag = false;
+      // Check trial eligibility
       if (user.id) {
         const { data: eligibilityData, error: eligibilityError } = await supabase
-          .rpc('is_trial_eligible', { user_id_param: user.id });
+          .rpc('is_trial_eligible', {
+            user_id_param: user.id
+          });
+
         if (!eligibilityError && eligibilityData !== null) {
-          trialEligibleFlag = eligibilityData as boolean;
+          setIsTrialEligible(eligibilityData);
         }
       }
-      setIsTrialEligible(trialEligibleFlag);
-
+      
     } catch (err) {
       console.error('[SubscriptionContext] Error fetching subscription:', err);
-
+      
+      // Use the error handler to categorize and potentially show the error
       const handledError = subscriptionErrorHandler.handleError(err, 'Subscription');
+      
+      // Only set error state for critical errors that aren't silenced
       if (!handledError.silent && handledError.type !== 'network') {
         setError(handledError.message);
       }
+      
+      // Default to free tier on error
       setTier('free');
       setStatus('free');
       setTrialEndDate(null);
       setIsTrialEligible(false);
-      setIsPremiumFlag(false);
     } finally {
       setIsLoading(false);
       setHasInitialLoadCompleted(true);
@@ -165,26 +171,25 @@ export const SubscriptionProvider: React.FC<{ children: ReactNode }> = ({ childr
     await fetchSubscriptionData();
   };
 
+  // Fetch subscription data when user changes
   useEffect(() => {
     fetchSubscriptionData();
+    
+    // Reset error handler when user changes
     if (user) {
       subscriptionErrorHandler.reset();
     }
   }, [user]);
 
-  // --- Robust trial and premium logic ---
-  const isPremium = tier === 'premium' || isPremiumFlag;
-
-  // Check if trial is actually active (not expired)
-  const isTrialActive = (status === 'trial' || status === 'in_trial') && trialEndDate && trialEndDate > new Date();
-
-  // Has active subscription means premium, active, or trial states, or premium flag
-  const hasActiveSubscription = (
-    isPremium ||
-    status === 'active' ||
-    isTrialActive
-  );
-
+  // Computed properties with proper trial logic
+  const isPremium = tier === 'premium';
+  
+  // Check if trial is actually active (not expired) - more robust check
+  const isTrialActive = status === 'trial' && trialEndDate && trialEndDate > new Date();
+  
+  // Has active subscription means either active subscription OR active (non-expired) trial
+  const hasActiveSubscription = status === 'active' || isTrialActive;
+  
   const daysRemainingInTrial = trialEndDate && isTrialActive
     ? Math.max(0, Math.ceil((trialEndDate.getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24)))
     : 0;
@@ -197,14 +202,15 @@ export const SubscriptionProvider: React.FC<{ children: ReactNode }> = ({ childr
     refreshSubscription,
     isPremium,
     hasActiveSubscription,
-
+    
+    // Additional properties
     isTrialActive,
     trialEndDate,
     daysRemainingInTrial,
-    subscriptionStatus: status,
+    subscriptionStatus: status, // Alias for status
     refreshSubscriptionStatus,
     hasInitialLoadCompleted,
-    isTrialEligible,
+    isTrialEligible
   };
 
   return (
