@@ -2,6 +2,8 @@
 import React from 'react';
 import { Routes, Route, useLocation } from 'react-router-dom';
 import { AuthProvider } from './contexts/AuthContext';
+import { SubscriptionProvider } from './contexts/SubscriptionContext';
+import { LocationProvider } from './contexts/LocationContext';
 import { ThemeProvider } from './hooks/use-theme';
 import { MarketingThemeProvider } from './contexts/MarketingThemeProvider';
 import { MarketingErrorBoundary } from './components/marketing/MarketingErrorBoundary';
@@ -70,6 +72,51 @@ class AppErrorBoundary extends React.Component<
           <div className="text-center">
             <h1 className="text-2xl font-bold mb-4">Something went wrong</h1>
             <p className="text-muted-foreground mb-4">Please refresh the page to try again.</p>
+            <p className="text-sm text-red-600 mb-4">Error: {this.state.error?.message}</p>
+            <button 
+              onClick={() => window.location.reload()} 
+              className="px-4 py-2 bg-primary text-primary-foreground rounded"
+            >
+              Refresh Page
+            </button>
+          </div>
+        </div>
+      );
+    }
+
+    return this.props.children;
+  }
+}
+
+// Context Provider Error Boundary for specific provider failures
+class ProviderErrorBoundary extends React.Component<
+  { children: React.ReactNode; providerName: string },
+  { hasError: boolean; error?: Error }
+> {
+  constructor(props: { children: React.ReactNode; providerName: string }) {
+    super(props);
+    this.state = { hasError: false };
+  }
+
+  static getDerivedStateFromError(error: Error) {
+    console.error('[ProviderErrorBoundary] Provider error caught:', error);
+    return { hasError: true, error };
+  }
+
+  componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
+    console.error(`[ProviderErrorBoundary] ${this.props.providerName} provider error:`, error, errorInfo);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      console.error(`[ProviderErrorBoundary] Rendering ${this.props.providerName} provider fallback`);
+      return (
+        <div className="min-h-screen flex items-center justify-center bg-background">
+          <div className="text-center">
+            <h1 className="text-2xl font-bold mb-4">Provider Error</h1>
+            <p className="text-muted-foreground mb-4">
+              {this.props.providerName} failed to initialize
+            </p>
             <p className="text-sm text-red-600 mb-4">Error: {this.state.error?.message}</p>
             <button 
               onClick={() => window.location.reload()} 
@@ -177,25 +224,41 @@ const AppRoutesWithNavigation = () => {
   }
 };
 
-// Debug wrapper for context providers
+// Enhanced context wrapper with proper provider order and error boundaries
 const DebugContextWrapper = ({ children }: { children: React.ReactNode }) => {
   console.log('[DebugContextWrapper] Starting context provider chain...');
   
   return (
     <AppErrorBoundary>
-      <ThemeProvider>
-        <TranslationProvider>
-          <AuthProvider>
-            <TutorialProvider>
-              <ViewportManager>
-                {children}
-              </ViewportManager>
-              <Toaster />
-              <ShadcnToaster />
-            </TutorialProvider>
-          </AuthProvider>
-        </TranslationProvider>
-      </ThemeProvider>
+      <ProviderErrorBoundary providerName="Theme">
+        <ThemeProvider>
+          <ProviderErrorBoundary providerName="Translation">
+            <TranslationProvider>
+              <ProviderErrorBoundary providerName="Auth">
+                <AuthProvider>
+                  <ProviderErrorBoundary providerName="Location">
+                    <LocationProvider>
+                      <ProviderErrorBoundary providerName="Subscription">
+                        <SubscriptionProvider>
+                          <ProviderErrorBoundary providerName="Tutorial">
+                            <TutorialProvider>
+                              <ViewportManager>
+                                {children}
+                              </ViewportManager>
+                              <Toaster />
+                              <ShadcnToaster />
+                            </TutorialProvider>
+                          </ProviderErrorBoundary>
+                        </SubscriptionProvider>
+                      </ProviderErrorBoundary>
+                    </LocationProvider>
+                  </ProviderErrorBoundary>
+                </AuthProvider>
+              </ProviderErrorBoundary>
+            </TranslationProvider>
+          </ProviderErrorBoundary>
+        </ThemeProvider>
+      </ProviderErrorBoundary>
     </AppErrorBoundary>
   );
 };

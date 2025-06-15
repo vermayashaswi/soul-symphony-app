@@ -1,70 +1,105 @@
 import { useState, useEffect } from 'react';
 import { useLocation } from '@/contexts/LocationContext';
 
-interface LocationPricing {
-  countryCode: string;
-  country: string;
+interface PricingData {
+  monthlyPrice: string;
   currency: string;
-  price: string;
-  productId: string;
+  countryCode: string;
 }
 
-const PRICING_MAP: Record<string, LocationPricing> = {
-  IN: { countryCode: 'IN', country: 'India', currency: 'INR', price: '₹99', productId: 'premium_monthly_in' },
-  US: { countryCode: 'US', country: 'United States', currency: 'USD', price: '$4.99', productId: 'premium_monthly_us' },
-  GB: { countryCode: 'GB', country: 'United Kingdom', currency: 'GBP', price: '£3.99', productId: 'premium_monthly_gb' },
-  CA: { countryCode: 'CA', country: 'Canada', currency: 'CAD', price: '$5.49', productId: 'premium_monthly_ca' },
-  AU: { countryCode: 'AU', country: 'Australia', currency: 'AUD', price: '$6.49', productId: 'premium_monthly_au' },
-  DE: { countryCode: 'DE', country: 'Germany', currency: 'EUR', price: '€4.99', productId: 'premium_monthly_de' },
-  FR: { countryCode: 'FR', country: 'France', currency: 'EUR', price: '€4.99', productId: 'premium_monthly_fr' },
-  IT: { countryCode: 'IT', country: 'Italy', currency: 'EUR', price: '€4.99', productId: 'premium_monthly_it' },
-  ES: { countryCode: 'ES', country: 'Spain', currency: 'EUR', price: '€4.99', productId: 'premium_monthly_es' },
-  NL: { countryCode: 'NL', country: 'Netherlands', currency: 'EUR', price: '€4.99', productId: 'premium_monthly_nl' },
-  SE: { countryCode: 'SE', country: 'Sweden', currency: 'EUR', price: '€6.49', productId: 'premium_monthly_se' },
-  NO: { countryCode: 'NO', country: 'Norway', currency: 'EUR', price: '€6.49', productId: 'premium_monthly_no' },
-  DK: { countryCode: 'DK', country: 'Denmark', currency: 'EUR', price: '€6.49', productId: 'premium_monthly_dk' },
-  AE: { countryCode: 'AE', country: 'UAE', currency: 'AED', price: '19.99 AED', productId: 'premium_monthly_ae' },
-  SA: { countryCode: 'SA', country: 'Saudi Arabia', currency: 'SAR', price: '19.99 SAR', productId: 'premium_monthly_sa' },
-  JP: { countryCode: 'JP', country: 'Japan', currency: 'JPY', price: '¥600', productId: 'premium_monthly_jp' },
-  KR: { countryCode: 'KR', country: 'South Korea', currency: 'KRW', price: '₩5,900', productId: 'premium_monthly_kr' },
-  SG: { countryCode: 'SG', country: 'Singapore', currency: 'USD', price: '$1.49', productId: 'premium_monthly_sg' },
-  MY: { countryCode: 'MY', country: 'Malaysia', currency: 'USD', price: '$1.49', productId: 'premium_monthly_my' },
-  TH: { countryCode: 'TH', country: 'Thailand', currency: 'USD', price: '$1.49', productId: 'premium_monthly_th' },
-  MX: { countryCode: 'MX', country: 'Mexico', currency: 'MXN', price: 'MX$29.99', productId: 'premium_monthly_mx' },
-  BR: { countryCode: 'BR', country: 'Brazil', currency: 'BRL', price: 'R$9.99', productId: 'premium_monthly_br' },
-  ZA: { countryCode: 'ZA', country: 'South Africa', currency: 'USD', price: '$1.49', productId: 'premium_monthly_za' },
-  NG: { countryCode: 'NG', country: 'Nigeria', currency: 'USD', price: '$0.99', productId: 'premium_monthly_ng' },
-  DEFAULT: { countryCode: 'DEFAULT', country: 'Global', currency: 'USD', price: '$4.99', productId: 'premium_monthly_default' }
-};
-
 export const useLocationPricing = () => {
-  const { locationData, isLoading: locationLoading, error: locationError } = useLocation();
-  const [pricing, setPricing] = useState<LocationPricing>(PRICING_MAP.DEFAULT);
+  const [pricingData, setPricingData] = useState<PricingData>({
+    monthlyPrice: '$4.99',
+    currency: 'USD',
+    countryCode: 'US'
+  });
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  // Safely use location context with fallback
+  let locationData: { country: string | null; currency: string | null; isLoading: boolean; error: string | null } | null = null;
+  
+  try {
+    locationData = useLocation();
+  } catch (err) {
+    console.warn('[useLocationPricing] LocationProvider not available, using defaults');
+    locationData = null;
+  }
 
   useEffect(() => {
-    if (locationData && locationData.country) {
-      const countryCode = locationData.country;
-      const selectedPricing = PRICING_MAP[countryCode] || PRICING_MAP.DEFAULT;
-      
-      console.log('[useLocationPricing] Setting pricing based on location:', {
-        countryCode,
-        currency: locationData.currency,
-        selectedPricing
-      });
-      
-      setPricing(selectedPricing);
-    } else if (!locationLoading) {
-      // Only set default if location loading is complete
-      setPricing(PRICING_MAP.DEFAULT);
-    }
-  }, [locationData, locationLoading]);
+    const fetchPricing = async () => {
+      if (locationData?.isLoading) {
+        setIsLoading(true);
+        return;
+      }
+
+      try {
+        setIsLoading(true);
+        setError(null);
+
+        const country = locationData?.country || 'US';
+        const currency = locationData?.currency || 'USD';
+
+        // Simple pricing logic based on country
+        let monthlyPrice = '$4.99';
+        
+        switch (country) {
+          case 'IN':
+            monthlyPrice = '₹299';
+            break;
+          case 'GB':
+            monthlyPrice = '£3.99';
+            break;
+          case 'CA':
+            monthlyPrice = 'C$6.99';
+            break;
+          case 'AU':
+            monthlyPrice = 'A$7.99';
+            break;
+          case 'EU':
+          case 'DE':
+          case 'FR':
+          case 'ES':
+          case 'IT':
+            monthlyPrice = '€4.99';
+            break;
+          default:
+            monthlyPrice = '$4.99';
+        }
+
+        setPricingData({
+          monthlyPrice,
+          currency,
+          countryCode: country
+        });
+
+        console.log('[useLocationPricing] Pricing data updated:', {
+          monthlyPrice,
+          currency,
+          countryCode: country
+        });
+
+      } catch (err) {
+        console.error('[useLocationPricing] Error fetching pricing:', err);
+        setError(err instanceof Error ? err.message : 'Unknown error');
+        
+        // Keep defaults on error
+        setPricingData({
+          monthlyPrice: '$4.99',
+          currency: 'USD',
+          countryCode: 'US'
+        });
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchPricing();
+  }, [locationData?.country, locationData?.currency, locationData?.isLoading]);
 
   return {
-    pricing,
-    isLoading: locationLoading,
-    error: locationError,
-    refreshLocation: async () => {
-      // Location refresh is handled by the LocationContext
-    }
+    ...pricingData,
+    isLoading,
+    error
   };
 };
