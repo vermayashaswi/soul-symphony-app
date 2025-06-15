@@ -56,35 +56,35 @@ const AppRoutesWithAuth = () => {
 
   return (
     <ViewportManager>
-      <div className="min-h-screen bg-background text-foreground">
-        <Navbar />
-        <Routes>
-          <Route path="/app/auth" element={<Auth />} />
-          <Route path="/app/*" element={<ProtectedRoute />}>
-            <Route
-              index
-              element={
-                <OnboardingCheck
-                  onboardingComplete={onboardingComplete}
-                  onboardingLoading={onboardingLoading}
-                  user={user as User | null}
-                >
-                  <Home />
-                </OnboardingCheck>
-              }
-            />
-            <Route path="journal" element={<Journal />} />
-            <Route path="chat" element={<Chat />} />
-            <Route path="smart-chat" element={<SmartChat />} />
-            <Route path="insights" element={<Insights />} />
-            <Route path="settings" element={<Settings />} />
-            <Route path="themes" element={<ThemesManagement />} />
-          </Route>
-        </Routes>
-        <MobileNavigation onboardingComplete={onboardingComplete} />
-        <Toaster />
-        <ShadcnToaster />
-      </div>
+      {/* ViewportManager now only wraps <Outlet /> per its definition - so don't pass children here */}
+      {/* Instead, use a Routes tree and let Outlets render content */}
+      <Navbar />
+      <Routes>
+        <Route path="/app/auth" element={<Auth />} />
+        <Route path="/app/*" element={<ProtectedRoute />}>
+          <Route
+            index
+            element={
+              <OnboardingCheck
+                onboardingComplete={onboardingComplete}
+                onboardingLoading={onboardingLoading}
+                user={user as User | null}
+              >
+                <Home />
+              </OnboardingCheck>
+            }
+          />
+          <Route path="journal" element={<Journal />} />
+          <Route path="chat" element={<Chat />} />
+          <Route path="smart-chat" element={<SmartChat />} />
+          <Route path="insights" element={<Insights />} />
+          <Route path="settings" element={<Settings />} />
+          <Route path="themes" element={<ThemesManagement />} />
+        </Route>
+      </Routes>
+      <MobileNavigation onboardingComplete={onboardingComplete} />
+      <Toaster />
+      <ShadcnToaster />
     </ViewportManager>
   );
 };
