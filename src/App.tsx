@@ -54,20 +54,23 @@ class AppErrorBoundary extends React.Component<
   }
 
   static getDerivedStateFromError(error: Error) {
+    console.error('[AppErrorBoundary] Error caught:', error);
     return { hasError: true, error };
   }
 
   componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
-    console.error('[App] Error caught by boundary:', error, errorInfo);
+    console.error('[AppErrorBoundary] Error caught by boundary:', error, errorInfo);
   }
 
   render() {
     if (this.state.hasError) {
+      console.error('[AppErrorBoundary] Rendering error fallback');
       return this.props.fallback || (
         <div className="min-h-screen flex items-center justify-center bg-background">
           <div className="text-center">
             <h1 className="text-2xl font-bold mb-4">Something went wrong</h1>
             <p className="text-muted-foreground mb-4">Please refresh the page to try again.</p>
+            <p className="text-sm text-red-600 mb-4">Error: {this.state.error?.message}</p>
             <button 
               onClick={() => window.location.reload()} 
               className="px-4 py-2 bg-primary text-primary-foreground rounded"
@@ -85,35 +88,66 @@ class AppErrorBoundary extends React.Component<
 
 // --- App Routes with Mobile Navigation ---
 const AppRoutesWithNavigation = () => {
-  const { onboardingComplete } = useOnboarding();
+  console.log('[AppRoutesWithNavigation] Component mounting...');
+  
+  try {
+    const { onboardingComplete } = useOnboarding();
+    console.log('[AppRoutesWithNavigation] Onboarding status:', onboardingComplete);
 
+    return (
+      <>
+        <Navbar />
+        <Routes>
+          <Route path="/app/onboarding" element={<OnboardingScreen />} />
+          <Route path="/app/auth" element={<Auth />} />
+          <Route element={<ProtectedRoute />}>
+            <Route 
+              path="/app" 
+              element={
+                <OnboardingCheck>
+                  <Home />
+                </OnboardingCheck>
+              } 
+            />
+            <Route path="/app/home" element={<Home />} />
+            <Route path="/app/journal" element={<Journal />} />
+            <Route path="/app/chat" element={<Chat />} />
+            <Route path="/app/smart-chat" element={<SmartChat />} />
+            <Route path="/app/insights" element={<Insights />} />
+            <Route path="/app/settings" element={<Settings />} />
+            <Route path="/app/themes" element={<ThemesManagement />} />
+          </Route>
+        </Routes>
+        <MobileNavigation onboardingComplete={onboardingComplete} />
+        <TutorialOverlay />
+      </>
+    );
+  } catch (error) {
+    console.error('[AppRoutesWithNavigation] Error in component:', error);
+    throw error;
+  }
+};
+
+// Debug wrapper for context providers
+const DebugContextWrapper = ({ children }: { children: React.ReactNode }) => {
+  console.log('[DebugContextWrapper] Starting context provider chain...');
+  
   return (
-    <>
-      <Navbar />
-      <Routes>
-        <Route path="/app/onboarding" element={<OnboardingScreen />} />
-        <Route path="/app/auth" element={<Auth />} />
-        <Route element={<ProtectedRoute />}>
-          <Route 
-            path="/app" 
-            element={
-              <OnboardingCheck>
-                <Home />
-              </OnboardingCheck>
-            } 
-          />
-          <Route path="/app/home" element={<Home />} />
-          <Route path="/app/journal" element={<Journal />} />
-          <Route path="/app/chat" element={<Chat />} />
-          <Route path="/app/smart-chat" element={<SmartChat />} />
-          <Route path="/app/insights" element={<Insights />} />
-          <Route path="/app/settings" element={<Settings />} />
-          <Route path="/app/themes" element={<ThemesManagement />} />
-        </Route>
-      </Routes>
-      <MobileNavigation onboardingComplete={onboardingComplete} />
-      <TutorialOverlay />
-    </>
+    <AppErrorBoundary>
+      <ThemeProvider>
+        <TranslationProvider>
+          <AuthProvider>
+            <TutorialProvider>
+              <ViewportManager>
+                {children}
+              </ViewportManager>
+              <Toaster />
+              <ShadcnToaster />
+            </TutorialProvider>
+          </AuthProvider>
+        </TranslationProvider>
+      </ThemeProvider>
+    </AppErrorBoundary>
   );
 };
 
@@ -123,27 +157,37 @@ const App = () => {
   const isOnAppRoute = isAppRoute(location.pathname);
   
   console.log('[App] Current route:', location.pathname, 'isAppRoute:', isOnAppRoute);
+  console.log('[App] Window location:', window.location.href);
+  console.log('[App] User agent:', navigator.userAgent);
   
   // Render app routes with full context providers
   if (isOnAppRoute) {
-    console.log('[App] Rendering app routes with ThemeProvider');
-    return (
-      <AppErrorBoundary>
-        <ThemeProvider>
-          <TranslationProvider>
-            <AuthProvider>
-              <TutorialProvider>
-                <ViewportManager>
-                  <AppRoutesWithNavigation />
-                </ViewportManager>
-                <Toaster />
-                <ShadcnToaster />
-              </TutorialProvider>
-            </AuthProvider>
-          </TranslationProvider>
-        </ThemeProvider>
-      </AppErrorBoundary>
-    );
+    console.log('[App] Rendering app routes with full context providers');
+    
+    try {
+      return (
+        <DebugContextWrapper>
+          <AppRoutesWithNavigation />
+        </DebugContextWrapper>
+      );
+    } catch (error) {
+      console.error('[App] Error rendering app routes:', error);
+      return (
+        <div className="min-h-screen flex items-center justify-center bg-red-50">
+          <div className="text-center">
+            <h1 className="text-2xl font-bold mb-4 text-red-600">App Loading Error</h1>
+            <p className="text-gray-600 mb-4">Failed to load app components</p>
+            <p className="text-sm text-red-500">{error instanceof Error ? error.message : 'Unknown error'}</p>
+            <button 
+              onClick={() => window.location.reload()} 
+              className="mt-4 px-4 py-2 bg-red-600 text-white rounded"
+            >
+              Refresh Page
+            </button>
+          </div>
+        </div>
+      );
+    }
   }
 
   // Render marketing routes with simple purple background - NO CONTEXT PROVIDERS
@@ -155,6 +199,11 @@ const App = () => {
           <h1 className="text-4xl font-bold mb-4">SOULo</h1>
           <p className="text-xl mb-6">Voice Journaling for Your Soul</p>
           <p className="text-lg">Coming Soon</p>
+          <div className="mt-4">
+            <a href="/app" className="text-blue-200 hover:text-white underline">
+              Try the App
+            </a>
+          </div>
         </div>
       </div>
     </div>
