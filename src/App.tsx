@@ -126,6 +126,7 @@ const App = () => {
   
   // Render app routes with full context providers
   if (isOnAppRoute) {
+    console.log('[App] Rendering app routes with ThemeProvider');
     return (
       <AppErrorBoundary>
         <ThemeProvider>
@@ -146,6 +147,7 @@ const App = () => {
   }
 
   // Render marketing routes with minimal context
+  console.log('[App] Rendering marketing routes with MarketingThemeProvider');
   return (
     <MarketingErrorBoundary>
       <MarketingThemeProvider>
