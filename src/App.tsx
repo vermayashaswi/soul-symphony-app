@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from 'react';
 import AppRoutes from './routes/AppRoutes';
 import { Toaster } from "@/components/ui/toaster";
@@ -14,6 +13,7 @@ import { preloadCriticalImages } from './utils/imagePreloader';
 import { toast } from 'sonner';
 import './styles/emoji.css';
 import './styles/tutorial.css';
+import { FeatureFlagsProvider } from "./contexts/FeatureFlagsContext";
 
 const App: React.FC = () => {
   const [isInitialized, setIsInitialized] = useState(false);
@@ -67,18 +67,20 @@ const App: React.FC = () => {
 
   return (
     <ErrorBoundary onError={handleAppError}>
-      <TranslationProvider>
-        <SubscriptionProvider>
-          <TutorialProvider>
-            <TranslationLoadingOverlay />
-            <JournalProcessingInitializer />
-            <AppRoutes key={isInitialized ? 'initialized' : 'initializing'} />
-            <TutorialOverlay />
-            <Toaster />
-            <SonnerToaster position="top-right" />
-          </TutorialProvider>
-        </SubscriptionProvider>
-      </TranslationProvider>
+      <FeatureFlagsProvider>
+        <TranslationProvider>
+          <SubscriptionProvider>
+            <TutorialProvider>
+              <TranslationLoadingOverlay />
+              <JournalProcessingInitializer />
+              <AppRoutes key={isInitialized ? 'initialized' : 'initializing'} />
+              <TutorialOverlay />
+              <Toaster />
+              <SonnerToaster position="top-right" />
+            </TutorialProvider>
+          </SubscriptionProvider>
+        </TranslationProvider>
+      </FeatureFlagsProvider>
     </ErrorBoundary>
   );
 };
