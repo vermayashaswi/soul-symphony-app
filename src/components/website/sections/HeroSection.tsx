@@ -1,4 +1,3 @@
-
 import React, { Suspense, lazy } from 'react';
 import { Apple, Play, Shield, Check } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -24,7 +23,7 @@ const HeroSection: React.FC<HeroSectionProps> = ({ openAppStore, openPlayStore }
   const shouldRenderMobile = isMobile.isMobile || mobileDemo;
 
   return (
-    <div className="relative w-full bg-gradient-to-br from-blue-50 to-purple-50 pt-12 md:pt-16 pb-4 md:pb-6 overflow-hidden min-h-[80vh] md:min-h-[85vh] flex items-center">
+    <div className="relative w-full bg-gradient-to-br from-blue-50 to-purple-50 pt-16 md:pt-8 pb-8 md:pb-4 overflow-hidden min-h-[80vh] md:min-h-[85vh] flex items-center">
       {/* Background image */}
       <div 
         className="absolute inset-0 z-0 bg-cover bg-center opacity-20"
