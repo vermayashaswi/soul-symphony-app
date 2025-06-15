@@ -1,3 +1,4 @@
+
 import { useState, useMemo, useEffect, useRef } from 'react';
 import { 
   LineChart, 
@@ -47,7 +48,29 @@ interface EmotionChartProps {
   onTimeRangeNavigate?: (nextDate: Date) => void;
 }
 
-// ... keep existing code (EMOTION_COLORS, getEmotionColor function)
+// Color palette for emotions
+const EMOTION_COLORS = [
+  '#8b5cf6', // Purple
+  '#06b6d4', // Cyan
+  '#84cc16', // Lime
+  '#f59e0b', // Amber
+  '#ef4444', // Red
+  '#ec4899', // Pink
+  '#10b981', // Emerald
+  '#f97316', // Orange
+  '#6366f1', // Indigo
+  '#14b8a6', // Teal
+];
+
+const getEmotionColor = (emotion: string, index: number): string => {
+  // Use a hash of the emotion name for consistent colors
+  const emotionHash = emotion.split('').reduce((acc, char) => {
+    return char.charCodeAt(0) + ((acc << 5) - acc);
+  }, 0);
+  
+  const colorIndex = Math.abs(emotionHash) % EMOTION_COLORS.length;
+  return EMOTION_COLORS[colorIndex];
+};
 
 // Persist chartType via local storage so that navigation doesn't reset chart type for user UX continuity
 function usePersistedState<T>(key: string, defaultValue: T): [T, (val: T) => void] {
@@ -727,5 +750,3 @@ export function EmotionChart({
 }
 
 export default EmotionChart;
-
-// --- Reminder: This file is now 601+ lines long. Consider refactoring into smaller files/components!
