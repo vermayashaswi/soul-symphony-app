@@ -51,12 +51,10 @@ export class EnhancedSoulNetPreloadService {
   private static cache = new Map<string, CachedEnhancedData>();
   private static translationCoordinator = new Map<string, Promise<Map<string, string>>>();
   
-  // Translation state tracking
+  // Translation state tracking - FIXED: Remove duplicate properties
   private static translationStates = new Map<string, {
     isTranslating: boolean;
     progress: number;
-    totalNodes: number;
-    translatedNodes: number;
     totalNodes: number;
     translatedNodes: number;
   }>();
