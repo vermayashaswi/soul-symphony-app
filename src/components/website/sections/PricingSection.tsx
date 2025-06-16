@@ -205,7 +205,7 @@ const PricingSection: React.FC<PricingSectionProps> = ({ openAppStore, openPlayS
               >
                 <TranslatableText text={plan.cta} />
               </Button>
-            </div>
+            </motion.div>
           ))}
         </motion.div>
 
