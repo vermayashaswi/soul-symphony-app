@@ -4,6 +4,7 @@ import { motion } from 'framer-motion';
 import { Check, Star } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { TranslatableText } from '@/components/translation/TranslatableText';
+import { useLocationPricing } from '@/hooks/useLocationPricing';
 
 interface PricingSectionProps {
   openAppStore: () => void;
@@ -11,6 +12,8 @@ interface PricingSectionProps {
 }
 
 const PricingSection: React.FC<PricingSectionProps> = ({ openAppStore, openPlayStore }) => {
+  const { pricing, isLoading } = useLocationPricing();
+
   const plans = [
     {
       name: "Free Trial",
@@ -28,7 +31,7 @@ const PricingSection: React.FC<PricingSectionProps> = ({ openAppStore, openPlayS
     },
     {
       name: "Premium",
-      price: "$9.99",
+      price: isLoading ? "..." : pricing.price,
       period: "month",
       description: "Complete voice journaling experience with AI insights",
       features: [
@@ -45,9 +48,9 @@ const PricingSection: React.FC<PricingSectionProps> = ({ openAppStore, openPlayS
     },
     {
       name: "Yearly",
-      price: "$79.99",
+      price: isLoading ? "..." : getYearlyPrice(pricing.price),
       period: "year",
-      originalPrice: "$119.88",
+      originalPrice: isLoading ? undefined : getYearlyOriginalPrice(pricing.price),
       description: "Best value for serious journalers",
       features: [
         "Everything in Premium",
@@ -61,6 +64,40 @@ const PricingSection: React.FC<PricingSectionProps> = ({ openAppStore, openPlayS
       cta: "Save 33%"
     }
   ];
+
+  // Helper function to calculate yearly price (33% savings)
+  function getYearlyPrice(monthlyPrice: string): string {
+    if (!monthlyPrice || monthlyPrice === "Free") return monthlyPrice;
+    
+    // Extract currency symbol and numeric value
+    const match = monthlyPrice.match(/^([^\d]+)?(\d+(?:\.\d+)?)/);
+    if (!match) return monthlyPrice;
+    
+    const currencySymbol = match[1] || '';
+    const numericValue = parseFloat(match[2]);
+    
+    // Calculate yearly price with 33% discount
+    const yearlyPrice = Math.round((numericValue * 12 * 0.67) * 100) / 100;
+    
+    return `${currencySymbol}${yearlyPrice}`;
+  }
+
+  // Helper function to calculate original yearly price (without discount)
+  function getYearlyOriginalPrice(monthlyPrice: string): string {
+    if (!monthlyPrice || monthlyPrice === "Free") return monthlyPrice;
+    
+    // Extract currency symbol and numeric value
+    const match = monthlyPrice.match(/^([^\d]+)?(\d+(?:\.\d+)?)/);
+    if (!match) return monthlyPrice;
+    
+    const currencySymbol = match[1] || '';
+    const numericValue = parseFloat(match[2]);
+    
+    // Calculate original yearly price (12 months)
+    const originalYearlyPrice = Math.round((numericValue * 12) * 100) / 100;
+    
+    return `${currencySymbol}${originalYearlyPrice}`;
+  }
 
   const containerVariants = {
     hidden: { opacity: 0 },
@@ -136,7 +173,9 @@ const PricingSection: React.FC<PricingSectionProps> = ({ openAppStore, openPlayS
                     </span>
                   )}
                   <span className="text-4xl font-bold text-gray-900">{plan.price}</span>
-                  <span className="text-gray-600">/{plan.period}</span>
+                  {plan.price !== "Free" && plan.price !== "..." && (
+                    <span className="text-gray-600">/{plan.period}</span>
+                  )}
                 </div>
                 <p className="text-gray-600">
                   <TranslatableText text={plan.description} />
@@ -162,10 +201,11 @@ const PricingSection: React.FC<PricingSectionProps> = ({ openAppStore, openPlayS
                 }`}
                 size="lg"
                 onClick={openAppStore}
+                disabled={isLoading}
               >
                 <TranslatableText text={plan.cta} />
               </Button>
-            </motion.div>
+            </div>
           ))}
         </motion.div>
 
@@ -179,6 +219,11 @@ const PricingSection: React.FC<PricingSectionProps> = ({ openAppStore, openPlayS
           <p className="text-gray-600">
             <TranslatableText text="All plans include a 14-day free trial. Cancel anytime." />
           </p>
+          {!isLoading && pricing.country !== 'Global' && (
+            <p className="text-sm text-gray-500 mt-2">
+              Prices shown for {pricing.country} in {pricing.currency}
+            </p>
+          )}
         </motion.div>
       </div>
     </section>
