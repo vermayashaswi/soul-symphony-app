@@ -3,8 +3,12 @@ import React, { useEffect } from 'react';
 import Navbar from '@/components/website/Navbar';
 import Footer from '@/components/website/Footer';
 import HeroSection from '@/components/website/sections/HeroSection';
+import FeaturesSection from '@/components/website/sections/FeaturesSection';
+import HowItWorksSection from '@/components/website/sections/HowItWorksSection';
+import PricingSection from '@/components/website/sections/PricingSection';
+import TestimonialsSection from '@/components/website/sections/TestimonialsSection';
+import CTASection from '@/components/website/sections/CTASection';
 import SoulNetTranslationIndicator from '@/components/translation/SoulNetTranslationIndicator';
-import { TranslatableText } from '@/components/translation/TranslatableText';
 import { forceEnableScrolling } from '@/hooks/use-scroll-restoration';
 
 const HomePage = () => {
@@ -60,10 +64,41 @@ const HomePage = () => {
       {/* SoulNet Translation Indicator */}
       <SoulNetTranslationIndicator className="fixed top-20 right-4 z-50 bg-background/90 backdrop-blur-sm px-3 py-2 rounded-lg border" />
       
+      {/* Hero Section */}
       <HeroSection 
         openAppStore={openAppStore}
         openPlayStore={openPlayStore}
       />
+      
+      {/* Features Section */}
+      <section id="features">
+        <FeaturesSection />
+      </section>
+      
+      {/* How It Works Section */}
+      <section id="how-it-works">
+        <HowItWorksSection />
+      </section>
+      
+      {/* Pricing Section */}
+      <section id="pricing">
+        <PricingSection 
+          openAppStore={openAppStore}
+          openPlayStore={openPlayStore}
+        />
+      </section>
+      
+      {/* Testimonials Section */}
+      <TestimonialsSection />
+      
+      {/* Call to Action Section */}
+      <section id="download">
+        <CTASection 
+          openAppStore={openAppStore}
+          openPlayStore={openPlayStore}
+        />
+      </section>
+      
       <Footer />
     </div>
   );
