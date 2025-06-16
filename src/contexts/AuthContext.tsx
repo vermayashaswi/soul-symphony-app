@@ -6,6 +6,7 @@ import { AuthContextType } from '@/types/auth';
 import { ensureProfileExists as ensureProfileExistsService, updateUserProfile as updateUserProfileService } from '@/services/profileService';
 import { 
   signInWithGoogle as signInWithGoogleService,
+  signInWithApple as signInWithAppleService,
   signInWithEmail as signInWithEmailService,
   signUp as signUpService,
   resetPassword as resetPasswordService,
@@ -322,6 +323,28 @@ function AuthProviderCore({ children }: { children: ReactNode }) {
     }
   };
 
+  const signInWithApple = async (): Promise<void> => {
+    setIsLoading(true);
+    logInfo('Initiating Apple ID sign-in', 'AuthContext', { 
+      origin: window.location.origin,
+      pathname: window.location.pathname
+    });
+    
+    try {
+      await signInWithAppleService();
+      logInfo('Apple ID sign-in initiated', 'AuthContext');
+      
+      // Track sign-in attempt
+      await trackConversion('sign_in_attempt', { 
+        method: 'apple',
+        timestamp: new Date().toISOString(),
+      });
+    } catch (error: any) {
+      logAuthError(`Apple ID sign-in failed: ${error.message}`, 'AuthContext', error);
+      setIsLoading(false);
+    }
+  };
+
   const signInWithEmail = async (email: string, password: string): Promise<void> => {
     setIsLoading(true);
     logInfo('Initiating email sign-in', 'AuthContext', { 
@@ -619,6 +642,7 @@ function AuthProviderCore({ children }: { children: ReactNode }) {
     user,
     isLoading,
     signInWithGoogle,
+    signInWithApple,
     signOut,
     refreshSession,
     signInWithEmail,

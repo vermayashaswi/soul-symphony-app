@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { isAppRoute } from '@/routes/RouteHelpers';
@@ -58,6 +57,39 @@ export const signInWithGoogle = async (): Promise<void> => {
   } catch (error: any) {
     console.error('Error signing in with Google:', error.message);
     toast.error(`Error signing in with Google: ${error.message}`);
+    throw error;
+  }
+};
+
+/**
+ * Sign in with Apple ID
+ */
+export const signInWithApple = async (): Promise<void> => {
+  try {
+    const redirectUrl = getRedirectUrl();
+    console.log('Using redirect URL for Apple ID:', redirectUrl);
+    
+    const { data, error } = await supabase.auth.signInWithOAuth({
+      provider: 'apple',
+      options: {
+        redirectTo: redirectUrl,
+      },
+    });
+
+    if (error) {
+      throw error;
+    }
+    
+    // If we have a URL, manually redirect to it (as a backup)
+    if (data?.url) {
+      console.log('Redirecting to Apple OAuth URL:', data.url);
+      setTimeout(() => {
+        window.location.href = data.url;
+      }, 100);
+    }
+  } catch (error: any) {
+    console.error('Error signing in with Apple:', error.message);
+    toast.error(`Error signing in with Apple: ${error.message}`);
     throw error;
   }
 };
