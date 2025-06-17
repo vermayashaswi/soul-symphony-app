@@ -114,6 +114,9 @@ export const fetchJournalEntries = async (userId: string, timeoutRef?: React.Mut
         name: entity.name || '',
         text: entity.text
       })) : [], // Properly transform entities to expected structure
+      languages: Array.isArray(entry.languages) ? entry.languages : 
+                 (entry.languages && typeof entry.languages === 'object' && Array.isArray((entry.languages as any))) ? 
+                 (entry.languages as string[]) : [], // Handle Json to string[] conversion
     }));
     
     return mappedEntries;
