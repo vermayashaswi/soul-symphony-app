@@ -1,3 +1,4 @@
+
 import { serviceWorkerManager } from '@/utils/serviceWorker';
 import { toast } from 'sonner';
 
@@ -181,7 +182,7 @@ class PushNotificationService {
           payload: {
             title: 'Test Notification',
             body: 'This is a test push notification from Soulo!',
-            icon: '/lovable-uploads/31ed88ef-f596-4b91-ba58-a4175eebe779.png'
+            icon: '/lovable-uploads/a66f2232-4b39-4d46-ace5-19e4c81b1f05.png?v=2'
           }
         })
       });
