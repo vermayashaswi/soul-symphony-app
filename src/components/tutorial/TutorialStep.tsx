@@ -1,4 +1,3 @@
-
 import React, { useRef, useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import { Button } from '@/components/ui/button';
@@ -88,8 +87,20 @@ const TutorialStep: React.FC<TutorialStepProps> = ({
     }
   }, [onNext, step.id]);
   
-  // Get background color based on step ID
+  // Get background color based on step ID - UPDATED for step 5 transparency
   const getBackgroundStyle = () => {
+    // Step 5 should be COMPLETELY TRANSPARENT to show Soul-Net behind it
+    if (step.id === 5) {
+      return {
+        backgroundColor: 'transparent', // Completely transparent background
+        border: 'none', // Remove border that might create visual artifacts
+        boxShadow: 'none', // Remove box shadow
+        backdropFilter: 'none', // Remove blur effects
+        color: 'white',
+        textShadow: '0 0 8px rgba(0, 0, 0, 1)' // Strong black text shadow for maximum readability
+      };
+    }
+    
     // Step 1 should be fully opaque
     if (step.id === 1) {
       return {
@@ -99,7 +110,7 @@ const TutorialStep: React.FC<TutorialStepProps> = ({
       };
     }
     
-    // All other steps (including step 5) have semi-transparent background with blur
+    // All other steps have semi-transparent background with blur
     return {
       backgroundColor: 'rgba(26, 31, 44, 0.2)', // Very light background for other steps
       backdropFilter: 'blur(2px)', // Slight blur to improve text readability
@@ -191,8 +202,15 @@ const TutorialStep: React.FC<TutorialStepProps> = ({
         ...getPositionStyle(),
         ...getBackgroundStyle(),
         ...getContainerWidth(),
-        border: '3px solid var(--color-theme)',
-        boxShadow: '0 0 30px rgba(0, 0, 0, 0.7)',
+        // Override border and shadow for step 5 - make completely invisible
+        ...(step.id === 5 ? {
+          border: 'none',
+          boxShadow: 'none',
+          background: 'transparent'
+        } : {
+          border: '3px solid var(--color-theme)',
+          boxShadow: '0 0 30px rgba(0, 0, 0, 0.7)'
+        }),
         zIndex: 30000, // Consistently high z-index for all steps
         pointerEvents: 'auto'
       }}
@@ -207,15 +225,30 @@ const TutorialStep: React.FC<TutorialStepProps> = ({
       {/* Step indicator */}
       <div className="flex justify-between items-center mb-2">
         <div className="flex items-center">
-          <div className="bg-theme text-white text-xs px-2 py-1 rounded-md">
+          <div 
+            className="bg-theme text-white text-xs px-2 py-1 rounded-md"
+            style={step.id === 5 ? {
+              backgroundColor: 'rgba(var(--primary-h), var(--primary-s), var(--primary-l), 0.9)',
+              textShadow: '0 0 6px rgba(0, 0, 0, 1)',
+              border: '1px solid rgba(255, 255, 255, 0.3)'
+            } : {}}
+          >
             <TranslatableText 
               text={`Step ${stepNumber} of ${totalSteps}`} 
               forceTranslate={true}
               className="text-white" 
+              style={step.id === 5 ? { textShadow: '0 0 6px rgba(0, 0, 0, 1)' } : {}}
             />
           </div>
           {shouldShowPremiumBadge && (
-            <PremiumBadge className="ml-2" />
+            <PremiumBadge 
+              className="ml-2" 
+              style={step.id === 5 ? {
+                textShadow: '0 0 6px rgba(0, 0, 0, 1)',
+                backgroundColor: 'rgba(var(--primary-h), var(--primary-s), var(--primary-l), 0.9)',
+                border: '1px solid rgba(255, 255, 255, 0.3)'
+              } : {}}
+            />
           )}
         </div>
         <Button 
@@ -223,28 +256,39 @@ const TutorialStep: React.FC<TutorialStepProps> = ({
           size="sm" 
           className="h-8 w-8 p-0 text-white hover:text-white/90" 
           onClick={handleSkip}
+          style={step.id === 5 ? {
+            backgroundColor: 'rgba(255, 255, 255, 0.1)',
+            textShadow: '0 0 6px rgba(0, 0, 0, 1)',
+            border: '1px solid rgba(255, 255, 255, 0.3)'
+          } : {}}
         >
           <X className="h-4 w-4" />
         </Button>
       </div>
       
       {/* Title */}
-      <h3 className="text-lg font-semibold mb-1 text-white">
+      <h3 
+        className="text-lg font-semibold mb-1 text-white"
+        style={step.id === 5 ? { textShadow: '0 0 8px rgba(0, 0, 0, 1)' } : { textShadow: '0 0 4px rgba(0, 0, 0, 0.8)' }}
+      >
         <TranslatableText 
           text={step.title} 
           forceTranslate={true}
           className="text-white font-semibold"
-          style={{ textShadow: '0 0 4px rgba(0, 0, 0, 0.8)' }}
+          style={step.id === 5 ? { textShadow: '0 0 8px rgba(0, 0, 0, 1)' } : { textShadow: '0 0 4px rgba(0, 0, 0, 0.8)' }}
         />
       </h3>
       
       {/* Content */}
-      <p className="text-sm text-white/80 mb-4">
+      <p 
+        className="text-sm text-white/80 mb-4"
+        style={step.id === 5 ? { textShadow: '0 0 8px rgba(0, 0, 0, 1)', color: 'white' } : { textShadow: '0 0 4px rgba(0, 0, 0, 0.8)' }}
+      >
         <TranslatableText 
           text={step.content} 
           forceTranslate={true}
-          className="text-white/80"
-          style={{ textShadow: '0 0 4px rgba(0, 0, 0, 0.8)' }}
+          className={step.id === 5 ? "text-white" : "text-white/80"}
+          style={step.id === 5 ? { textShadow: '0 0 8px rgba(0, 0, 0, 1)' } : { textShadow: '0 0 4px rgba(0, 0, 0, 0.8)' }}
         />
       </p>
       
@@ -263,9 +307,15 @@ const TutorialStep: React.FC<TutorialStepProps> = ({
             size="sm" 
             onClick={handlePrev}
             className="flex items-center gap-1 pointer-events-auto bg-gray-800 border-white/50 text-white hover:text-white hover:bg-gray-700"
-            style={{
-              color: "#FFFFFF !important", // Ensure text is visible in light mode
-              backgroundColor: "rgba(51,51,51,0.8)",  // More opaque background for all steps
+            style={step.id === 5 ? {
+              color: "#FFFFFF !important",
+              backgroundColor: "rgba(51,51,51,0.9)",
+              borderColor: "rgba(255,255,255,0.7)",
+              textShadow: "0 0 6px rgba(0, 0, 0, 1)",
+              border: "2px solid rgba(255, 255, 255, 0.5)"
+            } : {
+              color: "#FFFFFF !important",
+              backgroundColor: "rgba(51,51,51,0.8)",
               borderColor: "rgba(255,255,255,0.5)"
             }}
           >
@@ -274,6 +324,7 @@ const TutorialStep: React.FC<TutorialStepProps> = ({
               text="Back" 
               forceTranslate={true} 
               className="text-white"
+              style={step.id === 5 ? { textShadow: '0 0 6px rgba(0, 0, 0, 1)' } : {}}
             />
           </Button>
         )}
@@ -288,18 +339,27 @@ const TutorialStep: React.FC<TutorialStepProps> = ({
             onClick={handleNext}
             className="flex items-center gap-1 bg-theme hover:bg-theme/80 pointer-events-auto z-50"
             data-testid="tutorial-next-button"
-            style={{ 
+            style={step.id === 5 ? { 
               cursor: 'pointer', 
               position: 'relative', 
               zIndex: 30001,
               backgroundColor: 'var(--color-theme)',
-              opacity: 1  // Ensure buttons remain fully opaque
+              opacity: 1,
+              textShadow: '0 0 6px rgba(0, 0, 0, 1)',
+              border: '2px solid rgba(255, 255, 255, 0.3)'
+            } : { 
+              cursor: 'pointer', 
+              position: 'relative', 
+              zIndex: 30001,
+              backgroundColor: 'var(--color-theme)',
+              opacity: 1
             }}
           >
             <TranslatableText 
               text={isLast ? 'Finish' : 'Next'} 
               forceTranslate={true}
               className="text-white" 
+              style={step.id === 5 ? { textShadow: '0 0 6px rgba(0, 0, 0, 1)' } : {}}
             />
             {!isLast && <ChevronRight className="h-4 w-4" />}
           </Button>
