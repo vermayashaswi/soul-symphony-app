@@ -9,7 +9,6 @@ import { LocationProvider } from "@/contexts/LocationContext";
 import { SubscriptionProvider } from "@/contexts/SubscriptionContext";
 import { FeatureFlagsProvider } from "@/contexts/FeatureFlagsContext";
 import { TutorialProvider } from "@/contexts/TutorialContext";
-import ViewportManager from "@/routes/ViewportManager";
 import AppRoutes from "@/routes/AppRoutes";
 import { NetworkAwareContent } from "@/components/NetworkAwareContent";
 import { InstallPrompt } from "@/components/pwa/InstallPrompt";
