@@ -9,7 +9,7 @@ import { AuthProvider } from './contexts/AuthContext'
 import { BrowserRouter } from 'react-router-dom'
 import { TranslationProvider } from './contexts/TranslationContext'
 import { ContextReadinessProvider } from './contexts/ContextReadinessManager'
-import { SafeThemeProvider } from './contexts/SafeThemeProvider'
+import { ThemeProvider } from './hooks/use-theme'
 
 // Enhanced Font Loading System
 const initializeFontSystem = async () => {
@@ -163,13 +163,13 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
     <BrowserRouter>
       <ContextReadinessProvider>
-        <SafeThemeProvider>
+        <ThemeProvider>
           <TranslationProvider>
             <AuthProvider>
               <App />
             </AuthProvider>
           </TranslationProvider>
-        </SafeThemeProvider>
+        </ThemeProvider>
       </ContextReadinessProvider>
     </BrowserRouter>
   </React.StrictMode>,

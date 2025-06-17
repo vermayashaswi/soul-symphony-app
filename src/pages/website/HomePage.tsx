@@ -10,11 +10,8 @@ import TestimonialsSection from '@/components/website/sections/TestimonialsSecti
 import CTASection from '@/components/website/sections/CTASection';
 import SoulNetTranslationIndicator from '@/components/translation/SoulNetTranslationIndicator';
 import { forceEnableScrolling } from '@/hooks/use-scroll-restoration';
-import { useContextReadiness } from '@/contexts/ContextReadinessManager';
 
 const HomePage = () => {
-  const { isReady, error } = useContextReadiness();
-
   // Force enable scrolling for website pages
   React.useEffect(() => {
     console.log('HomePage: Forcing scroll enabling for website');
@@ -56,19 +53,6 @@ const HomePage = () => {
       window.open(playStoreUrl, '_blank');
     }
   };
-
-  // Show loading state if contexts aren't ready
-  if (!isReady || error) {
-    return (
-      <div className="min-h-screen bg-white flex items-center justify-center">
-        <div className="text-center">
-          <div className="w-8 h-8 border-2 border-gray-300 border-t-blue-500 rounded-full animate-spin mx-auto mb-4"></div>
-          <h1 className="text-xl font-semibold text-gray-900 mb-2">Loading SOULo</h1>
-          <p className="text-gray-600">Preparing your experience...</p>
-        </div>
-      </div>
-    );
-  }
 
   // Log the route to help with debugging
   console.log('HomePage: Rendering the website home page at route "/"');
