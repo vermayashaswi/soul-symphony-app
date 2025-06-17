@@ -902,6 +902,10 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: undefined
       }
+      delete_all_user_journal_entries: {
+        Args: { p_user_id: string }
+        Returns: Json
+      }
       enhanced_manage_user_session: {
         Args:
           | {

@@ -32,6 +32,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { TranslatableText } from '@/components/translation/TranslatableText';
 import { useTranslation } from '@/contexts/TranslationContext';
 import { useTutorial } from '@/contexts/TutorialContext';
+import { DeleteAllEntriesSection } from '@/components/settings/DeleteAllEntriesSection';
 
 interface SettingItemProps {
   icon: React.ElementType;
@@ -780,6 +781,19 @@ function SettingsContent() {
                   </span>
                 </Button>
               </div>
+            </motion.div>
+            
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.3, delay: 0.4 }}
+              className="bg-background rounded-xl p-6 shadow-sm border"
+            >
+              <h2 className="text-xl font-semibold mb-4 text-theme-color">
+                <TranslatableText text="Data Management" />
+              </h2>
+              
+              <DeleteAllEntriesSection />
             </motion.div>
             
             <div className="py-4 text-center text-sm text-muted-foreground">
