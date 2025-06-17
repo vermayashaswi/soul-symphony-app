@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useRef } from 'react';
 import { cn } from '@/lib/utils';
 import { useInsightsCacheData } from '@/hooks/use-insights-cache-data';
@@ -165,6 +164,7 @@ function InsightsContent() {
 
             <InsightsStatsGrid 
               timeRange={timeRange}
+              globalDate={globalDate}
               insightsData={insightsData}
             />
             

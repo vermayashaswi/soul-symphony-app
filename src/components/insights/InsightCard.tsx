@@ -1,13 +1,18 @@
+
 import { motion } from 'framer-motion';
 import { ArrowUp, ArrowDown, TrendingUp, Activity, Award } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { EnhancedTranslatableText } from '@/components/translation/EnhancedTranslatableText';
+import { useTranslation } from '@/contexts/TranslationContext';
+import { getTimeRangeLabel } from '@/utils/timeRangeUtils';
 
 interface BaseInsightCardProps {
   title: string;
   delay: number;
   badge?: string;
   badgeColor?: string;
+  timeRange: string;
+  currentDate: Date;
 }
 
 interface DominantMoodCardProps extends BaseInsightCardProps {
@@ -16,7 +21,6 @@ interface DominantMoodCardProps extends BaseInsightCardProps {
     emotion: string;
     emoji: string;
   } | null;
-  timeRange: string;
 }
 
 interface BiggestChangeCardProps extends BaseInsightCardProps {
@@ -25,7 +29,6 @@ interface BiggestChangeCardProps extends BaseInsightCardProps {
     emotion: string;
     percentage: number;
   } | null;
-  timeRange: string;
 }
 
 interface JournalActivityCardProps extends BaseInsightCardProps {
@@ -35,12 +38,16 @@ interface JournalActivityCardProps extends BaseInsightCardProps {
     streak: number;
     maxStreak: number;
   };
-  timeRange: string;
 }
 
 type InsightCardProps = DominantMoodCardProps | BiggestChangeCardProps | JournalActivityCardProps;
 
-export const InsightCard = ({ title, delay, badge, badgeColor, ...props }: InsightCardProps) => {
+export const InsightCard = ({ title, delay, badge, badgeColor, timeRange, currentDate, ...props }: InsightCardProps) => {
+  const { currentLanguage } = useTranslation();
+  
+  // Generate dynamic time range label
+  const timeRangeLabel = getTimeRangeLabel(timeRange as any, currentDate, currentLanguage);
+  
   const renderContent = () => {
     switch (props.type) {
       case 'mood':
@@ -189,7 +196,7 @@ export const InsightCard = ({ title, delay, badge, badgeColor, ...props }: Insig
               </h3>
               <p className="text-muted-foreground text-sm capitalize">
                 <EnhancedTranslatableText 
-                  text={`This ${props.timeRange}`} 
+                  text={timeRangeLabel} 
                   forceTranslate={true}
                   enableFontScaling={true}
                   scalingContext="compact"
@@ -204,6 +211,9 @@ export const InsightCard = ({ title, delay, badge, badgeColor, ...props }: Insig
         return null;
     }
   };
+
+  // Use dynamic badge for mood card
+  const dynamicBadge = props.type === 'mood' ? timeRangeLabel : badge;
 
   return (
     <motion.div
@@ -222,10 +232,10 @@ export const InsightCard = ({ title, delay, badge, badgeColor, ...props }: Insig
             usePageTranslation={true}
           />
         </h2>
-        {badge && (
-          <span className={cn("px-2 py-1 rounded-full text-xs font-medium", badgeColor)}>
+        {dynamicBadge && (
+          <span className={cn("px-2 py-1 rounded-full text-xs font-medium", badgeColor || "bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-200")}>
             <EnhancedTranslatableText 
-              text={badge} 
+              text={dynamicBadge} 
               forceTranslate={true}
               enableFontScaling={true}
               scalingContext="compact"

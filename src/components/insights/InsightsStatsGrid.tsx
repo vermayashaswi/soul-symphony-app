@@ -7,6 +7,7 @@ import { useIsMobile } from '@/hooks/use-mobile';
 
 interface InsightsStatsGridProps {
   timeRange: TimeRange;
+  globalDate: Date;
   insightsData: {
     dominantMood: any;
     biggestImprovement: any;
@@ -14,7 +15,7 @@ interface InsightsStatsGridProps {
   };
 }
 
-export function InsightsStatsGrid({ timeRange, insightsData }: InsightsStatsGridProps) {
+export function InsightsStatsGrid({ timeRange, globalDate, insightsData }: InsightsStatsGridProps) {
   const isMobile = useIsMobile();
 
   return (
@@ -25,10 +26,9 @@ export function InsightsStatsGrid({ timeRange, insightsData }: InsightsStatsGrid
         type="mood"
         title="Dominant Mood"
         delay={0}
-        badge={`This ${timeRange}`}
-        badgeColor="bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-200"
-        data={insightsData.dominantMood}
         timeRange={timeRange}
+        currentDate={globalDate}
+        data={insightsData.dominantMood}
       />
       
       <InsightCard
@@ -47,8 +47,9 @@ export function InsightsStatsGrid({ timeRange, insightsData }: InsightsStatsGrid
               : "bg-red-100 dark:bg-red-900 text-red-700 dark:text-red-200"
           ) : undefined
         }
-        data={insightsData.biggestImprovement}
         timeRange={timeRange}
+        currentDate={globalDate}
+        data={insightsData.biggestImprovement}
       />
       
       <InsightCard
@@ -60,8 +61,9 @@ export function InsightsStatsGrid({ timeRange, insightsData }: InsightsStatsGrid
           undefined
         }
         badgeColor="bg-purple-100 dark:bg-purple-900 text-purple-700 dark:text-purple-200"
-        data={insightsData.journalActivity}
         timeRange={timeRange}
+        currentDate={globalDate}
+        data={insightsData.journalActivity}
       />
     </div>
   );
