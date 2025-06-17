@@ -593,8 +593,8 @@ export class EnhancedSoulNetPreloadService {
     const EMOTION_LAYER_RADIUS = 11;
     const ENTITY_LAYER_RADIUS = 6;
     
-    // Custom y-axis pattern for entity nodes: [+5, -5, +8, -8, +6.5, -6.5, +5, -5, +8]
-    const entityYPattern = [5, -5, 8, -8, 6.5, -6.5, 5, -5, 8];
+    // Custom y-axis pattern for entity nodes: [+3, -3, +6, -6, +2.5, -2.5, +3, -3, +6]
+    const entityYPattern = [3, -3, 6, -6, 2.5, -2.5, 3, -3, 6];
     
     entityList.forEach((entity, entityIndex) => {
       entityNodes.add(entity);
