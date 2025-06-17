@@ -4,7 +4,6 @@ import { onDemandTranslationCache } from '@/utils/website-translations';
 import { SoulNetPreloadService } from '@/services/soulnetPreloadService';
 import { EnhancedSoulNetPreloadService } from '@/services/enhancedSoulNetPreloadService';
 import { translationService } from '@/services/translationService';
-import { nodeTranslationCache } from '@/services/nodeTranslationCache';
 import { supabase } from '@/integrations/supabase/client';
 
 interface TranslationContextType {
@@ -107,12 +106,11 @@ export const TranslationProvider: React.FC<TranslationProviderProps> = ({ childr
       console.error('[TranslationContext] APP-LEVEL: Error saving language to localStorage:', error);
     }
     
-    // ENHANCED: Clear all caches when language changes
+    // ENHANCED: Clear both enhanced and legacy SoulNet caches when language changes
     EnhancedSoulNetPreloadService.clearInstantCache();
     SoulNetPreloadService.clearCache();
-    nodeTranslationCache.clearCache('*'); // Clear all users for this language change
     
-    console.log('[TranslationContext] APP-LEVEL: Cleared all caches for language change');
+    console.log('[TranslationContext] APP-LEVEL: Cleared all SoulNet caches for language change');
     
     // Dispatch custom event for components that need to know about language changes
     const event = new CustomEvent('languageChange', { 
@@ -124,6 +122,7 @@ export const TranslationProvider: React.FC<TranslationProviderProps> = ({ childr
     window.dispatchEvent(event);
     
     // If not English, indicate that SoulNet translations are ready
+    // (actual pre-translation will happen when SoulNet components mount)
     if (language === 'en') {
       setIsSoulNetTranslating(false);
     }
@@ -261,7 +260,7 @@ export const TranslationProvider: React.FC<TranslationProviderProps> = ({ childr
   const value: TranslationContextType = {
     currentLanguage,
     setCurrentLanguage: handleLanguageChange,
-    setLanguage: handleLanguageChange,
+    setLanguage: handleLanguageChange, // Alias for backwards compatibility
     translate,
     isTranslating,
     clearCache: useCallback(() => {
@@ -270,7 +269,6 @@ export const TranslationProvider: React.FC<TranslationProviderProps> = ({ childr
       onDemandTranslationCache.clearAll();
       EnhancedSoulNetPreloadService.clearInstantCache();
       SoulNetPreloadService.clearCache();
-      nodeTranslationCache.clearCache('*'); // Clear all
     }, []),
     getCachedTranslation,
     translationProgress: isTranslating ? 50 : 100,
