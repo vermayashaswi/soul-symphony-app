@@ -14,20 +14,35 @@ import { useUserProfile } from '@/hooks/useUserProfile';
 import { useAuth } from '@/contexts/AuthContext';
 import { InsightsTranslationProvider } from '@/components/insights/InsightsTranslationProvider';
 import { addDays, addWeeks, addMonths, addYears, subDays, subWeeks, subMonths, subYears } from 'date-fns';
+import InsightsDebugPanel from '@/components/insights/InsightsDebugPanel';
 
 const Insights: React.FC = () => {
   const isMobile = useIsMobile();
   const [timeRange, setTimeRange] = useState<TimeRange>('week');
   const [globalDate, setGlobalDate] = useState<Date>(new Date());
   const [refreshing, setRefreshing] = useState(false);
+  const [showDebugPanel, setShowDebugPanel] = useState(true); // Enable debug panel
   const userProfile = useUserProfile();
   const { user } = useAuth();
   
-  const { insightsData, loading } = useInsightsData(
+  const { insightsData, loading, error } = useInsightsData(
     user?.id,
     timeRange,
     globalDate
   );
+
+  // Debug logging for auth and data state
+  useEffect(() => {
+    console.log('[Insights] Component state:', {
+      userFromAuth: user?.id,
+      userFromProfile: userProfile?.id,
+      loading,
+      error,
+      hasInsightsData: !!insightsData,
+      entriesCount: insightsData?.entries?.length || 0,
+      allEntriesCount: insightsData?.allEntries?.length || 0
+    });
+  }, [user, userProfile, loading, error, insightsData]);
 
   // Debug logging for global date changes
   useEffect(() => {
@@ -84,10 +99,6 @@ const Insights: React.FC = () => {
     return <InsightsLoadingState />;
   }
 
-  if (!insightsData || (!insightsData.entries?.length && !loading)) {
-    return <InsightsEmptyState />;
-  }
-
   return (
     <InsightsTranslationProvider>
       <div className={`min-h-screen ${isMobile ? 'pb-20' : ''}`}>
@@ -100,41 +111,134 @@ const Insights: React.FC = () => {
             <InsightsHeader />
           </motion.div>
 
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.4, delay: 0.1 }}
-            className="mb-6"
-          >
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-              <InsightsTimeToggle 
-                timeRange={timeRange} 
-                onTimeRangeChange={handleTimeRangeChange}
-                refreshing={refreshing}
-                onRefresh={handleRefresh}
-              />
-              <InsightsGlobalNavigation
+          {/* Debug Panel - Remove this once issue is resolved */}
+          {showDebugPanel && (
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.4, delay: 0.05 }}
+            >
+              <InsightsDebugPanel />
+              <button
+                onClick={() => setShowDebugPanel(false)}
+                className="mb-4 text-sm text-gray-500 hover:text-gray-700 underline"
+              >
+                Hide Debug Panel
+              </button>
+            </motion.div>
+          )}
+
+          {/* Show error state if there's an error */}
+          {error && (
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.4, delay: 0.1 }}
+            >
+              <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-6 mb-6">
+                <h3 className="text-lg font-semibold text-red-800 dark:text-red-300 mb-2">
+                  Data Access Error
+                </h3>
+                <p className="text-red-700 dark:text-red-400 mb-4">
+                  {error}
+                </p>
+                <div className="text-sm text-red-600 dark:text-red-400 space-y-2">
+                  <p><strong>Debug Info:</strong></p>
+                  <p>• Authenticated User: {user?.id || 'None'}</p>
+                  <p>• User Email: {user?.email || 'None'}</p>
+                  <p>• Profile User: {userProfile?.id || 'None'}</p>
+                  <p>• Time Range: {timeRange}</p>
+                  <p>• Date: {globalDate.toISOString()}</p>
+                </div>
+                <button 
+                  onClick={handleRefresh}
+                  className="mt-4 px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700"
+                >
+                  Retry
+                </button>
+              </div>
+            </motion.div>
+          )}
+
+          {/* Show no data state */}
+          {!error && (!insightsData || (!insightsData.entries?.length && !loading)) && (
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.4, delay: 0.1 }}
+            >
+              <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-6 mb-6">
+                <h3 className="text-lg font-semibold text-yellow-800 dark:text-yellow-300 mb-2">
+                  No Data for Selected Period
+                </h3>
+                <p className="text-yellow-700 dark:text-yellow-400 mb-4">
+                  No journal entries found for the selected time period.
+                </p>
+                <div className="text-sm text-yellow-600 dark:text-yellow-400 space-y-2">
+                  <p><strong>Debug Info:</strong></p>
+                  <p>• Total entries in database: {insightsData?.allEntries?.length || 0}</p>
+                  <p>• Entries in selected period: {insightsData?.entries?.length || 0}</p>
+                  <p>• Time Range: {timeRange}</p>
+                  <p>• Date: {globalDate.toISOString()}</p>
+                </div>
+                <div className="mt-4 space-x-2">
+                  <button 
+                    onClick={() => setTimeRange('year')}
+                    className="px-4 py-2 bg-yellow-600 text-white rounded-md hover:bg-yellow-700"
+                  >
+                    View Full Year
+                  </button>
+                  <button 
+                    onClick={handleRefresh}
+                    className="px-4 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-700"
+                  >
+                    Refresh
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          )}
+
+          {/* Show normal content if we have data */}
+          {!error && insightsData && insightsData.entries?.length > 0 && (
+            <>
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.4, delay: 0.1 }}
+                className="mb-6"
+              >
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                  <InsightsTimeToggle 
+                    timeRange={timeRange} 
+                    onTimeRangeChange={handleTimeRangeChange}
+                    refreshing={refreshing}
+                    onRefresh={handleRefresh}
+                  />
+                  <InsightsGlobalNavigation
+                    timeRange={timeRange}
+                    currentDate={globalDate}
+                    onNavigate={handleNavigation}
+                    isNavigating={refreshing}
+                  />
+                </div>
+              </motion.div>
+
+              <InsightsStatsGrid
                 timeRange={timeRange}
-                currentDate={globalDate}
-                onNavigate={handleNavigation}
-                isNavigating={refreshing}
+                insightsData={transformedInsightsData}
+                isLoading={loading}
+                globalDate={globalDate}
               />
-            </div>
-          </motion.div>
 
-          <InsightsStatsGrid
-            timeRange={timeRange}
-            insightsData={transformedInsightsData}
-            isLoading={loading}
-            globalDate={globalDate}
-          />
-
-          <InsightsCharts
-            timeRange={timeRange}
-            insightsData={insightsData}
-            globalDate={globalDate}
-            userId={user?.id}
-          />
+              <InsightsCharts
+                timeRange={timeRange}
+                insightsData={insightsData}
+                globalDate={globalDate}
+                userId={user?.id}
+              />
+            </>
+          )}
         </div>
       </div>
     </InsightsTranslationProvider>
