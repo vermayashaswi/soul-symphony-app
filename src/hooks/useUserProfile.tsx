@@ -7,7 +7,6 @@ import { ensureProfileExists } from '@/services/profileService';
 export interface UserProfileData {
   displayName: string | null;
   timezone: string | null;
-  full_name: string | null;
 }
 
 export const useUserProfile = (): UserProfileData & { 
@@ -17,7 +16,6 @@ export const useUserProfile = (): UserProfileData & {
   const { user } = useAuth();
   const [displayName, setDisplayName] = useState<string | null>(null);
   const [timezone, setTimezone] = useState<string | null>(null);
-  const [fullName, setFullName] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchUserProfile = async () => {
@@ -43,11 +41,6 @@ export const useUserProfile = (): UserProfileData & {
         if (error && error.code !== 'PGRST116') {
           console.error('Error fetching profile', error);
           return;
-        }
-
-        // Set full_name
-        if (data && data.full_name) {
-          setFullName(data.full_name);
         }
 
         // Handle display name priority: local storage > display_name > full_name
@@ -133,11 +126,5 @@ export const useUserProfile = (): UserProfileData & {
     }
   };
 
-  return { 
-    displayName, 
-    timezone, 
-    full_name: fullName, 
-    updateDisplayName, 
-    updateTimezone 
-  };
+  return { displayName, timezone, updateDisplayName, updateTimezone };
 };

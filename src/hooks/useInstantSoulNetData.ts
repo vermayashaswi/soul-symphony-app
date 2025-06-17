@@ -41,19 +41,17 @@ interface InstantSoulNetData {
 
 export const useInstantSoulNetData = (
   userId: string | undefined,
-  timeRange: string,
-  globalDate?: Date
+  timeRange: string
 ): InstantSoulNetData => {
   const { currentLanguage, getCachedTranslation } = useTranslation();
   
-  // ENHANCED: Cache key with global date dependency
+  // ENHANCED: Cache key with proper dependency tracking
   const cacheKey = useMemo(() => {
     if (!userId) return '';
-    const dateStr = globalDate ? globalDate.toISOString().split('T')[0] : new Date().toISOString().split('T')[0];
-    const key = `${userId}-${timeRange}-${currentLanguage}-${dateStr}`;
+    const key = `${userId}-${timeRange}-${currentLanguage}`;
     console.log(`[useInstantSoulNetData] CACHE KEY: ${key}`);
     return key;
-  }, [userId, timeRange, currentLanguage, globalDate]);
+  }, [userId, timeRange, currentLanguage]);
 
   // ENHANCED: Comprehensive state initialization
   const [graphData, setGraphData] = useState<{ nodes: NodeData[], links: LinkData[] }>({ nodes: [], links: [] });
@@ -67,9 +65,9 @@ export const useInstantSoulNetData = (
   const [translationProgress, setTranslationProgress] = useState(0);
   const [translationComplete, setTranslationComplete] = useState(false);
 
-  // ENHANCED: Parameter change tracking with global date
+  // ENHANCED: Immediate state reset and cache management when parameters change
   useEffect(() => {
-    console.log(`[useInstantSoulNetData] PARAMETERS CHANGED: timeRange=${timeRange}, language=${currentLanguage}, userId=${userId}, globalDate=${globalDate?.toISOString()}`);
+    console.log(`[useInstantSoulNetData] PARAMETERS CHANGED: timeRange=${timeRange}, language=${currentLanguage}, userId=${userId}`);
     
     if (!userId) {
       console.log('[useInstantSoulNetData] NO USER ID - resetting to empty state');
@@ -119,9 +117,9 @@ export const useInstantSoulNetData = (
     } else {
       console.log(`[useInstantSoulNetData] NO VALID CACHE: will fetch fresh data for ${cacheKey}`);
     }
-  }, [userId, timeRange, currentLanguage, globalDate, cacheKey]);
+  }, [userId, timeRange, currentLanguage, cacheKey]);
 
-  // ENHANCED: Fresh data fetching with global date support
+  // ENHANCED: Fresh data fetching with comprehensive error handling
   const fetchFreshData = useCallback(async () => {
     if (!userId || !cacheKey) {
       console.log('[useInstantSoulNetData] FETCH SKIP: missing userId or cacheKey');
@@ -151,13 +149,12 @@ export const useInstantSoulNetData = (
       setError(null);
       setLoading(true);
       
-      console.log(`[useInstantSoulNetData] FETCHING FRESH: userId=${userId}, timeRange=${timeRange}, language=${currentLanguage}, globalDate=${globalDate?.toISOString()}`);
+      console.log(`[useInstantSoulNetData] FETCHING FRESH: userId=${userId}, timeRange=${timeRange}, language=${currentLanguage}`);
       
       const result = await EnhancedSoulNetPreloadService.preloadInstantData(
         userId,
         timeRange,
-        currentLanguage,
-        globalDate
+        currentLanguage
       );
 
       if (result) {
@@ -190,7 +187,7 @@ export const useInstantSoulNetData = (
     } finally {
       setLoading(false);
     }
-  }, [userId, timeRange, currentLanguage, globalDate, cacheKey]);
+  }, [userId, timeRange, currentLanguage, cacheKey]);
 
   // Trigger data fetching
   useEffect(() => {

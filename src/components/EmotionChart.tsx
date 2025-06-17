@@ -28,7 +28,6 @@ interface EmotionChartProps {
   aggregatedData?: AggregatedEmotionData;
   currentDate?: Date;
   onTimeRangeNavigate?: (nextDate: Date) => void;
-  hideNavigation?: boolean;
 }
 
 export function EmotionChart({ 
@@ -37,7 +36,6 @@ export function EmotionChart({
   aggregatedData,
   currentDate,
   onTimeRangeNavigate,
-  hideNavigation = false,
 }: EmotionChartProps) {
   // Chart type (persisted per device!)
   const [chartType, setChartType] = usePersistedState<ChartType>('emotion-chart-type', 'bubble');
@@ -68,8 +66,6 @@ export function EmotionChart({
   
   // Navigation handlers with reduced loading state (since data is cached)
   const goToPrevious = () => {
-    if (hideNavigation) return;
-    
     setIsNavigating(true);
     const newDate = getPreviousDate(timeframe, activeDate);
     if (onTimeRangeNavigate) onTimeRangeNavigate(newDate);
@@ -80,8 +76,6 @@ export function EmotionChart({
   };
   
   const goToNext = () => {
-    if (hideNavigation) return;
-    
     setIsNavigating(true);
     const newDate = getNextDate(timeframe, activeDate);
     if (onTimeRangeNavigate) onTimeRangeNavigate(newDate);
@@ -187,14 +181,12 @@ export function EmotionChart({
     if (lineData.length === 0) {
       return (
         <div className="flex flex-col h-full">
-          {!hideNavigation && (
-            <ChevronHeader 
-              isNavigating={isNavigating}
-              onPrevious={goToPrevious}
-              onNext={goToNext}
-              periodLabel={getPeriodLabel(timeframe, activeDate)}
-            />
-          )}
+          <ChevronHeader 
+            isNavigating={isNavigating}
+            onPrevious={goToPrevious}
+            onNext={goToNext}
+            periodLabel={getPeriodLabel(timeframe, activeDate)}
+          />
           <div className="flex items-center justify-center h-full">
             <p className="text-muted-foreground">
               <TranslatableText 
@@ -230,14 +222,12 @@ export function EmotionChart({
 
     return (
       <div className="flex flex-col h-full">
-        {!hideNavigation && (
-          <ChevronHeader 
-            isNavigating={isNavigating}
-            onPrevious={goToPrevious}
-            onNext={goToNext}
-            periodLabel={getPeriodLabel(timeframe, activeDate)}
-          />
-        )}
+        <ChevronHeader 
+          isNavigating={isNavigating}
+          onPrevious={goToPrevious}
+          onNext={goToNext}
+          periodLabel={getPeriodLabel(timeframe, activeDate)}
+        />
         <LineChart 
           data={lineData}
           visibleEmotions={visibleEmotions}
@@ -249,14 +239,12 @@ export function EmotionChart({
 
   const renderBubbleChart = () => (
     <div className="w-full h-full flex flex-col">
-      {!hideNavigation && (
-        <ChevronHeader 
-          isNavigating={isNavigating}
-          onPrevious={goToPrevious}
-          onNext={goToNext}
-          periodLabel={getPeriodLabel(timeframe, activeDate)}
-        />
-      )}
+      <ChevronHeader 
+        isNavigating={isNavigating}
+        onPrevious={goToPrevious}
+        onNext={goToNext}
+        periodLabel={getPeriodLabel(timeframe, activeDate)}
+      />
       <BubbleChart 
         timeframe={timeframe}
         activeDate={activeDate}

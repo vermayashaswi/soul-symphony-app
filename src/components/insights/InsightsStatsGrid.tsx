@@ -1,113 +1,68 @@
 
-import React from 'react';
 import { motion } from 'framer-motion';
-import InsightCard from '@/components/insights/InsightCard';
+import { cn } from '@/lib/utils';
+import { InsightCard } from '@/components/insights/InsightCard';
 import { TimeRange } from '@/hooks/use-insights-data';
-import { useTranslation } from '@/contexts/TranslationContext';
-import { getTimeRangeLabel } from '@/utils/dateRangeUtils';
+import { useIsMobile } from '@/hooks/use-mobile';
 
 interface InsightsStatsGridProps {
   timeRange: TimeRange;
   insightsData: {
-    moodFrequency: any;
-    totalEntries: number;
-    avgSentiment: number;
-    topEmotion: string;
-    emotionDistribution: any;
+    dominantMood: any;
+    biggestImprovement: any;
+    journalActivity: any;
   };
-  isLoading: boolean;
-  globalDate: Date;
 }
 
-const InsightsStatsGrid: React.FC<InsightsStatsGridProps> = ({
-  timeRange,
-  insightsData,
-  isLoading,
-  globalDate
-}) => {
-  const { currentLanguage } = useTranslation();
-
-  // Calculate dynamic labels using the utility function
-  const timeRangeLabel = getTimeRangeLabel(timeRange, globalDate, currentLanguage);
-
-  const getMoodIcon = (emotion: string) => {
-    const moodMap: { [key: string]: string } = {
-      joy: '😊',
-      happiness: '😊',
-      sadness: '😢',
-      anger: '😠',
-      fear: '😨',
-      surprise: '😲',
-      disgust: '🤢',
-      anticipation: '🤔',
-      trust: '🤝',
-      love: '❤️',
-      calm: '😌',
-      excited: '🤩',
-      grateful: '🙏',
-      confident: '💪',
-      peaceful: '☮️',
-      hopeful: '🌟',
-    };
-    return moodMap[emotion?.toLowerCase()] || '😊';
-  };
-
-  const formatSentiment = (sentiment: number) => {
-    if (sentiment > 0.6) return 'Very Positive';
-    if (sentiment > 0.2) return 'Positive';
-    if (sentiment > -0.2) return 'Neutral';
-    if (sentiment > -0.6) return 'Negative';
-    return 'Very Negative';
-  };
+export function InsightsStatsGrid({ timeRange, insightsData }: InsightsStatsGridProps) {
+  const isMobile = useIsMobile();
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.4 }}
-      >
-        <InsightCard
-          title="Dominant Mood"
-          value={isLoading ? '...' : (insightsData.topEmotion ? `${getMoodIcon(insightsData.topEmotion)} ${insightsData.topEmotion}` : 'No data')}
-          description={`Most frequent emotion for ${timeRangeLabel}`}
-          icon="😊"
-          globalDate={globalDate}
-          timeRange={timeRange}
-        />
-      </motion.div>
-
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.4, delay: 0.1 }}
-      >
-        <InsightCard
-          title="Journal Activity"
-          value={isLoading ? '...' : `${insightsData.totalEntries} entries`}
-          description={`Total journal entries for ${timeRangeLabel}`}
-          icon="📝"
-          globalDate={globalDate}
-          timeRange={timeRange}
-        />
-      </motion.div>
-
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.4, delay: 0.2 }}
-      >
-        <InsightCard
-          title="Overall Sentiment"
-          value={isLoading ? '...' : formatSentiment(insightsData.avgSentiment)}
-          description={`Average emotional tone for ${timeRangeLabel}`}
-          icon="💭"
-          globalDate={globalDate}
-          timeRange={timeRange}
-        />
-      </motion.div>
+    <div className={cn(
+      "grid grid-cols-1 md:grid-cols-3 gap-6 mb-8 px-2 md:px-0"
+    )}>
+      <InsightCard
+        type="mood"
+        title="Dominant Mood"
+        delay={0}
+        badge={`This ${timeRange}`}
+        badgeColor="bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-200"
+        data={insightsData.dominantMood}
+        timeRange={timeRange}
+      />
+      
+      <InsightCard
+        type="change"
+        title="Biggest Change"
+        delay={0.1}
+        badge={insightsData.biggestImprovement ? 
+          `${insightsData.biggestImprovement.percentage >= 0 ? '+' : ''}${insightsData.biggestImprovement.percentage}%` : 
+          undefined
+        }
+        badgeColor={insightsData.biggestImprovement ? 
+          cn(
+            "px-2 py-1 rounded-full text-xs font-medium",
+            insightsData.biggestImprovement.percentage >= 0 
+              ? "bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-200" 
+              : "bg-red-100 dark:bg-red-900 text-red-700 dark:text-red-200"
+          ) : undefined
+        }
+        data={insightsData.biggestImprovement}
+        timeRange={timeRange}
+      />
+      
+      <InsightCard
+        type="activity"
+        title="Journal Activity"
+        delay={0.2}
+        badge={insightsData.journalActivity.maxStreak > 0 ? 
+          `Max streak: ${insightsData.journalActivity.maxStreak} ${timeRange === 'today' ? 'entries' : 'days'}` : 
+          undefined
+        }
+        badgeColor="bg-purple-100 dark:bg-purple-900 text-purple-700 dark:text-purple-200"
+        data={insightsData.journalActivity}
+        timeRange={timeRange}
+      />
     </div>
   );
-};
-
-export default InsightsStatsGrid;
+}

@@ -41,12 +41,10 @@ export const filterAggregatedData = (
   // Filter data points in each emotion to this period
   const filtered: AggregatedEmotionData = {};
   for (const [emotion, points] of Object.entries(aggregatedData)) {
-    if (Array.isArray(points)) {
-      filtered[emotion] = points.filter(pt => {
-        const dateObj = new Date(pt.date);
-        return dateObj >= periodStart && dateObj < periodEnd;
-      });
-    }
+    filtered[emotion] = points.filter(pt => {
+      const dateObj = new Date(pt.date);
+      return dateObj >= periodStart && dateObj < periodEnd;
+    });
   }
   return filtered;
 };
@@ -65,22 +63,19 @@ export const processLineData = (
   Object.entries(filteredAggregatedData).forEach(([emotion, dataPoints]) => {
     let totalValue = 0;
     
-    if (Array.isArray(dataPoints)) {
-      dataPoints.forEach(point => {
-        if (!dateMap.has(point.date)) {
-          dateMap.set(point.date, new Map());
-        }
-        const dateEntry = dateMap.get(point.date)!;
-        if (!dateEntry.has(emotion)) {
-          dateEntry.set(emotion, { total: 0, count: 0 });
-        }
-        const emotionEntry = dateEntry.get(emotion)!;
-        emotionEntry.total += point.value;
-        emotionEntry.count += 1;
-        totalValue += point.value;
-      });
-    }
-    
+    dataPoints.forEach(point => {
+      if (!dateMap.has(point.date)) {
+        dateMap.set(point.date, new Map());
+      }
+      const dateEntry = dateMap.get(point.date)!;
+      if (!dateEntry.has(emotion)) {
+        dateEntry.set(emotion, { total: 0, count: 0 });
+      }
+      const emotionEntry = dateEntry.get(emotion)!;
+      emotionEntry.total += point.value;
+      emotionEntry.count += 1;
+      totalValue += point.value;
+    });
     if (totalValue > 0) {
       emotionTotals[emotion] = totalValue;
     }
@@ -127,7 +122,7 @@ export const processBubbleData = (filteredAggregatedData: AggregatedEmotionData)
   const emotionScores: Record<string, number> = {};
   
   Object.entries(filteredAggregatedData).forEach(([emotion, dataPoints]) => {
-    if (Array.isArray(dataPoints) && dataPoints.length > 0) {
+    if (dataPoints.length > 0) {
       const totalScore = dataPoints.reduce((sum, point) => sum + point.value, 0);
       if (totalScore > 0) {
         emotionScores[emotion] = totalScore / dataPoints.length;
@@ -148,11 +143,9 @@ export const getDominantEmotion = (filteredAggregatedData: AggregatedEmotionData
   const emotionTotals: Record<string, number> = {};
   Object.entries(filteredAggregatedData).forEach(([emotion, dataPoints]) => {
     let totalValue = 0;
-    if (Array.isArray(dataPoints)) {
-      dataPoints.forEach(point => {
-        totalValue += point.value;
-      });
-    }
+    dataPoints.forEach(point => {
+      totalValue += point.value;
+    });
     if (totalValue > 0) {
       emotionTotals[emotion] = totalValue;
     }

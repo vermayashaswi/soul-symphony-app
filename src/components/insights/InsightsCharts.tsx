@@ -15,14 +15,20 @@ interface InsightsChartsProps {
     allEntries: any[];
     aggregatedEmotionData: any;
   };
-  globalDate: Date;
+  emotionChartDate: Date;
+  moodCalendarDate: Date;
+  onEmotionChartNavigate: (date: Date) => void;
+  onMoodCalendarNavigate: (date: Date) => void;
   userId?: string;
 }
 
 export function InsightsCharts({
   timeRange,
   insightsData,
-  globalDate,
+  emotionChartDate,
+  moodCalendarDate,
+  onEmotionChartNavigate,
+  onMoodCalendarNavigate,
   userId
 }: InsightsChartsProps) {
   const isMobile = useIsMobile();
@@ -56,8 +62,8 @@ export function InsightsCharts({
         <EmotionChart 
           timeframe={timeRange}
           aggregatedData={insightsData.aggregatedEmotionData}
-          currentDate={globalDate}
-          hideNavigation={true}
+          currentDate={emotionChartDate}
+          onTimeRangeNavigate={onEmotionChartNavigate}
         />
       </motion.div>
       
@@ -73,8 +79,8 @@ export function InsightsCharts({
         <MoodCalendar 
           sentimentData={getSentimentData()}
           timeRange={timeRange}
-          currentDate={globalDate}
-          hideNavigation={true}
+          currentDate={moodCalendarDate}
+          onTimeRangeNavigate={onMoodCalendarNavigate}
         />
       </motion.div>
       
@@ -90,7 +96,6 @@ export function InsightsCharts({
         <SoulNet
           userId={userId}
           timeRange={timeRange}
-          globalDate={globalDate}
         />
       </motion.div>
     </>
