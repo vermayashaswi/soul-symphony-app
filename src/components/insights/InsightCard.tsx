@@ -168,6 +168,8 @@ export const InsightCard = ({ title, delay, badge, badgeColor, ...props }: Insig
         );
 
       case 'activity':
+        const timeRangeText = props.timeRange === 'today' ? 'Today' : `This ${props.timeRange}`;
+        
         return (
           <div className="flex items-center gap-4">
             <div className="h-16 w-16 bg-purple-100 dark:bg-purple-900 rounded-full flex items-center justify-center">
@@ -177,7 +179,7 @@ export const InsightCard = ({ title, delay, badge, badgeColor, ...props }: Insig
                 <Activity className="h-8 w-8 text-purple-600 dark:text-purple-300" />
               )}
             </div>
-            <div>
+            <div className="flex-1">
               <h3 className="text-2xl font-bold">
                 <EnhancedTranslatableText 
                   text={`${props.data.entryCount} entries`} 
@@ -187,9 +189,9 @@ export const InsightCard = ({ title, delay, badge, badgeColor, ...props }: Insig
                   usePageTranslation={true}
                 />
               </h3>
-              <p className="text-muted-foreground text-sm capitalize">
+              <p className="text-muted-foreground text-sm">
                 <EnhancedTranslatableText 
-                  text={`This ${props.timeRange}`} 
+                  text={timeRangeText} 
                   forceTranslate={true}
                   enableFontScaling={true}
                   scalingContext="compact"
