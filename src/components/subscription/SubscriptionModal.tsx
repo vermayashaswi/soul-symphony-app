@@ -14,7 +14,6 @@ import { Crown, Check, X, Loader2 } from 'lucide-react';
 import { TranslatableText } from '@/components/translation/TranslatableText';
 import { useRevenueCat } from '@/hooks/useRevenueCat';
 import { useSubscription } from '@/contexts/SubscriptionContext';
-import { useLocationPricing } from '@/hooks/useLocationPricing';
 import { toast } from 'sonner';
 import { motion } from 'framer-motion';
 
@@ -31,28 +30,28 @@ const PREMIUM_FEATURES = [
   'Priority customer support - Faster response times for help'
 ];
 
+// Default pricing - this would typically come from your app store configuration
+const DEFAULT_PRICING = {
+  price: '$9.99',
+  productId: 'soulo_premium_monthly',
+  country: 'Global'
+};
+
 export const SubscriptionModal: React.FC<SubscriptionModalProps> = ({
   isOpen,
   onClose
 }) => {
   const { purchaseProduct, isLoading: revenueCatLoading } = useRevenueCat();
   const { isPremium, isTrialActive } = useSubscription();
-  const { pricing, isLoading: pricingLoading, error: pricingError } = useLocationPricing();
   const [isPurchasing, setIsPurchasing] = useState(false);
-
-  console.log('[SubscriptionModal] Current pricing state:', {
-    pricing,
-    isLoading: pricingLoading,
-    error: pricingError
-  });
 
   const handleSubscribe = async () => {
     try {
       setIsPurchasing(true);
       
-      console.log('[SubscriptionModal] Starting subscription for product:', pricing.productId);
+      console.log('[SubscriptionModal] Starting subscription for product:', DEFAULT_PRICING.productId);
       
-      const success = await purchaseProduct(pricing.productId);
+      const success = await purchaseProduct(DEFAULT_PRICING.productId);
       
       if (success) {
         toast.success(
@@ -130,35 +129,19 @@ export const SubscriptionModal: React.FC<SubscriptionModalProps> = ({
           <Card className="border-2 border-primary/20 bg-gradient-to-br from-primary/5 to-primary/10">
             <CardContent className="p-6">
               <div className="text-center space-y-2">
-                {pricingLoading ? (
-                  <div className="flex items-center justify-center gap-2">
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                    <span className="text-sm text-muted-foreground">
-                      <TranslatableText text="Detecting location..." />
-                    </span>
-                  </div>
-                ) : (
-                  <>
-                    <Badge variant="secondary" className="mb-2">
-                      {pricing.country}
-                    </Badge>
-                    <div className="text-3xl font-bold text-primary">
-                      {pricing.price}
-                    </div>
-                    <div className="text-sm text-muted-foreground">
-                      <TranslatableText text="per month" />
-                    </div>
-                    {isTrialActive && (
-                      <Badge variant="outline" className="bg-blue-50 dark:bg-blue-950/20">
-                        <TranslatableText text="Currently in 7-day free trial" />
-                      </Badge>
-                    )}
-                    {pricingError && (
-                      <div className="text-xs text-yellow-600 dark:text-yellow-400">
-                        <TranslatableText text="Using default pricing due to location detection issues" />
-                      </div>
-                    )}
-                  </>
+                <Badge variant="secondary" className="mb-2">
+                  {DEFAULT_PRICING.country}
+                </Badge>
+                <div className="text-3xl font-bold text-primary">
+                  {DEFAULT_PRICING.price}
+                </div>
+                <div className="text-sm text-muted-foreground">
+                  <TranslatableText text="per month" />
+                </div>
+                {isTrialActive && (
+                  <Badge variant="outline" className="bg-blue-50 dark:bg-blue-950/20">
+                    <TranslatableText text="Currently in 7-day free trial" />
+                  </Badge>
                 )}
               </div>
             </CardContent>
@@ -191,7 +174,7 @@ export const SubscriptionModal: React.FC<SubscriptionModalProps> = ({
           <div className="space-y-3">
             <Button
               onClick={handleSubscribe}
-              disabled={isPurchasing || revenueCatLoading || pricingLoading}
+              disabled={isPurchasing || revenueCatLoading}
               className="w-full bg-gradient-to-r from-yellow-400 to-orange-500 hover:from-yellow-500 hover:to-orange-600 text-white border-0"
               size="lg"
             >

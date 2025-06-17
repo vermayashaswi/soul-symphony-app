@@ -5,7 +5,6 @@ import { Card } from '@/components/ui/card';
 import { Crown, Clock, Calendar, RefreshCw, AlertCircle, Wifi, WifiOff } from 'lucide-react';
 import { TranslatableText } from '@/components/translation/TranslatableText';
 import { useSubscription } from '@/contexts/SubscriptionContext';
-import { useLocationPricing } from '@/hooks/useLocationPricing';
 import { motion } from 'framer-motion';
 import { toast } from 'sonner';
 import { Alert, AlertDescription } from '@/components/ui/alert';
@@ -26,7 +25,6 @@ export const SubscriptionManagement: React.FC = () => {
     hasInitialLoadCompleted
   } = useSubscription();
 
-  const { pricing, isLoading: pricingLoading } = useLocationPricing();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
 
@@ -36,8 +34,7 @@ export const SubscriptionManagement: React.FC = () => {
     subscriptionStatus,
     isLoading,
     error,
-    hasInitialLoadCompleted,
-    pricing
+    hasInitialLoadCompleted
   });
 
   const handleRefreshStatus = async () => {
@@ -194,15 +191,9 @@ export const SubscriptionManagement: React.FC = () => {
                   <p className="text-sm text-muted-foreground mb-3">
                     <TranslatableText text="Upgrade to Premium for unlimited journaling, advanced insights, and more features." />
                   </p>
-                  {!pricingLoading && (
-                    <div className="text-xs text-muted-foreground mb-2">
-                      {pricing.country} - {pricing.price}/month
-                    </div>
-                  )}
                   <Button 
                     onClick={handleUpgradeClick}
                     className="w-full bg-gradient-to-r from-yellow-400 to-orange-500 hover:from-yellow-500 hover:to-orange-600 text-white border-0"
-                    disabled={pricingLoading}
                   >
                     <Crown className="h-4 w-4 mr-2" />
                     <TranslatableText text="Upgrade to Premium" />
