@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 import { NodeTranslationCacheService } from '@/services/nodeTranslationCacheService';
 
@@ -74,7 +73,7 @@ export class EnhancedSoulNetPreloadService {
     try {
       // STEP 1: Fetch raw data
       const rawData = await this.fetchRawData(userId, timeRange);
-      if (!rawData || rawData.nodes.length === 0) {
+      if (!rawData || rawData.entries.length === 0) {
         console.log('[EnhancedSoulNetPreloadService] ENHANCED: No raw data found');
         return { 
           nodes: [], 
