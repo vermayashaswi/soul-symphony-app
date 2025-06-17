@@ -5,6 +5,7 @@ import Footer from '@/components/website/Footer';
 import HeroSection from '@/components/website/sections/HeroSection';
 import FeaturesSection from '@/components/website/sections/FeaturesSection';
 import HowItWorksSection from '@/components/website/sections/HowItWorksSection';
+import PricingSection from '@/components/website/sections/PricingSection';
 import TestimonialsSection from '@/components/website/sections/TestimonialsSection';
 import CTASection from '@/components/website/sections/CTASection';
 import SoulNetTranslationIndicator from '@/components/translation/SoulNetTranslationIndicator';
@@ -77,6 +78,14 @@ const HomePage = () => {
       {/* How It Works Section */}
       <section id="how-it-works">
         <HowItWorksSection />
+      </section>
+      
+      {/* Pricing Section */}
+      <section id="pricing">
+        <PricingSection 
+          openAppStore={openAppStore}
+          openPlayStore={openPlayStore}
+        />
       </section>
       
       {/* Testimonials Section */}

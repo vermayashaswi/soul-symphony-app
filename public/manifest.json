@@ -1,32 +1,20 @@
 
 {
-  "id": "soulo-voice-journaling-app",
   "name": "Soulo - Voice Journaling App",
   "short_name": "Soulo",
-  "description": "AI-powered voice journaling for emotional wellness and self-discovery. Express your thoughts through voice, reflect on your emotions with AI insights, and grow through personalized guidance.",
+  "description": "AI-powered voice journaling for emotional wellness and self-discovery",
   "start_url": "/app",
   "display": "standalone",
-  "display_override": ["window-controls-overlay", "standalone"],
   "background_color": "#ffffff",
   "theme_color": "#8b5cf6",
   "orientation": "portrait-primary",
   "scope": "/app/",
-  "lang": "en",
-  "dir": "ltr",
-  "categories": ["health", "lifestyle", "productivity", "wellness"],
-  "prefer_related_applications": false,
   "icons": [
     {
       "src": "/lovable-uploads/ade042ee-6a1b-48d3-9ad3-7448b9fcaf8b.png",
       "sizes": "512x512",
       "type": "image/png",
-      "purpose": "any"
-    },
-    {
-      "src": "/lovable-uploads/ade042ee-6a1b-48d3-9ad3-7448b9fcaf8b.png",
-      "sizes": "512x512",
-      "type": "image/png",
-      "purpose": "maskable"
+      "purpose": "any maskable"
     },
     {
       "src": "/lovable-uploads/ade042ee-6a1b-48d3-9ad3-7448b9fcaf8b.png",
@@ -39,91 +27,9 @@
       "sizes": "144x144",
       "type": "image/png",
       "purpose": "any"
-    },
-    {
-      "src": "/lovable-uploads/ade042ee-6a1b-48d3-9ad3-7448b9fcaf8b.png",
-      "sizes": "96x96",
-      "type": "image/png",
-      "purpose": "any"
-    },
-    {
-      "src": "/lovable-uploads/ade042ee-6a1b-48d3-9ad3-7448b9fcaf8b.png",
-      "sizes": "72x72",
-      "type": "image/png",
-      "purpose": "any"
-    },
-    {
-      "src": "/lovable-uploads/ade042ee-6a1b-48d3-9ad3-7448b9fcaf8b.png",
-      "sizes": "48x48",
-      "type": "image/png",
-      "purpose": "any"
     }
   ],
-  "screenshots": [
-    {
-      "src": "/lovable-uploads/ade042ee-6a1b-48d3-9ad3-7448b9fcaf8b.png",
-      "sizes": "540x720",
-      "type": "image/png",
-      "form_factor": "narrow",
-      "label": "Voice journaling interface"
-    },
-    {
-      "src": "/lovable-uploads/ade042ee-6a1b-48d3-9ad3-7448b9fcaf8b.png",
-      "sizes": "720x540",
-      "type": "image/png",
-      "form_factor": "wide",
-      "label": "Dashboard view"
-    }
-  ],
-  "shortcuts": [
-    {
-      "name": "Start Recording",
-      "short_name": "Record",
-      "description": "Start a new voice journal entry",
-      "url": "/app/home?action=record",
-      "icons": [
-        {
-          "src": "/lovable-uploads/ade042ee-6a1b-48d3-9ad3-7448b9fcaf8b.png",
-          "sizes": "96x96"
-        }
-      ]
-    },
-    {
-      "name": "View Journal",
-      "short_name": "Journal",
-      "description": "View your journal entries",
-      "url": "/app/journal",
-      "icons": [
-        {
-          "src": "/lovable-uploads/ade042ee-6a1b-48d3-9ad3-7448b9fcaf8b.png",
-          "sizes": "96x96"
-        }
-      ]
-    },
-    {
-      "name": "Insights",
-      "short_name": "Insights",
-      "description": "View your emotional insights",
-      "url": "/app/insights",
-      "icons": [
-        {
-          "src": "/lovable-uploads/ade042ee-6a1b-48d3-9ad3-7448b9fcaf8b.png",
-          "sizes": "96x96"
-        }
-      ]
-    }
-  ],
-  "launch_handler": {
-    "client_mode": "navigate-existing"
-  },
-  "handle_links": "preferred",
-  "edge_side_panel": {
-    "preferred_width": 400
-  },
-  "protocol_handlers": [
-    {
-      "protocol": "web+soulo",
-      "url": "/app/handle/%s"
-    }
-  ]
+  "categories": ["health", "lifestyle", "productivity"],
+  "lang": "en",
+  "dir": "ltr"
 }
