@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { Routes, Route, Navigate, Outlet, useLocation } from 'react-router-dom';
+import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import Index from '@/pages/Index';
 import Home from '@/pages/Home';
 import Journal from '@/pages/Journal';
@@ -40,6 +40,9 @@ const AppRoutes = () => {
   
   // Check if current path is in the list of paths where navigation should be hidden
   const isOnboardingOrAuth = onboardingOrAuthPaths.includes(location.pathname);
+  
+  // Check if we're on an app route (moved from AuthContext)
+  const currentlyOnAppRoute = isAppRoute(location.pathname);
   
   // This will be used for conditional rendering of the /app route
   const AppRootRedirect = () => {
@@ -108,7 +111,7 @@ const AppRoutes = () => {
           2. User is logged in
           3. We're not on onboarding/auth screens
           4. If we're on /app, we also check if onboarding is complete */}
-      {isAppRoute(location.pathname) && 
+      {currentlyOnAppRoute && 
        user && 
        !isOnboardingOrAuth && 
        onboardingComplete && (
