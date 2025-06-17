@@ -86,23 +86,23 @@ const Node: React.FC<NodeProps> = ({
     return undefined;
   }, [node.id, getCoordinatedTranslation, isInstantMode]);
 
-  // UPDATED: Fixed color scheme with proper default and selected states
+  // UPDATED: New darker color scheme implementation
   const color = useMemo(() => {
     if (isSelected) {
-      // Selected state: Use darker/brighter shades
+      // Selected state: Use darker shades
       if (node.type === 'entity') {
-        return new THREE.Color('#16a34a'); // Darker green for selected entity nodes
+        return new THREE.Color('#14532d'); // Much darker green for selected entity nodes
       } else {
-        return new THREE.Color('#d97706'); // Darker golden for selected emotion nodes
+        return new THREE.Color('#b45309'); // Much darker golden for selected emotion nodes
       }
     }
     
     if (isHighlighted || (!dimmed && !isSelected)) {
-      // Default state: Use the main colors for both highlighted and normal nodes
+      // Default state: Use the new darker colors for both highlighted and normal nodes
       if (node.type === 'entity') {
-        return new THREE.Color('#22c55e'); // Green for entity nodes (spheres)
+        return new THREE.Color('#15803d'); // Darker green for entity nodes (spheres)
       } else {
-        return new THREE.Color('#f59e0b'); // Golden for emotion nodes (cubes)
+        return new THREE.Color('#d97706'); // Darker golden for emotion nodes (cubes)
       }
     }
     
@@ -193,18 +193,18 @@ const Node: React.FC<NodeProps> = ({
   }
 
   if (isInstantMode) {
-    console.log(`[Node] ENHANCED FIXED COLORS INSTANT MODE: Rendering ${node.type} node ${node.id} with ${isSelected ? 'SELECTED' : 'DEFAULT'} ${node.type === 'entity' ? 'GREEN' : 'GOLDEN'} color, enhanced coordinated translation: "${coordinatedTranslation}", base scale ${baseNodeScale.toFixed(2)} - NO LOADING DELAY`);
+    console.log(`[Node] ENHANCED DARKER COLORS INSTANT MODE: Rendering ${node.type} node ${node.id} with ${isSelected ? 'SELECTED' : 'DEFAULT'} DARKER ${node.type === 'entity' ? 'GREEN' : 'GOLDEN'} color, enhanced coordinated translation: "${coordinatedTranslation}", base scale ${baseNodeScale.toFixed(2)} - NO LOADING DELAY`);
   } else {
-    console.log(`[Node] ENHANCED FIXED COLORS: Rendering ${node.type} node ${node.id} with ${isSelected ? 'SELECTED' : 'DEFAULT'} ${node.type === 'entity' ? 'GREEN' : 'GOLDEN'} color, enhanced coordinated translation: "${coordinatedTranslation}", base scale ${baseNodeScale.toFixed(2)}`);
+    console.log(`[Node] ENHANCED DARKER COLORS: Rendering ${node.type} node ${node.id} with ${isSelected ? 'SELECTED' : 'DEFAULT'} DARKER ${node.type === 'entity' ? 'GREEN' : 'GOLDEN'} color, enhanced coordinated translation: "${coordinatedTranslation}", base scale ${baseNodeScale.toFixed(2)}`);
   }
 
   // ENHANCED: Improved geometry sizes to work with the enhanced scale differences
   const renderGeometry = () => {
     if (node.type === 'emotion') {
-      // Cube for emotion nodes (golden)
+      // Cube for emotion nodes (darker golden)
       return <boxGeometry args={[1.6, 1.6, 1.6]} />;
     } else {
-      // Sphere for entity nodes (green)
+      // Sphere for entity nodes (darker green)
       return <sphereGeometry args={[0.8, 32, 32]} />;
     }
   };
