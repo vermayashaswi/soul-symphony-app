@@ -1,4 +1,3 @@
-
 import { serviceWorkerManager } from '@/utils/serviceWorker';
 import { toast } from 'sonner';
 
@@ -9,6 +8,12 @@ export interface PushSubscriptionData {
     auth: string;
   };
   userId: string;
+}
+
+export interface NotificationAction {
+  action: string;
+  title: string;
+  icon?: string;
 }
 
 export interface NotificationPayload {
