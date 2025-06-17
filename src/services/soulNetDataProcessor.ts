@@ -10,16 +10,17 @@ interface EmotionData {
   intensity?: number;
 }
 
-interface JournalEntry {
+// FIXED: Updated interface to match what actually comes from Supabase
+interface DatabaseJournalEntry {
   id: number;
-  entities: EntityData[] | null;
-  emotions: Record<string, number> | EmotionData[] | null;
+  entities: any; // Json type from Supabase (can be array, object, or null)
+  emotions: any; // Json type from Supabase (can be object, array, or null)
   master_themes?: string[] | null;
   created_at: string;
 }
 
 export class SoulNetDataProcessor {
-  static processJournalEntries(entries: JournalEntry[]): {
+  static processJournalEntries(entries: DatabaseJournalEntry[]): {
     entityCounts: Map<string, number>;
     emotionCounts: Map<string, number>;
     coOccurrences: Map<string, number>;
