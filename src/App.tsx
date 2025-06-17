@@ -37,11 +37,9 @@ function App() {
                     <SubscriptionProvider>
                       <FeatureFlagsProvider>
                         <TutorialProvider>
-                          <ViewportManager>
-                            <AppRoutes />
-                            <InstallPrompt />
-                            <Toaster />
-                          </ViewportManager>
+                          <AppRoutes />
+                          <InstallPrompt />
+                          <Toaster />
                         </TutorialProvider>
                       </FeatureFlagsProvider>
                     </SubscriptionProvider>
