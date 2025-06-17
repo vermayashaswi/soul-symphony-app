@@ -142,36 +142,6 @@
       "purpose": "maskable"
     }
   ],
-  "screenshots": [
-    {
-      "src": "/lovable-uploads/5b18686b-4a3c-4341-a072-479db470ac1d.png",
-      "sizes": "1170x2532",
-      "type": "image/png",
-      "form_factor": "narrow",
-      "label": "Voice Recording Interface - Capture your thoughts naturally by speaking"
-    },
-    {
-      "src": "/lovable-uploads/624f7365-8259-44e3-9c0f-baa65d0b9776.png",
-      "sizes": "1170x2532",
-      "type": "image/png",
-      "form_factor": "narrow",
-      "label": "Journal Entries - View and manage your voice journal entries with AI insights"
-    },
-    {
-      "src": "/lovable-uploads/69a98431-43ec-41e5-93f1-7ddaf28e2884.png",
-      "sizes": "1170x2532",
-      "type": "image/png",
-      "form_factor": "narrow",
-      "label": "Emotional Insights - Discover patterns in your emotions and mental wellness"
-    },
-    {
-      "src": "/lovable-uploads/86f40c9c-bea5-4d03-9eb3-7336786f1bbb.png",
-      "sizes": "1170x2532",
-      "type": "image/png",
-      "form_factor": "narrow",
-      "label": "Smart Chat - Get personalized guidance and insights from AI"
-    }
-  ],
   "shortcuts": [
     {
       "name": "Start Recording",
