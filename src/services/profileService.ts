@@ -1,3 +1,4 @@
+
 import { User } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
@@ -305,9 +306,9 @@ export const startUserTrial = async (userId: string): Promise<boolean> => {
       return false;
     }
 
-    // Start the trial
+    // Start the trial - Updated to use 14 days instead of 7
     const trialEndDate = new Date();
-    trialEndDate.setDate(trialEndDate.getDate() + 7); // 7 days from now
+    trialEndDate.setDate(trialEndDate.getDate() + 14); // Changed from 7 to 14 days
 
     const { error: updateError } = await supabase
       .from('profiles')

@@ -1,4 +1,5 @@
 
+
 -- Update the auto_start_trial trigger to set subscription_tier to 'premium' during trial
 CREATE OR REPLACE FUNCTION public.auto_start_trial()
 RETURNS trigger
@@ -8,8 +9,8 @@ AS $function$
 BEGIN
   -- Only set trial for new users (not updates)
   IF TG_OP = 'INSERT' THEN
-    -- Set trial period to 7 days from now
-    NEW.trial_ends_at = NOW() + INTERVAL '7 days';
+    -- Set trial period to 14 days from now (updated from 7 days)
+    NEW.trial_ends_at = NOW() + INTERVAL '14 days';
     NEW.subscription_status = 'trial';
     NEW.subscription_tier = 'premium'; -- Fixed: Set to premium during trial
     NEW.is_premium = true; -- Grant premium access during trial
@@ -28,3 +29,4 @@ WHERE
   subscription_status = 'trial' 
   AND is_premium = true 
   AND subscription_tier = 'free';
+
