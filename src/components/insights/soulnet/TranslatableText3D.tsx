@@ -64,26 +64,26 @@ export const TranslatableText3D: React.FC<TranslatableText3DProps> = ({
         return;
       }
 
-      // ENHANCED: Check node-specific cache first
+      // ENHANCED: Check node-specific cache first - INSTANT response for cached items
       const cachedTranslation = NodeTranslationCacheService.getCachedTranslation(text, currentLanguage);
       if (cachedTranslation) {
-        console.log(`[TranslatableText3D] Using node cache for "${text}": "${cachedTranslation}"`);
+        console.log(`[TranslatableText3D] INSTANT cache hit for "${text}": "${cachedTranslation}"`);
         setTranslatedText(cachedTranslation);
         onTranslationComplete?.(cachedTranslation);
         return;
       }
 
-      // ENHANCED: Fallback to coordinated translation system if no cache
-      if (useCoordinatedTranslation && !coordinatedTranslation) {
-        console.log(`[TranslatableText3D] No coordinated translation available for "${text}", using original`);
+      // ENHANCED: For coordinated systems, don't fallback to individual translation
+      if (useCoordinatedTranslation) {
+        console.log(`[TranslatableText3D] Coordinated mode - using original for "${text}"`);
         setTranslatedText(text);
         onTranslationComplete?.(text);
         return;
       }
 
-      // ENHANCED: Only translate if not using coordinated system
+      // ENHANCED: Only show loading for individual translations, not coordinated ones
       if (!useCoordinatedTranslation && translate) {
-        console.log(`[TranslatableText3D] Translating "${text}" from ${sourceLanguage} to ${currentLanguage}`);
+        console.log(`[TranslatableText3D] Individual translation for "${text}" from ${sourceLanguage} to ${currentLanguage}`);
         
         try {
           setIsTranslating(true);
@@ -91,7 +91,6 @@ export const TranslatableText3D: React.FC<TranslatableText3DProps> = ({
           
           if (result && result !== text) {
             console.log(`[TranslatableText3D] Translation successful: "${text}" -> "${result}"`);
-            // Cache the result in node-specific cache
             NodeTranslationCacheService.setCachedTranslation(text, result, currentLanguage);
             setTranslatedText(result);
             onTranslationComplete?.(result);
@@ -117,12 +116,14 @@ export const TranslatableText3D: React.FC<TranslatableText3DProps> = ({
     translateText();
   }, [text, currentLanguage, sourceLanguage, translate, onTranslationComplete, coordinatedTranslation, useCoordinatedTranslation]);
 
-  // Always render with current text - don't hide during translation
+  // ENHANCED: Never dim text during translation in coordinated mode
+  const shouldDimText = isTranslating && !useCoordinatedTranslation;
+
   return (
     <SmartTextRenderer
       text={translatedText}
       position={position}
-      color={isTranslating ? '#888888' : color}
+      color={shouldDimText ? '#888888' : color}
       size={size}
       visible={visible}
       renderOrder={renderOrder}
