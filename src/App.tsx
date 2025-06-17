@@ -23,6 +23,8 @@ const queryClient = new QueryClient({
 });
 
 function App() {
+  console.log('[App] App component rendering - no BrowserRouter here');
+  
   return (
     <QueryClientProvider client={queryClient}>
       <ThemeProvider attribute="class" defaultTheme="light" enableSystem>

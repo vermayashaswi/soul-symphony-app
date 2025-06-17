@@ -21,6 +21,8 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useOnboarding } from '@/hooks/use-onboarding';
 
 const AppRoutes = () => {
+  console.log('[AppRoutes] AppRoutes component rendering - using Routes/Route components only');
+  
   const { user } = useAuth();
   const { onboardingComplete } = useOnboarding();
   

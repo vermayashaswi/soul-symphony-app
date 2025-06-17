@@ -158,6 +158,8 @@ const initializeApp = async () => {
 // Start initialization
 initializeApp();
 
+console.log('[main.tsx] About to render app with BrowserRouter - THIS IS THE ONLY ROUTER');
+
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
     <BrowserRouter>
