@@ -1,8 +1,8 @@
-
 import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react';
 import { onDemandTranslationCache } from '@/utils/website-translations';
 import { SoulNetPreloadService } from '@/services/soulnetPreloadService';
 import { EnhancedSoulNetPreloadService } from '@/services/enhancedSoulNetPreloadService';
+import { NodeTranslationCacheService } from '@/services/nodeTranslationCacheService';
 import { translationService } from '@/services/translationService';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -32,14 +32,14 @@ export const TranslationProvider: React.FC<TranslationProviderProps> = ({ childr
   const [isSoulNetTranslating, setIsSoulNetTranslating] = useState<boolean>(false);
   const [translationCache, setTranslationCache] = useState<Record<string, string>>({});
 
-  // APP-LEVEL: Set up translation service integration on context initialization
+  // ENHANCED: Set up translation service integration on context initialization
   useEffect(() => {
-    console.log('[TranslationContext] APP-LEVEL: Setting up translation service integration');
+    console.log('[TranslationContext] ENHANCED: Setting up translation service integration');
     
     // Register translation service with EnhancedSoulNetPreloadService
     EnhancedSoulNetPreloadService.setAppLevelTranslationService(translationService);
     
-    console.log('[TranslationContext] APP-LEVEL: Translation service integration complete');
+    console.log('[TranslationContext] ENHANCED: Translation service integration complete');
   }, []);
 
   // Load language from localStorage or browser default
@@ -68,28 +68,28 @@ export const TranslationProvider: React.FC<TranslationProviderProps> = ({ childr
 
   const prefetchSoulNetTranslations = useCallback(async (userId: string, timeRange: string): Promise<void> => {
     if (currentLanguage === 'en') {
-      console.log('[TranslationContext] Skipping SoulNet pre-translation for English');
+      console.log('[TranslationContext] ENHANCED: Skipping SoulNet pre-translation for English');
       return;
     }
 
-    console.log(`[TranslationContext] APP-LEVEL: Pre-translating SoulNet data for ${userId}, ${timeRange}, ${currentLanguage}`);
+    console.log(`[TranslationContext] ENHANCED: Pre-translating SoulNet data for ${userId}, ${timeRange}, ${currentLanguage}`);
     
     try {
       setIsSoulNetTranslating(true);
       
-      // ENHANCED: Use enhanced preload service for better translation coordination
+      // ENHANCED: Use enhanced preload service for coordinated translation
       await EnhancedSoulNetPreloadService.preloadInstantData(userId, timeRange, currentLanguage);
       
-      console.log('[TranslationContext] APP-LEVEL: SoulNet pre-translation completed successfully');
+      console.log('[TranslationContext] ENHANCED: SoulNet pre-translation completed successfully');
     } catch (error) {
-      console.error('[TranslationContext] APP-LEVEL: Error pre-translating SoulNet data:', error);
+      console.error('[TranslationContext] ENHANCED: Error pre-translating SoulNet data:', error);
     } finally {
       setIsSoulNetTranslating(false);
     }
   }, [currentLanguage]);
 
   const handleLanguageChange = useCallback(async (language: string) => {
-    console.log('[TranslationContext] APP-LEVEL: Changing language to:', language);
+    console.log('[TranslationContext] ENHANCED: Changing language to:', language);
     
     // Set loading state for SoulNet translations
     if (language !== 'en') {
@@ -101,16 +101,28 @@ export const TranslationProvider: React.FC<TranslationProviderProps> = ({ childr
     // Save to localStorage for persistence
     try {
       localStorage.setItem('soulo-language', language);
-      console.log('[TranslationContext] APP-LEVEL: Saved language to localStorage:', language);
+      console.log('[TranslationContext] ENHANCED: Saved language to localStorage:', language);
     } catch (error) {
-      console.error('[TranslationContext] APP-LEVEL: Error saving language to localStorage:', error);
+      console.error('[TranslationContext] ENHANCED: Error saving language to localStorage:', error);
     }
     
-    // ENHANCED: Clear both enhanced and legacy SoulNet caches when language changes
+    // ENHANCED: Clear all caches when language changes (except node translations stay)
     EnhancedSoulNetPreloadService.clearInstantCache();
     SoulNetPreloadService.clearCache();
     
-    console.log('[TranslationContext] APP-LEVEL: Cleared all SoulNet caches for language change');
+    // ENHANCED: Only clear node cache if switching away from target language
+    const stats = NodeTranslationCacheService.getCacheStats();
+    console.log('[TranslationContext] ENHANCED: Node cache stats before language change:', stats);
+    
+    // Keep node translations for the target language, clear others
+    stats.languages.forEach(cachedLang => {
+      if (cachedLang !== language) {
+        NodeTranslationCacheService.clearLanguageCache(cachedLang);
+        console.log(`[TranslationContext] ENHANCED: Cleared node cache for ${cachedLang}`);
+      }
+    });
+    
+    console.log('[TranslationContext] ENHANCED: Smart cache clearing completed for language change');
     
     // Dispatch custom event for components that need to know about language changes
     const event = new CustomEvent('languageChange', { 
@@ -154,6 +166,14 @@ export const TranslationProvider: React.FC<TranslationProviderProps> = ({ childr
       return translationCache[cacheKey];
     }
 
+    // ENHANCED: Check node cache for SoulNet nodes
+    const nodeCached = NodeTranslationCacheService.getCachedTranslation(text, currentLanguage);
+    if (nodeCached) {
+      console.log('[TranslationContext] Using node cache for:', text.substring(0, 30));
+      setTranslationCache(prev => ({ ...prev, [cacheKey]: nodeCached }));
+      return nodeCached;
+    }
+
     // Check on-demand cache
     const cachedTranslation = onDemandTranslationCache.get(currentLanguage, text);
     if (cachedTranslation) {
@@ -190,9 +210,14 @@ export const TranslationProvider: React.FC<TranslationProviderProps> = ({ childr
           translated: translatedText.substring(0, 30) 
         });
         
-        // Cache both locally and in on-demand cache
+        // ENHANCED: Cache in all relevant caches
         setTranslationCache(prev => ({ ...prev, [cacheKey]: translatedText }));
         onDemandTranslationCache.set(currentLanguage, text, translatedText);
+        
+        // Also cache in node cache if it looks like a node name
+        if (text.length < 50 && !text.includes(' ') || text.split(' ').length <= 3) {
+          NodeTranslationCacheService.setCachedTranslation(text, translatedText, currentLanguage);
+        }
         
         return translatedText;
       }
@@ -210,15 +235,21 @@ export const TranslationProvider: React.FC<TranslationProviderProps> = ({ childr
   const getCachedTranslation = useCallback((text: string): string | null => {
     const cacheKey = `${text}_en_${currentLanguage}`;
     const localCache = translationCache[cacheKey];
+    
+    // ENHANCED: Check node cache first for SoulNet nodes
+    const nodeCache = NodeTranslationCacheService.getCachedTranslation(text, currentLanguage);
+    if (nodeCache) {
+      return nodeCache;
+    }
+    
     const onDemandCache = onDemandTranslationCache.get(currentLanguage, text);
     console.log('[TranslationContext] Checking cache for:', text.substring(0, 30), 
-      { localCache: !!localCache, onDemandCache: !!onDemandCache });
+      { localCache: !!localCache, nodeCache: !!nodeCache, onDemandCache: !!onDemandCache });
     return localCache || onDemandCache || null;
   }, [currentLanguage, translationCache]);
 
   const prefetchTranslationsForRoute = useCallback(async (route: string): Promise<void> => {
     console.log(`[TranslationContext] Prefetching translations for route: ${route}`);
-    // Get common route texts for prefetching - can be expanded
     const routeTexts = {
       '/': ['Home', 'Download on App Store', 'Your Voice, Your Journey'],
       '/insights': ['Insights', 'Discover patterns', 'Soul-Net Visualization', 'Dominant Mood'],
@@ -228,7 +259,6 @@ export const TranslationProvider: React.FC<TranslationProviderProps> = ({ childr
     const textsToTranslate = routeTexts[route] || [];
     if (textsToTranslate.length > 0 && currentLanguage !== 'en') {
       try {
-        // ENHANCED: Use Supabase edge function with proper source language
         const { data, error } = await supabase.functions.invoke('translate-text', {
           body: {
             texts: textsToTranslate,
@@ -241,7 +271,6 @@ export const TranslationProvider: React.FC<TranslationProviderProps> = ({ childr
         if (!error && data && data.translatedTexts) {
           console.log(`[TranslationContext] Prefetched ${data.translatedTexts.length} translations for route ${route}`);
           
-          // Cache the results
           textsToTranslate.forEach((originalText, index) => {
             const translatedText = data.translatedTexts[index];
             if (translatedText) {
@@ -264,15 +293,52 @@ export const TranslationProvider: React.FC<TranslationProviderProps> = ({ childr
     translate,
     isTranslating,
     clearCache: useCallback(() => {
-      console.log('[TranslationContext] APP-LEVEL: Clearing all translation caches');
+      console.log('[TranslationContext] ENHANCED: Clearing all translation caches');
       setTranslationCache({});
       onDemandTranslationCache.clearAll();
+      NodeTranslationCacheService.clearAllCache();
       EnhancedSoulNetPreloadService.clearInstantCache();
       SoulNetPreloadService.clearCache();
     }, []),
     getCachedTranslation,
     translationProgress: isTranslating ? 50 : 100,
-    prefetchTranslationsForRoute,
+    prefetchTranslationsForRoute: useCallback(async (route: string): Promise<void> => {
+      console.log(`[TranslationContext] Prefetching translations for route: ${route}`);
+      const routeTexts = {
+        '/': ['Home', 'Download on App Store', 'Your Voice, Your Journey'],
+        '/insights': ['Insights', 'Discover patterns', 'Soul-Net Visualization', 'Dominant Mood'],
+        '/journal': ['Journal', 'New Entry', 'Search', 'Recent Entries']
+      };
+      
+      const textsToTranslate = routeTexts[route] || [];
+      if (textsToTranslate.length > 0 && currentLanguage !== 'en') {
+        try {
+          const { data, error } = await supabase.functions.invoke('translate-text', {
+            body: {
+              texts: textsToTranslate,
+              sourceLanguage: 'en',
+              targetLanguage: currentLanguage,
+              cleanResult: true
+            }
+          });
+
+          if (!error && data && data.translatedTexts) {
+            console.log(`[TranslationContext] Prefetched ${data.translatedTexts.length} translations for route ${route}`);
+            
+            textsToTranslate.forEach((originalText, index) => {
+              const translatedText = data.translatedTexts[index];
+              if (translatedText) {
+                const cacheKey = `${originalText}_en_${currentLanguage}`;
+                setTranslationCache(prev => ({ ...prev, [cacheKey]: translatedText }));
+                onDemandTranslationCache.set(currentLanguage, originalText, translatedText);
+              }
+            });
+          }
+        } catch (error) {
+          console.error('[TranslationContext] Error prefetching translations:', error);
+        }
+      }
+    }, [currentLanguage]),
     prefetchSoulNetTranslations,
     isSoulNetTranslating
   };

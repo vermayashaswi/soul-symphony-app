@@ -1,4 +1,6 @@
+
 import { supabase } from '@/integrations/supabase/client';
+import { NodeTranslationCacheService } from '@/services/nodeTranslationCacheService';
 
 interface NodeData {
   id: string;
@@ -20,476 +22,191 @@ interface NodeConnectionData {
   averageStrength: number;
 }
 
-interface EnhancedSoulNetData {
+interface ProcessedInstantData {
   nodes: NodeData[];
   links: LinkData[];
   translations: Map<string, string>;
   connectionPercentages: Map<string, number>;
   nodeConnectionData: Map<string, NodeConnectionData>;
-  translationComplete: boolean;
   translationProgress: number;
+  translationComplete: boolean;
 }
 
-interface CachedEnhancedData {
-  data: EnhancedSoulNetData;
+interface CachedInstantData {
+  data: ProcessedInstantData;
   timestamp: number;
   userId: string;
   timeRange: string;
   language: string;
-  version: number;
 }
 
-interface AppLevelTranslationService {
-  batchTranslate(options: { texts: string[], targetLanguage: string, sourceLanguage?: string }): Promise<Map<string, string>>;
+interface TranslationService {
+  batchTranslate: (options: { texts: string[]; targetLanguage: string }) => Promise<Map<string, string>>;
 }
 
 export class EnhancedSoulNetPreloadService {
-  private static readonly CACHE_KEY = 'enhanced-soulnet-data';
+  private static readonly CACHE_KEY = 'enhanced-soulnet-instant-data';
   private static readonly CACHE_DURATION = 15 * 60 * 1000; // 15 minutes
-  private static readonly CACHE_VERSION = 10; // INCREMENTED: For comprehensive cache fix
-  private static cache = new Map<string, CachedEnhancedData>();
-  private static translationCoordinator = new Map<string, Promise<Map<string, string>>>();
-  
-  private static translationStates = new Map<string, {
-    isTranslating: boolean;
-    progress: number;
-    totalNodes: number;
-    translatedNodes: number;
-  }>();
-  
-  private static appTranslationService: AppLevelTranslationService | null = null;
+  private static cache = new Map<string, CachedInstantData>();
+  private static appLevelTranslationService: TranslationService | null = null;
 
-  static setAppLevelTranslationService(service: AppLevelTranslationService) {
-    console.log('[EnhancedSoulNetPreloadService] Setting app-level translation service');
-    this.appTranslationService = service;
-  }
-
-  // ENHANCED: Comprehensive cache clearing with better logic
-  static clearTimeRangeCache(userId: string, keepTimeRange: string, keepLanguage: string): void {
-    const keepCacheKey = this.generateCacheKey(userId, keepTimeRange, keepLanguage);
-    console.log(`[EnhancedSoulNetPreloadService] COMPREHENSIVE CACHE CLEAR: userId=${userId}, keeping=${keepCacheKey}`);
-    
-    let clearedMemoryCount = 0;
-    let clearedStorageCount = 0;
-    
-    // Clear in-memory cache - keep only the current combination
-    const memoryKeysToDelete = Array.from(this.cache.keys()).filter(key => {
-      const shouldKeep = key === keepCacheKey;
-      const isUserKey = key.startsWith(`${userId}-`);
-      return isUserKey && !shouldKeep;
-    });
-    
-    memoryKeysToDelete.forEach(key => {
-      console.log(`[EnhancedSoulNetPreloadService] CLEARING MEMORY: ${key}`);
-      this.cache.delete(key);
-      this.translationStates.delete(key);
-      this.translationCoordinator.delete(key);
-      clearedMemoryCount++;
-    });
-
-    // Clear localStorage - keep only the current combination
-    try {
-      const userStoragePrefix = `${this.CACHE_KEY}-${userId}-`;
-      const keepStorageKey = `${this.CACHE_KEY}-${keepCacheKey}`;
-      
-      const allStorageKeys = Object.keys(localStorage);
-      const storageKeysToDelete = allStorageKeys.filter(storageKey => {
-        const isUserKey = storageKey.startsWith(userStoragePrefix);
-        const shouldKeep = storageKey === keepStorageKey;
-        return isUserKey && !shouldKeep;
-      });
-      
-      storageKeysToDelete.forEach(storageKey => {
-        console.log(`[EnhancedSoulNetPreloadService] CLEARING STORAGE: ${storageKey}`);
-        localStorage.removeItem(storageKey);
-        clearedStorageCount++;
-      });
-    } catch (error) {
-      console.error('[EnhancedSoulNetPreloadService] STORAGE CLEAR ERROR:', error);
-    }
-    
-    console.log(`[EnhancedSoulNetPreloadService] CACHE CLEAR COMPLETE: Memory cleared: ${clearedMemoryCount}, Storage cleared: ${clearedStorageCount}`);
-  }
-
-  // ENHANCED: Manual cache invalidation for specific scenarios
-  static forceInvalidateCache(userId: string, timeRange: string, language: string): void {
-    const cacheKey = this.generateCacheKey(userId, timeRange, language);
-    console.log(`[EnhancedSoulNetPreloadService] FORCE INVALIDATING: ${cacheKey}`);
-    
-    // Remove from memory
-    this.cache.delete(cacheKey);
-    this.translationStates.delete(cacheKey);
-    this.translationCoordinator.delete(cacheKey);
-    
-    // Remove from storage
-    try {
-      const storageKey = `${this.CACHE_KEY}-${cacheKey}`;
-      localStorage.removeItem(storageKey);
-      console.log(`[EnhancedSoulNetPreloadService] FORCE INVALIDATED: ${cacheKey}`);
-    } catch (error) {
-      console.error('[EnhancedSoulNetPreloadService] FORCE INVALIDATION ERROR:', error);
-    }
-  }
-
-  static getTranslationState(cacheKey: string) {
-    return this.translationStates.get(cacheKey) || {
-      isTranslating: false,
-      progress: 100,
-      totalNodes: 0,
-      translatedNodes: 0
-    };
+  // APP-LEVEL: Set translation service for coordinated translations
+  static setAppLevelTranslationService(translationService: TranslationService): void {
+    this.appLevelTranslationService = translationService;
+    console.log('[EnhancedSoulNetPreloadService] APP-LEVEL: Translation service configured');
   }
 
   static async preloadInstantData(
-    userId: string, 
-    timeRange: string, 
+    userId: string,
+    timeRange: string,
     language: string
-  ): Promise<EnhancedSoulNetData | null> {
-    console.log(`[EnhancedSoulNetPreloadService] PRELOAD START: userId=${userId}, timeRange=${timeRange}, language=${language}`);
+  ): Promise<ProcessedInstantData | null> {
+    console.log(`[EnhancedSoulNetPreloadService] ENHANCED: Preloading instant data for ${userId}, ${timeRange}, ${language}`);
     
-    const cacheKey = this.generateCacheKey(userId, timeRange, language);
-    
-    // STEP 1: Check cache with strict validation
+    const cacheKey = `${userId}-${timeRange}-${language}`;
     const cached = this.getInstantData(cacheKey);
+    
     if (cached && cached.data.translationComplete) {
-      console.log(`[EnhancedSoulNetPreloadService] USING VALID CACHE: ${cacheKey}`);
+      console.log(`[EnhancedSoulNetPreloadService] ENHANCED: Using complete cached data for ${cacheKey}`);
       return cached.data;
-    } else if (cached) {
-      console.log(`[EnhancedSoulNetPreloadService] CACHE INCOMPLETE: ${cacheKey}, translation: ${cached.data.translationComplete}`);
     }
 
     try {
-      // STEP 2: Calculate correct date range
-      const startDate = this.getStartDate(timeRange);
-      console.log(`[EnhancedSoulNetPreloadService] DATE CALCULATION: timeRange=${timeRange}, startDate=${startDate.toISOString()}`);
-      
-      // STEP 3: Fetch fresh data from database
-      const { data: entries, error } = await supabase
-        .from('Journal Entries')
-        .select('id, themeemotion, "refined text", "transcription text"')
-        .eq('user_id', userId)
-        .gte('created_at', startDate.toISOString())
-        .order('created_at', { ascending: false });
-
-      if (error) {
-        console.error('[EnhancedSoulNetPreloadService] DATABASE ERROR:', error);
-        return null;
-      }
-
-      console.log(`[EnhancedSoulNetPreloadService] FRESH DATA FETCHED: ${entries?.length || 0} entries for ${timeRange}`);
-
-      // STEP 4: Handle empty results
-      if (!entries || entries.length === 0) {
-        console.log(`[EnhancedSoulNetPreloadService] NO ENTRIES: Creating empty data for ${timeRange}`);
-        const emptyData: EnhancedSoulNetData = {
+      // STEP 1: Fetch raw data
+      const rawData = await this.fetchRawData(userId, timeRange);
+      if (!rawData || rawData.nodes.length === 0) {
+        console.log('[EnhancedSoulNetPreloadService] ENHANCED: No raw data found');
+        return { 
           nodes: [], 
           links: [], 
           translations: new Map(), 
           connectionPercentages: new Map(),
           nodeConnectionData: new Map(),
-          translationComplete: true,
-          translationProgress: 100
+          translationProgress: 100,
+          translationComplete: true
         };
-        
-        this.setCachedData(cacheKey, {
-          data: emptyData,
-          timestamp: Date.now(),
-          userId,
-          timeRange,
-          language,
-          version: this.CACHE_VERSION
-        });
-        
-        return emptyData;
       }
 
-      // STEP 5: Process the data
-      const graphData = this.processEntities(entries);
-      console.log(`[EnhancedSoulNetPreloadService] DATA PROCESSED: ${graphData.nodes.length} nodes, ${graphData.links.length} links`);
+      // STEP 2: Process graph structure
+      const processedGraph = this.processGraphData(rawData.entries);
       
-      // STEP 6: Handle translations
-      const uniqueNodes = [...new Set(graphData.nodes.map(node => node.id))];
-      this.translationStates.set(cacheKey, {
-        isTranslating: language !== 'en' && uniqueNodes.length > 0,
-        progress: language === 'en' ? 100 : 0,
-        totalNodes: uniqueNodes.length,
-        translatedNodes: language === 'en' ? uniqueNodes.length : 0
-      });
-
-      const translations = await this.getAppLevelCoordinatedTranslations(graphData.nodes, language, cacheKey);
+      // STEP 3: Calculate connection data
       const connectionPercentages = new Map<string, number>();
       const nodeConnectionData = new Map<string, NodeConnectionData>();
-      
-      this.calculateConnectionPercentages(graphData, connectionPercentages);
-      this.calculateNodeConnections(graphData, nodeConnectionData);
+      this.calculateConnections(processedGraph, connectionPercentages, nodeConnectionData);
 
-      const isTranslationComplete = language === 'en' || translations.size === uniqueNodes.length;
-      const translationProgress = language === 'en' ? 100 : Math.round((translations.size / uniqueNodes.length) * 100);
+      // STEP 4: Handle translations efficiently
+      const nodeIds = [...new Set(processedGraph.nodes.map(node => node.id))];
+      const translations = new Map<string, string>();
+      let translationProgress = 0;
+      let translationComplete = false;
 
-      this.translationStates.set(cacheKey, {
-        isTranslating: false,
-        progress: translationProgress,
-        totalNodes: uniqueNodes.length,
-        translatedNodes: translations.size
-      });
+      if (language === 'en') {
+        // English - no translation needed
+        nodeIds.forEach(nodeId => translations.set(nodeId, nodeId));
+        translationProgress = 100;
+        translationComplete = true;
+        console.log('[EnhancedSoulNetPreloadService] ENHANCED: English language, no translation needed');
+      } else {
+        // ENHANCED: Check if batch already completed
+        const batchAlreadyCompleted = NodeTranslationCacheService.isBatchCompleted(nodeIds, language);
+        
+        if (batchAlreadyCompleted) {
+          console.log(`[EnhancedSoulNetPreloadService] ENHANCED: Batch already completed, loading from cache`);
+          
+          // Load all from cache
+          nodeIds.forEach(nodeId => {
+            const cached = NodeTranslationCacheService.getCachedTranslation(nodeId, language);
+            translations.set(nodeId, cached || nodeId);
+          });
+          
+          translationProgress = 100;
+          translationComplete = true;
+        } else {
+          console.log(`[EnhancedSoulNetPreloadService] ENHANCED: Starting coordinated batch translation`);
+          
+          try {
+            // Use coordinated translation service
+            const batchResults = await NodeTranslationCacheService.batchTranslateNodes(nodeIds, language);
+            
+            batchResults.forEach((translatedText, originalText) => {
+              translations.set(originalText, translatedText);
+            });
+            
+            translationProgress = 100;
+            translationComplete = true;
+            
+            console.log(`[EnhancedSoulNetPreloadService] ENHANCED: Coordinated translation completed for ${nodeIds.length} nodes`);
+          } catch (error) {
+            console.error('[EnhancedSoulNetPreloadService] ENHANCED: Coordinated translation failed:', error);
+            
+            // Fallback: use original text
+            nodeIds.forEach(nodeId => translations.set(nodeId, nodeId));
+            translationProgress = 100;
+            translationComplete = true;
+          }
+        }
+      }
 
-      const enhancedData: EnhancedSoulNetData = {
-        nodes: graphData.nodes,
-        links: graphData.links,
+      const processedData: ProcessedInstantData = {
+        nodes: processedGraph.nodes,
+        links: processedGraph.links,
         translations,
         connectionPercentages,
         nodeConnectionData,
-        translationComplete: isTranslationComplete,
-        translationProgress
+        translationProgress,
+        translationComplete
       };
 
-      // STEP 7: Cache complete data only
-      if (isTranslationComplete) {
-        this.setCachedData(cacheKey, {
-          data: enhancedData,
-          timestamp: Date.now(),
-          userId,
-          timeRange,
-          language,
-          version: this.CACHE_VERSION
-        });
-        console.log(`[EnhancedSoulNetPreloadService] DATA CACHED: ${cacheKey}`);
-      }
+      // Cache the result
+      this.setInstantData(cacheKey, {
+        data: processedData,
+        timestamp: Date.now(),
+        userId,
+        timeRange,
+        language
+      });
 
-      return enhancedData;
+      console.log(`[EnhancedSoulNetPreloadService] ENHANCED: Successfully processed ${processedData.nodes.length} nodes with ${processedData.translations.size} translations`);
+      return processedData;
+
     } catch (error) {
-      console.error('[EnhancedSoulNetPreloadService] PRELOAD ERROR:', error);
-      this.translationStates.delete(cacheKey);
+      console.error('[EnhancedSoulNetPreloadService] ENHANCED: Error preloading instant data:', error);
       return null;
     }
   }
 
-  // ENHANCED: Stricter cache validation
-  static getInstantData(cacheKey: string): CachedEnhancedData | null {
-    if (!cacheKey) {
-      console.log('[EnhancedSoulNetPreloadService] INVALID CACHE KEY');
-      return null;
-    }
-    
-    // Check memory cache first
+  // Get cached instant data
+  static getInstantData(cacheKey: string): CachedInstantData | null {
     const memoryCache = this.cache.get(cacheKey);
-    if (memoryCache && this.isCacheValid(memoryCache)) {
-      console.log(`[EnhancedSoulNetPreloadService] MEMORY CACHE HIT: ${cacheKey}`);
+    if (memoryCache && (Date.now() - memoryCache.timestamp) < this.CACHE_DURATION) {
       return memoryCache;
-    } else if (memoryCache) {
-      console.log(`[EnhancedSoulNetPreloadService] MEMORY CACHE INVALID: ${cacheKey}`);
-      this.cache.delete(cacheKey);
     }
-    
-    // Check localStorage
+
+    // Try localStorage
     try {
-      const storageKey = `${this.CACHE_KEY}-${cacheKey}`;
-      const storedData = localStorage.getItem(storageKey);
+      const storedData = localStorage.getItem(`${this.CACHE_KEY}-${cacheKey}`);
       if (storedData) {
         const parsed = JSON.parse(storedData);
-        if (this.isCacheValid(parsed)) {
-          // Restore Maps from stored objects
+        if ((Date.now() - parsed.timestamp) < this.CACHE_DURATION) {
+          // Convert back to Maps
           parsed.data.translations = new Map(Object.entries(parsed.data.translations || {}));
           parsed.data.connectionPercentages = new Map(Object.entries(parsed.data.connectionPercentages || {}));
-          parsed.data.nodeConnectionData = new Map(
-            Object.entries(parsed.data.nodeConnectionData || {}).map(([key, value]) => [key, value as NodeConnectionData])
-          );
-          parsed.data.translationComplete = parsed.data.translationComplete ?? true;
-          parsed.data.translationProgress = parsed.data.translationProgress ?? 100;
+          parsed.data.nodeConnectionData = new Map(Object.entries(parsed.data.nodeConnectionData || {}));
           
           this.cache.set(cacheKey, parsed);
-          console.log(`[EnhancedSoulNetPreloadService] STORAGE CACHE HIT: ${cacheKey}`);
           return parsed;
-        } else {
-          console.log(`[EnhancedSoulNetPreloadService] STORAGE CACHE INVALID: ${cacheKey}`);
-          localStorage.removeItem(storageKey);
         }
       }
     } catch (error) {
-      console.error('[EnhancedSoulNetPreloadService] CACHE RETRIEVAL ERROR:', error);
+      console.error('[EnhancedSoulNetPreloadService] Error loading from localStorage:', error);
     }
-    
-    console.log(`[EnhancedSoulNetPreloadService] CACHE MISS: ${cacheKey}`);
+
     return null;
   }
 
-  // APP-LEVEL: Enhanced coordinated translation using app-level service
-  private static async getAppLevelCoordinatedTranslations(
-    nodes: NodeData[], 
-    language: string, 
-    cacheKey: string
-  ): Promise<Map<string, string>> {
-    if (language === 'en') {
-      const translations = new Map<string, string>();
-      nodes.forEach(node => translations.set(node.id, node.id));
-      return translations;
-    }
-
-    const existingTranslation = this.translationCoordinator.get(cacheKey);
-    if (existingTranslation) {
-      return existingTranslation;
-    }
-
-    const translationPromise = this.performAppLevelBatchTranslation(nodes, language, cacheKey);
-    this.translationCoordinator.set(cacheKey, translationPromise);
-
-    try {
-      const result = await translationPromise;
-      return result;
-    } finally {
-      this.translationCoordinator.delete(cacheKey);
-    }
-  }
-
-  // APP-LEVEL: Enhanced batch translation with proper error handling
-  private static async performAppLevelBatchTranslation(nodes: NodeData[], language: string, cacheKey: string): Promise<Map<string, string>> {
-    const translations = new Map<string, string>();
-    const nodesToTranslate = [...new Set(nodes.map(node => node.id))];
-    
-    this.translationStates.set(cacheKey, {
-      isTranslating: true,
-      progress: 0,
-      totalNodes: nodesToTranslate.length,
-      translatedNodes: 0
-    });
-    
-    try {
-      if (!this.appTranslationService) {
-        nodesToTranslate.forEach(nodeId => {
-          translations.set(nodeId, nodeId);
-        });
-        
-        this.translationStates.set(cacheKey, {
-          isTranslating: false,
-          progress: 100,
-          totalNodes: nodesToTranslate.length,
-          translatedNodes: nodesToTranslate.length
-        });
-        
-        return translations;
-      }
-
-      const batchResults = await this.appTranslationService.batchTranslate({
-        texts: nodesToTranslate,
-        targetLanguage: language,
-        sourceLanguage: 'en'
-      });
-      
-      batchResults.forEach((translatedText, originalText) => {
-        if (translatedText && translatedText.trim() !== '') {
-          translations.set(originalText, translatedText);
-        } else {
-          translations.set(originalText, originalText);
-        }
-      });
-
-      nodesToTranslate.forEach(nodeId => {
-        if (!translations.has(nodeId)) {
-          translations.set(nodeId, nodeId);
-        }
-      });
-
-      this.translationStates.set(cacheKey, {
-        isTranslating: false,
-        progress: 100,
-        totalNodes: nodesToTranslate.length,
-        translatedNodes: translations.size
-      });
-
-    } catch (error) {
-      console.error('[EnhancedSoulNetPreloadService] Translation error:', error);
-      nodesToTranslate.forEach(nodeId => {
-        translations.set(nodeId, nodeId);
-      });
-      
-      this.translationStates.set(cacheKey, {
-        isTranslating: false,
-        progress: 100,
-        totalNodes: nodesToTranslate.length,
-        translatedNodes: nodesToTranslate.length
-      });
-    }
-
-    return translations;
-  }
-
-  private static calculateNodeConnections(
-    graphData: { nodes: NodeData[], links: LinkData[] },
-    nodeConnectionMap: Map<string, NodeConnectionData>
-  ): void {
-    graphData.nodes.forEach(node => {
-      const connectedNodes: string[] = [];
-      let totalStrength = 0;
-      
-      graphData.links.forEach(link => {
-        if (link.source === node.id) {
-          connectedNodes.push(link.target);
-          totalStrength += link.value;
-        } else if (link.target === node.id) {
-          connectedNodes.push(link.source);
-          totalStrength += link.value;
-        }
-      });
-      
-      const averageStrength = connectedNodes.length > 0 ? totalStrength / connectedNodes.length : 0;
-      
-      nodeConnectionMap.set(node.id, {
-        connectedNodes,
-        totalStrength,
-        averageStrength
-      });
-    });
-  }
-
-  private static calculateConnectionPercentages(
-    graphData: { nodes: NodeData[], links: LinkData[] },
-    percentageMap: Map<string, number>
-  ): void {
-    const nodeConnectionTotals = new Map<string, number>();
-    
-    graphData.links.forEach(link => {
-      const sourceTotal = nodeConnectionTotals.get(link.source) || 0;
-      const targetTotal = nodeConnectionTotals.get(link.target) || 0;
-      
-      nodeConnectionTotals.set(link.source, sourceTotal + link.value);
-      nodeConnectionTotals.set(link.target, targetTotal + link.value);
-    });
-
-    graphData.links.forEach(link => {
-      const sourceTotal = nodeConnectionTotals.get(link.source) || 1;
-      const targetTotal = nodeConnectionTotals.get(link.target) || 1;
-      
-      const sourcePercentage = Math.round((link.value / sourceTotal) * 100);
-      percentageMap.set(`${link.source}-${link.target}`, sourcePercentage);
-      
-      const targetPercentage = Math.round((link.value / targetTotal) * 100);
-      percentageMap.set(`${link.target}-${link.source}`, targetPercentage);
-    });
-  }
-
-  // ENHANCED: Stricter cache validation
-  private static isCacheValid(cached: CachedEnhancedData): boolean {
-    const now = Date.now();
-    const age = now - cached.timestamp;
-    const isWithinDuration = age < this.CACHE_DURATION;
-    const isCorrectVersion = cached.version === this.CACHE_VERSION;
-    const hasValidData = cached.data && 
-                        Array.isArray(cached.data.nodes) && 
-                        Array.isArray(cached.data.links);
-    
-    console.log(`[EnhancedSoulNetPreloadService] CACHE VALIDATION: age=${age}ms, version=${cached.version}/${this.CACHE_VERSION}, hasData=${hasValidData}, withinDuration=${isWithinDuration}`);
-    
-    return isWithinDuration && isCorrectVersion && hasValidData;
-  }
-
-  // ENHANCED: Better cache key generation
-  private static generateCacheKey(userId: string, timeRange: string, language: string): string {
-    const key = `${userId}-${timeRange}-${language}-v${this.CACHE_VERSION}`;
-    console.log(`[EnhancedSoulNetPreloadService] CACHE KEY GENERATED: ${key}`);
-    return key;
-  }
-
-  private static setCachedData(cacheKey: string, data: CachedEnhancedData): void {
+  // Set cached instant data
+  private static setInstantData(cacheKey: string, data: CachedInstantData): void {
     this.cache.set(cacheKey, data);
     
     try {
@@ -499,61 +216,79 @@ export class EnhancedSoulNetPreloadService {
           ...data.data,
           translations: Object.fromEntries(data.data.translations),
           connectionPercentages: Object.fromEntries(data.data.connectionPercentages),
-          nodeConnectionData: Object.fromEntries(
-            Array.from(data.data.nodeConnectionData.entries()).map(([key, value]) => [key, value])
-          )
+          nodeConnectionData: Object.fromEntries(data.data.nodeConnectionData)
         }
       };
       localStorage.setItem(`${this.CACHE_KEY}-${cacheKey}`, JSON.stringify(storableData));
-      console.log(`[EnhancedSoulNetPreloadService] CACHED TO STORAGE: ${cacheKey}`);
     } catch (error) {
-      console.error('[EnhancedSoulNetPreloadService] STORAGE SAVE ERROR:', error);
+      console.error('[EnhancedSoulNetPreloadService] Error saving to localStorage:', error);
     }
   }
 
-  // FIXED: Corrected week calculation
-  private static getStartDate(timeRange: string): Date {
-    const now = new Date();
-    console.log(`[EnhancedSoulNetPreloadService] DATE CALCULATION START: ${timeRange} at ${now.toISOString()}`);
+  // ENHANCED: Smart cache invalidation - only clear other time ranges
+  static clearTimeRangeCache(userId: string, keepTimeRange: string, keepLanguage: string): void {
+    console.log(`[EnhancedSoulNetPreloadService] ENHANCED: Smart cache clearing - keeping ${keepTimeRange} for ${keepLanguage}`);
     
-    switch (timeRange) {
-      case 'today':
-        const todayStart = new Date(now);
-        todayStart.setHours(0, 0, 0, 0);
-        console.log(`[EnhancedSoulNetPreloadService] TODAY START: ${todayStart.toISOString()}`);
-        return todayStart;
-        
-      case 'week':
-        // Calculate start of current week (Monday 00:00:00)
-        const currentWeekStart = new Date(now);
-        const dayOfWeek = currentWeekStart.getDay(); // 0 = Sunday, 1 = Monday, etc.
-        const daysToSubtract = dayOfWeek === 0 ? 6 : dayOfWeek - 1; // If Sunday, go back 6 days to Monday
-        currentWeekStart.setDate(currentWeekStart.getDate() - daysToSubtract);
-        currentWeekStart.setHours(0, 0, 0, 0);
-        console.log(`[EnhancedSoulNetPreloadService] WEEK START: dayOfWeek=${dayOfWeek}, subtract=${daysToSubtract}, result=${currentWeekStart.toISOString()}`);
-        return currentWeekStart;
-        
-      case 'month':
-        const monthStart = new Date(now);
-        monthStart.setMonth(monthStart.getMonth() - 1);
-        console.log(`[EnhancedSoulNetPreloadService] MONTH START: ${monthStart.toISOString()}`);
-        return monthStart;
-        
-      case 'year':
-        const yearStart = new Date(now);
-        yearStart.setFullYear(yearStart.getFullYear() - 1);
-        console.log(`[EnhancedSoulNetPreloadService] YEAR START: ${yearStart.toISOString()}`);
-        return yearStart;
-        
-      default:
-        const defaultStart = new Date(now);
-        defaultStart.setDate(defaultStart.getDate() - 7);
-        console.log(`[EnhancedSoulNetPreloadService] DEFAULT START: ${defaultStart.toISOString()}`);
-        return defaultStart;
-    }
+    const keysToDelete: string[] = [];
+    
+    this.cache.forEach((cached, key) => {
+      if (cached.userId === userId) {
+        // Only clear if different time range OR different language
+        if (cached.timeRange !== keepTimeRange || cached.language !== keepLanguage) {
+          keysToDelete.push(key);
+        }
+      }
+    });
+    
+    keysToDelete.forEach(key => {
+      this.cache.delete(key);
+      localStorage.removeItem(`${this.CACHE_KEY}-${key}`);
+    });
+    
+    console.log(`[EnhancedSoulNetPreloadService] ENHANCED: Cleared ${keysToDelete.length} cache entries, keeping current`);
   }
 
-  private static processEntities(entries: any[]): { nodes: NodeData[], links: LinkData[] } {
+  // Force invalidate specific cache
+  static forceInvalidateCache(userId: string, timeRange: string, language: string): void {
+    const cacheKey = `${userId}-${timeRange}-${language}`;
+    this.cache.delete(cacheKey);
+    localStorage.removeItem(`${this.CACHE_KEY}-${cacheKey}`);
+    console.log(`[EnhancedSoulNetPreloadService] ENHANCED: Force invalidated cache for ${cacheKey}`);
+  }
+
+  // Clear all instant cache
+  static clearInstantCache(): void {
+    this.cache.clear();
+    Object.keys(localStorage).forEach(key => {
+      if (key.startsWith(this.CACHE_KEY)) {
+        localStorage.removeItem(key);
+      }
+    });
+    console.log('[EnhancedSoulNetPreloadService] ENHANCED: Cleared all instant cache');
+  }
+
+  // Fetch raw data from database
+  private static async fetchRawData(userId: string, timeRange: string): Promise<{ entries: any[] } | null> {
+    const startDate = this.getStartDate(timeRange);
+    const { data: entries, error } = await supabase
+      .from('Journal Entries')
+      .select('id, themeemotion, "refined text", "transcription text"')
+      .eq('user_id', userId)
+      .gte('created_at', startDate.toISOString())
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      console.error('[EnhancedSoulNetPreloadService] Error fetching journal entries:', error);
+      return null;
+    }
+
+    return { entries: entries || [] };
+  }
+
+  // Process raw entries into graph data
+  private static processGraphData(entries: any[]): { nodes: NodeData[], links: LinkData[] } {
+    console.log("[EnhancedSoulNetPreloadService] Processing graph data for", entries.length, "entries");
+    
     const entityEmotionMap: Record<string, Record<string, number>> = {};
     
     entries.forEach(entry => {
@@ -581,6 +316,7 @@ export class EnhancedSoulNetPreloadService {
     return this.generateGraph(entityEmotionMap);
   }
 
+  // Generate graph from entity-emotion mapping
   private static generateGraph(entityEmotionMap: Record<string, Record<string, number>>): { nodes: NodeData[], links: LinkData[] } {
     const nodes: NodeData[] = [];
     const links: LinkData[] = [];
@@ -590,20 +326,24 @@ export class EnhancedSoulNetPreloadService {
     const entityList = Object.keys(entityEmotionMap);
     const EMOTION_LAYER_RADIUS = 11;
     const ENTITY_LAYER_RADIUS = 6;
+    const EMOTION_Y_SPAN = 6;
+    const ENTITY_Y_SPAN = 3;
+
+    console.log("[EnhancedSoulNetPreloadService] Generating graph with", entityList.length, "entities");
     
     entityList.forEach((entity, entityIndex) => {
       entityNodes.add(entity);
       const entityAngle = (entityIndex / entityList.length) * Math.PI * 2;
       const entityRadius = ENTITY_LAYER_RADIUS;
       const entityX = Math.cos(entityAngle) * entityRadius;
-      const entityY = (entityIndex % 2 === 0) ? 2 : -2;
+      const entityY = ((entityIndex % 2) === 0 ? -1 : 1) * 0.7 * (Math.random() - 0.5) * ENTITY_Y_SPAN;
       const entityZ = Math.sin(entityAngle) * entityRadius;
       
       nodes.push({
         id: entity,
         type: 'entity',
         value: 1,
-        color: '#22c55e',
+        color: '#fff',
         position: [entityX, entityY, entityZ]
       });
 
@@ -621,55 +361,100 @@ export class EnhancedSoulNetPreloadService {
       const emotionAngle = (emotionIndex / emotionNodes.size) * Math.PI * 2;
       const emotionRadius = EMOTION_LAYER_RADIUS;
       const emotionX = Math.cos(emotionAngle) * emotionRadius;
-      
-      const getEmotionYPosition = (index: number): number => {
-        const pattern = [7, 9, 11];
-        const patternIndex = index % 6;
-        
-        if (patternIndex < 3) {
-          return pattern[patternIndex];
-        } else {
-          return -pattern[patternIndex - 3];
-        }
-      };
-      
-      const emotionY = getEmotionYPosition(emotionIndex);
+      const emotionY = ((emotionIndex % 2) === 0 ? -1 : 1) * 0.7 * (Math.random() - 0.5) * EMOTION_Y_SPAN;
       const emotionZ = Math.sin(emotionAngle) * emotionRadius;
       
       nodes.push({
         id: emotion,
         type: 'emotion',
         value: 0.8,
-        color: '#f59e0b',
+        color: '#fff',
         position: [emotionX, emotionY, emotionZ]
       });
     });
 
+    console.log("[EnhancedSoulNetPreloadService] Generated graph with", nodes.length, "nodes and", links.length, "links");
     return { nodes, links };
   }
 
-  static clearInstantCache(userId?: string): void {
-    if (userId) {
-      const keysToDelete = Array.from(this.cache.keys()).filter(key => key.startsWith(userId));
-      keysToDelete.forEach(key => {
-        this.cache.delete(key);
-        localStorage.removeItem(`${this.CACHE_KEY}-${key}`);
-        this.translationStates.delete(key);
-      });
+  // Calculate connection percentages and node data
+  private static calculateConnections(
+    graphData: { nodes: NodeData[], links: LinkData[] },
+    connectionPercentages: Map<string, number>,
+    nodeConnectionData: Map<string, NodeConnectionData>
+  ): void {
+    console.log('[EnhancedSoulNetPreloadService] Calculating connection data');
+    
+    // Calculate connection percentages
+    const nodeConnectionTotals = new Map<string, number>();
+    
+    graphData.links.forEach(link => {
+      const sourceTotal = nodeConnectionTotals.get(link.source) || 0;
+      const targetTotal = nodeConnectionTotals.get(link.target) || 0;
       
-      const coordinatorKeysToDelete = Array.from(this.translationCoordinator.keys()).filter(key => key.startsWith(userId));
-      coordinatorKeysToDelete.forEach(key => {
-        this.translationCoordinator.delete(key);
-      });
-    } else {
-      this.cache.clear();
-      this.translationCoordinator.clear();
-      this.translationStates.clear();
-      Object.keys(localStorage).forEach(key => {
-        if (key.startsWith(this.CACHE_KEY)) {
-          localStorage.removeItem(key);
+      nodeConnectionTotals.set(link.source, sourceTotal + link.value);
+      nodeConnectionTotals.set(link.target, targetTotal + link.value);
+    });
+
+    graphData.links.forEach(link => {
+      const sourceTotal = nodeConnectionTotals.get(link.source) || 1;
+      const targetTotal = nodeConnectionTotals.get(link.target) || 1;
+      
+      const sourcePercentage = Math.round((link.value / sourceTotal) * 100);
+      connectionPercentages.set(`${link.source}-${link.target}`, sourcePercentage);
+      
+      const targetPercentage = Math.round((link.value / targetTotal) * 100);
+      connectionPercentages.set(`${link.target}-${link.source}`, targetPercentage);
+    });
+
+    // Calculate node connection data
+    graphData.nodes.forEach(node => {
+      const connectedNodes: string[] = [];
+      let totalStrength = 0;
+      
+      graphData.links.forEach(link => {
+        if (link.source === node.id) {
+          connectedNodes.push(link.target);
+          totalStrength += link.value;
+        } else if (link.target === node.id) {
+          connectedNodes.push(link.source);
+          totalStrength += link.value;
         }
       });
+      
+      const averageStrength = connectedNodes.length > 0 ? totalStrength / connectedNodes.length : 0;
+      
+      nodeConnectionData.set(node.id, {
+        connectedNodes,
+        totalStrength,
+        averageStrength
+      });
+    });
+
+    console.log(`[EnhancedSoulNetPreloadService] Calculated ${connectionPercentages.size} connection percentages and ${nodeConnectionData.size} node data entries`);
+  }
+
+  private static getStartDate(timeRange: string): Date {
+    const now = new Date();
+    switch (timeRange) {
+      case 'today':
+        return new Date(now.setHours(0, 0, 0, 0));
+      case 'week':
+        const weekStart = new Date(now);
+        weekStart.setDate(weekStart.getDate() - 7);
+        return weekStart;
+      case 'month':
+        const monthStart = new Date(now);
+        monthStart.setMonth(monthStart.getMonth() - 1);
+        return monthStart;
+      case 'year':
+        const yearStart = new Date(now);
+        yearStart.setFullYear(yearStart.getFullYear() - 1);
+        return yearStart;
+      default:
+        const defaultStart = new Date(now);
+        defaultStart.setDate(defaultStart.getDate() - 7);
+        return defaultStart;
     }
   }
 }
