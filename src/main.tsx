@@ -6,9 +6,10 @@ import './index.css'
 import './styles/mobile.css' // Import mobile-specific styles
 import './styles/tutorial.css' // Import tutorial-specific styles
 import { AuthProvider } from './contexts/AuthContext'
-import { ThemeProvider } from './hooks/use-theme'
 import { BrowserRouter } from 'react-router-dom'
 import { TranslationProvider } from './contexts/TranslationContext'
+import { ContextReadinessProvider } from './contexts/ContextReadinessManager'
+import { SafeThemeProvider } from './contexts/SafeThemeProvider'
 
 // Enhanced Font Loading System
 const initializeFontSystem = async () => {
@@ -161,13 +162,15 @@ initializeApp();
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
     <BrowserRouter>
-      <ThemeProvider>
-        <TranslationProvider>
-          <AuthProvider>
-            <App />
-          </AuthProvider>
-        </TranslationProvider>
-      </ThemeProvider>
+      <ContextReadinessProvider>
+        <SafeThemeProvider>
+          <TranslationProvider>
+            <AuthProvider>
+              <App />
+            </AuthProvider>
+          </TranslationProvider>
+        </SafeThemeProvider>
+      </ContextReadinessProvider>
     </BrowserRouter>
   </React.StrictMode>,
 )
