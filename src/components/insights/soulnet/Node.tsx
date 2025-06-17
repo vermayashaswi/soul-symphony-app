@@ -1,9 +1,9 @@
-
-import React, { useRef, useMemo, useState, useEffect } from 'react';
-import { useFrame } from '@react-three/fiber';
+import React, { useState, useRef, useMemo, useCallback } from 'react';
+import { useFrame, useThree } from '@react-three/fiber';
 import * as THREE from 'three';
-import DirectNodeLabel from './DirectNodeLabel';
-import { useUserColorThemeHex } from './useUserColorThemeHex';
+import { Html } from '@react-three/drei';
+import TranslatableText3D from './TranslatableText3D';
+import { useAuth } from '@/contexts/AuthContext';
 
 interface NodeData {
   id: string;
@@ -29,6 +29,9 @@ interface NodeProps {
   forceShowLabels?: boolean;
   effectiveTheme?: 'light' | 'dark';
   isInstantMode?: boolean;
+  getInstantTranslation?: (nodeId: string) => string;
+  userId?: string;
+  timeRange?: string;
   // ENHANCED: Coordinated translation props
   getCoordinatedTranslation?: (nodeId: string) => string;
 }
@@ -49,8 +52,12 @@ const Node: React.FC<NodeProps> = ({
   forceShowLabels = false,
   effectiveTheme = 'light',
   isInstantMode = false,
-  getCoordinatedTranslation
+  getInstantTranslation,
+  userId,
+  timeRange
 }) => {
+  const { user } = useAuth();
+  
   const meshRef = useRef<THREE.Mesh>(null);
   const userColorThemeHex = useUserColorThemeHex();
   
@@ -214,8 +221,24 @@ const Node: React.FC<NodeProps> = ({
     return null;
   }
 
+  const contextUserId = userId || user?.id;
+  
+  const labelPosition = [node.position[0], node.position[1] + 1.5, node.position[2]];
+  const labelColor = new THREE.Color(color);
+  const labelSize = 0.5;
+  const labelOutlineWidth = 0.05;
+  const labelOutlineColor = new THREE.Color('#000000');
+  const labelMaxWidth = 1.5;
+  const labelMaxCharsPerLine = 10;
+  
+  const percentagePosition = [node.position[0], node.position[1] + 2.5, node.position[2]];
+  const percentageColor = new THREE.Color(color);
+  const percentageSize = 0.5;
+  const percentageOutlineWidth = 0.05;
+  const percentageOutlineColor = new THREE.Color('#000000');
+  
   return (
-    <group>
+    <group position={node.position}>
       <mesh
         ref={meshRef}
         position={node.position}
@@ -234,22 +257,52 @@ const Node: React.FC<NodeProps> = ({
         />
       </mesh>
       
+      {/* Enhanced label with context-aware translation */}
       {shouldShowLabel && (
-        <DirectNodeLabel
-          id={node.id}
-          type={node.type}
-          position={node.position}
-          isHighlighted={isHighlighted}
-          isSelected={isSelected}
-          shouldShowLabel={shouldShowLabel}
-          cameraZoom={cameraZoom}
-          themeHex={themeHex}
-          nodeScale={baseNodeScale}
-          connectionPercentage={connectionPercentage}
-          showPercentage={showPercentage}
-          effectiveTheme={effectiveTheme}
-          isInstantMode={isInstantMode}
-          coordinatedTranslation={coordinatedTranslation}
+        <TranslatableText3D
+          text={node.id}
+          position={labelPosition}
+          color={labelColor}
+          size={labelSize}
+          visible={shouldShowLabel}
+          renderOrder={20}
+          bold={false}
+          outlineWidth={labelOutlineWidth}
+          outlineColor={labelOutlineColor}
+          maxWidth={labelMaxWidth}
+          enableWrapping={true}
+          maxCharsPerLine={labelMaxCharsPerLine}
+          maxLines={2}
+          userId={contextUserId}
+          timeRange={timeRange}
+          coordinatedTranslation={isInstantMode ? getInstantTranslation?.(node.id) : undefined}
+          useCoordinatedTranslation={isInstantMode}
+          onTranslationComplete={(translatedText) => {
+            console.log(`[Node] Translation completed for ${node.id}: ${translatedText}`);
+          }}
+        />
+      )}
+      
+      {/* Enhanced percentage display with context-aware translation */}
+      {showPercentage && connectionPercentage > 0 && (
+        <TranslatableText3D
+          text={`${connectionPercentage}%`}
+          position={percentagePosition}
+          color={percentageColor}
+          size={percentageSize}
+          visible={showPercentage}
+          renderOrder={25}
+          bold={true}
+          outlineWidth={percentageOutlineWidth}
+          outlineColor={percentageOutlineColor}
+          maxWidth={10}
+          enableWrapping={false}
+          userId={contextUserId}
+          timeRange={timeRange}
+          useCoordinatedTranslation={false} // Percentages don't need translation
+          onTranslationComplete={(translatedText) => {
+            console.log(`[Node] Percentage display for ${node.id}: ${translatedText}`);
+          }}
         />
       )}
     </group>

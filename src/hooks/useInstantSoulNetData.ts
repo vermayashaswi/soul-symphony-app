@@ -1,7 +1,7 @@
-
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { EnhancedSoulNetPreloadService } from '@/services/enhancedSoulNetPreloadService';
 import { useTranslation } from '@/contexts/TranslationContext';
+import { nodeTranslationCache } from '@/services/nodeTranslationCache';
 
 interface NodeData {
   id: string;
@@ -97,26 +97,32 @@ export const useInstantSoulNetData = (
     setLoading(true);
     setError(null);
 
-    // STEP 2: Clear other time range caches immediately
+    // STEP 2: Check centralized cache first
+    const isCacheComplete = nodeTranslationCache.isCacheComplete(userId, timeRange, currentLanguage);
+    if (isCacheComplete) {
+      console.log(`[useInstantSoulNetData] CENTRALIZED CACHE COMPLETE: ${cacheKey}`);
+      
+      const validCache = EnhancedSoulNetPreloadService.getInstantData(cacheKey);
+      if (validCache && validCache.data.translationComplete) {
+        console.log(`[useInstantSoulNetData] FOUND VALID CACHE: ${cacheKey}`);
+        setGraphData({ nodes: validCache.data.nodes, links: validCache.data.links });
+        setTranslations(validCache.data.translations);
+        setConnectionPercentages(validCache.data.connectionPercentages);
+        setNodeConnectionData(validCache.data.nodeConnectionData);
+        setIsInstantReady(true);
+        setTranslationComplete(true);
+        setIsTranslating(false);
+        setTranslationProgress(100);
+        setLoading(false);
+        return;
+      }
+    }
+
+    // STEP 3: Clear other time range caches
     console.log(`[useInstantSoulNetData] CLEARING OTHER CACHES: keeping ${timeRange} for ${currentLanguage}`);
     EnhancedSoulNetPreloadService.clearTimeRangeCache(userId, timeRange, currentLanguage);
 
-    // STEP 3: Check for valid cache after clearing others
-    const validCache = EnhancedSoulNetPreloadService.getInstantData(cacheKey);
-    if (validCache && validCache.data.translationComplete) {
-      console.log(`[useInstantSoulNetData] FOUND VALID CACHE: ${cacheKey}`);
-      setGraphData({ nodes: validCache.data.nodes, links: validCache.data.links });
-      setTranslations(validCache.data.translations);
-      setConnectionPercentages(validCache.data.connectionPercentages);
-      setNodeConnectionData(validCache.data.nodeConnectionData);
-      setIsInstantReady(true);
-      setTranslationComplete(true);
-      setIsTranslating(false);
-      setTranslationProgress(100);
-      setLoading(false);
-    } else {
-      console.log(`[useInstantSoulNetData] NO VALID CACHE: will fetch fresh data for ${cacheKey}`);
-    }
+    console.log(`[useInstantSoulNetData] NO VALID CACHE: will fetch fresh data for ${cacheKey}`);
   }, [userId, timeRange, currentLanguage, cacheKey]);
 
   // ENHANCED: Fresh data fetching with comprehensive error handling
@@ -194,7 +200,7 @@ export const useInstantSoulNetData = (
     fetchFreshData();
   }, [fetchFreshData]);
 
-  // ENHANCED: Optimized getter functions
+  // ENHANCED: Optimized getter functions using centralized cache
   const getInstantConnectionPercentage = useCallback((selectedNode: string, targetNode: string): number => {
     if (!selectedNode || selectedNode === targetNode || connectionPercentages.size === 0) return 0;
     
@@ -205,19 +211,46 @@ export const useInstantSoulNetData = (
   const getInstantTranslation = useCallback((nodeId: string): string => {
     if (currentLanguage === 'en') return nodeId;
     
-    // Priority: completed translations > app-level cache > fallback
+    // Priority 1: Centralized node translation cache
+    if (userId) {
+      const centralizedTranslation = nodeTranslationCache.getNodeTranslation(
+        userId, 
+        timeRange, 
+        currentLanguage, 
+        nodeId
+      );
+      if (centralizedTranslation) {
+        return centralizedTranslation;
+      }
+    }
+    
+    // Priority 2: Coordinated translations from current session
     if (translationComplete) {
       const coordinatedTranslation = translations.get(nodeId);
       if (coordinatedTranslation) return coordinatedTranslation;
     }
     
+    // Priority 3: App-level cache as fallback
     if (!isTranslating) {
       const appLevelTranslation = getCachedTranslation(nodeId);
-      if (appLevelTranslation) return appLevelTranslation;
+      if (appLevelTranslation) {
+        // Store in centralized cache for future use
+        if (userId) {
+          nodeTranslationCache.setNodeTranslation(
+            userId, 
+            timeRange, 
+            currentLanguage, 
+            nodeId, 
+            appLevelTranslation, 
+            'app-level'
+          );
+        }
+        return appLevelTranslation;
+      }
     }
     
     return nodeId;
-  }, [currentLanguage, translations, getCachedTranslation, translationComplete, isTranslating]);
+  }, [currentLanguage, translations, getCachedTranslation, translationComplete, isTranslating, userId, timeRange]);
 
   const getInstantNodeConnections = useCallback((nodeId: string): NodeConnectionData => {
     return nodeConnectionData.get(nodeId) || {
