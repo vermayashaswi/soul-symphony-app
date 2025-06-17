@@ -282,12 +282,12 @@ body.tutorial-active[data-current-step="5"] button:has(.lucide-mic) {
   cursor: default !important;
 }
 
-/* Chat UI styling for step 5 - GLOBAL with enhanced visibility */
+/* UPDATED: Chat UI styling for step 5 - TRANSPARENT backgrounds to avoid covering Soul-Net */
 body.tutorial-active[data-current-step="5"] .chat-messages-container {
   opacity: 1 !important;
-  background-color: #1A1F2C !important;
-  background-image: linear-gradient(to bottom, #1A1F2C, #2D243A) !important;
-  box-shadow: inset 0 0 25px rgba(155, 135, 245, 0.15) !important;
+  background-color: transparent !important;
+  background-image: none !important;
+  box-shadow: none !important;
   border-radius: 10px !important;
 }
 
@@ -302,9 +302,10 @@ body.tutorial-active[data-current-step="5"] .flex.flex-col.items-center.justify-
   visibility: visible !important;
   opacity: 1 !important;
   z-index: 5000 !important;
+  background-color: transparent !important;
 }
 
-/* Hide chat input container in step 5 - GLOBAL */
+/* UPDATED: Hide chat input container in step 5 - transparent backgrounds */
 body.tutorial-active[data-current-step="5"] .chat-input-container,
 body.tutorial-active[data-current-step="5"] [class*="chat"] form,
 body.tutorial-active[data-current-step="5"] .relative.flex.items-center.w-full,

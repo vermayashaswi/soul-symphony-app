@@ -172,28 +172,31 @@ const TutorialOverlay: React.FC = () => {
     }
   }, [shouldShowTutorial, currentStep, steps]);
 
-  // Helper function to setup chat visibility for step 5
+  // Helper function to setup chat visibility for step 5 - UPDATED to use transparent backgrounds
   const setupChatVisibilityForStep5 = () => {
     try {
-      // Prepare the chat container for better visibility - Use purple background
+      console.log('[TutorialOverlay] Setting up transparent chat visibility for step 5 (Soul-Net fix)');
+      
+      // Use TRANSPARENT backgrounds instead of solid colors to avoid covering Soul-Net
       const chatContainers = document.querySelectorAll('.smart-chat-container, .mobile-chat-interface, .chat-messages-container');
       chatContainers.forEach(container => {
         if (container instanceof HTMLElement) {
-          container.style.backgroundColor = '#1A1F2C';
-          container.style.backgroundImage = 'linear-gradient(to bottom, #1A1F2C, #2D243A)';
-          container.style.boxShadow = 'inset 0 0 25px rgba(155, 135, 245, 0.15)';
+          container.style.backgroundColor = 'transparent'; // Changed from solid color to transparent
+          container.style.backgroundImage = 'none'; // Remove any background gradients
+          container.style.boxShadow = 'none'; // Remove shadows that might create visual artifacts
           container.style.opacity = '1';
           container.style.visibility = 'visible';
         }
       });
       
-      // Make sure EmptyChatState is visible
+      // Make sure EmptyChatState is visible with transparent background
       const emptyChatState = document.querySelector('.flex.flex-col.items-center.justify-center.p-6.text-center.h-full');
       if (emptyChatState && emptyChatState instanceof HTMLElement) {
         emptyChatState.style.visibility = 'visible';
         emptyChatState.style.opacity = '1';
         emptyChatState.style.zIndex = '5000';
         emptyChatState.style.display = 'flex';
+        emptyChatState.style.backgroundColor = 'transparent'; // Ensure transparent background
       }
       
       // Run another check after a short delay to catch dynamically loaded elements
@@ -213,7 +216,7 @@ const TutorialOverlay: React.FC = () => {
         }
       }, 500);
     } catch (error) {
-      console.error('[TutorialOverlay] Error setting up chat visibility for step 5:', error);
+      console.error('[TutorialOverlay] Error setting up transparent chat visibility for step 5:', error);
     }
   };
 
@@ -327,7 +330,7 @@ const TutorialOverlay: React.FC = () => {
     try {
       console.log('[TutorialOverlay] Setting up highlight for chat question (step 5)');
       
-      // Set purple background for better visibility
+      // Set transparent background for better visibility (UPDATED)
       setupChatVisibilityForStep5();
       
       // Log all potential targets for debugging
