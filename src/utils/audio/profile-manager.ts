@@ -24,7 +24,7 @@ export async function ensureUserProfileExists(userId: string | undefined): Promi
     const profileExists = await ensureProfileExists(userData.user);
     
     if (profileExists) {
-      // Check if user has existing journal entries for state management
+      // Check if user has existing journal entries for logging purposes
       const { data: entries, error: entriesError } = await supabase
         .from('Journal Entries')
         .select('id')
@@ -33,11 +33,6 @@ export async function ensureUserProfileExists(userId: string | undefined): Promi
         
       const hasEntries = !entriesError && entries && entries.length > 0;
       console.log('User has previous entries:', hasEntries);
-      
-      // Import setHasPreviousEntries from state management
-      import('./processing-state').then(({ setHasPreviousEntries }) => {
-        setHasPreviousEntries(hasEntries);
-      });
       
       return true;
     }
