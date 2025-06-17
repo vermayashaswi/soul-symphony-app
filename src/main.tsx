@@ -10,6 +10,8 @@ import { BrowserRouter } from 'react-router-dom'
 import { TranslationProvider } from './contexts/TranslationContext'
 import { ContextReadinessProvider } from './contexts/ContextReadinessManager'
 import { ThemeProvider } from './hooks/use-theme'
+import { initializeServiceWorker } from './utils/serviceWorker'
+import { backgroundSyncService } from './services/backgroundSyncService'
 
 // Enhanced Font Loading System
 const initializeFontSystem = async () => {
@@ -139,6 +141,34 @@ const fixViewportHeight = () => {
   }
 };
 
+// Initialize PWA Service Worker
+const initializePWA = async () => {
+  try {
+    console.log('[PWA] Initializing service worker...');
+    
+    const result = await initializeServiceWorker();
+    
+    if (result.success) {
+      console.log('[PWA] Service worker registered successfully');
+      
+      // Initialize background sync service
+      backgroundSyncService.initializeListeners();
+      
+      // Listen for service worker updates
+      window.addEventListener('swUpdateAvailable', () => {
+        console.log('[PWA] Service worker update available');
+        // You can show a notification to the user here
+      });
+      
+    } else {
+      console.warn('[PWA] Service worker registration failed:', result.error?.message);
+    }
+    
+  } catch (error) {
+    console.error('[PWA] PWA initialization error:', error);
+  }
+};
+
 // Initialize systems
 const initializeApp = async () => {
   // Initialize font system first
@@ -146,6 +176,9 @@ const initializeApp = async () => {
   
   // Initialize viewport fix
   fixViewportHeight();
+  
+  // Initialize PWA features
+  await initializePWA();
   
   // Detect iOS and set a class on the HTML element
   if (/iPad|iPhone|iPod/.test(navigator.userAgent) || 

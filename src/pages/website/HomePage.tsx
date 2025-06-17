@@ -9,6 +9,8 @@ import PricingSection from '@/components/website/sections/PricingSection';
 import TestimonialsSection from '@/components/website/sections/TestimonialsSection';
 import CTASection from '@/components/website/sections/CTASection';
 import SoulNetTranslationIndicator from '@/components/translation/SoulNetTranslationIndicator';
+import PWAInstallPrompt from '@/components/pwa/PWAInstallPrompt';
+import OfflineIndicator from '@/components/pwa/OfflineIndicator';
 import { forceEnableScrolling } from '@/hooks/use-scroll-restoration';
 
 const HomePage = () => {
@@ -60,6 +62,12 @@ const HomePage = () => {
   return (
     <div className="min-h-screen bg-white overflow-x-hidden">
       <Navbar />
+      
+      {/* PWA Install Prompt */}
+      <PWAInstallPrompt />
+      
+      {/* Offline Status Indicator */}
+      <OfflineIndicator className="fixed top-4 left-4 z-50" />
       
       {/* SoulNet Translation Indicator */}
       <SoulNetTranslationIndicator className="fixed top-20 right-4 z-50 bg-background/90 backdrop-blur-sm px-3 py-2 rounded-lg border" />
