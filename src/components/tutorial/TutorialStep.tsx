@@ -1,3 +1,4 @@
+
 import React, { useRef, useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import { Button } from '@/components/ui/button';
@@ -89,15 +90,6 @@ const TutorialStep: React.FC<TutorialStepProps> = ({
   
   // Get background color based on step ID
   const getBackgroundStyle = () => {
-    // All steps should be fully opaque, especially step 5
-    if (step.id === 5) {
-      return {
-        backgroundColor: 'rgba(26, 31, 44, 1)', // Fully opaque for step 5
-        color: 'white',
-        textShadow: '0 0 4px rgba(0, 0, 0, 0.8)' // Text shadow for readability
-      };
-    }
-    
     // Step 1 should be fully opaque
     if (step.id === 1) {
       return {
@@ -107,7 +99,7 @@ const TutorialStep: React.FC<TutorialStepProps> = ({
       };
     }
     
-    // Other steps have semi-transparent background with blur
+    // All other steps (including step 5) have semi-transparent background with blur
     return {
       backgroundColor: 'rgba(26, 31, 44, 0.2)', // Very light background for other steps
       backdropFilter: 'blur(2px)', // Slight blur to improve text readability
