@@ -23,8 +23,8 @@ export const deleteAllUserJournalEntries = async (userId: string) => {
       throw new Error(`Failed to delete entries: ${error.message}`);
     }
     
-    // Type assertion for the response data
-    const result = data as DeleteAllEntriesResult;
+    // Type assertion for the response data with proper unknown conversion first
+    const result = (data as unknown) as DeleteAllEntriesResult;
     
     if (!result.success) {
       console.error('[JournalService] Function returned error:', result.error);
@@ -105,14 +105,20 @@ export const fetchJournalEntries = async (userId: string, timeoutRef?: React.Mut
       throw new Error(`Failed to fetch entries: ${error.message}`);
     }
     
-    return data || [];
+    // Map the database response to JournalEntry format, adding the required content field
+    const mappedEntries: JournalEntry[] = (data || []).map(entry => ({
+      ...entry,
+      content: entry["refined text"] || entry["transcription text"] || '', // Map content from refined or transcription text
+    }));
+    
+    return mappedEntries;
   } catch (error) {
     console.error('[JournalService] Exception in fetchJournalEntries:', error);
     throw error;
   }
 };
 
-export const reprocessJournalEntry = async (entryId: number, newContent: string): Promise<void> => {
+export const reprocessJournalEntry = async (entryId: number, newContent: string): Promise<boolean> => {
   try {
     console.log('[JournalService] Reprocessing journal entry:', entryId);
     
@@ -131,6 +137,7 @@ export const reprocessJournalEntry = async (entryId: number, newContent: string)
     }
     
     console.log('[JournalService] Successfully reprocessed entry:', entryId);
+    return true;
   } catch (error) {
     console.error('[JournalService] Exception in reprocessJournalEntry:', error);
     throw error;

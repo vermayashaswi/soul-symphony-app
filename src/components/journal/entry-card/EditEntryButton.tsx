@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Edit } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -196,8 +197,8 @@ export function EditEntryButton({ entryId, content, onEntryUpdated }: EditEntryB
       }));
       
       try {
-        // Always reprocess since we changed the English content
-        const success = await reprocessJournalEntry(entryId);
+        // Always reprocess since we changed the English content - fix the function call
+        const success = await reprocessJournalEntry(entryId, contentToSave);
         
         if (!success) {
           console.error('Reprocessing failed for entry:', entryId);
