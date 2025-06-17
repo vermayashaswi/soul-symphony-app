@@ -16,14 +16,16 @@ import { InsightsStatsGrid } from '@/components/insights/InsightsStatsGrid';
 import { InsightsCharts } from '@/components/insights/InsightsCharts';
 import { InsightsEmptyState } from '@/components/insights/InsightsEmptyState';
 import { InsightsLoadingState } from '@/components/insights/InsightsLoadingState';
+import { InsightsGlobalNavigation } from '@/components/insights/InsightsGlobalNavigation';
+import { getNextDate, getPreviousDate } from '@/components/insights/emotion-chart/utils/dateNavigation';
 
 function InsightsContent() {
   const { user } = useAuth();
   const { prefetchTranslationsForRoute } = useTranslation();
   const [timeRange, setTimeRange] = useState<TimeRange>('week');
-  const [emotionChartDate, setEmotionChartDate] = useState<Date>(new Date());
-  const [moodCalendarDate, setMoodCalendarDate] = useState<Date>(new Date());
+  const [globalDate, setGlobalDate] = useState<Date>(new Date());
   const [isSticky, setIsSticky] = useState(false);
+  const [isNavigating, setIsNavigating] = useState(false);
   const timeToggleRef = useRef<HTMLDivElement>(null);
   const scrollPositionRef = useRef<number>(0);
   const isMobile = useIsMobile();
@@ -35,7 +37,7 @@ function InsightsContent() {
     refreshing, 
     refreshCache, 
     isCacheHit 
-  } = useInsightsCacheData(user?.id, timeRange, emotionChartDate);
+  } = useInsightsCacheData(user?.id, timeRange, globalDate);
 
   useEffect(() => {
     // Prefetch translations for the insights route
@@ -62,26 +64,33 @@ function InsightsContent() {
     return () => window.removeEventListener('scroll', handleScroll);
   }, [isMobile, isSticky]); 
 
-  // When timeRange changes, reset both independently-scoped dates to today
+  // When timeRange changes, reset global date to today
   useEffect(() => {
-    setEmotionChartDate(new Date());
-    setMoodCalendarDate(new Date());
+    setGlobalDate(new Date());
   }, [timeRange]);
 
-  // Handlers to navigate up/down the timeframe
-  const handleEmotionChartNavigate = (nextDate: Date) => {
-    setEmotionChartDate(nextDate);
-  };
-  const handleMoodCalendarNavigate = (nextDate: Date) => {
-    setMoodCalendarDate(nextDate);
+  // Global navigation handler
+  const handleGlobalNavigate = (direction: 'previous' | 'next') => {
+    setIsNavigating(true);
+    const nextDate = direction === 'previous' 
+      ? getPreviousDate(timeRange, globalDate)
+      : getNextDate(timeRange, globalDate);
+    
+    scrollPositionRef.current = window.scrollY;
+    setGlobalDate(nextDate);
+    
+    // Shorter timeout since navigation should be instant with cached data
+    setTimeout(() => {
+      setIsNavigating(false);
+      window.scrollTo({ top: scrollPositionRef.current });
+    }, 100);
   };
 
   const handleTimeRangeChange = (value: string) => {
     if (value) {
       scrollPositionRef.current = window.scrollY;
       setTimeRange(value as TimeRange);
-      setEmotionChartDate(new Date());
-      setMoodCalendarDate(new Date());
+      setGlobalDate(new Date());
       setTimeout(() => {
         window.scrollTo({ top: scrollPositionRef.current });
       }, 10);
@@ -146,6 +155,14 @@ function InsightsContent() {
           <InsightsEmptyState />
         ) : (
           <>
+            {/* Global Navigation Component */}
+            <InsightsGlobalNavigation
+              timeRange={timeRange}
+              currentDate={globalDate}
+              onNavigate={handleGlobalNavigate}
+              isNavigating={isNavigating}
+            />
+
             <InsightsStatsGrid 
               timeRange={timeRange}
               insightsData={insightsData}
@@ -154,10 +171,7 @@ function InsightsContent() {
             <InsightsCharts
               timeRange={timeRange}
               insightsData={insightsData}
-              emotionChartDate={emotionChartDate}
-              moodCalendarDate={moodCalendarDate}
-              onEmotionChartNavigate={handleEmotionChartNavigate}
-              onMoodCalendarNavigate={handleMoodCalendarNavigate}
+              globalDate={globalDate}
               userId={user?.id}
             />
           </>

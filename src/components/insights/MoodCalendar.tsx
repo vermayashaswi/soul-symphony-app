@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from 'react';
 import { useTheme } from '@/hooks/use-theme';
 import { TimeRange } from '@/hooks/use-insights-data';
@@ -28,12 +29,12 @@ interface SentimentData {
   sentiment: number;
 }
 
-// Added currentDate and onTimeRangeNavigate as optional props
 interface MoodCalendarProps {
   sentimentData: SentimentData[];
   timeRange: TimeRange;
   currentDate?: Date;
   onTimeRangeNavigate?: (nextDate: Date) => void;
+  hideNavigation?: boolean;
 }
 
 type ViewMode = 'chart' | 'calendar';
@@ -94,8 +95,13 @@ const CustomTooltip = ({ active, payload, label }: any) => {
   return null;
 };
 
-// Accepts currentDate and onTimeRangeNavigate from props
-const MoodCalendar: React.FC<MoodCalendarProps> = ({ sentimentData, timeRange, currentDate: propCurrentDate, onTimeRangeNavigate }) => {
+const MoodCalendar: React.FC<MoodCalendarProps> = ({ 
+  sentimentData, 
+  timeRange, 
+  currentDate: propCurrentDate, 
+  onTimeRangeNavigate,
+  hideNavigation = false 
+}) => {
   const { theme } = useTheme();
   const isMobile = useIsMobile();
   const { currentLanguage } = useTranslation();
@@ -108,6 +114,8 @@ const MoodCalendar: React.FC<MoodCalendarProps> = ({ sentimentData, timeRange, c
   
   // Function to navigate to previous time period
   const goToPrevious = () => {
+    if (hideNavigation) return;
+    
     let nextDate: Date;
     switch (timeRange) {
       case 'today':
@@ -131,6 +139,8 @@ const MoodCalendar: React.FC<MoodCalendarProps> = ({ sentimentData, timeRange, c
 
   // Function to navigate to next time period
   const goToNext = () => {
+    if (hideNavigation) return;
+    
     let nextDate: Date;
     switch (timeRange) {
       case 'today':
@@ -408,37 +418,39 @@ const MoodCalendar: React.FC<MoodCalendarProps> = ({ sentimentData, timeRange, c
         </p>
       </div>
       
-      <div className="flex items-center justify-between mb-6">
-        <Button 
-          variant="ghost" 
-          size="icon" 
-          onClick={goToPrevious}
-          className="text-muted-foreground hover:text-foreground"
-          title="Previous period"
-        >
-          <ChevronLeft className="h-5 w-5" />
-        </Button>
-        
-        <div className="text-center font-medium">
-          <EnhancedTranslatableText 
-            text={getPeriodLabel()} 
-            forceTranslate={true}
-            enableFontScaling={true}
-            scalingContext="compact"
-            usePageTranslation={true}
-          />
+      {!hideNavigation && (
+        <div className="flex items-center justify-between mb-6">
+          <Button 
+            variant="ghost" 
+            size="icon" 
+            onClick={goToPrevious}
+            className="text-muted-foreground hover:text-foreground"
+            title="Previous period"
+          >
+            <ChevronLeft className="h-5 w-5" />
+          </Button>
+          
+          <div className="text-center font-medium">
+            <EnhancedTranslatableText 
+              text={getPeriodLabel()} 
+              forceTranslate={true}
+              enableFontScaling={true}
+              scalingContext="compact"
+              usePageTranslation={true}
+            />
+          </div>
+          
+          <Button 
+            variant="ghost" 
+            size="icon" 
+            onClick={goToNext}
+            className="text-muted-foreground hover:text-foreground"
+            title="Next period"
+          >
+            <ChevronRight className="h-5 w-5" />
+          </Button>
         </div>
-        
-        <Button 
-          variant="ghost" 
-          size="icon" 
-          onClick={goToNext}
-          className="text-muted-foreground hover:text-foreground"
-          title="Next period"
-        >
-          <ChevronRight className="h-5 w-5" />
-        </Button>
-      </div>
+      )}
       
       <div className="flex justify-center mb-6">
         <ToggleGroup 
