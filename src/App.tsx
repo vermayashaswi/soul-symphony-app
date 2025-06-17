@@ -1,7 +1,5 @@
-
 import React, { useEffect, useState } from 'react';
 import AppRoutes from './routes/AppRoutes';
-import ViewportManager from './routes/ViewportManager';
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as SonnerToaster } from "sonner";
 import { TranslationProvider } from '@/contexts/TranslationContext';
@@ -75,9 +73,7 @@ const App: React.FC = () => {
             <TutorialProvider>
               <TranslationLoadingOverlay />
               <JournalProcessingInitializer />
-              <ViewportManager>
-                <AppRoutes key={isInitialized ? 'initialized' : 'initializing'} />
-              </ViewportManager>
+              <AppRoutes key={isInitialized ? 'initialized' : 'initializing'} />
               <TutorialOverlay />
               <Toaster />
               <SonnerToaster position="top-right" />
