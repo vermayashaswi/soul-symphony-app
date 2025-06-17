@@ -1,5 +1,6 @@
 import { nodeTranslationCache } from './nodeTranslationCache';
 import { supabase } from '@/integrations/supabase/client';
+import { SoulNetDataProcessor } from './soulNetDataProcessor';
 
 interface NodeData {
   id: string;
@@ -39,7 +40,7 @@ interface CachedInstantData {
 
 class EnhancedSoulNetPreloadService {
   private static instantCache = new Map<string, CachedInstantData>();
-  private static readonly CACHE_VERSION = 2;
+  private static readonly CACHE_VERSION = 3; // Incremented for new logic
   private static readonly CACHE_DURATION = 30 * 60 * 1000; // 30 minutes
   private static translationService: any = null;
 
@@ -155,14 +156,13 @@ class EnhancedSoulNetPreloadService {
       // Get time range filter
       const startDate = this.getTimeRangeFilter(timeRange);
       
-      // Fetch journal entries with entities and emotions
+      // FIXED: Use .or() filter to include entries with EITHER entities OR emotions (not both required)
       const { data: entries, error } = await supabase
         .from('Journal Entries')
-        .select('id, entities, emotions, created_at')
+        .select('id, entities, emotions, master_themes, created_at')
         .eq('user_id', userId)
         .gte('created_at', startDate)
-        .not('entities', 'is', null)
-        .not('emotions', 'is', null);
+        .or('entities.not.is.null,emotions.not.is.null,master_themes.not.is.null');
 
       if (error) {
         console.error('[EnhancedSoulNetPreloadService] Error fetching journal entries:', error);
@@ -175,117 +175,64 @@ class EnhancedSoulNetPreloadService {
       }
 
       console.log(`[EnhancedSoulNetPreloadService] Processing ${entries.length} journal entries`);
+      console.log(`[EnhancedSoulNetPreloadService] Sample entry:`, entries[0]);
 
-      // Process entities and emotions to create nodes and links
-      const entityCounts = new Map<string, number>();
-      const emotionCounts = new Map<string, number>();
-      const coOccurrences = new Map<string, number>();
+      // ENHANCED: Use the separated data processor for better handling
+      const { entityCounts, emotionCounts, coOccurrences } = SoulNetDataProcessor.processJournalEntries(entries);
 
-      entries.forEach(entry => {
-        const entryEntities: string[] = [];
-        const entryEmotions: string[] = [];
-
-        // Process entities
-        if (entry.entities && Array.isArray(entry.entities)) {
-          entry.entities.forEach((entity: any) => {
-            if (entity && typeof entity === 'object' && entity.name) {
-              const entityName = entity.name.toLowerCase().trim();
-              if (entityName) {
-                entryEntities.push(entityName);
-                entityCounts.set(entityName, (entityCounts.get(entityName) || 0) + 1);
-              }
-            }
-          });
-        }
-
-        // Process emotions
-        if (entry.emotions) {
-          if (typeof entry.emotions === 'object' && !Array.isArray(entry.emotions)) {
-            // Handle object format {joy: 0.7, sadness: 0.5}
-            Object.entries(entry.emotions).forEach(([emotion, intensity]) => {
-              if (typeof intensity === 'number' && intensity > 0.3) { // Only include significant emotions
-                const emotionName = emotion.toLowerCase().trim();
-                if (emotionName) {
-                  entryEmotions.push(emotionName);
-                  emotionCounts.set(emotionName, (emotionCounts.get(emotionName) || 0) + intensity);
-                }
-              }
-            });
-          } else if (Array.isArray(entry.emotions)) {
-            // Handle array format
-            entry.emotions.forEach((emotion: any) => {
-              if (emotion && typeof emotion === 'object' && emotion.name && emotion.intensity) {
-                const emotionName = emotion.name.toLowerCase().trim();
-                const intensity = parseFloat(emotion.intensity);
-                if (emotionName && intensity > 0.3) {
-                  entryEmotions.push(emotionName);
-                  emotionCounts.set(emotionName, (emotionCounts.get(emotionName) || 0) + intensity);
-                }
-              }
-            });
-          }
-        }
-
-        // Calculate co-occurrences within this entry
-        const allNodes = [...entryEntities, ...entryEmotions];
-        for (let i = 0; i < allNodes.length; i++) {
-          for (let j = i + 1; j < allNodes.length; j++) {
-            const node1 = allNodes[i];
-            const node2 = allNodes[j];
-            if (node1 !== node2) {
-              const key = [node1, node2].sort().join('|');
-              coOccurrences.set(key, (coOccurrences.get(key) || 0) + 1);
-            }
-          }
-        }
+      console.log(`[EnhancedSoulNetPreloadService] Processed counts:`, {
+        entities: entityCounts.size,
+        emotions: emotionCounts.size,
+        coOccurrences: coOccurrences.size
       });
 
-      // Filter and create nodes (only include items that appear more than once or have strong emotions)
+      // ENHANCED: Use the separated processor for filtering
+      const { entities: filteredEntities, emotions: filteredEmotions } = SoulNetDataProcessor.filterSignificantNodes(
+        entityCounts,
+        emotionCounts,
+        1, // Lower threshold for entities (was 2)
+        0.8 // Lower threshold for emotions (was 1.0)
+      );
+
+      console.log(`[EnhancedSoulNetPreloadService] After filtering:`, {
+        entities: filteredEntities.size,
+        emotions: filteredEmotions.size
+      });
+
+      // Create nodes
       const nodes: NodeData[] = [];
-      const nodePositions = new Map<string, [number, number, number]>();
+      let nodeIndex = 0;
 
       // Add entity nodes
-      entityCounts.forEach((count, entity) => {
-        if (count >= 2) { // Only include entities that appear at least twice
-          const angle = (nodes.length * 2 * Math.PI) / Math.max(entityCounts.size + emotionCounts.size, 8);
-          const radius = 15;
-          const position: [number, number, number] = [
-            Math.cos(angle) * radius,
-            Math.sin(angle) * radius,
-            (Math.random() - 0.5) * 10
-          ];
-          
-          nodePositions.set(entity, position);
-          nodes.push({
-            id: entity,
-            type: 'entity',
-            value: count,
-            color: '#22c55e', // Green for entities
-            position
-          });
-        }
+      filteredEntities.forEach((count, entity) => {
+        const position = SoulNetDataProcessor.generateNodePositions(
+          filteredEntities.size + filteredEmotions.size,
+          nodeIndex++
+        );
+        
+        nodes.push({
+          id: entity,
+          type: 'entity',
+          value: count,
+          color: '#22c55e', // Green for entities
+          position
+        });
       });
 
       // Add emotion nodes
-      emotionCounts.forEach((totalIntensity, emotion) => {
-        if (totalIntensity >= 1.0) { // Only include emotions with significant total intensity
-          const angle = (nodes.length * 2 * Math.PI) / Math.max(entityCounts.size + emotionCounts.size, 8);
-          const radius = 15;
-          const position: [number, number, number] = [
-            Math.cos(angle) * radius,
-            Math.sin(angle) * radius,
-            (Math.random() - 0.5) * 10
-          ];
-          
-          nodePositions.set(emotion, position);
-          nodes.push({
-            id: emotion,
-            type: 'emotion',
-            value: totalIntensity,
-            color: '#f59e0b', // Golden for emotions
-            position
-          });
-        }
+      filteredEmotions.forEach((totalIntensity, emotion) => {
+        const position = SoulNetDataProcessor.generateNodePositions(
+          filteredEntities.size + filteredEmotions.size,
+          nodeIndex++
+        );
+        
+        nodes.push({
+          id: emotion,
+          type: 'emotion',
+          value: totalIntensity,
+          color: '#f59e0b', // Golden for emotions
+          position
+        });
       });
 
       // Create links from co-occurrences
@@ -293,7 +240,7 @@ class EnhancedSoulNetPreloadService {
       const nodeIds = new Set(nodes.map(n => n.id));
 
       coOccurrences.forEach((count, key) => {
-        if (count >= 2) { // Only include relationships that occur at least twice
+        if (count >= 1) { // Lower threshold for links
           const [node1, node2] = key.split('|');
           if (nodeIds.has(node1) && nodeIds.has(node2)) {
             links.push({
@@ -306,6 +253,14 @@ class EnhancedSoulNetPreloadService {
       });
 
       console.log(`[EnhancedSoulNetPreloadService] Generated ${nodes.length} nodes and ${links.length} links`);
+      
+      // DEBUGGING: Log some sample nodes and links
+      if (nodes.length > 0) {
+        console.log(`[EnhancedSoulNetPreloadService] Sample nodes:`, nodes.slice(0, 3));
+      }
+      if (links.length > 0) {
+        console.log(`[EnhancedSoulNetPreloadService] Sample links:`, links.slice(0, 3));
+      }
       
       return { nodes, links };
     } catch (error) {
