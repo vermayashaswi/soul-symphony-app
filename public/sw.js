@@ -3,6 +3,8 @@
 const CACHE_NAME = 'soulo-cache-v1';
 const OFFLINE_URL = '/offline.html';
 const BACKGROUND_SYNC_TAG = 'journal-entry-sync';
+const PERIODIC_SYNC_TAG = 'journal-periodic-sync';
+const INSIGHTS_SYNC_TAG = 'insights-periodic-sync';
 
 // Assets to cache for offline functionality
 const STATIC_ASSETS = [
@@ -141,6 +143,17 @@ self.addEventListener('sync', (event) => {
   }
 });
 
+// Periodic Background Sync
+self.addEventListener('periodicsync', (event) => {
+  console.log('[SW] Periodic sync triggered:', event.tag);
+  
+  if (event.tag === PERIODIC_SYNC_TAG) {
+    event.waitUntil(periodicJournalSync());
+  } else if (event.tag === INSIGHTS_SYNC_TAG) {
+    event.waitUntil(periodicInsightsSync());
+  }
+});
+
 // Handle offline journal entry creation
 async function handleOfflineJournalEntry(request) {
   try {
@@ -248,6 +261,72 @@ async function syncJournalEntries() {
   }
 }
 
+// Periodic sync for journal entries
+async function periodicJournalSync() {
+  try {
+    console.log('[SW] Starting periodic journal sync...');
+    
+    // Check if there are any pending offline entries
+    const pendingEntries = await getOfflineJournalEntries();
+    
+    if (pendingEntries.length > 0) {
+      console.log('[SW] Found pending entries during periodic sync:', pendingEntries.length);
+      await syncJournalEntries();
+    }
+    
+    // Notify app about periodic sync completion
+    await notifyAppOfPeriodicSync('journal', pendingEntries.length);
+    
+  } catch (error) {
+    console.error('[SW] Error during periodic journal sync:', error);
+  }
+}
+
+// Periodic sync for insights refresh
+async function periodicInsightsSync() {
+  try {
+    console.log('[SW] Starting periodic insights sync...');
+    
+    // Trigger insights cache refresh
+    await refreshInsightsCache();
+    
+    // Notify app about insights sync
+    await notifyAppOfPeriodicSync('insights', 0);
+    
+  } catch (error) {
+    console.error('[SW] Error during periodic insights sync:', error);
+  }
+}
+
+// Refresh insights cache
+async function refreshInsightsCache() {
+  const insightUrls = [
+    '/functions/v1/get-insights',
+    '/functions/v1/get-emotion-data',
+    '/functions/v1/get-journal-stats'
+  ];
+  
+  for (const url of insightUrls) {
+    try {
+      const response = await fetch(url, {
+        headers: {
+          'Cache-Control': 'no-cache',
+          'Pragma': 'no-cache'
+        }
+      });
+      
+      if (response.ok) {
+        // Cache the fresh data
+        const cache = await caches.open(CACHE_NAME);
+        await cache.put(url, response.clone());
+        console.log('[SW] Refreshed cache for:', url);
+      }
+    } catch (error) {
+      console.error('[SW] Failed to refresh cache for:', url, error);
+    }
+  }
+}
+
 // Get offline journal entries from IndexedDB
 async function getOfflineJournalEntries() {
   return new Promise((resolve, reject) => {
@@ -261,7 +340,7 @@ async function getOfflineJournalEntries() {
       const store = transaction.objectStore('journalEntries');
       const index = store.index('offline');
       
-      const getRequest = index.getAll(true);
+      const getRequest = index.getAll(IDBKeyRange.only(true));
       getRequest.onsuccess = () => resolve(getRequest.result || []);
       getRequest.onerror = () => reject(getRequest.error);
     };
@@ -298,7 +377,18 @@ async function notifyAppOfSync(entry, status) {
   });
 }
 
-// Handle push notifications (future enhancement)
+// Notify the app about periodic sync
+async function notifyAppOfPeriodicSync(type, itemCount) {
+  const clients = await self.clients.matchAll();
+  clients.forEach(client => {
+    client.postMessage({
+      type: 'PERIODIC_SYNC_STATUS',
+      payload: { type, itemCount, timestamp: Date.now() }
+    });
+  });
+}
+
+// Handle push notifications
 self.addEventListener('push', (event) => {
   console.log('[SW] Push notification received');
   
@@ -316,8 +406,14 @@ self.addEventListener('push', (event) => {
           action: 'open',
           title: 'Open App',
           icon: '/lovable-uploads/d61c0a45-1846-4bde-b495-f6b8c58a2951.png'
+        },
+        {
+          action: 'dismiss',
+          title: 'Dismiss',
+          icon: '/lovable-uploads/d61c0a45-1846-4bde-b495-f6b8c58a2951.png'
         }
-      ]
+      ],
+      data: data.data || {}
     };
 
     event.waitUntil(
@@ -336,6 +432,18 @@ self.addEventListener('notificationclick', (event) => {
     event.waitUntil(
       clients.openWindow('/app')
     );
+  } else if (event.action === 'dismiss') {
+    // Just close the notification
+    console.log('[SW] Notification dismissed');
+  }
+});
+
+// Handle messages from the app
+self.addEventListener('message', (event) => {
+  console.log('[SW] Message received:', event.data);
+  
+  if (event.data && event.data.type === 'SKIP_WAITING') {
+    self.skipWaiting();
   }
 });
 

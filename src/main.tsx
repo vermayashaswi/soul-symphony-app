@@ -12,6 +12,8 @@ import { ContextReadinessProvider } from './contexts/ContextReadinessManager'
 import { ThemeProvider } from './hooks/use-theme'
 import { initializeServiceWorker } from './utils/serviceWorker'
 import { backgroundSyncService } from './services/backgroundSyncService'
+import { periodicSyncService } from './services/periodicSyncService'
+import { pushNotificationService } from './services/pushNotificationService'
 
 // Enhanced Font Loading System
 const initializeFontSystem = async () => {
@@ -154,10 +156,20 @@ const initializePWA = async () => {
       // Initialize background sync service
       backgroundSyncService.initializeListeners();
       
+      // Initialize periodic sync service
+      await periodicSyncService.initialize();
+      
       // Listen for service worker updates
       window.addEventListener('swUpdateAvailable', () => {
         console.log('[PWA] Service worker update available');
         // You can show a notification to the user here
+      });
+      
+      // Listen for periodic sync messages
+      navigator.serviceWorker?.addEventListener('message', (event) => {
+        if (event.data?.type === 'PERIODIC_SYNC_STATUS') {
+          console.log('[PWA] Periodic sync completed:', event.data.payload);
+        }
       });
       
     } else {

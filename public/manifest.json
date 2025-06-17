@@ -10,13 +10,51 @@
   "background_color": "#ffffff",
   "theme_color": "#8b5cf6",
   "orientation": "portrait-primary",
-  "scope": "/app/",
+  "scope": "/",
+  "scope_extensions": [
+    {
+      "origin": "https://soulo.online"
+    }
+  ],
   "lang": "en",
   "dir": "ltr",
   "categories": ["health", "lifestyle", "productivity", "medical", "wellness"],
   "iarc_rating_id": "e84b072d-71b3-4d3e-86ae-31a8ce4e53b7",
   "launch_handler": {
     "client_mode": "focus-existing"
+  },
+  "edge_side_panel": {
+    "preferred_width": 400
+  },
+  "protocol_handlers": [
+    {
+      "protocol": "web+soulo",
+      "url": "/app?action=%s"
+    }
+  ],
+  "file_handlers": [
+    {
+      "action": "/app/journal",
+      "accept": {
+        "audio/*": [".mp3", ".wav", ".m4a", ".webm"]
+      }
+    }
+  ],
+  "share_target": {
+    "action": "/app/journal",
+    "method": "POST",
+    "enctype": "multipart/form-data",
+    "params": {
+      "title": "title",
+      "text": "text",
+      "url": "url",
+      "files": [
+        {
+          "name": "audio",
+          "accept": ["audio/*"]
+        }
+      ]
+    }
   },
   "icons": [
     {
@@ -174,38 +212,5 @@
       "url": "https://apps.apple.com/app/soulo"
     }
   ],
-  "prefer_related_applications": false,
-  "edge_side_panel": {
-    "preferred_width": 400
-  },
-  "protocol_handlers": [
-    {
-      "protocol": "web+soulo",
-      "url": "/app?action=%s"
-    }
-  ],
-  "file_handlers": [
-    {
-      "action": "/app/journal",
-      "accept": {
-        "audio/*": [".mp3", ".wav", ".m4a", ".webm"]
-      }
-    }
-  ],
-  "share_target": {
-    "action": "/app/journal",
-    "method": "POST",
-    "enctype": "multipart/form-data",
-    "params": {
-      "title": "title",
-      "text": "text",
-      "url": "url",
-      "files": [
-        {
-          "name": "audio",
-          "accept": ["audio/*"]
-        }
-      ]
-    }
-  }
+  "prefer_related_applications": false
 }
