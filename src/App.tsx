@@ -12,6 +12,7 @@ import AppRoutes from "@/routes/AppRoutes";
 import { NetworkAwareContent } from "@/components/NetworkAwareContent";
 import { InstallPrompt } from "@/components/pwa/InstallPrompt";
 import { ThemeProvider } from "next-themes";
+import { BrowserRouter } from 'react-router-dom';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -25,27 +26,29 @@ const queryClient = new QueryClient({
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
-      <ThemeProvider attribute="class" defaultTheme="light" enableSystem>
-        <TooltipProvider>
-          <NetworkAwareContent>
-            <AuthProvider>
-              <TranslationProvider>
-                <LocationProvider>
-                  <SubscriptionProvider>
-                    <FeatureFlagsProvider>
-                      <TutorialProvider>
-                        <AppRoutes />
-                        <InstallPrompt />
-                        <Toaster />
-                      </TutorialProvider>
-                    </FeatureFlagsProvider>
-                  </SubscriptionProvider>
-                </LocationProvider>
-              </TranslationProvider>
-            </AuthProvider>
-          </NetworkAwareContent>
-        </TooltipProvider>
-      </ThemeProvider>
+      <BrowserRouter>
+        <ThemeProvider attribute="class" defaultTheme="light" enableSystem>
+          <TooltipProvider>
+            <NetworkAwareContent>
+              <AuthProvider>
+                <TranslationProvider>
+                  <LocationProvider>
+                    <SubscriptionProvider>
+                      <FeatureFlagsProvider>
+                        <TutorialProvider>
+                          <AppRoutes />
+                          <InstallPrompt />
+                          <Toaster />
+                        </TutorialProvider>
+                      </FeatureFlagsProvider>
+                    </SubscriptionProvider>
+                  </LocationProvider>
+                </TranslationProvider>
+              </AuthProvider>
+            </NetworkAwareContent>
+          </TooltipProvider>
+        </ThemeProvider>
+      </BrowserRouter>
     </QueryClientProvider>
   );
 }

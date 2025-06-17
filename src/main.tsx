@@ -5,7 +5,6 @@ import App from './App.tsx'
 import './index.css'
 import './styles/mobile.css' // Import mobile-specific styles
 import './styles/tutorial.css' // Import tutorial-specific styles
-import { BrowserRouter } from 'react-router-dom'
 
 // Enhanced Font Loading System
 const initializeFontSystem = async () => {
@@ -157,8 +156,6 @@ initializeApp();
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
-    <BrowserRouter>
-      <App />
-    </BrowserRouter>
+    <App />
   </React.StrictMode>,
 )
