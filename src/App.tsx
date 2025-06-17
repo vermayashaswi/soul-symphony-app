@@ -5,12 +5,11 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter } from "react-router-dom";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { TranslationProvider } from "@/contexts/TranslationContext";
-import { LocationProvider } from "@/contexts/LocationContext";
 import { SubscriptionProvider } from "@/contexts/SubscriptionContext";
 import { FeatureFlagsProvider } from "@/contexts/FeatureFlagsContext";
 import { TutorialProvider } from "@/contexts/TutorialContext";
-import { ViewportManager } from "@/routes/ViewportManager";
-import { AppRoutes } from "@/routes/AppRoutes";
+import ViewportManager from "@/routes/ViewportManager";
+import AppRoutes from "@/routes/AppRoutes";
 import { NetworkAwareContent } from "@/components/NetworkAwareContent";
 import { InstallPrompt } from "@/components/pwa/InstallPrompt";
 import { ThemeProvider } from "next-themes";
@@ -33,19 +32,17 @@ function App() {
             <NetworkAwareContent>
               <AuthProvider>
                 <TranslationProvider>
-                  <LocationProvider>
-                    <SubscriptionProvider>
-                      <FeatureFlagsProvider>
-                        <TutorialProvider>
-                          <ViewportManager>
-                            <AppRoutes />
-                            <InstallPrompt />
-                            <Toaster />
-                          </ViewportManager>
-                        </TutorialProvider>
-                      </FeatureFlagsProvider>
-                    </SubscriptionProvider>
-                  </LocationProvider>
+                  <SubscriptionProvider>
+                    <FeatureFlagsProvider>
+                      <TutorialProvider>
+                        <ViewportManager>
+                          <AppRoutes />
+                          <InstallPrompt />
+                          <Toaster />
+                        </ViewportManager>
+                      </TutorialProvider>
+                    </FeatureFlagsProvider>
+                  </SubscriptionProvider>
                 </TranslationProvider>
               </AuthProvider>
             </NetworkAwareContent>
