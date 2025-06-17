@@ -1,7 +1,6 @@
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { EnhancedSoulNetPreloadService } from '@/services/enhancedSoulNetPreloadService';
-import { NodeTranslationCacheService } from '@/services/nodeTranslationCacheService';
 import { useTranslation } from '@/contexts/TranslationContext';
 
 interface NodeData {
@@ -44,17 +43,17 @@ export const useInstantSoulNetData = (
   userId: string | undefined,
   timeRange: string
 ): InstantSoulNetData => {
-  const { currentLanguage } = useTranslation();
+  const { currentLanguage, getCachedTranslation } = useTranslation();
   
-  // ENHANCED: Stable cache key management
+  // ENHANCED: Cache key with proper dependency tracking
   const cacheKey = useMemo(() => {
     if (!userId) return '';
     const key = `${userId}-${timeRange}-${currentLanguage}`;
-    console.log(`[useInstantSoulNetData] STREAMLINED: Cache key: ${key}`);
+    console.log(`[useInstantSoulNetData] CACHE KEY: ${key}`);
     return key;
   }, [userId, timeRange, currentLanguage]);
 
-  // STREAMLINED: Simplified state initialization
+  // ENHANCED: Comprehensive state initialization
   const [graphData, setGraphData] = useState<{ nodes: NodeData[], links: LinkData[] }>({ nodes: [], links: [] });
   const [translations, setTranslations] = useState<Map<string, string>>(new Map());
   const [connectionPercentages, setConnectionPercentages] = useState<Map<string, number>>(new Map());
@@ -62,83 +61,86 @@ export const useInstantSoulNetData = (
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
   const [isInstantReady, setIsInstantReady] = useState(false);
-
-  // STREAMLINED: Remove individual translation state - only track completion
+  const [isTranslating, setIsTranslating] = useState(false);
+  const [translationProgress, setTranslationProgress] = useState(0);
   const [translationComplete, setTranslationComplete] = useState(false);
 
-  // ENHANCED: Smart parameter change handling with instant cache check
+  // ENHANCED: Immediate state reset and cache management when parameters change
   useEffect(() => {
-    console.log(`[useInstantSoulNetData] STREAMLINED: Parameters changed - timeRange=${timeRange}, language=${currentLanguage}, userId=${userId}`);
+    console.log(`[useInstantSoulNetData] PARAMETERS CHANGED: timeRange=${timeRange}, language=${currentLanguage}, userId=${userId}`);
     
     if (!userId) {
-      console.log('[useInstantSoulNetData] STREAMLINED: No user ID - resetting to empty state');
+      console.log('[useInstantSoulNetData] NO USER ID - resetting to empty state');
       setGraphData({ nodes: [], links: [] });
       setTranslations(new Map());
       setConnectionPercentages(new Map());
       setNodeConnectionData(new Map());
       setIsInstantReady(false);
       setTranslationComplete(false);
+      setIsTranslating(false);
+      setTranslationProgress(0);
       setLoading(false);
       setError(null);
       return;
     }
 
-    // ENHANCED: Immediate cache check for instant response
-    const validCache = EnhancedSoulNetPreloadService.getInstantData(cacheKey);
-    if (validCache && validCache.data.translationComplete) {
-      console.log(`[useInstantSoulNetData] STREAMLINED: Found complete cache for ${cacheKey} - INSTANT LOAD`);
-      
-      // Immediate state update with cached data - NO LOADING STATE
-      setGraphData({ nodes: validCache.data.nodes, links: validCache.data.links });
-      setTranslations(validCache.data.translations);
-      setConnectionPercentages(validCache.data.connectionPercentages);
-      setNodeConnectionData(validCache.data.nodeConnectionData);
-      setIsInstantReady(true);
-      setTranslationComplete(true);
-      setLoading(false);
-      setError(null);
-      
-      // Smart cache management
-      EnhancedSoulNetPreloadService.clearTimeRangeCache(userId, timeRange, currentLanguage);
-      return;
-    }
-
-    // STREAMLINED: No valid cache - reset state cleanly
-    console.log(`[useInstantSoulNetData] STREAMLINED: No complete cache for ${cacheKey} - preparing fresh fetch`);
+    // STEP 1: Immediate state reset to prevent stale data display
+    console.log('[useInstantSoulNetData] RESETTING STATE for fresh data');
     setGraphData({ nodes: [], links: [] });
     setTranslations(new Map());
     setConnectionPercentages(new Map());
     setNodeConnectionData(new Map());
     setIsInstantReady(false);
     setTranslationComplete(false);
+    setIsTranslating(false);
+    setTranslationProgress(0);
     setLoading(true);
     setError(null);
-    
-    // Clear other caches
+
+    // STEP 2: Clear other time range caches immediately
+    console.log(`[useInstantSoulNetData] CLEARING OTHER CACHES: keeping ${timeRange} for ${currentLanguage}`);
     EnhancedSoulNetPreloadService.clearTimeRangeCache(userId, timeRange, currentLanguage);
-    
+
+    // STEP 3: Check for valid cache after clearing others
+    const validCache = EnhancedSoulNetPreloadService.getInstantData(cacheKey);
+    if (validCache && validCache.data.translationComplete) {
+      console.log(`[useInstantSoulNetData] FOUND VALID CACHE: ${cacheKey}`);
+      setGraphData({ nodes: validCache.data.nodes, links: validCache.data.links });
+      setTranslations(validCache.data.translations);
+      setConnectionPercentages(validCache.data.connectionPercentages);
+      setNodeConnectionData(validCache.data.nodeConnectionData);
+      setIsInstantReady(true);
+      setTranslationComplete(true);
+      setIsTranslating(false);
+      setTranslationProgress(100);
+      setLoading(false);
+    } else {
+      console.log(`[useInstantSoulNetData] NO VALID CACHE: will fetch fresh data for ${cacheKey}`);
+    }
   }, [userId, timeRange, currentLanguage, cacheKey]);
 
-  // STREAMLINED: Fresh data fetching with optimized flow
+  // ENHANCED: Fresh data fetching with comprehensive error handling
   const fetchFreshData = useCallback(async () => {
     if (!userId || !cacheKey) {
-      console.log('[useInstantSoulNetData] STREAMLINED: Fetch skip - missing userId or cacheKey');
+      console.log('[useInstantSoulNetData] FETCH SKIP: missing userId or cacheKey');
       setLoading(false);
       return;
     }
 
-    console.log(`[useInstantSoulNetData] STREAMLINED: Fetch start for ${cacheKey}`);
+    console.log(`[useInstantSoulNetData] FETCH START: ${cacheKey}`);
     
     // Double-check cache before expensive fetch
     const currentCached = EnhancedSoulNetPreloadService.getInstantData(cacheKey);
     if (currentCached && currentCached.data.translationComplete) {
-      console.log(`[useInstantSoulNetData] STREAMLINED: Found cache during fetch for ${cacheKey}`);
+      console.log(`[useInstantSoulNetData] FETCH SKIP: found valid cache ${cacheKey}`);
       setGraphData({ nodes: currentCached.data.nodes, links: currentCached.data.links });
       setTranslations(currentCached.data.translations);
       setConnectionPercentages(currentCached.data.connectionPercentages);
       setNodeConnectionData(currentCached.data.nodeConnectionData);
       setIsInstantReady(true);
       setTranslationComplete(true);
+      setIsTranslating(false);
+      setTranslationProgress(100);
       setLoading(false);
       return;
     }
@@ -147,7 +149,7 @@ export const useInstantSoulNetData = (
       setError(null);
       setLoading(true);
       
-      console.log(`[useInstantSoulNetData] STREAMLINED: Fetching fresh data - userId=${userId}, timeRange=${timeRange}, language=${currentLanguage}`);
+      console.log(`[useInstantSoulNetData] FETCHING FRESH: userId=${userId}, timeRange=${timeRange}, language=${currentLanguage}`);
       
       const result = await EnhancedSoulNetPreloadService.preloadInstantData(
         userId,
@@ -156,7 +158,7 @@ export const useInstantSoulNetData = (
       );
 
       if (result) {
-        console.log(`[useInstantSoulNetData] STREAMLINED: Fetch success - ${result.nodes.length} nodes, complete=${result.translationComplete}`);
+        console.log(`[useInstantSoulNetData] FETCH SUCCESS: ${result.nodes.length} nodes, complete=${result.translationComplete}`);
         
         setGraphData({ nodes: result.nodes, links: result.links });
         setTranslations(result.translations);
@@ -164,33 +166,35 @@ export const useInstantSoulNetData = (
         setNodeConnectionData(result.nodeConnectionData);
         setIsInstantReady(true);
         setTranslationComplete(result.translationComplete);
+        setIsTranslating(!result.translationComplete);
+        setTranslationProgress(result.translationProgress);
       } else {
-        console.log('[useInstantSoulNetData] STREAMLINED: Fetch empty - no data returned');
+        console.log('[useInstantSoulNetData] FETCH EMPTY: no data for current parameters');
         setGraphData({ nodes: [], links: [] });
         setTranslations(new Map());
         setConnectionPercentages(new Map());
         setNodeConnectionData(new Map());
         setIsInstantReady(true);
         setTranslationComplete(true);
+        setIsTranslating(false);
+        setTranslationProgress(100);
       }
     } catch (err) {
-      console.error('[useInstantSoulNetData] STREAMLINED: Fetch error:', err);
+      console.error('[useInstantSoulNetData] FETCH ERROR:', err);
       setError(err instanceof Error ? err : new Error('Failed to fetch data'));
+      setIsTranslating(false);
+      setTranslationProgress(100);
     } finally {
       setLoading(false);
     }
   }, [userId, timeRange, currentLanguage, cacheKey]);
 
-  // Trigger data fetching when needed
+  // Trigger data fetching
   useEffect(() => {
-    // Only fetch if we don't have valid cached data
-    const currentCached = EnhancedSoulNetPreloadService.getInstantData(cacheKey);
-    if (!currentCached || !currentCached.data.translationComplete) {
-      fetchFreshData();
-    }
-  }, [fetchFreshData, cacheKey]);
+    fetchFreshData();
+  }, [fetchFreshData]);
 
-  // ENHANCED: Optimized getter functions with coordinated translations
+  // ENHANCED: Optimized getter functions
   const getInstantConnectionPercentage = useCallback((selectedNode: string, targetNode: string): number => {
     if (!selectedNode || selectedNode === targetNode || connectionPercentages.size === 0) return 0;
     
@@ -201,27 +205,19 @@ export const useInstantSoulNetData = (
   const getInstantTranslation = useCallback((nodeId: string): string => {
     if (currentLanguage === 'en') return nodeId;
     
-    // STREAMLINED: Priority order for translation lookup
-    // 1. Coordinated translations (highest priority - no loading)
-    if (translationComplete && translations.size > 0) {
+    // Priority: completed translations > app-level cache > fallback
+    if (translationComplete) {
       const coordinatedTranslation = translations.get(nodeId);
-      if (coordinatedTranslation) {
-        console.log(`[useInstantSoulNetData] STREAMLINED: Using coordinated translation for ${nodeId}: ${coordinatedTranslation}`);
-        return coordinatedTranslation;
-      }
+      if (coordinatedTranslation) return coordinatedTranslation;
     }
     
-    // 2. Node cache (second priority - instant)
-    const nodeCache = NodeTranslationCacheService.getCachedTranslation(nodeId, currentLanguage);
-    if (nodeCache) {
-      console.log(`[useInstantSoulNetData] STREAMLINED: Using node cache for ${nodeId}: ${nodeCache}`);
-      return nodeCache;
+    if (!isTranslating) {
+      const appLevelTranslation = getCachedTranslation(nodeId);
+      if (appLevelTranslation) return appLevelTranslation;
     }
     
-    // 3. Fallback to original (no loading state)
-    console.log(`[useInstantSoulNetData] STREAMLINED: Using original text for ${nodeId}`);
     return nodeId;
-  }, [currentLanguage, translations, translationComplete]);
+  }, [currentLanguage, translations, getCachedTranslation, translationComplete, isTranslating]);
 
   const getInstantNodeConnections = useCallback((nodeId: string): NodeConnectionData => {
     return nodeConnectionData.get(nodeId) || {
@@ -231,6 +227,9 @@ export const useInstantSoulNetData = (
     };
   }, [nodeConnectionData]);
 
+  // ENHANCED: Comprehensive debug logging
+  console.log(`[useInstantSoulNetData] STATE: key=${cacheKey}, nodes=${graphData.nodes.length}, loading=${loading}, ready=${isInstantReady}, complete=${translationComplete}, translating=${isTranslating}`);
+
   return {
     graphData,
     translations,
@@ -239,8 +238,8 @@ export const useInstantSoulNetData = (
     loading,
     error,
     isInstantReady,
-    isTranslating: false, // STREAMLINED: No individual translation loading
-    translationProgress: translationComplete ? 100 : 0, // STREAMLINED: Binary progress
+    isTranslating,
+    translationProgress,
     translationComplete,
     getInstantConnectionPercentage,
     getInstantTranslation,

@@ -23,6 +23,37 @@ interface SoulNetProps {
   timeRange: TimeRange;
 }
 
+// ENHANCED: Translation Loading Component
+const TranslationLoadingState: React.FC<{ progress: number }> = ({ progress }) => (
+  <div className="bg-background rounded-xl shadow-sm border w-full p-6">
+    <div className="flex flex-col items-center justify-center py-12 space-y-4">
+      <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+      <h3 className="text-lg font-medium">
+        <TranslatableText 
+          text="Translating Soul-Net..." 
+          forceTranslate={true}
+          enableFontScaling={true}
+          scalingContext="general"
+        />
+      </h3>
+      <div className="w-64 bg-gray-200 rounded-full h-2">
+        <div 
+          className="bg-primary h-2 rounded-full transition-all duration-300" 
+          style={{ width: `${progress}%` }}
+        ></div>
+      </div>
+      <p className="text-sm text-muted-foreground">
+        <TranslatableText 
+          text={`${progress}% complete`}
+          forceTranslate={false}
+          enableFontScaling={true}
+          scalingContext="general"
+        />
+      </p>
+    </div>
+  </div>
+);
+
 const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
   const [isFullScreen, setIsFullScreen] = useState(false);
   const [canvasError, setCanvasError] = useState<Error | null>(null);
@@ -33,15 +64,15 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
   const [selectedEntity, setSelectedEntity] = useState<string | null>(null);
   const { currentLanguage } = useTranslation();
   
-  // STREAMLINED: Rendering initialization tracking
+  // ENHANCED: Rendering initialization tracking
   const renderingInitialized = useRef(false);
   const lastTimeRange = useRef<string>(timeRange);
   const lastLanguage = useRef<string>(currentLanguage);
 
-  // STREAMLINED: Track parameter changes for immediate reset
+  // ENHANCED: Track parameter changes for immediate reset
   useEffect(() => {
     if (lastTimeRange.current !== timeRange || lastLanguage.current !== currentLanguage) {
-      console.log(`[SoulNet] STREAMLINED PARAMETER CHANGE: timeRange ${lastTimeRange.current} -> ${timeRange}, language ${lastLanguage.current} -> ${currentLanguage}`);
+      console.log(`[SoulNet] PARAMETER CHANGE: timeRange ${lastTimeRange.current} -> ${timeRange}, language ${lastLanguage.current} -> ${currentLanguage}`);
       
       // Immediate rendering reset on parameter change
       setRenderingReady(false);
@@ -53,67 +84,73 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
     }
   }, [timeRange, currentLanguage]);
 
-  // Initialize translation service
+  // APP-LEVEL: Initialize the enhanced service
   useEffect(() => {
-    console.log("[SoulNet] STREAMLINED: Setting up enhanced translation service");
+    console.log("[SoulNet] INITIALIZING: Setting up enhanced translation service");
     EnhancedSoulNetPreloadService.setAppLevelTranslationService(translationService);
   }, []);
 
-  // Use the streamlined instant data hook
+  // Use the enhanced instant data hook
   const { 
     graphData, 
     loading, 
     error,
     isInstantReady,
+    isTranslating,
+    translationProgress,
     translationComplete,
     getInstantConnectionPercentage,
     getInstantTranslation,
     getInstantNodeConnections
   } = useInstantSoulNetData(userId, timeRange);
 
-  console.log("[SoulNet] STREAMLINED STATE", { 
+  console.log("[SoulNet] ENHANCED STATE", { 
     userId, 
     timeRange, 
     currentLanguage,
     nodesCount: graphData.nodes.length,
     isInstantReady,
     loading,
+    isTranslating,
+    translationProgress,
     translationComplete,
     renderingReady,
     renderingInitialized: renderingInitialized.current
   });
 
-  // STREAMLINED: Rendering initialization - no translation loading states
+  // ENHANCED: Rendering initialization with proper dependencies
   useEffect(() => {
     const shouldInitializeRendering = 
       isInstantReady && 
       translationComplete && 
       graphData.nodes.length > 0 && 
       !renderingInitialized.current &&
-      !loading;
+      !loading &&
+      !isTranslating;
 
     if (shouldInitializeRendering) {
-      console.log("[SoulNet] STREAMLINED: Initializing rendering - all conditions met");
+      console.log("[SoulNet] INITIALIZING RENDERING: All conditions met");
       setRenderingReady(true);
       renderingInitialized.current = true;
     }
     
     // Reset rendering on data issues
-    if ((error || (graphData.nodes.length === 0 && !loading)) && renderingInitialized.current) {
-      console.log("[SoulNet] STREAMLINED: Resetting rendering - data issues detected", { 
+    if ((error || (graphData.nodes.length === 0 && !loading && !isTranslating)) && renderingInitialized.current) {
+      console.log("[SoulNet] RESETTING RENDERING: Data issues detected", { 
         hasError: !!error, 
         nodesCount: graphData.nodes.length,
-        loading
+        loading,
+        isTranslating
       });
       setRenderingReady(false);
       renderingInitialized.current = false;
     }
-  }, [isInstantReady, translationComplete, graphData.nodes.length, loading, error]);
+  }, [isInstantReady, translationComplete, graphData.nodes.length, loading, error, isTranslating]);
 
-  // STREAMLINED: Manual cache refresh handler
+  // ENHANCED: Manual cache refresh handler
   const handleManualRefresh = useCallback(() => {
     if (userId) {
-      console.log('[SoulNet] STREAMLINED: Manual refresh - forcing cache invalidation');
+      console.log('[SoulNet] MANUAL REFRESH: Forcing cache invalidation');
       EnhancedSoulNetPreloadService.forceInvalidateCache(userId, timeRange, currentLanguage);
       
       // Reset rendering state
@@ -128,9 +165,9 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
     }
   }, [userId, timeRange, currentLanguage]);
 
-  // Node selection with state stability
+  // ENHANCED: Node selection with state stability
   const handleNodeSelect = useCallback((id: string) => {
-    console.log(`[SoulNet] STREAMLINED: Node selected: ${id}`);
+    console.log(`[SoulNet] NODE SELECTED: ${id}`);
     if (selectedEntity === id) {
       setSelectedEntity(null);
     } else {
@@ -144,13 +181,13 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
   const toggleFullScreen = useCallback(() => {
     setIsFullScreen(prev => {
       if (!prev) setSelectedEntity(null);
-      console.log(`[SoulNet] STREAMLINED: Fullscreen toggle: ${!prev}`);
+      console.log(`[SoulNet] FULLSCREEN TOGGLE: ${!prev}`);
       return !prev;
     });
   }, []);
 
   const handleCanvasError = useCallback((error: Error) => {
-    console.error('[SoulNet] STREAMLINED: Canvas error:', error);
+    console.error('[SoulNet] CANVAS ERROR:', error);
     setCanvasError(error);
     setRetryCount(prev => prev + 1);
     setRenderingReady(false);
@@ -163,9 +200,32 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
     renderingInitialized.current = false;
   }, []);
 
-  // Show general loading only when truly loading (no translation loading)
+  // ENHANCED: Show translation loading with manual refresh option
+  if (isTranslating && !translationComplete) {
+    console.log("[SoulNet] SHOWING TRANSLATION LOADING");
+    return (
+      <div className="bg-background rounded-xl shadow-sm border w-full p-6">
+        <TranslationLoadingState progress={translationProgress} />
+        <div className="mt-4 text-center">
+          <button 
+            onClick={handleManualRefresh}
+            className="text-sm text-muted-foreground hover:text-primary underline"
+          >
+            <TranslatableText 
+              text="Force refresh if stuck" 
+              forceTranslate={true}
+              enableFontScaling={true}
+              scalingContext="general"
+            />
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // Show general loading only when truly loading
   if (loading && !isInstantReady && graphData.nodes.length === 0) {
-    console.log("[SoulNet] STREAMLINED: Showing general loading");
+    console.log("[SoulNet] SHOWING GENERAL LOADING");
     return (
       <div className="bg-background rounded-xl shadow-sm border w-full p-6">
         <LoadingState />
@@ -305,7 +365,7 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
     );
   };
 
-  console.log(`[SoulNet] STREAMLINED FINAL RENDER: ${graphData.nodes.length} nodes, ${graphData.links.length} links, renderingReady: ${renderingReady}`);
+  console.log(`[SoulNet] FINAL RENDER: ${graphData.nodes.length} nodes, ${graphData.links.length} links, renderingReady: ${renderingReady}`);
 
   return (
     <div className={cn(
@@ -367,7 +427,7 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
             </div>
           }
         >
-          {/* STREAMLINED: Canvas renders only when fully ready */}
+          {/* Canvas renders only when fully ready */}
           {renderingReady && translationComplete && (
             <Canvas
               style={{
