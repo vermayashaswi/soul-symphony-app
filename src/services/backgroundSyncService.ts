@@ -1,4 +1,3 @@
-
 import { serviceWorkerManager } from '@/utils/serviceWorker';
 import { toast } from 'sonner';
 
@@ -99,7 +98,8 @@ class BackgroundSyncService {
       const store = transaction.objectStore(this.storeName);
       const index = store.index('offline');
       
-      const request = index.getAll(true);
+      // Use IDBKeyRange.only() instead of passing boolean directly
+      const request = index.getAll(IDBKeyRange.only(true));
       
       request.onsuccess = () => resolve(request.result || []);
       request.onerror = () => reject(request.error);
@@ -138,7 +138,8 @@ class BackgroundSyncService {
       const store = transaction.objectStore(this.storeName);
       const index = store.index('offline');
       
-      const request = index.count(true);
+      // Use IDBKeyRange.only() instead of passing boolean directly
+      const request = index.count(IDBKeyRange.only(true));
       
       request.onsuccess = () => resolve(request.result);
       request.onerror = () => reject(request.error);

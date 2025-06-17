@@ -1,4 +1,3 @@
-
 /**
  * Service Worker Registration and Management
  */
@@ -13,6 +12,13 @@ export interface SyncCapabilities {
   backgroundSync: boolean;
   pushNotifications: boolean;
   periodicSync: boolean;
+}
+
+// Extend ServiceWorkerRegistration type to include sync property
+interface ServiceWorkerRegistrationWithSync extends ServiceWorkerRegistration {
+  sync?: {
+    register(tag: string): Promise<void>;
+  };
 }
 
 class ServiceWorkerManager {
@@ -99,13 +105,21 @@ class ServiceWorkerManager {
    * Request background sync for journal entries
    */
   async requestBackgroundSync(tag: string = 'journal-entry-sync'): Promise<boolean> {
-    if (!this.registration || !('sync' in window.ServiceWorkerRegistration.prototype)) {
+    if (!this.registration) {
+      console.warn('[SW] No service worker registration available');
+      return false;
+    }
+
+    // Type guard to check if sync is available
+    const registrationWithSync = this.registration as ServiceWorkerRegistrationWithSync;
+    
+    if (!registrationWithSync.sync) {
       console.warn('[SW] Background sync not supported');
       return false;
     }
 
     try {
-      await this.registration.sync.register(tag);
+      await registrationWithSync.sync.register(tag);
       console.log('[SW] Background sync registered:', tag);
       return true;
     } catch (error) {

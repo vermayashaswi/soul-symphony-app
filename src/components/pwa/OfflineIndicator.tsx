@@ -39,7 +39,8 @@ const OfflineIndicator: React.FC<OfflineIndicatorProps> = ({ className }) => {
             const store = transaction.objectStore('journalEntries');
             const index = store.index('offline');
             
-            const countRequest = index.count(true);
+            // Use IDBKeyRange.only() instead of passing boolean directly
+            const countRequest = index.count(IDBKeyRange.only(true));
             countRequest.onsuccess = () => {
               setPendingSyncCount(countRequest.result);
             };
