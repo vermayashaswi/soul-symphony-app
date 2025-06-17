@@ -4,6 +4,31 @@ import { supabase } from '@/integrations/supabase/client';
 
 export type TimeRange = 'today' | 'week' | 'month' | 'year';
 
+export interface AggregatedEmotionData {
+  [emotion: string]: Array<{
+    date: string;
+    value: number;
+    emotion: string;
+  }>;
+}
+
+export interface DominantMood {
+  emotion: string;
+  emoji: string;
+  score: number;
+}
+
+export interface BiggestImprovement {
+  emotion: string;
+  percentage: number;
+}
+
+export interface JournalActivity {
+  entryCount: number;
+  streak: number;
+  maxStreak: number;
+}
+
 interface InsightsData {
   entries: any[];
   allEntries: any[];
@@ -71,7 +96,7 @@ export const useInsightsData = (userId: string | undefined, timeRange: TimeRange
         }
 
         // Calculate date range for filtering
-        const endDate = new Date(globalDate);
+        let endDate = new Date(globalDate);
         let startDate = new Date(globalDate);
 
         switch (timeRange) {
@@ -82,6 +107,7 @@ export const useInsightsData = (userId: string | undefined, timeRange: TimeRange
           case 'week':
             startDate.setDate(startDate.getDate() - startDate.getDay());
             startDate.setHours(0, 0, 0, 0);
+            endDate = new Date(startDate);
             endDate.setDate(startDate.getDate() + 6);
             endDate.setHours(23, 59, 59, 999);
             break;

@@ -35,7 +35,7 @@ const Insights: React.FC = () => {
   useEffect(() => {
     console.log('[Insights] Component state:', {
       userFromAuth: user?.id,
-      userFromProfile: userProfile?.id,
+      userFromProfile: userProfile?.full_name,
       loading,
       error,
       hasInsightsData: !!insightsData,
@@ -146,7 +146,7 @@ const Insights: React.FC = () => {
                   <p><strong>Debug Info:</strong></p>
                   <p>• Authenticated User: {user?.id || 'None'}</p>
                   <p>• User Email: {user?.email || 'None'}</p>
-                  <p>• Profile User: {userProfile?.id || 'None'}</p>
+                  <p>• Profile User: {userProfile?.full_name || 'None'}</p>
                   <p>• Time Range: {timeRange}</p>
                   <p>• Date: {globalDate.toISOString()}</p>
                 </div>
