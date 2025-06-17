@@ -17,6 +17,22 @@ interface InsightsStatsGridProps {
 export function InsightsStatsGrid({ timeRange, insightsData }: InsightsStatsGridProps) {
   const isMobile = useIsMobile();
 
+  // Helper function to format badge text correctly
+  const formatTimeRangeBadge = (timeRange: TimeRange) => {
+    switch (timeRange) {
+      case 'today':
+        return 'Today';
+      case 'week':
+        return 'This week';
+      case 'month':
+        return 'This month';
+      case 'year':
+        return 'This year';
+      default:
+        return `This ${timeRange}`;
+    }
+  };
+
   return (
     <div className={cn(
       "grid grid-cols-1 md:grid-cols-3 gap-6 mb-8 px-2 md:px-0"
@@ -25,7 +41,7 @@ export function InsightsStatsGrid({ timeRange, insightsData }: InsightsStatsGrid
         type="mood"
         title="Dominant Mood"
         delay={0}
-        badge={`This ${timeRange}`}
+        badge={formatTimeRangeBadge(timeRange)}
         badgeColor="bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-200"
         data={insightsData.dominantMood}
         timeRange={timeRange}

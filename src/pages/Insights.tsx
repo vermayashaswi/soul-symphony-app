@@ -28,9 +28,10 @@ function InsightsContent() {
   const scrollPositionRef = useRef<number>(0);
   const isMobile = useIsMobile();
 
-  // FETCH INSIGHTS DATA: Now uses cached data for instant navigation
+  // FETCH INSIGHTS DATA: Now uses separated data for stats vs charts
   const { 
-    insightsData, 
+    statsInsightsData, 
+    chartInsightsData,
     loading, 
     refreshing, 
     refreshCache, 
@@ -94,9 +95,9 @@ function InsightsContent() {
         window.scrollTo({ top: scrollPositionRef.current });
       }, 100);
     }
-  }, [loading, insightsData]);
+  }, [loading, statsInsightsData]);
 
-  const hasAnyEntries = insightsData.entries.length > 0 || insightsData.allEntries.length > 0;
+  const hasAnyEntries = statsInsightsData.entries.length > 0 || statsInsightsData.allEntries.length > 0;
 
   return (
     <div className="min-h-screen pb-20 insights-container">
@@ -148,12 +149,12 @@ function InsightsContent() {
           <>
             <InsightsStatsGrid 
               timeRange={timeRange}
-              insightsData={insightsData}
+              insightsData={statsInsightsData}
             />
             
             <InsightsCharts
               timeRange={timeRange}
-              insightsData={insightsData}
+              chartInsightsData={chartInsightsData}
               emotionChartDate={emotionChartDate}
               moodCalendarDate={moodCalendarDate}
               onEmotionChartNavigate={handleEmotionChartNavigate}

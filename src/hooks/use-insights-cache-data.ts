@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { format, subMonths, startOfMonth, endOfMonth, isWithinInterval } from 'date-fns';
@@ -183,8 +182,8 @@ export const useInsightsCacheData = (
     }
   }, [userId, cacheRange, isCacheValid, cachedData]);
 
-  // Process cached data for specific timeRange and currentDate
-  const processedData = useMemo((): ProcessedInsightsData => {
+  // Process cached data for stats cards (uses timeRange and current date only)
+  const statsInsightsData = useMemo((): ProcessedInsightsData => {
     if (!cachedData) {
       return {
         entries: [],
@@ -196,43 +195,41 @@ export const useInsightsCacheData = (
       };
     }
 
-    // Import processing functions from original hook
-    const getDateRange = (timeRange: TimeRange, baseDate: Date = new Date()) => {
-      let startDate, endDate;
-      switch (timeRange) {
-        case 'today':
-          startDate = new Date(baseDate);
-          startDate.setHours(0, 0, 0, 0);
-          endDate = new Date(baseDate);
-          endDate.setHours(23, 59, 59, 999);
-          break;
-        case 'week':
-          startDate = new Date(baseDate);
-          startDate.setDate(baseDate.getDate() - baseDate.getDay() + 1);
-          startDate.setHours(0, 0, 0, 0);
-          endDate = new Date(startDate);
-          endDate.setDate(startDate.getDate() + 6);
-          endDate.setHours(23, 59, 59, 999);
-          break;
-        case 'month':
-          startDate = new Date(baseDate.getFullYear(), baseDate.getMonth(), 1);
-          endDate = new Date(baseDate.getFullYear(), baseDate.getMonth() + 1, 0, 23, 59, 59, 999);
-          break;
-        case 'year':
-          startDate = new Date(baseDate.getFullYear(), 0, 1);
-          endDate = new Date(baseDate.getFullYear(), 11, 31, 23, 59, 59, 999);
-          break;
-        default:
-          startDate = new Date(baseDate);
-          startDate.setDate(baseDate.getDate() - baseDate.getDay() + 1);
-          startDate.setHours(0, 0, 0, 0);
-          endDate = new Date(startDate);
-          endDate.setDate(startDate.getDate() + 6);
-          endDate.setHours(23, 59, 59, 999);
-      }
-      return { startDate, endDate };
-    };
+    // For stats cards, always use current date (not navigation date)
+    const effectiveBaseDate = new Date(); // Always use current date for stats
+    const { startDate, endDate } = getDateRange(timeRange, effectiveBaseDate);
 
+    // Filter cached entries for the specific time range
+    const filteredEntries = cachedData.entries.filter(entry => {
+      if (!entry.created_at) return false;
+      const entryDate = new Date(entry.created_at);
+      return entryDate >= startDate && entryDate <= endDate;
+    });
+
+    return {
+      entries: filteredEntries,
+      allEntries: cachedData.allEntries,
+      dominantMood: calculateDominantMood(filteredEntries),
+      biggestImprovement: calculateBiggestImprovement(cachedData.allEntries, filteredEntries, timeRange),
+      journalActivity: calculateJournalActivity(filteredEntries, timeRange),
+      aggregatedEmotionData: processEmotionData(filteredEntries, timeRange)
+    };
+  }, [cachedData, timeRange]); // Note: removed currentDate dependency for stats
+
+  // Process cached data for charts (uses timeRange and currentDate for navigation)
+  const chartInsightsData = useMemo((): ProcessedInsightsData => {
+    if (!cachedData) {
+      return {
+        entries: [],
+        allEntries: [],
+        dominantMood: null,
+        biggestImprovement: null,
+        journalActivity: { entryCount: 0, streak: 0, maxStreak: 0 },
+        aggregatedEmotionData: {}
+      };
+    }
+
+    // For charts, use the navigation date (currentDate)
     const effectiveBaseDate = currentDate || new Date();
     const { startDate, endDate } = getDateRange(timeRange, effectiveBaseDate);
 
@@ -243,7 +240,6 @@ export const useInsightsCacheData = (
       return entryDate >= startDate && entryDate <= endDate;
     });
 
-    // Use the same processing functions from the original hook
     return {
       entries: filteredEntries,
       allEntries: cachedData.allEntries,
@@ -252,7 +248,7 @@ export const useInsightsCacheData = (
       journalActivity: calculateJournalActivity(filteredEntries, timeRange),
       aggregatedEmotionData: processEmotionData(filteredEntries, timeRange)
     };
-  }, [cachedData, timeRange, currentDate]);
+  }, [cachedData, timeRange, currentDate]); // Charts depend on currentDate
 
   // Initial cache load
   useEffect(() => {
@@ -265,7 +261,8 @@ export const useInsightsCacheData = (
   }, [fetchCachedData]);
 
   return {
-    insightsData: processedData,
+    statsInsightsData,
+    chartInsightsData,
     loading: isLoading,
     refreshing: isRefreshing,
     refreshCache,
@@ -273,7 +270,44 @@ export const useInsightsCacheData = (
   };
 };
 
-// Helper functions copied from original hook
+// Helper functions (keeping existing implementations)
+const getDateRange = (timeRange: TimeRange, baseDate: Date = new Date()) => {
+  let startDate, endDate;
+  switch (timeRange) {
+    case 'today':
+      startDate = new Date(baseDate);
+      startDate.setHours(0, 0, 0, 0);
+      endDate = new Date(baseDate);
+      endDate.setHours(23, 59, 59, 999);
+      break;
+    case 'week':
+      startDate = new Date(baseDate);
+      startDate.setDate(baseDate.getDate() - baseDate.getDay() + 1);
+      startDate.setHours(0, 0, 0, 0);
+      endDate = new Date(startDate);
+      endDate.setDate(startDate.getDate() + 6);
+      endDate.setHours(23, 59, 59, 999);
+      break;
+    case 'month':
+      startDate = new Date(baseDate.getFullYear(), baseDate.getMonth(), 1);
+      endDate = new Date(baseDate.getFullYear(), baseDate.getMonth() + 1, 0, 23, 59, 59, 999);
+      break;
+    case 'year':
+      startDate = new Date(baseDate.getFullYear(), 0, 1);
+      endDate = new Date(baseDate.getFullYear(), 11, 31, 23, 59, 59, 999);
+      break;
+    default:
+      startDate = new Date(baseDate);
+      startDate.setDate(baseDate.getDate() - baseDate.getDay() + 1);
+      startDate.setHours(0, 0, 0, 0);
+      endDate = new Date(startDate);
+      endDate.setDate(startDate.getDate() + 6);
+      endDate.setHours(23, 59, 59, 999);
+  }
+  return { startDate, endDate };
+};
+
+// ... keep existing code (all the helper functions like calculateDominantMood, calculateBiggestImprovement, etc.)
 const calculateDominantMood = (entries: any[]): DominantMood | null => {
   if (!entries || entries.length === 0) return null;
 

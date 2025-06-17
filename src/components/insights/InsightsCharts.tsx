@@ -10,7 +10,7 @@ import { useIsMobile } from '@/hooks/use-mobile';
 
 interface InsightsChartsProps {
   timeRange: TimeRange;
-  insightsData: {
+  chartInsightsData: {
     entries: any[];
     allEntries: any[];
     aggregatedEmotionData: any;
@@ -24,7 +24,7 @@ interface InsightsChartsProps {
 
 export function InsightsCharts({
   timeRange,
-  insightsData,
+  chartInsightsData,
   emotionChartDate,
   moodCalendarDate,
   onEmotionChartNavigate,
@@ -35,7 +35,7 @@ export function InsightsCharts({
 
   // Filter sentimentData for MoodCalendar
   const getSentimentData = () => {
-    const entries = insightsData.allEntries || [];
+    const entries = chartInsightsData.allEntries || [];
     if (entries.length === 0) return [];
     
     return entries
@@ -61,7 +61,7 @@ export function InsightsCharts({
       >
         <EmotionChart 
           timeframe={timeRange}
-          aggregatedData={insightsData.aggregatedEmotionData}
+          aggregatedData={chartInsightsData.aggregatedEmotionData}
           currentDate={emotionChartDate}
           onTimeRangeNavigate={onEmotionChartNavigate}
         />
