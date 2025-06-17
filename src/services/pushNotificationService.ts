@@ -181,7 +181,7 @@ class PushNotificationService {
           payload: {
             title: 'Test Notification',
             body: 'This is a test push notification from Soulo!',
-            icon: '/lovable-uploads/d61c0a45-1846-4bde-b495-f6b8c58a2951.png'
+            icon: '/lovable-uploads/31ed88ef-f596-4b91-ba58-a4175eebe779.png'
           }
         })
       });

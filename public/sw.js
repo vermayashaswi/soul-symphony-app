@@ -1,4 +1,3 @@
-
 // Soulo PWA Service Worker
 const CACHE_NAME = 'soulo-cache-v1';
 const OFFLINE_URL = '/offline.html';
@@ -17,7 +16,7 @@ const STATIC_ASSETS = [
   '/app/settings',
   '/offline.html',
   '/manifest.json',
-  '/lovable-uploads/d61c0a45-1846-4bde-b495-f6b8c58a2951.png',
+  '/lovable-uploads/31ed88ef-f596-4b91-ba58-a4175eebe779.png',
   '/lovable-uploads/3f275134-f471-4af9-a7cd-700ccd855fe3.png'
 ];
 
@@ -397,20 +396,20 @@ self.addEventListener('push', (event) => {
     
     const options = {
       body: data.body || 'New notification from Soulo',
-      icon: '/lovable-uploads/d61c0a45-1846-4bde-b495-f6b8c58a2951.png',
-      badge: '/lovable-uploads/d61c0a45-1846-4bde-b495-f6b8c58a2951.png',
+      icon: '/lovable-uploads/31ed88ef-f596-4b91-ba58-a4175eebe779.png',
+      badge: '/lovable-uploads/31ed88ef-f596-4b91-ba58-a4175eebe779.png',
       tag: 'soulo-notification',
       requireInteraction: false,
       actions: [
         {
           action: 'open',
           title: 'Open App',
-          icon: '/lovable-uploads/d61c0a45-1846-4bde-b495-f6b8c58a2951.png'
+          icon: '/lovable-uploads/31ed88ef-f596-4b91-ba58-a4175eebe779.png'
         },
         {
           action: 'dismiss',
           title: 'Dismiss',
-          icon: '/lovable-uploads/d61c0a45-1846-4bde-b495-f6b8c58a2951.png'
+          icon: '/lovable-uploads/31ed88ef-f596-4b91-ba58-a4175eebe779.png'
         }
       ],
       data: data.data || {}
