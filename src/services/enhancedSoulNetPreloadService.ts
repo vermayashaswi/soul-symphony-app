@@ -1,4 +1,5 @@
 import { supabase } from '@/integrations/supabase/client';
+import { startOfDay, startOfWeek, startOfMonth, startOfYear, endOfDay, endOfWeek, endOfMonth, endOfYear } from 'date-fns';
 
 interface NodeData {
   id: string;
@@ -46,7 +47,7 @@ interface AppLevelTranslationService {
 export class EnhancedSoulNetPreloadService {
   private static readonly CACHE_KEY = 'enhanced-soulnet-data';
   private static readonly CACHE_DURATION = 15 * 60 * 1000; // 15 minutes
-  private static readonly CACHE_VERSION = 10; // INCREMENTED: For comprehensive cache fix
+  private static readonly CACHE_VERSION = 11; // INCREMENTED: For date range support
   private static cache = new Map<string, CachedEnhancedData>();
   private static translationCoordinator = new Map<string, Promise<Map<string, string>>>();
   
@@ -140,14 +141,16 @@ export class EnhancedSoulNetPreloadService {
     };
   }
 
+  // ENHANCED: Support for global date parameter
   static async preloadInstantData(
     userId: string, 
     timeRange: string, 
-    language: string
+    language: string,
+    globalDate?: Date
   ): Promise<EnhancedSoulNetData | null> {
-    console.log(`[EnhancedSoulNetPreloadService] PRELOAD START: userId=${userId}, timeRange=${timeRange}, language=${language}`);
+    console.log(`[EnhancedSoulNetPreloadService] PRELOAD START: userId=${userId}, timeRange=${timeRange}, language=${language}, globalDate=${globalDate?.toISOString()}`);
     
-    const cacheKey = this.generateCacheKey(userId, timeRange, language);
+    const cacheKey = this.generateCacheKey(userId, timeRange, language, globalDate);
     
     // STEP 1: Check cache with strict validation
     const cached = this.getInstantData(cacheKey);
@@ -159,16 +162,17 @@ export class EnhancedSoulNetPreloadService {
     }
 
     try {
-      // STEP 2: Calculate correct date range
-      const startDate = this.getStartDate(timeRange);
-      console.log(`[EnhancedSoulNetPreloadService] DATE CALCULATION: timeRange=${timeRange}, startDate=${startDate.toISOString()}`);
+      // STEP 2: Calculate correct date range with global date support
+      const { startDate, endDate } = this.getDateRange(timeRange, globalDate);
+      console.log(`[EnhancedSoulNetPreloadService] DATE CALCULATION: timeRange=${timeRange}, startDate=${startDate.toISOString()}, endDate=${endDate.toISOString()}`);
       
-      // STEP 3: Fetch fresh data from database
+      // STEP 3: Fetch fresh data from database with date filtering
       const { data: entries, error } = await supabase
         .from('Journal Entries')
         .select('id, themeemotion, "refined text", "transcription text"')
         .eq('user_id', userId)
         .gte('created_at', startDate.toISOString())
+        .lte('created_at', endDate.toISOString())
         .order('created_at', { ascending: false });
 
       if (error) {
@@ -176,7 +180,7 @@ export class EnhancedSoulNetPreloadService {
         return null;
       }
 
-      console.log(`[EnhancedSoulNetPreloadService] FRESH DATA FETCHED: ${entries?.length || 0} entries for ${timeRange}`);
+      console.log(`[EnhancedSoulNetPreloadService] FRESH DATA FETCHED: ${entries?.length || 0} entries for ${timeRange} (${startDate.toDateString()} - ${endDate.toDateString()})`);
 
       // STEP 4: Handle empty results
       if (!entries || entries.length === 0) {
@@ -261,6 +265,45 @@ export class EnhancedSoulNetPreloadService {
       console.error('[EnhancedSoulNetPreloadService] PRELOAD ERROR:', error);
       this.translationStates.delete(cacheKey);
       return null;
+    }
+  }
+
+  // ENHANCED: Date range calculation with global date support
+  private static getDateRange(timeRange: string, globalDate?: Date): { startDate: Date, endDate: Date } {
+    const referenceDate = globalDate || new Date();
+    console.log(`[EnhancedSoulNetPreloadService] DATE RANGE CALCULATION: timeRange=${timeRange}, referenceDate=${referenceDate.toISOString()}`);
+    
+    switch (timeRange) {
+      case 'today':
+        return {
+          startDate: startOfDay(referenceDate),
+          endDate: endOfDay(referenceDate)
+        };
+        
+      case 'week':
+        return {
+          startDate: startOfWeek(referenceDate, { weekStartsOn: 1 }),
+          endDate: endOfWeek(referenceDate, { weekStartsOn: 1 })
+        };
+        
+      case 'month':
+        return {
+          startDate: startOfMonth(referenceDate),
+          endDate: endOfMonth(referenceDate)
+        };
+        
+      case 'year':
+        return {
+          startDate: startOfYear(referenceDate),
+          endDate: endOfYear(referenceDate)
+        };
+        
+      default:
+        // Default to week
+        return {
+          startDate: startOfWeek(referenceDate, { weekStartsOn: 1 }),
+          endDate: endOfWeek(referenceDate, { weekStartsOn: 1 })
+        };
     }
   }
 
@@ -482,9 +525,10 @@ export class EnhancedSoulNetPreloadService {
     return isWithinDuration && isCorrectVersion && hasValidData;
   }
 
-  // ENHANCED: Better cache key generation
-  private static generateCacheKey(userId: string, timeRange: string, language: string): string {
-    const key = `${userId}-${timeRange}-${language}-v${this.CACHE_VERSION}`;
+  // ENHANCED: Include global date in cache key generation
+  private static generateCacheKey(userId: string, timeRange: string, language: string, globalDate?: Date): string {
+    const dateStr = globalDate ? globalDate.toISOString().split('T')[0] : new Date().toISOString().split('T')[0];
+    const key = `${userId}-${timeRange}-${language}-${dateStr}-v${this.CACHE_VERSION}`;
     console.log(`[EnhancedSoulNetPreloadService] CACHE KEY GENERATED: ${key}`);
     return key;
   }
@@ -508,48 +552,6 @@ export class EnhancedSoulNetPreloadService {
       console.log(`[EnhancedSoulNetPreloadService] CACHED TO STORAGE: ${cacheKey}`);
     } catch (error) {
       console.error('[EnhancedSoulNetPreloadService] STORAGE SAVE ERROR:', error);
-    }
-  }
-
-  // FIXED: Corrected week calculation
-  private static getStartDate(timeRange: string): Date {
-    const now = new Date();
-    console.log(`[EnhancedSoulNetPreloadService] DATE CALCULATION START: ${timeRange} at ${now.toISOString()}`);
-    
-    switch (timeRange) {
-      case 'today':
-        const todayStart = new Date(now);
-        todayStart.setHours(0, 0, 0, 0);
-        console.log(`[EnhancedSoulNetPreloadService] TODAY START: ${todayStart.toISOString()}`);
-        return todayStart;
-        
-      case 'week':
-        // Calculate start of current week (Monday 00:00:00)
-        const currentWeekStart = new Date(now);
-        const dayOfWeek = currentWeekStart.getDay(); // 0 = Sunday, 1 = Monday, etc.
-        const daysToSubtract = dayOfWeek === 0 ? 6 : dayOfWeek - 1; // If Sunday, go back 6 days to Monday
-        currentWeekStart.setDate(currentWeekStart.getDate() - daysToSubtract);
-        currentWeekStart.setHours(0, 0, 0, 0);
-        console.log(`[EnhancedSoulNetPreloadService] WEEK START: dayOfWeek=${dayOfWeek}, subtract=${daysToSubtract}, result=${currentWeekStart.toISOString()}`);
-        return currentWeekStart;
-        
-      case 'month':
-        const monthStart = new Date(now);
-        monthStart.setMonth(monthStart.getMonth() - 1);
-        console.log(`[EnhancedSoulNetPreloadService] MONTH START: ${monthStart.toISOString()}`);
-        return monthStart;
-        
-      case 'year':
-        const yearStart = new Date(now);
-        yearStart.setFullYear(yearStart.getFullYear() - 1);
-        console.log(`[EnhancedSoulNetPreloadService] YEAR START: ${yearStart.toISOString()}`);
-        return yearStart;
-        
-      default:
-        const defaultStart = new Date(now);
-        defaultStart.setDate(defaultStart.getDate() - 7);
-        console.log(`[EnhancedSoulNetPreloadService] DEFAULT START: ${defaultStart.toISOString()}`);
-        return defaultStart;
     }
   }
 

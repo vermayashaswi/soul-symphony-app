@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { EnhancedSoulNetPreloadService } from '@/services/enhancedSoulNetPreloadService';
 import { useTranslation } from '@/contexts/TranslationContext';
@@ -41,17 +40,19 @@ interface InstantSoulNetData {
 
 export const useInstantSoulNetData = (
   userId: string | undefined,
-  timeRange: string
+  timeRange: string,
+  globalDate?: Date
 ): InstantSoulNetData => {
   const { currentLanguage, getCachedTranslation } = useTranslation();
   
-  // ENHANCED: Cache key with proper dependency tracking
+  // ENHANCED: Cache key with global date dependency
   const cacheKey = useMemo(() => {
     if (!userId) return '';
-    const key = `${userId}-${timeRange}-${currentLanguage}`;
+    const dateStr = globalDate ? globalDate.toISOString().split('T')[0] : new Date().toISOString().split('T')[0];
+    const key = `${userId}-${timeRange}-${currentLanguage}-${dateStr}`;
     console.log(`[useInstantSoulNetData] CACHE KEY: ${key}`);
     return key;
-  }, [userId, timeRange, currentLanguage]);
+  }, [userId, timeRange, currentLanguage, globalDate]);
 
   // ENHANCED: Comprehensive state initialization
   const [graphData, setGraphData] = useState<{ nodes: NodeData[], links: LinkData[] }>({ nodes: [], links: [] });
@@ -65,9 +66,9 @@ export const useInstantSoulNetData = (
   const [translationProgress, setTranslationProgress] = useState(0);
   const [translationComplete, setTranslationComplete] = useState(false);
 
-  // ENHANCED: Immediate state reset and cache management when parameters change
+  // ENHANCED: Parameter change tracking with global date
   useEffect(() => {
-    console.log(`[useInstantSoulNetData] PARAMETERS CHANGED: timeRange=${timeRange}, language=${currentLanguage}, userId=${userId}`);
+    console.log(`[useInstantSoulNetData] PARAMETERS CHANGED: timeRange=${timeRange}, language=${currentLanguage}, userId=${userId}, globalDate=${globalDate?.toISOString()}`);
     
     if (!userId) {
       console.log('[useInstantSoulNetData] NO USER ID - resetting to empty state');
@@ -117,9 +118,9 @@ export const useInstantSoulNetData = (
     } else {
       console.log(`[useInstantSoulNetData] NO VALID CACHE: will fetch fresh data for ${cacheKey}`);
     }
-  }, [userId, timeRange, currentLanguage, cacheKey]);
+  }, [userId, timeRange, currentLanguage, globalDate, cacheKey]);
 
-  // ENHANCED: Fresh data fetching with comprehensive error handling
+  // ENHANCED: Fresh data fetching with global date support
   const fetchFreshData = useCallback(async () => {
     if (!userId || !cacheKey) {
       console.log('[useInstantSoulNetData] FETCH SKIP: missing userId or cacheKey');
@@ -149,12 +150,13 @@ export const useInstantSoulNetData = (
       setError(null);
       setLoading(true);
       
-      console.log(`[useInstantSoulNetData] FETCHING FRESH: userId=${userId}, timeRange=${timeRange}, language=${currentLanguage}`);
+      console.log(`[useInstantSoulNetData] FETCHING FRESH: userId=${userId}, timeRange=${timeRange}, language=${currentLanguage}, globalDate=${globalDate?.toISOString()}`);
       
       const result = await EnhancedSoulNetPreloadService.preloadInstantData(
         userId,
         timeRange,
-        currentLanguage
+        currentLanguage,
+        globalDate
       );
 
       if (result) {
@@ -187,7 +189,7 @@ export const useInstantSoulNetData = (
     } finally {
       setLoading(false);
     }
-  }, [userId, timeRange, currentLanguage, cacheKey]);
+  }, [userId, timeRange, currentLanguage, globalDate, cacheKey]);
 
   // Trigger data fetching
   useEffect(() => {

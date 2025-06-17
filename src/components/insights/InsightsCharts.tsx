@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import { motion } from 'framer-motion';
 import { cn } from '@/lib/utils';
@@ -90,6 +89,7 @@ export function InsightsCharts({
         <SoulNet
           userId={userId}
           timeRange={timeRange}
+          globalDate={globalDate}
         />
       </motion.div>
     </>

@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import '@/types/three-reference';
 import { Canvas } from '@react-three/fiber';
@@ -21,6 +20,7 @@ import { translationService } from '@/services/translationService';
 interface SoulNetProps {
   userId: string | undefined;
   timeRange: TimeRange;
+  globalDate?: Date; // ENHANCED: Accept global date prop
 }
 
 // ENHANCED: Translation Loading Component
@@ -54,7 +54,7 @@ const TranslationLoadingState: React.FC<{ progress: number }> = ({ progress }) =
   </div>
 );
 
-const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
+const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange, globalDate }) => {
   const [isFullScreen, setIsFullScreen] = useState(false);
   const [canvasError, setCanvasError] = useState<Error | null>(null);
   const [retryCount, setRetryCount] = useState(0);
@@ -64,15 +64,18 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
   const [selectedEntity, setSelectedEntity] = useState<string | null>(null);
   const { currentLanguage } = useTranslation();
   
-  // ENHANCED: Rendering initialization tracking
+  // ENHANCED: Track parameter changes including global date
   const renderingInitialized = useRef(false);
   const lastTimeRange = useRef<string>(timeRange);
   const lastLanguage = useRef<string>(currentLanguage);
+  const lastGlobalDate = useRef<Date | undefined>(globalDate);
 
   // ENHANCED: Track parameter changes for immediate reset
   useEffect(() => {
-    if (lastTimeRange.current !== timeRange || lastLanguage.current !== currentLanguage) {
-      console.log(`[SoulNet] PARAMETER CHANGE: timeRange ${lastTimeRange.current} -> ${timeRange}, language ${lastLanguage.current} -> ${currentLanguage}`);
+    const globalDateChanged = lastGlobalDate.current?.getTime() !== globalDate?.getTime();
+    
+    if (lastTimeRange.current !== timeRange || lastLanguage.current !== currentLanguage || globalDateChanged) {
+      console.log(`[SoulNet] PARAMETER CHANGE: timeRange ${lastTimeRange.current} -> ${timeRange}, language ${lastLanguage.current} -> ${currentLanguage}, globalDate changed: ${globalDateChanged}`);
       
       // Immediate rendering reset on parameter change
       setRenderingReady(false);
@@ -81,8 +84,9 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
       
       lastTimeRange.current = timeRange;
       lastLanguage.current = currentLanguage;
+      lastGlobalDate.current = globalDate;
     }
-  }, [timeRange, currentLanguage]);
+  }, [timeRange, currentLanguage, globalDate]);
 
   // APP-LEVEL: Initialize the enhanced service
   useEffect(() => {
@@ -102,12 +106,13 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
     getInstantConnectionPercentage,
     getInstantTranslation,
     getInstantNodeConnections
-  } = useInstantSoulNetData(userId, timeRange);
+  } = useInstantSoulNetData(userId, timeRange, globalDate);
 
   console.log("[SoulNet] ENHANCED STATE", { 
     userId, 
     timeRange, 
     currentLanguage,
+    globalDate: globalDate?.toISOString(),
     nodesCount: graphData.nodes.length,
     isInstantReady,
     loading,
