@@ -1,3 +1,4 @@
+
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.7.1';
@@ -127,17 +128,18 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
-    const { userId, ipAddress } = RateLimitManager.getClientInfo(req);
+    // FIXED: Rename to avoid conflicts with later userId declaration
+    const { userId: rateLimitUserId, ipAddress } = RateLimitManager.getClientInfo(req);
 
     // Check rate limits - transcription is resource intensive so we check early
     const rateLimitCheck = await rateLimitManager.checkRateLimit({
-      userId,
+      userId: rateLimitUserId,
       ipAddress,
       functionName: 'transcribe-audio'
     });
 
     if (!rateLimitCheck.allowed) {
-      console.log(`[transcribe-audio] Rate limit exceeded for user ${userId || 'anonymous'} from IP ${ipAddress}`);
+      console.log(`[transcribe-audio] Rate limit exceeded for user ${rateLimitUserId || 'anonymous'} from IP ${ipAddress}`);
       return rateLimitManager.createRateLimitResponse(rateLimitCheck);
     }
 
@@ -209,7 +211,7 @@ serve(async (req) => {
       });
     }
     
-    // Extract validated parameters
+    // Extract validated parameters - this is the userId from the request data
     const { userId, highQuality = true, directTranscription = false, recordingTime = null } = requestData;
     const actualAudioData = requestData.audio || requestData.audioData;
     
@@ -552,17 +554,17 @@ serve(async (req) => {
       errorMessage = error.message;
     }
 
-    // Log failed API usage
+    // Log failed API usage - FIXED: Use rateLimitUserId for consistency
     try {
       const rateLimitManager = new RateLimitManager(
         Deno.env.get('SUPABASE_URL') ?? '',
         Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
       );
-      const { userId, ipAddress } = RateLimitManager.getClientInfo(req);
+      const { userId: errorUserId, ipAddress: errorIpAddress } = RateLimitManager.getClientInfo(req);
       
       await rateLimitManager.logApiUsage({
-        userId,
-        ipAddress,
+        userId: errorUserId,
+        ipAddress: errorIpAddress,
         functionName: 'transcribe-audio',
         statusCode,
         responseTimeMs: totalTime,
