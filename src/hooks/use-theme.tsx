@@ -1,3 +1,4 @@
+
 import { createContext, useContext, useEffect, useState, ReactNode } from "react";
 
 type Theme = 'light' | 'dark' | 'system';
@@ -19,64 +20,50 @@ interface ThemeContextType {
 
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 
-export function ThemeProvider({ children }: ThemeProviderProps) {
-  // Defensive check for React context readiness
-  let theme: Theme;
-  let setTheme: (theme: Theme) => void;
-  let systemTheme: 'light' | 'dark';
-  let setSystemTheme: (theme: 'light' | 'dark') => void;
-  let colorTheme: ColorTheme;
-  let setColorTheme: (theme: ColorTheme) => void;
-  let customColor: string;
-  let setCustomColor: (color: string) => void;
-
+// Safe localStorage access
+const safeLocalStorageGet = (key: string, defaultValue: string): string => {
   try {
-    [theme, setTheme] = useState<Theme>(() => {
-      try {
-        const savedTheme = localStorage.getItem('feelosophy-theme');
-        return (savedTheme as Theme) || 'system';
-      } catch {
-        return 'system';
-      }
-    });
-    
-    [systemTheme, setSystemTheme] = useState<'light' | 'dark'>(() => {
-      try {
-        return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
-      } catch {
-        return 'light';
-      }
-    });
-    
-    [colorTheme, setColorTheme] = useState<ColorTheme>(() => {
-      try {
-        const savedColorTheme = localStorage.getItem('feelosophy-color-theme');
-        return (savedColorTheme as ColorTheme) || 'Calm';
-      } catch {
-        return 'Calm';
-      }
-    });
-
-    [customColor, setCustomColor] = useState<string>(() => {
-      try {
-        const savedCustomColor = localStorage.getItem('feelosophy-custom-color');
-        return savedCustomColor || '#3b82f6';
-      } catch {
-        return '#3b82f6';
-      }
-    });
-  } catch (error) {
-    console.error('Theme provider initialization error:', error);
-    // Fallback to default values if hooks fail
-    theme = 'system';
-    setTheme = () => {};
-    systemTheme = 'light';
-    setSystemTheme = () => {};
-    colorTheme = 'Calm';
-    setColorTheme = () => {};
-    customColor = '#3b82f6';
-    setCustomColor = () => {};
+    return localStorage.getItem(key) || defaultValue;
+  } catch {
+    return defaultValue;
   }
+};
+
+// Safe localStorage set
+const safeLocalStorageSet = (key: string, value: string): void => {
+  try {
+    localStorage.setItem(key, value);
+  } catch {
+    // Silently fail if localStorage is not available
+  }
+};
+
+// Safe media query check
+const safeMediaQueryCheck = (): 'light' | 'dark' => {
+  try {
+    return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+  } catch {
+    return 'light';
+  }
+};
+
+export function ThemeProvider({ children }: ThemeProviderProps) {
+  // All hooks must be called at the top level, unconditionally
+  const [theme, setTheme] = useState<Theme>(() => {
+    return (safeLocalStorageGet('feelosophy-theme', 'system') as Theme) || 'system';
+  });
+  
+  const [systemTheme, setSystemTheme] = useState<'light' | 'dark'>(() => {
+    return safeMediaQueryCheck();
+  });
+  
+  const [colorTheme, setColorTheme] = useState<ColorTheme>(() => {
+    return (safeLocalStorageGet('feelosophy-color-theme', 'Calm') as ColorTheme) || 'Calm';
+  });
+
+  const [customColor, setCustomColor] = useState<string>(() => {
+    return safeLocalStorageGet('feelosophy-custom-color', '#3b82f6');
+  });
 
   useEffect(() => {
     try {
@@ -122,7 +109,7 @@ export function ThemeProvider({ children }: ThemeProviderProps) {
         root.classList.add(theme);
       }
       
-      localStorage.setItem('feelosophy-theme', theme);
+      safeLocalStorageSet('feelosophy-theme', theme);
     } catch (error) {
       console.warn('Theme application error:', error);
     }
@@ -184,7 +171,7 @@ export function ThemeProvider({ children }: ThemeProviderProps) {
 
   useEffect(() => {
     try {
-      localStorage.setItem('feelosophy-color-theme', colorTheme);
+      safeLocalStorageSet('feelosophy-color-theme', colorTheme);
       
       const root = window.document.documentElement;
       const primaryHex = getColorHex(colorTheme);
@@ -271,7 +258,7 @@ export function ThemeProvider({ children }: ThemeProviderProps) {
   // This effect specifically handles when custom color changes
   useEffect(() => {
     try {
-      localStorage.setItem('feelosophy-custom-color', customColor);
+      safeLocalStorageSet('feelosophy-custom-color', customColor);
       
       // Only update the theme if currently using Custom theme
       if (colorTheme === 'Custom') {
