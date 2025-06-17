@@ -109,7 +109,11 @@ export const fetchJournalEntries = async (userId: string, timeoutRef?: React.Mut
     const mappedEntries: JournalEntry[] = (data || []).map(entry => ({
       ...entry,
       content: entry["refined text"] || entry["transcription text"] || '', // Map content from refined or transcription text
-      entities: Array.isArray(entry.entities) ? entry.entities : [], // Ensure entities is an array
+      entities: Array.isArray(entry.entities) ? entry.entities.map((entity: any) => ({
+        type: entity.type || '',
+        name: entity.name || '',
+        text: entity.text
+      })) : [], // Properly transform entities to expected structure
     }));
     
     return mappedEntries;
