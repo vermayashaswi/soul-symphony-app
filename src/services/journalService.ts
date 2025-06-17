@@ -105,10 +105,11 @@ export const fetchJournalEntries = async (userId: string, timeoutRef?: React.Mut
       throw new Error(`Failed to fetch entries: ${error.message}`);
     }
     
-    // Map the database response to JournalEntry format, adding the required content field
+    // Map the database response to JournalEntry format, handling type conversions
     const mappedEntries: JournalEntry[] = (data || []).map(entry => ({
       ...entry,
       content: entry["refined text"] || entry["transcription text"] || '', // Map content from refined or transcription text
+      entities: Array.isArray(entry.entities) ? entry.entities : [], // Ensure entities is an array
     }));
     
     return mappedEntries;
