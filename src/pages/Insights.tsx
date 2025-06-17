@@ -11,6 +11,7 @@ import { InsightsLoadingState } from '@/components/insights/InsightsLoadingState
 import { InsightsEmptyState } from '@/components/insights/InsightsEmptyState';
 import { InsightsGlobalNavigation } from '@/components/insights/InsightsGlobalNavigation';
 import { useUserProfile } from '@/hooks/useUserProfile';
+import { useAuth } from '@/contexts/AuthContext';
 import { InsightsTranslationProvider } from '@/components/insights/InsightsTranslationProvider';
 import { addDays, addWeeks, addMonths, addYears, subDays, subWeeks, subMonths, subYears } from 'date-fns';
 
@@ -20,8 +21,10 @@ const Insights: React.FC = () => {
   const [globalDate, setGlobalDate] = useState<Date>(new Date());
   const [refreshing, setRefreshing] = useState(false);
   const userProfile = useUserProfile();
+  const { user } = useAuth();
   
   const { insightsData, loading } = useInsightsData(
+    user?.id,
     timeRange,
     globalDate
   );
@@ -60,6 +63,23 @@ const Insights: React.FC = () => {
     }, 500);
   };
 
+  // Handle time range change with proper typing
+  const handleTimeRangeChange = (value: string) => {
+    setTimeRange(value as TimeRange);
+  };
+
+  // Transform insights data to match expected interface
+  const transformedInsightsData = {
+    moodFrequency: insightsData?.dominantMood || null,
+    totalEntries: insightsData?.entries?.length || 0,
+    avgSentiment: insightsData?.entries?.reduce((sum, entry) => {
+      const sentiment = parseFloat(entry.sentiment || '0');
+      return sum + sentiment;
+    }, 0) / (insightsData?.entries?.length || 1) || 0,
+    topEmotion: insightsData?.dominantMood?.emotion || '',
+    emotionDistribution: insightsData?.aggregatedEmotionData || {}
+  };
+
   if (loading) {
     return <InsightsLoadingState />;
   }
@@ -89,7 +109,7 @@ const Insights: React.FC = () => {
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
               <InsightsTimeToggle 
                 timeRange={timeRange} 
-                onTimeRangeChange={setTimeRange}
+                onTimeRangeChange={handleTimeRangeChange}
                 refreshing={refreshing}
                 onRefresh={handleRefresh}
               />
@@ -104,7 +124,7 @@ const Insights: React.FC = () => {
 
           <InsightsStatsGrid
             timeRange={timeRange}
-            insightsData={insightsData}
+            insightsData={transformedInsightsData}
             isLoading={loading}
             globalDate={globalDate}
           />
@@ -113,7 +133,7 @@ const Insights: React.FC = () => {
             timeRange={timeRange}
             insightsData={insightsData}
             globalDate={globalDate}
-            userId={userProfile?.id}
+            userId={user?.id}
           />
         </div>
       </div>
