@@ -2,7 +2,6 @@
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter } from "react-router-dom";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { TranslationProvider } from "@/contexts/TranslationContext";
 import { LocationProvider } from "@/contexts/LocationContext";
@@ -26,29 +25,27 @@ const queryClient = new QueryClient({
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
-      <BrowserRouter>
-        <ThemeProvider attribute="class" defaultTheme="light" enableSystem>
-          <TooltipProvider>
-            <NetworkAwareContent>
-              <AuthProvider>
-                <TranslationProvider>
-                  <LocationProvider>
-                    <SubscriptionProvider>
-                      <FeatureFlagsProvider>
-                        <TutorialProvider>
-                          <AppRoutes />
-                          <InstallPrompt />
-                          <Toaster />
-                        </TutorialProvider>
-                      </FeatureFlagsProvider>
-                    </SubscriptionProvider>
-                  </LocationProvider>
-                </TranslationProvider>
-              </AuthProvider>
-            </NetworkAwareContent>
-          </TooltipProvider>
-        </ThemeProvider>
-      </BrowserRouter>
+      <ThemeProvider attribute="class" defaultTheme="light" enableSystem>
+        <TooltipProvider>
+          <NetworkAwareContent>
+            <AuthProvider>
+              <TranslationProvider>
+                <LocationProvider>
+                  <SubscriptionProvider>
+                    <FeatureFlagsProvider>
+                      <TutorialProvider>
+                        <AppRoutes />
+                        <InstallPrompt />
+                        <Toaster />
+                      </TutorialProvider>
+                    </FeatureFlagsProvider>
+                  </SubscriptionProvider>
+                </LocationProvider>
+              </TranslationProvider>
+            </AuthProvider>
+          </NetworkAwareContent>
+        </TooltipProvider>
+      </ThemeProvider>
     </QueryClientProvider>
   );
 }
