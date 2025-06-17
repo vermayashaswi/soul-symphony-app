@@ -33,5 +33,22 @@ export default defineConfig(({ mode }) => ({
     commonjsOptions: {
       transformMixedEsModules: true,
     },
+    rollupOptions: {
+      output: {
+        // Copy manifest.json to app subdirectory for PWA
+        assetFileNames: (assetInfo) => {
+          if (assetInfo.name === 'manifest.json') {
+            return 'app/manifest.json';
+          }
+          return '[name]-[hash][extname]';
+        }
+      }
+    }
   },
+  // Configure public directory handling for manifest
+  publicDir: 'public',
+  // Add custom handling for manifest.json in app path
+  define: {
+    __APP_MANIFEST_PATH__: JSON.stringify('/app/manifest.json')
+  }
 }));
