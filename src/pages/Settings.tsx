@@ -452,7 +452,10 @@ function SettingsContent() {
               <div className="flex flex-col sm:flex-row gap-6 items-center sm:items-start">
                 <div className="flex flex-col items-center">
                   <Avatar className="h-24 w-24 mb-4">
-                    <AvatarImage src={user?.user_metadata?.avatar_url} />
+                    <AvatarImage 
+                      src={user?.user_metadata?.avatar_url} 
+                      optimizeSize={192}
+                    />
                     <AvatarFallback>
                       {user?.email?.substring(0, 2).toUpperCase() || "U"}
                     </AvatarFallback>
@@ -460,93 +463,65 @@ function SettingsContent() {
                 </div>
                 
                 <div className="flex-1 space-y-4 text-center sm:text-left">
-                  <div>
-                    {isEditingName ? (
-                      <div className="flex flex-col space-y-2">
-                        <Input
-                          value={displayName}
-                          onChange={handleNameChange}
-                          placeholder="Enter your display name"
-                          className={cn("max-w-xs", nameError && "border-red-500")}
-                          autoFocus
-                          maxLength={MAX_NAME_LENGTH}
-                        />
-                        {nameError && (
-                          <p className="text-xs text-red-500">{nameError}</p>
-                        )}
-                        <div className="flex gap-2 mt-2">
-                          <Button 
-                            variant="outline" 
-                            size="sm"
-                            onClick={cancelNameEdit}
-                            className="flex items-center gap-1"
-                          >
-                            <X className="h-3 w-3" />
-                            <TranslatableText text="Cancel" />
-                          </Button>
-                          <Button 
-                            variant="default" 
-                            size="sm"
-                            onClick={saveDisplayName}
-                            className="flex items-center gap-1 bg-theme hover:bg-theme/90"
-                            disabled={!displayName.trim() || displayName.trim() === originalDisplayName || !!nameError || displayName.length > MAX_NAME_LENGTH}
-                          >
-                            <Save className="h-3 w-3" />
-                            <TranslatableText text="Save" />
-                          </Button>
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="flex items-center justify-center sm:justify-start gap-2 flex-wrap">
-                        <h3 className="text-xl font-semibold text-foreground">
-                          {isLoadingProfile ? <TranslatableText text="Loading..." /> : 
-                           originalDisplayName || user?.user_metadata?.full_name || <TranslatableText text="User" />}
-                        </h3>
-                        <SubscriptionBadge
-                          isPremium={isPremium}
-                          isTrialActive={isTrialActive}
-                          subscriptionStatus={subscriptionStatus}
-                          isLoading={subscriptionLoading}
-                          size="sm"
-                        />
+                  {isEditingName ? (
+                    <div className="flex flex-col space-y-2">
+                      <Input
+                        value={displayName}
+                        onChange={handleNameChange}
+                        placeholder="Enter your display name"
+                        className={cn("max-w-xs", nameError && "border-red-500")}
+                        autoFocus
+                        maxLength={MAX_NAME_LENGTH}
+                      />
+                      {nameError && (
+                        <p className="text-xs text-red-500">{nameError}</p>
+                      )}
+                      <div className="flex gap-2 mt-2">
                         <Button 
-                          variant="ghost" 
-                          size="icon" 
-                          className="h-6 w-6"
-                          onClick={() => setIsEditingName(true)}
+                          variant="outline" 
+                          size="sm"
+                          onClick={cancelNameEdit}
+                          className="flex items-center gap-1"
                         >
-                          <Pencil className="h-3 w-3" />
+                          <X className="h-3 w-3" />
+                          <TranslatableText text="Cancel" />
+                        </Button>
+                        <Button 
+                          variant="default" 
+                          size="sm"
+                          onClick={saveDisplayName}
+                          className="flex items-center gap-1 bg-theme hover:bg-theme/90"
+                          disabled={!displayName.trim() || displayName.trim() === originalDisplayName || !!nameError || displayName.length > MAX_NAME_LENGTH}
+                        >
+                          <Save className="h-3 w-3" />
+                          <TranslatableText text="Save" />
                         </Button>
                       </div>
-                    )}
-                    <p className="text-muted-foreground">{user?.email}</p>
-                  </div>
-                  
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="bg-secondary rounded-lg p-3">
-                      <p className="text-muted-foreground text-sm">
-                        <TranslatableText text="Journal Entries" />
-                      </p>
-                      <p className="text-xl font-medium text-foreground">{entries.length}</p>
                     </div>
-                    <div className="bg-secondary rounded-lg p-3">
-                      <p className="text-muted-foreground text-sm">
-                        <TranslatableText text="Max Streak" />
-                      </p>
-                      <p className="text-xl font-medium text-foreground">
-                        {maxStreak} <TranslatableText text="days" />
-                      </p>
+                  ) : (
+                    <div className="flex items-center justify-center sm:justify-start gap-2 flex-wrap">
+                      <h3 className="text-xl font-semibold text-foreground">
+                        {isLoadingProfile ? <TranslatableText text="Loading..." /> : 
+                         originalDisplayName || user?.user_metadata?.full_name || <TranslatableText text="User" />}
+                      </h3>
+                      <SubscriptionBadge
+                        isPremium={isPremium}
+                        isTrialActive={isTrialActive}
+                        subscriptionStatus={subscriptionStatus}
+                        isLoading={subscriptionLoading}
+                        size="sm"
+                      />
+                      <Button 
+                        variant="ghost" 
+                        size="icon" 
+                        className="h-6 w-6"
+                        onClick={() => setIsEditingName(true)}
+                      >
+                        <Pencil className="h-3 w-3" />
+                      </Button>
                     </div>
-                  </div>
-                  
-                  <Button 
-                    variant="destructive" 
-                    className="gap-2" 
-                    onClick={handleLogout}
-                  >
-                    <LogOut className="h-4 w-4" />
-                    <TranslatableText text="logout" forceTranslate={true} />
-                  </Button>
+                  )}
+                  <p className="text-muted-foreground">{user?.email}</p>
                 </div>
               </div>
             </motion.div>
