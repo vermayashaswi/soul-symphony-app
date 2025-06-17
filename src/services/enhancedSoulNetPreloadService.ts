@@ -1,3 +1,4 @@
+
 import { supabase } from '@/integrations/supabase/client';
 
 interface NodeData {
@@ -581,6 +582,7 @@ export class EnhancedSoulNetPreloadService {
     return this.generateGraph(entityEmotionMap);
   }
 
+  // UPDATED: Implement custom y-axis positioning pattern for entity nodes
   private static generateGraph(entityEmotionMap: Record<string, Record<string, number>>): { nodes: NodeData[], links: LinkData[] } {
     const nodes: NodeData[] = [];
     const links: LinkData[] = [];
@@ -591,13 +593,22 @@ export class EnhancedSoulNetPreloadService {
     const EMOTION_LAYER_RADIUS = 11;
     const ENTITY_LAYER_RADIUS = 6;
     
+    // Custom y-axis pattern for entity nodes: [+5, -5, +8, -8, +6.5, -6.5, +5, -5, +8]
+    const entityYPattern = [5, -5, 8, -8, 6.5, -6.5, 5, -5, 8];
+    
     entityList.forEach((entity, entityIndex) => {
       entityNodes.add(entity);
       const entityAngle = (entityIndex / entityList.length) * Math.PI * 2;
       const entityRadius = ENTITY_LAYER_RADIUS;
       const entityX = Math.cos(entityAngle) * entityRadius;
-      const entityY = (entityIndex % 2 === 0) ? 2 : -2;
+      
+      // Apply custom y-axis pattern that repeats every 9 nodes
+      const patternIndex = entityIndex % entityYPattern.length;
+      const entityY = entityYPattern[patternIndex];
+      
       const entityZ = Math.sin(entityAngle) * entityRadius;
+      
+      console.log(`[EnhancedSoulNetPreloadService] Entity ${entityIndex}: ${entity}, Y-position: ${entityY} (pattern index: ${patternIndex})`);
       
       nodes.push({
         id: entity,
@@ -645,6 +656,7 @@ export class EnhancedSoulNetPreloadService {
       });
     });
 
+    console.log(`[EnhancedSoulNetPreloadService] Generated graph with custom entity Y-pattern: ${nodes.filter(n => n.type === 'entity').length} entities, ${nodes.filter(n => n.type === 'emotion').length} emotions`);
     return { nodes, links };
   }
 
