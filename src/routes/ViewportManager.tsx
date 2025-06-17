@@ -1,6 +1,6 @@
 
 import React, { useEffect } from 'react';
-import { Outlet, useLocation, Navigate } from 'react-router-dom';
+import { useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useIsMobile } from '@/hooks/use-mobile';
 import MobileNavigation from '@/components/MobileNavigation';
@@ -8,7 +8,11 @@ import { isAppRoute, isWebsiteRoute } from './RouteHelpers';
 import { useOnboarding } from '@/hooks/use-onboarding';
 import { forceEnableScrolling } from '@/hooks/use-scroll-restoration';
 
-const ViewportManager: React.FC = () => {
+interface ViewportManagerProps {
+  children: React.ReactNode;
+}
+
+const ViewportManager: React.FC<ViewportManagerProps> = ({ children }) => {
   const location = useLocation();
   const { user } = useAuth();
   const isMobile = useIsMobile();
@@ -80,7 +84,7 @@ const ViewportManager: React.FC = () => {
   return (
     <>
       <div className={`app-container ${isMobile ? 'mobile-view' : 'desktop-view'} ${isHomePage ? 'overflow-hidden' : 'overflow-x-hidden'}`}>
-        <Outlet />
+        {children}
       </div>
       
       {/* Only display mobile navigation when:
