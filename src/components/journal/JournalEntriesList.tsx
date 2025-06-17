@@ -1,3 +1,4 @@
+
 import React, { useEffect, useRef, useState } from 'react';
 import { JournalEntry } from '@/types/journal';
 import JournalEntryCard from './JournalEntryCard';
@@ -39,12 +40,9 @@ const JournalEntriesList: React.FC<JournalEntriesListProps> = ({
     isImmediatelyProcessing 
   } = useProcessingEntries();
   
-  // CRITICAL: Enhanced state for immediate processing detection
+  // Simplified state for immediate processing detection
   const [hasImmediateProcessing, setHasImmediateProcessing] = useState<boolean>(false);
-  const [emergencyProcessingFlag, setEmergencyProcessingFlag] = useState<boolean>(false);
   const [processingIntentActive, setProcessingIntentActive] = useState<boolean>(false);
-  const processingIntentRef = useRef<boolean>(false);
-  
   const [lastAction, setLastAction] = useState<string | null>(null);
   const [fallbackProcessingIds, setFallbackProcessingIds] = useState<string[]>([]);
   const deletedEntryIdsRef = useRef<Set<number>>(new Set());
@@ -52,35 +50,34 @@ const JournalEntriesList: React.FC<JournalEntriesListProps> = ({
   const hasEntries = entries && entries.length > 0;
   const isLoading = loading && !hasEntries;
   
-  // CRITICAL: Monitor isSavingRecording prop for immediate processing detection
+  // IMMEDIATE monitoring for isSavingRecording prop
   useEffect(() => {
     if (isSavingRecording) {
-      console.log('[JournalEntriesList] isSavingRecording detected - setting emergency processing');
-      setEmergencyProcessingFlag(true);
+      console.log('[JournalEntriesList] isSavingRecording detected - setting immediate processing');
       setHasImmediateProcessing(true);
-      processingIntentRef.current = true;
-    } else if (!hasProcessingIntent() && processingEntries.length === 0) {
-      // Only clear flags if no other processing is happening
-      setEmergencyProcessingFlag(false);
-      setHasImmediateProcessing(false);
-      processingIntentRef.current = false;
+    } else {
+      // Only clear if no other processing is happening
+      const stillProcessing = hasProcessingIntent() || 
+                            processingEntries.length > 0 || 
+                            visibleEntries.length > 0;
+      if (!stillProcessing) {
+        setHasImmediateProcessing(false);
+      }
     }
-  }, [isSavingRecording, processingEntries.length]);
+  }, [isSavingRecording, processingEntries.length, visibleEntries.length]);
   
-  // CRITICAL: Monitor processing intent directly
+  // IMMEDIATE monitoring for processing intent
   useEffect(() => {
     const checkProcessingIntent = () => {
       const intentActive = hasProcessingIntent();
       setProcessingIntentActive(intentActive);
       if (intentActive) {
         setHasImmediateProcessing(true);
-        setEmergencyProcessingFlag(true);
-        processingIntentRef.current = true;
       }
     };
     
     checkProcessingIntent();
-    const interval = setInterval(checkProcessingIntent, 100);
+    const interval = setInterval(checkProcessingIntent, 50); // Reduced from 100ms to 50ms
     
     return () => clearInterval(interval);
   }, []);
@@ -89,22 +86,16 @@ const JournalEntriesList: React.FC<JournalEntriesListProps> = ({
     console.log('[JournalEntriesList] Component mounted');
     setLastAction('Component Mounted');
     
-    // IMMEDIATE event handlers - no delays, synchronous updates
+    // IMMEDIATE event handlers - completely synchronous
     const handleImmediateProcessingStarted = (event: CustomEvent) => {
       console.log('[JournalEntriesList] IMMEDIATE processing started event received:', event.detail);
-      // SYNCHRONOUS state updates
       setHasImmediateProcessing(true);
-      setEmergencyProcessingFlag(true);
-      processingIntentRef.current = true;
       forceRefresh();
     };
     
     const handleProcessingStarted = (event: CustomEvent) => {
       console.log('[JournalEntriesList] Processing started event received:', event.detail);
-      // SYNCHRONOUS state updates
       setHasImmediateProcessing(true);
-      setEmergencyProcessingFlag(true);
-      processingIntentRef.current = true;
       
       if (event.detail?.tempId) {
         setFallbackProcessingIds(prev => {
@@ -124,24 +115,17 @@ const JournalEntriesList: React.FC<JournalEntriesListProps> = ({
         setFallbackProcessingIds(prev => prev.filter(id => id !== event.detail.tempId));
       }
       
-      // Only clear flags if no more processing
-      setTimeout(() => {
-        const stillProcessing = processingStateManager.hasAnyImmediateProcessing() || 
-                              hasProcessingIntent() || 
-                              isSavingRecording;
-        if (!stillProcessing) {
-          setHasImmediateProcessing(false);
-          setEmergencyProcessingFlag(false);
-          processingIntentRef.current = false;
-        }
-      }, 100);
+      // IMMEDIATE clearing - no timeouts
+      const stillProcessing = processingStateManager.hasAnyImmediateProcessing() || 
+                            hasProcessingIntent() || 
+                            isSavingRecording;
+      if (!stillProcessing) {
+        setHasImmediateProcessing(false);
+      }
     };
     
-    // Listen for processing intent events
     const handleProcessingIntent = (event: CustomEvent) => {
       console.log('[JournalEntriesList] Processing intent event received:', event.detail);
-      setEmergencyProcessingFlag(true);
-      processingIntentRef.current = true;
       setHasImmediateProcessing(true);
     };
     
@@ -161,7 +145,7 @@ const JournalEntriesList: React.FC<JournalEntriesListProps> = ({
     };
   }, [forceRefresh, isSavingRecording]);
   
-  // Handle entries that have both ID and tempId (completed processing)
+  // Handle entries that have both ID and tempId (completed processing) - IMMEDIATE cleanup
   useEffect(() => {
     entries.forEach(entry => {
       if (entry.id && entry.tempId) {
@@ -172,20 +156,16 @@ const JournalEntriesList: React.FC<JournalEntriesListProps> = ({
           processingStateManager.updateEntryState(entry.tempId, EntryProcessingState.COMPLETED);
           processingStateManager.setEntryId(entry.tempId, entry.id);
           
-          // Remove from fallback state
+          // Remove from fallback state IMMEDIATELY
           setFallbackProcessingIds(prev => prev.filter(id => id !== entry.tempId));
           
-          // Clear emergency flags if this was the last processing entry
-          setTimeout(() => {
-            const stillProcessing = processingStateManager.hasAnyImmediateProcessing() || 
-                                  hasProcessingIntent() || 
-                                  isSavingRecording;
-            if (!stillProcessing) {
-              setHasImmediateProcessing(false);
-              setEmergencyProcessingFlag(false);
-              processingIntentRef.current = false;
-            }
-          }, 100);
+          // IMMEDIATE clearing - no delays
+          const stillProcessing = processingStateManager.hasAnyImmediateProcessing() || 
+                                hasProcessingIntent() || 
+                                isSavingRecording;
+          if (!stillProcessing) {
+            setHasImmediateProcessing(false);
+          }
         }
       }
     });
@@ -231,7 +211,7 @@ const JournalEntriesList: React.FC<JournalEntriesListProps> = ({
   // Filter entries to remove deleted ones
   const filteredEntries = entries.filter(entry => !deletedEntryIdsRef.current.has(entry.id));
   
-  // CRITICAL: Enhanced processing detection with multiple fallbacks
+  // SIMPLIFIED processing detection with immediate checks
   const visibleProcessingIds = visibleEntries.map(entry => entry.tempId);
   const allProcessingIds = [...new Set([...visibleProcessingIds, ...fallbackProcessingIds])];
   
@@ -240,12 +220,10 @@ const JournalEntriesList: React.FC<JournalEntriesListProps> = ({
   const directProcessingIds = directProcessingEntries.map(entry => entry.tempId);
   const finalProcessingIds = [...new Set([...allProcessingIds, ...directProcessingIds])];
   
-  // CRITICAL: Multiple checks for immediate processing - FIXED LOGIC
+  // SIMPLIFIED processing detection - prioritize immediate indicators
   const isCurrentlyProcessing = 
-    isSavingRecording || // EMERGENCY: Check isSavingRecording first
+    isSavingRecording || 
     hasImmediateProcessing || 
-    emergencyProcessingFlag || 
-    processingIntentRef.current ||
     processingIntentActive ||
     processingStateManager.hasProcessingIntent() ||
     processingStateManager.hasAnyImmediateProcessing() ||
@@ -255,7 +233,7 @@ const JournalEntriesList: React.FC<JournalEntriesListProps> = ({
   
   console.log(`[JournalEntriesList] Processing detection: isSavingRecording=${isSavingRecording}, isCurrentlyProcessing=${isCurrentlyProcessing}, finalProcessingIds=${finalProcessingIds.length}, filteredEntries=${filteredEntries.length}`);
 
-  // CRITICAL: FIXED conditional logic - prioritize processing over empty state
+  // SIMPLIFIED conditional logic - prioritize processing over empty state
   const shouldShowProcessing = isCurrentlyProcessing;
   const shouldShowEntries = filteredEntries.length > 0;
   const shouldShowEmpty = !shouldShowProcessing && !shouldShowEntries && !isLoading;
@@ -274,7 +252,7 @@ const JournalEntriesList: React.FC<JournalEntriesListProps> = ({
         </div>
       ) : shouldShowProcessing ? (
         <div className="grid gap-4" data-entries-count={filteredEntries.length}>
-          {/* CRITICAL: Show processing cards FIRST with forced visibility */}
+          {/* Show processing cards FIRST with IMMEDIATE visibility */}
           <div data-processing-cards-container="true" className="processing-cards-container">
             {finalProcessingIds.length > 0 ? (
               finalProcessingIds.map((tempId) => {

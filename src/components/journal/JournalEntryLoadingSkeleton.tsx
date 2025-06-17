@@ -13,125 +13,105 @@ interface JournalEntryLoadingSkeletonProps {
   isVisible?: boolean;
 }
 
-export default function JournalEntryLoadingSkeleton({ 
+const JournalEntryLoadingSkeleton: React.FC<JournalEntryLoadingSkeletonProps> = ({ 
   count = 1, 
-  tempId, 
-  isVisible = true 
-}: JournalEntryLoadingSkeletonProps) {
-  const { addEvent } = useDebugLog();
-  const mountTimeRef = useRef(Date.now());
+  tempId,
+  isVisible = true
+}) => {
+  const { log } = useDebugLog();
+  const componentRef = useRef<HTMLDivElement>(null);
   const [shouldRender, setShouldRender] = React.useState(isVisible);
   
   useEffect(() => {
     if (tempId) {
-      console.log(`[JournalEntryLoadingSkeleton] Mounted with tempId ${tempId}, visible: ${isVisible}`);
-      addEvent('LoadingUI', `JournalEntryLoadingSkeleton rendered with tempId ${tempId}`, 'info');
-      
-      // Listen for hide events
-      const handleHidden = (event: CustomEvent) => {
-        if (event.detail.tempId === tempId) {
-          console.log(`[JournalEntryLoadingSkeleton] Hide event received for ${tempId}`);
-          setShouldRender(false);
-        }
-      };
-      
-      // Listen for real entry detection with faster polling
-      const handleRealEntryDetected = () => {
-        const hasRealEntry = document.querySelector(`[data-temp-id="${tempId}"][data-processing="false"]`) ||
-                            document.querySelector(`[data-temp-id="${tempId}"].journal-entry-card:not(.processing-card)`);
-        
-        if (hasRealEntry) {
-          console.log(`[JournalEntryLoadingSkeleton] Real entry detected for ${tempId}, hiding immediately`);
-          processingStateManager.hideEntry(tempId);
-          setShouldRender(false);
-        }
-      };
-      
-      // Very fast polling for real entry detection
-      const pollInterval = setInterval(handleRealEntryDetected, 100);
-      
-      window.addEventListener('processingEntryHidden', handleHidden as EventListener);
-      
-      // Initial check
-      setTimeout(handleRealEntryDetected, 50);
-      
-      return () => {
-        clearInterval(pollInterval);
-        window.removeEventListener('processingEntryHidden', handleHidden as EventListener);
-        
-        if (tempId) {
-          const visibleDuration = Date.now() - mountTimeRef.current;
-          console.log(`[JournalEntryLoadingSkeleton] Unmounting skeleton with tempId ${tempId}. Was visible for ${visibleDuration}ms`);
-        }
-      };
+      log(`[JournalEntryLoadingSkeleton] Component mounted for tempId: ${tempId}, isVisible: ${isVisible}`);
     }
-  }, [tempId, addEvent, isVisible]);
+  }, [tempId, isVisible, log]);
   
-  // SIMPLIFIED: Always show when prop says to show
+  // Listen for immediate removal events
+  useEffect(() => {
+    const handleForceRemove = (event: CustomEvent) => {
+      if (event.detail?.tempId === tempId || event.detail?.tempId === 'all') {
+        console.log(`[JournalEntryLoadingSkeleton] Force remove event received for ${tempId}`);
+        setShouldRender(false);
+        
+        // IMMEDIATE DOM removal
+        if (componentRef.current) {
+          componentRef.current.style.display = 'none';
+          setTimeout(() => {
+            if (componentRef.current?.parentNode) {
+              componentRef.current.parentNode.removeChild(componentRef.current);
+            }
+          }, 0); // Remove immediately
+        }
+      }
+    };
+    
+    const handleProcessingCompleted = (event: CustomEvent) => {
+      if (event.detail?.tempId === tempId) {
+        console.log(`[JournalEntryLoadingSkeleton] Processing completed event received for ${tempId}`);
+        setShouldRender(false);
+        
+        // IMMEDIATE DOM removal
+        if (componentRef.current) {
+          componentRef.current.style.display = 'none';
+          setTimeout(() => {
+            if (componentRef.current?.parentNode) {
+              componentRef.current.parentNode.removeChild(componentRef.current);
+            }
+          }, 0); // Remove immediately
+        }
+      }
+    };
+    
+    window.addEventListener('forceRemoveProcessingCard', handleForceRemove as EventListener);
+    window.addEventListener('forceRemoveLoadingContent', handleForceRemove as EventListener);
+    window.addEventListener('forceRemoveAllProcessingCards', handleForceRemove as EventListener);
+    window.addEventListener('forceRemoveAllLoadingContent', handleForceRemove as EventListener);
+    window.addEventListener('processingEntryCompleted', handleProcessingCompleted as EventListener);
+    
+    return () => {
+      window.removeEventListener('forceRemoveProcessingCard', handleForceRemove as EventListener);
+      window.removeEventListener('forceRemoveLoadingContent', handleForceRemove as EventListener);
+      window.removeEventListener('forceRemoveAllProcessingCards', handleForceRemove as EventListener);
+      window.removeEventListener('forceRemoveAllLoadingContent', handleForceRemove as EventListener);
+      window.removeEventListener('processingEntryCompleted', handleProcessingCompleted as EventListener);
+    };
+  }, [tempId]);
+  
+  // Update visibility immediately based on props
   useEffect(() => {
     setShouldRender(isVisible);
+    if (!isVisible && componentRef.current) {
+      componentRef.current.style.display = 'none';
+    }
   }, [isVisible]);
   
-  // FORCE VISIBILITY during critical first moments
-  const finalShouldRender = isVisible || shouldRender;
-  
-  if (!finalShouldRender) {
+  if (!shouldRender) {
     return null;
   }
   
   return (
     <AnimatePresence mode="wait">
       <motion.div
-        key={`skeleton-${tempId}`}
-        initial={{ opacity: 0, y: 10 }}
-        animate={{ opacity: 1, y: 0 }} // Always animate to visible
-        exit={{ 
-          opacity: 0, 
-          y: -10,
-          transition: { duration: 0.15 }
-        }}
-        transition={{ duration: 0.15 }}
-        className="overflow-hidden skeleton-container"
-        data-loading-skeleton={true}
+        ref={componentRef}
+        key={tempId || 'loading-skeleton'}
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        exit={{ opacity: 0, y: -20, transition: { duration: 0.1 } }} // Faster exit animation
+        transition={{ duration: 0.2 }} // Faster entrance animation
+        className="processing-card"
         data-temp-id={tempId}
-        style={{ 
-          opacity: 1, // FORCE OPACITY
-          visibility: 'visible', // FORCE VISIBILITY
-          display: 'block', // FORCE DISPLAY
-          transition: 'opacity 0.15s ease-out'
-        }}
+        data-loading-skeleton="true"
       >
-        <Card className="p-4 bg-card border-2 border-primary/20 shadow-md relative journal-entry-card processing-card">
-          <div className="flex justify-between items-start mb-4">
-            <div>
-              <ShimmerSkeleton className="h-5 w-32 mb-2" />
-              <div className="flex items-center">
-                <ShimmerSkeleton className="h-5 w-5 rounded-full" />
-              </div>
-            </div>
-            <div className="flex items-center space-x-2">
-              <ShimmerSkeleton className="h-8 w-8 rounded-md" />
-              <ShimmerSkeleton className="h-8 w-8 rounded-md" />
-            </div>
-          </div>
-          
-          <LoadingEntryContent />
-          
-          {/* Processing indicator */}
-          <div className="absolute top-2 right-2 flex items-center justify-center h-8 w-8 bg-primary/30 rounded-full border-2 border-primary/50">
-            <div className="h-5 w-5 rounded-full bg-primary/60 animate-ping absolute"></div>
-            <div className="h-4 w-4 rounded-full bg-primary relative z-10"></div>
-          </div>
-          
-          {/* Debug info - now completely invisible */}
-          {tempId && (
-            <div className="absolute bottom-2 right-2 text-xs text-muted-foreground opacity-0" 
-                 data-temp-id={tempId}>
-              {tempId.substring(0, 8)}...
-            </div>
-          )}
-        </Card>
+        {Array.from({ length: count }).map((_, index) => (
+          <Card key={index} className="journal-entry-card processing-card p-6 mb-4 border border-slate-200/20 bg-gradient-to-br from-slate-50/50 to-white/50 dark:from-slate-900/50 dark:to-slate-800/50">
+            <LoadingEntryContent />
+          </Card>
+        ))}
       </motion.div>
     </AnimatePresence>
   );
-}
+};
+
+export default JournalEntryLoadingSkeleton;

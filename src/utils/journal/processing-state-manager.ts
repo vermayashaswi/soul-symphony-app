@@ -26,22 +26,22 @@ export class ProcessingStateManager {
   private processingIntentFlag = false; // Emergency fallback flag
   
   constructor() {
-    console.log('[ProcessingStateManager] Initialized with smart transparency');
+    console.log('[ProcessingStateManager] Initialized with immediate cleanup');
   }
   
-  // NEW: Emergency fallback methods for immediate processing detection
+  // Emergency fallback methods for immediate processing detection
   public setProcessingIntent(value: boolean): void {
     this.processingIntentFlag = value;
     console.log(`[ProcessingStateManager] Processing intent set to ${value}`);
     
-    // Clear intent after short delay if not overridden
+    // Clear intent after shorter delay if not overridden
     if (value) {
       setTimeout(() => {
         if (this.processingIntentFlag && this.processingEntries.length === 0) {
           this.processingIntentFlag = false;
           console.log('[ProcessingStateManager] Auto-cleared processing intent flag');
         }
-      }, 3000);
+      }, 1000); // Reduced from 3s to 1s
     }
   }
   
@@ -107,10 +107,10 @@ export class ProcessingStateManager {
       detail: { tempId, timestamp: Date.now() }
     }));
     
-    // Clean up active call tracking after a short delay
+    // Clean up active call tracking after shorter delay
     setTimeout(() => {
       this.activeStartProcessingCalls.delete(tempId);
-    }, 1000);
+    }, 500); // Reduced from 1s to 500ms
   }
   
   // New method to check immediate processing state
@@ -152,31 +152,29 @@ export class ProcessingStateManager {
   }
   
   private checkAndHideEntry(tempId: string): void {
-    // Immediate DOM check with smart selectors
+    // IMMEDIATE DOM check with smart selectors
     const realEntryExists = this.hasRealEntryInDOM(tempId);
     
     if (realEntryExists) {
       console.log(`[ProcessingStateManager] Real entry found for ${tempId}, hiding immediately`);
       this.hideEntry(tempId);
       
-      // Remove after brief delay for smooth transition
-      setTimeout(() => {
-        this.removeEntry(tempId);
-      }, 200);
+      // Remove IMMEDIATELY - no delays
+      this.removeEntry(tempId);
     } else {
-      // Quick retry with shorter timeout
+      // Quick retry with much shorter timeout
       setTimeout(() => {
         const retryCheck = this.hasRealEntryInDOM(tempId);
         if (retryCheck) {
           console.log(`[ProcessingStateManager] Real entry found on retry for ${tempId}`);
           this.hideEntry(tempId);
-          setTimeout(() => this.removeEntry(tempId), 200);
+          this.removeEntry(tempId); // Remove immediately on retry too
         } else {
           // Force cleanup if no real entry found
           console.log(`[ProcessingStateManager] Force cleanup for ${tempId} - no real entry detected`);
           this.removeEntry(tempId);
         }
-      }, 500);
+      }, 100); // Reduced from 500ms to 100ms
     }
   }
   
@@ -228,7 +226,7 @@ export class ProcessingStateManager {
       
       // Immediately hide since we have a real entry ID
       this.hideEntry(tempId);
-      setTimeout(() => this.removeEntry(tempId), 300);
+      this.removeEntry(tempId); // Remove immediately, no delays
     }
   }
   
@@ -299,10 +297,10 @@ export class ProcessingStateManager {
       const storedEntries = localStorage.getItem('processingEntries');
       if (storedEntries) {
         const parsed = JSON.parse(storedEntries);
-        // Clean up old entries and add isVisible field if missing
+        // Clean up old entries - reduced timeout from 30s to 10s
         const now = Date.now();
         this.processingEntries = parsed
-          .filter((entry: ProcessingEntry) => now - entry.startTime < 30000)
+          .filter((entry: ProcessingEntry) => now - entry.startTime < 10000)
           .map((entry: ProcessingEntry) => ({
             ...entry,
             isVisible: entry.isVisible !== undefined ? entry.isVisible : true

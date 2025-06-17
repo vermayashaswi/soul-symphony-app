@@ -3,6 +3,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import TranscriptionService from './transcription-service';
+import { removeProcessingEntryById } from './processing-state';
 
 export const processAudioInBackground = async (
   audioBlob: Blob,
@@ -26,6 +27,46 @@ export const processAudioInBackground = async (
     );
 
     const result = await transcriptionService.transcribeAudio(audioBlob, options);
+    
+    // IMMEDIATE cleanup - fire events right after successful processing
+    if (result && result.entryId) {
+      console.log(`[BackgroundProcessor] Processing completed for entry ${result.entryId}, triggering immediate cleanup`);
+      
+      // Remove from processing state immediately
+      if (result.tempId) {
+        removeProcessingEntryById(result.tempId);
+      }
+      
+      // Fire immediate completion events
+      window.dispatchEvent(new CustomEvent('processingEntryCompleted', {
+        detail: { 
+          tempId: result.tempId, 
+          entryId: result.entryId, 
+          timestamp: Date.now(),
+          immediate: true,
+          forceClearProcessingCard: true
+        }
+      }));
+      
+      window.dispatchEvent(new CustomEvent('forceRemoveProcessingCard', {
+        detail: { 
+          tempId: result.tempId, 
+          entryId: result.entryId, 
+          timestamp: Date.now(),
+          immediate: true,
+          forceCleanup: true
+        }
+      }));
+      
+      window.dispatchEvent(new CustomEvent('forceRemoveLoadingContent', {
+        detail: { 
+          tempId: result.tempId, 
+          entryId: result.entryId, 
+          timestamp: Date.now(),
+          immediate: true
+        }
+      }));
+    }
     
     // Show success toast
     toast.success('Voice journal entry saved successfully!', {
