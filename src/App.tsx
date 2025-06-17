@@ -8,7 +8,6 @@ import { TranslationProvider } from "@/contexts/TranslationContext";
 import { SubscriptionProvider } from "@/contexts/SubscriptionContext";
 import { FeatureFlagsProvider } from "@/contexts/FeatureFlagsContext";
 import { TutorialProvider } from "@/contexts/TutorialContext";
-import ViewportManager from "@/routes/ViewportManager";
 import AppRoutes from "@/routes/AppRoutes";
 import { NetworkAwareContent } from "@/components/NetworkAwareContent";
 import { InstallPrompt } from "@/components/pwa/InstallPrompt";
@@ -35,11 +34,9 @@ function App() {
                   <SubscriptionProvider>
                     <FeatureFlagsProvider>
                       <TutorialProvider>
-                        <ViewportManager>
-                          <AppRoutes />
-                          <InstallPrompt />
-                          <Toaster />
-                        </ViewportManager>
+                        <AppRoutes />
+                        <InstallPrompt />
+                        <Toaster />
                       </TutorialProvider>
                     </FeatureFlagsProvider>
                   </SubscriptionProvider>
