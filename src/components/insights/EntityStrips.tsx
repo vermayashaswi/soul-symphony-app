@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
 import { cn } from '@/lib/utils';
@@ -23,7 +22,7 @@ type Entity = {
 interface EntityStripsProps {
   userId?: string;
   timeRange: TimeRange;
-  currentDate?: Date;
+  currentDate?: Date; // Add currentDate prop
   onEntityClick?: (entity: string, sentiment: number) => void;
   className?: string;
 }
@@ -31,22 +30,21 @@ interface EntityStripsProps {
 const EntityStrips: React.FC<EntityStripsProps> = ({
   userId,
   timeRange,
-  currentDate = new Date(),
+  currentDate = new Date(), // Default to current date if not provided
   onEntityClick,
   className
 }) => {
   const [entities, setEntities] = useState<Entity[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [debugInfo, setDebugInfo] = useState<any>(null);
   const [highlightedEntity, setHighlightedEntity] = useState<string | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
-  const [dimensions, setDimensions] = useState({ width: 300, height: 300 });
+  const [dimensions, setDimensions] = useState({ width: 300, height: 300 }); // Default dimensions
   const { theme } = useTheme();
   const isMobile = useIsMobile();
   
-  // Enhanced date range calculation with debugging
+  // Calculate date range based on timeRange and currentDate
   const getDateRange = () => {
+    // Use the provided currentDate instead of always using 'now'
     const baseDate = currentDate;
     let startDate: Date;
     let endDate: Date;
@@ -73,21 +71,13 @@ const EntityStrips: React.FC<EntityStripsProps> = ({
         endDate = addDays(startDate, 1);
     }
     
-    const dateRange = {
+    return {
       startDate: startDate.toISOString(),
       endDate: endDate.toISOString()
     };
-    
-    console.log('[EntityStrips] Date range calculation:', {
-      timeRange,
-      baseDate: baseDate.toISOString(),
-      calculatedRange: dateRange
-    });
-    
-    return dateRange;
   };
   
-  // Enhanced sentiment color function
+  // Function to get sentiment color with appropriate intensity
   const getSentimentColor = (sentiment: number): string => {
     if (sentiment <= -1) return '#dc2626'; // Bright red for -1
     if (sentiment <= -0.2) return '#ef4444'; // Dull red for -0.2
@@ -97,134 +87,52 @@ const EntityStrips: React.FC<EntityStripsProps> = ({
     return '#22c55e'; // Bright green for 1.0
   };
   
-  // Enhanced data fetching with comprehensive debugging
+  // Fetch themes and their sentiments
   useEffect(() => {
     const fetchEntities = async () => {
-      console.log('[EntityStrips] Starting fetch with params:', {
-        userId,
-        timeRange,
-        currentDate: currentDate.toISOString(),
-        hasUserId: !!userId
-      });
-
       if (!userId) {
-        console.warn('[EntityStrips] No userId provided, clearing data');
-        setEntities([]);
+        console.log('No user ID provided');
         setLoading(false);
-        setError('No user ID provided');
-        setDebugInfo({ error: 'No userId provided' });
         return;
       }
       
       setLoading(true);
-      setError(null);
-      
       try {
-        // Step 1: Verify authentication
-        const { data: { user }, error: authError } = await supabase.auth.getUser();
-        console.log('[EntityStrips] Auth verification:', {
-          authUser: user?.id,
-          providedUserId: userId,
-          authError: authError?.message,
-          userMatch: user?.id === userId
-        });
-
-        if (authError) {
-          throw new Error(`Authentication error: ${authError.message}`);
-        }
-
-        if (!user) {
-          throw new Error('No authenticated user found');
-        }
-
-        if (user.id !== userId) {
-          throw new Error(`User ID mismatch: auth(${user.id}) vs provided(${userId})`);
-        }
-
+        console.log(`Fetching themes for timeRange: ${timeRange}, userId: ${userId}, currentDate: ${currentDate.toISOString()}`);
         const { startDate, endDate } = getDateRange();
         
-        // Step 2: First check total entries for this user (no date filter)
-        console.log('[EntityStrips] Checking total user entries...');
-        const { data: totalEntries, error: totalError } = await supabase
+        // Query journal entries within the time range
+        const { data: entries, error } = await supabase
           .from('Journal Entries')
-          .select('id, created_at, master_themes')
-          .eq('user_id', userId)
-          .order('created_at', { ascending: false });
-
-        if (totalError) {
-          console.error('[EntityStrips] Error fetching total entries:', totalError);
-          throw new Error(`Database error: ${totalError.message}`);
-        }
-
-        console.log('[EntityStrips] Total entries for user:', {
-          totalCount: totalEntries?.length || 0,
-          entriesWithThemes: totalEntries?.filter(e => e.master_themes && e.master_themes.length > 0).length || 0,
-          sampleEntry: totalEntries?.[0] ? {
-            id: totalEntries[0].id,
-            created_at: totalEntries[0].created_at,
-            hasThemes: !!(totalEntries[0].master_themes && totalEntries[0].master_themes.length > 0)
-          } : null
-        });
-
-        // Step 3: Query entries within the specific date range
-        console.log('[EntityStrips] Fetching entries for date range:', { startDate, endDate });
-        const { data: entries, error: entriesError } = await supabase
-          .from('Journal Entries')
-          .select('id, master_themes, sentiment, created_at')
+          .select('master_themes, sentiment')
           .eq('user_id', userId)
           .gte('created_at', startDate)
           .lte('created_at', endDate)
-          .not('master_themes', 'is', null)
-          .order('created_at', { ascending: false });
+          .not('master_themes', 'is', null);
         
-        if (entriesError) {
-          console.error('[EntityStrips] Error fetching filtered entries:', entriesError);
-          throw new Error(`Database error: ${entriesError.message}`);
+        if (error) {
+          console.error('Error fetching entries:', error);
+          throw error;
         }
         
-        console.log('[EntityStrips] Filtered entries result:', {
-          filteredCount: entries?.length || 0,
-          dateRange: `${startDate} to ${endDate}`,
-          entriesWithValidThemes: entries?.filter(e => 
-            e.master_themes && 
-            Array.isArray(e.master_themes) && 
-            e.master_themes.length > 0
-          ).length || 0
-        });
-
-        // Step 4: Process themes and calculate sentiments
-        const themeMap = new Map<string, { count: number, totalSentiment: number, entries: any[] }>();
+        console.log(`Found ${entries?.length || 0} entries with themes for date range ${startDate} to ${endDate}`);
+        
+        // Process entries to extract themes and calculate sentiments
+        const themeMap = new Map<string, { count: number, totalSentiment: number }>();
         
         entries?.forEach(entry => {
-          if (!entry.master_themes || !Array.isArray(entry.master_themes)) {
-            console.warn('[EntityStrips] Entry has invalid master_themes:', {
-              entryId: entry.id,
-              master_themes: entry.master_themes
-            });
-            return;
-          }
+          if (!entry.master_themes || !Array.isArray(entry.master_themes)) return;
           
-          // Enhanced sentiment processing with better fallbacks
+          // Convert sentiment to number if it's a string
           let sentimentScore = 0;
           if (entry.sentiment) {
             if (typeof entry.sentiment === 'string') {
-              switch (entry.sentiment.toLowerCase()) {
-                case 'positive':
-                  sentimentScore = 0.7;
-                  break;
-                case 'negative':
-                  sentimentScore = -0.7;
-                  break;
-                case 'neutral':
-                  sentimentScore = 0;
-                  break;
-                default:
-                  // Try to parse as number
-                  const parsed = parseFloat(entry.sentiment);
-                  sentimentScore = isNaN(parsed) ? 0 : Math.max(-1, Math.min(1, parsed));
-              }
+              if (entry.sentiment === 'positive') sentimentScore = 0.7;
+              else if (entry.sentiment === 'negative') sentimentScore = -0.7;
+              else if (entry.sentiment === 'neutral') sentimentScore = 0;
+              else sentimentScore = parseFloat(entry.sentiment) || 0;
             } else {
-              sentimentScore = Math.max(-1, Math.min(1, Number(entry.sentiment) || 0));
+              sentimentScore = Number(entry.sentiment) || 0;
             }
           }
           
@@ -234,82 +142,65 @@ const EntityStrips: React.FC<EntityStripsProps> = ({
               const themeName = theme.toLowerCase().trim();
               
               if (!themeMap.has(themeName)) {
-                themeMap.set(themeName, { count: 0, totalSentiment: 0, entries: [] });
+                themeMap.set(themeName, { count: 0, totalSentiment: 0 });
               }
               
               const themeData = themeMap.get(themeName)!;
               themeData.count += 1;
               themeData.totalSentiment += sentimentScore;
-              themeData.entries.push({
-                id: entry.id,
-                sentiment: sentimentScore,
-                created_at: entry.created_at
-              });
             }
           });
         });
         
-        // Step 5: Convert to final format and sort
+        // Convert map to array and calculate average sentiment
         const entitiesArray = Array.from(themeMap.entries()).map(([name, data]) => ({
           name: name.charAt(0).toUpperCase() + name.slice(1),
           count: data.count,
           sentiment: data.totalSentiment / data.count
         }));
         
+        // Sort by frequency and take top 7
         const topEntities = entitiesArray
           .sort((a, b) => b.count - a.count)
           .slice(0, 7);
         
-        console.log('[EntityStrips] Final processing result:', {
-          totalThemes: entitiesArray.length,
-          topEntities: topEntities.map(e => ({
-            name: e.name,
-            count: e.count,
-            sentiment: e.sentiment.toFixed(2)
-          }))
-        });
-
-        // Set debug info for the debug panel
-        setDebugInfo({
-          totalUserEntries: totalEntries?.length || 0,
-          filteredEntries: entries?.length || 0,
-          processedThemes: entitiesArray.length,
-          displayedThemes: topEntities.length,
-          dateRange: { startDate, endDate },
-          sampleProcessing: themeMap.size > 0 ? {
-            firstTheme: Array.from(themeMap.entries())[0]
-          } : null
-        });
-        
+        console.log('Top themes for current period:', topEntities);
         setEntities(topEntities);
-        setError(null);
-        
-      } catch (err: any) {
-        console.error('[EntityStrips] Fetch error:', err);
-        setError(err.message);
-        setDebugInfo({ error: err.message, stack: err.stack });
-        toast.error(`Failed to load life areas: ${err.message}`);
+      } catch (error) {
+        console.error('Error fetching theme data:', error);
+        toast.error('Failed to load life areas');
       } finally {
         setLoading(false);
       }
     };
     
     fetchEntities();
-  }, [userId, timeRange, currentDate]);
+  }, [userId, timeRange, currentDate]); // Add currentDate to dependency array
   
   // Update dimensions when the component mounts and on resize
   useEffect(() => {
     const updateDimensions = () => {
       if (containerRef.current) {
         const { offsetWidth, offsetHeight } = containerRef.current;
+        
+        // Ensure we have valid dimensions, with fallbacks
         const width = offsetWidth || 300;
         const height = offsetHeight || 300;
-        setDimensions({ width, height });
+        
+        setDimensions({
+          width,
+          height
+        });
       }
     };
     
+    // Initial update
     updateDimensions();
+    
+    // Add event listener
     window.addEventListener('resize', updateDimensions);
+    
+    // Update dimensions after a small delay to ensure the container is rendered
     const timeoutId = setTimeout(updateDimensions, 200);
     
     return () => {
@@ -318,7 +209,6 @@ const EntityStrips: React.FC<EntityStripsProps> = ({
     };
   }, []);
   
-  // Loading state
   if (loading) {
     return (
       <div className="flex items-center justify-center h-full w-full">
@@ -327,52 +217,16 @@ const EntityStrips: React.FC<EntityStripsProps> = ({
     );
   }
   
-  // Error state with enhanced debugging
-  if (error) {
+  if (entities.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center h-full w-full p-4">
-        <div className="text-red-500 text-center mb-4">
-          <p className="font-medium">Failed to load life areas</p>
-          <p className="text-sm">{error}</p>
-        </div>
-        {debugInfo && (
-          <details className="w-full max-w-md">
-            <summary className="text-xs text-gray-500 cursor-pointer hover:text-gray-700">
-              Debug Info
-            </summary>
-            <pre className="text-xs bg-gray-100 dark:bg-gray-800 p-2 rounded mt-2 overflow-auto">
-              {JSON.stringify(debugInfo, null, 2)}
-            </pre>
-          </details>
-        )}
+      <div className="flex items-center justify-center h-full w-full">
+        <p className="text-muted-foreground">
+          <TranslatableText text="No life areas found in this time period" forceTranslate={true} />
+        </p>
       </div>
     );
   }
   
-  // Empty state with debug info
-  if (entities.length === 0) {
-    return (
-      <div className="flex flex-col items-center justify-center h-full w-full p-4">
-        <p className="text-muted-foreground text-center mb-4">
-          <TranslatableText text="No life areas found in this time period" forceTranslate={true} />
-        </p>
-        {debugInfo && (
-          <details className="w-full max-w-md">
-            <summary className="text-xs text-gray-500 cursor-pointer hover:text-gray-700">
-              Debug Info
-            </summary>
-            <div className="text-xs bg-gray-100 dark:bg-gray-800 p-2 rounded mt-2">
-              <p><strong>Total user entries:</strong> {debugInfo.totalUserEntries}</p>
-              <p><strong>Filtered entries:</strong> {debugInfo.filteredEntries}</p>
-              <p><strong>Date range:</strong> {debugInfo.dateRange?.startDate} to {debugInfo.dateRange?.endDate}</p>
-              <p><strong>Processed themes:</strong> {debugInfo.processedThemes}</p>
-            </div>
-          </details>
-        )}
-      </div>
-    );
-  }
-
   // Helper to ensure sentiment is within range -1 to 1
   const normalizeScore = (score: number) => {
     return Math.max(-1, Math.min(1, score));
@@ -430,7 +284,7 @@ const EntityStrips: React.FC<EntityStripsProps> = ({
                 </span>
                 {isHighlighted && (
                   <span className="ml-2 text-white/90 text-xs">
-                    ({entity.sentiment.toFixed(2)}, {entity.count}x)
+                    ({entity.sentiment.toFixed(2)})
                   </span>
                 )}
               </div>
@@ -461,17 +315,6 @@ const EntityStrips: React.FC<EntityStripsProps> = ({
           </span>
         </div>
       </div>
-
-      {/* Debug info footer - only show in development */}
-      {process.env.NODE_ENV === 'development' && debugInfo && (
-        <details className="mt-2">
-          <summary className="text-xs text-gray-400 cursor-pointer">Debug</summary>
-          <div className="text-xs bg-gray-50 dark:bg-gray-900 p-2 rounded mt-1">
-            <p>Entries: {debugInfo.filteredEntries}/{debugInfo.totalUserEntries}</p>
-            <p>Themes: {debugInfo.displayedThemes}/{debugInfo.processedThemes}</p>
-          </div>
-        </details>
-      )}
     </div>
   );
 };

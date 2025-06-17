@@ -6,13 +6,13 @@ import { validateAudioBlob } from "@/utils/audio/blob-utils";
 interface UseVoiceRecorderProps {
   onRecordingComplete: (audioBlob: Blob, tempId?: string) => void;
   onError?: (error: any) => void;
-  maxDuration?: number;
+  maxDuration?: number; // in seconds
 }
 
 export function useVoiceRecorder({
   onRecordingComplete,
   onError,
-  maxDuration = 300
+  maxDuration = 300 // 5 minutes default
 }: UseVoiceRecorderProps) {
   const [status, setStatus] = useState<
     "idle" | "acquiring_media" | "recording" | "stopping"
@@ -26,6 +26,7 @@ export function useVoiceRecorder({
   const timerInterval = useRef<ReturnType<typeof setInterval> | null>(null);
   const maxDurationTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // Clean up function
   const cleanupRecording = () => {
     if (timerInterval.current) {
       clearInterval(timerInterval.current);
@@ -38,6 +39,7 @@ export function useVoiceRecorder({
     }
   };
 
+  // Clean up on unmount
   useEffect(() => {
     return () => {
       cleanupRecording();
@@ -46,20 +48,30 @@ export function useVoiceRecorder({
 
   const startRecording = async () => {
     try {
-      console.log('[useVoiceRecorder] Starting recording');
+      // Dispatch operation start event for debugging
+      const event = new CustomEvent('journalOperationStart', {
+        detail: {
+          type: 'recording',
+          message: 'Starting voice recording'
+        }
+      });
+      const opId = window.dispatchEvent(event) ? (event as any).detail?.id : null;
+      
       setStatus("acquiring_media");
       setElapsedTime(0);
       setAudioDuration(0);
       setRecordingBlob(null);
       
+      // Set up new recorder
       const recorder = await recordAudio();
       recorderRef.current = recorder;
       
+      // Start recording
       setStatus("recording");
       const currentTime = Date.now();
       setStartTime(currentTime);
       
-      // Update timer
+      // Update timer at regular intervals
       timerInterval.current = setInterval(() => {
         const current = Date.now();
         const elapsed = current - startTime;
@@ -70,10 +82,19 @@ export function useVoiceRecorder({
       if (maxDuration && maxDuration > 0) {
         maxDurationTimeout.current = setTimeout(() => {
           if (status === "recording") {
-            console.log(`[useVoiceRecorder] Maximum duration (${maxDuration}s) reached`);
+            console.log(`[useVoiceRecorder] Maximum recording duration (${maxDuration}s) reached, stopping automatically`);
             stopRecording();
           }
         }, maxDuration * 1000);
+      }
+      
+      if (opId) {
+        window.dispatchEvent(new CustomEvent('journalOperationUpdate', {
+          detail: {
+            id: opId,
+            status: 'success'
+          }
+        }));
       }
       
       console.log('[useVoiceRecorder] Recording started successfully');
@@ -81,6 +102,16 @@ export function useVoiceRecorder({
       console.error("[useVoiceRecorder] Error starting recording:", err);
       setStatus("idle");
       if (onError) onError(err);
+      
+      // Dispatch error event for debugging
+      window.dispatchEvent(new CustomEvent('journalOperationStart', {
+        detail: {
+          type: 'recording',
+          message: 'Recording failed to start',
+          status: 'error',
+          details: err instanceof Error ? err.message : String(err)
+        }
+      }));
     }
   };
 
@@ -91,17 +122,30 @@ export function useVoiceRecorder({
     }
     
     try {
-      console.log('[useVoiceRecorder] Stopping recording');
+      // Dispatch operation event for debugging
+      const event = new CustomEvent('journalOperationStart', {
+        detail: {
+          type: 'recording',
+          message: 'Finishing recording and processing audio'
+        }
+      });
+      const opId = window.dispatchEvent(event) ? (event as any).detail?.id : null;
+
       setStatus("stopping");
       
+      // Stop the recording timer
       cleanupRecording();
       
+      // Get the actual recording duration
       const finalElapsedTime = Date.now() - startTime;
       setElapsedTime(finalElapsedTime);
+      console.log(`[useVoiceRecorder] Final elapsed time: ${finalElapsedTime/1000}s`);
       
+      // Stop the recorder and get the audio blob
       const { blob, duration } = await recorderRef.current.stop();
-      console.log(`[useVoiceRecorder] Recording stopped. Duration: ${duration}s, Size: ${blob.size}`);
+      console.log(`[useVoiceRecorder] Recording stopped. Duration from recorder: ${duration}s, Elapsed time: ${finalElapsedTime/1000}s`);
       
+      // Set the duration from the recorder or fallback to elapsed time
       const actualDuration = duration > 0 ? duration : finalElapsedTime / 1000;
       setAudioDuration(actualDuration);
       
@@ -112,10 +156,12 @@ export function useVoiceRecorder({
         throw new Error(validation.errorMessage || "Recording validation failed");
       }
       
-      // Ensure blob has duration property
+      // Ensure the blob has the duration property
       let finalBlob = blob;
       if (!('duration' in blob) || (blob as any).duration === 0) {
+        console.log('[useVoiceRecorder] Adding missing duration to blob:', actualDuration);
         try {
+          // Create a new blob with the duration property
           Object.defineProperty(finalBlob, 'duration', {
             value: actualDuration,
             writable: false,
@@ -123,26 +169,66 @@ export function useVoiceRecorder({
             configurable: false
           });
         } catch (error) {
-          console.warn('[useVoiceRecorder] Could not add duration property:', error);
+          console.warn('[useVoiceRecorder] Could not add duration property directly:', error);
+          // If we can't add directly, create a new blob
+          const newBlob = new Blob([blob], { type: blob.type });
+          try {
+            Object.defineProperty(newBlob, 'duration', {
+              value: actualDuration,
+              writable: false,
+              enumerable: true,
+              configurable: false
+            });
+            finalBlob = newBlob;
+          } catch (e) {
+            console.error('[useVoiceRecorder] Failed to add duration to new blob as well:', e);
+          }
         }
       }
       
       setRecordingBlob(finalBlob);
       setStatus("idle");
       
-      if (finalBlob.size > 0 && onRecordingComplete) {
-        const tempId = `temp-${Date.now()}-${Math.random().toString(36).substring(2)}`;
-        console.log(`[useVoiceRecorder] Calling onRecordingComplete with tempId: ${tempId}`);
-        onRecordingComplete(finalBlob, tempId);
+      if (finalBlob.size > 0) {
+        if (onRecordingComplete) {
+          const tempId = generateTempId();
+          console.log(`[useVoiceRecorder] Calling onRecordingComplete with blob size: ${finalBlob.size}, duration: ${actualDuration}`);
+          onRecordingComplete(finalBlob, tempId);
+          
+          if (opId) {
+            window.dispatchEvent(new CustomEvent('journalOperationUpdate', {
+              detail: {
+                id: opId,
+                status: 'success',
+                message: 'Recording completed',
+                details: `Audio size: ${formatBytes(finalBlob.size)}, Duration: ${actualDuration}s, TempID: ${tempId}`
+              }
+            }));
+          }
+        }
       } else {
         console.error("[useVoiceRecorder] Recording failed: empty blob");
+        
+        if (opId) {
+          window.dispatchEvent(new CustomEvent('journalOperationUpdate', {
+            detail: {
+              id: opId,
+              status: 'error',
+              message: 'Recording failed',
+              details: 'Empty audio blob received'
+            }
+          }));
+        }
+        
         if (onError) onError(new Error("Recording failed: empty blob"));
       }
     } catch (err) {
       console.error("[useVoiceRecorder] Error stopping recording:", err);
       setStatus("idle");
+      
       if (onError) onError(err);
     } finally {
+      // Clean up recorder reference
       recorderRef.current = null;
     }
   };
@@ -164,6 +250,7 @@ export function useVoiceRecorder({
   };
 }
 
+// Helper function to format time
 function formatTime(milliseconds: number): string {
   const totalSeconds = Math.floor(milliseconds / 1000);
   const minutes = Math.floor(totalSeconds / 60);
@@ -173,4 +260,22 @@ function formatTime(milliseconds: number): string {
   const formattedSeconds = String(seconds).padStart(2, "0");
 
   return `${formattedMinutes}:${formattedSeconds}`;
+}
+
+// Helper function to format bytes
+function formatBytes(bytes: number, decimals = 2): string {
+  if (bytes === 0) return '0 Bytes';
+  
+  const k = 1024;
+  const dm = decimals < 0 ? 0 : decimals;
+  const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+  
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  
+  return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + ' ' + sizes[i];
+}
+
+// Generate a random ID for the recording
+function generateTempId(): string {
+  return Date.now().toString(36) + Math.random().toString(36).substring(2);
 }

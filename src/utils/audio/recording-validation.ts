@@ -1,18 +1,21 @@
 
 /**
- * Simplified audio recording validation utilities
+ * Audio recording validation utilities
  */
 import { clearAllToasts, ensureAllToastsCleared } from '@/services/notificationService';
-import { validateAudioBlob } from './blob-utils';
+import { verifyUserAuthentication } from './auth-utils';
 import { 
   setProcessingLock, 
   setIsEntryBeingProcessed, 
   setProcessingTimeoutId,
-  getProcessingTimeoutId
+  getProcessingTimeoutId,
+  updateProcessingEntries
 } from './processing-state';
+import { validateAudioBlob } from './blob-utils';
 
 /**
  * Validates the initial state before audio processing
+ * Returns a result object with success status and optional error message
  */
 export async function validateInitialState(
   audioBlob: Blob | null, 
@@ -22,24 +25,41 @@ export async function validateInitialState(
   error?: string;
   tempId?: string;
 }> {
-  // Clear all toasts
+  // Clear all toasts to ensure UI is clean before processing
   clearAllToasts();
+  
+  // If there's already a processing operation in progress, wait briefly
+  if (await isProcessingLockActive()) {
+    console.log('[AudioValidation] Processing lock detected, waiting briefly...');
+    
+    try {
+      await new Promise(resolve => setTimeout(resolve, 200));
+      
+      // If lock is still active after waiting, return an error
+      if (await isProcessingLockActive()) {
+        console.error('[AudioValidation] Processing lock still active, cannot process multiple recordings simultaneously');
+        return { success: false, error: 'Another recording is already being processed' };
+      }
+    } catch (err) {
+      console.error('[AudioValidation] Error waiting for processing lock:', err);
+    }
+  }
   
   // Validate the audio blob
   const validation = validateAudioBlob(audioBlob);
   if (!validation.isValid) {
-    console.error('[AudioValidation] Audio validation failed:', validation.errorMessage);
+    console.error('Audio validation failed:', validation.errorMessage);
     return { success: false, error: validation.errorMessage };
   }
   
-  // Verify the user ID
+  // Verify the user ID is valid
   if (!userId) {
-    console.error('[AudioValidation] No user ID provided');
+    console.error('No user ID provided for audio processing');
     return { success: false, error: 'Authentication required' };
   }
   
-  // Generate a temporary ID
-  const tempId = `temp-${Date.now()}-${Math.random().toString(36).substring(2)}`;
+  // Generate a temporary ID for this recording
+  const tempId = `temp-${Date.now()}`;
   
   return { success: true, tempId };
 }
@@ -48,17 +68,38 @@ export async function validateInitialState(
  * Sets up a timeout to ensure the processing lock is eventually released
  */
 export function setupProcessingTimeout(): void {
-  // Clear existing timeout
+  // Clear existing timeout if any
   if (getProcessingTimeoutId()) {
     clearTimeout(getProcessingTimeoutId()!);
   }
   
-  // Set timeout to release lock after 30 seconds
+  // Set a timeout to release the lock after a maximum time to prevent deadlocks
   const timeoutId = setTimeout(() => {
     console.log('[AudioValidation] Releasing processing lock due to timeout');
     setProcessingLock(false);
     setIsEntryBeingProcessed(false);
-  }, 30000);
+    
+    // Clean up any lingering entries after timeout
+    const entries = import('./processing-state').then(({ getProcessingEntries }) => {
+      return getProcessingEntries();
+    });
+    
+    entries.then(entries => {
+      if (entries.length > 0) {
+        entries.forEach(entry => {
+          updateProcessingEntries(entry, 'remove');
+        });
+      }
+    });
+  }, 30000); // 30 second maximum lock time
   
   setProcessingTimeoutId(timeoutId);
+}
+
+/**
+ * Checks if the processing lock is active
+ */
+async function isProcessingLockActive(): Promise<boolean> {
+  const { getProcessingLock } = await import('./processing-state');
+  return getProcessingLock();
 }
