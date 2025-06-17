@@ -1,4 +1,4 @@
-import { supabase } from '@/integrations/supabase/client';
+
 import { nodeTranslationCache } from './nodeTranslationCache';
 
 interface NodeData {
@@ -125,27 +125,18 @@ class EnhancedSoulNetPreloadService {
 
   private static async fetchSoulNetData(userId: string, timeRange: string): Promise<{ nodes: NodeData[]; links: LinkData[] } | null> {
     try {
-      const { data, error } = await supabase
-        .from('journal_insights_soulnet')
-        .select('*')
-        .eq('user_id', userId)
-        .eq('time_range', timeRange)
-        .single();
+      // Since the database table doesn't exist, we'll return mock data for now
+      // In a real implementation, this would fetch from the actual database table
+      console.log(`[EnhancedSoulNetPreloadService] Mock data for user ${userId}, timeRange ${timeRange}`);
+      
+      // Return empty data for now - this should be replaced with actual database queries
+      // when the journal_insights_soulnet table is created
+      const mockData = {
+        nodes: [] as NodeData[],
+        links: [] as LinkData[]
+      };
 
-      if (error) {
-        console.error('Error fetching SoulNet data:', error);
-        return null;
-      }
-
-      if (!data) {
-        console.warn('No SoulNet data found for user', userId, 'and time range', timeRange);
-        return null;
-      }
-
-      const nodes: NodeData[] = data.nodes || [];
-      const links: LinkData[] = data.links || [];
-
-      return { nodes, links };
+      return mockData;
     } catch (error) {
       console.error('Error processing SoulNet data:', error);
       return null;

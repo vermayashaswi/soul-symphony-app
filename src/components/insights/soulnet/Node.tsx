@@ -1,9 +1,10 @@
-import React, { useState, useRef, useMemo, useCallback } from 'react';
+
+import React, { useState, useRef, useMemo, useCallback, useEffect } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';
 import * as THREE from 'three';
-import { Html } from '@react-three/drei';
 import TranslatableText3D from './TranslatableText3D';
 import { useAuth } from '@/contexts/AuthContext';
+import { useUserColorThemeHex } from './useUserColorThemeHex';
 
 interface NodeData {
   id: string;
@@ -54,7 +55,8 @@ const Node: React.FC<NodeProps> = ({
   isInstantMode = false,
   getInstantTranslation,
   userId,
-  timeRange
+  timeRange,
+  getCoordinatedTranslation
 }) => {
   const { user } = useAuth();
   
@@ -223,7 +225,7 @@ const Node: React.FC<NodeProps> = ({
 
   const contextUserId = userId || user?.id;
   
-  const labelPosition = [node.position[0], node.position[1] + 1.5, node.position[2]];
+  const labelPosition: [number, number, number] = [node.position[0], node.position[1] + 1.5, node.position[2]];
   const labelColor = new THREE.Color(color);
   const labelSize = 0.5;
   const labelOutlineWidth = 0.05;
@@ -231,7 +233,7 @@ const Node: React.FC<NodeProps> = ({
   const labelMaxWidth = 1.5;
   const labelMaxCharsPerLine = 10;
   
-  const percentagePosition = [node.position[0], node.position[1] + 2.5, node.position[2]];
+  const percentagePosition: [number, number, number] = [node.position[0], node.position[1] + 2.5, node.position[2]];
   const percentageColor = new THREE.Color(color);
   const percentageSize = 0.5;
   const percentageOutlineWidth = 0.05;
