@@ -10,6 +10,8 @@ export type TranscriptionOptions = {
 
 export type TranscriptionResult = {
   id: number;
+  entryId?: number; // Add the missing entryId property
+  tempId?: string; // Add the missing tempId property
   transcription: string;
   refined: string;
   language: string;
@@ -135,6 +137,8 @@ export class TranscriptionService {
 
       return {
         id: result.id || result.entryId,
+        entryId: result.entryId || result.id, // Map entryId from the response
+        tempId: result.tempId, // Include tempId from the response
         transcription: result.transcription,
         refined: result.refined,
         language: result.language,

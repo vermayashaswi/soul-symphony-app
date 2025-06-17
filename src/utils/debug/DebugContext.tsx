@@ -1,3 +1,4 @@
+
 import React, { createContext, useContext, useState } from 'react';
 
 // Provide a context with debugging functionality
@@ -13,6 +14,7 @@ export type DebugStep = {
 interface DebugContextType {
   logs: any[];
   addLog: (...args: any[]) => void;
+  log: (...args: any[]) => void; // Add the missing log method
   addEvent: (...args: any[]) => void;
   clearLogs: () => void;
   isEnabled: boolean;
@@ -29,6 +31,7 @@ interface DebugContextType {
 const DebugContext = createContext<DebugContextType>({
   logs: [],
   addLog: () => {},
+  log: () => {}, // Add the missing log method
   addEvent: () => {},
   clearLogs: () => {},
   isEnabled: false,
@@ -50,6 +53,11 @@ export const DebugProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const addLog = (...args: any[]) => {
     setLogs(prevLogs => [...prevLogs, ...args]);
     console.log(...args);
+  };
+
+  // Add the log method that's an alias for addLog
+  const log = (...args: any[]) => {
+    addLog(...args);
   };
 
   const addEvent = (...args: any[]) => {
@@ -87,6 +95,7 @@ export const DebugProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     <DebugContext.Provider value={{
       logs,
       addLog,
+      log, // Include the log method
       addEvent,
       clearLogs,
       isEnabled,
