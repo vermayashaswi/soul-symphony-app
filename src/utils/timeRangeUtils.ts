@@ -1,3 +1,4 @@
+
 import { TimeRange } from '@/hooks/use-insights-data';
 import { formatDateForTimeRange } from '@/utils/date-formatter';
 import { addDays, addWeeks, addMonths, addYears, startOfWeek, startOfMonth, startOfYear, startOfDay } from 'date-fns';
@@ -55,5 +56,29 @@ export const getTimeRangeLabel = (timeRange: TimeRange, currentDate: Date, langu
       return currentDate.getFullYear().toString();
     default:
       return `This ${timeRange}`;
+  }
+};
+
+/**
+ * Navigate to the next or previous period based on time range
+ */
+export const navigateTimeRange = (
+  currentDate: Date, 
+  timeRange: TimeRange, 
+  direction: 'next' | 'previous'
+): Date => {
+  const multiplier = direction === 'next' ? 1 : -1;
+  
+  switch (timeRange) {
+    case 'today':
+      return addDays(currentDate, multiplier);
+    case 'week':
+      return addWeeks(currentDate, multiplier);
+    case 'month':
+      return addMonths(currentDate, multiplier);
+    case 'year':
+      return addYears(currentDate, multiplier);
+    default:
+      return currentDate;
   }
 };

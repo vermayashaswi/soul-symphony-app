@@ -3,23 +3,25 @@ import React, { useState, useEffect } from 'react';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { motion } from 'framer-motion';
 import { useInsightsData, TimeRange } from '@/hooks/use-insights-data';
-import InsightsHeader from '@/components/insights/InsightsHeader';
-import InsightsTimeToggle from '@/components/insights/InsightsTimeToggle';
+import { InsightsHeader } from '@/components/insights/InsightsHeader';
+import { InsightsTimeToggle } from '@/components/insights/InsightsTimeToggle';
 import InsightsStatsGrid from '@/components/insights/InsightsStatsGrid';
 import { InsightsCharts } from '@/components/insights/InsightsCharts';
-import InsightsLoadingState from '@/components/insights/InsightsLoadingState';
-import InsightsEmptyState from '@/components/insights/InsightsEmptyState';
+import { InsightsLoadingState } from '@/components/insights/InsightsLoadingState';
+import { InsightsEmptyState } from '@/components/insights/InsightsEmptyState';
 import { InsightsGlobalNavigation } from '@/components/insights/InsightsGlobalNavigation';
 import { useUserProfile } from '@/hooks/useUserProfile';
 import { InsightsTranslationProvider } from '@/components/insights/InsightsTranslationProvider';
+import { addDays, addWeeks, addMonths, addYears, subDays, subWeeks, subMonths, subYears } from 'date-fns';
 
 const Insights: React.FC = () => {
   const isMobile = useIsMobile();
   const [timeRange, setTimeRange] = useState<TimeRange>('week');
   const [globalDate, setGlobalDate] = useState<Date>(new Date());
-  const { profile } = useUserProfile();
+  const [refreshing, setRefreshing] = useState(false);
+  const userProfile = useUserProfile();
   
-  const { data: insightsData, isLoading, error } = useInsightsData(
+  const { insightsData, loading } = useInsightsData(
     timeRange,
     globalDate
   );
@@ -29,32 +31,45 @@ const Insights: React.FC = () => {
     console.log('[Insights] Global date changed to:', globalDate);
   }, [globalDate]);
 
-  if (isLoading) {
+  // Handle navigation between time periods
+  const handleNavigation = (direction: 'previous' | 'next') => {
+    setGlobalDate(currentDate => {
+      switch (timeRange) {
+        case 'today':
+          return direction === 'next' ? addDays(currentDate, 1) : subDays(currentDate, 1);
+        case 'week':
+          return direction === 'next' ? addWeeks(currentDate, 1) : subWeeks(currentDate, 1);
+        case 'month':
+          return direction === 'next' ? addMonths(currentDate, 1) : subMonths(currentDate, 1);
+        case 'year':
+          return direction === 'next' ? addYears(currentDate, 1) : subYears(currentDate, 1);
+        default:
+          return currentDate;
+      }
+    });
+  };
+
+  // Handle manual refresh
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    // Reset global date to current date
+    setGlobalDate(new Date());
+    // Add a small delay to show the refresh animation
+    setTimeout(() => {
+      setRefreshing(false);
+    }, 500);
+  };
+
+  if (loading) {
     return <InsightsLoadingState />;
   }
 
-  if (error) {
-    console.error('Insights error:', error);
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="text-center">
-          <h2 className="text-xl font-semibold mb-2">Error loading insights</h2>
-          <p className="text-muted-foreground">{error.message}</p>
-        </div>
-      </div>
-    );
-  }
-
-  if (!insightsData || (!insightsData.entries?.length && !isLoading)) {
+  if (!insightsData || (!insightsData.entries?.length && !loading)) {
     return <InsightsEmptyState />;
   }
 
   return (
-    <InsightsTranslationProvider 
-      timeRange={timeRange} 
-      globalDate={globalDate}
-      userId={profile?.id}
-    >
+    <InsightsTranslationProvider>
       <div className={`min-h-screen ${isMobile ? 'pb-20' : ''}`}>
         <div className="container mx-auto px-4 py-6 max-w-7xl">
           <motion.div
@@ -74,12 +89,15 @@ const Insights: React.FC = () => {
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
               <InsightsTimeToggle 
                 timeRange={timeRange} 
-                onTimeRangeChange={setTimeRange} 
+                onTimeRangeChange={setTimeRange}
+                refreshing={refreshing}
+                onRefresh={handleRefresh}
               />
               <InsightsGlobalNavigation
                 timeRange={timeRange}
-                globalDate={globalDate}
-                onDateChange={setGlobalDate}
+                currentDate={globalDate}
+                onNavigate={handleNavigation}
+                isNavigating={refreshing}
               />
             </div>
           </motion.div>
@@ -87,7 +105,7 @@ const Insights: React.FC = () => {
           <InsightsStatsGrid
             timeRange={timeRange}
             insightsData={insightsData}
-            isLoading={isLoading}
+            isLoading={loading}
             globalDate={globalDate}
           />
 
@@ -95,7 +113,7 @@ const Insights: React.FC = () => {
             timeRange={timeRange}
             insightsData={insightsData}
             globalDate={globalDate}
-            userId={profile?.id}
+            userId={userProfile?.id}
           />
         </div>
       </div>
