@@ -5,6 +5,10 @@ import App from './App.tsx'
 import './index.css'
 import './styles/mobile.css' // Import mobile-specific styles
 import './styles/tutorial.css' // Import tutorial-specific styles
+import { AuthProvider } from './contexts/AuthContext'
+import { ThemeProvider } from './hooks/use-theme'
+import { BrowserRouter } from 'react-router-dom'
+import { TranslationProvider } from './contexts/TranslationContext'
 
 // Enhanced Font Loading System
 const initializeFontSystem = async () => {
@@ -156,6 +160,14 @@ initializeApp();
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
-    <App />
+    <BrowserRouter>
+      <ThemeProvider>
+        <TranslationProvider>
+          <AuthProvider>
+            <App />
+          </AuthProvider>
+        </TranslationProvider>
+      </ThemeProvider>
+    </BrowserRouter>
   </React.StrictMode>,
 )

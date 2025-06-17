@@ -1,4 +1,3 @@
-
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { Session, User } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
@@ -15,6 +14,8 @@ import {
   refreshSession as refreshSessionService
 } from '@/services/authService';
 import { debugLogger, logInfo, logError, logAuthError, logProfile, logAuth } from '@/components/debug/DebugPanel';
+import { isAppRoute } from '@/routes/RouteHelpers';
+import { useLocation } from 'react-router-dom';
 import { SessionTrackingService } from '@/services/sessionTrackingService';
 import { LocationProvider } from '@/contexts/LocationContext';
 
@@ -36,6 +37,7 @@ function AuthProviderCore({ children }: { children: ReactNode }) {
   const [autoRetryTimeoutId, setAutoRetryTimeoutId] = useState<NodeJS.Timeout | null>(null);
   const [sessionCreated, setSessionCreated] = useState(false);
   const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
+  const location = useLocation();
 
   const detectUserLanguage = (): string => {
     // Try to get language from various sources in order of preference
@@ -581,7 +583,9 @@ function AuthProviderCore({ children }: { children: ReactNode }) {
 
         if (event === 'SIGNED_IN') {
           logInfo('User signed in successfully', 'AuthContext');
-          toast.success('Signed in successfully');
+          if (isAppRoute(location.pathname)) {
+            toast.success('Signed in successfully');
+          }
         } else if (event === 'SIGNED_OUT') {
           logInfo('User signed out', 'AuthContext');
           setProfileExistsStatus(null);
@@ -595,7 +599,9 @@ function AuthProviderCore({ children }: { children: ReactNode }) {
             setAutoRetryTimeoutId(null);
           }
           
-          toast.info('Signed out');
+          if (isAppRoute(location.pathname)) {
+            toast.info('Signed out');
+          }
         }
       }
     );
@@ -629,7 +635,7 @@ function AuthProviderCore({ children }: { children: ReactNode }) {
         clearTimeout(autoRetryTimeoutId);
       }
     };
-  }, [isMobileDevice]);
+  }, [isMobileDevice, location.pathname]);
 
   const value = {
     session,
