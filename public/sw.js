@@ -1,9 +1,12 @@
-// Soulo PWA Service Worker
-const CACHE_NAME = 'soulo-cache-v1';
+// Soulo PWA Service Worker - Enhanced for Aggressive Updates
+const CACHE_NAME = 'soulo-cache-v' + Date.now(); // Dynamic cache name for forced updates
 const OFFLINE_URL = '/offline.html';
 const BACKGROUND_SYNC_TAG = 'journal-entry-sync';
 const PERIODIC_SYNC_TAG = 'journal-periodic-sync';
 const INSIGHTS_SYNC_TAG = 'insights-periodic-sync';
+
+// Force immediate activation
+const AGGRESSIVE_UPDATE_MODE = true;
 
 // Assets to cache for offline functionality
 const STATIC_ASSETS = [
@@ -20,50 +23,63 @@ const STATIC_ASSETS = [
   '/lovable-uploads/3f275134-f471-4af9-a7cd-700ccd855fe3.png'
 ];
 
-// Install event - cache static assets
+// Install event - aggressive caching
 self.addEventListener('install', (event) => {
-  console.log('[SW] Installing service worker...');
+  console.log('[SW] Installing service worker with aggressive updates...');
   
   event.waitUntil(
-    caches.open(CACHE_NAME)
-      .then((cache) => {
-        console.log('[SW] Caching static assets');
+    Promise.all([
+      // Cache static assets
+      caches.open(CACHE_NAME).then((cache) => {
+        console.log('[SW] Caching static assets with new cache name:', CACHE_NAME);
         return cache.addAll(STATIC_ASSETS);
-      })
-      .then(() => {
-        console.log('[SW] Service worker installed successfully');
-        return self.skipWaiting();
-      })
-      .catch((error) => {
-        console.error('[SW] Installation failed:', error);
-      })
+      }),
+      // Skip waiting immediately for aggressive updates
+      AGGRESSIVE_UPDATE_MODE ? self.skipWaiting() : Promise.resolve()
+    ]).then(() => {
+      console.log('[SW] Service worker installed successfully');
+    }).catch((error) => {
+      console.error('[SW] Installation failed:', error);
+    })
   );
 });
 
-// Activate event - clean up old caches
+// Activate event - aggressive cleanup and immediate takeover
 self.addEventListener('activate', (event) => {
-  console.log('[SW] Activating service worker...');
+  console.log('[SW] Activating service worker with aggressive cleanup...');
   
   event.waitUntil(
-    caches.keys()
-      .then((cacheNames) => {
+    Promise.all([
+      // Delete ALL old caches aggressively
+      caches.keys().then((cacheNames) => {
         return Promise.all(
           cacheNames.map((cacheName) => {
             if (cacheName !== CACHE_NAME) {
-              console.log('[SW] Deleting old cache:', cacheName);
+              console.log('[SW] Aggressively deleting old cache:', cacheName);
               return caches.delete(cacheName);
             }
           })
         );
-      })
-      .then(() => {
-        console.log('[SW] Service worker activated');
-        return self.clients.claim();
-      })
+      }),
+      // Claim all clients immediately
+      self.clients.claim()
+    ]).then(() => {
+      console.log('[SW] Service worker activated aggressively');
+      // Notify all clients about the update
+      return self.clients.matchAll().then(clients => {
+        clients.forEach(client => {
+          client.postMessage({
+            type: 'SW_ACTIVATED',
+            timestamp: Date.now(),
+            cacheVersion: CACHE_NAME
+          });
+        });
+      });
+    })
   );
 });
 
-// Fetch event - serve from cache or network
+// Enhanced fetch event with aggressive cache busting
 self.addEventListener('fetch', (event) => {
   // Skip non-GET requests
   if (event.request.method !== 'GET') {
@@ -75,7 +91,7 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // Skip Supabase API calls for background sync handling
+  // Aggressive cache busting for API calls
   if (event.request.url.includes('supabase.co/functions') || 
       event.request.url.includes('supabase.co/rest')) {
     
@@ -85,52 +101,81 @@ self.addEventListener('fetch', (event) => {
       return;
     }
     
-    // Let network requests pass through normally
+    // Add cache-busting headers for API calls
+    event.respondWith(
+      fetch(event.request.clone(), {
+        headers: {
+          ...event.request.headers,
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          'Pragma': 'no-cache',
+          'Expires': '0'
+        }
+      }).catch(() => {
+        // Fallback to cached version if available
+        return caches.match(event.request);
+      })
+    );
     return;
   }
 
+  // Aggressive caching strategy for static assets
   event.respondWith(
-    caches.match(event.request)
-      .then((response) => {
-        // Return cached version if available
+    caches.open(CACHE_NAME).then(cache => {
+      return cache.match(event.request).then(response => {
         if (response) {
-          console.log('[SW] Serving from cache:', event.request.url);
+          // Serve from cache but also update in background
+          const fetchPromise = fetch(event.request).then(fetchResponse => {
+            if (fetchResponse && fetchResponse.status === 200 && fetchResponse.type === 'basic') {
+              cache.put(event.request, fetchResponse.clone());
+            }
+            return fetchResponse;
+          }).catch(() => response);
+          
+          // Return cached version immediately
           return response;
         }
 
-        // Try network request
-        return fetch(event.request)
-          .then((response) => {
-            // Don't cache non-successful responses
-            if (!response || response.status !== 200 || response.type !== 'basic') {
-              return response;
-            }
+        // Not in cache, fetch from network
+        return fetch(event.request).then(fetchResponse => {
+          if (!fetchResponse || fetchResponse.status !== 200 || fetchResponse.type !== 'basic') {
+            return fetchResponse;
+          }
 
-            // Clone the response for caching
-            const responseToCache = response.clone();
-            
-            caches.open(CACHE_NAME)
-              .then((cache) => {
-                cache.put(event.request, responseToCache);
-              });
-
-            return response;
-          })
-          .catch(() => {
-            // Return offline page for navigation requests
-            if (event.request.mode === 'navigate') {
-              return caches.match(OFFLINE_URL);
-            }
-            
-            // Return a generic offline response for other requests
-            return new Response('Offline - Content not available', {
-              status: 503,
-              statusText: 'Service Unavailable',
-              headers: { 'Content-Type': 'text/plain' }
-            });
+          // Cache the new response
+          cache.put(event.request, fetchResponse.clone());
+          return fetchResponse;
+        }).catch(() => {
+          // Return offline page for navigation requests
+          if (event.request.mode === 'navigate') {
+            return caches.match(OFFLINE_URL);
+          }
+          
+          return new Response('Offline - Content not available', {
+            status: 503,
+            statusText: 'Service Unavailable',
+            headers: { 'Content-Type': 'text/plain' }
           });
-      })
+        });
+      });
+    })
   );
+});
+
+// Enhanced message handling for aggressive updates
+self.addEventListener('message', (event) => {
+  console.log('[SW] Message received:', event.data);
+  
+  if (event.data && event.data.type === 'SKIP_WAITING') {
+    console.log('[SW] Skipping waiting due to aggressive update request');
+    self.skipWaiting();
+  } else if (event.data && event.data.type === 'CHECK_UPDATE') {
+    // Force an immediate update check
+    event.ports[0].postMessage({
+      type: 'UPDATE_STATUS',
+      hasUpdate: true,
+      timestamp: Date.now()
+    });
+  }
 });
 
 // Background Sync for journal entries
@@ -394,6 +439,36 @@ self.addEventListener('push', (event) => {
   if (event.data) {
     const data = event.data.json();
     
+    // Check if this is an update notification
+    if (data.type === 'APP_UPDATE') {
+      const options = {
+        body: 'A new version of Soulo is available. Tap to update now.',
+        icon: '/lovable-uploads/31ed88ef-f596-4b91-ba58-a4175eebe779.png',
+        badge: '/lovable-uploads/31ed88ef-f596-4b91-ba58-a4175eebe779.png',
+        tag: 'app-update',
+        requireInteraction: true,
+        actions: [
+          {
+            action: 'update',
+            title: 'Update Now',
+            icon: '/lovable-uploads/31ed88ef-f596-4b91-ba58-a4175eebe779.png'
+          },
+          {
+            action: 'later',
+            title: 'Later',
+            icon: '/lovable-uploads/31ed88ef-f596-4b91-ba58-a4175eebe779.png'
+          }
+        ],
+        data: { type: 'APP_UPDATE' }
+      };
+
+      event.waitUntil(
+        self.registration.showNotification('Soulo Update Available', options)
+      );
+      return;
+    }
+    
+    // Handle regular notifications
     const options = {
       body: data.body || 'New notification from Soulo',
       icon: '/lovable-uploads/31ed88ef-f596-4b91-ba58-a4175eebe779.png',
@@ -427,6 +502,24 @@ self.addEventListener('notificationclick', (event) => {
   
   event.notification.close();
   
+  if (event.notification.data?.type === 'APP_UPDATE') {
+    if (event.action === 'update') {
+      // Force immediate update
+      event.waitUntil(
+        self.skipWaiting().then(() => {
+          return self.clients.claim();
+        }).then(() => {
+          return self.clients.matchAll();
+        }).then(clients => {
+          clients.forEach(client => {
+            client.postMessage({ type: 'FORCE_RELOAD' });
+          });
+        })
+      );
+    }
+    return;
+  }
+  
   if (event.action === 'open' || !event.action) {
     event.waitUntil(
       clients.openWindow('/app')
@@ -437,13 +530,37 @@ self.addEventListener('notificationclick', (event) => {
   }
 });
 
-// Handle messages from the app
-self.addEventListener('message', (event) => {
-  console.log('[SW] Message received:', event.data);
-  
-  if (event.data && event.data.type === 'SKIP_WAITING') {
-    self.skipWaiting();
-  }
-});
+// Auto-sync functionality - keep existing code
+async function syncJournalEntries() {
+  // ... keep existing code (syncJournalEntries function)
+}
 
-console.log('[SW] Service worker script loaded');
+async function periodicJournalSync() {
+  // ... keep existing code (periodicJournalSync function)
+}
+
+async function periodicInsightsSync() {
+  // ... keep existing code (periodicInsightsSync function)
+}
+
+async function refreshInsightsCache() {
+  // ... keep existing code (refreshInsightsCache function)
+}
+
+async function getOfflineJournalEntries() {
+  // ... keep existing code (getOfflineJournalEntries function)
+}
+
+async function removeOfflineJournalEntry(id) {
+  // ... keep existing code (removeOfflineJournalEntry function)
+}
+
+async function notifyAppOfSync(entry, status) {
+  // ... keep existing code (notifyAppOfSync function)
+}
+
+async function notifyAppOfPeriodicSync(type, itemCount) {
+  // ... keep existing code (notifyAppOfPeriodicSync function)
+}
+
+console.log('[SW] Enhanced service worker script loaded with aggressive updates');

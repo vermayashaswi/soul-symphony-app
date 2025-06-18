@@ -1,5 +1,4 @@
 
-import { supabase } from '@/integrations/supabase/client';
 import { FeatureFlags, AppFeatureFlag } from '@/types/featureFlags';
 
 export interface FeatureFlagConfig {
@@ -14,7 +13,7 @@ export interface FeatureFlagConfig {
 class FeatureFlagService {
   private cache: Map<AppFeatureFlag, boolean> = new Map();
   private lastFetch: number = 0;
-  private cacheExpiry: number = 5 * 60 * 1000; // 5 minutes
+  private cacheExpiry: number = 30 * 1000; // 30 seconds for faster updates
 
   async getFlags(): Promise<FeatureFlags> {
     const now = Date.now();
@@ -24,31 +23,25 @@ class FeatureFlagService {
       return this.cacheToFlags();
     }
 
+    // For now, use local storage and default values
+    // This can be extended to use a remote service later
     try {
-      // Fetch from Supabase
-      const { data, error } = await supabase
-        .from('feature_flags')
-        .select('*')
-        .eq('enabled', true);
-
-      if (error) {
-        console.warn('[FeatureFlagService] Error fetching flags:', error);
-        return this.getDefaultFlags();
+      const localFlags = localStorage.getItem('feature_flags');
+      if (localFlags) {
+        const parsed = JSON.parse(localFlags);
+        this.cache.clear();
+        Object.entries(parsed).forEach(([flag, enabled]) => {
+          if (this.isValidFlag(flag)) {
+            this.cache.set(flag as AppFeatureFlag, enabled as boolean);
+          }
+        });
       }
-
-      // Update cache
-      this.cache.clear();
-      data?.forEach(flag => {
-        if (this.isValidFlag(flag.flag)) {
-          this.cache.set(flag.flag as AppFeatureFlag, flag.enabled);
-        }
-      });
 
       this.lastFetch = now;
       return this.cacheToFlags();
 
     } catch (error) {
-      console.error('[FeatureFlagService] Network error:', error);
+      console.error('[FeatureFlagService] Error loading flags:', error);
       return this.getDefaultFlags();
     }
   }
@@ -60,19 +53,12 @@ class FeatureFlagService {
 
   async updateFlag(flag: AppFeatureFlag, enabled: boolean): Promise<boolean> {
     try {
-      const { error } = await supabase
-        .from('feature_flags')
-        .upsert({
-          flag,
-          enabled,
-          updated_at: new Date().toISOString()
-        });
-
-      if (error) {
-        console.error('[FeatureFlagService] Error updating flag:', error);
-        return false;
-      }
-
+      // Update local storage
+      const currentFlags = await this.getFlags();
+      currentFlags[flag] = enabled;
+      
+      localStorage.setItem('feature_flags', JSON.stringify(currentFlags));
+      
       // Update cache
       this.cache.set(flag, enabled);
       return true;
@@ -85,24 +71,16 @@ class FeatureFlagService {
 
   async getAllConfigs(): Promise<FeatureFlagConfig[]> {
     try {
-      const { data, error } = await supabase
-        .from('feature_flags')
-        .select('*')
-        .order('flag');
-
-      if (error) {
-        console.error('[FeatureFlagService] Error fetching configs:', error);
-        return [];
-      }
-
-      return data?.map(item => ({
-        flag: item.flag as AppFeatureFlag,
-        enabled: item.enabled,
-        description: item.description || '',
-        rolloutPercentage: item.rollout_percentage,
-        userGroups: item.user_groups,
-        expiresAt: item.expires_at
-      })) || [];
+      const flags = await this.getFlags();
+      
+      return Object.entries(flags).map(([flag, enabled]) => ({
+        flag: flag as AppFeatureFlag,
+        enabled,
+        description: this.getFlagDescription(flag as AppFeatureFlag),
+        rolloutPercentage: 100,
+        userGroups: [],
+        expiresAt: undefined
+      }));
 
     } catch (error) {
       console.error('[FeatureFlagService] Error fetching configs:', error);
@@ -146,6 +124,18 @@ class FeatureFlagService {
       'otherReservedFlags'
     ];
     return validFlags.includes(flag as AppFeatureFlag);
+  }
+
+  private getFlagDescription(flag: AppFeatureFlag): string {
+    const descriptions: Record<AppFeatureFlag, string> = {
+      smartChatV2: 'Enhanced AI chat capabilities',
+      premiumMessaging: 'Premium messaging features',
+      emotionCalendar: 'Emotion tracking calendar',
+      insightsV2: 'Advanced insights dashboard',
+      journalVoicePlayback: 'Voice playback for journal entries',
+      otherReservedFlags: 'Reserved for future features'
+    };
+    return descriptions[flag] || '';
   }
 }
 

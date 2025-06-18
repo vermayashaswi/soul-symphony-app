@@ -1,5 +1,6 @@
 
 import { toast } from 'sonner';
+import { aggressiveUpdateService } from './aggressiveUpdateService';
 
 export interface AppVersion {
   version: string;
@@ -36,47 +37,57 @@ class VersionService {
 
   async checkForUpdates(): Promise<UpdateInfo> {
     try {
+      console.log('[VersionService] Checking for updates...');
+      
       // Check service worker for updates
       const registration = await navigator.serviceWorker.getRegistration();
       
       if (registration?.waiting) {
+        console.log('[VersionService] Waiting service worker found');
         return {
           available: true,
           currentVersion: this.currentVersion.version,
           latestVersion: 'Latest',
-          releaseNotes: 'App improvements and bug fixes available'
+          releaseNotes: 'App improvements and bug fixes available',
+          mandatory: false
         };
       }
 
-      // Check for new service worker
+      // Force service worker update check
       if (registration) {
+        console.log('[VersionService] Forcing service worker update check...');
         await registration.update();
         
         return new Promise((resolve) => {
-          registration.addEventListener('updatefound', () => {
-            const newWorker = registration.installing;
-            if (newWorker) {
-              newWorker.addEventListener('statechange', () => {
-                if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
-                  resolve({
-                    available: true,
-                    currentVersion: this.currentVersion.version,
-                    latestVersion: 'Latest',
-                    releaseNotes: 'New version available with latest features'
-                  });
-                }
-              });
-            }
-          });
-
-          // If no update found after 3 seconds, resolve with no update
-          setTimeout(() => {
+          const checkTimeout = setTimeout(() => {
             resolve({
               available: false,
               currentVersion: this.currentVersion.version,
               latestVersion: this.currentVersion.version
             });
-          }, 3000);
+          }, 2000); // Reduced timeout for faster response
+          
+          registration.addEventListener('updatefound', () => {
+            clearTimeout(checkTimeout);
+            const newWorker = registration.installing;
+            
+            if (newWorker) {
+              const handleStateChange = () => {
+                if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                  newWorker.removeEventListener('statechange', handleStateChange);
+                  resolve({
+                    available: true,
+                    currentVersion: this.currentVersion.version,
+                    latestVersion: 'Latest',
+                    releaseNotes: 'New version available with latest features',
+                    mandatory: false
+                  });
+                }
+              };
+              
+              newWorker.addEventListener('statechange', handleStateChange);
+            }
+          });
         });
       }
 
@@ -98,18 +109,37 @@ class VersionService {
 
   async applyUpdate(): Promise<boolean> {
     try {
+      console.log('[VersionService] Applying update...');
+      
       const registration = await navigator.serviceWorker.getRegistration();
       
       if (registration?.waiting) {
+        // Clear all caches before updating
+        await this.clearCache();
+        
         // Send skip waiting message to the waiting service worker
         registration.waiting.postMessage({ type: 'SKIP_WAITING' });
         
         // Wait for the new service worker to take control
         return new Promise((resolve) => {
-          navigator.serviceWorker.addEventListener('controllerchange', () => {
+          const handleControllerChange = () => {
+            navigator.serviceWorker.removeEventListener('controllerchange', handleControllerChange);
+            console.log('[VersionService] Controller changed, reloading...');
+            
+            // Force hard reload to ensure latest content
             window.location.reload();
             resolve(true);
-          });
+          };
+          
+          navigator.serviceWorker.addEventListener('controllerchange', handleControllerChange);
+          
+          // Fallback timeout
+          setTimeout(() => {
+            navigator.serviceWorker.removeEventListener('controllerchange', handleControllerChange);
+            console.log('[VersionService] Timeout reached, forcing reload...');
+            window.location.reload();
+            resolve(true);
+          }, 3000);
         });
       }
 
@@ -120,8 +150,13 @@ class VersionService {
     }
   }
 
-  startUpdatePolling(intervalMs: number = 300000) { // 5 minutes
+  startUpdatePolling(intervalMs: number = 30000) { // Reduced to 30 seconds
     this.stopUpdatePolling();
+    
+    console.log('[VersionService] Starting update polling...');
+    
+    // Initialize aggressive update service
+    aggressiveUpdateService.initialize();
     
     this.updateCheckInterval = setInterval(async () => {
       const updateInfo = await this.checkForUpdates();
@@ -136,6 +171,11 @@ class VersionService {
       clearInterval(this.updateCheckInterval);
       this.updateCheckInterval = null;
     }
+    
+    // Stop aggressive update service
+    aggressiveUpdateService.stop();
+    
+    console.log('[VersionService] Update polling stopped');
   }
 
   private notifyUpdateAvailable(updateInfo: UpdateInfo) {
@@ -145,16 +185,31 @@ class VersionService {
         label: 'Update',
         onClick: () => this.applyUpdate()
       },
-      duration: 10000
+      duration: 15000 // Longer duration for better visibility
     });
   }
 
   async clearCache(): Promise<void> {
     try {
+      console.log('[VersionService] Clearing all caches...');
+      
       const cacheNames = await caches.keys();
       await Promise.all(
-        cacheNames.map(cacheName => caches.delete(cacheName))
+        cacheNames.map(cacheName => {
+          console.log('[VersionService] Deleting cache:', cacheName);
+          return caches.delete(cacheName);
+        })
       );
+      
+      // Clear local storage cache markers
+      const cacheKeys = Object.keys(localStorage).filter(key => 
+        key.includes('cache') || key.includes('version') || key.includes('timestamp')
+      );
+      
+      cacheKeys.forEach(key => {
+        localStorage.removeItem(key);
+      });
+      
       console.log('[VersionService] All caches cleared');
     } catch (error) {
       console.error('[VersionService] Error clearing cache:', error);
@@ -172,6 +227,39 @@ class VersionService {
     } catch (error) {
       console.error('[VersionService] Error getting cache size:', error);
       return 'Error';
+    }
+  }
+
+  // Force immediate update check and application
+  async forceUpdate(): Promise<boolean> {
+    console.log('[VersionService] Forcing immediate update...');
+    
+    try {
+      // Clear all caches first
+      await this.clearCache();
+      
+      // Check for updates
+      const updateInfo = await this.checkForUpdates();
+      
+      if (updateInfo.available) {
+        return await this.applyUpdate();
+      } else {
+        // Force service worker re-registration
+        const registration = await navigator.serviceWorker.getRegistration();
+        if (registration) {
+          await registration.unregister();
+          // Re-register service worker
+          await navigator.serviceWorker.register('/sw.js');
+          // Reload page
+          window.location.reload();
+          return true;
+        }
+      }
+      
+      return false;
+    } catch (error) {
+      console.error('[VersionService] Force update failed:', error);
+      return false;
     }
   }
 }
