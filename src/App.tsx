@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from 'react';
 import AppRoutes from './routes/AppRoutes';
 import { Toaster } from "@/components/ui/toaster";
@@ -14,6 +15,9 @@ import { toast } from 'sonner';
 import './styles/emoji.css';
 import './styles/tutorial.css';
 import { FeatureFlagsProvider } from "./contexts/FeatureFlagsContext";
+import PWABuilderManager from './components/pwa/PWABuilderManager';
+import UpdateNotification from './components/pwa/UpdateNotification';
+import MaintenanceBanner from './components/MaintenanceBanner';
 
 const App: React.FC = () => {
   const [isInitialized, setIsInitialized] = useState(false);
@@ -71,6 +75,12 @@ const App: React.FC = () => {
         <TranslationProvider>
           <SubscriptionProvider>
             <TutorialProvider>
+              <PWABuilderManager />
+              <MaintenanceBanner 
+                isVisible={false}
+                isDismissible={true}
+              />
+              <UpdateNotification />
               <TranslationLoadingOverlay />
               <JournalProcessingInitializer />
               <AppRoutes key={isInitialized ? 'initialized' : 'initializing'} />
