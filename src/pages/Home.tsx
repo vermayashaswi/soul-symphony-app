@@ -126,7 +126,7 @@ const Home = () => {
         height: '100%'
       }}
     >
-      {/* Maintenance Banner - positioned at the very top */}
+      {/* Maintenance Banner - controlled by feature flag */}
       <MaintenanceBanner />
 
       {/* Background elements including animations */}
