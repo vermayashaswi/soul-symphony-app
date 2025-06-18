@@ -34,8 +34,7 @@ export const FeatureFlagsProvider = ({ children }: { children: ReactNode }) => {
       try {
         const { data, error } = await supabase
           .from('feature_flags')
-          .select('name, is_enabled')
-          .eq('is_enabled', true); // Only fetch enabled flags
+          .select('name, is_enabled'); // Fetch all flags, not just enabled ones
 
         if (error) {
           console.error('Error fetching feature flags:', error);
