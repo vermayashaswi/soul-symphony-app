@@ -109,50 +109,33 @@ const Home = () => {
     document.body.style.top = '0';
     document.body.style.left = '0';
     
-    // Enhanced PWA Builder styling
+    // Enhanced PWA Builder styling with runtime fixes
     if (appInfo.isPWABuilder) {
-      console.log('[Home] PWA BUILDER: Applying PWA Builder specific styling');
+      console.log('[Home] PWA BUILDER: Applying enhanced PWA Builder styling');
+      
+      // Apply PWA Builder fixes from service
+      nativeAppService.applyPWABuilderFixes();
+      
+      // Force consistent background color
+      const isDark = document.documentElement.classList.contains('dark');
+      const backgroundColor = isDark ? '#0a0a0a' : '#ffffff';
+      
+      document.body.style.backgroundColor = backgroundColor;
+      document.documentElement.style.backgroundColor = backgroundColor;
+      
+      // Ensure proper CSS variables are set
+      const root = document.documentElement;
+      if (isDark) {
+        root.style.setProperty('--background', '240 10% 3.9%');
+        root.style.setProperty('--foreground', '0 0% 98%');
+      } else {
+        root.style.setProperty('--background', '0 0% 100%');
+        root.style.setProperty('--foreground', '240 10% 3.9%');
+      }
+      
+      // Apply PWA Builder specific classes
       document.body.classList.add('pwa-builder-app', 'native-app-environment');
       
-      document.body.style.backgroundColor = 'var(--background)';
-      document.body.style.contain = 'layout style paint';
-      document.body.style.isolation = 'isolate';
-      
-      const pwaBuilderStyles = document.getElementById('pwa-builder-home-styles') || document.createElement('style');
-      pwaBuilderStyles.id = 'pwa-builder-home-styles';
-      pwaBuilderStyles.textContent = `
-        .pwa-builder-app .home-container {
-          -webkit-user-select: none !important;
-          -webkit-touch-callout: none !important;
-          -webkit-tap-highlight-color: transparent !important;
-          contain: layout style paint !important;
-          isolation: isolate !important;
-          overflow: hidden !important;
-          will-change: transform !important;
-        }
-        
-        .pwa-builder-app .journal-arrow-button {
-          -webkit-transform: translate3d(0, 0, 0) !important;
-          transform: translate3d(0, 0, 0) !important;
-          contain: layout style !important;
-          will-change: transform !important;
-        }
-        
-        .pwa-builder-app .pwa-builder-test-indicator {
-          z-index: 10000 !important;
-          position: fixed !important;
-          top: 4px !important;
-          right: 4px !important;
-        }
-        
-        .pwa-builder-cache-clear-${Date.now()} {
-          background: linear-gradient(45deg, transparent 0%, transparent 100%);
-        }
-      `;
-      
-      if (!document.getElementById('pwa-builder-home-styles')) {
-        document.head.appendChild(pwaBuilderStyles);
-      }
     } else if (appInfo.isNativeApp) {
       console.log('[Home] PWA BUILDER: Applying enhanced native app styling');
       document.body.classList.add('webview-environment', 'native-app-environment');
@@ -161,41 +144,6 @@ const Home = () => {
       document.body.style.contain = 'layout style paint';
       document.body.style.isolation = 'isolate';
       
-      const nativeHomeStyles = document.getElementById('native-home-styles') || document.createElement('style');
-      nativeHomeStyles.id = 'native-home-styles';
-      nativeHomeStyles.textContent = `
-        .native-app-environment .home-container {
-          -webkit-user-select: none !important;
-          -webkit-touch-callout: none !important;
-          -webkit-tap-highlight-color: transparent !important;
-          contain: layout style paint !important;
-          isolation: isolate !important;
-          overflow: hidden !important;
-          will-change: transform !important;
-        }
-        
-        .native-app-environment .journal-arrow-button {
-          -webkit-transform: translate3d(0, 0, 0) !important;
-          transform: translate3d(0, 0, 0) !important;
-          contain: layout style !important;
-          will-change: transform !important;
-        }
-        
-        .native-app-environment .pwa-test-indicator {
-          z-index: 10000 !important;
-          position: fixed !important;
-          top: 4px !important;
-          right: 4px !important;
-        }
-        
-        .native-cache-clear-${Date.now()} {
-          background: linear-gradient(45deg, transparent 0%, transparent 100%);
-        }
-      `;
-      
-      if (!document.getElementById('native-home-styles')) {
-        document.head.appendChild(nativeHomeStyles);
-      }
     } else {
       const isWebView = (() => {
         try {
@@ -217,29 +165,6 @@ const Home = () => {
         document.body.style.backgroundColor = 'var(--background)';
         document.body.style.contain = 'layout style paint';
         document.body.style.isolation = 'isolate';
-        
-        const webViewStyles = document.getElementById('webview-home-styles') || document.createElement('style');
-        webViewStyles.id = 'webview-home-styles';
-        webViewStyles.textContent = `
-          .webview-environment .home-container {
-            -webkit-user-select: none !important;
-            -webkit-touch-callout: none !important;
-            -webkit-tap-highlight-color: transparent !important;
-            contain: layout style paint !important;
-            isolation: isolate !important;
-            overflow: hidden !important;
-          }
-          
-          .webview-environment .journal-arrow-button {
-            -webkit-transform: translate3d(0, 0, 0) !important;
-            transform: translate3d(0, 0, 0) !important;
-            contain: layout style !important;
-          }
-        `;
-        
-        if (!document.getElementById('webview-home-styles')) {
-          document.head.appendChild(webViewStyles);
-        }
       }
     }
     
@@ -252,21 +177,6 @@ const Home = () => {
       document.body.style.top = '';
       document.body.style.left = '';
       document.body.classList.remove('webview-environment', 'native-app-environment', 'pwa-builder-app');
-      
-      const pwaBuilderStyles = document.getElementById('pwa-builder-home-styles');
-      if (pwaBuilderStyles) {
-        pwaBuilderStyles.remove();
-      }
-      
-      const nativeStyles = document.getElementById('native-home-styles');
-      if (nativeStyles) {
-        nativeStyles.remove();
-      }
-      
-      const webViewStyles = document.getElementById('webview-home-styles');
-      if (webViewStyles) {
-        webViewStyles.remove();
-      }
     };
   }, [isActive, currentStep, steps, navigationState, appInfo]);
 
@@ -289,7 +199,9 @@ const Home = () => {
         height: '100%',
         contain: appInfo.isNativeApp ? 'layout style paint' : 'none',
         isolation: appInfo.isNativeApp ? 'isolate' : 'auto',
-        backgroundColor: 'var(--background)',
+        backgroundColor: appInfo.isPWABuilder ? 
+          (document.documentElement.classList.contains('dark') ? '#0a0a0a' : '#ffffff') : 
+          'var(--background)',
         willChange: appInfo.isNativeApp ? 'transform' : 'auto'
       }}
     >

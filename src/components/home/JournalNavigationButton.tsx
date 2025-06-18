@@ -1,3 +1,4 @@
+
 import React, { useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
 import { ArrowRight } from 'lucide-react';
@@ -6,6 +7,7 @@ import { useTutorial } from '@/contexts/TutorialContext';
 import { useTranslation } from '@/contexts/TranslationContext';
 import { showTranslatedToast, showTutorialToast, registerComponent, unregisterComponent } from '@/services/notificationService';
 import ButtonStateManager from './ButtonStateManager';
+import { nativeAppService } from '@/services/nativeAppService';
 
 const JournalNavigationButton: React.FC = () => {
   const navigate = useNavigate();
@@ -14,6 +16,7 @@ const JournalNavigationButton: React.FC = () => {
   const buttonRef = useRef<HTMLDivElement>(null);
   const componentId = useRef(`journal-nav-${Date.now()}`);
   const isMountedRef = useRef(true);
+  const appInfo = nativeAppService.getAppInfo();
   
   // Check if we're in tutorial step 2
   const isInArrowTutorialStep = isActive && steps[currentStep]?.id === 2;
@@ -27,7 +30,9 @@ const JournalNavigationButton: React.FC = () => {
       isActive,
       currentStep,
       isInArrowTutorialStep,
-      stepId: steps[currentStep]?.id
+      stepId: steps[currentStep]?.id,
+      isPWABuilder: appInfo.isPWABuilder,
+      isNativeApp: appInfo.isNativeApp
     });
     
     return () => {
@@ -97,7 +102,10 @@ const JournalNavigationButton: React.FC = () => {
       />
       
       <div 
-        className="journal-arrow-button"
+        className={`journal-arrow-button ${
+          appInfo.isPWABuilder ? 'pwa-builder-arrow' : 
+          appInfo.isNativeApp ? 'native-app-arrow' : ''
+        }`}
         style={{
           position: 'fixed',
           top: '50%',
@@ -114,6 +122,8 @@ const JournalNavigationButton: React.FC = () => {
           alignItems: 'center',
           width: 'auto',
           height: 'auto',
+          contain: appInfo.isNativeApp ? 'layout style' : 'none',
+          willChange: appInfo.isNativeApp ? 'transform' : 'auto',
         }}
         data-testid="journal-arrow-button"
         ref={buttonRef}
@@ -137,6 +147,9 @@ const JournalNavigationButton: React.FC = () => {
             transform: 'translate(-50%, -50%)',
             width: "calc(100% + 20px)",
             height: "calc(100% + 20px)",
+            backgroundColor: 'hsl(var(--primary) / 0.3)',
+            borderRadius: '9999px',
+            contain: appInfo.isNativeApp ? 'layout style' : 'none',
           }}
         />
         <motion.button
@@ -147,6 +160,16 @@ const JournalNavigationButton: React.FC = () => {
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ delay: 0.5 }}
+          style={{
+            backgroundColor: 'hsl(var(--primary))',
+            color: 'hsl(var(--primary-foreground))',
+            border: 'none',
+            outline: 'none',
+            borderRadius: '9999px',
+            transform: appInfo.isNativeApp ? 'translate3d(0, 0, 0)' : 'none',
+            contain: appInfo.isNativeApp ? 'layout style paint' : 'none',
+            willChange: appInfo.isNativeApp ? 'transform' : 'auto',
+          }}
         >
           <ArrowRight className="text-primary-foreground h-8 w-8" />
         </motion.button>

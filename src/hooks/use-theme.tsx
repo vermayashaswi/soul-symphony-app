@@ -19,7 +19,7 @@ interface ThemeContextType {
 
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 
-// WebView detection utility
+// Enhanced WebView and PWA Builder detection
 const isWebView = (): boolean => {
   try {
     const userAgent = navigator.userAgent;
@@ -28,6 +28,23 @@ const isWebView = (): boolean => {
            window.location.protocol === 'file:' ||
            (window as any).AndroidInterface !== undefined ||
            document.URL.indexOf('http://') === -1 && document.URL.indexOf('https://') === -1;
+  } catch {
+    return false;
+  }
+};
+
+const isPWABuilder = (): boolean => {
+  try {
+    const isPWAStandalone = window.matchMedia('(display-mode: standalone)').matches;
+    const isIOSStandalone = (window.navigator as any).standalone === true;
+    const userAgent = navigator.userAgent;
+    const isPWABuilderUA = userAgent.includes('PWABuilder') || 
+                          userAgent.includes('TWA') || 
+                          userAgent.includes('WebAPK');
+    const urlParams = new URLSearchParams(window.location.search);
+    const hasNativeParams = urlParams.has('nativeApp') || urlParams.has('pwabuilder');
+    
+    return isPWABuilderUA || isPWAStandalone || isIOSStandalone || hasNativeParams;
   } catch {
     return false;
   }
@@ -70,7 +87,7 @@ export function ThemeProvider({ children }: ThemeProviderProps) {
     return safeMediaQueryCheck();
   });
   
-  // FIXED: Changed default from 'Calm' to 'Default' to match CSS defaults
+  // Default color theme changed to 'Default' for consistency
   const [colorTheme, setColorTheme] = useState<ColorTheme>(() => {
     return (safeLocalStorageGet('feelosophy-color-theme', 'Default') as ColorTheme) || 'Default';
   });
@@ -79,33 +96,60 @@ export function ThemeProvider({ children }: ThemeProviderProps) {
     return safeLocalStorageGet('feelosophy-custom-color', '#3b82f6');
   });
 
-  // Enhanced WebView-specific theme initialization
+  // Enhanced initialization with PWA Builder support
   useEffect(() => {
-    console.log('[Theme] Initializing theme system with WebView support:', { theme, colorTheme, systemTheme });
+    console.log('[Theme] Initializing theme system with enhanced PWA Builder support:', { 
+      theme, 
+      colorTheme, 
+      systemTheme,
+      isPWABuilderApp: isPWABuilder(),
+      isWebViewApp: isWebView()
+    });
     
     try {
       const root = window.document.documentElement;
       const body = document.body;
       
-      // Apply WebView-specific fixes
-      if (isWebView()) {
-        console.log('[Theme] WebView detected, applying compatibility fixes');
+      // Enhanced PWA Builder theme fixes
+      if (isPWABuilder()) {
+        console.log('[Theme] PWA Builder detected, applying enhanced compatibility fixes');
         
-        // Force white background for light mode in WebView
-        root.style.setProperty('--background', theme === 'dark' ? '0 0% 3.9%' : '0 0% 100%');
-        root.style.setProperty('--card', theme === 'dark' ? '0 0% 3.9%' : '0 0% 100%');
+        // Force consistent background colors for PWA Builder
+        const appliedTheme = theme === 'system' ? systemTheme : theme;
         
-        // Add WebView-specific CSS class
-        body.classList.add('webview-environment');
-        
-        // Force background color at body level for WebView
-        if (theme === 'light' || (theme === 'system' && systemTheme === 'light')) {
+        if (appliedTheme === 'light') {
+          root.style.setProperty('--background', '0 0% 100%');
+          root.style.setProperty('--card', '0 0% 100%');
+          root.style.setProperty('--foreground', '240 10% 3.9%');
           body.style.backgroundColor = '#ffffff';
           root.style.backgroundColor = '#ffffff';
         } else {
-          body.style.backgroundColor = '#0a0a0a';  
+          root.style.setProperty('--background', '240 10% 3.9%');
+          root.style.setProperty('--card', '240 10% 3.9%');
+          root.style.setProperty('--foreground', '0 0% 98%');
+          body.style.backgroundColor = '#0a0a0a';
           root.style.backgroundColor = '#0a0a0a';
         }
+        
+        // Add PWA Builder specific CSS class
+        body.classList.add('pwa-builder-app', 'native-app-environment');
+        
+      } else if (isWebView()) {
+        console.log('[Theme] WebView detected, applying compatibility fixes');
+        
+        // Apply WebView-specific fixes
+        const appliedTheme = theme === 'system' ? systemTheme : theme;
+        
+        if (appliedTheme === 'light') {
+          body.style.backgroundColor = '#ffffff';
+          root.style.backgroundColor = '#ffffff';
+        } else {
+          body.style.backgroundColor = '#0a0a0a';
+          root.style.backgroundColor = '#0a0a0a';
+        }
+        
+        // Add WebView-specific CSS class
+        body.classList.add('webview-environment');
       }
       
       // Apply theme mode immediately
@@ -130,7 +174,7 @@ export function ThemeProvider({ children }: ThemeProviderProps) {
     }
   }, []); // Run only once on mount
 
-  // ... keep existing code (media query listener and theme application effects)
+  // ... keep existing code (media query listener effect)
   useEffect(() => {
     try {
       const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
@@ -166,6 +210,7 @@ export function ThemeProvider({ children }: ThemeProviderProps) {
     }
   }, [theme]);
 
+  // Enhanced theme application with PWA Builder support
   useEffect(() => {
     try {
       const root = window.document.documentElement;
@@ -176,8 +221,29 @@ export function ThemeProvider({ children }: ThemeProviderProps) {
       const appliedTheme = theme === 'system' ? systemTheme : theme;
       root.classList.add(appliedTheme);
       
-      // Enhanced WebView background fixes
-      if (isWebView()) {
+      // Enhanced background fixes for PWA Builder and WebView
+      if (isPWABuilder()) {
+        console.log('[Theme] Applying PWA Builder background fixes for theme:', appliedTheme);
+        
+        if (appliedTheme === 'light') {
+          body.style.backgroundColor = '#ffffff';
+          root.style.backgroundColor = '#ffffff';
+          root.style.setProperty('--background', '0 0% 100%');
+          root.style.setProperty('--foreground', '240 10% 3.9%');
+        } else {
+          body.style.backgroundColor = '#0a0a0a';
+          root.style.backgroundColor = '#0a0a0a';
+          root.style.setProperty('--background', '240 10% 3.9%');
+          root.style.setProperty('--foreground', '0 0% 98%');
+        }
+        
+        // Force immediate visual update for PWA Builder
+        body.style.transition = 'none';
+        setTimeout(() => {
+          body.style.transition = '';
+        }, 50);
+        
+      } else if (isWebView()) {
         if (appliedTheme === 'light') {
           body.style.backgroundColor = '#ffffff';
           root.style.backgroundColor = '#ffffff';
@@ -185,7 +251,7 @@ export function ThemeProvider({ children }: ThemeProviderProps) {
         } else {
           body.style.backgroundColor = '#0a0a0a';
           root.style.backgroundColor = '#0a0a0a';
-          root.style.setProperty('--background', '0 0% 3.9%');
+          root.style.setProperty('--background', '240 10% 3.9%');
         }
       }
       
@@ -251,10 +317,10 @@ export function ThemeProvider({ children }: ThemeProviderProps) {
     return [Math.round(h * 360), Math.round(s * 100), Math.round(l * 100)];
   };
 
-  // ... keep existing code (color theme application effect)
+  // Enhanced color theme application with PWA Builder support
   useEffect(() => {
     try {
-      console.log('[Theme] Applying color theme:', colorTheme);
+      console.log('[Theme] Applying color theme with PWA Builder support:', colorTheme);
       safeLocalStorageSet('feelosophy-color-theme', colorTheme);
       
       const root = window.document.documentElement;
@@ -277,11 +343,11 @@ export function ThemeProvider({ children }: ThemeProviderProps) {
         
         console.log('[Theme] Applied color variables:', { primaryHex, h, s, l });
         
-        // Create or update style element for global theme colors
+        // Enhanced style injection with PWA Builder support
         const style = document.getElementById('theme-colors-style') || document.createElement('style');
         style.id = 'theme-colors-style';
         
-        // Enhanced CSS variables and utility classes with WebView fixes
+        // Enhanced CSS variables and utility classes with PWA Builder fixes
         style.textContent = `
           :root {
             --theme-color: ${primaryHex};
@@ -290,6 +356,23 @@ export function ThemeProvider({ children }: ThemeProviderProps) {
             --theme-lighter: color-mix(in srgb, ${primaryHex} 15%, white);
             --theme-dark: color-mix(in srgb, ${primaryHex} 30%, black);
             --theme-darker: color-mix(in srgb, ${primaryHex} 50%, black);
+          }
+          
+          /* Enhanced PWA Builder-specific fixes */
+          .pwa-builder-app {
+            -webkit-user-select: none !important;
+            -webkit-touch-callout: none !important;
+            -webkit-tap-highlight-color: transparent !important;
+          }
+          
+          .pwa-builder-app .journal-arrow-button button {
+            -webkit-transform: translate3d(0, 0, 0) !important;
+            transform: translate3d(0, 0, 0) !important;
+            position: relative !important;
+            background-color: ${primaryHex} !important;
+            color: white !important;
+            border: none !important;
+            outline: none !important;
           }
           
           /* WebView-specific fixes */
@@ -306,7 +389,7 @@ export function ThemeProvider({ children }: ThemeProviderProps) {
             margin: auto !important;
           }
           
-          /* Theme utilities */
+          /* Theme utilities with enhanced specificity */
           .text-theme { color: ${primaryHex} !important; }
           .text-theme-light { color: var(--theme-light) !important; }
           .text-theme-dark { color: var(--theme-dark) !important; }
@@ -357,7 +440,7 @@ export function ThemeProvider({ children }: ThemeProviderProps) {
     }
   }, [colorTheme, customColor]);
 
-  // ... keep existing code (custom color effect and context provider)
+  // Custom color effect remains the same
   useEffect(() => {
     try {
       safeLocalStorageSet('feelosophy-custom-color', customColor);
