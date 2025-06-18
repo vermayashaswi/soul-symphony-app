@@ -125,7 +125,7 @@ const EnergyAnimation: React.FC<EnergyAnimationProps> = ({
         contain: isWebView() ? 'layout style paint' : 'none',
         isolation: isWebView() ? 'isolate' : 'auto',
         backfaceVisibility: isWebView() ? 'hidden' : 'visible',
-        webkitBackfaceVisibility: isWebView() ? 'hidden' : 'visible'
+        WebkitBackfaceVisibility: isWebView() ? 'hidden' : 'visible'
       }}
     >
       {/* Glowing center with enhanced blur */}
