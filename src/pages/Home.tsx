@@ -1,10 +1,10 @@
-
 import React, { useEffect } from 'react';
 import { useTutorial } from '@/contexts/TutorialContext';
 import JournalHeader from '@/components/home/JournalHeader';
 import JournalNavigationButton from '@/components/home/JournalNavigationButton';
 import JournalContent from '@/components/home/JournalContent';
 import BackgroundElements from '@/components/home/BackgroundElements';
+import { PWATestIndicator } from '@/components/home/PWATestIndicator';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 
@@ -29,6 +29,17 @@ const Home = () => {
   // Check if we're in specific tutorial steps
   const isInWelcomeTutorialStep = isActive && steps[currentStep]?.id === 1;
   const isInArrowTutorialStep = isActive && steps[currentStep]?.id === 2;
+  
+  // Add test plan logging
+  useEffect(() => {
+    console.log('[Home] TEST PLAN: Component mounted with tutorial state:', {
+      isActive, 
+      currentStep, 
+      stepId: steps[currentStep]?.id,
+      navigationInProgress: navigationState.inProgress,
+      isWebView: isWebView()
+    });
+  }, []);
   
   // Tutorial startup logic - let TutorialContext handle the main logic
   useEffect(() => {
@@ -97,7 +108,7 @@ const Home = () => {
   }, [user, startTutorial, isActive, navigationState.inProgress]);
   
   useEffect(() => {
-    console.log('[Home] Component mounted, tutorial state:', {
+    console.log('[Home] TEST PLAN: Component mounted, tutorial state:', {
       isActive, 
       currentStep, 
       stepId: steps[currentStep]?.id,
@@ -115,7 +126,7 @@ const Home = () => {
     
     // Apply WebView-specific body styling
     if (isWebView()) {
-      console.log('[Home] Applying WebView-specific styling');
+      console.log('[Home] TEST PLAN: Applying WebView-specific styling');
       document.body.classList.add('webview-environment');
       
       // Ensure proper background containment for WebView
@@ -186,6 +197,9 @@ const Home = () => {
         backgroundColor: 'var(--background)'
       }}
     >
+      {/* TEST PLAN: PWA Test Indicator - visible on all environments */}
+      <PWATestIndicator />
+
       {/* Background elements including animations */}
       <BackgroundElements />
 

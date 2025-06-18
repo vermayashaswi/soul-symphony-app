@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { format } from 'date-fns';
@@ -9,6 +8,8 @@ import LanguageSelector from '@/components/LanguageSelector';
 import { useUserProfile } from '@/hooks/useUserProfile';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTutorial } from '@/contexts/TutorialContext';
+import { versionService } from '@/services/versionService';
+import { Badge } from '@/components/ui/badge';
 
 const JournalHeader: React.FC = () => {
   const { user } = useAuth();
@@ -17,12 +18,20 @@ const JournalHeader: React.FC = () => {
   const { translate } = useTranslation();
   const [journalLabel, setJournalLabel] = useState("Journal");
   const [yourJournalLabel, setYourJournalLabel] = useState("Your Journal");
+  const [appVersion, setAppVersion] = useState<string>('Unknown');
   const today = new Date();
   const formattedDate = format(today, 'EEE, MMM d');
   
   // Get tutorial context to check if we're in step 1
   const { isActive, currentStep, steps } = useTutorial();
   const isInWelcomeTutorialStep = isActive && steps[currentStep]?.id === 1;
+
+  // Initialize version info
+  useEffect(() => {
+    const version = versionService.getCurrentVersion();
+    setAppVersion(version.version);
+    console.log('[JournalHeader] TEST PLAN: Version loaded:', version.version);
+  }, []);
 
   // Pre-translate common labels
   useEffect(() => {
@@ -94,6 +103,13 @@ const JournalHeader: React.FC = () => {
           >
             <TranslatableText text={getJournalName()} forceTranslate={true} />
           </h1>
+          
+          {/* TEST PLAN: Version indicator */}
+          <div className="mt-1">
+            <Badge variant="outline" className="text-xs">
+              TEST v{appVersion}
+            </Badge>
+          </div>
         </div>
 
         <div className={`flex items-center ${isInWelcomeTutorialStep ? 'z-[9999]' : 'z-50'}`}>

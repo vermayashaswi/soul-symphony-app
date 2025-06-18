@@ -1,4 +1,3 @@
-
 import { toast } from 'sonner';
 
 export interface AppVersion {
@@ -27,16 +26,18 @@ class VersionService {
 
   constructor() {
     this.currentVersion = {
-      version: '1.2.1', // Updated to match service worker
+      version: '1.2.2', // Incremented for test
       buildDate: new Date().toISOString(),
-      features: ['comprehensiveUpdateFix', 'aggressiveCaching', 'forceRefresh', 'smartChatV2', 'premiumMessaging', 'journalVoicePlayback', 'themeConsistency', 'webViewCompatibility'],
-      cacheVersion: 'soulo-cache-v1.2.1' // Match service worker cache name
+      features: ['testPlan', 'comprehensiveUpdateFix', 'aggressiveCaching', 'forceRefresh', 'smartChatV2', 'premiumMessaging', 'journalVoicePlayback', 'themeConsistency', 'webViewCompatibility'],
+      cacheVersion: 'soulo-cache-v1.2.2' // Match service worker cache name
     };
     
     this.setupServiceWorkerListeners();
     this.initializeForceRefreshHandling();
     
-    console.log('[VersionService] Initialized with comprehensive update fix', this.currentVersion);
+    console.log('[VersionService] TEST PLAN: Initialized with version', this.currentVersion.version);
+    console.log('[VersionService] TEST PLAN: Build date', this.currentVersion.buildDate);
+    console.log('[VersionService] TEST PLAN: Features', this.currentVersion.features);
   }
 
   private isWebView(): boolean {
@@ -189,6 +190,7 @@ class VersionService {
   }
 
   getCurrentVersion(): AppVersion {
+    console.log('[VersionService] TEST PLAN: getCurrentVersion called', this.currentVersion);
     return this.currentVersion;
   }
 

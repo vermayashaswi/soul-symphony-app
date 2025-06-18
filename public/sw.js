@@ -1,8 +1,7 @@
-
-// Soulo PWA Service Worker - Comprehensive Update Fix
-const CACHE_NAME = 'soulo-cache-v1.2.1'; // Incremented version
+// Soulo PWA Service Worker - Test Plan Implementation
+const CACHE_NAME = 'soulo-cache-v1.2.2'; // Incremented version for test
 const OFFLINE_URL = '/offline.html';
-const APP_VERSION = '1.2.1'; // Incremented version
+const APP_VERSION = '1.2.2'; // Incremented version for test
 const UPDATE_CHECK_INTERVAL = 30000; // 30 seconds
 
 // Assets to cache for offline functionality
@@ -23,29 +22,29 @@ const STATIC_ASSETS = [
 // Cache-busting headers for critical routes
 const CACHE_BUSTING_ROUTES = ['/app', '/app/', '/app/home', '/app/journal', '/app/insights', '/app/smart-chat', '/app/settings'];
 
-// Enhanced logging
+// Enhanced logging with TEST PLAN prefix
 function swLog(message, data = null) {
   const timestamp = new Date().toISOString();
-  console.log(`[SW ${APP_VERSION}] ${timestamp}: ${message}`, data || '');
+  console.log(`[SW TEST PLAN ${APP_VERSION}] ${timestamp}: ${message}`, data || '');
 }
 
 // Force immediate activation and client claiming
 self.addEventListener('install', (event) => {
-  swLog('Installing new service worker - forcing immediate activation');
+  swLog('TEST PLAN: Installing new service worker - forcing immediate activation');
   
   event.waitUntil(
     Promise.all([
       // Cache static assets
       caches.open(CACHE_NAME).then((cache) => {
-        swLog('Caching static assets');
+        swLog('TEST PLAN: Caching static assets');
         return cache.addAll(STATIC_ASSETS);
       }),
       // Force immediate activation
       self.skipWaiting()
     ]).then(() => {
-      swLog('Service worker installed and activated immediately');
+      swLog('TEST PLAN: Service worker installed and activated immediately');
     }).catch((error) => {
-      swLog('Installation failed', error);
+      swLog('TEST PLAN: Installation failed', error);
       throw error;
     })
   );
@@ -53,7 +52,7 @@ self.addEventListener('install', (event) => {
 
 // Enhanced activate with aggressive cleanup
 self.addEventListener('activate', (event) => {
-  swLog('Activating new service worker with aggressive cleanup');
+  swLog('TEST PLAN: Activating new service worker with aggressive cleanup');
   
   event.waitUntil(
     Promise.all([
@@ -61,7 +60,7 @@ self.addEventListener('activate', (event) => {
       caches.keys().then((cacheNames) => {
         const deletePromises = cacheNames.map((cacheName) => {
           if (cacheName !== CACHE_NAME) {
-            swLog('Deleting old cache', cacheName);
+            swLog('TEST PLAN: Deleting old cache', cacheName);
             return caches.delete(cacheName);
           }
         }).filter(Boolean);
@@ -71,20 +70,21 @@ self.addEventListener('activate', (event) => {
       // Claim all clients immediately
       self.clients.claim()
     ]).then(async () => {
-      swLog('Service worker activated with full cache cleanup');
+      swLog('TEST PLAN: Service worker activated with full cache cleanup');
       
       // Notify all clients immediately
       const clients = await self.clients.matchAll({ includeUncontrolled: true });
-      swLog(`Notifying ${clients.length} clients of update`);
+      swLog(`TEST PLAN: Notifying ${clients.length} clients of update`);
       
       clients.forEach(client => {
         client.postMessage({
           type: 'SW_ACTIVATED',
           version: APP_VERSION,
           cacheVersion: CACHE_NAME,
-          message: 'App updated successfully! Please refresh.',
+          message: 'TEST PLAN: App updated successfully! Please refresh.',
           timestamp: Date.now(),
-          forceRefresh: true
+          forceRefresh: true,
+          testPlan: true
         });
       });
       
@@ -92,15 +92,16 @@ self.addEventListener('activate', (event) => {
       clients.forEach(client => {
         const url = new URL(client.url);
         if (url.pathname.startsWith('/app')) {
-          swLog('Forcing refresh for app route:', url.pathname);
+          swLog('TEST PLAN: Forcing refresh for app route:', url.pathname);
           client.postMessage({
             type: 'FORCE_REFRESH',
-            reason: 'Service worker updated'
+            reason: 'TEST PLAN: Service worker updated',
+            testPlan: true
           });
         }
       });
     }).catch(error => {
-      swLog('Activation failed', error);
+      swLog('TEST PLAN: Activation failed', error);
     })
   );
 });
@@ -131,7 +132,7 @@ self.addEventListener('fetch', (event) => {
       // For app routes and cache-busting routes, always try network first
       if (isAppRoute || isCacheBustingRoute) {
         try {
-          swLog(`Network-first strategy for: ${url.pathname}`);
+          swLog(`TEST PLAN: Network-first strategy for: ${url.pathname}`);
           
           // Add cache-busting headers
           const networkRequest = new Request(event.request.url, {
@@ -152,7 +153,7 @@ self.addEventListener('fetch', (event) => {
             return networkResponse;
           }
         } catch (error) {
-          swLog(`Network failed for ${url.pathname}, falling back to cache`, error);
+          swLog(`TEST PLAN: Network failed for ${url.pathname}, falling back to cache`, error);
         }
       }
 
@@ -186,7 +187,7 @@ self.addEventListener('fetch', (event) => {
         
         return networkResponse;
       } catch (error) {
-        swLog(`Complete fetch failure for ${event.request.url}`, error);
+        swLog(`TEST PLAN: Complete fetch failure for ${event.request.url}`, error);
         
         // Return offline page for navigation requests
         if (event.request.mode === 'navigate') {
@@ -211,7 +212,7 @@ self.addEventListener('message', (event) => {
   swLog('Message received', event.data);
   
   if (event.data && event.data.type === 'SKIP_WAITING') {
-    swLog('Skipping waiting due to client request');
+    swLog('TEST PLAN: Skipping waiting due to client request');
     self.skipWaiting();
   }
   
@@ -224,16 +225,16 @@ self.addEventListener('message', (event) => {
   }
   
   if (event.data && event.data.type === 'CHECK_UPDATE') {
-    swLog('Manual update check requested');
+    swLog('TEST PLAN: Manual update check requested');
     self.registration.update().then(() => {
-      swLog('Manual update check completed');
+      swLog('TEST PLAN: Manual update check completed');
     }).catch(error => {
-      swLog('Manual update check failed', error);
+      swLog('TEST PLAN: Manual update check failed', error);
     });
   }
   
   if (event.data && event.data.type === 'CLEAR_CACHE') {
-    swLog('Cache clear requested');
+    swLog('TEST PLAN: Cache clear requested');
     caches.keys().then(cacheNames => {
       return Promise.all(
         cacheNames.map(cacheName => {
@@ -243,10 +244,10 @@ self.addEventListener('message', (event) => {
         })
       );
     }).then(() => {
-      swLog('Cache cleared successfully');
+      swLog('TEST PLAN: Cache cleared successfully');
       event.ports[0].postMessage({ success: true });
     }).catch(error => {
-      swLog('Cache clear failed', error);
+      swLog('TEST PLAN: Cache clear failed', error);
       event.ports[0].postMessage({ success: false, error: error.message });
     });
   }
@@ -260,28 +261,28 @@ function startAggressiveUpdateChecking() {
     clearInterval(updateCheckInterval);
   }
   
-  swLog('Starting aggressive update checking');
+  swLog('TEST PLAN: Starting aggressive update checking');
   
   updateCheckInterval = setInterval(async () => {
     try {
-      swLog('Performing scheduled update check');
+      swLog('TEST PLAN: Performing scheduled update check');
       
       const registration = await self.registration.update();
       
       if (registration.installing || registration.waiting) {
-        swLog('New service worker version detected during scheduled check');
+        swLog('TEST PLAN: New service worker version detected during scheduled check');
         
         const clients = await self.clients.matchAll();
         clients.forEach(client => {
           client.postMessage({
             type: 'UPDATE_AVAILABLE',
             version: APP_VERSION,
-            message: 'A new version is available - refresh to update'
+            message: 'TEST PLAN: A new version is available - refresh to update'
           });
         });
       }
     } catch (error) {
-      swLog('Scheduled update check failed', error);
+      swLog('TEST PLAN: Scheduled update check failed', error);
     }
   }, UPDATE_CHECK_INTERVAL);
 }
@@ -306,8 +307,9 @@ self.addEventListener('sync', (event) => {
   }
 });
 
-swLog('Enhanced service worker script loaded', { 
+swLog('TEST PLAN: Enhanced service worker script loaded', { 
   version: APP_VERSION, 
   cache: CACHE_NAME,
-  updateInterval: UPDATE_CHECK_INTERVAL 
+  updateInterval: UPDATE_CHECK_INTERVAL,
+  testPlan: true
 });
