@@ -1,3 +1,4 @@
+
 import React, { Suspense, useEffect } from 'react';
 import { BrowserRouter as Router, Route, Routes } from 'react-router-dom';
 import { ClerkProvider, useUser } from '@clerk/clerk-react';
@@ -19,7 +20,7 @@ import PrivacyPolicyPage from '@/pages/legal/PrivacyPolicyPage';
 import TermsOfServicePage from '@/pages/legal/TermsOfServicePage';
 import Offline from '@/pages/Offline';
 import NotFound from '@/pages/NotFound';
-import { QueryClient, QueryClientProvider } from 'react-query';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { AppUpdateManager } from '@/components/app/AppUpdateManager';
 import { PWAStatusIndicator } from '@/components/app/PWAStatusIndicator';
 import { featureFlagService } from '@/services/featureFlagService';
