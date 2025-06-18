@@ -24,10 +24,10 @@ class VersionService {
 
   constructor() {
     this.currentVersion = {
-      version: '1.0.0',
+      version: '1.0.1',
       buildDate: new Date().toISOString(),
-      features: ['smartChatV2', 'premiumMessaging', 'journalVoicePlayback'],
-      cacheVersion: 'v1.0.0'
+      features: ['smartChatV2', 'premiumMessaging', 'journalVoicePlayback', 'themeConsistency'],
+      cacheVersion: 'v1.0.1'
     };
   }
 
@@ -208,7 +208,7 @@ class VersionService {
         })
       );
       
-      // Clear local storage cache markers
+      // Clear local storage cache markers but preserve theme settings
       const cacheKeys = Object.keys(localStorage).filter(key => 
         key.includes('cache') || key.includes('version') || key.includes('timestamp')
       );
@@ -217,7 +217,7 @@ class VersionService {
         localStorage.removeItem(key);
       });
       
-      console.log('[VersionService] All caches cleared');
+      console.log('[VersionService] All caches cleared, theme settings preserved');
     } catch (error) {
       console.error('[VersionService] Error clearing cache:', error);
     }
@@ -242,7 +242,7 @@ class VersionService {
     console.log('[VersionService] Forcing immediate update...');
     
     try {
-      // Clear all caches first
+      // Clear all caches first (but preserve theme settings)
       await this.clearCache();
       
       // Check for updates
@@ -267,6 +267,51 @@ class VersionService {
     } catch (error) {
       console.error('[VersionService] Force update failed:', error);
       return false;
+    }
+  }
+
+  // Initialize theme consistency check
+  initializeThemeConsistency(): void {
+    console.log('[VersionService] Initializing theme consistency...');
+    
+    try {
+      // Ensure theme CSS variables are set before first paint
+      const root = document.documentElement;
+      
+      // Get stored theme preferences
+      const storedColorTheme = localStorage.getItem('feelosophy-color-theme') || 'Default';
+      
+      // Apply immediate CSS variable based on stored theme
+      let primaryColor = '#3b82f6'; // Default blue
+      
+      switch (storedColorTheme) {
+        case 'Default':
+          primaryColor = '#3b82f6';
+          break;
+        case 'Calm':
+          primaryColor = '#8b5cf6';
+          break;
+        case 'Soothing':
+          primaryColor = '#FFDEE2';
+          break;
+        case 'Energy':
+          primaryColor = '#f59e0b';
+          break;
+        case 'Focus':
+          primaryColor = '#10b981';
+          break;
+        case 'Custom':
+          primaryColor = localStorage.getItem('feelosophy-custom-color') || '#3b82f6';
+          break;
+      }
+      
+      root.style.setProperty('--color-theme', primaryColor);
+      root.style.setProperty('--primary', primaryColor);
+      
+      console.log('[VersionService] Theme consistency initialized:', { storedColorTheme, primaryColor });
+      
+    } catch (error) {
+      console.warn('[VersionService] Theme consistency initialization failed:', error);
     }
   }
 }

@@ -1,6 +1,6 @@
 
-// Soulo PWA Service Worker - Auto-Update Version
-const CACHE_NAME = 'soulo-cache-v1.1.0';
+// Soulo PWA Service Worker - Auto-Update Version with Theme Consistency
+const CACHE_NAME = 'soulo-cache-v1.1.1';
 const OFFLINE_URL = '/offline.html';
 
 // Assets to cache for offline functionality
@@ -20,7 +20,7 @@ const STATIC_ASSETS = [
 
 // Install event - skip waiting immediately
 self.addEventListener('install', (event) => {
-  console.log('[SW] Installing new service worker...');
+  console.log('[SW] Installing new service worker with theme consistency...');
   
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => {
@@ -63,7 +63,7 @@ self.addEventListener('activate', (event) => {
         clients.forEach(client => {
           client.postMessage({
             type: 'SW_UPDATED',
-            message: 'Service worker updated successfully'
+            message: 'Service worker updated with theme consistency fixes'
           });
         });
       });

@@ -57,13 +57,43 @@ export function ThemeProvider({ children }: ThemeProviderProps) {
     return safeMediaQueryCheck();
   });
   
+  // FIXED: Changed default from 'Calm' to 'Default' to match CSS defaults
   const [colorTheme, setColorTheme] = useState<ColorTheme>(() => {
-    return (safeLocalStorageGet('feelosophy-color-theme', 'Calm') as ColorTheme) || 'Calm';
+    return (safeLocalStorageGet('feelosophy-color-theme', 'Default') as ColorTheme) || 'Default';
   });
 
   const [customColor, setCustomColor] = useState<string>(() => {
     return safeLocalStorageGet('feelosophy-custom-color', '#3b82f6');
   });
+
+  // Initialize theme immediately on load to prevent flash
+  useEffect(() => {
+    console.log('[Theme] Initializing theme system:', { theme, colorTheme, systemTheme });
+    
+    try {
+      const root = window.document.documentElement;
+      
+      // Apply theme mode immediately
+      root.classList.remove('light', 'dark');
+      if (theme === 'system') {
+        const detectedTheme = safeMediaQueryCheck();
+        root.classList.add(detectedTheme);
+        setSystemTheme(detectedTheme);
+        console.log('[Theme] Applied system theme:', detectedTheme);
+      } else {
+        root.classList.add(theme);
+        console.log('[Theme] Applied explicit theme:', theme);
+      }
+      
+      // Apply color theme immediately
+      const primaryHex = getColorHex(colorTheme);
+      root.style.setProperty('--color-theme', primaryHex);
+      console.log('[Theme] Applied color theme:', colorTheme, primaryHex);
+      
+    } catch (error) {
+      console.warn('[Theme] Initialization error:', error);
+    }
+  }, []); // Run only once on mount
 
   useEffect(() => {
     try {
@@ -71,12 +101,14 @@ export function ThemeProvider({ children }: ThemeProviderProps) {
       
       const handleChange = (e: MediaQueryListEvent) => {
         const newSystemTheme = e.matches ? 'dark' : 'light';
+        console.log('[Theme] System theme changed:', newSystemTheme);
         setSystemTheme(newSystemTheme);
         
         if (theme === 'system') {
           const root = window.document.documentElement;
           root.classList.remove('light', 'dark');
           root.classList.add(newSystemTheme);
+          console.log('[Theme] Applied new system theme:', newSystemTheme);
         }
       };
       
@@ -94,7 +126,7 @@ export function ThemeProvider({ children }: ThemeProviderProps) {
         mediaQuery.removeEventListener('change', handleChange);
       };
     } catch (error) {
-      console.warn('Theme system theme detection error:', error);
+      console.warn('[Theme] System theme detection error:', error);
     }
   }, [theme]);
 
@@ -105,20 +137,22 @@ export function ThemeProvider({ children }: ThemeProviderProps) {
       
       if (theme === 'system') {
         root.classList.add(systemTheme);
+        console.log('[Theme] Applied system theme:', systemTheme);
       } else {
         root.classList.add(theme);
+        console.log('[Theme] Applied theme:', theme);
       }
       
       safeLocalStorageSet('feelosophy-theme', theme);
     } catch (error) {
-      console.warn('Theme application error:', error);
+      console.warn('[Theme] Theme application error:', error);
     }
   }, [theme, systemTheme]);
   
   const getColorHex = (theme: ColorTheme): string => {
     switch (theme) {
       case 'Default':
-        return '#3b82f6';
+        return '#3b82f6'; // Blue-500 to match CSS defaults
       case 'Calm':
         return '#8b5cf6';
       case 'Soothing':
@@ -130,7 +164,7 @@ export function ThemeProvider({ children }: ThemeProviderProps) {
       case 'Custom':
         return customColor;
       default:
-        return '#3b82f6';
+        return '#3b82f6'; // Fallback to Default blue
     }
   };
   
@@ -171,6 +205,7 @@ export function ThemeProvider({ children }: ThemeProviderProps) {
 
   useEffect(() => {
     try {
+      console.log('[Theme] Applying color theme:', colorTheme);
       safeLocalStorageSet('feelosophy-color-theme', colorTheme);
       
       const root = window.document.documentElement;
@@ -190,6 +225,8 @@ export function ThemeProvider({ children }: ThemeProviderProps) {
         root.style.setProperty('--primary-h', `${h}`);
         root.style.setProperty('--primary-s', `${s}%`);
         root.style.setProperty('--primary-l', `${l}%`);
+        
+        console.log('[Theme] Applied color variables:', { primaryHex, h, s, l });
         
         // Create or update style element for global theme colors
         const style = document.getElementById('theme-colors-style') || document.createElement('style');
@@ -251,7 +288,7 @@ export function ThemeProvider({ children }: ThemeProviderProps) {
         }
       }
     } catch (error) {
-      console.warn('Color theme application error:', error);
+      console.warn('[Theme] Color theme application error:', error);
     }
   }, [colorTheme, customColor]);
 
@@ -262,6 +299,7 @@ export function ThemeProvider({ children }: ThemeProviderProps) {
       
       // Only update the theme if currently using Custom theme
       if (colorTheme === 'Custom') {
+        console.log('[Theme] Applying custom color:', customColor);
         const root = window.document.documentElement;
         root.style.setProperty('--color-theme', customColor);
         
@@ -276,7 +314,7 @@ export function ThemeProvider({ children }: ThemeProviderProps) {
         }
       }
     } catch (error) {
-      console.warn('Custom color application error:', error);
+      console.warn('[Theme] Custom color application error:', error);
     }
   }, [customColor, colorTheme]);
 

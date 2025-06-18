@@ -21,6 +21,9 @@ const App: React.FC = () => {
   const [isInitialized, setIsInitialized] = useState(false);
 
   useEffect(() => {
+    // Initialize theme consistency BEFORE anything else
+    versionService.initializeThemeConsistency();
+    
     // Clean up any malformed paths
     const currentPath = window.location.pathname;
     
