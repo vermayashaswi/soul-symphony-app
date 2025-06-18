@@ -47,10 +47,8 @@ export default defineConfig(({ mode }) => ({
   },
   // Configure public directory handling for manifest
   publicDir: 'public',
-  // Add custom handling for manifest.json in app path and version injection
+  // Add custom handling for manifest.json in app path
   define: {
-    __APP_MANIFEST_PATH__: JSON.stringify('/app/manifest.json'),
-    __APP_VERSION__: JSON.stringify('1.1.0'),
-    __BUILD_ID__: JSON.stringify(Date.now().toString())
+    __APP_MANIFEST_PATH__: JSON.stringify('/app/manifest.json')
   }
 }));
