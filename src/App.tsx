@@ -15,7 +15,7 @@ import { toast } from 'sonner';
 import './styles/emoji.css';
 import './styles/tutorial.css';
 import { FeatureFlagsProvider } from "./contexts/FeatureFlagsContext";
-import AppUpdateManager from './components/pwa/AppUpdateManager';
+import { versionService } from './services/versionService';
 
 const App: React.FC = () => {
   const [isInitialized, setIsInitialized] = useState(false);
@@ -40,10 +40,18 @@ const App: React.FC = () => {
       // Non-critical error, continue app initialization
     }
 
+    // Initialize automatic update checking
+    versionService.startAutomaticUpdates();
+
     // Mark app as initialized after a brief delay to ensure smooth startup
     setTimeout(() => {
       setIsInitialized(true);
     }, 500);
+
+    // Cleanup on unmount
+    return () => {
+      versionService.stopAutomaticUpdates();
+    };
   }, []);
 
   const handleAppError = (error: Error, errorInfo: any) => {
@@ -75,7 +83,6 @@ const App: React.FC = () => {
             <TutorialProvider>
               <TranslationLoadingOverlay />
               <JournalProcessingInitializer />
-              <AppUpdateManager />
               <AppRoutes key={isInitialized ? 'initialized' : 'initializing'} />
               <TutorialOverlay />
               <Toaster />

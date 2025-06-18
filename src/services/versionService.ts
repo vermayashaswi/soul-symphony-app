@@ -20,6 +20,7 @@ export interface UpdateInfo {
 class VersionService {
   private currentVersion: AppVersion;
   private updateCheckInterval: NodeJS.Timeout | null = null;
+  private isAutoUpdating: boolean = false;
 
   constructor() {
     this.currentVersion = {
@@ -64,7 +65,7 @@ class VersionService {
               currentVersion: this.currentVersion.version,
               latestVersion: this.currentVersion.version
             });
-          }, 2000); // Reduced timeout for faster response
+          }, 2000);
           
           registration.addEventListener('updatefound', () => {
             clearTimeout(checkTimeout);
@@ -106,9 +107,9 @@ class VersionService {
     }
   }
 
-  async applyUpdate(): Promise<boolean> {
+  private async applyAutomaticUpdate(): Promise<boolean> {
     try {
-      console.log('[VersionService] Applying update...');
+      console.log('[VersionService] Applying automatic update...');
       
       const registration = await navigator.serviceWorker.getRegistration();
       
@@ -123,10 +124,18 @@ class VersionService {
         return new Promise((resolve) => {
           const handleControllerChange = () => {
             navigator.serviceWorker.removeEventListener('controllerchange', handleControllerChange);
-            console.log('[VersionService] Controller changed, reloading...');
+            console.log('[VersionService] Automatic update applied, reloading...');
             
-            // Force hard reload to ensure latest content
-            window.location.reload();
+            // Show a brief notification
+            toast.success('App updated to latest version!', {
+              duration: 2000
+            });
+            
+            // Delay reload slightly to show the toast
+            setTimeout(() => {
+              window.location.reload();
+            }, 1000);
+            
             resolve(true);
           };
           
@@ -138,48 +147,53 @@ class VersionService {
             console.log('[VersionService] Timeout reached, forcing reload...');
             window.location.reload();
             resolve(true);
-          }, 3000);
+          }, 5000);
         });
       }
 
       return false;
     } catch (error) {
-      console.error('[VersionService] Error applying update:', error);
+      console.error('[VersionService] Error applying automatic update:', error);
       return false;
     }
   }
 
-  startUpdatePolling(intervalMs: number = 30000) { // Reduced to 30 seconds
-    this.stopUpdatePolling();
+  startAutomaticUpdates(intervalMs: number = 60000) { // Check every minute
+    this.stopAutomaticUpdates();
     
-    console.log('[VersionService] Starting update polling...');
+    console.log('[VersionService] Starting automatic update checking...');
+    this.isAutoUpdating = true;
     
     this.updateCheckInterval = setInterval(async () => {
+      if (!this.isAutoUpdating) return;
+      
       const updateInfo = await this.checkForUpdates();
       if (updateInfo.available) {
-        this.notifyUpdateAvailable(updateInfo);
+        console.log('[VersionService] Update found, applying automatically...');
+        await this.applyAutomaticUpdate();
       }
     }, intervalMs);
+
+    // Also check immediately
+    setTimeout(async () => {
+      if (!this.isAutoUpdating) return;
+      
+      const updateInfo = await this.checkForUpdates();
+      if (updateInfo.available) {
+        console.log('[VersionService] Initial update found, applying automatically...');
+        await this.applyAutomaticUpdate();
+      }
+    }, 5000); // Wait 5 seconds after app start
   }
 
-  stopUpdatePolling() {
+  stopAutomaticUpdates() {
     if (this.updateCheckInterval) {
       clearInterval(this.updateCheckInterval);
       this.updateCheckInterval = null;
     }
     
-    console.log('[VersionService] Update polling stopped');
-  }
-
-  private notifyUpdateAvailable(updateInfo: UpdateInfo) {
-    toast.info('App Update Available', {
-      description: updateInfo.releaseNotes || 'New features and improvements ready',
-      action: {
-        label: 'Update',
-        onClick: () => this.applyUpdate()
-      },
-      duration: 15000 // Longer duration for better visibility
-    });
+    this.isAutoUpdating = false;
+    console.log('[VersionService] Automatic update checking stopped');
   }
 
   async clearCache(): Promise<void> {
@@ -235,7 +249,7 @@ class VersionService {
       const updateInfo = await this.checkForUpdates();
       
       if (updateInfo.available) {
-        return await this.applyUpdate();
+        return await this.applyAutomaticUpdate();
       } else {
         // Force service worker re-registration
         const registration = await navigator.serviceWorker.getRegistration();
