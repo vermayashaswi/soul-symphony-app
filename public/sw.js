@@ -1,5 +1,7 @@
-// Soulo PWA Service Worker
-const CACHE_NAME = 'soulo-cache-v1';
+
+// Soulo PWA Service Worker with Dynamic Versioning
+const APP_VERSION = '1.2.0'; // Increment this for force updates
+const CACHE_NAME = `soulo-cache-v${APP_VERSION}`;
 const OFFLINE_URL = '/offline.html';
 const BACKGROUND_SYNC_TAG = 'journal-entry-sync';
 const PERIODIC_SYNC_TAG = 'journal-periodic-sync';
@@ -20,9 +22,9 @@ const STATIC_ASSETS = [
   '/lovable-uploads/3f275134-f471-4af9-a7cd-700ccd855fe3.png'
 ];
 
-// Install event - cache static assets
+// Install event - cache static assets and skip waiting
 self.addEventListener('install', (event) => {
-  console.log('[SW] Installing service worker...');
+  console.log(`[SW] Installing service worker version ${APP_VERSION}...`);
   
   event.waitUntil(
     caches.open(CACHE_NAME)
@@ -32,6 +34,7 @@ self.addEventListener('install', (event) => {
       })
       .then(() => {
         console.log('[SW] Service worker installed successfully');
+        // Force immediate activation
         return self.skipWaiting();
       })
       .catch((error) => {
@@ -40,30 +43,42 @@ self.addEventListener('install', (event) => {
   );
 });
 
-// Activate event - clean up old caches
+// Activate event - clean up old caches and claim clients immediately
 self.addEventListener('activate', (event) => {
-  console.log('[SW] Activating service worker...');
+  console.log(`[SW] Activating service worker version ${APP_VERSION}...`);
   
   event.waitUntil(
-    caches.keys()
-      .then((cacheNames) => {
+    Promise.all([
+      // Clean up old caches
+      caches.keys().then((cacheNames) => {
         return Promise.all(
           cacheNames.map((cacheName) => {
-            if (cacheName !== CACHE_NAME) {
+            if (cacheName !== CACHE_NAME && cacheName.startsWith('soulo-cache-')) {
               console.log('[SW] Deleting old cache:', cacheName);
               return caches.delete(cacheName);
             }
           })
         );
-      })
-      .then(() => {
-        console.log('[SW] Service worker activated');
-        return self.clients.claim();
-      })
+      }),
+      // Claim all clients immediately
+      self.clients.claim()
+    ]).then(() => {
+      console.log('[SW] Service worker activated and claiming clients');
+      
+      // Notify all clients about the update
+      return self.clients.matchAll().then(clients => {
+        clients.forEach(client => {
+          client.postMessage({
+            type: 'SW_UPDATED',
+            version: APP_VERSION
+          });
+        });
+      });
+    })
   );
 });
 
-// Fetch event - serve from cache or network
+// Fetch event - serve from cache or network with cache-busting for dynamic content
 self.addEventListener('fetch', (event) => {
   // Skip non-GET requests
   if (event.request.method !== 'GET') {
@@ -75,46 +90,74 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // Skip Supabase API calls for background sync handling
-  if (event.request.url.includes('supabase.co/functions') || 
-      event.request.url.includes('supabase.co/rest')) {
+  // Handle API requests (Supabase) with cache-busting
+  if (event.request.url.includes('supabase.co') || 
+      event.request.url.includes('/functions/')) {
     
-    // Handle offline journal entry creation
-    if (event.request.url.includes('transcribe-audio') && navigator.onLine === false) {
-      event.respondWith(handleOfflineJournalEntry(event.request));
-      return;
-    }
-    
-    // Let network requests pass through normally
+    event.respondWith(
+      fetch(event.request.clone(), {
+        headers: {
+          ...Object.fromEntries(event.request.headers.entries()),
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          'Pragma': 'no-cache'
+        }
+      }).catch(() => {
+        // Return cached version if available during offline
+        return caches.match(event.request);
+      })
+    );
     return;
   }
 
+  // Handle app routes and static assets
   event.respondWith(
     caches.match(event.request)
       .then((response) => {
-        // Return cached version if available
+        // For app routes, always try network first to get fresh content
+        if (event.request.url.includes('/app/') || 
+            event.request.url.endsWith('/app')) {
+          
+          return fetch(event.request.clone(), {
+            headers: {
+              'Cache-Control': 'no-cache'
+            }
+          }).then((networkResponse) => {
+            // Cache the fresh response
+            if (networkResponse && networkResponse.status === 200) {
+              const responseToCache = networkResponse.clone();
+              caches.open(CACHE_NAME).then(cache => {
+                cache.put(event.request, responseToCache);
+              });
+            }
+            return networkResponse;
+          }).catch(() => {
+            // Fallback to cache if network fails
+            return response || caches.match('/offline.html');
+          });
+        }
+
+        // For static assets, return cached version if available
         if (response) {
           console.log('[SW] Serving from cache:', event.request.url);
           return response;
         }
 
-        // Try network request
-        return fetch(event.request)
-          .then((response) => {
+        // Try network request for non-cached resources
+        return fetch(event.request.clone())
+          .then((networkResponse) => {
             // Don't cache non-successful responses
-            if (!response || response.status !== 200 || response.type !== 'basic') {
-              return response;
+            if (!networkResponse || networkResponse.status !== 200 || networkResponse.type !== 'basic') {
+              return networkResponse;
             }
 
             // Clone the response for caching
-            const responseToCache = response.clone();
+            const responseToCache = networkResponse.clone();
             
-            caches.open(CACHE_NAME)
-              .then((cache) => {
-                cache.put(event.request, responseToCache);
-              });
+            caches.open(CACHE_NAME).then((cache) => {
+              cache.put(event.request, responseToCache);
+            });
 
-            return response;
+            return networkResponse;
           })
           .catch(() => {
             // Return offline page for navigation requests
@@ -122,7 +165,6 @@ self.addEventListener('fetch', (event) => {
               return caches.match(OFFLINE_URL);
             }
             
-            // Return a generic offline response for other requests
             return new Response('Offline - Content not available', {
               status: 503,
               statusText: 'Service Unavailable',
@@ -443,7 +485,24 @@ self.addEventListener('message', (event) => {
   
   if (event.data && event.data.type === 'SKIP_WAITING') {
     self.skipWaiting();
+  } else if (event.data && event.data.type === 'GET_VERSION') {
+    // Respond with current service worker version
+    event.ports[0].postMessage({
+      type: 'VERSION_RESPONSE',
+      version: APP_VERSION
+    });
+  } else if (event.data && event.data.type === 'CLEAR_CACHE') {
+    // Clear all caches on request
+    caches.keys().then(cacheNames => {
+      return Promise.all(
+        cacheNames.map(cacheName => caches.delete(cacheName))
+      );
+    }).then(() => {
+      event.ports[0].postMessage({
+        type: 'CACHE_CLEARED'
+      });
+    });
   }
 });
 
-console.log('[SW] Service worker script loaded');
+console.log(`[SW] Service worker script loaded - Version ${APP_VERSION}`);
