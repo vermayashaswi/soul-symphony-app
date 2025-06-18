@@ -1,10 +1,10 @@
+
 import React, { useEffect } from 'react';
 import { useTutorial } from '@/contexts/TutorialContext';
 import JournalHeader from '@/components/home/JournalHeader';
 import JournalNavigationButton from '@/components/home/JournalNavigationButton';
 import JournalContent from '@/components/home/JournalContent';
 import BackgroundElements from '@/components/home/BackgroundElements';
-import { PWATestIndicator } from '@/components/home/PWATestIndicator';
 import { PWABuilderTestIndicator } from '@/components/home/PWABuilderTestIndicator';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
@@ -293,8 +293,8 @@ const Home = () => {
         willChange: appInfo.isNativeApp ? 'transform' : 'auto'
       }}
     >
-      {/* Show appropriate test indicator based on app type */}
-      {appInfo.isPWABuilder ? <PWABuilderTestIndicator /> : <PWATestIndicator />}
+      {/* Show PWA Builder test indicator only for PWA Builder apps */}
+      {appInfo.isPWABuilder && <PWABuilderTestIndicator />}
 
       <BackgroundElements />
 
