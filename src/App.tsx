@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from 'react';
 import AppRoutes from './routes/AppRoutes';
 import { Toaster } from "@/components/ui/toaster";
@@ -15,14 +14,11 @@ import { toast } from 'sonner';
 import './styles/emoji.css';
 import './styles/tutorial.css';
 import { FeatureFlagsProvider } from "./contexts/FeatureFlagsContext";
-import MaintenanceBanner from './components/MaintenanceBanner';
 
 const App: React.FC = () => {
   const [isInitialized, setIsInitialized] = useState(false);
 
   useEffect(() => {
-    console.log('[App] App component initialized, route:', window.location.pathname);
-    
     // Clean up any malformed paths
     const currentPath = window.location.pathname;
     
@@ -75,9 +71,6 @@ const App: React.FC = () => {
         <TranslationProvider>
           <SubscriptionProvider>
             <TutorialProvider>
-              {/* MaintenanceBanner at the top level to ensure it appears on all routes */}
-              <MaintenanceBanner />
-              
               <TranslationLoadingOverlay />
               <JournalProcessingInitializer />
               <AppRoutes key={isInitialized ? 'initialized' : 'initializing'} />

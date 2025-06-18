@@ -4,7 +4,7 @@ import { Outlet, useLocation, Navigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useIsMobile } from '@/hooks/use-mobile';
 import MobileNavigation from '@/components/MobileNavigation';
-import { isAppRoute, isWebsiteRoute, isNativeAppContext } from './RouteHelpers';
+import { isAppRoute, isWebsiteRoute } from './RouteHelpers';
 import { useOnboarding } from '@/hooks/use-onboarding';
 import { forceEnableScrolling } from '@/hooks/use-scroll-restoration';
 
@@ -20,13 +20,11 @@ const ViewportManager: React.FC = () => {
     '/app/auth',
     '/onboarding',
     '/auth',
-    '/' // Also hide on root path, unless it's a native app context
+    '/' // Also hide on root path
   ];
   
   // Check if current path is in the list of paths where navigation should be hidden
-  // For native apps, don't hide navigation on root path since they'll be redirected
-  const isOnboardingOrAuth = onboardingOrAuthPaths.includes(location.pathname) && 
-    !(location.pathname === '/' && isNativeAppContext());
+  const isOnboardingOrAuth = onboardingOrAuthPaths.includes(location.pathname);
   
   // Is this the home page where scrolling should be disabled?
   const isHomePage = location.pathname === '/app/home';
@@ -35,7 +33,6 @@ const ViewportManager: React.FC = () => {
   console.log('ViewportManager - Path:', location.pathname, {
     isAppRoute: isAppRoute(location.pathname),
     isWebsiteRoute: isWebsiteRoute(location.pathname),
-    isNativeContext: isNativeAppContext(),
     isHomePage,
     user: !!user,
     isOnboardingOrAuth,

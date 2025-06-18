@@ -5,6 +5,7 @@ import JournalHeader from '@/components/home/JournalHeader';
 import JournalNavigationButton from '@/components/home/JournalNavigationButton';
 import JournalContent from '@/components/home/JournalContent';
 import BackgroundElements from '@/components/home/BackgroundElements';
+import MaintenanceBanner from '@/components/MaintenanceBanner';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 
@@ -125,6 +126,9 @@ const Home = () => {
         height: '100%'
       }}
     >
+      {/* Maintenance Banner - positioned at the very top */}
+      <MaintenanceBanner />
+
       {/* Background elements including animations */}
       <BackgroundElements />
 
