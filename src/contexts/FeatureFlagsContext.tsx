@@ -7,7 +7,6 @@ type FeatureFlagsContextValue = {
   flags: FeatureFlags;
   isEnabled: (flag: AppFeatureFlag) => boolean;
   loading: boolean;
-  lastUpdated: Date | null;
 };
 
 const defaultFlags: FeatureFlags = {
@@ -23,80 +22,47 @@ const defaultFlags: FeatureFlags = {
 const FeatureFlagsContext = createContext<FeatureFlagsContextValue>({
   flags: defaultFlags,
   isEnabled: () => false,
-  loading: true,
-  lastUpdated: null
+  loading: true
 });
 
 export const FeatureFlagsProvider = ({ children }: { children: ReactNode }) => {
   const [flags, setFlags] = useState<FeatureFlags>(defaultFlags);
   const [loading, setLoading] = useState(true);
-  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
-
-  const fetchFeatureFlags = async () => {
-    try {
-      console.log('[FeatureFlags] Fetching feature flags...');
-      const { data, error } = await supabase
-        .from('feature_flags')
-        .select('name, is_enabled');
-
-      if (error) {
-        console.error('[FeatureFlags] Error fetching feature flags:', error);
-        setLoading(false);
-        return;
-      }
-
-      // Create a new flags object based on database results
-      const updatedFlags = { ...defaultFlags };
-      
-      if (data) {
-        data.forEach((flag) => {
-          const flagKey = flag.name as AppFeatureFlag;
-          if (flagKey in updatedFlags) {
-            updatedFlags[flagKey] = flag.is_enabled;
-          }
-        });
-      }
-
-      console.log('[FeatureFlags] Updated flags:', updatedFlags);
-      setFlags(updatedFlags);
-      setLastUpdated(new Date());
-    } catch (err) {
-      console.error('[FeatureFlags] Failed to fetch feature flags:', err);
-    } finally {
-      setLoading(false);
-    }
-  };
 
   useEffect(() => {
-    // Initial fetch
-    fetchFeatureFlags();
+    const fetchFeatureFlags = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('feature_flags')
+          .select('name, is_enabled'); // Fetch all flags, not just enabled ones
 
-    // Set up real-time subscription
-    console.log('[FeatureFlags] Setting up real-time subscription...');
-    const channel = supabase
-      .channel('feature-flags-changes')
-      .on(
-        'postgres_changes',
-        {
-          event: '*', // Listen to all changes (INSERT, UPDATE, DELETE)
-          schema: 'public',
-          table: 'feature_flags'
-        },
-        (payload) => {
-          console.log('[FeatureFlags] Real-time update received:', payload);
-          // Refetch flags when any change occurs
-          fetchFeatureFlags();
+        if (error) {
+          console.error('Error fetching feature flags:', error);
+          setLoading(false);
+          return;
         }
-      )
-      .subscribe((status) => {
-        console.log('[FeatureFlags] Subscription status:', status);
-      });
 
-    // Cleanup subscription on unmount
-    return () => {
-      console.log('[FeatureFlags] Cleaning up real-time subscription');
-      supabase.removeChannel(channel);
+        // Create a new flags object based on database results
+        const updatedFlags = { ...defaultFlags };
+        
+        if (data) {
+          data.forEach((flag) => {
+            const flagKey = flag.name as AppFeatureFlag;
+            if (flagKey in updatedFlags) {
+              updatedFlags[flagKey] = flag.is_enabled;
+            }
+          });
+        }
+
+        setFlags(updatedFlags);
+      } catch (err) {
+        console.error('Failed to fetch feature flags:', err);
+      } finally {
+        setLoading(false);
+      }
     };
+
+    fetchFeatureFlags();
   }, []);
 
   const isEnabled = (flag: AppFeatureFlag) => !!flags[flag];
@@ -106,9 +72,8 @@ export const FeatureFlagsProvider = ({ children }: { children: ReactNode }) => {
       flags,
       isEnabled,
       loading,
-      lastUpdated,
     }),
-    [flags, loading, lastUpdated]
+    [flags, loading]
   );
 
   return (

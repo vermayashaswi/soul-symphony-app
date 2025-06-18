@@ -6,7 +6,7 @@ const config: CapacitorConfig = {
   appName: 'soul-symphony-app',
   webDir: 'dist',
   server: {
-    url: 'https://soulo.online/app?forceHideBadge=true',
+    url: 'https://soulo.online?forceHideBadge=true',
     cleartext: true
   },
   // Ensure proper permissions for iOS and Android

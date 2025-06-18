@@ -1,3 +1,4 @@
+
 import React, { useEffect } from 'react';
 import { useTutorial } from '@/contexts/TutorialContext';
 import JournalHeader from '@/components/home/JournalHeader';
@@ -5,7 +6,6 @@ import JournalNavigationButton from '@/components/home/JournalNavigationButton';
 import JournalContent from '@/components/home/JournalContent';
 import BackgroundElements from '@/components/home/BackgroundElements';
 import MaintenanceBanner from '@/components/MaintenanceBanner';
-import FeatureFlagDebug from '@/components/FeatureFlagDebug';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 
@@ -142,9 +142,6 @@ const Home = () => {
       <div className={`relative ${isInWelcomeTutorialStep ? 'z-[9999]' : 'z-20'} flex flex-col pt-16`}>
         <JournalHeader />
       </div>
-
-      {/* Debug component for development */}
-      <FeatureFlagDebug />
     </div>
   );
 };

@@ -8,7 +8,6 @@ import { useOnboarding } from '@/hooks/use-onboarding';
 import NetworkAwareContent from '@/components/NetworkAwareContent';
 import { useNetworkStatus } from '@/utils/network';
 import HomePage from '@/pages/website/HomePage';
-import MaintenanceBanner from '@/components/MaintenanceBanner';
 import { TranslatableText } from '@/components/translation/TranslatableText';
 import { useTranslation } from '@/contexts/TranslationContext';
 import { supabase } from '@/integrations/supabase/client';
@@ -147,9 +146,6 @@ const Index = () => {
   // Always render the website homepage component when at root URL
   return (
     <>
-      {/* Maintenance Banner - appears on all pages as backup */}
-      <MaintenanceBanner />
-      
       <NetworkAwareContent
         lowBandwidthFallback={
           <div className="flex flex-col items-center justify-center min-h-screen p-4">
