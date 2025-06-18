@@ -28,6 +28,8 @@ const Settings = () => {
   const [notifications, setNotifications] = useState(true);
   const [dataAnalytics, setDataAnalytics] = useState(true);
   const [updating, setUpdating] = useState(false);
+  const [accentColor, setAccentColor] = useState('#3b82f6');
+  const [isLoading, setIsLoading] = useState(false);
   const { toast } = useToast();
   const { user, signOut } = useAuth();
   const { theme, setTheme } = useTheme();
@@ -80,8 +82,14 @@ const Settings = () => {
     setTheme(theme === 'light' ? 'dark' : 'light');
   };
 
+  const handleColorChange = (color: string) => {
+    setAccentColor(color);
+    // Apply the color to CSS custom properties or your theme system
+    document.documentElement.style.setProperty('--accent-color', color);
+  };
+
   return (
-    <SettingsLoadingWrapper>
+    <SettingsLoadingWrapper isLoading={isLoading}>
       <div className="min-h-screen bg-background">
         <div className="container mx-auto max-w-4xl px-4 py-8">
           <div className="mb-8">
@@ -180,7 +188,10 @@ const Settings = () => {
                   <Label className="text-base">
                     <TranslatableText text="Accent Color" />
                   </Label>
-                  <ColorPicker />
+                  <ColorPicker 
+                    value={accentColor}
+                    onChange={handleColorChange}
+                  />
                 </div>
 
                 <div className="space-y-3">
