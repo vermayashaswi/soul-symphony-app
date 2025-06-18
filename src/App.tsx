@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from 'react';
 import AppRoutes from './routes/AppRoutes';
 import { Toaster } from "@/components/ui/toaster";
@@ -15,7 +16,6 @@ import './styles/emoji.css';
 import './styles/tutorial.css';
 import { FeatureFlagsProvider } from "./contexts/FeatureFlagsContext";
 import AppUpdateManager from './components/pwa/AppUpdateManager';
-import { aggressiveUpdateService } from './services/aggressiveUpdateService';
 
 const App: React.FC = () => {
   const [isInitialized, setIsInitialized] = useState(false);
@@ -38,13 +38,6 @@ const App: React.FC = () => {
     } catch (error) {
       console.warn('Failed to preload some images:', error);
       // Non-critical error, continue app initialization
-    }
-
-    // Initialize aggressive update service for immediate updates
-    if ('serviceWorker' in navigator) {
-      aggressiveUpdateService.initialize().catch(error => {
-        console.warn('Failed to initialize aggressive update service:', error);
-      });
     }
 
     // Mark app as initialized after a brief delay to ensure smooth startup
