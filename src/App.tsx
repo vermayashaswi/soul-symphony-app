@@ -14,6 +14,7 @@ import { toast } from 'sonner';
 import './styles/emoji.css';
 import './styles/tutorial.css';
 import { FeatureFlagsProvider } from "./contexts/FeatureFlagsContext";
+import AppUpdateManager from './components/pwa/AppUpdateManager';
 
 const App: React.FC = () => {
   const [isInitialized, setIsInitialized] = useState(false);
@@ -73,6 +74,7 @@ const App: React.FC = () => {
             <TutorialProvider>
               <TranslationLoadingOverlay />
               <JournalProcessingInitializer />
+              <AppUpdateManager />
               <AppRoutes key={isInitialized ? 'initialized' : 'initializing'} />
               <TutorialOverlay />
               <Toaster />
