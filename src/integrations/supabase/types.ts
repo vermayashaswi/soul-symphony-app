@@ -185,6 +185,51 @@ export type Database = {
         }
         Relationships: []
       }
+      feature_flags: {
+        Row: {
+          created_at: string
+          description: string | null
+          enabled: boolean | null
+          id: string
+          is_enabled: boolean
+          key: string | null
+          name: string
+          target_percentage: number
+          target_type: string | null
+          target_value: string | null
+          updated_at: string
+          user_criteria: Json | null
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          enabled?: boolean | null
+          id?: string
+          is_enabled?: boolean
+          key?: string | null
+          name: string
+          target_percentage?: number
+          target_type?: string | null
+          target_value?: string | null
+          updated_at?: string
+          user_criteria?: Json | null
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          enabled?: boolean | null
+          id?: string
+          is_enabled?: boolean
+          key?: string | null
+          name?: string
+          target_percentage?: number
+          target_type?: string | null
+          target_value?: string | null
+          updated_at?: string
+          user_criteria?: Json | null
+        }
+        Relationships: []
+      }
       "Journal Entries": {
         Row: {
           audio_url: string | null
@@ -684,6 +729,41 @@ export type Database = {
           updated_at?: string
         }
         Relationships: []
+      }
+      user_feature_flags: {
+        Row: {
+          created_at: string
+          feature_flag_id: string
+          id: string
+          is_enabled: boolean
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          feature_flag_id: string
+          id?: string
+          is_enabled: boolean
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          feature_flag_id?: string
+          id?: string
+          is_enabled?: boolean
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_feature_flags_feature_flag_id_fkey"
+            columns: ["feature_flag_id"]
+            isOneToOne: false
+            referencedRelation: "feature_flags"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       user_sessions: {
         Row: {

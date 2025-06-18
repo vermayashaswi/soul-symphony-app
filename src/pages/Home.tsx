@@ -5,7 +5,6 @@ import JournalHeader from '@/components/home/JournalHeader';
 import JournalNavigationButton from '@/components/home/JournalNavigationButton';
 import JournalContent from '@/components/home/JournalContent';
 import BackgroundElements from '@/components/home/BackgroundElements';
-import MaintenanceBanner from '@/components/MaintenanceBanner';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 
@@ -126,9 +125,6 @@ const Home = () => {
         height: '100%'
       }}
     >
-      {/* Maintenance Banner - positioned at the very top */}
-      <MaintenanceBanner />
-
       {/* Background elements including animations */}
       <BackgroundElements />
 
@@ -139,7 +135,7 @@ const Home = () => {
       <JournalContent />
 
       {/* Header with journal name and date - ensure visibility during tutorial */}
-      <div className={`relative ${isInWelcomeTutorialStep ? 'z-[9999]' : 'z-20'} flex flex-col pt-16`}>
+      <div className={`relative ${isInWelcomeTutorialStep ? 'z-[9999]' : 'z-20'} flex flex-col`}>
         <JournalHeader />
       </div>
     </div>
