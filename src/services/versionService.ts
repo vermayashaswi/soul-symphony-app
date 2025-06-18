@@ -1,10 +1,12 @@
 import { toast } from 'sonner';
+import { nativeAppService } from './nativeAppService';
 
 export interface AppVersion {
   version: string;
   buildDate: string;
   features: string[];
   cacheVersion: string;
+  nativeAppSupport: boolean;
 }
 
 export interface UpdateInfo {
@@ -14,6 +16,7 @@ export interface UpdateInfo {
   updateSize?: string;
   releaseNotes?: string;
   mandatory?: boolean;
+  isNativeApp?: boolean;
 }
 
 class VersionService {
@@ -21,23 +24,62 @@ class VersionService {
   private updateCheckInterval: NodeJS.Timeout | null = null;
   private isAutoUpdating: boolean = false;
   private lastUpdateCheck: number = 0;
-  private updateCheckCooldown: number = 10000; // Reduced to 10 seconds
+  private updateCheckCooldown: number = 8000; // Reduced for native apps
   private forceRefreshTimeout: NodeJS.Timeout | null = null;
 
   constructor() {
     this.currentVersion = {
-      version: '1.2.2', // Incremented for test
+      version: '1.2.3', // Incremented for native app fixes
       buildDate: new Date().toISOString(),
-      features: ['testPlan', 'comprehensiveUpdateFix', 'aggressiveCaching', 'forceRefresh', 'smartChatV2', 'premiumMessaging', 'journalVoicePlayback', 'themeConsistency', 'webViewCompatibility'],
-      cacheVersion: 'soulo-cache-v1.2.2' // Match service worker cache name
+      features: ['nativeAppFix', 'webViewCacheClearing', 'enhancedRouting', 'testPlan', 'comprehensiveUpdateFix', 'aggressiveCaching', 'forceRefresh', 'smartChatV2', 'premiumMessaging', 'journalVoicePlayback', 'themeConsistency', 'webViewCompatibility'],
+      cacheVersion: 'soulo-cache-v1.2.3', // Updated cache version
+      nativeAppSupport: true
     };
     
     this.setupServiceWorkerListeners();
-    this.initializeForceRefreshHandling();
+    this.initializeNativeAppSupport();
     
-    console.log('[VersionService] TEST PLAN: Initialized with version', this.currentVersion.version);
-    console.log('[VersionService] TEST PLAN: Build date', this.currentVersion.buildDate);
-    console.log('[VersionService] TEST PLAN: Features', this.currentVersion.features);
+    console.log('[VersionService] NATIVE FIX: Initialized with version', this.currentVersion.version);
+    console.log('[VersionService] NATIVE FIX: Native app support enabled');
+  }
+
+  private initializeNativeAppSupport(): void {
+    const isNative = nativeAppService.isNativeApp();
+    
+    console.log('[VersionService] NATIVE FIX: Native app detected:', isNative);
+    
+    if (isNative) {
+      // Ensure proper routing for native apps
+      nativeAppService.ensureAppRoute();
+      
+      // Start native-specific update checking
+      nativeAppService.startNativeUpdateChecking();
+      
+      // Handle page visibility for native apps
+      this.initializeNativeVisibilityHandling();
+    }
+    
+    this.initializeForceRefreshHandling();
+  }
+
+  private initializeNativeVisibilityHandling(): void {
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible' && nativeAppService.isNativeApp()) {
+        console.log('[VersionService] NATIVE FIX: Native app became visible, checking updates');
+        setTimeout(() => {
+          this.checkForUpdates();
+        }, 500);
+      }
+    });
+
+    window.addEventListener('focus', () => {
+      if (nativeAppService.isNativeApp()) {
+        console.log('[VersionService] NATIVE FIX: Native app focused, checking updates');
+        setTimeout(() => {
+          this.checkForUpdates();
+        }, 300);
+      }
+    });
   }
 
   private isWebView(): boolean {
@@ -54,7 +96,6 @@ class VersionService {
   }
 
   private initializeForceRefreshHandling(): void {
-    // Handle page visibility changes to check for updates
     document.addEventListener('visibilitychange', () => {
       if (document.visibilityState === 'visible') {
         console.log('[VersionService] Page became visible, checking for updates');
@@ -64,7 +105,6 @@ class VersionService {
       }
     });
 
-    // Handle focus events
     window.addEventListener('focus', () => {
       console.log('[VersionService] Window focused, checking for updates');
       setTimeout(() => {
@@ -77,41 +117,51 @@ class VersionService {
     if (!('serviceWorker' in navigator)) return;
 
     navigator.serviceWorker.addEventListener('message', (event) => {
-      console.log('[VersionService] Service worker message:', event.data);
+      console.log('[VersionService] NATIVE FIX: Service worker message:', event.data);
+      
+      const isNative = nativeAppService.isNativeApp();
       
       switch (event.data.type) {
         case 'SW_ACTIVATED':
-          this.handleServiceWorkerActivated(event.data);
+          this.handleServiceWorkerActivated(event.data, isNative);
           break;
         case 'UPDATE_AVAILABLE':
-          this.handleUpdateAvailable(event.data);
+          this.handleUpdateAvailable(event.data, isNative);
           break;
         case 'FORCE_REFRESH':
-          this.handleForceRefresh(event.data);
+          this.handleForceRefresh(event.data, isNative);
           break;
         case 'SW_UPDATED':
-          this.handleServiceWorkerUpdated(event.data);
+          this.handleServiceWorkerUpdated(event.data, isNative);
           break;
       }
     });
 
     navigator.serviceWorker.addEventListener('controllerchange', () => {
-      console.log('[VersionService] Service worker controller changed - forcing refresh');
-      this.executeForceRefresh('Service worker updated');
+      console.log('[VersionService] NATIVE FIX: Service worker controller changed');
+      if (nativeAppService.isNativeApp()) {
+        nativeAppService.forceAppRefresh();
+      } else {
+        this.executeForceRefresh('Service worker updated');
+      }
     });
   }
 
-  private handleServiceWorkerActivated(data: any): void {
-    console.log('[VersionService] Service worker activated:', data);
+  private handleServiceWorkerActivated(data: any, isNative: boolean): void {
+    console.log('[VersionService] NATIVE FIX: Service worker activated:', data);
     
-    if (data.forceRefresh) {
+    if (data.forceRefresh || (isNative && data.nativeApp)) {
       toast.success('App Updated!', {
-        description: 'New version is active. Refreshing...',
+        description: isNative ? 'Native app updated! Refreshing...' : 'New version is active. Refreshing...',
         duration: 2000
       });
       
       setTimeout(() => {
-        this.executeForceRefresh('Service worker activated');
+        if (isNative) {
+          nativeAppService.forceAppRefresh();
+        } else {
+          this.executeForceRefresh('Service worker activated');
+        }
       }, 2000);
     } else {
       toast.success('App Ready', {
@@ -120,133 +170,131 @@ class VersionService {
       });
     }
     
-    // Update version info
     if (data.version && data.version !== this.currentVersion.version) {
       this.currentVersion.version = data.version;
       this.currentVersion.cacheVersion = data.cacheVersion || this.currentVersion.cacheVersion;
     }
   }
 
-  private handleUpdateAvailable(data: any): void {
-    console.log('[VersionService] Update available:', data);
+  private handleUpdateAvailable(data: any, isNative: boolean): void {
+    console.log('[VersionService] NATIVE FIX: Update available:', data);
     
-    toast.info('Update Available!', {
-      description: 'Tap to update to the latest version',
-      duration: 0, // Don't auto-dismiss
+    toast.info(isNative ? 'Native App Update!' : 'Update Available!', {
+      description: isNative ? 'Tap to update your native app' : 'Tap to update to the latest version',
+      duration: 0,
       action: {
         label: 'Update Now',
-        onClick: () => this.forceUpdate()
+        onClick: () => isNative ? nativeAppService.forceAppRefresh() : this.forceUpdate()
       }
     });
   }
 
-  private handleForceRefresh(data: any): void {
-    console.log('[VersionService] Force refresh requested:', data);
+  private handleForceRefresh(data: any, isNative: boolean): void {
+    console.log('[VersionService] NATIVE FIX: Force refresh requested:', data);
     
-    toast.info('Updating App...', {
-      description: 'Refreshing to latest version',
+    toast.info(isNative ? 'Updating Native App...' : 'Updating App...', {
+      description: isNative ? 'Refreshing native app to latest version' : 'Refreshing to latest version',
       duration: 2000
     });
     
     setTimeout(() => {
-      this.executeForceRefresh(data.reason || 'Update required');
+      if (isNative) {
+        nativeAppService.forceAppRefresh();
+      } else {
+        this.executeForceRefresh(data.reason || 'Update required');
+      }
     }, 2000);
   }
 
-  private handleServiceWorkerUpdated(data: any): void {
-    console.log('[VersionService] Service worker updated:', data);
+  private handleServiceWorkerUpdated(data: any, isNative: boolean): void {
+    console.log('[VersionService] NATIVE FIX: Service worker updated:', data);
     
-    toast.success('Update Downloaded', {
-      description: 'New version ready to install',
+    toast.success(isNative ? 'Native App Update Downloaded' : 'Update Downloaded', {
+      description: isNative ? 'New native app version ready' : 'New version ready to install',
       duration: 5000,
       action: {
         label: 'Activate',
-        onClick: () => this.forceUpdate()
+        onClick: () => isNative ? nativeAppService.forceAppRefresh() : this.forceUpdate()
       }
     });
   }
 
   private executeForceRefresh(reason: string): void {
-    console.log(`[VersionService] Executing force refresh: ${reason}`);
+    console.log(`[VersionService] NATIVE FIX: Executing force refresh: ${reason}`);
     
-    // Clear any existing timeout
-    if (this.forceRefreshTimeout) {
-      clearTimeout(this.forceRefreshTimeout);
+    if (nativeAppService.isNativeApp()) {
+      nativeAppService.forceAppRefresh();
+      return;
     }
     
-    // Add cache-busting parameters
     const url = new URL(window.location.href);
     url.searchParams.set('_refresh', Date.now().toString());
     url.searchParams.set('_v', this.currentVersion.version);
     
-    // Force reload with cache bypass
-    if (this.isWebView()) {
-      // For WebView, use location.replace to ensure complete refresh
-      window.location.replace(url.toString());
-    } else {
-      // For browsers, use reload with cache bypass
-      window.location.href = url.toString();
-    }
+    window.location.href = url.toString();
   }
 
   getCurrentVersion(): AppVersion {
-    console.log('[VersionService] TEST PLAN: getCurrentVersion called', this.currentVersion);
-    return this.currentVersion;
+    console.log('[VersionService] NATIVE FIX: getCurrentVersion called', this.currentVersion);
+    return { ...this.currentVersion };
   }
 
   async checkForUpdates(): Promise<UpdateInfo> {
     const now = Date.now();
-    if (now - this.lastUpdateCheck < this.updateCheckCooldown) {
-      console.log('[VersionService] Update check on cooldown');
+    const isNative = nativeAppService.isNativeApp();
+    const cooldown = isNative ? 5000 : this.updateCheckCooldown; // Shorter cooldown for native
+    
+    if (now - this.lastUpdateCheck < cooldown) {
+      console.log('[VersionService] NATIVE FIX: Update check on cooldown');
       return {
         available: false,
         currentVersion: this.currentVersion.version,
-        latestVersion: this.currentVersion.version
+        latestVersion: this.currentVersion.version,
+        isNativeApp: isNative
       };
     }
 
     this.lastUpdateCheck = now;
 
     try {
-      console.log('[VersionService] Checking for updates with aggressive detection...');
+      console.log('[VersionService] NATIVE FIX: Checking for updates (native app:', isNative, ')');
       
       const registration = await navigator.serviceWorker.getRegistration();
       
       if (!registration) {
-        console.log('[VersionService] No service worker registration found');
+        console.log('[VersionService] NATIVE FIX: No service worker registration');
         return {
           available: false,
           currentVersion: this.currentVersion.version,
-          latestVersion: this.currentVersion.version
+          latestVersion: this.currentVersion.version,
+          isNativeApp: isNative
         };
       }
 
-      // Check for waiting service worker first
       if (registration.waiting) {
-        console.log('[VersionService] Waiting service worker found - update available');
+        console.log('[VersionService] NATIVE FIX: Waiting service worker found - update available');
         return {
           available: true,
           currentVersion: this.currentVersion.version,
           latestVersion: 'Latest',
-          releaseNotes: 'Comprehensive update fixes and improvements',
-          mandatory: false
+          releaseNotes: isNative ? 'Native app improvements and fixes' : 'Comprehensive update fixes and improvements',
+          mandatory: false,
+          isNativeApp: isNative
         };
       }
 
-      // Force aggressive update check
-      console.log('[VersionService] Forcing aggressive service worker update check...');
       await registration.update();
       
-      // Wait a bit and check again
       return new Promise((resolve) => {
         const checkTimeout = setTimeout(() => {
-          console.log('[VersionService] Update check timeout');
+          console.log('[VersionService] NATIVE FIX: Update check timeout');
           resolve({
             available: false,
             currentVersion: this.currentVersion.version,
-            latestVersion: this.currentVersion.version
+            latestVersion: this.currentVersion.version,
+            isNativeApp: isNative
           });
-        }, 3000); // Reduced timeout
+        }, isNative ? 2000 : 3000); // Shorter timeout for native
 
         const handleUpdateFound = () => {
           clearTimeout(checkTimeout);
@@ -254,7 +302,7 @@ class VersionService {
           
           const newWorker = registration.installing;
           if (newWorker) {
-            console.log('[VersionService] New service worker detected during update check');
+            console.log('[VersionService] NATIVE FIX: New service worker detected');
             
             const handleStateChange = () => {
               if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
@@ -263,8 +311,9 @@ class VersionService {
                   available: true,
                   currentVersion: this.currentVersion.version,
                   latestVersion: 'Latest',
-                  releaseNotes: 'New version with comprehensive fixes',
-                  mandatory: false
+                  releaseNotes: isNative ? 'New native app version with enhanced features' : 'New version with comprehensive fixes',
+                  mandatory: false,
+                  isNativeApp: isNative
                 });
               }
             };
@@ -277,19 +326,23 @@ class VersionService {
       });
 
     } catch (error) {
-      console.error('[VersionService] Error checking for updates:', error);
+      console.error('[VersionService] NATIVE FIX: Error checking for updates:', error);
       return {
         available: false,
         currentVersion: this.currentVersion.version,
-        latestVersion: this.currentVersion.version
+        latestVersion: this.currentVersion.version,
+        isNativeApp: isNative
       };
     }
   }
 
-  startAutomaticUpdates(intervalMs: number = 30000) { // Reduced to 30 seconds
+  startAutomaticUpdates(intervalMs: number = 20000) {
     this.stopAutomaticUpdates();
     
-    console.log('[VersionService] Starting aggressive automatic update checking...');
+    const isNative = nativeAppService.isNativeApp();
+    const interval = isNative ? 15000 : intervalMs; // More frequent for native apps
+    
+    console.log('[VersionService] NATIVE FIX: Starting automatic updates (native:', isNative, 'interval:', interval, ')');
     this.isAutoUpdating = true;
     
     this.updateCheckInterval = setInterval(async () => {
@@ -298,44 +351,43 @@ class VersionService {
       try {
         const updateInfo = await this.checkForUpdates();
         if (updateInfo.available) {
-          console.log('[VersionService] Automatic update found, notifying user...');
+          console.log('[VersionService] NATIVE FIX: Automatic update found');
           
-          toast.info('Update Ready!', {
-            description: 'New version available - tap to update',
+          toast.info(isNative ? 'Native App Update Ready!' : 'Update Ready!', {
+            description: isNative ? 'New native app version - tap to update' : 'New version available - tap to update',
             duration: 10000,
             action: {
               label: 'Update Now',
-              onClick: () => this.forceUpdate()
+              onClick: () => isNative ? nativeAppService.forceAppRefresh() : this.forceUpdate()
             }
           });
         }
       } catch (error) {
-        console.error('[VersionService] Automatic update check failed:', error);
+        console.error('[VersionService] NATIVE FIX: Automatic update check failed:', error);
       }
-    }, intervalMs);
+    }, interval);
 
-    // Initial check after short delay
     setTimeout(async () => {
       if (!this.isAutoUpdating) return;
       
       try {
         const updateInfo = await this.checkForUpdates();
         if (updateInfo.available) {
-          console.log('[VersionService] Initial update check found update');
+          console.log('[VersionService] NATIVE FIX: Initial update check found update');
           
-          toast.info('Update Available', {
-            description: 'New version ready to install',
+          toast.info(isNative ? 'Native App Update Available' : 'Update Available', {
+            description: isNative ? 'New native app version ready' : 'New version ready to install',
             duration: 8000,
             action: {
               label: 'Update',
-              onClick: () => this.forceUpdate()
+              onClick: () => isNative ? nativeAppService.forceAppRefresh() : this.forceUpdate()
             }
           });
         }
       } catch (error) {
-        console.error('[VersionService] Initial update check failed:', error);
+        console.error('[VersionService] NATIVE FIX: Initial update check failed:', error);
       }
-    }, 5000); // Reduced delay
+    }, 3000);
   }
 
   stopAutomaticUpdates() {
@@ -345,58 +397,64 @@ class VersionService {
     }
     
     this.isAutoUpdating = false;
-    console.log('[VersionService] Automatic update checking stopped');
+    
+    if (nativeAppService.isNativeApp()) {
+      nativeAppService.stopNativeUpdateChecking();
+    }
+    
+    console.log('[VersionService] NATIVE FIX: Automatic update checking stopped');
   }
 
   async clearCache(): Promise<void> {
     try {
-      console.log('[VersionService] Clearing all application caches...');
+      console.log('[VersionService] NATIVE FIX: Clearing cache (native app mode)');
       
-      // Clear all caches
-      const cacheNames = await caches.keys();
-      const deletionPromises = cacheNames.map(cacheName => {
-        console.log('[VersionService] Deleting cache:', cacheName);
-        return caches.delete(cacheName);
-      });
-      
-      await Promise.all(deletionPromises);
-      
-      // Clear service worker cache via message
-      const registration = await navigator.serviceWorker.getRegistration();
-      if (registration && registration.active) {
-        return new Promise((resolve) => {
-          const messageChannel = new MessageChannel();
-          messageChannel.port1.onmessage = (event) => {
-            console.log('[VersionService] Cache clear response:', event.data);
-            resolve();
-          };
-          
-          registration.active.postMessage(
-            { type: 'CLEAR_CACHE' },
-            [messageChannel.port2]
-          );
-          
-          // Timeout after 3 seconds
-          setTimeout(resolve, 3000);
+      if (nativeAppService.isNativeApp()) {
+        await nativeAppService.clearNativeCache();
+      } else {
+        // ... keep existing code (regular cache clearing logic)
+        const cacheNames = await caches.keys();
+        const deletionPromises = cacheNames.map(cacheName => {
+          console.log('[VersionService] Deleting cache:', cacheName);
+          return caches.delete(cacheName);
+        });
+        
+        await Promise.all(deletionPromises);
+        
+        const registration = await navigator.serviceWorker.getRegistration();
+        if (registration && registration.active) {
+          return new Promise((resolve) => {
+            const messageChannel = new MessageChannel();
+            messageChannel.port1.onmessage = (event) => {
+              console.log('[VersionService] Cache clear response:', event.data);
+              resolve();
+            };
+            
+            registration.active.postMessage(
+              { type: 'CLEAR_CACHE' },
+              [messageChannel.port2]
+            );
+            
+            setTimeout(resolve, 3000);
+          });
+        }
+        
+        const cacheKeys = Object.keys(localStorage).filter(key => 
+          key.includes('cache') || 
+          key.includes('version') || 
+          key.includes('timestamp') ||
+          key.includes('sw-')
+        );
+        
+        cacheKeys.forEach(key => {
+          console.log('[VersionService] Removing localStorage key:', key);
+          localStorage.removeItem(key);
         });
       }
       
-      // Clear relevant localStorage items
-      const cacheKeys = Object.keys(localStorage).filter(key => 
-        key.includes('cache') || 
-        key.includes('version') || 
-        key.includes('timestamp') ||
-        key.includes('sw-')
-      );
-      
-      cacheKeys.forEach(key => {
-        console.log('[VersionService] Removing localStorage key:', key);
-        localStorage.removeItem(key);
-      });
-      
-      console.log('[VersionService] Comprehensive cache clearing completed');
+      console.log('[VersionService] NATIVE FIX: Cache clearing completed');
     } catch (error) {
-      console.error('[VersionService] Error clearing cache:', error);
+      console.error('[VersionService] NATIVE FIX: Error clearing cache:', error);
     }
   }
 
@@ -415,31 +473,34 @@ class VersionService {
   }
 
   async forceUpdate(): Promise<boolean> {
-    console.log('[VersionService] Forcing comprehensive update...');
+    console.log('[VersionService] NATIVE FIX: Forcing update');
     
+    const isNative = nativeAppService.isNativeApp();
+    
+    if (isNative) {
+      await nativeAppService.forceAppRefresh();
+      return true;
+    }
+    
+    // ... keep existing code (regular force update logic)
     try {
       toast.info('Updating App...', {
         description: 'Clearing cache and applying updates',
         duration: 3000
       });
       
-      // Step 1: Clear all caches
       await this.clearCache();
       
-      // Step 2: Get registration and force update
       const registration = await navigator.serviceWorker.getRegistration();
       
       if (registration) {
-        // Force update check
         await registration.update();
         
-        // If there's a waiting service worker, activate it
         if (registration.waiting) {
           console.log('[VersionService] Activating waiting service worker...');
           
           registration.waiting.postMessage({ type: 'SKIP_WAITING' });
           
-          // Wait for controller change or timeout
           return new Promise((resolve) => {
             const handleControllerChange = () => {
               navigator.serviceWorker.removeEventListener('controllerchange', handleControllerChange);
@@ -454,7 +515,6 @@ class VersionService {
             
             navigator.serviceWorker.addEventListener('controllerchange', handleControllerChange);
             
-            // Fallback timeout
             setTimeout(() => {
               navigator.serviceWorker.removeEventListener('controllerchange', handleControllerChange);
               console.log('[VersionService] Update timeout, forcing refresh anyway...');
@@ -463,7 +523,6 @@ class VersionService {
             }, 5000);
           });
         } else {
-          // No waiting worker, force refresh anyway
           console.log('[VersionService] No waiting service worker, forcing refresh...');
           
           toast.success('Cache Cleared', {
@@ -496,7 +555,6 @@ class VersionService {
         duration: 5000
       });
       
-      // Force refresh anyway as fallback
       setTimeout(() => {
         this.executeForceRefresh('Update error fallback');
       }, 3000);
@@ -506,35 +564,35 @@ class VersionService {
   }
 
   async triggerManualUpdate(): Promise<void> {
-    console.log('[VersionService] Manual update triggered with aggressive detection');
+    console.log('[VersionService] NATIVE FIX: Manual update triggered');
+    
+    const isNative = nativeAppService.isNativeApp();
     
     try {
       const registration = await navigator.serviceWorker.getRegistration();
       if (registration) {
-        // Send message to service worker
         registration.active?.postMessage({ type: 'CHECK_UPDATE' });
         
-        // Force our own update check
         const updateInfo = await this.checkForUpdates();
         
         if (updateInfo.available) {
-          toast.success('Update Found!', {
-            description: 'New version is ready to install',
+          toast.success(isNative ? 'Native App Update Found!' : 'Update Found!', {
+            description: isNative ? 'New native app version ready' : 'New version is ready to install',
             duration: 5000,
             action: {
               label: 'Install Now',
-              onClick: () => this.forceUpdate()
+              onClick: () => isNative ? nativeAppService.forceAppRefresh() : this.forceUpdate()
             }
           });
         } else {
           toast.success('Up to Date', {
-            description: 'You have the latest version',
+            description: isNative ? 'Native app is current' : 'You have the latest version',
             duration: 3000
           });
         }
       }
     } catch (error) {
-      console.error('[VersionService] Manual update trigger failed:', error);
+      console.error('[VersionService] NATIVE FIX: Manual update trigger failed:', error);
       toast.error('Update Check Failed', {
         description: 'Unable to check for updates',
         duration: 3000
@@ -543,11 +601,12 @@ class VersionService {
   }
 
   initializeThemeConsistency(): void {
-    console.log('[VersionService] Initializing enhanced theme consistency...');
+    console.log('[VersionService] NATIVE FIX: Initializing enhanced theme consistency...');
     
     try {
       const root = document.documentElement;
       const body = document.body;
+      const isNative = nativeAppService.isNativeApp();
       
       const storedTheme = localStorage.getItem('feelosophy-theme') || 'system';
       const storedColorTheme = localStorage.getItem('feelosophy-color-theme') || 'Default';
@@ -578,10 +637,10 @@ class VersionService {
       root.style.setProperty('--color-theme', primaryColor);
       root.style.setProperty('--primary', primaryColor);
       
-      if (this.isWebView()) {
-        console.log('[VersionService] WebView detected, applying enhanced compatibility');
+      if (isNative) {
+        console.log('[VersionService] NATIVE FIX: Native app detected, applying enhanced compatibility');
         
-        body.classList.add('webview-environment');
+        body.classList.add('webview-environment', 'native-app-environment');
         
         const themeMode = storedTheme === 'system' 
           ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light')
@@ -602,11 +661,10 @@ class VersionService {
         root.classList.remove('light', 'dark');
         root.classList.add(themeMode);
         
-        // Enhanced WebView styles
-        const webViewStyle = document.createElement('style');
-        webViewStyle.id = 'webview-enhanced-styles';
-        webViewStyle.textContent = `
-          .webview-environment {
+        const nativeStyle = document.createElement('style');
+        nativeStyle.id = 'native-app-enhanced-styles';
+        nativeStyle.textContent = `
+          .native-app-environment {
             -webkit-user-select: none !important;
             -webkit-touch-callout: none !important;
             -webkit-tap-highlight-color: transparent !important;
@@ -615,29 +673,28 @@ class VersionService {
             will-change: transform !important;
           }
           
-          .webview-environment * {
+          .native-app-environment * {
             -webkit-transform: translate3d(0, 0, 0);
             transform: translate3d(0, 0, 0);
             will-change: transform;
           }
           
-          /* Cache busting styles */
-          .cache-bust {
+          .native-cache-bust-${Date.now()} {
             background-image: url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMSIgaGVpZ2h0PSIxIiB2aWV3Qm94PSIwIDAgMSAxIiB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciPjwvc3ZnPg==');
           }
         `;
-        document.head.appendChild(webViewStyle);
+        document.head.appendChild(nativeStyle);
       }
       
-      console.log('[VersionService] Enhanced theme consistency initialized', { 
+      console.log('[VersionService] NATIVE FIX: Enhanced theme consistency initialized', { 
         storedColorTheme, 
         primaryColor, 
-        isWebView: this.isWebView(),
+        isNative,
         version: this.currentVersion.version
       });
       
     } catch (error) {
-      console.warn('[VersionService] Theme consistency initialization failed:', error);
+      console.warn('[VersionService] NATIVE FIX: Theme consistency initialization failed:', error);
     }
   }
 }

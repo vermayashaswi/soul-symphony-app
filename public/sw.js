@@ -1,13 +1,15 @@
-// Soulo PWA Service Worker - Test Plan Implementation
-const CACHE_NAME = 'soulo-cache-v1.2.2'; // Incremented version for test
-const OFFLINE_URL = '/offline.html';
-const APP_VERSION = '1.2.2'; // Incremented version for test
-const UPDATE_CHECK_INTERVAL = 30000; // 30 seconds
 
-// Assets to cache for offline functionality
+// Soulo PWA Service Worker - Enhanced Native App Support
+const CACHE_NAME = 'soulo-cache-v1.2.3'; // Incremented for native app fixes
+const OFFLINE_URL = '/offline.html';
+const APP_VERSION = '1.2.3'; // Incremented for native app fixes
+const UPDATE_CHECK_INTERVAL = 15000; // 15 seconds for better native app support
+
+// Enhanced assets for native app compatibility
 const STATIC_ASSETS = [
   '/',
   '/app',
+  '/app/',
   '/app/home',
   '/app/journal',
   '/app/insights',
@@ -15,163 +17,162 @@ const STATIC_ASSETS = [
   '/app/settings',
   '/offline.html',
   '/manifest.json',
+  '/app/manifest.json',
   '/lovable-uploads/31ed88ef-f596-4b91-ba58-a4175eebe779.png',
   '/lovable-uploads/3f275134-f471-4af9-a7cd-700ccd855fe3.png'
 ];
 
-// Cache-busting headers for critical routes
-const CACHE_BUSTING_ROUTES = ['/app', '/app/', '/app/home', '/app/journal', '/app/insights', '/app/smart-chat', '/app/settings'];
+// Enhanced cache-busting for native apps
+const NATIVE_CACHE_BUSTING_ROUTES = [
+  '/app', '/app/', '/app/home', '/app/journal', 
+  '/app/insights', '/app/smart-chat', '/app/settings'
+];
 
-// Enhanced logging with TEST PLAN prefix
 function swLog(message, data = null) {
   const timestamp = new Date().toISOString();
-  console.log(`[SW TEST PLAN ${APP_VERSION}] ${timestamp}: ${message}`, data || '');
+  console.log(`[SW NATIVE FIX ${APP_VERSION}] ${timestamp}: ${message}`, data || '');
 }
 
-// Force immediate activation and client claiming
+function isNativeApp() {
+  try {
+    const userAgent = self.navigator?.userAgent || '';
+    return userAgent.includes('SouloNativeApp') || 
+           userAgent.includes('Capacitor') ||
+           userAgent.includes('wv') ||
+           userAgent.includes('WebView');
+  } catch {
+    return false;
+  }
+}
+
+// Enhanced install with native app support
 self.addEventListener('install', (event) => {
-  swLog('TEST PLAN: Installing new service worker - forcing immediate activation');
+  swLog('NATIVE FIX: Installing service worker with native app support');
   
   event.waitUntil(
     Promise.all([
-      // Cache static assets
       caches.open(CACHE_NAME).then((cache) => {
-        swLog('TEST PLAN: Caching static assets');
+        swLog('NATIVE FIX: Caching assets for native app');
         return cache.addAll(STATIC_ASSETS);
       }),
-      // Force immediate activation
       self.skipWaiting()
     ]).then(() => {
-      swLog('TEST PLAN: Service worker installed and activated immediately');
+      swLog('NATIVE FIX: Service worker installed with native app support');
     }).catch((error) => {
-      swLog('TEST PLAN: Installation failed', error);
+      swLog('NATIVE FIX: Installation failed', error);
       throw error;
     })
   );
 });
 
-// Enhanced activate with aggressive cleanup
+// Enhanced activate with aggressive native app cleanup
 self.addEventListener('activate', (event) => {
-  swLog('TEST PLAN: Activating new service worker with aggressive cleanup');
+  swLog('NATIVE FIX: Activating service worker with native app cleanup');
   
   event.waitUntil(
     Promise.all([
-      // Clear ALL old caches
       caches.keys().then((cacheNames) => {
         const deletePromises = cacheNames.map((cacheName) => {
           if (cacheName !== CACHE_NAME) {
-            swLog('TEST PLAN: Deleting old cache', cacheName);
+            swLog('NATIVE FIX: Deleting old cache for native app', cacheName);
             return caches.delete(cacheName);
           }
         }).filter(Boolean);
         
         return Promise.all(deletePromises);
       }),
-      // Claim all clients immediately
       self.clients.claim()
     ]).then(async () => {
-      swLog('TEST PLAN: Service worker activated with full cache cleanup');
+      swLog('NATIVE FIX: Service worker activated with native app cleanup');
       
-      // Notify all clients immediately
       const clients = await self.clients.matchAll({ includeUncontrolled: true });
-      swLog(`TEST PLAN: Notifying ${clients.length} clients of update`);
+      swLog(`NATIVE FIX: Notifying ${clients.length} clients (including native apps)`);
       
       clients.forEach(client => {
+        const isNative = isNativeApp();
+        
         client.postMessage({
           type: 'SW_ACTIVATED',
           version: APP_VERSION,
           cacheVersion: CACHE_NAME,
-          message: 'TEST PLAN: App updated successfully! Please refresh.',
+          message: 'NATIVE FIX: App updated with native support!',
           timestamp: Date.now(),
-          forceRefresh: true,
-          testPlan: true
+          forceRefresh: isNative, // Force refresh for native apps
+          nativeApp: isNative
         });
       });
       
-      // Force page reload for app routes
+      // Enhanced native app refresh logic
       clients.forEach(client => {
         const url = new URL(client.url);
-        if (url.pathname.startsWith('/app')) {
-          swLog('TEST PLAN: Forcing refresh for app route:', url.pathname);
+        const isAppRoute = url.pathname.startsWith('/app');
+        
+        if (isAppRoute || isNativeApp()) {
+          swLog('NATIVE FIX: Forcing refresh for native app route:', url.pathname);
           client.postMessage({
             type: 'FORCE_REFRESH',
-            reason: 'TEST PLAN: Service worker updated',
-            testPlan: true
+            reason: 'NATIVE FIX: Service worker updated for native app',
+            nativeApp: isNativeApp()
           });
         }
       });
     }).catch(error => {
-      swLog('TEST PLAN: Activation failed', error);
+      swLog('NATIVE FIX: Activation failed', error);
     })
   );
 });
 
-// Enhanced fetch with cache-busting for app routes
+// Enhanced fetch with native app optimization
 self.addEventListener('fetch', (event) => {
-  // Skip non-GET requests
-  if (event.request.method !== 'GET') {
-    return;
-  }
-
-  // Skip Chrome extension requests
-  if (event.request.url.startsWith('chrome-extension://')) {
-    return;
-  }
-
-  // Don't interfere with Supabase API calls
-  if (event.request.url.includes('supabase.co')) {
-    return;
-  }
+  if (event.request.method !== 'GET') return;
+  if (event.request.url.startsWith('chrome-extension://')) return;
+  if (event.request.url.includes('supabase.co')) return;
 
   const url = new URL(event.request.url);
   const isAppRoute = url.pathname.startsWith('/app');
-  const isCacheBustingRoute = CACHE_BUSTING_ROUTES.includes(url.pathname);
+  const isNativeCacheBustingRoute = NATIVE_CACHE_BUSTING_ROUTES.includes(url.pathname);
+  const isNative = isNativeApp();
 
   event.respondWith(
     (async () => {
-      // For app routes and cache-busting routes, always try network first
-      if (isAppRoute || isCacheBustingRoute) {
+      // Enhanced strategy for native apps and app routes
+      if (isAppRoute || isNativeCacheBustingRoute || isNative) {
         try {
-          swLog(`TEST PLAN: Network-first strategy for: ${url.pathname}`);
+          swLog(`NATIVE FIX: Network-first strategy for native app: ${url.pathname}`);
           
-          // Add cache-busting headers
           const networkRequest = new Request(event.request.url, {
             headers: {
               ...event.request.headers,
               'Cache-Control': 'no-cache, no-store, must-revalidate',
               'Pragma': 'no-cache',
-              'Expires': '0'
+              'Expires': '0',
+              'X-Native-App': isNative ? 'true' : 'false'
             }
           });
           
           const networkResponse = await fetch(networkRequest);
           
           if (networkResponse && networkResponse.status === 200) {
-            // Update cache with fresh content
             const cache = await caches.open(CACHE_NAME);
             cache.put(event.request, networkResponse.clone());
             return networkResponse;
           }
         } catch (error) {
-          swLog(`TEST PLAN: Network failed for ${url.pathname}, falling back to cache`, error);
+          swLog(`NATIVE FIX: Network failed for native app ${url.pathname}`, error);
         }
       }
 
-      // Try cache first for other routes
+      // Cache fallback
       const cachedResponse = await caches.match(event.request);
       if (cachedResponse) {
-        // For app routes, check if cache is stale
-        if (isAppRoute) {
-          // Serve cached content but update in background
+        if (isAppRoute || isNative) {
           fetch(event.request).then(networkResponse => {
             if (networkResponse && networkResponse.status === 200) {
               caches.open(CACHE_NAME).then(cache => {
                 cache.put(event.request, networkResponse);
               });
             }
-          }).catch(() => {
-            // Ignore background update failures
-          });
+          }).catch(() => {});
         }
         return cachedResponse;
       }
@@ -187,9 +188,8 @@ self.addEventListener('fetch', (event) => {
         
         return networkResponse;
       } catch (error) {
-        swLog(`TEST PLAN: Complete fetch failure for ${event.request.url}`, error);
+        swLog(`NATIVE FIX: Complete fetch failure for ${event.request.url}`, error);
         
-        // Return offline page for navigation requests
         if (event.request.mode === 'navigate') {
           const offlineResponse = await caches.match(OFFLINE_URL);
           if (offlineResponse) {
@@ -207,12 +207,12 @@ self.addEventListener('fetch', (event) => {
   );
 });
 
-// Enhanced message handling with force refresh capability
+// Enhanced message handling for native apps
 self.addEventListener('message', (event) => {
-  swLog('Message received', event.data);
+  swLog('NATIVE FIX: Message received', event.data);
   
   if (event.data && event.data.type === 'SKIP_WAITING') {
-    swLog('TEST PLAN: Skipping waiting due to client request');
+    swLog('NATIVE FIX: Skipping waiting for native app');
     self.skipWaiting();
   }
   
@@ -220,21 +220,22 @@ self.addEventListener('message', (event) => {
     event.ports[0].postMessage({
       version: APP_VERSION,
       cacheVersion: CACHE_NAME,
-      timestamp: Date.now()
+      timestamp: Date.now(),
+      nativeAppSupport: true
     });
   }
   
   if (event.data && event.data.type === 'CHECK_UPDATE') {
-    swLog('TEST PLAN: Manual update check requested');
+    swLog('NATIVE FIX: Manual update check for native app');
     self.registration.update().then(() => {
-      swLog('TEST PLAN: Manual update check completed');
+      swLog('NATIVE FIX: Native app update check completed');
     }).catch(error => {
-      swLog('TEST PLAN: Manual update check failed', error);
+      swLog('NATIVE FIX: Native app update check failed', error);
     });
   }
   
   if (event.data && event.data.type === 'CLEAR_CACHE') {
-    swLog('TEST PLAN: Cache clear requested');
+    swLog('NATIVE FIX: Cache clear for native app');
     caches.keys().then(cacheNames => {
       return Promise.all(
         cacheNames.map(cacheName => {
@@ -244,72 +245,57 @@ self.addEventListener('message', (event) => {
         })
       );
     }).then(() => {
-      swLog('TEST PLAN: Cache cleared successfully');
-      event.ports[0].postMessage({ success: true });
+      swLog('NATIVE FIX: Native app cache cleared');
+      event.ports[0].postMessage({ success: true, nativeApp: isNativeApp() });
     }).catch(error => {
-      swLog('TEST PLAN: Cache clear failed', error);
+      swLog('NATIVE FIX: Native app cache clear failed', error);
       event.ports[0].postMessage({ success: false, error: error.message });
     });
   }
 });
 
-// Aggressive update checking
+// Enhanced update checking for native apps
 let updateCheckInterval;
 
-function startAggressiveUpdateChecking() {
+function startNativeAppUpdateChecking() {
   if (updateCheckInterval) {
     clearInterval(updateCheckInterval);
   }
   
-  swLog('TEST PLAN: Starting aggressive update checking');
+  swLog('NATIVE FIX: Starting native app update checking');
   
   updateCheckInterval = setInterval(async () => {
     try {
-      swLog('TEST PLAN: Performing scheduled update check');
+      swLog('NATIVE FIX: Performing native app update check');
       
       const registration = await self.registration.update();
       
       if (registration.installing || registration.waiting) {
-        swLog('TEST PLAN: New service worker version detected during scheduled check');
+        swLog('NATIVE FIX: New version detected for native app');
         
         const clients = await self.clients.matchAll();
         clients.forEach(client => {
           client.postMessage({
             type: 'UPDATE_AVAILABLE',
             version: APP_VERSION,
-            message: 'TEST PLAN: A new version is available - refresh to update'
+            message: 'NATIVE FIX: New version available for native app',
+            nativeApp: isNativeApp()
           });
         });
       }
     } catch (error) {
-      swLog('TEST PLAN: Scheduled update check failed', error);
+      swLog('NATIVE FIX: Native app update check failed', error);
     }
   }, UPDATE_CHECK_INTERVAL);
 }
 
-// Start aggressive checking after activation
 self.addEventListener('activate', () => {
-  setTimeout(startAggressiveUpdateChecking, 5000);
+  setTimeout(startNativeAppUpdateChecking, 3000);
 });
 
-// PWABuilder compatibility - enhanced background sync
-self.addEventListener('sync', (event) => {
-  swLog('Background sync event', event.tag);
-  
-  if (event.tag === 'app-update-check') {
-    event.waitUntil(
-      self.registration.update().then(() => {
-        swLog('Background update check completed');
-      }).catch(error => {
-        swLog('Background update check failed', error);
-      })
-    );
-  }
-});
-
-swLog('TEST PLAN: Enhanced service worker script loaded', { 
+swLog('NATIVE FIX: Enhanced service worker loaded with native app support', { 
   version: APP_VERSION, 
   cache: CACHE_NAME,
   updateInterval: UPDATE_CHECK_INTERVAL,
-  testPlan: true
+  nativeAppSupport: true
 });

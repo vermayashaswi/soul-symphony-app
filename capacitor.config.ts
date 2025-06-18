@@ -6,12 +6,16 @@ const config: CapacitorConfig = {
   appName: 'soul-symphony-app',
   webDir: 'dist',
   server: {
-    url: 'https://soulo.online?forceHideBadge=true',
-    cleartext: true
+    url: 'https://soulo.online/app?forceHideBadge=true&nativeApp=true',
+    cleartext: true,
+    // Enhanced native app configuration
+    allowNavigation: [
+      'https://soulo.online/*',
+      'https://*.supabase.co/*'
+    ]
   },
-  // Ensure proper permissions for iOS and Android
+  // Enhanced plugins configuration for better PWA support
   plugins: {
-    // Add specific iOS-related configurations
     SplashScreen: {
       launchAutoHide: false,
       backgroundColor: "#FFFFFF",
@@ -22,27 +26,38 @@ const config: CapacitorConfig = {
       splashFullScreen: true,
       splashImmersive: true
     },
-    // Handle keyboard properly
     Keyboard: {
       resize: "body",
       style: "dark",
       resizeOnFullScreen: true
+    },
+    // Add App plugin for better update handling
+    App: {
+      appendUserAgent: 'SouloNativeApp/1.0'
     }
   },
-  // iOS-specific configuration
+  // Enhanced iOS configuration
   ios: {
     contentInset: "always",
     allowsLinkPreview: false,
     scrollEnabled: true,
     useUserAgentString: false,
     limitsNavigationsToAppBoundDomains: true,
-    backgroundColor: "#FFFFFF"
+    backgroundColor: "#FFFFFF",
+    // Enhanced WebView settings for better caching control
+    webContentsDebuggingEnabled: true,
+    allowsInlineMediaPlayback: true,
+    mediaPlaybackRequiresUserAction: false
   },
-  // Android-specific configuration
+  // Enhanced Android configuration
   android: {
     allowMixedContent: true,
     captureInput: true,
-    webContentsDebuggingEnabled: true
+    webContentsDebuggingEnabled: true,
+    // Enhanced WebView settings
+    appendUserAgent: 'SouloNativeApp/1.0',
+    overrideUserAgent: false,
+    backgroundColor: "#FFFFFF"
   }
 };
 
