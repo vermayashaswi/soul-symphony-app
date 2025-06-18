@@ -34,7 +34,7 @@ export const FeatureFlagsProvider = ({ children }: { children: ReactNode }) => {
       try {
         const { data, error } = await supabase
           .from('feature_flags')
-          .select('flag_name, is_enabled')
+          .select('name, is_enabled')
           .eq('is_enabled', true); // Only fetch enabled flags
 
         if (error) {
@@ -48,7 +48,7 @@ export const FeatureFlagsProvider = ({ children }: { children: ReactNode }) => {
         
         if (data) {
           data.forEach((flag) => {
-            const flagKey = flag.flag_name as AppFeatureFlag;
+            const flagKey = flag.name as AppFeatureFlag;
             if (flagKey in updatedFlags) {
               updatedFlags[flagKey] = flag.is_enabled;
             }
