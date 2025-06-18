@@ -1,4 +1,3 @@
-
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react-swc";
 import path from "path";
@@ -28,27 +27,27 @@ export default defineConfig(({ mode }) => ({
     exclude: ['lovable-tagger'],
     include: ['react', 'react-dom']
   },
-  // Ensure that Vite correctly resolves Node.js built-in modules
   build: {
     commonjsOptions: {
       transformMixedEsModules: true,
     },
     rollupOptions: {
       output: {
-        // Copy manifest.json to app subdirectory for PWA
+        // Ensure manifest.json is properly handled for PWABuilder
         assetFileNames: (assetInfo) => {
+          // Keep manifest.json at root for PWABuilder detection
           if (assetInfo.name === 'manifest.json') {
-            return 'app/manifest.json';
+            return 'manifest.json';
           }
           return '[name]-[hash][extname]';
         }
       }
     }
   },
-  // Configure public directory handling for manifest
   publicDir: 'public',
-  // Add custom handling for manifest.json in app path
+  // PWABuilder-friendly configuration
   define: {
-    __APP_MANIFEST_PATH__: JSON.stringify('/app/manifest.json')
+    __PWA_MANIFEST_PATH__: JSON.stringify('/manifest.json'),
+    __APP_VERSION__: JSON.stringify('1.3.0')
   }
 }));

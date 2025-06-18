@@ -1,11 +1,11 @@
 
-// Soulo PWA Service Worker - Enhanced PWA Builder Support
-const CACHE_NAME = 'soulo-cache-v1.2.4'; // Incremented for PWA Builder support
+// Soulo PWA Service Worker - PWABuilder Optimized
+const CACHE_NAME = 'soulo-cache-v1.3.0';
 const OFFLINE_URL = '/offline.html';
-const APP_VERSION = '1.2.4'; // Incremented for PWA Builder support
-const UPDATE_CHECK_INTERVAL = 10000; // 10 seconds for better PWA Builder support
+const APP_VERSION = '1.3.0';
+const UPDATE_CHECK_INTERVAL = 30000; // 30 seconds for PWABuilder
 
-// Enhanced assets for PWA Builder compatibility
+// Core assets for PWABuilder compatibility
 const STATIC_ASSETS = [
   '/',
   '/app',
@@ -17,31 +17,27 @@ const STATIC_ASSETS = [
   '/app/settings',
   '/offline.html',
   '/manifest.json',
-  '/app/manifest.json',
-  '/lovable-uploads/31ed88ef-f596-4b91-ba58-a4175eebe779.png',
-  '/lovable-uploads/3f275134-f471-4af9-a7cd-700ccd855fe3.png'
+  '/lovable-uploads/a07b91eb-274a-47b6-8180-fb4c9c0bc8a5.png'
 ];
 
-// Enhanced cache-busting for PWA Builder apps
-const PWA_BUILDER_CACHE_BUSTING_ROUTES = [
+// PWABuilder-friendly routes (less aggressive caching)
+const PWA_BUILDER_ROUTES = [
   '/app', '/app/', '/app/home', '/app/journal', 
   '/app/insights', '/app/smart-chat', '/app/settings'
 ];
 
 function swLog(message, data = null) {
   const timestamp = new Date().toISOString();
-  console.log(`[SW PWA BUILDER ${APP_VERSION}] ${timestamp}: ${message}`, data || '');
+  console.log(`[SW PWABuilder ${APP_VERSION}] ${timestamp}: ${message}`, data || '');
 }
 
 function isPWABuilder() {
   try {
-    // Enhanced PWA Builder detection
     const userAgent = self.navigator?.userAgent || '';
     const isPWABuilderUA = userAgent.includes('PWABuilder') || 
                           userAgent.includes('TWA') || 
                           userAgent.includes('WebAPK');
     
-    // Check for PWA context indicators
     const standaloneQuery = self.matchMedia && self.matchMedia('(display-mode: standalone)').matches;
     const fullscreenQuery = self.matchMedia && self.matchMedia('(display-mode: fullscreen)').matches;
     
@@ -51,49 +47,35 @@ function isPWABuilder() {
   }
 }
 
-function isNativeApp() {
-  try {
-    const userAgent = self.navigator?.userAgent || '';
-    return userAgent.includes('SouloNativeApp') || 
-           userAgent.includes('Capacitor') ||
-           userAgent.includes('wv') ||
-           userAgent.includes('WebView') ||
-           isPWABuilder();
-  } catch {
-    return false;
-  }
-}
-
-// Enhanced install with PWA Builder support
+// Install event - PWABuilder optimized
 self.addEventListener('install', (event) => {
-  swLog('PWA BUILDER: Installing service worker with PWA Builder support');
+  swLog('Installing service worker for PWABuilder compatibility');
   
   event.waitUntil(
     Promise.all([
       caches.open(CACHE_NAME).then((cache) => {
-        swLog('PWA BUILDER: Caching assets for PWA Builder app');
+        swLog('Caching core assets for PWABuilder');
         return cache.addAll(STATIC_ASSETS);
       }),
       self.skipWaiting()
     ]).then(() => {
-      swLog('PWA BUILDER: Service worker installed with PWA Builder support');
+      swLog('Service worker installed successfully');
     }).catch((error) => {
-      swLog('PWA BUILDER: Installation failed', error);
-      throw error;
+      swLog('Installation failed', error);
     })
   );
 });
 
-// Enhanced activate with aggressive PWA Builder cleanup
+// Activate event - clean up old caches
 self.addEventListener('activate', (event) => {
-  swLog('PWA BUILDER: Activating service worker with PWA Builder cleanup');
+  swLog('Activating service worker');
   
   event.waitUntil(
     Promise.all([
       caches.keys().then((cacheNames) => {
         const deletePromises = cacheNames.map((cacheName) => {
           if (cacheName !== CACHE_NAME) {
-            swLog('PWA BUILDER: Deleting old cache for PWA Builder app', cacheName);
+            swLog('Deleting old cache', cacheName);
             return caches.delete(cacheName);
           }
         }).filter(Boolean);
@@ -102,49 +84,28 @@ self.addEventListener('activate', (event) => {
       }),
       self.clients.claim()
     ]).then(async () => {
-      swLog('PWA BUILDER: Service worker activated with PWA Builder cleanup');
+      swLog('Service worker activated');
       
       const clients = await self.clients.matchAll({ includeUncontrolled: true });
-      swLog(`PWA BUILDER: Notifying ${clients.length} clients (including PWA Builder apps)`);
-      
       const isPWABuilderEnv = isPWABuilder();
-      const isNativeEnv = isNativeApp();
       
       clients.forEach(client => {
         client.postMessage({
           type: 'SW_ACTIVATED',
           version: APP_VERSION,
           cacheVersion: CACHE_NAME,
-          message: 'PWA BUILDER: App updated with PWA Builder support!',
+          message: 'PWA updated and ready!',
           timestamp: Date.now(),
-          forceRefresh: isPWABuilderEnv || isNativeEnv,
-          pwaBuilder: isPWABuilderEnv,
-          nativeApp: isNativeEnv
+          pwaBuilder: isPWABuilderEnv
         });
       });
-      
-      // Enhanced PWA Builder refresh logic
-      clients.forEach(client => {
-        const url = new URL(client.url);
-        const isAppRoute = url.pathname.startsWith('/app');
-        
-        if (isAppRoute || isPWABuilderEnv || isNativeEnv) {
-          swLog('PWA BUILDER: Forcing refresh for PWA Builder app route:', url.pathname);
-          client.postMessage({
-            type: 'FORCE_REFRESH',
-            reason: 'PWA BUILDER: Service worker updated for PWA Builder app',
-            pwaBuilder: isPWABuilderEnv,
-            nativeApp: isNativeEnv
-          });
-        }
-      });
     }).catch(error => {
-      swLog('PWA BUILDER: Activation failed', error);
+      swLog('Activation failed', error);
     })
   );
 });
 
-// Enhanced fetch with PWA Builder optimization
+// Fetch event - PWABuilder friendly caching strategy
 self.addEventListener('fetch', (event) => {
   if (event.request.method !== 'GET') return;
   if (event.request.url.startsWith('chrome-extension://')) return;
@@ -152,29 +113,32 @@ self.addEventListener('fetch', (event) => {
 
   const url = new URL(event.request.url);
   const isAppRoute = url.pathname.startsWith('/app');
-  const isPWABuilderCacheBustingRoute = PWA_BUILDER_CACHE_BUSTING_ROUTES.includes(url.pathname);
+  const isPWABuilderRoute = PWA_BUILDER_ROUTES.includes(url.pathname);
   const isPWABuilderEnv = isPWABuilder();
-  const isNativeEnv = isNativeApp();
 
   event.respondWith(
     (async () => {
-      // Enhanced strategy for PWA Builder apps and app routes
-      if (isAppRoute || isPWABuilderCacheBustingRoute || isPWABuilderEnv || isNativeEnv) {
+      // For PWABuilder apps and app routes, use network-first with reasonable timeouts
+      if (isAppRoute || isPWABuilderRoute || isPWABuilderEnv) {
         try {
-          swLog(`PWA BUILDER: Network-first strategy for PWA Builder app: ${url.pathname}`);
+          swLog(`Network-first strategy for: ${url.pathname}`);
           
+          // Create request without aggressive cache control
           const networkRequest = new Request(event.request.url, {
             headers: {
-              ...Object.fromEntries(event.request.headers.entries()),
-              'Cache-Control': 'no-cache, no-store, must-revalidate',
-              'Pragma': 'no-cache',
-              'Expires': '0',
-              'X-PWA-Builder': isPWABuilderEnv ? 'true' : 'false',
-              'X-Native-App': isNativeEnv ? 'true' : 'false'
+              ...Object.fromEntries(event.request.headers.entries())
             }
           });
           
-          const networkResponse = await fetch(networkRequest);
+          // Set reasonable timeout for network requests
+          const controller = new AbortController();
+          const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
+          
+          const networkResponse = await fetch(networkRequest, {
+            signal: controller.signal
+          });
+          
+          clearTimeout(timeoutId);
           
           if (networkResponse && networkResponse.status === 200) {
             const cache = await caches.open(CACHE_NAME);
@@ -182,14 +146,15 @@ self.addEventListener('fetch', (event) => {
             return networkResponse;
           }
         } catch (error) {
-          swLog(`PWA BUILDER: Network failed for PWA Builder app ${url.pathname}`, error);
+          swLog(`Network failed for ${url.pathname}`, error.name);
         }
       }
 
       // Cache fallback
       const cachedResponse = await caches.match(event.request);
       if (cachedResponse) {
-        if (isAppRoute || isPWABuilderEnv || isNativeEnv) {
+        // Update cache in background for app routes
+        if (isAppRoute || isPWABuilderEnv) {
           fetch(event.request).then(networkResponse => {
             if (networkResponse && networkResponse.status === 200) {
               caches.open(CACHE_NAME).then(cache => {
@@ -201,7 +166,7 @@ self.addEventListener('fetch', (event) => {
         return cachedResponse;
       }
 
-      // Network fallback
+      // Final network attempt
       try {
         const networkResponse = await fetch(event.request);
         
@@ -212,7 +177,7 @@ self.addEventListener('fetch', (event) => {
         
         return networkResponse;
       } catch (error) {
-        swLog(`PWA BUILDER: Complete fetch failure for ${event.request.url}`, error);
+        swLog(`Complete fetch failure for ${event.request.url}`, error);
         
         if (event.request.mode === 'navigate') {
           const offlineResponse = await caches.match(OFFLINE_URL);
@@ -231,12 +196,12 @@ self.addEventListener('fetch', (event) => {
   );
 });
 
-// Enhanced message handling for PWA Builder apps
+// Message handling
 self.addEventListener('message', (event) => {
-  swLog('PWA BUILDER: Message received', event.data);
+  swLog('Message received', event.data);
   
   if (event.data && event.data.type === 'SKIP_WAITING') {
-    swLog('PWA BUILDER: Skipping waiting for PWA Builder app');
+    swLog('Skipping waiting');
     self.skipWaiting();
   }
   
@@ -245,91 +210,61 @@ self.addEventListener('message', (event) => {
       version: APP_VERSION,
       cacheVersion: CACHE_NAME,
       timestamp: Date.now(),
-      pwaBuilderSupport: true,
-      nativeAppSupport: true
+      pwaBuilderSupport: true
     });
   }
   
   if (event.data && event.data.type === 'CHECK_UPDATE') {
-    swLog('PWA BUILDER: Manual update check for PWA Builder app');
+    swLog('Manual update check');
     self.registration.update().then(() => {
-      swLog('PWA BUILDER: PWA Builder app update check completed');
+      swLog('Update check completed');
     }).catch(error => {
-      swLog('PWA BUILDER: PWA Builder app update check failed', error);
-    });
-  }
-  
-  if (event.data && event.data.type === 'CLEAR_CACHE') {
-    swLog('PWA BUILDER: Cache clear for PWA Builder app');
-    caches.keys().then(cacheNames => {
-      return Promise.all(
-        cacheNames.map(cacheName => {
-          if (cacheName !== CACHE_NAME) {
-            return caches.delete(cacheName);
-          }
-        })
-      );
-    }).then(() => {
-      swLog('PWA BUILDER: PWA Builder app cache cleared');
-      event.ports[0].postMessage({ 
-        success: true, 
-        pwaBuilder: isPWABuilder(),
-        nativeApp: isNativeApp() 
-      });
-    }).catch(error => {
-      swLog('PWA BUILDER: PWA Builder app cache clear failed', error);
-      event.ports[0].postMessage({ success: false, error: error.message });
+      swLog('Update check failed', error);
     });
   }
 });
 
-// Enhanced update checking for PWA Builder apps
+// Periodic update checking
 let updateCheckInterval;
 
-function startPWABuilderUpdateChecking() {
+function startUpdateChecking() {
   if (updateCheckInterval) {
     clearInterval(updateCheckInterval);
   }
   
-  swLog('PWA BUILDER: Starting PWA Builder app update checking');
+  swLog('Starting update checking');
   
   updateCheckInterval = setInterval(async () => {
     try {
-      swLog('PWA BUILDER: Performing PWA Builder app update check');
-      
       const registration = await self.registration.update();
       
       if (registration.installing || registration.waiting) {
-        swLog('PWA BUILDER: New version detected for PWA Builder app');
+        swLog('New version detected');
         
         const clients = await self.clients.matchAll();
         const isPWABuilderEnv = isPWABuilder();
-        const isNativeEnv = isNativeApp();
         
         clients.forEach(client => {
           client.postMessage({
             type: 'UPDATE_AVAILABLE',
             version: APP_VERSION,
-            message: 'PWA BUILDER: New version available for PWA Builder app',
-            pwaBuilder: isPWABuilderEnv,
-            nativeApp: isNativeEnv
+            message: 'New version available',
+            pwaBuilder: isPWABuilderEnv
           });
         });
       }
     } catch (error) {
-      swLog('PWA BUILDER: PWA Builder app update check failed', error);
+      swLog('Update check failed', error);
     }
   }, UPDATE_CHECK_INTERVAL);
 }
 
 self.addEventListener('activate', () => {
-  setTimeout(startPWABuilderUpdateChecking, 2000);
+  setTimeout(startUpdateChecking, 2000);
 });
 
-swLog('PWA BUILDER: Enhanced service worker loaded with PWA Builder support', { 
+swLog('PWABuilder-optimized service worker loaded', { 
   version: APP_VERSION, 
   cache: CACHE_NAME,
-  updateInterval: UPDATE_CHECK_INTERVAL,
-  pwaBuilderSupport: true,
-  nativeAppSupport: true
+  updateInterval: UPDATE_CHECK_INTERVAL
 });
