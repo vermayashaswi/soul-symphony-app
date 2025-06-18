@@ -184,7 +184,7 @@ const PrivacyPolicyPage = () => {
               />
             </p>
             <p>
-              <a href="mailto:hello@soulo.online">hello@soulo.online</a>
+              <a href="mailto:support@soulo.online">support@soulo.online</a>
             </p>
           </div>
         </div>
