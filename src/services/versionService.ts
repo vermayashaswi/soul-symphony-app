@@ -1,6 +1,5 @@
 
 import { toast } from 'sonner';
-import { aggressiveUpdateService } from './aggressiveUpdateService';
 
 export interface AppVersion {
   version: string;
@@ -155,9 +154,6 @@ class VersionService {
     
     console.log('[VersionService] Starting update polling...');
     
-    // Initialize aggressive update service
-    aggressiveUpdateService.initialize();
-    
     this.updateCheckInterval = setInterval(async () => {
       const updateInfo = await this.checkForUpdates();
       if (updateInfo.available) {
@@ -171,9 +167,6 @@ class VersionService {
       clearInterval(this.updateCheckInterval);
       this.updateCheckInterval = null;
     }
-    
-    // Stop aggressive update service
-    aggressiveUpdateService.stop();
     
     console.log('[VersionService] Update polling stopped');
   }
