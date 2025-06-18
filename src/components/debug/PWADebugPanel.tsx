@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
-import { RefreshCw, Download, Trash2, Info, Wifi, WifiOff, Smartphone, Monitor } from 'lucide-react';
+import { RefreshCw, Download, Trash2, Info, Wifi, WifiOff, Smartphone, Monitor, Bell, BellOff } from 'lucide-react';
 import { versionService } from '@/services/versionService';
 import { useTheme } from '@/hooks/use-theme';
 
@@ -14,6 +14,9 @@ export function PWADebugPanel() {
   const [isInstalled, setIsInstalled] = useState(false);
   const [cacheSize, setCacheSize] = useState<string>('Calculating...');
   const [updateAvailable, setUpdateAvailable] = useState(false);
+  const [lastUpdateCheck, setLastUpdateCheck] = useState<string>('Never');
+  const [swVersion, setSwVersion] = useState<string>('Unknown');
+  const [isUpdating, setIsUpdating] = useState(false);
   const { theme, colorTheme, systemTheme } = useTheme();
 
   useEffect(() => {
@@ -48,21 +51,53 @@ export function PWADebugPanel() {
   }, []);
 
   useEffect(() => {
-    const getCacheSize = async () => {
+    const initializeData = async () => {
+      // Get cache size
       const size = await versionService.getCacheSize();
       setCacheSize(size);
+      
+      // Check for updates
+      try {
+        const updateInfo = await versionService.checkForUpdates();
+        setUpdateAvailable(updateInfo.available);
+        setLastUpdateCheck(new Date().toLocaleTimeString());
+      } catch (error) {
+        console.error('Failed to check for updates:', error);
+      }
+      
+      // Get service worker version
+      try {
+        const registration = await navigator.serviceWorker.getRegistration();
+        if (registration && registration.active) {
+          setSwVersion('Active');
+        }
+      } catch (error) {
+        console.error('Failed to get service worker info:', error);
+      }
     };
     
-    getCacheSize();
+    initializeData();
   }, []);
 
+  // Listen for service worker messages
   useEffect(() => {
-    const checkForUpdates = async () => {
-      const updateInfo = await versionService.checkForUpdates();
-      setUpdateAvailable(updateInfo.available);
+    if (!('serviceWorker' in navigator)) return;
+
+    const handleMessage = (event: MessageEvent) => {
+      if (event.data.type === 'UPDATE_AVAILABLE') {
+        setUpdateAvailable(true);
+        setLastUpdateCheck(new Date().toLocaleTimeString());
+      } else if (event.data.type === 'SW_UPDATED') {
+        setUpdateAvailable(false);
+        setLastUpdateCheck(new Date().toLocaleTimeString());
+      }
     };
+
+    navigator.serviceWorker.addEventListener('message', handleMessage);
     
-    checkForUpdates();
+    return () => {
+      navigator.serviceWorker.removeEventListener('message', handleMessage);
+    };
   }, []);
 
   const handleInstallApp = async () => {
@@ -84,9 +119,31 @@ export function PWADebugPanel() {
   };
 
   const handleForceUpdate = async () => {
-    const success = await versionService.forceUpdate();
-    if (success) {
-      console.log('Force update initiated');
+    setIsUpdating(true);
+    try {
+      const success = await versionService.forceUpdate();
+      if (success) {
+        setUpdateAvailable(false);
+        setLastUpdateCheck(new Date().toLocaleTimeString());
+      }
+    } catch (error) {
+      console.error('Force update failed:', error);
+    } finally {
+      setIsUpdating(false);
+    }
+  };
+
+  const handleManualUpdateCheck = async () => {
+    setIsUpdating(true);
+    try {
+      await versionService.triggerManualUpdate();
+      const updateInfo = await versionService.checkForUpdates();
+      setUpdateAvailable(updateInfo.available);
+      setLastUpdateCheck(new Date().toLocaleTimeString());
+    } catch (error) {
+      console.error('Manual update check failed:', error);
+    } finally {
+      setIsUpdating(false);
     }
   };
 
@@ -120,6 +177,11 @@ export function PWADebugPanel() {
             </div>
 
             <div className="flex items-center justify-between">
+              <span className="text-sm font-medium">Service Worker</span>
+              <Badge variant="outline">{swVersion}</Badge>
+            </div>
+
+            <div className="flex items-center justify-between">
               <span className="text-sm font-medium">Theme</span>
               <Badge variant="outline">
                 {theme} ({theme === 'system' ? systemTheme : theme}) / {colorTheme}
@@ -140,9 +202,15 @@ export function PWADebugPanel() {
 
             <div className="flex items-center justify-between">
               <span className="text-sm font-medium">Updates</span>
-              <Badge variant={updateAvailable ? "destructive" : "default"}>
+              <Badge variant={updateAvailable ? "destructive" : "default"} className="flex items-center gap-1">
+                {updateAvailable ? <Bell className="h-3 w-3" /> : <BellOff className="h-3 w-3" />}
                 {updateAvailable ? 'Available' : 'Current'}
               </Badge>
+            </div>
+
+            <div className="flex items-center justify-between">
+              <span className="text-sm font-medium">Last Check</span>
+              <Badge variant="outline" className="text-xs">{lastUpdateCheck}</Badge>
             </div>
           </div>
         </div>
@@ -157,14 +225,32 @@ export function PWADebugPanel() {
             </Button>
           )}
           
+          <Button 
+            onClick={handleManualUpdateCheck} 
+            variant="outline" 
+            size="sm" 
+            className="flex items-center gap-1"
+            disabled={isUpdating}
+          >
+            <RefreshCw className={`h-3 w-3 ${isUpdating ? 'animate-spin' : ''}`} />
+            Check Updates
+          </Button>
+          
+          {updateAvailable && (
+            <Button 
+              onClick={handleForceUpdate} 
+              size="sm" 
+              className="flex items-center gap-1"
+              disabled={isUpdating}
+            >
+              <Download className="h-3 w-3" />
+              Update Now
+            </Button>
+          )}
+          
           <Button onClick={handleClearCache} variant="outline" size="sm" className="flex items-center gap-1">
             <Trash2 className="h-3 w-3" />
             Clear Cache
-          </Button>
-          
-          <Button onClick={handleForceUpdate} variant="outline" size="sm" className="flex items-center gap-1">
-            <RefreshCw className="h-3 w-3" />
-            Force Update
           </Button>
         </div>
 
@@ -174,7 +260,12 @@ export function PWADebugPanel() {
             Build: {currentVersion.buildDate.slice(0, 10)}
           </div>
           <div>Cache: {currentVersion.cacheVersion}</div>
-          <div>Features: {currentVersion.features.join(', ')}</div>
+          <div>Features: {currentVersion.features.slice(0, 3).join(', ')}{currentVersion.features.length > 3 ? '...' : ''}</div>
+          {updateAvailable && (
+            <div className="text-orange-600 dark:text-orange-400 font-medium">
+              🔄 Update ready to install
+            </div>
+          )}
         </div>
       </CardContent>
     </Card>

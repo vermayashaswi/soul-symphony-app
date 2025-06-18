@@ -1,7 +1,8 @@
 
-// Soulo PWA Service Worker - Auto-Update Version with Theme Consistency
-const CACHE_NAME = 'soulo-cache-v1.1.1';
+// Soulo PWA Service Worker - Enhanced Update Detection with PWABuilder Compatibility
+const CACHE_NAME = 'soulo-cache-v1.2.0'; // Updated version to match app version
 const OFFLINE_URL = '/offline.html';
+const APP_VERSION = '1.2.0'; // Explicit version tracking
 
 // Assets to cache for offline functionality
 const STATIC_ASSETS = [
@@ -18,60 +19,82 @@ const STATIC_ASSETS = [
   '/lovable-uploads/3f275134-f471-4af9-a7cd-700ccd855fe3.png'
 ];
 
-// Install event - skip waiting immediately
+// Enhanced logging for debugging
+function swLog(message, data = null) {
+  const timestamp = new Date().toISOString();
+  console.log(`[SW ${APP_VERSION}] ${timestamp}: ${message}`, data || '');
+}
+
+// Install event - enhanced with better logging
 self.addEventListener('install', (event) => {
-  console.log('[SW] Installing new service worker with theme consistency...');
+  swLog('Installing new service worker...');
   
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => {
-      console.log('[SW] Caching static assets');
+      swLog('Caching static assets');
       return cache.addAll(STATIC_ASSETS);
     }).then(() => {
-      console.log('[SW] Service worker installed, skipping waiting...');
-      // Skip waiting immediately for faster updates
+      swLog('Service worker installed successfully, forcing activation');
+      // Force immediate activation for faster updates
       return self.skipWaiting();
     }).catch((error) => {
-      console.error('[SW] Installation failed:', error);
+      swLog('Installation failed', error);
+      throw error;
     })
   );
 });
 
-// Activate event - claim clients immediately
+// Activate event - enhanced cleanup and client notification
 self.addEventListener('activate', (event) => {
-  console.log('[SW] Activating new service worker...');
+  swLog('Activating new service worker...');
   
   event.waitUntil(
     Promise.all([
-      // Clear old caches
+      // Clear old caches with better logging
       caches.keys().then((cacheNames) => {
-        return Promise.all(
-          cacheNames.map((cacheName) => {
-            if (cacheName !== CACHE_NAME) {
-              console.log('[SW] Deleting old cache:', cacheName);
-              return caches.delete(cacheName);
-            }
-          })
-        );
+        const deletePromises = cacheNames.map((cacheName) => {
+          if (cacheName !== CACHE_NAME) {
+            swLog('Deleting old cache', cacheName);
+            return caches.delete(cacheName);
+          }
+        }).filter(Boolean);
+        
+        return Promise.all(deletePromises);
       }),
       // Claim all clients immediately
       self.clients.claim()
-    ]).then(() => {
-      console.log('[SW] Service worker activated and claimed all clients');
+    ]).then(async () => {
+      swLog('Service worker activated and claimed all clients');
       
-      // Notify all clients about the update
-      return self.clients.matchAll().then(clients => {
-        clients.forEach(client => {
-          client.postMessage({
-            type: 'SW_UPDATED',
-            message: 'Service worker updated with theme consistency fixes'
-          });
+      // Enhanced client notification with version info
+      const clients = await self.clients.matchAll();
+      swLog(`Notifying ${clients.length} clients of update`);
+      
+      clients.forEach(client => {
+        client.postMessage({
+          type: 'SW_UPDATED',
+          version: APP_VERSION,
+          cacheVersion: CACHE_NAME,
+          message: 'App updated successfully!',
+          timestamp: Date.now()
         });
       });
+      
+      // Also notify about successful activation
+      clients.forEach(client => {
+        client.postMessage({
+          type: 'SW_ACTIVATED',
+          version: APP_VERSION,
+          message: 'New version is now active'
+        });
+      });
+    }).catch(error => {
+      swLog('Activation failed', error);
     })
   );
 });
 
-// Fetch event with proper API handling
+// Enhanced fetch event with better error handling
 self.addEventListener('fetch', (event) => {
   // Skip non-GET requests
   if (event.request.method !== 'GET') {
@@ -83,15 +106,16 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // Don't interfere with Supabase API calls - let them go through normally
+  // Don't interfere with Supabase API calls
   if (event.request.url.includes('supabase.co')) {
     return;
   }
 
-  // Cache-first strategy for static assets
+  // Enhanced cache strategy with logging
   event.respondWith(
     caches.match(event.request).then(response => {
       if (response) {
+        // swLog(`Serving from cache: ${event.request.url}`);
         return response;
       }
 
@@ -108,7 +132,9 @@ self.addEventListener('fetch', (event) => {
         });
 
         return fetchResponse;
-      }).catch(() => {
+      }).catch(error => {
+        swLog(`Fetch failed for ${event.request.url}`, error);
+        
         // Return offline page for navigation requests
         if (event.request.mode === 'navigate') {
           return caches.match(OFFLINE_URL);
@@ -124,55 +150,106 @@ self.addEventListener('fetch', (event) => {
   );
 });
 
-// Handle messages from the app
+// Enhanced message handling
 self.addEventListener('message', (event) => {
-  console.log('[SW] Message received:', event.data);
+  swLog('Message received', event.data);
   
   if (event.data && event.data.type === 'SKIP_WAITING') {
-    console.log('[SW] Skipping waiting due to app request');
+    swLog('Skipping waiting due to app request');
     self.skipWaiting();
+  }
+  
+  if (event.data && event.data.type === 'GET_VERSION') {
+    // Respond with current version info
+    event.ports[0].postMessage({
+      version: APP_VERSION,
+      cacheVersion: CACHE_NAME,
+      timestamp: Date.now()
+    });
+  }
+  
+  if (event.data && event.data.type === 'CHECK_UPDATE') {
+    swLog('Manual update check requested');
+    // Trigger update check
+    self.registration.update().then(() => {
+      swLog('Update check completed');
+    }).catch(error => {
+      swLog('Update check failed', error);
+    });
   }
 });
 
-// Periodic update check (every 30 seconds when page is active)
+// Enhanced periodic update checking
 let updateCheckInterval;
+let isUpdateCheckActive = false;
 
 function startUpdateChecking() {
-  if (updateCheckInterval) return;
+  if (updateCheckInterval || isUpdateCheckActive) {
+    swLog('Update checking already active');
+    return;
+  }
+  
+  swLog('Starting periodic update checks');
+  isUpdateCheckActive = true;
   
   updateCheckInterval = setInterval(async () => {
     try {
-      // Check if there's a newer version available
-      const response = await fetch('/sw.js', { cache: 'no-cache' });
-      if (response.ok) {
-        const newSwContent = await response.text();
-        const currentVersion = CACHE_NAME;
+      swLog('Performing periodic update check');
+      
+      // Check for new service worker version
+      const registration = await self.registration.update();
+      
+      if (registration.installing || registration.waiting) {
+        swLog('New service worker version detected');
         
-        // Simple version check based on cache name in the new SW
-        if (newSwContent.includes('soulo-cache-v') && !newSwContent.includes(currentVersion)) {
-          console.log('[SW] New version detected, triggering update...');
-          
-          // Clear current cache
-          const cacheNames = await caches.keys();
-          await Promise.all(cacheNames.map(name => caches.delete(name)));
-          
-          // Trigger service worker update
-          self.registration.update();
-        }
+        // Notify clients about available update
+        const clients = await self.clients.matchAll();
+        clients.forEach(client => {
+          client.postMessage({
+            type: 'UPDATE_AVAILABLE',
+            version: APP_VERSION,
+            message: 'A new version is available'
+          });
+        });
       }
     } catch (error) {
-      console.error('[SW] Error checking for updates:', error);
+      swLog('Periodic update check failed', error);
     }
-  }, 30000); // Check every 30 seconds
+  }, 60000); // Check every 60 seconds
+}
+
+function stopUpdateChecking() {
+  if (updateCheckInterval) {
+    swLog('Stopping periodic update checks');
+    clearInterval(updateCheckInterval);
+    updateCheckInterval = null;
+    isUpdateCheckActive = false;
+  }
 }
 
 // Start checking when SW becomes active
-self.addEventListener('activate', startUpdateChecking);
+self.addEventListener('activate', () => {
+  setTimeout(startUpdateChecking, 5000); // Start after 5 seconds
+});
 
 // Stop checking when SW is being replaced
 self.addEventListener('install', () => {
-  if (updateCheckInterval) {
-    clearInterval(updateCheckInterval);
-    updateCheckInterval = null;
+  stopUpdateChecking();
+});
+
+// PWABuilder compatibility - handle background sync if available
+self.addEventListener('sync', (event) => {
+  swLog('Background sync event', event.tag);
+  
+  if (event.tag === 'app-update-check') {
+    event.waitUntil(
+      self.registration.update().then(() => {
+        swLog('Background update check completed');
+      }).catch(error => {
+        swLog('Background update check failed', error);
+      })
+    );
   }
 });
+
+swLog('Service worker script loaded', { version: APP_VERSION, cache: CACHE_NAME });

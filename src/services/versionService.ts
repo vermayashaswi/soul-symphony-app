@@ -20,14 +20,21 @@ class VersionService {
   private currentVersion: AppVersion;
   private updateCheckInterval: NodeJS.Timeout | null = null;
   private isAutoUpdating: boolean = false;
+  private lastUpdateCheck: number = 0;
+  private updateCheckCooldown: number = 30000; // 30 seconds
 
   constructor() {
     this.currentVersion = {
-      version: '1.0.2',
+      version: '1.2.0', // Updated to match service worker
       buildDate: new Date().toISOString(),
-      features: ['smartChatV2', 'premiumMessaging', 'journalVoicePlayback', 'themeConsistency', 'webViewCompatibility'],
-      cacheVersion: 'v1.0.2'
+      features: ['smartChatV2', 'premiumMessaging', 'journalVoicePlayback', 'themeConsistency', 'webViewCompatibility', 'enhancedUpdates'],
+      cacheVersion: 'soulo-cache-v1.2.0' // Match service worker cache name
     };
+    
+    // Listen for service worker messages
+    this.setupServiceWorkerListeners();
+    
+    console.log('[VersionService] Initialized', this.currentVersion);
   }
 
   // WebView detection utility
@@ -44,18 +51,100 @@ class VersionService {
     }
   }
 
+  // Enhanced service worker listener setup
+  private setupServiceWorkerListeners(): void {
+    if (!('serviceWorker' in navigator)) return;
+
+    navigator.serviceWorker.addEventListener('message', (event) => {
+      console.log('[VersionService] Service worker message:', event.data);
+      
+      switch (event.data.type) {
+        case 'SW_UPDATED':
+          this.handleServiceWorkerUpdated(event.data);
+          break;
+        case 'SW_ACTIVATED':
+          this.handleServiceWorkerActivated(event.data);
+          break;
+        case 'UPDATE_AVAILABLE':
+          this.handleUpdateAvailable(event.data);
+          break;
+      }
+    });
+
+    // Listen for service worker updates
+    navigator.serviceWorker.addEventListener('controllerchange', () => {
+      console.log('[VersionService] Service worker controller changed');
+      toast.success('App updated successfully!', {
+        description: 'The latest version is now active',
+        duration: 3000
+      });
+    });
+  }
+
+  private handleServiceWorkerUpdated(data: any): void {
+    console.log('[VersionService] Service worker updated:', data);
+    toast.success('Update Available!', {
+      description: 'A new version has been downloaded and will be active soon',
+      duration: 4000
+    });
+  }
+
+  private handleServiceWorkerActivated(data: any): void {
+    console.log('[VersionService] Service worker activated:', data);
+    // Update current version info if provided
+    if (data.version && data.version !== this.currentVersion.version) {
+      this.currentVersion.version = data.version;
+      this.currentVersion.cacheVersion = data.cacheVersion || this.currentVersion.cacheVersion;
+    }
+  }
+
+  private handleUpdateAvailable(data: any): void {
+    console.log('[VersionService] Update available:', data);
+    toast.info('New Version Available', {
+      description: 'Tap here to update the app',
+      duration: 10000,
+      action: {
+        label: 'Update Now',
+        onClick: () => this.forceUpdate()
+      }
+    });
+  }
+
   getCurrentVersion(): AppVersion {
     return this.currentVersion;
   }
 
+  // Enhanced update checking with better detection
   async checkForUpdates(): Promise<UpdateInfo> {
+    const now = Date.now();
+    if (now - this.lastUpdateCheck < this.updateCheckCooldown) {
+      console.log('[VersionService] Update check on cooldown');
+      return {
+        available: false,
+        currentVersion: this.currentVersion.version,
+        latestVersion: this.currentVersion.version
+      };
+    }
+
+    this.lastUpdateCheck = now;
+
     try {
       console.log('[VersionService] Checking for updates...');
       
-      // Check service worker for updates
+      // Get service worker registration
       const registration = await navigator.serviceWorker.getRegistration();
       
-      if (registration?.waiting) {
+      if (!registration) {
+        console.log('[VersionService] No service worker registration found');
+        return {
+          available: false,
+          currentVersion: this.currentVersion.version,
+          latestVersion: this.currentVersion.version
+        };
+      }
+
+      // Check for waiting service worker
+      if (registration.waiting) {
         console.log('[VersionService] Waiting service worker found');
         return {
           available: true,
@@ -66,49 +155,48 @@ class VersionService {
         };
       }
 
-      // Force service worker update check
-      if (registration) {
-        console.log('[VersionService] Forcing service worker update check...');
-        await registration.update();
-        
-        return new Promise((resolve) => {
-          const checkTimeout = setTimeout(() => {
-            resolve({
-              available: false,
-              currentVersion: this.currentVersion.version,
-              latestVersion: this.currentVersion.version
-            });
-          }, 2000);
-          
-          registration.addEventListener('updatefound', () => {
-            clearTimeout(checkTimeout);
-            const newWorker = registration.installing;
-            
-            if (newWorker) {
-              const handleStateChange = () => {
-                if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
-                  newWorker.removeEventListener('statechange', handleStateChange);
-                  resolve({
-                    available: true,
-                    currentVersion: this.currentVersion.version,
-                    latestVersion: 'Latest',
-                    releaseNotes: 'New version available with latest features',
-                    mandatory: false
-                  });
-                }
-              };
-              
-              newWorker.addEventListener('statechange', handleStateChange);
-            }
+      // Force update check
+      console.log('[VersionService] Forcing service worker update check...');
+      await registration.update();
+      
+      // Check again after forced update
+      return new Promise((resolve) => {
+        const checkTimeout = setTimeout(() => {
+          console.log('[VersionService] Update check timeout');
+          resolve({
+            available: false,
+            currentVersion: this.currentVersion.version,
+            latestVersion: this.currentVersion.version
           });
-        });
-      }
-
-      return {
-        available: false,
-        currentVersion: this.currentVersion.version,
-        latestVersion: this.currentVersion.version
-      };
+        }, 5000);
+        
+        const handleUpdateFound = () => {
+          clearTimeout(checkTimeout);
+          registration.removeEventListener('updatefound', handleUpdateFound);
+          
+          const newWorker = registration.installing;
+          if (newWorker) {
+            console.log('[VersionService] New service worker installing');
+            
+            const handleStateChange = () => {
+              if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                newWorker.removeEventListener('statechange', handleStateChange);
+                resolve({
+                  available: true,
+                  currentVersion: this.currentVersion.version,
+                  latestVersion: 'Latest',
+                  releaseNotes: 'New version available with latest features',
+                  mandatory: false
+                });
+              }
+            };
+            
+            newWorker.addEventListener('statechange', handleStateChange);
+          }
+        };
+        
+        registration.addEventListener('updatefound', handleUpdateFound);
+      });
 
     } catch (error) {
       console.error('[VersionService] Error checking for updates:', error);
@@ -120,6 +208,7 @@ class VersionService {
     }
   }
 
+  // Enhanced automatic update with user notification
   private async applyAutomaticUpdate(): Promise<boolean> {
     try {
       console.log('[VersionService] Applying automatic update...');
@@ -127,27 +216,35 @@ class VersionService {
       const registration = await navigator.serviceWorker.getRegistration();
       
       if (registration?.waiting) {
-        // Clear all caches before updating
+        console.log('[VersionService] Activating waiting service worker...');
+        
+        // Clear caches before updating
         await this.clearCache();
         
-        // Send skip waiting message to the waiting service worker
+        // Send skip waiting message
         registration.waiting.postMessage({ type: 'SKIP_WAITING' });
         
-        // Wait for the new service worker to take control
+        // Show update notification
+        toast.info('Updating App...', {
+          description: 'Please wait while we apply the latest updates',
+          duration: 3000
+        });
+        
+        // Wait for controller change
         return new Promise((resolve) => {
           const handleControllerChange = () => {
             navigator.serviceWorker.removeEventListener('controllerchange', handleControllerChange);
-            console.log('[VersionService] Automatic update applied, reloading...');
+            console.log('[VersionService] Update applied successfully');
             
-            // Show a brief notification
-            toast.success('App updated to latest version!', {
-              duration: 2000
+            toast.success('Update Complete!', {
+              description: 'App has been updated to the latest version',
+              duration: 3000
             });
             
-            // Delay reload slightly to show the toast
+            // Reload after a short delay
             setTimeout(() => {
               window.location.reload();
-            }, 1000);
+            }, 1500);
             
             resolve(true);
           };
@@ -157,21 +254,27 @@ class VersionService {
           // Fallback timeout
           setTimeout(() => {
             navigator.serviceWorker.removeEventListener('controllerchange', handleControllerChange);
-            console.log('[VersionService] Timeout reached, forcing reload...');
+            console.log('[VersionService] Update timeout, forcing reload...');
             window.location.reload();
             resolve(true);
-          }, 5000);
+          }, 8000);
         });
       }
 
+      console.log('[VersionService] No waiting service worker found');
       return false;
     } catch (error) {
       console.error('[VersionService] Error applying automatic update:', error);
+      toast.error('Update Failed', {
+        description: 'Please refresh the page to get the latest version',
+        duration: 5000
+      });
       return false;
     }
   }
 
-  startAutomaticUpdates(intervalMs: number = 60000) { // Check every minute
+  // Enhanced automatic updates with better user experience
+  startAutomaticUpdates(intervalMs: number = 90000) { // Increased to 90 seconds
     this.stopAutomaticUpdates();
     
     console.log('[VersionService] Starting automatic update checking...');
@@ -180,23 +283,39 @@ class VersionService {
     this.updateCheckInterval = setInterval(async () => {
       if (!this.isAutoUpdating) return;
       
-      const updateInfo = await this.checkForUpdates();
-      if (updateInfo.available) {
-        console.log('[VersionService] Update found, applying automatically...');
-        await this.applyAutomaticUpdate();
+      try {
+        const updateInfo = await this.checkForUpdates();
+        if (updateInfo.available) {
+          console.log('[VersionService] Update found, applying automatically...');
+          await this.applyAutomaticUpdate();
+        }
+      } catch (error) {
+        console.error('[VersionService] Automatic update check failed:', error);
       }
     }, intervalMs);
 
-    // Also check immediately
+    // Initial check after delay
     setTimeout(async () => {
       if (!this.isAutoUpdating) return;
       
-      const updateInfo = await this.checkForUpdates();
-      if (updateInfo.available) {
-        console.log('[VersionService] Initial update found, applying automatically...');
-        await this.applyAutomaticUpdate();
+      try {
+        const updateInfo = await this.checkForUpdates();
+        if (updateInfo.available) {
+          console.log('[VersionService] Initial update found');
+          // Show notification instead of immediate update
+          toast.info('Update Available', {
+            description: 'Tap to update to the latest version',
+            duration: 8000,
+            action: {
+              label: 'Update',
+              onClick: () => this.forceUpdate()
+            }
+          });
+        }
+      } catch (error) {
+        console.error('[VersionService] Initial update check failed:', error);
       }
-    }, 5000); // Wait 5 seconds after app start
+    }, 10000); // Wait 10 seconds after app start
   }
 
   stopAutomaticUpdates() {
@@ -209,28 +328,33 @@ class VersionService {
     console.log('[VersionService] Automatic update checking stopped');
   }
 
+  // Enhanced cache clearing with preservation of important data
   async clearCache(): Promise<void> {
     try {
-      console.log('[VersionService] Clearing all caches...');
+      console.log('[VersionService] Clearing application caches...');
       
       const cacheNames = await caches.keys();
-      await Promise.all(
-        cacheNames.map(cacheName => {
-          console.log('[VersionService] Deleting cache:', cacheName);
-          return caches.delete(cacheName);
-        })
-      );
+      const deletionPromises = cacheNames.map(cacheName => {
+        console.log('[VersionService] Deleting cache:', cacheName);
+        return caches.delete(cacheName);
+      });
       
-      // Clear local storage cache markers but preserve theme settings
+      await Promise.all(deletionPromises);
+      
+      // Clear local storage cache markers but preserve user data
       const cacheKeys = Object.keys(localStorage).filter(key => 
-        key.includes('cache') || key.includes('version') || key.includes('timestamp')
+        key.includes('cache') || 
+        key.includes('version') || 
+        key.includes('timestamp') ||
+        key.includes('sw-')
       );
       
       cacheKeys.forEach(key => {
+        console.log('[VersionService] Removing localStorage key:', key);
         localStorage.removeItem(key);
       });
       
-      console.log('[VersionService] All caches cleared, theme settings preserved');
+      console.log('[VersionService] Cache clearing completed');
     } catch (error) {
       console.error('[VersionService] Error clearing cache:', error);
     }
@@ -250,36 +374,101 @@ class VersionService {
     }
   }
 
-  // Force immediate update check and application
+  // Enhanced force update with better user feedback
   async forceUpdate(): Promise<boolean> {
     console.log('[VersionService] Forcing immediate update...');
     
     try {
-      // Clear all caches first (but preserve theme settings)
+      toast.info('Checking for Updates...', {
+        description: 'Please wait while we check for the latest version',
+        duration: 2000
+      });
+      
+      // Clear caches first
       await this.clearCache();
       
-      // Check for updates
-      const updateInfo = await this.checkForUpdates();
+      // Get fresh service worker registration
+      const registration = await navigator.serviceWorker.getRegistration();
       
-      if (updateInfo.available) {
-        return await this.applyAutomaticUpdate();
-      } else {
-        // Force service worker re-registration
-        const registration = await navigator.serviceWorker.getRegistration();
-        if (registration) {
+      if (registration) {
+        // Force update check
+        await registration.update();
+        
+        // Check for updates
+        const updateInfo = await this.checkForUpdates();
+        
+        if (updateInfo.available) {
+          console.log('[VersionService] Update available, applying...');
+          return await this.applyAutomaticUpdate();
+        } else {
+          // Force re-registration if no update found
+          console.log('[VersionService] No update found, re-registering service worker...');
+          
           await registration.unregister();
-          // Re-register service worker
           await navigator.serviceWorker.register('/sw.js');
-          // Reload page
-          window.location.reload();
+          
+          toast.success('App Refreshed', {
+            description: 'The app has been refreshed with the latest resources',
+            duration: 3000
+          });
+          
+          setTimeout(() => {
+            window.location.reload();
+          }, 1500);
+          
           return true;
         }
+      } else {
+        console.log('[VersionService] No service worker registration found');
+        toast.error('Update Error', {
+          description: 'Unable to check for updates. Please refresh the page.',
+          duration: 5000
+        });
+        return false;
       }
       
-      return false;
     } catch (error) {
       console.error('[VersionService] Force update failed:', error);
+      toast.error('Update Failed', {
+        description: 'Please refresh the page manually to get the latest version',
+        duration: 5000
+      });
       return false;
+    }
+  }
+
+  // Manual update trigger for user-initiated updates
+  async triggerManualUpdate(): Promise<void> {
+    console.log('[VersionService] Manual update triggered');
+    
+    try {
+      const registration = await navigator.serviceWorker.getRegistration();
+      if (registration) {
+        // Send message to service worker to check for updates
+        registration.active?.postMessage({ type: 'CHECK_UPDATE' });
+        
+        toast.info('Checking for Updates...', {
+          description: 'Looking for the latest version',
+          duration: 3000
+        });
+        
+        // Also force our own update check
+        setTimeout(async () => {
+          const updateInfo = await this.checkForUpdates();
+          if (!updateInfo.available) {
+            toast.success('Already Up to Date', {
+              description: 'You have the latest version',
+              duration: 3000
+            });
+          }
+        }, 2000);
+      }
+    } catch (error) {
+      console.error('[VersionService] Manual update trigger failed:', error);
+      toast.error('Update Check Failed', {
+        description: 'Unable to check for updates',
+        duration: 3000
+      });
     }
   }
 
