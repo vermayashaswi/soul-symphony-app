@@ -523,6 +523,18 @@ function SettingsContent() {
                     </div>
                   )}
                   <p className="text-muted-foreground">{user?.email}</p>
+                  
+                  {/* Logout Button */}
+                  <div className="pt-4">
+                    <Button 
+                      variant="outline" 
+                      onClick={handleLogout}
+                      className="gap-2 text-red-600 hover:text-red-700 hover:bg-red-50 border-red-200 hover:border-red-300 transition-colors"
+                    >
+                      <LogOut className="h-4 w-4" />
+                      <TranslatableText text="Sign Out" />
+                    </Button>
+                  </div>
                 </div>
               </div>
             </motion.div>
