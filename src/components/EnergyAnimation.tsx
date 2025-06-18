@@ -1,4 +1,3 @@
-
 import React, { useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
 import { useTheme } from '@/hooks/use-theme';
@@ -105,9 +104,9 @@ const EnergyAnimation: React.FC<EnergyAnimationProps> = ({
       container.style.contain = 'layout style paint';
       container.style.isolation = 'isolate';
       container.style.backfaceVisibility = 'hidden';
-      container.style.WebkitBackfaceVisibility = 'hidden';
+      container.style.webkitBackfaceVisibility = 'hidden';
       container.style.transform = 'translate3d(0, 0, 0)';
-      container.style.WebkitTransform = 'translate3d(0, 0, 0)';
+      container.style.webkitTransform = 'translate3d(0, 0, 0)';
       
       // Reduce animation intensity for WebView
       container.style.opacity = '0.5';
@@ -126,7 +125,7 @@ const EnergyAnimation: React.FC<EnergyAnimationProps> = ({
         contain: isWebView() ? 'layout style paint' : 'none',
         isolation: isWebView() ? 'isolate' : 'auto',
         backfaceVisibility: isWebView() ? 'hidden' : 'visible',
-        WebkitBackfaceVisibility: isWebView() ? 'hidden' : 'visible'
+        webkitBackfaceVisibility: isWebView() ? 'hidden' : 'visible'
       }}
     >
       {/* Glowing center with enhanced blur */}
