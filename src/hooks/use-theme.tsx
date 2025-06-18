@@ -1,4 +1,3 @@
-
 import { createContext, useContext, useEffect, useState, ReactNode } from "react";
 
 type Theme = 'light' | 'dark' | 'system';
@@ -19,6 +18,20 @@ interface ThemeContextType {
 }
 
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
+
+// WebView detection utility
+const isWebView = (): boolean => {
+  try {
+    const userAgent = navigator.userAgent;
+    return userAgent.includes('wv') || 
+           userAgent.includes('WebView') || 
+           window.location.protocol === 'file:' ||
+           (window as any).AndroidInterface !== undefined ||
+           document.URL.indexOf('http://') === -1 && document.URL.indexOf('https://') === -1;
+  } catch {
+    return false;
+  }
+};
 
 // Safe localStorage access
 const safeLocalStorageGet = (key: string, defaultValue: string): string => {
@@ -66,12 +79,34 @@ export function ThemeProvider({ children }: ThemeProviderProps) {
     return safeLocalStorageGet('feelosophy-custom-color', '#3b82f6');
   });
 
-  // Initialize theme immediately on load to prevent flash
+  // Enhanced WebView-specific theme initialization
   useEffect(() => {
-    console.log('[Theme] Initializing theme system:', { theme, colorTheme, systemTheme });
+    console.log('[Theme] Initializing theme system with WebView support:', { theme, colorTheme, systemTheme });
     
     try {
       const root = window.document.documentElement;
+      const body = document.body;
+      
+      // Apply WebView-specific fixes
+      if (isWebView()) {
+        console.log('[Theme] WebView detected, applying compatibility fixes');
+        
+        // Force white background for light mode in WebView
+        root.style.setProperty('--background', theme === 'dark' ? '0 0% 3.9%' : '0 0% 100%');
+        root.style.setProperty('--card', theme === 'dark' ? '0 0% 3.9%' : '0 0% 100%');
+        
+        // Add WebView-specific CSS class
+        body.classList.add('webview-environment');
+        
+        // Force background color at body level for WebView
+        if (theme === 'light' || (theme === 'system' && systemTheme === 'light')) {
+          body.style.backgroundColor = '#ffffff';
+          root.style.backgroundColor = '#ffffff';
+        } else {
+          body.style.backgroundColor = '#0a0a0a';  
+          root.style.backgroundColor = '#0a0a0a';
+        }
+      }
       
       // Apply theme mode immediately
       root.classList.remove('light', 'dark');
@@ -95,6 +130,7 @@ export function ThemeProvider({ children }: ThemeProviderProps) {
     }
   }, []); // Run only once on mount
 
+  // ... keep existing code (media query listener and theme application effects)
   useEffect(() => {
     try {
       const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
@@ -133,16 +169,27 @@ export function ThemeProvider({ children }: ThemeProviderProps) {
   useEffect(() => {
     try {
       const root = window.document.documentElement;
+      const body = document.body;
+      
       root.classList.remove('light', 'dark');
       
-      if (theme === 'system') {
-        root.classList.add(systemTheme);
-        console.log('[Theme] Applied system theme:', systemTheme);
-      } else {
-        root.classList.add(theme);
-        console.log('[Theme] Applied theme:', theme);
+      const appliedTheme = theme === 'system' ? systemTheme : theme;
+      root.classList.add(appliedTheme);
+      
+      // Enhanced WebView background fixes
+      if (isWebView()) {
+        if (appliedTheme === 'light') {
+          body.style.backgroundColor = '#ffffff';
+          root.style.backgroundColor = '#ffffff';
+          root.style.setProperty('--background', '0 0% 100%');
+        } else {
+          body.style.backgroundColor = '#0a0a0a';
+          root.style.backgroundColor = '#0a0a0a';
+          root.style.setProperty('--background', '0 0% 3.9%');
+        }
       }
       
+      console.log('[Theme] Applied theme:', appliedTheme);
       safeLocalStorageSet('feelosophy-theme', theme);
     } catch (error) {
       console.warn('[Theme] Theme application error:', error);
@@ -168,6 +215,7 @@ export function ThemeProvider({ children }: ThemeProviderProps) {
     }
   };
   
+  // ... keep existing code (hex to rgb and rgb to hsl conversion functions)
   const hexToRgb = (hex: string): { r: number, g: number, b: number } | null => {
     const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
     return result ? {
@@ -203,6 +251,7 @@ export function ThemeProvider({ children }: ThemeProviderProps) {
     return [Math.round(h * 360), Math.round(s * 100), Math.round(l * 100)];
   };
 
+  // ... keep existing code (color theme application effect)
   useEffect(() => {
     try {
       console.log('[Theme] Applying color theme:', colorTheme);
@@ -232,7 +281,7 @@ export function ThemeProvider({ children }: ThemeProviderProps) {
         const style = document.getElementById('theme-colors-style') || document.createElement('style');
         style.id = 'theme-colors-style';
         
-        // Apply more comprehensive CSS variables and utility classes
+        // Enhanced CSS variables and utility classes with WebView fixes
         style.textContent = `
           :root {
             --theme-color: ${primaryHex};
@@ -242,6 +291,22 @@ export function ThemeProvider({ children }: ThemeProviderProps) {
             --theme-dark: color-mix(in srgb, ${primaryHex} 30%, black);
             --theme-darker: color-mix(in srgb, ${primaryHex} 50%, black);
           }
+          
+          /* WebView-specific fixes */
+          .webview-environment {
+            -webkit-user-select: none;
+            -webkit-touch-callout: none;
+            -webkit-tap-highlight-color: transparent;
+          }
+          
+          .webview-environment .journal-arrow-button button {
+            -webkit-transform: translate3d(0, 0, 0) !important;
+            transform: translate3d(0, 0, 0) !important;
+            position: relative !important;
+            margin: auto !important;
+          }
+          
+          /* Theme utilities */
           .text-theme { color: ${primaryHex} !important; }
           .text-theme-light { color: var(--theme-light) !important; }
           .text-theme-dark { color: var(--theme-dark) !important; }
@@ -292,7 +357,7 @@ export function ThemeProvider({ children }: ThemeProviderProps) {
     }
   }, [colorTheme, customColor]);
 
-  // This effect specifically handles when custom color changes
+  // ... keep existing code (custom color effect and context provider)
   useEffect(() => {
     try {
       safeLocalStorageSet('feelosophy-custom-color', customColor);

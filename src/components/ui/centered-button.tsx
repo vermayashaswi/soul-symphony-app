@@ -8,6 +8,20 @@ interface CenteredButtonProps extends React.ButtonHTMLAttributes<HTMLButtonEleme
   size?: 'default' | 'sm' | 'lg' | 'icon';
 }
 
+// WebView detection utility
+const isWebView = (): boolean => {
+  try {
+    const userAgent = navigator.userAgent;
+    return userAgent.includes('wv') || 
+           userAgent.includes('WebView') || 
+           window.location.protocol === 'file:' ||
+           (window as any).AndroidInterface !== undefined ||
+           document.URL.indexOf('http://') === -1 && document.URL.indexOf('https://') === -1;
+  } catch {
+    return false;
+  }
+};
+
 export function CenteredButton({ 
   children, 
   className, 
@@ -30,31 +44,53 @@ export function CenteredButton({
     icon: "h-10 w-10"
   };
 
-  // Enhanced centering for arrow buttons and navigation elements
+  // Enhanced centering for WebView environments
+  const webViewCenteringStyles = isWebView() ? `
+    /* WebView-specific centering fixes */
+    position: relative !important;
+    left: 50% !important;
+    top: 50% !important;
+    transform: translate(-50%, -50%) translate3d(0, 0, 0) !important;
+    -webkit-transform: translate(-50%, -50%) translate3d(0, 0, 0) !important;
+    margin: 0 !important;
+  ` : '';
+
   const centeringStyles = "relative transform-gpu";
   
-  // Specific fixes for arrow button centering issues
-  const arrowButtonFixes = `
-    /* Ensure perfect centering for arrow buttons */
-    display: flex !important;
-    align-items: center !important;
-    justify-content: center !important;
-    
-    /* Fix for native app centering */
-    box-sizing: border-box !important;
-    min-height: 44px !important; /* Touch-friendly minimum */
-    min-width: 44px !important;
-    
-    /* Prevent layout shifts */
-    flex-shrink: 0 !important;
-    
-    /* Center child elements */
-    & > * {
-      display: flex !important;
-      align-items: center !important;
-      justify-content: center !important;
+  // Create enhanced style element for WebView
+  React.useEffect(() => {
+    if (isWebView()) {
+      const styleId = 'webview-button-centering';
+      let style = document.getElementById(styleId) as HTMLStyleElement;
+      
+      if (!style) {
+        style = document.createElement('style');
+        style.id = styleId;
+        document.head.appendChild(style);
+      }
+      
+      style.textContent = `
+        .webview-centered-button {
+          -webkit-user-select: none !important;
+          -webkit-touch-callout: none !important;
+          -webkit-tap-highlight-color: transparent !important;
+          position: relative !important;
+          display: flex !important;
+          align-items: center !important;
+          justify-content: center !important;
+          margin: auto !important;
+          -webkit-transform: translate3d(0, 0, 0) !important;
+          transform: translate3d(0, 0, 0) !important;
+        }
+        
+        .webview-centered-button > * {
+          display: flex !important;
+          align-items: center !important;
+          justify-content: center !important;
+        }
+      `;
     }
-  `;
+  }, []);
 
   return (
     <button
@@ -63,6 +99,7 @@ export function CenteredButton({
         variants[variant],
         sizes[size],
         centeringStyles,
+        isWebView() ? 'webview-centered-button' : '',
         className
       )}
       style={{
@@ -72,7 +109,11 @@ export function CenteredButton({
         boxSizing: 'border-box',
         minHeight: size === 'icon' ? '44px' : undefined,
         minWidth: size === 'icon' ? '44px' : undefined,
-        flexShrink: 0
+        flexShrink: 0,
+        position: 'relative',
+        margin: isWebView() ? 'auto' : undefined,
+        WebkitTransform: isWebView() ? 'translate3d(0, 0, 0)' : undefined,
+        transform: isWebView() ? 'translate3d(0, 0, 0)' : undefined
       }}
       {...props}
     >

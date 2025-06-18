@@ -8,6 +8,20 @@ import BackgroundElements from '@/components/home/BackgroundElements';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 
+// WebView detection utility
+const isWebView = (): boolean => {
+  try {
+    const userAgent = navigator.userAgent;
+    return userAgent.includes('wv') || 
+           userAgent.includes('WebView') || 
+           window.location.protocol === 'file:' ||
+           (window as any).AndroidInterface !== undefined ||
+           document.URL.indexOf('http://') === -1 && document.URL.indexOf('https://') === -1;
+  } catch {
+    return false;
+  }
+};
+
 const Home = () => {
   const { isActive, currentStep, steps, navigationState, startTutorial } = useTutorial();
   const { user } = useAuth();
@@ -87,7 +101,8 @@ const Home = () => {
       isActive, 
       currentStep, 
       stepId: steps[currentStep]?.id,
-      navigationInProgress: navigationState.inProgress
+      navigationInProgress: navigationState.inProgress,
+      isWebView: isWebView()
     });
     
     // Always prevent scrolling on home page - regardless of tutorial state
@@ -98,6 +113,41 @@ const Home = () => {
     document.body.style.top = '0';
     document.body.style.left = '0';
     
+    // Apply WebView-specific body styling
+    if (isWebView()) {
+      console.log('[Home] Applying WebView-specific styling');
+      document.body.classList.add('webview-environment');
+      
+      // Ensure proper background containment for WebView
+      document.body.style.backgroundColor = 'var(--background)';
+      document.body.style.contain = 'layout style paint';
+      document.body.style.isolation = 'isolate';
+      
+      // Add WebView-specific CSS
+      const webViewStyles = document.getElementById('webview-home-styles') || document.createElement('style');
+      webViewStyles.id = 'webview-home-styles';
+      webViewStyles.textContent = `
+        .webview-environment .home-container {
+          -webkit-user-select: none !important;
+          -webkit-touch-callout: none !important;
+          -webkit-tap-highlight-color: transparent !important;
+          contain: layout style paint !important;
+          isolation: isolate !important;
+          overflow: hidden !important;
+        }
+        
+        .webview-environment .journal-arrow-button {
+          -webkit-transform: translate3d(0, 0, 0) !important;
+          transform: translate3d(0, 0, 0) !important;
+          contain: layout style !important;
+        }
+      `;
+      
+      if (!document.getElementById('webview-home-styles')) {
+        document.head.appendChild(webViewStyles);
+      }
+    }
+    
     // Cleanup function to restore scrolling when navigating away
     return () => {
       document.body.style.overflow = '';
@@ -106,12 +156,19 @@ const Home = () => {
       document.body.style.height = '';
       document.body.style.top = '';
       document.body.style.left = '';
+      document.body.classList.remove('webview-environment');
+      
+      // Remove WebView styles if they exist
+      const webViewStyles = document.getElementById('webview-home-styles');
+      if (webViewStyles) {
+        webViewStyles.remove();
+      }
     };
   }, [isActive, currentStep, steps, navigationState]);
 
   return (
     <div 
-      className="min-h-screen bg-background text-foreground relative overflow-hidden"
+      className={`min-h-screen bg-background text-foreground relative overflow-hidden ${isWebView() ? 'home-container' : ''}`}
       style={{ 
         // Always apply fixed positioning on home page (not just during tutorial)
         touchAction: 'none',
@@ -122,7 +179,11 @@ const Home = () => {
         right: 0,
         bottom: 0,
         width: '100%',
-        height: '100%'
+        height: '100%',
+        // WebView-specific enhancements
+        contain: isWebView() ? 'layout style paint' : 'none',
+        isolation: isWebView() ? 'isolate' : 'auto',
+        backgroundColor: 'var(--background)'
       }}
     >
       {/* Background elements including animations */}

@@ -1,4 +1,3 @@
-
 import { toast } from 'sonner';
 
 export interface AppVersion {
@@ -24,11 +23,25 @@ class VersionService {
 
   constructor() {
     this.currentVersion = {
-      version: '1.0.1',
+      version: '1.0.2',
       buildDate: new Date().toISOString(),
-      features: ['smartChatV2', 'premiumMessaging', 'journalVoicePlayback', 'themeConsistency'],
-      cacheVersion: 'v1.0.1'
+      features: ['smartChatV2', 'premiumMessaging', 'journalVoicePlayback', 'themeConsistency', 'webViewCompatibility'],
+      cacheVersion: 'v1.0.2'
     };
+  }
+
+  // WebView detection utility
+  private isWebView(): boolean {
+    try {
+      const userAgent = navigator.userAgent;
+      return userAgent.includes('wv') || 
+             userAgent.includes('WebView') || 
+             window.location.protocol === 'file:' ||
+             (window as any).AndroidInterface !== undefined ||
+             document.URL.indexOf('http://') === -1 && document.URL.indexOf('https://') === -1;
+    } catch {
+      return false;
+    }
   }
 
   getCurrentVersion(): AppVersion {
@@ -270,15 +283,17 @@ class VersionService {
     }
   }
 
-  // Initialize theme consistency check
+  // Enhanced initialize theme consistency with WebView support
   initializeThemeConsistency(): void {
-    console.log('[VersionService] Initializing theme consistency...');
+    console.log('[VersionService] Initializing theme consistency with WebView support...');
     
     try {
       // Ensure theme CSS variables are set before first paint
       const root = document.documentElement;
+      const body = document.body;
       
       // Get stored theme preferences
+      const storedTheme = localStorage.getItem('feelosophy-theme') || 'system';
       const storedColorTheme = localStorage.getItem('feelosophy-color-theme') || 'Default';
       
       // Apply immediate CSS variable based on stored theme
@@ -308,7 +323,61 @@ class VersionService {
       root.style.setProperty('--color-theme', primaryColor);
       root.style.setProperty('--primary', primaryColor);
       
-      console.log('[VersionService] Theme consistency initialized:', { storedColorTheme, primaryColor });
+      // WebView-specific initialization
+      if (this.isWebView()) {
+        console.log('[VersionService] WebView detected, applying compatibility fixes');
+        
+        // Apply WebView body class immediately
+        body.classList.add('webview-environment');
+        
+        // Determine theme mode
+        const themeMode = storedTheme === 'system' 
+          ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light')
+          : storedTheme;
+        
+        // Force background colors for WebView
+        if (themeMode === 'light') {
+          body.style.backgroundColor = '#ffffff';
+          root.style.backgroundColor = '#ffffff';
+          root.style.setProperty('--background', '0 0% 100%');
+          root.style.setProperty('--card', '0 0% 100%');
+        } else {
+          body.style.backgroundColor = '#0a0a0a';
+          root.style.backgroundColor = '#0a0a0a';
+          root.style.setProperty('--background', '0 0% 3.9%');
+          root.style.setProperty('--card', '0 0% 3.9%');
+        }
+        
+        // Apply theme class
+        root.classList.remove('light', 'dark');
+        root.classList.add(themeMode);
+        
+        // WebView-specific CSS injection
+        const webViewStyle = document.createElement('style');
+        webViewStyle.id = 'webview-init-styles';
+        webViewStyle.textContent = `
+          .webview-environment {
+            -webkit-user-select: none !important;
+            -webkit-touch-callout: none !important;
+            -webkit-tap-highlight-color: transparent !important;
+            contain: layout style paint !important;
+            isolation: isolate !important;
+          }
+          
+          .webview-environment * {
+            -webkit-transform: translate3d(0, 0, 0);
+            transform: translate3d(0, 0, 0);
+          }
+        `;
+        document.head.appendChild(webViewStyle);
+      }
+      
+      console.log('[VersionService] Theme consistency initialized:', { 
+        storedColorTheme, 
+        primaryColor, 
+        isWebView: this.isWebView(),
+        storedTheme
+      });
       
     } catch (error) {
       console.warn('[VersionService] Theme consistency initialization failed:', error);
