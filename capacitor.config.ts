@@ -6,15 +6,15 @@ const config: CapacitorConfig = {
   appName: 'soul-symphony-app',
   webDir: 'dist',
   server: {
-    url: 'https://soulo.online/app?forceHideBadge=true&nativeApp=true',
+    url: 'https://soulo.online/app?forceHideBadge=true&nativeApp=true&pwabuilder=true',
     cleartext: true,
-    // Enhanced native app configuration
+    // Enhanced configuration for both PWA Builder and Capacitor
     allowNavigation: [
       'https://soulo.online/*',
       'https://*.supabase.co/*'
     ]
   },
-  // Enhanced plugins configuration for better PWA support
+  // Enhanced plugins configuration for better PWA Builder support
   plugins: {
     SplashScreen: {
       launchAutoHide: false,
@@ -31,12 +31,12 @@ const config: CapacitorConfig = {
       style: "dark",
       resizeOnFullScreen: true
     },
-    // Add App plugin for better update handling
+    // Enhanced App plugin for better update handling and PWA Builder compatibility
     App: {
-      appendUserAgent: 'SouloNativeApp/1.0'
+      appendUserAgent: 'SouloNativeApp/1.0 PWABuilderCompatible'
     }
   },
-  // Enhanced iOS configuration
+  // Enhanced iOS configuration for PWA Builder compatibility
   ios: {
     contentInset: "always",
     allowsLinkPreview: false,
@@ -44,18 +44,18 @@ const config: CapacitorConfig = {
     useUserAgentString: false,
     limitsNavigationsToAppBoundDomains: true,
     backgroundColor: "#FFFFFF",
-    // Enhanced WebView settings for better caching control
+    // Enhanced WebView settings for better caching control and PWA Builder support
     webContentsDebuggingEnabled: true,
     allowsInlineMediaPlayback: true,
     mediaPlaybackRequiresUserAction: false
   },
-  // Enhanced Android configuration
+  // Enhanced Android configuration for PWA Builder compatibility
   android: {
     allowMixedContent: true,
     captureInput: true,
     webContentsDebuggingEnabled: true,
-    // Enhanced WebView settings
-    appendUserAgent: 'SouloNativeApp/1.0',
+    // Enhanced WebView settings for PWA Builder support
+    appendUserAgent: 'SouloNativeApp/1.0 PWABuilderCompatible',
     overrideUserAgent: false,
     backgroundColor: "#FFFFFF"
   }
