@@ -29,7 +29,7 @@ import { PWADebugPanel } from '@/components/debug/PWADebugPanel';
 const queryClient = new QueryClient();
 
 // Retrieve Clerk publishable key from environment - be sure to add this to your .env file.
-const clerkPubKey = process.env.VITE_CLERK_PUBLISHABLE_KEY;
+const clerkPubKey = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY;
 
 if (!clerkPubKey) {
   throw new Error("Missing Publishable Key")

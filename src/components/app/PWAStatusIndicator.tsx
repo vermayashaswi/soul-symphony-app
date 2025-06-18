@@ -52,7 +52,7 @@ export const PWAStatusIndicator: React.FC<{ className?: string }> = ({ className
   }, []);
 
   // Only show in development or when there are issues
-  const shouldShow = process.env.NODE_ENV === 'development' || 
+  const shouldShow = import.meta.env.MODE === 'development' || 
                     !status.isOnline || 
                     status.isPWABuilder;
 
@@ -104,7 +104,7 @@ export const PWAStatusIndicator: React.FC<{ className?: string }> = ({ className
       </Badge>
 
       {/* Version in development */}
-      {process.env.NODE_ENV === 'development' && (
+      {import.meta.env.MODE === 'development' && (
         <Badge variant="outline" className="text-xs">
           v{status.version}
         </Badge>
