@@ -2,177 +2,185 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Offline - Soulo</title>
-  <link rel="icon" type="image/png" href="/lovable-uploads/31ed88ef-f596-4b91-ba58-a4175eebe779.png">
-  <style>
-    body {
-      font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-      margin: 0;
-      padding: 0;
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-      color: white;
-      min-height: 100vh;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      text-align: center;
-    }
-    
-    .container {
-      max-width: 400px;
-      padding: 2rem;
-    }
-    
-    .logo {
-      width: 80px;
-      height: 80px;
-      margin: 0 auto 2rem;
-      border-radius: 20px;
-      background: white;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
-    }
-    
-    .logo img {
-      width: 60px;
-      height: 60px;
-      border-radius: 12px;
-    }
-    
-    h1 {
-      font-size: 2rem;
-      margin-bottom: 1rem;
-      font-weight: 600;
-    }
-    
-    p {
-      font-size: 1.1rem;
-      margin-bottom: 2rem;
-      opacity: 0.9;
-      line-height: 1.6;
-    }
-    
-    .status {
-      background: rgba(255, 255, 255, 0.1);
-      border-radius: 12px;
-      padding: 1rem;
-      margin: 1rem 0;
-      backdrop-filter: blur(10px);
-    }
-    
-    .retry-btn {
-      background: white;
-      color: #667eea;
-      border: none;
-      padding: 12px 24px;
-      border-radius: 8px;
-      font-weight: 600;
-      cursor: pointer;
-      transition: transform 0.2s;
-      font-size: 1rem;
-    }
-    
-    .retry-btn:hover {
-      transform: translateY(-2px);
-    }
-    
-    .features {
-      margin-top: 2rem;
-      text-align: left;
-    }
-    
-    .feature {
-      margin: 0.5rem 0;
-      opacity: 0.8;
-    }
-    
-    .offline-indicator {
-      display: inline-block;
-      width: 12px;
-      height: 12px;
-      background: #ff6b6b;
-      border-radius: 50%;
-      margin-right: 8px;
-      animation: pulse 2s infinite;
-    }
-    
-    @keyframes pulse {
-      0% { opacity: 1; }
-      50% { opacity: 0.5; }
-      100% { opacity: 1; }
-    }
-    
-    .online-indicator {
-      background: #51cf66;
-      animation: none;
-    }
-  </style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Soulo - Offline</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            text-align: center;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+        }
+        .container {
+            max-width: 400px;
+            padding: 2rem;
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 16px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+        h1 {
+            margin: 0 0 1rem 0;
+            font-size: 2rem;
+            font-weight: 600;
+        }
+        p {
+            margin: 0 0 1.5rem 0;
+            line-height: 1.6;
+            opacity: 0.9;
+        }
+        .retry-btn {
+            background: rgba(255, 255, 255, 0.2);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            color: white;
+            padding: 12px 24px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 1rem;
+            transition: all 0.2s;
+        }
+        .retry-btn:hover {
+            background: rgba(255, 255, 255, 0.3);
+            transform: translateY(-1px);
+        }
+        .status {
+            margin-top: 1rem;
+            font-size: 0.9rem;
+            opacity: 0.8;
+        }
+        .pulse {
+            animation: pulse 2s infinite;
+        }
+        @keyframes pulse {
+            0% { opacity: 0.6; }
+            50% { opacity: 1; }
+            100% { opacity: 0.6; }
+        }
+    </style>
 </head>
 <body>
-  <div class="container">
-    <div class="logo">
-      <img src="/lovable-uploads/31ed88ef-f596-4b91-ba58-a4175eebe779.png" alt="Soulo Logo">
+    <div class="container">
+        <h1>You're Offline</h1>
+        <p>Soulo needs an internet connection to sync your journal entries and provide AI insights.</p>
+        <p>Please check your connection and try again.</p>
+        
+        <button class="retry-btn" onclick="retryConnection()">
+            <span id="retryText">Retry Connection</span>
+        </button>
+        
+        <div class="status">
+            <div id="connectionStatus" class="pulse">
+                Checking connection...
+            </div>
+        </div>
     </div>
-    
-    <h1>You're Offline</h1>
-    <p>Don't worry! You can still use Soulo even without an internet connection.</p>
-    
-    <div class="status">
-      <div>
-        <span class="offline-indicator" id="connectionIndicator"></span>
-        <span id="connectionStatus">Offline</span>
-      </div>
-    </div>
-    
-    <button class="retry-btn" onclick="checkConnection()">
-      Try Again
-    </button>
-    
-    <div class="features">
-      <h3>Available Offline:</h3>
-      <div class="feature">📝 Record voice journal entries</div>
-      <div class="feature">📱 View cached journal entries</div>
-      <div class="feature">🎯 Access previously loaded insights</div>
-      <div class="feature">⚙️ Manage app settings</div>
-      <div class="feature">🔄 Auto-sync when back online</div>
-    </div>
-  </div>
 
-  <script>
-    function checkConnection() {
-      if (navigator.onLine) {
-        window.location.href = '/app';
-      } else {
-        alert('Still offline. Please check your internet connection.');
-      }
-    }
-    
-    function updateConnectionStatus() {
-      const indicator = document.getElementById('connectionIndicator');
-      const status = document.getElementById('connectionStatus');
-      
-      if (navigator.onLine) {
-        indicator.className = 'offline-indicator online-indicator';
-        status.textContent = 'Back Online!';
-        setTimeout(() => {
-          window.location.href = '/app';
-        }, 1000);
-      } else {
-        indicator.className = 'offline-indicator';
-        status.textContent = 'Offline';
-      }
-    }
-    
-    // Listen for online/offline events
-    window.addEventListener('online', updateConnectionStatus);
-    window.addEventListener('offline', updateConnectionStatus);
-    
-    // Initial status check
-    updateConnectionStatus();
-  </script>
+    <script>
+        let retryCount = 0;
+        const maxRetries = 5;
+        
+        function updateStatus(message, isPulsing = true) {
+            const statusEl = document.getElementById('connectionStatus');
+            statusEl.textContent = message;
+            statusEl.className = isPulsing ? 'pulse' : '';
+        }
+        
+        function checkConnection() {
+            return fetch('/', { 
+                method: 'HEAD',
+                cache: 'no-cache',
+                headers: {
+                    'Cache-Control': 'no-cache, no-store, must-revalidate'
+                }
+            }).then(response => {
+                return response.ok;
+            }).catch(() => {
+                return false;
+            });
+        }
+        
+        async function retryConnection() {
+            const retryBtn = document.querySelector('.retry-btn');
+            const retryText = document.getElementById('retryText');
+            
+            retryBtn.disabled = true;
+            retryText.textContent = 'Checking...';
+            updateStatus('Testing connection...', true);
+            
+            const isOnline = await checkConnection();
+            
+            if (isOnline) {
+                updateStatus('Connection restored! Redirecting...', false);
+                retryText.textContent = 'Redirecting...';
+                
+                // Clear any cached offline responses and redirect
+                if ('caches' in window) {
+                    try {
+                        const cacheNames = await caches.keys();
+                        await Promise.all(cacheNames.map(name => caches.delete(name)));
+                    } catch (error) {
+                        console.warn('Cache clearing failed:', error);
+                    }
+                }
+                
+                // Force fresh reload with cache busting
+                const url = new URL(window.location.origin + '/app');
+                url.searchParams.set('_refresh', Date.now().toString());
+                url.searchParams.set('_offline_recovery', 'true');
+                
+                setTimeout(() => {
+                    window.location.href = url.toString();
+                }, 1000);
+                
+            } else {
+                retryCount++;
+                updateStatus(`Still offline (attempt ${retryCount}/${maxRetries})`, false);
+                retryText.textContent = retryCount >= maxRetries ? 'Keep Trying' : 'Retry Connection';
+                retryBtn.disabled = false;
+                
+                if (retryCount >= maxRetries) {
+                    updateStatus('Please check your internet connection and try again later.', false);
+                }
+            }
+        }
+        
+        // Auto-check connection periodically
+        setInterval(async () => {
+            if (retryCount < maxRetries) {
+                const isOnline = await checkConnection();
+                if (isOnline) {
+                    retryConnection();
+                }
+            }
+        }, 10000); // Check every 10 seconds
+        
+        // Listen for online events
+        window.addEventListener('online', () => {
+            updateStatus('Connection detected! Checking...', true);
+            setTimeout(retryConnection, 1000);
+        });
+        
+        window.addEventListener('offline', () => {
+            updateStatus('Connection lost. Please check your internet.', false);
+        });
+        
+        // Initial connection check
+        setTimeout(async () => {
+            const isOnline = await checkConnection();
+            if (isOnline) {
+                retryConnection();
+            } else {
+                updateStatus('No connection detected. Tap retry when ready.', false);
+            }
+        }, 2000);
+    </script>
 </body>
 </html>
