@@ -1,13 +1,15 @@
-
 import React, { useEffect } from 'react';
 import { Navigate, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
-import { isPWABuilder, isNativeApp } from '@/utils/pwaDetection';
+import { isPWABuilder, isNativeApp as isNativeAppDetection } from '@/utils/pwaDetection';
 
 // Instead of checking subdomain, now we check path prefix
 export const isNativeAppContext = (): boolean => {
-  return isPWABuilder() || isNativeApp() || /native/i.test(window.navigator.userAgent);
+  return isPWABuilder() || isNativeAppDetection() || /native/i.test(window.navigator.userAgent);
 };
+
+// Export the isNativeApp function for use in other components
+export const isNativeApp = isNativeAppDetection;
 
 // Update the path-based check to be more strict about app routes
 export const isAppRoute = (pathname: string): boolean => {
