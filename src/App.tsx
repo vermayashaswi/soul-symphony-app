@@ -31,8 +31,18 @@ const queryClient = new QueryClient();
 // Retrieve Clerk publishable key from environment - be sure to add this to your .env file.
 const clerkPubKey = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY;
 
+// Debug logging for environment variables
+console.log('[App] Environment check:', {
+  clerkPubKey: clerkPubKey ? 'Present' : 'Missing',
+  mode: import.meta.env.MODE,
+  dev: import.meta.env.DEV,
+  allEnvKeys: Object.keys(import.meta.env)
+});
+
 if (!clerkPubKey) {
-  throw new Error("Missing Publishable Key")
+  console.error('[App] VITE_CLERK_PUBLISHABLE_KEY is missing from environment variables');
+  console.error('[App] Available environment variables:', Object.keys(import.meta.env));
+  throw new Error("Missing Publishable Key - Please set VITE_CLERK_PUBLISHABLE_KEY environment variable")
 }
 
 function App() {
