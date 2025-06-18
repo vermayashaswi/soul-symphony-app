@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -10,14 +11,14 @@ import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { Loader2, Moon, Sun, Palette, User, Bell, Shield, HelpCircle, LogOut, Trash2, Download, Upload } from 'lucide-react';
 import { useTheme } from '@/hooks/use-theme';
-import ColorPicker from '@/components/settings/ColorPicker';
+import { ColorPicker } from '@/components/settings/ColorPicker';
 import { useTranslation } from '@/contexts/TranslationContext';
 import { TranslatableText } from '@/components/translation/TranslatableText';
 import LanguageSelector from '@/components/translation/LanguageSelector';
-import SubscriptionManagement from '@/components/settings/SubscriptionManagement';
-import DeleteAllEntriesSection from '@/components/settings/DeleteAllEntriesSection';
-import ProfilePictureUpload from '@/components/settings/ProfilePictureUpload';
-import SettingsLoadingWrapper from '@/components/settings/SettingsLoadingWrapper';
+import { SubscriptionManagement } from '@/components/settings/SubscriptionManagement';
+import { DeleteAllEntriesSection } from '@/components/settings/DeleteAllEntriesSection';
+import { ProfilePictureUpload } from '@/components/settings/ProfilePictureUpload';
+import { SettingsLoadingWrapper } from '@/components/settings/SettingsLoadingWrapper';
 import { Link } from 'react-router-dom';
 import { ScrollArea } from '@/components/ui/scroll-area';
 
@@ -52,22 +53,22 @@ const Settings = () => {
       if (error) {
         console.error('Error updating profile:', error);
         toast({
-          title: translate('Error'),
-          description: translate('Failed to update profile'),
+          title: await translate('Error'),
+          description: await translate('Failed to update profile'),
           variant: 'destructive',
         });
       } else {
         console.log('Profile updated successfully:', data);
         toast({
-          title: translate('Success'),
-          description: translate('Profile updated successfully'),
+          title: await translate('Success'),
+          description: await translate('Profile updated successfully'),
         });
       }
     } catch (error) {
       console.error('Error updating profile:', error);
       toast({
-        title: translate('Error'),
-        description: translate('Failed to update profile'),
+        title: await translate('Error'),
+        description: await translate('Failed to update profile'),
         variant: 'destructive',
       });
     } finally {
