@@ -1,4 +1,3 @@
-
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -17,7 +16,7 @@
     --card-foreground: 240 10% 3.9%;
     --popover: 0 0% 100%;
     --popover-foreground: 240 10% 3.9%;
-    --primary: 217 91.2% 59.8%; /* Default blue theme */
+    --primary: 217 91.2% 59.8%; /* Default is Calm/Blue */
     --primary-foreground: 0 0% 98%;
     --secondary: 240 4.8% 95.9%;
     --secondary-foreground: 240 5.9% 10%;
@@ -31,13 +30,13 @@
     --input: 240 5.9% 90%;
     --ring: 217 91.2% 59.8%; /* Match primary */
     --radius: 0.75rem;
-    --radius-full: 9999px;
-    --color-theme: #3b82f6; /* Default blue */
-    --chart-bg: 0 0% 100%;
-    --primary-h: 217;
-    --primary-s: 91.2%;
-    --primary-l: 59.8%;
-    /* Thread action buttons */
+    --radius-full: 9999px; /* Add this to ensure circular elements */
+    --color-theme: #3b82f6; /* Calm/Blue as default */
+    --chart-bg: 0 0% 100%; /* New variable for chart backgrounds */
+    --primary-h: 217; /* For direct HSL usage */
+    --primary-s: 91.2%; /* For direct HSL usage */
+    --primary-l: 59.8%; /* For direct HSL usage */
+    /* New variables for thread action buttons */
     --edit-btn-bg: 217 91.2% 95%; 
     --edit-btn-text: 217 91.2% 40%;
     --delete-btn-bg: 0 84.2% 95%;
@@ -51,7 +50,7 @@
     --card-foreground: 0 0% 98%;
     --popover: 240 10% 3.9%;
     --popover-foreground: 0 0% 98%;
-    --primary: 217 91.2% 59.8%; /* Consistent blue theme */
+    --primary: 217 91.2% 59.8%; /* Default is Calm/Blue */
     --primary-foreground: 0 0% 98%;
     --secondary: 240 3.7% 15.9%;
     --secondary-foreground: 0 0% 98%;
@@ -64,74 +63,16 @@
     --border: 240 3.7% 15.9%;
     --input: 240 3.7% 15.9%;
     --ring: 217 91.2% 59.8%; /* Match primary */
-    --radius-full: 9999px;
-    --chart-bg: 240 10% 3.9%;
-    --primary-h: 217;
-    --primary-s: 91.2%;
-    --primary-l: 59.8%;
+    --radius-full: 9999px; /* Add this to ensure circular elements */
+    --chart-bg: 240 10% 3.9%; /* Match background in dark mode */
+    --primary-h: 217; /* For direct HSL usage */
+    --primary-s: 91.2%; /* For direct HSL usage */
+    --primary-l: 59.8%; /* For direct HSL usage */
     /* Dark mode thread action buttons */
     --edit-btn-bg: 217 91.2% 25%;
     --edit-btn-text: 217 91.2% 80%;
     --delete-btn-bg: 0 62.8% 20%;
     --delete-btn-text: 0 62.8% 80%;
-  }
-  
-  /* Enhanced PWA Builder and Native App Support */
-  .pwa-builder-app,
-  .native-app-environment {
-    -webkit-user-select: none !important;
-    -webkit-touch-callout: none !important;
-    -webkit-tap-highlight-color: transparent !important;
-    contain: layout style paint !important;
-    isolation: isolate !important;
-  }
-  
-  /* Force consistent backgrounds for PWA Builder */
-  .pwa-builder-app {
-    background-color: hsl(var(--background)) !important;
-  }
-  
-  .pwa-builder-app:not(.dark) {
-    background-color: #ffffff !important;
-    --background: 0 0% 100% !important;
-    --foreground: 240 10% 3.9% !important;
-  }
-  
-  .pwa-builder-app.dark {
-    background-color: #0a0a0a !important;
-    --background: 240 10% 3.9% !important;
-    --foreground: 0 0% 98% !important;
-  }
-  
-  /* Enhanced arrow button styling for consistency */
-  .pwa-builder-app .journal-arrow-button,
-  .native-app-environment .journal-arrow-button {
-    position: fixed !important;
-    top: 50% !important;
-    left: 50% !important;
-    transform: translate(-50%, -50%) translate3d(0, 0, 0) !important;
-    z-index: 40 !important;
-    margin: 0 !important;
-    padding: 0 !important;
-    contain: layout style !important;
-    will-change: transform !important;
-  }
-  
-  .pwa-builder-app .journal-arrow-button button,
-  .native-app-environment .journal-arrow-button button {
-    -webkit-transform: translate3d(0, 0, 0) !important;
-    transform: translate3d(0, 0, 0) !important;
-    contain: layout style paint !important;
-    will-change: transform !important;
-    position: relative !important;
-    display: flex !important;
-    align-items: center !important;
-    justify-content: center !important;
-    background-color: hsl(var(--primary)) !important;
-    color: hsl(var(--primary-foreground)) !important;
-    border: none !important;
-    outline: none !important;
-    border-radius: 9999px !important;
   }
 }
 
@@ -142,7 +83,6 @@
   body {
     @apply bg-background text-foreground;
   }
-  
   /* Apply theme color to all page headers */
   h1, h2, h3 {
     @apply text-theme-color;
@@ -160,7 +100,7 @@
   }
 }
 
-/* Enhanced Global theme color utilities */
+/* Global theme color utilities */
 @layer utilities {
   .theme-text {
     color: var(--color-theme) !important;
@@ -194,7 +134,7 @@
     border-color: var(--color-theme) !important;
   }
   
-  /* Enhanced utility classes for text-theme and bg-theme */
+  /* Special utility classes for text-theme and bg-theme */
   .text-theme, .text-theme-color {
     color: var(--color-theme) !important;
   }
@@ -235,6 +175,8 @@ html {
   :root:not(.light):not(.dark) {
     --background: 240 10% 3.9%;
     --foreground: 0 0% 98%;
+    /* Apply all dark theme variables when system theme is dark and no explicit theme is set */
+    /* This ensures proper fallback when JavaScript hasn't loaded yet */
     --card: 240 10% 3.9%;
     --card-foreground: 0 0% 98%;
     --popover: 240 10% 3.9%;
@@ -251,22 +193,13 @@ html {
     --border: 240 3.7% 15.9%;
     --input: 240 3.7% 15.9%;
     --chart-bg: 240 10% 3.9%;
+    /* Dark mode thread action buttons */
     --edit-btn-bg: 217 91.2% 25%;
     --edit-btn-text: 217 91.2% 80%;
     --delete-btn-bg: 0 62.8% 20%;
     --delete-btn-text: 0 62.8% 80%;
   }
 }
-
-/* Enhanced WebView and PWA Builder specific optimizations */
-.webview-environment,
-.pwa-builder-app {
-  -webkit-overflow-scrolling: touch;
-  overscroll-behavior-y: none;
-  -webkit-text-size-adjust: 100%;
-}
-
-/* ... keep existing code (dark mode styles for chart components, chat message styles, entity bubble styles, text rendering styles, Google Translate hiding, Select component styles) */
 
 /* Dark mode styles for chart components */
 .dark .recharts-surface,
@@ -286,11 +219,13 @@ html {
 
 /* Fix for TypeScript issue in SmartChatInterface */
 .chat-message-role-assistant {
+  /* Style for assistant chat messages */
   background-color: hsl(var(--muted));
   color: hsl(var(--foreground));
 }
 
 .chat-message-role-user {
+  /* Style for user chat messages */
   background-color: hsl(var(--primary));
   color: hsl(var(--primary-foreground));
 }
