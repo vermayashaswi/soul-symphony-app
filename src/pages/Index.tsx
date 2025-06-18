@@ -11,6 +11,7 @@ import HomePage from '@/pages/website/HomePage';
 import { TranslatableText } from '@/components/translation/TranslatableText';
 import { useTranslation } from '@/contexts/TranslationContext';
 import { supabase } from '@/integrations/supabase/client';
+import { isPWABuilder, isNativeApp } from '@/utils/pwaDetection';
 
 const Index = () => {
   const navigate = useNavigate();
@@ -25,6 +26,38 @@ const Index = () => {
   const mobileDemo = urlParams.get('mobileDemo') === 'true';
   
   const shouldRenderMobile = isMobile.isMobile || mobileDemo;
+
+  // PWABuilder/Native app redirect logic
+  useEffect(() => {
+    const handleNativeAppRedirect = () => {
+      console.log('[Index] Checking for native app redirect');
+      console.log('[Index] isPWABuilder:', isPWABuilder());
+      console.log('[Index] isNativeApp:', isNativeApp());
+      console.log('[Index] Current path:', window.location.pathname);
+      
+      // If this is a PWABuilder or native app and we're on the root path, redirect to app
+      if ((isPWABuilder() || isNativeApp()) && window.location.pathname === '/') {
+        console.log('[Index] Native app detected at root path, redirecting to /app');
+        
+        if (user) {
+          if (onboardingComplete) {
+            console.log('[Index] User logged in and onboarded, redirecting to /app/home');
+            navigate('/app/home', { replace: true });
+          } else {
+            console.log('[Index] User logged in but not onboarded, redirecting to /app/onboarding');
+            navigate('/app/onboarding', { replace: true });
+          }
+        } else {
+          console.log('[Index] User not logged in, redirecting to /app/auth');
+          navigate('/app/auth', { replace: true });
+        }
+        return;
+      }
+    };
+
+    // Run the redirect check immediately
+    handleNativeAppRedirect();
+  }, [user, onboardingComplete, navigate]);
 
   // Enhanced tutorial status checking for proper navigation flow
   useEffect(() => {
@@ -140,10 +173,12 @@ const Index = () => {
   
   console.log('[Index] Rendering Index.tsx component, path:', window.location.pathname, {
     hasUser: !!user,
-    onboardingComplete
+    onboardingComplete,
+    isPWABuilder: isPWABuilder(),
+    isNativeApp: isNativeApp()
   });
 
-  // Always render the website homepage component when at root URL
+  // Always render the website homepage component when at root URL (unless redirected)
   return (
     <>
       <NetworkAwareContent

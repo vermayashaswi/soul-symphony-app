@@ -4,6 +4,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { AlertTriangle } from 'lucide-react';
 import { useFeatureFlag } from '@/hooks/useFeatureFlag';
 import { supabase } from '@/integrations/supabase/client';
+import { isPWABuilder, isNativeApp } from '@/utils/pwaDetection';
 
 const MaintenanceBanner: React.FC = () => {
   const isMaintenanceEnabled = useFeatureFlag('maintenanceBanner');
@@ -12,6 +13,8 @@ const MaintenanceBanner: React.FC = () => {
     console.log('[MaintenanceBanner] Component mounted, maintenance enabled:', isMaintenanceEnabled);
     console.log('[MaintenanceBanner] Current route:', window.location.pathname);
     console.log('[MaintenanceBanner] User agent:', navigator.userAgent);
+    console.log('[MaintenanceBanner] PWABuilder detected:', isPWABuilder());
+    console.log('[MaintenanceBanner] Native app detected:', isNativeApp());
     
     // Set up real-time subscription for feature flag updates
     const channel = supabase
@@ -44,7 +47,7 @@ const MaintenanceBanner: React.FC = () => {
     return null;
   }
 
-  console.log('[MaintenanceBanner] Rendering maintenance banner');
+  console.log('[MaintenanceBanner] Rendering maintenance banner - PWABuilder context:', isPWABuilder());
 
   return (
     <div 
@@ -59,6 +62,8 @@ const MaintenanceBanner: React.FC = () => {
         <AlertTriangle className="h-4 w-4 text-white" />
         <AlertDescription className="text-white font-medium text-sm">
           🔧 We're performing maintenance to improve your experience. Some features may be temporarily unavailable.
+          {isPWABuilder() && ' (PWABuilder)'}
+          {isNativeApp() && !isPWABuilder() && ' (Native)'}
         </AlertDescription>
       </Alert>
     </div>

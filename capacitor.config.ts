@@ -5,9 +5,9 @@ const config: CapacitorConfig = {
   appId: 'app.soulo.online',
   appName: 'soul-symphony-app',
   webDir: 'dist',
-  // Basic server configuration for development only
+  // Point to the app route instead of root for mobile apps
   server: {
-    url: 'https://soulo.online?forceHideBadge=true',
+    url: 'https://soulo.online/app?forceHideBadge=true',
     cleartext: true
   }
 };

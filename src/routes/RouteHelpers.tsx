@@ -2,10 +2,11 @@
 import React, { useEffect } from 'react';
 import { Navigate, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
+import { isPWABuilder, isNativeApp } from '@/utils/pwaDetection';
 
 // Instead of checking subdomain, now we check path prefix
-export const isNativeApp = (): boolean => {
-  return /native/i.test(window.navigator.userAgent);
+export const isNativeAppContext = (): boolean => {
+  return isPWABuilder() || isNativeApp() || /native/i.test(window.navigator.userAgent);
 };
 
 // Update the path-based check to be more strict about app routes
@@ -23,10 +24,11 @@ export const isWebsiteRoute = (pathname: string): boolean => {
     return false;
   }
   
-  // For root URL (/), consider it as a website route
+  // For root URL (/), consider it as a website route unless it's a native app
   if (pathname === '/') {
-    console.log(`${pathname} is root, treating as website route`);
-    return true;
+    const isWebsite = !isNativeAppContext();
+    console.log(`${pathname} is root, treating as website route: ${isWebsite} (native context: ${isNativeAppContext()})`);
+    return isWebsite;
   }
   
   // Explicitly define website routes
@@ -76,7 +78,8 @@ export const AppRouteWrapper = ({
   console.log('AppRouteWrapper rendering:', location.pathname, { 
     requiresAuth, 
     userExists: !!user,
-    isAppRoute: isAppRoute(location.pathname)
+    isAppRoute: isAppRoute(location.pathname),
+    isNativeContext: isNativeAppContext()
   });
   
   useEffect(() => {
