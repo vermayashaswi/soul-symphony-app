@@ -1,5 +1,5 @@
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Navigate, useNavigate, useLocation, useSearchParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { useAuth } from '@/contexts/AuthContext';
@@ -10,16 +10,18 @@ import { TranslatableText } from '@/components/translation/TranslatableText';
 import PlatformAuthButton from '@/components/auth/PlatformAuthButton';
 import { useKeyboardState } from '@/hooks/use-keyboard-state';
 import { useIsMobile } from '@/hooks/use-mobile';
+import { handleAuthCallback } from '@/services/authService';
 
 export default function Auth() {
   const location = useLocation();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const [redirecting, setRedirecting] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [authError, setAuthError] = useState<string | null>(null);
+  const [processingCallback, setProcessingCallback] = useState(false);
+  
   const { user, isLoading: authLoading } = useAuth();
   const { onboardingComplete } = useOnboarding();
-  const [authError, setAuthError] = useState<string | null>(null);
   const { isWebtonative, isAndroid, isIOS } = useIsMobile();
   const { keyboardState, setInputFocused } = useKeyboardState();
   
@@ -27,8 +29,8 @@ export default function Auth() {
   const fromLocation = location.state?.from?.pathname;
   const storedRedirect = typeof window !== 'undefined' ? localStorage.getItem('authRedirectTo') : null;
   
-  // Get valid redirect path with priority
-  const getValidRedirectPath = (path: string | null) => {
+  // Enhanced redirect path logic
+  const getValidRedirectPath = useCallback((path: string | null) => {
     if (!path) {
       return onboardingComplete ? '/app/home' : '/app/onboarding';
     }
@@ -38,218 +40,166 @@ export default function Auth() {
     if (path === '/onboarding') return '/app/onboarding';
     
     return path;
-  };
+  }, [onboardingComplete]);
   
-  // Determine where to redirect after auth
   const redirectTo = getValidRedirectPath(redirectParam || fromLocation || storedRedirect);
 
-  console.log('Auth page mounted', { 
-    redirectTo, 
-    redirectParam, 
-    fromLocation,
-    storedRedirect,
-    hasUser: !!user,
-    currentPath: location.pathname,
-    onboardingComplete,
-    isWebtonative,
-    keyboardOpen: keyboardState.isOpen,
-    keyboardHeight: keyboardState.height,
-    availableHeight: keyboardState.availableHeight
-  });
-
-  // Enhanced OAuth flow detection and optimization for webtonative
+  // Enhanced OAuth callback handling
   useEffect(() => {
-    if (isWebtonative) {
-      const body = document.body;
-      const html = document.documentElement;
+    const processOAuthCallback = async () => {
+      // Only process if we have auth parameters and not already processing
+      const hasAuthParams = window.location.search.includes('code') || 
+                          window.location.hash.includes('access_token') ||
+                          window.location.search.includes('error') ||
+                          window.location.hash.includes('error');
       
-      // Add webtonative OAuth flow classes
-      body.classList.add('webtonative-oauth-flow', 'auth-viewport-optimized');
-      html.classList.add('webtonative-oauth-environment');
-      
-      // Set up enhanced viewport management for OAuth
-      const optimizeAuthViewport = () => {
-        const currentHeight = window.innerHeight;
-        const visualHeight = window.visualViewport?.height || currentHeight;
-        
-        // Set CSS custom properties for auth-specific viewport
-        html.style.setProperty('--auth-vh', `${currentHeight * 0.01}px`);
-        html.style.setProperty('--auth-visual-vh', `${visualHeight * 0.01}px`);
-        html.style.setProperty('--auth-available-height', `${visualHeight}px`);
-        html.style.setProperty('--auth-total-height', `${currentHeight}px`);
-        
-        console.log('[Auth] Viewport optimized for OAuth:', {
-          currentHeight,
-          visualHeight,
-          keyboardHeight: currentHeight - visualHeight,
-          isWebtonative
-        });
-      };
-      
-      // Initial optimization
-      optimizeAuthViewport();
-      
-      // Set up listeners for viewport changes during OAuth flow
-      const handleAuthResize = () => {
-        console.log('[Auth] OAuth viewport resize detected');
-        setTimeout(optimizeAuthViewport, 100);
-      };
-      
-      const handleAuthOrientationChange = () => {
-        console.log('[Auth] OAuth orientation change detected');
-        setTimeout(optimizeAuthViewport, 300);
-      };
-      
-      window.addEventListener('resize', handleAuthResize);
-      window.addEventListener('orientationchange', handleAuthOrientationChange);
-      
-      if (window.visualViewport) {
-        window.visualViewport.addEventListener('resize', optimizeAuthViewport);
+      if (!hasAuthParams || processingCallback) {
+        return;
       }
       
-      return () => {
-        body.classList.remove('webtonative-oauth-flow', 'auth-viewport-optimized');
-        html.classList.remove('webtonative-oauth-environment');
-        
-        window.removeEventListener('resize', handleAuthResize);
-        window.removeEventListener('orientationchange', handleAuthOrientationChange);
-        
-        if (window.visualViewport) {
-          window.visualViewport.removeEventListener('resize', optimizeAuthViewport);
-        }
-      };
-    }
-  }, [isWebtonative]);
-
-  useEffect(() => {
-    setIsLoading(false);
-  }, []);
-
-  useEffect(() => {
-    // If user is logged in and page has finished initial loading, redirect
-    if (user && !authLoading && !redirecting) {
-      console.log('User is logged in, redirecting to:', redirectTo);
-      setRedirecting(true);
+      console.log('[Auth] Processing OAuth callback...');
+      setProcessingCallback(true);
+      setIsLoading(true);
       
-      // Clean up stored redirect
+      try {
+        const session = await handleAuthCallback();
+        
+        if (session?.user) {
+          console.log('[Auth] OAuth callback successful, user authenticated');
+          // AuthContext will handle the user state update
+          // Navigation will happen in the next useEffect
+        } else {
+          console.log('[Auth] OAuth callback completed but no user found');
+          setAuthError('Authentication failed. Please try again.');
+        }
+      } catch (error: any) {
+        console.error('[Auth] OAuth callback error:', error);
+        setAuthError(error.message || 'Authentication failed. Please try again.');
+      } finally {
+        setIsLoading(false);
+        setProcessingCallback(false);
+      }
+    };
+    
+    // Only run callback processing on mount
+    processOAuthCallback();
+  }, []); // Empty dependency array to run only once
+
+  // Enhanced user redirect logic
+  useEffect(() => {
+    if (user && !authLoading && !processingCallback) {
+      console.log('[Auth] User authenticated, preparing redirect:', { 
+        redirectTo,
+        onboardingComplete 
+      });
+      
       localStorage.removeItem('authRedirectTo');
       
-      // Add small delay to ensure state updates before navigation
+      // Small delay to ensure state consistency
       const timer = setTimeout(() => {
-        // If onboarding is not complete, redirect to onboarding
-        if (!onboardingComplete && !redirectTo.includes('onboarding')) {
-          console.log('Redirecting to onboarding as it is not complete');
-          navigate('/app/onboarding', { replace: true });
-        } else {
-          navigate(redirectTo, { replace: true });
-        }
-      }, 500);
+        const finalRedirect = !onboardingComplete && !redirectTo.includes('onboarding') 
+          ? '/app/onboarding'
+          : redirectTo;
+          
+        console.log('[Auth] Redirecting to:', finalRedirect);
+        navigate(finalRedirect, { replace: true });
+      }, 300);
       
       return () => clearTimeout(timer);
     }
-  }, [user, authLoading, navigate, redirecting, redirectTo, onboardingComplete]);
+  }, [user, authLoading, processingCallback, navigate, redirectTo, onboardingComplete]);
 
-  // If still checking auth state, show loading
-  if (authLoading) {
+  // Show loading during auth processing
+  if (authLoading || processingCallback) {
     return (
-      <div className="min-h-screen flex items-center justify-center auth-loading-container">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+          <p className="text-muted-foreground">
+            <TranslatableText text="Authenticating..." forceTranslate={true} />
+          </p>
+        </div>
       </div>
     );
   }
 
-  // If already logged in, redirect to target page
+  // Redirect if already authenticated
   if (user) {
-    // If onboarding is not complete, redirect to onboarding instead
     const finalRedirect = !onboardingComplete && !redirectTo.includes('onboarding') 
       ? '/app/onboarding'
       : redirectTo;
       
-    console.log('User already logged in, redirecting to:', finalRedirect, {
-      onboardingComplete,
-      originalRedirect: redirectTo
-    });
     return <Navigate to={finalRedirect} replace />;
   }
 
-  // Calculate dynamic styles based on keyboard state
+  // Enhanced container styles for keyboard handling
   const containerStyles = keyboardState.isOpen && isWebtonative ? {
     height: `${keyboardState.availableHeight}px`,
     maxHeight: `${keyboardState.availableHeight}px`,
-    minHeight: `${keyboardState.availableHeight}px`,
-  } : {};
-
-  const cardStyles = keyboardState.isOpen && isWebtonative ? {
-    maxHeight: `${keyboardState.availableHeight - 32}px`, // 32px for padding
-    overflowY: 'auto' as const,
   } : {};
 
   return (
     <div 
-      className={`auth-page ${keyboardState.isOpen ? 'keyboard-visible webtonative-keyboard-open' : ''} ${isWebtonative ? 'webtonative-auth-optimized' : ''}`}
+      className={`min-h-screen flex items-center justify-center p-4 bg-background ${
+        keyboardState.isOpen ? 'keyboard-visible' : ''
+      } ${isWebtonative ? 'webtonative-auth' : ''}`}
       style={containerStyles}
     >
-      <div 
-        className={`auth-container ${keyboardState.isOpen ? 'keyboard-visible webtonative-keyboard-open' : ''} ${isWebtonative ? 'webtonative-auth-container' : ''}`}
-        style={containerStyles}
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.6 }}
+        className={`w-full max-w-md bg-card rounded-lg shadow-lg p-6 ${
+          keyboardState.isOpen ? 'keyboard-adjusted' : ''
+        }`}
       >
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6 }}
-          className={`auth-card w-full max-w-md ${keyboardState.isOpen ? 'keyboard-visible webtonative-keyboard-open' : ''} ${isWebtonative ? 'webtonative-auth-card' : ''}`}
-          style={cardStyles}
-        >
-          <div className="text-center mb-6">
-            <h1 className="text-2xl md:text-3xl font-bold mb-2">
-              <TranslatableText text="Welcome to" forceTranslate={true} />{" "}
-              <SouloLogo size="large" className="text-blue-600" />
-            </h1>
-            <p className="text-sm md:text-base text-muted-foreground">
+        <div className="text-center mb-6">
+          <h1 className="text-2xl md:text-3xl font-bold mb-2">
+            <TranslatableText text="Welcome to" forceTranslate={true} />{" "}
+            <SouloLogo size="large" className="text-blue-600" />
+          </h1>
+          <p className="text-sm md:text-base text-muted-foreground">
+            <TranslatableText 
+              text="Sign in to start your journaling journey and track your emotional wellbeing" 
+              forceTranslate={true} 
+            />
+          </p>
+        </div>
+        
+        {authError && (
+          <div className="mb-4 p-3 border border-red-500 bg-red-50 text-red-600 rounded-lg">
+            <p className="text-sm">
+              <TranslatableText text="Error:" forceTranslate={true} /> {authError}
+            </p>
+          </div>
+        )}
+        
+        <div className="space-y-4">
+          <PlatformAuthButton 
+            isLoading={isLoading}
+            onLoadingChange={setIsLoading}
+            onError={setAuthError}
+            onFocusChange={setInputFocused}
+            keyboardState={keyboardState}
+          />
+          
+          <div className="text-center text-xs md:text-sm text-muted-foreground">
+            <p>
               <TranslatableText 
-                text="Sign in to start your journaling journey and track your emotional wellbeing" 
+                text="By signing in, you agree to our Terms of Service and Privacy Policy" 
                 forceTranslate={true} 
               />
             </p>
           </div>
-          
-          {authError && (
-            <div className="mb-4 p-3 border border-red-500 bg-red-50 text-red-600 rounded-lg">
-              <p className="text-sm">
-                <TranslatableText text="Error:" forceTranslate={true} /> {authError}
-              </p>
-            </div>
-          )}
-          
-          <div className="space-y-4">
-            <PlatformAuthButton 
-              isLoading={isLoading}
-              onLoadingChange={setIsLoading}
-              onError={setAuthError}
-              onFocusChange={setInputFocused}
-              keyboardState={keyboardState}
-            />
-            
-            <div className="text-center text-xs md:text-sm text-muted-foreground">
-              <p>
-                <TranslatableText 
-                  text="By signing in, you agree to our Terms of Service and Privacy Policy" 
-                  forceTranslate={true} 
-                />
-              </p>
-            </div>
-          </div>
-        </motion.div>
-      </div>
+        </div>
+      </motion.div>
       
-      {/* Enhanced debug info for webtonative development */}
-      {(process.env.NODE_ENV === 'development' || isWebtonative) && (
-        <div className="debug-auth-info">
-          KB: {keyboardState.isOpen ? 'Open' : 'Closed'} | 
-          H: {keyboardState.height}px | 
-          AH: {keyboardState.availableHeight}px |
-          WTN: {isWebtonative ? 'Yes' : 'No'} |
-          Platform: {isAndroid ? 'Android' : isIOS ? 'iOS' : 'Other'}
+      {/* Debug info for development */}
+      {process.env.NODE_ENV === 'development' && (
+        <div className="fixed bottom-4 left-4 bg-black text-white p-2 rounded text-xs opacity-70 z-50">
+          Webtonative: {isWebtonative ? 'Yes' : 'No'} | 
+          Keyboard: {keyboardState.isOpen ? 'Open' : 'Closed'} |
+          Processing: {processingCallback ? 'Yes' : 'No'}
         </div>
       )}
     </div>

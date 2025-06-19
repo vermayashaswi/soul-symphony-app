@@ -1,96 +1,180 @@
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { isAppRoute } from '@/routes/RouteHelpers';
 
 /**
- * Gets the redirect URL for authentication
+ * Enhanced redirect URL handling for webtonative OAuth
  */
 export const getRedirectUrl = (): string => {
-  // For iOS in standalone mode (PWA), we need to handle redirects differently
-  // Check for standalone mode in a type-safe way
-  const isInStandaloneMode = () => {
-    // Check for display-mode: standalone media query (PWA)
-    const standaloneCheck = window.matchMedia('(display-mode: standalone)').matches;
-    
-    // Check for navigator.standalone (iOS Safari)
-    // @ts-ignore - This is valid on iOS Safari but not in the TypeScript types
-    const iosSafariStandalone = window.navigator.standalone;
-    
-    return standaloneCheck || iosSafariStandalone;
-  };
+  const baseUrl = window.location.origin;
   
-  // All auth redirects should go to /app/auth
-  return `${window.location.origin}/app/auth`;
+  // For webtonative, always use the app auth route
+  const redirectPath = '/app/auth';
+  const fullRedirectUrl = `${baseUrl}${redirectPath}`;
+  
+  console.log('[AuthService] Redirect URL configured:', {
+    baseUrl,
+    redirectPath,
+    fullRedirectUrl,
+    isWebtonative: /webtonative|wv|WebView/i.test(navigator.userAgent)
+  });
+  
+  return fullRedirectUrl;
 };
 
 /**
- * Sign in with Google
+ * Enhanced Google sign-in with better error handling
  */
 export const signInWithGoogle = async (): Promise<void> => {
   try {
     const redirectUrl = getRedirectUrl();
-    console.log('Using redirect URL:', redirectUrl);
+    console.log('[AuthService] Starting Google OAuth flow:', { redirectUrl });
+    
+    // Clear any existing auth state first
+    await supabase.auth.signOut({ scope: 'local' });
     
     const { data, error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: {
         redirectTo: redirectUrl,
         queryParams: {
-          // Force refresh of Google access tokens
           access_type: 'offline',
-          prompt: 'consent',
+          prompt: 'select_account' // Force account selection for better UX
         },
-      },
+        // Enhanced skip browser redirect for webtonative
+        skipBrowserRedirect: false
+      }
     });
 
     if (error) {
-      throw error;
+      console.error('[AuthService] Google OAuth error:', error);
+      throw new Error(`Google sign-in failed: ${error.message}`);
     }
     
-    // If we have a URL, manually redirect to it (as a backup)
-    if (data?.url) {
-      console.log('Redirecting to OAuth URL:', data.url);
-      setTimeout(() => {
-        window.location.href = data.url;
-      }, 100);
-    }
+    console.log('[AuthService] Google OAuth initiated successfully:', { 
+      url: data?.url,
+      provider: data?.provider 
+    });
+    
   } catch (error: any) {
-    console.error('Error signing in with Google:', error.message);
-    toast.error(`Error signing in with Google: ${error.message}`);
+    console.error('[AuthService] Google sign-in error:', error);
+    const friendlyMessage = error.message?.includes('popup_closed_by_user') 
+      ? 'Sign-in was cancelled. Please try again.'
+      : `Sign-in failed: ${error.message}`;
+    
+    toast.error(friendlyMessage);
     throw error;
   }
 };
 
 /**
- * Sign in with Apple ID
+ * Enhanced Apple sign-in
  */
 export const signInWithApple = async (): Promise<void> => {
   try {
     const redirectUrl = getRedirectUrl();
-    console.log('Using redirect URL for Apple ID:', redirectUrl);
+    console.log('[AuthService] Starting Apple OAuth flow:', { redirectUrl });
+    
+    // Clear any existing auth state first
+    await supabase.auth.signOut({ scope: 'local' });
     
     const { data, error } = await supabase.auth.signInWithOAuth({
       provider: 'apple',
       options: {
         redirectTo: redirectUrl,
-      },
+        skipBrowserRedirect: false
+      }
     });
 
     if (error) {
-      throw error;
+      console.error('[AuthService] Apple OAuth error:', error);
+      throw new Error(`Apple sign-in failed: ${error.message}`);
     }
     
-    // If we have a URL, manually redirect to it (as a backup)
-    if (data?.url) {
-      console.log('Redirecting to Apple OAuth URL:', data.url);
-      setTimeout(() => {
-        window.location.href = data.url;
-      }, 100);
-    }
+    console.log('[AuthService] Apple OAuth initiated successfully');
+    
   } catch (error: any) {
-    console.error('Error signing in with Apple:', error.message);
-    toast.error(`Error signing in with Apple: ${error.message}`);
+    console.error('[AuthService] Apple sign-in error:', error);
+    const friendlyMessage = error.message?.includes('popup_closed_by_user') 
+      ? 'Sign-in was cancelled. Please try again.'
+      : `Sign-in failed: ${error.message}`;
+    
+    toast.error(friendlyMessage);
     throw error;
+  }
+};
+
+/**
+ * Enhanced OAuth callback handler
+ */
+export const handleAuthCallback = async (): Promise<any> => {
+  try {
+    console.log('[AuthService] Processing OAuth callback...');
+    
+    // Check URL for auth parameters
+    const urlParams = new URLSearchParams(window.location.search);
+    const hashParams = new URLSearchParams(window.location.hash.substring(1));
+    
+    const hasAuthParams = urlParams.has('code') || hashParams.has('access_token') || hashParams.has('error');
+    
+    if (!hasAuthParams) {
+      console.log('[AuthService] No OAuth parameters found in URL');
+      return null;
+    }
+    
+    console.log('[AuthService] OAuth parameters detected, processing session...');
+    
+    // Get session with retries for webtonative
+    let retries = 3;
+    let session = null;
+    
+    while (retries > 0 && !session) {
+      const { data, error } = await supabase.auth.getSession();
+      
+      if (error) {
+        console.error('[AuthService] Session retrieval error:', error);
+        retries--;
+        if (retries > 0) {
+          await new Promise(resolve => setTimeout(resolve, 1000));
+          continue;
+        }
+        throw error;
+      }
+      
+      session = data.session;
+      if (!session && retries > 1) {
+        console.log('[AuthService] Session not ready, retrying...');
+        await new Promise(resolve => setTimeout(resolve, 500));
+        retries--;
+      } else {
+        break;
+      }
+    }
+    
+    if (session?.user) {
+      console.log('[AuthService] OAuth callback successful:', { 
+        userId: session.user.id,
+        email: session.user.email 
+      });
+      
+      // Clean up URL parameters
+      const cleanUrl = window.location.origin + window.location.pathname;
+      window.history.replaceState({}, document.title, cleanUrl);
+      
+      return session;
+    }
+    
+    console.warn('[AuthService] OAuth callback completed but no user session found');
+    return null;
+    
+  } catch (error: any) {
+    console.error('[AuthService] OAuth callback error:', error);
+    
+    // Clean up URL on error
+    const cleanUrl = window.location.origin + window.location.pathname;
+    window.history.replaceState({}, document.title, cleanUrl);
+    
+    toast.error(`Authentication failed: ${error.message}`);
+    return null;
   }
 };
 
@@ -241,42 +325,6 @@ export const getCurrentUser = async () => {
     return data.user;
   } catch (error) {
     console.error('Error getting current user:', error);
-    return null;
-  }
-};
-
-/**
- * Handle auth callback
- * This is specifically added to fix the auth flow
- */
-export const handleAuthCallback = async () => {
-  try {
-    // Check if we have hash params that might indicate an auth callback
-    const hasHashParams = window.location.hash.includes('access_token') || 
-                         window.location.hash.includes('error') ||
-                         window.location.search.includes('error');
-    
-    console.log('Checking for auth callback params:', hasHashParams);
-    
-    if (hasHashParams) {
-      // Get the session
-      const { data, error } = await supabase.auth.getSession();
-      
-      if (error) {
-        console.error('Error in auth callback session check:', error);
-        return null;
-      } 
-      
-      if (data.session?.user) {
-        console.log('User authenticated in callback handler');
-        // Session creation will be handled by AuthContext
-        return data.session;
-      }
-    }
-    
-    return null;
-  } catch (error) {
-    console.error('Error in handleAuthCallback:', error);
     return null;
   }
 };

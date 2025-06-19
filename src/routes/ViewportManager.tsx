@@ -1,13 +1,12 @@
 
 import React, { useEffect } from 'react';
-import { Outlet, useLocation, Navigate } from 'react-router-dom';
+import { Outlet, useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { useKeyboardState } from '@/hooks/use-keyboard-state';
 import MobileNavigation from '@/components/MobileNavigation';
 import { isAppRoute, isWebsiteRoute } from './RouteHelpers';
 import { useOnboarding } from '@/hooks/use-onboarding';
-import { forceEnableScrolling } from '@/hooks/use-scroll-restoration';
 
 const ViewportManager: React.FC = () => {
   const location = useLocation();
@@ -16,62 +15,50 @@ const ViewportManager: React.FC = () => {
   const { keyboardState } = useKeyboardState();
   const { onboardingComplete } = useOnboarding();
   
-  // Comprehensive list of routes where navigation should be hidden
-  const onboardingOrAuthPaths = [
+  // Paths where navigation should be hidden
+  const hideNavigationPaths = [
     '/app/onboarding',
     '/app/auth',
     '/onboarding',
     '/auth',
-    '/' // Also hide on root path
+    '/'
   ];
   
-  // Check if current path is in the list of paths where navigation should be hidden
-  const isOnboardingOrAuth = onboardingOrAuthPaths.includes(location.pathname);
-  
-  // Is this the home page where scrolling should be disabled?
-  const isHomePage = location.pathname === '/app/home';
-  
-  // Is this an auth page that needs special viewport handling?
+  const shouldHideNavigation = hideNavigationPaths.includes(location.pathname);
   const isAuthPage = location.pathname === '/app/auth' || location.pathname === '/auth';
   
-  // Debug log to understand route detection
-  console.log('ViewportManager - Path:', location.pathname, {
+  console.log('[ViewportManager] Route state:', {
+    path: location.pathname,
     isAppRoute: isAppRoute(location.pathname),
-    isWebsiteRoute: isWebsiteRoute(location.pathname),
-    isHomePage,
     isAuthPage,
-    user: !!user,
-    isOnboardingOrAuth,
+    hasUser: !!user,
+    shouldHideNavigation,
     onboardingComplete,
     keyboardOpen: keyboardState.isOpen,
-    isWebtonative,
-    hideNavigation: 
-      isOnboardingOrAuth || 
-      !user || 
-      (location.pathname === '/app' && !onboardingComplete)
+    isWebtonative
   });
   
-  // Enhanced route-specific viewport management
+  // Enhanced viewport management
   useEffect(() => {
     const body = document.body;
     const html = document.documentElement;
     
-    // Clean up previous route classes
+    // Clean up previous classes
     body.classList.remove(
       'viewport-home', 'viewport-auth', 'viewport-app', 'viewport-website',
-      'route-optimized', 'auth-optimized', 'webtonative-auth-flow'
+      'auth-optimized', 'webtonative-auth-flow'
     );
+    html.classList.remove('auth-route', 'app-route', 'website-route');
     
-    // Apply route-specific classes
+    // Apply route-specific optimizations
     if (isAuthPage) {
       body.classList.add('viewport-auth', 'auth-optimized');
       html.classList.add('auth-route');
       
       if (isWebtonative) {
         body.classList.add('webtonative-auth-flow');
-        html.classList.add('webtonative-auth-environment');
         
-        // Set up OAuth-optimized viewport for webtonative
+        // Enhanced viewport handling for OAuth
         const setAuthViewport = () => {
           const vh = window.innerHeight * 0.01;
           html.style.setProperty('--vh', `${vh}px`);
@@ -80,74 +67,56 @@ const ViewportManager: React.FC = () => {
           if (window.visualViewport) {
             const visualVh = window.visualViewport.height * 0.01;
             html.style.setProperty('--visual-vh', `${visualVh}px`);
+            html.style.setProperty('--available-height', `${window.visualViewport.height}px`);
           }
         };
         
         setAuthViewport();
-        window.addEventListener('resize', setAuthViewport);
-        window.addEventListener('orientationchange', () => {
+        
+        const handleResize = () => {
+          console.log('[ViewportManager] Auth viewport resize');
+          setTimeout(setAuthViewport, 100);
+        };
+        
+        const handleOrientationChange = () => {
+          console.log('[ViewportManager] Auth orientation change');
           setTimeout(setAuthViewport, 300);
-        });
+        };
+        
+        window.addEventListener('resize', handleResize);
+        window.addEventListener('orientationchange', handleOrientationChange);
         
         return () => {
-          window.removeEventListener('resize', setAuthViewport);
-          window.removeEventListener('orientationchange', setAuthViewport);
+          window.removeEventListener('resize', handleResize);
+          window.removeEventListener('orientationchange', handleOrientationChange);
         };
       }
-    } else if (isHomePage) {
-      body.classList.add('viewport-home');
-      html.classList.add('home-route');
-      
-      // Disable scrolling on home page
-      body.style.overflow = 'hidden';
-      body.style.position = 'fixed';
-      body.style.width = '100%';
-      body.style.height = '100%';
-      body.style.top = '0';
-      body.style.left = '0';
     } else if (isAppRoute(location.pathname)) {
-      body.classList.add('viewport-app', 'route-optimized');
+      body.classList.add('viewport-app');
       html.classList.add('app-route');
-      
-      // Ensure proper scrolling for app routes
-      forceEnableScrolling();
     } else if (isWebsiteRoute(location.pathname)) {
       body.classList.add('viewport-website');
       html.classList.add('website-route');
-      
-      // Ensure proper scrolling for website routes
-      forceEnableScrolling();
     }
     
-    // Cleanup when route changes
+    // Cleanup on route change
     return () => {
-      if (isHomePage) {
-        body.style.overflow = '';
-        body.style.position = '';
-        body.style.width = '';
-        body.style.height = '';
-        body.style.top = '';
-        body.style.left = '';
-      }
-      
-      html.classList.remove(
-        'auth-route', 'home-route', 'app-route', 'website-route',
-        'webtonative-auth-environment'
-      );
+      html.classList.remove('auth-route', 'app-route', 'website-route');
     };
-  }, [location.pathname, isHomePage, isAuthPage, isWebtonative]);
+  }, [location.pathname, isAuthPage, isWebtonative]);
   
-  // Render the appropriate layout based on route and device
   return (
     <>
-      <div className={`app-container ${isMobile ? 'mobile-view' : 'desktop-view'} ${isHomePage ? 'overflow-hidden' : 'overflow-x-hidden'} ${keyboardState.isOpen ? 'keyboard-active' : ''}`}>
+      <div className={`app-container ${isMobile ? 'mobile-view' : 'desktop-view'} ${
+        keyboardState.isOpen ? 'keyboard-active' : ''
+      }`}>
         <Outlet />
       </div>
       
-      {/* Enhanced mobile navigation with keyboard awareness */}
+      {/* Enhanced mobile navigation */}
       {isAppRoute(location.pathname) && 
        user && 
-       !isOnboardingOrAuth && 
+       !shouldHideNavigation && 
        onboardingComplete && (
         <MobileNavigation 
           onboardingComplete={onboardingComplete}

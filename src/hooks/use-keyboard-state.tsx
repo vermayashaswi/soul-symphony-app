@@ -18,10 +18,10 @@ interface KeyboardStateHook {
 }
 
 export function useKeyboardState(): KeyboardStateHook {
-  const { isWebtonative, isAndroid, isIOS } = useIsMobile();
+  const { isWebtonative, isAndroid } = useIsMobile();
   const [isInputFocused, setIsInputFocused] = useState(false);
-  const animationFrameRef = useRef<number>();
-  const lastHeightRef = useRef<number>(window.innerHeight);
+  const updateTimeoutRef = useRef<NodeJS.Timeout>();
+  const lastUpdateRef = useRef<number>(0);
   
   const [keyboardState, setKeyboardState] = useState<KeyboardState>({
     isOpen: false,
@@ -32,30 +32,35 @@ export function useKeyboardState(): KeyboardStateHook {
   });
 
   const updateKeyboardState = useCallback(() => {
+    // Throttle updates to prevent excessive calls
+    const now = Date.now();
+    if (now - lastUpdateRef.current < 50) {
+      return;
+    }
+    lastUpdateRef.current = now;
+
     const currentHeight = window.innerHeight;
     const visualHeight = window.visualViewport?.height || currentHeight;
     const keyboardHeight = Math.max(0, currentHeight - visualHeight);
-    const isKeyboardOpen = keyboardHeight > 100; // More conservative threshold
-    
-    // Detect animation state
-    const heightChanged = Math.abs(lastHeightRef.current - visualHeight) > 10;
-    lastHeightRef.current = visualHeight;
+    const isKeyboardOpen = keyboardHeight > 150;
+    const availableHeight = visualHeight;
     
     const newState: KeyboardState = {
       isOpen: isKeyboardOpen,
       height: keyboardHeight,
-      animating: heightChanged,
+      animating: false,
       viewportHeight: currentHeight,
-      availableHeight: visualHeight
+      availableHeight
     };
     
     setKeyboardState(prevState => {
-      // Only update if there's a significant change
+      // Only update if there's a meaningful change
       if (
         prevState.isOpen !== newState.isOpen ||
-        Math.abs(prevState.height - newState.height) > 10 ||
-        Math.abs(prevState.availableHeight - newState.availableHeight) > 10
+        Math.abs(prevState.height - newState.height) > 20 ||
+        Math.abs(prevState.availableHeight - newState.availableHeight) > 20
       ) {
+        console.log('[KeyboardState] State updated:', newState);
         return newState;
       }
       return prevState;
@@ -63,10 +68,10 @@ export function useKeyboardState(): KeyboardStateHook {
     
     // Update CSS custom properties
     document.documentElement.style.setProperty('--keyboard-height', `${keyboardHeight}px`);
-    document.documentElement.style.setProperty('--available-height', `${visualHeight}px`);
+    document.documentElement.style.setProperty('--available-height', `${availableHeight}px`);
     document.documentElement.style.setProperty('--viewport-height', `${currentHeight}px`);
     
-    // Manage body classes for keyboard state
+    // Manage body classes
     const body = document.body;
     const html = document.documentElement;
     
@@ -74,65 +79,43 @@ export function useKeyboardState(): KeyboardStateHook {
       body.classList.add('keyboard-visible');
       html.classList.add('keyboard-open');
       
-      // Add webtonative-specific classes
       if (isWebtonative) {
         body.classList.add('webtonative-keyboard-visible');
-        html.classList.add('webtonative-keyboard-open');
-      }
-      
-      // Add platform-specific classes
-      if (isAndroid) {
-        body.classList.add('android-keyboard-visible');
-      }
-      if (isIOS) {
-        body.classList.add('ios-keyboard-visible');
       }
     } else {
-      body.classList.remove('keyboard-visible', 'webtonative-keyboard-visible', 'android-keyboard-visible', 'ios-keyboard-visible');
-      html.classList.remove('keyboard-open', 'webtonative-keyboard-open');
+      body.classList.remove('keyboard-visible', 'webtonative-keyboard-visible');
+      html.classList.remove('keyboard-open');
     }
-    
-    console.log('[KeyboardState] Updated:', {
-      isOpen: isKeyboardOpen,
-      height: keyboardHeight,
-      available: visualHeight,
-      viewport: currentHeight,
-      isWebtonative,
-      isAndroid,
-      isIOS
-    });
-  }, [isWebtonative, isAndroid, isIOS]);
+  }, [isWebtonative]);
 
   useEffect(() => {
     if (!isWebtonative) {
       return;
     }
 
-    console.log('[KeyboardState] Setting up keyboard detection for webtonative');
-
-    // Initial state
+    console.log('[KeyboardState] Initializing for webtonative');
     updateKeyboardState();
 
-    // Set up event listeners
-    const handleResize = () => {
-      if (animationFrameRef.current) {
-        cancelAnimationFrame(animationFrameRef.current);
+    const debouncedUpdate = () => {
+      if (updateTimeoutRef.current) {
+        clearTimeout(updateTimeoutRef.current);
       }
-      animationFrameRef.current = requestAnimationFrame(updateKeyboardState);
+      updateTimeoutRef.current = setTimeout(updateKeyboardState, 100);
+    };
+
+    const handleResize = () => {
+      console.log('[KeyboardState] Resize detected');
+      debouncedUpdate();
     };
 
     const handleVisualViewportChange = () => {
-      if (animationFrameRef.current) {
-        cancelAnimationFrame(animationFrameRef.current);
-      }
-      animationFrameRef.current = requestAnimationFrame(updateKeyboardState);
+      console.log('[KeyboardState] Visual viewport change');
+      debouncedUpdate();
     };
 
     const handleOrientationChange = () => {
-      console.log('[KeyboardState] Orientation change detected');
-      setTimeout(() => {
-        updateKeyboardState();
-      }, 300);
+      console.log('[KeyboardState] Orientation change');
+      setTimeout(updateKeyboardState, 300);
     };
 
     // Add event listeners
@@ -141,21 +124,20 @@ export function useKeyboardState(): KeyboardStateHook {
     
     if (window.visualViewport) {
       window.visualViewport.addEventListener('resize', handleVisualViewportChange, { passive: true });
-      window.visualViewport.addEventListener('scroll', handleVisualViewportChange, { passive: true });
     }
 
-    // Enhanced Android-specific handling
+    // Enhanced Android support
     if (isAndroid) {
       const handleFocusIn = () => {
-        console.log('[KeyboardState] Input focused - Android');
+        console.log('[KeyboardState] Android input focused');
         setIsInputFocused(true);
-        setTimeout(updateKeyboardState, 100);
+        setTimeout(updateKeyboardState, 150);
       };
 
       const handleFocusOut = () => {
-        console.log('[KeyboardState] Input blurred - Android');
+        console.log('[KeyboardState] Android input blurred');
         setIsInputFocused(false);
-        setTimeout(updateKeyboardState, 100);
+        setTimeout(updateKeyboardState, 150);
       };
 
       document.addEventListener('focusin', handleFocusIn);
@@ -169,27 +151,24 @@ export function useKeyboardState(): KeyboardStateHook {
         
         if (window.visualViewport) {
           window.visualViewport.removeEventListener('resize', handleVisualViewportChange);
-          window.visualViewport.removeEventListener('scroll', handleVisualViewportChange);
         }
         
-        if (animationFrameRef.current) {
-          cancelAnimationFrame(animationFrameRef.current);
+        if (updateTimeoutRef.current) {
+          clearTimeout(updateTimeoutRef.current);
         }
       };
     }
 
-    // Cleanup for non-Android devices
     return () => {
       window.removeEventListener('resize', handleResize);
       window.removeEventListener('orientationchange', handleOrientationChange);
       
       if (window.visualViewport) {
         window.visualViewport.removeEventListener('resize', handleVisualViewportChange);
-        window.visualViewport.removeEventListener('scroll', handleVisualViewportChange);
       }
       
-      if (animationFrameRef.current) {
-        cancelAnimationFrame(animationFrameRef.current);
+      if (updateTimeoutRef.current) {
+        clearTimeout(updateTimeoutRef.current);
       }
     };
   }, [isWebtonative, isAndroid, updateKeyboardState]);
@@ -197,9 +176,7 @@ export function useKeyboardState(): KeyboardStateHook {
   const setInputFocusedWrapper = useCallback((focused: boolean) => {
     setIsInputFocused(focused);
     console.log('[KeyboardState] Input focus changed:', focused);
-    
-    // Trigger keyboard state update on focus change
-    setTimeout(updateKeyboardState, 50);
+    setTimeout(updateKeyboardState, 100);
   }, [updateKeyboardState]);
 
   return {
