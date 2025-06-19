@@ -31,16 +31,8 @@
     --input: 240 5.9% 90%;
     --ring: 217 91.2% 59.8%;
     --radius: 0.75rem;
-    --radius-full: 9999px;
     --color-theme: #3b82f6;
     --chart-bg: 0 0% 100%;
-    --primary-h: 217;
-    --primary-s: 91.2%;
-    --primary-l: 59.8%;
-    --edit-btn-bg: 217 91.2% 95%; 
-    --edit-btn-text: 217 91.2% 40%;
-    --delete-btn-bg: 0 84.2% 95%;
-    --delete-btn-text: 0 84.2% 40%;
   }
  
   .dark {
@@ -63,15 +55,7 @@
     --border: 240 3.7% 15.9%;
     --input: 240 3.7% 15.9%;
     --ring: 217 91.2% 59.8%;
-    --radius-full: 9999px;
     --chart-bg: 240 10% 3.9%;
-    --primary-h: 217;
-    --primary-s: 91.2%;
-    --primary-l: 59.8%;
-    --edit-btn-bg: 217 91.2% 25%;
-    --edit-btn-text: 217 91.2% 80%;
-    --delete-btn-bg: 0 62.8% 20%;
-    --delete-btn-text: 0 62.8% 80%;
   }
 }
 
@@ -86,15 +70,6 @@
     -moz-osx-font-smoothing: grayscale;
   }
   
-  /* Native app specific styling */
-  body[data-native-app] {
-    -webkit-appearance: none !important;
-    -webkit-tap-highlight-color: transparent !important;
-    -webkit-user-select: none !important;
-    -webkit-touch-callout: none !important;
-    -webkit-text-size-adjust: 100% !important;
-  }
-  
   /* App route specific styling */
   body[data-app-route="true"] h1, 
   body[data-app-route="true"] h2, 
@@ -102,20 +77,10 @@
     color: var(--color-theme) !important;
     font-weight: 600 !important;
   }
-  
-  .rounded-full {
-    border-radius: 9999px !important;
-  }
-  
-  [data-radix-popper-content-wrapper] [data-radix-radio-item],
-  [data-radix-radio-item] {
-    border-radius: 9999px !important;
-  }
 }
 
-/* Unified theme utilities */
+/* Theme utilities */
 @layer utilities {
-  /* Theme color classes */
   .text-theme, 
   .text-theme-color {
     color: var(--color-theme) !important;
@@ -151,27 +116,13 @@
   body:not([data-app-route="true"]) .hover\\:bg-primary:hover {
     background-color: rgb(126 34 206) !important;
   }
-  
-  /* Native app button styling */
-  body[data-native-app] button {
-    -webkit-appearance: none !important;
-    border-radius: 8px !important;
-    transition: all 0.2s ease !important;
-  }
-  
-  body[data-native-app] input,
-  body[data-native-app] select,
-  body[data-native-app] textarea {
-    -webkit-appearance: none !important;
-    border-radius: 8px !important;
-  }
 }
 
 html {
   scroll-behavior: smooth;
 }
 
-/* Dark mode support with enhanced contrast for native apps */
+/* Dark mode support */
 @media (prefers-color-scheme: dark) {
   :root:not(.light):not(.dark) {
     --background: 240 10% 3.9%;
@@ -192,36 +143,12 @@ html {
     --border: 240 3.7% 15.9%;
     --input: 240 3.7% 15.9%;
     --chart-bg: 240 10% 3.9%;
-    --edit-btn-bg: 217 91.2% 25%;
-    --edit-btn-text: 217 91.2% 80%;
-    --delete-btn-bg: 0 62.8% 20%;
-    --delete-btn-text: 0 62.8% 80%;
   }
 }
 
-/* Enhanced styles for better native app rendering */
+/* Performance optimizations */
 .crisp-text {
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  letter-spacing: 0.01em;
-}
-
-.text-glow {
-  text-shadow: 
-    0 0 10px rgba(255, 255, 255, 1),
-    0 0 5px rgba(255, 255, 255, 1);
-}
-
-.text-glow-strong {
-  text-shadow: 
-    0 0 15px rgba(255, 255, 255, 1),
-    0 0 8px rgba(255, 255, 255, 1),
-    0 0 3px rgba(255, 255, 255, 1);
-}
-
-/* Native app performance optimizations */
-body[data-native-app] * {
-  transform: translateZ(0); /* Force hardware acceleration */
-  backface-visibility: hidden;
 }
