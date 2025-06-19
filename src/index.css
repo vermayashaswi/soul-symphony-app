@@ -1,3 +1,4 @@
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -83,8 +84,11 @@
   body {
     @apply bg-background text-foreground;
   }
-  /* Apply theme color to all page headers */
-  h1, h2, h3 {
+  
+  /* Apply theme color only to app pages, not marketing pages */
+  body[data-app-route="true"] h1, 
+  body[data-app-route="true"] h2, 
+  body[data-app-route="true"] h3 {
     @apply text-theme-color;
   }
   
@@ -100,68 +104,85 @@
   }
 }
 
-/* Global theme color utilities */
+/* Global theme color utilities - ONLY for app routes */
 @layer utilities {
-  .theme-text {
+  /* Theme utilities only apply to app routes */
+  body[data-app-route="true"] .theme-text {
     color: var(--color-theme) !important;
   }
   
-  .theme-bg {
+  body[data-app-route="true"] .theme-bg {
     background-color: var(--color-theme) !important;
   }
   
-  .theme-border {
+  body[data-app-route="true"] .theme-border {
     border-color: var(--color-theme) !important;
   }
   
-  .theme-fill {
+  body[data-app-route="true"] .theme-fill {
     fill: var(--color-theme) !important;
   }
   
-  .theme-stroke {
+  body[data-app-route="true"] .theme-stroke {
     stroke: var(--color-theme) !important;
   }
   
-  .hover-theme-bg:hover {
+  body[data-app-route="true"] .hover-theme-bg:hover {
     background-color: var(--color-theme) !important;
   }
   
-  .hover-theme-text:hover {
+  body[data-app-route="true"] .hover-theme-text:hover {
     color: var(--color-theme) !important;
   }
   
-  .hover-theme-border:hover {
+  body[data-app-route="true"] .hover-theme-border:hover {
     border-color: var(--color-theme) !important;
   }
   
-  /* Special utility classes for text-theme and bg-theme */
-  .text-theme, .text-theme-color {
+  /* Special utility classes for text-theme and bg-theme - APP ROUTES ONLY */
+  body[data-app-route="true"] .text-theme, 
+  body[data-app-route="true"] .text-theme-color {
     color: var(--color-theme) !important;
   }
   
-  .bg-theme, .bg-theme-color {
+  body[data-app-route="true"] .bg-theme, 
+  body[data-app-route="true"] .bg-theme-color {
     background-color: var(--color-theme) !important;
   }
   
-  .border-theme, .border-theme-color {
+  body[data-app-route="true"] .border-theme, 
+  body[data-app-route="true"] .border-theme-color {
     border-color: var(--color-theme) !important;
   }
   
   /* Thread action button utilities */
-  .edit-button-bg {
+  body[data-app-route="true"] .edit-button-bg {
     background-color: hsl(var(--edit-btn-bg)) !important;
   }
   
-  .edit-button-text {
+  body[data-app-route="true"] .edit-button-text {
     color: hsl(var(--edit-btn-text)) !important;
   }
   
-  .delete-button-bg {
+  body[data-app-route="true"] .delete-button-bg {
     background-color: hsl(var(--delete-btn-bg)) !important;
   }
   
-  .delete-button-text {
+  body[data-app-route="true"] .delete-button-text {
     color: hsl(var(--delete-btn-text)) !important;
+  }
+  
+  /* Marketing page specific styles - override any theme colors */
+  body:not([data-app-route="true"]) .text-primary {
+    color: rgb(147 51 234) !important; /* purple-600 */
+  }
+  
+  body:not([data-app-route="true"]) .bg-primary {
+    background-color: rgb(147 51 234) !important; /* purple-600 */
+  }
+  
+  body:not([data-app-route="true"]) .hover\\:bg-primary:hover {
+    background-color: rgb(126 34 206) !important; /* purple-700 */
   }
 }
 
