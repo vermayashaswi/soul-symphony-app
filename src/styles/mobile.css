@@ -13,6 +13,13 @@
   --safe-area-bottom: 0px;
   --safe-area-left: 0px;
   --safe-area-right: 0px;
+  
+  /* Enhanced auth-specific viewport properties */
+  --auth-vh: 1vh;
+  --auth-visual-vh: 1vh;
+  --auth-available-height: 100vh;
+  --auth-total-height: 100vh;
+  --viewport-height: 100vh;
 }
 
 /* Enhanced viewport meta handling for webtonative */
@@ -35,7 +42,7 @@ body {
   -webkit-overflow-scrolling: touch;
 }
 
-/* Webtonative-specific viewport management */
+/* Enhanced webtonative-specific viewport management */
 .webtonative-app {
   /* Force hardware acceleration */
   transform: translateZ(0);
@@ -57,7 +64,8 @@ body {
 }
 
 /* Enhanced keyboard detection and handling */
-.keyboard-visible {
+.keyboard-visible,
+.keyboard-open {
   /* Prevent viewport jumping when keyboard opens */
   position: fixed !important;
   width: 100% !important;
@@ -67,29 +75,24 @@ body {
   max-height: var(--available-height) !important;
 }
 
-.keyboard-visible body {
+.keyboard-visible body,
+.keyboard-open body {
   height: var(--available-height) !important;
   max-height: var(--available-height) !important;
   overflow: hidden !important;
 }
 
-/* Input focus management with enhanced keyboard handling */
-.input-focused {
-  transition: all 0.2s ease !important;
-  /* Ensure input stays visible */
-  position: relative !important;
-  z-index: 1000 !important;
-}
-
-/* Webtonative keyboard-specific fixes */
-.webtonative-keyboard-open {
+/* Enhanced webtonative keyboard-specific fixes */
+.webtonative-keyboard-open,
+.webtonative-keyboard-visible {
   /* Adjust viewport when keyboard is open */
   height: var(--available-height) !important;
   min-height: var(--available-height) !important;
   max-height: var(--available-height) !important;
 }
 
-.webtonative-keyboard-open body {
+.webtonative-keyboard-open body,
+.webtonative-keyboard-visible body {
   height: var(--available-height) !important;
   overflow: hidden !important;
 }
@@ -102,7 +105,9 @@ body {
   touch-action: pan-x pan-y !important;
 }
 
-.android-device.keyboard-visible {
+.android-device.keyboard-visible,
+.android-device.webtonative-keyboard-visible,
+.android-keyboard-visible {
   /* Use available height instead of full viewport when keyboard is open */
   height: var(--available-height) !important;
   max-height: var(--available-height) !important;
@@ -117,31 +122,39 @@ body {
 /* Enhanced auth page specific keyboard handling */
 .auth-page {
   /* Use dynamic viewport height */
-  min-height: calc(var(--vh, 1vh) * 100) !important;
-  height: calc(var(--vh, 1vh) * 100) !important;
-  max-height: calc(var(--vh, 1vh) * 100) !important;
+  min-height: calc(var(--auth-vh, 1vh) * 100) !important;
+  height: calc(var(--auth-vh, 1vh) * 100) !important;
+  max-height: calc(var(--auth-vh, 1vh) * 100) !important;
   overflow: hidden !important;
   position: relative !important;
   /* Prevent white space issues */
   background: hsl(var(--background)) !important;
 }
 
-.auth-page.keyboard-visible {
-  height: var(--available-height) !important;
-  min-height: var(--available-height) !important;
-  max-height: var(--available-height) !important;
+/* Enhanced auth page viewport optimization */
+.auth-page.webtonative-auth-optimized {
+  height: calc(var(--auth-total-height, 100vh)) !important;
+  min-height: calc(var(--auth-total-height, 100vh)) !important;
+  max-height: calc(var(--auth-total-height, 100vh)) !important;
+  position: fixed !important;
+  top: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  bottom: 0 !important;
+  z-index: 9999 !important;
 }
 
+.auth-page.keyboard-visible,
 .auth-page.webtonative-keyboard-open {
-  height: var(--available-height) !important;
-  min-height: var(--available-height) !important;
-  max-height: var(--available-height) !important;
+  height: var(--auth-available-height, var(--available-height)) !important;
+  min-height: var(--auth-available-height, var(--available-height)) !important;
+  max-height: var(--auth-available-height, var(--available-height)) !important;
 }
 
 .auth-container {
   /* Use dynamic viewport height */
-  min-height: calc(var(--vh, 1vh) * 100) !important;
-  height: calc(var(--vh, 1vh) * 100) !important;
+  min-height: calc(var(--auth-vh, 1vh) * 100) !important;
+  height: calc(var(--auth-vh, 1vh) * 100) !important;
   display: flex !important;
   flex-direction: column !important;
   justify-content: center !important;
@@ -154,20 +167,25 @@ body {
   background: hsl(var(--background)) !important;
 }
 
-.auth-container.keyboard-visible {
-  justify-content: flex-start !important;
-  padding-top: 2rem !important;
-  height: var(--available-height) !important;
-  min-height: var(--available-height) !important;
-  max-height: var(--available-height) !important;
+/* Enhanced auth container for webtonative */
+.auth-container.webtonative-auth-container {
+  height: calc(var(--auth-total-height, 100vh)) !important;
+  min-height: calc(var(--auth-total-height, 100vh)) !important;
+  max-height: calc(var(--auth-total-height, 100vh)) !important;
+  position: fixed !important;
+  top: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  bottom: 0 !important;
 }
 
+.auth-container.keyboard-visible,
 .auth-container.webtonative-keyboard-open {
   justify-content: flex-start !important;
-  padding-top: 1rem !important;
-  height: var(--available-height) !important;
-  min-height: var(--available-height) !important;
-  max-height: var(--available-height) !important;
+  padding-top: 2rem !important;
+  height: var(--auth-available-height, var(--available-height)) !important;
+  min-height: var(--auth-available-height, var(--available-height)) !important;
+  max-height: var(--auth-available-height, var(--available-height)) !important;
 }
 
 .auth-card {
@@ -184,6 +202,16 @@ body {
   box-sizing: border-box !important;
 }
 
+/* Enhanced auth card for webtonative */
+.auth-card.webtonative-auth-card {
+  /* Ensure proper sizing in webtonative */
+  max-height: calc(var(--auth-total-height, 100vh) - 4rem) !important;
+  overflow-y: auto !important;
+  /* Optimize for webtonative rendering */
+  transform: translateZ(0) !important;
+  will-change: transform !important;
+}
+
 .keyboard-visible .auth-card,
 .webtonative-keyboard-open .auth-card {
   margin: 0.5rem !important;
@@ -191,35 +219,11 @@ body {
   /* Ensure card stays visible when keyboard opens */
   transform: translateY(0) !important;
   /* Prevent card from growing too large */
-  max-height: calc(var(--available-height) - 2rem) !important;
+  max-height: calc(var(--auth-available-height, var(--available-height)) - 2rem) !important;
   overflow-y: auto !important;
 }
 
-/* Enhanced input field styles for webtonative */
-.auth-input {
-  width: 100% !important;
-  padding: 12px 16px !important;
-  border: 2px solid hsl(var(--border)) !important;
-  border-radius: 8px !important;
-  font-size: 16px !important; /* Prevent zoom on iOS */
-  line-height: 1.5 !important;
-  background: hsl(var(--background)) !important;
-  color: hsl(var(--foreground)) !important;
-  transition: border-color 0.2s ease !important;
-  /* Prevent appearance issues */
-  -webkit-appearance: none !important;
-  appearance: none !important;
-  /* Improve touch handling */
-  touch-action: manipulation !important;
-}
-
-.auth-input:focus {
-  outline: none !important;
-  border-color: hsl(var(--primary)) !important;
-  box-shadow: 0 0 0 3px hsla(var(--primary), 0.1) !important;
-}
-
-/* Enhanced button styles for webtonative */
+/* Enhanced auth button styles for webtonative */
 .auth-button {
   width: 100% !important;
   padding: 12px 24px !important;
@@ -238,23 +242,113 @@ body {
   -webkit-user-select: none !important;
 }
 
-/* Enhanced webtonative container management */
-.webtonative-container {
+/* Enhanced webtonative auth button */
+.webtonative-auth-button {
+  /* Optimize for webtonative interaction */
+  transform: translateZ(0) !important;
+  will-change: transform !important;
+  /* Ensure proper touch handling */
+  -webkit-tap-highlight-color: transparent !important;
+}
+
+.keyboard-visible-button {
+  /* Adjust button when keyboard is visible */
+  margin-top: 0.5rem !important;
+  padding: 10px 20px !important;
+}
+
+/* Enhanced webtonative OAuth flow optimization */
+.webtonative-oauth-flow .auth-page {
+  /* Ensure stable layout during OAuth redirects */
   position: fixed !important;
   top: 0 !important;
   left: 0 !important;
   right: 0 !important;
   bottom: 0 !important;
+  background: hsl(var(--background)) !important;
+  z-index: 9999 !important;
+}
+
+.webtonative-oauth-flow .auth-container {
+  height: 100vh !important;
+  height: calc(var(--auth-vh, 1vh) * 100) !important;
+  max-height: 100vh !important;
+  max-height: calc(var(--auth-vh, 1vh) * 100) !important;
+}
+
+.auth-viewport-optimized {
+  /* Additional optimization for auth viewport */
+  overflow: hidden !important;
+  position: fixed !important;
   width: 100% !important;
   height: 100% !important;
+}
+
+/* Enhanced route-specific viewport classes */
+.viewport-auth {
+  /* Auth page specific viewport */
+  height: calc(var(--auth-vh, 1vh) * 100) !important;
+  min-height: calc(var(--auth-vh, 1vh) * 100) !important;
   overflow: hidden !important;
+}
+
+.auth-optimized {
+  /* Auth-optimized viewport handling */
+  position: relative !important;
   background: hsl(var(--background)) !important;
 }
 
-.webtonative-container.keyboard-visible,
-.webtonative-container.webtonative-keyboard-open {
-  bottom: var(--keyboard-height, 0px) !important;
-  height: calc(100% - var(--keyboard-height, 0px)) !important;
+html.auth-route {
+  /* HTML optimizations for auth routes */
+  height: 100% !important;
+  overflow: hidden !important;
+}
+
+html.webtonative-auth-environment {
+  /* Enhanced webtonative auth environment */
+  position: fixed !important;
+  width: 100% !important;
+  height: 100% !important;
+  overflow: hidden !important;
+}
+
+/* Enhanced loading states for auth */
+.auth-loading-container {
+  min-height: calc(var(--auth-vh, 1vh) * 100) !important;
+  height: calc(var(--auth-vh, 1vh) * 100) !important;
+  background: hsl(var(--background)) !important;
+}
+
+/* Enhanced debug styles for webtonative development */
+.debug-auth-info {
+  position: fixed !important;
+  bottom: 0 !important;
+  left: 0 !important;
+  background: rgba(0, 0, 255, 0.8) !important;
+  color: white !important;
+  padding: 4px 8px !important;
+  font-size: 10px !important;
+  z-index: 99999 !important;
+  pointer-events: none !important;
+  font-family: monospace !important;
+  max-width: 100% !important;
+  overflow: hidden !important;
+  white-space: nowrap !important;
+}
+
+/* Enhanced mobile navigation with keyboard awareness */
+.mobile-navigation.keyboard-hidden {
+  transform: translateY(100%) !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+  transition: all 0.2s ease !important;
+}
+
+/* Enhanced app container keyboard awareness */
+.app-container.keyboard-active {
+  height: var(--available-height) !important;
+  max-height: var(--available-height) !important;
+  overflow: hidden !important;
 }
 
 @media (max-width: 768px) {
@@ -283,7 +377,7 @@ body {
   .webtonative-keyboard-open .auth-card {
     margin: 0.5rem 0 !important;
     padding: 1rem !important;
-    max-height: calc(var(--available-height) - 2rem) !important;
+    max-height: calc(var(--auth-available-height, var(--available-height)) - 2rem) !important;
     overflow-y: auto !important;
   }
   
@@ -477,50 +571,4 @@ body {
     transform: translateZ(0) !important;
     -webkit-transform: translateZ(0) !important;
   }
-}
-
-/* Enhanced debug styles for webtonative development */
-.debug-viewport {
-  position: fixed !important;
-  top: 0 !important;
-  right: 0 !important;
-  background: rgba(0, 0, 0, 0.8) !important;
-  color: white !important;
-  padding: 4px 8px !important;
-  font-size: 10px !important;
-  z-index: 99999 !important;
-  pointer-events: none !important;
-  font-family: monospace !important;
-}
-
-.debug-keyboard-info {
-  position: fixed !important;
-  bottom: 0 !important;
-  left: 0 !important;
-  background: rgba(255, 0, 0, 0.8) !important;
-  color: white !important;
-  padding: 4px 8px !important;
-  font-size: 10px !important;
-  z-index: 99999 !important;
-  pointer-events: none !important;
-  font-family: monospace !important;
-}
-
-/* Webtonative OAuth-specific fixes */
-.webtonative-oauth-flow .auth-page {
-  /* Ensure stable layout during OAuth redirects */
-  position: fixed !important;
-  top: 0 !important;
-  left: 0 !important;
-  right: 0 !important;
-  bottom: 0 !important;
-  background: hsl(var(--background)) !important;
-  z-index: 9999 !important;
-}
-
-.webtonative-oauth-flow .auth-container {
-  height: 100vh !important;
-  height: calc(var(--vh, 1vh) * 100) !important;
-  max-height: 100vh !important;
-  max-height: calc(var(--vh, 1vh) * 100) !important;
 }

@@ -5,16 +5,28 @@ import { TranslatableText } from '@/components/translation/TranslatableText';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { signInWithGoogle, signInWithApple } from '@/services/authService';
 
+interface KeyboardState {
+  isOpen: boolean;
+  height: number;
+  animating: boolean;
+  viewportHeight: number;
+  availableHeight: number;
+}
+
 interface PlatformAuthButtonProps {
   isLoading: boolean;
   onLoadingChange: (loading: boolean) => void;
   onError: (error: string) => void;
+  onFocusChange?: (focused: boolean) => void;
+  keyboardState?: KeyboardState;
 }
 
 const PlatformAuthButton: React.FC<PlatformAuthButtonProps> = ({ 
   isLoading, 
   onLoadingChange, 
-  onError 
+  onError,
+  onFocusChange,
+  keyboardState
 }) => {
   const { isIOS, isAndroid, isWebtonative } = useIsMobile();
 
@@ -22,12 +34,22 @@ const PlatformAuthButton: React.FC<PlatformAuthButtonProps> = ({
     try {
       onLoadingChange(true);
       onError('');
-      console.log('Initiating Google sign-in', { isWebtonative, isAndroid });
+      console.log('Initiating Google sign-in', { 
+        isWebtonative, 
+        isAndroid,
+        keyboardOpen: keyboardState?.isOpen,
+        availableHeight: keyboardState?.availableHeight 
+      });
+      
+      // Notify about focus change for keyboard handling
+      onFocusChange?.(true);
+      
       await signInWithGoogle();
     } catch (error: any) {
       console.error('Google sign-in error:', error.message);
       onError(error.message);
       onLoadingChange(false);
+      onFocusChange?.(false);
     }
   };
 
@@ -35,13 +57,34 @@ const PlatformAuthButton: React.FC<PlatformAuthButtonProps> = ({
     try {
       onLoadingChange(true);
       onError('');
-      console.log('Initiating Apple ID sign-in', { isWebtonative, isIOS });
+      console.log('Initiating Apple ID sign-in', { 
+        isWebtonative, 
+        isIOS,
+        keyboardOpen: keyboardState?.isOpen,
+        availableHeight: keyboardState?.availableHeight 
+      });
+      
+      // Notify about focus change for keyboard handling
+      onFocusChange?.(true);
+      
       await signInWithApple();
     } catch (error: any) {
       console.error('Apple ID sign-in error:', error.message);
       onError(error.message);
       onLoadingChange(false);
+      onFocusChange?.(false);
     }
+  };
+
+  // Enhanced button styling for webtonative keyboard handling
+  const getButtonClasses = () => {
+    let classes = "w-full flex items-center justify-center gap-2 auth-button webtonative-auth-button";
+    
+    if (isWebtonative && keyboardState?.isOpen) {
+      classes += " keyboard-visible-button";
+    }
+    
+    return classes;
   };
 
   // For iOS devices, show Apple ID sign-in
@@ -49,9 +92,11 @@ const PlatformAuthButton: React.FC<PlatformAuthButtonProps> = ({
     return (
       <Button 
         size="lg" 
-        className="w-full flex items-center justify-center gap-2 bg-black text-white hover:bg-gray-800 auth-button"
+        className={`${getButtonClasses()} bg-black text-white hover:bg-gray-800`}
         onClick={handleAppleSignIn}
         disabled={isLoading}
+        onFocus={() => onFocusChange?.(true)}
+        onBlur={() => onFocusChange?.(false)}
       >
         {isLoading ? (
           <span className="animate-spin h-5 w-5 border-t-2 border-white rounded-full mr-2" />
@@ -70,9 +115,11 @@ const PlatformAuthButton: React.FC<PlatformAuthButtonProps> = ({
     return (
       <Button 
         size="lg" 
-        className="w-full flex items-center justify-center gap-2 auth-button"
+        className={getButtonClasses()}
         onClick={handleGoogleSignIn}
         disabled={isLoading}
+        onFocus={() => onFocusChange?.(true)}
+        onBlur={() => onFocusChange?.(false)}
       >
         {isLoading ? (
           <span className="animate-spin h-5 w-5 border-t-2 border-white rounded-full mr-2" />
@@ -95,9 +142,11 @@ const PlatformAuthButton: React.FC<PlatformAuthButtonProps> = ({
   return (
     <Button 
       size="lg" 
-      className="w-full flex items-center justify-center gap-2 auth-button"
+      className={getButtonClasses()}
       onClick={handleGoogleSignIn}
       disabled={isLoading}
+      onFocus={() => onFocusChange?.(true)}
+      onBlur={() => onFocusChange?.(false)}
     >
       {isLoading ? (
         <span className="animate-spin h-5 w-5 border-t-2 border-white rounded-full mr-2" />

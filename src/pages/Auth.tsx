@@ -8,7 +8,7 @@ import SouloLogo from '@/components/SouloLogo';
 import { useOnboarding } from '@/hooks/use-onboarding';
 import { TranslatableText } from '@/components/translation/TranslatableText';
 import PlatformAuthButton from '@/components/auth/PlatformAuthButton';
-import { useWebtonativeViewport } from '@/hooks/use-webtonative-viewport';
+import { useKeyboardState } from '@/hooks/use-keyboard-state';
 import { useIsMobile } from '@/hooks/use-mobile';
 
 export default function Auth() {
@@ -20,8 +20,8 @@ export default function Auth() {
   const { user, isLoading: authLoading } = useAuth();
   const { onboardingComplete } = useOnboarding();
   const [authError, setAuthError] = useState<string | null>(null);
-  const { isWebtonative } = useIsMobile();
-  const { isKeyboardOpen } = useWebtonativeViewport();
+  const { isWebtonative, isAndroid, isIOS } = useIsMobile();
+  const { keyboardState, setInputFocused } = useKeyboardState();
   
   const redirectParam = searchParams.get('redirectTo');
   const fromLocation = location.state?.from?.pathname;
@@ -52,15 +52,71 @@ export default function Auth() {
     currentPath: location.pathname,
     onboardingComplete,
     isWebtonative,
-    isKeyboardOpen
+    keyboardOpen: keyboardState.isOpen,
+    keyboardHeight: keyboardState.height,
+    availableHeight: keyboardState.availableHeight
   });
 
-  // Set up OAuth flow detection for webtonative
+  // Enhanced OAuth flow detection and optimization for webtonative
   useEffect(() => {
     if (isWebtonative) {
-      document.body.classList.add('webtonative-oauth-flow');
+      const body = document.body;
+      const html = document.documentElement;
+      
+      // Add webtonative OAuth flow classes
+      body.classList.add('webtonative-oauth-flow', 'auth-viewport-optimized');
+      html.classList.add('webtonative-oauth-environment');
+      
+      // Set up enhanced viewport management for OAuth
+      const optimizeAuthViewport = () => {
+        const currentHeight = window.innerHeight;
+        const visualHeight = window.visualViewport?.height || currentHeight;
+        
+        // Set CSS custom properties for auth-specific viewport
+        html.style.setProperty('--auth-vh', `${currentHeight * 0.01}px`);
+        html.style.setProperty('--auth-visual-vh', `${visualHeight * 0.01}px`);
+        html.style.setProperty('--auth-available-height', `${visualHeight}px`);
+        html.style.setProperty('--auth-total-height', `${currentHeight}px`);
+        
+        console.log('[Auth] Viewport optimized for OAuth:', {
+          currentHeight,
+          visualHeight,
+          keyboardHeight: currentHeight - visualHeight,
+          isWebtonative
+        });
+      };
+      
+      // Initial optimization
+      optimizeAuthViewport();
+      
+      // Set up listeners for viewport changes during OAuth flow
+      const handleAuthResize = () => {
+        console.log('[Auth] OAuth viewport resize detected');
+        setTimeout(optimizeAuthViewport, 100);
+      };
+      
+      const handleAuthOrientationChange = () => {
+        console.log('[Auth] OAuth orientation change detected');
+        setTimeout(optimizeAuthViewport, 300);
+      };
+      
+      window.addEventListener('resize', handleAuthResize);
+      window.addEventListener('orientationchange', handleAuthOrientationChange);
+      
+      if (window.visualViewport) {
+        window.visualViewport.addEventListener('resize', optimizeAuthViewport);
+      }
+      
       return () => {
-        document.body.classList.remove('webtonative-oauth-flow');
+        body.classList.remove('webtonative-oauth-flow', 'auth-viewport-optimized');
+        html.classList.remove('webtonative-oauth-environment');
+        
+        window.removeEventListener('resize', handleAuthResize);
+        window.removeEventListener('orientationchange', handleAuthOrientationChange);
+        
+        if (window.visualViewport) {
+          window.visualViewport.removeEventListener('resize', optimizeAuthViewport);
+        }
       };
     }
   }, [isWebtonative]);
@@ -96,7 +152,7 @@ export default function Auth() {
   // If still checking auth state, show loading
   if (authLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
+      <div className="min-h-screen flex items-center justify-center auth-loading-container">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
       </div>
     );
@@ -116,14 +172,33 @@ export default function Auth() {
     return <Navigate to={finalRedirect} replace />;
   }
 
+  // Calculate dynamic styles based on keyboard state
+  const containerStyles = keyboardState.isOpen && isWebtonative ? {
+    height: `${keyboardState.availableHeight}px`,
+    maxHeight: `${keyboardState.availableHeight}px`,
+    minHeight: `${keyboardState.availableHeight}px`,
+  } : {};
+
+  const cardStyles = keyboardState.isOpen && isWebtonative ? {
+    maxHeight: `${keyboardState.availableHeight - 32}px`, // 32px for padding
+    overflowY: 'auto' as const,
+  } : {};
+
   return (
-    <div className={`auth-page ${isKeyboardOpen ? 'keyboard-visible webtonative-keyboard-open' : ''}`}>
-      <div className={`auth-container ${isKeyboardOpen ? 'keyboard-visible webtonative-keyboard-open' : ''}`}>
+    <div 
+      className={`auth-page ${keyboardState.isOpen ? 'keyboard-visible webtonative-keyboard-open' : ''} ${isWebtonative ? 'webtonative-auth-optimized' : ''}`}
+      style={containerStyles}
+    >
+      <div 
+        className={`auth-container ${keyboardState.isOpen ? 'keyboard-visible webtonative-keyboard-open' : ''} ${isWebtonative ? 'webtonative-auth-container' : ''}`}
+        style={containerStyles}
+      >
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6 }}
-          className={`auth-card w-full max-w-md ${isKeyboardOpen ? 'keyboard-visible webtonative-keyboard-open' : ''}`}
+          className={`auth-card w-full max-w-md ${keyboardState.isOpen ? 'keyboard-visible webtonative-keyboard-open' : ''} ${isWebtonative ? 'webtonative-auth-card' : ''}`}
+          style={cardStyles}
         >
           <div className="text-center mb-6">
             <h1 className="text-2xl md:text-3xl font-bold mb-2">
@@ -151,6 +226,8 @@ export default function Auth() {
               isLoading={isLoading}
               onLoadingChange={setIsLoading}
               onError={setAuthError}
+              onFocusChange={setInputFocused}
+              keyboardState={keyboardState}
             />
             
             <div className="text-center text-xs md:text-sm text-muted-foreground">
@@ -165,11 +242,14 @@ export default function Auth() {
         </motion.div>
       </div>
       
-      {/* Debug info for development */}
-      {process.env.NODE_ENV === 'development' && (
-        <div className="debug-keyboard-info">
-          Keyboard: {isKeyboardOpen ? 'Open' : 'Closed'} | 
-          Webtonative: {isWebtonative ? 'Yes' : 'No'}
+      {/* Enhanced debug info for webtonative development */}
+      {(process.env.NODE_ENV === 'development' || isWebtonative) && (
+        <div className="debug-auth-info">
+          KB: {keyboardState.isOpen ? 'Open' : 'Closed'} | 
+          H: {keyboardState.height}px | 
+          AH: {keyboardState.availableHeight}px |
+          WTN: {isWebtonative ? 'Yes' : 'No'} |
+          Platform: {isAndroid ? 'Android' : isIOS ? 'iOS' : 'Other'}
         </div>
       )}
     </div>
