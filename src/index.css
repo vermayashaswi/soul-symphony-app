@@ -17,7 +17,7 @@
     --card-foreground: 240 10% 3.9%;
     --popover: 0 0% 100%;
     --popover-foreground: 240 10% 3.9%;
-    --primary: 217 91.2% 59.8%; /* Default is Calm/Blue */
+    --primary: 217 91.2% 59.8%;
     --primary-foreground: 0 0% 98%;
     --secondary: 240 4.8% 95.9%;
     --secondary-foreground: 240 5.9% 10%;
@@ -29,15 +29,14 @@
     --destructive-foreground: 0 0% 98%;
     --border: 240 5.9% 90%;
     --input: 240 5.9% 90%;
-    --ring: 217 91.2% 59.8%; /* Match primary */
+    --ring: 217 91.2% 59.8%;
     --radius: 0.75rem;
-    --radius-full: 9999px; /* Add this to ensure circular elements */
-    --color-theme: #3b82f6; /* Calm/Blue as default */
-    --chart-bg: 0 0% 100%; /* New variable for chart backgrounds */
-    --primary-h: 217; /* For direct HSL usage */
-    --primary-s: 91.2%; /* For direct HSL usage */
-    --primary-l: 59.8%; /* For direct HSL usage */
-    /* New variables for thread action buttons */
+    --radius-full: 9999px;
+    --color-theme: #3b82f6;
+    --chart-bg: 0 0% 100%;
+    --primary-h: 217;
+    --primary-s: 91.2%;
+    --primary-l: 59.8%;
     --edit-btn-bg: 217 91.2% 95%; 
     --edit-btn-text: 217 91.2% 40%;
     --delete-btn-bg: 0 84.2% 95%;
@@ -51,7 +50,7 @@
     --card-foreground: 0 0% 98%;
     --popover: 240 10% 3.9%;
     --popover-foreground: 0 0% 98%;
-    --primary: 217 91.2% 59.8%; /* Default is Calm/Blue */
+    --primary: 217 91.2% 59.8%;
     --primary-foreground: 0 0% 98%;
     --secondary: 240 3.7% 15.9%;
     --secondary-foreground: 0 0% 98%;
@@ -63,13 +62,12 @@
     --destructive-foreground: 0 0% 98%;
     --border: 240 3.7% 15.9%;
     --input: 240 3.7% 15.9%;
-    --ring: 217 91.2% 59.8%; /* Match primary */
-    --radius-full: 9999px; /* Add this to ensure circular elements */
-    --chart-bg: 240 10% 3.9%; /* Match background in dark mode */
-    --primary-h: 217; /* For direct HSL usage */
-    --primary-s: 91.2%; /* For direct HSL usage */
-    --primary-l: 59.8%; /* For direct HSL usage */
-    /* Dark mode thread action buttons */
+    --ring: 217 91.2% 59.8%;
+    --radius-full: 9999px;
+    --chart-bg: 240 10% 3.9%;
+    --primary-h: 217;
+    --primary-s: 91.2%;
+    --primary-l: 59.8%;
     --edit-btn-bg: 217 91.2% 25%;
     --edit-btn-text: 217 91.2% 80%;
     --delete-btn-bg: 0 62.8% 20%;
@@ -85,28 +83,25 @@
     @apply bg-background text-foreground;
   }
   
-  /* Apply theme color only to app pages, not marketing pages */
+  /* App route specific styling */
   body[data-app-route="true"] h1, 
   body[data-app-route="true"] h2, 
   body[data-app-route="true"] h3 {
     @apply text-theme-color;
   }
   
-  /* Ensure rounded-full elements are truly circular */
   .rounded-full {
     border-radius: 9999px !important;
   }
   
-  /* Fix for radix UI components */
   [data-radix-popper-content-wrapper] [data-radix-radio-item],
   [data-radix-radio-item] {
     border-radius: 9999px !important;
   }
 }
 
-/* Global theme color utilities - ONLY for app routes */
+/* Theme utilities for app routes only */
 @layer utilities {
-  /* Theme utilities only apply to app routes */
   body[data-app-route="true"] .theme-text {
     color: var(--color-theme) !important;
   }
@@ -119,27 +114,6 @@
     border-color: var(--color-theme) !important;
   }
   
-  body[data-app-route="true"] .theme-fill {
-    fill: var(--color-theme) !important;
-  }
-  
-  body[data-app-route="true"] .theme-stroke {
-    stroke: var(--color-theme) !important;
-  }
-  
-  body[data-app-route="true"] .hover-theme-bg:hover {
-    background-color: var(--color-theme) !important;
-  }
-  
-  body[data-app-route="true"] .hover-theme-text:hover {
-    color: var(--color-theme) !important;
-  }
-  
-  body[data-app-route="true"] .hover-theme-border:hover {
-    border-color: var(--color-theme) !important;
-  }
-  
-  /* Special utility classes for text-theme and bg-theme - APP ROUTES ONLY */
   body[data-app-route="true"] .text-theme, 
   body[data-app-route="true"] .text-theme-color {
     color: var(--color-theme) !important;
@@ -155,49 +129,29 @@
     border-color: var(--color-theme) !important;
   }
   
-  /* Thread action button utilities */
-  body[data-app-route="true"] .edit-button-bg {
-    background-color: hsl(var(--edit-btn-bg)) !important;
-  }
-  
-  body[data-app-route="true"] .edit-button-text {
-    color: hsl(var(--edit-btn-text)) !important;
-  }
-  
-  body[data-app-route="true"] .delete-button-bg {
-    background-color: hsl(var(--delete-btn-bg)) !important;
-  }
-  
-  body[data-app-route="true"] .delete-button-text {
-    color: hsl(var(--delete-btn-text)) !important;
-  }
-  
-  /* Marketing page specific styles - override any theme colors */
+  /* Marketing page overrides */
   body:not([data-app-route="true"]) .text-primary {
-    color: rgb(147 51 234) !important; /* purple-600 */
+    color: rgb(147 51 234) !important;
   }
   
   body:not([data-app-route="true"]) .bg-primary {
-    background-color: rgb(147 51 234) !important; /* purple-600 */
+    background-color: rgb(147 51 234) !important;
   }
   
   body:not([data-app-route="true"]) .hover\\:bg-primary:hover {
-    background-color: rgb(126 34 206) !important; /* purple-700 */
+    background-color: rgb(126 34 206) !important;
   }
 }
 
-/* Add custom styles for scroll to top behavior */
 html {
   scroll-behavior: smooth;
 }
 
-/* Support for system theme preference media query */
+/* Dark mode support */
 @media (prefers-color-scheme: dark) {
   :root:not(.light):not(.dark) {
     --background: 240 10% 3.9%;
     --foreground: 0 0% 98%;
-    /* Apply all dark theme variables when system theme is dark and no explicit theme is set */
-    /* This ensures proper fallback when JavaScript hasn't loaded yet */
     --card: 240 10% 3.9%;
     --card-foreground: 0 0% 98%;
     --popover: 240 10% 3.9%;
@@ -214,7 +168,6 @@ html {
     --border: 240 3.7% 15.9%;
     --input: 240 3.7% 15.9%;
     --chart-bg: 240 10% 3.9%;
-    /* Dark mode thread action buttons */
     --edit-btn-bg: 217 91.2% 25%;
     --edit-btn-text: 217 91.2% 80%;
     --delete-btn-bg: 0 62.8% 20%;
@@ -222,51 +175,7 @@ html {
   }
 }
 
-/* Dark mode styles for chart components */
-.dark .recharts-surface,
-.dark .recharts-default-tooltip {
-  background-color: hsl(var(--card)) !important;
-  color: hsl(var(--card-foreground)) !important;
-}
-
-.dark .recharts-tooltip-cursor {
-  fill: hsl(var(--muted)) !important;
-}
-
-.dark .recharts-tooltip-item-name,
-.dark .recharts-tooltip-item-value {
-  color: hsl(var(--foreground)) !important;
-}
-
-/* Fix for TypeScript issue in SmartChatInterface */
-.chat-message-role-assistant {
-  /* Style for assistant chat messages */
-  background-color: hsl(var(--muted));
-  color: hsl(var(--foreground));
-}
-
-.chat-message-role-user {
-  /* Style for user chat messages */
-  background-color: hsl(var(--primary));
-  color: hsl(var(--primary-foreground));
-}
-
-/* Custom text sizes for entity bubbles */
-.text-2xs {
-  font-size: 0.65rem;
-  line-height: 1rem;
-}
-
-/* Entity bubble glow effect */
-.entity-bubble-glow {
-  box-shadow: 0 0 10px 2px rgba(var(--primary), 0.3);
-  transition: box-shadow 0.3s ease;
-}
-.entity-bubble-glow:hover {
-  box-shadow: 0 0 15px 5px rgba(var(--primary), 0.6);
-}
-
-/* Add custom styles for better text rendering */
+/* Enhanced styles for better rendering */
 .crisp-text {
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
@@ -274,73 +183,15 @@ html {
   letter-spacing: 0.01em;
 }
 
-/* Strong text shadow for elements that need to be visible over backgrounds */
 .text-glow {
   text-shadow: 
     0 0 10px rgba(255, 255, 255, 1),
     0 0 5px rgba(255, 255, 255, 1);
 }
 
-/* Stronger glow for titles and important text */
 .text-glow-strong {
   text-shadow: 
     0 0 15px rgba(255, 255, 255, 1),
     0 0 8px rgba(255, 255, 255, 1),
     0 0 3px rgba(255, 255, 255, 1);
-}
-
-/* Hide Google Translate widget */
-.goog-te-banner-frame,
-.goog-te-gadget-icon,
-.goog-te-menu-value span,
-.goog-te-gadget span {
-  display: none !important;
-}
-
-.goog-te-gadget {
-  color: transparent !important;
-  font-size: 0px !important;
-}
-
-.goog-te-gadget select {
-  display: none !important;
-}
-
-/* Remove Google Translate top spacing */
-body {
-  top: 0 !important;
-}
-
-/* Hide "Select Language" text */
-.goog-te-gadget-simple {
-  display: none !important;
-}
-
-/* Enhanced Select component styles for dark backgrounds */
-.dark [data-radix-select-trigger] [data-placeholder],
-[data-radix-select-trigger] [data-placeholder] {
-  color: #F1F1F1;
-}
-
-.dark [data-radix-select-content],
-[data-radix-select-content] {
-  background-color: hsl(var(--background));
-  border-color: rgba(var(--color-theme), 0.3);
-}
-
-.dark [data-radix-select-item][data-state="checked"],
-[data-radix-select-item][data-state="checked"] {
-  background-color: rgba(var(--color-theme), 0.4);
-  color: white;
-}
-
-/* Specific styles for onboarding select component */
-.onboarding-language-select [data-radix-select-trigger] {
-  background-color: rgba(255, 255, 255, 0.1);
-  border-color: rgba(255, 255, 255, 0.2);
-  color: white;
-}
-
-.onboarding-language-select [data-radix-select-value] {
-  color: white;
 }

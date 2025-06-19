@@ -1,80 +1,62 @@
 
-// Soulo PWA Service Worker - PWABuilder Optimized
-const CACHE_NAME = 'soulo-cache-v1.3.0';
-const OFFLINE_URL = '/offline.html';
-const APP_VERSION = '1.3.0';
-const UPDATE_CHECK_INTERVAL = 30000; // 30 seconds for PWABuilder
+// Soulo PWA Service Worker - Deployment Optimized
+const CACHE_NAME = 'soulo-cache-v2.0.0';
+const APP_VERSION = '2.0.0';
+const STATIC_CACHE_NAME = 'soulo-static-v2.0.0';
+const DYNAMIC_CACHE_NAME = 'soulo-dynamic-v2.0.0';
 
-// Core assets for PWABuilder compatibility
+// Core static assets - only essential files
 const STATIC_ASSETS = [
   '/',
   '/app',
-  '/app/',
-  '/app/home',
-  '/app/journal',
-  '/app/insights',
-  '/app/smart-chat',
-  '/app/settings',
   '/offline.html',
-  '/manifest.json',
-  '/lovable-uploads/a07b91eb-274a-47b6-8180-fb4c9c0bc8a5.png'
+  '/manifest.json'
 ];
 
-// PWABuilder-friendly routes (less aggressive caching)
-const PWA_BUILDER_ROUTES = [
-  '/app', '/app/', '/app/home', '/app/journal', 
-  '/app/insights', '/app/smart-chat', '/app/settings'
+// Routes that should always fetch from network first
+const NETWORK_FIRST_ROUTES = [
+  '/app/',
+  '/app/home',
+  '/app/journal', 
+  '/app/insights',
+  '/app/smart-chat',
+  '/app/settings'
 ];
 
 function swLog(message, data = null) {
-  const timestamp = new Date().toISOString();
-  console.log(`[SW PWABuilder ${APP_VERSION}] ${timestamp}: ${message}`, data || '');
+  console.log(`[SW v${APP_VERSION}] ${new Date().toISOString()}: ${message}`, data || '');
 }
 
-function isPWABuilder() {
-  try {
-    const userAgent = self.navigator?.userAgent || '';
-    const isPWABuilderUA = userAgent.includes('PWABuilder') || 
-                          userAgent.includes('TWA') || 
-                          userAgent.includes('WebAPK');
-    
-    const standaloneQuery = self.matchMedia && self.matchMedia('(display-mode: standalone)').matches;
-    const fullscreenQuery = self.matchMedia && self.matchMedia('(display-mode: fullscreen)').matches;
-    
-    return isPWABuilderUA || standaloneQuery || fullscreenQuery;
-  } catch {
-    return false;
-  }
-}
-
-// Install event - PWABuilder optimized
+// Install - minimal caching
 self.addEventListener('install', (event) => {
-  swLog('Installing service worker for PWABuilder compatibility');
+  swLog('Installing service worker');
   
   event.waitUntil(
-    Promise.all([
-      caches.open(CACHE_NAME).then((cache) => {
-        swLog('Caching core assets for PWABuilder');
+    caches.open(STATIC_CACHE_NAME)
+      .then(cache => {
+        swLog('Caching static assets');
         return cache.addAll(STATIC_ASSETS);
-      }),
-      self.skipWaiting()
-    ]).then(() => {
-      swLog('Service worker installed successfully');
-    }).catch((error) => {
-      swLog('Installation failed', error);
-    })
+      })
+      .then(() => {
+        swLog('Service worker installed, skipping waiting');
+        return self.skipWaiting();
+      })
+      .catch(error => {
+        swLog('Installation failed', error);
+      })
   );
 });
 
-// Activate event - clean up old caches
+// Activate - clean old caches aggressively
 self.addEventListener('activate', (event) => {
   swLog('Activating service worker');
   
   event.waitUntil(
     Promise.all([
-      caches.keys().then((cacheNames) => {
-        const deletePromises = cacheNames.map((cacheName) => {
-          if (cacheName !== CACHE_NAME) {
+      // Delete ALL old caches
+      caches.keys().then(cacheNames => {
+        const deletePromises = cacheNames.map(cacheName => {
+          if (cacheName !== STATIC_CACHE_NAME && cacheName !== DYNAMIC_CACHE_NAME) {
             swLog('Deleting old cache', cacheName);
             return caches.delete(cacheName);
           }
@@ -83,113 +65,103 @@ self.addEventListener('activate', (event) => {
         return Promise.all(deletePromises);
       }),
       self.clients.claim()
-    ]).then(async () => {
+    ])
+    .then(async () => {
       swLog('Service worker activated');
       
+      // Notify all clients of activation
       const clients = await self.clients.matchAll({ includeUncontrolled: true });
-      const isPWABuilderEnv = isPWABuilder();
-      
       clients.forEach(client => {
         client.postMessage({
           type: 'SW_ACTIVATED',
           version: APP_VERSION,
-          cacheVersion: CACHE_NAME,
-          message: 'PWA updated and ready!',
-          timestamp: Date.now(),
-          pwaBuilder: isPWABuilderEnv
+          timestamp: Date.now()
         });
       });
-    }).catch(error => {
+    })
+    .catch(error => {
       swLog('Activation failed', error);
     })
   );
 });
 
-// Fetch event - PWABuilder friendly caching strategy
+// Fetch - simplified network-first strategy
 self.addEventListener('fetch', (event) => {
+  // Skip non-GET requests and extensions
   if (event.request.method !== 'GET') return;
   if (event.request.url.startsWith('chrome-extension://')) return;
   if (event.request.url.includes('supabase.co')) return;
 
   const url = new URL(event.request.url);
-  const isAppRoute = url.pathname.startsWith('/app');
-  const isPWABuilderRoute = PWA_BUILDER_ROUTES.includes(url.pathname);
-  const isPWABuilderEnv = isPWABuilder();
-
+  const isAppRoute = NETWORK_FIRST_ROUTES.some(route => url.pathname.startsWith(route));
+  
   event.respondWith(
     (async () => {
-      // For PWABuilder apps and app routes, use network-first with reasonable timeouts
-      if (isAppRoute || isPWABuilderRoute || isPWABuilderEnv) {
-        try {
-          swLog(`Network-first strategy for: ${url.pathname}`);
+      try {
+        // Always try network first for app routes and API calls
+        if (isAppRoute || url.pathname.startsWith('/api/')) {
+          swLog(`Network first for: ${url.pathname}`);
           
-          // Create request without aggressive cache control
-          const networkRequest = new Request(event.request.url, {
-            headers: {
-              ...Object.fromEntries(event.request.headers.entries())
-            }
-          });
-          
-          // Set reasonable timeout for network requests
+          // Network with timeout
           const controller = new AbortController();
-          const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
+          const timeoutId = setTimeout(() => controller.abort(), 3000);
           
-          const networkResponse = await fetch(networkRequest, {
-            signal: controller.signal
+          const networkResponse = await fetch(event.request, {
+            signal: controller.signal,
+            cache: 'no-cache' // Force fresh fetch
           });
           
           clearTimeout(timeoutId);
           
-          if (networkResponse && networkResponse.status === 200) {
-            const cache = await caches.open(CACHE_NAME);
-            cache.put(event.request, networkResponse.clone());
+          if (networkResponse && networkResponse.ok) {
+            // Don't cache app routes - always fetch fresh
+            if (!isAppRoute) {
+              const cache = await caches.open(DYNAMIC_CACHE_NAME);
+              cache.put(event.request, networkResponse.clone());
+            }
             return networkResponse;
           }
-        } catch (error) {
-          swLog(`Network failed for ${url.pathname}`, error.name);
         }
-      }
 
-      // Cache fallback
-      const cachedResponse = await caches.match(event.request);
-      if (cachedResponse) {
-        // Update cache in background for app routes
-        if (isAppRoute || isPWABuilderEnv) {
-          fetch(event.request).then(networkResponse => {
-            if (networkResponse && networkResponse.status === 200) {
-              caches.open(CACHE_NAME).then(cache => {
-                cache.put(event.request, networkResponse);
-              });
-            }
-          }).catch(() => {});
+        // Try cache for static assets
+        const cachedResponse = await caches.match(event.request);
+        if (cachedResponse) {
+          return cachedResponse;
         }
-        return cachedResponse;
-      }
 
-      // Final network attempt
-      try {
+        // Final network attempt
         const networkResponse = await fetch(event.request);
         
-        if (networkResponse && networkResponse.status === 200 && networkResponse.type === 'basic') {
-          const cache = await caches.open(CACHE_NAME);
-          cache.put(event.request, networkResponse.clone());
+        if (networkResponse && networkResponse.ok) {
+          // Only cache successful responses for static assets
+          if (!isAppRoute && !url.pathname.startsWith('/api/')) {
+            const cache = await caches.open(DYNAMIC_CACHE_NAME);
+            cache.put(event.request, networkResponse.clone());
+          }
         }
         
         return networkResponse;
-      } catch (error) {
-        swLog(`Complete fetch failure for ${event.request.url}`, error);
         
+      } catch (error) {
+        swLog(`Fetch failed for ${event.request.url}`, error.name);
+        
+        // Try cache as last resort
+        const cachedResponse = await caches.match(event.request);
+        if (cachedResponse) {
+          return cachedResponse;
+        }
+        
+        // Return offline page for navigation requests
         if (event.request.mode === 'navigate') {
-          const offlineResponse = await caches.match(OFFLINE_URL);
+          const offlineResponse = await caches.match('/offline.html');
           if (offlineResponse) {
             return offlineResponse;
           }
         }
         
-        return new Response('Offline - Content not available', {
+        return new Response('Network error', {
           status: 503,
-          statusText: 'Service Unavailable',
-          headers: { 'Content-Type': 'text/plain' }
+          statusText: 'Service Unavailable'
         });
       }
     })()
@@ -205,66 +177,15 @@ self.addEventListener('message', (event) => {
     self.skipWaiting();
   }
   
-  if (event.data && event.data.type === 'GET_VERSION') {
-    event.ports[0].postMessage({
-      version: APP_VERSION,
-      cacheVersion: CACHE_NAME,
-      timestamp: Date.now(),
-      pwaBuilderSupport: true
-    });
-  }
-  
-  if (event.data && event.data.type === 'CHECK_UPDATE') {
-    swLog('Manual update check');
-    self.registration.update().then(() => {
-      swLog('Update check completed');
-    }).catch(error => {
-      swLog('Update check failed', error);
+  if (event.data && event.data.type === 'CLEAR_CACHE') {
+    swLog('Clearing all caches');
+    caches.keys().then(cacheNames => {
+      return Promise.all(cacheNames.map(name => caches.delete(name)));
+    }).then(() => {
+      swLog('All caches cleared');
+      event.ports[0]?.postMessage({ success: true });
     });
   }
 });
 
-// Periodic update checking
-let updateCheckInterval;
-
-function startUpdateChecking() {
-  if (updateCheckInterval) {
-    clearInterval(updateCheckInterval);
-  }
-  
-  swLog('Starting update checking');
-  
-  updateCheckInterval = setInterval(async () => {
-    try {
-      const registration = await self.registration.update();
-      
-      if (registration.installing || registration.waiting) {
-        swLog('New version detected');
-        
-        const clients = await self.clients.matchAll();
-        const isPWABuilderEnv = isPWABuilder();
-        
-        clients.forEach(client => {
-          client.postMessage({
-            type: 'UPDATE_AVAILABLE',
-            version: APP_VERSION,
-            message: 'New version available',
-            pwaBuilder: isPWABuilderEnv
-          });
-        });
-      }
-    } catch (error) {
-      swLog('Update check failed', error);
-    }
-  }, UPDATE_CHECK_INTERVAL);
-}
-
-self.addEventListener('activate', () => {
-  setTimeout(startUpdateChecking, 2000);
-});
-
-swLog('PWABuilder-optimized service worker loaded', { 
-  version: APP_VERSION, 
-  cache: CACHE_NAME,
-  updateInterval: UPDATE_CHECK_INTERVAL
-});
+swLog('Service worker loaded', { version: APP_VERSION });
