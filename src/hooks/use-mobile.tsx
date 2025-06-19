@@ -3,6 +3,30 @@ import * as React from "react"
 
 const MOBILE_BREAKPOINT = 768
 
+// Extend Navigator interface for iOS-specific properties
+interface IOSNavigator extends Navigator {
+  standalone?: boolean;
+}
+
+// Extend Window interface for our debug helpers and visual viewport
+declare global {
+  interface Window {
+    __forceMobileView?: boolean;
+    toggleMobileView?: () => void;
+    visualViewport?: {
+      readonly offsetLeft: number;
+      readonly offsetTop: number;
+      readonly pageLeft: number;
+      readonly pageTop: number;
+      readonly width: number;
+      readonly height: number;
+      readonly scale: number;
+      addEventListener(type: string, listener: EventListener): void;
+      removeEventListener(type: string, listener: EventListener): void;
+    };
+  }
+}
+
 export function useIsMobile() {
   const [isMobile, setIsMobile] = React.useState<boolean>(false);
   const [isInitialized, setIsInitialized] = React.useState<boolean>(false);
@@ -52,7 +76,7 @@ export function useIsMobile() {
       // Check for webtonative specific indicators
       const hasWebtonativeUA = /webtonative/i.test(navigator.userAgent);
       const hasWebView = /wv|WebView/i.test(navigator.userAgent);
-      const hasWebApp = window.navigator.standalone === true;
+      const hasWebApp = (navigator as IOSNavigator).standalone === true;
       const hasNoBackButton = !window.history || window.history.length <= 1;
       
       // Check for common webview user agents
@@ -243,22 +267,3 @@ export function useIsMobile() {
 
 // Add an alias export so that Chat.tsx can import it as useMobile
 export const useMobile = useIsMobile;
-
-// Extend global interface for our debug helpers
-declare global {
-  interface Window {
-    __forceMobileView?: boolean;
-    toggleMobileView?: () => void;
-    visualViewport?: VisualViewport;
-  }
-  
-  interface VisualViewport extends EventTarget {
-    readonly offsetLeft: number;
-    readonly offsetTop: number;
-    readonly pageLeft: number;
-    readonly pageTop: number;
-    readonly width: number;
-    readonly height: number;
-    readonly scale: number;
-  }
-}
