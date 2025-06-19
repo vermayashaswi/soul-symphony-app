@@ -79,15 +79,28 @@
   * {
     @apply border-border;
   }
+  
   body {
     @apply bg-background text-foreground;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+  
+  /* Native app specific styling */
+  body[data-native-app] {
+    -webkit-appearance: none !important;
+    -webkit-tap-highlight-color: transparent !important;
+    -webkit-user-select: none !important;
+    -webkit-touch-callout: none !important;
+    -webkit-text-size-adjust: 100% !important;
   }
   
   /* App route specific styling */
   body[data-app-route="true"] h1, 
   body[data-app-route="true"] h2, 
   body[data-app-route="true"] h3 {
-    @apply text-theme-color;
+    color: var(--color-theme) !important;
+    font-weight: 600 !important;
   }
   
   .rounded-full {
@@ -100,36 +113,33 @@
   }
 }
 
-/* Theme utilities for app routes only */
+/* Unified theme utilities */
 @layer utilities {
-  body[data-app-route="true"] .theme-text {
+  /* Theme color classes */
+  .text-theme, 
+  .text-theme-color {
     color: var(--color-theme) !important;
   }
   
-  body[data-app-route="true"] .theme-bg {
+  .bg-theme, 
+  .bg-theme-color {
     background-color: var(--color-theme) !important;
   }
   
-  body[data-app-route="true"] .theme-border {
+  .border-theme, 
+  .border-theme-color {
     border-color: var(--color-theme) !important;
   }
   
-  body[data-app-route="true"] .text-theme, 
-  body[data-app-route="true"] .text-theme-color {
-    color: var(--color-theme) !important;
+  .stroke-theme {
+    stroke: var(--color-theme) !important;
   }
   
-  body[data-app-route="true"] .bg-theme, 
-  body[data-app-route="true"] .bg-theme-color {
-    background-color: var(--color-theme) !important;
+  .fill-theme {
+    fill: var(--color-theme) !important;
   }
   
-  body[data-app-route="true"] .border-theme, 
-  body[data-app-route="true"] .border-theme-color {
-    border-color: var(--color-theme) !important;
-  }
-  
-  /* Marketing page overrides */
+  /* Marketing page overrides (non-app routes) */
   body:not([data-app-route="true"]) .text-primary {
     color: rgb(147 51 234) !important;
   }
@@ -141,13 +151,27 @@
   body:not([data-app-route="true"]) .hover\\:bg-primary:hover {
     background-color: rgb(126 34 206) !important;
   }
+  
+  /* Native app button styling */
+  body[data-native-app] button {
+    -webkit-appearance: none !important;
+    border-radius: 8px !important;
+    transition: all 0.2s ease !important;
+  }
+  
+  body[data-native-app] input,
+  body[data-native-app] select,
+  body[data-native-app] textarea {
+    -webkit-appearance: none !important;
+    border-radius: 8px !important;
+  }
 }
 
 html {
   scroll-behavior: smooth;
 }
 
-/* Dark mode support */
+/* Dark mode support with enhanced contrast for native apps */
 @media (prefers-color-scheme: dark) {
   :root:not(.light):not(.dark) {
     --background: 240 10% 3.9%;
@@ -175,7 +199,7 @@ html {
   }
 }
 
-/* Enhanced styles for better rendering */
+/* Enhanced styles for better native app rendering */
 .crisp-text {
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
@@ -194,4 +218,10 @@ html {
     0 0 15px rgba(255, 255, 255, 1),
     0 0 8px rgba(255, 255, 255, 1),
     0 0 3px rgba(255, 255, 255, 1);
+}
+
+/* Native app performance optimizations */
+body[data-native-app] * {
+  transform: translateZ(0); /* Force hardware acceleration */
+  backface-visibility: hidden;
 }

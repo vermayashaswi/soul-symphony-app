@@ -1,11 +1,11 @@
 
-// Soulo PWA Service Worker - Deployment Optimized
-const CACHE_NAME = 'soulo-cache-v2.0.0';
-const APP_VERSION = '2.0.0';
-const STATIC_CACHE_NAME = 'soulo-static-v2.0.0';
-const DYNAMIC_CACHE_NAME = 'soulo-dynamic-v2.0.0';
+// Soulo PWA Service Worker - Native App Optimized
+const CACHE_NAME = 'soulo-cache-v2.1.0';
+const APP_VERSION = '2.1.0';
+const STATIC_CACHE_NAME = 'soulo-static-v2.1.0';
+const DYNAMIC_CACHE_NAME = 'soulo-dynamic-v2.1.0';
 
-// Core static assets - only essential files
+// Core static assets - minimal for native apps
 const STATIC_ASSETS = [
   '/',
   '/app',
@@ -27,18 +27,33 @@ function swLog(message, data = null) {
   console.log(`[SW v${APP_VERSION}] ${new Date().toISOString()}: ${message}`, data || '');
 }
 
-// Install - minimal caching
+// Enhanced native app detection
+function isNativeApp() {
+  try {
+    const userAgent = navigator.userAgent;
+    return userAgent.includes('wv') || 
+           userAgent.includes('WebView') || 
+           userAgent.includes('PWABuilder') ||
+           userAgent.includes('TWA') ||
+           userAgent.includes('WebAPK') ||
+           self.location.protocol === 'file:';
+  } catch {
+    return false;
+  }
+}
+
+// Install - aggressive caching for native apps
 self.addEventListener('install', (event) => {
-  swLog('Installing service worker');
+  swLog('Installing service worker for native app');
   
   event.waitUntil(
     caches.open(STATIC_CACHE_NAME)
       .then(cache => {
-        swLog('Caching static assets');
+        swLog('Caching static assets for native app');
         return cache.addAll(STATIC_ASSETS);
       })
       .then(() => {
-        swLog('Service worker installed, skipping waiting');
+        swLog('Service worker installed, skipping waiting for native app');
         return self.skipWaiting();
       })
       .catch(error => {
@@ -47,17 +62,17 @@ self.addEventListener('install', (event) => {
   );
 });
 
-// Activate - clean old caches aggressively
+// Activate - aggressive cache cleanup for native apps
 self.addEventListener('activate', (event) => {
-  swLog('Activating service worker');
+  swLog('Activating service worker for native app');
   
   event.waitUntil(
     Promise.all([
-      // Delete ALL old caches
+      // Delete ALL old caches aggressively
       caches.keys().then(cacheNames => {
         const deletePromises = cacheNames.map(cacheName => {
           if (cacheName !== STATIC_CACHE_NAME && cacheName !== DYNAMIC_CACHE_NAME) {
-            swLog('Deleting old cache', cacheName);
+            swLog('Deleting old cache for native app', cacheName);
             return caches.delete(cacheName);
           }
         }).filter(Boolean);
@@ -67,14 +82,15 @@ self.addEventListener('activate', (event) => {
       self.clients.claim()
     ])
     .then(async () => {
-      swLog('Service worker activated');
+      swLog('Service worker activated for native app');
       
-      // Notify all clients of activation
+      // Notify all clients of activation with native app info
       const clients = await self.clients.matchAll({ includeUncontrolled: true });
       clients.forEach(client => {
         client.postMessage({
           type: 'SW_ACTIVATED',
           version: APP_VERSION,
+          isNativeApp: isNativeApp(),
           timestamp: Date.now()
         });
       });
@@ -85,7 +101,7 @@ self.addEventListener('activate', (event) => {
   );
 });
 
-// Fetch - simplified network-first strategy
+// Fetch - optimized for native apps
 self.addEventListener('fetch', (event) => {
   // Skip non-GET requests and extensions
   if (event.request.method !== 'GET') return;
@@ -94,27 +110,28 @@ self.addEventListener('fetch', (event) => {
 
   const url = new URL(event.request.url);
   const isAppRoute = NETWORK_FIRST_ROUTES.some(route => url.pathname.startsWith(route));
+  const nativeApp = isNativeApp();
   
   event.respondWith(
     (async () => {
       try {
-        // Always try network first for app routes and API calls
-        if (isAppRoute || url.pathname.startsWith('/api/')) {
-          swLog(`Network first for: ${url.pathname}`);
+        // For native apps, always try network first with shorter timeout
+        if (nativeApp && (isAppRoute || url.pathname.startsWith('/api/'))) {
+          swLog(`Native app network first for: ${url.pathname}`);
           
-          // Network with timeout
+          // Shorter timeout for native apps
           const controller = new AbortController();
-          const timeoutId = setTimeout(() => controller.abort(), 3000);
+          const timeoutId = setTimeout(() => controller.abort(), 2000);
           
           const networkResponse = await fetch(event.request, {
             signal: controller.signal,
-            cache: 'no-cache' // Force fresh fetch
+            cache: 'no-cache' // Always fetch fresh for native apps
           });
           
           clearTimeout(timeoutId);
           
           if (networkResponse && networkResponse.ok) {
-            // Don't cache app routes - always fetch fresh
+            // Cache successful responses for non-app routes only
             if (!isAppRoute) {
               const cache = await caches.open(DYNAMIC_CACHE_NAME);
               cache.put(event.request, networkResponse.clone());
@@ -123,18 +140,20 @@ self.addEventListener('fetch', (event) => {
           }
         }
 
-        // Try cache for static assets
+        // Try cache for non-native or fallback
         const cachedResponse = await caches.match(event.request);
         if (cachedResponse) {
-          return cachedResponse;
+          if (!nativeApp || !isAppRoute) {
+            return cachedResponse;
+          }
         }
 
         // Final network attempt
         const networkResponse = await fetch(event.request);
         
         if (networkResponse && networkResponse.ok) {
-          // Only cache successful responses for static assets
-          if (!isAppRoute && !url.pathname.startsWith('/api/')) {
+          // Cache successful responses
+          if (!isAppRoute || !nativeApp) {
             const cache = await caches.open(DYNAMIC_CACHE_NAME);
             cache.put(event.request, networkResponse.clone());
           }
@@ -168,24 +187,29 @@ self.addEventListener('fetch', (event) => {
   );
 });
 
-// Message handling
+// Enhanced message handling for native apps
 self.addEventListener('message', (event) => {
-  swLog('Message received', event.data);
+  swLog('Message received from native app', event.data);
   
   if (event.data && event.data.type === 'SKIP_WAITING') {
-    swLog('Skipping waiting');
+    swLog('Skipping waiting for native app');
     self.skipWaiting();
   }
   
   if (event.data && event.data.type === 'CLEAR_CACHE') {
-    swLog('Clearing all caches');
+    swLog('Clearing all caches for native app');
     caches.keys().then(cacheNames => {
       return Promise.all(cacheNames.map(name => caches.delete(name)));
     }).then(() => {
-      swLog('All caches cleared');
+      swLog('All caches cleared for native app');
       event.ports[0]?.postMessage({ success: true });
     });
   }
+  
+  if (event.data && event.data.type === 'NATIVE_APP_READY') {
+    swLog('Native app ready, optimizing service worker behavior');
+    // Could add native-specific optimizations here
+  }
 });
 
-swLog('Service worker loaded', { version: APP_VERSION });
+swLog('Service worker loaded for native app', { version: APP_VERSION, isNativeApp: isNativeApp() });
