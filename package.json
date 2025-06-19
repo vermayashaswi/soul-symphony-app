@@ -79,7 +79,6 @@
     "sonner": "^1.5.0",
     "tailwind-merge": "^2.5.2",
     "tailwindcss-animate": "^1.0.7",
-    "terser": "^5.43.1",
     "three": "^0.133.1",
     "twemoji": "^14.0.2",
     "use-debounce": "^10.0.4",

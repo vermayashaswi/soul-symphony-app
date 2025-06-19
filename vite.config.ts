@@ -1,3 +1,4 @@
+
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react-swc";
 import path from "path";
@@ -27,43 +28,27 @@ export default defineConfig(({ mode }) => ({
     exclude: ['lovable-tagger'],
     include: ['react', 'react-dom']
   },
+  // Ensure that Vite correctly resolves Node.js built-in modules
   build: {
-    // Deployment optimizations
-    target: 'esnext',
-    minify: 'terser',
-    sourcemap: false,
+    commonjsOptions: {
+      transformMixedEsModules: true,
+    },
     rollupOptions: {
       output: {
-        // Better cache busting for deployment
-        entryFileNames: 'assets/[name]-[hash].js',
-        chunkFileNames: 'assets/[name]-[hash].js',
+        // Copy manifest.json to app subdirectory for PWA
         assetFileNames: (assetInfo) => {
-          // Keep manifest.json and sw.js at root
-          if (assetInfo.name === 'manifest.json' || assetInfo.name === 'sw.js') {
-            return '[name][extname]';
+          if (assetInfo.name === 'manifest.json') {
+            return 'app/manifest.json';
           }
-          return 'assets/[name]-[hash][extname]';
-        },
-        // Code splitting for better caching
-        manualChunks: {
-          vendor: ['react', 'react-dom'],
-          router: ['react-router-dom'],
-          ui: ['@radix-ui/react-dialog', '@radix-ui/react-select'],
-          utils: ['date-fns', 'clsx', 'tailwind-merge']
+          return '[name]-[hash][extname]';
         }
       }
-    },
-    // Ensure clean builds
-    emptyOutDir: true,
-    // Optimize chunk size warnings
-    chunkSizeWarningLimit: 1000
+    }
   },
+  // Configure public directory handling for manifest
   publicDir: 'public',
-  // Cache busting and deployment optimization
+  // Add custom handling for manifest.json in app path
   define: {
-    __APP_VERSION__: JSON.stringify('2.0.0'),
-    __BUILD_TIME__: JSON.stringify(new Date().toISOString())
-  },
-  // Ensure proper base path handling
-  base: '/'
+    __APP_MANIFEST_PATH__: JSON.stringify('/app/manifest.json')
+  }
 }));

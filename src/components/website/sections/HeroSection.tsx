@@ -1,4 +1,3 @@
-
 import React, { Suspense, lazy } from 'react';
 import { Apple, Play, Shield, Check } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -26,10 +25,11 @@ const HeroSection: React.FC<HeroSectionProps> = ({ openAppStore, openPlayStore }
   return (
     <div
       className={`
-        relative w-full bg-gradient-to-br from-purple-100 via-pink-50 to-blue-50
+        relative w-full bg-gradient-to-br from-blue-50 to-purple-50 
         pt-32 pb-2 md:pt-4 md:pb-1 
         overflow-hidden min-h-[75vh] md:min-h-[78vh] lg:min-h-[82vh] flex items-center
       `}
+      // ↑ pt-32 for mobile triples the spacing, default is 8rem, md:pt-4 keeps current for tablets/desktops
     >
       {/* Background image */}
       <div 
@@ -45,7 +45,7 @@ const HeroSection: React.FC<HeroSectionProps> = ({ openAppStore, openPlayStore }
             transition={{ duration: 0.8 }}
             className="w-full lg:w-1/2 text-center lg:text-left"
           >
-            <h1 className="text-2xl md:text-3xl lg:text-4xl xl:text-5xl font-bold mb-2 md:mb-3 text-purple-600 leading-tight">
+            <h1 className="text-2xl md:text-3xl lg:text-4xl xl:text-5xl font-bold mb-2 md:mb-3 text-primary leading-tight">
               <TranslatableText text="Express. Reflect. Grow." />
             </h1>
             <p className="text-base md:text-lg lg:text-xl text-gray-700 mb-3 md:mb-4 max-w-2xl mx-auto lg:mx-0 leading-relaxed">
@@ -63,7 +63,7 @@ const HeroSection: React.FC<HeroSectionProps> = ({ openAppStore, openPlayStore }
               </Button>
               <Button 
                 size="lg" 
-                className="gap-2 bg-purple-600 hover:bg-purple-700 text-white text-sm md:text-base" 
+                className="gap-2 bg-primary hover:bg-primary/90 text-sm md:text-base" 
                 onClick={openPlayStore}
               >
                 <Play className="h-4 w-4 md:h-5 md:w-5" />
@@ -73,11 +73,11 @@ const HeroSection: React.FC<HeroSectionProps> = ({ openAppStore, openPlayStore }
             
             <div className="flex items-center justify-center lg:justify-start gap-4 md:gap-6 text-xs md:text-sm text-gray-500">
               <div className="flex items-center gap-1">
-                <Shield className="h-3 w-3 md:h-4 md:w-4 text-purple-600" />
+                <Shield className="h-3 w-3 md:h-4 md:w-4 text-primary" />
                 <TranslatableText text="Privacy-Focused" />
               </div>
               <div className="flex items-center gap-1">
-                <Check className="h-3 w-3 md:h-4 md:w-4 text-purple-600" />
+                <Check className="h-3 w-3 md:h-4 md:w-4 text-primary" />
                 <TranslatableText text="14-Day Free Trial" />
               </div>
             </div>

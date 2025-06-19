@@ -1,4 +1,3 @@
-
 import React, { useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
 import { ArrowRight } from 'lucide-react';
@@ -142,7 +141,7 @@ const JournalNavigationButton: React.FC = () => {
         />
         <motion.button
           onClick={navigateToJournal}
-          className="w-16 h-16 rounded-full bg-primary flex items-center justify-center shadow-lg relative z-20 theme-button"
+          className="w-16 h-16 rounded-full bg-primary flex items-center justify-center shadow-lg relative z-20"
           whileHover={{ scale: 1.1 }}
           whileTap={{ scale: 0.95 }}
           initial={{ opacity: 0 }}

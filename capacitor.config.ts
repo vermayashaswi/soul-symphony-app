@@ -6,16 +6,12 @@ const config: CapacitorConfig = {
   appName: 'soul-symphony-app',
   webDir: 'dist',
   server: {
-    url: 'https://soulo.online/app?forceHideBadge=true&nativeApp=true&pwabuilder=true',
-    cleartext: true,
-    // Enhanced configuration for both PWA Builder and Capacitor
-    allowNavigation: [
-      'https://soulo.online/*',
-      'https://*.supabase.co/*'
-    ]
+    url: 'https://soulo.online?forceHideBadge=true',
+    cleartext: true
   },
-  // Enhanced plugins configuration for better PWA Builder support
+  // Ensure proper permissions for iOS and Android
   plugins: {
+    // Add specific iOS-related configurations
     SplashScreen: {
       launchAutoHide: false,
       backgroundColor: "#FFFFFF",
@@ -26,38 +22,27 @@ const config: CapacitorConfig = {
       splashFullScreen: true,
       splashImmersive: true
     },
+    // Handle keyboard properly
     Keyboard: {
       resize: "body",
       style: "dark",
       resizeOnFullScreen: true
-    },
-    // Enhanced App plugin for better update handling and PWA Builder compatibility
-    App: {
-      appendUserAgent: 'SouloNativeApp/1.0 PWABuilderCompatible'
     }
   },
-  // Enhanced iOS configuration for PWA Builder compatibility
+  // iOS-specific configuration
   ios: {
     contentInset: "always",
     allowsLinkPreview: false,
     scrollEnabled: true,
     useUserAgentString: false,
     limitsNavigationsToAppBoundDomains: true,
-    backgroundColor: "#FFFFFF",
-    // Enhanced WebView settings for better caching control and PWA Builder support
-    webContentsDebuggingEnabled: true,
-    allowsInlineMediaPlayback: true,
-    mediaPlaybackRequiresUserAction: false
+    backgroundColor: "#FFFFFF"
   },
-  // Enhanced Android configuration for PWA Builder compatibility
+  // Android-specific configuration
   android: {
     allowMixedContent: true,
     captureInput: true,
-    webContentsDebuggingEnabled: true,
-    // Enhanced WebView settings for PWA Builder support
-    appendUserAgent: 'SouloNativeApp/1.0 PWABuilderCompatible',
-    overrideUserAgent: false,
-    backgroundColor: "#FFFFFF"
+    webContentsDebuggingEnabled: true
   }
 };
 

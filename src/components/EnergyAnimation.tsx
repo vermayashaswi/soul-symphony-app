@@ -1,3 +1,4 @@
+
 import React, { useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
 import { useTheme } from '@/hooks/use-theme';
@@ -7,20 +8,6 @@ interface EnergyAnimationProps {
   fullScreen?: boolean;
   bottomNavOffset?: boolean;
 }
-
-// WebView detection utility
-const isWebView = (): boolean => {
-  try {
-    const userAgent = navigator.userAgent;
-    return userAgent.includes('wv') || 
-           userAgent.includes('WebView') || 
-           window.location.protocol === 'file:' ||
-           (window as any).AndroidInterface !== undefined ||
-           document.URL.indexOf('http://') === -1 && document.URL.indexOf('https://') === -1;
-  } catch {
-    return false;
-  }
-};
 
 const EnergyAnimation: React.FC<EnergyAnimationProps> = ({ 
   className, 
@@ -94,39 +81,13 @@ const EnergyAnimation: React.FC<EnergyAnimationProps> = ({
   
   const colors = getThemeColors();
   
-  // WebView-specific styling and containment
-  useEffect(() => {
-    if (isWebView() && containerRef.current) {
-      const container = containerRef.current;
-      
-      // Apply WebView-specific containment styles
-      container.style.overflow = 'hidden';
-      container.style.contain = 'layout style paint';
-      container.style.isolation = 'isolate';
-      container.style.backfaceVisibility = 'hidden';
-      container.style.webkitBackfaceVisibility = 'hidden';
-      container.style.transform = 'translate3d(0, 0, 0)';
-      container.style.webkitTransform = 'translate3d(0, 0, 0)';
-      
-      // Reduce animation intensity for WebView
-      container.style.opacity = '0.5';
-    }
-  }, []);
-  
   return (
     <div 
       ref={containerRef}
       className={`absolute ${fullScreen ? 'fixed inset-0' : 'w-full h-full'} 
                  ${bottomNavOffset ? 'bottom-16' : 'bottom-0'} 
-                 left-0 right-0 top-0 overflow-hidden z-0 ${className}`}
-      style={{ 
-        pointerEvents: 'none',
-        opacity: isWebView() ? '0.4' : '0.7', // Reduced opacity for WebView
-        contain: isWebView() ? 'layout style paint' : 'none',
-        isolation: isWebView() ? 'isolate' : 'auto',
-        backfaceVisibility: isWebView() ? 'hidden' : 'visible',
-        WebkitBackfaceVisibility: isWebView() ? 'hidden' : 'visible'
-      }}
+                 left-0 right-0 top-0 overflow-hidden opacity-70 z-0 ${className}`}
+      style={{ pointerEvents: 'none' }} // Ensure the animation doesn't interfere with user interactions
     >
       {/* Glowing center with enhanced blur */}
       <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-10">
@@ -137,8 +98,8 @@ const EnergyAnimation: React.FC<EnergyAnimationProps> = ({
         <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-20 h-20 rounded-full bg-white blur-md opacity-80"></div>
       </div>
       
-      {/* Reduced number of pulses for WebView performance */}
-      {[...Array(isWebView() ? 8 : 15)].map((_, index) => (
+      {/* Expanded radiating pulses with staggered transitions */}
+      {[...Array(15)].map((_, index) => (
         <motion.div
           key={index}
           className="absolute top-1/2 left-1/2 rounded-full"
@@ -150,15 +111,14 @@ const EnergyAnimation: React.FC<EnergyAnimationProps> = ({
             opacity: 0.8
           }}
           animate={{ 
-            width: isWebView() ? 600 : 1000, 
-            height: isWebView() ? 600 : 1000, 
-            x: isWebView() ? -300 : -500, 
-            y: isWebView() ? -300 : -500, 
+            width: 1000, 
+            height: 1000, 
+            x: -500, 
+            y: -500, 
             opacity: 0
           }}
           style={{
-            background: `radial-gradient(circle, ${colors.main} 0%, ${colors.secondary} 50%, ${colors.tertiary} 100%)`,
-            contain: isWebView() ? 'layout style paint' : 'none'
+            background: `radial-gradient(circle, ${colors.main} 0%, ${colors.secondary} 50%, ${colors.tertiary} 100%)`
           }}
           transition={{ 
             repeat: Infinity, 
@@ -170,24 +130,22 @@ const EnergyAnimation: React.FC<EnergyAnimationProps> = ({
         />
       ))}
       
-      {/* Enhanced background gradients with containment */}
+      {/* Enhanced background gradients with wider coverage */}
       <div 
         className="absolute inset-0"
         style={{ 
-          background: `linear-gradient(to bottom right, ${colors.main}10, ${colors.secondary}10, ${colors.tertiary}10)`,
-          contain: isWebView() ? 'layout style paint' : 'none'
+          background: `linear-gradient(to bottom right, ${colors.main}10, ${colors.secondary}10, ${colors.tertiary}10)`
         }}
       ></div>
       <div 
         className="absolute inset-0"
         style={{ 
-          background: `linear-gradient(to top right, ${colors.secondary}10, ${colors.main}10, ${colors.tertiary}10)`,
-          contain: isWebView() ? 'layout style paint' : 'none'
+          background: `linear-gradient(to top right, ${colors.secondary}10, ${colors.main}10, ${colors.tertiary}10)`
         }}
       ></div>
       
-      {/* Reduce particle count for WebView */}
-      {[...Array(isWebView() ? 12 : 24)].map((_, index) => (
+      {/* Additional smaller, faster pulses with improved timing */}
+      {[...Array(24)].map((_, index) => (
         <motion.div
           key={`small-${index}`}
           className="absolute top-1/2 left-1/2 rounded-full"
@@ -199,15 +157,14 @@ const EnergyAnimation: React.FC<EnergyAnimationProps> = ({
             opacity: 0.7
           }}
           animate={{ 
-            width: isWebView() ? 400 : 700, 
-            height: isWebView() ? 400 : 700, 
-            x: isWebView() ? -200 : -350, 
-            y: isWebView() ? -200 : -350, 
+            width: 700, 
+            height: 700, 
+            x: -350, 
+            y: -350, 
             opacity: 0
           }}
           style={{
-            background: `radial-gradient(circle, rgba(255,255,255,0.8) 0%, ${colors.light} 50%, ${colors.tertiary} 100%)`,
-            contain: isWebView() ? 'layout style paint' : 'none'
+            background: `radial-gradient(circle, rgba(255,255,255,0.8) 0%, ${colors.light} 50%, ${colors.tertiary} 100%)`
           }}
           transition={{ 
             repeat: Infinity, 
@@ -219,8 +176,8 @@ const EnergyAnimation: React.FC<EnergyAnimationProps> = ({
         />
       ))}
       
-      {/* Significantly reduce ultra-small particles for WebView */}
-      {[...Array(isWebView() ? 15 : 40)].map((_, index) => (
+      {/* Ultra-small particles with random paths for added fluidity */}
+      {[...Array(40)].map((_, index) => (
         <motion.div
           key={`particle-${index}`}
           className="absolute top-1/2 left-1/2 rounded-full bg-white/80"
@@ -232,12 +189,9 @@ const EnergyAnimation: React.FC<EnergyAnimationProps> = ({
             opacity: 0.9
           }}
           animate={{ 
-            x: -1.5 + (Math.random() * (isWebView() ? 400 : 800) - (isWebView() ? 200 : 400)),
-            y: -1.5 + (Math.random() * (isWebView() ? 400 : 800) - (isWebView() ? 200 : 400)),
+            x: -1.5 + (Math.random() * 800 - 400),
+            y: -1.5 + (Math.random() * 800 - 400),
             opacity: 0
-          }}
-          style={{
-            contain: isWebView() ? 'layout style paint' : 'none'
           }}
           transition={{ 
             repeat: Infinity, 

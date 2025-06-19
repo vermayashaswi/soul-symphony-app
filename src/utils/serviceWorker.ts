@@ -1,6 +1,5 @@
-
 /**
- * Simplified Service Worker Management
+ * Service Worker Registration and Management
  */
 
 export interface SwRegistrationResult {
@@ -9,126 +8,222 @@ export interface SwRegistrationResult {
   error?: Error;
 }
 
+export interface SyncCapabilities {
+  backgroundSync: boolean;
+  pushNotifications: boolean;
+  periodicSync: boolean;
+}
+
+// Extend ServiceWorkerRegistration type to include sync property
+interface ServiceWorkerRegistrationWithSync extends ServiceWorkerRegistration {
+  sync?: {
+    register(tag: string): Promise<void>;
+  };
+}
+
 class ServiceWorkerManager {
   private registration: ServiceWorkerRegistration | null = null;
   private isRegistered = false;
 
+  /**
+   * Register the service worker
+   */
   async register(): Promise<SwRegistrationResult> {
     if (!('serviceWorker' in navigator)) {
-      console.warn('[SW Manager] Service workers not supported');
+      console.warn('[SW] Service workers not supported');
       return { success: false, error: new Error('Service workers not supported') };
     }
 
     try {
-      console.log('[SW Manager] Registering simplified service worker...');
+      console.log('[SW] Registering service worker...');
       
       const registration = await navigator.serviceWorker.register('/sw.js', {
-        scope: '/',
-        updateViaCache: 'none'
+        scope: '/'
       });
 
       this.registration = registration;
       this.isRegistered = true;
 
-      // Simple update handling
+      // Handle updates
       registration.addEventListener('updatefound', () => {
-        console.log('[SW Manager] Update found');
-        const newWorker = registration.installing;
-        if (newWorker) {
-          newWorker.addEventListener('statechange', () => {
-            if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
-              console.log('[SW Manager] New version available - reloading');
-              window.location.reload();
-            }
-          });
-        }
+        console.log('[SW] Update found, installing new version...');
+        this.handleUpdate(registration);
       });
 
-      console.log('[SW Manager] Service worker registered successfully');
-      
-      // Check for updates every 30 seconds
-      setInterval(() => {
-        this.checkForUpdates();
-      }, 30000);
+      // Listen for messages from service worker
+      navigator.serviceWorker.addEventListener('message', this.handleMessage.bind(this));
+
+      console.log('[SW] Service worker registered successfully');
       
       return { success: true, registration };
       
     } catch (error) {
-      console.error('[SW Manager] Service worker registration failed:', error);
+      console.error('[SW] Service worker registration failed:', error);
       return { success: false, error: error as Error };
     }
   }
 
-  async checkForUpdates(): Promise<boolean> {
-    if (!this.registration) return false;
+  /**
+   * Unregister the service worker
+   */
+  async unregister(): Promise<boolean> {
+    if (!this.registration) {
+      return true;
+    }
 
     try {
-      await this.registration.update();
-      return true;
+      const result = await this.registration.unregister();
+      this.registration = null;
+      this.isRegistered = false;
+      console.log('[SW] Service worker unregistered');
+      return result;
     } catch (error) {
-      console.error('[SW Manager] Update check failed:', error);
+      console.error('[SW] Failed to unregister service worker:', error);
       return false;
     }
   }
 
-  async clearAllCaches(): Promise<boolean> {
-    try {
-      console.log('[SW Manager] Clearing all caches...');
-      
-      if ('caches' in window) {
-        const cacheNames = await caches.keys();
-        await Promise.all(cacheNames.map(name => caches.delete(name)));
-      }
-
-      // Clear storage except auth
-      const keysToKeep = ['sb-auth-token'];
-      const allKeys = Object.keys(localStorage);
-      
-      allKeys.forEach(key => {
-        if (!keysToKeep.some(keepKey => key.includes(keepKey))) {
-          localStorage.removeItem(key);
-        }
-      });
-      
-      sessionStorage.clear();
-      return true;
-    } catch (error) {
-      console.error('[SW Manager] Cache clearing failed:', error);
-      return false;
-    }
-  }
-
-  // Added missing methods for compatibility
-  async requestBackgroundSync(): Promise<boolean> {
-    console.log('[SW Manager] Background sync requested');
-    return true;
-  }
-
-  getCapabilities(): { hasBackgroundSync: boolean; hasNotifications: boolean } {
-    return {
-      hasBackgroundSync: 'serviceWorker' in navigator && 'sync' in window.ServiceWorkerRegistration.prototype,
-      hasNotifications: 'Notification' in window
-    };
-  }
-
+  /**
+   * Check if service worker is registered
+   */
   isServiceWorkerRegistered(): boolean {
     return this.isRegistered && this.registration !== null;
   }
 
+  /**
+   * Get service worker capabilities
+   */
+  getCapabilities(): SyncCapabilities {
+    return {
+      backgroundSync: 'serviceWorker' in navigator && 'sync' in window.ServiceWorkerRegistration.prototype,
+      pushNotifications: 'serviceWorker' in navigator && 'PushManager' in window,
+      periodicSync: 'serviceWorker' in navigator && 'periodicSync' in window.ServiceWorkerRegistration.prototype
+    };
+  }
+
+  /**
+   * Request background sync for journal entries
+   */
+  async requestBackgroundSync(tag: string = 'journal-entry-sync'): Promise<boolean> {
+    if (!this.registration) {
+      console.warn('[SW] No service worker registration available');
+      return false;
+    }
+
+    // Type guard to check if sync is available
+    const registrationWithSync = this.registration as ServiceWorkerRegistrationWithSync;
+    
+    if (!registrationWithSync.sync) {
+      console.warn('[SW] Background sync not supported');
+      return false;
+    }
+
+    try {
+      await registrationWithSync.sync.register(tag);
+      console.log('[SW] Background sync registered:', tag);
+      return true;
+    } catch (error) {
+      console.error('[SW] Failed to register background sync:', error);
+      return false;
+    }
+  }
+
+  /**
+   * Handle service worker updates
+   */
+  private handleUpdate(registration: ServiceWorkerRegistration) {
+    const newWorker = registration.installing;
+    if (!newWorker) return;
+
+    newWorker.addEventListener('statechange', () => {
+      if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+        // New content is available
+        this.notifyUpdate();
+      }
+    });
+  }
+
+  /**
+   * Handle messages from service worker
+   */
+  private handleMessage(event: MessageEvent) {
+    console.log('[SW] Message received from service worker:', event.data);
+    
+    if (event.data.type === 'JOURNAL_SYNC_STATUS') {
+      this.handleJournalSyncStatus(event.data.payload);
+    }
+  }
+
+  /**
+   * Handle journal sync status updates
+   */
+  private handleJournalSyncStatus(payload: any) {
+    const { entry, status } = payload;
+    
+    if (status === 'success') {
+      // Dispatch custom event for app to handle
+      window.dispatchEvent(new CustomEvent('journalSyncSuccess', {
+        detail: { entry }
+      }));
+    }
+  }
+
+  /**
+   * Notify about service worker updates
+   */
+  private notifyUpdate() {
+    // Dispatch custom event for app to handle
+    window.dispatchEvent(new CustomEvent('swUpdateAvailable'));
+  }
+
+  /**
+   * Get the current registration
+   */
   getRegistration(): ServiceWorkerRegistration | null {
     return this.registration;
   }
+
+  /**
+   * Skip waiting and activate new service worker
+   */
+  async skipWaiting(): Promise<void> {
+    if (!this.registration || !this.registration.waiting) {
+      return;
+    }
+
+    this.registration.waiting.postMessage({ type: 'SKIP_WAITING' });
+  }
 }
 
+// Export singleton instance
 export const serviceWorkerManager = new ServiceWorkerManager();
 
+/**
+ * Initialize service worker
+ */
 export async function initializeServiceWorker(): Promise<SwRegistrationResult> {
-  console.log('[SW Init] Initializing simplified service worker...');
+  // Only register in production or when explicitly enabled
+  if (process.env.NODE_ENV === 'development' && !localStorage.getItem('enableSW')) {
+    console.log('[SW] Service worker disabled in development');
+    return { success: false, error: new Error('Disabled in development') };
+  }
+
   return await serviceWorkerManager.register();
 }
 
+/**
+ * Check if app is running as PWA
+ */
 export function isPWA(): boolean {
-  const standaloneQuery = window.matchMedia('(display-mode: standalone)');
-  const iOSStandalone = (window.navigator as any).standalone === true;
-  return standaloneQuery.matches || iOSStandalone;
+  return window.matchMedia('(display-mode: standalone)').matches ||
+         window.matchMedia('(display-mode: fullscreen)').matches ||
+         (window.navigator as any).standalone === true;
+}
+
+/**
+ * Check if device supports PWA installation
+ */
+export function canInstallPWA(): boolean {
+  return 'serviceWorker' in navigator && 
+         'BeforeInstallPromptEvent' in window;
 }

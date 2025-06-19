@@ -1,13 +1,10 @@
 
-import React, { createContext, useContext, useMemo, ReactNode, useEffect, useState } from "react";
+import React, { createContext, useContext, useMemo, ReactNode } from "react";
 import { FeatureFlags, AppFeatureFlag } from "../types/featureFlags";
-import { featureFlagService } from "../services/featureFlagService";
 
 type FeatureFlagsContextValue = {
   flags: FeatureFlags;
   isEnabled: (flag: AppFeatureFlag) => boolean;
-  isLoading: boolean;
-  refresh: () => Promise<void>;
 };
 
 const defaultFlags: FeatureFlags = {
@@ -21,48 +18,22 @@ const defaultFlags: FeatureFlags = {
 
 const FeatureFlagsContext = createContext<FeatureFlagsContextValue>({
   flags: defaultFlags,
-  isEnabled: () => false,
-  isLoading: false,
-  refresh: async () => {}
+  isEnabled: () => false
 });
 
 export const FeatureFlagsProvider = ({ children }: { children: ReactNode }) => {
-  const [flags, setFlags] = useState<FeatureFlags>(defaultFlags);
-  const [isLoading, setIsLoading] = useState(true);
-
-  const loadFlags = async () => {
-    try {
-      setIsLoading(true);
-      const fetchedFlags = await featureFlagService.getFlags();
-      setFlags(fetchedFlags);
-    } catch (error) {
-      console.error('[FeatureFlagsProvider] Error loading flags:', error);
-      // Fall back to default flags
-      setFlags(defaultFlags);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    loadFlags();
-  }, []);
+  // In a real app, fetch or compute flags here (e.g., from Supabase, API, etc).
+  // For now, we use static defaults.
+  const flags = defaultFlags;
 
   const isEnabled = (flag: AppFeatureFlag) => !!flags[flag];
-
-  const refresh = async () => {
-    featureFlagService.clearCache();
-    await loadFlags();
-  };
 
   const value = useMemo(
     () => ({
       flags,
       isEnabled,
-      isLoading,
-      refresh,
     }),
-    [flags, isLoading]
+    [flags]
   );
 
   return (

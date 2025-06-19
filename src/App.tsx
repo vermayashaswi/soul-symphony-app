@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from 'react';
 import AppRoutes from './routes/AppRoutes';
 import { Toaster } from "@/components/ui/toaster";
@@ -23,23 +22,23 @@ const App: React.FC = () => {
     // Clean up any malformed paths
     const currentPath = window.location.pathname;
     
+    // Fix incorrectly formatted URLs that have domains or https in the path
     if (currentPath.includes('https://') || currentPath.includes('soulo.online')) {
       window.history.replaceState(null, '', '/');
     }
     
+    // Apply a CSS class to the document body for theme-specific overrides
     document.body.classList.add('app-initialized');
     
-    // Preload critical images
+    // Preload critical images including the chat avatar
     try {
       preloadCriticalImages();
     } catch (error) {
       console.warn('Failed to preload some images:', error);
+      // Non-critical error, continue app initialization
     }
 
-    // Simple cache busting for updates
-    const cacheVersion = Date.now().toString();
-    sessionStorage.setItem('cache-version', cacheVersion);
-
+    // Mark app as initialized after a brief delay to ensure smooth startup
     setTimeout(() => {
       setIsInitialized(true);
     }, 500);
@@ -48,6 +47,7 @@ const App: React.FC = () => {
   const handleAppError = (error: Error, errorInfo: any) => {
     console.error('Application-level error:', error, errorInfo);
     
+    // Log critical app errors for debugging
     const errorData = {
       message: error.message,
       stack: error.stack,
@@ -58,7 +58,11 @@ const App: React.FC = () => {
     };
     
     console.error('Detailed error info:', errorData);
+
+    // Show user-friendly error notification
     toast.error('Something went wrong. The app will try to recover automatically.');
+
+    // Allow the app to continue functioning despite errors
   };
 
   return (
