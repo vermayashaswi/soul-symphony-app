@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { 
@@ -81,7 +82,7 @@ export const useChatPersistence = (userId: string | undefined) => {
       
       setLoading(true);
       try {
-        const threadMessages = await getChatMessages(activeThread, userId);
+        const threadMessages = await getChatMessages(activeThread);
         if (threadMessages) {
           // Convert ChatMessage to ChatMessagePersistence
           const persistenceMessages: ChatMessagePersistence[] = threadMessages.map(msg => ({
@@ -205,7 +206,7 @@ export const useChatPersistence = (userId: string | undefined) => {
     setMessages(prev => [...prev, tempMessage]);
     
     try {
-      const savedMessage = await createChatMessage(activeThread, content, 'user', userId);
+      const savedMessage = await createChatMessage(activeThread, content, 'user');
       
       if (savedMessage) {
         // Convert to ChatMessagePersistence to avoid type mismatch

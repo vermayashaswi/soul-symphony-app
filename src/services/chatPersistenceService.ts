@@ -9,7 +9,7 @@ import {
   updateThreadTitle
 } from './chat/messageService';
 import { useChatPersistence } from './chat/useChatPersistence';
-import { ChatThread, ChatMessage } from './chat/types';
+import { ChatThread, ChatMessage } from '@/types/chat';
 
 // Re-export everything for backward compatibility
 export type { ChatThread, ChatMessage };
