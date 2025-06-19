@@ -16,6 +16,12 @@ interface ContextReadinessContextType {
 const ContextReadinessContext = createContext<ContextReadinessContextType | undefined>(undefined);
 
 export function ContextReadinessProvider({ children }: { children: ReactNode }) {
+  // Add defensive check to ensure React hooks are available
+  if (!React || typeof React.useState !== 'function') {
+    console.error('React is not properly initialized in ContextReadinessProvider');
+    return <>{children}</>;
+  }
+
   const [state, setState] = useState<ContextReadinessState>({
     isReady: false,
     error: null
