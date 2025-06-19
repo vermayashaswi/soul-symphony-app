@@ -131,7 +131,7 @@ export function useIsMobile() {
     // Create event listeners for resize and orientation change
     const handleResize = () => {
       const newIsMobile = checkIfMobile();
-      if (newIsMobile !== isM(obile) {
+      if (newIsMobile !== isMobile) {
         console.log("Mobile state changed:", newIsMobile, "width:", window.innerWidth);
         setIsMobile(newIsMobile);
       }
