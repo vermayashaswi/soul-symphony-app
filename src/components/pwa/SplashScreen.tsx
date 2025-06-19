@@ -130,7 +130,6 @@ const SplashScreen: React.FC<SplashScreenProps> = ({
             <motion.div
               key={i}
               className="absolute w-2 h-2 rounded-full opacity-30"
-              style={{ backgroundColor: themeColor }}
               animate={{
                 x: [0, Math.random() * 100 - 50],
                 y: [0, Math.random() * 100 - 50],
