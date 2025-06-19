@@ -63,7 +63,7 @@ export const getChatMessages = async (threadId: string): Promise<ChatMessage[]> 
   }
 };
 
-// Alias for backward compatibility
+// Export as getThreadMessages for backward compatibility
 export const getThreadMessages = async (threadId: string, userId?: string): Promise<ChatMessage[]> => {
   try {
     let query = supabase

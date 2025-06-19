@@ -82,6 +82,7 @@ export const useChatPersistence = (userId: string | undefined) => {
       
       setLoading(true);
       try {
+        // Fix: Use getChatMessages with single argument
         const threadMessages = await getChatMessages(activeThread);
         if (threadMessages) {
           // Convert ChatMessage to ChatMessagePersistence
