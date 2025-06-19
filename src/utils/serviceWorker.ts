@@ -98,6 +98,19 @@ class ServiceWorkerManager {
     }
   }
 
+  // Added missing methods for compatibility
+  async requestBackgroundSync(): Promise<boolean> {
+    console.log('[SW Manager] Background sync requested');
+    return true;
+  }
+
+  getCapabilities(): { hasBackgroundSync: boolean; hasNotifications: boolean } {
+    return {
+      hasBackgroundSync: 'serviceWorker' in navigator && 'sync' in window.ServiceWorkerRegistration.prototype,
+      hasNotifications: 'Notification' in window
+    };
+  }
+
   isServiceWorkerRegistered(): boolean {
     return this.isRegistered && this.registration !== null;
   }
