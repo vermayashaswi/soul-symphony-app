@@ -22,7 +22,7 @@ export const getRedirectUrl = (): string => {
 };
 
 /**
- * Enhanced Google sign-in with better error handling
+ * Enhanced Google sign-in with better webtonative handling
  */
 export const signInWithGoogle = async (): Promise<void> => {
   try {
@@ -32,15 +32,16 @@ export const signInWithGoogle = async (): Promise<void> => {
     // Clear any existing auth state first
     await supabase.auth.signOut({ scope: 'local' });
     
+    // Enhanced options for webtonative
     const { data, error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: {
         redirectTo: redirectUrl,
         queryParams: {
           access_type: 'offline',
-          prompt: 'select_account' // Force account selection for better UX
+          prompt: 'select_account'
         },
-        // Enhanced skip browser redirect for webtonative
+        // Critical: Don't skip browser redirect for webtonative
         skipBrowserRedirect: false
       }
     });
@@ -104,7 +105,7 @@ export const signInWithApple = async (): Promise<void> => {
 };
 
 /**
- * Enhanced OAuth callback handler
+ * Enhanced OAuth callback handler with better error handling
  */
 export const handleAuthCallback = async (): Promise<any> => {
   try {
@@ -114,39 +115,55 @@ export const handleAuthCallback = async (): Promise<any> => {
     const urlParams = new URLSearchParams(window.location.search);
     const hashParams = new URLSearchParams(window.location.hash.substring(1));
     
-    const hasAuthParams = urlParams.has('code') || hashParams.has('access_token') || hashParams.has('error');
+    const hasAuthParams = urlParams.has('code') || hashParams.has('access_token') || 
+                          hashParams.has('error') || urlParams.has('error');
     
     if (!hasAuthParams) {
       console.log('[AuthService] No OAuth parameters found in URL');
       return null;
     }
     
+    // Check for error parameters first
+    const error = urlParams.get('error') || hashParams.get('error');
+    const errorDescription = urlParams.get('error_description') || hashParams.get('error_description');
+    
+    if (error) {
+      console.error('[AuthService] OAuth error in URL:', error, errorDescription);
+      throw new Error(errorDescription || error);
+    }
+    
     console.log('[AuthService] OAuth parameters detected, processing session...');
     
-    // Get session with retries for webtonative
+    // Enhanced session retrieval with better error handling
     let retries = 3;
     let session = null;
     
     while (retries > 0 && !session) {
-      const { data, error } = await supabase.auth.getSession();
-      
-      if (error) {
-        console.error('[AuthService] Session retrieval error:', error);
+      try {
+        const { data, error: sessionError } = await supabase.auth.getSession();
+        
+        if (sessionError) {
+          console.error('[AuthService] Session retrieval error:', sessionError);
+          throw sessionError;
+        }
+        
+        session = data.session;
+        
+        if (!session && retries > 1) {
+          console.log('[AuthService] Session not ready, retrying...');
+          await new Promise(resolve => setTimeout(resolve, 500));
+          retries--;
+        } else {
+          break;
+        }
+      } catch (error) {
+        console.error('[AuthService] Session error:', error);
         retries--;
         if (retries > 0) {
           await new Promise(resolve => setTimeout(resolve, 1000));
-          continue;
+        } else {
+          throw error;
         }
-        throw error;
-      }
-      
-      session = data.session;
-      if (!session && retries > 1) {
-        console.log('[AuthService] Session not ready, retrying...');
-        await new Promise(resolve => setTimeout(resolve, 500));
-        retries--;
-      } else {
-        break;
       }
     }
     
@@ -156,9 +173,13 @@ export const handleAuthCallback = async (): Promise<any> => {
         email: session.user.email 
       });
       
-      // Clean up URL parameters
-      const cleanUrl = window.location.origin + window.location.pathname;
-      window.history.replaceState({}, document.title, cleanUrl);
+      // Clean up URL parameters without causing navigation issues
+      try {
+        const cleanUrl = window.location.origin + window.location.pathname;
+        window.history.replaceState({}, document.title, cleanUrl);
+      } catch (historyError) {
+        console.warn('[AuthService] Could not clean URL:', historyError);
+      }
       
       return session;
     }
@@ -170,11 +191,14 @@ export const handleAuthCallback = async (): Promise<any> => {
     console.error('[AuthService] OAuth callback error:', error);
     
     // Clean up URL on error
-    const cleanUrl = window.location.origin + window.location.pathname;
-    window.history.replaceState({}, document.title, cleanUrl);
+    try {
+      const cleanUrl = window.location.origin + window.location.pathname;
+      window.history.replaceState({}, document.title, cleanUrl);
+    } catch (historyError) {
+      console.warn('[AuthService] Could not clean URL after error:', historyError);
+    }
     
-    toast.error(`Authentication failed: ${error.message}`);
-    return null;
+    throw error;
   }
 };
 

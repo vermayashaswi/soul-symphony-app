@@ -19,6 +19,7 @@ export default function Auth() {
   const [isLoading, setIsLoading] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
   const [processingCallback, setProcessingCallback] = useState(false);
+  const [isInitialized, setIsInitialized] = useState(false);
   
   const { user, isLoading: authLoading } = useAuth();
   const { onboardingComplete } = useOnboarding();
@@ -53,13 +54,15 @@ export default function Auth() {
                           window.location.search.includes('error') ||
                           window.location.hash.includes('error');
       
-      if (!hasAuthParams || processingCallback) {
+      if (!hasAuthParams || processingCallback || user) {
+        setIsInitialized(true);
         return;
       }
       
       console.log('[Auth] Processing OAuth callback...');
       setProcessingCallback(true);
       setIsLoading(true);
+      setAuthError(null);
       
       try {
         const session = await handleAuthCallback();
@@ -75,9 +78,11 @@ export default function Auth() {
       } catch (error: any) {
         console.error('[Auth] OAuth callback error:', error);
         setAuthError(error.message || 'Authentication failed. Please try again.');
+        toast.error(error.message || 'Authentication failed. Please try again.');
       } finally {
         setIsLoading(false);
         setProcessingCallback(false);
+        setIsInitialized(true);
       }
     };
     
@@ -87,7 +92,7 @@ export default function Auth() {
 
   // Enhanced user redirect logic
   useEffect(() => {
-    if (user && !authLoading && !processingCallback) {
+    if (user && !authLoading && !processingCallback && isInitialized) {
       console.log('[Auth] User authenticated, preparing redirect:', { 
         redirectTo,
         onboardingComplete 
@@ -107,12 +112,12 @@ export default function Auth() {
       
       return () => clearTimeout(timer);
     }
-  }, [user, authLoading, processingCallback, navigate, redirectTo, onboardingComplete]);
+  }, [user, authLoading, processingCallback, isInitialized, navigate, redirectTo, onboardingComplete]);
 
   // Show loading during auth processing
-  if (authLoading || processingCallback) {
+  if (authLoading || processingCallback || !isInitialized) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
+      <div className="min-h-screen flex items-center justify-center bg-background auth-loading">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
           <p className="text-muted-foreground">
@@ -171,6 +176,12 @@ export default function Auth() {
             <p className="text-sm">
               <TranslatableText text="Error:" forceTranslate={true} /> {authError}
             </p>
+            <button 
+              onClick={() => setAuthError(null)} 
+              className="mt-2 text-xs underline hover:no-underline"
+            >
+              <TranslatableText text="Dismiss" forceTranslate={true} />
+            </button>
           </div>
         )}
         
@@ -199,7 +210,8 @@ export default function Auth() {
         <div className="fixed bottom-4 left-4 bg-black text-white p-2 rounded text-xs opacity-70 z-50">
           Webtonative: {isWebtonative ? 'Yes' : 'No'} | 
           Keyboard: {keyboardState.isOpen ? 'Open' : 'Closed'} |
-          Processing: {processingCallback ? 'Yes' : 'No'}
+          Processing: {processingCallback ? 'Yes' : 'No'} |
+          User: {user ? 'Yes' : 'No'}
         </div>
       )}
     </div>
