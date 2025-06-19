@@ -1,3 +1,4 @@
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -41,6 +42,13 @@
     --edit-btn-text: 217 91.2% 40%;
     --delete-btn-bg: 0 84.2% 95%;
     --delete-btn-text: 0 84.2% 40%;
+    
+    /* Enhanced viewport variables for webtonative */
+    --vh: 1vh;
+    --real-vh: 100vh;
+    --visual-vh: 1vh;
+    --available-height: 100vh;
+    --keyboard-height: 0px;
   }
  
   .dark {
@@ -82,7 +90,33 @@
   }
   body {
     @apply bg-background text-foreground;
+    /* Enhanced webtonative optimizations */
+    overscroll-behavior: none;
+    -webkit-overflow-scrolling: touch;
+    position: relative;
+    overflow-x: hidden;
   }
+  
+  /* Enhanced keyboard handling */
+  body.keyboard-visible {
+    position: fixed !important;
+    width: 100% !important;
+    overflow: hidden !important;
+    height: calc(var(--visual-vh, 1vh) * 100) !important;
+  }
+  
+  /* Auth page keyboard handling */
+  html.auth-keyboard-open {
+    overflow: hidden !important;
+  }
+  
+  html.auth-keyboard-open body {
+    position: fixed !important;
+    width: 100% !important;
+    height: 100% !important;
+    overflow: hidden !important;
+  }
+  
   /* Apply theme color to all page headers */
   h1, h2, h3 {
     @apply text-theme-color;
@@ -97,6 +131,16 @@
   [data-radix-popper-content-wrapper] [data-radix-radio-item],
   [data-radix-radio-item] {
     border-radius: 9999px !important;
+  }
+  
+  /* Enhanced input handling for webtonative */
+  input, textarea, select {
+    font-size: 16px !important; /* Prevent zoom on iOS */
+    transition: all 0.2s ease !important;
+  }
+  
+  input:focus, textarea:focus, select:focus {
+    transform: none !important; /* Prevent layout shifts */
   }
 }
 
@@ -163,11 +207,35 @@
   .delete-button-text {
     color: hsl(var(--delete-btn-text)) !important;
   }
+  
+  /* Enhanced webtonative utilities */
+  .webtonative-safe-height {
+    height: calc(var(--vh, 1vh) * 100) !important;
+    min-height: calc(var(--vh, 1vh) * 100) !important;
+  }
+  
+  .webtonative-available-height {
+    height: var(--available-height) !important;
+    min-height: var(--available-height) !important;
+  }
+  
+  .keyboard-adaptive {
+    transition: all 0.3s ease !important;
+  }
+  
+  .keyboard-adaptive.keyboard-visible {
+    height: var(--available-height) !important;
+    max-height: var(--available-height) !important;
+  }
 }
 
 /* Add custom styles for scroll to top behavior */
 html {
   scroll-behavior: smooth;
+  /* Enhanced webtonative support */
+  -webkit-text-size-adjust: 100%;
+  -ms-text-size-adjust: 100%;
+  text-size-adjust: 100%;
 }
 
 /* Support for system theme preference media query */
@@ -322,4 +390,42 @@ body {
 
 .onboarding-language-select [data-radix-select-value] {
   color: white;
+}
+
+/* Enhanced webtonative keyboard handling */
+@media screen and (max-device-width: 768px) {
+  /* Prevent zoom on input focus for webtonative */
+  input[type="text"],
+  input[type="email"],
+  input[type="password"],
+  input[type="number"],
+  input[type="tel"],
+  input[type="url"],
+  input[type="search"],
+  textarea,
+  select {
+    font-size: 16px !important;
+    font-size: max(16px, 1rem) !important;
+  }
+  
+  /* Enhanced viewport handling */
+  .webtonative-container {
+    position: fixed !important;
+    top: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+    bottom: 0 !important;
+    width: 100% !important;
+    height: 100% !important;
+    overflow: hidden !important;
+  }
+  
+  /* Keyboard adaptive containers */
+  .keyboard-adaptive-container {
+    transition: height 0.3s ease !important;
+  }
+  
+  .keyboard-adaptive-container.keyboard-visible {
+    height: calc(100vh - var(--keyboard-height, 0px)) !important;
+  }
 }

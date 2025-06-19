@@ -8,6 +8,7 @@ export function useIsMobile() {
   const [isInitialized, setIsInitialized] = React.useState<boolean>(false);
   const [isIOS, setIsIOS] = React.useState<boolean>(false); 
   const [isAndroid, setIsAndroid] = React.useState<boolean>(false);
+  const [isWebtonative, setIsWebtonative] = React.useState<boolean>(false);
 
   React.useEffect(() => {
     // Function to check if mobile
@@ -45,24 +46,55 @@ export function useIsMobile() {
     const checkIfAndroid = () => {
       return /Android/i.test(navigator.userAgent);
     };
+    
+    // Function to check if running in webtonative
+    const checkIfWebtonative = () => {
+      // Check for webtonative specific indicators
+      const hasWebtonativeUA = /webtonative/i.test(navigator.userAgent);
+      const hasWebView = /wv|WebView/i.test(navigator.userAgent);
+      const hasWebApp = window.navigator.standalone === true;
+      const hasNoBackButton = !window.history || window.history.length <= 1;
+      
+      // Check for common webview user agents
+      const isWebView = hasWebtonativeUA || hasWebView || hasWebApp;
+      
+      // Additional checks for webtonative environment
+      const isLikelyWebtonative = isWebView && (checkIfAndroid() || checkIfIOS());
+      
+      console.log('[Mobile] Webtonative detection:', {
+        hasWebtonativeUA,
+        hasWebView,
+        hasWebApp,
+        hasNoBackButton,
+        isWebView,
+        isLikelyWebtonative,
+        userAgent: navigator.userAgent
+      });
+      
+      return isLikelyWebtonative;
+    };
 
     // Set initial state immediately
     const initialIsMobile = checkIfMobile();
     const initialIsIOS = checkIfIOS();
     const initialIsAndroid = checkIfAndroid();
+    const initialIsWebtonative = checkIfWebtonative();
     
     setIsMobile(initialIsMobile);
     setIsIOS(initialIsIOS);
     setIsAndroid(initialIsAndroid);
+    setIsWebtonative(initialIsWebtonative);
     setIsInitialized(true);
     
-    console.log("Mobile detection initialized:", {
+    console.log("Enhanced mobile detection initialized:", {
       isMobile: initialIsMobile, 
       isIOS: initialIsIOS,
       isAndroid: initialIsAndroid,
+      isWebtonative: initialIsWebtonative,
       width: window.innerWidth, 
       userAgent: navigator.userAgent,
-      touch: 'ontouchstart' in window || navigator.maxTouchPoints > 0
+      touch: 'ontouchstart' in window || navigator.maxTouchPoints > 0,
+      visualViewport: !!window.visualViewport
     });
     
     // Create event listeners for resize and orientation change
@@ -77,11 +109,11 @@ export function useIsMobile() {
     // Special handling for iOS orientation changes
     const handleOrientationChange = () => {
       console.log("Orientation change detected");
-      // On iOS, we need a small delay
-      if (initialIsIOS) {
+      // On iOS and webtonative, we need a small delay
+      if (initialIsIOS || initialIsWebtonative) {
         setTimeout(() => {
           handleResize();
-        }, 100);
+        }, 300);
       } else {
         handleResize();
       }
@@ -97,6 +129,10 @@ export function useIsMobile() {
     if (initialIsAndroid) {
       document.body.classList.add('android-device');
     }
+    if (initialIsWebtonative) {
+      document.body.classList.add('webtonative-app');
+      document.documentElement.classList.add('webtonative-env');
+    }
     
     // Setup matchMedia query as well
     const mql = window.matchMedia(`(max-width: ${MOBILE_BREAKPOINT - 1}px)`);
@@ -111,6 +147,29 @@ export function useIsMobile() {
       // For older browsers
       // @ts-ignore - Using deprecated API for compatibility
       mql.addListener && mql.addListener(handleMqlChange);
+    }
+    
+    // Enhanced keyboard detection for webtonative
+    if (initialIsWebtonative && window.visualViewport) {
+      const handleViewportChange = () => {
+        const visualHeight = window.visualViewport!.height;
+        const windowHeight = window.innerHeight;
+        const keyboardHeight = windowHeight - visualHeight;
+        
+        console.log('[Webtonative] Viewport change:', {
+          visual: visualHeight,
+          window: windowHeight,
+          keyboard: keyboardHeight
+        });
+        
+        // Update CSS custom properties
+        document.documentElement.style.setProperty('--keyboard-height', `${keyboardHeight}px`);
+        document.documentElement.style.setProperty('--visual-vh', `${visualHeight * 0.01}px`);
+        document.documentElement.style.setProperty('--available-height', `${visualHeight}px`);
+      };
+      
+      window.visualViewport.addEventListener('resize', handleViewportChange);
+      window.visualViewport.addEventListener('scroll', handleViewportChange);
     }
     
     // Force a recheck after a short delay (helps with some mobile browsers)
@@ -139,6 +198,10 @@ export function useIsMobile() {
       if (initialIsAndroid) {
         document.body.classList.remove('android-device');
       }
+      if (initialIsWebtonative) {
+        document.body.classList.remove('webtonative-app');
+        document.documentElement.classList.remove('webtonative-env');
+      }
     };
   }, [isMobile]);
 
@@ -161,7 +224,8 @@ export function useIsMobile() {
   const result = {
     isMobile: isInitialized ? isMobile : false,
     isIOS: isInitialized ? isIOS : false,
-    isAndroid: isInitialized ? isAndroid : false
+    isAndroid: isInitialized ? isAndroid : false,
+    isWebtonative: isInitialized ? isWebtonative : false
   } as const;
   
   // Add a valueOf method to make the object behave like a boolean
@@ -185,5 +249,16 @@ declare global {
   interface Window {
     __forceMobileView?: boolean;
     toggleMobileView?: () => void;
+    visualViewport?: VisualViewport;
+  }
+  
+  interface VisualViewport extends EventTarget {
+    readonly offsetLeft: number;
+    readonly offsetTop: number;
+    readonly pageLeft: number;
+    readonly pageTop: number;
+    readonly width: number;
+    readonly height: number;
+    readonly scale: number;
   }
 }

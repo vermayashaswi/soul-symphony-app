@@ -18,6 +18,7 @@ export default function Auth() {
   const { user, isLoading: authLoading } = useAuth();
   const { onboardingComplete } = useOnboarding();
   const [authError, setAuthError] = useState<string | null>(null);
+  const [keyboardVisible, setKeyboardVisible] = useState(false);
   
   const redirectParam = searchParams.get('redirectTo');
   const fromLocation = location.state?.from?.pathname;
@@ -48,6 +49,60 @@ export default function Auth() {
     currentPath: location.pathname,
     onboardingComplete
   });
+
+  // Enhanced keyboard detection for webtonative
+  useEffect(() => {
+    let initialHeight = window.innerHeight;
+    
+    const handleKeyboard = () => {
+      const currentHeight = window.innerHeight;
+      const heightDifference = initialHeight - currentHeight;
+      const isKeyboardOpen = heightDifference > 150;
+      
+      if (isKeyboardOpen !== keyboardVisible) {
+        console.log(`[Auth] Keyboard ${isKeyboardOpen ? 'opened' : 'closed'}`);
+        setKeyboardVisible(isKeyboardOpen);
+        
+        if (isKeyboardOpen) {
+          document.body.classList.add('keyboard-visible');
+          document.documentElement.classList.add('auth-keyboard-open');
+        } else {
+          document.body.classList.remove('keyboard-visible');
+          document.documentElement.classList.remove('auth-keyboard-open');
+        }
+      }
+    };
+    
+    // Listen for viewport changes
+    window.addEventListener('resize', handleKeyboard);
+    
+    // Visual viewport API for more accurate detection
+    if (window.visualViewport) {
+      window.visualViewport.addEventListener('resize', handleKeyboard);
+    }
+    
+    // Reset initial height on orientation change
+    const handleOrientationChange = () => {
+      setTimeout(() => {
+        initialHeight = window.innerHeight;
+        handleKeyboard();
+      }, 300);
+    };
+    
+    window.addEventListener('orientationchange', handleOrientationChange);
+    
+    return () => {
+      window.removeEventListener('resize', handleKeyboard);
+      window.removeEventListener('orientationchange', handleOrientationChange);
+      if (window.visualViewport) {
+        window.visualViewport.removeEventListener('resize', handleKeyboard);
+      }
+      
+      // Cleanup classes
+      document.body.classList.remove('keyboard-visible');
+      document.documentElement.classList.remove('auth-keyboard-open');
+    };
+  }, [keyboardVisible]);
 
   useEffect(() => {
     setIsLoading(false);
@@ -101,51 +156,53 @@ export default function Auth() {
   }
 
   return (
-    <div className="min-h-screen bg-background flex flex-col items-center justify-center px-4 py-12">
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.6 }}
-        className="max-w-md w-full glass-card p-8 rounded-xl relative z-10"
-      >
-        <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold mb-2">
-            <TranslatableText text="Welcome to" forceTranslate={true} />{" "}
-            <SouloLogo size="large" className="text-blue-600" />
-          </h1>
-          <p className="text-muted-foreground">
-            <TranslatableText 
-              text="Sign in to start your journaling journey and track your emotional wellbeing" 
-              forceTranslate={true} 
-            />
-          </p>
-        </div>
-        
-        {authError && (
-          <div className="mb-4 p-2 border border-red-500 bg-red-50 text-red-600 rounded">
-            <p className="text-sm">
-              <TranslatableText text="Error:" forceTranslate={true} /> {authError}
-            </p>
-          </div>
-        )}
-        
-        <div className="space-y-4">
-          <PlatformAuthButton 
-            isLoading={isLoading}
-            onLoadingChange={setIsLoading}
-            onError={setAuthError}
-          />
-          
-          <div className="text-center text-sm text-muted-foreground">
-            <p>
+    <div className={`auth-page ${keyboardVisible ? 'keyboard-visible' : ''}`}>
+      <div className={`auth-container ${keyboardVisible ? 'keyboard-visible' : ''}`}>
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.6 }}
+          className={`auth-card w-full max-w-md ${keyboardVisible ? 'keyboard-visible' : ''}`}
+        >
+          <div className="text-center mb-6">
+            <h1 className="text-2xl md:text-3xl font-bold mb-2">
+              <TranslatableText text="Welcome to" forceTranslate={true} />{" "}
+              <SouloLogo size="large" className="text-blue-600" />
+            </h1>
+            <p className="text-sm md:text-base text-muted-foreground">
               <TranslatableText 
-                text="By signing in, you agree to our Terms of Service and Privacy Policy" 
+                text="Sign in to start your journaling journey and track your emotional wellbeing" 
                 forceTranslate={true} 
               />
             </p>
           </div>
-        </div>
-      </motion.div>
+          
+          {authError && (
+            <div className="mb-4 p-3 border border-red-500 bg-red-50 text-red-600 rounded-lg">
+              <p className="text-sm">
+                <TranslatableText text="Error:" forceTranslate={true} /> {authError}
+              </p>
+            </div>
+          )}
+          
+          <div className="space-y-4">
+            <PlatformAuthButton 
+              isLoading={isLoading}
+              onLoadingChange={setIsLoading}
+              onError={setAuthError}
+            />
+            
+            <div className="text-center text-xs md:text-sm text-muted-foreground">
+              <p>
+                <TranslatableText 
+                  text="By signing in, you agree to our Terms of Service and Privacy Policy" 
+                  forceTranslate={true} 
+                />
+              </p>
+            </div>
+          </div>
+        </motion.div>
+      </div>
     </div>
   );
 }
