@@ -1,4 +1,3 @@
-
 import { toast } from 'sonner';
 
 export interface UnifiedNativeAppInfo {
@@ -137,7 +136,7 @@ class UnifiedNativeAppService {
     document.addEventListener('visibilitychange', () => {
       if (document.visibilityState === 'visible' && this.isAppRoute()) {
         console.log('[UnifiedNativeApp] App became visible, revalidating theme');
-        setTimeout(() => this.validateAndCorreectTheme(), 1000);
+        setTimeout(() => this.validateAndCorrectTheme(), 1000);
       }
     });
   }
