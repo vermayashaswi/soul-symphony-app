@@ -1,5 +1,6 @@
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { oauthFlowManager } from '@/utils/oauth-flow-manager';
 
 /**
  * Enhanced redirect URL handling for webtonative OAuth
@@ -28,6 +29,9 @@ export const signInWithGoogle = async (): Promise<void> => {
   try {
     const redirectUrl = getRedirectUrl();
     console.log('[AuthService] Starting Google OAuth flow:', { redirectUrl });
+    
+    // Clear any previous OAuth state
+    oauthFlowManager.clearState();
     
     // Clear any existing auth state first
     await supabase.auth.signOut({ scope: 'local' });
@@ -75,6 +79,9 @@ export const signInWithApple = async (): Promise<void> => {
     const redirectUrl = getRedirectUrl();
     console.log('[AuthService] Starting Apple OAuth flow:', { redirectUrl });
     
+    // Clear any previous OAuth state
+    oauthFlowManager.clearState();
+    
     // Clear any existing auth state first
     await supabase.auth.signOut({ scope: 'local' });
     
@@ -105,100 +112,17 @@ export const signInWithApple = async (): Promise<void> => {
 };
 
 /**
- * Enhanced OAuth callback handler with better error handling
+ * Enhanced OAuth callback handler using the flow manager
  */
 export const handleAuthCallback = async (): Promise<any> => {
-  try {
-    console.log('[AuthService] Processing OAuth callback...');
-    
-    // Check URL for auth parameters
-    const urlParams = new URLSearchParams(window.location.search);
-    const hashParams = new URLSearchParams(window.location.hash.substring(1));
-    
-    const hasAuthParams = urlParams.has('code') || hashParams.has('access_token') || 
-                          hashParams.has('error') || urlParams.has('error');
-    
-    if (!hasAuthParams) {
-      console.log('[AuthService] No OAuth parameters found in URL');
-      return null;
-    }
-    
-    // Check for error parameters first
-    const error = urlParams.get('error') || hashParams.get('error');
-    const errorDescription = urlParams.get('error_description') || hashParams.get('error_description');
-    
-    if (error) {
-      console.error('[AuthService] OAuth error in URL:', error, errorDescription);
-      throw new Error(errorDescription || error);
-    }
-    
-    console.log('[AuthService] OAuth parameters detected, processing session...');
-    
-    // Enhanced session retrieval with better error handling
-    let retries = 3;
-    let session = null;
-    
-    while (retries > 0 && !session) {
-      try {
-        const { data, error: sessionError } = await supabase.auth.getSession();
-        
-        if (sessionError) {
-          console.error('[AuthService] Session retrieval error:', sessionError);
-          throw sessionError;
-        }
-        
-        session = data.session;
-        
-        if (!session && retries > 1) {
-          console.log('[AuthService] Session not ready, retrying...');
-          await new Promise(resolve => setTimeout(resolve, 500));
-          retries--;
-        } else {
-          break;
-        }
-      } catch (error) {
-        console.error('[AuthService] Session error:', error);
-        retries--;
-        if (retries > 0) {
-          await new Promise(resolve => setTimeout(resolve, 1000));
-        } else {
-          throw error;
-        }
-      }
-    }
-    
-    if (session?.user) {
-      console.log('[AuthService] OAuth callback successful:', { 
-        userId: session.user.id,
-        email: session.user.email 
-      });
-      
-      // Clean up URL parameters without causing navigation issues
-      try {
-        const cleanUrl = window.location.origin + window.location.pathname;
-        window.history.replaceState({}, document.title, cleanUrl);
-      } catch (historyError) {
-        console.warn('[AuthService] Could not clean URL:', historyError);
-      }
-      
-      return session;
-    }
-    
-    console.warn('[AuthService] OAuth callback completed but no user session found');
-    return null;
-    
-  } catch (error: any) {
-    console.error('[AuthService] OAuth callback error:', error);
-    
-    // Clean up URL on error
-    try {
-      const cleanUrl = window.location.origin + window.location.pathname;
-      window.history.replaceState({}, document.title, cleanUrl);
-    } catch (historyError) {
-      console.warn('[AuthService] Could not clean URL after error:', historyError);
-    }
-    
-    throw error;
+  console.log('[AuthService] Delegating to OAuth flow manager...');
+  
+  const result = await oauthFlowManager.handleCallback();
+  
+  if (result.success) {
+    return result.session;
+  } else {
+    throw new Error(result.error || 'OAuth callback failed');
   }
 };
 
@@ -269,6 +193,9 @@ export const resetPassword = async (email: string): Promise<void> => {
  */
 export const signOut = async (navigate?: (path: string) => void): Promise<void> => {
   try {
+    // Clear OAuth flow manager state
+    oauthFlowManager.clearState();
+    
     // Check if there's a session before trying to sign out
     const { data: sessionData } = await supabase.auth.getSession();
     
