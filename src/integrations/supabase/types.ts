@@ -189,44 +189,32 @@ export type Database = {
         Row: {
           created_at: string
           description: string | null
-          enabled: boolean | null
           id: string
           is_enabled: boolean
-          key: string | null
           name: string
-          target_percentage: number
-          target_type: string | null
-          target_value: string | null
+          rollout_percentage: number | null
+          target_audience: Json | null
           updated_at: string
-          user_criteria: Json | null
         }
         Insert: {
           created_at?: string
           description?: string | null
-          enabled?: boolean | null
           id?: string
           is_enabled?: boolean
-          key?: string | null
           name: string
-          target_percentage?: number
-          target_type?: string | null
-          target_value?: string | null
+          rollout_percentage?: number | null
+          target_audience?: Json | null
           updated_at?: string
-          user_criteria?: Json | null
         }
         Update: {
           created_at?: string
           description?: string | null
-          enabled?: boolean | null
           id?: string
           is_enabled?: boolean
-          key?: string | null
           name?: string
-          target_percentage?: number
-          target_type?: string | null
-          target_value?: string | null
+          rollout_percentage?: number | null
+          target_audience?: Json | null
           updated_at?: string
-          user_criteria?: Json | null
         }
         Relationships: []
       }
@@ -761,6 +749,13 @@ export type Database = {
             columns: ["feature_flag_id"]
             isOneToOne: false
             referencedRelation: "feature_flags"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "user_feature_flags_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
         ]
