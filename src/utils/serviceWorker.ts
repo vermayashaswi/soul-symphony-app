@@ -9,6 +9,12 @@ export interface SwRegistrationResult {
   error?: Error;
 }
 
+export interface ServiceWorkerCapabilities {
+  backgroundSync: boolean;
+  periodicSync: boolean;
+  pushNotifications: boolean;
+}
+
 class ServiceWorkerManager {
   private registration: ServiceWorkerRegistration | null = null;
   private isRegistered = false;
@@ -157,6 +163,41 @@ class ServiceWorkerManager {
 
     console.log('[SW Manager] Skipping waiting service worker');
     this.registration.waiting.postMessage({ type: 'SKIP_WAITING' });
+  }
+
+  /**
+   * Request background sync for a given tag
+   */
+  async requestBackgroundSync(tag: string): Promise<boolean> {
+    if (!this.registration) {
+      console.warn('[SW Manager] No registration available for background sync');
+      return false;
+    }
+
+    try {
+      if ('sync' in this.registration) {
+        await (this.registration as any).sync.register(tag);
+        console.log('[SW Manager] Background sync requested for tag:', tag);
+        return true;
+      } else {
+        console.warn('[SW Manager] Background sync not supported');
+        return false;
+      }
+    } catch (error) {
+      console.error('[SW Manager] Failed to request background sync:', error);
+      return false;
+    }
+  }
+
+  /**
+   * Get service worker capabilities
+   */
+  getCapabilities(): ServiceWorkerCapabilities {
+    return {
+      backgroundSync: 'serviceWorker' in navigator && 'sync' in window.ServiceWorkerRegistration.prototype,
+      periodicSync: 'serviceWorker' in navigator && 'periodicSync' in window.ServiceWorkerRegistration.prototype,
+      pushNotifications: 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window
+    };
   }
 
   private handleUpdate(registration: ServiceWorkerRegistration) {
