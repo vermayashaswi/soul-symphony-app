@@ -18,6 +18,7 @@ import FAQPage from '@/pages/website/FAQPage';
 import BlogPage from '@/pages/website/BlogPage';
 import BlogPostPage from '@/pages/website/BlogPostPage';
 import OnboardingScreen from '@/components/onboarding/OnboardingScreen';
+import AppLayout from '@/components/app/AppLayout';
 import { useAuth } from '@/contexts/AuthContext';
 import { useOnboarding } from '@/hooks/use-onboarding';
 
@@ -53,23 +54,25 @@ const AppRoutes = () => {
         <Route path="/blog" element={<BlogPage />} />
         <Route path="/blog/:slug" element={<BlogPostPage />} />
         
-        {/* App Routes - reordered to fix routing issue */}
-        <Route path="/app/onboarding" element={<OnboardingScreen />} />
-        <Route path="/app/auth" element={<Auth />} />
-        
-        {/* Protected App Routes */}
-        <Route path="/app" element={<ProtectedRoute />}>
-          <Route index element={<AppRootRedirect />} />
-          <Route path="home" element={<Home />} />
-          <Route path="journal" element={<Journal />} />
-          <Route path="insights" element={
-            <React.Suspense fallback={<div className="flex items-center justify-center h-screen">Loading...</div>}>
-              <Insights />
-            </React.Suspense>
-          } />
-          <Route path="chat" element={<Chat />} />
-          <Route path="smart-chat" element={<SmartChat />} />
-          <Route path="settings" element={<Settings />} />
+        {/* App Routes with AppLayout wrapper */}
+        <Route path="/app" element={<AppLayout />}>
+          <Route path="onboarding" element={<OnboardingScreen />} />
+          <Route path="auth" element={<Auth />} />
+          
+          {/* Protected App Routes */}
+          <Route element={<ProtectedRoute />}>
+            <Route index element={<AppRootRedirect />} />
+            <Route path="home" element={<Home />} />
+            <Route path="journal" element={<Journal />} />
+            <Route path="insights" element={
+              <React.Suspense fallback={<div className="flex items-center justify-center h-screen">Loading...</div>}>
+                <Insights />
+              </React.Suspense>
+            } />
+            <Route path="chat" element={<Chat />} />
+            <Route path="smart-chat" element={<SmartChat />} />
+            <Route path="settings" element={<Settings />} />
+          </Route>
         </Route>
         
         {/* Legacy Route Redirects - all app features redirect to /app/ routes */}

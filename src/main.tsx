@@ -49,7 +49,7 @@ const initializePWA = async () => {
 };
 
 // Initialize basic systems
-const initializeApp = () => {
+const initializeBasicSystems = () => {
   fixViewportHeight();
   
   // Initialize PWA features asynchronously without blocking React
@@ -63,7 +63,7 @@ const initializeApp = () => {
 };
 
 // Start basic initialization before React renders
-initializeApp();
+initializeBasicSystems();
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
