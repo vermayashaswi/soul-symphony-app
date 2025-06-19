@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from 'react';
 import { useLocation, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
@@ -14,9 +13,10 @@ import { useSubscription } from '@/contexts/SubscriptionContext';
 
 interface MobileNavigationProps {
   onboardingComplete: boolean | null;
+  className?: string;
 }
 
-const MobileNavigation: React.FC<MobileNavigationProps> = ({ onboardingComplete }) => {
+const MobileNavigation: React.FC<MobileNavigationProps> = ({ onboardingComplete, className }) => {
   const location = useLocation();
   const isMobile = useIsMobile();
   const [isVisible, setIsVisible] = useState(false);
@@ -136,7 +136,8 @@ const MobileNavigation: React.FC<MobileNavigationProps> = ({ onboardingComplete 
       key={`nav-${renderKey}-${currentLanguage}`} // Force re-render on language change
       className={cn(
         "fixed bottom-0 left-0 right-0 bg-background border-t border-muted",
-        isTutorialActive && "opacity-30 pointer-events-none"
+        isTutorialActive && "opacity-30 pointer-events-none",
+        className
       )}
       style={{
         zIndex: 9998,
