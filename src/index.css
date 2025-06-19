@@ -1,66 +1,78 @@
-
-@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap");
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-/* Import custom styles */
-@import './styles/splash.css';
+@layer utilities {
+  .text-shadow-sm {
+    text-shadow: 0px 0px 6px rgba(255, 255, 255, 1), 0px 0px 3px rgba(255, 255, 255, 1);
+  }
+}
 
 @layer base {
   :root {
     --background: 0 0% 100%;
-    --foreground: 222.2 84% 4.9%;
+    --foreground: 240 10% 3.9%;
     --card: 0 0% 100%;
-    --card-foreground: 222.2 84% 4.9%;
+    --card-foreground: 240 10% 3.9%;
     --popover: 0 0% 100%;
-    --popover-foreground: 222.2 84% 4.9%;
-    --primary: 221.2 83.2% 53.3%;
-    --primary-foreground: 210 40% 98%;
-    --secondary: 210 40% 96%;
-    --secondary-foreground: 222.2 84% 4.9%;
-    --muted: 210 40% 96%;
-    --muted-foreground: 215.4 16.3% 46.9%;
-    --accent: 210 40% 96%;
-    --accent-foreground: 222.2 84% 4.9%;
+    --popover-foreground: 240 10% 3.9%;
+    --primary: 217 91.2% 59.8%; /* Default is Calm/Blue */
+    --primary-foreground: 0 0% 98%;
+    --secondary: 240 4.8% 95.9%;
+    --secondary-foreground: 240 5.9% 10%;
+    --muted: 240 4.8% 95.9%;
+    --muted-foreground: 240 3.8% 46.1%;
+    --accent: 240 4.8% 95.9%;
+    --accent-foreground: 240 5.9% 10%;
     --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 210 40% 98%;
-    --border: 214.3 31.8% 91.4%;
-    --input: 214.3 31.8% 91.4%;
-    --ring: 221.2 83.2% 53.3%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 240 5.9% 90%;
+    --input: 240 5.9% 90%;
+    --ring: 217 91.2% 59.8%; /* Match primary */
     --radius: 0.75rem;
-    --chart-1: 12 76% 61%;
-    --chart-2: 173 58% 39%;
-    --chart-3: 197 37% 24%;
-    --chart-4: 43 74% 66%;
-    --chart-5: 27 87% 67%;
+    --radius-full: 9999px; /* Add this to ensure circular elements */
+    --color-theme: #3b82f6; /* Calm/Blue as default */
+    --chart-bg: 0 0% 100%; /* New variable for chart backgrounds */
+    --primary-h: 217; /* For direct HSL usage */
+    --primary-s: 91.2%; /* For direct HSL usage */
+    --primary-l: 59.8%; /* For direct HSL usage */
+    /* New variables for thread action buttons */
+    --edit-btn-bg: 217 91.2% 95%; 
+    --edit-btn-text: 217 91.2% 40%;
+    --delete-btn-bg: 0 84.2% 95%;
+    --delete-btn-text: 0 84.2% 40%;
   }
-
+ 
   .dark {
-    --background: 222.2 84% 4.9%;
-    --foreground: 210 40% 98%;
-    --card: 222.2 84% 4.9%;
-    --card-foreground: 210 40% 98%;
-    --popover: 222.2 84% 4.9%;
-    --popover-foreground: 210 40% 98%;
-    --primary: 217.2 91.2% 59.8%;
-    --primary-foreground: 222.2 84% 4.9%;
-    --secondary: 217.2 32.6% 17.5%;
-    --secondary-foreground: 210 40% 98%;
-    --muted: 217.2 32.6% 17.5%;
-    --muted-foreground: 215 20.2% 65.1%;
-    --accent: 217.2 32.6% 17.5%;
-    --accent-foreground: 210 40% 98%;
+    --background: 240 10% 3.9%;
+    --foreground: 0 0% 98%;
+    --card: 240 10% 3.9%;
+    --card-foreground: 0 0% 98%;
+    --popover: 240 10% 3.9%;
+    --popover-foreground: 0 0% 98%;
+    --primary: 217 91.2% 59.8%; /* Default is Calm/Blue */
+    --primary-foreground: 0 0% 98%;
+    --secondary: 240 3.7% 15.9%;
+    --secondary-foreground: 0 0% 98%;
+    --muted: 240 3.7% 15.9%;
+    --muted-foreground: 240 5% 64.9%;
+    --accent: 240 3.7% 15.9%;
+    --accent-foreground: 0 0% 98%;
     --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 210 40% 98%;
-    --border: 217.2 32.6% 17.5%;
-    --input: 217.2 32.6% 17.5%;
-    --ring: 224.3 76.3% 94.1%;
-    --chart-1: 220 70% 50%;
-    --chart-2: 160 60% 45%;
-    --chart-3: 30 80% 55%;
-    --chart-4: 280 65% 60%;
-    --chart-5: 340 75% 55%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 240 3.7% 15.9%;
+    --input: 240 3.7% 15.9%;
+    --ring: 217 91.2% 59.8%; /* Match primary */
+    --radius-full: 9999px; /* Add this to ensure circular elements */
+    --chart-bg: 240 10% 3.9%; /* Match background in dark mode */
+    --primary-h: 217; /* For direct HSL usage */
+    --primary-s: 91.2%; /* For direct HSL usage */
+    --primary-l: 59.8%; /* For direct HSL usage */
+    /* Dark mode thread action buttons */
+    --edit-btn-bg: 217 91.2% 25%;
+    --edit-btn-text: 217 91.2% 80%;
+    --delete-btn-bg: 0 62.8% 20%;
+    --delete-btn-text: 0 62.8% 80%;
   }
 }
 
@@ -68,23 +80,246 @@
   * {
     @apply border-border;
   }
-  
   body {
     @apply bg-background text-foreground;
-    font-family: "Inter", sans-serif;
   }
-
-  .app-initialized {
-    /* Ensure smooth transitions after app initialization */
-    transition: all 0.3s ease-in-out;
+  /* Apply theme color to all page headers */
+  h1, h2, h3 {
+    @apply text-theme-color;
+  }
+  
+  /* Ensure rounded-full elements are truly circular */
+  .rounded-full {
+    border-radius: 9999px !important;
+  }
+  
+  /* Fix for radix UI components */
+  [data-radix-popper-content-wrapper] [data-radix-radio-item],
+  [data-radix-radio-item] {
+    border-radius: 9999px !important;
   }
 }
 
-/* Ensure PWA splash screen works correctly */
-@media (display-mode: standalone) {
-  body {
-    -webkit-user-select: none;
-    -webkit-touch-callout: none;
-    -webkit-tap-highlight-color: transparent;
+/* Global theme color utilities */
+@layer utilities {
+  .theme-text {
+    color: var(--color-theme) !important;
   }
+  
+  .theme-bg {
+    background-color: var(--color-theme) !important;
+  }
+  
+  .theme-border {
+    border-color: var(--color-theme) !important;
+  }
+  
+  .theme-fill {
+    fill: var(--color-theme) !important;
+  }
+  
+  .theme-stroke {
+    stroke: var(--color-theme) !important;
+  }
+  
+  .hover-theme-bg:hover {
+    background-color: var(--color-theme) !important;
+  }
+  
+  .hover-theme-text:hover {
+    color: var(--color-theme) !important;
+  }
+  
+  .hover-theme-border:hover {
+    border-color: var(--color-theme) !important;
+  }
+  
+  /* Special utility classes for text-theme and bg-theme */
+  .text-theme, .text-theme-color {
+    color: var(--color-theme) !important;
+  }
+  
+  .bg-theme, .bg-theme-color {
+    background-color: var(--color-theme) !important;
+  }
+  
+  .border-theme, .border-theme-color {
+    border-color: var(--color-theme) !important;
+  }
+  
+  /* Thread action button utilities */
+  .edit-button-bg {
+    background-color: hsl(var(--edit-btn-bg)) !important;
+  }
+  
+  .edit-button-text {
+    color: hsl(var(--edit-btn-text)) !important;
+  }
+  
+  .delete-button-bg {
+    background-color: hsl(var(--delete-btn-bg)) !important;
+  }
+  
+  .delete-button-text {
+    color: hsl(var(--delete-btn-text)) !important;
+  }
+}
+
+/* Add custom styles for scroll to top behavior */
+html {
+  scroll-behavior: smooth;
+}
+
+/* Support for system theme preference media query */
+@media (prefers-color-scheme: dark) {
+  :root:not(.light):not(.dark) {
+    --background: 240 10% 3.9%;
+    --foreground: 0 0% 98%;
+    /* Apply all dark theme variables when system theme is dark and no explicit theme is set */
+    /* This ensures proper fallback when JavaScript hasn't loaded yet */
+    --card: 240 10% 3.9%;
+    --card-foreground: 0 0% 98%;
+    --popover: 240 10% 3.9%;
+    --popover-foreground: 0 0% 98%;
+    --primary-foreground: 0 0% 98%;
+    --secondary: 240 3.7% 15.9%;
+    --secondary-foreground: 0 0% 98%;
+    --muted: 240 3.7% 15.9%;
+    --muted-foreground: 240 5% 64.9%;
+    --accent: 240 3.7% 15.9%;
+    --accent-foreground: 0 0% 98%;
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 240 3.7% 15.9%;
+    --input: 240 3.7% 15.9%;
+    --chart-bg: 240 10% 3.9%;
+    /* Dark mode thread action buttons */
+    --edit-btn-bg: 217 91.2% 25%;
+    --edit-btn-text: 217 91.2% 80%;
+    --delete-btn-bg: 0 62.8% 20%;
+    --delete-btn-text: 0 62.8% 80%;
+  }
+}
+
+/* Dark mode styles for chart components */
+.dark .recharts-surface,
+.dark .recharts-default-tooltip {
+  background-color: hsl(var(--card)) !important;
+  color: hsl(var(--card-foreground)) !important;
+}
+
+.dark .recharts-tooltip-cursor {
+  fill: hsl(var(--muted)) !important;
+}
+
+.dark .recharts-tooltip-item-name,
+.dark .recharts-tooltip-item-value {
+  color: hsl(var(--foreground)) !important;
+}
+
+/* Fix for TypeScript issue in SmartChatInterface */
+.chat-message-role-assistant {
+  /* Style for assistant chat messages */
+  background-color: hsl(var(--muted));
+  color: hsl(var(--foreground));
+}
+
+.chat-message-role-user {
+  /* Style for user chat messages */
+  background-color: hsl(var(--primary));
+  color: hsl(var(--primary-foreground));
+}
+
+/* Custom text sizes for entity bubbles */
+.text-2xs {
+  font-size: 0.65rem;
+  line-height: 1rem;
+}
+
+/* Entity bubble glow effect */
+.entity-bubble-glow {
+  box-shadow: 0 0 10px 2px rgba(var(--primary), 0.3);
+  transition: box-shadow 0.3s ease;
+}
+.entity-bubble-glow:hover {
+  box-shadow: 0 0 15px 5px rgba(var(--primary), 0.6);
+}
+
+/* Add custom styles for better text rendering */
+.crisp-text {
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  letter-spacing: 0.01em;
+}
+
+/* Strong text shadow for elements that need to be visible over backgrounds */
+.text-glow {
+  text-shadow: 
+    0 0 10px rgba(255, 255, 255, 1),
+    0 0 5px rgba(255, 255, 255, 1);
+}
+
+/* Stronger glow for titles and important text */
+.text-glow-strong {
+  text-shadow: 
+    0 0 15px rgba(255, 255, 255, 1),
+    0 0 8px rgba(255, 255, 255, 1),
+    0 0 3px rgba(255, 255, 255, 1);
+}
+
+/* Hide Google Translate widget */
+.goog-te-banner-frame,
+.goog-te-gadget-icon,
+.goog-te-menu-value span,
+.goog-te-gadget span {
+  display: none !important;
+}
+
+.goog-te-gadget {
+  color: transparent !important;
+  font-size: 0px !important;
+}
+
+.goog-te-gadget select {
+  display: none !important;
+}
+
+/* Remove Google Translate top spacing */
+body {
+  top: 0 !important;
+}
+
+/* Hide "Select Language" text */
+.goog-te-gadget-simple {
+  display: none !important;
+}
+
+/* Enhanced Select component styles for dark backgrounds */
+.dark [data-radix-select-trigger] [data-placeholder],
+[data-radix-select-trigger] [data-placeholder] {
+  color: #F1F1F1;
+}
+
+.dark [data-radix-select-content],
+[data-radix-select-content] {
+  background-color: hsl(var(--background));
+  border-color: rgba(var(--color-theme), 0.3);
+}
+
+.dark [data-radix-select-item][data-state="checked"],
+[data-radix-select-item][data-state="checked"] {
+  background-color: rgba(var(--color-theme), 0.4);
+  color: white;
+}
+
+/* Specific styles for onboarding select component */
+.onboarding-language-select [data-radix-select-trigger] {
+  background-color: rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 255, 255, 0.2);
+  color: white;
+}
+
+.onboarding-language-select [data-radix-select-value] {
+  color: white;
 }
