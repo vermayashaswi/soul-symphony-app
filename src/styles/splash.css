@@ -1,0 +1,125 @@
+
+/* Splash Screen Enhancements */
+.splash-screen {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 9999;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, #ffffff 0%, #f8fafc 50%, rgba(139, 92, 246, 0.1) 100%);
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}
+
+/* Splash Screen Animations */
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(30px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes pulseGlow {
+  0%, 100% {
+    opacity: 0.4;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.8;
+    transform: scale(1.05);
+  }
+}
+
+@keyframes progressBar {
+  from {
+    width: 0%;
+  }
+  to {
+    width: 100%;
+  }
+}
+
+/* Logo glow effect */
+.splash-logo-glow {
+  animation: pulseGlow 2s ease-in-out infinite;
+}
+
+/* Progress bar animation */
+.splash-progress-bar {
+  animation: progressBar 3s ease-out forwards;
+}
+
+/* Particle floating animation */
+@keyframes floatParticle {
+  0%, 100% {
+    transform: translateY(0px) translateX(0px) scale(1);
+    opacity: 0.3;
+  }
+  25% {
+    transform: translateY(-10px) translateX(5px) scale(1.1);
+    opacity: 0.7;
+  }
+  50% {
+    transform: translateY(-5px) translateX(-5px) scale(1.2);
+    opacity: 0.5;
+  }
+  75% {
+    transform: translateY(-15px) translateX(3px) scale(1.1);
+    opacity: 0.8;
+  }
+}
+
+.splash-particle {
+  animation: floatParticle 4s ease-in-out infinite;
+}
+
+.splash-particle:nth-child(2) {
+  animation-delay: 0.5s;
+}
+
+.splash-particle:nth-child(3) {
+  animation-delay: 1s;
+}
+
+.splash-particle:nth-child(4) {
+  animation-delay: 1.5s;
+}
+
+.splash-particle:nth-child(5) {
+  animation-delay: 2s;
+}
+
+.splash-particle:nth-child(6) {
+  animation-delay: 2.5s;
+}
+
+/* Responsive splash screen */
+@media (max-width: 768px) {
+  .splash-screen {
+    padding: 2rem 1rem;
+  }
+}
+
+/* PWA splash screen meta tags support */
+@media (display-mode: standalone) {
+  .splash-screen {
+    /* Enhanced styling for PWA mode */
+    background: linear-gradient(135deg, #ffffff 0%, #f8fafc 30%, rgba(139, 92, 246, 0.15) 100%);
+  }
+}
+
+/* Dark mode support */
+@media (prefers-color-scheme: dark) {
+  .splash-screen {
+    background: linear-gradient(135deg, #1a1a1a 0%, #2d2d30 50%, rgba(139, 92, 246, 0.2) 100%);
+    color: #ffffff;
+  }
+}

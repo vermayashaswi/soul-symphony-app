@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from 'react';
 import AppRoutes from './routes/AppRoutes';
 import { Toaster } from "@/components/ui/toaster";
@@ -11,38 +12,54 @@ import TutorialOverlay from './components/tutorial/TutorialOverlay';
 import ErrorBoundary from './components/insights/ErrorBoundary';
 import { preloadCriticalImages } from './utils/imagePreloader';
 import { toast } from 'sonner';
+import SplashScreen from './components/pwa/SplashScreen';
 import './styles/emoji.css';
 import './styles/tutorial.css';
 import { FeatureFlagsProvider } from "./contexts/FeatureFlagsContext";
 
 const App: React.FC = () => {
   const [isInitialized, setIsInitialized] = useState(false);
+  const [showSplashScreen, setShowSplashScreen] = useState(true);
+  const [appReady, setAppReady] = useState(false);
 
   useEffect(() => {
-    // Clean up any malformed paths
-    const currentPath = window.location.pathname;
-    
-    // Fix incorrectly formatted URLs that have domains or https in the path
-    if (currentPath.includes('https://') || currentPath.includes('soulo.online')) {
-      window.history.replaceState(null, '', '/');
-    }
-    
-    // Apply a CSS class to the document body for theme-specific overrides
-    document.body.classList.add('app-initialized');
-    
-    // Preload critical images including the chat avatar
-    try {
-      preloadCriticalImages();
-    } catch (error) {
-      console.warn('Failed to preload some images:', error);
-      // Non-critical error, continue app initialization
-    }
+    const initializeApp = async () => {
+      // Clean up any malformed paths
+      const currentPath = window.location.pathname;
+      
+      // Fix incorrectly formatted URLs that have domains or https in the path
+      if (currentPath.includes('https://') || currentPath.includes('soulo.online')) {
+        window.history.replaceState(null, '', '/');
+      }
+      
+      // Apply a CSS class to the document body for theme-specific overrides
+      document.body.classList.add('app-initialized');
+      
+      try {
+        // Preload critical images including the chat avatar
+        await preloadCriticalImages();
+      } catch (error) {
+        console.warn('Failed to preload some images:', error);
+        // Non-critical error, continue app initialization
+      }
 
-    // Mark app as initialized after a brief delay to ensure smooth startup
-    setTimeout(() => {
+      // Simulate app initialization process
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
       setIsInitialized(true);
-    }, 500);
+      
+      // Additional delay to ensure smooth transition
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
+      setAppReady(true);
+    };
+
+    initializeApp();
   }, []);
+
+  const handleSplashComplete = () => {
+    setShowSplashScreen(false);
+  };
 
   const handleAppError = (error: Error, errorInfo: any) => {
     console.error('Application-level error:', error, errorInfo);
@@ -64,6 +81,17 @@ const App: React.FC = () => {
 
     // Allow the app to continue functioning despite errors
   };
+
+  // Show splash screen during initialization
+  if (showSplashScreen) {
+    return (
+      <SplashScreen 
+        isLoading={!appReady} 
+        onComplete={handleSplashComplete}
+        minDisplayTime={2500}
+      />
+    );
+  }
 
   return (
     <ErrorBoundary onError={handleAppError}>
