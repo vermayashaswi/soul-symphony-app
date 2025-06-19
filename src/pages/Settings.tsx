@@ -25,9 +25,20 @@ const Settings = () => {
   const { user, signOut } = useAuth();
   const navigate = useNavigate();
   const { t } = useTranslation();
-  const { currentTheme, changeTheme, themes } = useTheme();
+  const { colorTheme, setColorTheme, customColor, setCustomColor } = useTheme();
   const { isMobile } = useIsMobile();
   const [isLoggingOut, setIsLoggingOut] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+
+  // Define available themes
+  const availableThemes = [
+    { name: 'Default', color: '#3b82f6' },
+    { name: 'Calm', color: '#8b5cf6' },
+    { name: 'Soothing', color: '#FFDEE2' },
+    { name: 'Energy', color: '#f59e0b' },
+    { name: 'Focus', color: '#10b981' },
+    { name: 'Custom', color: customColor }
+  ];
 
   const handleLogout = async () => {
     if (isLoggingOut) return;
@@ -45,12 +56,24 @@ const Settings = () => {
     }
   };
 
+  const handleThemeChange = (themeName: string) => {
+    setColorTheme(themeName as any);
+  };
+
+  const handleCustomColorChange = (color: string) => {
+    setCustomColor(color);
+    if (colorTheme === 'Custom') {
+      // Force re-apply the custom theme
+      setColorTheme('Custom');
+    }
+  };
+
   const containerClass = isMobile 
     ? "settings-container min-h-screen bg-gradient-to-br from-blue-50 to-purple-50 dark:from-gray-900 dark:to-gray-800 p-4 webtonative-safe-top"
     : "min-h-screen bg-gradient-to-br from-blue-50 to-purple-50 dark:from-gray-900 dark:to-gray-800 p-6";
 
   return (
-    <SettingsLoadingWrapper>
+    <SettingsLoadingWrapper isLoading={isLoading}>
       <div className={containerClass}>
         <div className="max-w-4xl mx-auto space-y-6">
           {/* Header */}
@@ -86,7 +109,12 @@ const Settings = () => {
                 <div className="flex-1 space-y-1">
                   <p className="font-medium">{user?.email || t('settings.no_email', 'No email')}</p>
                   <div className="flex items-center gap-2">
-                    <SubscriptionBadge />
+                    <SubscriptionBadge 
+                      isPremium={false}
+                      isTrialActive={false}
+                      subscriptionStatus={null}
+                      isLoading={false}
+                    />
                   </div>
                 </div>
               </div>
@@ -136,15 +164,39 @@ const Settings = () => {
                   <TranslatableText text="Color Theme" />
                 </h3>
                 <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
-                  {themes.map((theme) => (
-                    <ColorPicker
+                  {availableThemes.map((theme) => (
+                    <div
                       key={theme.name}
-                      theme={theme}
-                      isSelected={currentTheme?.name === theme.name}
-                      onSelect={changeTheme}
-                    />
+                      className={`p-3 rounded-lg border-2 cursor-pointer transition-all ${
+                        colorTheme === theme.name
+                          ? 'border-primary bg-primary/10'
+                          : 'border-gray-200 hover:border-gray-300'
+                      }`}
+                      onClick={() => handleThemeChange(theme.name)}
+                    >
+                      <div className="flex flex-col items-center gap-2">
+                        <div
+                          className="w-8 h-8 rounded-full border-2 border-gray-200"
+                          style={{ backgroundColor: theme.color }}
+                        />
+                        <span className="text-xs font-medium">{theme.name}</span>
+                      </div>
+                    </div>
                   ))}
                 </div>
+                
+                {colorTheme === 'Custom' && (
+                  <div className="mt-4 p-4 border rounded-lg">
+                    <h4 className="text-sm font-medium mb-3">
+                      <TranslatableText text="Custom Color" />
+                    </h4>
+                    <ColorPicker
+                      value={customColor}
+                      onChange={handleCustomColorChange}
+                      applyImmediately={true}
+                    />
+                  </div>
+                )}
               </div>
             </CardContent>
           </Card>
