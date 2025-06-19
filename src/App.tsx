@@ -16,7 +16,6 @@ import './styles/emoji.css';
 import './styles/tutorial.css';
 import { FeatureFlagsProvider } from "./contexts/FeatureFlagsContext";
 import { versionService } from './services/versionService';
-import { ContextReadinessProvider } from '@/contexts/ContextReadinessManager';
 
 const App: React.FC = () => {
   const [isInitialized, setIsInitialized] = useState(false);
@@ -81,22 +80,20 @@ const App: React.FC = () => {
 
   return (
     <ErrorBoundary onError={handleAppError}>
-      <ContextReadinessProvider>
-        <FeatureFlagsProvider>
-          <TranslationProvider>
-            <SubscriptionProvider>
-              <TutorialProvider>
-                <TranslationLoadingOverlay />
-                <JournalProcessingInitializer />
-                <AppRoutes key={isInitialized ? 'initialized' : 'initializing'} />
-                <TutorialOverlay />
-                <Toaster />
-                <SonnerToaster position="top-right" />
-              </TutorialProvider>
-            </SubscriptionProvider>
-          </TranslationProvider>
-        </FeatureFlagsProvider>
-      </ContextReadinessProvider>
+      <FeatureFlagsProvider>
+        <TranslationProvider>
+          <SubscriptionProvider>
+            <TutorialProvider>
+              <TranslationLoadingOverlay />
+              <JournalProcessingInitializer />
+              <AppRoutes key={isInitialized ? 'initialized' : 'initializing'} />
+              <TutorialOverlay />
+              <Toaster />
+              <SonnerToaster position="top-right" />
+            </TutorialProvider>
+          </SubscriptionProvider>
+        </TranslationProvider>
+      </FeatureFlagsProvider>
     </ErrorBoundary>
   );
 };
