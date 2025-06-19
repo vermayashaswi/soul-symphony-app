@@ -1,4 +1,3 @@
-
 import * as React from "react"
 
 const MOBILE_BREAKPOINT = 768
@@ -8,22 +7,11 @@ interface IOSNavigator extends Navigator {
   standalone?: boolean;
 }
 
-// Extend Window interface for our debug helpers and visual viewport
+// Extend Window interface for our debug helpers only
 declare global {
   interface Window {
     __forceMobileView?: boolean;
     toggleMobileView?: () => void;
-    visualViewport?: {
-      readonly offsetLeft: number;
-      readonly offsetTop: number;
-      readonly pageLeft: number;
-      readonly pageTop: number;
-      readonly width: number;
-      readonly height: number;
-      readonly scale: number;
-      addEventListener(type: string, listener: EventListener): void;
-      removeEventListener(type: string, listener: EventListener): void;
-    };
   }
 }
 
