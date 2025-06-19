@@ -35,12 +35,12 @@ const HeroSection: React.FC<HeroSectionProps> = ({ user }) => {
     >
       <div className="relative z-10">
         <h1 className={`${shouldRenderMobile ? 'text-3xl' : 'text-4xl md:text-5xl'} font-bold mb-3 flex items-center justify-center`}>
-          <span className="text-purple-600">
+          <span className="text-foreground dark:text-white">
             Welcome to
           </span> 
-          <SouloLogo size={shouldRenderMobile ? "large" : "large"} className="ml-2" useColorTheme={false} animate={true} />
+          <SouloLogo size={shouldRenderMobile ? "large" : "large"} className="ml-2" useColorTheme={true} animate={true} />
         </h1>
-        <p className={`${shouldRenderMobile ? 'text-lg' : 'text-xl'} max-w-2xl mx-auto text-purple-500 animate-pulse mt-4 mb-8`}>
+        <p className={`${shouldRenderMobile ? 'text-lg' : 'text-xl'} max-w-2xl mx-auto text-primary animate-pulse mt-4 mb-8`}>
           Your personal AI companion for emotional wellness and self-reflection using VOICE journaling
         </p>
         
@@ -52,7 +52,7 @@ const HeroSection: React.FC<HeroSectionProps> = ({ user }) => {
             <Button 
               size={shouldRenderMobile ? "default" : "lg"} 
               onClick={() => navigate('/auth')}
-              className="animate-pulse relative z-10 bg-purple-600 hover:bg-purple-700 text-white"
+              className="animate-pulse relative z-10"
             >
               Get Started
             </Button>
