@@ -8,6 +8,8 @@ import SouloLogo from '@/components/SouloLogo';
 import { useOnboarding } from '@/hooks/use-onboarding';
 import { TranslatableText } from '@/components/translation/TranslatableText';
 import PlatformAuthButton from '@/components/auth/PlatformAuthButton';
+import { useWebtonativeViewport } from '@/hooks/use-webtonative-viewport';
+import { useIsMobile } from '@/hooks/use-mobile';
 
 export default function Auth() {
   const location = useLocation();
@@ -18,7 +20,8 @@ export default function Auth() {
   const { user, isLoading: authLoading } = useAuth();
   const { onboardingComplete } = useOnboarding();
   const [authError, setAuthError] = useState<string | null>(null);
-  const [keyboardVisible, setKeyboardVisible] = useState(false);
+  const { isWebtonative } = useIsMobile();
+  const { isKeyboardOpen } = useWebtonativeViewport();
   
   const redirectParam = searchParams.get('redirectTo');
   const fromLocation = location.state?.from?.pathname;
@@ -47,62 +50,20 @@ export default function Auth() {
     storedRedirect,
     hasUser: !!user,
     currentPath: location.pathname,
-    onboardingComplete
+    onboardingComplete,
+    isWebtonative,
+    isKeyboardOpen
   });
 
-  // Enhanced keyboard detection for webtonative
+  // Set up OAuth flow detection for webtonative
   useEffect(() => {
-    let initialHeight = window.innerHeight;
-    
-    const handleKeyboard = () => {
-      const currentHeight = window.innerHeight;
-      const heightDifference = initialHeight - currentHeight;
-      const isKeyboardOpen = heightDifference > 150;
-      
-      if (isKeyboardOpen !== keyboardVisible) {
-        console.log(`[Auth] Keyboard ${isKeyboardOpen ? 'opened' : 'closed'}`);
-        setKeyboardVisible(isKeyboardOpen);
-        
-        if (isKeyboardOpen) {
-          document.body.classList.add('keyboard-visible');
-          document.documentElement.classList.add('auth-keyboard-open');
-        } else {
-          document.body.classList.remove('keyboard-visible');
-          document.documentElement.classList.remove('auth-keyboard-open');
-        }
-      }
-    };
-    
-    // Listen for viewport changes
-    window.addEventListener('resize', handleKeyboard);
-    
-    // Visual viewport API for more accurate detection
-    if (window.visualViewport) {
-      window.visualViewport.addEventListener('resize', handleKeyboard);
+    if (isWebtonative) {
+      document.body.classList.add('webtonative-oauth-flow');
+      return () => {
+        document.body.classList.remove('webtonative-oauth-flow');
+      };
     }
-    
-    // Reset initial height on orientation change
-    const handleOrientationChange = () => {
-      setTimeout(() => {
-        initialHeight = window.innerHeight;
-        handleKeyboard();
-      }, 300);
-    };
-    
-    window.addEventListener('orientationchange', handleOrientationChange);
-    
-    return () => {
-      window.removeEventListener('resize', handleKeyboard);
-      window.removeEventListener('orientationchange', handleOrientationChange);
-      if (window.visualViewport) {
-        window.visualViewport.removeEventListener('resize', handleKeyboard);
-      }
-      
-      // Cleanup classes
-      document.body.classList.remove('keyboard-visible');
-      document.documentElement.classList.remove('auth-keyboard-open');
-    };
-  }, [keyboardVisible]);
+  }, [isWebtonative]);
 
   useEffect(() => {
     setIsLoading(false);
@@ -156,13 +117,13 @@ export default function Auth() {
   }
 
   return (
-    <div className={`auth-page ${keyboardVisible ? 'keyboard-visible' : ''}`}>
-      <div className={`auth-container ${keyboardVisible ? 'keyboard-visible' : ''}`}>
+    <div className={`auth-page ${isKeyboardOpen ? 'keyboard-visible webtonative-keyboard-open' : ''}`}>
+      <div className={`auth-container ${isKeyboardOpen ? 'keyboard-visible webtonative-keyboard-open' : ''}`}>
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6 }}
-          className={`auth-card w-full max-w-md ${keyboardVisible ? 'keyboard-visible' : ''}`}
+          className={`auth-card w-full max-w-md ${isKeyboardOpen ? 'keyboard-visible webtonative-keyboard-open' : ''}`}
         >
           <div className="text-center mb-6">
             <h1 className="text-2xl md:text-3xl font-bold mb-2">
@@ -203,6 +164,14 @@ export default function Auth() {
           </div>
         </motion.div>
       </div>
+      
+      {/* Debug info for development */}
+      {process.env.NODE_ENV === 'development' && (
+        <div className="debug-keyboard-info">
+          Keyboard: {isKeyboardOpen ? 'Open' : 'Closed'} | 
+          Webtonative: {isWebtonative ? 'Yes' : 'No'}
+        </div>
+      )}
     </div>
   );
 }

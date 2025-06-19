@@ -16,13 +16,13 @@ const PlatformAuthButton: React.FC<PlatformAuthButtonProps> = ({
   onLoadingChange, 
   onError 
 }) => {
-  const { isIOS, isAndroid } = useIsMobile();
+  const { isIOS, isAndroid, isWebtonative } = useIsMobile();
 
   const handleGoogleSignIn = async () => {
     try {
       onLoadingChange(true);
       onError('');
-      console.log('Initiating Google sign-in');
+      console.log('Initiating Google sign-in', { isWebtonative, isAndroid });
       await signInWithGoogle();
     } catch (error: any) {
       console.error('Google sign-in error:', error.message);
@@ -35,7 +35,7 @@ const PlatformAuthButton: React.FC<PlatformAuthButtonProps> = ({
     try {
       onLoadingChange(true);
       onError('');
-      console.log('Initiating Apple ID sign-in');
+      console.log('Initiating Apple ID sign-in', { isWebtonative, isIOS });
       await signInWithApple();
     } catch (error: any) {
       console.error('Apple ID sign-in error:', error.message);
@@ -49,7 +49,7 @@ const PlatformAuthButton: React.FC<PlatformAuthButtonProps> = ({
     return (
       <Button 
         size="lg" 
-        className="w-full flex items-center justify-center gap-2 bg-black text-white hover:bg-gray-800"
+        className="w-full flex items-center justify-center gap-2 bg-black text-white hover:bg-gray-800 auth-button"
         onClick={handleAppleSignIn}
         disabled={isLoading}
       >
@@ -70,7 +70,7 @@ const PlatformAuthButton: React.FC<PlatformAuthButtonProps> = ({
     return (
       <Button 
         size="lg" 
-        className="w-full flex items-center justify-center gap-2"
+        className="w-full flex items-center justify-center gap-2 auth-button"
         onClick={handleGoogleSignIn}
         disabled={isLoading}
       >
@@ -95,7 +95,7 @@ const PlatformAuthButton: React.FC<PlatformAuthButtonProps> = ({
   return (
     <Button 
       size="lg" 
-      className="w-full flex items-center justify-center gap-2"
+      className="w-full flex items-center justify-center gap-2 auth-button"
       onClick={handleGoogleSignIn}
       disabled={isLoading}
     >
