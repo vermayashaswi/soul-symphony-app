@@ -18,40 +18,40 @@ import './styles/tutorial.css';
 import { FeatureFlagsProvider } from "./contexts/FeatureFlagsContext";
 
 const App: React.FC = () => {
-  const [isInitialized, setIsInitialized] = useState(false);
   const [showSplashScreen, setShowSplashScreen] = useState(true);
   const [appReady, setAppReady] = useState(false);
 
   useEffect(() => {
     const initializeApp = async () => {
-      // Clean up any malformed paths
-      const currentPath = window.location.pathname;
-      
-      // Fix incorrectly formatted URLs that have domains or https in the path
-      if (currentPath.includes('https://') || currentPath.includes('soulo.online')) {
-        window.history.replaceState(null, '', '/');
-      }
-      
-      // Apply a CSS class to the document body for theme-specific overrides
-      document.body.classList.add('app-initialized');
-      
       try {
-        // Preload critical images including the chat avatar
-        await preloadCriticalImages();
-      } catch (error) {
-        console.warn('Failed to preload some images:', error);
-        // Non-critical error, continue app initialization
-      }
+        // Clean up any malformed paths
+        const currentPath = window.location.pathname;
+        
+        if (currentPath.includes('https://') || currentPath.includes('soulo.online')) {
+          window.history.replaceState(null, '', '/');
+        }
+        
+        // Apply CSS class for theme-specific overrides
+        document.body.classList.add('app-initialized');
+        
+        // Preload critical images (non-blocking)
+        preloadCriticalImages().catch(error => {
+          console.warn('Failed to preload some images:', error);
+        });
 
-      // Simulate app initialization process
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      setIsInitialized(true);
-      
-      // Additional delay to ensure smooth transition
-      await new Promise(resolve => setTimeout(resolve, 500));
-      
-      setAppReady(true);
+        // Simulate brief initialization
+        await new Promise(resolve => setTimeout(resolve, 1500));
+        
+        setAppReady(true);
+        
+        // Additional delay for smooth transition
+        await new Promise(resolve => setTimeout(resolve, 500));
+        
+      } catch (error) {
+        console.error('App initialization error:', error);
+        // Continue even if initialization fails
+        setAppReady(true);
+      }
     };
 
     initializeApp();
@@ -64,22 +64,8 @@ const App: React.FC = () => {
   const handleAppError = (error: Error, errorInfo: any) => {
     console.error('Application-level error:', error, errorInfo);
     
-    // Log critical app errors for debugging
-    const errorData = {
-      message: error.message,
-      stack: error.stack,
-      componentStack: errorInfo.componentStack,
-      timestamp: new Date().toISOString(),
-      userAgent: navigator.userAgent,
-      url: window.location.href
-    };
-    
-    console.error('Detailed error info:', errorData);
-
     // Show user-friendly error notification
     toast.error('Something went wrong. The app will try to recover automatically.');
-
-    // Allow the app to continue functioning despite errors
   };
 
   // Show splash screen during initialization
@@ -88,7 +74,7 @@ const App: React.FC = () => {
       <SplashScreen 
         isLoading={!appReady} 
         onComplete={handleSplashComplete}
-        minDisplayTime={2500}
+        minDisplayTime={2000}
       />
     );
   }
@@ -101,7 +87,7 @@ const App: React.FC = () => {
             <TutorialProvider>
               <TranslationLoadingOverlay />
               <JournalProcessingInitializer />
-              <AppRoutes key={isInitialized ? 'initialized' : 'initializing'} />
+              <AppRoutes />
               <TutorialOverlay />
               <Toaster />
               <SonnerToaster position="top-right" />

@@ -29,9 +29,9 @@ const SplashScreen: React.FC<SplashScreenProps> = ({
           clearInterval(progressInterval);
           return 100;
         }
-        return prev + Math.random() * 20;
+        return prev + Math.random() * 15 + 5; // More predictable progress
       });
-    }, 100);
+    }, 150);
 
     // Handle splash screen completion
     const checkComplete = () => {
@@ -40,11 +40,15 @@ const SplashScreen: React.FC<SplashScreenProps> = ({
       
       setTimeout(() => {
         setShowSplash(false);
-        onComplete?.();
+        if (onComplete) {
+          onComplete();
+        }
       }, remainingTime);
     };
 
+    // Complete when loading is done and progress is full
     if (!isLoading && progress >= 100) {
+      clearInterval(progressInterval);
       checkComplete();
     }
 
