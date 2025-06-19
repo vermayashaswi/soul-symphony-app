@@ -82,7 +82,9 @@ const SplashScreen: React.FC<SplashScreenProps> = ({
           >
             <div className="absolute inset-0 animate-pulse rounded-full opacity-20"
                  style={{ backgroundColor: themeColor, filter: 'blur(20px)' }} />
-            <SouloLogo size="extra-large" animate={true} useColorTheme={true} />
+            <div className="text-6xl">
+              <SouloLogo size="large" animate={true} useColorTheme={true} />
+            </div>
           </motion.div>
 
           {/* App Name */}
@@ -144,6 +146,7 @@ const SplashScreen: React.FC<SplashScreenProps> = ({
               style={{
                 left: `${10 + Math.random() * 80}%`,
                 top: `${10 + Math.random() * 80}%`,
+                backgroundColor: themeColor
               }}
             />
           ))}
