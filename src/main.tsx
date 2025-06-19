@@ -8,7 +8,6 @@ import './styles/tutorial.css' // Import tutorial-specific styles
 import { AuthProvider } from './contexts/AuthContext'
 import { BrowserRouter } from 'react-router-dom'
 import { TranslationProvider } from './contexts/TranslationContext'
-import { ContextReadinessProvider } from './contexts/ContextReadinessManager'
 import { ThemeProvider } from './hooks/use-theme'
 import { initializeServiceWorker } from './utils/serviceWorker'
 import { backgroundSyncService } from './services/backgroundSyncService'
@@ -207,15 +206,13 @@ initializeApp();
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
     <BrowserRouter>
-      <ContextReadinessProvider>
-        <ThemeProvider>
-          <TranslationProvider>
-            <AuthProvider>
-              <App />
-            </AuthProvider>
-          </TranslationProvider>
-        </ThemeProvider>
-      </ContextReadinessProvider>
+      <ThemeProvider>
+        <TranslationProvider>
+          <AuthProvider>
+            <App />
+          </AuthProvider>
+        </TranslationProvider>
+      </ThemeProvider>
     </BrowserRouter>
   </React.StrictMode>,
 )
