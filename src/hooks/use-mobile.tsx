@@ -1,4 +1,3 @@
-
 import * as React from "react"
 
 const MOBILE_BREAKPOINT = 768
@@ -8,11 +7,15 @@ interface IOSNavigator extends Navigator {
   standalone?: boolean;
 }
 
-// Extend Window interface for our debug helpers only
+// Extend Window interface for browser-specific properties and debug helpers
 declare global {
   interface Window {
     __forceMobileView?: boolean;
     toggleMobileView?: () => void;
+    // Browser-specific properties for webview detection
+    chrome?: any;
+    sidebar?: any;
+    external?: any;
   }
 }
 
