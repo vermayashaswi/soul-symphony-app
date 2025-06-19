@@ -1,5 +1,5 @@
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect } from 'react';
 import { Navigate, useNavigate, useLocation, useSearchParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { useAuth } from '@/contexts/AuthContext';
@@ -8,29 +8,23 @@ import SouloLogo from '@/components/SouloLogo';
 import { useOnboarding } from '@/hooks/use-onboarding';
 import { TranslatableText } from '@/components/translation/TranslatableText';
 import PlatformAuthButton from '@/components/auth/PlatformAuthButton';
-import { useKeyboardState } from '@/hooks/use-keyboard-state';
-import { useIsMobile } from '@/hooks/use-mobile';
-import { oauthFlowManager } from '@/utils/oauth-flow-manager';
 
 export default function Auth() {
   const location = useLocation();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
+  const [redirecting, setRedirecting] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const [authError, setAuthError] = useState<string | null>(null);
-  const [isInitialized, setIsInitialized] = useState(false);
-  
   const { user, isLoading: authLoading } = useAuth();
   const { onboardingComplete } = useOnboarding();
-  const { isWebtonative, isAndroid, isIOS } = useIsMobile();
-  const { keyboardState, setInputFocused } = useKeyboardState();
+  const [authError, setAuthError] = useState<string | null>(null);
   
   const redirectParam = searchParams.get('redirectTo');
   const fromLocation = location.state?.from?.pathname;
   const storedRedirect = typeof window !== 'undefined' ? localStorage.getItem('authRedirectTo') : null;
   
-  // Enhanced redirect path logic
-  const getValidRedirectPath = useCallback((path: string | null) => {
+  // Get valid redirect path with priority
+  const getValidRedirectPath = (path: string | null) => {
     if (!path) {
       return onboardingComplete ? '/app/home' : '/app/onboarding';
     }
@@ -40,131 +34,86 @@ export default function Auth() {
     if (path === '/onboarding') return '/app/onboarding';
     
     return path;
-  }, [onboardingComplete]);
+  };
   
+  // Determine where to redirect after auth
   const redirectTo = getValidRedirectPath(redirectParam || fromLocation || storedRedirect);
 
-  // Subscribe to OAuth flow manager state
-  useEffect(() => {
-    const unsubscribe = oauthFlowManager.subscribe((state) => {
-      setIsLoading(state.isProcessing);
-      if (state.hasError && state.errorMessage) {
-        setAuthError(state.errorMessage);
-      }
-    });
+  console.log('Auth page mounted', { 
+    redirectTo, 
+    redirectParam, 
+    fromLocation,
+    storedRedirect,
+    hasUser: !!user,
+    currentPath: location.pathname,
+    onboardingComplete
+  });
 
-    return unsubscribe;
+  useEffect(() => {
+    setIsLoading(false);
   }, []);
 
-  // Enhanced OAuth callback handling using the flow manager
   useEffect(() => {
-    const processOAuthCallback = async () => {
-      // Only process if we have auth parameters and not already processing
-      if (!oauthFlowManager.hasOAuthParams() || user) {
-        setIsInitialized(true);
-        return;
-      }
+    // If user is logged in and page has finished initial loading, redirect
+    if (user && !authLoading && !redirecting) {
+      console.log('User is logged in, redirecting to:', redirectTo);
+      setRedirecting(true);
       
-      console.log('[Auth] Processing OAuth callback with flow manager...');
+      // Clean up stored redirect
+      localStorage.removeItem('authRedirectTo');
       
-      try {
-        const result = await oauthFlowManager.handleCallback();
-        
-        if (result.success && result.session?.user) {
-          console.log('[Auth] OAuth callback successful via flow manager');
-          // AuthContext will handle the user state update
-          // Navigation will happen in the next useEffect
-        } else {
-          console.log('[Auth] OAuth callback failed:', result.error);
-          setAuthError(result.error || 'Authentication failed. Please try again.');
-        }
-      } catch (error: any) {
-        console.error('[Auth] OAuth callback error:', error);
-        setAuthError(error.message || 'Authentication failed. Please try again.');
-        toast.error(error.message || 'Authentication failed. Please try again.');
-      } finally {
-        setIsInitialized(true);
-      }
-    };
-    
-    // Only run callback processing on mount
-    processOAuthCallback();
-  }, []); // Empty dependency array to run only once
-
-  // Enhanced user redirect logic
-  useEffect(() => {
-    if (user && !authLoading && isInitialized && !oauthFlowManager.isProcessing()) {
-      console.log('[Auth] User authenticated, preparing redirect:', { 
-        redirectTo,
-        onboardingComplete 
-      });
-      
-      oauthFlowManager.clearRedirectPath();
-      
-      // Small delay to ensure state consistency
+      // Add small delay to ensure state updates before navigation
       const timer = setTimeout(() => {
-        const finalRedirect = !onboardingComplete && !redirectTo.includes('onboarding') 
-          ? '/app/onboarding'
-          : redirectTo;
-          
-        console.log('[Auth] Redirecting to:', finalRedirect);
-        navigate(finalRedirect, { replace: true });
-      }, 300);
+        // If onboarding is not complete, redirect to onboarding
+        if (!onboardingComplete && !redirectTo.includes('onboarding')) {
+          console.log('Redirecting to onboarding as it is not complete');
+          navigate('/app/onboarding', { replace: true });
+        } else {
+          navigate(redirectTo, { replace: true });
+        }
+      }, 500);
       
       return () => clearTimeout(timer);
     }
-  }, [user, authLoading, isInitialized, navigate, redirectTo, onboardingComplete]);
+  }, [user, authLoading, navigate, redirecting, redirectTo, onboardingComplete]);
 
-  // Show loading during auth processing
-  if (authLoading || oauthFlowManager.isProcessing() || !isInitialized) {
+  // If still checking auth state, show loading
+  if (authLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-background auth-loading">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
-          <p className="text-muted-foreground">
-            <TranslatableText text="Authenticating..." forceTranslate={true} />
-          </p>
-        </div>
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
       </div>
     );
   }
 
-  // Redirect if already authenticated
+  // If already logged in, redirect to target page
   if (user) {
+    // If onboarding is not complete, redirect to onboarding instead
     const finalRedirect = !onboardingComplete && !redirectTo.includes('onboarding') 
       ? '/app/onboarding'
       : redirectTo;
       
+    console.log('User already logged in, redirecting to:', finalRedirect, {
+      onboardingComplete,
+      originalRedirect: redirectTo
+    });
     return <Navigate to={finalRedirect} replace />;
   }
 
-  // Enhanced container styles for keyboard handling
-  const containerStyles = keyboardState.isOpen && isWebtonative ? {
-    height: `${keyboardState.availableHeight}px`,
-    maxHeight: `${keyboardState.availableHeight}px`,
-  } : {};
-
   return (
-    <div 
-      className={`min-h-screen flex items-center justify-center p-4 bg-background ${
-        keyboardState.isOpen ? 'keyboard-visible' : ''
-      } ${isWebtonative ? 'webtonative-auth' : ''}`}
-      style={containerStyles}
-    >
+    <div className="min-h-screen bg-background flex flex-col items-center justify-center px-4 py-12">
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.6 }}
-        className={`w-full max-w-md bg-card rounded-lg shadow-lg p-6 ${
-          keyboardState.isOpen ? 'keyboard-adjusted' : ''
-        }`}
+        className="max-w-md w-full glass-card p-8 rounded-xl relative z-10"
       >
-        <div className="text-center mb-6">
-          <h1 className="text-2xl md:text-3xl font-bold mb-2">
+        <div className="text-center mb-8">
+          <h1 className="text-3xl font-bold mb-2">
             <TranslatableText text="Welcome to" forceTranslate={true} />{" "}
             <SouloLogo size="large" className="text-blue-600" />
           </h1>
-          <p className="text-sm md:text-base text-muted-foreground">
+          <p className="text-muted-foreground">
             <TranslatableText 
               text="Sign in to start your journaling journey and track your emotional wellbeing" 
               forceTranslate={true} 
@@ -173,19 +122,10 @@ export default function Auth() {
         </div>
         
         {authError && (
-          <div className="mb-4 p-3 border border-red-500 bg-red-50 text-red-600 rounded-lg">
+          <div className="mb-4 p-2 border border-red-500 bg-red-50 text-red-600 rounded">
             <p className="text-sm">
               <TranslatableText text="Error:" forceTranslate={true} /> {authError}
             </p>
-            <button 
-              onClick={() => {
-                setAuthError(null);
-                oauthFlowManager.clearState();
-              }} 
-              className="mt-2 text-xs underline hover:no-underline"
-            >
-              <TranslatableText text="Dismiss" forceTranslate={true} />
-            </button>
           </div>
         )}
         
@@ -194,11 +134,9 @@ export default function Auth() {
             isLoading={isLoading}
             onLoadingChange={setIsLoading}
             onError={setAuthError}
-            onFocusChange={setInputFocused}
-            keyboardState={keyboardState}
           />
           
-          <div className="text-center text-xs md:text-sm text-muted-foreground">
+          <div className="text-center text-sm text-muted-foreground">
             <p>
               <TranslatableText 
                 text="By signing in, you agree to our Terms of Service and Privacy Policy" 
@@ -208,16 +146,6 @@ export default function Auth() {
           </div>
         </div>
       </motion.div>
-      
-      {/* Debug info for development */}
-      {process.env.NODE_ENV === 'development' && (
-        <div className="fixed bottom-4 left-4 bg-black text-white p-2 rounded text-xs opacity-70 z-50">
-          Webtonative: {isWebtonative ? 'Yes' : 'No'} | 
-          Keyboard: {keyboardState.isOpen ? 'Open' : 'Closed'} |
-          Processing: {oauthFlowManager.isProcessing() ? 'Yes' : 'No'} |
-          User: {user ? 'Yes' : 'No'}
-        </div>
-      )}
     </div>
   );
 }

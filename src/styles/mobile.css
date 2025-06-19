@@ -1,334 +1,20 @@
 
-/* Enhanced Mobile-specific styles for webtonative OAuth handling */
-
-/* CSS Custom Properties */
-:root {
-  --vh: 1vh;
-  --visual-vh: 1vh;
-  --available-height: 100vh;
-  --keyboard-height: 0px;
-  --viewport-height: 100vh;
-  --auth-viewport-height: 100vh;
-}
-
-/* Enhanced HTML/Body optimizations */
-html {
-  height: 100%;
-  height: -webkit-fill-available;
-  -webkit-text-size-adjust: 100%;
-  text-size-adjust: 100%;
-  touch-action: manipulation;
-  overflow-x: hidden;
-}
-
-body {
-  height: 100%;
-  height: -webkit-fill-available;
-  overscroll-behavior: none;
-  -webkit-overflow-scrolling: touch;
-  overflow-x: hidden;
-  position: relative;
-}
-
-/* Critical: Root container must be properly sized */
-#root {
-  min-height: 100vh;
-  min-height: calc(var(--vh) * 100);
-  width: 100%;
-  overflow-x: hidden;
-  position: relative;
-}
-
-/* Enhanced webtonative optimizations */
-.webtonative-app {
-  transform: translateZ(0);
-  -webkit-transform: translateZ(0);
-  will-change: transform;
-  position: relative;
-  width: 100%;
-  max-width: 100vw;
-  overflow-x: hidden;
-  min-height: 100vh;
-}
-
-/* Critical: Auth page container fixes */
-.viewport-auth {
-  position: fixed !important;
-  top: 0 !important;
-  left: 0 !important;
-  right: 0 !important;
-  bottom: 0 !important;
-  width: 100vw !important;
-  height: 100vh !important;
-  height: calc(var(--vh) * 100) !important;
-  background: hsl(var(--background)) !important;
-  overflow: hidden !important;
-  z-index: 9999 !important;
-}
-
-.auth-optimized {
-  position: relative !important;
-  width: 100% !important;
-  height: 100% !important;
-  display: flex !important;
-  align-items: center !important;
-  justify-content: center !important;
-  background: hsl(var(--background)) !important;
-}
-
-.webtonative-auth-flow {
-  position: fixed !important;
-  top: 0 !important;
-  left: 0 !important;
-  right: 0 !important;
-  bottom: 0 !important;
-  width: 100vw !important;
-  height: 100vh !important;
-  z-index: 10000 !important;
-  background: hsl(var(--background)) !important;
-  display: flex !important;
-  align-items: center !important;
-  justify-content: center !important;
-}
-
-/* Enhanced webtonative auth container */
-.webtonative-auth {
-  position: relative !important;
-  width: 100% !important;
-  height: 100% !important;
-  min-height: 100vh !important;
-  min-height: calc(var(--vh) * 100) !important;
-  display: flex !important;
-  align-items: center !important;
-  justify-content: center !important;
-  padding: 1rem !important;
-  box-sizing: border-box !important;
-  overflow-y: auto !important;
-  overflow-x: hidden !important;
-  background: hsl(var(--background)) !important;
-}
-
-/* Enhanced keyboard handling */
-.keyboard-visible,
-.keyboard-open {
-  height: var(--available-height) !important;
-  max-height: var(--available-height) !important;
-  overflow: hidden !important;
-}
-
-.webtonative-keyboard-visible {
-  height: var(--available-height) !important;
-  min-height: var(--available-height) !important;
-  max-height: var(--available-height) !important;
-}
-
-.webtonative-auth.keyboard-visible {
-  height: var(--available-height) !important;
-  min-height: var(--available-height) !important;
-  max-height: var(--available-height) !important;
-  justify-content: flex-start !important;
-  padding-top: 0.5rem !important;
-}
-
-.keyboard-adjusted {
-  max-height: calc(var(--available-height) - 2rem) !important;
-  overflow-y: auto !important;
-  margin: 0.5rem !important;
-}
-
-/* Enhanced auth button styles */
-.auth-button {
-  width: 100% !important;
-  padding: 14px 24px !important;
-  font-size: 16px !important;
-  border-radius: 8px !important;
-  font-weight: 600 !important;
-  transition: all 0.2s ease !important;
-  -webkit-appearance: none !important;
-  appearance: none !important;
-  touch-action: manipulation !important;
-  user-select: none !important;
-  -webkit-user-select: none !important;
-  -webkit-tap-highlight-color: transparent !important;
-  border: none !important;
-  cursor: pointer !important;
-  display: flex !important;
-  align-items: center !important;
-  justify-content: center !important;
-  gap: 8px !important;
-}
-
-.webtonative-auth-button {
-  min-height: 48px !important;
-  font-size: 17px !important;
-  font-weight: 500 !important;
-}
-
-.keyboard-visible-button {
-  padding: 12px 20px !important;
-  font-size: 15px !important;
-}
-
-/* Enhanced app container */
-.app-container {
-  min-height: 100vh;
-  min-height: calc(var(--vh, 1vh) * 100);
-  position: relative;
-  overflow-x: hidden;
-  width: 100%;
-}
-
-.app-container.keyboard-active {
-  height: var(--available-height) !important;
-  max-height: var(--available-height) !important;
-  overflow: hidden !important;
-}
-
-/* Enhanced mobile navigation */
-.keyboard-hidden {
-  transform: translateY(100%) !important;
-  opacity: 0 !important;
-  pointer-events: none !important;
-  transition: all 0.2s ease !important;
-}
-
-/* Enhanced route-specific optimizations */
-html.auth-route {
-  height: 100% !important;
-  overflow: hidden !important;
-  background: hsl(var(--background)) !important;
-}
-
-html.auth-route body {
-  height: 100% !important;
-  overflow: hidden !important;
-  background: hsl(var(--background)) !important;
-}
-
-html.app-route {
-  height: 100% !important;
-  background: hsl(var(--background)) !important;
-}
-
-/* Enhanced safe area support */
-@supports (padding: max(0px)) {
-  .webtonative-auth {
-    padding-top: max(1rem, env(safe-area-inset-top)) !important;
-    padding-bottom: max(1rem, env(safe-area-inset-bottom)) !important;
-    padding-left: max(1rem, env(safe-area-inset-left)) !important;
-    padding-right: max(1rem, env(safe-area-inset-right)) !important;
-  }
-  
-  .viewport-auth {
-    padding-top: env(safe-area-inset-top) !important;
-    padding-bottom: env(safe-area-inset-bottom) !important;
-    padding-left: env(safe-area-inset-left) !important;
-    padding-right: env(safe-area-inset-right) !important;
-  }
-}
-
-/* Critical: Loading state fixes */
-.auth-loading {
-  position: fixed !important;
-  top: 0 !important;
-  left: 0 !important;
-  right: 0 !important;
-  bottom: 0 !important;
-  background: hsl(var(--background)) !important;
-  display: flex !important;
-  align-items: center !important;
-  justify-content: center !important;
-  z-index: 10001 !important;
-}
-
+/* Mobile-specific styles */
 @media (max-width: 768px) {
-  /* Enhanced mobile-specific optimizations */
-  
-  html {
-    height: 100%;
-    height: -webkit-fill-available;
-    overflow-x: hidden;
+  /* Rounded corners for mobile UI elements */
+  .mobile-chat-interface .rounded-full {
+    border-radius: 9999px !important; /* Force perfect circles */
   }
   
-  body {
-    height: 100%;
-    height: -webkit-fill-available;
-    overflow-x: hidden;
-  }
-  
-  #root {
-    min-height: 100vh;
-    min-height: -webkit-fill-available;
-    overflow-x: hidden;
-  }
-  
-  /* Enhanced keyboard handling for mobile auth */
-  .keyboard-visible .webtonative-auth {
-    justify-content: flex-start !important;
-    padding-top: 1rem !important;
-    align-items: flex-start !important;
-  }
-  
-  .keyboard-visible .keyboard-adjusted {
-    margin: 0.5rem !important;
-    padding: 1rem !important;
-    max-height: calc(var(--available-height) - 2rem) !important;
-    overflow-y: auto !important;
-  }
-  
-  /* Enhanced safe area handling */
-  @supports (padding: max(0px)) {
-    .webtonative-auth {
-      padding-top: max(1rem, env(safe-area-inset-top) + 0.5rem) !important;
-      padding-bottom: max(1rem, env(safe-area-inset-bottom) + 0.5rem) !important;
-    }
-    
-    .keyboard-visible .webtonative-auth {
-      padding-top: max(0.5rem, env(safe-area-inset-top)) !important;
-      padding-bottom: max(0.5rem, env(safe-area-inset-bottom)) !important;
-    }
-  }
-  
-  /* Mobile navigation styles */
-  .fixed.bottom-0.left-0.right-0.bg-background.border-t.border-muted {
-    z-index: 9998 !important;
-  }
-
-  /* Insights page mobile styles */
-  .insights-container {
-    padding: 1rem !important;
-  }
-
-  .insights-container .grid-cols-1 > div {
-    width: 100% !important;
-    max-width: 100% !important;
-    margin-left: 0 !important;
-    margin-right: 0 !important;
-    border-radius: 10px !important;
-  }
-
-  /* Journal page mobile styles */
-  .journal-container {
-    padding: 1rem !important;
-  }
-
-  /* Smart Chat page mobile styles */
-  .smart-chat-container {
-    padding: 1rem !important;
-  }
-
-  /* Settings page mobile styles */
-  .settings-container {
-    padding: 1rem !important;
-  }
-  
+  /* Add padding to the bottom of the page content to make room for the navigation bar */
   .smart-chat-container,
   .journal-container,
   .insights-container,
   .settings-container {
-    padding-bottom: 4.5rem !important;
+    padding-bottom: 4.5rem !important; /* Increased to ensure content doesn't get cut off */
   }
 
+  /* Make cards take full width in mobile view and remove horizontal padding */
   .insights-container .grid-cols-1 > div,
   .insights-container .bg-background,
   .insights-container .mb-8 > div {
@@ -339,27 +25,32 @@ html.app-route {
     border-radius: 10px !important;
   }
   
+  /* Ensure insights page has minimal horizontal padding */
   .insights-page-content {
     padding-left: 0 !important;
     padding-right: 0 !important;
-    overflow-x: hidden !important;
+    overflow-x: hidden !important; /* Prevent horizontal scrolling */
   }
   
+  /* Remove horizontal margins on cards */
   .insights-container .max-w-5xl > div {
     margin-left: 0 !important;
     margin-right: 0 !important;
   }
   
+  /* Remove padding in SoulNet component when in normal (non-fullscreen) view */
   .insights-container .mb-8 .bg-background .rounded-xl:not(.fixed) {
     padding: 0 !important;
   }
   
+  /* Prevent horizontal scrolling at the root level */
   html, body {
     overflow-x: hidden !important;
     width: 100% !important;
     position: relative !important;
   }
   
+  /* Fix for the App.css padding causing overflow */
   #root {
     padding-left: 0 !important;
     padding-right: 0 !important;
@@ -367,6 +58,7 @@ html.app-route {
     overflow-x: hidden !important;
   }
   
+  /* iOS-specific padding for safe areas */
   @supports (padding: max(0px)) {
     .smart-chat-container,
     .journal-container,
@@ -378,6 +70,7 @@ html.app-route {
     }
   }
 
+  /* SoulNet fullscreen behavior improvements */
   .fixed.inset-0.z-\[9999\] {
     position: fixed !important;
     top: 0 !important;
@@ -386,33 +79,39 @@ html.app-route {
     bottom: 0 !important;
     width: 100vw !important;
     height: 100vh !important;
-    z-index: 9998 !important;
+    z-index: 9998 !important; /* Decreased to be below the navigation bar */
     margin: 0 !important;
     padding: 0 !important;
     background-color: hsl(var(--background)) !important;
   }
 
+  /* Ensure entity info panel stays on top */
   .z-\[10000\] {
     z-index: 10000 !important;
   }
 
+  /* Make SoulNet visualization clickable and fully interactive */
   canvas {
     touch-action: none !important;
   }
 
+  /* Fix any styling issues with SoulNet info panel on mobile */
   .absolute.top-2.right-2.p-2.rounded-lg.shadow-lg {
     z-index: 10000 !important;
     max-width: 170px !important;
   }
 
+  /* Ensure the mobile chat input is fully visible */
   .mobile-chat-input-container {
-    bottom: 4.5rem !important;
+    bottom: 4.5rem !important; /* Adjusted to match the increased bottom padding */
   }
 
+  /* Add more space at the bottom of the chat content */
   .mobile-chat-content {
     padding-bottom: 70px !important;
   }
   
+  /* Year view calendar compact styling for mobile - Updated dot sizes */
   .compact-table-mobile {
     table-layout: fixed !important;
     font-size: 10px !important;
@@ -430,15 +129,19 @@ html.app-route {
   }
 }
 
+/* Styles for both mobile and desktop */
 @media all {
+  /* Ensure SoulNet container has proper padding when not in fullscreen */
   .soulnet-container:not(.fixed) {
     margin: 0 8px !important;
   }
   
+  /* Fix for mobile navigation to stay on top */
   .fixed.bottom-0.left-0.right-0.bg-background.border-t.border-muted {
     z-index: 9999 !important;
   }
   
+  /* Year view calendar compact styling - Updated dot sizes */
   .compact-year-view {
     width: 100%;
     overflow-x: hidden;
@@ -458,17 +161,11 @@ html.app-route {
     height: 18px;
   }
   
+  /* Desktop year view - larger dots */
   @media (min-width: 769px) {
     .compact-year-view div.rounded-full {
       width: 16px !important;
       height: 16px !important;
     }
-  }
-  
-  .webtonative-app {
-    overscroll-behavior: none !important;
-    touch-action: pan-x pan-y !important;
-    transform: translateZ(0) !important;
-    -webkit-transform: translateZ(0) !important;
   }
 }

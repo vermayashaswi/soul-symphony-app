@@ -1,128 +1,96 @@
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { oauthFlowManager } from '@/utils/oauth-flow-manager';
+import { isAppRoute } from '@/routes/RouteHelpers';
 
 /**
- * Enhanced redirect URL handling for webtonative OAuth
+ * Gets the redirect URL for authentication
  */
 export const getRedirectUrl = (): string => {
-  const baseUrl = window.location.origin;
+  // For iOS in standalone mode (PWA), we need to handle redirects differently
+  // Check for standalone mode in a type-safe way
+  const isInStandaloneMode = () => {
+    // Check for display-mode: standalone media query (PWA)
+    const standaloneCheck = window.matchMedia('(display-mode: standalone)').matches;
+    
+    // Check for navigator.standalone (iOS Safari)
+    // @ts-ignore - This is valid on iOS Safari but not in the TypeScript types
+    const iosSafariStandalone = window.navigator.standalone;
+    
+    return standaloneCheck || iosSafariStandalone;
+  };
   
-  // For webtonative, always use the app auth route
-  const redirectPath = '/app/auth';
-  const fullRedirectUrl = `${baseUrl}${redirectPath}`;
-  
-  console.log('[AuthService] Redirect URL configured:', {
-    baseUrl,
-    redirectPath,
-    fullRedirectUrl,
-    isWebtonative: /webtonative|wv|WebView/i.test(navigator.userAgent)
-  });
-  
-  return fullRedirectUrl;
+  // All auth redirects should go to /app/auth
+  return `${window.location.origin}/app/auth`;
 };
 
 /**
- * Enhanced Google sign-in with better webtonative handling
+ * Sign in with Google
  */
 export const signInWithGoogle = async (): Promise<void> => {
   try {
     const redirectUrl = getRedirectUrl();
-    console.log('[AuthService] Starting Google OAuth flow:', { redirectUrl });
+    console.log('Using redirect URL:', redirectUrl);
     
-    // Clear any previous OAuth state
-    oauthFlowManager.clearState();
-    
-    // Clear any existing auth state first
-    await supabase.auth.signOut({ scope: 'local' });
-    
-    // Enhanced options for webtonative
     const { data, error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: {
         redirectTo: redirectUrl,
         queryParams: {
+          // Force refresh of Google access tokens
           access_type: 'offline',
-          prompt: 'select_account'
+          prompt: 'consent',
         },
-        // Critical: Don't skip browser redirect for webtonative
-        skipBrowserRedirect: false
-      }
+      },
     });
 
     if (error) {
-      console.error('[AuthService] Google OAuth error:', error);
-      throw new Error(`Google sign-in failed: ${error.message}`);
+      throw error;
     }
     
-    console.log('[AuthService] Google OAuth initiated successfully:', { 
-      url: data?.url,
-      provider: data?.provider 
-    });
-    
+    // If we have a URL, manually redirect to it (as a backup)
+    if (data?.url) {
+      console.log('Redirecting to OAuth URL:', data.url);
+      setTimeout(() => {
+        window.location.href = data.url;
+      }, 100);
+    }
   } catch (error: any) {
-    console.error('[AuthService] Google sign-in error:', error);
-    const friendlyMessage = error.message?.includes('popup_closed_by_user') 
-      ? 'Sign-in was cancelled. Please try again.'
-      : `Sign-in failed: ${error.message}`;
-    
-    toast.error(friendlyMessage);
+    console.error('Error signing in with Google:', error.message);
+    toast.error(`Error signing in with Google: ${error.message}`);
     throw error;
   }
 };
 
 /**
- * Enhanced Apple sign-in
+ * Sign in with Apple ID
  */
 export const signInWithApple = async (): Promise<void> => {
   try {
     const redirectUrl = getRedirectUrl();
-    console.log('[AuthService] Starting Apple OAuth flow:', { redirectUrl });
-    
-    // Clear any previous OAuth state
-    oauthFlowManager.clearState();
-    
-    // Clear any existing auth state first
-    await supabase.auth.signOut({ scope: 'local' });
+    console.log('Using redirect URL for Apple ID:', redirectUrl);
     
     const { data, error } = await supabase.auth.signInWithOAuth({
       provider: 'apple',
       options: {
         redirectTo: redirectUrl,
-        skipBrowserRedirect: false
-      }
+      },
     });
 
     if (error) {
-      console.error('[AuthService] Apple OAuth error:', error);
-      throw new Error(`Apple sign-in failed: ${error.message}`);
+      throw error;
     }
     
-    console.log('[AuthService] Apple OAuth initiated successfully');
-    
+    // If we have a URL, manually redirect to it (as a backup)
+    if (data?.url) {
+      console.log('Redirecting to Apple OAuth URL:', data.url);
+      setTimeout(() => {
+        window.location.href = data.url;
+      }, 100);
+    }
   } catch (error: any) {
-    console.error('[AuthService] Apple sign-in error:', error);
-    const friendlyMessage = error.message?.includes('popup_closed_by_user') 
-      ? 'Sign-in was cancelled. Please try again.'
-      : `Sign-in failed: ${error.message}`;
-    
-    toast.error(friendlyMessage);
+    console.error('Error signing in with Apple:', error.message);
+    toast.error(`Error signing in with Apple: ${error.message}`);
     throw error;
-  }
-};
-
-/**
- * Enhanced OAuth callback handler using the flow manager
- */
-export const handleAuthCallback = async (): Promise<any> => {
-  console.log('[AuthService] Delegating to OAuth flow manager...');
-  
-  const result = await oauthFlowManager.handleCallback();
-  
-  if (result.success) {
-    return result.session;
-  } else {
-    throw new Error(result.error || 'OAuth callback failed');
   }
 };
 
@@ -193,9 +161,6 @@ export const resetPassword = async (email: string): Promise<void> => {
  */
 export const signOut = async (navigate?: (path: string) => void): Promise<void> => {
   try {
-    // Clear OAuth flow manager state
-    oauthFlowManager.clearState();
-    
     // Check if there's a session before trying to sign out
     const { data: sessionData } = await supabase.auth.getSession();
     
@@ -276,6 +241,42 @@ export const getCurrentUser = async () => {
     return data.user;
   } catch (error) {
     console.error('Error getting current user:', error);
+    return null;
+  }
+};
+
+/**
+ * Handle auth callback
+ * This is specifically added to fix the auth flow
+ */
+export const handleAuthCallback = async () => {
+  try {
+    // Check if we have hash params that might indicate an auth callback
+    const hasHashParams = window.location.hash.includes('access_token') || 
+                         window.location.hash.includes('error') ||
+                         window.location.search.includes('error');
+    
+    console.log('Checking for auth callback params:', hasHashParams);
+    
+    if (hasHashParams) {
+      // Get the session
+      const { data, error } = await supabase.auth.getSession();
+      
+      if (error) {
+        console.error('Error in auth callback session check:', error);
+        return null;
+      } 
+      
+      if (data.session?.user) {
+        console.log('User authenticated in callback handler');
+        // Session creation will be handled by AuthContext
+        return data.session;
+      }
+    }
+    
+    return null;
+  } catch (error) {
+    console.error('Error in handleAuthCallback:', error);
     return null;
   }
 };

@@ -100,145 +100,47 @@ const initializeFontSystem = async () => {
   }
 };
 
-// Enhanced iOS Viewport Height Fix - addresses the iOS Safari issue with viewport height
+// iOS Viewport Height Fix - addresses the iOS Safari issue with viewport height
 const fixViewportHeight = () => {
-  // Enhanced viewport height management for webtonative
+  // Set CSS variable for viewport height that updates on resize
   const setVhProperty = () => {
     const vh = window.innerHeight * 0.01;
     document.documentElement.style.setProperty('--vh', `${vh}px`);
-    document.documentElement.style.setProperty('--real-vh', `${window.innerHeight}px`);
-    
-    // Log for debugging
-    console.log(`[Viewport] Setting --vh: ${vh}px, window height: ${window.innerHeight}px`);
   };
   
   // Initial set
   setVhProperty();
   
-  // Enhanced keyboard detection for Android webtonative
-  let initialViewportHeight = window.innerHeight;
-  let keyboardVisible = false;
-  
-  const detectKeyboard = () => {
-    const currentHeight = window.innerHeight;
-    const heightDifference = initialViewportHeight - currentHeight;
-    const threshold = 150; // Minimum height change to consider keyboard open
-    
-    const wasKeyboardVisible = keyboardVisible;
-    keyboardVisible = heightDifference > threshold;
-    
-    if (keyboardVisible !== wasKeyboardVisible) {
-      console.log(`[Keyboard] Keyboard ${keyboardVisible ? 'opened' : 'closed'}, height difference: ${heightDifference}px`);
-      
-      if (keyboardVisible) {
-        document.body.classList.add('keyboard-visible');
-        document.documentElement.classList.add('keyboard-visible');
-        // Set available height for keyboard mode
-        document.documentElement.style.setProperty('--available-height', `${currentHeight}px`);
-      } else {
-        document.body.classList.remove('keyboard-visible');
-        document.documentElement.classList.remove('keyboard-visible');
-        // Reset to full height
-        document.documentElement.style.setProperty('--available-height', `${initialViewportHeight}px`);
-      }
-    }
-    
-    setVhProperty();
-  };
-  
   // Update on resize and orientation change
-  window.addEventListener('resize', detectKeyboard);
+  window.addEventListener('resize', setVhProperty);
   window.addEventListener('orientationchange', () => {
-    // Reset initial height on orientation change
-    setTimeout(() => {
-      initialViewportHeight = window.innerHeight;
-      detectKeyboard();
-    }, 300);
+    // Slight delay to ensure viewport has updated after orientation change
+    setTimeout(setVhProperty, 100);
   });
   
-  // Special handling for webtonative and mobile browsers
-  if (/Android/i.test(navigator.userAgent) || 
-      /iPad|iPhone|iPod/.test(navigator.userAgent) || 
+  // Special handling for iOS keyboard appearance
+  if (/iPad|iPhone|iPod/.test(navigator.userAgent) || 
       (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)) {
     
-    // Visual viewport API support for better keyboard handling
-    if (window.visualViewport) {
-      console.log('[Viewport] Visual Viewport API available');
-      
-      const handleVisualViewportChange = () => {
-        const visualHeight = window.visualViewport!.height;
-        const windowHeight = window.innerHeight;
-        
-        console.log(`[VisualViewport] Visual: ${visualHeight}px, Window: ${windowHeight}px`);
-        
-        if (visualHeight < windowHeight * 0.75) {
-          document.body.classList.add('keyboard-visible');
-          document.documentElement.classList.add('keyboard-visible');
-          document.documentElement.style.setProperty('--keyboard-height', `${windowHeight - visualHeight}px`);
-        } else {
-          document.body.classList.remove('keyboard-visible');
-          document.documentElement.classList.remove('keyboard-visible');
-          document.documentElement.style.setProperty('--keyboard-height', '0px');
-        }
-        
-        // Update viewport height based on visual viewport
-        const vh = visualHeight * 0.01;
-        document.documentElement.style.setProperty('--vh', `${vh}px`);
-        document.documentElement.style.setProperty('--visual-vh', `${vh}px`);
-      };
-      
-      window.visualViewport.addEventListener('resize', handleVisualViewportChange);
-      window.visualViewport.addEventListener('scroll', handleVisualViewportChange);
-    }
-    
-    // Enhanced input focus handling
+    // Track when iOS keyboard shows/hides by monitoring input focus
     const inputs = document.querySelectorAll('input, textarea');
     inputs.forEach(input => {
       input.addEventListener('focus', () => {
-        console.log('[Input] Input focused, managing viewport');
-        document.body.classList.add('input-focused');
-        
-        // Scroll to input after a delay to ensure keyboard is open
+        document.body.classList.add('keyboard-visible');
+        // Force reflow to ensure transition works
         setTimeout(() => {
-          input.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        }, 300);
+          window.scrollTo(0, 0);
+          setVhProperty();
+        }, 50);
       });
       
       input.addEventListener('blur', () => {
-        console.log('[Input] Input blurred');
-        document.body.classList.remove('input-focused');
+        document.body.classList.remove('keyboard-visible');
+        // Small delay to ensure UI updates after keyboard hides
+        setTimeout(setVhProperty, 50);
       });
     });
-    
-    // Add mutation observer to handle dynamically added inputs
-    const observer = new MutationObserver((mutations) => {
-      mutations.forEach((mutation) => {
-        mutation.addedNodes.forEach((node) => {
-          if (node.nodeType === 1) { // Element node
-            const element = node as Element;
-            const newInputs = element.querySelectorAll('input, textarea');
-            newInputs.forEach(input => {
-              input.addEventListener('focus', () => {
-                document.body.classList.add('input-focused');
-                setTimeout(() => {
-                  input.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                }, 300);
-              });
-              
-              input.addEventListener('blur', () => {
-                document.body.classList.remove('input-focused');
-              });
-            });
-          }
-        });
-      });
-    });
-    
-    observer.observe(document.body, { childList: true, subtree: true });
   }
-  
-  // Set initial available height
-  document.documentElement.style.setProperty('--available-height', `${initialViewportHeight}px`);
 };
 
 // Initialize PWA Service Worker
@@ -284,43 +186,20 @@ const initializeApp = async () => {
   // Initialize font system first
   await initializeFontSystem();
   
-  // Initialize enhanced viewport fix
+  // Initialize viewport fix
   fixViewportHeight();
   
   // Initialize PWA features
   await initializePWA();
   
-  // Detect device type and set classes
+  // Detect iOS and set a class on the HTML element
   if (/iPad|iPhone|iPod/.test(navigator.userAgent) || 
       (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)) {
     document.documentElement.classList.add('ios-device');
   }
   
-  if (/Android/i.test(navigator.userAgent)) {
-    document.documentElement.classList.add('android-device');
-  }
-  
   console.log('[App] Initialization complete');
 };
-
-// Enhanced viewport meta tag configuration for webtonative
-const updateViewportMetaTag = () => {
-  let viewportMeta = document.querySelector('meta[name="viewport"]') as HTMLMetaElement;
-  
-  if (!viewportMeta) {
-    viewportMeta = document.createElement('meta');
-    viewportMeta.name = 'viewport';
-    document.head.appendChild(viewportMeta);
-  }
-  
-  // Enhanced viewport configuration for webtonative keyboard handling
-  viewportMeta.content = 'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover, interactive-widget=resizes-content';
-  
-  console.log('[Viewport] Updated meta tag:', viewportMeta.content);
-};
-
-// Update viewport meta tag immediately
-updateViewportMetaTag();
 
 // Start initialization
 initializeApp();

@@ -1,30 +1,13 @@
+
 import * as React from "react"
 
 const MOBILE_BREAKPOINT = 768
-
-// Extend Navigator interface for iOS-specific properties
-interface IOSNavigator extends Navigator {
-  standalone?: boolean;
-}
-
-// Extend Window interface for browser-specific properties and debug helpers
-declare global {
-  interface Window {
-    __forceMobileView?: boolean;
-    toggleMobileView?: () => void;
-    // Browser-specific properties for webview detection
-    chrome?: any;
-    sidebar?: any;
-    // Note: external already exists in DOM lib, so we don't redeclare it
-  }
-}
 
 export function useIsMobile() {
   const [isMobile, setIsMobile] = React.useState<boolean>(false);
   const [isInitialized, setIsInitialized] = React.useState<boolean>(false);
   const [isIOS, setIsIOS] = React.useState<boolean>(false); 
   const [isAndroid, setIsAndroid] = React.useState<boolean>(false);
-  const [isWebtonative, setIsWebtonative] = React.useState<boolean>(false);
 
   React.useEffect(() => {
     // Function to check if mobile
@@ -62,73 +45,24 @@ export function useIsMobile() {
     const checkIfAndroid = () => {
       return /Android/i.test(navigator.userAgent);
     };
-    
-    // Enhanced function to check if running in webtonative
-    const checkIfWebtonative = () => {
-      // Check for webtonative specific indicators
-      const hasWebtonativeUA = /webtonative/i.test(navigator.userAgent);
-      const hasWebView = /wv|WebView/i.test(navigator.userAgent);
-      const hasWebApp = (navigator as IOSNavigator).standalone === true;
-      
-      // Enhanced webview detection
-      const isWebView = hasWebtonativeUA || hasWebView || hasWebApp;
-      
-      // Check for common mobile webview characteristics
-      const hasMobileWebViewSignals = (
-        window.orientation !== undefined ||
-        /Mobile|Android|iPhone|iPad|iPod/i.test(navigator.userAgent)
-      ) && (
-        // Check for webview-specific properties
-        !window.chrome || // Chrome desktop has window.chrome
-        hasWebView ||
-        window.navigator.userAgent.includes('wv') ||
-        // Check for missing browser features that indicate webview
-        !window.external ||
-        !window.sidebar
-      );
-      
-      // Additional checks for webtonative environment
-      const isLikelyWebtonative = (isWebView || hasMobileWebViewSignals) && 
-                                  (checkIfAndroid() || checkIfIOS());
-      
-      console.log('[Mobile] Enhanced webtonative detection:', {
-        hasWebtonativeUA,
-        hasWebView,
-        hasWebApp,
-        hasMobileWebViewSignals,
-        isWebView,
-        isLikelyWebtonative,
-        hasChrome: !!window.chrome,
-        hasExternal: !!window.external,
-        userAgent: navigator.userAgent,
-        orientation: window.orientation,
-        visualViewport: !!window.visualViewport
-      });
-      
-      return isLikelyWebtonative;
-    };
 
     // Set initial state immediately
     const initialIsMobile = checkIfMobile();
     const initialIsIOS = checkIfIOS();
     const initialIsAndroid = checkIfAndroid();
-    const initialIsWebtonative = checkIfWebtonative();
     
     setIsMobile(initialIsMobile);
     setIsIOS(initialIsIOS);
     setIsAndroid(initialIsAndroid);
-    setIsWebtonative(initialIsWebtonative);
     setIsInitialized(true);
     
-    console.log("Enhanced mobile detection initialized:", {
+    console.log("Mobile detection initialized:", {
       isMobile: initialIsMobile, 
       isIOS: initialIsIOS,
       isAndroid: initialIsAndroid,
-      isWebtonative: initialIsWebtonative,
       width: window.innerWidth, 
       userAgent: navigator.userAgent,
-      touch: 'ontouchstart' in window || navigator.maxTouchPoints > 0,
-      visualViewport: !!window.visualViewport
+      touch: 'ontouchstart' in window || navigator.maxTouchPoints > 0
     });
     
     // Create event listeners for resize and orientation change
@@ -143,16 +77,11 @@ export function useIsMobile() {
     // Special handling for iOS orientation changes
     const handleOrientationChange = () => {
       console.log("Orientation change detected");
-      // On iOS and webtonative, we need a small delay
-      if (initialIsIOS || initialIsWebtonative) {
+      // On iOS, we need a small delay
+      if (initialIsIOS) {
         setTimeout(() => {
           handleResize();
-          // Re-check webtonative status after orientation change
-          const newWebtonativeStatus = checkIfWebtonative();
-          if (newWebtonativeStatus !== initialIsWebtonative) {
-            setIsWebtonative(newWebtonativeStatus);
-          }
-        }, 300);
+        }, 100);
       } else {
         handleResize();
       }
@@ -167,25 +96,6 @@ export function useIsMobile() {
     }
     if (initialIsAndroid) {
       document.body.classList.add('android-device');
-    }
-    if (initialIsWebtonative) {
-      document.body.classList.add('webtonative-app');
-      document.documentElement.classList.add('webtonative-env');
-      
-      // Set initial viewport properties for webtonative
-      const setViewportProperties = () => {
-        const vh = window.innerHeight * 0.01;
-        document.documentElement.style.setProperty('--vh', `${vh}px`);
-        document.documentElement.style.setProperty('--real-vh', `${window.innerHeight}px`);
-        
-        if (window.visualViewport) {
-          const visualVh = window.visualViewport.height * 0.01;
-          document.documentElement.style.setProperty('--visual-vh', `${visualVh}px`);
-          document.documentElement.style.setProperty('--available-height', `${window.visualViewport.height}px`);
-        }
-      };
-      
-      setViewportProperties();
     }
     
     // Setup matchMedia query as well
@@ -229,10 +139,6 @@ export function useIsMobile() {
       if (initialIsAndroid) {
         document.body.classList.remove('android-device');
       }
-      if (initialIsWebtonative) {
-        document.body.classList.remove('webtonative-app');
-        document.documentElement.classList.remove('webtonative-env');
-      }
     };
   }, [isMobile]);
 
@@ -255,8 +161,7 @@ export function useIsMobile() {
   const result = {
     isMobile: isInitialized ? isMobile : false,
     isIOS: isInitialized ? isIOS : false,
-    isAndroid: isInitialized ? isAndroid : false,
-    isWebtonative: isInitialized ? isWebtonative : false
+    isAndroid: isInitialized ? isAndroid : false
   } as const;
   
   // Add a valueOf method to make the object behave like a boolean
@@ -274,3 +179,11 @@ export function useIsMobile() {
 
 // Add an alias export so that Chat.tsx can import it as useMobile
 export const useMobile = useIsMobile;
+
+// Extend global interface for our debug helpers
+declare global {
+  interface Window {
+    __forceMobileView?: boolean;
+    toggleMobileView?: () => void;
+  }
+}

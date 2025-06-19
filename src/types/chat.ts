@@ -24,26 +24,6 @@ export interface ChatMessage {
   ambiguityInfo?: AmbiguityAnalysis; // New field for ambiguity information
 }
 
-export interface ChatThread {
-  id: string;
-  title: string;
-  user_id: string;
-  created_at: string;
-  updated_at: string;
-  processing_status?: 'idle' | 'processing' | 'failed';
-  metadata?: {
-    timeContext?: string | null;
-    topicContext?: string | null;
-    intentType?: string;
-    confidenceScore?: number;
-    needsClarity?: boolean;
-    ambiguities?: string[];
-    domainContext?: string | null;
-    lastUpdated?: string;
-    [key: string]: any;
-  };
-}
-
 export interface InteractiveOption {
   text: string;
   action: string;

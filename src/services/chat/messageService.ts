@@ -1,49 +1,81 @@
 
 import { supabase } from '@/integrations/supabase/client';
-import { toast } from 'sonner';
-import type { ChatMessage, ChatThread } from '@/types/chat';
+import { ChatMessage } from '@/types/chat';
 
 export const createChatMessage = async (
-  threadId: string,
-  content: string,
-  role: 'user' | 'assistant' = 'user',
-  metadata?: any
+  threadId: string, 
+  content: string, 
+  sender: 'user' | 'assistant', 
+  userId: string,
+  additionalData?: Partial<ChatMessage>
 ): Promise<ChatMessage | null> => {
   try {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) {
-      throw new Error('User not authenticated');
+    // First verify the thread belongs to the user
+    const { data: thread, error: threadError } = await supabase
+      .from('chat_threads')
+      .select('id')
+      .eq('id', threadId)
+      .eq('user_id', userId)
+      .single();
+
+    if (threadError || !thread) {
+      console.error('Thread not found or access denied:', threadError);
+      return null;
     }
 
     const { data, error } = await supabase
       .from('chat_messages')
-      .insert([
-        {
-          thread_id: threadId,
-          content,
-          role,
-          user_id: user.id,
-          metadata: metadata || {}
-        }
-      ])
-      .select('*')
+      .insert({
+        thread_id: threadId,
+        content,
+        sender,
+        role: sender,
+        created_at: new Date().toISOString(),
+        ...additionalData
+      })
+      .select()
       .single();
 
     if (error) {
       console.error('Error creating chat message:', error);
-      throw error;
+      return null;
     }
 
-    return data;
-  } catch (error: any) {
-    console.error('Error in createChatMessage:', error);
-    toast.error(`Failed to save message: ${error.message}`);
+    // Update thread's updated_at timestamp
+    await supabase
+      .from('chat_threads')
+      .update({ updated_at: new Date().toISOString() })
+      .eq('id', threadId)
+      .eq('user_id', userId);
+
+    // Cast sender and role to proper types and handle sub_query_responses
+    return {
+      ...data,
+      sender: data.sender as 'user' | 'assistant' | 'error',
+      role: data.role as 'user' | 'assistant' | 'error',
+      sub_query_responses: Array.isArray(data.sub_query_responses) ? data.sub_query_responses : []
+    };
+  } catch (error) {
+    console.error('Exception creating chat message:', error);
     return null;
   }
 };
 
-export const getChatMessages = async (threadId: string): Promise<ChatMessage[]> => {
+export const getChatMessages = async (threadId: string, userId: string): Promise<ChatMessage[]> => {
   try {
+    // First verify the thread belongs to the user
+    const { data: thread, error: threadError } = await supabase
+      .from('chat_threads')
+      .select('id')
+      .eq('id', threadId)
+      .eq('user_id', userId)
+      .single();
+
+    if (threadError || !thread) {
+      console.error('Thread not found or access denied:', threadError);
+      return [];
+    }
+
     const { data, error } = await supabase
       .from('chat_messages')
       .select('*')
@@ -52,120 +84,85 @@ export const getChatMessages = async (threadId: string): Promise<ChatMessage[]> 
 
     if (error) {
       console.error('Error fetching chat messages:', error);
-      throw error;
+      return [];
     }
 
-    return data || [];
-  } catch (error: any) {
-    console.error('Error in getChatMessages:', error);
-    toast.error(`Failed to load messages: ${error.message}`);
+    // Cast sender and role to proper types and handle sub_query_responses
+    return (data || []).map(msg => ({
+      ...msg,
+      sender: msg.sender as 'user' | 'assistant' | 'error',
+      role: msg.role as 'user' | 'assistant' | 'error',
+      sub_query_responses: Array.isArray(msg.sub_query_responses) ? msg.sub_query_responses : []
+    }));
+  } catch (error) {
+    console.error('Exception fetching chat messages:', error);
     return [];
-  }
-};
-
-// Export as getThreadMessages for backward compatibility
-export const getThreadMessages = async (threadId: string, userId?: string): Promise<ChatMessage[]> => {
-  try {
-    let query = supabase
-      .from('chat_messages')
-      .select('*')
-      .eq('thread_id', threadId)
-      .order('created_at', { ascending: true });
-
-    if (userId) {
-      query = query.eq('user_id', userId);
-    }
-
-    const { data, error } = await query;
-
-    if (error) {
-      console.error('Error fetching thread messages:', error);
-      throw error;
-    }
-
-    return data || [];
-  } catch (error: any) {
-    console.error('Error in getThreadMessages:', error);
-    toast.error(`Failed to load messages: ${error.message}`);
-    return [];
-  }
-};
-
-// Save message function
-export const saveMessage = async (
-  threadId: string,
-  content: string,
-  role: 'user' | 'assistant' | 'error',
-  userId: string,
-  references?: any[] | null,
-  hasNumericResult?: boolean,
-  isInteractive?: boolean,
-  interactiveOptions?: any[]
-): Promise<ChatMessage | null> => {
-  try {
-    const messageData: any = {
-      thread_id: threadId,
-      content,
-      role,
-      sender: role, // Set sender same as role for compatibility
-      user_id: userId,
-      reference_entries: references || null,
-      has_numeric_result: hasNumericResult || false
-    };
-
-    if (isInteractive && interactiveOptions) {
-      messageData.metadata = { 
-        isInteractive: true, 
-        interactiveOptions 
-      };
-    }
-
-    const { data, error } = await supabase
-      .from('chat_messages')
-      .insert([messageData])
-      .select('*')
-      .single();
-
-    if (error) {
-      console.error('Error saving message:', error);
-      throw error;
-    }
-
-    return data;
-  } catch (error: any) {
-    console.error('Error in saveMessage:', error);
-    toast.error(`Failed to save message: ${error.message}`);
-    return null;
   }
 };
 
 export const updateChatMessage = async (
-  messageId: string,
-  updates: Partial<ChatMessage>
+  messageId: string, 
+  updates: Partial<ChatMessage>,
+  userId: string
 ): Promise<ChatMessage | null> => {
   try {
+    // First verify the message belongs to a thread owned by the user
+    const { data: message, error: messageError } = await supabase
+      .from('chat_messages')
+      .select(`
+        *,
+        chat_threads!inner(user_id)
+      `)
+      .eq('id', messageId)
+      .single();
+
+    if (messageError || !message || message.chat_threads.user_id !== userId) {
+      console.error('Message not found or access denied:', messageError);
+      return null;
+    }
+
     const { data, error } = await supabase
       .from('chat_messages')
       .update(updates)
       .eq('id', messageId)
-      .select('*')
+      .select()
       .single();
 
     if (error) {
       console.error('Error updating chat message:', error);
-      throw error;
+      return null;
     }
 
-    return data;
-  } catch (error: any) {
-    console.error('Error in updateChatMessage:', error);
-    toast.error(`Failed to update message: ${error.message}`);
+    // Cast sender and role to proper types and handle sub_query_responses
+    return {
+      ...data,
+      sender: data.sender as 'user' | 'assistant' | 'error',
+      role: data.role as 'user' | 'assistant' | 'error',
+      sub_query_responses: Array.isArray(data.sub_query_responses) ? data.sub_query_responses : []
+    };
+  } catch (error) {
+    console.error('Exception updating chat message:', error);
     return null;
   }
 };
 
-export const deleteChatMessage = async (messageId: string): Promise<boolean> => {
+export const deleteChatMessage = async (messageId: string, userId: string): Promise<boolean> => {
   try {
+    // First verify the message belongs to a thread owned by the user
+    const { data: message, error: messageError } = await supabase
+      .from('chat_messages')
+      .select(`
+        id,
+        chat_threads!inner(user_id)
+      `)
+      .eq('id', messageId)
+      .single();
+
+    if (messageError || !message || message.chat_threads.user_id !== userId) {
+      console.error('Message not found or access denied:', messageError);
+      return false;
+    }
+
     const { error } = await supabase
       .from('chat_messages')
       .delete()
@@ -173,162 +170,62 @@ export const deleteChatMessage = async (messageId: string): Promise<boolean> => 
 
     if (error) {
       console.error('Error deleting chat message:', error);
-      throw error;
+      return false;
     }
 
     return true;
-  } catch (error: any) {
-    console.error('Error in deleteChatMessage:', error);
-    toast.error(`Failed to delete message: ${error.message}`);
+  } catch (error) {
+    console.error('Exception deleting chat message:', error);
     return false;
   }
 };
 
-export const getMessagesByUser = async (userId: string): Promise<ChatMessage[]> => {
-  try {
-    const { data, error } = await supabase
-      .from('chat_messages')
-      .select('*')
-      .eq('user_id', userId)
-      .order('created_at', { ascending: false });
+// Legacy function aliases for backward compatibility
+export const getThreadMessages = getChatMessages;
 
-    if (error) {
-      console.error('Error fetching user messages:', error);
-      throw error;
-    }
-
-    return data || [];
-  } catch (error: any) {
-    console.error('Error in getMessagesByUser:', error);
-    return [];
-  }
-};
-
-// Fixed function to get unique users from messages
-export const getUniqueUsersFromMessages = async (threadId: string): Promise<string[]> => {
-  try {
-    const { data, error } = await supabase
-      .from('chat_messages')
-      .select('user_id')
-      .eq('thread_id', threadId);
-
-    if (error) {
-      console.error('Error fetching unique users:', error);
-      throw error;
-    }
-
-    // Extract unique user IDs
-    const uniqueUserIds = [...new Set(data?.map(message => message.user_id) || [])];
-    return uniqueUserIds.filter(Boolean); // Remove any null/undefined values
-  } catch (error: any) {
-    console.error('Error in getUniqueUsersFromMessages:', error);
-    return [];
-  }
-};
-
-export const searchMessages = async (
-  query: string,
+// Updated saveMessage function with correct signature
+export const saveMessage = async (
+  threadId: string, 
+  content: string, 
+  sender: 'user' | 'assistant', 
   userId?: string,
-  threadId?: string
-): Promise<ChatMessage[]> => {
-  try {
-    let queryBuilder = supabase
-      .from('chat_messages')
-      .select('*')
-      .ilike('content', `%${query}%`);
-
-    if (userId) {
-      queryBuilder = queryBuilder.eq('user_id', userId);
-    }
-
-    if (threadId) {
-      queryBuilder = queryBuilder.eq('thread_id', threadId);
-    }
-
-    const { data, error } = await queryBuilder
-      .order('created_at', { ascending: false })
-      .limit(50);
-
-    if (error) {
-      console.error('Error searching messages:', error);
-      throw error;
-    }
-
-    return data || [];
-  } catch (error: any) {
-    console.error('Error in searchMessages:', error);
-    return [];
+  references?: any[] | null,
+  hasNumericResult?: boolean,
+  isInteractive?: boolean,
+  interactiveOptions?: any[]
+) => {
+  if (!userId) {
+    console.error('User ID is required for saveMessage');
+    return null;
   }
+
+  const additionalData: Partial<ChatMessage> = {};
+  if (references) additionalData.reference_entries = references;
+  if (hasNumericResult !== undefined) additionalData.has_numeric_result = hasNumericResult;
+  if (isInteractive) additionalData.isInteractive = isInteractive;
+  if (interactiveOptions) additionalData.interactiveOptions = interactiveOptions;
+
+  return createChatMessage(threadId, content, sender, userId, additionalData);
 };
 
 // Thread management functions
-export const createThread = async (userId: string, title: string = "New Conversation"): Promise<string | null> => {
-  try {
-    const { data, error } = await supabase
-      .from('chat_threads')
-      .insert([
-        {
-          user_id: userId,
-          title,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString()
-        }
-      ])
-      .select('id')
-      .single();
-
-    if (error) {
-      console.error('Error creating thread:', error);
-      throw error;
-    }
-
-    return data?.id || null;
-  } catch (error: any) {
-    console.error('Error in createThread:', error);
-    toast.error(`Failed to create thread: ${error.message}`);
-    return null;
-  }
+export const createThread = async (userId: string, title: string = "New Conversation") => {
+  const { createChatThread } = await import('./threadService');
+  const thread = await createChatThread(userId, title);
+  return thread?.id || null;
 };
 
-export const getUserChatThreads = async (userId: string): Promise<ChatThread[]> => {
-  try {
-    const { data, error } = await supabase
-      .from('chat_threads')
-      .select('*')
-      .eq('user_id', userId)
-      .order('updated_at', { ascending: false });
-
-    if (error) {
-      console.error('Error fetching user threads:', error);
-      throw error;
-    }
-
-    return data || [];
-  } catch (error: any) {
-    console.error('Error in getUserChatThreads:', error);
-    return [];
-  }
+export const getUserChatThreads = async (userId: string) => {
+  const { getChatThreads } = await import('./threadService');
+  return getChatThreads(userId);
 };
 
-export const updateThreadTitle = async (threadId: string, title: string): Promise<boolean> => {
-  try {
-    const { error } = await supabase
-      .from('chat_threads')
-      .update({ 
-        title,
-        updated_at: new Date().toISOString()
-      })
-      .eq('id', threadId);
-
-    if (error) {
-      console.error('Error updating thread title:', error);
-      throw error;
-    }
-
-    return true;
-  } catch (error: any) {
-    console.error('Error in updateThreadTitle:', error);
-    toast.error(`Failed to update thread title: ${error.message}`);
+export const updateThreadTitle = async (threadId: string, title: string, userId?: string) => {
+  if (!userId) {
+    console.error('User ID is required for updateThreadTitle');
     return false;
   }
+  const { updateChatThread } = await import('./threadService');
+  const result = await updateChatThread(threadId, { title }, userId);
+  return !!result;
 };
