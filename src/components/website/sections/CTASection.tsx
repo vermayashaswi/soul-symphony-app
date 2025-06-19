@@ -12,7 +12,7 @@ interface CTASectionProps {
 
 const CTASection: React.FC<CTASectionProps> = ({ openAppStore, openPlayStore }) => {
   return (
-    <section className="py-16 md:py-24 bg-gradient-to-br from-primary via-purple-600 to-blue-600 relative overflow-hidden">
+    <section className="py-16 md:py-24 bg-gradient-to-br from-purple-700 via-purple-800 to-indigo-800 relative overflow-hidden">
       {/* Background Pattern */}
       <div className="absolute inset-0 opacity-10">
         <div className="absolute top-10 left-10 w-20 h-20 border border-white rounded-full"></div>
@@ -45,19 +45,19 @@ const CTASection: React.FC<CTASectionProps> = ({ openAppStore, openPlayStore }) 
           >
             <Button 
               size="lg" 
-              className="gap-2 bg-white text-primary hover:bg-gray-100 text-lg px-8 py-4 h-auto" 
+              className="gap-2 bg-black text-white hover:bg-gray-800 text-lg px-8 py-4 h-auto" 
               onClick={openAppStore}
             >
               <Apple className="h-5 w-5" />
-              <TranslatableText text="Download for iOS" />
+              <TranslatableText text="App Store" />
             </Button>
             <Button 
               size="lg" 
-              className="gap-2 bg-black text-white hover:bg-gray-800 text-lg px-8 py-4 h-auto" 
+              className="gap-2 bg-purple-600 hover:bg-purple-700 text-white text-lg px-8 py-4 h-auto" 
               onClick={openPlayStore}
             >
               <Play className="h-5 w-5" />
-              <TranslatableText text="Download for Android" />
+              <TranslatableText text="Google Play" />
             </Button>
           </motion.div>
 
