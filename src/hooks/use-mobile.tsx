@@ -15,7 +15,7 @@ declare global {
     // Browser-specific properties for webview detection
     chrome?: any;
     sidebar?: any;
-    external?: any;
+    // Note: external already exists in DOM lib, so we don't redeclare it
   }
 }
 
