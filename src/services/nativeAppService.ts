@@ -23,9 +23,6 @@ class NativeAppService {
     if (this.appInfo.isPWABuilder) {
       this.initializePWABuilderSupport();
     }
-    
-    // Initialize theme consistency for native apps
-    this.initializeThemeConsistency();
   }
 
   private detectNativeApp(): NativeAppInfo {
@@ -59,7 +56,7 @@ class NativeAppService {
       isPWABuilder,
       userAgent,
       platform,
-      version: '1.2.5', // Incremented for enhanced theme support
+      version: '1.2.4', // Incremented for PWA Builder support
       buildTimestamp
     };
   }
@@ -109,178 +106,6 @@ class NativeAppService {
       console.warn('[NativeAppService] PWA BUILDER: Detection failed:', error);
       return false;
     }
-  }
-
-  private initializeThemeConsistency(): void {
-    if (!this.isAppRoute()) return;
-    
-    console.log('[NativeAppService] Initializing theme consistency for native app');
-    
-    // Set up theme reapplication when app becomes visible
-    document.addEventListener('visibilitychange', () => {
-      if (document.visibilityState === 'visible' && this.isAppRoute()) {
-        console.log('[NativeAppService] App became visible, checking theme consistency');
-        setTimeout(() => this.validateAndReapplyTheme(), 1000);
-      }
-    });
-    
-    // Monitor for route changes to app routes
-    let lastPathname = window.location.pathname;
-    const checkRouteChange = () => {
-      const currentPathname = window.location.pathname;
-      if (currentPathname !== lastPathname) {
-        lastPathname = currentPathname;
-        if (this.isAppRoute()) {
-          console.log('[NativeAppService] App route detected, ensuring theme consistency');
-          setTimeout(() => this.validateAndReapplyTheme(), 500);
-        }
-      }
-    };
-    
-    // Check for route changes periodically
-    setInterval(checkRouteChange, 2000);
-  }
-
-  private isAppRoute(): boolean {
-    try {
-      return window.location.pathname.startsWith('/app');
-    } catch {
-      return false;
-    }
-  }
-
-  private validateAndReapplyTheme(): void {
-    if (!this.isAppRoute() || !(this.isNativeApp() || this.isWebView())) return;
-    
-    try {
-      console.log('[NativeAppService] Validating theme consistency...');
-      
-      // Get expected theme from localStorage
-      const expectedColorTheme = localStorage.getItem('feelosophy-color-theme') || 'Default';
-      const expectedCustomColor = localStorage.getItem('feelosophy-custom-color') || '#3b82f6';
-      
-      // Get expected color hex
-      let expectedHex = '#3b82f6'; // Default
-      switch (expectedColorTheme) {
-        case 'Calm': expectedHex = '#8b5cf6'; break;
-        case 'Soothing': expectedHex = '#FFDEE2'; break;
-        case 'Energy': expectedHex = '#f59e0b'; break;
-        case 'Focus': expectedHex = '#10b981'; break;
-        case 'Custom': expectedHex = expectedCustomColor; break;
-      }
-      
-      // Check if theme is applied correctly
-      const root = document.documentElement;
-      const appliedColor = root.style.getPropertyValue('--color-theme');
-      
-      if (appliedColor !== expectedHex) {
-        console.log('[NativeAppService] Theme inconsistency detected, reapplying...', {
-          expected: expectedHex,
-          applied: appliedColor
-        });
-        
-        // Force theme reapplication
-        this.forceThemeReapplication(expectedColorTheme, expectedCustomColor, expectedHex);
-      } else {
-        console.log('[NativeAppService] Theme consistency validated successfully');
-      }
-    } catch (error) {
-      console.error('[NativeAppService] Theme validation failed:', error);
-    }
-  }
-
-  private forceThemeReapplication(colorTheme: string, customColor: string, expectedHex: string): void {
-    try {
-      const root = document.documentElement;
-      const body = document.body;
-      
-      // Force color theme variables
-      root.style.setProperty('--color-theme', expectedHex, 'important');
-      root.style.setProperty('--primary', this.convertHexToHsl(expectedHex), 'important');
-      root.style.setProperty('--ring', this.convertHexToHsl(expectedHex), 'important');
-      
-      // Mark as app route
-      body.setAttribute('data-app-route', 'true');
-      
-      // Add WebView class if needed
-      if (this.isWebView()) {
-        body.classList.add('webview-environment');
-        
-        // Create WebView-specific style injection
-        let webViewStyle = document.getElementById('native-theme-override');
-        if (!webViewStyle) {
-          webViewStyle = document.createElement('style');
-          webViewStyle.id = 'native-theme-override';
-          document.head.appendChild(webViewStyle);
-        }
-        
-        webViewStyle.textContent = `
-          /* Native app theme override */
-          body[data-app-route="true"] .text-theme,
-          body[data-app-route="true"] .text-theme-color,
-          body[data-app-route="true"] .theme-text { 
-            color: ${expectedHex} !important; 
-          }
-          
-          body[data-app-route="true"] .bg-theme,
-          body[data-app-route="true"] .bg-theme-color,
-          body[data-app-route="true"] .theme-bg { 
-            background-color: ${expectedHex} !important; 
-          }
-          
-          body[data-app-route="true"] .border-theme,
-          body[data-app-route="true"] .border-theme-color,
-          body[data-app-route="true"] .theme-border { 
-            border-color: ${expectedHex} !important; 
-          }
-          
-          body[data-app-route="true"] .bg-primary {
-            background-color: ${expectedHex} !important;
-          }
-          
-          body[data-app-route="true"] .text-primary {
-            color: ${expectedHex} !important;
-          }
-          
-          body[data-app-route="true"] .border-primary {
-            border-color: ${expectedHex} !important;
-          }
-        `;
-      }
-      
-      console.log('[NativeAppService] Theme reapplication completed for:', expectedHex);
-    } catch (error) {
-      console.error('[NativeAppService] Theme reapplication failed:', error);
-    }
-  }
-
-  private convertHexToHsl(hex: string): string {
-    const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
-    if (!result) return '217 91.2% 59.8%'; // Default blue
-    
-    const r = parseInt(result[1], 16) / 255;
-    const g = parseInt(result[2], 16) / 255;
-    const b = parseInt(result[3], 16) / 255;
-    
-    const max = Math.max(r, g, b);
-    const min = Math.min(r, g, b);
-    let h = 0, s = 0;
-    const l = (max + min) / 2;
-    
-    if (max !== min) {
-      const d = max - min;
-      s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
-      
-      switch (max) {
-        case r: h = (g - b) / d + (g < b ? 6 : 0); break;
-        case g: h = (b - r) / d + 2; break;
-        case b: h = (r - g) / d + 4; break;
-      }
-      
-      h /= 6;
-    }
-    
-    return `${Math.round(h * 360)} ${Math.round(s * 100)}% ${Math.round(l * 100)}%`;
   }
 
   private initializePWABuilderSupport(): void {
@@ -444,7 +269,6 @@ class NativeAppService {
       const keysToKeep = [
         'feelosophy-theme', 
         'feelosophy-color-theme', 
-        'feelosophy-custom-color',
         'sb-auth-token',
         'pwa-builder-build-timestamp'
       ];
@@ -489,8 +313,6 @@ class NativeAppService {
   async clearNativeCache(): Promise<boolean> {
     if (this.appInfo.isPWABuilder) {
       await this.clearPWABuilderCache();
-      // Trigger theme reapplication after cache clear
-      setTimeout(() => this.validateAndReapplyTheme(), 1000);
       return true;
     }
     
@@ -503,7 +325,7 @@ class NativeAppService {
         console.log('[NativeAppService] Cleared cache storages');
       }
 
-      const keysToKeep = ['feelosophy-theme', 'feelosophy-color-theme', 'feelosophy-custom-color', 'sb-auth-token'];
+      const keysToKeep = ['feelosophy-theme', 'feelosophy-color-theme', 'sb-auth-token'];
       const allKeys = Object.keys(localStorage);
       
       allKeys.forEach(key => {
@@ -512,12 +334,9 @@ class NativeAppService {
         }
       });
       
-      console.log('[NativeAppService] Cleared localStorage (keeping auth and theme)');
+      console.log('[NativeAppService] Cleared localStorage (keeping auth)');
       sessionStorage.clear();
       console.log('[NativeAppService] Cleared sessionStorage');
-
-      // Trigger theme reapplication after cache clear
-      setTimeout(() => this.validateAndReapplyTheme(), 1000);
 
       return true;
     } catch (error) {
