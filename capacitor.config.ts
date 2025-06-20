@@ -42,7 +42,10 @@ const config: CapacitorConfig = {
   android: {
     allowMixedContent: true,
     captureInput: true,
-    webContentsDebuggingEnabled: true
+    webContentsDebuggingEnabled: true,
+    // Add icon configuration for Android
+    iconBackgroundColor: "#FFFFFF",
+    iconForegroundColor: "#8b5cf6"
   }
 };
 
