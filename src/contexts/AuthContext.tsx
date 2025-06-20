@@ -3,12 +3,15 @@ import React, { createContext, useContext, useEffect, useState } from 'react';
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 import { SessionTrackingService } from '@/services/sessionTrackingService';
+import { updateUserProfile as updateUserProfileService, ensureProfileExists as ensureProfileExistsService } from '@/services/profileService';
 
 interface AuthContextType {
   user: User | null;
   session: Session | null;
   isLoading: boolean;
   signOut: () => Promise<void>;
+  updateUserProfile: (metadata: Record<string, any>) => Promise<boolean>;
+  ensureProfileExists: () => Promise<boolean>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -109,11 +112,21 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     }
   };
 
+  const updateUserProfile = async (metadata: Record<string, any>): Promise<boolean> => {
+    return await updateUserProfileService(user, metadata);
+  };
+
+  const ensureProfileExists = async (): Promise<boolean> => {
+    return await ensureProfileExistsService(user);
+  };
+
   const value: AuthContextType = {
     user,
     session,
     isLoading,
     signOut,
+    updateUserProfile,
+    ensureProfileExists,
   };
 
   return (
