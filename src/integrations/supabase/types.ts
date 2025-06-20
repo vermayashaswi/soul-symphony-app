@@ -763,10 +763,12 @@ export type Database = {
       user_sessions: {
         Row: {
           attribution_data: Json | null
+          browser_info: Json | null
           conversion_events: Json | null
           country_code: string | null
           created_at: string
           currency: string | null
+          device_fingerprint: string | null
           device_type: string | null
           entry_page: string | null
           fbclid: string | null
@@ -779,10 +781,13 @@ export type Database = {
           last_activity: string | null
           location: string | null
           page_views: number | null
+          platform: string | null
           referrer: string | null
           session_duration: unknown | null
           session_end: string | null
+          session_fingerprint: string | null
           session_start: string
+          session_timeout: string | null
           user_agent: string | null
           user_id: string
           utm_campaign: string | null
@@ -793,10 +798,12 @@ export type Database = {
         }
         Insert: {
           attribution_data?: Json | null
+          browser_info?: Json | null
           conversion_events?: Json | null
           country_code?: string | null
           created_at?: string
           currency?: string | null
+          device_fingerprint?: string | null
           device_type?: string | null
           entry_page?: string | null
           fbclid?: string | null
@@ -809,10 +816,13 @@ export type Database = {
           last_activity?: string | null
           location?: string | null
           page_views?: number | null
+          platform?: string | null
           referrer?: string | null
           session_duration?: unknown | null
           session_end?: string | null
+          session_fingerprint?: string | null
           session_start?: string
+          session_timeout?: string | null
           user_agent?: string | null
           user_id: string
           utm_campaign?: string | null
@@ -823,10 +833,12 @@ export type Database = {
         }
         Update: {
           attribution_data?: Json | null
+          browser_info?: Json | null
           conversion_events?: Json | null
           country_code?: string | null
           created_at?: string
           currency?: string | null
+          device_fingerprint?: string | null
           device_type?: string | null
           entry_page?: string | null
           fbclid?: string | null
@@ -839,10 +851,13 @@ export type Database = {
           last_activity?: string | null
           location?: string | null
           page_views?: number | null
+          platform?: string | null
           referrer?: string | null
           session_duration?: unknown | null
           session_end?: string | null
+          session_fingerprint?: string | null
           session_start?: string
+          session_timeout?: string | null
           user_agent?: string | null
           user_id?: string
           utm_campaign?: string | null
@@ -893,9 +908,17 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: undefined
       }
+      cleanup_expired_sessions: {
+        Args: Record<PropertyKey, never>
+        Returns: number
+      }
       cleanup_expired_trials: {
         Args: Record<PropertyKey, never>
         Returns: undefined
+      }
+      close_user_session: {
+        Args: { p_session_id: string; p_user_id: string }
+        Returns: boolean
       }
       delete_all_user_journal_entries: {
         Args: { p_user_id: string }
@@ -932,6 +955,30 @@ export type Database = {
               p_gclid?: string
               p_fbclid?: string
               p_attribution_data?: Json
+            }
+          | {
+              p_user_id: string
+              p_device_type: string
+              p_user_agent: string
+              p_entry_page: string
+              p_last_active_page: string
+              p_language?: string
+              p_referrer?: string
+              p_ip_address?: string
+              p_country_code?: string
+              p_currency?: string
+              p_utm_source?: string
+              p_utm_medium?: string
+              p_utm_campaign?: string
+              p_utm_term?: string
+              p_utm_content?: string
+              p_gclid?: string
+              p_fbclid?: string
+              p_attribution_data?: Json
+              p_session_fingerprint?: string
+              p_browser_info?: Json
+              p_device_fingerprint?: string
+              p_platform?: string
             }
         Returns: string
       }
@@ -1098,10 +1145,6 @@ export type Database = {
           is_trial_active: boolean
           days_remaining: number
         }[]
-      }
-      has_active_session: {
-        Args: { p_user_id: string }
-        Returns: boolean
       }
       insert_sample_journal_entries: {
         Args: { target_user_id: string }
@@ -1386,7 +1429,7 @@ export type Database = {
           p_event_type: string
           p_event_data?: Json
         }
-        Returns: undefined
+        Returns: boolean
       }
       update_session_activity: {
         Args: { p_session_id: string; p_page?: string; p_language?: string }
