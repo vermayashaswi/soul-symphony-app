@@ -1,5 +1,6 @@
+
 // Soulo PWA Service Worker
-const CACHE_NAME = 'soulo-cache-v1';
+const CACHE_NAME = 'soulo-cache-v2'; // Updated cache version to invalidate old cache
 const OFFLINE_URL = '/offline.html';
 const BACKGROUND_SYNC_TAG = 'journal-entry-sync';
 const PERIODIC_SYNC_TAG = 'journal-periodic-sync';
@@ -15,7 +16,8 @@ const STATIC_ASSETS = [
   '/app/smart-chat',
   '/app/settings',
   '/offline.html',
-  '/manifest.json',
+  '/manifest.json?v=2',
+  '/lovable-uploads/soulo-icon.png?v=2',
   '/lovable-uploads/31ed88ef-f596-4b91-ba58-a4175eebe779.png',
   '/lovable-uploads/3f275134-f471-4af9-a7cd-700ccd855fe3.png'
 ];
@@ -72,6 +74,27 @@ self.addEventListener('fetch', (event) => {
 
   // Skip Chrome extension requests
   if (event.request.url.startsWith('chrome-extension://')) {
+    return;
+  }
+
+  // Handle icon requests with cache-busting
+  if (event.request.url.includes('soulo-icon.png')) {
+    event.respondWith(
+      fetch(event.request)
+        .then((response) => {
+          if (response.ok) {
+            const responseToCache = response.clone();
+            caches.open(CACHE_NAME)
+              .then((cache) => {
+                cache.put(event.request, responseToCache);
+              });
+          }
+          return response;
+        })
+        .catch(() => {
+          return caches.match(event.request);
+        })
+    );
     return;
   }
 

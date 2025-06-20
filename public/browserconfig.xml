@@ -3,10 +3,10 @@
 <browserconfig>
   <msapplication>
     <tile>
-      <square70x70logo src="/lovable-uploads/soulo icon.png"/>
-      <square150x150logo src="/lovable-uploads/soulo icon.png"/>
-      <wide310x150logo src="/lovable-uploads/soulo icon.png"/>
-      <square310x310logo src="/lovable-uploads/soulo icon.png"/>
+      <square70x70logo src="/lovable-uploads/soulo-icon.png?v=2"/>
+      <square150x150logo src="/lovable-uploads/soulo-icon.png?v=2"/>
+      <wide310x150logo src="/lovable-uploads/soulo-icon.png?v=2"/>
+      <square310x310logo src="/lovable-uploads/soulo-icon.png?v=2"/>
       <TileColor>#8b5cf6</TileColor>
     </tile>
   </msapplication>
