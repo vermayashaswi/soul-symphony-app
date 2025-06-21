@@ -18,13 +18,34 @@ import FAQPage from '@/pages/website/FAQPage';
 import BlogPage from '@/pages/website/BlogPage';
 import BlogPostPage from '@/pages/website/BlogPostPage';
 import OnboardingScreen from '@/components/onboarding/OnboardingScreen';
+import { useAuth } from '@/contexts/AuthContext';
+import { useOnboarding } from '@/hooks/use-onboarding';
 
 const AppRoutes = () => {
+  const { user } = useAuth();
+  const { onboardingComplete } = useOnboarding();
+  
+  // This will be used for conditional rendering of the /app route
+  const AppRootRedirect = () => {
+    if (user) {
+      if (onboardingComplete) {
+        // If user is logged in and onboarding is complete, go to home
+        return <Navigate to="/app/home" replace />;
+      } else {
+        // If user is logged in but onboarding is not complete, go to onboarding
+        return <Navigate to="/app/onboarding" replace />;
+      }
+    } else {
+      // If user is not logged in, go to onboarding
+      return <Navigate to="/app/onboarding" replace />;
+    }
+  };
+  
   return (
     <Routes>
       {/* Wrap all routes that need ViewportManager in a parent Route */}
       <Route element={<ViewportManager />}>
-        {/* Website Routes */}
+        {/* Website Routes - Now properly wrapped in translation context */}
         <Route path="/" element={<Index />} />
         <Route path="/privacy-policy" element={<PrivacyPolicyPage />} />
         <Route path="/faq" element={<FAQPage />} />
@@ -32,13 +53,13 @@ const AppRoutes = () => {
         <Route path="/blog" element={<BlogPage />} />
         <Route path="/blog/:slug" element={<BlogPostPage />} />
         
-        {/* App Routes - onboarding and auth are outside protected area */}
+        {/* App Routes - reordered to fix routing issue */}
         <Route path="/app/onboarding" element={<OnboardingScreen />} />
         <Route path="/app/auth" element={<Auth />} />
         
-        {/* Protected App Routes - ProtectedRoute handles /app index internally */}
+        {/* Protected App Routes */}
         <Route path="/app" element={<ProtectedRoute />}>
-          <Route index element={null} /> {/* Handled by ProtectedRoute logic */}
+          <Route index element={<AppRootRedirect />} />
           <Route path="home" element={<Home />} />
           <Route path="journal" element={<Journal />} />
           <Route path="insights" element={
