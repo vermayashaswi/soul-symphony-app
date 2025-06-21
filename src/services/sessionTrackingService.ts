@@ -20,10 +20,6 @@ interface SessionTrackingData {
   gclid?: string;
   fbclid?: string;
   attributionData?: Record<string, any>;
-  sessionFingerprint?: string;
-  browserInfo?: Record<string, any>;
-  deviceFingerprint?: string;
-  platform?: string;
 }
 
 interface LocationData {
@@ -32,83 +28,20 @@ interface LocationData {
   timezone: string;
 }
 
-interface SessionInfo {
-  sessionId: string;
-  isNewSession: boolean;
-  sessionStart: Date;
-}
-
 export class SessionTrackingService {
   private static locationCache: LocationData | null = null;
   private static locationPromise: Promise<LocationData | null> | null = null;
-  private static currentSessionId: string | null = null;
-  private static sessionStartTime: Date | null = null;
-
-  /**
-   * Generate a unique browser fingerprint
-   */
-  private static generateBrowserFingerprint(): string {
-    const canvas = document.createElement('canvas');
-    const ctx = canvas.getContext('2d');
-    ctx?.fillText('fingerprint', 2, 2);
-    
-    const fingerprint = [
-      navigator.userAgent,
-      navigator.language,
-      screen.width + 'x' + screen.height,
-      screen.colorDepth,
-      new Date().getTimezoneOffset(),
-      navigator.platform,
-      navigator.cookieEnabled,
-      canvas.toDataURL()
-    ].join('|');
-    
-    return btoa(fingerprint).substring(0, 32);
-  }
-
-  /**
-   * Generate session fingerprint combining device and timing info
-   */
-  private static generateSessionFingerprint(): string {
-    const browserFingerprint = this.generateBrowserFingerprint();
-    const timestamp = Math.floor(Date.now() / (1000 * 60 * 30)); // 30-minute windows
-    
-    return `${browserFingerprint}_${timestamp}`;
-  }
-
-  /**
-   * Get browser information
-   */
-  private static getBrowserInfo(): Record<string, any> {
-    return {
-      language: navigator.language,
-      languages: navigator.languages,
-      platform: navigator.platform,
-      cookieEnabled: navigator.cookieEnabled,
-      onLine: navigator.onLine,
-      screen: {
-        width: screen.width,
-        height: screen.height,
-        colorDepth: screen.colorDepth,
-        pixelDepth: screen.pixelDepth
-      },
-      viewport: {
-        width: window.innerWidth,
-        height: window.innerHeight
-      },
-      timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-      timezoneOffset: new Date().getTimezoneOffset()
-    };
-  }
 
   /**
    * Detect user's location using multiple fallback methods
    */
   static async detectLocation(): Promise<LocationData | null> {
+    // Return cached result if available
     if (this.locationCache) {
       return this.locationCache;
     }
 
+    // Return ongoing promise if detection is in progress
     if (this.locationPromise) {
       return this.locationPromise;
     }
@@ -257,7 +190,7 @@ export class SessionTrackingService {
   }
 
   /**
-   * Create or update user session with enhanced tracking and proper session management
+   * Create or update user session with enhanced tracking
    */
   static async createUserSession(data: SessionTrackingData): Promise<string | null> {
     try {
@@ -269,11 +202,6 @@ export class SessionTrackingService {
         utmSource: data.utmSource,
         language: data.language,
       });
-
-      // Generate session fingerprint and browser info if not provided
-      const sessionFingerprint = data.sessionFingerprint || this.generateSessionFingerprint();
-      const browserInfo = data.browserInfo || this.getBrowserInfo();
-      const deviceFingerprint = data.deviceFingerprint || this.generateBrowserFingerprint();
 
       const { data: sessionId, error } = await supabase
         .rpc('enhanced_manage_user_session', {
@@ -295,10 +223,6 @@ export class SessionTrackingService {
           p_gclid: data.gclid,
           p_fbclid: data.fbclid,
           p_attribution_data: data.attributionData || {},
-          p_session_fingerprint: sessionFingerprint,
-          p_browser_info: browserInfo,
-          p_device_fingerprint: deviceFingerprint,
-          p_platform: data.platform || navigator.platform
         });
 
       if (error) {
@@ -306,11 +230,7 @@ export class SessionTrackingService {
         return null;
       }
 
-      // Store current session info
-      this.currentSessionId = sessionId;
-      this.sessionStartTime = new Date();
-
-      console.log('Enhanced user session created/updated successfully with ID:', sessionId);
+      console.log('Enhanced user session created successfully with ID:', sessionId);
       return sessionId;
     } catch (error) {
       console.error('Exception creating enhanced user session:', error);
@@ -319,103 +239,13 @@ export class SessionTrackingService {
   }
 
   /**
-   * Get current session information
+   * Track conversion event
    */
-  static getCurrentSession(): SessionInfo | null {
-    if (!this.currentSessionId) {
-      return null;
-    }
-
-    return {
-      sessionId: this.currentSessionId,
-      isNewSession: this.sessionStartTime ? (Date.now() - this.sessionStartTime.getTime()) < 60000 : false,
-      sessionStart: this.sessionStartTime || new Date()
-    };
-  }
-
-  /**
-   * Update current session activity
-   */
-  static async updateSessionActivity(lastActivePage: string): Promise<void> {
-    if (!this.currentSessionId) {
-      return;
-    }
-
-    try {
-      // This will update the session through the enhanced_manage_user_session function
-      // by calling it with the same fingerprint, which will update the existing session
-      const currentUser = await supabase.auth.getUser();
-      if (!currentUser.data.user) {
-        return;
-      }
-
-      await this.createUserSession({
-        userId: currentUser.data.user.id,
-        deviceType: this.getDeviceType(),
-        userAgent: navigator.userAgent,
-        entryPage: document.referrer || window.location.pathname,
-        lastActivePage: lastActivePage,
-        language: navigator.language,
-        sessionFingerprint: this.generateSessionFingerprint(),
-        browserInfo: this.getBrowserInfo(),
-        deviceFingerprint: this.generateBrowserFingerprint(),
-        platform: navigator.platform
-      });
-    } catch (error) {
-      console.error('Error updating session activity:', error);
-    }
-  }
-
-  /**
-   * Close current session
-   */
-  static async closeCurrentSession(): Promise<boolean> {
-    if (!this.currentSessionId) {
-      return false;
-    }
-
-    try {
-      const currentUser = await supabase.auth.getUser();
-      if (!currentUser.data.user) {
-        return false;
-      }
-
-      const { data: success, error } = await supabase
-        .rpc('close_user_session', {
-          p_session_id: this.currentSessionId,
-          p_user_id: currentUser.data.user.id
-        });
-
-      if (error) {
-        console.error('Error closing user session:', error);
-        return false;
-      }
-
-      // Clear local session info
-      this.currentSessionId = null;
-      this.sessionStartTime = null;
-
-      console.log('Session closed successfully');
-      return success;
-    } catch (error) {
-      console.error('Exception closing session:', error);
-      return false;
-    }
-  }
-
-  /**
-   * Track conversion event in current session
-   */
-  static async trackConversion(eventType: string, eventData: Record<string, any> = {}): Promise<void> {
-    if (!this.currentSessionId) {
-      console.warn('No active session to track conversion');
-      return;
-    }
-
+  static async trackConversion(sessionId: string, eventType: string, eventData: Record<string, any> = {}): Promise<void> {
     try {
       const { error } = await supabase
         .rpc('track_conversion_event', {
-          p_session_id: this.currentSessionId,
+          p_session_id: sessionId,
           p_event_type: eventType,
           p_event_data: eventData,
         });
@@ -427,23 +257,6 @@ export class SessionTrackingService {
       }
     } catch (error) {
       console.error('Exception tracking conversion event:', error);
-    }
-  }
-
-  /**
-   * Get device type based on user agent and screen size
-   */
-  private static getDeviceType(): string {
-    const userAgent = navigator.userAgent.toLowerCase();
-    const isMobile = /android|webos|iphone|ipad|ipod|blackberry|iemobile|opera mini/i.test(userAgent);
-    const isTablet = /ipad|android(?!.*mobile)/i.test(userAgent) || (window.innerWidth >= 768 && window.innerWidth <= 1024);
-    
-    if (isMobile && !isTablet) {
-      return 'mobile';
-    } else if (isTablet) {
-      return 'tablet';
-    } else {
-      return 'desktop';
     }
   }
 
@@ -469,75 +282,4 @@ export class SessionTrackingService {
       return null;
     }
   }
-
-  /**
-   * Initialize session tracking for the current user
-   */
-  static async initializeSessionTracking(): Promise<string | null> {
-    try {
-      const currentUser = await supabase.auth.getUser();
-      if (!currentUser.data.user) {
-        return null;
-      }
-
-      const locationData = await this.detectLocation();
-      const utmParams = this.extractUtmParameters();
-
-      const sessionData: SessionTrackingData = {
-        userId: currentUser.data.user.id,
-        deviceType: this.getDeviceType(),
-        userAgent: navigator.userAgent,
-        entryPage: window.location.pathname,
-        lastActivePage: window.location.pathname,
-        language: navigator.language,
-        referrer: document.referrer || undefined,
-        countryCode: locationData?.country,
-        currency: locationData?.currency,
-        utmSource: utmParams.utm_source,
-        utmMedium: utmParams.utm_medium,
-        utmCampaign: utmParams.utm_campaign,
-        utmTerm: utmParams.utm_term,
-        utmContent: utmParams.utm_content,
-        gclid: utmParams.gclid,
-        fbclid: utmParams.fbclid,
-        platform: navigator.platform
-      };
-
-      return await this.createUserSession(sessionData);
-    } catch (error) {
-      console.error('Error initializing session tracking:', error);
-      return null;
-    }
-  }
-}
-
-// Auto-initialize session tracking when the service is imported
-if (typeof window !== 'undefined') {
-  // Initialize session tracking when the page loads
-  window.addEventListener('load', () => {
-    SessionTrackingService.initializeSessionTracking();
-  });
-
-  // Update session activity on page visibility changes
-  document.addEventListener('visibilitychange', () => {
-    if (!document.hidden) {
-      SessionTrackingService.updateSessionActivity(window.location.pathname);
-    }
-  });
-
-  // Track page navigation
-  let lastPath = window.location.pathname;
-  const observer = new MutationObserver(() => {
-    if (window.location.pathname !== lastPath) {
-      lastPath = window.location.pathname;
-      SessionTrackingService.updateSessionActivity(window.location.pathname);
-    }
-  });
-  
-  observer.observe(document.body, { childList: true, subtree: true });
-
-  // Close session on page unload
-  window.addEventListener('beforeunload', () => {
-    SessionTrackingService.closeCurrentSession();
-  });
 }
