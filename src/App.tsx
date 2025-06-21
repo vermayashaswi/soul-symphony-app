@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from 'react';
 import AppRoutes from './routes/AppRoutes';
 import { Toaster } from "@/components/ui/toaster";
@@ -19,6 +18,7 @@ import TWAWrapper from './components/twa/TWAWrapper';
 import TWAInitializationWrapper from './components/twa/TWAInitializationWrapper';
 import { detectTWAEnvironment } from './utils/twaDetection';
 import { useTWAAutoRefresh } from './hooks/useTWAAutoRefresh';
+import { twaUpdateService } from './services/twaUpdateService';
 
 const App: React.FC = () => {
   const [isInitialized, setIsInitialized] = useState(false);
@@ -37,6 +37,12 @@ const App: React.FC = () => {
     
     // Apply a CSS class to the document body for theme-specific overrides
     document.body.classList.add('app-initialized');
+    
+    // Initialize TWA update service
+    if (twaEnv.isTWA || twaEnv.isStandalone) {
+      console.log('[App] Initializing TWA update service');
+      twaUpdateService.init();
+    }
     
     // Preload critical images including the chat avatar
     try {
@@ -63,8 +69,15 @@ const App: React.FC = () => {
         }
       }, 15000); // 15 second emergency timeout
 
-      return () => clearTimeout(recoveryTimeout);
+      return () => {
+        clearTimeout(recoveryTimeout);
+        twaUpdateService.destroy();
+      };
     }
+
+    return () => {
+      twaUpdateService.destroy();
+    };
   }, [twaEnv.isTWA, twaEnv.isStandalone, isStuckDetected, refreshCount]);
 
   const handleAppError = (error: Error, errorInfo: any) => {

@@ -1,5 +1,5 @@
 /**
- * Service Worker Registration and Management
+ * Service Worker Registration and Management - Enhanced for TWA Updates
  */
 
 export interface SwRegistrationResult {
@@ -26,7 +26,7 @@ class ServiceWorkerManager {
   private isRegistered = false;
 
   /**
-   * Register the service worker
+   * Register the service worker with enhanced update handling
    */
   async register(): Promise<SwRegistrationResult> {
     if (!('serviceWorker' in navigator)) {
@@ -35,16 +35,17 @@ class ServiceWorkerManager {
     }
 
     try {
-      console.log('[SW] Registering service worker...');
+      console.log('[SW] Registering enhanced service worker...');
       
       const registration = await navigator.serviceWorker.register('/sw.js', {
-        scope: '/'
+        scope: '/',
+        updateViaCache: 'none' // Ensure SW updates are checked
       });
 
       this.registration = registration;
       this.isRegistered = true;
 
-      // Handle updates
+      // Enhanced update handling
       registration.addEventListener('updatefound', () => {
         console.log('[SW] Update found, installing new version...');
         this.handleUpdate(registration);
@@ -53,13 +54,55 @@ class ServiceWorkerManager {
       // Listen for messages from service worker
       navigator.serviceWorker.addEventListener('message', this.handleMessage.bind(this));
 
-      console.log('[SW] Service worker registered successfully');
+      // Force check for updates on registration
+      registration.update();
+
+      console.log('[SW] Enhanced service worker registered successfully');
       
       return { success: true, registration };
       
     } catch (error) {
       console.error('[SW] Service worker registration failed:', error);
       return { success: false, error: error as Error };
+    }
+  }
+
+  /**
+   * Force clear all caches and reload
+   */
+  async forceCacheRefresh(): Promise<void> {
+    try {
+      console.log('[SW] Forcing cache refresh...');
+      
+      if (this.registration && this.registration.active) {
+        // Send message to SW to clear caches
+        this.registration.active.postMessage({ type: 'CLEAR_CACHE' });
+      }
+
+      // Clear browser caches
+      if ('caches' in window) {
+        const cacheNames = await caches.keys();
+        await Promise.all(
+          cacheNames.map(cacheName => {
+            console.log('[SW] Clearing cache:', cacheName);
+            return caches.delete(cacheName);
+          })
+        );
+      }
+
+      // Add cache bust parameter and reload
+      const cacheBustValue = Date.now();
+      const currentUrl = new URL(window.location.href);
+      currentUrl.searchParams.set('v', cacheBustValue.toString());
+      
+      setTimeout(() => {
+        window.location.href = currentUrl.toString();
+      }, 500);
+      
+    } catch (error) {
+      console.error('[SW] Error forcing cache refresh:', error);
+      // Fallback to simple reload
+      window.location.reload();
     }
   }
 
@@ -129,7 +172,7 @@ class ServiceWorkerManager {
   }
 
   /**
-   * Handle service worker updates
+   * Handle service worker updates with aggressive cache clearing
    */
   private handleUpdate(registration: ServiceWorkerRegistration) {
     const newWorker = registration.installing;
@@ -137,8 +180,10 @@ class ServiceWorkerManager {
 
     newWorker.addEventListener('statechange', () => {
       if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
-        // New content is available
-        this.notifyUpdate();
+        console.log('[SW] New content is available, clearing caches...');
+        
+        // Clear caches and force reload
+        this.forceCacheRefresh();
       }
     });
   }
@@ -169,14 +214,6 @@ class ServiceWorkerManager {
   }
 
   /**
-   * Notify about service worker updates
-   */
-  private notifyUpdate() {
-    // Dispatch custom event for app to handle
-    window.dispatchEvent(new CustomEvent('swUpdateAvailable'));
-  }
-
-  /**
    * Get the current registration
    */
   getRegistration(): ServiceWorkerRegistration | null {
@@ -184,7 +221,7 @@ class ServiceWorkerManager {
   }
 
   /**
-   * Skip waiting and activate new service worker
+   * Skip waiting and activate new service worker immediately
    */
   async skipWaiting(): Promise<void> {
     if (!this.registration || !this.registration.waiting) {
@@ -192,6 +229,11 @@ class ServiceWorkerManager {
     }
 
     this.registration.waiting.postMessage({ type: 'SKIP_WAITING' });
+    
+    // Force cache refresh after activation
+    setTimeout(() => {
+      this.forceCacheRefresh();
+    }, 1000);
   }
 }
 
@@ -199,12 +241,15 @@ class ServiceWorkerManager {
 export const serviceWorkerManager = new ServiceWorkerManager();
 
 /**
- * Initialize service worker
+ * Initialize service worker with enhanced update handling
  */
 export async function initializeServiceWorker(): Promise<SwRegistrationResult> {
-  // Only register in production or when explicitly enabled
-  if (process.env.NODE_ENV === 'development' && !localStorage.getItem('enableSW')) {
-    console.log('[SW] Service worker disabled in development');
+  // Always register in TWA environment for update handling
+  const twaEnv = window.matchMedia('(display-mode: standalone)').matches ||
+                (window.navigator as any).standalone === true;
+  
+  if (process.env.NODE_ENV === 'development' && !localStorage.getItem('enableSW') && !twaEnv) {
+    console.log('[SW] Service worker disabled in development (not TWA)');
     return { success: false, error: new Error('Disabled in development') };
   }
 

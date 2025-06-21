@@ -1,5 +1,5 @@
-// Soulo PWA Service Worker
-const CACHE_NAME = 'soulo-cache-v1';
+// Soulo PWA Service Worker - Enhanced for TWA Updates
+const CACHE_NAME = 'soulo-cache-v2'; // Incremented version
 const OFFLINE_URL = '/offline.html';
 const BACKGROUND_SYNC_TAG = 'journal-entry-sync';
 const PERIODIC_SYNC_TAG = 'journal-periodic-sync';
@@ -20,9 +20,12 @@ const STATIC_ASSETS = [
   '/lovable-uploads/3f275134-f471-4af9-a7cd-700ccd855fe3.png'
 ];
 
+// Cache bust parameter name
+const CACHE_BUST_PARAM = 'v';
+
 // Install event - cache static assets
 self.addEventListener('install', (event) => {
-  console.log('[SW] Installing service worker...');
+  console.log('[SW] Installing service worker v2...');
   
   event.waitUntil(
     caches.open(CACHE_NAME)
@@ -40,15 +43,16 @@ self.addEventListener('install', (event) => {
   );
 });
 
-// Activate event - clean up old caches
+// Activate event - clean up old caches aggressively
 self.addEventListener('activate', (event) => {
-  console.log('[SW] Activating service worker...');
+  console.log('[SW] Activating service worker v2...');
   
   event.waitUntil(
     caches.keys()
       .then((cacheNames) => {
         return Promise.all(
           cacheNames.map((cacheName) => {
+            // Delete ALL old caches to ensure fresh content
             if (cacheName !== CACHE_NAME) {
               console.log('[SW] Deleting old cache:', cacheName);
               return caches.delete(cacheName);
@@ -57,13 +61,13 @@ self.addEventListener('activate', (event) => {
         );
       })
       .then(() => {
-        console.log('[SW] Service worker activated');
+        console.log('[SW] Service worker activated - all old caches cleared');
         return self.clients.claim();
       })
   );
 });
 
-// Fetch event - serve from cache or network
+// Enhanced fetch event with better cache busting
 self.addEventListener('fetch', (event) => {
   // Skip non-GET requests
   if (event.request.method !== 'GET') {
@@ -74,6 +78,10 @@ self.addEventListener('fetch', (event) => {
   if (event.request.url.startsWith('chrome-extension://')) {
     return;
   }
+
+  // Check if this is a cache-busted request
+  const url = new URL(event.request.url);
+  const hasCacheBust = url.searchParams.has(CACHE_BUST_PARAM);
 
   // Skip Supabase API calls for background sync handling
   if (event.request.url.includes('supabase.co/functions') || 
@@ -90,48 +98,119 @@ self.addEventListener('fetch', (event) => {
   }
 
   event.respondWith(
-    caches.match(event.request)
-      .then((response) => {
-        // Return cached version if available
-        if (response) {
-          console.log('[SW] Serving from cache:', event.request.url);
-          return response;
-        }
-
-        // Try network request
-        return fetch(event.request)
-          .then((response) => {
-            // Don't cache non-successful responses
-            if (!response || response.status !== 200 || response.type !== 'basic') {
-              return response;
-            }
-
-            // Clone the response for caching
-            const responseToCache = response.clone();
-            
-            caches.open(CACHE_NAME)
-              .then((cache) => {
-                cache.put(event.request, responseToCache);
-              });
-
-            return response;
-          })
-          .catch(() => {
-            // Return offline page for navigation requests
-            if (event.request.mode === 'navigate') {
-              return caches.match(OFFLINE_URL);
-            }
-            
-            // Return a generic offline response for other requests
-            return new Response('Offline - Content not available', {
-              status: 503,
-              statusText: 'Service Unavailable',
-              headers: { 'Content-Type': 'text/plain' }
-            });
-          });
-      })
+    handleFetchWithCacheBusting(event.request, hasCacheBust)
   );
 });
+
+// Enhanced fetch handler with cache busting support
+async function handleFetchWithCacheBusting(request, hasCacheBust) {
+  try {
+    // If cache bust parameter is present, always fetch from network
+    if (hasCacheBust) {
+      console.log('[SW] Cache-busted request, fetching from network:', request.url);
+      
+      const response = await fetch(request);
+      
+      // Cache the fresh response
+      if (response && response.status === 200 && response.type === 'basic') {
+        const cache = await caches.open(CACHE_NAME);
+        // Remove cache bust parameter before caching
+        const cleanUrl = removeUrlParams(request.url, [CACHE_BUST_PARAM]);
+        const cleanRequest = new Request(cleanUrl);
+        cache.put(cleanRequest, response.clone());
+      }
+      
+      return response;
+    }
+
+    // For manifest.json, always try network first to check for updates
+    if (request.url.includes('manifest.json')) {
+      try {
+        const networkResponse = await fetch(request);
+        if (networkResponse && networkResponse.status === 200) {
+          const cache = await caches.open(CACHE_NAME);
+          cache.put(request, networkResponse.clone());
+          return networkResponse;
+        }
+      } catch (networkError) {
+        console.warn('[SW] Network failed for manifest, trying cache');
+      }
+    }
+
+    // Try cache first for other requests
+    const cachedResponse = await caches.match(request);
+    if (cachedResponse) {
+      console.log('[SW] Serving from cache:', request.url);
+      return cachedResponse;
+    }
+
+    // Try network request
+    const networkResponse = await fetch(request);
+    
+    // Cache successful responses
+    if (networkResponse && networkResponse.status === 200 && networkResponse.type === 'basic') {
+      const cache = await caches.open(CACHE_NAME);
+      cache.put(request, networkResponse.clone());
+    }
+
+    return networkResponse;
+    
+  } catch (error) {
+    console.error('[SW] Fetch failed:', error);
+    
+    // Return offline page for navigation requests
+    if (request.mode === 'navigate') {
+      const offlineResponse = await caches.match(OFFLINE_URL);
+      if (offlineResponse) {
+        return offlineResponse;
+      }
+    }
+    
+    // Return a generic offline response for other requests
+    return new Response('Offline - Content not available', {
+      status: 503,
+      statusText: 'Service Unavailable',
+      headers: { 'Content-Type': 'text/plain' }
+    });
+  }
+}
+
+// Utility function to remove URL parameters
+function removeUrlParams(url, paramsToRemove) {
+  const urlObj = new URL(url);
+  paramsToRemove.forEach(param => {
+    urlObj.searchParams.delete(param);
+  });
+  return urlObj.toString();
+}
+
+// Handle service worker updates more aggressively
+self.addEventListener('message', (event) => {
+  console.log('[SW] Message received:', event.data);
+  
+  if (event.data && event.data.type === 'SKIP_WAITING') {
+    self.skipWaiting();
+  } else if (event.data && event.data.type === 'CLEAR_CACHE') {
+    // Clear all caches when requested
+    event.waitUntil(clearAllCaches());
+  }
+});
+
+// Clear all caches function
+async function clearAllCaches() {
+  try {
+    const cacheNames = await caches.keys();
+    await Promise.all(
+      cacheNames.map(cacheName => {
+        console.log('[SW] Force clearing cache:', cacheName);
+        return caches.delete(cacheName);
+      })
+    );
+    console.log('[SW] All caches cleared');
+  } catch (error) {
+    console.error('[SW] Error clearing caches:', error);
+  }
+}
 
 // Background Sync for journal entries
 self.addEventListener('sync', (event) => {
@@ -437,13 +516,4 @@ self.addEventListener('notificationclick', (event) => {
   }
 });
 
-// Handle messages from the app
-self.addEventListener('message', (event) => {
-  console.log('[SW] Message received:', event.data);
-  
-  if (event.data && event.data.type === 'SKIP_WAITING') {
-    self.skipWaiting();
-  }
-});
-
-console.log('[SW] Service worker script loaded');
+console.log('[SW] Enhanced service worker script loaded v2');
