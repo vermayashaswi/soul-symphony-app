@@ -78,8 +78,12 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
             method: 'oauth' // This could be enhanced to detect the actual method
           });
         } else if (event === 'SIGNED_OUT') {
-          console.log('User signed out, closing session');
+          console.log('User signed out, closing session and clearing onboarding data');
           await SessionTrackingService.closeCurrentSession();
+          
+          // Clear onboarding data on logout
+          localStorage.removeItem('onboardingComplete');
+          localStorage.removeItem('user_display_name');
           
           // Track sign-out event (if there was an active session)
           await SessionTrackingService.trackConversion('user_sign_out', {
@@ -100,6 +104,10 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     try {
       // Close session before signing out
       await SessionTrackingService.closeCurrentSession();
+      
+      // Clear onboarding data
+      localStorage.removeItem('onboardingComplete');
+      localStorage.removeItem('user_display_name');
       
       const { error } = await supabase.auth.signOut();
       if (error) {

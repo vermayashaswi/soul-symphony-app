@@ -32,7 +32,9 @@ export function useOnboarding() {
 
   const resetOnboarding = () => {
     localStorage.removeItem('onboardingComplete');
+    localStorage.removeItem('user_display_name');
     setOnboardingComplete(false);
+    setDisplayName(null);
   };
 
   const saveNameToProfile = async (userId: string, name: string) => {
