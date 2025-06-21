@@ -1,42 +1,13 @@
 
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import { Navigate, useLocation, Outlet } from 'react-router-dom';
-import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/contexts/AuthContext';
 
 const ProtectedRoute: React.FC = () => {
-  const [isLoading, setIsLoading] = useState(true);
-  const [user, setUser] = useState<any>(null);
+  const { user, isLoading } = useAuth();
   const location = useLocation();
   
-  useEffect(() => {
-    const checkAuth = async () => {
-      try {
-        const { data } = await supabase.auth.getSession();
-        setUser(data.session?.user || null);
-        setIsLoading(false);
-      } catch (error) {
-        console.error('Error checking authentication in ProtectedRoute:', error);
-        setIsLoading(false);
-      }
-    };
-    
-    checkAuth();
-    
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      setUser(session?.user || null);
-      setIsLoading(false);
-    });
-    
-    return () => subscription.unsubscribe();
-  }, []);
-  
-  useEffect(() => {
-    if (!isLoading && !user) {
-      console.log("Protected route: No user, should redirect to /app/onboarding", {
-        path: location.pathname
-      });
-    }
-  }, [user, isLoading, location]);
+  console.log("ProtectedRoute - Auth state:", { user: !!user, isLoading, path: location.pathname });
   
   if (isLoading) {
     return (
