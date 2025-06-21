@@ -16,6 +16,7 @@ import './styles/emoji.css';
 import './styles/tutorial.css';
 import { FeatureFlagsProvider } from "./contexts/FeatureFlagsContext";
 import TWAWrapper from './components/twa/TWAWrapper';
+import TWAInitializationWrapper from './components/twa/TWAInitializationWrapper';
 
 const App: React.FC = () => {
   const [isInitialized, setIsInitialized] = useState(false);
@@ -43,7 +44,7 @@ const App: React.FC = () => {
     // Mark app as initialized after a brief delay to ensure smooth startup
     setTimeout(() => {
       setIsInitialized(true);
-    }, 500);
+    }, 300); // Reduced delay for faster startup
   }, []);
 
   const handleAppError = (error: Error, errorInfo: any) => {
@@ -74,12 +75,14 @@ const App: React.FC = () => {
           <SubscriptionProvider>
             <TutorialProvider>
               <TWAWrapper>
-                <TranslationLoadingOverlay />
-                <JournalProcessingInitializer />
-                <AppRoutes key={isInitialized ? 'initialized' : 'initializing'} />
-                <TutorialOverlay />
-                <Toaster />
-                <SonnerToaster position="top-right" />
+                <TWAInitializationWrapper>
+                  <TranslationLoadingOverlay />
+                  <JournalProcessingInitializer />
+                  <AppRoutes key={isInitialized ? 'initialized' : 'initializing'} />
+                  <TutorialOverlay />
+                  <Toaster />
+                  <SonnerToaster position="top-right" />
+                </TWAInitializationWrapper>
               </TWAWrapper>
             </TutorialProvider>
           </SubscriptionProvider>
