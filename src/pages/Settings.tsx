@@ -448,6 +448,15 @@ function SettingsContent() {
                 <h2 className="text-xl font-semibold text-theme-color">
                   <TranslatableText text="Your Profile" />
                 </h2>
+                <Button 
+                  variant="outline" 
+                  size="sm"
+                  onClick={handleLogout}
+                  className="flex items-center gap-2 text-destructive hover:text-destructive hover:bg-destructive/10"
+                >
+                  <LogOut className="h-4 w-4" />
+                  <TranslatableText text="Logout" />
+                </Button>
               </div>
               
               <div className="flex flex-col sm:flex-row gap-6 items-center sm:items-start">
