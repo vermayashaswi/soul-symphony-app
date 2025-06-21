@@ -76,17 +76,9 @@ function AuthProviderCore({ children }: { children: ReactNode }) {
     try {
       console.log('Creating enhanced user session for user:', userId);
       
-      // Check if session already exists to prevent duplicates
-      const { data: hasSession, error: checkError } = await supabase
-        .rpc('has_active_session', { p_user_id: userId });
-      
-      if (checkError) {
-        console.error('Error checking for existing session:', checkError);
-        return false;
-      }
-      
-      if (hasSession) {
-        console.log('Active session already exists for user, skipping creation');
+      // Simple check to prevent duplicate sessions by tracking in memory
+      if (currentSessionId) {
+        console.log('Session already exists for user, skipping creation');
         return true;
       }
       
