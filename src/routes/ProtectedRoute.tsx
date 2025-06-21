@@ -2,23 +2,12 @@
 import React from 'react';
 import { Navigate, useLocation, Outlet } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
-import { useOnboarding } from '@/hooks/use-onboarding';
 
 const ProtectedRoute: React.FC = () => {
-  const { user, isLoading: authLoading } = useAuth();
-  const { onboardingComplete, loading: onboardingLoading } = useOnboarding();
+  const { user, isLoading } = useAuth();
   const location = useLocation();
   
-  console.log("ProtectedRoute - State:", { 
-    user: !!user, 
-    authLoading, 
-    onboardingComplete, 
-    onboardingLoading,
-    path: location.pathname 
-  });
-  
-  // Show loading while we're checking auth or onboarding status
-  const isLoading = authLoading || onboardingLoading;
+  console.log("ProtectedRoute - Auth state:", { user: !!user, isLoading, path: location.pathname });
   
   if (isLoading) {
     return (
@@ -28,25 +17,12 @@ const ProtectedRoute: React.FC = () => {
     );
   }
   
-  // If no user, redirect to auth
   if (!user) {
-    console.log("ProtectedRoute: No user, redirecting to auth");
-    return <Navigate to="/app/auth" replace />;
+    console.log("Redirecting to onboarding from protected route:", location.pathname);
+    return <Navigate to={`/app/onboarding?redirectTo=${location.pathname}`} replace />;
   }
   
-  // If user exists but onboarding is not complete, redirect to onboarding
-  if (!onboardingComplete) {
-    console.log("ProtectedRoute: User exists but onboarding not complete, redirecting to onboarding");
-    return <Navigate to="/app/onboarding" replace />;
-  }
-  
-  // Handle /app root path - redirect to home if user is authenticated and onboarded
-  if (location.pathname === '/app' || location.pathname === '/app/') {
-    console.log("ProtectedRoute: At /app root, redirecting to home");
-    return <Navigate to="/app/home" replace />;
-  }
-  
-  // User is authenticated and onboarded, render the protected content
+  // Use Outlet to render child routes
   return <Outlet />;
 };
 
