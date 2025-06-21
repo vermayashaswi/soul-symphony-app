@@ -4,6 +4,7 @@ import { useLocation, Navigate } from 'react-router-dom';
 import { User } from '@supabase/supabase-js';
 import { isAppRoute, isWebsiteRoute } from './RouteHelpers';
 import { useTranslation } from '@/contexts/TranslationContext';
+import { detectTWAEnvironment } from '@/utils/twaDetection';
 
 interface OnboardingCheckProps {
   onboardingComplete: boolean | null;
@@ -20,6 +21,7 @@ const OnboardingCheck: React.FC<OnboardingCheckProps> = ({
 }) => {
   const location = useLocation();
   const { currentLanguage } = useTranslation();
+  const twaEnv = detectTWAEnvironment();
   
   // Expanded list of onboarding/auth paths
   const onboardingOrAuthPaths = [
@@ -40,7 +42,8 @@ const OnboardingCheck: React.FC<OnboardingCheckProps> = ({
     isAppRoute: isAppRoute(location.pathname),
     isWebsiteRoute: isWebsiteRoute(location.pathname),
     isOnboardingOrAuth,
-    language: currentLanguage
+    language: currentLanguage,
+    isTWA: twaEnv.isTWA || twaEnv.isStandalone
   });
   
   // For website routes, no checks needed - just render children
@@ -74,9 +77,10 @@ const OnboardingCheck: React.FC<OnboardingCheckProps> = ({
       console.log('User is logged in, redirecting to /app/home');
       return <Navigate to="/app/home" replace />;
     } else {
-      // If user is not logged in, redirect to onboarding
-      console.log('User not logged in, redirecting to /app/onboarding');
-      return <Navigate to="/app/onboarding" replace />;
+      // If user is not logged in, redirect to auth in TWA or onboarding otherwise
+      const redirectPath = (twaEnv.isTWA || twaEnv.isStandalone) ? '/app/auth' : '/app/onboarding';
+      console.log('User not logged in, redirecting to', redirectPath);
+      return <Navigate to={redirectPath} replace />;
     }
   }
   

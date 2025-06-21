@@ -36,8 +36,8 @@ const AppRoutes = () => {
         return <Navigate to="/app/onboarding" replace />;
       }
     } else {
-      // If user is not logged in, go to onboarding
-      return <Navigate to="/app/onboarding" replace />;
+      // If user is not logged in, go to auth instead of onboarding for TWA
+      return <Navigate to="/app/auth" replace />;
     }
   };
   
