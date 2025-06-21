@@ -22,8 +22,8 @@ import { detectTWAEnvironment } from '@/utils/twaDetection';
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-const MAX_AUTO_PROFILE_ATTEMPTS = 3; // Reduced attempts to prevent loops
-const BASE_RETRY_DELAY = 1000; // Increased delay
+const MAX_AUTO_PROFILE_ATTEMPTS = 2; // Reduced for TWA stability
+const BASE_RETRY_DELAY = 2000; // Increased delay
 
 function AuthProviderCore({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
@@ -39,24 +39,18 @@ function AuthProviderCore({ children }: { children: ReactNode }) {
   const [sessionCreated, setSessionCreated] = useState(false);
   const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
   const [authInitialized, setAuthInitialized] = useState(false);
+  const [authStateStable, setAuthStateStable] = useState(false);
   const location = useLocation();
   const twaEnv = detectTWAEnvironment();
 
   const detectUserLanguage = (): string => {
-    // Try to get language from various sources in order of preference
     const browserLanguage = navigator.language || navigator.languages?.[0] || 'en';
-    
-    // Extract the language code (e.g., 'en' from 'en-US')
     const languageCode = browserLanguage.split('-')[0].toLowerCase();
-    
-    // Map to supported languages or default to 'en'
     const supportedLanguages = ['en', 'es', 'fr', 'de', 'it', 'pt', 'ru', 'zh', 'ja', 'ko', 'ar', 'hi', 'bn'];
-    
     return supportedLanguages.includes(languageCode) ? languageCode : 'en';
   };
 
   const getReferrer = (): string | null => {
-    // Get referrer, but exclude same-domain referrers
     const referrer = document.referrer;
     if (!referrer) return null;
     
@@ -64,7 +58,6 @@ function AuthProviderCore({ children }: { children: ReactNode }) {
       const referrerUrl = new URL(referrer);
       const currentUrl = new URL(window.location.href);
       
-      // Only return external referrers
       if (referrerUrl.hostname !== currentUrl.hostname) {
         return referrer;
       }
@@ -79,7 +72,6 @@ function AuthProviderCore({ children }: { children: ReactNode }) {
     try {
       console.log('Creating enhanced user session for user:', userId);
       
-      // Simple check to prevent duplicate sessions by tracking in memory
       if (currentSessionId) {
         console.log('Session already exists for user, skipping creation');
         return true;
@@ -90,7 +82,6 @@ function AuthProviderCore({ children }: { children: ReactNode }) {
       const referrer = getReferrer();
       const utmParams = SessionTrackingService.extractUtmParameters();
       
-      // Detect location asynchronously
       let locationData = null;
       try {
         locationData = await SessionTrackingService.detectLocation();
@@ -155,7 +146,6 @@ function AuthProviderCore({ children }: { children: ReactNode }) {
     }
   };
 
-  // Track conversion events
   const trackConversion = async (eventType: string, eventData: Record<string, any> = {}) => {
     if (currentSessionId) {
       await SessionTrackingService.trackConversion(currentSessionId, eventType, eventData);
@@ -191,7 +181,7 @@ function AuthProviderCore({ children }: { children: ReactNode }) {
     }
     
     const now = Date.now();
-    if (!forceRetry && now - lastProfileAttemptTime < 3000) { // Increased delay
+    if (!forceRetry && now - lastProfileAttemptTime < 5000) { // Increased delay for TWA
       logProfile('Skipping profile check - too soon after last attempt', 'AuthContext');
       return profileExistsStatus || false;
     }
@@ -217,7 +207,6 @@ function AuthProviderCore({ children }: { children: ReactNode }) {
         setProfileCreationComplete(true);
         debugLogger.setLastProfileError(null);
         
-        // Only create session once per auth session
         if (!sessionCreated) {
           const sessionSuccess = await createUserSession(user.id);
           if (sessionSuccess) {
@@ -232,8 +221,7 @@ function AuthProviderCore({ children }: { children: ReactNode }) {
         debugLogger.setLastProfileError(errorMsg);
         setProfileExistsStatus(false);
         
-        // Reduced retry attempts for TWA environment
-        const maxAttempts = (twaEnv.isTWA || twaEnv.isStandalone) ? 2 : MAX_AUTO_PROFILE_ATTEMPTS;
+        const maxAttempts = MAX_AUTO_PROFILE_ATTEMPTS;
         
         if (profileCreationAttempts < maxAttempts) {
           const nextAttemptDelay = BASE_RETRY_DELAY * Math.pow(1.5, profileCreationAttempts);
@@ -270,7 +258,6 @@ function AuthProviderCore({ children }: { children: ReactNode }) {
   const updateUserProfile = async (metadata: Record<string, any>): Promise<boolean> => {
     logProfile(`Updating user profile metadata`, 'AuthContext', { metadataKeys: Object.keys(metadata) });
     
-    // Always include timezone in updates if not explicitly provided
     if (!metadata.timezone) {
       try {
         metadata.timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
@@ -287,7 +274,6 @@ function AuthProviderCore({ children }: { children: ReactNode }) {
         setUser(data.user);
         logProfile('User profile updated successfully', 'AuthContext');
         
-        // Track profile update as conversion event
         await trackConversion('profile_updated', { 
           updatedFields: Object.keys(metadata),
           timestamp: new Date().toISOString(),
@@ -310,7 +296,6 @@ function AuthProviderCore({ children }: { children: ReactNode }) {
       await signInWithGoogleService();
       logInfo('Google sign-in initiated', 'AuthContext');
       
-      // Track sign-in attempt
       await trackConversion('sign_in_attempt', { 
         method: 'google',
         timestamp: new Date().toISOString(),
@@ -332,7 +317,6 @@ function AuthProviderCore({ children }: { children: ReactNode }) {
       await signInWithAppleService();
       logInfo('Apple ID sign-in initiated', 'AuthContext');
       
-      // Track sign-in attempt
       await trackConversion('sign_in_attempt', { 
         method: 'apple',
         timestamp: new Date().toISOString(),
@@ -355,7 +339,6 @@ function AuthProviderCore({ children }: { children: ReactNode }) {
       await signInWithEmailService(email, password);
       logInfo('Email sign-in initiated', 'AuthContext');
       
-      // Track sign-in attempt
       await trackConversion('sign_in_attempt', { 
         method: 'email',
         timestamp: new Date().toISOString(),
@@ -378,7 +361,6 @@ function AuthProviderCore({ children }: { children: ReactNode }) {
       await signUpService(email, password);
       logInfo('Sign-up initiated', 'AuthContext');
       
-      // Track sign-up attempt
       await trackConversion('sign_up_attempt', { 
         method: 'email',
         timestamp: new Date().toISOString(),
@@ -410,7 +392,6 @@ function AuthProviderCore({ children }: { children: ReactNode }) {
     try {
       console.log('[AuthContext] Attempting to sign out user');
       
-      // Track sign-out event
       await trackConversion('sign_out', {
         timestamp: new Date().toISOString(),
       });
@@ -420,6 +401,7 @@ function AuthProviderCore({ children }: { children: ReactNode }) {
       setProfileExistsStatus(null);
       setProfileCreationComplete(false);
       setCurrentSessionId(null);
+      setAuthStateStable(false);
       
       await signOutService((path: string) => {
         console.log(`[AuthContext] Redirecting to ${path} after signout`);
@@ -462,9 +444,10 @@ function AuthProviderCore({ children }: { children: ReactNode }) {
         userMetadataKeys: currentUser.user_metadata ? Object.keys(currentUser.user_metadata) : []
       });
       
+      // Increased delay for TWA stability
       if (isMobileDevice || twaEnv.isTWA || twaEnv.isStandalone) {
         logProfile('Mobile/TWA device detected, adding stabilization delay', 'AuthContext');
-        await new Promise(resolve => setTimeout(resolve, 1200)); // Increased delay for TWA
+        await new Promise(resolve => setTimeout(resolve, 2000));
       }
       
       const profileCreated = await ensureProfileExistsService(currentUser);
@@ -476,7 +459,6 @@ function AuthProviderCore({ children }: { children: ReactNode }) {
         setProfileCreationComplete(true);
         debugLogger.setLastProfileError(null);
         
-        // Only create session once per auth session
         if (!sessionCreated) {
           const sessionSuccess = await createUserSession(currentUser.id);
           if (sessionSuccess) {
@@ -488,7 +470,7 @@ function AuthProviderCore({ children }: { children: ReactNode }) {
       } else {
         logAuthError('First attempt to create profile failed, retrying once...', 'AuthContext');
         
-        await new Promise(resolve => setTimeout(resolve, 1500)); // Increased retry delay
+        await new Promise(resolve => setTimeout(resolve, 2500)); // Increased retry delay
         
         const retryResult = await ensureProfileExistsService(currentUser);
         if (retryResult) {
@@ -498,7 +480,6 @@ function AuthProviderCore({ children }: { children: ReactNode }) {
           setProfileCreationComplete(true);
           debugLogger.setLastProfileError(null);
           
-          // Only create session once per auth session
           if (!sessionCreated) {
             const sessionSuccess = await createUserSession(currentUser.id);
             if (sessionSuccess) {
@@ -514,8 +495,7 @@ function AuthProviderCore({ children }: { children: ReactNode }) {
         debugLogger.setLastProfileError(errorMsg);
         setProfileExistsStatus(false);
         
-        // Reduced retry attempts for TWA environment
-        const maxAttempts = (twaEnv.isTWA || twaEnv.isStandalone) ? 2 : MAX_AUTO_PROFILE_ATTEMPTS;
+        const maxAttempts = MAX_AUTO_PROFILE_ATTEMPTS;
         
         if (profileCreationAttempts < maxAttempts) {
           const nextAttemptDelay = BASE_RETRY_DELAY * Math.pow(1.5, profileCreationAttempts);
@@ -550,7 +530,7 @@ function AuthProviderCore({ children }: { children: ReactNode }) {
   };
 
   useEffect(() => {
-    if (authInitialized) return; // Prevent multiple initializations
+    if (authInitialized) return;
     
     logInfo("Setting up auth state listener", 'AuthContext');
     
@@ -567,12 +547,20 @@ function AuthProviderCore({ children }: { children: ReactNode }) {
         setSession(currentSession);
         setUser(currentSession?.user ?? null);
         
+        // Mark auth state as stable after processing
+        if (!authStateStable) {
+          setTimeout(() => {
+            setAuthStateStable(true);
+          }, 1000);
+        }
+        
         // Reset session tracking on new session
         if (event === 'SIGNED_IN' && currentSession?.user) {
           setSessionCreated(false);
           setCurrentSessionId(null);
           
-          const initialDelay = (isMobileDevice || twaEnv.isTWA || twaEnv.isStandalone) ? 2000 : 1500;
+          // Increased delay for TWA stability
+          const initialDelay = (isMobileDevice || twaEnv.isTWA || twaEnv.isStandalone) ? 3000 : 2000;
           logProfile(`Scheduling profile creation in ${initialDelay}ms for platform stability`, 'AuthContext');
           
           setTimeout(() => {
@@ -582,17 +570,17 @@ function AuthProviderCore({ children }: { children: ReactNode }) {
               });
           }, initialDelay);
 
-          // Track successful sign-in
           await trackConversion('sign_in_success', {
             method: currentSession.user.app_metadata?.provider || 'unknown',
             timestamp: new Date().toISOString(),
           });
         }
         
-        // Set loading to false with a delay to prevent UI flashing
+        // Improved loading state management
+        const loadingDelay = (twaEnv.isTWA || twaEnv.isStandalone) ? 1500 : 800;
         setTimeout(() => {
           setIsLoading(false);
-        }, (twaEnv.isTWA || twaEnv.isStandalone) ? 1000 : 500);
+        }, loadingDelay);
 
         if (event === 'SIGNED_IN') {
           logInfo('User signed in successfully', 'AuthContext');
@@ -605,6 +593,7 @@ function AuthProviderCore({ children }: { children: ReactNode }) {
           setProfileCreationComplete(false);
           setSessionCreated(false);
           setCurrentSessionId(null);
+          setAuthStateStable(false);
           debugLogger.setLastProfileError(null);
           
           if (autoRetryTimeoutId) {
@@ -628,7 +617,8 @@ function AuthProviderCore({ children }: { children: ReactNode }) {
         setSessionCreated(false);
         setCurrentSessionId(null);
         
-        const initialDelay = (isMobileDevice || twaEnv.isTWA || twaEnv.isStandalone) ? 2000 : 1500;
+        // Increased delay for TWA stability
+        const initialDelay = (isMobileDevice || twaEnv.isTWA || twaEnv.isStandalone) ? 3000 : 2000;
         logProfile(`Scheduling initial profile creation in ${initialDelay}ms for platform stability`, 'AuthContext');
         
         setTimeout(() => {
@@ -639,11 +629,13 @@ function AuthProviderCore({ children }: { children: ReactNode }) {
         }, initialDelay);
       }
       
-      // Set loading to false with proper timing
+      // Better timing for initialization completion
+      const initDelay = (twaEnv.isTWA || twaEnv.isStandalone) ? 2000 : 1000;
       setTimeout(() => {
         setIsLoading(false);
         setAuthInitialized(true);
-      }, (twaEnv.isTWA || twaEnv.isStandalone) ? 1500 : 800);
+        setAuthStateStable(true);
+      }, initDelay);
     });
 
     return () => {

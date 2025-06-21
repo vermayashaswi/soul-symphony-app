@@ -7,72 +7,100 @@ interface TWAInitializationState {
   isInitialized: boolean;
   isLoading: boolean;
   initializationComplete: boolean;
+  hasTimedOut: boolean;
 }
 
 export const useTWAInitialization = () => {
   const [initState, setInitState] = useState<TWAInitializationState>({
     isInitialized: false,
     isLoading: true,
-    initializationComplete: false
+    initializationComplete: false,
+    hasTimedOut: false
   });
   
   const { user, isLoading: authLoading } = useAuth();
   const twaEnv = detectTWAEnvironment();
   const initializationStartedRef = useRef(false);
   const initTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const authStabilizedRef = useRef(false);
 
   useEffect(() => {
-    // Only run initialization once
-    if (initializationStartedRef.current) {
+    // Only run initialization once and only in TWA environment
+    if (initializationStartedRef.current || (!twaEnv.isTWA && !twaEnv.isStandalone)) {
+      // For non-TWA environments, complete initialization immediately
+      if (!twaEnv.isTWA && !twaEnv.isStandalone && !initState.initializationComplete) {
+        setInitState(prev => ({
+          ...prev,
+          isInitialized: true,
+          isLoading: false,
+          initializationComplete: true
+        }));
+      }
       return;
     }
     
     initializationStartedRef.current = true;
-    console.log('[TWA Init] Starting initialization process', {
-      isTWA: twaEnv.isTWA || twaEnv.isStandalone,
+    console.log('[TWA Init] Starting TWA initialization process', {
+      isTWA: twaEnv.isTWA,
+      isStandalone: twaEnv.isStandalone,
       authLoading,
       hasUser: !!user
     });
 
-    const initializeApp = () => {
-      // Set a maximum timeout for initialization to prevent infinite loading
-      initTimeoutRef.current = setTimeout(() => {
-        console.log('[TWA Init] Force completing initialization after timeout');
-        setInitState({
-          isInitialized: true,
-          isLoading: false,
-          initializationComplete: true
-        });
-      }, 5000); // 5 second maximum
-
-      // Wait for auth to stabilize
-      if (!authLoading) {
-        console.log('[TWA Init] Auth loading complete, finalizing initialization');
-        
-        // Clear timeout since we're completing normally
-        if (initTimeoutRef.current) {
-          clearTimeout(initTimeoutRef.current);
-          initTimeoutRef.current = null;
-        }
-        
-        setInitState({
-          isInitialized: true,
-          isLoading: false,
-          initializationComplete: true
-        });
-      }
-    };
-
-    // Small delay to ensure all contexts are ready
-    const delay = (twaEnv.isTWA || twaEnv.isStandalone) ? 1000 : 500;
-    setTimeout(initializeApp, delay);
+    // Set a timeout to prevent infinite loading
+    initTimeoutRef.current = setTimeout(() => {
+      console.log('[TWA Init] Initialization timeout reached, forcing completion');
+      setInitState(prev => ({
+        ...prev,
+        isInitialized: true,
+        isLoading: false,
+        initializationComplete: true,
+        hasTimedOut: true
+      }));
+    }, 8000); // Increased timeout for better stability
 
     return () => {
       if (initTimeoutRef.current) {
         clearTimeout(initTimeoutRef.current);
+        initTimeoutRef.current = null;
       }
     };
-  }, [authLoading, user, twaEnv.isTWA, twaEnv.isStandalone]);
+  }, [twaEnv.isTWA, twaEnv.isStandalone]);
+
+  // Handle auth stabilization
+  useEffect(() => {
+    if (!twaEnv.isTWA && !twaEnv.isStandalone) return;
+    
+    // Auth is considered stabilized when loading stops
+    if (!authLoading && !authStabilizedRef.current) {
+      authStabilizedRef.current = true;
+      console.log('[TWA Init] Auth has stabilized, completing initialization');
+      
+      // Clear any existing timeout
+      if (initTimeoutRef.current) {
+        clearTimeout(initTimeoutRef.current);
+        initTimeoutRef.current = null;
+      }
+      
+      // Add a small delay for TWA stability
+      setTimeout(() => {
+        setInitState(prev => ({
+          ...prev,
+          isInitialized: true,
+          isLoading: false,
+          initializationComplete: true
+        }));
+      }, 1000);
+    }
+  }, [authLoading, twaEnv.isTWA, twaEnv.isStandalone]);
+
+  // Reset initialization state when auth state changes significantly
+  useEffect(() => {
+    if (!twaEnv.isTWA && !twaEnv.isStandalone) return;
+    
+    // If user changes (login/logout), reset auth stabilization
+    authStabilizedRef.current = false;
+  }, [user?.id, twaEnv.isTWA, twaEnv.isStandalone]);
 
   return {
     ...initState,
