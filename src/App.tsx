@@ -18,11 +18,13 @@ import { FeatureFlagsProvider } from "./contexts/FeatureFlagsContext";
 import TWAWrapper from './components/twa/TWAWrapper';
 import TWAInitializationWrapper from './components/twa/TWAInitializationWrapper';
 import { detectTWAEnvironment } from './utils/twaDetection';
+import { useTWAAutoRefresh } from './hooks/useTWAAutoRefresh';
 
 const App: React.FC = () => {
   const [isInitialized, setIsInitialized] = useState(false);
   const [emergencyRecovery, setEmergencyRecovery] = useState(false);
   const twaEnv = detectTWAEnvironment();
+  const { refreshCount, isStuckDetected } = useTWAAutoRefresh();
 
   useEffect(() => {
     // Clean up any malformed paths
@@ -53,14 +55,17 @@ const App: React.FC = () => {
     // Emergency recovery mechanism for TWA apps that get stuck
     if (twaEnv.isTWA || twaEnv.isStandalone) {
       const recoveryTimeout = setTimeout(() => {
-        console.warn('[App] Emergency recovery triggered - forcing app initialization');
-        setEmergencyRecovery(true);
-        setIsInitialized(true);
+        // Only trigger emergency recovery if auto-refresh hasn't already handled it
+        if (!isStuckDetected && refreshCount === 0) {
+          console.warn('[App] Emergency recovery triggered - forcing app initialization');
+          setEmergencyRecovery(true);
+          setIsInitialized(true);
+        }
       }, 15000); // 15 second emergency timeout
 
       return () => clearTimeout(recoveryTimeout);
     }
-  }, [twaEnv.isTWA, twaEnv.isStandalone]);
+  }, [twaEnv.isTWA, twaEnv.isStandalone, isStuckDetected, refreshCount]);
 
   const handleAppError = (error: Error, errorInfo: any) => {
     console.error('Application-level error:', error, errorInfo);
@@ -74,7 +79,8 @@ const App: React.FC = () => {
       userAgent: navigator.userAgent,
       url: window.location.href,
       isTWA: twaEnv.isTWA || twaEnv.isStandalone,
-      emergencyRecovery
+      emergencyRecovery,
+      autoRefreshCount: refreshCount
     };
     
     console.error('Detailed error info:', errorData);
@@ -82,8 +88,8 @@ const App: React.FC = () => {
     // Show user-friendly error notification
     toast.error('Something went wrong. The app will try to recover automatically.');
 
-    // Trigger emergency recovery for TWA if needed
-    if ((twaEnv.isTWA || twaEnv.isStandalone) && !emergencyRecovery) {
+    // Trigger emergency recovery for TWA if needed and auto-refresh hasn't been tried
+    if ((twaEnv.isTWA || twaEnv.isStandalone) && !emergencyRecovery && refreshCount === 0) {
       console.log('[App] Triggering emergency recovery due to error');
       setEmergencyRecovery(true);
     }
@@ -99,6 +105,11 @@ const App: React.FC = () => {
           <p className="text-muted-foreground">
             The app encountered an issue and is recovering. Please wait a moment...
           </p>
+          {refreshCount > 0 && (
+            <p className="text-sm text-muted-foreground">
+              Auto-refresh attempts: {refreshCount}
+            </p>
+          )}
           <button 
             onClick={() => window.location.reload()} 
             className="mt-4 px-4 py-2 bg-primary text-primary-foreground rounded-md"

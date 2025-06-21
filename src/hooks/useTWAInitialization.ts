@@ -2,6 +2,7 @@
 import { useEffect, useState, useRef } from 'react';
 import { detectTWAEnvironment } from '@/utils/twaDetection';
 import { useAuth } from '@/contexts/AuthContext';
+import { useTWAAutoRefresh } from './useTWAAutoRefresh';
 
 interface TWAInitializationState {
   isInitialized: boolean;
@@ -23,6 +24,13 @@ export const useTWAInitialization = () => {
   const initializationStartedRef = useRef(false);
   const initTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const authStabilizedRef = useRef(false);
+  
+  const { 
+    startStuckDetection, 
+    stopStuckDetection, 
+    resetRefreshState,
+    isTWAEnvironment 
+  } = useTWAAutoRefresh();
 
   useEffect(() => {
     // Only run initialization once and only in TWA environment
@@ -40,12 +48,15 @@ export const useTWAInitialization = () => {
     }
     
     initializationStartedRef.current = true;
-    console.log('[TWA Init] Starting TWA initialization process', {
+    console.log('[TWA Init] Starting TWA initialization process with auto-refresh monitoring', {
       isTWA: twaEnv.isTWA,
       isStandalone: twaEnv.isStandalone,
       authLoading,
       hasUser: !!user
     });
+
+    // Start auto-refresh monitoring
+    startStuckDetection();
 
     // Set a timeout to prevent infinite loading
     initTimeoutRef.current = setTimeout(() => {
@@ -57,15 +68,19 @@ export const useTWAInitialization = () => {
         initializationComplete: true,
         hasTimedOut: true
       }));
-    }, 8000); // Increased timeout for better stability
+      
+      // Stop auto-refresh monitoring since we're completing initialization
+      stopStuckDetection();
+    }, 8000);
 
     return () => {
       if (initTimeoutRef.current) {
         clearTimeout(initTimeoutRef.current);
         initTimeoutRef.current = null;
       }
+      stopStuckDetection();
     };
-  }, [twaEnv.isTWA, twaEnv.isStandalone]);
+  }, [twaEnv.isTWA, twaEnv.isStandalone, startStuckDetection, stopStuckDetection]);
 
   // Handle auth stabilization
   useEffect(() => {
@@ -90,9 +105,12 @@ export const useTWAInitialization = () => {
           isLoading: false,
           initializationComplete: true
         }));
+        
+        // Reset auto-refresh state since initialization completed successfully
+        resetRefreshState();
       }, 1000);
     }
-  }, [authLoading, twaEnv.isTWA, twaEnv.isStandalone]);
+  }, [authLoading, twaEnv.isTWA, twaEnv.isStandalone, resetRefreshState]);
 
   // Reset initialization state when auth state changes significantly
   useEffect(() => {
