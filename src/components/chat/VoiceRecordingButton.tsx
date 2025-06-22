@@ -147,12 +147,19 @@ const VoiceRecordingButton: React.FC<VoiceRecordingButtonProps> = ({
               toast({
                 title: "Microphone access blocked",
                 description: "Please enable microphone in your app settings",
-                variant: "destructive",
-                action: shouldShowSettings ? {
-                  altText: "Open Settings",
-                  onClick: twaOpenSettings
-                } : undefined
+                variant: "destructive"
               });
+              // Show settings button separately since we can't use it in action
+              if (shouldShowSettings) {
+                setTimeout(() => {
+                  toast({
+                    title: "Open Settings",
+                    description: "Tap here to open your app settings",
+                    variant: "default",
+                    duration: 10000
+                  });
+                }, 1000);
+              }
             } else {
               toast({
                 title: "Microphone access denied",
@@ -209,13 +216,14 @@ const VoiceRecordingButton: React.FC<VoiceRecordingButtonProps> = ({
         } else if (shouldShowSettings) {
           toast({
             title: "Microphone access required",
-            description: "Please enable microphone in your app settings",
+            description: "Please enable microphone in your app settings. Tap here to open settings.",
             variant: "destructive",
-            action: {
-              altText: "Open Settings",
-              onClick: twaOpenSettings
-            }
+            duration: 10000
           });
+          // Open settings after a brief delay to allow user to read the message
+          setTimeout(() => {
+            twaOpenSettings();
+          }, 2000);
         }
         return;
       }
