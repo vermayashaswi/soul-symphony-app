@@ -1,0 +1,71 @@
+
+{
+  "packageId": "com.soulo.app",
+  "host": "soulo.online",
+  "startUrl": "/app",
+  "name": "Soulo - Voice Journaling App",
+  "launcherName": "Soulo",
+  "themeColor": "#8b5cf6",
+  "navigationColor": "#ffffff",
+  "backgroundColor": "#ffffff",
+  "enableNotifications": true,
+  "twaManifest": {
+    "applicationId": "com.soulo.app",
+    "hostName": "soulo.online",
+    "startUrl": "/app",
+    "name": "Soulo - Voice Journaling App",
+    "shortName": "Soulo",
+    "iconUrl": "https://soulo.online/lovable-uploads/a07b91eb-274a-47b6-8180-fb4c9c0bc8a5.png",
+    "themeColor": "#8b5cf6",
+    "backgroundColor": "#ffffff",
+    "enableNotifications": true,
+    "isChromeOSOnly": false,
+    "orientation": "portrait",
+    "display": "standalone",
+    "webManifestUrl": "https://soulo.online/app/manifest.json",
+    "permissions": [
+      {
+        "permission": "android.permission.RECORD_AUDIO",
+        "usesFeature": "android.hardware.microphone"
+      },
+      {
+        "permission": "android.permission.MODIFY_AUDIO_SETTINGS"
+      },
+      {
+        "permission": "android.permission.WAKE_LOCK"
+      },
+      {
+        "permission": "android.permission.INTERNET"
+      },
+      {
+        "permission": "android.permission.ACCESS_NETWORK_STATE"
+      }
+    ],
+    "additionalManifestTags": [
+      "<uses-feature android:name=\"android.hardware.microphone\" android:required=\"true\" />",
+      "<uses-feature android:name=\"android.hardware.audio.low_latency\" android:required=\"false\" />",
+      "<uses-permission android:name=\"android.permission.RECORD_AUDIO\" />",
+      "<uses-permission android:name=\"android.permission.MODIFY_AUDIO_SETTINGS\" />",
+      "<uses-permission android:name=\"android.permission.WAKE_LOCK\" />",
+      "<queries>",
+      "  <intent>",
+      "    <action android:name=\"android.settings.APPLICATION_DETAILS_SETTINGS\" />",
+      "  </intent>",
+      "</queries>"
+    ]
+  },
+  "assetlinks": [
+    {
+      "relation": [
+        "delegate_permission/common.handle_all_urls"
+      ],
+      "target": {
+        "namespace": "android_app",
+        "package_name": "com.soulo.app",
+        "sha256_cert_fingerprints": [
+          "YOUR_SHA256_FINGERPRINT_HERE"
+        ]
+      }
+    }
+  ]
+}

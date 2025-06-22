@@ -1,10 +1,12 @@
 
 import React from 'react';
 import { motion } from 'framer-motion';
-import { Mic, Square } from 'lucide-react';
+import { Mic, Square, Settings } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useTutorial } from '@/contexts/TutorialContext';
-import { showToast } from '@/utils/journal/toast-helper';
+import { useTWAMicrophonePermission } from '@/hooks/useTWAMicrophonePermission';
+import { detectTWAEnvironment } from '@/utils/twaDetection';
+import { Button } from '@/components/ui/button';
 
 interface RecordingButtonProps {
   isRecording: boolean;
@@ -15,7 +17,7 @@ interface RecordingButtonProps {
   onPermissionRequest: () => void;
   audioLevel?: number;
   showAnimation?: boolean;
-  audioBlob?: Blob | null; // Add this to track if we have a recording
+  audioBlob?: Blob | null;
 }
 
 export function RecordingButton({
@@ -32,21 +34,85 @@ export function RecordingButton({
   const { isInStep, tutorialCompleted, isActive } = useTutorial();
   const isInTutorialStep3 = isInStep(3);
   const isInTutorialStep5 = isActive && isInStep(5);
+  const twaEnv = detectTWAEnvironment();
+  
+  // Use TWA-specific permission handling
+  const {
+    hasPermission: twaHasPermission,
+    canRequest: twaCanRequest,
+    requiresSettings: twaRequiresSettings,
+    requestPermission: twaRequestPermission,
+    openSettings: twaOpenSettings,
+    getStatusMessage,
+    isRequestingPermission
+  } = useTWAMicrophonePermission();
   
   // Don't render during tutorial step 5
   if (isInTutorialStep5) {
     return null;
   }
   
-  if (hasPermission === false) {
+  // Use TWA permission state if in TWA environment, otherwise use prop
+  const effectiveHasPermission = (twaEnv.isTWA || twaEnv.isStandalone) ? twaHasPermission : hasPermission;
+  const effectiveCanRequest = (twaEnv.isTWA || twaEnv.isStandalone) ? twaCanRequest : true;
+  const shouldShowSettings = (twaEnv.isTWA || twaEnv.isStandalone) ? twaRequiresSettings : false;
+  
+  // Handle permission request
+  const handlePermissionRequest = async () => {
+    if (twaEnv.isTWA || twaEnv.isStandalone) {
+      const granted = await twaRequestPermission();
+      if (!granted && shouldShowSettings) {
+        // Permission denied and requires settings - the hook will show appropriate toast
+        return;
+      }
+    } else {
+      onPermissionRequest();
+    }
+  };
+  
+  // Permission denied state - show different UI based on environment
+  if (effectiveHasPermission === false) {
     return (
-      <motion.button
-        onClick={onPermissionRequest}
-        className="relative z-10 rounded-full flex items-center justify-center border transition-all duration-300 shadow-lg bg-red-500 border-red-600 w-20 h-20"
-        whileTap={{ scale: 0.95 }}
-      >
-        <Mic className="w-8 h-8 text-white" />
-      </motion.button>
+      <div className="flex flex-col items-center space-y-4">
+        <motion.button
+          onClick={handlePermissionRequest}
+          disabled={isRequestingPermission || !effectiveCanRequest}
+          className="relative z-10 rounded-full flex items-center justify-center border transition-all duration-300 shadow-lg bg-red-500 border-red-600 w-20 h-20"
+          whileTap={{ scale: 0.95 }}
+        >
+          <Mic className="w-8 h-8 text-white" />
+        </motion.button>
+        
+        <div className="text-center max-w-xs">
+          <p className="text-sm text-muted-foreground mb-2">
+            {getStatusMessage()}
+          </p>
+          
+          {shouldShowSettings && (
+            <Button
+              onClick={twaOpenSettings}
+              variant="outline"
+              size="sm"
+              className="text-xs"
+            >
+              <Settings className="w-3 h-3 mr-1" />
+              Open Settings
+            </Button>
+          )}
+          
+          {effectiveCanRequest && !shouldShowSettings && (
+            <Button
+              onClick={handlePermissionRequest}
+              disabled={isRequestingPermission}
+              variant="outline"
+              size="sm"
+              className="text-xs"
+            >
+              {isRequestingPermission ? 'Requesting...' : 'Allow Microphone'}
+            </Button>
+          )}
+        </div>
+      </div>
     );
   }
   

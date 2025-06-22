@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from "react";
-import { Mic, Square } from "lucide-react";
+import { Mic, Square, Settings } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import RecordRTC, { StereoAudioRecorder } from 'recordrtc';
 import { formatTime } from "@/utils/format-time"; 
@@ -9,6 +9,8 @@ import { cn } from "@/lib/utils";
 import { LanguageBackground } from "@/components/voice-recorder/MultilingualTextAnimation";
 import { getAudioConfig, getRecorderOptions, RECORDING_LIMITS } from "@/utils/audio/recording-config";
 import { useTutorial } from "@/contexts/TutorialContext";
+import { useTWAMicrophonePermission } from "@/hooks/useTWAMicrophonePermission";
+import { detectTWAEnvironment } from "@/utils/twaDetection";
 
 interface VoiceRecordingButtonProps {
   isLoading: boolean;
@@ -33,6 +35,18 @@ const VoiceRecordingButton: React.FC<VoiceRecordingButtonProps> = ({
   const [stream, setStream] = useState<MediaStream | null>(null);
   const { toast } = useToast();
   const { isActive, isInStep } = useTutorial();
+  const twaEnv = detectTWAEnvironment();
+  
+  // Use TWA-specific permission handling
+  const {
+    hasPermission: twaHasPermission,
+    canRequest: twaCanRequest,
+    requiresSettings: twaRequiresSettings,
+    requestPermission: twaRequestPermission,
+    openSettings: twaOpenSettings,
+    getStatusMessage,
+    isRequestingPermission
+  } = useTWAMicrophonePermission();
   
   // Check if we're in tutorial step 5
   const isInTutorialStep = isActive && isInStep(5);
@@ -42,6 +56,11 @@ const VoiceRecordingButton: React.FC<VoiceRecordingButtonProps> = ({
     return null;
   }
 
+  // Use TWA permission state if in TWA environment
+  const effectiveHasPermission = (twaEnv.isTWA || twaEnv.isStandalone) ? twaHasPermission : true;
+  const effectiveCanRequest = (twaEnv.isTWA || twaEnv.isStandalone) ? twaCanRequest : true;
+  const shouldShowSettings = (twaEnv.isTWA || twaEnv.isStandalone) ? twaRequiresSettings : false;
+
   useEffect(() => {
     let cleanup = () => {};
     
@@ -49,6 +68,18 @@ const VoiceRecordingButton: React.FC<VoiceRecordingButtonProps> = ({
       const setupRecording = async () => {
         try {
           console.log("[VoiceRecordingButton] Starting recording setup");
+          
+          // Check permission first in TWA environment
+          if ((twaEnv.isTWA || twaEnv.isStandalone) && !twaHasPermission) {
+            console.log("[VoiceRecordingButton] No permission in TWA environment");
+            toast({
+              title: "Microphone access required",
+              description: getStatusMessage(),
+              variant: "destructive"
+            });
+            return;
+          }
+          
           const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
           const isAndroid = /Android/.test(navigator.userAgent);
           const platform = isIOS ? 'ios' : (isAndroid ? 'android' : 'web');
@@ -110,11 +141,32 @@ const VoiceRecordingButton: React.FC<VoiceRecordingButtonProps> = ({
           };
         } catch (error) {
           console.error("[VoiceRecordingButton] Error recording audio:", error);
-          toast({
-            title: "Recording error",
-            description: "Could not access microphone. Check browser permissions.",
-            variant: "destructive"
-          });
+          
+          if (error instanceof DOMException && error.name === 'NotAllowedError') {
+            if (twaEnv.isTWA || twaEnv.isStandalone) {
+              toast({
+                title: "Microphone access blocked",
+                description: "Please enable microphone in your app settings",
+                variant: "destructive",
+                action: shouldShowSettings ? {
+                  altText: "Open Settings",
+                  onClick: twaOpenSettings
+                } : undefined
+              });
+            } else {
+              toast({
+                title: "Microphone access denied",
+                description: "Please allow microphone access and try again",
+                variant: "destructive"
+              });
+            }
+          } else {
+            toast({
+              title: "Recording error",
+              description: "Could not access microphone. Check browser permissions.",
+              variant: "destructive"
+            });
+          }
         }
       };
       
@@ -122,9 +174,9 @@ const VoiceRecordingButton: React.FC<VoiceRecordingButtonProps> = ({
     }
     
     return cleanup;
-  }, [isRecording, toast]);
+  }, [isRecording, toast, twaEnv, twaHasPermission, getStatusMessage, shouldShowSettings, twaOpenSettings]);
   
-  const handleVoiceRecording = () => {
+  const handleVoiceRecording = async () => {
     if (isRecording && recorder) {
       console.log("[VoiceRecordingButton] Stopping recording");
       recorder.stopRecording(() => {
@@ -146,10 +198,70 @@ const VoiceRecordingButton: React.FC<VoiceRecordingButtonProps> = ({
         setRecorder(null);
       });
     } else {
+      // Check permission before starting recording in TWA environment
+      if ((twaEnv.isTWA || twaEnv.isStandalone) && !twaHasPermission) {
+        if (twaCanRequest) {
+          const granted = await twaRequestPermission();
+          if (granted) {
+            console.log("[VoiceRecordingButton] Permission granted, starting recording");
+            onStartRecording();
+          }
+        } else if (shouldShowSettings) {
+          toast({
+            title: "Microphone access required",
+            description: "Please enable microphone in your app settings",
+            variant: "destructive",
+            action: {
+              altText: "Open Settings",
+              onClick: twaOpenSettings
+            }
+          });
+        }
+        return;
+      }
+      
       console.log("[VoiceRecordingButton] Starting recording");
       onStartRecording();
     }
   };
+  
+  // Show permission request UI if needed
+  if ((twaEnv.isTWA || twaEnv.isStandalone) && effectiveHasPermission === false) {
+    return (
+      <div className="flex flex-col items-center space-y-2">
+        <Button 
+          type="button" 
+          size={size} 
+          variant="destructive"
+          onClick={effectiveCanRequest ? twaRequestPermission : undefined}
+          disabled={isLoading || isRequestingPermission || !effectiveCanRequest}
+          className={cn(
+            "relative rounded-full flex items-center justify-center",
+            className
+          )}
+          style={{
+            width: size === "sm" ? "48px" : "64px",
+            height: size === "sm" ? "48px" : "64px",
+            backgroundColor: "#dc2626"
+          }}
+        >
+          <Mic className={`${size === "sm" ? "h-4 w-4" : "h-5 w-5"} text-white`} />
+        </Button>
+        
+        {shouldShowSettings && (
+          <Button
+            onClick={twaOpenSettings}
+            variant="outline"
+            size="sm"
+            className="text-xs"
+          >
+            <Settings className="w-3 h-3 mr-1" />
+            Settings
+          </Button>
+        )}
+      </div>
+    );
+  }
   
   return (
     <div className="relative">
