@@ -27,12 +27,21 @@ export const usePermissionManager = (): PermissionManagerResult => {
   
   const currentPath = window.location.pathname;
   const isTWAEnvironment = shouldApplyTWALogic(currentPath);
-  const twaEnv = detectTWAEnvironment();
 
-  // Check all permissions on mount
+  // Check all permissions on mount and set up monitoring
   useEffect(() => {
     checkAllPermissions();
-  }, []);
+    
+    // Set up permission monitoring for TWA
+    if (isTWAEnvironment) {
+      permissionService.monitorPermissionChanges((type, status) => {
+        setPermissions(prev => ({
+          ...prev,
+          [type]: status
+        }));
+      });
+    }
+  }, [isTWAEnvironment]);
 
   const checkAllPermissions = useCallback(async () => {
     try {
@@ -72,19 +81,25 @@ export const usePermissionManager = (): PermissionManagerResult => {
       }));
       
       if (granted) {
-        toast.success(
-          type === 'microphone' 
-            ? 'Microphone access granted!' 
-            : 'Notifications enabled!',
-          { duration: 2000 }
-        );
+        const message = type === 'microphone' 
+          ? 'Microphone access granted!' 
+          : 'Notifications enabled!';
+        
+        if (isTWAEnvironment) {
+          toast.success(message, { duration: 2000 });
+        } else {
+          toast.success(message, { duration: 2000 });
+        }
       } else {
-        toast.error(
-          type === 'microphone' 
-            ? 'Microphone access denied. You can enable it in your browser settings.' 
-            : 'Notification permission denied. You can enable it in your browser settings.',
-          { duration: 4000 }
-        );
+        const message = type === 'microphone' 
+          ? 'Microphone access denied. You can enable it in your device settings.' 
+          : 'Notification permission denied. You can enable it in your device settings.';
+        
+        if (isTWAEnvironment) {
+          toast.error(message, { duration: 4000 });
+        } else {
+          toast.error(message, { duration: 4000 });
+        }
       }
       
       return granted;
@@ -95,10 +110,10 @@ export const usePermissionManager = (): PermissionManagerResult => {
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [isTWAEnvironment]);
 
   const shouldShowPermissionPrompt = useCallback((type: PermissionType): boolean => {
-    // Show prompts more aggressively in TWA environment
+    // In TWA environment, be more aggressive about showing prompts
     if (isTWAEnvironment) {
       return permissions[type] === 'prompt' || permissions[type] === 'denied';
     }

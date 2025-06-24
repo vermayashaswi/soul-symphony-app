@@ -3,7 +3,7 @@ import React, { useEffect, useState } from 'react';
 import { usePermissionManager } from '@/hooks/usePermissionManager';
 import { PermissionPrompt } from './PermissionPrompt';
 import { PermissionType } from '@/services/permissionService';
-import { detectTWAEnvironment } from '@/utils/twaDetection';
+import { twaPermissionBootstrap } from '@/services/twaPermissionBootstrap';
 
 interface TWAPermissionInitializerProps {
   onComplete?: () => void;
@@ -20,8 +20,8 @@ export const TWAPermissionInitializer: React.FC<TWAPermissionInitializerProps> =
   } = usePermissionManager();
 
   const [currentPrompt, setCurrentPrompt] = useState<PermissionType | null>(null);
-  const [completedPrompts, setCompletedPrompts] = useState<Set<PermissionType>>(new Set());
   const [isProcessing, setIsProcessing] = useState(false);
+  const [showManualPrompts, setShowManualPrompts] = useState(false);
 
   // Only run in TWA environment
   useEffect(() => {
@@ -30,33 +30,48 @@ export const TWAPermissionInitializer: React.FC<TWAPermissionInitializerProps> =
       return;
     }
 
-    // Start the permission flow after a brief delay
-    const timer = setTimeout(() => {
-      startPermissionFlow();
-    }, 1000);
+    // Check if we need to show manual prompts after bootstrap
+    const checkForManualPrompts = async () => {
+      try {
+        // Give bootstrap service time to complete
+        await new Promise(resolve => setTimeout(resolve, 2000));
+        
+        const needsManualPrompts = shouldShowPermissionPrompt('microphone') || 
+                                  shouldShowPermissionPrompt('notifications');
+        
+        if (needsManualPrompts) {
+          console.log('[TWAPermissionInitializer] Manual permission prompts needed');
+          setShowManualPrompts(true);
+          startManualPermissionFlow();
+        } else {
+          console.log('[TWAPermissionInitializer] No manual prompts needed, completing');
+          onComplete?.();
+        }
+      } catch (error) {
+        console.error('[TWAPermissionInitializer] Error checking for manual prompts:', error);
+        onComplete?.();
+      }
+    };
 
-    return () => clearTimeout(timer);
-  }, [isTWAEnvironment]);
+    checkForManualPrompts();
+  }, [isTWAEnvironment, shouldShowPermissionPrompt, onComplete]);
 
-  const startPermissionFlow = () => {
-    console.log('[TWAPermissionInitializer] Starting permission flow', {
-      permissions,
-      isTWAEnvironment
-    });
+  const startManualPermissionFlow = () => {
+    console.log('[TWAPermissionInitializer] Starting manual permission flow');
 
     // Priority order: microphone first, then notifications
     const permissionOrder: PermissionType[] = ['microphone', 'notifications'];
     
     for (const permissionType of permissionOrder) {
-      if (shouldShowPermissionPrompt(permissionType) && !completedPrompts.has(permissionType)) {
-        console.log(`[TWAPermissionInitializer] Showing prompt for ${permissionType}`);
+      if (shouldShowPermissionPrompt(permissionType)) {
+        console.log(`[TWAPermissionInitializer] Showing manual prompt for ${permissionType}`);
         setCurrentPrompt(permissionType);
         return;
       }
     }
 
     // All permissions handled
-    console.log('[TWAPermissionInitializer] All permissions handled, completing initialization');
+    console.log('[TWAPermissionInitializer] All manual prompts completed');
     onComplete?.();
   };
 
@@ -67,20 +82,19 @@ export const TWAPermissionInitializer: React.FC<TWAPermissionInitializerProps> =
       setIsProcessing(true);
       const granted = await requestPermission(currentPrompt);
       
-      console.log(`[TWAPermissionInitializer] Permission ${currentPrompt} result:`, granted);
+      console.log(`[TWAPermissionInitializer] Manual permission ${currentPrompt} result:`, granted);
       
-      setCompletedPrompts(prev => new Set([...prev, currentPrompt]));
       setCurrentPrompt(null);
       
       // Move to next permission after a brief delay
       setTimeout(() => {
-        startPermissionFlow();
+        startManualPermissionFlow();
       }, 500);
       
     } catch (error) {
-      console.error('[TWAPermissionInitializer] Error requesting permission:', error);
+      console.error('[TWAPermissionInitializer] Error requesting manual permission:', error);
       setCurrentPrompt(null);
-      startPermissionFlow();
+      startManualPermissionFlow();
     } finally {
       setIsProcessing(false);
     }
@@ -89,24 +103,23 @@ export const TWAPermissionInitializer: React.FC<TWAPermissionInitializerProps> =
   const handleDenyPermission = () => {
     if (!currentPrompt) return;
     
-    console.log(`[TWAPermissionInitializer] Permission ${currentPrompt} denied by user`);
+    console.log(`[TWAPermissionInitializer] Manual permission ${currentPrompt} denied by user`);
     
-    setCompletedPrompts(prev => new Set([...prev, currentPrompt]));
     setCurrentPrompt(null);
     
     // Move to next permission
     setTimeout(() => {
-      startPermissionFlow();
+      startManualPermissionFlow();
     }, 300);
   };
 
   const handleClosePrompt = () => {
-    console.log('[TWAPermissionInitializer] Permission prompt closed');
+    console.log('[TWAPermissionInitializer] Manual permission prompt closed');
     handleDenyPermission();
   };
 
-  // Don't render anything if not in TWA environment
-  if (!isTWAEnvironment) {
+  // Don't render anything if not in TWA environment or if manual prompts aren't needed
+  if (!isTWAEnvironment || !showManualPrompts) {
     return null;
   }
 

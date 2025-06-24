@@ -33,17 +33,24 @@ class PermissionService {
   }
 
   /**
-   * Request a specific permission
+   * Request a specific permission with TWA-optimized handling
    */
   async requestPermission(type: PermissionType): Promise<boolean> {
     try {
       console.log(`[PermissionService] Requesting ${type} permission`);
       
+      const currentPath = window.location.pathname;
+      const isTWAEnvironment = shouldApplyTWALogic(currentPath);
+      
+      if (isTWAEnvironment) {
+        console.log(`[PermissionService] Using TWA-optimized ${type} permission request`);
+      }
+      
       switch (type) {
         case 'microphone':
           return await this.requestMicrophonePermission();
         case 'notifications':
-          return await this.requestNotificationPermission();
+          return await this.requestNotificationPermission(isTWAEnvironment);
         default:
           return false;
       }
@@ -66,7 +73,9 @@ class PermissionService {
       // Try to query the permission state
       if ('permissions' in navigator) {
         const permission = await navigator.permissions.query({ name: 'microphone' as PermissionName });
-        return permission.state as PermissionStatus;
+        const status = permission.state as PermissionStatus;
+        console.log('[PermissionService] Microphone permission status:', status);
+        return status;
       }
 
       // Fallback: Check if we have a cached permission
@@ -83,10 +92,12 @@ class PermissionService {
   }
 
   /**
-   * Request microphone permission
+   * Request microphone permission with enhanced error handling for TWA
    */
   private async requestMicrophonePermission(): Promise<boolean> {
     try {
+      console.log('[PermissionService] Requesting microphone access via getUserMedia');
+      
       const stream = await navigator.mediaDevices.getUserMedia({ 
         audio: {
           echoCancellation: true,
@@ -129,9 +140,9 @@ class PermissionService {
   }
 
   /**
-   * Request notification permission
+   * Request notification permission with TWA optimization
    */
-  private async requestNotificationPermission(): Promise<boolean> {
+  private async requestNotificationPermission(isTWAEnvironment: boolean = false): Promise<boolean> {
     if (!('Notification' in window)) {
       console.warn('[PermissionService] Notifications not supported');
       return false;
@@ -140,12 +151,28 @@ class PermissionService {
     try {
       let permission: NotificationPermission;
       
-      // Use the newer async API if available
-      if ('requestPermission' in Notification && typeof Notification.requestPermission === 'function') {
-        permission = await Notification.requestPermission();
+      if (isTWAEnvironment) {
+        console.log('[PermissionService] Using TWA-optimized notification request');
+        
+        // For TWA, be more aggressive about requesting permission
+        if (Notification.permission === 'default') {
+          // Use the newer async API if available
+          if ('requestPermission' in Notification && typeof Notification.requestPermission === 'function') {
+            permission = await Notification.requestPermission();
+          } else {
+            // Fallback - though this is rare in modern browsers
+            permission = Notification.permission;
+          }
+        } else {
+          permission = Notification.permission;
+        }
       } else {
-        // Fallback to the older sync API
-        permission = Notification.permission;
+        // Standard web request
+        if ('requestPermission' in Notification && typeof Notification.requestPermission === 'function') {
+          permission = await Notification.requestPermission();
+        } else {
+          permission = Notification.permission;
+        }
       }
       
       const granted = permission === 'granted';
@@ -243,6 +270,41 @@ class PermissionService {
         reason: 'Get reminders for daily journaling and insights updates'
       }
     ];
+  }
+
+  /**
+   * Monitor permission changes for TWA
+   */
+  async monitorPermissionChanges(callback: (type: PermissionType, status: PermissionStatus) => void): Promise<void> {
+    const currentPath = window.location.pathname;
+    if (!shouldApplyTWALogic(currentPath)) {
+      return;
+    }
+
+    try {
+      if ('permissions' in navigator) {
+        // Monitor microphone permission
+        const micPermission = await navigator.permissions.query({ name: 'microphone' as PermissionName });
+        micPermission.addEventListener('change', () => {
+          console.log('[PermissionService] Microphone permission changed:', micPermission.state);
+          callback('microphone', micPermission.state as PermissionStatus);
+        });
+
+        // Monitor notifications permission (if supported)
+        try {
+          const notificationPermission = await navigator.permissions.query({ name: 'notifications' as PermissionName });
+          notificationPermission.addEventListener('change', () => {
+            console.log('[PermissionService] Notification permission changed:', notificationPermission.state);
+            callback('notifications', notificationPermission.state as PermissionStatus);
+          });
+        } catch (error) {
+          // Notifications permission query might not be supported
+          console.log('[PermissionService] Notification permission monitoring not supported');
+        }
+      }
+    } catch (error) {
+      console.error('[PermissionService] Error setting up permission monitoring:', error);
+    }
   }
 }
 
