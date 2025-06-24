@@ -1,5 +1,5 @@
 
-import { detectTWAEnvironment } from '@/utils/twaDetection';
+import { detectTWAEnvironment, shouldApplyTWALogic } from '@/utils/twaDetection';
 import { toast } from 'sonner';
 
 export interface UpdateInfo {
@@ -15,16 +15,20 @@ class TWAUpdateService {
   private readonly CACHE_BUST_PARAM = 'v';
 
   /**
-   * Initialize update checking for TWA environment
+   * Initialize update checking for TWA environment on app routes only
    */
   init(): void {
-    const twaEnv = detectTWAEnvironment();
+    const currentPath = window.location.pathname;
     
-    if (twaEnv.isTWA || twaEnv.isStandalone) {
-      console.log('[TWA Update] Initializing update service for TWA environment');
-      this.startPeriodicUpdateCheck();
-      this.setupVisibilityChangeListener();
+    // Only initialize if we should apply TWA logic to this route
+    if (!shouldApplyTWALogic(currentPath)) {
+      console.log('[TWA Update] Skipping initialization - not an app route or not TWA environment');
+      return;
     }
+    
+    console.log('[TWA Update] Initializing update service for TWA app route');
+    this.startPeriodicUpdateCheck();
+    this.setupVisibilityChangeListener();
   }
 
   /**
@@ -36,12 +40,19 @@ class TWAUpdateService {
     }
 
     this.updateCheckInterval = setInterval(() => {
-      this.checkForUpdates();
+      // Double-check we're still on an app route before checking for updates
+      const currentPath = window.location.pathname;
+      if (shouldApplyTWALogic(currentPath)) {
+        this.checkForUpdates();
+      }
     }, this.CHECK_INTERVAL);
 
     // Check immediately on startup
     setTimeout(() => {
-      this.checkForUpdates();
+      const currentPath = window.location.pathname;
+      if (shouldApplyTWALogic(currentPath)) {
+        this.checkForUpdates();
+      }
     }, 2000);
   }
 
@@ -51,6 +62,12 @@ class TWAUpdateService {
   private setupVisibilityChangeListener(): void {
     document.addEventListener('visibilitychange', () => {
       if (!document.hidden) {
+        // Only check for updates if we're on an app route
+        const currentPath = window.location.pathname;
+        if (!shouldApplyTWALogic(currentPath)) {
+          return;
+        }
+        
         // App became visible, check for updates if it's been a while
         const timeSinceLastCheck = Date.now() - this.lastUpdateCheck;
         if (timeSinceLastCheck > this.CHECK_INTERVAL / 2) {

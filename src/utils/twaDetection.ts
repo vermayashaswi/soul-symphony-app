@@ -12,22 +12,24 @@ export interface TWAEnvironment {
 }
 
 /**
- * Detects if the app is running in a TWA environment
+ * Detects if the app is running in a TWA environment with improved accuracy
  */
 export const detectTWAEnvironment = (): TWAEnvironment => {
   const userAgent = navigator.userAgent.toLowerCase();
   const isAndroid = /android/i.test(userAgent);
   
-  // Check for TWA indicators
-  const isTWA = 
-    // Check if running in standalone mode (PWA/TWA)
-    window.matchMedia('(display-mode: standalone)').matches ||
-    // Check for TWA specific user agent patterns
-    userAgent.includes('wv') || // WebView indicator
-    // Check for Android Chrome Custom Tabs
-    (isAndroid && userAgent.includes('chrome') && !userAgent.includes('mobile safari'));
-
+  // More accurate TWA detection - must meet multiple criteria
   const isStandalone = window.matchMedia('(display-mode: standalone)').matches;
+  
+  // Check for TWA-specific indicators (more restrictive)
+  const hasTWAIndicators = 
+    // WebView indicator
+    userAgent.includes('wv') ||
+    // Android Chrome Custom Tabs with specific patterns
+    (isAndroid && userAgent.includes('chrome') && !userAgent.includes('mobile safari') && isStandalone);
+
+  // Only consider it a TWA if it's both standalone AND has TWA indicators
+  const isTWA = isStandalone && hasTWAIndicators;
   
   return {
     isTWA,
@@ -38,9 +40,32 @@ export const detectTWAEnvironment = (): TWAEnvironment => {
 };
 
 /**
+ * Route-aware TWA detection - only applies TWA logic to app routes
+ */
+export const shouldApplyTWALogic = (currentPath: string): boolean => {
+  const twaEnv = detectTWAEnvironment();
+  
+  // Only apply TWA logic if we're actually in a TWA environment AND on app routes
+  if (!twaEnv.isTWA && !twaEnv.isStandalone) {
+    return false;
+  }
+  
+  // Only apply to /app routes, not marketing website routes
+  return currentPath.startsWith('/app');
+};
+
+/**
  * Attempts to exit the TWA/PWA app
  */
 export const exitTWAApp = (): void => {
+  const currentPath = window.location.pathname;
+  
+  // Only allow exit from app routes
+  if (!shouldApplyTWALogic(currentPath)) {
+    console.warn('TWA exit not available for marketing website routes');
+    return;
+  }
+  
   const twaEnv = detectTWAEnvironment();
   
   if (twaEnv.canExit) {
@@ -70,10 +95,8 @@ export const exitTWAApp = (): void => {
  * Checks if we should intercept back navigation
  */
 export const shouldInterceptBackNavigation = (currentPath: string): boolean => {
-  const twaEnv = detectTWAEnvironment();
-  
-  // Only intercept in TWA environment
-  if (!twaEnv.isTWA && !twaEnv.isStandalone) {
+  // Only intercept if TWA logic should apply to this route
+  if (!shouldApplyTWALogic(currentPath)) {
     return false;
   }
   

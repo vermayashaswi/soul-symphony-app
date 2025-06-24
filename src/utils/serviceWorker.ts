@@ -1,6 +1,9 @@
+
 /**
  * Service Worker Registration and Management - Enhanced for TWA Updates
  */
+
+import { shouldApplyTWALogic } from './twaDetection';
 
 export interface SwRegistrationResult {
   success: boolean;
@@ -68,11 +71,19 @@ class ServiceWorkerManager {
   }
 
   /**
-   * Force clear all caches and reload
+   * Force clear all caches and reload - only for app routes
    */
   async forceCacheRefresh(): Promise<void> {
     try {
-      console.log('[SW] Forcing cache refresh...');
+      const currentPath = window.location.pathname;
+      
+      // Only force cache refresh for app routes
+      if (!shouldApplyTWALogic(currentPath)) {
+        console.log('[SW] Skipping cache refresh - not an app route');
+        return;
+      }
+      
+      console.log('[SW] Forcing cache refresh for app route...');
       
       if (this.registration && this.registration.active) {
         // Send message to SW to clear caches
@@ -244,12 +255,14 @@ export const serviceWorkerManager = new ServiceWorkerManager();
  * Initialize service worker with enhanced update handling
  */
 export async function initializeServiceWorker(): Promise<SwRegistrationResult> {
-  // Always register in TWA environment for update handling
-  const twaEnv = window.matchMedia('(display-mode: standalone)').matches ||
-                (window.navigator as any).standalone === true;
+  const currentPath = window.location.pathname;
   
-  if (process.env.NODE_ENV === 'development' && !localStorage.getItem('enableSW') && !twaEnv) {
-    console.log('[SW] Service worker disabled in development (not TWA)');
+  // Always register in TWA environment for update handling, but only for app routes
+  const shouldRegister = shouldApplyTWALogic(currentPath) || 
+                        (process.env.NODE_ENV === 'production' && localStorage.getItem('enableSW'));
+  
+  if (process.env.NODE_ENV === 'development' && !localStorage.getItem('enableSW') && !shouldRegister) {
+    console.log('[SW] Service worker disabled in development (not TWA app route)');
     return { success: false, error: new Error('Disabled in development') };
   }
 
