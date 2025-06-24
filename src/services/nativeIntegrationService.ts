@@ -1,14 +1,37 @@
 
 import { Capacitor } from '@capacitor/core';
-import { App } from '@capacitor/app';
-import { SplashScreen } from '@capacitor/splash-screen';
-import { StatusBar, Style } from '@capacitor/status-bar';
-import { Keyboard } from '@capacitor/keyboard';
-import { PushNotifications } from '@capacitor/push-notifications';
+
+// Conditional imports for Capacitor plugins - only import when running natively
+let App: any, SplashScreen: any, StatusBar: any, Keyboard: any, PushNotifications: any, Style: any;
+
+// Dynamically import Capacitor plugins only when needed
+const loadCapacitorPlugins = async () => {
+  try {
+    if (Capacitor.isNativePlatform()) {
+      const [appModule, splashModule, statusModule, keyboardModule, pushModule] = await Promise.all([
+        import('@capacitor/app'),
+        import('@capacitor/splash-screen'),
+        import('@capacitor/status-bar'),
+        import('@capacitor/keyboard'),
+        import('@capacitor/push-notifications')
+      ]);
+      
+      App = appModule.App;
+      SplashScreen = splashModule.SplashScreen;
+      StatusBar = statusModule.StatusBar;
+      Style = statusModule.Style;
+      Keyboard = keyboardModule.Keyboard;
+      PushNotifications = pushModule.PushNotifications;
+    }
+  } catch (error) {
+    console.warn('[Native] Capacitor plugins not available:', error);
+  }
+};
 
 export class NativeIntegrationService {
   private static instance: NativeIntegrationService;
   private isNative: boolean;
+  private pluginsLoaded: boolean = false;
 
   private constructor() {
     this.isNative = Capacitor.isNativePlatform();
@@ -33,6 +56,10 @@ export class NativeIntegrationService {
     console.log('[Native] Initializing native platform features');
 
     try {
+      // Load Capacitor plugins first
+      await loadCapacitorPlugins();
+      this.pluginsLoaded = true;
+
       // Configure status bar
       await this.configureStatusBar();
       
@@ -59,6 +86,11 @@ export class NativeIntegrationService {
    * Configure status bar appearance
    */
   private async configureStatusBar(): Promise<void> {
+    if (!this.pluginsLoaded || !StatusBar || !Style) {
+      console.warn('[Native] StatusBar plugin not available');
+      return;
+    }
+
     try {
       await StatusBar.setStyle({ style: Style.Dark });
       await StatusBar.setBackgroundColor({ color: '#000000' });
@@ -72,6 +104,11 @@ export class NativeIntegrationService {
    * Setup keyboard event handlers
    */
   private async setupKeyboardHandlers(): Promise<void> {
+    if (!this.pluginsLoaded || !Keyboard) {
+      console.warn('[Native] Keyboard plugin not available');
+      return;
+    }
+
     try {
       Keyboard.addListener('keyboardWillShow', (info) => {
         console.log('[Native] Keyboard will show:', info);
@@ -93,6 +130,11 @@ export class NativeIntegrationService {
    * Initialize push notifications
    */
   private async initializePushNotifications(): Promise<void> {
+    if (!this.pluginsLoaded || !PushNotifications) {
+      console.warn('[Native] PushNotifications plugin not available');
+      return;
+    }
+
     try {
       const permission = await PushNotifications.requestPermissions();
       
@@ -118,8 +160,13 @@ export class NativeIntegrationService {
    * Setup app event listeners
    */
   private async setupAppEventListeners(): Promise<void> {
+    if (!this.pluginsLoaded || !App) {
+      console.warn('[Native] App plugin not available');
+      return;
+    }
+
     try {
-      App.addListener('appStateChange', ({ isActive }) => {
+      App.addListener('appStateChange', ({ isActive }: { isActive: boolean }) => {
         console.log('[Native] App state changed. Active:', isActive);
         
         if (isActive) {
@@ -131,7 +178,7 @@ export class NativeIntegrationService {
         }
       });
 
-      App.addListener('backButton', ({ canGoBack }) => {
+      App.addListener('backButton', ({ canGoBack }: { canGoBack: boolean }) => {
         console.log('[Native] Back button pressed. Can go back:', canGoBack);
         
         if (canGoBack) {
@@ -152,6 +199,11 @@ export class NativeIntegrationService {
    * Hide splash screen
    */
   private async hideSplashScreen(): Promise<void> {
+    if (!this.pluginsLoaded || !SplashScreen) {
+      console.warn('[Native] SplashScreen plugin not available');
+      return;
+    }
+
     try {
       await SplashScreen.hide({
         fadeOutDuration: 300
@@ -182,7 +234,9 @@ export class NativeIntegrationService {
    * Get device info
    */
   async getDeviceInfo(): Promise<any> {
-    if (!this.isNative) return null;
+    if (!this.isNative || !this.pluginsLoaded || !App) {
+      return null;
+    }
 
     try {
       const info = await App.getInfo();
