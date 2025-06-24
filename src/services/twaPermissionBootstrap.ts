@@ -7,6 +7,7 @@ interface PermissionBootstrapResult {
   microphone: boolean;
   notifications: boolean;
   allGranted: boolean;
+  bootstrapAttempted: boolean;
 }
 
 class TWAPermissionBootstrap {
@@ -25,7 +26,12 @@ class TWAPermissionBootstrap {
 
     if (!shouldBootstrap) {
       console.log('[TWAPermissionBootstrap] Not a TWA environment, skipping bootstrap');
-      return { microphone: false, notifications: false, allGranted: false };
+      return { 
+        microphone: false, 
+        notifications: false, 
+        allGranted: false, 
+        bootstrapAttempted: false 
+      };
     }
 
     this.isBootstrapping = true;
@@ -44,7 +50,8 @@ class TWAPermissionBootstrap {
     const result: PermissionBootstrapResult = {
       microphone: false,
       notifications: false,
-      allGranted: false
+      allGranted: false,
+      bootstrapAttempted: true
     };
 
     try {
@@ -57,19 +64,24 @@ class TWAPermissionBootstrap {
         notifications: notificationsStatus
       });
 
+      // Update result for already granted permissions
+      if (microphoneStatus === 'granted') {
+        result.microphone = true;
+      }
+      
+      if (notificationsStatus === 'granted') {
+        result.notifications = true;
+      }
+
       // Only request permissions that are in 'prompt' state
       const permissionsToRequest: PermissionType[] = [];
       
       if (microphoneStatus === 'prompt') {
         permissionsToRequest.push('microphone');
-      } else if (microphoneStatus === 'granted') {
-        result.microphone = true;
       }
 
       if (notificationsStatus === 'prompt') {
         permissionsToRequest.push('notifications');
-      } else if (notificationsStatus === 'granted') {
-        result.notifications = true;
       }
 
       if (permissionsToRequest.length === 0) {
@@ -78,42 +90,69 @@ class TWAPermissionBootstrap {
         return result;
       }
 
+      // Show initial bootstrap message
+      toast.info('Setting up app permissions for the best experience...', {
+        duration: 2000
+      });
+
       // Request permissions sequentially with proper user interaction
       for (const permissionType of permissionsToRequest) {
         try {
           console.log(`[TWAPermissionBootstrap] Requesting ${permissionType} permission`);
           
           // Add a small delay to ensure user interaction context
-          await new Promise(resolve => setTimeout(resolve, 100));
+          await new Promise(resolve => setTimeout(resolve, 500));
           
           const granted = await permissionService.requestPermission(permissionType);
           result[permissionType] = granted;
 
           if (granted) {
             console.log(`[TWAPermissionBootstrap] ${permissionType} permission granted`);
+            
+            // Show specific success message
+            const message = permissionType === 'microphone' 
+              ? 'Microphone access granted! You can now record voice entries.' 
+              : 'Notifications enabled! You\'ll get helpful reminders.';
+              
+            toast.success(message, { duration: 2000 });
           } else {
             console.log(`[TWAPermissionBootstrap] ${permissionType} permission denied`);
+            
+            // Show helpful message for denied permissions
+            const message = permissionType === 'microphone' 
+              ? 'Microphone access is needed for voice journaling. You can enable it in Settings.' 
+              : 'Notifications help you stay consistent. You can enable them in Settings.';
+              
+            toast.warning(message, { duration: 3000 });
           }
 
           // Small delay between permission requests
-          await new Promise(resolve => setTimeout(resolve, 300));
+          await new Promise(resolve => setTimeout(resolve, 800));
           
         } catch (error) {
           console.error(`[TWAPermissionBootstrap] Error requesting ${permissionType} permission:`, error);
           result[permissionType] = false;
+          
+          toast.error(`Failed to request ${permissionType} permission. Please try manually in Settings.`, {
+            duration: 3000
+          });
         }
       }
 
       result.allGranted = result.microphone && result.notifications;
       
-      // Show success message if all permissions were granted
+      // Show final status message
       if (result.allGranted) {
-        toast.success('All permissions granted! You can now use all features of Soulo.', {
+        toast.success('All permissions granted! Soulo is ready to use.', {
           duration: 3000
         });
       } else if (result.microphone || result.notifications) {
-        toast.success('Some permissions granted. You can enable the rest in Settings if needed.', {
+        toast.info('Some permissions granted. You can enable others in Settings if needed.', {
           duration: 3000
+        });
+      } else {
+        toast.warning('Permissions were not granted. You can enable them manually in Settings for the best experience.', {
+          duration: 4000
         });
       }
 
@@ -122,6 +161,7 @@ class TWAPermissionBootstrap {
       
     } catch (error) {
       console.error('[TWAPermissionBootstrap] Error during permission bootstrap:', error);
+      toast.error('Permission setup encountered an issue. You can enable permissions manually in Settings.');
       return result;
     }
   }
@@ -139,7 +179,15 @@ class TWAPermissionBootstrap {
       const notificationsStatus = await permissionService.checkPermission('notifications');
 
       // Bootstrap is needed if any permission is in prompt state
-      return microphoneStatus === 'prompt' || notificationsStatus === 'prompt';
+      const isNeeded = microphoneStatus === 'prompt' || notificationsStatus === 'prompt';
+      
+      console.log('[TWAPermissionBootstrap] Bootstrap needed check:', {
+        microphone: microphoneStatus,
+        notifications: notificationsStatus,
+        isNeeded
+      });
+      
+      return isNeeded;
     } catch (error) {
       console.error('[TWAPermissionBootstrap] Error checking if bootstrap is needed:', error);
       return false;

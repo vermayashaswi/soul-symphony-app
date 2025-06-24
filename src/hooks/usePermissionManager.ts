@@ -16,6 +16,7 @@ export interface PermissionManagerResult {
   checkAllPermissions: () => Promise<void>;
   shouldShowPermissionPrompt: (type: PermissionType) => boolean;
   isTWAEnvironment: boolean;
+  hasEssentialPermissions: boolean;
 }
 
 export const usePermissionManager = (): PermissionManagerResult => {
@@ -28,13 +29,20 @@ export const usePermissionManager = (): PermissionManagerResult => {
   const currentPath = window.location.pathname;
   const isTWAEnvironment = shouldApplyTWALogic(currentPath);
 
+  // Calculate if essential permissions are granted
+  const hasEssentialPermissions = permissions.microphone === 'granted' && 
+                                  permissions.notifications === 'granted';
+
   // Check all permissions on mount and set up monitoring
   useEffect(() => {
     checkAllPermissions();
     
     // Set up permission monitoring for TWA
     if (isTWAEnvironment) {
+      console.log('[PermissionManager] Setting up permission monitoring for TWA');
+      
       permissionService.monitorPermissionChanges((type, status) => {
+        console.log(`[PermissionManager] Permission changed: ${type} -> ${status}`);
         setPermissions(prev => ({
           ...prev,
           [type]: status
@@ -80,32 +88,29 @@ export const usePermissionManager = (): PermissionManagerResult => {
         [type]: granted ? 'granted' : 'denied'
       }));
       
+      // Show appropriate feedback
       if (granted) {
         const message = type === 'microphone' 
-          ? 'Microphone access granted!' 
-          : 'Notifications enabled!';
+          ? 'Microphone access granted! You can now record voice entries.' 
+          : 'Notifications enabled! You\'ll get helpful reminders.';
         
-        if (isTWAEnvironment) {
-          toast.success(message, { duration: 2000 });
-        } else {
-          toast.success(message, { duration: 2000 });
-        }
+        toast.success(message, { duration: 2000 });
       } else {
         const message = type === 'microphone' 
-          ? 'Microphone access denied. You can enable it in your device settings.' 
-          : 'Notification permission denied. You can enable it in your device settings.';
+          ? 'Microphone access is required for voice journaling. You can enable it in device settings.' 
+          : 'Notifications help you stay consistent with journaling. You can enable them in device settings.';
         
         if (isTWAEnvironment) {
           toast.error(message, { duration: 4000 });
         } else {
-          toast.error(message, { duration: 4000 });
+          toast.warning(message, { duration: 4000 });
         }
       }
       
       return granted;
     } catch (error) {
       console.error(`[PermissionManager] Error requesting ${type} permission:`, error);
-      toast.error(`Failed to request ${type} permission. Please try again.`);
+      toast.error(`Failed to request ${type} permission. Please try again or enable it in device settings.`);
       return false;
     } finally {
       setIsLoading(false);
@@ -113,8 +118,9 @@ export const usePermissionManager = (): PermissionManagerResult => {
   }, [isTWAEnvironment]);
 
   const shouldShowPermissionPrompt = useCallback((type: PermissionType): boolean => {
-    // In TWA environment, be more aggressive about showing prompts
+    // In TWA environment, be more proactive about showing prompts
     if (isTWAEnvironment) {
+      // Show prompt for 'prompt' state, and also for 'denied' state to guide users to settings
       return permissions[type] === 'prompt' || permissions[type] === 'denied';
     }
     
@@ -128,6 +134,7 @@ export const usePermissionManager = (): PermissionManagerResult => {
     requestPermission,
     checkAllPermissions,
     shouldShowPermissionPrompt,
-    isTWAEnvironment
+    isTWAEnvironment,
+    hasEssentialPermissions
   };
 };

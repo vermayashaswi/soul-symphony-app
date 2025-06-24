@@ -18,18 +18,37 @@ export const detectTWAEnvironment = (): TWAEnvironment => {
   const userAgent = navigator.userAgent.toLowerCase();
   const isAndroid = /android/i.test(userAgent);
   
-  // More accurate TWA detection - must meet multiple criteria
+  // Check for standalone mode
   const isStandalone = window.matchMedia('(display-mode: standalone)').matches;
   
-  // Check for TWA-specific indicators (more restrictive)
+  // More comprehensive TWA detection
   const hasTWAIndicators = 
     // WebView indicator
     userAgent.includes('wv') ||
-    // Android Chrome Custom Tabs with specific patterns
-    (isAndroid && userAgent.includes('chrome') && !userAgent.includes('mobile safari') && isStandalone);
+    // Chrome Custom Tabs indicators
+    (isAndroid && userAgent.includes('chrome') && !userAgent.includes('mobile safari')) ||
+    // TWA-specific user agent patterns
+    userAgent.includes('twa') ||
+    // Check for lack of browser UI in standalone mode
+    (isStandalone && isAndroid) ||
+    // Check for TWA package name in referrer or origin
+    (document.referrer.includes('com.rhasys.soulo') || 
+     window.location.search.includes('twa=true'));
 
-  // Only consider it a TWA if it's both standalone AND has TWA indicators
-  const isTWA = isStandalone && hasTWAIndicators;
+  // Enhanced detection: TWA if standalone AND has indicators, OR explicit TWA markers
+  const isTWA = (isStandalone && hasTWAIndicators) || 
+                userAgent.includes('twa') ||
+                window.location.search.includes('twa=true');
+  
+  console.log('[TWA Detection]', {
+    userAgent,
+    isAndroid,
+    isStandalone,
+    hasTWAIndicators,
+    isTWA,
+    referrer: document.referrer,
+    search: window.location.search
+  });
   
   return {
     isTWA,
@@ -44,6 +63,13 @@ export const detectTWAEnvironment = (): TWAEnvironment => {
  */
 export const shouldApplyTWALogic = (currentPath: string): boolean => {
   const twaEnv = detectTWAEnvironment();
+  
+  console.log('[TWA Logic Check]', {
+    currentPath,
+    isTWA: twaEnv.isTWA,
+    isStandalone: twaEnv.isStandalone,
+    isAppRoute: currentPath.startsWith('/app')
+  });
   
   // Only apply TWA logic if we're actually in a TWA environment AND on app routes
   if (!twaEnv.isTWA && !twaEnv.isStandalone) {
