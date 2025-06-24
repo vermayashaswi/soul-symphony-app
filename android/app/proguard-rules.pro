@@ -1,3 +1,4 @@
+
 # Add project specific ProGuard rules here.
 # You can control the set of applied configuration files using the
 # proguardFiles setting in build.gradle.
@@ -19,3 +20,20 @@
 # If you keep the line number information, uncomment this to
 # hide the original source file name.
 #-renamesourcefileattribute SourceFile
+
+# Keep Capacitor classes
+-keep class com.getcapacitor.** { *; }
+-keep class com.getcapacitor.plugin.** { *; }
+
+# Keep WebView JavaScript interface
+-keepclassmembers class * {
+    @android.webkit.JavascriptInterface <methods>;
+}
+
+# Keep native methods
+-keepclasseswithmembers class * {
+    native <methods>;
+}
+
+# Keep Soulo app classes
+-keep class app.soulo.online.** { *; }
