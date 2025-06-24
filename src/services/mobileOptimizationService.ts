@@ -136,10 +136,12 @@ class MobileOptimizationService {
           const entries = list.getEntries();
           entries.forEach((entry) => {
             if (entry.entryType === 'navigation') {
+              // Cast to PerformanceNavigationTiming for navigation entries
+              const navEntry = entry as PerformanceNavigationTiming;
               console.log('[MobileOptimization] Navigation timing:', {
-                loadTime: entry.loadEventEnd - entry.loadEventStart,
-                domContentLoaded: entry.domContentLoadedEventEnd - entry.domContentLoadedEventStart,
-                type: entry.type
+                loadTime: navEntry.loadEventEnd - navEntry.loadEventStart,
+                domContentLoaded: navEntry.domContentLoadedEventEnd - navEntry.domContentLoadedEventStart,
+                type: navEntry.type
               });
             }
           });
