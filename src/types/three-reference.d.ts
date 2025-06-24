@@ -32,15 +32,6 @@ declare module 'three' {
     depthWrite?: boolean;
     depthTest?: boolean;
   }
-  
-  // Ensure compatibility with newer Three.js versions
-  interface BufferGeometry {
-    setFromPoints(points: Vector3[]): this;
-  }
-  
-  interface QuadraticBezierCurve3 {
-    getPoints(divisions?: number): Vector3[];
-  }
 }
 
 export {};
