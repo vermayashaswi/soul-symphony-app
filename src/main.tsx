@@ -1,4 +1,3 @@
-
 import React from 'react'
 import ReactDOM from 'react-dom/client'
 import App from './App.tsx'
@@ -6,7 +5,6 @@ import './index.css'
 import './styles/mobile.css' // Import mobile-specific styles
 import './styles/tutorial.css' // Import tutorial-specific styles
 import { AuthProvider } from './contexts/AuthContext'
-import { BrowserRouter } from 'react-router-dom'
 import { TranslationProvider } from './contexts/TranslationContext'
 import { ContextReadinessProvider } from './contexts/ContextReadinessContext'
 import { ThemeProvider } from './hooks/use-theme'
@@ -206,16 +204,14 @@ initializeApp();
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
-    <BrowserRouter>
-      <ContextReadinessProvider>
-        <ThemeProvider>
-          <TranslationProvider>
-            <AuthProvider>
-              <App />
-            </AuthProvider>
-          </TranslationProvider>
-        </ThemeProvider>
-      </ContextReadinessProvider>
-    </BrowserRouter>
+    <ContextReadinessProvider>
+      <ThemeProvider>
+        <TranslationProvider>
+          <AuthProvider>
+            <App />
+          </AuthProvider>
+        </TranslationProvider>
+      </ThemeProvider>
+    </ContextReadinessProvider>
   </React.StrictMode>,
 )
