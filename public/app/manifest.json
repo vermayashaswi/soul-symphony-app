@@ -2,9 +2,8 @@
 {
   "name": "Soulo - Voice Journaling App",
   "short_name": "Soulo",
-  "version": "1.0.1",
   "description": "AI-powered voice journaling for emotional wellness and self-discovery. Express your thoughts through voice, reflect on your emotions with AI insights, and grow through personalized guidance.",
-  "start_url": "/app?v=1.0.1",
+  "start_url": "/app",
   "id": "com.soulo.app",
   "display": "standalone",
   "display_override": ["window-controls-overlay", "standalone", "minimal-ui"],
