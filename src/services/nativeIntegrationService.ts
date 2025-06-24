@@ -1,4 +1,3 @@
-
 import { Capacitor } from '@capacitor/core';
 
 // Conditional imports for Capacitor plugins - only import when running natively
@@ -8,20 +7,42 @@ let App: any, SplashScreen: any, StatusBar: any, Keyboard: any, PushNotification
 const loadCapacitorPlugins = async () => {
   try {
     if (Capacitor.isNativePlatform()) {
-      const [appModule, splashModule, statusModule, keyboardModule, pushModule] = await Promise.all([
-        import('@capacitor/app'),
-        import('@capacitor/splash-screen'),
-        import('@capacitor/status-bar'),
-        import('@capacitor/keyboard'),
-        import('@capacitor/push-notifications')
-      ]);
-      
-      App = appModule.App;
-      SplashScreen = splashModule.SplashScreen;
-      StatusBar = statusModule.StatusBar;
-      Style = statusModule.Style;
-      Keyboard = keyboardModule.Keyboard;
-      PushNotifications = pushModule.PushNotifications;
+      // Use dynamic imports with proper error handling for each plugin
+      try {
+        const appModule = await import('@capacitor/app');
+        App = appModule.App;
+      } catch (error) {
+        console.warn('[Native] @capacitor/app not available:', error);
+      }
+
+      try {
+        const splashModule = await import('@capacitor/splash-screen');
+        SplashScreen = splashModule.SplashScreen;
+      } catch (error) {
+        console.warn('[Native] @capacitor/splash-screen not available:', error);
+      }
+
+      try {
+        const statusModule = await import('@capacitor/status-bar');
+        StatusBar = statusModule.StatusBar;
+        Style = statusModule.Style;
+      } catch (error) {
+        console.warn('[Native] @capacitor/status-bar not available:', error);
+      }
+
+      try {
+        const keyboardModule = await import('@capacitor/keyboard');
+        Keyboard = keyboardModule.Keyboard;
+      } catch (error) {
+        console.warn('[Native] @capacitor/keyboard not available:', error);
+      }
+
+      try {
+        const pushModule = await import('@capacitor/push-notifications');
+        PushNotifications = pushModule.PushNotifications;
+      } catch (error) {
+        console.warn('[Native] @capacitor/push-notifications not available:', error);
+      }
     }
   } catch (error) {
     console.warn('[Native] Capacitor plugins not available:', error);
