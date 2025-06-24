@@ -8,7 +8,7 @@ import './styles/tutorial.css' // Import tutorial-specific styles
 import { AuthProvider } from './contexts/AuthContext'
 import { BrowserRouter } from 'react-router-dom'
 import { TranslationProvider } from './contexts/TranslationContext'
-import { ContextReadinessProvider } from './contexts/ContextReadinessManager'
+import { ContextReadinessProvider } from './contexts/ContextReadinessContext'
 import { ThemeProvider } from './hooks/use-theme'
 import { initializeServiceWorker } from './utils/serviceWorker'
 import { backgroundSyncService } from './services/backgroundSyncService'
