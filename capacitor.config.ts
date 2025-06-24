@@ -7,7 +7,12 @@ const config: CapacitorConfig = {
   webDir: 'dist',
   server: {
     url: 'https://soulo.online/app?forceHideBadge=true',
-    cleartext: true
+    cleartext: true,
+    allowNavigation: [
+      'soulo.online',
+      '*.supabase.co',
+      'api.openai.com'
+    ]
   },
   plugins: {
     SplashScreen: {
@@ -19,7 +24,7 @@ const config: CapacitorConfig = {
       spinnerColor: "#8b5cf6",
       splashFullScreen: true,
       splashImmersive: true,
-      splashScreenDelay: 3000
+      splashScreenDelay: 2000
     },
     Keyboard: {
       resize: "body",
@@ -53,14 +58,16 @@ const config: CapacitorConfig = {
   android: {
     allowMixedContent: true,
     captureInput: true,
-    webContentsDebuggingEnabled: false,
+    webContentsDebuggingEnabled: true,
     backgroundColor: "#000000",
     launchMode: "singleTask",
     orientation: "portrait",
     useLegacyBridge: false,
     appendUserAgent: "SouloApp",
     overrideUserAgent: "SouloApp/1.0.0 Mobile",
-    androidScheme: "https"
+    androidScheme: "https",
+    loadOnMainThread: true,
+    handlePermissions: true
   }
 };
 

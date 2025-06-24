@@ -1,62 +1,23 @@
-import { Capacitor } from '@capacitor/core';
 
-// Conditional imports for Capacitor plugins - only import when running natively
-let App: any, SplashScreen: any, StatusBar: any, Keyboard: any, PushNotifications: any, Style: any;
+import { mobileErrorHandler } from './mobileErrorHandler';
 
-// Dynamically import Capacitor plugins only when needed
-const loadCapacitorPlugins = async () => {
-  try {
-    if (Capacitor.isNativePlatform()) {
-      // Use dynamic imports with proper error handling for each plugin
-      try {
-        const appModule = await import('@capacitor/app');
-        App = appModule.App;
-      } catch (error) {
-        console.warn('[Native] @capacitor/app not available:', error);
-      }
+interface CapacitorPlugin {
+  [key: string]: any;
+}
 
-      try {
-        const splashModule = await import('@capacitor/splash-screen');
-        SplashScreen = splashModule.SplashScreen;
-      } catch (error) {
-        console.warn('[Native] @capacitor/splash-screen not available:', error);
-      }
+interface DeviceInfo {
+  platform: string;
+  model: string;
+  osVersion: string;
+  manufacturer: string;
+  isVirtual: boolean;
+}
 
-      try {
-        const statusModule = await import('@capacitor/status-bar');
-        StatusBar = statusModule.StatusBar;
-        Style = statusModule.Style;
-      } catch (error) {
-        console.warn('[Native] @capacitor/status-bar not available:', error);
-      }
-
-      try {
-        const keyboardModule = await import('@capacitor/keyboard');
-        Keyboard = keyboardModule.Keyboard;
-      } catch (error) {
-        console.warn('[Native] @capacitor/keyboard not available:', error);
-      }
-
-      try {
-        const pushModule = await import('@capacitor/push-notifications');
-        PushNotifications = pushModule.PushNotifications;
-      } catch (error) {
-        console.warn('[Native] @capacitor/push-notifications not available:', error);
-      }
-    }
-  } catch (error) {
-    console.warn('[Native] Capacitor plugins not available:', error);
-  }
-};
-
-export class NativeIntegrationService {
+class NativeIntegrationService {
   private static instance: NativeIntegrationService;
-  private isNative: boolean;
-  private pluginsLoaded: boolean = false;
-
-  private constructor() {
-    this.isNative = Capacitor.isNativePlatform();
-  }
+  private isCapacitorReady = false;
+  private plugins: { [key: string]: CapacitorPlugin } = {};
+  private deviceInfo: DeviceInfo | null = null;
 
   static getInstance(): NativeIntegrationService {
     if (!NativeIntegrationService.instance) {
@@ -65,222 +26,301 @@ export class NativeIntegrationService {
     return NativeIntegrationService.instance;
   }
 
-  /**
-   * Initialize native platform features
-   */
   async initialize(): Promise<void> {
-    if (!this.isNative) {
-      console.log('[Native] Running in web mode, skipping native initialization');
-      return;
-    }
-
-    console.log('[Native] Initializing native platform features');
+    console.log('[NativeIntegration] Initializing native integration service');
 
     try {
-      // Load Capacitor plugins first
-      await loadCapacitorPlugins();
-      this.pluginsLoaded = true;
-
-      // Configure status bar
-      await this.configureStatusBar();
-      
-      // Setup keyboard handlers
-      await this.setupKeyboardHandlers();
-      
-      // Initialize push notifications
-      await this.initializePushNotifications();
-      
-      // Setup app event listeners
-      await this.setupAppEventListeners();
-      
-      // Hide splash screen after initialization
-      setTimeout(async () => {
-        await this.hideSplashScreen();
-      }, 2000);
-
-    } catch (error) {
-      console.error('[Native] Error during initialization:', error);
-    }
-  }
-
-  /**
-   * Configure status bar appearance
-   */
-  private async configureStatusBar(): Promise<void> {
-    if (!this.pluginsLoaded || !StatusBar || !Style) {
-      console.warn('[Native] StatusBar plugin not available');
-      return;
-    }
-
-    try {
-      await StatusBar.setStyle({ style: Style.Dark });
-      await StatusBar.setBackgroundColor({ color: '#000000' });
-      console.log('[Native] Status bar configured');
-    } catch (error) {
-      console.error('[Native] Error configuring status bar:', error);
-    }
-  }
-
-  /**
-   * Setup keyboard event handlers
-   */
-  private async setupKeyboardHandlers(): Promise<void> {
-    if (!this.pluginsLoaded || !Keyboard) {
-      console.warn('[Native] Keyboard plugin not available');
-      return;
-    }
-
-    try {
-      Keyboard.addListener('keyboardWillShow', (info) => {
-        console.log('[Native] Keyboard will show:', info);
-        document.body.style.paddingBottom = `${info.keyboardHeight}px`;
-      });
-
-      Keyboard.addListener('keyboardWillHide', () => {
-        console.log('[Native] Keyboard will hide');
-        document.body.style.paddingBottom = '0px';
-      });
-
-      console.log('[Native] Keyboard handlers setup');
-    } catch (error) {
-      console.error('[Native] Error setting up keyboard handlers:', error);
-    }
-  }
-
-  /**
-   * Initialize push notifications
-   */
-  private async initializePushNotifications(): Promise<void> {
-    if (!this.pluginsLoaded || !PushNotifications) {
-      console.warn('[Native] PushNotifications plugin not available');
-      return;
-    }
-
-    try {
-      const permission = await PushNotifications.requestPermissions();
-      
-      if (permission.receive === 'granted') {
-        await PushNotifications.register();
-        console.log('[Native] Push notifications initialized');
+      // Check if Capacitor is available
+      if (this.isCapacitorAvailable()) {
+        console.log('[NativeIntegration] Capacitor detected');
+        await this.initializeCapacitor();
+      } else {
+        console.log('[NativeIntegration] Running in web environment');
       }
 
-      PushNotifications.addListener('registration', (token) => {
-        console.log('[Native] Push registration token:', token.value);
-      });
+      // Initialize device info
+      await this.initializeDeviceInfo();
 
-      PushNotifications.addListener('pushNotificationReceived', (notification) => {
-        console.log('[Native] Push notification received:', notification);
-      });
+      // Setup plugin error handlers
+      this.setupPluginErrorHandlers();
 
+      console.log('[NativeIntegration] Native integration service initialized');
     } catch (error) {
-      console.error('[Native] Error initializing push notifications:', error);
+      console.error('[NativeIntegration] Failed to initialize:', error);
+      mobileErrorHandler.handleError({
+        type: 'unknown',
+        message: `Native integration initialization failed: ${error}`
+      });
     }
   }
 
-  /**
-   * Setup app event listeners
-   */
-  private async setupAppEventListeners(): Promise<void> {
-    if (!this.pluginsLoaded || !App) {
-      console.warn('[Native] App plugin not available');
-      return;
-    }
+  private isCapacitorAvailable(): boolean {
+    return typeof window !== 'undefined' && !!(window as any).Capacitor;
+  }
 
+  private async initializeCapacitor(): Promise<void> {
     try {
-      App.addListener('appStateChange', ({ isActive }: { isActive: boolean }) => {
-        console.log('[Native] App state changed. Active:', isActive);
+      const { Capacitor } = (window as any);
+      
+      if (Capacitor && Capacitor.Plugins) {
+        this.plugins = Capacitor.Plugins;
+        this.isCapacitorReady = true;
         
-        if (isActive) {
-          // App came to foreground
-          this.onAppResume();
-        } else {
-          // App went to background
-          this.onAppPause();
-        }
-      });
-
-      App.addListener('backButton', ({ canGoBack }: { canGoBack: boolean }) => {
-        console.log('[Native] Back button pressed. Can go back:', canGoBack);
+        console.log('[NativeIntegration] Available Capacitor plugins:', Object.keys(this.plugins));
         
-        if (canGoBack) {
-          window.history.back();
-        } else {
-          // Show exit confirmation or minimize app
-          App.minimizeApp();
+        // Initialize core plugins safely
+        await this.initializeCorePlugins();
+      }
+    } catch (error) {
+      console.error('[NativeIntegration] Capacitor initialization failed:', error);
+      mobileErrorHandler.handleCapacitorError('Core', error.toString());
+    }
+  }
+
+  private async initializeCorePlugins(): Promise<void> {
+    // Initialize App plugin
+    if (this.plugins.App) {
+      try {
+        // Listen for app state changes
+        this.plugins.App.addListener('appStateChange', (state: any) => {
+          console.log('[NativeIntegration] App state changed:', state);
+        });
+
+        // Listen for URL open events
+        this.plugins.App.addListener('appUrlOpen', (event: any) => {
+          console.log('[NativeIntegration] App URL opened:', event);
+        });
+
+        console.log('[NativeIntegration] App plugin initialized');
+      } catch (error) {
+        console.error('[NativeIntegration] App plugin initialization failed:', error);
+        mobileErrorHandler.handleCapacitorError('App', error.toString());
+      }
+    }
+
+    // Initialize Status Bar plugin
+    if (this.plugins.StatusBar) {
+      try {
+        await this.plugins.StatusBar.setStyle({ style: 'dark' });
+        await this.plugins.StatusBar.setBackgroundColor({ color: '#000000' });
+        console.log('[NativeIntegration] StatusBar plugin initialized');
+      } catch (error) {
+        console.error('[NativeIntegration] StatusBar plugin initialization failed:', error);
+        mobileErrorHandler.handleCapacitorError('StatusBar', error.toString());
+      }
+    }
+
+    // Initialize Keyboard plugin
+    if (this.plugins.Keyboard) {
+      try {
+        this.plugins.Keyboard.addListener('keyboardWillShow', (info: any) => {
+          console.log('[NativeIntegration] Keyboard will show:', info);
+          document.body.classList.add('keyboard-visible');
+        });
+
+        this.plugins.Keyboard.addListener('keyboardWillHide', () => {
+          console.log('[NativeIntegration] Keyboard will hide');
+          document.body.classList.remove('keyboard-visible');
+        });
+
+        console.log('[NativeIntegration] Keyboard plugin initialized');
+      } catch (error) {
+        console.error('[NativeIntegration] Keyboard plugin initialization failed:', error);
+        mobileErrorHandler.handleCapacitorError('Keyboard', error.toString());
+      }
+    }
+
+    // Initialize SplashScreen plugin
+    if (this.plugins.SplashScreen) {
+      try {
+        // Hide splash screen after a delay
+        setTimeout(async () => {
+          await this.plugins.SplashScreen.hide();
+          console.log('[NativeIntegration] Splash screen hidden');
+        }, 3000);
+      } catch (error) {
+        console.error('[NativeIntegration] SplashScreen plugin error:', error);
+        mobileErrorHandler.handleCapacitorError('SplashScreen', error.toString());
+      }
+    }
+  }
+
+  private async initializeDeviceInfo(): Promise<void> {
+    if (this.plugins.Device) {
+      try {
+        const info = await this.plugins.Device.getInfo();
+        this.deviceInfo = {
+          platform: info.platform || 'unknown',
+          model: info.model || 'unknown',
+          osVersion: info.osVersion || 'unknown',
+          manufacturer: info.manufacturer || 'unknown',
+          isVirtual: info.isVirtual || false
+        };
+        
+        console.log('[NativeIntegration] Device info:', this.deviceInfo);
+      } catch (error) {
+        console.error('[NativeIntegration] Failed to get device info:', error);
+        // Fallback to user agent detection
+        this.deviceInfo = this.getDeviceInfoFromUserAgent();
+      }
+    } else {
+      // Fallback for web environment
+      this.deviceInfo = this.getDeviceInfoFromUserAgent();
+    }
+  }
+
+  private getDeviceInfoFromUserAgent(): DeviceInfo {
+    const ua = navigator.userAgent;
+    let platform = 'web';
+    
+    if (ua.includes('Android')) {
+      platform = 'android';
+    } else if (ua.includes('iPhone') || ua.includes('iPad')) {
+      platform = 'ios';
+    }
+    
+    return {
+      platform,
+      model: 'unknown',
+      osVersion: 'unknown',
+      manufacturer: 'unknown',
+      isVirtual: false
+    };
+  }
+
+  private setupPluginErrorHandlers(): void {
+    // Global plugin error handler
+    if (this.isCapacitorReady) {
+      const originalConsoleError = console.error;
+      console.error = (...args) => {
+        originalConsoleError.apply(console, args);
+        
+        const errorMessage = args.join(' ');
+        if (errorMessage.includes('Capacitor') || errorMessage.includes('Plugin')) {
+          mobileErrorHandler.handleCapacitorError('Unknown', errorMessage);
         }
-      });
-
-      console.log('[Native] App event listeners setup');
-    } catch (error) {
-      console.error('[Native] Error setting up app event listeners:', error);
+      };
     }
   }
 
-  /**
-   * Hide splash screen
-   */
-  private async hideSplashScreen(): Promise<void> {
-    if (!this.pluginsLoaded || !SplashScreen) {
-      console.warn('[Native] SplashScreen plugin not available');
-      return;
-    }
-
-    try {
-      await SplashScreen.hide({
-        fadeOutDuration: 300
-      });
-      console.log('[Native] Splash screen hidden');
-    } catch (error) {
-      console.error('[Native] Error hiding splash screen:', error);
-    }
-  }
-
-  /**
-   * Handle app resume
-   */
-  private onAppResume(): void {
-    console.log('[Native] App resumed');
-    // Refresh data, check for updates, etc.
-  }
-
-  /**
-   * Handle app pause
-   */
-  private onAppPause(): void {
-    console.log('[Native] App paused');
-    // Save state, pause timers, etc.
-  }
-
-  /**
-   * Get device info
-   */
-  async getDeviceInfo(): Promise<any> {
-    if (!this.isNative || !this.pluginsLoaded || !App) {
-      return null;
-    }
-
-    try {
-      const info = await App.getInfo();
-      console.log('[Native] Device info:', info);
-      return info;
-    } catch (error) {
-      console.error('[Native] Error getting device info:', error);
-      return null;
-    }
-  }
-
-  /**
-   * Check if running on native platform
-   */
+  // Public methods
   isRunningNatively(): boolean {
-    return this.isNative;
+    return this.isCapacitorReady;
   }
 
-  /**
-   * Get platform name
-   */
   getPlatform(): string {
-    return Capacitor.getPlatform();
+    return this.deviceInfo?.platform || 'unknown';
+  }
+
+  getDeviceInfo(): DeviceInfo | null {
+    return this.deviceInfo;
+  }
+
+  async requestPermissions(permissions: string[]): Promise<{ [key: string]: string }> {
+    const results: { [key: string]: string } = {};
+    
+    for (const permission of permissions) {
+      try {
+        if (permission === 'microphone' && this.plugins.Microphone) {
+          const result = await this.plugins.Microphone.requestPermissions();
+          results[permission] = result.microphone || 'denied';
+        } else if (permission === 'notifications' && this.plugins.LocalNotifications) {
+          const result = await this.plugins.LocalNotifications.requestPermissions();
+          results[permission] = result.display || 'denied';
+        } else if (permission === 'push-notifications' && this.plugins.PushNotifications) {
+          const result = await this.plugins.PushNotifications.requestPermissions();
+          results[permission] = result.receive || 'denied';
+        }
+      } catch (error) {
+        console.error(`[NativeIntegration] Failed to request ${permission} permission:`, error);
+        results[permission] = 'denied';
+        mobileErrorHandler.handlePermissionError(permission);
+      }
+    }
+    
+    return results;
+  }
+
+  async hideStatusBar(): Promise<void> {
+    if (this.plugins.StatusBar) {
+      try {
+        await this.plugins.StatusBar.hide();
+      } catch (error) {
+        console.error('[NativeIntegration] Failed to hide status bar:', error);
+        mobileErrorHandler.handleCapacitorError('StatusBar', error.toString());
+      }
+    }
+  }
+
+  async showStatusBar(): Promise<void> {
+    if (this.plugins.StatusBar) {
+      try {
+        await this.plugins.StatusBar.show();
+      } catch (error) {
+        console.error('[NativeIntegration] Failed to show status bar:', error);
+        mobileErrorHandler.handleCapacitorError('StatusBar', error.toString());
+      }
+    }
+  }
+
+  async vibrate(duration: number = 100): Promise<void> {
+    if (this.plugins.Haptics) {
+      try {
+        await this.plugins.Haptics.vibrate({ duration });
+      } catch (error) {
+        console.error('[NativeIntegration] Failed to vibrate:', error);
+        mobileErrorHandler.handleCapacitorError('Haptics', error.toString());
+      }
+    } else if ('vibrate' in navigator) {
+      // Fallback to web vibration API
+      navigator.vibrate(duration);
+    }
+  }
+
+  async exitApp(): Promise<void> {
+    if (this.plugins.App) {
+      try {
+        await this.plugins.App.exitApp();
+      } catch (error) {
+        console.error('[NativeIntegration] Failed to exit app:', error);
+        mobileErrorHandler.handleCapacitorError('App', error.toString());
+      }
+    }
+  }
+
+  // Network status
+  async getNetworkStatus(): Promise<{ connected: boolean; connectionType: string }> {
+    if (this.plugins.Network) {
+      try {
+        const status = await this.plugins.Network.getStatus();
+        return {
+          connected: status.connected,
+          connectionType: status.connectionType
+        };
+      } catch (error) {
+        console.error('[NativeIntegration] Failed to get network status:', error);
+        mobileErrorHandler.handleCapacitorError('Network', error.toString());
+      }
+    }
+    
+    // Fallback
+    return {
+      connected: navigator.onLine,
+      connectionType: 'unknown'
+    };
+  }
+
+  // Safe plugin access
+  getPlugin(name: string): CapacitorPlugin | null {
+    if (this.isCapacitorReady && this.plugins[name]) {
+      return this.plugins[name];
+    }
+    return null;
+  }
+
+  // Check if specific plugin is available
+  isPluginAvailable(name: string): boolean {
+    return this.isCapacitorReady && !!this.plugins[name];
   }
 }
 
