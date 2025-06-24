@@ -14,6 +14,8 @@ import { initializeServiceWorker } from './utils/serviceWorker'
 import { backgroundSyncService } from './services/backgroundSyncService'
 import { periodicSyncService } from './services/periodicSyncService'
 import { pushNotificationService } from './services/pushNotificationService'
+import { mobileErrorHandler } from './services/mobileErrorHandler'
+import { mobileOptimizationService } from './services/mobileOptimizationService'
 
 // Enhanced Font Loading System
 const initializeFontSystem = async () => {
@@ -178,27 +180,47 @@ const initializePWA = async () => {
     
   } catch (error) {
     console.error('[PWA] PWA initialization error:', error);
+    mobileErrorHandler.handleError({
+      type: 'unknown',
+      message: `PWA initialization failed: ${error}`
+    });
   }
 };
 
 // Initialize systems
 const initializeApp = async () => {
-  // Initialize font system first
-  await initializeFontSystem();
-  
-  // Initialize viewport fix
-  fixViewportHeight();
-  
-  // Initialize PWA features
-  await initializePWA();
-  
-  // Detect iOS and set a class on the HTML element
-  if (/iPad|iPhone|iPod/.test(navigator.userAgent) || 
-      (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)) {
-    document.documentElement.classList.add('ios-device');
+  try {
+    // Initialize font system first
+    await initializeFontSystem();
+    
+    // Initialize viewport fix
+    fixViewportHeight();
+    
+    // Initialize mobile optimizations early
+    await mobileOptimizationService.initialize();
+    
+    // Initialize PWA features
+    await initializePWA();
+    
+    // Detect iOS and set a class on the HTML element
+    if (/iPad|iPhone|iPod/.test(navigator.userAgent) || 
+        (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)) {
+      document.documentElement.classList.add('ios-device');
+    }
+    
+    // Detect Android and set a class
+    if (/Android/.test(navigator.userAgent)) {
+      document.documentElement.classList.add('android-device');
+    }
+    
+    console.log('[App] Initialization complete');
+  } catch (error) {
+    console.error('[App] Initialization failed:', error);
+    mobileErrorHandler.handleError({
+      type: 'crash',
+      message: `App initialization failed: ${error}`
+    });
   }
-  
-  console.log('[App] Initialization complete');
 };
 
 // Start initialization

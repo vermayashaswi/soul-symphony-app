@@ -21,6 +21,8 @@ import { detectTWAEnvironment } from './utils/twaDetection';
 import { useTWAAutoRefresh } from './hooks/useTWAAutoRefresh';
 import { twaUpdateService } from './services/twaUpdateService';
 import { nativeIntegrationService } from './services/nativeIntegrationService';
+import { mobileErrorHandler } from './services/mobileErrorHandler';
+import { mobileOptimizationService } from './services/mobileOptimizationService';
 
 const App: React.FC = () => {
   const [isInitialized, setIsInitialized] = useState(false);
@@ -41,18 +43,42 @@ const App: React.FC = () => {
       // Apply a CSS class to the document body for theme-specific overrides
       document.body.classList.add('app-initialized');
       
+      // Initialize mobile optimization service first
+      try {
+        await mobileOptimizationService.initialize();
+        console.log('[App] Mobile optimization service initialized');
+      } catch (error) {
+        console.warn('[App] Mobile optimization failed:', error);
+        mobileErrorHandler.handleError({
+          type: 'unknown',
+          message: `Mobile optimization failed: ${error}`
+        });
+      }
+      
       // Initialize native platform features
       try {
         await nativeIntegrationService.initialize();
         console.log('[App] Native integration initialized');
       } catch (error) {
         console.warn('[App] Native integration failed:', error);
+        mobileErrorHandler.handleError({
+          type: 'crash',
+          message: `Native integration failed: ${error}`
+        });
       }
       
       // Initialize TWA update service
       if (twaEnv.isTWA || twaEnv.isStandalone) {
         console.log('[App] Initializing TWA update service');
-        twaUpdateService.init();
+        try {
+          twaUpdateService.init();
+        } catch (error) {
+          console.warn('[App] TWA update service failed:', error);
+          mobileErrorHandler.handleError({
+            type: 'unknown',
+            message: `TWA update service failed: ${error}`
+          });
+        }
       }
       
       // Preload critical images including the chat avatar
@@ -64,7 +90,7 @@ const App: React.FC = () => {
       }
 
       // Mark app as initialized after a brief delay to ensure smooth startup
-      const initDelay = (twaEnv.isTWA || twaEnv.isStandalone) ? 500 : 300;
+      const initDelay = (twaEnv.isTWA || twaEnv.isStandalone) ? 1000 : 500;
       setTimeout(() => {
         setIsInitialized(true);
       }, initDelay);
@@ -78,10 +104,14 @@ const App: React.FC = () => {
         // Only trigger emergency recovery if auto-refresh hasn't already handled it
         if (!isStuckDetected && refreshCount === 0) {
           console.warn('[App] Emergency recovery triggered - forcing app initialization');
+          mobileErrorHandler.handleError({
+            type: 'crash',
+            message: 'App initialization timeout - emergency recovery triggered'
+          });
           setEmergencyRecovery(true);
           setIsInitialized(true);
         }
-      }, 15000); // 15 second emergency timeout
+      }, 20000); // 20 second emergency timeout for mobile
 
       return () => {
         clearTimeout(recoveryTimeout);
@@ -97,6 +127,14 @@ const App: React.FC = () => {
   const handleAppError = (error: Error, errorInfo: any) => {
     console.error('Application-level error:', error, errorInfo);
     
+    // Use mobile error handler for consistent error tracking
+    mobileErrorHandler.handleError({
+      type: 'crash',
+      message: error.message,
+      stack: error.stack,
+      timestamp: Date.now()
+    });
+
     // Log critical app errors for debugging
     const errorData = {
       message: error.message,

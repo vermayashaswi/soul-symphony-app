@@ -19,7 +19,7 @@ const config: CapacitorConfig = {
       spinnerColor: "#8b5cf6",
       splashFullScreen: true,
       splashImmersive: true,
-      splashScreenDelay: 2000
+      splashScreenDelay: 3000
     },
     Keyboard: {
       resize: "body",
@@ -35,6 +35,11 @@ const config: CapacitorConfig = {
     },
     PushNotifications: {
       presentationOptions: ["badge", "sound", "alert"]
+    },
+    LocalNotifications: {
+      smallIcon: "ic_stat_icon_config_sample",
+      iconColor: "#8b5cf6",
+      sound: "beep.wav"
     }
   },
   ios: {
@@ -51,7 +56,11 @@ const config: CapacitorConfig = {
     webContentsDebuggingEnabled: false,
     backgroundColor: "#000000",
     launchMode: "singleTask",
-    orientation: "portrait"
+    orientation: "portrait",
+    useLegacyBridge: false,
+    appendUserAgent: "SouloApp",
+    overrideUserAgent: "SouloApp/1.0.0 Mobile",
+    androidScheme: "https"
   }
 };
 
