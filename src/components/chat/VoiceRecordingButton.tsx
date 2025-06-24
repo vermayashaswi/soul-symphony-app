@@ -9,6 +9,8 @@ import { cn } from "@/lib/utils";
 import { LanguageBackground } from "@/components/voice-recorder/MultilingualTextAnimation";
 import { getAudioConfig, getRecorderOptions, RECORDING_LIMITS } from "@/utils/audio/recording-config";
 import { useTutorial } from "@/contexts/TutorialContext";
+import { usePermissionManager } from "@/hooks/usePermissionManager";
+import { PermissionPrompt } from "@/components/permissions/PermissionPrompt";
 
 interface VoiceRecordingButtonProps {
   isLoading: boolean;
@@ -33,6 +35,9 @@ const VoiceRecordingButton: React.FC<VoiceRecordingButtonProps> = ({
   const [stream, setStream] = useState<MediaStream | null>(null);
   const { toast } = useToast();
   const { isActive, isInStep } = useTutorial();
+  const { requestPermission, permissions } = usePermissionManager();
+  const [showPermissionPrompt, setShowPermissionPrompt] = useState(false);
+  const [isRequestingPermission, setIsRequestingPermission] = useState(false);
   
   // Check if we're in tutorial step 5
   const isInTutorialStep = isActive && isInStep(5);
@@ -124,7 +129,7 @@ const VoiceRecordingButton: React.FC<VoiceRecordingButtonProps> = ({
     return cleanup;
   }, [isRecording, toast]);
   
-  const handleVoiceRecording = () => {
+  const handleVoiceRecording = async () => {
     if (isRecording && recorder) {
       console.log("[VoiceRecordingButton] Stopping recording");
       recorder.stopRecording(() => {
@@ -146,56 +151,101 @@ const VoiceRecordingButton: React.FC<VoiceRecordingButtonProps> = ({
         setRecorder(null);
       });
     } else {
+      // Check microphone permission before starting
+      if (permissions.microphone !== 'granted') {
+        console.log("[VoiceRecordingButton] Microphone permission needed, showing prompt");
+        setShowPermissionPrompt(true);
+        return;
+      }
+      
       console.log("[VoiceRecordingButton] Starting recording");
       onStartRecording();
     }
   };
+
+  const handlePermissionAllow = async () => {
+    try {
+      setIsRequestingPermission(true);
+      const granted = await requestPermission('microphone');
+      
+      if (granted) {
+        setShowPermissionPrompt(false);
+        // Start recording immediately after permission is granted
+        setTimeout(() => {
+          onStartRecording();
+        }, 500);
+      }
+    } catch (error) {
+      console.error('[VoiceRecordingButton] Error requesting microphone permission:', error);
+    } finally {
+      setIsRequestingPermission(false);
+    }
+  };
+
+  const handlePermissionDeny = () => {
+    setShowPermissionPrompt(false);
+  };
+
+  const handlePermissionClose = () => {
+    setShowPermissionPrompt(false);
+  };
   
   return (
-    <div className="relative">
-      {isRecording && (
-        <div className="absolute -z-10 inset-0 overflow-hidden rounded-full" style={{ 
-          width: size === "sm" ? "90px" : "110px", 
-          height: size === "sm" ? "90px" : "110px",
-          left: "50%",
-          top: "50%",
-          transform: "translate(-50%, -50%)"
-        }}>
-          <LanguageBackground contained={true} />
-        </div>
-      )}
-      
-      <Button 
-        type="button" 
-        size={size} 
-        variant={isRecording ? "destructive" : "default"}
-        onClick={handleVoiceRecording}
-        disabled={isLoading}
-        className={cn(
-          "relative rounded-full flex items-center justify-center",
-          isRecording ? "bg-red-500 hover:bg-red-600" : "",
-          isRecording && "animate-pulse",
-          className
-        )}
-        style={{
-          width: size === "sm" ? "48px" : "64px",
-          height: size === "sm" ? "48px" : "64px",
-          transition: "all 0.3s ease",
-          backgroundColor: "#000000" // Ensure black background
-        }}
-      >
-        {isRecording ? (
-          <Square className={`${size === "sm" ? "h-4 w-4" : "h-5 w-5"} text-white`} />
-        ) : (
-          <Mic className={`${size === "sm" ? "h-4 w-4" : "h-5 w-5"}`} />
-        )}
+    <>
+      <div className="relative">
         {isRecording && (
-          <span className={`absolute ${size === "sm" ? "-bottom-5" : "-bottom-6"} text-xs font-medium`}>
-            {formatTime(recordingTime)}
-          </span>
+          <div className="absolute -z-10 inset-0 overflow-hidden rounded-full" style={{ 
+            width: size === "sm" ? "90px" : "110px", 
+            height: size === "sm" ? "90px" : "110px",
+            left: "50%",
+            top: "50%",
+            transform: "translate(-50%, -50%)"
+          }}>
+            <LanguageBackground contained={true} />
+          </div>
         )}
-      </Button>
-    </div>
+        
+        <Button 
+          type="button" 
+          size={size} 
+          variant={isRecording ? "destructive" : "default"}
+          onClick={handleVoiceRecording}
+          disabled={isLoading}
+          className={cn(
+            "relative rounded-full flex items-center justify-center",
+            isRecording ? "bg-red-500 hover:bg-red-600" : "",
+            isRecording && "animate-pulse",
+            className
+          )}
+          style={{
+            width: size === "sm" ? "48px" : "64px",
+            height: size === "sm" ? "48px" : "64px",
+            transition: "all 0.3s ease",
+            backgroundColor: "#000000" // Ensure black background
+          }}
+        >
+          {isRecording ? (
+            <Square className={`${size === "sm" ? "h-4 w-4" : "h-5 w-5"} text-white`} />
+          ) : (
+            <Mic className={`${size === "sm" ? "h-4 w-4" : "h-5 w-5"}`} />
+          )}
+          {isRecording && (
+            <span className={`absolute ${size === "sm" ? "-bottom-5" : "-bottom-6"} text-xs font-medium`}>
+              {formatTime(recordingTime)}
+            </span>
+          )}
+        </Button>
+      </div>
+
+      <PermissionPrompt
+        type="microphone"
+        isVisible={showPermissionPrompt}
+        isLoading={isRequestingPermission}
+        onAllow={handlePermissionAllow}
+        onDeny={handlePermissionDeny}
+        onClose={handlePermissionClose}
+      />
+    </>
   );
 };
 
