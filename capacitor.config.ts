@@ -3,46 +3,55 @@ import { CapacitorConfig } from '@capacitor/cli';
 
 const config: CapacitorConfig = {
   appId: 'app.soulo.online',
-  appName: 'soul-symphony-app',
+  appName: 'Soulo',
   webDir: 'dist',
   server: {
-    url: 'https://soulo.online?forceHideBadge=true',
+    url: 'https://soulo.online/app?forceHideBadge=true',
     cleartext: true
   },
-  // Ensure proper permissions for iOS and Android
   plugins: {
-    // Add specific iOS-related configurations
     SplashScreen: {
       launchAutoHide: false,
-      backgroundColor: "#FFFFFF",
+      backgroundColor: "#000000",
       showSpinner: true,
       androidSpinnerStyle: "large",
-      iosSpinnerStyle: "small",
+      iosSpinnerStyle: "small", 
       spinnerColor: "#8b5cf6",
       splashFullScreen: true,
-      splashImmersive: true
+      splashImmersive: true,
+      splashScreenDelay: 2000
     },
-    // Handle keyboard properly
     Keyboard: {
       resize: "body",
       style: "dark",
       resizeOnFullScreen: true
+    },
+    StatusBar: {
+      style: "dark",
+      backgroundColor: "#000000"
+    },
+    App: {
+      launchUrl: "https://soulo.online/app"
+    },
+    PushNotifications: {
+      presentationOptions: ["badge", "sound", "alert"]
     }
   },
-  // iOS-specific configuration
   ios: {
     contentInset: "always",
     allowsLinkPreview: false,
     scrollEnabled: true,
-    useUserAgentString: false,
-    limitsNavigationsToAppBoundDomains: true,
-    backgroundColor: "#FFFFFF"
+    backgroundColor: "#000000",
+    scheme: "Soulo",
+    preferredContentMode: "mobile"
   },
-  // Android-specific configuration
   android: {
     allowMixedContent: true,
     captureInput: true,
-    webContentsDebuggingEnabled: true
+    webContentsDebuggingEnabled: false,
+    backgroundColor: "#000000",
+    launchMode: "singleTask",
+    orientation: "portrait"
   }
 };
 

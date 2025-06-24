@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from 'react';
 import AppRoutes from './routes/AppRoutes';
 import { Toaster } from "@/components/ui/toaster";
@@ -19,6 +20,7 @@ import TWAInitializationWrapper from './components/twa/TWAInitializationWrapper'
 import { detectTWAEnvironment } from './utils/twaDetection';
 import { useTWAAutoRefresh } from './hooks/useTWAAutoRefresh';
 import { twaUpdateService } from './services/twaUpdateService';
+import { nativeIntegrationService } from './services/nativeIntegrationService';
 
 const App: React.FC = () => {
   const [isInitialized, setIsInitialized] = useState(false);
@@ -27,36 +29,48 @@ const App: React.FC = () => {
   const { refreshCount, isStuckDetected } = useTWAAutoRefresh();
 
   useEffect(() => {
-    // Clean up any malformed paths
-    const currentPath = window.location.pathname;
-    
-    // Fix incorrectly formatted URLs that have domains or https in the path
-    if (currentPath.includes('https://') || currentPath.includes('soulo.online')) {
-      window.history.replaceState(null, '', '/');
-    }
-    
-    // Apply a CSS class to the document body for theme-specific overrides
-    document.body.classList.add('app-initialized');
-    
-    // Initialize TWA update service
-    if (twaEnv.isTWA || twaEnv.isStandalone) {
-      console.log('[App] Initializing TWA update service');
-      twaUpdateService.init();
-    }
-    
-    // Preload critical images including the chat avatar
-    try {
-      preloadCriticalImages();
-    } catch (error) {
-      console.warn('Failed to preload some images:', error);
-      // Non-critical error, continue app initialization
-    }
+    const initializeApp = async () => {
+      // Clean up any malformed paths
+      const currentPath = window.location.pathname;
+      
+      // Fix incorrectly formatted URLs that have domains or https in the path
+      if (currentPath.includes('https://') || currentPath.includes('soulo.online')) {
+        window.history.replaceState(null, '', '/');
+      }
+      
+      // Apply a CSS class to the document body for theme-specific overrides
+      document.body.classList.add('app-initialized');
+      
+      // Initialize native platform features
+      try {
+        await nativeIntegrationService.initialize();
+        console.log('[App] Native integration initialized');
+      } catch (error) {
+        console.warn('[App] Native integration failed:', error);
+      }
+      
+      // Initialize TWA update service
+      if (twaEnv.isTWA || twaEnv.isStandalone) {
+        console.log('[App] Initializing TWA update service');
+        twaUpdateService.init();
+      }
+      
+      // Preload critical images including the chat avatar
+      try {
+        preloadCriticalImages();
+      } catch (error) {
+        console.warn('Failed to preload some images:', error);
+        // Non-critical error, continue app initialization
+      }
 
-    // Mark app as initialized after a brief delay to ensure smooth startup
-    const initDelay = (twaEnv.isTWA || twaEnv.isStandalone) ? 500 : 300;
-    setTimeout(() => {
-      setIsInitialized(true);
-    }, initDelay);
+      // Mark app as initialized after a brief delay to ensure smooth startup
+      const initDelay = (twaEnv.isTWA || twaEnv.isStandalone) ? 500 : 300;
+      setTimeout(() => {
+        setIsInitialized(true);
+      }, initDelay);
+    };
+
+    initializeApp();
 
     // Emergency recovery mechanism for TWA apps that get stuck
     if (twaEnv.isTWA || twaEnv.isStandalone) {
@@ -92,6 +106,8 @@ const App: React.FC = () => {
       userAgent: navigator.userAgent,
       url: window.location.href,
       isTWA: twaEnv.isTWA || twaEnv.isStandalone,
+      isNative: nativeIntegrationService.isRunningNatively(),
+      platform: nativeIntegrationService.getPlatform(),
       emergencyRecovery,
       autoRefreshCount: refreshCount
     };
