@@ -36,13 +36,13 @@ function App() {
       <QueryClientProvider client={queryClient}>
         <ThemeProvider defaultTheme="light" storageKey="vite-ui-theme">
           <TranslationProvider>
-            <AuthProvider>
-              <SubscriptionProvider>
-                <LocationProvider>
-                  <FeatureFlagsProvider>
-                    <ContextReadinessProvider>
-                      <TutorialProvider>
-                        <BrowserRouter>
+            <BrowserRouter>
+              <AuthProvider>
+                <SubscriptionProvider>
+                  <LocationProvider>
+                    <FeatureFlagsProvider>
+                      <ContextReadinessProvider>
+                        <TutorialProvider>
                           <div className="min-h-screen bg-background font-sans antialiased">
                             <Toaster />
                             <OfflineIndicator />
@@ -50,13 +50,13 @@ function App() {
                             <NotificationCenter />
                             <AppRoutes />
                           </div>
-                        </BrowserRouter>
-                      </TutorialProvider>
-                    </ContextReadinessProvider>
-                  </FeatureFlagsProvider>
-                </LocationProvider>
-              </SubscriptionProvider>
-            </AuthProvider>
+                        </TutorialProvider>
+                      </ContextReadinessProvider>
+                    </FeatureFlagsProvider>
+                  </LocationProvider>
+                </SubscriptionProvider>
+              </AuthProvider>
+            </BrowserRouter>
           </TranslationProvider>
         </ThemeProvider>
       </QueryClientProvider>
