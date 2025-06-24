@@ -1,6 +1,6 @@
 
 import { useEffect, useRef, useState } from 'react';
-import { detectTWAEnvironment, shouldApplyTWALogic } from '@/utils/twaDetection';
+import { detectTWAEnvironment } from '@/utils/twaDetection';
 
 interface AutoRefreshState {
   isStuckDetected: boolean;
@@ -21,12 +21,11 @@ export const useTWAAutoRefresh = () => {
   
   const stuckDetectionTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const initializationStartTimeRef = useRef<number>(0);
-  const currentPath = window.location.pathname;
-  const shouldUseTWALogic = shouldApplyTWALogic(currentPath);
+  const twaEnv = detectTWAEnvironment();
 
   // Start monitoring for stuck loader
   const startStuckDetection = () => {
-    if (!shouldUseTWALogic) return;
+    if (!twaEnv.isTWA && !twaEnv.isStandalone) return;
     
     initializationStartTimeRef.current = Date.now();
     console.log('[TWA AutoRefresh] Starting stuck detection monitoring');
@@ -104,6 +103,6 @@ export const useTWAAutoRefresh = () => {
     stopStuckDetection,
     resetRefreshState,
     triggerAutoRefresh,
-    isTWAEnvironment: shouldUseTWALogic
+    isTWAEnvironment: twaEnv.isTWA || twaEnv.isStandalone
   };
 };

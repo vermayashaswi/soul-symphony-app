@@ -1,6 +1,6 @@
 
 import { useEffect, useState, useRef } from 'react';
-import { detectTWAEnvironment, shouldApplyTWALogic } from '@/utils/twaDetection';
+import { detectTWAEnvironment } from '@/utils/twaDetection';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTWAAutoRefresh } from './useTWAAutoRefresh';
 
@@ -20,8 +20,7 @@ export const useTWAInitialization = () => {
   });
   
   const { user, isLoading: authLoading } = useAuth();
-  const currentPath = window.location.pathname;
-  const shouldUseTWALogic = shouldApplyTWALogic(currentPath);
+  const twaEnv = detectTWAEnvironment();
   const initializationStartedRef = useRef(false);
   const initTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const authStabilizedRef = useRef(false);
@@ -34,10 +33,10 @@ export const useTWAInitialization = () => {
   } = useTWAAutoRefresh();
 
   useEffect(() => {
-    // Only run initialization once and only when TWA logic should apply
-    if (initializationStartedRef.current || !shouldUseTWALogic) {
-      // For non-TWA environments or non-app routes, complete initialization immediately
-      if (!shouldUseTWALogic && !initState.initializationComplete) {
+    // Only run initialization once and only in TWA environment
+    if (initializationStartedRef.current || (!twaEnv.isTWA && !twaEnv.isStandalone)) {
+      // For non-TWA environments, complete initialization immediately
+      if (!twaEnv.isTWA && !twaEnv.isStandalone && !initState.initializationComplete) {
         setInitState(prev => ({
           ...prev,
           isInitialized: true,
@@ -49,11 +48,11 @@ export const useTWAInitialization = () => {
     }
     
     initializationStartedRef.current = true;
-    console.log('[TWA Init] Starting TWA initialization process for app route', {
-      shouldUseTWALogic,
+    console.log('[TWA Init] Starting TWA initialization process with auto-refresh monitoring', {
+      isTWA: twaEnv.isTWA,
+      isStandalone: twaEnv.isStandalone,
       authLoading,
-      hasUser: !!user,
-      currentPath
+      hasUser: !!user
     });
 
     // Start auto-refresh monitoring
@@ -81,11 +80,11 @@ export const useTWAInitialization = () => {
       }
       stopStuckDetection();
     };
-  }, [shouldUseTWALogic, startStuckDetection, stopStuckDetection, currentPath]);
+  }, [twaEnv.isTWA, twaEnv.isStandalone, startStuckDetection, stopStuckDetection]);
 
   // Handle auth stabilization
   useEffect(() => {
-    if (!shouldUseTWALogic) return;
+    if (!twaEnv.isTWA && !twaEnv.isStandalone) return;
     
     // Auth is considered stabilized when loading stops
     if (!authLoading && !authStabilizedRef.current) {
@@ -111,18 +110,18 @@ export const useTWAInitialization = () => {
         resetRefreshState();
       }, 1000);
     }
-  }, [authLoading, shouldUseTWALogic, resetRefreshState]);
+  }, [authLoading, twaEnv.isTWA, twaEnv.isStandalone, resetRefreshState]);
 
   // Reset initialization state when auth state changes significantly
   useEffect(() => {
-    if (!shouldUseTWALogic) return;
+    if (!twaEnv.isTWA && !twaEnv.isStandalone) return;
     
     // If user changes (login/logout), reset auth stabilization
     authStabilizedRef.current = false;
-  }, [user?.id, shouldUseTWALogic]);
+  }, [user?.id, twaEnv.isTWA, twaEnv.isStandalone]);
 
   return {
     ...initState,
-    isTWAEnvironment: shouldUseTWALogic
+    isTWAEnvironment: twaEnv.isTWA || twaEnv.isStandalone
   };
 };

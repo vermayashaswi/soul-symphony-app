@@ -2,14 +2,16 @@
 import { CapacitorConfig } from '@capacitor/cli';
 
 const config: CapacitorConfig = {
-  appId: 'com.rhasys.soulo',
-  appName: 'Soulo',
+  appId: 'app.soulo.online',
+  appName: 'soul-symphony-app',
   webDir: 'dist',
   server: {
-    url: 'https://soulo.online/app?forceHideBadge=true',
+    url: 'https://soulo.online?forceHideBadge=true',
     cleartext: true
   },
+  // Ensure proper permissions for iOS and Android
   plugins: {
+    // Add specific iOS-related configurations
     SplashScreen: {
       launchAutoHide: false,
       backgroundColor: "#FFFFFF",
@@ -20,19 +22,14 @@ const config: CapacitorConfig = {
       splashFullScreen: true,
       splashImmersive: true
     },
+    // Handle keyboard properly
     Keyboard: {
       resize: "body",
       style: "dark",
       resizeOnFullScreen: true
-    },
-    // Request essential permissions on app startup
-    Permissions: {
-      permissions: [
-        'microphone',
-        'notifications'
-      ]
     }
   },
+  // iOS-specific configuration
   ios: {
     contentInset: "always",
     allowsLinkPreview: false,
@@ -41,15 +38,11 @@ const config: CapacitorConfig = {
     limitsNavigationsToAppBoundDomains: true,
     backgroundColor: "#FFFFFF"
   },
+  // Android-specific configuration
   android: {
     allowMixedContent: true,
     captureInput: true,
-    webContentsDebuggingEnabled: true,
-    // Add permissions to Android manifest
-    permissions: [
-      'android.permission.RECORD_AUDIO',
-      'android.permission.POST_NOTIFICATIONS'
-    ]
+    webContentsDebuggingEnabled: true
   }
 };
 

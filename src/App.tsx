@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from 'react';
 import AppRoutes from './routes/AppRoutes';
 import { Toaster } from "@/components/ui/toaster";
@@ -17,7 +16,7 @@ import './styles/tutorial.css';
 import { FeatureFlagsProvider } from "./contexts/FeatureFlagsContext";
 import TWAWrapper from './components/twa/TWAWrapper';
 import TWAInitializationWrapper from './components/twa/TWAInitializationWrapper';
-import { detectTWAEnvironment, shouldApplyTWALogic } from './utils/twaDetection';
+import { detectTWAEnvironment } from './utils/twaDetection';
 import { useTWAAutoRefresh } from './hooks/useTWAAutoRefresh';
 import { twaUpdateService } from './services/twaUpdateService';
 
@@ -25,8 +24,6 @@ const App: React.FC = () => {
   const [isInitialized, setIsInitialized] = useState(false);
   const [emergencyRecovery, setEmergencyRecovery] = useState(false);
   const twaEnv = detectTWAEnvironment();
-  const currentPath = window.location.pathname;
-  const shouldUseTWALogic = shouldApplyTWALogic(currentPath);
   const { refreshCount, isStuckDetected } = useTWAAutoRefresh();
 
   useEffect(() => {
@@ -41,9 +38,9 @@ const App: React.FC = () => {
     // Apply a CSS class to the document body for theme-specific overrides
     document.body.classList.add('app-initialized');
     
-    // Initialize TWA update service ONLY for app routes in TWA environment
-    if (shouldUseTWALogic) {
-      console.log('[App] Initializing TWA update service for app route');
+    // Initialize TWA update service
+    if (twaEnv.isTWA || twaEnv.isStandalone) {
+      console.log('[App] Initializing TWA update service');
       twaUpdateService.init();
     }
     
@@ -56,14 +53,13 @@ const App: React.FC = () => {
     }
 
     // Mark app as initialized after a brief delay to ensure smooth startup
-    // Only add TWA-specific delay if we're in a TWA environment on app routes
-    const initDelay = shouldUseTWALogic ? 500 : 300;
+    const initDelay = (twaEnv.isTWA || twaEnv.isStandalone) ? 500 : 300;
     setTimeout(() => {
       setIsInitialized(true);
     }, initDelay);
 
-    // Emergency recovery mechanism ONLY for TWA apps on app routes
-    if (shouldUseTWALogic) {
+    // Emergency recovery mechanism for TWA apps that get stuck
+    if (twaEnv.isTWA || twaEnv.isStandalone) {
       const recoveryTimeout = setTimeout(() => {
         // Only trigger emergency recovery if auto-refresh hasn't already handled it
         if (!isStuckDetected && refreshCount === 0) {
@@ -80,12 +76,9 @@ const App: React.FC = () => {
     }
 
     return () => {
-      // Only destroy TWA service if it was initialized
-      if (shouldUseTWALogic) {
-        twaUpdateService.destroy();
-      }
+      twaUpdateService.destroy();
     };
-  }, [shouldUseTWALogic, isStuckDetected, refreshCount]);
+  }, [twaEnv.isTWA, twaEnv.isStandalone, isStuckDetected, refreshCount]);
 
   const handleAppError = (error: Error, errorInfo: any) => {
     console.error('Application-level error:', error, errorInfo);
@@ -98,10 +91,9 @@ const App: React.FC = () => {
       timestamp: new Date().toISOString(),
       userAgent: navigator.userAgent,
       url: window.location.href,
-      isTWA: shouldUseTWALogic && (twaEnv.isTWA || twaEnv.isStandalone),
+      isTWA: twaEnv.isTWA || twaEnv.isStandalone,
       emergencyRecovery,
-      autoRefreshCount: refreshCount,
-      currentPath
+      autoRefreshCount: refreshCount
     };
     
     console.error('Detailed error info:', errorData);
@@ -109,15 +101,15 @@ const App: React.FC = () => {
     // Show user-friendly error notification
     toast.error('Something went wrong. The app will try to recover automatically.');
 
-    // Trigger emergency recovery ONLY for TWA on app routes
-    if (shouldUseTWALogic && !emergencyRecovery && refreshCount === 0) {
+    // Trigger emergency recovery for TWA if needed and auto-refresh hasn't been tried
+    if ((twaEnv.isTWA || twaEnv.isStandalone) && !emergencyRecovery && refreshCount === 0) {
       console.log('[App] Triggering emergency recovery due to error');
       setEmergencyRecovery(true);
     }
   };
 
-  // Emergency recovery UI - ONLY for TWA apps on app routes
-  if (emergencyRecovery && shouldUseTWALogic) {
+  // Emergency recovery UI for TWA apps
+  if (emergencyRecovery) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
         <div className="flex flex-col items-center space-y-4 p-6 text-center max-w-md">
@@ -148,27 +140,16 @@ const App: React.FC = () => {
         <TranslationProvider>
           <SubscriptionProvider>
             <TutorialProvider>
-              {shouldUseTWALogic ? (
-                <TWAWrapper>
-                  <TWAInitializationWrapper>
-                    <TranslationLoadingOverlay />
-                    <JournalProcessingInitializer />
-                    <AppRoutes key={isInitialized ? 'initialized' : 'initializing'} />
-                    <TutorialOverlay />
-                    <Toaster />
-                    <SonnerToaster position="top-right" />
-                  </TWAInitializationWrapper>
-                </TWAWrapper>
-              ) : (
-                <>
+              <TWAWrapper>
+                <TWAInitializationWrapper>
                   <TranslationLoadingOverlay />
                   <JournalProcessingInitializer />
                   <AppRoutes key={isInitialized ? 'initialized' : 'initializing'} />
                   <TutorialOverlay />
                   <Toaster />
                   <SonnerToaster position="top-right" />
-                </>
-              )}
+                </TWAInitializationWrapper>
+              </TWAWrapper>
             </TutorialProvider>
           </SubscriptionProvider>
         </TranslationProvider>

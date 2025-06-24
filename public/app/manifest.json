@@ -4,7 +4,7 @@
   "short_name": "Soulo",
   "description": "AI-powered voice journaling for emotional wellness and self-discovery. Express your thoughts through voice, reflect on your emotions with AI insights, and grow through personalized guidance.",
   "start_url": "/app",
-  "id": "com.rhasys.soulo",
+  "id": "com.soulo.app",
   "display": "standalone",
   "display_override": ["window-controls-overlay", "standalone", "minimal-ui"],
   "background_color": "#ffffff",
@@ -56,10 +56,6 @@
       ]
     }
   },
-  "permissions": [
-    "microphone",
-    "notifications"
-  ],
   "icons": [
     {
       "src": "/lovable-uploads/a07b91eb-274a-47b6-8180-fb4c9c0bc8a5.png",
@@ -190,8 +186,8 @@
   "related_applications": [
     {
       "platform": "play",
-      "url": "https://play.google.com/store/apps/details?id=com.rhasys.soulo",
-      "id": "com.rhasys.soulo"
+      "url": "https://play.google.com/store/apps/details?id=com.soulo.app",
+      "id": "com.soulo.app"
     },
     {
       "platform": "itunes",
