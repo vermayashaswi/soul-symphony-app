@@ -3,6 +3,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useTWAInitialization } from '@/hooks/useTWAInitialization';
 import { useTWAAutoRefresh } from '@/hooks/useTWAAutoRefresh';
 import { twaPermissionBootstrap } from '@/services/twaPermissionBootstrap';
+import { detectTWAEnvironment } from '@/utils/twaDetection';
 
 interface TWAInitializationWrapperProps {
   children: React.ReactNode;
@@ -13,13 +14,44 @@ const TWAInitializationWrapper: React.FC<TWAInitializationWrapperProps> = ({ chi
   const { isStuckDetected, refreshCount } = useTWAAutoRefresh();
   const [permissionsBootstrapped, setPermissionsBootstrapped] = useState(false);
   const [isBootstrapping, setIsBootstrapping] = useState(false);
+  const [delegationCheckComplete, setDelegationCheckComplete] = useState(false);
   const bootstrapAttemptedRef = useRef(false);
+
+  // Check for permission delegation on mount
+  useEffect(() => {
+    if (!isTWAEnvironment) {
+      setDelegationCheckComplete(true);
+      return;
+    }
+
+    const checkDelegation = async () => {
+      try {
+        console.log('[TWAInitializationWrapper] Checking permission delegation capabilities');
+        
+        const twaEnv = detectTWAEnvironment();
+        
+        if (twaEnv.hasPermissionDelegation) {
+          console.log('[TWAInitializationWrapper] Permission delegation detected, setting up enhanced monitoring');
+          
+          // If we have delegation, we might not need the same bootstrap flow
+          // But we still want to ensure permissions are properly set up
+        }
+        
+        setDelegationCheckComplete(true);
+      } catch (error) {
+        console.error('[TWAInitializationWrapper] Error checking permission delegation:', error);
+        setDelegationCheckComplete(true);
+      }
+    };
+
+    checkDelegation();
+  }, [isTWAEnvironment]);
 
   // Handle permission bootstrap after basic initialization is complete
   useEffect(() => {
     const handlePermissionBootstrap = async () => {
-      // Only bootstrap in TWA environment after initialization is complete
-      if (!isTWAEnvironment || !initializationComplete || bootstrapAttemptedRef.current) {
+      // Only bootstrap in TWA environment after initialization and delegation check are complete
+      if (!isTWAEnvironment || !initializationComplete || !delegationCheckComplete || bootstrapAttemptedRef.current) {
         return;
       }
 
@@ -56,11 +88,11 @@ const TWAInitializationWrapper: React.FC<TWAInitializationWrapperProps> = ({ chi
     };
 
     handlePermissionBootstrap();
-  }, [initializationComplete, isTWAEnvironment]);
+  }, [initializationComplete, isTWAEnvironment, delegationCheckComplete]);
 
   // Show loading if still initializing OR if permissions are being bootstrapped in TWA
   const shouldShowLoading = isTWAEnvironment && 
-    (isLoading || !initializationComplete || (initializationComplete && !permissionsBootstrapped));
+    (isLoading || !initializationComplete || !delegationCheckComplete || (initializationComplete && delegationCheckComplete && !permissionsBootstrapped));
 
   if (shouldShowLoading) {
     return (
@@ -70,11 +102,13 @@ const TWAInitializationWrapper: React.FC<TWAInitializationWrapperProps> = ({ chi
           <p className="text-muted-foreground text-center">
             {isBootstrapping
               ? 'Setting up permissions...'
-              : isStuckDetected && refreshCount > 0 
-                ? `Refreshing app... (attempt ${refreshCount})`
-                : hasTimedOut 
-                  ? 'Finalizing startup...' 
-                  : 'Starting Soulo...'
+              : !delegationCheckComplete
+                ? 'Checking permission capabilities...'
+                : isStuckDetected && refreshCount > 0 
+                  ? `Refreshing app... (attempt ${refreshCount})`
+                  : hasTimedOut 
+                    ? 'Finalizing startup...' 
+                    : 'Starting Soulo...'
             }
           </p>
           {hasTimedOut && !isStuckDetected && (
@@ -90,6 +124,11 @@ const TWAInitializationWrapper: React.FC<TWAInitializationWrapperProps> = ({ chi
           {isBootstrapping && (
             <p className="text-xs text-muted-foreground/70">
               Requesting app permissions...
+            </p>
+          )}
+          {!delegationCheckComplete && (
+            <p className="text-xs text-muted-foreground/70">
+              Checking native permission support...
             </p>
           )}
         </div>

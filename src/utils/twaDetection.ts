@@ -9,6 +9,7 @@ export interface TWAEnvironment {
   isAndroidTWA: boolean;
   isStandalone: boolean;
   canExit: boolean;
+  hasPermissionDelegation: boolean;
 }
 
 /**
@@ -21,7 +22,7 @@ export const detectTWAEnvironment = (): TWAEnvironment => {
   // Check for standalone mode
   const isStandalone = window.matchMedia('(display-mode: standalone)').matches;
   
-  // More comprehensive TWA detection
+  // Enhanced TWA detection with permission delegation check
   const hasTWAIndicators = 
     // WebView indicator
     userAgent.includes('wv') ||
@@ -33,18 +34,25 @@ export const detectTWAEnvironment = (): TWAEnvironment => {
     (isStandalone && isAndroid) ||
     // Check for TWA package name in referrer or origin
     (document.referrer.includes('com.rhasys.soulo') || 
-     window.location.search.includes('twa=true'));
+     window.location.search.includes('twa=true')) ||
+    // Check for Capacitor TWA indicators
+    window.location.search.includes('forceHideBadge=true');
+
+  // Check for permission delegation (TWA feature)
+  const hasPermissionDelegation = checkPermissionDelegation();
 
   // Enhanced detection: TWA if standalone AND has indicators, OR explicit TWA markers
   const isTWA = (isStandalone && hasTWAIndicators) || 
                 userAgent.includes('twa') ||
-                window.location.search.includes('twa=true');
+                window.location.search.includes('twa=true') ||
+                hasPermissionDelegation;
   
   console.log('[TWA Detection]', {
     userAgent,
     isAndroid,
     isStandalone,
     hasTWAIndicators,
+    hasPermissionDelegation,
     isTWA,
     referrer: document.referrer,
     search: window.location.search
@@ -54,8 +62,48 @@ export const detectTWAEnvironment = (): TWAEnvironment => {
     isTWA,
     isAndroidTWA: isTWA && isAndroid,
     isStandalone,
-    canExit: isTWA || isStandalone
+    canExit: isTWA || isStandalone,
+    hasPermissionDelegation
   };
+};
+
+/**
+ * Check if permission delegation is available (TWA feature)
+ */
+const checkPermissionDelegation = (): boolean => {
+  try {
+    // Check if we're running in a context that has permission delegation
+    // This is a TWA-specific feature where the native app can handle permissions
+    
+    // Check for Android TWA permission delegation indicators
+    const hasAndroidDelegation = 
+      // Check if we have access to Android-specific permission APIs
+      'permissions' in navigator &&
+      // Check for TWA-specific permission handling
+      typeof (navigator as any).permissions.request === 'function' &&
+      // Check for Android WebView context
+      /android/i.test(navigator.userAgent) &&
+      // Check for standalone mode (required for TWA)
+      window.matchMedia('(display-mode: standalone)').matches;
+
+    // Check for Capacitor-based TWA indicators
+    const hasCapacitorDelegation = 
+      // Check if we're running through Capacitor
+      window.location.search.includes('forceHideBadge=true') ||
+      // Check for Capacitor global
+      typeof (window as any).Capacitor !== 'undefined';
+
+    console.log('[Permission Delegation Check]', {
+      hasAndroidDelegation,
+      hasCapacitorDelegation,
+      userAgent: navigator.userAgent
+    });
+
+    return hasAndroidDelegation || hasCapacitorDelegation;
+  } catch (error) {
+    console.warn('[Permission Delegation Check] Error:', error);
+    return false;
+  }
 };
 
 /**
@@ -68,6 +116,7 @@ export const shouldApplyTWALogic = (currentPath: string): boolean => {
     currentPath,
     isTWA: twaEnv.isTWA,
     isStandalone: twaEnv.isStandalone,
+    hasPermissionDelegation: twaEnv.hasPermissionDelegation,
     isAppRoute: currentPath.startsWith('/app')
   });
   

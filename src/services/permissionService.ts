@@ -1,4 +1,3 @@
-
 import { detectTWAEnvironment, shouldApplyTWALogic } from '@/utils/twaDetection';
 
 export type PermissionType = 'microphone' | 'notifications';
@@ -14,10 +13,21 @@ class PermissionService {
   private permissionCache: Map<PermissionType, PermissionStatus> = new Map();
 
   /**
-   * Check the current status of a permission
+   * Check the current status of a permission with TWA delegation support
    */
   async checkPermission(type: PermissionType): Promise<PermissionStatus> {
     try {
+      const twaEnv = detectTWAEnvironment();
+      
+      // If we have permission delegation, check with the native layer first
+      if (twaEnv.hasPermissionDelegation) {
+        const delegatedStatus = await this.checkDelegatedPermission(type);
+        if (delegatedStatus) {
+          console.log(`[PermissionService] Using delegated ${type} permission:`, delegatedStatus);
+          return delegatedStatus;
+        }
+      }
+
       switch (type) {
         case 'microphone':
           return await this.checkMicrophonePermission();
@@ -33,7 +43,42 @@ class PermissionService {
   }
 
   /**
-   * Request a specific permission with TWA-optimized handling
+   * Check permission status through TWA delegation
+   */
+  private async checkDelegatedPermission(type: PermissionType): Promise<PermissionStatus | null> {
+    try {
+      // Check if we have Capacitor available for permission checking
+      if (typeof (window as any).Capacitor !== 'undefined') {
+        const { Capacitor } = window as any;
+        
+        if (Capacitor.isNativePlatform()) {
+          // Use Capacitor's permission checking
+          const permissionName = type === 'microphone' ? 'microphone' : 'notifications';
+          
+          if (Capacitor.Plugins && Capacitor.Plugins.Permissions) {
+            const result = await Capacitor.Plugins.Permissions.query({ name: permissionName });
+            console.log(`[PermissionService] Capacitor ${type} permission:`, result);
+            return result.state as PermissionStatus;
+          }
+        }
+      }
+
+      // Fallback to Android TWA permission delegation check
+      if ('permissions' in navigator && typeof (navigator as any).permissions.request === 'function') {
+        const permissionName = type === 'microphone' ? 'microphone' : 'notifications';
+        const permission = await navigator.permissions.query({ name: permissionName as PermissionName });
+        return permission.state as PermissionStatus;
+      }
+
+      return null;
+    } catch (error) {
+      console.warn(`[PermissionService] Delegated permission check failed for ${type}:`, error);
+      return null;
+    }
+  }
+
+  /**
+   * Request a specific permission with TWA-optimized handling and delegation
    */
   async requestPermission(type: PermissionType): Promise<boolean> {
     try {
@@ -41,9 +86,19 @@ class PermissionService {
       
       const currentPath = window.location.pathname;
       const isTWAEnvironment = shouldApplyTWALogic(currentPath);
+      const twaEnv = detectTWAEnvironment();
       
       if (isTWAEnvironment) {
         console.log(`[PermissionService] Using TWA-optimized ${type} permission request`);
+        
+        // Try delegation first if available
+        if (twaEnv.hasPermissionDelegation) {
+          const delegatedResult = await this.requestDelegatedPermission(type);
+          if (delegatedResult !== null) {
+            console.log(`[PermissionService] Delegated ${type} permission result:`, delegatedResult);
+            return delegatedResult;
+          }
+        }
       }
       
       switch (type) {
@@ -57,6 +112,43 @@ class PermissionService {
     } catch (error) {
       console.error(`[PermissionService] Error requesting ${type} permission:`, error);
       return false;
+    }
+  }
+
+  /**
+   * Request permission through TWA delegation
+   */
+  private async requestDelegatedPermission(type: PermissionType): Promise<boolean | null> {
+    try {
+      // Check if we have Capacitor available for permission requests
+      if (typeof (window as any).Capacitor !== 'undefined') {
+        const { Capacitor } = window as any;
+        
+        if (Capacitor.isNativePlatform()) {
+          const permissionName = type === 'microphone' ? 'microphone' : 'notifications';
+          
+          if (Capacitor.Plugins && Capacitor.Plugins.Permissions) {
+            const result = await Capacitor.Plugins.Permissions.request({ permissions: [permissionName] });
+            console.log(`[PermissionService] Capacitor ${type} permission request result:`, result);
+            
+            const status = result[permissionName];
+            const granted = status === 'granted';
+            
+            if (granted) {
+              this.savePermissionToStorage(type, 'granted');
+            } else {
+              this.savePermissionToStorage(type, 'denied');
+            }
+            
+            return granted;
+          }
+        }
+      }
+
+      return null;
+    } catch (error) {
+      console.warn(`[PermissionService] Delegated permission request failed for ${type}:`, error);
+      return null;
     }
   }
 
@@ -273,7 +365,7 @@ class PermissionService {
   }
 
   /**
-   * Monitor permission changes for TWA
+   * Enhanced TWA permission monitoring with delegation support
    */
   async monitorPermissionChanges(callback: (type: PermissionType, status: PermissionStatus) => void): Promise<void> {
     const currentPath = window.location.pathname;
@@ -282,6 +374,38 @@ class PermissionService {
     }
 
     try {
+      const twaEnv = detectTWAEnvironment();
+      
+      // Set up Capacitor permission monitoring if available
+      if (twaEnv.hasPermissionDelegation && typeof (window as any).Capacitor !== 'undefined') {
+        const { Capacitor } = window as any;
+        
+        if (Capacitor.isNativePlatform() && Capacitor.Plugins && Capacitor.Plugins.Permissions) {
+          // Note: Capacitor doesn't have built-in permission change monitoring
+          // We'll use periodic checking as a fallback
+          setInterval(async () => {
+            const micStatus = await this.checkPermission('microphone');
+            const notifStatus = await this.checkPermission('notifications');
+            
+            const cachedMic = this.permissionCache.get('microphone');
+            const cachedNotif = this.permissionCache.get('notifications');
+            
+            if (cachedMic !== micStatus) {
+              this.permissionCache.set('microphone', micStatus);
+              callback('microphone', micStatus);
+            }
+            
+            if (cachedNotif !== notifStatus) {
+              this.permissionCache.set('notifications', notifStatus);
+              callback('notifications', notifStatus);
+            }
+          }, 5000); // Check every 5 seconds
+          
+          return;
+        }
+      }
+
+      // Fallback to standard permission monitoring
       if ('permissions' in navigator) {
         // Monitor microphone permission
         const micPermission = await navigator.permissions.query({ name: 'microphone' as PermissionName });

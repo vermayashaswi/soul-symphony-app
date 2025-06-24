@@ -8,6 +8,7 @@ interface PermissionBootstrapResult {
   notifications: boolean;
   allGranted: boolean;
   bootstrapAttempted: boolean;
+  usedDelegation: boolean;
 }
 
 class TWAPermissionBootstrap {
@@ -30,7 +31,8 @@ class TWAPermissionBootstrap {
         microphone: false, 
         notifications: false, 
         allGranted: false, 
-        bootstrapAttempted: false 
+        bootstrapAttempted: false,
+        usedDelegation: false
       };
     }
 
@@ -51,17 +53,32 @@ class TWAPermissionBootstrap {
       microphone: false,
       notifications: false,
       allGranted: false,
-      bootstrapAttempted: true
+      bootstrapAttempted: true,
+      usedDelegation: false
     };
 
     try {
+      const twaEnv = detectTWAEnvironment();
+      
+      // Check if we have permission delegation
+      if (twaEnv.hasPermissionDelegation) {
+        console.log('[TWAPermissionBootstrap] Permission delegation detected, using enhanced flow');
+        result.usedDelegation = true;
+        
+        // Show delegation-specific message
+        toast.info('Setting up native app permissions...', {
+          duration: 2000
+        });
+      }
+
       // Check current permission states first
       const microphoneStatus = await permissionService.checkPermission('microphone');
       const notificationsStatus = await permissionService.checkPermission('notifications');
 
       console.log('[TWAPermissionBootstrap] Current permission states:', {
         microphone: microphoneStatus,
-        notifications: notificationsStatus
+        notifications: notificationsStatus,
+        hasPermissionDelegation: twaEnv.hasPermissionDelegation
       });
 
       // Update result for already granted permissions
@@ -91,9 +108,11 @@ class TWAPermissionBootstrap {
       }
 
       // Show initial bootstrap message
-      toast.info('Setting up app permissions for the best experience...', {
-        duration: 2000
-      });
+      if (!result.usedDelegation) {
+        toast.info('Setting up app permissions for the best experience...', {
+          duration: 2000
+        });
+      }
 
       // Request permissions sequentially with proper user interaction
       for (const permissionType of permissionsToRequest) {
@@ -119,9 +138,13 @@ class TWAPermissionBootstrap {
             console.log(`[TWAPermissionBootstrap] ${permissionType} permission denied`);
             
             // Show helpful message for denied permissions
-            const message = permissionType === 'microphone' 
-              ? 'Microphone access is needed for voice journaling. You can enable it in Settings.' 
-              : 'Notifications help you stay consistent. You can enable them in Settings.';
+            const message = result.usedDelegation
+              ? permissionType === 'microphone'
+                ? 'Microphone access needed for voice journaling. You can enable it in your device Settings.'
+                : 'Notifications help you stay consistent. You can enable them in your device Settings.'
+              : permissionType === 'microphone' 
+                ? 'Microphone access is needed for voice journaling. You can enable it in Settings.' 
+                : 'Notifications help you stay consistent. You can enable them in Settings.';
               
             toast.warning(message, { duration: 3000 });
           }
@@ -133,7 +156,11 @@ class TWAPermissionBootstrap {
           console.error(`[TWAPermissionBootstrap] Error requesting ${permissionType} permission:`, error);
           result[permissionType] = false;
           
-          toast.error(`Failed to request ${permissionType} permission. Please try manually in Settings.`, {
+          const errorMessage = result.usedDelegation
+            ? `Failed to request ${permissionType} permission through native app. Please enable manually in device Settings.`
+            : `Failed to request ${permissionType} permission. Please try manually in Settings.`;
+          
+          toast.error(errorMessage, {
             duration: 3000
           });
         }
@@ -143,15 +170,24 @@ class TWAPermissionBootstrap {
       
       // Show final status message
       if (result.allGranted) {
-        toast.success('All permissions granted! Soulo is ready to use.', {
+        const message = result.usedDelegation 
+          ? 'All native permissions granted! Soulo is ready to use.'
+          : 'All permissions granted! Soulo is ready to use.';
+        toast.success(message, {
           duration: 3000
         });
       } else if (result.microphone || result.notifications) {
-        toast.info('Some permissions granted. You can enable others in Settings if needed.', {
+        const message = result.usedDelegation
+          ? 'Some permissions granted. You can enable others in device Settings if needed.'
+          : 'Some permissions granted. You can enable others in Settings if needed.';
+        toast.info(message, {
           duration: 3000
         });
       } else {
-        toast.warning('Permissions were not granted. You can enable them manually in Settings for the best experience.', {
+        const message = result.usedDelegation
+          ? 'Permissions were not granted. You can enable them manually in device Settings for the best experience.'
+          : 'Permissions were not granted. You can enable them manually in Settings for the best experience.';
+        toast.warning(message, {
           duration: 4000
         });
       }
