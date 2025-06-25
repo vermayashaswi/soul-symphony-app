@@ -3,9 +3,17 @@ import { CapacitorConfig } from '@capacitor/cli';
 
 const config: CapacitorConfig = {
   appId: 'app.soulo.online',
-  appName: 'Soulo',
+  appName: 'Soulo Dev',
   webDir: 'dist',
-  // Remove server configuration for production - use bundled assets
+  server: {
+    url: 'https://soulo.online/app?forceHideBadge=true',
+    cleartext: true,
+    allowNavigation: [
+      'soulo.online',
+      '*.supabase.co',
+      'api.openai.com'
+    ]
+  },
   plugins: {
     SplashScreen: {
       launchAutoHide: false,
@@ -28,7 +36,7 @@ const config: CapacitorConfig = {
       backgroundColor: "#000000"
     },
     App: {
-      // Remove launchUrl for production builds
+      launchUrl: "https://soulo.online/app"
     },
     PushNotifications: {
       presentationOptions: ["badge", "sound", "alert"]
@@ -48,9 +56,9 @@ const config: CapacitorConfig = {
     preferredContentMode: "mobile"
   },
   android: {
-    allowMixedContent: false, // Disable for production security
+    allowMixedContent: true,
     captureInput: true,
-    webContentsDebuggingEnabled: false, // Disable for production
+    webContentsDebuggingEnabled: true,
     backgroundColor: "#000000",
     launchMode: "singleTask",
     orientation: "portrait",

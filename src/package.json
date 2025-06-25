@@ -1,5 +1,13 @@
 
 {
+  "scripts": {
+    "cap:build": "node scripts/build-capacitor.js",
+    "cap:build:dev": "node scripts/build-capacitor.js --dev",
+    "cap:build:android": "node scripts/build-capacitor.js android",
+    "cap:build:android:dev": "node scripts/build-capacitor.js --dev android",
+    "cap:build:ios": "node scripts/build-capacitor.js ios",
+    "cap:build:ios:dev": "node scripts/build-capacitor.js --dev ios"
+  },
   "dependencies": {
   }
 }
