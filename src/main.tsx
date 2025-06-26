@@ -16,6 +16,7 @@ import { periodicSyncService } from './services/periodicSyncService'
 import { pushNotificationService } from './services/pushNotificationService'
 import { mobileErrorHandler } from './services/mobileErrorHandler'
 import { mobileOptimizationService } from './services/mobileOptimizationService'
+import { nativeIntegrationService } from './services/nativeIntegrationService'
 
 // Enhanced Font Loading System
 const initializeFontSystem = async () => {
@@ -199,6 +200,9 @@ const initializeApp = async () => {
     // Initialize mobile optimizations early
     await mobileOptimizationService.initialize();
     
+    // Initialize native integration service for mobile features
+    await nativeIntegrationService.initialize();
+    
     // Initialize PWA features
     await initializePWA();
     
@@ -211,6 +215,12 @@ const initializeApp = async () => {
     // Detect Android and set a class
     if (/Android/.test(navigator.userAgent)) {
       document.documentElement.classList.add('android-device');
+    }
+    
+    // Detect if running in Capacitor native app
+    if ((window as any).Capacitor?.isNativePlatform?.()) {
+      document.documentElement.classList.add('capacitor-native');
+      console.log('[App] Running in Capacitor native environment');
     }
     
     console.log('[App] Initialization complete');

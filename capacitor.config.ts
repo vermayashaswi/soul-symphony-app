@@ -5,10 +5,6 @@ const config: CapacitorConfig = {
   appId: 'app.soulo.online',
   appName: 'Soulo',
   webDir: 'dist',
-  server: {
-    url: 'https://soulo.online/app'
-    cleartext: false 
-  },
   // Remove server configuration for production - use bundled assets
   plugins: {
     SplashScreen: {
@@ -20,7 +16,7 @@ const config: CapacitorConfig = {
       spinnerColor: "#8b5cf6",
       splashFullScreen: true,
       splashImmersive: true,
-      splashScreenDelay: 2000
+      splashScreenDelay: 3000
     },
     Keyboard: {
       resize: "body",
@@ -32,7 +28,8 @@ const config: CapacitorConfig = {
       backgroundColor: "#000000"
     },
     App: {
-      // Remove launchUrl for production builds
+      // Deep link handling for OAuth redirects
+      launchUrl: "soulo://auth"
     },
     PushNotifications: {
       presentationOptions: ["badge", "sound", "alert"]
@@ -48,13 +45,13 @@ const config: CapacitorConfig = {
     allowsLinkPreview: false,
     scrollEnabled: true,
     backgroundColor: "#000000",
-    scheme: "Soulo",
+    scheme: "soulo",
     preferredContentMode: "mobile"
   },
   android: {
-    allowMixedContent: false, // Disable for production security
+    allowMixedContent: false,
     captureInput: true,
-    webContentsDebuggingEnabled: false, // Disable for production
+    webContentsDebuggingEnabled: false,
     backgroundColor: "#000000",
     launchMode: "singleTask",
     orientation: "portrait",

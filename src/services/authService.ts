@@ -3,24 +3,69 @@ import { toast } from 'sonner';
 import { isAppRoute } from '@/routes/RouteHelpers';
 
 /**
- * Gets the redirect URL for authentication
+ * Detects if the app is running in a native mobile environment
+ */
+const isNativeApp = (): boolean => {
+  return !!(window as any).Capacitor?.isNativePlatform?.();
+};
+
+/**
+ * Gets the redirect URL for authentication based on environment
  */
 export const getRedirectUrl = (): string => {
-  // For iOS in standalone mode (PWA), we need to handle redirects differently
-  // Check for standalone mode in a type-safe way
-  const isInStandaloneMode = () => {
-    // Check for display-mode: standalone media query (PWA)
-    const standaloneCheck = window.matchMedia('(display-mode: standalone)').matches;
-    
-    // Check for navigator.standalone (iOS Safari)
-    // @ts-ignore - This is valid on iOS Safari but not in the TypeScript types
-    const iosSafariStandalone = window.navigator.standalone;
-    
-    return standaloneCheck || iosSafariStandalone;
-  };
+  if (isNativeApp()) {
+    // Use custom scheme for native apps to enable deep linking
+    return 'soulo://auth';
+  }
   
-  // All auth redirects should go to /app/auth
+  // For web, redirect to the auth page
   return `${window.location.origin}/app/auth`;
+};
+
+/**
+ * Handle deep link authentication callback in native apps
+ */
+export const handleDeepLinkAuth = async (url: string): Promise<boolean> => {
+  try {
+    console.log('Processing deep link auth:', url);
+    
+    // Parse the URL to extract auth tokens
+    const urlObj = new URL(url);
+    const fragment = urlObj.hash?.substring(1) || urlObj.search?.substring(1);
+    
+    if (!fragment) {
+      console.log('No auth fragment found in deep link');
+      return false;
+    }
+    
+    // Parse fragment parameters
+    const params = new URLSearchParams(fragment);
+    const accessToken = params.get('access_token');
+    const refreshToken = params.get('refresh_token');
+    
+    if (accessToken && refreshToken) {
+      console.log('Setting session from deep link tokens');
+      
+      // Set the session using the tokens from the deep link
+      const { data, error } = await supabase.auth.setSession({
+        access_token: accessToken,
+        refresh_token: refreshToken
+      });
+      
+      if (error) {
+        console.error('Error setting session from deep link:', error);
+        return false;
+      }
+      
+      console.log('Deep link authentication successful');
+      return true;
+    }
+    
+    return false;
+  } catch (error) {
+    console.error('Error handling deep link auth:', error);
+    return false;
+  }
 };
 
 /**
@@ -29,14 +74,13 @@ export const getRedirectUrl = (): string => {
 export const signInWithGoogle = async (): Promise<void> => {
   try {
     const redirectUrl = getRedirectUrl();
-    console.log('Using redirect URL:', redirectUrl);
+    console.log('Google sign-in redirect URL:', redirectUrl);
     
     const { data, error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: {
         redirectTo: redirectUrl,
         queryParams: {
-          // Force refresh of Google access tokens
           access_type: 'offline',
           prompt: 'consent',
         },
@@ -47,9 +91,17 @@ export const signInWithGoogle = async (): Promise<void> => {
       throw error;
     }
     
-    // If we have a URL, manually redirect to it (as a backup)
-    if (data?.url) {
-      console.log('Redirecting to OAuth URL:', data.url);
+    // For native apps, the OAuth flow will redirect to our custom scheme
+    if (data?.url && isNativeApp()) {
+      console.log('Opening OAuth URL in native browser:', data.url);
+      // The system browser will handle the OAuth flow and redirect back to our app
+      if ((window as any).Capacitor?.Plugins?.Browser) {
+        await (window as any).Capacitor.Plugins.Browser.open({ url: data.url });
+      } else {
+        window.location.href = data.url;
+      }
+    } else if (data?.url) {
+      // For web, redirect normally
       setTimeout(() => {
         window.location.href = data.url;
       }, 100);
@@ -67,7 +119,7 @@ export const signInWithGoogle = async (): Promise<void> => {
 export const signInWithApple = async (): Promise<void> => {
   try {
     const redirectUrl = getRedirectUrl();
-    console.log('Using redirect URL for Apple ID:', redirectUrl);
+    console.log('Apple sign-in redirect URL:', redirectUrl);
     
     const { data, error } = await supabase.auth.signInWithOAuth({
       provider: 'apple',
@@ -80,9 +132,16 @@ export const signInWithApple = async (): Promise<void> => {
       throw error;
     }
     
-    // If we have a URL, manually redirect to it (as a backup)
-    if (data?.url) {
-      console.log('Redirecting to Apple OAuth URL:', data.url);
+    // For native apps, the OAuth flow will redirect to our custom scheme
+    if (data?.url && isNativeApp()) {
+      console.log('Opening Apple OAuth URL in native browser:', data.url);
+      if ((window as any).Capacitor?.Plugins?.Browser) {
+        await (window as any).Capacitor.Plugins.Browser.open({ url: data.url });
+      } else {
+        window.location.href = data.url;
+      }
+    } else if (data?.url) {
+      // For web, redirect normally
       setTimeout(() => {
         window.location.href = data.url;
       }, 100);
@@ -246,10 +305,9 @@ export const getCurrentUser = async () => {
 };
 
 /**
- * Handle auth callback
- * This is specifically added to fix the auth flow
+ * Handle auth callback - enhanced for mobile deep links
  */
-export const handleAuthCallback = async () => {
+export const handleAuthCallback = async (): Promise<any> => {
   try {
     // Check if we have hash params that might indicate an auth callback
     const hasHashParams = window.location.hash.includes('access_token') || 
@@ -269,7 +327,6 @@ export const handleAuthCallback = async () => {
       
       if (data.session?.user) {
         console.log('User authenticated in callback handler');
-        // Session creation will be handled by AuthContext
         return data.session;
       }
     }

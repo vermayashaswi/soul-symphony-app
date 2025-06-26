@@ -8,6 +8,7 @@ import SouloLogo from '@/components/SouloLogo';
 import { useOnboarding } from '@/hooks/use-onboarding';
 import { TranslatableText } from '@/components/translation/TranslatableText';
 import PlatformAuthButton from '@/components/auth/PlatformAuthButton';
+import { handleDeepLinkAuth } from '@/services/authService';
 
 export default function Auth() {
   const location = useLocation();
@@ -48,6 +49,53 @@ export default function Auth() {
     currentPath: location.pathname,
     onboardingComplete
   });
+
+  // Handle deep link authentication for mobile apps
+  useEffect(() => {
+    const handleMobileDeepLink = async () => {
+      // Check if this is a mobile app and if we have auth callback params
+      const isNativeApp = !!(window as any).Capacitor?.isNativePlatform?.();
+      
+      if (isNativeApp) {
+        // Listen for app URL open events (deep links)
+        const handleAppUrlOpen = async (event: any) => {
+          console.log('App URL opened:', event.url);
+          
+          if (event.url.includes('access_token') || event.url.includes('soulo://auth')) {
+            console.log('Processing auth deep link');
+            const authSuccess = await handleDeepLinkAuth(event.url);
+            
+            if (authSuccess) {
+              console.log('Deep link authentication successful');
+              toast.success('Authentication successful!');
+            } else {
+              console.log('Deep link authentication failed');
+              setAuthError('Authentication failed. Please try again.');
+            }
+          }
+        };
+
+        // Add listener for URL open events
+        if ((window as any).Capacitor?.Plugins?.App) {
+          (window as any).Capacitor.Plugins.App.addListener('appUrlOpen', handleAppUrlOpen);
+          
+          // Cleanup listener on unmount
+          return () => {
+            (window as any).Capacitor.Plugins.App.removeAllListeners?.();
+          };
+        }
+      } else {
+        // For web, handle URL fragments normally
+        const fragment = window.location.hash || window.location.search;
+        if (fragment.includes('access_token')) {
+          console.log('Web auth callback detected');
+          // Let Supabase handle the callback
+        }
+      }
+    };
+
+    handleMobileDeepLink();
+  }, []);
 
   useEffect(() => {
     setIsLoading(false);

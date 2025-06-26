@@ -1,5 +1,6 @@
 
 import { mobileErrorHandler } from './mobileErrorHandler';
+import { handleDeepLinkAuth } from './authService';
 
 interface CapacitorPlugin {
   [key: string]: any;
@@ -18,6 +19,7 @@ class NativeIntegrationService {
   private isCapacitorReady = false;
   private plugins: { [key: string]: CapacitorPlugin } = {};
   private deviceInfo: DeviceInfo | null = null;
+  private splashScreenHidden = false;
 
   static getInstance(): NativeIntegrationService {
     if (!NativeIntegrationService.instance) {
@@ -78,7 +80,7 @@ class NativeIntegrationService {
   }
 
   private async initializeCorePlugins(): Promise<void> {
-    // Initialize App plugin
+    // Initialize App plugin with deep link handling
     if (this.plugins.App) {
       try {
         // Listen for app state changes
@@ -86,12 +88,25 @@ class NativeIntegrationService {
           console.log('[NativeIntegration] App state changed:', state);
         });
 
-        // Listen for URL open events
-        this.plugins.App.addListener('appUrlOpen', (event: any) => {
-          console.log('[NativeIntegration] App URL opened:', event);
+        // Listen for URL open events (deep links)
+        this.plugins.App.addListener('appUrlOpen', async (event: any) => {
+          console.log('[NativeIntegration] App URL opened:', event.url);
+          
+          // Handle authentication deep links
+          if (event.url.includes('access_token') || event.url.includes('soulo://auth')) {
+            console.log('[NativeIntegration] Processing auth deep link');
+            try {
+              const authSuccess = await handleDeepLinkAuth(event.url);
+              if (authSuccess) {
+                console.log('[NativeIntegration] Deep link authentication successful');
+              }
+            } catch (error) {
+              console.error('[NativeIntegration] Deep link auth failed:', error);
+            }
+          }
         });
 
-        console.log('[NativeIntegration] App plugin initialized');
+        console.log('[NativeIntegration] App plugin initialized with deep link support');
       } catch (error) {
         console.error('[NativeIntegration] App plugin initialization failed:', error);
         mobileErrorHandler.handleCapacitorError('App', error.toString());
@@ -130,16 +145,46 @@ class NativeIntegrationService {
       }
     }
 
-    // Initialize SplashScreen plugin
+    // Initialize SplashScreen plugin with proper timing
     if (this.plugins.SplashScreen) {
       try {
         // Hide splash screen after a delay
         setTimeout(async () => {
-          await this.plugins.SplashScreen.hide();
-          console.log('[NativeIntegration] Splash screen hidden');
-        }, 3000);
+          if (!this.splashScreenHidden) {
+            await this.hideSplashScreen();
+          }
+        }, 4000); // Increased delay for better UX
       } catch (error) {
         console.error('[NativeIntegration] SplashScreen plugin error:', error);
+        mobileErrorHandler.handleCapacitorError('SplashScreen', error.toString());
+      }
+    }
+  }
+
+  // Enhanced splash screen management
+  async hideSplashScreen(): Promise<void> {
+    if (this.plugins.SplashScreen && !this.splashScreenHidden) {
+      try {
+        console.log('[NativeIntegration] Hiding splash screen');
+        await this.plugins.SplashScreen.hide();
+        this.splashScreenHidden = true;
+        console.log('[NativeIntegration] Splash screen hidden successfully');
+      } catch (error) {
+        console.error('[NativeIntegration] Failed to hide splash screen:', error);
+        mobileErrorHandler.handleCapacitorError('SplashScreen', error.toString());
+      }
+    }
+  }
+
+  async showSplashScreen(): Promise<void> {
+    if (this.plugins.SplashScreen) {
+      try {
+        console.log('[NativeIntegration] Showing splash screen');
+        await this.plugins.SplashScreen.show();
+        this.splashScreenHidden = false;
+        console.log('[NativeIntegration] Splash screen shown');
+      } catch (error) {
+        console.error('[NativeIntegration] Failed to show splash screen:', error);
         mobileErrorHandler.handleCapacitorError('SplashScreen', error.toString());
       }
     }
