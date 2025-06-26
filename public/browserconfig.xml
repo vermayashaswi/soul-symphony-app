@@ -3,10 +3,10 @@
 <browserconfig>
   <msapplication>
     <tile>
-      <square70x70logo src="/lovable-uploads/31ed88ef-f596-4b91-ba58-a4175eebe779.png"/>
-      <square150x150logo src="/lovable-uploads/31ed88ef-f596-4b91-ba58-a4175eebe779.png"/>
-      <wide310x150logo src="/lovable-uploads/31ed88ef-f596-4b91-ba58-a4175eebe779.png"/>
-      <square310x310logo src="/lovable-uploads/31ed88ef-f596-4b91-ba58-a4175eebe779.png"/>
+      <square70x70logo src="https://soulo.online/lovable-uploads/soulo-icon.png?v=2"/>
+      <square150x150logo src="https://soulo.online/lovable-uploads/soulo-icon.png?v=2"/>
+      <wide310x150logo src="https://soulo.online/lovable-uploads/soulo-icon.png?v=2"/>
+      <square310x310logo src="https://soulo.online/lovable-uploads/soulo-icon.png?v=2"/>
       <TileColor>#8b5cf6</TileColor>
     </tile>
   </msapplication>
