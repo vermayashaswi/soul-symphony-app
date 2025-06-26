@@ -1,14 +1,27 @@
 
 <?xml version="1.0" encoding="utf-8"?>
 <layer-list xmlns:android="http://schemas.android.com/apk/res/android">
-    <!-- Black background -->
+    <!-- Black background matching app theme -->
     <item android:drawable="@android:color/black"/>
     
-    <!-- Centered logo -->
+    <!-- Centered Soulo logo -->
     <item>
         <bitmap
             android:gravity="center"
             android:src="@mipmap/ic_launcher"
-            android:tileMode="disabled" />
+            android:tileMode="disabled"
+            android:antialias="true"
+            android:filter="true" />
+    </item>
+    
+    <!-- Optional: Add subtle gradient overlay for polish -->
+    <item>
+        <shape android:shape="rectangle">
+            <gradient
+                android:type="radial"
+                android:gradientRadius="50%p"
+                android:centerColor="#00000000"
+                android:endColor="#33000000" />
+        </shape>
     </item>
 </layer-list>

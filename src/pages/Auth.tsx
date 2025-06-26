@@ -51,21 +51,24 @@ export default function Auth() {
     isNative: !!(window as any).Capacitor?.isNativePlatform?.()
   });
 
-  // Enhanced deep link handling for mobile apps
+  // Enhanced deep link handling for mobile apps with better error recovery
   useEffect(() => {
     const handleMobileDeepLink = async () => {
       const isNativeApp = !!(window as any).Capacitor?.isNativePlatform?.();
       
       if (isNativeApp) {
-        console.log('[Auth] Setting up mobile deep link handling');
+        console.log('[Auth] Setting up enhanced mobile deep link handling');
         
-        // Listen for app URL open events (deep links)
+        // Enhanced app URL open event handler
         const handleAppUrlOpen = async (event: any) => {
           console.log('[Auth] App URL opened:', event.url);
           
-          if (event.url.includes('access_token') || event.url.includes('soulo://auth')) {
+          if (event.url.includes('access_token') || 
+              event.url.includes('soulo://auth') || 
+              event.url.includes('error=')) {
             console.log('[Auth] Processing auth deep link');
             setIsLoading(true);
+            setAuthError(null);
             
             try {
               const authSuccess = await handleDeepLinkAuth(event.url);
@@ -73,6 +76,8 @@ export default function Auth() {
               if (authSuccess) {
                 console.log('[Auth] Deep link authentication successful');
                 toast.success('Authentication successful!');
+                // Clear any previous errors
+                setAuthError(null);
                 // The auth context will handle the redirect
               } else {
                 console.log('[Auth] Deep link authentication failed');
@@ -89,26 +94,44 @@ export default function Auth() {
           }
         };
 
-        // Add listener for URL open events
-        if ((window as any).Capacitor?.Plugins?.App) {
-          console.log('[Auth] Adding app URL open listener');
-          (window as any).Capacitor.Plugins.App.addListener('appUrlOpen', handleAppUrlOpen);
-          
-          // Return cleanup function
-          return () => {
-            console.log('[Auth] Removing app URL open listener');
-            (window as any).Capacitor.Plugins.App.removeAllListeners?.();
-          };
-        } else {
-          console.warn('[Auth] Capacitor App plugin not available');
+        // Add listener for URL open events with error handling
+        try {
+          if ((window as any).Capacitor?.Plugins?.App) {
+            console.log('[Auth] Adding enhanced app URL open listener');
+            (window as any).Capacitor.Plugins.App.addListener('appUrlOpen', handleAppUrlOpen);
+            
+            // Return cleanup function
+            return () => {
+              console.log('[Auth] Removing app URL open listener');
+              try {
+                (window as any).Capacitor.Plugins.App.removeAllListeners?.();
+              } catch (cleanupError) {
+                console.warn('[Auth] Error during listener cleanup:', cleanupError);
+              }
+            };
+          } else {
+            console.warn('[Auth] Capacitor App plugin not available');
+          }
+        } catch (error) {
+          console.error('[Auth] Error setting up app URL listener:', error);
         }
       } else {
-        // For web, handle URL fragments normally
-        const fragment = window.location.hash || window.location.search;
-        if (fragment.includes('access_token')) {
-          console.log('[Auth] Web auth callback detected');
-          // Let Supabase handle the callback automatically
-        }
+        // For web, handle URL fragments and search params
+        const handleWebAuth = () => {
+          const fragment = window.location.hash || window.location.search;
+          if (fragment.includes('access_token') || fragment.includes('error=')) {
+            console.log('[Auth] Web auth callback detected');
+            // Let Supabase handle the callback automatically
+          }
+        };
+        
+        handleWebAuth();
+        
+        // Listen for hash changes
+        window.addEventListener('hashchange', handleWebAuth);
+        return () => {
+          window.removeEventListener('hashchange', handleWebAuth);
+        };
       }
     };
 

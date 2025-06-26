@@ -24,7 +24,7 @@ export const getRedirectUrl = (): string => {
 };
 
 /**
- * Handle deep link authentication callback in native apps
+ * Enhanced deep link authentication handler for mobile apps
  */
 export const handleDeepLinkAuth = async (url: string): Promise<boolean> => {
   try {
@@ -35,7 +35,7 @@ export const handleDeepLinkAuth = async (url: string): Promise<boolean> => {
     
     // Handle different URL formats
     if (url.startsWith('soulo://auth')) {
-      // Custom scheme format: soulo://auth#access_token=...
+      // Custom scheme format: soulo://auth#access_token=... or soulo://auth?access_token=...
       urlToParse = url.replace('soulo://auth', 'https://dummy.com/auth');
     }
     
@@ -53,6 +53,8 @@ export const handleDeepLinkAuth = async (url: string): Promise<boolean> => {
     const params = new URLSearchParams(fragment);
     const accessToken = params.get('access_token');
     const refreshToken = params.get('refresh_token');
+    const tokenType = params.get('token_type');
+    const expiresIn = params.get('expires_in');
     const error = params.get('error');
     const errorDescription = params.get('error_description');
     
@@ -64,6 +66,11 @@ export const handleDeepLinkAuth = async (url: string): Promise<boolean> => {
     
     if (accessToken && refreshToken) {
       console.log('[AuthService] Setting session from deep link tokens');
+      
+      // Calculate expiry time
+      const expiresAt = expiresIn ? 
+        Math.floor(Date.now() / 1000) + parseInt(expiresIn) : 
+        Math.floor(Date.now() / 1000) + 3600; // Default 1 hour
       
       // Set the session using the tokens from the deep link
       const { data, error } = await supabase.auth.setSession({
@@ -82,7 +89,7 @@ export const handleDeepLinkAuth = async (url: string): Promise<boolean> => {
       return true;
     }
     
-    console.log('[AuthService] No tokens found in deep link');
+    console.log('[AuthService] No valid tokens found in deep link');
     return false;
   } catch (error) {
     console.error('[AuthService] Error handling deep link auth:', error);
@@ -92,130 +99,93 @@ export const handleDeepLinkAuth = async (url: string): Promise<boolean> => {
 };
 
 /**
- * Sign in with Google
+ * Enhanced OAuth initiation with better mobile support
  */
-export const signInWithGoogle = async (): Promise<void> => {
+const initiateOAuth = async (provider: 'google' | 'apple', options: any = {}) => {
   try {
     const redirectUrl = getRedirectUrl();
-    console.log('[AuthService] Starting Google sign-in with redirect URL:', redirectUrl);
+    console.log(`[AuthService] Starting ${provider} sign-in with redirect URL:`, redirectUrl);
     
     const { data, error } = await supabase.auth.signInWithOAuth({
-      provider: 'google',
+      provider,
       options: {
         redirectTo: redirectUrl,
-        queryParams: {
-          access_type: 'offline',
-          prompt: 'consent',
-        },
+        ...options
       },
     });
 
     if (error) {
-      console.error('[AuthService] Google OAuth error:', error);
+      console.error(`[AuthService] ${provider} OAuth error:`, error);
       throw error;
     }
     
-    console.log('[AuthService] Google OAuth response:', data);
+    console.log(`[AuthService] ${provider} OAuth response:`, data);
     
-    // For native apps, the OAuth flow will redirect to our custom scheme
+    // Handle OAuth URL opening based on environment
     if (data?.url) {
       if (isNativeApp()) {
-        console.log('[AuthService] Opening OAuth URL in native browser:', data.url);
+        console.log(`[AuthService] Opening ${provider} OAuth URL in native browser:`, data.url);
         
-        // Try to use Capacitor Browser plugin first
-        if ((window as any).Capacitor?.Plugins?.Browser) {
-          try {
-            await (window as any).Capacitor.Plugins.Browser.open({ 
+        // Try to use Capacitor Browser plugin with enhanced error handling
+        try {
+          const Browser = (window as any).Capacitor?.Plugins?.Browser;
+          if (Browser) {
+            await Browser.open({ 
               url: data.url,
-              windowName: '_system'
+              windowName: '_system',
+              presentationStyle: 'popover'
             });
-            console.log('[AuthService] Opened OAuth URL with Capacitor Browser');
-          } catch (browserError) {
-            console.warn('[AuthService] Capacitor Browser failed, falling back to window.open:', browserError);
-            window.open(data.url, '_system');
+            console.log(`[AuthService] Opened ${provider} OAuth URL with Capacitor Browser`);
+          } else {
+            throw new Error('Capacitor Browser plugin not available');
           }
-        } else {
-          console.log('[AuthService] Capacitor Browser not available, using window.open');
-          window.open(data.url, '_system');
+        } catch (browserError) {
+          console.warn(`[AuthService] Capacitor Browser failed, falling back to window.open:`, browserError);
+          // Fallback to system browser
+          if ((window as any).open) {
+            (window as any).open(data.url, '_system', 'location=yes');
+          } else {
+            window.location.href = data.url;
+          }
         }
       } else {
-        // For web, redirect normally
-        console.log('[AuthService] Redirecting to OAuth URL for web');
+        // For web, redirect normally with small delay for state updates
+        console.log(`[AuthService] Redirecting to ${provider} OAuth URL for web`);
         setTimeout(() => {
           window.location.href = data.url;
         }, 100);
       }
     } else {
-      console.warn('[AuthService] No OAuth URL received from Supabase');
+      console.warn(`[AuthService] No ${provider} OAuth URL received from Supabase`);
       throw new Error('No authentication URL received');
     }
   } catch (error: any) {
-    console.error('[AuthService] Error signing in with Google:', error);
+    console.error(`[AuthService] Error signing in with ${provider}:`, error);
     const errorMessage = error?.message || 'Unknown error occurred';
-    toast.error(`Error signing in with Google: ${errorMessage}`);
+    toast.error(`Error signing in with ${provider}: ${errorMessage}`);
     throw error;
   }
+};
+
+/**
+ * Sign in with Google
+ */
+export const signInWithGoogle = async (): Promise<void> => {
+  return initiateOAuth('google', {
+    queryParams: {
+      access_type: 'offline',
+      prompt: 'consent',
+    },
+  });
 };
 
 /**
  * Sign in with Apple ID
  */
 export const signInWithApple = async (): Promise<void> => {
-  try {
-    const redirectUrl = getRedirectUrl();
-    console.log('[AuthService] Starting Apple sign-in with redirect URL:', redirectUrl);
-    
-    const { data, error } = await supabase.auth.signInWithOAuth({
-      provider: 'apple',
-      options: {
-        redirectTo: redirectUrl,
-      },
-    });
-
-    if (error) {
-      console.error('[AuthService] Apple OAuth error:', error);
-      throw error;
-    }
-    
-    console.log('[AuthService] Apple OAuth response:', data);
-    
-    // For native apps, the OAuth flow will redirect to our custom scheme
-    if (data?.url) {
-      if (isNativeApp()) {
-        console.log('[AuthService] Opening Apple OAuth URL in native browser:', data.url);
-        
-        if ((window as any).Capacitor?.Plugins?.Browser) {
-          try {
-            await (window as any).Capacitor.Plugins.Browser.open({ 
-              url: data.url,
-              windowName: '_system'
-            });
-            console.log('[AuthService] Opened Apple OAuth URL with Capacitor Browser');
-          } catch (browserError) {
-            console.warn('[AuthService] Capacitor Browser failed, falling back to window.open:', browserError);
-            window.open(data.url, '_system');
-          }
-        } else {
-          console.log('[AuthService] Capacitor Browser not available, using window.open');
-          window.open(data.url, '_system');
-        }
-      } else {
-        // For web, redirect normally
-        console.log('[AuthService] Redirecting to Apple OAuth URL for web');
-        setTimeout(() => {
-          window.location.href = data.url;
-        }, 100);
-      }
-    } else {
-      console.warn('[AuthService] No Apple OAuth URL received from Supabase');
-      throw new Error('No authentication URL received');
-    }
-  } catch (error: any) {
-    console.error('[AuthService] Error signing in with Apple:', error);
-    const errorMessage = error?.message || 'Unknown error occurred';
-    toast.error(`Error signing in with Apple: ${errorMessage}`);
-    throw error;
-  }
+  return initiateOAuth('apple', {
+    scopes: 'name email',
+  });
 };
 
 /**

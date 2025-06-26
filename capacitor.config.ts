@@ -13,7 +13,7 @@ const config: CapacitorConfig = {
       showSpinner: false, // Disable spinner to avoid conflicts
       splashFullScreen: true,
       splashImmersive: true,
-      splashScreenDelay: 2000, // Reduced delay
+      splashScreenDelay: 3000, // Increased delay for better UX
       androidSplashResourceName: "splash", // Use our custom splash
       androidScaleType: "CENTER_CROP"
     },
@@ -59,7 +59,26 @@ const config: CapacitorConfig = {
     overrideUserAgent: "SouloApp/1.0.0 Mobile",
     androidScheme: "https",
     loadOnMainThread: true,
-    handlePermissions: true
+    handlePermissions: true,
+    // Enhanced deep linking support
+    intentFilters: [
+      {
+        action: "android.intent.action.VIEW",
+        autoVerify: true,
+        category: ["android.intent.category.DEFAULT", "android.intent.category.BROWSABLE"],
+        data: [
+          {
+            scheme: "soulo",
+            host: "auth"
+          },
+          {
+            scheme: "https",
+            host: "soulo.online",
+            pathPrefix: "/app/auth"
+          }
+        ]
+      }
+    ]
   }
 };
 
