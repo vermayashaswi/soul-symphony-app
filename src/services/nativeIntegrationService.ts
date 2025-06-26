@@ -1,4 +1,3 @@
-
 import { mobileErrorHandler } from './mobileErrorHandler';
 import { handleDeepLinkAuth } from './authService';
 
@@ -83,6 +82,8 @@ class NativeIntegrationService {
     // Initialize App plugin with deep link handling
     if (this.plugins.App) {
       try {
+        console.log('[NativeIntegration] Initializing App plugin');
+        
         // Listen for app state changes
         this.plugins.App.addListener('appStateChange', (state: any) => {
           console.log('[NativeIntegration] App state changed:', state);
@@ -99,6 +100,8 @@ class NativeIntegrationService {
               const authSuccess = await handleDeepLinkAuth(event.url);
               if (authSuccess) {
                 console.log('[NativeIntegration] Deep link authentication successful');
+              } else {
+                console.log('[NativeIntegration] Deep link authentication failed');
               }
             } catch (error) {
               console.error('[NativeIntegration] Deep link auth failed:', error);
@@ -145,15 +148,43 @@ class NativeIntegrationService {
       }
     }
 
-    // Initialize SplashScreen plugin with proper timing
+    // Initialize SplashScreen plugin with proper timing and error handling
     if (this.plugins.SplashScreen) {
       try {
-        // Hide splash screen after a delay
+        console.log('[NativeIntegration] Setting up splash screen management');
+        
+        // Hide splash screen after a delay, but ensure fonts and critical resources are loaded
         setTimeout(async () => {
           if (!this.splashScreenHidden) {
-            await this.hideSplashScreen();
+            // Check if fonts are ready before hiding splash
+            const fontsReady = (window as any).__SOULO_FONTS_READY__ || false;
+            if (fontsReady) {
+              await this.hideSplashScreen();
+            } else {
+              // Wait a bit more for fonts, but don't wait forever
+              setTimeout(async () => {
+                if (!this.splashScreenHidden) {
+                  await this.hideSplashScreen();
+                }
+              }, 2000);
+            }
           }
-        }, 4000); // Increased delay for better UX
+        }, 2000);
+        
+        // Also listen for font ready event
+        window.addEventListener('fontsReady', async () => {
+          console.log('[NativeIntegration] Fonts ready event received');
+          if (!this.splashScreenHidden) {
+            // Small delay to ensure UI is stable
+            setTimeout(async () => {
+              if (!this.splashScreenHidden) {
+                await this.hideSplashScreen();
+              }
+            }, 500);
+          }
+        });
+        
+        console.log('[NativeIntegration] SplashScreen management initialized');
       } catch (error) {
         console.error('[NativeIntegration] SplashScreen plugin error:', error);
         mobileErrorHandler.handleCapacitorError('SplashScreen', error.toString());
@@ -171,6 +202,8 @@ class NativeIntegrationService {
         console.log('[NativeIntegration] Splash screen hidden successfully');
       } catch (error) {
         console.error('[NativeIntegration] Failed to hide splash screen:', error);
+        // Don't throw error, just mark as hidden to prevent retry loops
+        this.splashScreenHidden = true;
         mobileErrorHandler.handleCapacitorError('SplashScreen', error.toString());
       }
     }

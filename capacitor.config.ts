@@ -10,13 +10,12 @@ const config: CapacitorConfig = {
     SplashScreen: {
       launchAutoHide: false,
       backgroundColor: "#000000",
-      showSpinner: true,
-      androidSpinnerStyle: "large",
-      iosSpinnerStyle: "small", 
-      spinnerColor: "#8b5cf6",
+      showSpinner: false, // Disable spinner to avoid conflicts
       splashFullScreen: true,
       splashImmersive: true,
-      splashScreenDelay: 3000
+      splashScreenDelay: 2000, // Reduced delay
+      androidSplashResourceName: "splash", // Use our custom splash
+      androidScaleType: "CENTER_CROP"
     },
     Keyboard: {
       resize: "body",
