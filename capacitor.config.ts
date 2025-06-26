@@ -5,6 +5,10 @@ const config: CapacitorConfig = {
   appId: 'app.soulo.online',
   appName: 'Soulo',
   webDir: 'dist',
+  server: {
+    url: 'https://soulo.online/app'
+    cleartext: false 
+  },
   // Remove server configuration for production - use bundled assets
   plugins: {
     SplashScreen: {
