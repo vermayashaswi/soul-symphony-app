@@ -94,7 +94,7 @@ export default function Auth() {
           console.log('[Auth] Adding app URL open listener');
           (window as any).Capacitor.Plugins.App.addListener('appUrlOpen', handleAppUrlOpen);
           
-          // Cleanup listener on unmount
+          // Return cleanup function
           return () => {
             console.log('[Auth] Removing app URL open listener');
             (window as any).Capacitor.Plugins.App.removeAllListeners?.();
@@ -112,8 +112,21 @@ export default function Auth() {
       }
     };
 
-    const cleanup = handleMobileDeepLink();
-    return cleanup;
+    // Call the async function and handle cleanup
+    let cleanup: (() => void) | undefined;
+    
+    handleMobileDeepLink().then((cleanupFn) => {
+      cleanup = cleanupFn;
+    }).catch((error) => {
+      console.error('[Auth] Error setting up deep link handling:', error);
+    });
+
+    // Return cleanup function for useEffect
+    return () => {
+      if (cleanup) {
+        cleanup();
+      }
+    };
   }, []);
 
   useEffect(() => {
