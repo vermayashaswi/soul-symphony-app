@@ -1,5 +1,5 @@
+
 import { mobileErrorHandler } from './mobileErrorHandler';
-import { handleDeepLinkAuth } from './authService';
 
 interface CapacitorPlugin {
   [key: string]: any;
@@ -18,8 +18,6 @@ class NativeIntegrationService {
   private isCapacitorReady = false;
   private plugins: { [key: string]: CapacitorPlugin } = {};
   private deviceInfo: DeviceInfo | null = null;
-  private splashScreenHidden = false;
-  private initializationPromise: Promise<void> | null = null;
 
   static getInstance(): NativeIntegrationService {
     if (!NativeIntegrationService.instance) {
@@ -29,16 +27,6 @@ class NativeIntegrationService {
   }
 
   async initialize(): Promise<void> {
-    // Prevent multiple initializations
-    if (this.initializationPromise) {
-      return this.initializationPromise;
-    }
-
-    this.initializationPromise = this._doInitialize();
-    return this.initializationPromise;
-  }
-
-  private async _doInitialize(): Promise<void> {
     console.log('[NativeIntegration] Initializing native integration service');
 
     try {
@@ -56,10 +44,7 @@ class NativeIntegrationService {
       // Setup plugin error handlers
       this.setupPluginErrorHandlers();
 
-      // Setup enhanced splash screen management
-      this.setupSplashScreenManagement();
-
-      console.log('[NativeIntegration] Native integration service initialized successfully');
+      console.log('[NativeIntegration] Native integration service initialized');
     } catch (error) {
       console.error('[NativeIntegration] Failed to initialize:', error);
       mobileErrorHandler.handleError({
@@ -93,46 +78,20 @@ class NativeIntegrationService {
   }
 
   private async initializeCorePlugins(): Promise<void> {
-    // Initialize App plugin with enhanced deep link handling
+    // Initialize App plugin
     if (this.plugins.App) {
       try {
-        console.log('[NativeIntegration] Initializing App plugin');
-        
         // Listen for app state changes
         this.plugins.App.addListener('appStateChange', (state: any) => {
           console.log('[NativeIntegration] App state changed:', state);
-          
-          // Hide splash screen when app becomes active if not already hidden
-          if (state.isActive && !this.splashScreenHidden) {
-            setTimeout(() => {
-              this.hideSplashScreen();
-            }, 1000);
-          }
         });
 
-        // Enhanced URL open event handling
-        this.plugins.App.addListener('appUrlOpen', async (event: any) => {
-          console.log('[NativeIntegration] App URL opened:', event.url);
-          
-          // Handle authentication deep links
-          if (this.isAuthUrl(event.url)) {
-            console.log('[NativeIntegration] Processing auth deep link');
-            try {
-              const authSuccess = await handleDeepLinkAuth(event.url);
-              if (authSuccess) {
-                console.log('[NativeIntegration] Deep link authentication successful');
-                // Ensure splash screen is hidden after successful auth
-                await this.hideSplashScreen();
-              } else {
-                console.log('[NativeIntegration] Deep link authentication failed');
-              }
-            } catch (error) {
-              console.error('[NativeIntegration] Deep link auth failed:', error);
-            }
-          }
+        // Listen for URL open events
+        this.plugins.App.addListener('appUrlOpen', (event: any) => {
+          console.log('[NativeIntegration] App URL opened:', event);
         });
 
-        console.log('[NativeIntegration] App plugin initialized with enhanced deep link support');
+        console.log('[NativeIntegration] App plugin initialized');
       } catch (error) {
         console.error('[NativeIntegration] App plugin initialization failed:', error);
         mobileErrorHandler.handleCapacitorError('App', error.toString());
@@ -171,126 +130,16 @@ class NativeIntegrationService {
       }
     }
 
-    // Enhanced SplashScreen plugin initialization
+    // Initialize SplashScreen plugin
     if (this.plugins.SplashScreen) {
       try {
-        console.log('[NativeIntegration] Setting up enhanced splash screen management');
-        // Splash screen will be managed by setupSplashScreenManagement method
-        console.log('[NativeIntegration] SplashScreen management initialized');
+        // Hide splash screen after a delay
+        setTimeout(async () => {
+          await this.plugins.SplashScreen.hide();
+          console.log('[NativeIntegration] Splash screen hidden');
+        }, 3000);
       } catch (error) {
         console.error('[NativeIntegration] SplashScreen plugin error:', error);
-        mobileErrorHandler.handleCapacitorError('SplashScreen', error.toString());
-      }
-    }
-  }
-
-  private isAuthUrl(url: string): boolean {
-    return url.includes('access_token') || 
-           url.includes('soulo://auth') || 
-           url.includes('/app/auth') ||
-           url.includes('error=');
-  }
-
-  private setupSplashScreenManagement(): void {
-    if (!this.plugins.SplashScreen) return;
-
-    console.log('[NativeIntegration] Setting up intelligent splash screen management');
-
-    // Multiple strategies to ensure splash screen is hidden
-    
-    // Strategy 1: Time-based fallback
-    setTimeout(async () => {
-      if (!this.splashScreenHidden) {
-        console.log('[NativeIntegration] Time-based splash screen hide (fallback)');
-        await this.hideSplashScreen();
-      }
-    }, 5000); // Max 5 seconds
-
-    // Strategy 2: Font and resource readiness
-    const checkResourcesReady = () => {
-      const fontsReady = (window as any).__SOULO_FONTS_READY__ || false;
-      const domReady = document.readyState === 'complete';
-      
-      if (fontsReady && domReady && !this.splashScreenHidden) {
-        console.log('[NativeIntegration] Resources ready, hiding splash screen');
-        setTimeout(() => {
-          if (!this.splashScreenHidden) {
-            this.hideSplashScreen();
-          }
-        }, 1000); // Small delay for smooth transition
-      }
-    };
-
-    // Check immediately
-    checkResourcesReady();
-
-    // Listen for font ready event
-    window.addEventListener('fontsReady', checkResourcesReady);
-    
-    // Listen for DOM ready
-    if (document.readyState === 'loading') {
-      document.addEventListener('DOMContentLoaded', checkResourcesReady);
-    }
-
-    // Strategy 3: App navigation readiness
-    window.addEventListener('load', () => {
-      setTimeout(() => {
-        if (!this.splashScreenHidden) {
-          console.log('[NativeIntegration] Window load completed, hiding splash screen');
-          this.hideSplashScreen();
-        }
-      }, 1500);
-    });
-  }
-
-  // Enhanced splash screen management with retry logic
-  async hideSplashScreen(): Promise<void> {
-    if (!this.plugins.SplashScreen || this.splashScreenHidden) {
-      return;
-    }
-
-    const maxRetries = 3;
-    let retryCount = 0;
-
-    while (retryCount < maxRetries && !this.splashScreenHidden) {
-      try {
-        console.log(`[NativeIntegration] Hiding splash screen (attempt ${retryCount + 1})`);
-        await this.plugins.SplashScreen.hide({
-          fadeOutDuration: 500
-        });
-        this.splashScreenHidden = true;
-        console.log('[NativeIntegration] Splash screen hidden successfully');
-        return;
-      } catch (error) {
-        retryCount++;
-        console.error(`[NativeIntegration] Failed to hide splash screen (attempt ${retryCount}):`, error);
-        
-        if (retryCount < maxRetries) {
-          // Wait before retry
-          await new Promise(resolve => setTimeout(resolve, 500));
-        } else {
-          // Final attempt failed, mark as hidden to prevent infinite retries
-          this.splashScreenHidden = true;
-          mobileErrorHandler.handleCapacitorError('SplashScreen', error.toString());
-        }
-      }
-    }
-  }
-
-  async showSplashScreen(): Promise<void> {
-    if (this.plugins.SplashScreen) {
-      try {
-        console.log('[NativeIntegration] Showing splash screen');
-        await this.plugins.SplashScreen.show({
-          showDuration: 3000,
-          fadeInDuration: 300,
-          fadeOutDuration: 300,
-          autoHide: true
-        });
-        this.splashScreenHidden = false;
-        console.log('[NativeIntegration] Splash screen shown');
-      } catch (error) {
-        console.error('[NativeIntegration] Failed to show splash screen:', error);
         mobileErrorHandler.handleCapacitorError('SplashScreen', error.toString());
       }
     }

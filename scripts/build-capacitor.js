@@ -29,38 +29,16 @@ try {
     console.log('Using production configuration');
   }
 
-  // Sync capacitor with enhanced logging
+  // Sync capacitor
   console.log('Syncing Capacitor...');
   execSync(`npx cap sync${platform ? ' ' + platform : ''}`, { stdio: 'inherit' });
-
-  // Verify Android resources if building for Android
-  if (platform === 'android' || !platform) {
-    console.log('Verifying Android resources...');
-    
-    const androidIconPaths = [
-      'android/app/src/main/res/mipmap-mdpi/ic_launcher.png',
-      'android/app/src/main/res/mipmap-hdpi/ic_launcher.png',
-      'android/app/src/main/res/mipmap-xhdpi/ic_launcher.png',
-      'android/app/src/main/res/mipmap-xxhdpi/ic_launcher.png',
-      'android/app/src/main/res/mipmap-xxxhdpi/ic_launcher.png',
-    ];
-    
-    const missingIcons = androidIconPaths.filter(iconPath => !fs.existsSync(iconPath));
-    
-    if (missingIcons.length > 0) {
-      console.warn('⚠️  Missing Android icons detected:');
-      missingIcons.forEach(icon => console.warn(`   - ${icon}`));
-      console.warn('Please replace these with actual Soulo logo files.');
-      console.warn('Download from: https://soulo.online/lovable-uploads/soulo-icon.png?v=2');
-    }
-  }
 
   // Clean up temp config
   if (fs.existsSync(configDest)) {
     fs.unlinkSync(configDest);
   }
 
-  console.log('✅ Capacitor build completed successfully!');
+  console.log('Capacitor build completed successfully!');
   
   if (platform) {
     console.log(`\nTo run on ${platform}:`);
@@ -71,13 +49,8 @@ try {
     console.log('npx cap run ios');
   }
 
-  console.log('\n📱 Next steps for mobile deployment:');
-  console.log('1. Replace placeholder icon files with actual Soulo logo');
-  console.log('2. Test OAuth authentication flow');
-  console.log('3. Verify splash screen appears correctly');
-
 } catch (error) {
-  console.error('❌ Build failed:', error.message);
+  console.error('Build failed:', error.message);
   
   // Clean up temp config on error
   if (fs.existsSync(configDest)) {
