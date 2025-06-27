@@ -1,5 +1,6 @@
 
 import React, { useEffect, useState } from 'react';
+import { BrowserRouter } from 'react-router-dom';
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as SonnerToaster } from "sonner";
 import { TranslationProvider } from '@/contexts/TranslationContext';
@@ -254,15 +255,17 @@ const App: React.FC = () => {
   }
 
   return (
-    <ErrorBoundary onError={handleAppError}>
-      <TranslationProvider>
-        <AuthErrorBoundary>
-          <AuthProvider>
-            <InnerApp key={isInitialized ? 'initialized' : 'initializing'} />
+    <BrowserRouter>
+      <ErrorBoundary onError={handleAppError}>
+        <TranslationProvider>
+          <AuthErrorBoundary>
+            <AuthProvider>
+              <InnerApp key={isInitialized ? 'initialized' : 'initializing'} />
+            </AuthErrorBoundary>
           </AuthProvider>
-        </AuthErrorBoundary>
-      </TranslationProvider>
-    </ErrorBoundary>
+        </TranslationProvider>
+      </ErrorBoundary>
+    </BrowserRouter>
   );
 };
 

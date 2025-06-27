@@ -48,11 +48,18 @@ export const useSafeAuth = (): SafeAuthState => {
     // Check immediately
     checkAuthAvailability();
 
-    // Set up periodic checks in case auth becomes available later
-    const interval = setInterval(checkAuthAvailability, 1000);
+    // Only set up periodic checks if auth is not available initially
+    let interval: NodeJS.Timeout | null = null;
+    if (!authState.isAvailable) {
+      interval = setInterval(checkAuthAvailability, 1000);
+    }
 
-    return () => clearInterval(interval);
-  }, []);
+    return () => {
+      if (interval) {
+        clearInterval(interval);
+      }
+    };
+  }, [authState.isAvailable]);
 
   return authState;
 };

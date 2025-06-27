@@ -1,7 +1,6 @@
 
-import React, { ReactNode, useEffect, useState } from 'react';
+import React, { ReactNode } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
-import { toast } from 'sonner';
 
 interface AuthGuardProps {
   children: ReactNode;
@@ -9,51 +8,34 @@ interface AuthGuardProps {
 }
 
 const AuthGuard: React.FC<AuthGuardProps> = ({ children, fallback }) => {
-  const [isReady, setIsReady] = useState(false);
-  const [hasError, setHasError] = useState(false);
-  const [authState, setAuthState] = useState<{
-    user: any;
-    isLoading: boolean;
-  } | null>(null);
-
-  useEffect(() => {
-    console.log('[AuthGuard] Initializing auth guard...');
+  // Since we're now inside the router context, we can safely use useAuth
+  try {
+    const { isLoading } = useAuth();
     
-    // Add a small delay to ensure AuthProvider is fully initialized
-    const initTimer = setTimeout(() => {
-      try {
-        console.log('[AuthGuard] Attempting to access auth context...');
-        // This will throw if AuthProvider is not available
-        const auth = useAuth();
-        setAuthState({
-          user: auth.user,
-          isLoading: auth.isLoading
-        });
-        setIsReady(true);
-        setHasError(false);
-        console.log('[AuthGuard] Auth context accessed successfully');
-      } catch (error) {
-        console.error('[AuthGuard] Error accessing auth context:', error);
-        setHasError(true);
-        setIsReady(false);
-        
-        // Show user-friendly error
-        toast.error('Authentication system is initializing. Please wait...');
-      }
-    }, 100);
+    if (isLoading) {
+      return fallback || (
+        <div className="min-h-screen flex items-center justify-center">
+          <div className="text-center p-6 max-w-md">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mb-4"></div>
+            <h2 className="text-xl font-semibold mb-2">Starting App</h2>
+            <p className="text-muted-foreground">
+              Initializing authentication system...
+            </p>
+          </div>
+        </div>
+      );
+    }
 
-    return () => clearTimeout(initTimer);
-  }, []);
-
-  // If there's an error accessing auth context
-  if (hasError) {
+    return <>{children}</>;
+  } catch (error) {
+    console.error('[AuthGuard] Auth context error:', error);
     return fallback || (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center p-6 max-w-md">
           <div className="text-4xl mb-4">⚠️</div>
-          <h2 className="text-xl font-semibold mb-4">Authentication Loading</h2>
+          <h2 className="text-xl font-semibold mb-4">Authentication Error</h2>
           <p className="text-muted-foreground mb-4">
-            The authentication system is still starting up. Please wait a moment.
+            There was a problem with the authentication system. Please refresh the page.
           </p>
           <button
             onClick={() => window.location.reload()}
@@ -65,17 +47,6 @@ const AuthGuard: React.FC<AuthGuardProps> = ({ children, fallback }) => {
       </div>
     );
   }
-
-  // If auth guard is not ready yet
-  if (!isReady) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
-      </div>
-    );
-  }
-
-  return <>{children}</>;
 };
 
 export default AuthGuard;

@@ -14,8 +14,6 @@ import {
   refreshSession as refreshSessionService
 } from '@/services/authService';
 import { debugLogger, logInfo, logError, logAuthError, logProfile, logAuth } from '@/components/debug/DebugPanel';
-import { isAppRoute } from '@/routes/RouteHelpers';
-import { useLocation } from 'react-router-dom';
 import { SessionTrackingService } from '@/services/sessionTrackingService';
 import { LocationProvider } from '@/contexts/LocationContext';
 import { detectTWAEnvironment } from '@/utils/twaDetection';
@@ -40,7 +38,6 @@ function AuthProviderCore({ children }: { children: ReactNode }) {
   const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
   const [authInitialized, setAuthInitialized] = useState(false);
   const [authStateStable, setAuthStateStable] = useState(false);
-  const location = useLocation();
   const twaEnv = detectTWAEnvironment();
 
   const detectUserLanguage = (): string => {
@@ -584,9 +581,8 @@ function AuthProviderCore({ children }: { children: ReactNode }) {
 
         if (event === 'SIGNED_IN') {
           logInfo('User signed in successfully', 'AuthContext');
-          if (isAppRoute(location.pathname)) {
-            toast.success('Signed in successfully');
-          }
+          // Remove location-specific toast for now since location is not available
+          console.log('User signed in successfully');
         } else if (event === 'SIGNED_OUT') {
           logInfo('User signed out', 'AuthContext');
           setProfileExistsStatus(null);
@@ -601,9 +597,7 @@ function AuthProviderCore({ children }: { children: ReactNode }) {
             setAutoRetryTimeoutId(null);
           }
           
-          if (isAppRoute(location.pathname)) {
-            toast.info('Signed out');
-          }
+          console.log('User signed out');
         }
       }
     );
@@ -644,7 +638,7 @@ function AuthProviderCore({ children }: { children: ReactNode }) {
         clearTimeout(autoRetryTimeoutId);
       }
     };
-  }, [authInitialized, isMobileDevice, location.pathname, twaEnv.isTWA, twaEnv.isStandalone]);
+  }, [authInitialized, isMobileDevice, twaEnv.isTWA, twaEnv.isStandalone]);
 
   const value = {
     session,
