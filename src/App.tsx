@@ -1,24 +1,16 @@
 
 import React, { useEffect, useState } from 'react';
-import AppRoutes from './routes/AppRoutes';
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as SonnerToaster } from "sonner";
 import { TranslationProvider } from '@/contexts/TranslationContext';
-import { SubscriptionProvider } from '@/contexts/SubscriptionContext';
 import { AuthProvider } from '@/contexts/AuthContext';
 import AuthErrorBoundary from '@/components/auth/AuthErrorBoundary';
-import { TranslationLoadingOverlay } from '@/components/translation/TranslationLoadingOverlay';
-import { JournalProcessingInitializer } from './app/journal-processing-init';
-import { TutorialProvider } from './contexts/TutorialContext';
-import TutorialOverlay from './components/tutorial/TutorialOverlay';
 import ErrorBoundary from './components/insights/ErrorBoundary';
+import ContextualizedApp from '@/components/app/ContextualizedApp';
 import { preloadCriticalImages } from './utils/imagePreloader';
 import { toast } from 'sonner';
 import './styles/emoji.css';
 import './styles/tutorial.css';
-import { FeatureFlagsProvider } from "./contexts/FeatureFlagsContext";
-import TWAWrapper from './components/twa/TWAWrapper';
-import TWAInitializationWrapper from './components/twa/TWAInitializationWrapper';
 import { detectTWAEnvironment } from './utils/twaDetection';
 import { useTWAAutoRefresh } from './hooks/useTWAAutoRefresh';
 import { twaUpdateService } from './services/twaUpdateService';
@@ -263,29 +255,25 @@ const App: React.FC = () => {
 
   return (
     <ErrorBoundary onError={handleAppError}>
-      <FeatureFlagsProvider>
-        <TranslationProvider>
-          <AuthErrorBoundary>
-            <AuthProvider>
-              <SubscriptionProvider>
-                <TutorialProvider>
-                  <TWAWrapper>
-                    <TWAInitializationWrapper>
-                      <TranslationLoadingOverlay />
-                      <JournalProcessingInitializer />
-                      <AppRoutes key={isInitialized ? 'initialized' : 'initializing'} />
-                      <TutorialOverlay />
-                      <Toaster />
-                      <SonnerToaster position="top-right" />
-                    </TWAInitializationWrapper>
-                  </TWAWrapper>
-                </TutorialProvider>
-              </SubscriptionProvider>
-            </AuthProvider>
-          </AuthErrorBoundary>
-        </TranslationProvider>
-      </FeatureFlagsProvider>
+      <TranslationProvider>
+        <AuthErrorBoundary>
+          <AuthProvider>
+            <InnerApp key={isInitialized ? 'initialized' : 'initializing'} />
+          </AuthProvider>
+        </AuthErrorBoundary>
+      </TranslationProvider>
     </ErrorBoundary>
+  );
+};
+
+// Separate component for the inner app that can use auth context
+const InnerApp: React.FC = () => {
+  return (
+    <>
+      <ContextualizedApp />
+      <Toaster />
+      <SonnerToaster position="top-right" />
+    </>
   );
 };
 

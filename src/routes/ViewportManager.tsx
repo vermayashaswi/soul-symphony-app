@@ -1,6 +1,6 @@
 
 import React, { useEffect } from 'react';
-import { Outlet, useLocation, Navigate } from 'react-router-dom';
+import { Outlet, useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useIsMobile } from '@/hooks/use-mobile';
 import MobileNavigation from '@/components/MobileNavigation';
@@ -10,9 +10,30 @@ import { forceEnableScrolling } from '@/hooks/use-scroll-restoration';
 
 const ViewportManager: React.FC = () => {
   const location = useLocation();
-  const { user } = useAuth();
   const isMobile = useIsMobile();
-  const { onboardingComplete } = useOnboarding();
+  
+  // Safely get auth state with error handling
+  let user = null;
+  let authError = false;
+  
+  try {
+    const authState = useAuth();
+    user = authState.user;
+  } catch (error) {
+    console.warn('[ViewportManager] Auth context not available yet:', error);
+    authError = true;
+  }
+  
+  // Safely get onboarding state with error handling
+  let onboardingComplete = null;
+  
+  try {
+    const onboardingState = useOnboarding();
+    onboardingComplete = onboardingState.onboardingComplete;
+  } catch (error) {
+    console.warn('[ViewportManager] Onboarding context not available yet:', error);
+    onboardingComplete = null;
+  }
   
   // Comprehensive list of routes where navigation should be hidden
   const onboardingOrAuthPaths = [
@@ -35,11 +56,13 @@ const ViewportManager: React.FC = () => {
     isWebsiteRoute: isWebsiteRoute(location.pathname),
     isHomePage,
     user: !!user,
+    authError,
     isOnboardingOrAuth,
     onboardingComplete,
     hideNavigation: 
       isOnboardingOrAuth || 
       !user || 
+      authError ||
       (location.pathname === '/app' && !onboardingComplete)
   });
   
@@ -85,11 +108,12 @@ const ViewportManager: React.FC = () => {
       
       {/* Only display mobile navigation when:
           1. We're on an app route
-          2. User is logged in
+          2. User is logged in (and auth context is available)
           3. We're not on onboarding/auth screens
           4. If we're on /app, we also check if onboarding is complete */}
       {isAppRoute(location.pathname) && 
        user && 
+       !authError &&
        !isOnboardingOrAuth && 
        onboardingComplete && (
         <MobileNavigation onboardingComplete={onboardingComplete} />

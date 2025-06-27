@@ -5,14 +5,50 @@ import { useAuth } from '@/contexts/AuthContext';
 import { detectTWAEnvironment } from '@/utils/twaDetection';
 
 const ProtectedRoute: React.FC = () => {
-  const { user, isLoading } = useAuth();
   const location = useLocation();
+  
+  // Safely get auth state with error handling
+  let user = null;
+  let isLoading = true;
+  let authError = false;
+  
+  try {
+    const authState = useAuth();
+    user = authState.user;
+    isLoading = authState.isLoading;
+  } catch (error) {
+    console.error('[ProtectedRoute] Auth context error:', error);
+    authError = true;
+    isLoading = false;
+  }
   
   console.log('[ProtectedRoute] State:', { 
     hasUser: !!user, 
     isLoading, 
+    authError,
     path: location.pathname 
   });
+  
+  // If there's an auth error, show error message
+  if (authError) {
+    console.log('[ProtectedRoute] Auth context error, showing error page');
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center p-6 max-w-md">
+          <h2 className="text-xl font-semibold mb-4">Authentication Loading</h2>
+          <p className="text-muted-foreground mb-4">
+            The authentication system is still initializing. Please wait a moment.
+          </p>
+          <button
+            onClick={() => window.location.reload()}
+            className="px-4 py-2 bg-primary text-primary-foreground rounded-md"
+          >
+            Refresh Page
+          </button>
+        </div>
+      </div>
+    );
+  }
   
   if (isLoading) {
     console.log('[ProtectedRoute] Auth is loading, showing spinner');

@@ -22,9 +22,31 @@ const MobileNavigation: React.FC<MobileNavigationProps> = ({ onboardingComplete 
   const [isVisible, setIsVisible] = useState(false);
   const [isKeyboardVisible, setIsKeyboardVisible] = useState(false);
   const { isActive: isTutorialActive } = useTutorial();
-  const { user } = useAuth();
   const { currentLanguage } = useTranslation();
-  const { hasActiveSubscription, isTrialActive } = useSubscription();
+  
+  // Safely get auth state with error handling
+  let user = null;
+  let authError = false;
+  
+  try {
+    const authState = useAuth();
+    user = authState.user;
+  } catch (error) {
+    console.warn('[MobileNavigation] Auth context not available:', error);
+    authError = true;
+  }
+  
+  // Safely get subscription state with error handling
+  let hasActiveSubscription = false;
+  let isTrialActive = false;
+  
+  try {
+    const subscriptionState = useSubscription();
+    hasActiveSubscription = subscriptionState.hasActiveSubscription;
+    isTrialActive = subscriptionState.isTrialActive;
+  } catch (error) {
+    console.warn('[MobileNavigation] Subscription context not available:', error);
+  }
   
   // Debug: Force component re-render when language changes
   const [renderKey, setRenderKey] = useState(0);
@@ -85,6 +107,7 @@ const MobileNavigation: React.FC<MobileNavigationProps> = ({ onboardingComplete 
     const shouldShowNav = (isMobile || isNativeApp()) && 
                           !isKeyboardVisible && 
                           !isOnboardingOrAuth &&
+                          !authError &&
                           !!user &&
                           onboardingComplete !== false;
     
@@ -95,6 +118,7 @@ const MobileNavigation: React.FC<MobileNavigationProps> = ({ onboardingComplete 
       path: location.pathname,
       isKeyboardVisible,
       isOnboardingOrAuth,
+      authError,
       hasUser: !!user,
       onboardingComplete,
       isTutorialActive,
@@ -103,9 +127,9 @@ const MobileNavigation: React.FC<MobileNavigationProps> = ({ onboardingComplete 
     });
     
     setIsVisible(shouldShowNav);
-  }, [location.pathname, isMobile, isKeyboardVisible, isTutorialActive, user, onboardingComplete, currentLanguage, renderKey]);
+  }, [location.pathname, isMobile, isKeyboardVisible, isTutorialActive, user, authError, onboardingComplete, currentLanguage, renderKey]);
   
-  if (!isVisible) {
+  if (!isVisible || authError) {
     return null;
   }
   
