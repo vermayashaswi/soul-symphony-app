@@ -1,3 +1,4 @@
+
 import React, { Suspense, lazy } from 'react';
 import { Apple, Play, Shield, Check } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -29,7 +30,6 @@ const HeroSection: React.FC<HeroSectionProps> = ({ openAppStore, openPlayStore }
         pt-32 pb-2 md:pt-4 md:pb-1 
         overflow-hidden min-h-[75vh] md:min-h-[78vh] lg:min-h-[82vh] flex items-center
       `}
-      // ↑ pt-32 for mobile triples the spacing, default is 8rem, md:pt-4 keeps current for tablets/desktops
     >
       {/* Background image */}
       <div 
@@ -45,6 +45,22 @@ const HeroSection: React.FC<HeroSectionProps> = ({ openAppStore, openPlayStore }
             transition={{ duration: 0.8 }}
             className="w-full lg:w-1/2 text-center lg:text-left"
           >
+            {/* Hero Image */}
+            <motion.div
+              initial={{ opacity: 0, scale: 0.8 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ duration: 1, delay: 0.2 }}
+              className="flex justify-center lg:justify-start mb-4 md:mb-6"
+            >
+              <div className="w-48 h-32 md:w-64 md:h-40 lg:w-72 lg:h-44 flex items-center justify-center">
+                <img
+                  src="/lovable-uploads/a07b91eb-274a-47b6-8180-fb4c9c0bc8a5.png"
+                  alt="Soulo Hero"
+                  className="w-full h-full object-contain drop-shadow-lg"
+                />
+              </div>
+            </motion.div>
+
             <h1 className="text-2xl md:text-3xl lg:text-4xl xl:text-5xl font-bold mb-2 md:mb-3 text-primary leading-tight">
               <TranslatableText text="Express. Reflect. Grow." />
             </h1>
