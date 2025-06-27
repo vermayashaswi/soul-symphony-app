@@ -46,19 +46,18 @@ const HeroSection: React.FC<HeroSectionProps> = ({ openAppStore, openPlayStore }
             className="w-full lg:w-1/2 text-center lg:text-left"
           >
             <h1 className="text-2xl md:text-3xl lg:text-4xl xl:text-5xl font-bold mb-2 md:mb-3 text-primary leading-tight relative">
-              <span className="block relative">
-                <span>Express. Refle</span>
-                <span className="relative inline-block">
-                  <motion.img
-                    src="https://soulo.online/lovable-uploads/soulo-icon.png?v=2"
-                    alt="Soulo Icon"
-                    className="absolute -top-12 md:-top-16 lg:-top-20 left-0 w-8 h-8 md:w-10 md:h-10 lg:w-12 lg:h-12 object-contain drop-shadow-lg z-10"
-                    initial={{ opacity: 0, scale: 0.8, y: 10 }}
-                    animate={{ opacity: 1, scale: 1, y: 0 }}
-                    transition={{ duration: 1, delay: 0.3 }}
-                  />
-                  <span>ct. Grow.</span>
-                </span>
+              <div className="flex items-center justify-center lg:justify-start gap-3 mb-2">
+                <motion.img
+                  src="https://soulo.online/lovable-uploads/soulo-icon.png?v=2"
+                  alt="Soulo Icon"
+                  className="w-40 h-40 md:w-50 md:h-50 lg:w-60 lg:h-60 object-contain drop-shadow-lg"
+                  initial={{ opacity: 0, scale: 0.8, y: 10 }}
+                  animate={{ opacity: 1, scale: 1, y: 0 }}
+                  transition={{ duration: 1, delay: 0.3 }}
+                />
+              </div>
+              <span className="block">
+                <TranslatableText text="Express. Reflect. Grow." />
               </span>
             </h1>
             <p className="text-base md:text-lg lg:text-xl text-gray-700 mb-3 md:mb-4 max-w-2xl mx-auto lg:mx-0 leading-relaxed">
