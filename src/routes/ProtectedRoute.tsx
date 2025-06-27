@@ -1,37 +1,24 @@
 
 import React from 'react';
 import { Navigate, useLocation, Outlet } from 'react-router-dom';
-import { useAuth } from '@/contexts/AuthContext';
+import { useSafeAuth } from '@/hooks/use-safe-auth';
 import { detectTWAEnvironment } from '@/utils/twaDetection';
 
 const ProtectedRoute: React.FC = () => {
   const location = useLocation();
-  
-  // Safely get auth state with error handling
-  let user = null;
-  let isLoading = true;
-  let authError = false;
-  
-  try {
-    const authState = useAuth();
-    user = authState.user;
-    isLoading = authState.isLoading;
-  } catch (error) {
-    console.error('[ProtectedRoute] Auth context error:', error);
-    authError = true;
-    isLoading = false;
-  }
+  const { user, isLoading, error, isAvailable } = useSafeAuth();
   
   console.log('[ProtectedRoute] State:', { 
     hasUser: !!user, 
     isLoading, 
-    authError,
+    error,
+    isAvailable,
     path: location.pathname 
   });
   
-  // If there's an auth error, show error message
-  if (authError) {
-    console.log('[ProtectedRoute] Auth context error, showing error page');
+  // If auth context is not available, show error message
+  if (!isAvailable) {
+    console.log('[ProtectedRoute] Auth context not available, showing error page');
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center p-6 max-w-md">
@@ -40,6 +27,25 @@ const ProtectedRoute: React.FC = () => {
             The authentication system is still initializing. Please wait a moment.
           </p>
           <button
+            onClick={() => window.location.reload()}
+            className="px-4 py-2 bg-primary text-primary-foreground rounded-md"
+          >
+            Refresh Page
+          </button>
+        </div>
+      </div>
+    );
+  }
+  
+  // If there's an auth error, show it
+  if (error) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center p-6 max-w-md">
+          <div className="text-4xl mb-4">⚠️</div>
+          <h2 className="text-xl font-semibold mb-4">Authentication Error</h2>
+          <p className="text-muted-foreground mb-4">{error}</p>
+          <button 
             onClick={() => window.location.reload()}
             className="px-4 py-2 bg-primary text-primary-foreground rounded-md"
           >

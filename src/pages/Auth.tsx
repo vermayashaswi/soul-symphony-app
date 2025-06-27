@@ -2,7 +2,7 @@
 import { useState, useEffect } from 'react';
 import { Navigate, useNavigate, useLocation, useSearchParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { useAuth } from '@/contexts/AuthContext';
+import { useSafeAuth } from '@/hooks/use-safe-auth';
 import { toast } from 'sonner';
 import SouloLogo from '@/components/SouloLogo';
 import { useOnboarding } from '@/hooks/use-onboarding';
@@ -17,18 +17,8 @@ export default function Auth() {
   const [isLoading, setIsLoading] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
   
-  // Safely get auth state with error handling
-  let user = null;
-  let authLoading = true;
-  
-  try {
-    const authState = useAuth();
-    user = authState.user;
-    authLoading = authState.isLoading;
-  } catch (error) {
-    console.error('[Auth] Error accessing auth context:', error);
-    setAuthError('Authentication system is still initializing. Please wait...');
-  }
+  // Use safe auth hook to prevent context errors
+  const { user, isLoading: authLoading, error: authContextError, isAvailable } = useSafeAuth();
   
   const { onboardingComplete } = useOnboarding();
   
@@ -61,7 +51,8 @@ export default function Auth() {
     currentPath: location.pathname,
     onboardingComplete,
     authLoading,
-    authError
+    authContextError,
+    isAvailable
   });
 
   useEffect(() => {
@@ -70,7 +61,7 @@ export default function Auth() {
 
   useEffect(() => {
     // If user is logged in and page has finished initial loading, redirect
-    if (user && !authLoading && !redirecting && !authError) {
+    if (user && !authLoading && !redirecting && isAvailable) {
       console.log('[Auth] User is logged in, redirecting to:', redirectTo);
       setRedirecting(true);
       
@@ -90,16 +81,35 @@ export default function Auth() {
       
       return () => clearTimeout(timer);
     }
-  }, [user, authLoading, navigate, redirecting, redirectTo, onboardingComplete, authError]);
+  }, [user, authLoading, navigate, redirecting, redirectTo, onboardingComplete, isAvailable]);
 
-  // If there's an auth error, show it
-  if (authError) {
+  // If auth context is not available, show loading
+  if (!isAvailable) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background px-4 py-12">
+        <div className="max-w-md w-full text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mb-4 mx-auto"></div>
+          <h2 className="text-xl font-semibold mb-4">Authentication Initializing</h2>
+          <p className="text-muted-foreground mb-6">Please wait while we set up the authentication system...</p>
+          <button 
+            onClick={() => window.location.reload()}
+            className="px-4 py-2 bg-primary text-primary-foreground rounded-md"
+          >
+            Refresh Page
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // If there's an auth context error, show it
+  if (authContextError) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background px-4 py-12">
         <div className="max-w-md w-full text-center">
           <div className="text-4xl mb-4">⚠️</div>
-          <h2 className="text-xl font-semibold mb-4">Authentication Initializing</h2>
-          <p className="text-muted-foreground mb-6">{authError}</p>
+          <h2 className="text-xl font-semibold mb-4">Authentication Error</h2>
+          <p className="text-muted-foreground mb-6">{authContextError}</p>
           <button 
             onClick={() => window.location.reload()}
             className="px-4 py-2 bg-primary text-primary-foreground rounded-md"

@@ -1,7 +1,7 @@
 
 import React, { useEffect } from 'react';
 import { Outlet, useLocation } from 'react-router-dom';
-import { useAuth } from '@/contexts/AuthContext';
+import { useSafeAuth } from '@/hooks/use-safe-auth';
 import { useIsMobile } from '@/hooks/use-mobile';
 import MobileNavigation from '@/components/MobileNavigation';
 import { isAppRoute, isWebsiteRoute } from './RouteHelpers';
@@ -12,17 +12,8 @@ const ViewportManager: React.FC = () => {
   const location = useLocation();
   const isMobile = useIsMobile();
   
-  // Safely get auth state with error handling
-  let user = null;
-  let authError = false;
-  
-  try {
-    const authState = useAuth();
-    user = authState.user;
-  } catch (error) {
-    console.warn('[ViewportManager] Auth context not available yet:', error);
-    authError = true;
-  }
+  // Use safe auth hook to prevent context errors
+  const { user, isAvailable: authAvailable } = useSafeAuth();
   
   // Safely get onboarding state with error handling
   let onboardingComplete = null;
@@ -56,13 +47,13 @@ const ViewportManager: React.FC = () => {
     isWebsiteRoute: isWebsiteRoute(location.pathname),
     isHomePage,
     user: !!user,
-    authError,
+    authAvailable,
     isOnboardingOrAuth,
     onboardingComplete,
     hideNavigation: 
       isOnboardingOrAuth || 
       !user || 
-      authError ||
+      !authAvailable ||
       (location.pathname === '/app' && !onboardingComplete)
   });
   
@@ -113,7 +104,7 @@ const ViewportManager: React.FC = () => {
           4. If we're on /app, we also check if onboarding is complete */}
       {isAppRoute(location.pathname) && 
        user && 
-       !authError &&
+       authAvailable &&
        !isOnboardingOrAuth && 
        onboardingComplete && (
         <MobileNavigation onboardingComplete={onboardingComplete} />
