@@ -15,9 +15,22 @@ export default function Auth() {
   const [searchParams] = useSearchParams();
   const [redirecting, setRedirecting] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const { user, isLoading: authLoading } = useAuth();
-  const { onboardingComplete } = useOnboarding();
   const [authError, setAuthError] = useState<string | null>(null);
+  
+  // Safely get auth state with error handling
+  let user = null;
+  let authLoading = true;
+  
+  try {
+    const authState = useAuth();
+    user = authState.user;
+    authLoading = authState.isLoading;
+  } catch (error) {
+    console.error('[Auth] Error accessing auth context:', error);
+    setAuthError('Authentication system is still initializing. Please wait...');
+  }
+  
+  const { onboardingComplete } = useOnboarding();
   
   const redirectParam = searchParams.get('redirectTo');
   const fromLocation = location.state?.from?.pathname;
@@ -39,14 +52,16 @@ export default function Auth() {
   // Determine where to redirect after auth
   const redirectTo = getValidRedirectPath(redirectParam || fromLocation || storedRedirect);
 
-  console.log('Auth page mounted', { 
+  console.log('[Auth] Component state:', { 
     redirectTo, 
     redirectParam, 
     fromLocation,
     storedRedirect,
     hasUser: !!user,
     currentPath: location.pathname,
-    onboardingComplete
+    onboardingComplete,
+    authLoading,
+    authError
   });
 
   useEffect(() => {
@@ -55,8 +70,8 @@ export default function Auth() {
 
   useEffect(() => {
     // If user is logged in and page has finished initial loading, redirect
-    if (user && !authLoading && !redirecting) {
-      console.log('User is logged in, redirecting to:', redirectTo);
+    if (user && !authLoading && !redirecting && !authError) {
+      console.log('[Auth] User is logged in, redirecting to:', redirectTo);
       setRedirecting(true);
       
       // Clean up stored redirect
@@ -66,7 +81,7 @@ export default function Auth() {
       const timer = setTimeout(() => {
         // If onboarding is not complete, redirect to onboarding
         if (!onboardingComplete && !redirectTo.includes('onboarding')) {
-          console.log('Redirecting to onboarding as it is not complete');
+          console.log('[Auth] Redirecting to onboarding as it is not complete');
           navigate('/app/onboarding', { replace: true });
         } else {
           navigate(redirectTo, { replace: true });
@@ -75,10 +90,30 @@ export default function Auth() {
       
       return () => clearTimeout(timer);
     }
-  }, [user, authLoading, navigate, redirecting, redirectTo, onboardingComplete]);
+  }, [user, authLoading, navigate, redirecting, redirectTo, onboardingComplete, authError]);
+
+  // If there's an auth error, show it
+  if (authError) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background px-4 py-12">
+        <div className="max-w-md w-full text-center">
+          <div className="text-4xl mb-4">⚠️</div>
+          <h2 className="text-xl font-semibold mb-4">Authentication Initializing</h2>
+          <p className="text-muted-foreground mb-6">{authError}</p>
+          <button 
+            onClick={() => window.location.reload()}
+            className="px-4 py-2 bg-primary text-primary-foreground rounded-md"
+          >
+            Refresh Page
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   // If still checking auth state, show loading
   if (authLoading) {
+    console.log('[Auth] Auth is loading, showing spinner');
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
@@ -93,7 +128,7 @@ export default function Auth() {
       ? '/app/onboarding'
       : redirectTo;
       
-    console.log('User already logged in, redirecting to:', finalRedirect, {
+    console.log('[Auth] User already logged in, redirecting to:', finalRedirect, {
       onboardingComplete,
       originalRedirect: redirectTo
     });
@@ -120,14 +155,6 @@ export default function Auth() {
             />
           </p>
         </div>
-        
-        {authError && (
-          <div className="mb-4 p-2 border border-red-500 bg-red-50 text-red-600 rounded">
-            <p className="text-sm">
-              <TranslatableText text="Error:" forceTranslate={true} /> {authError}
-            </p>
-          </div>
-        )}
         
         <div className="space-y-4">
           <PlatformAuthButton 

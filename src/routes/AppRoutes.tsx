@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { Routes, Route, Navigate, Outlet } from 'react-router-dom';
+import { Routes, Route, Navigate } from 'react-router-dom';
 import Index from '@/pages/Index';
 import Home from '@/pages/Home';
 import Journal from '@/pages/Journal';
@@ -18,29 +18,8 @@ import FAQPage from '@/pages/website/FAQPage';
 import BlogPage from '@/pages/website/BlogPage';
 import BlogPostPage from '@/pages/website/BlogPostPage';
 import OnboardingScreen from '@/components/onboarding/OnboardingScreen';
-import { useAuth } from '@/contexts/AuthContext';
-import { useOnboarding } from '@/hooks/use-onboarding';
 
 const AppRoutes = () => {
-  const { user } = useAuth();
-  const { onboardingComplete } = useOnboarding();
-  
-  // This will be used for conditional rendering of the /app route
-  const AppRootRedirect = () => {
-    if (user) {
-      if (onboardingComplete) {
-        // If user is logged in and onboarding is complete, go to home
-        return <Navigate to="/app/home" replace />;
-      } else {
-        // If user is logged in but onboarding is not complete, go to onboarding
-        return <Navigate to="/app/onboarding" replace />;
-      }
-    } else {
-      // If user is not logged in, go to auth instead of onboarding for TWA
-      return <Navigate to="/app/auth" replace />;
-    }
-  };
-  
   return (
     <Routes>
       {/* Wrap all routes that need ViewportManager in a parent Route */}
@@ -59,7 +38,7 @@ const AppRoutes = () => {
         
         {/* Protected App Routes */}
         <Route path="/app" element={<ProtectedRoute />}>
-          <Route index element={<AppRootRedirect />} />
+          <Route index element={<Navigate to="/app/home" replace />} />
           <Route path="home" element={<Home />} />
           <Route path="journal" element={<Journal />} />
           <Route path="insights" element={
