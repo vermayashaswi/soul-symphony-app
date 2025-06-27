@@ -6,7 +6,12 @@ import { isAppRoute } from '@/routes/RouteHelpers';
  * Gets the redirect URL for authentication
  */
 export const getRedirectUrl = (): string => {
-  // For iOS in standalone mode (PWA), we need to handle redirects differently
+  // For native apps, always redirect to /app/auth to handle the callback
+  if (typeof window !== 'undefined' && (window as any).Capacitor) {
+    return `${window.location.origin}/app/auth`;
+  }
+  
+  // For web apps, maintain existing behavior
   // Check for standalone mode in a type-safe way
   const isInStandaloneMode = () => {
     // Check for display-mode: standalone media query (PWA)
@@ -29,7 +34,13 @@ export const getRedirectUrl = (): string => {
 export const signInWithGoogle = async (): Promise<void> => {
   try {
     const redirectUrl = getRedirectUrl();
-    console.log('Using redirect URL:', redirectUrl);
+    console.log('[AuthService] Using redirect URL for Google:', redirectUrl);
+    
+    // Store current page for post-auth redirect
+    const currentPath = window.location.pathname;
+    if (currentPath !== '/app/auth') {
+      localStorage.setItem('authRedirectTo', currentPath);
+    }
     
     const { data, error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
@@ -47,15 +58,15 @@ export const signInWithGoogle = async (): Promise<void> => {
       throw error;
     }
     
-    // If we have a URL, manually redirect to it (as a backup)
-    if (data?.url) {
-      console.log('Redirecting to OAuth URL:', data.url);
+    // For native apps, don't manually redirect as it will be handled by webview
+    if (data?.url && !(window as any).Capacitor) {
+      console.log('[AuthService] Redirecting to OAuth URL:', data.url);
       setTimeout(() => {
         window.location.href = data.url;
       }, 100);
     }
   } catch (error: any) {
-    console.error('Error signing in with Google:', error.message);
+    console.error('[AuthService] Error signing in with Google:', error.message);
     toast.error(`Error signing in with Google: ${error.message}`);
     throw error;
   }
@@ -67,7 +78,13 @@ export const signInWithGoogle = async (): Promise<void> => {
 export const signInWithApple = async (): Promise<void> => {
   try {
     const redirectUrl = getRedirectUrl();
-    console.log('Using redirect URL for Apple ID:', redirectUrl);
+    console.log('[AuthService] Using redirect URL for Apple ID:', redirectUrl);
+    
+    // Store current page for post-auth redirect
+    const currentPath = window.location.pathname;
+    if (currentPath !== '/app/auth') {
+      localStorage.setItem('authRedirectTo', currentPath);
+    }
     
     const { data, error } = await supabase.auth.signInWithOAuth({
       provider: 'apple',
@@ -80,15 +97,15 @@ export const signInWithApple = async (): Promise<void> => {
       throw error;
     }
     
-    // If we have a URL, manually redirect to it (as a backup)
-    if (data?.url) {
-      console.log('Redirecting to Apple OAuth URL:', data.url);
+    // For native apps, don't manually redirect as it will be handled by webview
+    if (data?.url && !(window as any).Capacitor) {
+      console.log('[AuthService] Redirecting to Apple OAuth URL:', data.url);
       setTimeout(() => {
         window.location.href = data.url;
       }, 100);
     }
   } catch (error: any) {
-    console.error('Error signing in with Apple:', error.message);
+    console.error('[AuthService] Error signing in with Apple:', error.message);
     toast.error(`Error signing in with Apple: ${error.message}`);
     throw error;
   }
@@ -161,6 +178,8 @@ export const resetPassword = async (email: string): Promise<void> => {
  */
 export const signOut = async (navigate?: (path: string) => void): Promise<void> => {
   try {
+    console.log('[AuthService] Attempting to sign out user');
+    
     // Check if there's a session before trying to sign out
     const { data: sessionData } = await supabase.auth.getSession();
     
@@ -169,9 +188,11 @@ export const signOut = async (navigate?: (path: string) => void): Promise<void> 
       // Clear any auth-related items from local storage
       localStorage.removeItem('authRedirectTo');
       
-      // Redirect to onboarding page if navigate function is provided
+      // Always redirect to onboarding page for both web and native
       if (navigate) {
         navigate('/app/onboarding');
+      } else {
+        window.location.href = '/app/onboarding';
       }
       return;
     }
@@ -185,16 +206,20 @@ export const signOut = async (navigate?: (path: string) => void): Promise<void> 
     // Clear any auth-related items from local storage
     localStorage.removeItem('authRedirectTo');
     
-    // Always redirect to onboarding page if navigate function is provided
+    // Always redirect to onboarding page for both web and native
     if (navigate) {
       navigate('/app/onboarding');
+    } else {
+      window.location.href = '/app/onboarding';
     }
   } catch (error: any) {
-    console.error('Error signing out:', error.message);
+    console.error('[AuthService] Error signing out:', error.message);
     
     // Still navigate to onboarding page even if there's an error
     if (navigate) {
       navigate('/app/onboarding');
+    } else {
+      window.location.href = '/app/onboarding';
     }
     localStorage.removeItem('authRedirectTo');
     
@@ -256,19 +281,19 @@ export const handleAuthCallback = async () => {
                          window.location.hash.includes('error') ||
                          window.location.search.includes('error');
     
-    console.log('Checking for auth callback params:', hasHashParams);
+    console.log('[AuthService] Checking for auth callback params:', hasHashParams);
     
     if (hasHashParams) {
       // Get the session
       const { data, error } = await supabase.auth.getSession();
       
       if (error) {
-        console.error('Error in auth callback session check:', error);
+        console.error('[AuthService] Error in auth callback session check:', error);
         return null;
       } 
       
       if (data.session?.user) {
-        console.log('User authenticated in callback handler');
+        console.log('[AuthService] User authenticated in callback handler');
         // Session creation will be handled by AuthContext
         return data.session;
       }
@@ -276,7 +301,7 @@ export const handleAuthCallback = async () => {
     
     return null;
   } catch (error) {
-    console.error('Error in handleAuthCallback:', error);
+    console.error('[AuthService] Error in handleAuthCallback:', error);
     return null;
   }
 };

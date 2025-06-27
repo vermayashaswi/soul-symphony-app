@@ -22,7 +22,12 @@ export function useOnboarding() {
   };
 
   useEffect(() => {
-    checkOnboardingStatus();
+    // Add delay for native apps to ensure proper initialization
+    const initDelay = typeof window !== 'undefined' && (window as any).Capacitor ? 1000 : 0;
+    
+    setTimeout(() => {
+      checkOnboardingStatus();
+    }, initDelay);
   }, []);
 
   const completeOnboarding = () => {
@@ -32,7 +37,9 @@ export function useOnboarding() {
 
   const resetOnboarding = () => {
     localStorage.removeItem('onboardingComplete');
+    localStorage.removeItem('user_display_name');
     setOnboardingComplete(false);
+    setDisplayName(null);
   };
 
   const saveNameToProfile = async (userId: string, name: string) => {
@@ -51,6 +58,7 @@ export function useOnboarding() {
       if (error) {
         console.error('Error saving display name to profile:', error);
       } else {
+        console.log('[Onboarding] Display name saved to profile successfully');
         // Clear from localStorage after successful save
         localStorage.removeItem('user_display_name');
       }
