@@ -1,4 +1,3 @@
-
 import React from 'react'
 import ReactDOM from 'react-dom/client'
 import App from './App.tsx'
@@ -16,6 +15,13 @@ import { periodicSyncService } from './services/periodicSyncService'
 import { pushNotificationService } from './services/pushNotificationService'
 import { mobileErrorHandler } from './services/mobileErrorHandler'
 import { mobileOptimizationService } from './services/mobileOptimizationService'
+import { nativeIntegrationService } from './services/nativeIntegrationService'
+
+// Capacitor imports for mobile functionality
+import { Capacitor } from '@capacitor/core'
+import { SplashScreen } from '@capacitor/splash-screen'
+import { StatusBar, Style } from '@capacitor/status-bar'
+import { App as CapacitorApp } from '@capacitor/app'
 
 // Enhanced Font Loading System
 const initializeFontSystem = async () => {
@@ -99,6 +105,95 @@ const initializeFontSystem = async () => {
     // Set ready flag anyway to prevent hanging
     (window as any).__SOULO_FONTS_READY__ = true;
     window.dispatchEvent(new CustomEvent('fontsReady', { detail: { error } }));
+  }
+};
+
+// Capacitor Mobile Initialization
+const initializeCapacitor = async () => {
+  if (!Capacitor.isNativePlatform()) {
+    console.log('[Capacitor] Running in web mode, skipping native initialization');
+    return;
+  }
+
+  console.log('[Capacitor] Initializing native platform features...');
+
+  try {
+    // Configure status bar for dark theme
+    await StatusBar.setStyle({ style: Style.Dark });
+    await StatusBar.setBackgroundColor({ color: '#000000' });
+    console.log('[Capacitor] Status bar configured');
+
+    // Set up app state listeners
+    CapacitorApp.addListener('appStateChange', ({ isActive }) => {
+      console.log('[Capacitor] App state changed:', isActive ? 'active' : 'background');
+      if (isActive) {
+        // App came to foreground
+        document.dispatchEvent(new CustomEvent('appStateChange', { detail: { isActive: true } }));
+      } else {
+        // App went to background
+        document.dispatchEvent(new CustomEvent('appStateChange', { detail: { isActive: false } }));
+      }
+    });
+
+    // Handle deep links
+    CapacitorApp.addListener('appUrlOpen', (event) => {
+      console.log('[Capacitor] Deep link received:', event.url);
+      
+      // Handle OAuth redirects
+      if (event.url.includes('/app/auth') || event.url.includes('soulo://auth')) {
+        console.log('[Capacitor] OAuth redirect detected');
+        window.dispatchEvent(new CustomEvent('oauthRedirect', { detail: { url: event.url } }));
+      }
+    });
+
+    // Handle back button
+    CapacitorApp.addListener('backButton', ({ canGoBack }) => {
+      console.log('[Capacitor] Back button pressed, canGoBack:', canGoBack);
+      
+      if (!canGoBack) {
+        // Show exit confirmation or minimize app
+        CapacitorApp.minimizeApp();
+      } else {
+        // Let the browser handle the back navigation
+        window.history.back();
+      }
+    });
+
+    console.log('[Capacitor] Native initialization complete');
+
+  } catch (error) {
+    console.error('[Capacitor] Initialization error:', error);
+    mobileErrorHandler.handleError({
+      type: 'unknown',
+      message: `Capacitor initialization failed: ${error}`
+    });
+  }
+};
+
+// Enhanced Splash Screen Management
+const manageSplashScreen = async () => {
+  if (!Capacitor.isNativePlatform()) {
+    return;
+  }
+
+  try {
+    console.log('[SplashScreen] Managing splash screen...');
+    
+    // Keep splash screen visible during initialization
+    await new Promise(resolve => setTimeout(resolve, 2000));
+    
+    // Hide splash screen with fade animation
+    await SplashScreen.hide();
+    console.log('[SplashScreen] Splash screen hidden');
+    
+  } catch (error) {
+    console.error('[SplashScreen] Error managing splash screen:', error);
+    // Try to hide splash screen anyway
+    try {
+      await SplashScreen.hide();
+    } catch (fallbackError) {
+      console.error('[SplashScreen] Fallback hide failed:', fallbackError);
+    }
   }
 };
 
@@ -190,7 +285,12 @@ const initializePWA = async () => {
 // Initialize systems
 const initializeApp = async () => {
   try {
-    // Initialize font system first
+    console.log('[App] Starting initialization sequence...');
+    
+    // Initialize Capacitor first for native platforms
+    await initializeCapacitor();
+    
+    // Initialize font system
     await initializeFontSystem();
     
     // Initialize viewport fix
@@ -199,8 +299,14 @@ const initializeApp = async () => {
     // Initialize mobile optimizations early
     await mobileOptimizationService.initialize();
     
+    // Initialize native integration service for mobile features
+    await nativeIntegrationService.initialize();
+    
     // Initialize PWA features
     await initializePWA();
+    
+    // Manage splash screen after everything is initialized
+    await manageSplashScreen();
     
     // Detect iOS and set a class on the HTML element
     if (/iPad|iPhone|iPod/.test(navigator.userAgent) || 
@@ -211,6 +317,12 @@ const initializeApp = async () => {
     // Detect Android and set a class
     if (/Android/.test(navigator.userAgent)) {
       document.documentElement.classList.add('android-device');
+    }
+    
+    // Detect if running in Capacitor native app
+    if (Capacitor.isNativePlatform()) {
+      document.documentElement.classList.add('capacitor-native');
+      console.log('[App] Running in Capacitor native environment');
     }
     
     console.log('[App] Initialization complete');

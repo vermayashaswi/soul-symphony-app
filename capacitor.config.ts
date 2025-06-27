@@ -5,22 +5,17 @@ const config: CapacitorConfig = {
   appId: 'app.soulo.online',
   appName: 'Soulo',
   webDir: 'dist',
-  server: {
-    url: 'https://soulo.online/app'
-    cleartext: false 
-  },
   // Remove server configuration for production - use bundled assets
   plugins: {
     SplashScreen: {
       launchAutoHide: false,
       backgroundColor: "#000000",
-      showSpinner: true,
-      androidSpinnerStyle: "large",
-      iosSpinnerStyle: "small", 
-      spinnerColor: "#8b5cf6",
+      showSpinner: false, // Disable spinner to avoid conflicts
       splashFullScreen: true,
       splashImmersive: true,
-      splashScreenDelay: 2000
+      splashScreenDelay: 3000, // Increased delay for better UX
+      androidSplashResourceName: "splash", // Use our custom splash
+      androidScaleType: "CENTER_CROP"
     },
     Keyboard: {
       resize: "body",
@@ -32,7 +27,8 @@ const config: CapacitorConfig = {
       backgroundColor: "#000000"
     },
     App: {
-      // Remove launchUrl for production builds
+      // Deep link handling for OAuth redirects
+      launchUrl: "soulo://auth"
     },
     PushNotifications: {
       presentationOptions: ["badge", "sound", "alert"]
@@ -48,13 +44,13 @@ const config: CapacitorConfig = {
     allowsLinkPreview: false,
     scrollEnabled: true,
     backgroundColor: "#000000",
-    scheme: "Soulo",
+    scheme: "soulo",
     preferredContentMode: "mobile"
   },
   android: {
-    allowMixedContent: false, // Disable for production security
+    allowMixedContent: false,
     captureInput: true,
-    webContentsDebuggingEnabled: false, // Disable for production
+    webContentsDebuggingEnabled: false,
     backgroundColor: "#000000",
     launchMode: "singleTask",
     orientation: "portrait",
@@ -63,7 +59,26 @@ const config: CapacitorConfig = {
     overrideUserAgent: "SouloApp/1.0.0 Mobile",
     androidScheme: "https",
     loadOnMainThread: true,
-    handlePermissions: true
+    handlePermissions: true,
+    // Enhanced deep linking support
+    intentFilters: [
+      {
+        action: "android.intent.action.VIEW",
+        autoVerify: true,
+        category: ["android.intent.category.DEFAULT", "android.intent.category.BROWSABLE"],
+        data: [
+          {
+            scheme: "soulo",
+            host: "auth"
+          },
+          {
+            scheme: "https",
+            host: "soulo.online",
+            pathPrefix: "/app/auth"
+          }
+        ]
+      }
+    ]
   }
 };
 

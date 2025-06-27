@@ -1,12 +1,13 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
-import { User, Lock, Moon, Sun, Palette, HelpCircle, Shield, Mail, Check as CheckIcon, LogOut, Monitor, Pencil, Save, X, RefreshCw } from 'lucide-react';
+import { User, Bell, Lock, Moon, Sun, Palette, HelpCircle, Shield, Mail, Check as CheckIcon, LogOut, Monitor, Pencil, Save, X, Clock, Calendar, RefreshCw } from 'lucide-react';
 import { Button } from "@/components/ui/button";
+import { Switch } from "@/components/ui/switch";
 import { Separator } from "@/components/ui/separator";
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import { useTheme } from '@/hooks/use-theme';
+import { setupJournalReminder, initializeCapacitorNotifications, NotificationFrequency, NotificationTime } from '@/services/notificationService';
 import { useAuth } from '@/contexts/AuthContext';
 import { useSubscription } from '@/contexts/SubscriptionContext';
 import { supabase } from '@/integrations/supabase/client';
@@ -24,7 +25,10 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { startOfDay, subDays, isWithinInterval } from 'date-fns';
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Input } from "@/components/ui/input";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Label } from "@/components/ui/label";
 import { Card } from "@/components/ui/card";
+import { Checkbox } from "@/components/ui/checkbox";
 import { TranslatableText } from '@/components/translation/TranslatableText';
 import { useTranslation } from '@/contexts/TranslationContext';
 import { useTutorial } from '@/contexts/TutorialContext';
@@ -62,6 +66,9 @@ function SettingsContent() {
   console.log('[Settings] SettingsContent rendering');
   
   const { theme, setTheme, colorTheme, setColorTheme, customColor, setCustomColor, systemTheme } = useTheme();
+  const [notificationsEnabled, setNotificationsEnabled] = useState(false);
+  const [notificationTimes, setNotificationTimes] = useState<NotificationTime[]>(['evening']);
+  const [showNotificationSettings, setShowNotificationSettings] = useState(false);
   const { user, signOut } = useAuth();
   const { 
     isPremium, 
@@ -95,6 +102,13 @@ function SettingsContent() {
     { name: 'Soothing', color: 'bg-pink-200' },
     { name: 'Energy', color: 'bg-amber-400' },
     { name: 'Focus', color: 'bg-emerald-400' },
+  ];
+
+  const timeOptions: { label: string; value: NotificationTime }[] = [
+    { label: 'Morning (8:00 AM)', value: 'morning' },
+    { label: 'Afternoon (2:00 PM)', value: 'afternoon' },
+    { label: 'Evening (7:00 PM)', value: 'evening' },
+    { label: 'Night (10:00 PM)', value: 'night' },
   ];
 
   const { resetTutorial } = useTutorial();
@@ -203,6 +217,36 @@ function SettingsContent() {
     fetchUserProfile();
   }, [user]);
 
+  useEffect(() => {
+    const enabled = localStorage.getItem('notification_enabled') === 'true';
+    const times = localStorage.getItem('notification_times');
+    
+    if (enabled) {
+      setNotificationsEnabled(true);
+    }
+    
+    if (times) {
+      try {
+        const parsedTimes = JSON.parse(times) as NotificationTime[];
+        if (Array.isArray(parsedTimes) && parsedTimes.length > 0) {
+          setNotificationTimes(parsedTimes);
+        }
+      } catch (e) {
+        console.error('Error parsing notification times from localStorage', e);
+      }
+    }
+  }, []);
+
+  useEffect(() => {
+    if (notificationsEnabled) {
+      setupJournalReminder(true, 'once', notificationTimes);
+      if (typeof window !== 'undefined' && !('Notification' in window) || 
+          (window.Notification && window.Notification.permission !== 'granted')) {
+        initializeCapacitorNotifications();
+      }
+    }
+  }, [notificationsEnabled, notificationTimes]);
+
   const handleContactSupport = () => {
     const subject = encodeURIComponent("Help me, I don't want to be SOuLO right now");
     const mailtoLink = `mailto:support@soulo.online?subject=${subject}`;
@@ -269,6 +313,99 @@ function SettingsContent() {
     setDisplayName(originalDisplayName);
     setIsEditingName(false);
     setNameError(null);
+  };
+  
+  const handleToggleNotifications = async (checked: boolean) => {
+    setNotificationsEnabled(checked);
+    
+    if (checked) {
+      // Request permission first
+      if ('Notification' in window) {
+        const permission = await Notification.requestPermission();
+        if (permission === 'granted') {
+          setShowNotificationSettings(true);
+          toast.success(<TranslatableText text="Notifications enabled! Set your preferences." forceTranslate={true} />);
+        } else {
+          setNotificationsEnabled(false);
+          toast.error(<TranslatableText text="Notification permission denied" forceTranslate={true} />);
+        }
+      } else {
+        // For mobile/capacitor
+        setShowNotificationSettings(true);
+        toast.success(<TranslatableText text="Customize your notification settings" forceTranslate={true} />);
+      }
+    } else {
+      toast.info(<TranslatableText text="Notifications disabled" forceTranslate={true} />);
+      if (typeof window !== 'undefined') {
+        localStorage.removeItem('notification_enabled');
+        localStorage.removeItem('notification_times');
+      }
+    }
+  };
+  
+  const handleTimeChange = (time: NotificationTime) => {
+    setNotificationTimes(prev => {
+      if (prev.includes(time)) {
+        return prev.filter(t => t !== time);
+      }
+      return [...prev, time];
+    });
+  };
+  
+  const applyNotificationSettings = () => {
+    if (notificationTimes.length === 0) {
+      toast.error(<TranslatableText text="Please select at least one time for notifications" forceTranslate={true} />);
+      return;
+    }
+    
+    setupJournalReminder(true, 'once', notificationTimes);
+    toast.success(<TranslatableText text="Notification settings saved" forceTranslate={true} />);
+    setShowNotificationSettings(false);
+  };
+
+  const cancelNotificationSettings = () => {
+    // Get the current state from localStorage to determine what to reset to
+    const storedEnabled = localStorage.getItem('notification_enabled') === 'true';
+    const storedTimes = localStorage.getItem('notification_times');
+    
+    // Reset to the stored state
+    setNotificationsEnabled(storedEnabled);
+    
+    if (storedTimes) {
+      try {
+        const parsedTimes = JSON.parse(storedTimes) as NotificationTime[];
+        if (Array.isArray(parsedTimes) && parsedTimes.length > 0) {
+          setNotificationTimes(parsedTimes);
+        } else {
+          setNotificationTimes(['evening']);
+        }
+      } catch (e) {
+        setNotificationTimes(['evening']);
+      }
+    } else {
+      setNotificationTimes(['evening']);
+    }
+    
+    setShowNotificationSettings(false);
+  };
+  
+  const getNotificationSummary = () => {
+    if (!notificationsEnabled) return <TranslatableText text="Disabled" />;
+    
+    const timeLabels = notificationTimes.map(time => {
+      return {
+        'morning': 'Morning',
+        'afternoon': 'Afternoon', 
+        'evening': 'Evening',
+        'night': 'Night'
+      }[time];
+    }).join(", ");
+    
+    return (
+      <div className="flex flex-wrap items-center gap-1">
+        <TranslatableText text={timeLabels} />
+      </div>
+    );
   };
 
   const applyCustomColor = () => {
@@ -528,6 +665,51 @@ function SettingsContent() {
                     </Button>
                   </div>
                 </div>
+              </div>
+            </motion.div>
+            
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.3, delay: 0.2 }}
+              className="bg-background rounded-xl p-6 shadow-sm border"
+            >
+              <h2 className="text-xl font-semibold mb-4 text-theme-color">
+                <TranslatableText text="Preferences" />
+              </h2>
+              
+              <div className="space-y-3 divide-y">
+                <SettingItem
+                  icon={Bell}
+                  title="Journal Reminders"
+                  description={
+                    notificationsEnabled 
+                      ? ""
+                      : "Get reminders to journal and stay on track"
+                  }
+                >
+                  <div className="flex items-center gap-2">
+                    <Switch 
+                      checked={notificationsEnabled}
+                      onCheckedChange={handleToggleNotifications}
+                    />
+                    {notificationsEnabled && (
+                      <Button 
+                        variant="outline" 
+                        size="sm"
+                        onClick={() => setShowNotificationSettings(true)}
+                      >
+                        <TranslatableText text="Customize" />
+                      </Button>
+                    )}
+                  </div>
+                </SettingItem>
+                
+                {notificationsEnabled && (
+                  <div className="pt-2 text-sm text-muted-foreground">
+                    {getNotificationSummary()}
+                  </div>
+                )}
               </div>
             </motion.div>
             
@@ -854,6 +1036,76 @@ function SettingsContent() {
                 </div>
               </div>
             </ScrollArea>
+          </DialogContent>
+        </Dialog>
+        
+        <Dialog
+          open={showNotificationSettings}
+          onOpenChange={(open) => {
+            if (!open) {
+              cancelNotificationSettings();
+            }
+          }}
+        >
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle>
+                <TranslatableText text="Notification Settings" />
+              </DialogTitle>
+              <DialogDescription>
+                <TranslatableText text="Choose when you want to receive journal reminders" />
+              </DialogDescription>
+            </DialogHeader>
+            
+            <div className="space-y-6 py-4">
+              <div className="space-y-4">
+                <h3 className="font-medium text-sm">
+                  <TranslatableText text="Reminder Times" />
+                </h3>
+                
+                <div className="grid grid-cols-2 gap-3">
+                  {timeOptions.map(option => (
+                    <div 
+                      key={option.value} 
+                      className={cn(
+                        "border rounded-md px-3 py-2 flex items-center space-x-2 cursor-pointer",
+                        notificationTimes.includes(option.value) 
+                          ? "border-primary bg-primary/10" 
+                          : "border-input"
+                      )}
+                      onClick={() => handleTimeChange(option.value)}
+                    >
+                      <Checkbox 
+                        checked={notificationTimes.includes(option.value)} 
+                        onCheckedChange={() => handleTimeChange(option.value)}
+                        id={`time-${option.value}`}
+                      />
+                      <Label 
+                        htmlFor={`time-${option.value}`} 
+                        className="flex-1 cursor-pointer text-sm"
+                      >
+                        <TranslatableText text={option.label} />
+                      </Label>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+            
+            <div className="flex justify-end gap-3">
+              <Button 
+                variant="outline" 
+                onClick={cancelNotificationSettings}
+              >
+                <TranslatableText text="Cancel" />
+              </Button>
+              <Button 
+                onClick={applyNotificationSettings}
+                disabled={notificationTimes.length === 0}
+              >
+                <TranslatableText text="Save Settings" />
+              </Button>
+            </div>
           </DialogContent>
         </Dialog>
         

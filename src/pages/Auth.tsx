@@ -8,6 +8,7 @@ import SouloLogo from '@/components/SouloLogo';
 import { useOnboarding } from '@/hooks/use-onboarding';
 import { TranslatableText } from '@/components/translation/TranslatableText';
 import PlatformAuthButton from '@/components/auth/PlatformAuthButton';
+import { handleDeepLinkAuth } from '@/services/authService';
 
 export default function Auth() {
   const location = useLocation();
@@ -39,15 +40,117 @@ export default function Auth() {
   // Determine where to redirect after auth
   const redirectTo = getValidRedirectPath(redirectParam || fromLocation || storedRedirect);
 
-  console.log('Auth page mounted', { 
+  console.log('[Auth] Auth page mounted', { 
     redirectTo, 
     redirectParam, 
     fromLocation,
     storedRedirect,
     hasUser: !!user,
     currentPath: location.pathname,
-    onboardingComplete
+    onboardingComplete,
+    isNative: !!(window as any).Capacitor?.isNativePlatform?.()
   });
+
+  // Enhanced deep link handling for mobile apps with better error recovery
+  useEffect(() => {
+    const handleMobileDeepLink = async () => {
+      const isNativeApp = !!(window as any).Capacitor?.isNativePlatform?.();
+      
+      if (isNativeApp) {
+        console.log('[Auth] Setting up enhanced mobile deep link handling');
+        
+        // Enhanced app URL open event handler
+        const handleAppUrlOpen = async (event: any) => {
+          console.log('[Auth] App URL opened:', event.url);
+          
+          if (event.url.includes('access_token') || 
+              event.url.includes('soulo://auth') || 
+              event.url.includes('error=')) {
+            console.log('[Auth] Processing auth deep link');
+            setIsLoading(true);
+            setAuthError(null);
+            
+            try {
+              const authSuccess = await handleDeepLinkAuth(event.url);
+              
+              if (authSuccess) {
+                console.log('[Auth] Deep link authentication successful');
+                toast.success('Authentication successful!');
+                // Clear any previous errors
+                setAuthError(null);
+                // The auth context will handle the redirect
+              } else {
+                console.log('[Auth] Deep link authentication failed');
+                setAuthError('Authentication failed. Please try again.');
+                toast.error('Authentication failed. Please try again.');
+              }
+            } catch (error) {
+              console.error('[Auth] Deep link auth error:', error);
+              setAuthError('Authentication failed. Please try again.');
+              toast.error('Authentication failed. Please try again.');
+            } finally {
+              setIsLoading(false);
+            }
+          }
+        };
+
+        // Add listener for URL open events with error handling
+        try {
+          if ((window as any).Capacitor?.Plugins?.App) {
+            console.log('[Auth] Adding enhanced app URL open listener');
+            (window as any).Capacitor.Plugins.App.addListener('appUrlOpen', handleAppUrlOpen);
+            
+            // Return cleanup function
+            return () => {
+              console.log('[Auth] Removing app URL open listener');
+              try {
+                (window as any).Capacitor.Plugins.App.removeAllListeners?.();
+              } catch (cleanupError) {
+                console.warn('[Auth] Error during listener cleanup:', cleanupError);
+              }
+            };
+          } else {
+            console.warn('[Auth] Capacitor App plugin not available');
+          }
+        } catch (error) {
+          console.error('[Auth] Error setting up app URL listener:', error);
+        }
+      } else {
+        // For web, handle URL fragments and search params
+        const handleWebAuth = () => {
+          const fragment = window.location.hash || window.location.search;
+          if (fragment.includes('access_token') || fragment.includes('error=')) {
+            console.log('[Auth] Web auth callback detected');
+            // Let Supabase handle the callback automatically
+          }
+        };
+        
+        handleWebAuth();
+        
+        // Listen for hash changes
+        window.addEventListener('hashchange', handleWebAuth);
+        return () => {
+          window.removeEventListener('hashchange', handleWebAuth);
+        };
+      }
+    };
+
+    // Call the async function and handle cleanup
+    let cleanup: (() => void) | undefined;
+    
+    handleMobileDeepLink().then((cleanupFn) => {
+      cleanup = cleanupFn;
+    }).catch((error) => {
+      console.error('[Auth] Error setting up deep link handling:', error);
+    });
+
+    // Return cleanup function for useEffect
+    return () => {
+      if (cleanup) {
+        cleanup();
+      }
+    };
+  }, []);
 
   useEffect(() => {
     setIsLoading(false);
@@ -56,7 +159,7 @@ export default function Auth() {
   useEffect(() => {
     // If user is logged in and page has finished initial loading, redirect
     if (user && !authLoading && !redirecting) {
-      console.log('User is logged in, redirecting to:', redirectTo);
+      console.log('[Auth] User is logged in, redirecting to:', redirectTo);
       setRedirecting(true);
       
       // Clean up stored redirect
@@ -66,7 +169,7 @@ export default function Auth() {
       const timer = setTimeout(() => {
         // If onboarding is not complete, redirect to onboarding
         if (!onboardingComplete && !redirectTo.includes('onboarding')) {
-          console.log('Redirecting to onboarding as it is not complete');
+          console.log('[Auth] Redirecting to onboarding as it is not complete');
           navigate('/app/onboarding', { replace: true });
         } else {
           navigate(redirectTo, { replace: true });
@@ -80,8 +183,13 @@ export default function Auth() {
   // If still checking auth state, show loading
   if (authLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <div className="flex flex-col items-center space-y-4">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+          <p className="text-muted-foreground">
+            <TranslatableText text="Checking authentication..." forceTranslate={true} />
+          </p>
+        </div>
       </div>
     );
   }
@@ -93,7 +201,7 @@ export default function Auth() {
       ? '/app/onboarding'
       : redirectTo;
       
-    console.log('User already logged in, redirecting to:', finalRedirect, {
+    console.log('[Auth] User already logged in, redirecting to:', finalRedirect, {
       onboardingComplete,
       originalRedirect: redirectTo
     });
@@ -122,10 +230,21 @@ export default function Auth() {
         </div>
         
         {authError && (
-          <div className="mb-4 p-2 border border-red-500 bg-red-50 text-red-600 rounded">
+          <div className="mb-4 p-3 border border-red-500 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 rounded">
             <p className="text-sm">
               <TranslatableText text="Error:" forceTranslate={true} /> {authError}
             </p>
+          </div>
+        )}
+        
+        {isLoading && (
+          <div className="mb-4 p-3 border border-blue-500 bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 rounded">
+            <div className="flex items-center space-x-2">
+              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
+              <p className="text-sm">
+                <TranslatableText text="Processing authentication..." forceTranslate={true} />
+              </p>
+            </div>
           </div>
         )}
         
