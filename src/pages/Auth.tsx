@@ -27,11 +27,16 @@ export default function Auth() {
   const fromLocation = location.state?.from?.pathname;
   const storedRedirect = typeof window !== 'undefined' ? localStorage.getItem('authRedirectTo') : null;
   
-  // Check for OAuth callback parameters
+  // Enhanced OAuth callback detection
   const hasAuthCallback = location.hash.includes('access_token') || 
                          location.hash.includes('error') ||
                          location.search.includes('error') ||
-                         searchParams.get('code');
+                         location.search.includes('code') ||
+                         searchParams.get('error');
+  
+  // Check for OAuth errors in URL parameters
+  const oauthError = searchParams.get('error');
+  const oauthErrorDescription = searchParams.get('error_description');
   
   // Get valid redirect path - default to /app/home after successful login
   const getValidRedirectPath = (path: string | null) => {
@@ -58,14 +63,43 @@ export default function Auth() {
     currentPath: location.pathname,
     onboardingComplete,
     hasAuthCallback,
+    oauthError,
+    oauthErrorDescription,
     hash: location.hash,
     search: location.search
   });
 
+  // Handle OAuth errors in URL
+  useEffect(() => {
+    if (oauthError && !authCallbackProcessed) {
+      console.log('[Auth] OAuth error detected in URL:', oauthError, oauthErrorDescription);
+      setAuthCallbackProcessed(true);
+      
+      let errorMessage = 'Authentication failed';
+      
+      if (oauthError === 'redirect_uri_mismatch') {
+        errorMessage = 'Sign-in configuration error. Please contact support.';
+        console.error('[Auth] Redirect URI mismatch - Google OAuth settings need to be updated');
+      } else if (oauthError === 'access_denied') {
+        errorMessage = 'Sign-in was cancelled.';
+      } else if (oauthError === 'invalid_request') {
+        errorMessage = 'Invalid sign-in request. Please try again.';
+      } else if (oauthErrorDescription) {
+        errorMessage = oauthErrorDescription;
+      }
+      
+      setAuthError(errorMessage);
+      toast.error(errorMessage);
+      
+      // Clean up URL
+      window.history.replaceState(null, '', '/app/auth');
+    }
+  }, [oauthError, oauthErrorDescription, authCallbackProcessed]);
+
   // Handle OAuth callback
   useEffect(() => {
     const processAuthCallback = async () => {
-      if (hasAuthCallback && !authCallbackProcessed && !user) {
+      if (hasAuthCallback && !authCallbackProcessed && !user && !oauthError) {
         console.log('[Auth] Processing OAuth callback');
         setAuthCallbackProcessed(true);
         setIsLoading(true);
@@ -77,6 +111,7 @@ export default function Auth() {
             // Don't redirect here - let the auth state change handler do it
           } else {
             console.log('[Auth] OAuth callback did not create session');
+            setAuthError('Authentication incomplete. Please try again.');
             setIsLoading(false);
           }
         } catch (error) {
@@ -88,7 +123,7 @@ export default function Auth() {
     };
 
     processAuthCallback();
-  }, [hasAuthCallback, authCallbackProcessed, user]);
+  }, [hasAuthCallback, authCallbackProcessed, user, oauthError]);
 
   // Initialize native auth service
   useEffect(() => {
@@ -133,7 +168,7 @@ export default function Auth() {
   }, [user, authLoading, navigate, redirecting, redirectTo, nativeAuthReady, isLoading, hasAuthCallback]);
 
   // Show loading during OAuth callback processing or auth state check
-  if (authLoading || !nativeAuthReady || (hasAuthCallback && !authCallbackProcessed) || isLoading) {
+  if (authLoading || !nativeAuthReady || (hasAuthCallback && !authCallbackProcessed && !oauthError) || isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="flex flex-col items-center space-y-4">
@@ -174,10 +209,27 @@ export default function Auth() {
         </div>
         
         {authError && (
-          <div className="mb-4 p-2 border border-red-500 bg-red-50 text-red-600 rounded">
-            <p className="text-sm">
-              <TranslatableText text="Error:" forceTranslate={true} /> {authError}
-            </p>
+          <div className="mb-4 p-4 border border-red-200 bg-red-50 text-red-700 rounded-lg">
+            <div className="flex items-start space-x-2">
+              <div className="text-red-500 mt-1">⚠️</div>
+              <div>
+                <p className="text-sm font-medium">
+                  <TranslatableText text="Authentication Error" forceTranslate={true} />
+                </p>
+                <p className="text-sm mt-1">{authError}</p>
+                {authError.includes('configuration error') && (
+                  <details className="mt-2">
+                    <summary className="text-xs cursor-pointer text-red-600 hover:text-red-800">
+                      Technical Details
+                    </summary>
+                    <p className="text-xs mt-1 text-red-600">
+                      This error typically means the Google OAuth redirect URI needs to be updated. 
+                      Contact support if this persists.
+                    </p>
+                  </details>
+                )}
+              </div>
+            </div>
           </div>
         )}
         
