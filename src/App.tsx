@@ -73,17 +73,21 @@ const App: React.FC = () => {
           });
         }
         
-        // Initialize native auth service after native integration
-        try {
-          console.log('[App] Initializing native auth service...');
-          await nativeAuthService.initialize();
-          console.log('[App] Native auth service initialized');
-        } catch (error) {
-          console.warn('[App] Native auth service failed:', error);
-          mobileErrorHandler.handleError({
-            type: 'capacitor',
-            message: `Native auth service failed: ${error}`
-          });
+        // Initialize native auth service ONLY if running natively
+        if (nativeIntegrationService.isRunningNatively()) {
+          try {
+            console.log('[App] Running natively - initializing native auth service...');
+            await nativeAuthService.initialize();
+            console.log('[App] Native auth service initialized');
+          } catch (error) {
+            console.warn('[App] Native auth service failed:', error);
+            mobileErrorHandler.handleError({
+              type: 'capacitor',
+              message: `Native auth service failed: ${error}`
+            });
+          }
+        } else {
+          console.log('[App] Running in browser - skipping native auth service initialization');
         }
         
         // Initialize TWA update service
