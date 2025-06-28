@@ -1,6 +1,8 @@
+
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { isAppRoute } from '@/routes/RouteHelpers';
+import { nativeAuthService } from './nativeAuthService';
 
 /**
  * Gets the redirect URL for authentication
@@ -24,72 +26,27 @@ export const getRedirectUrl = (): string => {
 };
 
 /**
- * Sign in with Google
+ * Sign in with Google - uses native auth when available
  */
 export const signInWithGoogle = async (): Promise<void> => {
   try {
-    const redirectUrl = getRedirectUrl();
-    console.log('Using redirect URL:', redirectUrl);
-    
-    const { data, error } = await supabase.auth.signInWithOAuth({
-      provider: 'google',
-      options: {
-        redirectTo: redirectUrl,
-        queryParams: {
-          // Force refresh of Google access tokens
-          access_type: 'offline',
-          prompt: 'consent',
-        },
-      },
-    });
-
-    if (error) {
-      throw error;
-    }
-    
-    // If we have a URL, manually redirect to it (as a backup)
-    if (data?.url) {
-      console.log('Redirecting to OAuth URL:', data.url);
-      setTimeout(() => {
-        window.location.href = data.url;
-      }, 100);
-    }
+    console.log('[AuthService] Starting Google sign-in');
+    await nativeAuthService.signInWithGoogle();
   } catch (error: any) {
-    console.error('Error signing in with Google:', error.message);
-    toast.error(`Error signing in with Google: ${error.message}`);
+    console.error('[AuthService] Google sign-in error:', error);
     throw error;
   }
 };
 
 /**
- * Sign in with Apple ID
+ * Sign in with Apple ID - uses native auth when available
  */
 export const signInWithApple = async (): Promise<void> => {
   try {
-    const redirectUrl = getRedirectUrl();
-    console.log('Using redirect URL for Apple ID:', redirectUrl);
-    
-    const { data, error } = await supabase.auth.signInWithOAuth({
-      provider: 'apple',
-      options: {
-        redirectTo: redirectUrl,
-      },
-    });
-
-    if (error) {
-      throw error;
-    }
-    
-    // If we have a URL, manually redirect to it (as a backup)
-    if (data?.url) {
-      console.log('Redirecting to Apple OAuth URL:', data.url);
-      setTimeout(() => {
-        window.location.href = data.url;
-      }, 100);
-    }
+    console.log('[AuthService] Starting Apple sign-in');
+    await nativeAuthService.signInWithApple();
   } catch (error: any) {
-    console.error('Error signing in with Apple:', error.message);
-    toast.error(`Error signing in with Apple: ${error.message}`);
+    console.error('[AuthService] Apple sign-in error:', error);
     throw error;
   }
 };
@@ -156,31 +113,13 @@ export const resetPassword = async (email: string): Promise<void> => {
 };
 
 /**
- * Sign out
+ * Sign out - uses native auth when available
  * @param navigate Optional navigation function to redirect after logout
  */
 export const signOut = async (navigate?: (path: string) => void): Promise<void> => {
   try {
-    // Check if there's a session before trying to sign out
-    const { data: sessionData } = await supabase.auth.getSession();
-    
-    // If no session exists, just clean up local state and redirect
-    if (!sessionData?.session) {
-      // Clear any auth-related items from local storage
-      localStorage.removeItem('authRedirectTo');
-      
-      // Redirect to onboarding page if navigate function is provided
-      if (navigate) {
-        navigate('/app/onboarding');
-      }
-      return;
-    }
-    
-    // If session exists, proceed with normal sign out
-    const { error } = await supabase.auth.signOut();
-    if (error) {
-      throw error;
-    }
+    console.log('[AuthService] Starting sign out');
+    await nativeAuthService.signOut();
     
     // Clear any auth-related items from local storage
     localStorage.removeItem('authRedirectTo');
@@ -190,7 +129,7 @@ export const signOut = async (navigate?: (path: string) => void): Promise<void> 
       navigate('/app/onboarding');
     }
   } catch (error: any) {
-    console.error('Error signing out:', error.message);
+    console.error('[AuthService] Sign out error:', error);
     
     // Still navigate to onboarding page even if there's an error
     if (navigate) {
@@ -199,7 +138,7 @@ export const signOut = async (navigate?: (path: string) => void): Promise<void> 
     localStorage.removeItem('authRedirectTo');
     
     // Show error toast but don't prevent logout flow
-    toast.error(`Error while logging out: ${error.message}`);
+    throw error;
   }
 };
 

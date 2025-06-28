@@ -15,16 +15,21 @@ const config: CapacitorConfig = {
     ]
   },
   plugins: {
+    GoogleAuth: {
+      scopes: ['profile', 'email'],
+      serverClientId: '', // This will be set via environment variables
+      forceCodeForRefreshToken: true,
+    },
     SplashScreen: {
       launchAutoHide: false,
-      backgroundColor: "#000000",
-      showSpinner: true,
+      backgroundColor: "#FFFFFF",
+      showSpinner: false,
       androidSpinnerStyle: "large",
       iosSpinnerStyle: "small", 
       spinnerColor: "#8b5cf6",
       splashFullScreen: true,
       splashImmersive: true,
-      splashScreenDelay: 2000
+      splashScreenDelay: 3000
     },
     Keyboard: {
       resize: "body",
@@ -51,7 +56,7 @@ const config: CapacitorConfig = {
     contentInset: "always",
     allowsLinkPreview: false,
     scrollEnabled: true,
-    backgroundColor: "#000000",
+    backgroundColor: "#FFFFFF",
     scheme: "Soulo",
     preferredContentMode: "mobile"
   },
@@ -59,7 +64,7 @@ const config: CapacitorConfig = {
     allowMixedContent: true,
     captureInput: true,
     webContentsDebuggingEnabled: true,
-    backgroundColor: "#000000",
+    backgroundColor: "#FFFFFF",
     launchMode: "singleTask",
     orientation: "portrait",
     useLegacyBridge: false,

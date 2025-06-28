@@ -1,4 +1,3 @@
-
 import { mobileErrorHandler } from './mobileErrorHandler';
 
 interface CapacitorPlugin {
@@ -58,7 +57,7 @@ class NativeIntegrationService {
     return typeof window !== 'undefined' && !!(window as any).Capacitor;
   }
 
-  private async initializeCapacitor(): Promise<void> {
+  private async initializeCapacitor(): Promise<void> => {
     try {
       const { Capacitor } = (window as any);
       
@@ -75,7 +74,7 @@ class NativeIntegrationService {
       console.error('[NativeIntegration] Capacitor initialization failed:', error);
       mobileErrorHandler.handleCapacitorError('Core', error.toString());
     }
-  }
+  };
 
   private async initializeCorePlugins(): Promise<void> {
     // Initialize App plugin
@@ -102,7 +101,7 @@ class NativeIntegrationService {
     if (this.plugins.StatusBar) {
       try {
         await this.plugins.StatusBar.setStyle({ style: 'dark' });
-        await this.plugins.StatusBar.setBackgroundColor({ color: '#000000' });
+        await this.plugins.StatusBar.setBackgroundColor({ color: '#FFFFFF' });
         console.log('[NativeIntegration] StatusBar plugin initialized');
       } catch (error) {
         console.error('[NativeIntegration] StatusBar plugin initialization failed:', error);
@@ -133,7 +132,7 @@ class NativeIntegrationService {
     // Initialize SplashScreen plugin
     if (this.plugins.SplashScreen) {
       try {
-        // Hide splash screen after a delay
+        // Hide splash screen after a delay to show the Soulo logo
         setTimeout(async () => {
           await this.plugins.SplashScreen.hide();
           console.log('[NativeIntegration] Splash screen hidden');
@@ -141,6 +140,16 @@ class NativeIntegrationService {
       } catch (error) {
         console.error('[NativeIntegration] SplashScreen plugin error:', error);
         mobileErrorHandler.handleCapacitorError('SplashScreen', error.toString());
+      }
+    }
+
+    // Initialize Google Auth plugin
+    if (this.plugins.GoogleAuth) {
+      try {
+        console.log('[NativeIntegration] GoogleAuth plugin detected and available');
+      } catch (error) {
+        console.error('[NativeIntegration] GoogleAuth plugin initialization failed:', error);
+        mobileErrorHandler.handleCapacitorError('GoogleAuth', error.toString());
       }
     }
   }
@@ -308,6 +317,11 @@ class NativeIntegrationService {
       connected: navigator.onLine,
       connectionType: 'unknown'
     };
+  }
+
+  // Check if Google Auth plugin is available
+  isGoogleAuthAvailable(): boolean {
+    return this.isCapacitorReady && !!this.plugins.GoogleAuth;
   }
 
   // Safe plugin access
