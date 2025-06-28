@@ -30,10 +30,13 @@ const FeatureFlagsContext = createContext<FeatureFlagsContextValue>({
 });
 
 export const FeatureFlagsProvider = ({ children }: { children: ReactNode }) => {
-  const { user } = useAuth();
+  const authContext = useAuth();
   const [flags, setFlags] = useState<FeatureFlags>(defaultFlags);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Safe access to user - handle case where AuthProvider might not be available yet
+  const user = authContext?.user || null;
 
   const fetchFeatureFlags = async () => {
     try {
@@ -120,4 +123,17 @@ export const FeatureFlagsProvider = ({ children }: { children: ReactNode }) => {
   );
 };
 
-export const useFeatureFlagsContext = () => useContext(FeatureFlagsContext);
+export const useFeatureFlagsContext = () => {
+  const context = useContext(FeatureFlagsContext);
+  if (!context) {
+    console.warn('useFeatureFlagsContext used outside of FeatureFlagsProvider, returning default values');
+    return {
+      flags: defaultFlags,
+      isEnabled: () => false,
+      loading: false,
+      error: null,
+      refetch: async () => {},
+    };
+  }
+  return context;
+};

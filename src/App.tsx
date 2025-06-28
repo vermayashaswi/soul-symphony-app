@@ -1,9 +1,11 @@
 
 import React, { useEffect, useState } from 'react';
+import { BrowserRouter } from 'react-router-dom';
 import AppRoutes from './routes/AppRoutes';
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as SonnerToaster } from "sonner";
 import { TranslationProvider } from '@/contexts/TranslationContext';
+import { AuthProvider } from '@/contexts/AuthContext';
 import { SubscriptionProvider } from '@/contexts/SubscriptionContext';
 import { TranslationLoadingOverlay } from '@/components/translation/TranslationLoadingOverlay';
 import { JournalProcessingInitializer } from './app/journal-processing-init';
@@ -24,7 +26,7 @@ import { nativeIntegrationService } from './services/nativeIntegrationService';
 import { mobileErrorHandler } from './services/mobileErrorHandler';
 import { mobileOptimizationService } from './services/mobileOptimizationService';
 
-const App: React.FC = () => {
+const AppCore: React.FC = () => {
   const [isInitialized, setIsInitialized] = useState(false);
   const [emergencyRecovery, setEmergencyRecovery] = useState(false);
   const [initializationError, setInitializationError] = useState<string | null>(null);
@@ -261,25 +263,35 @@ const App: React.FC = () => {
 
   return (
     <ErrorBoundary onError={handleAppError}>
-      <FeatureFlagsProvider>
+      <TWAWrapper>
+        <TWAInitializationWrapper>
+          <TranslationLoadingOverlay />
+          <JournalProcessingInitializer />
+          <AppRoutes key={isInitialized ? 'initialized' : 'initializing'} />
+          <TutorialOverlay />
+          <Toaster />
+          <SonnerToaster position="top-right" />
+        </TWAInitializationWrapper>
+      </TWAWrapper>
+    </ErrorBoundary>
+  );
+};
+
+const App: React.FC = () => {
+  return (
+    <BrowserRouter>
+      <AuthProvider>
         <TranslationProvider>
           <SubscriptionProvider>
-            <TutorialProvider>
-              <TWAWrapper>
-                <TWAInitializationWrapper>
-                  <TranslationLoadingOverlay />
-                  <JournalProcessingInitializer />
-                  <AppRoutes key={isInitialized ? 'initialized' : 'initializing'} />
-                  <TutorialOverlay />
-                  <Toaster />
-                  <SonnerToaster position="top-right" />
-                </TWAInitializationWrapper>
-              </TWAWrapper>
-            </TutorialProvider>
+            <FeatureFlagsProvider>
+              <TutorialProvider>
+                <AppCore />
+              </TutorialProvider>
+            </FeatureFlagsProvider>
           </SubscriptionProvider>
         </TranslationProvider>
-      </FeatureFlagsProvider>
-    </ErrorBoundary>
+      </AuthProvider>
+    </BrowserRouter>
   );
 };
 
