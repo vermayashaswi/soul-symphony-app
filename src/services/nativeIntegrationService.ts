@@ -1,4 +1,3 @@
-
 import { mobileErrorHandler } from './mobileErrorHandler';
 
 interface CapacitorPlugin {
@@ -47,10 +46,7 @@ class NativeIntegrationService {
       console.log('[NativeIntegration] Native integration service initialized');
     } catch (error) {
       console.error('[NativeIntegration] Failed to initialize:', error);
-      mobileErrorHandler.handleError({
-        type: 'unknown',
-        message: `Native integration initialization failed: ${error}`
-      });
+      // Don't show user-facing error for initialization failures
     }
   }
 
@@ -73,7 +69,7 @@ class NativeIntegrationService {
       }
     } catch (error) {
       console.error('[NativeIntegration] Capacitor initialization failed:', error);
-      mobileErrorHandler.handleCapacitorError('Core', error.toString());
+      // Don't show user error for initialization failures
     }
   }
 
@@ -94,7 +90,6 @@ class NativeIntegrationService {
         console.log('[NativeIntegration] App plugin initialized');
       } catch (error) {
         console.error('[NativeIntegration] App plugin initialization failed:', error);
-        mobileErrorHandler.handleCapacitorError('App', error.toString());
       }
     }
 
@@ -106,7 +101,6 @@ class NativeIntegrationService {
         console.log('[NativeIntegration] StatusBar plugin initialized');
       } catch (error) {
         console.error('[NativeIntegration] StatusBar plugin initialization failed:', error);
-        mobileErrorHandler.handleCapacitorError('StatusBar', error.toString());
       }
     }
 
@@ -126,7 +120,6 @@ class NativeIntegrationService {
         console.log('[NativeIntegration] Keyboard plugin initialized');
       } catch (error) {
         console.error('[NativeIntegration] Keyboard plugin initialization failed:', error);
-        mobileErrorHandler.handleCapacitorError('Keyboard', error.toString());
       }
     }
 
@@ -140,18 +133,18 @@ class NativeIntegrationService {
         }, 3000);
       } catch (error) {
         console.error('[NativeIntegration] SplashScreen plugin error:', error);
-        mobileErrorHandler.handleCapacitorError('SplashScreen', error.toString());
       }
     }
 
-    // Initialize Google Auth plugin
+    // Check Google Auth plugin availability
     if (this.plugins.GoogleAuth) {
       try {
         console.log('[NativeIntegration] GoogleAuth plugin detected and available');
       } catch (error) {
-        console.error('[NativeIntegration] GoogleAuth plugin initialization failed:', error);
-        mobileErrorHandler.handleCapacitorError('GoogleAuth', error.toString());
+        console.error('[NativeIntegration] GoogleAuth plugin check failed:', error);
       }
+    } else {
+      console.warn('[NativeIntegration] GoogleAuth plugin not available, will use web fallback');
     }
   }
 

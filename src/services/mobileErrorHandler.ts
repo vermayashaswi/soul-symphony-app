@@ -37,6 +37,13 @@ class MobileErrorHandler {
     // Catch unhandled JavaScript errors
     window.addEventListener('error', (event) => {
       console.error('[MobileErrorHandler] Global error:', event);
+      
+      // Filter out non-critical errors that shouldn't show user toasts
+      if (this.shouldSuppressError(event.message || event.error?.message)) {
+        console.log('[MobileErrorHandler] Suppressing non-critical error from user notification');
+        return;
+      }
+      
       this.handleError({
         type: this.classifyError(event.message || event.error?.message || 'Unknown error'),
         message: event.message || event.error?.message || 'Unknown error occurred',
@@ -51,6 +58,13 @@ class MobileErrorHandler {
     // Catch unhandled promise rejections
     window.addEventListener('unhandledrejection', (event) => {
       console.error('[MobileErrorHandler] Unhandled promise rejection:', event);
+      
+      // Filter out non-critical promise rejections
+      if (this.shouldSuppressError(event.reason?.toString())) {
+        console.log('[MobileErrorHandler] Suppressing non-critical promise rejection from user notification');
+        return;
+      }
+      
       this.handleError({
         type: this.classifyError(event.reason?.toString() || 'Promise rejection'),
         message: `Unhandled promise rejection: ${event.reason}`,
@@ -69,17 +83,47 @@ class MobileErrorHandler {
     }
   }
 
+  private shouldSuppressError(message: string): boolean {
+    if (!message) return false;
+    
+    const suppressedErrors = [
+      // Plugin initialization errors that have fallbacks
+      'plugin not available',
+      'plugin not implemented',
+      'GoogleAuth not available',
+      'grantOfflineAccess',
+      // Non-critical network errors
+      'failed to fetch',
+      'network error',
+      // Development/debugging related
+      'development mode',
+      'hot reload',
+      // Auth-related non-critical errors that have fallbacks
+      'auth initialization',
+      'oauth redirect',
+    ];
+    
+    const lowerMessage = message.toLowerCase();
+    return suppressedErrors.some(suppressedError => 
+      lowerMessage.includes(suppressedError.toLowerCase())
+    );
+  }
+
   private setupCapacitorErrorHandlers(): void {
     // Listen for Capacitor plugin errors
     document.addEventListener('capacitorPluginError', (event: any) => {
       console.error('[MobileErrorHandler] Capacitor plugin error:', event.detail);
-      this.handleError({
-        type: 'capacitor',
-        message: `Capacitor plugin error: ${event.detail.message || 'Unknown plugin error'}`,
-        stack: event.detail.stack,
-        timestamp: Date.now(),
-        platform: nativeIntegrationService.getPlatform()
-      });
+      
+      // Only show user-facing errors for critical plugin failures
+      if (!this.shouldSuppressError(event.detail.message)) {
+        this.handleError({
+          type: 'capacitor',
+          message: `Capacitor plugin error: ${event.detail.message || 'Unknown plugin error'}`,
+          stack: event.detail.stack,
+          timestamp: Date.now(),
+          platform: nativeIntegrationService.getPlatform()
+        });
+      }
     });
 
     // Monitor Capacitor app state for crashes
@@ -238,8 +282,10 @@ class MobileErrorHandler {
     // Add to queue for later processing if offline
     this.errorQueue.push(fullError);
 
-    // Show user-friendly error message
-    this.showUserFriendlyError(fullError);
+    // Only show user-friendly error message for non-suppressed errors
+    if (!this.shouldSuppressError(fullError.message)) {
+      this.showUserFriendlyError(fullError);
+    }
 
     // Process immediately if online
     if (this.isOnline) {

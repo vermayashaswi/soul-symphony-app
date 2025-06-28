@@ -8,6 +8,7 @@ import SouloLogo from '@/components/SouloLogo';
 import { useOnboarding } from '@/hooks/use-onboarding';
 import { TranslatableText } from '@/components/translation/TranslatableText';
 import PlatformAuthButton from '@/components/auth/PlatformAuthButton';
+import { nativeAuthService } from '@/services/nativeAuthService';
 
 export default function Auth() {
   const location = useLocation();
@@ -15,6 +16,7 @@ export default function Auth() {
   const [searchParams] = useSearchParams();
   const [redirecting, setRedirecting] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [nativeAuthReady, setNativeAuthReady] = useState(false);
   const { user, isLoading: authLoading } = useAuth();
   const { onboardingComplete } = useOnboarding();
   const [authError, setAuthError] = useState<string | null>(null);
@@ -49,13 +51,27 @@ export default function Auth() {
     onboardingComplete
   });
 
+  // Initialize native auth service
   useEffect(() => {
+    const initializeNativeAuth = async () => {
+      try {
+        console.log('[Auth] Initializing native auth service');
+        await nativeAuthService.initialize();
+        setNativeAuthReady(true);
+        console.log('[Auth] Native auth service ready');
+      } catch (error) {
+        console.warn('[Auth] Native auth initialization failed, using web fallback:', error);
+        setNativeAuthReady(true); // Still allow web auth
+      }
+    };
+
+    initializeNativeAuth();
     setIsLoading(false);
   }, []);
 
   useEffect(() => {
     // If user is logged in and page has finished initial loading, redirect
-    if (user && !authLoading && !redirecting) {
+    if (user && !authLoading && !redirecting && nativeAuthReady) {
       console.log('User is logged in, redirecting to:', redirectTo);
       setRedirecting(true);
       
@@ -70,10 +86,10 @@ export default function Auth() {
       
       return () => clearTimeout(timer);
     }
-  }, [user, authLoading, navigate, redirecting, redirectTo]);
+  }, [user, authLoading, navigate, redirecting, redirectTo, nativeAuthReady]);
 
-  // If still checking auth state, show loading
-  if (authLoading) {
+  // If still checking auth state or initializing native auth, show loading
+  if (authLoading || !nativeAuthReady) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>

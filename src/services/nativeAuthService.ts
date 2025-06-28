@@ -24,11 +24,15 @@ class NativeAuthService {
       // Only initialize GoogleAuth if running natively
       if (nativeIntegrationService.isRunningNatively()) {
         console.log('[NativeAuth] Running natively, initializing GoogleAuth');
+        
+        // Initialize GoogleAuth with correct parameters
         await GoogleAuth.initialize({
-          clientId: '', // This should be set via environment variables
+          clientId: '11083941790-oi1vrl8bmsjajc0h1ka4f9q0qjmm80o9.apps.googleusercontent.com',
           scopes: ['profile', 'email'],
-          grantOfflineAccess: true,
+          // Remove grantOfflineAccess as it's not part of the initialize options
         });
+        
+        console.log('[NativeAuth] GoogleAuth initialized successfully');
       } else {
         console.log('[NativeAuth] Running in web, skipping GoogleAuth initialization');
       }
@@ -38,6 +42,7 @@ class NativeAuthService {
     } catch (error) {
       console.error('[NativeAuth] Failed to initialize:', error);
       // Don't throw error, fallback to web auth
+      // Only log the error, don't show user-facing toast for initialization issues
     }
   }
 
@@ -46,6 +51,12 @@ class NativeAuthService {
       console.log('[NativeAuth] Starting Google sign-in');
       
       if (nativeIntegrationService.isRunningNatively()) {
+        // Check if GoogleAuth is available and initialized
+        if (!this.isInitialized) {
+          console.log('[NativeAuth] GoogleAuth not initialized, attempting to initialize');
+          await this.initialize();
+        }
+        
         // Native Google Sign-In
         console.log('[NativeAuth] Using native Google Sign-In');
         
