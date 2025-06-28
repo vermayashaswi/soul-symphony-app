@@ -23,15 +23,15 @@ export default function Auth() {
   const fromLocation = location.state?.from?.pathname;
   const storedRedirect = typeof window !== 'undefined' ? localStorage.getItem('authRedirectTo') : null;
   
-  // Get valid redirect path with priority
+  // Get valid redirect path - default to /app/home after successful login
   const getValidRedirectPath = (path: string | null) => {
     if (!path) {
-      return onboardingComplete ? '/app/home' : '/app/onboarding';
+      return '/app/home';
     }
     
     // Normalize legacy paths
     if (path === '/home') return '/app/home';
-    if (path === '/onboarding') return '/app/onboarding';
+    if (path === '/onboarding') return '/app/home'; // After login, go to home not onboarding
     
     return path;
   };
@@ -64,18 +64,13 @@ export default function Auth() {
       
       // Add small delay to ensure state updates before navigation
       const timer = setTimeout(() => {
-        // If onboarding is not complete, redirect to onboarding
-        if (!onboardingComplete && !redirectTo.includes('onboarding')) {
-          console.log('Redirecting to onboarding as it is not complete');
-          navigate('/app/onboarding', { replace: true });
-        } else {
-          navigate(redirectTo, { replace: true });
-        }
+        // Always redirect to home after successful login (user is already authenticated)
+        navigate('/app/home', { replace: true });
       }, 500);
       
       return () => clearTimeout(timer);
     }
-  }, [user, authLoading, navigate, redirecting, redirectTo, onboardingComplete]);
+  }, [user, authLoading, navigate, redirecting, redirectTo]);
 
   // If still checking auth state, show loading
   if (authLoading) {
@@ -86,18 +81,10 @@ export default function Auth() {
     );
   }
 
-  // If already logged in, redirect to target page
+  // If already logged in, redirect to home
   if (user) {
-    // If onboarding is not complete, redirect to onboarding instead
-    const finalRedirect = !onboardingComplete && !redirectTo.includes('onboarding') 
-      ? '/app/onboarding'
-      : redirectTo;
-      
-    console.log('User already logged in, redirecting to:', finalRedirect, {
-      onboardingComplete,
-      originalRedirect: redirectTo
-    });
-    return <Navigate to={finalRedirect} replace />;
+    console.log('User already logged in, redirecting to home');
+    return <Navigate to="/app/home" replace />;
   }
 
   return (

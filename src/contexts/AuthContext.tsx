@@ -396,6 +396,7 @@ function AuthProviderCore({ children }: { children: ReactNode }) {
         timestamp: new Date().toISOString(),
       });
       
+      // Clear local state immediately
       setSession(null);
       setUser(null);
       setProfileExistsStatus(null);
@@ -403,14 +404,17 @@ function AuthProviderCore({ children }: { children: ReactNode }) {
       setCurrentSessionId(null);
       setAuthStateStable(false);
       
+      // Call the sign out service
       await signOutService((path: string) => {
         console.log(`[AuthContext] Redirecting to ${path} after signout`);
+        // Always redirect to onboarding after logout
         window.location.href = '/app/onboarding';
       });
     } catch (error: any) {
       console.error('[AuthContext] Error during sign out:', error);
       toast.error(`Error signing out: ${error.message}`);
       
+      // Even if signout fails, redirect to onboarding
       window.location.href = '/app/onboarding';
     }
   };
