@@ -1,5 +1,5 @@
+
 import { mobileErrorHandler } from './mobileErrorHandler';
-import { initializeWebViewOAuth, cleanupWebViewOAuth } from '@/utils/webviewOAuthHandler';
 
 interface CapacitorPlugin {
   [key: string]: any;
@@ -34,9 +34,6 @@ class NativeIntegrationService {
       if (this.isCapacitorAvailable()) {
         console.log('[NativeIntegration] Capacitor detected');
         await this.initializeCapacitor();
-        
-        // Initialize WebView OAuth handling for native apps
-        initializeWebViewOAuth();
       } else {
         console.log('[NativeIntegration] Running in web environment');
       }
@@ -105,7 +102,7 @@ class NativeIntegrationService {
     if (this.plugins.StatusBar) {
       try {
         await this.plugins.StatusBar.setStyle({ style: 'dark' });
-        await this.plugins.StatusBar.setBackgroundColor({ color: '#FFFFFF' });
+        await this.plugins.StatusBar.setBackgroundColor({ color: '#000000' });
         console.log('[NativeIntegration] StatusBar plugin initialized');
       } catch (error) {
         console.error('[NativeIntegration] StatusBar plugin initialization failed:', error);
@@ -133,31 +130,17 @@ class NativeIntegrationService {
       }
     }
 
-    // Initialize SplashScreen plugin with proper timing
+    // Initialize SplashScreen plugin
     if (this.plugins.SplashScreen) {
       try {
-        // Hide splash screen after ensuring app is ready
+        // Hide splash screen after a delay
         setTimeout(async () => {
-          await this.hideSplashScreen();
-        }, 3000); // 3 seconds to match config
+          await this.plugins.SplashScreen.hide();
+          console.log('[NativeIntegration] Splash screen hidden');
+        }, 3000);
       } catch (error) {
         console.error('[NativeIntegration] SplashScreen plugin error:', error);
         mobileErrorHandler.handleCapacitorError('SplashScreen', error.toString());
-      }
-    }
-  }
-
-  /**
-   * Hide splash screen with proper error handling
-   */
-  async hideSplashScreen(): Promise<void> {
-    if (this.plugins.SplashScreen) {
-      try {
-        await this.plugins.SplashScreen.hide();
-        console.log('[NativeIntegration] Splash screen hidden');
-      } catch (error) {
-        console.error('[NativeIntegration] Failed to hide splash screen:', error);
-        // Don't throw error as this is not critical
       }
     }
   }
@@ -338,15 +321,6 @@ class NativeIntegrationService {
   // Check if specific plugin is available
   isPluginAvailable(name: string): boolean {
     return this.isCapacitorReady && !!this.plugins[name];
-  }
-
-  /**
-   * Cleanup resources when app is closing
-   */
-  cleanup(): void {
-    if (this.isCapacitorReady) {
-      cleanupWebViewOAuth();
-    }
   }
 }
 
