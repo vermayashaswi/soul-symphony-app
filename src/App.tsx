@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from 'react';
 import { BrowserRouter } from 'react-router-dom';
 import { Toaster } from "@/components/ui/toaster";
@@ -261,8 +260,8 @@ const App: React.FC = () => {
           <AuthErrorBoundary>
             <AuthProvider>
               <InnerApp key={isInitialized ? 'initialized' : 'initializing'} />
-            </AuthErrorBoundary>
-          </AuthProvider>
+            </AuthProvider>
+          </AuthErrorBoundary>
         </TranslationProvider>
       </ErrorBoundary>
     </BrowserRouter>
