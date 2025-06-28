@@ -27,7 +27,7 @@ class NativeAuthService {
         await GoogleAuth.initialize({
           clientId: '', // This should be set via environment variables
           scopes: ['profile', 'email'],
-          grantOfflineAccess: true,
+          // Removed grantOfflineAccess: true to fix redirect_uri_mismatch
         });
       } else {
         console.log('[NativeAuth] Running in web, skipping GoogleAuth initialization');
@@ -73,7 +73,7 @@ class NativeAuthService {
         console.log('[NativeAuth] Successfully signed in with Google natively');
         toast.success('Signed in successfully');
       } else {
-        // Web Google Sign-In (fallback)
+        // Web Google Sign-In (fallback) - removed problematic parameters
         console.log('[NativeAuth] Using web Google Sign-In fallback');
         
         const redirectUrl = `${window.location.origin}/app/auth`;
@@ -81,14 +81,12 @@ class NativeAuthService {
           provider: 'google',
           options: {
             redirectTo: redirectUrl,
-            queryParams: {
-              access_type: 'offline',
-              prompt: 'consent',
-            },
+            // Removed access_type: 'offline' and prompt: 'consent' to fix redirect issues
           },
         });
 
         if (error) {
+          console.error('[NativeAuth] OAuth sign-in error:', error);
           throw error;
         }
 
@@ -101,7 +99,21 @@ class NativeAuthService {
       }
     } catch (error: any) {
       console.error('[NativeAuth] Google sign-in failed:', error);
-      toast.error(`Google sign-in failed: ${error.message}`);
+      
+      // Improved error handling with specific error messages
+      let errorMessage = 'Google sign-in failed';
+      
+      if (error.message?.includes('redirect_uri_mismatch')) {
+        errorMessage = 'Google sign-in configuration error. Please check your redirect URLs.';
+      } else if (error.message?.includes('popup_closed_by_user')) {
+        errorMessage = 'Sign-in was cancelled';
+      } else if (error.message?.includes('network')) {
+        errorMessage = 'Network error. Please check your connection and try again.';
+      } else if (error.message) {
+        errorMessage = `Google sign-in failed: ${error.message}`;
+      }
+      
+      toast.error(errorMessage);
       throw error;
     }
   }
@@ -122,6 +134,7 @@ class NativeAuthService {
       });
 
       if (error) {
+        console.error('[NativeAuth] Apple OAuth error:', error);
         throw error;
       }
 
@@ -133,7 +146,13 @@ class NativeAuthService {
       }
     } catch (error: any) {
       console.error('[NativeAuth] Apple sign-in failed:', error);
-      toast.error(`Apple sign-in failed: ${error.message}`);
+      
+      let errorMessage = 'Apple sign-in failed';
+      if (error.message) {
+        errorMessage = `Apple sign-in failed: ${error.message}`;
+      }
+      
+      toast.error(errorMessage);
       throw error;
     }
   }
@@ -156,6 +175,7 @@ class NativeAuthService {
       // Sign out from Supabase
       const { error } = await supabase.auth.signOut();
       if (error) {
+        console.error('[NativeAuth] Supabase sign-out error:', error);
         throw error;
       }
 

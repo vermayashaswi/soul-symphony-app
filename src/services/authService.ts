@@ -34,7 +34,19 @@ export const signInWithGoogle = async (): Promise<void> => {
     await nativeAuthService.signInWithGoogle();
   } catch (error: any) {
     console.error('[AuthService] Google sign-in error:', error);
-    throw error;
+    
+    // Enhanced error handling for common Google Auth issues
+    if (error.message?.includes('redirect_uri_mismatch')) {
+      console.error('[AuthService] Redirect URI mismatch - check Google OAuth configuration');
+      toast.error('Google sign-in configuration error. Please contact support.');
+    } else if (error.message?.includes('popup_closed_by_user')) {
+      console.log('[AuthService] User cancelled sign-in');
+      // Don't show error toast for user cancellation
+      return;
+    } else {
+      // Re-throw other errors to be handled by the caller
+      throw error;
+    }
   }
 };
 
