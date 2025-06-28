@@ -1,3 +1,4 @@
+
 import { mobileErrorHandler } from './mobileErrorHandler';
 
 interface CapacitorPlugin {
@@ -57,7 +58,7 @@ class NativeIntegrationService {
     return typeof window !== 'undefined' && !!(window as any).Capacitor;
   }
 
-  private async initializeCapacitor(): Promise<void> => {
+  private async initializeCapacitor(): Promise<void> {
     try {
       const { Capacitor } = (window as any);
       
@@ -74,7 +75,7 @@ class NativeIntegrationService {
       console.error('[NativeIntegration] Capacitor initialization failed:', error);
       mobileErrorHandler.handleCapacitorError('Core', error.toString());
     }
-  };
+  }
 
   private async initializeCorePlugins(): Promise<void> {
     // Initialize App plugin
