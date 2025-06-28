@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from 'react';
 import { useLocation, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
@@ -7,7 +8,7 @@ import { isNativeApp, isAppRoute } from '@/routes/RouteHelpers';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { TranslatableText } from '@/components/translation/TranslatableText';
 import { useTutorial } from '@/contexts/TutorialContext';
-import { useSafeAuth } from '@/hooks/use-safe-auth';
+import { useAuth } from '@/contexts/AuthContext';
 import { useTranslation } from '@/contexts/TranslationContext';
 import { useSubscription } from '@/contexts/SubscriptionContext';
 
@@ -21,22 +22,9 @@ const MobileNavigation: React.FC<MobileNavigationProps> = ({ onboardingComplete 
   const [isVisible, setIsVisible] = useState(false);
   const [isKeyboardVisible, setIsKeyboardVisible] = useState(false);
   const { isActive: isTutorialActive } = useTutorial();
+  const { user } = useAuth();
   const { currentLanguage } = useTranslation();
-  
-  // Use safe auth hook to prevent context errors
-  const { user, isAvailable: authAvailable } = useSafeAuth();
-  
-  // Safely get subscription state with error handling
-  let hasActiveSubscription = false;
-  let isTrialActive = false;
-  
-  try {
-    const subscriptionState = useSubscription();
-    hasActiveSubscription = subscriptionState.hasActiveSubscription;
-    isTrialActive = subscriptionState.isTrialActive;
-  } catch (error) {
-    console.warn('[MobileNavigation] Subscription context not available:', error);
-  }
+  const { hasActiveSubscription, isTrialActive } = useSubscription();
   
   // Debug: Force component re-render when language changes
   const [renderKey, setRenderKey] = useState(0);
@@ -97,7 +85,6 @@ const MobileNavigation: React.FC<MobileNavigationProps> = ({ onboardingComplete 
     const shouldShowNav = (isMobile || isNativeApp()) && 
                           !isKeyboardVisible && 
                           !isOnboardingOrAuth &&
-                          authAvailable &&
                           !!user &&
                           onboardingComplete !== false;
     
@@ -108,7 +95,6 @@ const MobileNavigation: React.FC<MobileNavigationProps> = ({ onboardingComplete 
       path: location.pathname,
       isKeyboardVisible,
       isOnboardingOrAuth,
-      authAvailable,
       hasUser: !!user,
       onboardingComplete,
       isTutorialActive,
@@ -117,9 +103,9 @@ const MobileNavigation: React.FC<MobileNavigationProps> = ({ onboardingComplete 
     });
     
     setIsVisible(shouldShowNav);
-  }, [location.pathname, isMobile, isKeyboardVisible, isTutorialActive, user, authAvailable, onboardingComplete, currentLanguage, renderKey]);
+  }, [location.pathname, isMobile, isKeyboardVisible, isTutorialActive, user, onboardingComplete, currentLanguage, renderKey]);
   
-  if (!isVisible || !authAvailable) {
+  if (!isVisible) {
     return null;
   }
   
