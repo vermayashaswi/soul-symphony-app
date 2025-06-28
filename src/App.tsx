@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from 'react';
 import AppRoutes from './routes/AppRoutes';
 import { Toaster } from "@/components/ui/toaster";
@@ -21,6 +20,7 @@ import { detectTWAEnvironment } from './utils/twaDetection';
 import { useTWAAutoRefresh } from './hooks/useTWAAutoRefresh';
 import { twaUpdateService } from './services/twaUpdateService';
 import { nativeIntegrationService } from './services/nativeIntegrationService';
+import { nativeAuthService } from './services/nativeAuthService';
 import { mobileErrorHandler } from './services/mobileErrorHandler';
 import { mobileOptimizationService } from './services/mobileOptimizationService';
 
@@ -70,6 +70,19 @@ const App: React.FC = () => {
           mobileErrorHandler.handleError({
             type: 'capacitor',
             message: `Native integration failed: ${error}`
+          });
+        }
+        
+        // Initialize native auth service after native integration
+        try {
+          console.log('[App] Initializing native auth service...');
+          await nativeAuthService.initialize();
+          console.log('[App] Native auth service initialized');
+        } catch (error) {
+          console.warn('[App] Native auth service failed:', error);
+          mobileErrorHandler.handleError({
+            type: 'capacitor',
+            message: `Native auth service failed: ${error}`
           });
         }
         
