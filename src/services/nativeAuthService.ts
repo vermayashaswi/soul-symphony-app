@@ -7,6 +7,7 @@ import { toast } from 'sonner';
 class NativeAuthService {
   private static instance: NativeAuthService;
   private isInitialized = false;
+  private initializationError: string | null = null;
 
   static getInstance(): NativeAuthService {
     if (!NativeAuthService.instance) {
@@ -21,23 +22,34 @@ class NativeAuthService {
     try {
       console.log('[NativeAuth] Initializing native auth service');
       
-      // Only initialize GoogleAuth if running natively
-      if (nativeIntegrationService.isRunningNatively()) {
-        console.log('[NativeAuth] Running natively, initializing GoogleAuth');
-        await GoogleAuth.initialize({
-          clientId: '', // This should be set via environment variables
-          scopes: ['profile', 'email'],
-          // Removed grantOfflineAccess: true to fix redirect_uri_mismatch
-        });
-      } else {
-        console.log('[NativeAuth] Running in web, skipping GoogleAuth initialization');
+      // Only initialize if we're actually running natively
+      if (!nativeIntegrationService.isRunningNatively()) {
+        console.log('[NativeAuth] Not running natively - skipping GoogleAuth initialization');
+        this.isInitialized = true;
+        return;
       }
 
+      // Verify GoogleAuth plugin is available
+      if (!nativeIntegrationService.isGoogleAuthAvailable()) {
+        console.warn('[NativeAuth] GoogleAuth plugin not available');
+        this.initializationError = 'GoogleAuth plugin not available';
+        this.isInitialized = true;
+        return;
+      }
+
+      console.log('[NativeAuth] Initializing GoogleAuth plugin');
+      await GoogleAuth.initialize({
+        clientId: '', // This should be set via environment variables
+        scopes: ['profile', 'email'],
+      });
+
       this.isInitialized = true;
-      console.log('[NativeAuth] Native auth service initialized');
+      console.log('[NativeAuth] Native auth service initialized successfully');
     } catch (error) {
       console.error('[NativeAuth] Failed to initialize:', error);
-      // Don't throw error, fallback to web auth
+      this.initializationError = error.toString();
+      this.isInitialized = true; // Mark as initialized even on error to prevent retry loops
+      // Don't throw error, just log it - fallback to web auth
     }
   }
 
@@ -45,9 +57,13 @@ class NativeAuthService {
     try {
       console.log('[NativeAuth] Starting Google sign-in');
       
-      if (nativeIntegrationService.isRunningNatively()) {
-        // Native Google Sign-In
+      // Check if we should use native auth
+      if (this.shouldUseNativeAuth()) {
         console.log('[NativeAuth] Using native Google Sign-In');
+        
+        if (this.initializationError) {
+          throw new Error(`Native auth not available: ${this.initializationError}`);
+        }
         
         const result = await GoogleAuth.signIn();
         console.log('[NativeAuth] Native Google sign-in result:', { 
@@ -73,48 +89,49 @@ class NativeAuthService {
         console.log('[NativeAuth] Successfully signed in with Google natively');
         toast.success('Signed in successfully');
       } else {
-        // Web Google Sign-In (fallback) - removed problematic parameters
-        console.log('[NativeAuth] Using web Google Sign-In fallback');
-        
-        const redirectUrl = `${window.location.origin}/app/auth`;
-        const { data, error } = await supabase.auth.signInWithOAuth({
-          provider: 'google',
-          options: {
-            redirectTo: redirectUrl,
-            // Removed access_type: 'offline' and prompt: 'consent' to fix redirect issues
-          },
-        });
-
-        if (error) {
-          console.error('[NativeAuth] OAuth sign-in error:', error);
-          throw error;
-        }
-
-        if (data?.url) {
-          console.log('[NativeAuth] Redirecting to OAuth URL:', data.url);
-          setTimeout(() => {
-            window.location.href = data.url;
-          }, 100);
-        }
+        // Fallback to web OAuth
+        console.log('[NativeAuth] Using web OAuth Google Sign-In');
+        await this.signInWithGoogleWeb();
       }
     } catch (error: any) {
       console.error('[NativeAuth] Google sign-in failed:', error);
       
-      // Improved error handling with specific error messages
-      let errorMessage = 'Google sign-in failed';
-      
-      if (error.message?.includes('redirect_uri_mismatch')) {
-        errorMessage = 'Google sign-in configuration error. Please check your redirect URLs.';
-      } else if (error.message?.includes('popup_closed_by_user')) {
-        errorMessage = 'Sign-in was cancelled';
-      } else if (error.message?.includes('network')) {
-        errorMessage = 'Network error. Please check your connection and try again.';
-      } else if (error.message) {
-        errorMessage = `Google sign-in failed: ${error.message}`;
+      // Try web fallback if native fails
+      if (this.shouldUseNativeAuth() && !error.message?.includes('popup_closed_by_user')) {
+        console.log('[NativeAuth] Native auth failed, trying web fallback');
+        try {
+          await this.signInWithGoogleWeb();
+          return;
+        } catch (webError) {
+          console.error('[NativeAuth] Web fallback also failed:', webError);
+        }
       }
       
-      toast.error(errorMessage);
+      // Show appropriate error message
+      this.handleAuthError(error);
       throw error;
+    }
+  }
+
+  private async signInWithGoogleWeb(): Promise<void> {
+    const redirectUrl = `${window.location.origin}/app/auth`;
+    const { data, error } = await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: {
+        redirectTo: redirectUrl,
+      },
+    });
+
+    if (error) {
+      console.error('[NativeAuth] OAuth sign-in error:', error);
+      throw error;
+    }
+
+    if (data?.url) {
+      console.log('[NativeAuth] Redirecting to OAuth URL:', data.url);
+      setTimeout(() => {
+        window.location.href = data.url;
+      }, 100);
     }
   }
 
@@ -146,13 +163,7 @@ class NativeAuthService {
       }
     } catch (error: any) {
       console.error('[NativeAuth] Apple sign-in failed:', error);
-      
-      let errorMessage = 'Apple sign-in failed';
-      if (error.message) {
-        errorMessage = `Apple sign-in failed: ${error.message}`;
-      }
-      
-      toast.error(errorMessage);
+      this.handleAuthError(error, 'Apple');
       throw error;
     }
   }
@@ -161,8 +172,8 @@ class NativeAuthService {
     try {
       console.log('[NativeAuth] Starting sign out');
       
-      if (nativeIntegrationService.isRunningNatively()) {
-        // Sign out from Google natively
+      // Only try native sign out if we're running natively and GoogleAuth is available
+      if (this.shouldUseNativeAuth() && !this.initializationError) {
         try {
           await GoogleAuth.signOut();
           console.log('[NativeAuth] Signed out from Google natively');
@@ -188,8 +199,36 @@ class NativeAuthService {
     }
   }
 
+  private shouldUseNativeAuth(): boolean {
+    return nativeIntegrationService.isRunningNatively() && 
+           nativeIntegrationService.isGoogleAuthAvailable() && 
+           this.isInitialized;
+  }
+
+  private handleAuthError(error: any, provider: string = 'Google'): void {
+    let errorMessage = `${provider} sign-in failed`;
+    
+    if (error.message?.includes('redirect_uri_mismatch')) {
+      errorMessage = `${provider} sign-in configuration error. Please check your redirect URLs.`;
+    } else if (error.message?.includes('popup_closed_by_user')) {
+      errorMessage = 'Sign-in was cancelled';
+    } else if (error.message?.includes('network')) {
+      errorMessage = 'Network error. Please check your connection and try again.';
+    } else if (error.message?.includes('not available')) {
+      errorMessage = `${provider} sign-in is not available. Please try again later.`;
+    } else if (error.message) {
+      errorMessage = `${provider} sign-in failed: ${error.message}`;
+    }
+    
+    toast.error(errorMessage);
+  }
+
   isRunningNatively(): boolean {
     return nativeIntegrationService.isRunningNatively();
+  }
+
+  getInitializationError(): string | null {
+    return this.initializationError;
   }
 }
 

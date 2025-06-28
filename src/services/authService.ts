@@ -1,3 +1,4 @@
+
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { isAppRoute } from '@/routes/RouteHelpers';
@@ -32,33 +33,44 @@ export const signInWithGoogle = async (): Promise<void> => {
   try {
     console.log('[AuthService] Starting Google sign-in');
     
-    // Check if we're running in a native environment
+    // Check if we should use native authentication
     if (nativeIntegrationService.isRunningNatively()) {
-      console.log('[AuthService] Using native Google sign-in');
-      await nativeAuthService.signInWithGoogle();
-    } else {
-      console.log('[AuthService] Using web OAuth Google sign-in');
-      
-      // Web Google Sign-In fallback
-      const redirectUrl = getRedirectUrl();
-      const { data, error } = await supabase.auth.signInWithOAuth({
-        provider: 'google',
-        options: {
-          redirectTo: redirectUrl,
-        },
-      });
-
-      if (error) {
-        console.error('[AuthService] OAuth sign-in error:', error);
-        throw error;
+      console.log('[AuthService] Attempting native Google sign-in');
+      try {
+        await nativeAuthService.signInWithGoogle();
+        return;
+      } catch (nativeError) {
+        console.warn('[AuthService] Native Google sign-in failed, falling back to web:', nativeError);
+        
+        // Don't show error for user cancellation
+        if (nativeError.message?.includes('popup_closed_by_user')) {
+          return;
+        }
+        
+        // Fall through to web OAuth for other errors
       }
+    }
+    
+    // Web Google Sign-In fallback
+    console.log('[AuthService] Using web OAuth Google sign-in');
+    const redirectUrl = getRedirectUrl();
+    const { data, error } = await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: {
+        redirectTo: redirectUrl,
+      },
+    });
 
-      if (data?.url) {
-        console.log('[AuthService] Redirecting to OAuth URL:', data.url);
-        setTimeout(() => {
-          window.location.href = data.url;
-        }, 100);
-      }
+    if (error) {
+      console.error('[AuthService] OAuth sign-in error:', error);
+      throw error;
+    }
+
+    if (data?.url) {
+      console.log('[AuthService] Redirecting to OAuth URL:', data.url);
+      setTimeout(() => {
+        window.location.href = data.url;
+      }, 100);
     }
   } catch (error: any) {
     console.error('[AuthService] Google sign-in error:', error);
@@ -71,6 +83,9 @@ export const signInWithGoogle = async (): Promise<void> => {
       console.log('[AuthService] User cancelled sign-in');
       // Don't show error toast for user cancellation
       return;
+    } else if (error.message?.includes('Cannot read properties of null')) {
+      console.error('[AuthService] Google Auth initialization error - likely running in unsupported environment');
+      toast.error('Google sign-in is not available in this environment. Please try refreshing the page.');
     } else {
       // Re-throw other errors to be handled by the caller
       throw error;
@@ -85,33 +100,38 @@ export const signInWithApple = async (): Promise<void> => {
   try {
     console.log('[AuthService] Starting Apple sign-in');
     
-    // Check if we're running in a native environment
+    // Check if we should use native authentication
     if (nativeIntegrationService.isRunningNatively()) {
-      console.log('[AuthService] Using native Apple sign-in');
-      await nativeAuthService.signInWithApple();
-    } else {
-      console.log('[AuthService] Using web OAuth Apple sign-in');
-      
-      // Web Apple Sign-In fallback
-      const redirectUrl = getRedirectUrl();
-      const { data, error } = await supabase.auth.signInWithOAuth({
-        provider: 'apple',
-        options: {
-          redirectTo: redirectUrl,
-        },
-      });
-
-      if (error) {
-        console.error('[AuthService] Apple OAuth error:', error);
-        throw error;
+      console.log('[AuthService] Attempting native Apple sign-in');
+      try {
+        await nativeAuthService.signInWithApple();
+        return;
+      } catch (nativeError) {
+        console.warn('[AuthService] Native Apple sign-in failed, falling back to web:', nativeError);
+        // Fall through to web OAuth
       }
+    }
+    
+    // Web Apple Sign-In fallback
+    console.log('[AuthService] Using web OAuth Apple sign-in');
+    const redirectUrl = getRedirectUrl();
+    const { data, error } = await supabase.auth.signInWithOAuth({
+      provider: 'apple',
+      options: {
+        redirectTo: redirectUrl,
+      },
+    });
 
-      if (data?.url) {
-        console.log('[AuthService] Redirecting to Apple OAuth URL:', data.url);
-        setTimeout(() => {
-          window.location.href = data.url;
-        }, 100);
-      }
+    if (error) {
+      console.error('[AuthService] Apple OAuth error:', error);
+      throw error;
+    }
+
+    if (data?.url) {
+      console.log('[AuthService] Redirecting to Apple OAuth URL:', data.url);
+      setTimeout(() => {
+        window.location.href = data.url;
+      }, 100);
     }
   } catch (error: any) {
     console.error('[AuthService] Apple sign-in error:', error);
@@ -188,14 +208,22 @@ export const signOut = async (navigate?: (path: string) => void): Promise<void> 
   try {
     console.log('[AuthService] Starting sign out');
     
-    // Check if we're running in a native environment
+    // Check if we should use native sign out
     if (nativeIntegrationService.isRunningNatively()) {
-      console.log('[AuthService] Using native sign out');
-      await nativeAuthService.signOut();
+      console.log('[AuthService] Attempting native sign out');
+      try {
+        await nativeAuthService.signOut();
+      } catch (nativeError) {
+        console.warn('[AuthService] Native sign out failed, using web fallback:', nativeError);
+        // Fall through to web sign out
+        const { error } = await supabase.auth.signOut();
+        if (error) {
+          console.error('[AuthService] Supabase sign-out error:', error);
+          throw error;
+        }
+      }
     } else {
       console.log('[AuthService] Using web sign out');
-      
-      // Web sign out
       const { error } = await supabase.auth.signOut();
       if (error) {
         console.error('[AuthService] Supabase sign-out error:', error);

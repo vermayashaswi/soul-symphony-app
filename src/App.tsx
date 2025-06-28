@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from 'react';
 import AppRoutes from './routes/AppRoutes';
 import { Toaster } from "@/components/ui/toaster";
@@ -65,29 +66,29 @@ const App: React.FC = () => {
           console.log('[App] Initializing native integration service...');
           await nativeIntegrationService.initialize();
           console.log('[App] Native integration initialized');
+          
+          // Only initialize native auth service if we're actually running natively
+          if (nativeIntegrationService.isRunningNatively()) {
+            console.log('[App] Running natively - initializing native auth service...');
+            try {
+              await nativeAuthService.initialize();
+              console.log('[App] Native auth service initialized successfully');
+            } catch (error) {
+              console.warn('[App] Native auth service initialization failed:', error);
+              mobileErrorHandler.handleError({
+                type: 'capacitor',
+                message: `Native auth service failed: ${error}`
+              });
+            }
+          } else {
+            console.log('[App] Running in browser - skipping native auth service initialization');
+          }
         } catch (error) {
           console.warn('[App] Native integration failed:', error);
           mobileErrorHandler.handleError({
             type: 'capacitor',
             message: `Native integration failed: ${error}`
           });
-        }
-        
-        // Initialize native auth service ONLY if running natively
-        if (nativeIntegrationService.isRunningNatively()) {
-          try {
-            console.log('[App] Running natively - initializing native auth service...');
-            await nativeAuthService.initialize();
-            console.log('[App] Native auth service initialized');
-          } catch (error) {
-            console.warn('[App] Native auth service failed:', error);
-            mobileErrorHandler.handleError({
-              type: 'capacitor',
-              message: `Native auth service failed: ${error}`
-            });
-          }
-        } else {
-          console.log('[App] Running in browser - skipping native auth service initialization');
         }
         
         // Initialize TWA update service
