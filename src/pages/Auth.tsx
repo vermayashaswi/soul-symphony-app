@@ -9,6 +9,7 @@ import { useOnboarding } from '@/hooks/use-onboarding';
 import { TranslatableText } from '@/components/translation/TranslatableText';
 import PlatformAuthButton from '@/components/auth/PlatformAuthButton';
 import { nativeAuthService } from '@/services/nativeAuthService';
+import { handleAuthCallback } from '@/services/authService';
 
 export default function Auth() {
   const location = useLocation();
@@ -17,6 +18,7 @@ export default function Auth() {
   const [redirecting, setRedirecting] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [nativeAuthReady, setNativeAuthReady] = useState(false);
+  const [authCallbackProcessed, setAuthCallbackProcessed] = useState(false);
   const { user, isLoading: authLoading } = useAuth();
   const { onboardingComplete } = useOnboarding();
   const [authError, setAuthError] = useState<string | null>(null);
@@ -24,6 +26,12 @@ export default function Auth() {
   const redirectParam = searchParams.get('redirectTo');
   const fromLocation = location.state?.from?.pathname;
   const storedRedirect = typeof window !== 'undefined' ? localStorage.getItem('authRedirectTo') : null;
+  
+  // Check for OAuth callback parameters
+  const hasAuthCallback = location.hash.includes('access_token') || 
+                         location.hash.includes('error') ||
+                         location.search.includes('error') ||
+                         searchParams.get('code');
   
   // Get valid redirect path - default to /app/home after successful login
   const getValidRedirectPath = (path: string | null) => {
@@ -48,8 +56,39 @@ export default function Auth() {
     storedRedirect,
     hasUser: !!user,
     currentPath: location.pathname,
-    onboardingComplete
+    onboardingComplete,
+    hasAuthCallback,
+    hash: location.hash,
+    search: location.search
   });
+
+  // Handle OAuth callback
+  useEffect(() => {
+    const processAuthCallback = async () => {
+      if (hasAuthCallback && !authCallbackProcessed && !user) {
+        console.log('[Auth] Processing OAuth callback');
+        setAuthCallbackProcessed(true);
+        setIsLoading(true);
+        
+        try {
+          const session = await handleAuthCallback();
+          if (session) {
+            console.log('[Auth] OAuth callback successful, session created');
+            // Don't redirect here - let the auth state change handler do it
+          } else {
+            console.log('[Auth] OAuth callback did not create session');
+            setIsLoading(false);
+          }
+        } catch (error) {
+          console.error('[Auth] OAuth callback error:', error);
+          setAuthError('Authentication failed. Please try again.');
+          setIsLoading(false);
+        }
+      }
+    };
+
+    processAuthCallback();
+  }, [hasAuthCallback, authCallbackProcessed, user]);
 
   // Initialize native auth service
   useEffect(() => {
@@ -66,17 +105,22 @@ export default function Auth() {
     };
 
     initializeNativeAuth();
-    setIsLoading(false);
   }, []);
 
+  // Handle successful authentication
   useEffect(() => {
     // If user is logged in and page has finished initial loading, redirect
-    if (user && !authLoading && !redirecting && nativeAuthReady) {
+    if (user && !authLoading && !redirecting && nativeAuthReady && !isLoading) {
       console.log('User is logged in, redirecting to:', redirectTo);
       setRedirecting(true);
       
       // Clean up stored redirect
       localStorage.removeItem('authRedirectTo');
+      
+      // Clear URL hash and search params from OAuth callback
+      if (hasAuthCallback) {
+        window.history.replaceState(null, '', '/app/auth');
+      }
       
       // Add small delay to ensure state updates before navigation
       const timer = setTimeout(() => {
@@ -86,13 +130,18 @@ export default function Auth() {
       
       return () => clearTimeout(timer);
     }
-  }, [user, authLoading, navigate, redirecting, redirectTo, nativeAuthReady]);
+  }, [user, authLoading, navigate, redirecting, redirectTo, nativeAuthReady, isLoading, hasAuthCallback]);
 
-  // If still checking auth state or initializing native auth, show loading
-  if (authLoading || !nativeAuthReady) {
+  // Show loading during OAuth callback processing or auth state check
+  if (authLoading || !nativeAuthReady || (hasAuthCallback && !authCallbackProcessed) || isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+        <div className="flex flex-col items-center space-y-4">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+          <p className="text-muted-foreground">
+            {hasAuthCallback ? 'Completing sign-in...' : 'Loading...'}
+          </p>
+        </div>
       </div>
     );
   }

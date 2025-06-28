@@ -1,4 +1,3 @@
-
 import { toast } from 'sonner';
 import { nativeIntegrationService } from './nativeIntegrationService';
 
@@ -90,8 +89,11 @@ class MobileErrorHandler {
       // Plugin initialization errors that have fallbacks
       'plugin not available',
       'plugin not implemented',
-      'GoogleAuth not available',
-      'grantOfflineAccess',
+      'googleauth not available',
+      'grantofflineaccess',
+      'native auth initialization failed',
+      'native auth service',
+      'capacitor plugin',
       // Non-critical network errors
       'failed to fetch',
       'network error',
@@ -101,6 +103,14 @@ class MobileErrorHandler {
       // Auth-related non-critical errors that have fallbacks
       'auth initialization',
       'oauth redirect',
+      'supabase auth',
+      // Feature flags and non-critical context errors
+      'useauth must be used within',
+      'context provider',
+      'feature flags',
+      // Translation and UI related
+      'translation',
+      'loading overlay',
     ];
     
     const lowerMessage = message.toLowerCase();
