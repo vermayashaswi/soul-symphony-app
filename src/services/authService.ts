@@ -1,16 +1,28 @@
+
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { isAppRoute } from '@/routes/RouteHelpers';
 import { nativeAuthService } from './nativeAuthService';
 
 /**
- * Gets the redirect URL for authentication - FIXED to be consistent
+ * Gets the redirect URL for authentication
  */
 export const getRedirectUrl = (): string => {
-  // Always use a consistent redirect URL to avoid OAuth mismatches
-  // This must match exactly what's configured in Google OAuth settings
-  const baseUrl = window.location.origin;
-  return `${baseUrl}/app/auth`;
+  // For iOS in standalone mode (PWA), we need to handle redirects differently
+  // Check for standalone mode in a type-safe way
+  const isInStandaloneMode = () => {
+    // Check for display-mode: standalone media query (PWA)
+    const standaloneCheck = window.matchMedia('(display-mode: standalone)').matches;
+    
+    // Check for navigator.standalone (iOS Safari)
+    // @ts-ignore - This is valid on iOS Safari but not in the TypeScript types
+    const iosSafariStandalone = window.navigator.standalone;
+    
+    return standaloneCheck || iosSafariStandalone;
+  };
+  
+  // All auth redirects should go to /app/auth
+  return `${window.location.origin}/app/auth`;
 };
 
 /**
@@ -22,20 +34,6 @@ export const signInWithGoogle = async (): Promise<void> => {
     await nativeAuthService.signInWithGoogle();
   } catch (error: any) {
     console.error('[AuthService] Google sign-in error:', error);
-    
-    // Handle specific OAuth errors
-    if (error.message?.includes('redirect_uri_mismatch') || 
-        error.message?.includes('invalid_request')) {
-      toast.error('Google sign-in configuration error. Please contact support.');
-      console.error('[AuthService] OAuth configuration error - check redirect URLs');
-    } else if (error.message?.includes('access_denied')) {
-      toast.error('Sign-in was cancelled or access was denied.');
-    } else if (error.message?.includes('popup_blocked')) {
-      toast.error('Pop-up was blocked. Please allow pop-ups and try again.');
-    } else {
-      toast.error('Google sign-in failed. Please try again.');
-    }
-    
     throw error;
   }
 };
@@ -187,68 +185,37 @@ export const getCurrentUser = async () => {
 };
 
 /**
- * Handle auth callback - Enhanced for better OAuth handling
+ * Handle auth callback
+ * This is specifically added to fix the auth flow
  */
 export const handleAuthCallback = async () => {
   try {
-    console.log('[AuthService] Processing auth callback');
-    
-    // Check for OAuth callback indicators
+    // Check if we have hash params that might indicate an auth callback
     const hasHashParams = window.location.hash.includes('access_token') || 
                          window.location.hash.includes('error') ||
-                         window.location.search.includes('error') ||
-                         window.location.search.includes('code');
+                         window.location.search.includes('error');
     
-    // Check for OAuth errors in URL
-    const urlParams = new URLSearchParams(window.location.search);
-    const hashParams = new URLSearchParams(window.location.hash.substring(1));
-    
-    const error = urlParams.get('error') || hashParams.get('error');
-    const errorDescription = urlParams.get('error_description') || hashParams.get('error_description');
-    
-    if (error) {
-      console.error('[AuthService] OAuth error in callback:', error, errorDescription);
-      
-      // Handle specific OAuth errors
-      if (error === 'redirect_uri_mismatch') {
-        toast.error('Sign-in configuration error. Please contact support.');
-        console.error('[AuthService] Redirect URI mismatch - check Google OAuth settings');
-      } else if (error === 'access_denied') {
-        toast.error('Sign-in was cancelled.');
-      } else {
-        toast.error(`Sign-in error: ${errorDescription || error}`);
-      }
-      
-      return null;
-    }
+    console.log('Checking for auth callback params:', hasHashParams);
     
     if (hasHashParams) {
-      console.log('[AuthService] OAuth callback detected, checking session');
+      // Get the session
+      const { data, error } = await supabase.auth.getSession();
       
-      // Get the session from Supabase
-      const { data, error: sessionError } = await supabase.auth.getSession();
-      
-      if (sessionError) {
-        console.error('[AuthService] Error in auth callback session check:', sessionError);
-        toast.error('Authentication failed. Please try again.');
+      if (error) {
+        console.error('Error in auth callback session check:', error);
         return null;
       } 
       
       if (data.session?.user) {
-        console.log('[AuthService] User authenticated successfully in callback');
-        toast.success('Signed in successfully!');
+        console.log('User authenticated in callback handler');
+        // Session creation will be handled by AuthContext
         return data.session;
-      } else {
-        console.log('[AuthService] No session found after OAuth callback');
-        toast.error('Authentication incomplete. Please try again.');
-        return null;
       }
     }
     
     return null;
   } catch (error) {
-    console.error('[AuthService] Error in handleAuthCallback:', error);
-    toast.error('Authentication failed. Please try again.');
+    console.error('Error in handleAuthCallback:', error);
     return null;
   }
 };

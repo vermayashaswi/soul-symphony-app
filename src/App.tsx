@@ -5,7 +5,6 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as SonnerToaster } from "sonner";
 import { TranslationProvider } from '@/contexts/TranslationContext';
 import { SubscriptionProvider } from '@/contexts/SubscriptionContext';
-import { AuthProvider } from '@/contexts/AuthContext';
 import { TranslationLoadingOverlay } from '@/components/translation/TranslationLoadingOverlay';
 import { JournalProcessingInitializer } from './app/journal-processing-init';
 import { TutorialProvider } from './contexts/TutorialContext';
@@ -262,26 +261,24 @@ const App: React.FC = () => {
 
   return (
     <ErrorBoundary onError={handleAppError}>
-      <TranslationProvider>
-        <AuthProvider>
-          <FeatureFlagsProvider>
-            <SubscriptionProvider>
-              <TutorialProvider>
-                <TWAWrapper>
-                  <TWAInitializationWrapper>
-                    <TranslationLoadingOverlay />
-                    <JournalProcessingInitializer />
-                    <AppRoutes key={isInitialized ? 'initialized' : 'initializing'} />
-                    <TutorialOverlay />
-                    <Toaster />
-                    <SonnerToaster position="top-right" />
-                  </TWAInitializationWrapper>
-                </TWAWrapper>
-              </TutorialProvider>
-            </SubscriptionProvider>
-          </FeatureFlagsProvider>
-        </AuthProvider>
-      </TranslationProvider>
+      <FeatureFlagsProvider>
+        <TranslationProvider>
+          <SubscriptionProvider>
+            <TutorialProvider>
+              <TWAWrapper>
+                <TWAInitializationWrapper>
+                  <TranslationLoadingOverlay />
+                  <JournalProcessingInitializer />
+                  <AppRoutes key={isInitialized ? 'initialized' : 'initializing'} />
+                  <TutorialOverlay />
+                  <Toaster />
+                  <SonnerToaster position="top-right" />
+                </TWAInitializationWrapper>
+              </TWAWrapper>
+            </TutorialProvider>
+          </SubscriptionProvider>
+        </TranslationProvider>
+      </FeatureFlagsProvider>
     </ErrorBoundary>
   );
 };

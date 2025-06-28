@@ -1,3 +1,4 @@
+
 import { GoogleAuth } from '@codetrix-studio/capacitor-google-auth';
 import { supabase } from '@/integrations/supabase/client';
 import { nativeIntegrationService } from './nativeIntegrationService';
@@ -23,14 +24,11 @@ class NativeAuthService {
       // Only initialize GoogleAuth if running natively
       if (nativeIntegrationService.isRunningNatively()) {
         console.log('[NativeAuth] Running natively, initializing GoogleAuth');
-        
-        // Initialize GoogleAuth with correct parameters
         await GoogleAuth.initialize({
-          clientId: '11083941790-oi1vrl8bmsjajc0h1ka4f9q0qjmm80o9.apps.googleusercontent.com',
+          clientId: '', // This should be set via environment variables
           scopes: ['profile', 'email'],
+          grantOfflineAccess: true,
         });
-        
-        console.log('[NativeAuth] GoogleAuth initialized successfully');
       } else {
         console.log('[NativeAuth] Running in web, skipping GoogleAuth initialization');
       }
@@ -40,7 +38,6 @@ class NativeAuthService {
     } catch (error) {
       console.error('[NativeAuth] Failed to initialize:', error);
       // Don't throw error, fallback to web auth
-      this.isInitialized = true; // Mark as initialized to prevent retry loops
     }
   }
 
@@ -49,12 +46,6 @@ class NativeAuthService {
       console.log('[NativeAuth] Starting Google sign-in');
       
       if (nativeIntegrationService.isRunningNatively()) {
-        // Check if GoogleAuth is available and initialized
-        if (!this.isInitialized) {
-          console.log('[NativeAuth] GoogleAuth not initialized, attempting to initialize');
-          await this.initialize();
-        }
-        
         // Native Google Sign-In
         console.log('[NativeAuth] Using native Google Sign-In');
         
@@ -82,14 +73,10 @@ class NativeAuthService {
         console.log('[NativeAuth] Successfully signed in with Google natively');
         toast.success('Signed in successfully');
       } else {
-        // Web Google Sign-In with FIXED redirect URL
-        console.log('[NativeAuth] Using web Google Sign-In');
+        // Web Google Sign-In (fallback)
+        console.log('[NativeAuth] Using web Google Sign-In fallback');
         
-        // Use consistent redirect URL that must match Google OAuth settings
         const redirectUrl = `${window.location.origin}/app/auth`;
-        
-        console.log('[NativeAuth] Using redirect URL:', redirectUrl);
-        
         const { data, error } = await supabase.auth.signInWithOAuth({
           provider: 'google',
           options: {
@@ -102,26 +89,19 @@ class NativeAuthService {
         });
 
         if (error) {
-          console.error('[NativeAuth] OAuth error:', error);
-          
-          // Handle specific OAuth errors
-          if (error.message?.includes('redirect_uri_mismatch')) {
-            throw new Error('OAuth configuration error: redirect URI mismatch. Please contact support.');
-          } else if (error.message?.includes('invalid_client')) {
-            throw new Error('OAuth configuration error: invalid client. Please contact support.');
-          } else {
-            throw error;
-          }
+          throw error;
         }
 
-        // For web OAuth, the redirect will happen automatically
-        // Don't show success toast here as it will be handled after redirect
-        console.log('[NativeAuth] OAuth redirect initiated');
+        if (data?.url) {
+          console.log('[NativeAuth] Redirecting to OAuth URL:', data.url);
+          setTimeout(() => {
+            window.location.href = data.url;
+          }, 100);
+        }
       }
     } catch (error: any) {
       console.error('[NativeAuth] Google sign-in failed:', error);
-      
-      // Don't show duplicate toasts - let the calling service handle user-facing errors
+      toast.error(`Google sign-in failed: ${error.message}`);
       throw error;
     }
   }
@@ -130,11 +110,10 @@ class NativeAuthService {
     try {
       console.log('[NativeAuth] Starting Apple sign-in');
       
-      // For Apple Sign-In, always use web OAuth with consistent redirect URL
+      // For now, Apple Sign-In will use web OAuth
+      // Native Apple Sign-In can be implemented later with @capacitor-community/apple-sign-in
+      
       const redirectUrl = `${window.location.origin}/app/auth`;
-      
-      console.log('[NativeAuth] Using Apple OAuth with redirect URL:', redirectUrl);
-      
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider: 'apple',
         options: {
@@ -146,9 +125,15 @@ class NativeAuthService {
         throw error;
       }
 
-      console.log('[NativeAuth] Apple OAuth redirect initiated');
+      if (data?.url) {
+        console.log('[NativeAuth] Redirecting to Apple OAuth URL:', data.url);
+        setTimeout(() => {
+          window.location.href = data.url;
+        }, 100);
+      }
     } catch (error: any) {
       console.error('[NativeAuth] Apple sign-in failed:', error);
+      toast.error(`Apple sign-in failed: ${error.message}`);
       throw error;
     }
   }
