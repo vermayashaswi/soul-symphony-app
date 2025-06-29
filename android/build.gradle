@@ -1,0 +1,49 @@
+
+// Top-level Gradle build file
+
+buildscript {
+    ext {
+        compileSdkVersion = 34
+        targetSdkVersion = 34
+        minSdkVersion = 22
+        androidxActivityVersion = '1.7.2'
+        androidxAppCompatVersion = '1.6.1'
+        androidxCoordinatorLayoutVersion = '1.2.0'
+        androidxCoreVersion = '1.10.1'
+        androidxFragmentVersion = '1.6.0'
+        coreSplashScreenVersion = '1.0.1'
+        androidxWebkitVersion = '1.7.0'
+        junitVersion = '4.13.2'
+        androidxJunitVersion = '1.1.5'
+        androidxEspressoCoreVersion = '3.5.1'
+        cordovaAndroidVersion = '10.1.1'
+        googleServicesVersion = '4.3.15'
+        firebaseBomVersion = '32.2.2'
+        playServicesAuthVersion = '20.6.0'
+    }
+    repositories {
+        google()
+        mavenCentral()
+    }
+    dependencies {
+        classpath 'com.android.tools.build:gradle:8.0.2'
+        classpath 'com.google.gms:google-services:4.3.15'
+        
+        // NOTE: Do not place your application dependencies here; they belong
+        // in the individual module build.gradle files
+    }
+}
+
+apply from: "variables.gradle"
+
+allprojects {
+    repositories {
+        google()
+        mavenCentral()
+        maven { url 'https://www.jitpack.io' }
+    }
+}
+
+task clean(type: Delete) {
+    delete rootProject.buildDir
+}
