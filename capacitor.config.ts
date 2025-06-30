@@ -9,7 +9,8 @@ const config: CapacitorConfig = {
   plugins: {
     GoogleAuth: {
       scopes: ['profile', 'email'],
-      serverClientId: '11083941790-oi1vrl8bmsjajc0h1ka4f9q0qjmm80o9.apps.googleusercontent.com', // This will be set via environment variables
+      // Use environment variable or fallback to empty string to prevent crashes
+      serverClientId: process.env.GOOGLE_OAUTH_CLIENT_ID || '', 
       forceCodeForRefreshToken: true,
     },
     SplashScreen: {
@@ -33,7 +34,7 @@ const config: CapacitorConfig = {
       backgroundColor: "#000000"
     },
     App: {
-      // Remove launchUrl for production builds
+      // Remove launchUrl for production builds to prevent loading marketing site
     },
     PushNotifications: {
       presentationOptions: ["badge", "sound", "alert"]
