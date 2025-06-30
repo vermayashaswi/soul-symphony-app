@@ -20,33 +20,70 @@ import BlogPostPage from '@/pages/website/BlogPostPage';
 import OnboardingScreen from '@/components/onboarding/OnboardingScreen';
 import { useAuth } from '@/contexts/AuthContext';
 import { useOnboarding } from '@/hooks/use-onboarding';
+import { nativeIntegrationService } from '@/services/nativeIntegrationService';
 
 const AppRoutes = () => {
   const { user } = useAuth();
   const { onboardingComplete } = useOnboarding();
   
-  // Handle /app root route redirects
+  // Handle /app root route redirects with native context awareness
   const AppRootRedirect = () => {
+    const isNative = nativeIntegrationService.isRunningNatively();
+    
+    // For native apps, always redirect to app routes
+    if (isNative) {
+      if (!user) {
+        return <Navigate to="/app/onboarding" replace />;
+      }
+      
+      if (!onboardingComplete) {
+        return <Navigate to="/app/onboarding" replace />;
+      }
+      
+      return <Navigate to="/app/home" replace />;
+    }
+    
+    // Web behavior (existing logic)
     if (!user) {
-      // Not logged in - redirect to onboarding
       return <Navigate to="/app/onboarding" replace />;
     }
     
     if (!onboardingComplete) {
-      // Logged in but onboarding not complete - redirect to onboarding
       return <Navigate to="/app/onboarding" replace />;
     }
     
-    // Logged in and onboarding complete - redirect to home
     return <Navigate to="/app/home" replace />;
+  };
+
+  // Handle root route redirects with native context
+  const RootRedirect = () => {
+    const isNative = nativeIntegrationService.isRunningNatively();
+    
+    // For native apps, always redirect to app interface
+    if (isNative) {
+      if (!user) {
+        return <Navigate to="/app/onboarding" replace />;
+      }
+      
+      if (!onboardingComplete) {
+        return <Navigate to="/app/onboarding" replace />;
+      }
+      
+      return <Navigate to="/app/home" replace />;
+    }
+    
+    // Web behavior - show marketing site
+    return <Index />;
   };
   
   return (
     <Routes>
       {/* Wrap all routes that need ViewportManager in a parent Route */}
       <Route element={<ViewportManager />}>
-        {/* Website Routes */}
-        <Route path="/" element={<Index />} />
+        {/* Root Route - context-aware */}
+        <Route path="/" element={<RootRedirect />} />
+        
+        {/* Website Routes - only accessible in web context */}
         <Route path="/privacy-policy" element={<PrivacyPolicyPage />} />
         <Route path="/faq" element={<FAQPage />} />
         <Route path="/download" element={<AppDownload />} />

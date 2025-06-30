@@ -39,7 +39,7 @@ class NativeAuthService {
 
       console.log('[NativeAuth] Initializing GoogleAuth plugin');
       await GoogleAuth.initialize({
-        clientId: '11083941790-oi1vrl8bmsjajc0h1ka4f9q0qjmm80o9.apps.googleusercontent.com', // This should be set via environment variables
+        clientId: '', // This should be set via environment variables
         scopes: ['profile', 'email'],
       });
 

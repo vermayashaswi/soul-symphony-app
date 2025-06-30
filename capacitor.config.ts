@@ -1,15 +1,15 @@
+
 import { CapacitorConfig } from '@capacitor/cli';
 
 const config: CapacitorConfig = {
   appId: 'app.soulo.online',
   appName: 'Soulo',
   webDir: 'dist',
-
   // Remove server configuration for production - use bundled assets
   plugins: {
     GoogleAuth: {
       scopes: ['profile', 'email'],
-      serverClientId: '11083941790-oi1vrl8bmsjajc0h1ka4f9q0qjmm80o9.apps.googleusercontent.com', // This will be set via environment variables
+      serverClientId: '', // This will be set via environment variables
       forceCodeForRefreshToken: true,
     },
     SplashScreen: {

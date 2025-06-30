@@ -20,8 +20,7 @@ import TWAInitializationWrapper from './components/twa/TWAInitializationWrapper'
 import { detectTWAEnvironment } from './utils/twaDetection';
 import { useTWAAutoRefresh } from './hooks/useTWAAutoRefresh';
 import { twaUpdateService } from './services/twaUpdateService';
-import { nativeIntegrationService } from './services/nativeIntegrationService';
-import { nativeAuthService } from './services/nativeAuthService';
+import { nativeAppInitService } from './services/nativeAppInitService';
 import { mobileErrorHandler } from './services/mobileErrorHandler';
 import { mobileOptimizationService } from './services/mobileOptimizationService';
 
@@ -61,33 +60,26 @@ const App: React.FC = () => {
           });
         }
         
-        // Initialize native platform features
+        // Initialize native app using the new service
         try {
-          console.log('[App] Initializing native integration service...');
-          await nativeIntegrationService.initialize();
-          console.log('[App] Native integration initialized');
+          console.log('[App] Initializing native app service...');
+          const nativeInitSuccess = await nativeAppInitService.initialize();
           
-          // Only initialize native auth service if we're actually running natively
-          if (nativeIntegrationService.isRunningNatively()) {
-            console.log('[App] Running natively - initializing native auth service...');
-            try {
-              await nativeAuthService.initialize();
-              console.log('[App] Native auth service initialized successfully');
-            } catch (error) {
-              console.warn('[App] Native auth service initialization failed:', error);
-              mobileErrorHandler.handleError({
-                type: 'capacitor',
-                message: `Native auth service failed: ${error}`
-              });
-            }
+          if (nativeInitSuccess) {
+            console.log('[App] Native app initialization completed successfully');
+            
+            // Get initialization status for debugging
+            const initStatus = await nativeAppInitService.getInitializationStatus();
+            console.log('[App] Native app status:', initStatus);
+            
           } else {
-            console.log('[App] Running in browser - skipping native auth service initialization');
+            console.warn('[App] Native app initialization failed, continuing with web fallback');
           }
         } catch (error) {
-          console.warn('[App] Native integration failed:', error);
+          console.warn('[App] Native app initialization error:', error);
           mobileErrorHandler.handleError({
             type: 'capacitor',
-            message: `Native integration failed: ${error}`
+            message: `Native app init failed: ${error}`
           });
         }
         
@@ -180,11 +172,9 @@ const App: React.FC = () => {
       userAgent: navigator.userAgent,
       url: window.location.href,
       isTWA: twaEnv.isTWA || twaEnv.isStandalone,
-      isNative: nativeIntegrationService.isRunningNatively(),
-      platform: nativeIntegrationService.getPlatform(),
+      isNative: nativeAppInitService.isNativeAppInitialized(),
       emergencyRecovery,
-      autoRefreshCount: refreshCount,
-      deviceInfo: nativeIntegrationService.getDeviceInfo()
+      autoRefreshCount: refreshCount
     };
     
     console.error('Detailed error info:', errorData);
