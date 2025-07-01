@@ -12,7 +12,7 @@ const platform = args.find(arg => arg === 'android' || arg === 'ios');
 console.log(`Building Capacitor app for ${isDev ? 'development' : 'production'}...`);
 
 // Copy appropriate config
-const configSource = isDev ? 'capacitor.config.dev.ts' : 'capacitor.config.ts';
+const configSource = 'capacitor.config.ts';
 const configDest = 'capacitor.config.temp.ts';
 
 try {
