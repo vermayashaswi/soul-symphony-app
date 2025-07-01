@@ -168,17 +168,25 @@ class NativeAppInitService {
       // Configure status bar
       await nativeIntegrationService.showStatusBar();
 
-      // Hide splash screen after initialization
+      // Hide splash screen immediately after app initialization is complete
       const splashPlugin = nativeIntegrationService.getPlugin('SplashScreen');
       if (splashPlugin) {
-        setTimeout(async () => {
+        console.log('[NativeAppInit] Hiding splash screen...');
+        try {
+          await splashPlugin.hide();
+          console.log('[NativeAppInit] Splash screen hidden successfully');
+        } catch (error) {
+          console.warn('[NativeAppInit] Failed to hide splash screen:', error);
+          // Try alternative method
           try {
-            await splashPlugin.hide();
-            console.log('[NativeAppInit] Splash screen hidden');
-          } catch (error) {
-            console.warn('[NativeAppInit] Failed to hide splash screen:', error);
+            await splashPlugin.hide({ fadeOutDuration: 300 });
+            console.log('[NativeAppInit] Splash screen hidden with fadeOut');
+          } catch (fallbackError) {
+            console.error('[NativeAppInit] Splash screen hide fallback also failed:', fallbackError);
           }
-        }, 3000);
+        }
+      } else {
+        console.warn('[NativeAppInit] SplashScreen plugin not available');
       }
 
     } catch (error) {

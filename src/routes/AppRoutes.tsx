@@ -30,20 +30,27 @@ const AppRoutes = () => {
   const AppRootRedirect = () => {
     const isNative = nativeIntegrationService.isRunningNatively();
     
+    console.log('[AppRoutes] AppRootRedirect - isNative:', isNative, 'user:', !!user, 'onboardingComplete:', onboardingComplete);
+    
     // For native apps, always redirect to app routes
     if (isNative) {
+      console.log('[AppRoutes] Native environment detected, redirecting to app interface');
       if (!user) {
+        console.log('[AppRoutes] No user, redirecting to onboarding');
         return <Navigate to="/app/onboarding" replace />;
       }
       
       if (!onboardingComplete) {
+        console.log('[AppRoutes] Onboarding not complete, redirecting to onboarding');
         return <Navigate to="/app/onboarding" replace />;
       }
       
+      console.log('[AppRoutes] User authenticated and onboarded, redirecting to home');
       return <Navigate to="/app/home" replace />;
     }
     
     // Web behavior (existing logic)
+    console.log('[AppRoutes] Web environment, using standard flow');
     if (!user) {
       return <Navigate to="/app/onboarding" replace />;
     }
@@ -59,20 +66,27 @@ const AppRoutes = () => {
   const RootRedirect = () => {
     const isNative = nativeIntegrationService.isRunningNatively();
     
+    console.log('[AppRoutes] RootRedirect - isNative:', isNative, 'user:', !!user, 'onboardingComplete:', onboardingComplete);
+    
     // For native apps, always redirect to app interface
     if (isNative) {
+      console.log('[AppRoutes] Native environment detected at root, redirecting to app');
       if (!user) {
+        console.log('[AppRoutes] No user in native app, redirecting to onboarding');
         return <Navigate to="/app/onboarding" replace />;
       }
       
       if (!onboardingComplete) {
+        console.log('[AppRoutes] Onboarding not complete in native app, redirecting to onboarding');
         return <Navigate to="/app/onboarding" replace />;
       }
       
+      console.log('[AppRoutes] Native app user ready, redirecting to home');
       return <Navigate to="/app/home" replace />;
     }
     
     // Web behavior - show marketing site
+    console.log('[AppRoutes] Web environment, showing marketing site');
     return <Index />;
   };
   

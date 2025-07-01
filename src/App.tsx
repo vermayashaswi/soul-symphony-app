@@ -70,7 +70,12 @@ const App: React.FC = () => {
             
             // Get initialization status for debugging
             const initStatus = await nativeAppInitService.getInitializationStatus();
-            console.log('[App] Native app status:', initStatus);
+            console.log('[App] Native app initialization status:', initStatus);
+            
+            // If we're in a native environment, ensure proper routing
+            if (initStatus.nativeEnvironment) {
+              console.log('[App] Native environment confirmed - app will route to app interface');
+            }
             
           } else {
             console.warn('[App] Native app initialization failed, continuing with web fallback');
@@ -107,10 +112,14 @@ const App: React.FC = () => {
         }
 
         // Mark app as initialized after a brief delay to ensure smooth startup
-        const initDelay = (twaEnv.isTWA || twaEnv.isStandalone) ? 1500 : 500;
+        // Shorter delay for native apps to hide splash screen faster
+        const isNativeApp = nativeAppInitService.isNativeAppInitialized();
+        const initDelay = isNativeApp ? 200 : (twaEnv.isTWA || twaEnv.isStandalone) ? 1500 : 500;
+        
+        console.log('[App] Setting initialization delay:', initDelay, 'ms (native:', isNativeApp, ')');
         
         setTimeout(() => {
-          console.log('[App] App initialization completed');
+          console.log('[App] App initialization completed - setting isInitialized to true');
           setIsInitialized(true);
         }, initDelay);
 
