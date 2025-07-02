@@ -32,6 +32,18 @@ const AppRoutes = () => {
     
     console.log('[AppRoutes] AppRootRedirect - isNative:', isNative, 'user:', !!user, 'onboardingComplete:', onboardingComplete);
     
+    // Check for OAuth callback parameters in URL
+    const urlParams = new URLSearchParams(window.location.search);
+    const hashParams = new URLSearchParams(window.location.hash.replace('#', ''));
+    const hasOAuthParams = urlParams.has('access_token') || hashParams.has('access_token') || 
+                          urlParams.has('code') || hashParams.has('code');
+    
+    // If OAuth callback, redirect to auth page to handle the callback
+    if (hasOAuthParams) {
+      console.log('[AppRoutes] OAuth callback detected, redirecting to auth page');
+      return <Navigate to={`/app/auth${window.location.search}${window.location.hash}`} replace />;
+    }
+    
     // For native apps, always redirect to app routes
     if (isNative) {
       console.log('[AppRoutes] Native environment detected, redirecting to app interface');

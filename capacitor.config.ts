@@ -9,20 +9,20 @@ const config: CapacitorConfig = {
   plugins: {
     GoogleAuth: {
       scopes: ['profile', 'email'],
-      // Use environment variable or fallback to empty string to prevent crashes
-      serverClientId: process.env.GOOGLE_OAUTH_CLIENT_ID || '', 
+      // Use the correct Android OAuth Client ID for native authentication
+      serverClientId: '11083941790-h3s79i47p0u9vqjp4e8dbkj8g9ohf5np.apps.googleusercontent.com',
       forceCodeForRefreshToken: true,
     },
     SplashScreen: {
       launchAutoHide: false,
-      backgroundColor: "#FFFFFF",
-      showSpinner: false,
+      backgroundColor: "#8b5cf6",
+      showSpinner: true,
       androidSpinnerStyle: "large",
       iosSpinnerStyle: "small", 
-      spinnerColor: "#8b5cf6",
+      spinnerColor: "#FFFFFF",
       splashFullScreen: true,
       splashImmersive: true,
-      splashScreenDelay: 3000
+      splashScreenDelay: 2000
     },
     Keyboard: {
       resize: "body",
@@ -35,6 +35,7 @@ const config: CapacitorConfig = {
     },
     App: {
       // Remove launchUrl for production builds to prevent loading marketing site
+      urlScheme: "app.soulo.online"
     },
     PushNotifications: {
       presentationOptions: ["badge", "sound", "alert"]

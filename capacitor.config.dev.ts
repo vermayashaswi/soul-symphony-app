@@ -1,4 +1,3 @@
-
 import { CapacitorConfig } from '@capacitor/cli';
 
 const config: CapacitorConfig = {
@@ -17,19 +16,20 @@ const config: CapacitorConfig = {
   plugins: {
     GoogleAuth: {
       scopes: ['profile', 'email'],
-      serverClientId: '', // This will be set via environment variables
+      // Use the correct Android OAuth Client ID for development
+      serverClientId: '11083941790-h3s79i47p0u9vqjp4e8dbkj8g9ohf5np.apps.googleusercontent.com',
       forceCodeForRefreshToken: true,
     },
     SplashScreen: {
       launchAutoHide: false,
-      backgroundColor: "#FFFFFF",
-      showSpinner: false,
+      backgroundColor: "#8b5cf6",
+      showSpinner: true,
       androidSpinnerStyle: "large",
       iosSpinnerStyle: "small", 
-      spinnerColor: "#8b5cf6",
+      spinnerColor: "#FFFFFF",
       splashFullScreen: true,
       splashImmersive: true,
-      splashScreenDelay: 3000
+      splashScreenDelay: 2000
     },
     Keyboard: {
       resize: "body",
@@ -41,7 +41,8 @@ const config: CapacitorConfig = {
       backgroundColor: "#000000"
     },
     App: {
-      launchUrl: "https://soulo.online/app"
+      launchUrl: "https://soulo.online/app",
+      urlScheme: "app.soulo.online"
     },
     PushNotifications: {
       presentationOptions: ["badge", "sound", "alert"]

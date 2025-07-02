@@ -66,13 +66,12 @@ class NativeAuthService {
   }
 
   private getGoogleClientId(): string {
-    // Try to get from environment variables or configuration
-    // In production, this should be set via build process or environment
-    const clientId = process.env.GOOGLE_OAUTH_CLIENT_ID || 
-                    '11083941790-oi1vrl8bmsjajc0h1ka4f9q0qjmm80o9.apps.googleusercontent.com';
+    // Use the correct Android Client ID for native authentication
+    // This is the OAuth 2.0 client ID for Android applications from Google Cloud Console
+    const androidClientId = '11083941790-h3s79i47p0u9vqjp4e8dbkj8g9ohf5np.apps.googleusercontent.com';
     
-    console.log('[NativeAuth] Using Google Client ID:', clientId ? 'configured' : 'not configured');
-    return clientId;
+    console.log('[NativeAuth] Using Android Google Client ID for native auth');
+    return androidClientId;
   }
 
   async signInWithGoogle(): Promise<void> {
@@ -140,7 +139,14 @@ class NativeAuthService {
   }
 
   private async signInWithGoogleWeb(): Promise<void> {
-    const redirectUrl = `${window.location.origin}/app/auth`;
+    // For native apps, use custom URL scheme for OAuth redirect
+    const isNative = nativeIntegrationService.isRunningNatively();
+    const redirectUrl = isNative 
+      ? 'app.soulo.online://oauth/callback'
+      : `${window.location.origin}/app/auth`;
+
+    console.log('[NativeAuth] Using redirect URL:', redirectUrl);
+    
     const { data, error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: {
@@ -155,9 +161,20 @@ class NativeAuthService {
 
     if (data?.url) {
       console.log('[NativeAuth] Redirecting to OAuth URL:', data.url);
-      setTimeout(() => {
-        window.location.href = data.url;
-      }, 100);
+      if (isNative) {
+        // For native apps, open the OAuth URL in the system browser
+        const browserPlugin = nativeIntegrationService.getPlugin('Browser');
+        if (browserPlugin) {
+          await browserPlugin.open({ url: data.url });
+        } else {
+          // Fallback to window location
+          window.location.href = data.url;
+        }
+      } else {
+        setTimeout(() => {
+          window.location.href = data.url;
+        }, 100);
+      }
     }
   }
 
