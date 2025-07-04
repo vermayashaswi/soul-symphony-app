@@ -512,7 +512,7 @@ export class EnhancedSoulNetPreloadService {
     }
   }
 
-  // FIXED: Corrected week calculation
+  // FIXED: Corrected date calculations for proper time range filtering
   private static getStartDate(timeRange: string): Date {
     const now = new Date();
     console.log(`[EnhancedSoulNetPreloadService] DATE CALCULATION START: ${timeRange} at ${now.toISOString()}`);
@@ -535,9 +535,11 @@ export class EnhancedSoulNetPreloadService {
         return currentWeekStart;
         
       case 'month':
+        // FIXED: Show current month data, not previous month
         const monthStart = new Date(now);
-        monthStart.setMonth(monthStart.getMonth() - 1);
-        console.log(`[EnhancedSoulNetPreloadService] MONTH START: ${monthStart.toISOString()}`);
+        monthStart.setDate(1); // Set to first day of current month
+        monthStart.setHours(0, 0, 0, 0);
+        console.log(`[EnhancedSoulNetPreloadService] MONTH START (CURRENT MONTH): ${monthStart.toISOString()}`);
         return monthStart;
         
       case 'year':
