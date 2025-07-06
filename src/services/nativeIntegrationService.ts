@@ -169,10 +169,9 @@ class NativeIntegrationService {
           console.log('[NativeIntegration] App state changed:', state);
         });
 
-        // Listen for URL open events (OAuth callbacks)
+        // Listen for URL open events
         this.plugins.App.addListener('appUrlOpen', (event: any) => {
-          console.log('[NativeIntegration] App URL opened:', event.url);
-          this.handleOAuthCallback(event.url);
+          console.log('[NativeIntegration] App URL opened:', event);
         });
 
         console.log('[NativeIntegration] App plugin initialized');
@@ -217,11 +216,6 @@ class NativeIntegrationService {
     // Initialize SplashScreen plugin - DO NOT auto-hide here
     if (this.plugins.SplashScreen) {
       console.log('[NativeIntegration] SplashScreen plugin available - will be managed by nativeAppInitService');
-    }
-
-    // Initialize Browser plugin for OAuth flows
-    if (this.plugins.Browser) {
-      console.log('[NativeIntegration] Browser plugin available for OAuth redirects');
     }
 
     // Initialize Google Auth plugin
@@ -290,43 +284,6 @@ class NativeIntegrationService {
           mobileErrorHandler.handleCapacitorError('Unknown', errorMessage);
         }
       };
-    }
-  }
-
-  private handleOAuthCallback(url: string): void {
-    try {
-      console.log('[NativeIntegration] Handling OAuth callback URL:', url);
-      
-      // Check if this is a Supabase OAuth callback
-      if (url.includes('oauth/callback') || url.includes('access_token')) {
-        // Extract the hash fragment if present (OAuth parameters)
-        const urlObj = new URL(url);
-        const fragment = urlObj.hash || urlObj.search;
-        
-        if (fragment) {
-          // Redirect to the app auth page with the OAuth parameters
-          const newUrl = `/app/auth${fragment}`;
-          console.log('[NativeIntegration] Redirecting to:', newUrl);
-          
-          // Use setTimeout to ensure app is ready
-          setTimeout(() => {
-            window.location.href = newUrl;
-          }, 100);
-        } else {
-          // Fallback to app home if no parameters
-          window.location.href = '/app/home';
-        }
-      } else {
-        // Handle other deep links
-        console.log('[NativeIntegration] Handling general deep link:', url);
-        const urlObj = new URL(url);
-        const path = urlObj.pathname || '/app/home';
-        window.location.href = path;
-      }
-    } catch (error) {
-      console.error('[NativeIntegration] Error handling OAuth callback:', error);
-      // Fallback to app home
-      window.location.href = '/app/home';
     }
   }
 
