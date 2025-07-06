@@ -279,22 +279,20 @@ const App: React.FC = () => {
   return (
     <ErrorBoundary onError={handleAppError}>
       <FeatureFlagsProvider>
-        <TranslationProvider>
-          <SubscriptionProvider>
-            <TutorialProvider>
-              <TWAWrapper>
-                <TWAInitializationWrapper>
-                  <TranslationLoadingOverlay />
-                  <JournalProcessingInitializer />
-                  <AppRoutes key={isInitialized ? 'initialized' : 'initializing'} />
-                  <TutorialOverlay />
-                  <Toaster />
-                  <SonnerToaster position="top-right" />
-                </TWAInitializationWrapper>
-              </TWAWrapper>
-            </TutorialProvider>
-          </SubscriptionProvider>
-        </TranslationProvider>
+        <SubscriptionProvider>
+          <TutorialProvider>
+            <TWAWrapper>
+              <TWAInitializationWrapper>
+                <TranslationLoadingOverlay />
+                <JournalProcessingInitializer />
+                <AppRoutes key={isInitialized ? 'initialized' : 'initializing'} />
+                <TutorialOverlay />
+                <Toaster />
+                <SonnerToaster position="top-right" />
+              </TWAInitializationWrapper>
+            </TWAWrapper>
+          </TutorialProvider>
+        </SubscriptionProvider>
       </FeatureFlagsProvider>
     </ErrorBoundary>
   );
