@@ -20,7 +20,8 @@ import TWAInitializationWrapper from './components/twa/TWAInitializationWrapper'
 import { detectTWAEnvironment } from './utils/twaDetection';
 import { useTWAAutoRefresh } from './hooks/useTWAAutoRefresh';
 import { twaUpdateService } from './services/twaUpdateService';
-import { nativeAppInitService } from './services/nativeAppInitService';
+import { nativeIntegrationService } from './services/nativeIntegrationService';
+import { nativeAuthService } from './services/nativeAuthService';
 import { mobileErrorHandler } from './services/mobileErrorHandler';
 import { mobileOptimizationService } from './services/mobileOptimizationService';
 
@@ -60,31 +61,33 @@ const App: React.FC = () => {
           });
         }
         
-        // Initialize native app using the new service
+        // Initialize native platform features
         try {
-          console.log('[App] Initializing native app service...');
-          const nativeInitSuccess = await nativeAppInitService.initialize();
+          console.log('[App] Initializing native integration service...');
+          await nativeIntegrationService.initialize();
+          console.log('[App] Native integration initialized');
           
-          if (nativeInitSuccess) {
-            console.log('[App] Native app initialization completed successfully');
-            
-            // Get initialization status for debugging
-            const initStatus = await nativeAppInitService.getInitializationStatus();
-            console.log('[App] Native app initialization status:', initStatus);
-            
-            // If we're in a native environment, ensure proper routing
-            if (initStatus.nativeEnvironment) {
-              console.log('[App] Native environment confirmed - app will route to app interface');
+          // Only initialize native auth service if we're actually running natively
+          if (nativeIntegrationService.isRunningNatively()) {
+            console.log('[App] Running natively - initializing native auth service...');
+            try {
+              await nativeAuthService.initialize();
+              console.log('[App] Native auth service initialized successfully');
+            } catch (error) {
+              console.warn('[App] Native auth service initialization failed:', error);
+              mobileErrorHandler.handleError({
+                type: 'capacitor',
+                message: `Native auth service failed: ${error}`
+              });
             }
-            
           } else {
-            console.warn('[App] Native app initialization failed, continuing with web fallback');
+            console.log('[App] Running in browser - skipping native auth service initialization');
           }
         } catch (error) {
-          console.warn('[App] Native app initialization error:', error);
+          console.warn('[App] Native integration failed:', error);
           mobileErrorHandler.handleError({
             type: 'capacitor',
-            message: `Native app init failed: ${error}`
+            message: `Native integration failed: ${error}`
           });
         }
         
@@ -112,14 +115,10 @@ const App: React.FC = () => {
         }
 
         // Mark app as initialized after a brief delay to ensure smooth startup
-        // Shorter delay for native apps to hide splash screen faster
-        const isNativeApp = nativeAppInitService.isNativeAppInitialized();
-        const initDelay = isNativeApp ? 200 : (twaEnv.isTWA || twaEnv.isStandalone) ? 1500 : 500;
-        
-        console.log('[App] Setting initialization delay:', initDelay, 'ms (native:', isNativeApp, ')');
+        const initDelay = (twaEnv.isTWA || twaEnv.isStandalone) ? 1500 : 500;
         
         setTimeout(() => {
-          console.log('[App] App initialization completed - setting isInitialized to true');
+          console.log('[App] App initialization completed');
           setIsInitialized(true);
         }, initDelay);
 
@@ -181,9 +180,11 @@ const App: React.FC = () => {
       userAgent: navigator.userAgent,
       url: window.location.href,
       isTWA: twaEnv.isTWA || twaEnv.isStandalone,
-      isNative: nativeAppInitService.isNativeAppInitialized(),
+      isNative: nativeIntegrationService.isRunningNatively(),
+      platform: nativeIntegrationService.getPlatform(),
       emergencyRecovery,
-      autoRefreshCount: refreshCount
+      autoRefreshCount: refreshCount,
+      deviceInfo: nativeIntegrationService.getDeviceInfo()
     };
     
     console.error('Detailed error info:', errorData);

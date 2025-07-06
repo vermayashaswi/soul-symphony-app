@@ -8,7 +8,6 @@ class NativeAuthService {
   private static instance: NativeAuthService;
   private isInitialized = false;
   private initializationError: string | null = null;
-  private hasValidClientId = false;
 
   static getInstance(): NativeAuthService {
     if (!NativeAuthService.instance) {
@@ -38,23 +37,12 @@ class NativeAuthService {
         return;
       }
 
-      // Check if we have a valid client ID
-      const clientId = this.getGoogleClientId();
-      if (!clientId || clientId.trim() === '') {
-        console.warn('[NativeAuth] No valid Google Client ID configured');
-        this.initializationError = 'Google Client ID not configured';
-        this.hasValidClientId = false;
-        this.isInitialized = true;
-        return;
-      }
-
-      console.log('[NativeAuth] Initializing GoogleAuth plugin with client ID');
+      console.log('[NativeAuth] Initializing GoogleAuth plugin');
       await GoogleAuth.initialize({
-        clientId: clientId,
+        clientId: '', // This should be set via environment variables
         scopes: ['profile', 'email'],
       });
 
-      this.hasValidClientId = true;
       this.isInitialized = true;
       console.log('[NativeAuth] Native auth service initialized successfully');
     } catch (error) {
@@ -63,16 +51,6 @@ class NativeAuthService {
       this.isInitialized = true; // Mark as initialized even on error to prevent retry loops
       // Don't throw error, just log it - fallback to web auth
     }
-  }
-
-  private getGoogleClientId(): string {
-    // Try to get from environment variables or configuration
-    // In production, this should be set via build process or environment
-    const clientId = process.env.GOOGLE_OAUTH_CLIENT_ID || 
-                    '11083941790-oi1vrl8bmsjajc0h1ka4f9q0qjmm80o9.apps.googleusercontent.com';
-    
-    console.log('[NativeAuth] Using Google Client ID:', clientId ? 'configured' : 'not configured');
-    return clientId;
   }
 
   async signInWithGoogle(): Promise<void> {
@@ -85,10 +63,6 @@ class NativeAuthService {
         
         if (this.initializationError) {
           throw new Error(`Native auth not available: ${this.initializationError}`);
-        }
-
-        if (!this.hasValidClientId) {
-          throw new Error('Google Client ID not configured for native auth');
         }
         
         const result = await GoogleAuth.signIn();
@@ -199,7 +173,7 @@ class NativeAuthService {
       console.log('[NativeAuth] Starting sign out');
       
       // Only try native sign out if we're running natively and GoogleAuth is available
-      if (this.shouldUseNativeAuth() && !this.initializationError && this.hasValidClientId) {
+      if (this.shouldUseNativeAuth() && !this.initializationError) {
         try {
           await GoogleAuth.signOut();
           console.log('[NativeAuth] Signed out from Google natively');
@@ -228,16 +202,13 @@ class NativeAuthService {
   private shouldUseNativeAuth(): boolean {
     return nativeIntegrationService.isRunningNatively() && 
            nativeIntegrationService.isGoogleAuthAvailable() && 
-           this.isInitialized &&
-           this.hasValidClientId;
+           this.isInitialized;
   }
 
   private handleAuthError(error: any, provider: string = 'Google'): void {
     let errorMessage = `${provider} sign-in failed`;
     
-    if (error.message?.includes('Client ID not configured')) {
-      errorMessage = `${provider} sign-in is not configured properly. Using web authentication instead.`;
-    } else if (error.message?.includes('redirect_uri_mismatch')) {
+    if (error.message?.includes('redirect_uri_mismatch')) {
       errorMessage = `${provider} sign-in configuration error. Please check your redirect URLs.`;
     } else if (error.message?.includes('popup_closed_by_user')) {
       errorMessage = 'Sign-in was cancelled';
@@ -249,10 +220,7 @@ class NativeAuthService {
       errorMessage = `${provider} sign-in failed: ${error.message}`;
     }
     
-    // Only show error toast for actual failures, not configuration issues
-    if (!error.message?.includes('Client ID not configured')) {
-      toast.error(errorMessage);
-    }
+    toast.error(errorMessage);
   }
 
   isRunningNatively(): boolean {
@@ -261,10 +229,6 @@ class NativeAuthService {
 
   getInitializationError(): string | null {
     return this.initializationError;
-  }
-
-  hasValidConfiguration(): boolean {
-    return this.hasValidClientId;
   }
 }
 

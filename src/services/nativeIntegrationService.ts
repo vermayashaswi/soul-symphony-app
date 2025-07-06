@@ -69,68 +69,34 @@ class NativeIntegrationService {
 
   private async detectNativeEnvironment(): Promise<void> {
     try {
-      console.log('[NativeIntegration] Starting native environment detection...');
-      
       const { Capacitor } = (window as any);
       
       if (Capacitor) {
         // Check if we're running on a native platform
         const platform = Capacitor.getPlatform();
-        console.log('[NativeIntegration] Capacitor platform detected:', platform);
+        console.log('[NativeIntegration] Capacitor platform:', platform);
         
         // Only consider it native if platform is 'ios' or 'android'
         // 'web' means we're in a browser with Capacitor loaded but not native
         this.isActuallyNative = platform === 'ios' || platform === 'android';
         
-        console.log('[NativeIntegration] Platform-based native detection:', this.isActuallyNative);
+        console.log('[NativeIntegration] Actually native environment:', this.isActuallyNative);
         
-        // Additional robust checks for native environment
+        // Additional checks for native environment
         if (this.isActuallyNative) {
-          console.log('[NativeIntegration] Running additional native environment checks...');
-          
-          // Check 1: Verify we can access native plugins
+          // Verify we can access native plugins
           try {
             if (Capacitor.Plugins?.Device) {
               const deviceInfo = await Capacitor.Plugins.Device.getInfo();
-              console.log('[NativeIntegration] Device plugin test successful:', {
-                platform: deviceInfo.platform,
-                model: deviceInfo.model
-              });
+              console.log('[NativeIntegration] Native device info available:', !!deviceInfo);
             }
-            
-            // Check 2: Verify we're not in a web context
-            if (Capacitor.Plugins?.App) {
-              console.log('[NativeIntegration] App plugin available - confirming native context');
-            }
-            
-            // Check 3: Additional native context verification
-            const isWebView = window.location.protocol.includes('http') && 
-                             window.location.hostname !== 'localhost' && 
-                             !window.location.hostname.includes('capacitor');
-            
-            if (isWebView) {
-              console.warn('[NativeIntegration] Detected web view context, may not be truly native');
-            }
-            
           } catch (error) {
-            console.warn('[NativeIntegration] Failed to access native APIs:', error);
+            console.warn('[NativeIntegration] Failed to access native device info:', error);
             // If we can't access native APIs, we're probably not truly native
             this.isActuallyNative = false;
           }
         }
-        
-        // Force native detection for APK builds (additional safety check)
-        if (!this.isActuallyNative && (platform === 'ios' || platform === 'android')) {
-          console.log('[NativeIntegration] Force enabling native mode for mobile platform');
-          this.isActuallyNative = true;
-        }
-        
-      } else {
-        console.log('[NativeIntegration] Capacitor not detected - web environment');
-        this.isActuallyNative = false;
       }
-      
-      console.log('[NativeIntegration] Final native environment status:', this.isActuallyNative);
     } catch (error) {
       console.error('[NativeIntegration] Error detecting native environment:', error);
       this.isActuallyNative = false;
@@ -213,9 +179,18 @@ class NativeIntegrationService {
       }
     }
 
-    // Initialize SplashScreen plugin - DO NOT auto-hide here
+    // Initialize SplashScreen plugin
     if (this.plugins.SplashScreen) {
-      console.log('[NativeIntegration] SplashScreen plugin available - will be managed by nativeAppInitService');
+      try {
+        // Hide splash screen after a delay to show the Soulo logo
+        setTimeout(async () => {
+          await this.plugins.SplashScreen.hide();
+          console.log('[NativeIntegration] Splash screen hidden');
+        }, 3000);
+      } catch (error) {
+        console.error('[NativeIntegration] SplashScreen plugin error:', error);
+        mobileErrorHandler.handleCapacitorError('SplashScreen', error.toString());
+      }
     }
 
     // Initialize Google Auth plugin
