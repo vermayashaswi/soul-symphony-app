@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useTranslation } from '@/contexts/TranslationContext';
+import { useNoTranslation } from '@/contexts/NoTranslationContext';
 import { useLocation } from 'react-router-dom';
 import { isWebsiteRoute } from '@/routes/RouteHelpers';
 import { useLanguageFontConfig } from '@/utils/languageFontScaling';
@@ -35,6 +36,7 @@ export function TranslatableText({
   const [translatedText, setTranslatedText] = useState<string>(text);
   const [isLoading, setIsLoading] = useState(false);
   const { translate, currentLanguage, getCachedTranslation } = useTranslation();
+  const { translationsDisabled } = useNoTranslation();
   const location = useLocation();
   const prevLangRef = useRef<string>(currentLanguage);
   const initialLoadDoneRef = useRef<boolean>(false);
@@ -57,6 +59,13 @@ export function TranslatableText({
   const translateText = async () => {
     if (!text?.trim()) {
       setTranslatedText('');
+      return;
+    }
+
+    // Skip translation if translations are disabled
+    if (translationsDisabled) {
+      setTranslatedText(text);
+      setIsLoading(false);
       return;
     }
 
@@ -185,7 +194,7 @@ export function TranslatableText({
     return () => {
       mountedRef.current = false;
     };
-  }, [text, currentLanguage, sourceLanguage, entryId, forceTranslate]);
+  }, [text, currentLanguage, sourceLanguage, entryId, forceTranslate, translationsDisabled]);
   
   useEffect(() => {
     const handleLanguageChange = (event: CustomEvent) => {
@@ -218,7 +227,7 @@ export function TranslatableText({
     return () => {
       window.removeEventListener('languageChange', handleLanguageChange as EventListener);
     };
-  }, [text, sourceLanguage, entryId, currentLanguage, forceTranslate]);
+  }, [text, sourceLanguage, entryId, currentLanguage, forceTranslate, translationsDisabled]);
 
   // Generate language-aware styling
   const languageAwareClassName = enableFontScaling

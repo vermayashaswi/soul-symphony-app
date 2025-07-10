@@ -9,6 +9,7 @@ import PricingSection from '@/components/website/sections/PricingSection';
 import TestimonialsSection from '@/components/website/sections/TestimonialsSection';
 import CTASection from '@/components/website/sections/CTASection';
 import { forceEnableScrolling } from '@/hooks/use-scroll-restoration';
+import { NoTranslationWrapper } from '@/contexts/NoTranslationContext';
 
 const HomePage = () => {
   // Force enable scrolling for website pages
@@ -57,46 +58,48 @@ const HomePage = () => {
   console.log('HomePage: Rendering the website home page at route "/"');
 
   return (
-    <div className="min-h-screen bg-white overflow-x-hidden">
-      <Navbar />
-      
-      {/* Hero Section */}
-      <HeroSection 
-        openAppStore={openAppStore}
-        openPlayStore={openPlayStore}
-      />
-      
-      {/* Features Section */}
-      <section id="features">
-        <FeaturesSection />
-      </section>
-      
-      {/* How It Works Section */}
-      <section id="how-it-works">
-        <HowItWorksSection />
-      </section>
-      
-      {/* Pricing Section */}
-      <section id="pricing">
-        <PricingSection 
+    <NoTranslationWrapper>
+      <div className="min-h-screen bg-white overflow-x-hidden">
+        <Navbar />
+        
+        {/* Hero Section */}
+        <HeroSection 
           openAppStore={openAppStore}
           openPlayStore={openPlayStore}
         />
-      </section>
-      
-      {/* Testimonials Section */}
-      <TestimonialsSection />
-      
-      {/* Call to Action Section */}
-      <section id="download">
-        <CTASection 
-          openAppStore={openAppStore}
-          openPlayStore={openPlayStore}
-        />
-      </section>
-      
-      <Footer />
-    </div>
+        
+        {/* Features Section */}
+        <section id="features">
+          <FeaturesSection />
+        </section>
+        
+        {/* How It Works Section */}
+        <section id="how-it-works">
+          <HowItWorksSection />
+        </section>
+        
+        {/* Pricing Section */}
+        <section id="pricing">
+          <PricingSection 
+            openAppStore={openAppStore}
+            openPlayStore={openPlayStore}
+          />
+        </section>
+        
+        {/* Testimonials Section */}
+        <TestimonialsSection />
+        
+        {/* Call to Action Section */}
+        <section id="download">
+          <CTASection 
+            openAppStore={openAppStore}
+            openPlayStore={openPlayStore}
+          />
+        </section>
+        
+        <Footer />
+      </div>
+    </NoTranslationWrapper>
   );
 };
 
