@@ -10,7 +10,7 @@ interface TranslationContextType {
   currentLanguage: string;
   setCurrentLanguage: (language: string) => void;
   setLanguage: (language: string) => void; // Alias for backwards compatibility
-  translate: (text: string, sourceLanguage?: string, entryId?: number) => Promise<string | null>;
+  translate: (text: string, sourceLanguage?: string, entryId?: number, forceTranslate?: boolean) => Promise<string | null>;
   isTranslating: boolean;
   clearCache: () => void;
   getCachedTranslation: (text: string) => string | null;
@@ -18,6 +18,7 @@ interface TranslationContextType {
   prefetchTranslationsForRoute?: (route: string) => Promise<void>;
   prefetchSoulNetTranslations: (userId: string, timeRange: string) => Promise<void>;
   isSoulNetTranslating: boolean;
+  setTestLanguageForDevelopment?: (language: string | null) => void; // For development testing
 }
 
 const TranslationContext = createContext<TranslationContextType | undefined>(undefined);
@@ -31,6 +32,16 @@ export const TranslationProvider: React.FC<TranslationProviderProps> = ({ childr
   const [isTranslating, setIsTranslating] = useState<boolean>(false);
   const [isSoulNetTranslating, setIsSoulNetTranslating] = useState<boolean>(false);
   const [translationCache, setTranslationCache] = useState<Record<string, string>>({});
+  
+  // Development mode for testing translations
+  const isDevelopmentMode = process.env.NODE_ENV === 'development';
+  
+  // Add a way to temporarily override language for testing
+  const [testLanguageOverride, setTestLanguageOverride] = useState<string | null>(() => {
+    return isDevelopmentMode ? localStorage.getItem('testLanguageOverride') : null;
+  });
+  
+  const effectiveLanguage = testLanguageOverride || currentLanguage;
 
   // APP-LEVEL: Set up translation service integration on context initialization
   useEffect(() => {
@@ -128,25 +139,32 @@ export const TranslationProvider: React.FC<TranslationProviderProps> = ({ childr
     }
   }, []);
 
-  const translate = useCallback(async (text: string, sourceLanguage: string = 'en', entryId?: number): Promise<string | null> => {
+  const translate = useCallback(async (text: string, sourceLanguage: string = 'en', entryId?: number, forceTranslate: boolean = false): Promise<string | null> => {
     if (!text || typeof text !== 'string') {
       console.warn('[TranslationContext] Invalid text provided for translation:', text);
       return text || '';
     }
 
-    if (currentLanguage === sourceLanguage) {
-      console.log('[TranslationContext] Text already in target language, skipping translation:', { text, currentLanguage });
+    // Skip translation only if languages match AND forceTranslate is false
+    if (effectiveLanguage === sourceLanguage && !forceTranslate) {
+      console.log('[TranslationContext] Text already in target language, skipping translation:', { text, currentLanguage: effectiveLanguage, forceTranslate });
       return text;
+    }
+
+    // Add development mode override for testing
+    if (forceTranslate && effectiveLanguage === sourceLanguage) {
+      console.log('[TranslationContext] ForceTranslate enabled, proceeding with translation for testing:', { text, currentLanguage: effectiveLanguage });
     }
 
     console.log('[TranslationContext] SUPABASE EDGE FUNCTION - Attempting to translate:', { 
       text: text.substring(0, 30) + (text.length > 30 ? '...' : ''), 
       from: sourceLanguage, 
-      to: currentLanguage,
-      entryId
+      to: effectiveLanguage,
+      entryId,
+      forceTranslate
     });
 
-    const cacheKey = `${text}_${sourceLanguage}_${currentLanguage}`;
+    const cacheKey = `${text}_${sourceLanguage}_${effectiveLanguage}`;
     
     // Check local cache first
     if (translationCache[cacheKey]) {
@@ -155,7 +173,7 @@ export const TranslationProvider: React.FC<TranslationProviderProps> = ({ childr
     }
 
     // Check on-demand cache
-    const cachedTranslation = onDemandTranslationCache.get(currentLanguage, text);
+    const cachedTranslation = onDemandTranslationCache.get(effectiveLanguage, text);
     if (cachedTranslation) {
       console.log('[TranslationContext] Using on-demand cache for:', text.substring(0, 30));
       setTranslationCache(prev => ({ ...prev, [cacheKey]: cachedTranslation }));
@@ -172,9 +190,10 @@ export const TranslationProvider: React.FC<TranslationProviderProps> = ({ childr
         body: {
           text,
           sourceLanguage: sourceLanguage === 'auto' ? 'en' : sourceLanguage,
-          targetLanguage: currentLanguage,
+          targetLanguage: effectiveLanguage,
           entryId,
-          cleanResult: true
+          cleanResult: true,
+          forceTranslate
         }
       });
 
@@ -192,7 +211,7 @@ export const TranslationProvider: React.FC<TranslationProviderProps> = ({ childr
         
         // Cache both locally and in on-demand cache
         setTranslationCache(prev => ({ ...prev, [cacheKey]: translatedText }));
-        onDemandTranslationCache.set(currentLanguage, text, translatedText);
+        onDemandTranslationCache.set(effectiveLanguage, text, translatedText);
         
         return translatedText;
       }
@@ -205,16 +224,29 @@ export const TranslationProvider: React.FC<TranslationProviderProps> = ({ childr
     } finally {
       setIsTranslating(false);
     }
-  }, [currentLanguage, translationCache]);
+  }, [effectiveLanguage, translationCache]);
 
   const getCachedTranslation = useCallback((text: string): string | null => {
-    const cacheKey = `${text}_en_${currentLanguage}`;
+    const cacheKey = `${text}_en_${effectiveLanguage}`;
     const localCache = translationCache[cacheKey];
-    const onDemandCache = onDemandTranslationCache.get(currentLanguage, text);
+    const onDemandCache = onDemandTranslationCache.get(effectiveLanguage, text);
     console.log('[TranslationContext] Checking cache for:', text.substring(0, 30), 
-      { localCache: !!localCache, onDemandCache: !!onDemandCache });
+      { localCache: !!localCache, onDemandCache: !!onDemandCache, effectiveLanguage });
     return localCache || onDemandCache || null;
-  }, [currentLanguage, translationCache]);
+  }, [effectiveLanguage, translationCache]);
+  
+  // Development helper for testing translations
+  const setTestLanguageForDevelopment = useCallback((language: string | null) => {
+    if (isDevelopmentMode) {
+      setTestLanguageOverride(language);
+      if (language) {
+        localStorage.setItem('testLanguageOverride', language);
+      } else {
+        localStorage.removeItem('testLanguageOverride');
+      }
+      console.log('[TranslationContext] Development mode: Set test language override to:', language);
+    }
+  }, [isDevelopmentMode]);
 
   const prefetchTranslationsForRoute = useCallback(async (route: string): Promise<void> => {
     console.log(`[TranslationContext] Prefetching translations for route: ${route}`);
@@ -258,7 +290,7 @@ export const TranslationProvider: React.FC<TranslationProviderProps> = ({ childr
   }, [currentLanguage]);
 
   const value: TranslationContextType = {
-    currentLanguage,
+    currentLanguage: effectiveLanguage, // Use effectiveLanguage to include test override
     setCurrentLanguage: handleLanguageChange,
     setLanguage: handleLanguageChange, // Alias for backwards compatibility
     translate,
@@ -274,7 +306,8 @@ export const TranslationProvider: React.FC<TranslationProviderProps> = ({ childr
     translationProgress: isTranslating ? 50 : 100,
     prefetchTranslationsForRoute,
     prefetchSoulNetTranslations,
-    isSoulNetTranslating
+    isSoulNetTranslating,
+    setTestLanguageForDevelopment
   };
 
   return (
@@ -291,3 +324,19 @@ export const useTranslation = (): TranslationContextType => {
   }
   return context;
 };
+
+// Development helper - expose to global scope for testing
+if (process.env.NODE_ENV === 'development') {
+  (window as any).testTranslation = {
+    setLanguage: (language: string | null) => {
+      console.log('[Development] Setting test language override to:', language);
+      const event = new CustomEvent('devTestLanguageChange', { detail: { language } });
+      window.dispatchEvent(event);
+    },
+    enableForceTranslate: () => {
+      console.log('[Development] To test translations, use the browser console:');
+      console.log('testTranslation.setLanguage("es") // Set test language to Spanish');
+      console.log('testTranslation.setLanguage(null) // Remove override');
+    }
+  };
+}
