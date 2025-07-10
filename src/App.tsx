@@ -38,7 +38,7 @@ const App: React.FC = () => {
         // Clean up any malformed paths
         const currentPath = window.location.pathname;
         
-        // Fix incorrectly formatted URLs that have domains or https in the path
+        // Fix incorrectly formatted URLs that have domains or external references in the path
         if (currentPath.includes('https://') || currentPath.includes('soulo.online')) {
           window.history.replaceState(null, '', '/');
         }

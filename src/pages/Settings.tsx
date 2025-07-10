@@ -953,7 +953,7 @@ function SettingsContent() {
                     <TranslatableText text="Welcome to SOuLO ('we,' 'our,' or 'us'). We are committed to protecting your privacy and handling your data with transparency and care. This Privacy Policy explains how we collect, use, disclose, and safeguard your information when you use our journaling application." />
                   </p>
                   <p className="text-sm text-muted-foreground">
-                    <TranslatableText text="This Privacy Policy is available at" /> <a href="https://soulo.online/privacy-policy" className="text-blue-500 hover:underline" target="_blank" rel="noopener noreferrer">https://soulo.online/privacy-policy</a>
+                    <TranslatableText text="This Privacy Policy is available in the app settings" />
                   </p>
                 </div>
                 

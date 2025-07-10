@@ -53,13 +53,13 @@ const NotFound = ({ isAppSubdomain }: NotFoundProps = {}) => {
           
           {isAppPath && (
             <div className="mt-4 text-sm text-muted-foreground">
-              <p>Looking for the main website? Visit <Link to="/" className="text-primary hover:underline">soulo.online</Link></p>
+              <p>Looking for the home page? Visit <Link to="/" className="text-primary hover:underline">Home</Link></p>
             </div>
           )}
           
           {!isAppPath && (
             <div className="mt-4 text-sm text-muted-foreground">
-              <p>Looking for the app? Visit <Link to="/app" className="text-primary hover:underline">soulo.online/app</Link></p>
+              <p>Looking for the app? Visit <Link to="/app" className="text-primary hover:underline">App</Link></p>
             </div>
           )}
         </div>

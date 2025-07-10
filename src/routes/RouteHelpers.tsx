@@ -47,8 +47,8 @@ export const getBaseUrl = (): string => {
     return window.location.origin;
   }
   
-  // For production, always use main domain
-  return 'https://soulo.online';
+  // For production native app, use relative path
+  return window.location.origin;
 };
 
 export const WebsiteRouteWrapper = ({ element }: { element: React.ReactNode }) => {
@@ -111,7 +111,7 @@ export const AppRouteWrapper = ({
 };
 
 export const RedirectRoute = ({ to }: { to: string }) => {
-  // Handle absolute URLs (like https://soulo.online)
+  // Handle absolute URLs - redirect to app routes in native context
   if (to.startsWith('http')) {
     // For external redirects, use a useEffect to navigate
     useEffect(() => {

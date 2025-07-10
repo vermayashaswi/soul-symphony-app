@@ -48,7 +48,7 @@ const HeroSection: React.FC<HeroSectionProps> = ({ openAppStore, openPlayStore }
             <h1 className="text-2xl md:text-3xl lg:text-4xl xl:text-5xl font-bold mb-2 md:mb-3 text-primary leading-tight relative">
               <div className="flex items-center justify-center lg:justify-start gap-3 mb-2">
                 <motion.img
-                  src="https://soulo.online/lovable-uploads/soulo-icon.png?v=2"
+                  src="/lovable-uploads/soulo-icon.png"
                   alt="Soulo Icon"
                   className="w-40 h-40 md:w-50 md:h-50 lg:w-60 lg:h-60 object-contain drop-shadow-lg"
                   initial={{ opacity: 0, scale: 0.8, y: 10 }}
