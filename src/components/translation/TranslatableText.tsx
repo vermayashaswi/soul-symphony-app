@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { useTranslation } from '@/contexts/TranslationContext';
 import { useLocation } from 'react-router-dom';
@@ -61,24 +60,33 @@ export function TranslatableText({
       return;
     }
 
+    // Log detailed state for debugging
+    console.log('🔤 TranslatableText: TRANSLATION ATTEMPT:', {
+      text: text.substring(0, 50) + (text.length > 50 ? '...' : ''),
+      currentLanguage,
+      sourceLanguage,
+      forceTranslate,
+      isOnWebsite,
+      pathname,
+      attemptNumber: translationAttemptRef.current + 1
+    });
+
     // Skip translation only if languages match AND forceTranslate is false
     if (currentLanguage === sourceLanguage && !forceTranslate) {
-      console.log(`TranslatableText: Text already in ${currentLanguage}, skipping translation (forceTranslate: ${forceTranslate})`);
+      console.log(`🔤 TranslatableText: ⏭️ SKIPPING - Same language (${currentLanguage}), forceTranslate: ${forceTranslate}`);
       setTranslatedText(text);
       return;
     }
 
-    // Add development mode override for testing
+    // Development mode override for testing
     if (forceTranslate && currentLanguage === sourceLanguage) {
-      console.log(`TranslatableText: ForceTranslate enabled, proceeding with translation for testing: "${text.substring(0, 30)}"`);
+      console.log(`🔤 TranslatableText: 🧪 FORCE TRANSLATE enabled for "${text.substring(0, 30)}"`);
     }
-
-    console.log(`TranslatableText: Translation check for "${text.substring(0, 30)}" - forceTranslate: ${forceTranslate}, isOnWebsite: ${isOnWebsite}, currentLanguage: ${currentLanguage}`);
 
     // Check cache first
     const cachedResult = getCachedTranslation(text);
     if (cachedResult) {
-      console.log(`TranslatableText: Using cached translation for "${text.substring(0, 30)}": "${cachedResult.substring(0, 30)}"`);
+      console.log(`🔤 TranslatableText: 💾 Using cached translation for "${text.substring(0, 30)}": "${cachedResult.substring(0, 30)}"`);
       setTranslatedText(cachedResult);
       return;
     }
@@ -87,7 +95,7 @@ export function TranslatableText({
     translationAttemptRef.current += 1;
     const attemptNumber = translationAttemptRef.current;
     
-    console.log(`TranslatableText: Starting translation attempt #${attemptNumber} for "${text.substring(0, 30)}" to ${currentLanguage}`);
+    console.log(`🔤 TranslatableText: 🚀 Starting translation attempt #${attemptNumber} for "${text.substring(0, 30)}" to ${currentLanguage}`);
     
     if (!isLoading) {
       setIsLoading(true);
@@ -97,23 +105,53 @@ export function TranslatableText({
     }
       
     try {
-      console.log(`TranslatableText: Calling translate service for "${text.substring(0, 30)}..." to ${currentLanguage} (forceTranslate: ${forceTranslate})`);
+      console.log(`🔤 TranslatableText: 📤 CALLING TRANSLATE SERVICE:`, {
+        text: text.substring(0, 50),
+        sourceLanguage,
+        targetLanguage: currentLanguage,
+        forceTranslate,
+        attemptNumber
+      });
+      
       const result = await translate(text, sourceLanguage, entryId, forceTranslate);
       
-      console.log(`TranslatableText: Translation service returned for "${text.substring(0, 30)}...": "${result?.substring(0, 30) || 'null'}..."`);
+      console.log(`🔤 TranslatableText: 📥 TRANSLATE SERVICE RESPONSE:`, {
+        originalText: text.substring(0, 30),
+        translatedText: result?.substring(0, 30) || 'null',
+        isChanged: result !== text,
+        attemptNumber
+      });
       
       if (mountedRef.current && prevLangRef.current === currentLanguage && textRef.current === text) {
         if (result) {
           const cleanedResult = cleanTranslationResult(result);
-          console.log(`TranslatableText: Setting translated text for "${text.substring(0, 30)}...": "${cleanedResult.substring(0, 30)}..."`);
+          console.log(`🔤 TranslatableText: ✅ SETTING TRANSLATED TEXT:`, {
+            original: text.substring(0, 30),
+            cleaned: cleanedResult.substring(0, 30),
+            attemptNumber
+          });
           setTranslatedText(cleanedResult || text);
         } else {
-          console.log(`TranslatableText: Empty translation result for "${text.substring(0, 30)}...", using original`);
+          console.log(`🔤 TranslatableText: ⚠️ EMPTY RESULT, using original:`, {
+            text: text.substring(0, 30),
+            attemptNumber
+          });
           setTranslatedText(text);
         }
+      } else {
+        console.log(`🔤 TranslatableText: 🚫 COMPONENT STATE CHANGED, ignoring result:`, {
+          mounted: mountedRef.current,
+          langMatch: prevLangRef.current === currentLanguage,
+          textMatch: textRef.current === text,
+          attemptNumber
+        });
       }
     } catch (error) {
-      console.error(`TranslatableText: Translation error for "${text.substring(0, 30)}..."`, error);
+      console.error(`🔤 TranslatableText: ❌ TRANSLATION ERROR:`, {
+        text: text.substring(0, 30),
+        error,
+        attemptNumber
+      });
       if (mountedRef.current && prevLangRef.current === currentLanguage && textRef.current === text) {
         setTranslatedText(text);
       }
@@ -150,12 +188,29 @@ export function TranslatableText({
   }, [text, currentLanguage, sourceLanguage, entryId, forceTranslate]);
   
   useEffect(() => {
-    const handleLanguageChange = () => {
-      console.log(`TranslatableText: Language change event detected - new language: ${currentLanguage}`);
-      prevLangRef.current = currentLanguage;
+    const handleLanguageChange = (event: CustomEvent) => {
+      const { language: newLanguage, timestamp } = event.detail || {};
+      console.log(`🔤 TranslatableText: 📢 LANGUAGE CHANGE EVENT:`, {
+        text: text.substring(0, 30),
+        oldLang: currentLanguage,
+        newLang: newLanguage,
+        eventTimestamp: timestamp,
+        currentTimestamp: Date.now()
+      });
+      
+      // Update refs immediately
+      prevLangRef.current = newLanguage || currentLanguage;
       textRef.current = text;
       translationAttemptRef.current = 0; // Reset attempt counter
-      translateText();
+      
+      // Trigger translation with small delay to ensure state propagation
+      setTimeout(() => {
+        console.log(`🔤 TranslatableText: 🔄 RETRANSLATING after language change:`, {
+          text: text.substring(0, 30),
+          newLang: newLanguage || currentLanguage
+        });
+        translateText();
+      }, 10);
     };
     
     window.addEventListener('languageChange', handleLanguageChange as EventListener);

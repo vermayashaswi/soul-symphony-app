@@ -74,16 +74,25 @@ const LanguageSelector = () => {
   const [isOpen, setIsOpen] = useState(false);
 
   const handleLanguageChange = async (languageCode: string) => {
-    debug.info('Language change requested:', languageCode);
+    console.log('🌍 LanguageSelector: LANGUAGE CHANGE REQUESTED:', { 
+      from: currentLanguage, 
+      to: languageCode,
+      timestamp: Date.now()
+    });
     
     // First change the language which will clear caches and set loading states
-    await setLanguage(languageCode);
+    try {
+      await setLanguage(languageCode);
+      console.log('🌍 LanguageSelector: ✅ Language change completed:', languageCode);
+    } catch (error) {
+      console.error('🌍 LanguageSelector: ❌ Language change failed:', error);
+      return;
+    }
     
     // If user is logged in and language is not English, pre-translate SoulNet data for ALL time ranges
     if (user && languageCode !== 'en') {
       try {
-        debug.info('Pre-translating SoulNet data for new language:', languageCode);
-        // Pre-translate for ALL time ranges that users frequently view including "year"
+        console.log('🌍 LanguageSelector: 🔄 Pre-translating SoulNet data for:', languageCode);
         const timeRanges = ['today', 'week', 'month', 'year'];
         const preloadPromises = timeRanges.map(timeRange => 
           prefetchSoulNetTranslations(user.id, timeRange)
@@ -91,9 +100,9 @@ const LanguageSelector = () => {
         
         // Execute all pre-translations in parallel for better performance
         await Promise.allSettled(preloadPromises);
-        console.log('[LanguageSelector] Completed pre-translation for all time ranges');
+        console.log('🌍 LanguageSelector: ✅ Completed pre-translation for all time ranges');
       } catch (error) {
-        debug.error('Failed to pre-translate SoulNet data:', error);
+        console.error('🌍 LanguageSelector: ❌ Failed to pre-translate SoulNet data:', error);
       }
     }
     
@@ -108,8 +117,9 @@ const LanguageSelector = () => {
         ...parsed.filter((code: string) => code !== languageCode)
       ].slice(0, 3);
       localStorage.setItem('recentLanguages', JSON.stringify(updated));
+      console.log('🌍 LanguageSelector: 💾 Stored recent language:', languageCode);
     } catch (err) {
-      debug.error('Failed to store recent language:', err);
+      console.error('🌍 LanguageSelector: ❌ Failed to store recent language:', err);
     }
   };
 

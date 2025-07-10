@@ -100,69 +100,102 @@ export const TranslationProvider: React.FC<TranslationProviderProps> = ({ childr
   }, [currentLanguage]);
 
   const handleLanguageChange = useCallback(async (language: string) => {
-    console.log('[TranslationContext] APP-LEVEL: Changing language to:', language);
+    console.log('[TranslationContext] 🌍 LANGUAGE CHANGE INITIATED:', { 
+      from: currentLanguage, 
+      to: language, 
+      timestamp: new Date().toISOString() 
+    });
+    
+    // IMMEDIATE STATE UPDATE - Use functional update to ensure immediate consistency
+    setCurrentLanguage((prevLang) => {
+      console.log('[TranslationContext] 🔄 STATE UPDATE:', { prevLang, newLang: language });
+      return language;
+    });
     
     // Set loading state for SoulNet translations
     if (language !== 'en') {
       setIsSoulNetTranslating(true);
+      console.log('[TranslationContext] 🔄 SoulNet translating state set to true');
     }
-    
-    setCurrentLanguage(language);
     
     // Save to localStorage for persistence
     try {
       localStorage.setItem('soulo-language', language);
-      console.log('[TranslationContext] APP-LEVEL: Saved language to localStorage:', language);
+      console.log('[TranslationContext] 💾 Saved language to localStorage:', language);
     } catch (error) {
-      console.error('[TranslationContext] APP-LEVEL: Error saving language to localStorage:', error);
+      console.error('[TranslationContext] ❌ Error saving language to localStorage:', error);
     }
     
-    // ENHANCED: Clear both enhanced and legacy SoulNet caches when language changes
+    // Clear translation caches immediately
+    setTranslationCache({});
+    onDemandTranslationCache.clearAll();
     EnhancedSoulNetPreloadService.clearInstantCache();
     SoulNetPreloadService.clearCache();
     
-    console.log('[TranslationContext] APP-LEVEL: Cleared all SoulNet caches for language change');
+    console.log('[TranslationContext] 🧹 Cleared all translation caches for language:', language);
     
-    // Dispatch custom event for components that need to know about language changes
+    // Dispatch custom event with immediate language value
     const event = new CustomEvent('languageChange', { 
       detail: { 
         language,
-        isSoulNetTranslating: language !== 'en'
+        previousLanguage: currentLanguage,
+        isSoulNetTranslating: language !== 'en',
+        timestamp: Date.now()
       } 
     });
-    window.dispatchEvent(event);
     
-    // If not English, indicate that SoulNet translations are ready
-    // (actual pre-translation will happen when SoulNet components mount)
+    // Use setTimeout to ensure state has propagated before event dispatch
+    setTimeout(() => {
+      console.log('[TranslationContext] 📢 Dispatching languageChange event:', { language });
+      window.dispatchEvent(event);
+    }, 0);
+    
+    // If English, stop SoulNet translating immediately
     if (language === 'en') {
       setIsSoulNetTranslating(false);
+      console.log('[TranslationContext] ✅ SoulNet translating state set to false for English');
     }
-  }, []);
+    
+    console.log('[TranslationContext] ✅ Language change completed:', language);
+  }, [currentLanguage]);
 
   const translate = useCallback(async (text: string, sourceLanguage: string = 'en', entryId?: number, forceTranslate: boolean = false): Promise<string | null> => {
     if (!text || typeof text !== 'string') {
-      console.warn('[TranslationContext] Invalid text provided for translation:', text);
+      console.warn('[TranslationContext] ⚠️ Invalid text provided for translation:', text);
       return text || '';
     }
 
+    const currentTargetLang = effectiveLanguage;
+    
+    console.log('[TranslationContext] 🔍 TRANSLATION REQUEST:', { 
+      text: text.substring(0, 50) + (text.length > 50 ? '...' : ''), 
+      sourceLanguage, 
+      targetLanguage: currentTargetLang,
+      effectiveLanguage,
+      currentLanguage,
+      testOverride: testLanguageOverride,
+      forceTranslate,
+      entryId,
+      timestamp: new Date().toISOString()
+    });
+
     // Skip translation only if languages match AND forceTranslate is false
-    if (effectiveLanguage === sourceLanguage && !forceTranslate) {
-      console.log('[TranslationContext] Text already in target language, skipping translation:', { text, currentLanguage: effectiveLanguage, forceTranslate });
+    if (currentTargetLang === sourceLanguage && !forceTranslate) {
+      console.log('[TranslationContext] ⏭️ SKIPPING TRANSLATION - Same language:', { 
+        text: text.substring(0, 30), 
+        lang: currentTargetLang, 
+        forceTranslate 
+      });
       return text;
     }
 
-    // Add development mode override for testing
-    if (forceTranslate && effectiveLanguage === sourceLanguage) {
-      console.log('[TranslationContext] ForceTranslate enabled, proceeding with translation for testing:', { text, currentLanguage: effectiveLanguage });
+    // Development mode override for testing
+    if (forceTranslate && currentTargetLang === sourceLanguage) {
+      console.log('[TranslationContext] 🧪 FORCE TRANSLATE ENABLED for testing:', { 
+        text: text.substring(0, 30), 
+        targetLang: currentTargetLang 
+      });
     }
-
-    console.log('[TranslationContext] SUPABASE EDGE FUNCTION - Attempting to translate:', { 
-      text: text.substring(0, 30) + (text.length > 30 ? '...' : ''), 
-      from: sourceLanguage, 
-      to: effectiveLanguage,
-      entryId,
-      forceTranslate
-    });
 
     const cacheKey = `${text}_${sourceLanguage}_${effectiveLanguage}`;
     
@@ -186,37 +219,53 @@ export const TranslationProvider: React.FC<TranslationProviderProps> = ({ childr
       console.log('[TranslationContext] Using Supabase edge function for translation');
       
       // ENHANCED: Use Supabase edge function with proper source language handling
+      const payload = {
+        text,
+        sourceLanguage: sourceLanguage === 'auto' ? 'en' : sourceLanguage,
+        targetLanguage: currentTargetLang,
+        entryId,
+        cleanResult: true,
+        forceTranslate
+      };
+      
+      console.log('[TranslationContext] 📤 CALLING EDGE FUNCTION with payload:', payload);
+      
       const { data, error } = await supabase.functions.invoke('translate-text', {
-        body: {
-          text,
-          sourceLanguage: sourceLanguage === 'auto' ? 'en' : sourceLanguage,
-          targetLanguage: effectiveLanguage,
-          entryId,
-          cleanResult: true,
-          forceTranslate
-        }
+        body: payload
+      });
+
+      console.log('[TranslationContext] 📥 EDGE FUNCTION RESPONSE:', { 
+        hasError: !!error, 
+        hasData: !!data,
+        dataKeys: data ? Object.keys(data) : [],
+        error 
       });
 
       if (error) {
-        console.error('[TranslationContext] Edge function error:', error);
+        console.error('[TranslationContext] ❌ EDGE FUNCTION ERROR:', error);
         return text;
       }
 
       if (data && data.translatedText && data.translatedText !== text) {
         const translatedText = data.translatedText;
-        console.log('[TranslationContext] Translation successful:', { 
-          original: text.substring(0, 30), 
-          translated: translatedText.substring(0, 30) 
+        console.log('[TranslationContext] ✅ TRANSLATION SUCCESSFUL:', { 
+          original: text.substring(0, 50), 
+          translated: translatedText.substring(0, 50),
+          targetLang: currentTargetLang
         });
         
         // Cache both locally and in on-demand cache
-        setTranslationCache(prev => ({ ...prev, [cacheKey]: translatedText }));
-        onDemandTranslationCache.set(effectiveLanguage, text, translatedText);
+        const newCacheKey = `${text}_${sourceLanguage}_${currentTargetLang}`;
+        setTranslationCache(prev => ({ ...prev, [newCacheKey]: translatedText }));
+        onDemandTranslationCache.set(currentTargetLang, text, translatedText);
         
         return translatedText;
       }
       
-      console.log('[TranslationContext] Translation returned same text, using original');
+      console.log('[TranslationContext] ⚠️ TRANSLATION RETURNED SAME TEXT, using original:', {
+        originalText: text.substring(0, 30),
+        returnedText: data?.translatedText?.substring(0, 30)
+      });
       return text;
     } catch (error) {
       console.error('[TranslationContext] Translation failed:', error);
@@ -327,16 +376,32 @@ export const useTranslation = (): TranslationContextType => {
 
 // Development helper - expose to global scope for testing
 if (process.env.NODE_ENV === 'development') {
-  (window as any).testTranslation = {
-    setLanguage: (language: string | null) => {
-      console.log('[Development] Setting test language override to:', language);
+  (window as any).debugTranslation = {
+    testLanguage: (language: string | null) => {
+      console.log('🧪 [DevTools] Setting test language override to:', language);
       const event = new CustomEvent('devTestLanguageChange', { detail: { language } });
       window.dispatchEvent(event);
     },
-    enableForceTranslate: () => {
-      console.log('[Development] To test translations, use the browser console:');
-      console.log('testTranslation.setLanguage("es") // Set test language to Spanish');
-      console.log('testTranslation.setLanguage(null) // Remove override');
+    forceTranslate: (text: string, targetLang: string = 'es') => {
+      console.log('🧪 [DevTools] Force translating:', { text, targetLang });
+      // This will be implemented to directly call the translate function
+    },
+    showHelp: () => {
+      console.log('🧪 [DevTools] Translation Debug Commands:');
+      console.log('debugTranslation.testLanguage("es") // Set test language to Spanish'); 
+      console.log('debugTranslation.testLanguage(null) // Remove override');
+      console.log('debugTranslation.forceTranslate("Hello", "es") // Test direct translation');
+      console.log('debugTranslation.showState() // Show current translation state');
+    },
+    showState: () => {
+      console.log('🧪 [DevTools] Current Translation State:', {
+        currentLanguage: localStorage.getItem('soulo-language'),
+        testOverride: localStorage.getItem('testLanguageOverride'),
+        recentLanguages: localStorage.getItem('recentLanguages')
+      });
     }
   };
+  
+  // Auto-show help on load
+  console.log('🧪 Translation Debug Mode Active - Type debugTranslation.showHelp() for commands');
 }
