@@ -58,3 +58,6 @@ verify_jwt = true
 
 [functions.gpt-master-orchestrator]
 verify_jwt = true
+
+[functions.translate-text]
+verify_jwt = false
