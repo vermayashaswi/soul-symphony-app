@@ -2,7 +2,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">Soulo</string>
-    <string name="title_activity_main">Soulo</string>
+    <string name="title_activity_main">Soulo - Voice Journaling</string>
     <string name="package_name">app.soulo.online</string>
-    <string name="custom_url_scheme">app.soulo.online</string>
+    <string name="custom_url_scheme">soulo</string>
+    <string name="notification_channel_name">Journal Reminders</string>
+    <string name="notification_channel_description">Notifications for journal reminders and insights</string>
 </resources>

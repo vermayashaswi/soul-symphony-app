@@ -23,35 +23,6 @@ export default function Auth() {
   const fromLocation = location.state?.from?.pathname;
   const storedRedirect = typeof window !== 'undefined' ? localStorage.getItem('authRedirectTo') : null;
   
-  // Check for auth errors in URL params
-  useEffect(() => {
-    const error = searchParams.get('error');
-    const errorDescription = searchParams.get('error_description');
-    
-    if (error) {
-      console.error('[Auth] OAuth error from URL:', { error, errorDescription });
-      
-      // Clear error from URL
-      const newUrl = new URL(window.location.href);
-      newUrl.searchParams.delete('error');
-      newUrl.searchParams.delete('error_description');
-      window.history.replaceState({}, '', newUrl.toString());
-      
-      // Show user-friendly error message
-      let userMessage = 'Sign-in failed';
-      if (errorDescription?.includes('redirect_uri_mismatch')) {
-        userMessage = 'Google sign-in configuration error. Please try again or contact support.';
-      } else if (errorDescription) {
-        userMessage = `Sign-in failed: ${errorDescription}`;
-      } else if (error === 'access_denied') {
-        userMessage = 'Sign-in was cancelled';
-      }
-      
-      setAuthError(userMessage);
-      toast.error(userMessage);
-    }
-  }, [searchParams]);
-  
   // Get valid redirect path - default to /app/home after successful login
   const getValidRedirectPath = (path: string | null) => {
     if (!path) {
@@ -138,16 +109,10 @@ export default function Auth() {
         </div>
         
         {authError && (
-          <div className="mb-4 p-3 border border-red-200 bg-red-50 text-red-700 rounded-md">
+          <div className="mb-4 p-2 border border-red-500 bg-red-50 text-red-600 rounded">
             <p className="text-sm">
-              {authError}
+              <TranslatableText text="Error:" forceTranslate={true} /> {authError}
             </p>
-            <button 
-              onClick={() => setAuthError(null)}
-              className="mt-2 text-xs text-red-600 hover:text-red-800 underline"
-            >
-              Dismiss
-            </button>
           </div>
         )}
         
@@ -155,10 +120,7 @@ export default function Auth() {
           <PlatformAuthButton 
             isLoading={isLoading}
             onLoadingChange={setIsLoading}
-            onError={(error) => {
-              console.error('[Auth] Platform auth error:', error);
-              setAuthError(error);
-            }}
+            onError={setAuthError}
           />
           
           <div className="text-center text-sm text-muted-foreground">
