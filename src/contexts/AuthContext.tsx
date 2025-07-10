@@ -1,3 +1,4 @@
+
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { Session, User } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
@@ -19,6 +20,8 @@ import { useLocation } from 'react-router-dom';
 import { SessionTrackingService } from '@/services/sessionTrackingService';
 import { LocationProvider } from '@/contexts/LocationContext';
 import { detectTWAEnvironment } from '@/utils/twaDetection';
+import { nativeAuthService } from '@/services/nativeAuthService';
+import { nativeIntegrationService } from '@/services/nativeIntegrationService';
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
@@ -42,6 +45,22 @@ function AuthProviderCore({ children }: { children: ReactNode }) {
   const [authStateStable, setAuthStateStable] = useState(false);
   const location = useLocation();
   const twaEnv = detectTWAEnvironment();
+
+  // Initialize native services
+  useEffect(() => {
+    const initializeNativeServices = async () => {
+      try {
+        console.log('[AuthContext] Initializing native services');
+        await nativeIntegrationService.initialize();
+        await nativeAuthService.initialize();
+        console.log('[AuthContext] Native services initialized');
+      } catch (error) {
+        console.error('[AuthContext] Failed to initialize native services:', error);
+      }
+    };
+
+    initializeNativeServices();
+  }, []);
 
   const detectUserLanguage = (): string => {
     const browserLanguage = navigator.language || navigator.languages?.[0] || 'en';
@@ -396,6 +415,7 @@ function AuthProviderCore({ children }: { children: ReactNode }) {
         timestamp: new Date().toISOString(),
       });
       
+      // Clear local state immediately
       setSession(null);
       setUser(null);
       setProfileExistsStatus(null);
@@ -403,14 +423,17 @@ function AuthProviderCore({ children }: { children: ReactNode }) {
       setCurrentSessionId(null);
       setAuthStateStable(false);
       
+      // Call the sign out service
       await signOutService((path: string) => {
         console.log(`[AuthContext] Redirecting to ${path} after signout`);
+        // Always redirect to onboarding after logout
         window.location.href = '/app/onboarding';
       });
     } catch (error: any) {
       console.error('[AuthContext] Error during sign out:', error);
       toast.error(`Error signing out: ${error.message}`);
       
+      // Even if signout fails, redirect to onboarding
       window.location.href = '/app/onboarding';
     }
   };

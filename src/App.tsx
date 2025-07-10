@@ -20,7 +20,7 @@ import TWAInitializationWrapper from './components/twa/TWAInitializationWrapper'
 import { detectTWAEnvironment } from './utils/twaDetection';
 import { useTWAAutoRefresh } from './hooks/useTWAAutoRefresh';
 import { twaUpdateService } from './services/twaUpdateService';
-import { nativeIntegrationService } from './services/nativeIntegrationService';
+import { nativeAppInitService } from './services/nativeAppInitService';
 import { mobileErrorHandler } from './services/mobileErrorHandler';
 import { mobileOptimizationService } from './services/mobileOptimizationService';
 
@@ -60,16 +60,31 @@ const App: React.FC = () => {
           });
         }
         
-        // Initialize native platform features
+        // Initialize native app using the new service
         try {
-          console.log('[App] Initializing native integration service...');
-          await nativeIntegrationService.initialize();
-          console.log('[App] Native integration initialized');
+          console.log('[App] Initializing native app service...');
+          const nativeInitSuccess = await nativeAppInitService.initialize();
+          
+          if (nativeInitSuccess) {
+            console.log('[App] Native app initialization completed successfully');
+            
+            // Get initialization status for debugging
+            const initStatus = await nativeAppInitService.getInitializationStatus();
+            console.log('[App] Native app initialization status:', initStatus);
+            
+            // If we're in a native environment, ensure proper routing
+            if (initStatus.nativeEnvironment) {
+              console.log('[App] Native environment confirmed - app will route to app interface');
+            }
+            
+          } else {
+            console.warn('[App] Native app initialization failed, continuing with web fallback');
+          }
         } catch (error) {
-          console.warn('[App] Native integration failed:', error);
+          console.warn('[App] Native app initialization error:', error);
           mobileErrorHandler.handleError({
             type: 'capacitor',
-            message: `Native integration failed: ${error}`
+            message: `Native app init failed: ${error}`
           });
         }
         
@@ -97,10 +112,14 @@ const App: React.FC = () => {
         }
 
         // Mark app as initialized after a brief delay to ensure smooth startup
-        const initDelay = (twaEnv.isTWA || twaEnv.isStandalone) ? 1500 : 500;
+        // Shorter delay for native apps to hide splash screen faster
+        const isNativeApp = nativeAppInitService.isNativeAppInitialized();
+        const initDelay = isNativeApp ? 200 : (twaEnv.isTWA || twaEnv.isStandalone) ? 1500 : 500;
+        
+        console.log('[App] Setting initialization delay:', initDelay, 'ms (native:', isNativeApp, ')');
         
         setTimeout(() => {
-          console.log('[App] App initialization completed');
+          console.log('[App] App initialization completed - setting isInitialized to true');
           setIsInitialized(true);
         }, initDelay);
 
@@ -162,11 +181,9 @@ const App: React.FC = () => {
       userAgent: navigator.userAgent,
       url: window.location.href,
       isTWA: twaEnv.isTWA || twaEnv.isStandalone,
-      isNative: nativeIntegrationService.isRunningNatively(),
-      platform: nativeIntegrationService.getPlatform(),
+      isNative: nativeAppInitService.isNativeAppInitialized(),
       emergencyRecovery,
-      autoRefreshCount: refreshCount,
-      deviceInfo: nativeIntegrationService.getDeviceInfo()
+      autoRefreshCount: refreshCount
     };
     
     console.error('Detailed error info:', errorData);
@@ -262,22 +279,20 @@ const App: React.FC = () => {
   return (
     <ErrorBoundary onError={handleAppError}>
       <FeatureFlagsProvider>
-        <TranslationProvider>
-          <SubscriptionProvider>
-            <TutorialProvider>
-              <TWAWrapper>
-                <TWAInitializationWrapper>
-                  <TranslationLoadingOverlay />
-                  <JournalProcessingInitializer />
-                  <AppRoutes key={isInitialized ? 'initialized' : 'initializing'} />
-                  <TutorialOverlay />
-                  <Toaster />
-                  <SonnerToaster position="top-right" />
-                </TWAInitializationWrapper>
-              </TWAWrapper>
-            </TutorialProvider>
-          </SubscriptionProvider>
-        </TranslationProvider>
+        <SubscriptionProvider>
+          <TutorialProvider>
+            <TWAWrapper>
+              <TWAInitializationWrapper>
+                <TranslationLoadingOverlay />
+                <JournalProcessingInitializer />
+                <AppRoutes key={isInitialized ? 'initialized' : 'initializing'} />
+                <TutorialOverlay />
+                <Toaster />
+                <SonnerToaster position="top-right" />
+              </TWAInitializationWrapper>
+            </TWAWrapper>
+          </TutorialProvider>
+        </SubscriptionProvider>
       </FeatureFlagsProvider>
     </ErrorBoundary>
   );

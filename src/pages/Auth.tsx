@@ -23,15 +23,44 @@ export default function Auth() {
   const fromLocation = location.state?.from?.pathname;
   const storedRedirect = typeof window !== 'undefined' ? localStorage.getItem('authRedirectTo') : null;
   
-  // Get valid redirect path with priority
+  // Check for auth errors in URL params
+  useEffect(() => {
+    const error = searchParams.get('error');
+    const errorDescription = searchParams.get('error_description');
+    
+    if (error) {
+      console.error('[Auth] OAuth error from URL:', { error, errorDescription });
+      
+      // Clear error from URL
+      const newUrl = new URL(window.location.href);
+      newUrl.searchParams.delete('error');
+      newUrl.searchParams.delete('error_description');
+      window.history.replaceState({}, '', newUrl.toString());
+      
+      // Show user-friendly error message
+      let userMessage = 'Sign-in failed';
+      if (errorDescription?.includes('redirect_uri_mismatch')) {
+        userMessage = 'Google sign-in configuration error. Please try again or contact support.';
+      } else if (errorDescription) {
+        userMessage = `Sign-in failed: ${errorDescription}`;
+      } else if (error === 'access_denied') {
+        userMessage = 'Sign-in was cancelled';
+      }
+      
+      setAuthError(userMessage);
+      toast.error(userMessage);
+    }
+  }, [searchParams]);
+  
+  // Get valid redirect path - default to /app/home after successful login
   const getValidRedirectPath = (path: string | null) => {
     if (!path) {
-      return onboardingComplete ? '/app/home' : '/app/onboarding';
+      return '/app/home';
     }
     
     // Normalize legacy paths
     if (path === '/home') return '/app/home';
-    if (path === '/onboarding') return '/app/onboarding';
+    if (path === '/onboarding') return '/app/home'; // After login, go to home not onboarding
     
     return path;
   };
@@ -64,18 +93,13 @@ export default function Auth() {
       
       // Add small delay to ensure state updates before navigation
       const timer = setTimeout(() => {
-        // If onboarding is not complete, redirect to onboarding
-        if (!onboardingComplete && !redirectTo.includes('onboarding')) {
-          console.log('Redirecting to onboarding as it is not complete');
-          navigate('/app/onboarding', { replace: true });
-        } else {
-          navigate(redirectTo, { replace: true });
-        }
+        // Always redirect to home after successful login (user is already authenticated)
+        navigate('/app/home', { replace: true });
       }, 500);
       
       return () => clearTimeout(timer);
     }
-  }, [user, authLoading, navigate, redirecting, redirectTo, onboardingComplete]);
+  }, [user, authLoading, navigate, redirecting, redirectTo]);
 
   // If still checking auth state, show loading
   if (authLoading) {
@@ -86,18 +110,10 @@ export default function Auth() {
     );
   }
 
-  // If already logged in, redirect to target page
+  // If already logged in, redirect to home
   if (user) {
-    // If onboarding is not complete, redirect to onboarding instead
-    const finalRedirect = !onboardingComplete && !redirectTo.includes('onboarding') 
-      ? '/app/onboarding'
-      : redirectTo;
-      
-    console.log('User already logged in, redirecting to:', finalRedirect, {
-      onboardingComplete,
-      originalRedirect: redirectTo
-    });
-    return <Navigate to={finalRedirect} replace />;
+    console.log('User already logged in, redirecting to home');
+    return <Navigate to="/app/home" replace />;
   }
 
   return (
@@ -122,10 +138,16 @@ export default function Auth() {
         </div>
         
         {authError && (
-          <div className="mb-4 p-2 border border-red-500 bg-red-50 text-red-600 rounded">
+          <div className="mb-4 p-3 border border-red-200 bg-red-50 text-red-700 rounded-md">
             <p className="text-sm">
-              <TranslatableText text="Error:" forceTranslate={true} /> {authError}
+              {authError}
             </p>
+            <button 
+              onClick={() => setAuthError(null)}
+              className="mt-2 text-xs text-red-600 hover:text-red-800 underline"
+            >
+              Dismiss
+            </button>
           </div>
         )}
         
@@ -133,7 +155,10 @@ export default function Auth() {
           <PlatformAuthButton 
             isLoading={isLoading}
             onLoadingChange={setIsLoading}
-            onError={setAuthError}
+            onError={(error) => {
+              console.error('[Auth] Platform auth error:', error);
+              setAuthError(error);
+            }}
           />
           
           <div className="text-center text-sm text-muted-foreground">

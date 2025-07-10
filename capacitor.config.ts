@@ -5,19 +5,21 @@ const config: CapacitorConfig = {
   appId: 'app.soulo.online',
   appName: 'Soulo',
   webDir: 'dist',
-  server: {
-    url: 'https://soulo.online/app'
-    cleartext: false 
-  },
   // Remove server configuration for production - use bundled assets
   plugins: {
+    GoogleAuth: {
+      scopes: ['profile', 'email'],
+      // Use the correct Android OAuth Client ID for native authentication
+      serverClientId: '11083941790-h3s79i47p0u9vqjp4e8dbkj8g9ohf5np.apps.googleusercontent.com',
+      forceCodeForRefreshToken: true,
+    },
     SplashScreen: {
       launchAutoHide: false,
-      backgroundColor: "#000000",
+      backgroundColor: "#8b5cf6",
       showSpinner: true,
       androidSpinnerStyle: "large",
       iosSpinnerStyle: "small", 
-      spinnerColor: "#8b5cf6",
+      spinnerColor: "#FFFFFF",
       splashFullScreen: true,
       splashImmersive: true,
       splashScreenDelay: 2000
@@ -32,7 +34,8 @@ const config: CapacitorConfig = {
       backgroundColor: "#000000"
     },
     App: {
-      // Remove launchUrl for production builds
+      // Remove launchUrl for production builds to prevent loading marketing site
+      urlScheme: "app.soulo.online"
     },
     PushNotifications: {
       presentationOptions: ["badge", "sound", "alert"]
@@ -47,15 +50,15 @@ const config: CapacitorConfig = {
     contentInset: "always",
     allowsLinkPreview: false,
     scrollEnabled: true,
-    backgroundColor: "#000000",
+    backgroundColor: "#FFFFFF",
     scheme: "Soulo",
     preferredContentMode: "mobile"
   },
   android: {
-    allowMixedContent: false, // Disable for production security
+    allowMixedContent: false,
     captureInput: true,
-    webContentsDebuggingEnabled: false, // Disable for production
-    backgroundColor: "#000000",
+    webContentsDebuggingEnabled: false,
+    backgroundColor: "#FFFFFF",
     launchMode: "singleTask",
     orientation: "portrait",
     useLegacyBridge: false,

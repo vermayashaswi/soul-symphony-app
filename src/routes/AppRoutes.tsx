@@ -20,46 +20,112 @@ import BlogPostPage from '@/pages/website/BlogPostPage';
 import OnboardingScreen from '@/components/onboarding/OnboardingScreen';
 import { useAuth } from '@/contexts/AuthContext';
 import { useOnboarding } from '@/hooks/use-onboarding';
+import { nativeIntegrationService } from '@/services/nativeIntegrationService';
 
 const AppRoutes = () => {
   const { user } = useAuth();
   const { onboardingComplete } = useOnboarding();
   
-  // This will be used for conditional rendering of the /app route
+  // Handle /app root route redirects with native context awareness
   const AppRootRedirect = () => {
-    if (user) {
-      if (onboardingComplete) {
-        // If user is logged in and onboarding is complete, go to home
-        return <Navigate to="/app/home" replace />;
-      } else {
-        // If user is logged in but onboarding is not complete, go to onboarding
+    const isNative = nativeIntegrationService.isRunningNatively();
+    
+    console.log('[AppRoutes] AppRootRedirect - isNative:', isNative, 'user:', !!user, 'onboardingComplete:', onboardingComplete);
+    
+    // Check for OAuth callback parameters in URL
+    const urlParams = new URLSearchParams(window.location.search);
+    const hashParams = new URLSearchParams(window.location.hash.replace('#', ''));
+    const hasOAuthParams = urlParams.has('access_token') || hashParams.has('access_token') || 
+                          urlParams.has('code') || hashParams.has('code');
+    
+    // If OAuth callback, redirect to auth page to handle the callback
+    if (hasOAuthParams) {
+      console.log('[AppRoutes] OAuth callback detected, redirecting to auth page');
+      return <Navigate to={`/app/auth${window.location.search}${window.location.hash}`} replace />;
+    }
+    
+    // For native apps, always redirect to app routes
+    if (isNative) {
+      console.log('[AppRoutes] Native environment detected, redirecting to app interface');
+      if (!user) {
+        console.log('[AppRoutes] No user, redirecting to onboarding');
         return <Navigate to="/app/onboarding" replace />;
       }
-    } else {
-      // If user is not logged in, go to auth instead of onboarding for TWA
-      return <Navigate to="/app/auth" replace />;
+      
+      if (!onboardingComplete) {
+        console.log('[AppRoutes] Onboarding not complete, redirecting to onboarding');
+        return <Navigate to="/app/onboarding" replace />;
+      }
+      
+      console.log('[AppRoutes] User authenticated and onboarded, redirecting to home');
+      return <Navigate to="/app/home" replace />;
     }
+    
+    // Web behavior (existing logic)
+    console.log('[AppRoutes] Web environment, using standard flow');
+    if (!user) {
+      return <Navigate to="/app/onboarding" replace />;
+    }
+    
+    if (!onboardingComplete) {
+      return <Navigate to="/app/onboarding" replace />;
+    }
+    
+    return <Navigate to="/app/home" replace />;
+  };
+
+  // Handle root route redirects with native context
+  const RootRedirect = () => {
+    const isNative = nativeIntegrationService.isRunningNatively();
+    
+    console.log('[AppRoutes] RootRedirect - isNative:', isNative, 'user:', !!user, 'onboardingComplete:', onboardingComplete);
+    
+    // For native apps, always redirect to app interface
+    if (isNative) {
+      console.log('[AppRoutes] Native environment detected at root, redirecting to app');
+      if (!user) {
+        console.log('[AppRoutes] No user in native app, redirecting to onboarding');
+        return <Navigate to="/app/onboarding" replace />;
+      }
+      
+      if (!onboardingComplete) {
+        console.log('[AppRoutes] Onboarding not complete in native app, redirecting to onboarding');
+        return <Navigate to="/app/onboarding" replace />;
+      }
+      
+      console.log('[AppRoutes] Native app user ready, redirecting to home');
+      return <Navigate to="/app/home" replace />;
+    }
+    
+    // Web behavior - show marketing site
+    console.log('[AppRoutes] Web environment, showing marketing site');
+    return <Index />;
   };
   
   return (
     <Routes>
       {/* Wrap all routes that need ViewportManager in a parent Route */}
       <Route element={<ViewportManager />}>
-        {/* Website Routes - Now properly wrapped in translation context */}
-        <Route path="/" element={<Index />} />
+        {/* Root Route - context-aware */}
+        <Route path="/" element={<RootRedirect />} />
+        
+        {/* Website Routes - only accessible in web context */}
         <Route path="/privacy-policy" element={<PrivacyPolicyPage />} />
         <Route path="/faq" element={<FAQPage />} />
         <Route path="/download" element={<AppDownload />} />
         <Route path="/blog" element={<BlogPage />} />
         <Route path="/blog/:slug" element={<BlogPostPage />} />
         
-        {/* App Routes - reordered to fix routing issue */}
+        {/* App Routes */}
+        {/* Public app routes (no auth required) */}
         <Route path="/app/onboarding" element={<OnboardingScreen />} />
         <Route path="/app/auth" element={<Auth />} />
         
+        {/* Root app route with smart redirect */}
+        <Route path="/app" element={<AppRootRedirect />} />
+        
         {/* Protected App Routes */}
         <Route path="/app" element={<ProtectedRoute />}>
-          <Route index element={<AppRootRedirect />} />
           <Route path="home" element={<Home />} />
           <Route path="journal" element={<Journal />} />
           <Route path="insights" element={

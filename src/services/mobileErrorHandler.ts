@@ -1,4 +1,3 @@
-
 import { toast } from 'sonner';
 import { nativeIntegrationService } from './nativeIntegrationService';
 
@@ -11,6 +10,7 @@ interface MobileError {
   appVersion?: string;
   url?: string;
   userAgent?: string;
+  context?: string;
 }
 
 class MobileErrorHandler {
@@ -230,7 +230,8 @@ class MobileErrorHandler {
       platform: error.platform || nativeIntegrationService.getPlatform(),
       appVersion: '1.0.0',
       url: error.url || window.location.href,
-      userAgent: error.userAgent || navigator.userAgent
+      userAgent: error.userAgent || navigator.userAgent,
+      context: error.context
     };
 
     console.error('[MobileErrorHandler] Error captured:', fullError);
