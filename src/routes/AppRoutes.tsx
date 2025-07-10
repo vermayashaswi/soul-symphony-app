@@ -25,27 +25,27 @@ const AppRoutes = () => {
   const { user } = useAuth();
   const { onboardingComplete } = useOnboarding();
   
-  // Handle /app root route redirects
+  // This will be used for conditional rendering of the /app route
   const AppRootRedirect = () => {
-    if (!user) {
-      // Not logged in - redirect to onboarding
-      return <Navigate to="/app/onboarding" replace />;
+    if (user) {
+      if (onboardingComplete) {
+        // If user is logged in and onboarding is complete, go to home
+        return <Navigate to="/app/home" replace />;
+      } else {
+        // If user is logged in but onboarding is not complete, go to onboarding
+        return <Navigate to="/app/onboarding" replace />;
+      }
+    } else {
+      // If user is not logged in, go to auth instead of onboarding for TWA
+      return <Navigate to="/app/auth" replace />;
     }
-    
-    if (!onboardingComplete) {
-      // Logged in but onboarding not complete - redirect to onboarding
-      return <Navigate to="/app/onboarding" replace />;
-    }
-    
-    // Logged in and onboarding complete - redirect to home
-    return <Navigate to="/app/home" replace />;
   };
   
   return (
     <Routes>
       {/* Wrap all routes that need ViewportManager in a parent Route */}
       <Route element={<ViewportManager />}>
-        {/* Website Routes */}
+        {/* Website Routes - Now properly wrapped in translation context */}
         <Route path="/" element={<Index />} />
         <Route path="/privacy-policy" element={<PrivacyPolicyPage />} />
         <Route path="/faq" element={<FAQPage />} />
@@ -53,16 +53,13 @@ const AppRoutes = () => {
         <Route path="/blog" element={<BlogPage />} />
         <Route path="/blog/:slug" element={<BlogPostPage />} />
         
-        {/* App Routes */}
-        {/* Public app routes (no auth required) */}
+        {/* App Routes - reordered to fix routing issue */}
         <Route path="/app/onboarding" element={<OnboardingScreen />} />
         <Route path="/app/auth" element={<Auth />} />
         
-        {/* Root app route with smart redirect */}
-        <Route path="/app" element={<AppRootRedirect />} />
-        
         {/* Protected App Routes */}
         <Route path="/app" element={<ProtectedRoute />}>
+          <Route index element={<AppRootRedirect />} />
           <Route path="home" element={<Home />} />
           <Route path="journal" element={<Journal />} />
           <Route path="insights" element={

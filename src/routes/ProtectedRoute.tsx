@@ -33,7 +33,7 @@ const ProtectedRoute: React.FC = () => {
   
   useEffect(() => {
     if (!isLoading && !user) {
-      console.log("Protected route: No user, should redirect to onboarding", {
+      console.log("Protected route: No user, should redirect to /app/auth", {
         path: location.pathname
       });
     }
@@ -48,10 +48,15 @@ const ProtectedRoute: React.FC = () => {
   }
   
   if (!user) {
-    console.log("Redirecting to onboarding from protected route:", location.pathname);
+    console.log("Redirecting to auth from protected route:", location.pathname);
     
-    // Always redirect to onboarding when not authenticated
-    return <Navigate to="/app/onboarding" replace />;
+    // In TWA environment, be more careful about redirects to avoid exit triggers
+    const twaEnv = detectTWAEnvironment();
+    const redirectPath = twaEnv.isTWA || twaEnv.isStandalone 
+      ? `/app/auth?redirectTo=${encodeURIComponent(location.pathname)}`
+      : `/app/auth?redirectTo=${encodeURIComponent(location.pathname)}`;
+    
+    return <Navigate to={redirectPath} replace />;
   }
   
   // Use Outlet to render child routes
