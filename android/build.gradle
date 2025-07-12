@@ -1,6 +1,8 @@
 
 // Top-level Gradle build file
-
+ext {
+    JAVA_VERSION = JavaVersion.VERSION_17
+}
 buildscript {
     ext {
         compileSdkVersion = 35
