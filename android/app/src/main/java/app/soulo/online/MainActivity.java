@@ -1,9 +1,5 @@
-import com.codetrix.studio.CapacitorGoogleAuth.GoogleAuth;
+package app.soulo.online;
 
-public class MainActivity extends BridgeActivity {
-    @Override
-    public void onCreate(Bundle savedInstanceState) {
-        super.onCreate(savedInstanceState);
-        registerPlugin(GoogleAuth.class);
-    }
-}
+import com.getcapacitor.BridgeActivity;
+
+public class MainActivity extends BridgeActivity {}
