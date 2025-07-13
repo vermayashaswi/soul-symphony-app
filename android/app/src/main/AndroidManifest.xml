@@ -22,6 +22,16 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
 
+            <!-- ADD THIS BLOCK FOR GOOGLE AUTH TO WORK NATIVELY -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data
+                    android:scheme="com.googleusercontent.apps.11083941790-h3s79i47p0u9vqjp4e8dbkj8g9ohf5np"
+                    android:host="oauth2redirect" />
+            </intent-filter>
+
         </activity>
 
         <provider

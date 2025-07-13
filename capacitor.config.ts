@@ -10,9 +10,12 @@ const config: CapacitorConfig = {
     GoogleAuth: {
       scopes: ['profile', 'email'],
       // Use the correct Android OAuth Client ID for native authentication
-      serverClientId: '11083941790-h3s79i47p0u9vqjp4e8dbkj8g9ohf5np.apps.googleusercontent.com',
+      serverClientId: '11083941790-vgbdbj6j313ggo6jbt9agp3bvrlilam8.apps.googleusercontent.com',
       forceCodeForRefreshToken: true,
     },
+App: {
+    urlScheme: "app.soulo.online"}
+
     SplashScreen: {
       launchAutoHide: false,
       backgroundColor: "#8b5cf6",
