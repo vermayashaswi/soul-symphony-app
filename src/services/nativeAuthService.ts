@@ -142,8 +142,7 @@ class NativeAuthService {
     // For native apps, use custom URL scheme for OAuth redirect
     const isNative = nativeIntegrationService.isRunningNatively();
     const redirectUrl = isNative 
-      ? 'app.soulo.online://oauth/callback'
-      : `${window.location.origin}/app/auth`;
+      ? `${window.location.origin}/app/auth`;
 
     console.log('[NativeAuth] Using redirect URL:', redirectUrl);
     
