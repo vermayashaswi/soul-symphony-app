@@ -15,7 +15,7 @@ interface DeviceInfo {
 class NativeIntegrationService {
   private static instance: NativeIntegrationService;
   private isCapacitorReady = false;
-  private isActuallyNative = false; // New flag for true native detection
+  private isActuallyNative = false;
   private plugins: { [key: string]: CapacitorPlugin } = {};
   private deviceInfo: DeviceInfo | null = null;
 
@@ -30,21 +30,16 @@ class NativeIntegrationService {
     console.log('[NativeIntegration] Initializing native integration service');
 
     try {
-      // Check if Capacitor is available
       if (this.isCapacitorAvailable()) {
         console.log('[NativeIntegration] Capacitor detected');
         await this.initializeCapacitor();
-        
-        // Additional check to determine if we're actually running natively
         await this.detectNativeEnvironment();
       } else {
         console.log('[NativeIntegration] Running in web environment');
       }
 
-      // Initialize device info
       await this.initializeDeviceInfo();
 
-      // Setup plugin error handlers only if truly native
       if (this.isActuallyNative) {
         this.setupPluginErrorHandlers();
       }
@@ -70,25 +65,21 @@ class NativeIntegrationService {
   private async detectNativeEnvironment(): Promise<void> {
     try {
       console.log('[NativeIntegration] Starting native environment detection...');
-      
+
       const { Capacitor } = (window as any);
-      
+
       if (Capacitor) {
-        // Check if we're running on a native platform
         const platform = Capacitor.getPlatform();
         console.log('[NativeIntegration] Capacitor platform detected:', platform);
-        
-        // Only consider it native if platform is 'ios' or 'android'
-        // 'web' means we're in a browser with Capacitor loaded but not native
+
+        // Critical fix: Only consider it native if platform is 'ios' or 'android'
         this.isActuallyNative = platform === 'ios' || platform === 'android';
-        
+
         console.log('[NativeIntegration] Platform-based native detection:', this.isActuallyNative);
-        
-        // Additional robust checks for native environment
+
         if (this.isActuallyNative) {
           console.log('[NativeIntegration] Running additional native environment checks...');
-          
-          // Check 1: Verify we can access native plugins
+
           try {
             if (Capacitor.Plugins?.Device) {
               const deviceInfo = await Capacitor.Plugins.Device.getInfo();
@@ -97,39 +88,36 @@ class NativeIntegrationService {
                 model: deviceInfo.model
               });
             }
-            
-            // Check 2: Verify we're not in a web context
+
             if (Capacitor.Plugins?.App) {
               console.log('[NativeIntegration] App plugin available - confirming native context');
             }
-            
-            // Check 3: Additional native context verification
-            const isWebView = window.location.protocol.includes('http') && 
-                             window.location.hostname !== 'localhost' && 
+
+            // Additional verification that we're not in a browser
+            const isWebView = window.location.protocol.includes('http') &&
+                             window.location.hostname !== 'localhost' &&
                              !window.location.hostname.includes('capacitor');
-            
-            if (isWebView) {
+
+            if (isWebView && !window.location.hostname.includes('soulo.online')) {
               console.warn('[NativeIntegration] Detected web view context, may not be truly native');
             }
-            
+
           } catch (error) {
             console.warn('[NativeIntegration] Failed to access native APIs:', error);
-            // If we can't access native APIs, we're probably not truly native
             this.isActuallyNative = false;
           }
         }
-        
-        // Force native detection for APK builds (additional safety check)
+
         if (!this.isActuallyNative && (platform === 'ios' || platform === 'android')) {
           console.log('[NativeIntegration] Force enabling native mode for mobile platform');
           this.isActuallyNative = true;
         }
-        
+
       } else {
         console.log('[NativeIntegration] Capacitor not detected - web environment');
         this.isActuallyNative = false;
       }
-      
+
       console.log('[NativeIntegration] Final native environment status:', this.isActuallyNative);
     } catch (error) {
       console.error('[NativeIntegration] Error detecting native environment:', error);
@@ -140,14 +128,13 @@ class NativeIntegrationService {
   private async initializeCapacitor(): Promise<void> {
     try {
       const { Capacitor } = (window as any);
-      
+
       if (Capacitor && Capacitor.Plugins) {
         this.plugins = Capacitor.Plugins;
         this.isCapacitorReady = true;
-        
+
         console.log('[NativeIntegration] Available Capacitor plugins:', Object.keys(this.plugins));
-        
-        // Only initialize core plugins if we're actually running natively
+
         if (this.isActuallyNative) {
           await this.initializeCorePlugins();
         } else {
@@ -161,18 +148,17 @@ class NativeIntegrationService {
   }
 
   private async initializeCorePlugins(): Promise<void> {
-    // Initialize App plugin
+    // Initialize App plugin for deep link handling
     if (this.plugins.App) {
       try {
-        // Listen for app state changes
         this.plugins.App.addListener('appStateChange', (state: any) => {
           console.log('[NativeIntegration] App state changed:', state);
         });
 
-        // Listen for URL open events (OAuth callbacks)
+        // CRITICAL: Handle OAuth callbacks through deep links
         this.plugins.App.addListener('appUrlOpen', (event: any) => {
           console.log('[NativeIntegration] App URL opened:', event.url);
-          this.handleOAuthCallback(event.url);
+          this.handleDeepLink(event.url);
         });
 
         console.log('[NativeIntegration] App plugin initialized');
@@ -182,7 +168,7 @@ class NativeIntegrationService {
       }
     }
 
-    // Initialize Status Bar plugin
+    // Initialize other plugins...
     if (this.plugins.StatusBar) {
       try {
         await this.plugins.StatusBar.setStyle({ style: 'dark' });
@@ -194,7 +180,6 @@ class NativeIntegrationService {
       }
     }
 
-    // Initialize Keyboard plugin
     if (this.plugins.Keyboard) {
       try {
         this.plugins.Keyboard.addListener('keyboardWillShow', (info: any) => {
@@ -214,17 +199,14 @@ class NativeIntegrationService {
       }
     }
 
-    // Initialize SplashScreen plugin - DO NOT auto-hide here
     if (this.plugins.SplashScreen) {
       console.log('[NativeIntegration] SplashScreen plugin available - will be managed by nativeAppInitService');
     }
 
-    // Initialize Browser plugin for OAuth flows
     if (this.plugins.Browser) {
       console.log('[NativeIntegration] Browser plugin available for OAuth redirects');
     }
 
-    // Initialize Google Auth plugin
     if (this.plugins.GoogleAuth) {
       try {
         console.log('[NativeIntegration] GoogleAuth plugin detected and available');
@@ -246,15 +228,13 @@ class NativeIntegrationService {
           manufacturer: info.manufacturer || 'unknown',
           isVirtual: info.isVirtual || false
         };
-        
+
         console.log('[NativeIntegration] Device info:', this.deviceInfo);
       } catch (error) {
         console.error('[NativeIntegration] Failed to get device info:', error);
-        // Fallback to user agent detection
         this.deviceInfo = this.getDeviceInfoFromUserAgent();
       }
     } else {
-      // Fallback for web environment
       this.deviceInfo = this.getDeviceInfoFromUserAgent();
     }
   }
@@ -262,13 +242,13 @@ class NativeIntegrationService {
   private getDeviceInfoFromUserAgent(): DeviceInfo {
     const ua = navigator.userAgent;
     let platform = 'web';
-    
+
     if (ua.includes('Android')) {
       platform = 'android';
     } else if (ua.includes('iPhone') || ua.includes('iPad')) {
       platform = 'ios';
     }
-    
+
     return {
       platform,
       model: 'unknown',
@@ -279,12 +259,11 @@ class NativeIntegrationService {
   }
 
   private setupPluginErrorHandlers(): void {
-    // Global plugin error handler
     if (this.isCapacitorReady) {
       const originalConsoleError = console.error;
       console.error = (...args) => {
         originalConsoleError.apply(console, args);
-        
+
         const errorMessage = args.join(' ');
         if (errorMessage.includes('Capacitor') || errorMessage.includes('Plugin')) {
           mobileErrorHandler.handleCapacitorError('Unknown', errorMessage);
@@ -293,44 +272,65 @@ class NativeIntegrationService {
     }
   }
 
-  private handleOAuthCallback(url: string): void {
+  // CRITICAL: Fixed deep link handling for OAuth
+  private handleDeepLink(url: string): void {
     try {
-      console.log('[NativeIntegration] Handling OAuth callback URL:', url);
-      
+      console.log('[NativeIntegration] Handling deep link URL:', url);
+
+      // Parse the URL to check for OAuth parameters
+      const urlObj = new URL(url);
+
       // Check if this is a Supabase OAuth callback
-      if (url.includes('oauth/callback') || url.includes('access_token')) {
-        // Extract the hash fragment if present (OAuth parameters)
-        const urlObj = new URL(url);
+      if (url.includes('oauth/callback') ||
+          url.includes('access_token') ||
+          url.includes('code=') ||
+          urlObj.hash.includes('access_token') ||
+          urlObj.search.includes('code=')) {
+
+        console.log('[NativeIntegration] OAuth callback detected in deep link');
+
+        // Extract OAuth parameters from hash or search
         const fragment = urlObj.hash || urlObj.search;
-        
+
         if (fragment) {
-          // Redirect to the app auth page with the OAuth parameters
-          const newUrl = `/app/auth${fragment}`;
-          console.log('[NativeIntegration] Redirecting to:', newUrl);
-          
-          // Use setTimeout to ensure app is ready
+          // Navigate to auth page with OAuth parameters for processing
+          const authUrl = `/app/auth${fragment}`;
+          console.log('[NativeIntegration] Redirecting to auth page:', authUrl);
+
+          // Use history.pushState to navigate without full page reload
           setTimeout(() => {
-            window.location.href = newUrl;
+            window.history.pushState({}, '', authUrl);
+            // Trigger a popstate event to notify React Router
+            window.dispatchEvent(new PopStateEvent('popstate'));
           }, 100);
         } else {
-          // Fallback to app home if no parameters
-          window.location.href = '/app/home';
+          // No OAuth parameters found, go to app home
+          console.log('[NativeIntegration] No OAuth parameters, redirecting to app home');
+          setTimeout(() => {
+            window.history.pushState({}, '', '/app/home');
+            window.dispatchEvent(new PopStateEvent('popstate'));
+          }, 100);
         }
       } else {
         // Handle other deep links
         console.log('[NativeIntegration] Handling general deep link:', url);
-        const urlObj = new URL(url);
         const path = urlObj.pathname || '/app/home';
-        window.location.href = path;
+        setTimeout(() => {
+          window.history.pushState({}, '', path);
+          window.dispatchEvent(new PopStateEvent('popstate'));
+        }, 100);
       }
     } catch (error) {
-      console.error('[NativeIntegration] Error handling OAuth callback:', error);
+      console.error('[NativeIntegration] Error handling deep link:', error);
       // Fallback to app home
-      window.location.href = '/app/home';
+      setTimeout(() => {
+        window.history.pushState({}, '', '/app/home');
+        window.dispatchEvent(new PopStateEvent('popstate'));
+      }, 100);
     }
   }
 
-  // Public methods
+  // Public methods remain the same...
   isRunningNatively(): boolean {
     return this.isActuallyNative;
   }
@@ -353,15 +353,15 @@ class NativeIntegrationService {
 
   async requestPermissions(permissions: string[]): Promise<{ [key: string]: string }> {
     const results: { [key: string]: string } = {};
-    
+
     if (!this.isActuallyNative) {
       console.log('[NativeIntegration] Permission requests not available in web environment');
       permissions.forEach(permission => {
-        results[permission] = 'granted'; // Assume granted for web
+        results[permission] = 'granted';
       });
       return results;
     }
-    
+
     for (const permission of permissions) {
       try {
         if (permission === 'microphone' && this.plugins.Microphone) {
@@ -380,7 +380,7 @@ class NativeIntegrationService {
         mobileErrorHandler.handlePermissionError(permission);
       }
     }
-    
+
     return results;
   }
 
@@ -415,7 +415,6 @@ class NativeIntegrationService {
         mobileErrorHandler.handleCapacitorError('Haptics', error.toString());
       }
     } else if ('vibrate' in navigator) {
-      // Fallback to web vibration API
       navigator.vibrate(duration);
     }
   }
@@ -431,7 +430,6 @@ class NativeIntegrationService {
     }
   }
 
-  // Network status
   async getNetworkStatus(): Promise<{ connected: boolean; connectionType: string }> {
     if (this.plugins.Network) {
       try {
@@ -445,20 +443,17 @@ class NativeIntegrationService {
         mobileErrorHandler.handleCapacitorError('Network', error.toString());
       }
     }
-    
-    // Fallback
+
     return {
       connected: navigator.onLine,
       connectionType: 'unknown'
     };
   }
 
-  // Check if Google Auth plugin is available
   isGoogleAuthAvailable(): boolean {
     return this.isActuallyNative && this.isCapacitorReady && !!this.plugins.GoogleAuth;
   }
 
-  // Safe plugin access
   getPlugin(name: string): CapacitorPlugin | null {
     if (this.isActuallyNative && this.isCapacitorReady && this.plugins[name]) {
       return this.plugins[name];
@@ -466,7 +461,6 @@ class NativeIntegrationService {
     return null;
   }
 
-  // Check if specific plugin is available
   isPluginAvailable(name: string): boolean {
     return this.isActuallyNative && this.isCapacitorReady && !!this.plugins[name];
   }

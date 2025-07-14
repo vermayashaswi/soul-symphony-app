@@ -73,9 +73,9 @@ class NativeAuthService {
     try {
       console.log('[NativeAuth] Starting Google sign-in');
 
-      // **KEY CHANGE**: Only use native auth when running natively
+      // CRITICAL: Strict native vs web separation
       if (this.shouldUseNativeAuth()) {
-        console.log('[NativeAuth] Using native Google Sign-In');
+        console.log('[NativeAuth] Using native Google Sign-In - no browser redirects');
 
         if (this.initializationError) {
           throw new Error(`Native auth not available: ${this.initializationError}`);
@@ -109,27 +109,26 @@ class NativeAuthService {
         console.log('[NativeAuth] Successfully signed in with Google natively');
         toast.success('Signed in successfully');
 
-        // **KEY CHANGE**: No web OAuth fallback, native auth is complete
+        // CRITICAL: No redirect needed - auth context will handle navigation
         return;
       } else {
-        // **KEY CHANGE**: Only for web environments
+        // For web environments only
         console.log('[NativeAuth] Using web OAuth Google Sign-In');
         await this.signInWithGoogleWeb();
       }
     } catch (error: any) {
       console.error('[NativeAuth] Google sign-in failed:', error);
 
-      // **KEY CHANGE**: Remove automatic web fallback that causes browser redirects
-      // Only show error, don't try web OAuth which opens browser
+      // CRITICAL: No fallback to web OAuth in native apps
       if (this.shouldUseNativeAuth()) {
-        console.log('[NativeAuth] Native auth failed, no web fallback to avoid browser redirect');
+        console.log('[NativeAuth] Native auth failed - showing error, no browser fallback');
         this.handleAuthError(error);
         throw error;
       }
 
-      // For web environments, still allow web OAuth
+      // For web environments, handle OAuth
       if (!this.shouldUseNativeAuth()) {
-        console.log('[NativeAuth] Web environment, trying OAuth');
+        console.log('[NativeAuth] Web environment auth error');
         try {
           await this.signInWithGoogleWeb();
           return;
@@ -144,10 +143,11 @@ class NativeAuthService {
   }
 
   private async signInWithGoogleWeb(): Promise<void> {
-    // **KEY CHANGE**: Use production domain for redirect
-    const redirectUrl = 'https://soulo.online/app/auth';
+    // CRITICAL: Use app domain for redirect, not external domains
+    const currentOrigin = window.location.origin;
+    const redirectUrl = `${currentOrigin}/app/auth`;
 
-    console.log('[NativeAuth] Using redirect URL:', redirectUrl);
+    console.log('[NativeAuth] Using redirect URL for web OAuth:', redirectUrl);
 
     const { data, error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
@@ -171,7 +171,10 @@ class NativeAuthService {
     try {
       console.log('[NativeAuth] Starting Apple sign-in');
 
-      const redirectUrl = 'https://soulo.online/app/auth';
+      // CRITICAL: Use current origin for redirect
+      const currentOrigin = window.location.origin;
+      const redirectUrl = `${currentOrigin}/app/auth`;
+
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider: 'apple',
         options: {
