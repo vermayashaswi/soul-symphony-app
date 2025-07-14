@@ -72,47 +72,28 @@ class NativeIntegrationService {
         const platform = Capacitor.getPlatform();
         console.log('[NativeIntegration] Capacitor platform detected:', platform);
 
-        // Critical fix: Only consider it native if platform is 'ios' or 'android'
+        // CRITICAL FIX: Only consider it native if platform is 'ios' or 'android'
         this.isActuallyNative = platform === 'ios' || platform === 'android';
 
         console.log('[NativeIntegration] Platform-based native detection:', this.isActuallyNative);
 
         if (this.isActuallyNative) {
-          console.log('[NativeIntegration] Running additional native environment checks...');
+          console.log('[NativeIntegration] Confirmed native environment - no browser fallbacks will be used');
 
+          // Additional verification for completeness
           try {
             if (Capacitor.Plugins?.Device) {
               const deviceInfo = await Capacitor.Plugins.Device.getInfo();
-              console.log('[NativeIntegration] Device plugin test successful:', {
+              console.log('[NativeIntegration] Device plugin confirmed:', {
                 platform: deviceInfo.platform,
                 model: deviceInfo.model
               });
             }
-
-            if (Capacitor.Plugins?.App) {
-              console.log('[NativeIntegration] App plugin available - confirming native context');
-            }
-
-            // Additional verification that we're not in a browser
-            const isWebView = window.location.protocol.includes('http') &&
-                             window.location.hostname !== 'localhost' &&
-                             !window.location.hostname.includes('capacitor');
-
-            if (isWebView && !window.location.hostname.includes('soulo.online')) {
-              console.warn('[NativeIntegration] Detected web view context, may not be truly native');
-            }
-
           } catch (error) {
-            console.warn('[NativeIntegration] Failed to access native APIs:', error);
-            this.isActuallyNative = false;
+            console.warn('[NativeIntegration] Device plugin check failed:', error);
+            // Don't fail the native detection for this
           }
         }
-
-        if (!this.isActuallyNative && (platform === 'ios' || platform === 'android')) {
-          console.log('[NativeIntegration] Force enabling native mode for mobile platform');
-          this.isActuallyNative = true;
-        }
-
       } else {
         console.log('[NativeIntegration] Capacitor not detected - web environment');
         this.isActuallyNative = false;
@@ -199,21 +180,8 @@ class NativeIntegrationService {
       }
     }
 
-    if (this.plugins.SplashScreen) {
-      console.log('[NativeIntegration] SplashScreen plugin available - will be managed by nativeAppInitService');
-    }
-
-    if (this.plugins.Browser) {
-      console.log('[NativeIntegration] Browser plugin available for OAuth redirects');
-    }
-
     if (this.plugins.GoogleAuth) {
-      try {
-        console.log('[NativeIntegration] GoogleAuth plugin detected and available');
-      } catch (error) {
-        console.error('[NativeIntegration] GoogleAuth plugin initialization failed:', error);
-        mobileErrorHandler.handleCapacitorError('GoogleAuth', error.toString());
-      }
+      console.log('[NativeIntegration] GoogleAuth plugin detected and available for native authentication');
     }
   }
 
@@ -330,7 +298,7 @@ class NativeIntegrationService {
     }
   }
 
-  // Public methods remain the same...
+  // Public methods
   isRunningNatively(): boolean {
     return this.isActuallyNative;
   }
@@ -351,6 +319,22 @@ class NativeIntegrationService {
     return this.deviceInfo;
   }
 
+  isGoogleAuthAvailable(): boolean {
+    return this.isActuallyNative && this.isCapacitorReady && !!this.plugins.GoogleAuth;
+  }
+
+  getPlugin(name: string): CapacitorPlugin | null {
+    if (this.isActuallyNative && this.isCapacitorReady && this.plugins[name]) {
+      return this.plugins[name];
+    }
+    return null;
+  }
+
+  isPluginAvailable(name: string): boolean {
+    return this.isActuallyNative && this.isCapacitorReady && !!this.plugins[name];
+  }
+
+  // Additional methods for completeness...
   async requestPermissions(permissions: string[]): Promise<{ [key: string]: string }> {
     const results: { [key: string]: string } = {};
 
@@ -448,21 +432,6 @@ class NativeIntegrationService {
       connected: navigator.onLine,
       connectionType: 'unknown'
     };
-  }
-
-  isGoogleAuthAvailable(): boolean {
-    return this.isActuallyNative && this.isCapacitorReady && !!this.plugins.GoogleAuth;
-  }
-
-  getPlugin(name: string): CapacitorPlugin | null {
-    if (this.isActuallyNative && this.isCapacitorReady && this.plugins[name]) {
-      return this.plugins[name];
-    }
-    return null;
-  }
-
-  isPluginAvailable(name: string): boolean {
-    return this.isActuallyNative && this.isCapacitorReady && !!this.plugins[name];
   }
 }
 

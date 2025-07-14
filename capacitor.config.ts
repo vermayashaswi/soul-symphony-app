@@ -1,4 +1,3 @@
-
 import { CapacitorConfig } from '@capacitor/cli';
 
 const config: CapacitorConfig = {
@@ -13,15 +12,15 @@ const config: CapacitorConfig = {
       serverClientId: '11083941790-vgbdbj6j313ggo6jbt9agp3bvrlilam8.apps.googleusercontent.com',
       forceCodeForRefreshToken: true,
     },
-App: {
-    urlScheme: "app.soulo.online"}
-
+    App: {
+      urlScheme: "app.soulo.online"
+    },
     SplashScreen: {
       launchAutoHide: false,
       backgroundColor: "#8b5cf6",
       showSpinner: true,
       androidSpinnerStyle: "large",
-      iosSpinnerStyle: "small", 
+      iosSpinnerStyle: "small",
       spinnerColor: "#FFFFFF",
       splashFullScreen: true,
       splashImmersive: true,
@@ -35,10 +34,6 @@ App: {
     StatusBar: {
       style: "dark",
       backgroundColor: "#000000"
-    },
-    App: {
-      // Remove launchUrl for production builds to prevent loading marketing site
-      urlScheme: "app.soulo.online"
     },
     PushNotifications: {
       presentationOptions: ["badge", "sound", "alert"]

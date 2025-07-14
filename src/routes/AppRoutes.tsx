@@ -50,7 +50,7 @@ const AppRoutes = () => {
       return <Navigate to={`/app/auth${window.location.search}${window.location.hash}`} replace />;
     }
 
-    // For native apps, redirect to appropriate app screens (never to marketing site)
+    // CRITICAL: For native apps, redirect to appropriate app screens (never to marketing site)
     if (isNative) {
       console.log('[AppRoutes] Native environment detected, redirecting to app interface');
       if (!user) {

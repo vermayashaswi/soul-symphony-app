@@ -143,7 +143,7 @@ class NativeAuthService {
   }
 
   private async signInWithGoogleWeb(): Promise<void> {
-    // CRITICAL: Use app domain for redirect, not external domains
+    // CRITICAL: Use current app domain for redirect, not external domains
     const currentOrigin = window.location.origin;
     const redirectUrl = `${currentOrigin}/app/auth`;
 
