@@ -4,19 +4,10 @@ const config: CapacitorConfig = {
   appId: 'app.soulo.online',
   appName: 'Soulo Dev',
   webDir: 'dist',
-  server: {
-    url: 'https://soulo.online/app?forceHideBadge=true',
-    cleartext: true,
-    allowNavigation: [
-      'soulo.online',
-      '*.supabase.co',
-      'api.openai.com'
-    ]
-  },
+  // CRITICAL FIX: Remove external server URL - use bundled assets in development too
   plugins: {
     GoogleAuth: {
       scopes: ['profile', 'email'],
-      // Use the correct Android OAuth Client ID for development
       serverClientId: '11083941790-vgbdbj6j313ggo6jbt9agp3bvrlilam8.apps.googleusercontent.com',
       forceCodeForRefreshToken: true,
     },
@@ -25,7 +16,7 @@ const config: CapacitorConfig = {
       backgroundColor: "#8b5cf6",
       showSpinner: true,
       androidSpinnerStyle: "large",
-      iosSpinnerStyle: "small", 
+      iosSpinnerStyle: "small",
       spinnerColor: "#FFFFFF",
       splashFullScreen: true,
       splashImmersive: true,
@@ -41,7 +32,7 @@ const config: CapacitorConfig = {
       backgroundColor: "#000000"
     },
     App: {
-      launchUrl: "https://soulo.online/app",
+      // FIXED: No external URLs - handle deep links properly
       urlScheme: "app.soulo.online"
     },
     PushNotifications: {
@@ -62,9 +53,9 @@ const config: CapacitorConfig = {
     preferredContentMode: "mobile"
   },
   android: {
-    allowMixedContent: true,
+    allowMixedContent: false, // FIXED: No mixed content in dev
     captureInput: true,
-    webContentsDebuggingEnabled: true,
+    webContentsDebuggingEnabled: true, // Keep debugging for dev
     backgroundColor: "#FFFFFF",
     launchMode: "singleTask",
     orientation: "portrait",

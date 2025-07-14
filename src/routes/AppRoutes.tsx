@@ -31,27 +31,21 @@ const AppRoutes = () => {
 
     console.log('[AppRoutes] AppRootRedirect - isNative:', isNative, 'user:', !!user, 'onboardingComplete:', onboardingComplete);
 
-    // Check for OAuth callback parameters in URL
-    const urlParams = new URLSearchParams(window.location.search);
-    const hashParams = new URLSearchParams(window.location.hash.replace('#', ''));
-    const hasOAuthParams = urlParams.has('access_token') || hashParams.has('access_token') ||
-                          urlParams.has('code') || hashParams.has('code') ||
-                          urlParams.has('error') || hashParams.has('error');
-
-    // CRITICAL: OAuth callback handling for native apps
-    if (hasOAuthParams && isNative) {
-      console.log('[AppRoutes] OAuth callback detected in native app, redirecting to auth page');
-      return <Navigate to={`/app/auth${window.location.search}${window.location.hash}`} replace />;
-    }
-
-    // For web OAuth callbacks, also redirect to auth page
-    if (hasOAuthParams && !isNative) {
-      console.log('[AppRoutes] OAuth callback detected in web, redirecting to auth page');
-      return <Navigate to={`/app/auth${window.location.search}${window.location.hash}`} replace />;
-    }
-
-    // CRITICAL: For native apps, redirect to appropriate app screens (never to marketing site)
+    // CRITICAL: For native apps, handle OAuth callback parameters properly
     if (isNative) {
+      // Check for OAuth callback deep links
+      const urlParams = new URLSearchParams(window.location.search);
+      const hashParams = new URLSearchParams(window.location.hash.replace('#', ''));
+      const hasOAuthParams = urlParams.has('access_token') || hashParams.has('access_token') ||
+                            urlParams.has('code') || hashParams.has('code') ||
+                            urlParams.has('error') || hashParams.has('error');
+
+      if (hasOAuthParams) {
+        console.log('[AppRoutes] OAuth callback detected in native app, processing auth');
+        return <Navigate to={`/app/auth${window.location.search}${window.location.hash}`} replace />;
+      }
+
+      // CRITICAL: For native apps, redirect to appropriate app screens
       console.log('[AppRoutes] Native environment detected, redirecting to app interface');
       if (!user) {
         console.log('[AppRoutes] No user in native app, redirecting to onboarding');
@@ -69,6 +63,19 @@ const AppRoutes = () => {
 
     // Web behavior (existing logic)
     console.log('[AppRoutes] Web environment, using standard flow');
+
+    // Check for web OAuth callback parameters
+    const urlParams = new URLSearchParams(window.location.search);
+    const hashParams = new URLSearchParams(window.location.hash.replace('#', ''));
+    const hasOAuthParams = urlParams.has('access_token') || hashParams.has('access_token') ||
+                          urlParams.has('code') || hashParams.has('code') ||
+                          urlParams.has('error') || hashParams.has('error');
+
+    if (hasOAuthParams) {
+      console.log('[AppRoutes] OAuth callback detected in web, redirecting to auth page');
+      return <Navigate to={`/app/auth${window.location.search}${window.location.hash}`} replace />;
+    }
+
     if (!user) {
       return <Navigate to="/app/onboarding" replace />;
     }

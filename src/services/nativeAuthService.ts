@@ -112,9 +112,9 @@ class NativeAuthService {
         // CRITICAL: No redirect needed - auth context will handle navigation
         return;
       } else {
-        // For web environments only
-        console.log('[NativeAuth] Using web OAuth Google Sign-In');
-        await this.signInWithGoogleWeb();
+        // CRITICAL FIX: Never fallback to web OAuth in native apps
+        console.log('[NativeAuth] Native auth not available - throwing error instead of web fallback');
+        throw new Error('Native Google authentication not available');
       }
     } catch (error: any) {
       console.error('[NativeAuth] Google sign-in failed:', error);
@@ -126,71 +126,15 @@ class NativeAuthService {
         throw error;
       }
 
-      // For web environments, handle OAuth
-      if (!this.shouldUseNativeAuth()) {
-        console.log('[NativeAuth] Web environment auth error');
-        try {
-          await this.signInWithGoogleWeb();
-          return;
-        } catch (webError) {
-          console.error('[NativeAuth] Web OAuth also failed:', webError);
-        }
-      }
-
       this.handleAuthError(error);
       throw error;
     }
   }
 
-  private async signInWithGoogleWeb(): Promise<void> {
-    // CRITICAL: Use current app domain for redirect, not external domains
-    const currentOrigin = window.location.origin;
-    const redirectUrl = `${currentOrigin}/app/auth`;
-
-    console.log('[NativeAuth] Using redirect URL for web OAuth:', redirectUrl);
-
-    const { data, error } = await supabase.auth.signInWithOAuth({
-      provider: 'google',
-      options: {
-        redirectTo: redirectUrl,
-      },
-    });
-
-    if (error) {
-      console.error('[NativeAuth] OAuth sign-in error:', error);
-      throw error;
-    }
-
-    if (data?.url) {
-      console.log('[NativeAuth] Redirecting to OAuth URL:', data.url);
-      window.location.href = data.url;
-    }
-  }
-
   async signInWithApple(): Promise<void> {
     try {
-      console.log('[NativeAuth] Starting Apple sign-in');
-
-      // CRITICAL: Use current origin for redirect
-      const currentOrigin = window.location.origin;
-      const redirectUrl = `${currentOrigin}/app/auth`;
-
-      const { data, error } = await supabase.auth.signInWithOAuth({
-        provider: 'apple',
-        options: {
-          redirectTo: redirectUrl,
-        },
-      });
-
-      if (error) {
-        console.error('[NativeAuth] Apple OAuth error:', error);
-        throw error;
-      }
-
-      if (data?.url) {
-        console.log('[NativeAuth] Redirecting to Apple OAuth URL:', data.url);
-        window.location.href = data.url;
-      }
+      console.log('[NativeAuth] Apple sign-in not implemented for native');
+      throw new Error('Apple sign-in not available in native app');
     } catch (error: any) {
       console.error('[NativeAuth] Apple sign-in failed:', error);
       this.handleAuthError(error, 'Apple');

@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { Navigate, useNavigate, useLocation, useSearchParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
@@ -8,6 +7,7 @@ import SouloLogo from '@/components/SouloLogo';
 import { useOnboarding } from '@/hooks/use-onboarding';
 import { TranslatableText } from '@/components/translation/TranslatableText';
 import PlatformAuthButton from '@/components/auth/PlatformAuthButton';
+import { nativeIntegrationService } from '@/services/nativeIntegrationService';
 
 export default function Auth() {
   const location = useLocation();
@@ -18,25 +18,25 @@ export default function Auth() {
   const { user, isLoading: authLoading } = useAuth();
   const { onboardingComplete } = useOnboarding();
   const [authError, setAuthError] = useState<string | null>(null);
-  
+
   const redirectParam = searchParams.get('redirectTo');
   const fromLocation = location.state?.from?.pathname;
   const storedRedirect = typeof window !== 'undefined' ? localStorage.getItem('authRedirectTo') : null;
-  
+
   // Check for auth errors in URL params
   useEffect(() => {
     const error = searchParams.get('error');
     const errorDescription = searchParams.get('error_description');
-    
+
     if (error) {
       console.error('[Auth] OAuth error from URL:', { error, errorDescription });
-      
+
       // Clear error from URL
       const newUrl = new URL(window.location.href);
       newUrl.searchParams.delete('error');
       newUrl.searchParams.delete('error_description');
       window.history.replaceState({}, '', newUrl.toString());
-      
+
       // Show user-friendly error message
       let userMessage = 'Sign-in failed';
       if (errorDescription?.includes('redirect_uri_mismatch')) {
@@ -46,36 +46,43 @@ export default function Auth() {
       } else if (error === 'access_denied') {
         userMessage = 'Sign-in was cancelled';
       }
-      
+
       setAuthError(userMessage);
       toast.error(userMessage);
     }
   }, [searchParams]);
-  
-  // Get valid redirect path - default to /app/home after successful login
+
+  // Get valid redirect path - CRITICAL: Always go to home after auth in native apps
   const getValidRedirectPath = (path: string | null) => {
+    // CRITICAL: For native apps, always redirect to home after successful login
+    if (nativeIntegrationService.isRunningNatively()) {
+      console.log('[Auth] Native app detected - redirecting to home after auth');
+      return '/app/home';
+    }
+
     if (!path) {
       return '/app/home';
     }
-    
-    // Normalize legacy paths
+
+    // Normalize legacy paths for web
     if (path === '/home') return '/app/home';
     if (path === '/onboarding') return '/app/home'; // After login, go to home not onboarding
-    
+
     return path;
   };
-  
+
   // Determine where to redirect after auth
   const redirectTo = getValidRedirectPath(redirectParam || fromLocation || storedRedirect);
 
-  console.log('Auth page mounted', { 
-    redirectTo, 
-    redirectParam, 
+  console.log('Auth page mounted', {
+    redirectTo,
+    redirectParam,
     fromLocation,
     storedRedirect,
     hasUser: !!user,
     currentPath: location.pathname,
-    onboardingComplete
+    onboardingComplete,
+    isNative: nativeIntegrationService.isRunningNatively()
   });
 
   useEffect(() => {
@@ -85,18 +92,25 @@ export default function Auth() {
   useEffect(() => {
     // If user is logged in and page has finished initial loading, redirect
     if (user && !authLoading && !redirecting) {
-      console.log('User is logged in, redirecting to:', redirectTo);
+      console.log('[Auth] User is logged in, redirecting to:', redirectTo);
       setRedirecting(true);
-      
+
       // Clean up stored redirect
       localStorage.removeItem('authRedirectTo');
-      
+
       // Add small delay to ensure state updates before navigation
       const timer = setTimeout(() => {
-        // Always redirect to home after successful login (user is already authenticated)
-        navigate('/app/home', { replace: true });
+        // CRITICAL: For native apps, always go to home
+        if (nativeIntegrationService.isRunningNatively()) {
+          console.log('[Auth] Native app - redirecting to home after successful auth');
+          navigate('/app/home', { replace: true });
+        } else {
+          // Web behavior
+          console.log('[Auth] Web app - redirecting to:', redirectTo);
+          navigate(redirectTo, { replace: true });
+        }
       }, 500);
-      
+
       return () => clearTimeout(timer);
     }
   }, [user, authLoading, navigate, redirecting, redirectTo]);
@@ -110,10 +124,13 @@ export default function Auth() {
     );
   }
 
-  // If already logged in, redirect to home
+  // If already logged in, redirect appropriately
   if (user) {
-    console.log('User already logged in, redirecting to home');
-    return <Navigate to="/app/home" replace />;
+    console.log('[Auth] User already logged in, redirecting');
+    if (nativeIntegrationService.isRunningNatively()) {
+      return <Navigate to="/app/home" replace />;
+    }
+    return <Navigate to={redirectTo} replace />;
   }
 
   return (
@@ -130,19 +147,19 @@ export default function Auth() {
             <SouloLogo size="large" className="text-blue-600" />
           </h1>
           <p className="text-muted-foreground">
-            <TranslatableText 
-              text="Sign in to start your journaling journey and track your emotional wellbeing" 
-              forceTranslate={true} 
+            <TranslatableText
+              text="Sign in to start your journaling journey and track your emotional wellbeing"
+              forceTranslate={true}
             />
           </p>
         </div>
-        
+
         {authError && (
           <div className="mb-4 p-3 border border-red-200 bg-red-50 text-red-700 rounded-md">
             <p className="text-sm">
               {authError}
             </p>
-            <button 
+            <button
               onClick={() => setAuthError(null)}
               className="mt-2 text-xs text-red-600 hover:text-red-800 underline"
             >
@@ -150,9 +167,9 @@ export default function Auth() {
             </button>
           </div>
         )}
-        
+
         <div className="space-y-4">
-          <PlatformAuthButton 
+          <PlatformAuthButton
             isLoading={isLoading}
             onLoadingChange={setIsLoading}
             onError={(error) => {
@@ -160,12 +177,12 @@ export default function Auth() {
               setAuthError(error);
             }}
           />
-          
+
           <div className="text-center text-sm text-muted-foreground">
             <p>
-              <TranslatableText 
-                text="By signing in, you agree to our Terms of Service and Privacy Policy" 
-                forceTranslate={true} 
+              <TranslatableText
+                text="By signing in, you agree to our Terms of Service and Privacy Policy"
+                forceTranslate={true}
               />
             </p>
           </div>
