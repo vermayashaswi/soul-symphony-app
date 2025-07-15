@@ -1,5 +1,7 @@
 
 // Type definitions for React Three Fiber
+import * as THREE from 'three';
+
 declare module '@react-three/fiber' {
   import { ReactNode, RefObject } from 'react';
   import * as THREE from 'three';
@@ -12,6 +14,7 @@ declare module '@react-three/fiber' {
     boxGeometry: any;
     meshStandardMaterial: any;
     meshBasicMaterial: any;
+    lineBasicMaterial: any;
     ambientLight: any;
     pointLight: any;
     hemisphereLight: any;
@@ -81,6 +84,7 @@ declare namespace JSX {
     boxGeometry: any;
     meshStandardMaterial: any;
     meshBasicMaterial: any;
+    lineBasicMaterial: any;
     ambientLight: any;
     pointLight: any;
     hemisphereLight: any;
@@ -101,5 +105,19 @@ declare namespace JSX {
       opacity?: number;
     };
     fog: any;
+  }
+}
+
+// Extend Three.js types for better React Three Fiber integration
+declare module 'three' {
+  interface Object3D {
+    userData?: any;
+  }
+  
+  interface Material {
+    transparent?: boolean;
+    opacity?: number;
+    depthWrite?: boolean;
+    depthTest?: boolean;
   }
 }
