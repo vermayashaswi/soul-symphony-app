@@ -22,6 +22,17 @@ class NativeAuthService {
     try {
       console.log('[NativeAuth] Initializing native auth service');
 
+      // Enhanced configuration validation
+      const validation = this.validateConfiguration();
+      console.log('[NativeAuth] Configuration validation:', validation);
+
+      if (!validation.isValid) {
+        console.warn('[NativeAuth] Configuration validation failed:', validation.errors);
+        this.initializationError = validation.errors.join(', ');
+        this.isInitialized = true;
+        return;
+      }
+
       if (!nativeIntegrationService.isRunningNatively()) {
         console.log('[NativeAuth] Not running natively - skipping GoogleAuth initialization');
         this.isInitialized = true;
@@ -36,15 +47,12 @@ class NativeAuthService {
       }
 
       const clientId = this.getGoogleClientId();
-      if (!clientId || clientId.trim() === '') {
-        console.warn('[NativeAuth] No valid Google Client ID configured');
-        this.initializationError = 'Google Client ID not configured';
-        this.hasValidClientId = false;
-        this.isInitialized = true;
-        return;
-      }
+      console.log('[NativeAuth] Initializing GoogleAuth plugin with configuration:', {
+        clientId: clientId,
+        scopes: ['profile', 'email'],
+        expectedClientId: '11083941790-oi1vrl8bmsjajc0h1ka4f9q0qjmm80o9.apps.googleusercontent.com'
+      });
 
-      console.log('[NativeAuth] Initializing GoogleAuth plugin with client ID');
       await GoogleAuth.initialize({
         clientId: clientId,
         scopes: ['profile', 'email'],
@@ -61,10 +69,36 @@ class NativeAuthService {
   }
 
   private getGoogleClientId(): string {
-    // Use the Android client ID for native auth
-    const androidClientId = '11083941790-vgbdbj6j313ggo6jbt9agp3bvrlilam8.apps.googleusercontent.com';
-    console.log('[NativeAuth] Using Android Google Client ID for native auth');
-    return androidClientId;
+    // Use the clientId from Capacitor config (NOT serverClientId)
+    // This should match the clientId in capacitor.config.ts
+    const clientId = '11083941790-oi1vrl8bmsjajc0h1ka4f9q0qjmm80o9.apps.googleusercontent.com';
+    console.log('[NativeAuth] Using correct clientId from Capacitor config for native auth');
+    console.log('[NativeAuth] ClientId:', clientId);
+    return clientId;
+  }
+
+  private validateConfiguration(): { isValid: boolean; errors: string[] } {
+    const errors: string[] = [];
+    
+    // Check if running natively
+    if (!nativeIntegrationService.isRunningNatively()) {
+      errors.push('Not running in native environment');
+    }
+    
+    // Check if GoogleAuth plugin is available
+    if (!nativeIntegrationService.isGoogleAuthAvailable()) {
+      errors.push('GoogleAuth plugin not available');
+    }
+    
+    // Check client ID configuration
+    const clientId = this.getGoogleClientId();
+    if (!clientId || clientId.trim() === '') {
+      errors.push('Google Client ID not configured');
+    } else if (!clientId.includes('oi1vrl8bmsjajc0h1ka4f9q0qjmm80o9')) {
+      errors.push('Using wrong Google Client ID - should use clientId, not serverClientId');
+    }
+    
+    return { isValid: errors.length === 0, errors };
   }
 
   async signInWithGoogle(): Promise<void> {
@@ -81,8 +115,18 @@ class NativeAuthService {
       if (this.shouldUseNativeAuth()) {
         console.log('[NativeAuth] Using native Google Sign-In - no browser redirects');
 
+        // Enhanced pre-flight configuration validation
+        const validation = this.validateConfiguration();
+        console.log('[NativeAuth] Pre-flight validation:', validation);
+
         if (this.initializationError) {
           console.error('[NativeAuth] Initialization error:', this.initializationError);
+          
+          // Specific error for client ID mismatch
+          if (this.initializationError.includes('wrong Google Client ID')) {
+            throw new Error('Google OAuth configuration error: Using wrong client ID. Please contact support.');
+          }
+          
           throw new Error(`Native auth not available: ${this.initializationError}`);
         }
 
@@ -258,6 +302,8 @@ class NativeAuthService {
       errorMessage = 'Network error. Please check your connection and try again.';
     } else if (error.message?.includes('Configuration') || error.message?.includes('configuration')) {
       errorMessage = `${provider} sign-in configuration error. Please contact support.`;
+    } else if (error.message?.includes('wrong client ID') || error.message?.includes('OAuth configuration')) {
+      errorMessage = 'Google OAuth configuration error. Please contact support.';
     } else if (error.message?.includes('timeout')) {
       errorMessage = 'Sign-in timed out. Please try again.';
     } else if (error.message?.includes('not available')) {
