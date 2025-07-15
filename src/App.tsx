@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from 'react';
 import AppRoutes from './routes/AppRoutes';
 import { Toaster } from "@/components/ui/toaster";
@@ -31,6 +30,11 @@ const App: React.FC = () => {
   const { refreshCount, isStuckDetected } = useTWAAutoRefresh();
 
   useEffect(() => {
+      if (nativeIntegrationService.isRunningNatively()) {
+          console.log('[App] Initializing native services');
+          nativeAuthService.initialize();
+          nativeAuthService.initializeWithCapacitor();
+        }
     const initializeApp = async () => {
       try {
         console.log('[App] Starting app initialization...');

@@ -22,14 +22,20 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
 
-            <!-- ADD THIS BLOCK FOR GOOGLE AUTH TO WORK NATIVELY -->
+            <!-- CRITICAL FIX: Proper Google OAuth intent filter -->
             <intent-filter>
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
-                <data
-                    android:scheme="com.googleusercontent.apps.11083941790-h3s79i47p0u9vqjp4e8dbkj8g9ohf5np"
-                    android:host="oauth2redirect" />
+                <data android:scheme="com.googleusercontent.apps.11083941790-vgbdbj6j313ggo6jbt9agp3bvrlilam8" />
+            </intent-filter>
+
+            <!-- App deep link handling -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="app.soulo.online" />
             </intent-filter>
 
         </activity>
@@ -46,6 +52,5 @@
     </application>
 
     <!-- Permissions -->
-
     <uses-permission android:name="android.permission.INTERNET" />
 </manifest>

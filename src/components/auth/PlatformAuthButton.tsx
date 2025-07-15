@@ -18,18 +18,46 @@ const PlatformAuthButton: React.FC<PlatformAuthButtonProps> = ({
 }) => {
   const { isIOS, isAndroid } = useIsMobile();
 
+  // REPLACE the handleGoogleSignIn function with this:
+
   const handleGoogleSignIn = async () => {
     try {
-      onLoadingChange(true);
-      onError('');
-      console.log('Initiating Google sign-in');
-      await signInWithGoogle();
+      setIsLoading(true);
+
+      // CRITICAL: Always try native auth first in mobile apps
+      if (nativeIntegrationService.isRunningNatively()) {
+        console.log('[PlatformAuth] Native environment - using native Google auth');
+        await nativeAuthService.signInWithGoogle();
+        return;
+      }
+
+      // Web fallback
+      console.log('[PlatformAuth] Web environment - using Supabase OAuth');
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo: `${window.location.origin}/app/auth`,
+          queryParams: {
+            access_type: 'offline',
+            prompt: 'consent',
+          }
+        }
+      });
+
+      if (error) {
+        console.error('[PlatformAuth] Web OAuth error:', error);
+        throw error;
+      }
     } catch (error: any) {
-      console.error('Google sign-in error:', error.message);
-      onError(error.message);
-      onLoadingChange(false);
+      console.error('[PlatformAuth] Google sign-in failed:', error);
+      const errorMessage = error.message || 'Google sign-in failed';
+      onError?.(errorMessage);
+      toast.error(errorMessage);
+    } finally {
+      setIsLoading(false);
     }
   };
+
 
   const handleAppleSignIn = async () => {
     try {

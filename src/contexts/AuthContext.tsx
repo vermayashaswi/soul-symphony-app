@@ -48,6 +48,11 @@ function AuthProviderCore({ children }: { children: ReactNode }) {
 
   // Initialize native services
   useEffect(() => {
+       // Initialize native auth service and deep link handling
+        if (nativeIntegrationService.isRunningNatively()) {
+          nativeAuthService.initialize();
+          nativeAuthService.initializeWithCapacitor(); // ADD THIS LINE
+        }
     const initializeNativeServices = async () => {
       try {
         console.log('[AuthContext] Initializing native services');
