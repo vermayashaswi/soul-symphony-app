@@ -221,6 +221,7 @@ class NativeAuthService {
         });
 
         console.log('[NativeAuth] Successfully signed in with Google natively');
+        console.log('[NativeAuth] Navigation should now be handled by AuthContext/Auth component');
         toast.success('Signed in successfully');
         return;
 

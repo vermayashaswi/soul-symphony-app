@@ -33,8 +33,15 @@ const ProtectedRoute: React.FC = () => {
   
   useEffect(() => {
     if (!isLoading && !user) {
-      console.log("Protected route: No user, should redirect to onboarding", {
-        path: location.pathname
+      console.log("[ProtectedRoute] No user detected, should redirect to onboarding", {
+        path: location.pathname,
+        isLoading,
+        hasUser: !!user
+      });
+    } else if (!isLoading && user) {
+      console.log("[ProtectedRoute] User authenticated, allowing access", {
+        path: location.pathname,
+        userEmail: user.email
       });
     }
   }, [user, isLoading, location]);
@@ -48,7 +55,7 @@ const ProtectedRoute: React.FC = () => {
   }
   
   if (!user) {
-    console.log("Redirecting to onboarding from protected route:", location.pathname);
+    console.log("[ProtectedRoute] REDIRECTING to onboarding from protected route:", location.pathname);
     
     // Always redirect to onboarding when not authenticated
     return <Navigate to="/app/onboarding" replace />;

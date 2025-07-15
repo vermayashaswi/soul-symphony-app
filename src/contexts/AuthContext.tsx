@@ -563,7 +563,12 @@ function AuthProviderCore({ children }: { children: ReactNode }) {
     
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, currentSession) => {
-        logInfo(`Auth state changed: ${event}, user: ${currentSession?.user?.email}`, 'AuthContext');
+        logInfo(`Auth state changed: ${event}, user: ${currentSession?.user?.email}`, 'AuthContext', {
+          isNative: nativeIntegrationService.isRunningNatively(),
+          event,
+          hasUser: !!currentSession?.user,
+          userId: currentSession?.user?.id
+        });
         
         // Prevent loops by checking if this is the same session
         if (currentSession?.access_token === session?.access_token && event !== 'SIGNED_OUT') {
@@ -574,11 +579,12 @@ function AuthProviderCore({ children }: { children: ReactNode }) {
         setSession(currentSession);
         setUser(currentSession?.user ?? null);
         
-        // Mark auth state as stable after processing
+        // Mark auth state as stable after processing - faster for native
         if (!authStateStable) {
+          const stabilityDelay = nativeIntegrationService.isRunningNatively() ? 200 : 1000;
           setTimeout(() => {
             setAuthStateStable(true);
-          }, 1000);
+          }, stabilityDelay);
         }
         
         // Reset session tracking on new session
@@ -586,9 +592,16 @@ function AuthProviderCore({ children }: { children: ReactNode }) {
           setSessionCreated(false);
           setCurrentSessionId(null);
           
-          // Increased delay for TWA stability
-          const initialDelay = (isMobileDevice || twaEnv.isTWA || twaEnv.isStandalone) ? 3000 : 2000;
-          logProfile(`Scheduling profile creation in ${initialDelay}ms for platform stability`, 'AuthContext');
+          // Reduced delay for native apps, increased for TWA stability
+          const initialDelay = nativeIntegrationService.isRunningNatively() 
+            ? 500 
+            : (isMobileDevice || twaEnv.isTWA || twaEnv.isStandalone) ? 3000 : 2000;
+          
+          logProfile(`Scheduling profile creation in ${initialDelay}ms for platform stability`, 'AuthContext', {
+            isNative: nativeIntegrationService.isRunningNatively(),
+            isTWA: twaEnv.isTWA,
+            isStandalone: twaEnv.isStandalone
+          });
           
           setTimeout(() => {
             createOrVerifyProfile(currentSession.user)
@@ -600,17 +613,24 @@ function AuthProviderCore({ children }: { children: ReactNode }) {
           await trackConversion('sign_in_success', {
             method: currentSession.user.app_metadata?.provider || 'unknown',
             timestamp: new Date().toISOString(),
+            isNative: nativeIntegrationService.isRunningNatively()
           });
         }
         
-        // Improved loading state management
-        const loadingDelay = (twaEnv.isTWA || twaEnv.isStandalone) ? 1500 : 800;
+        // Improved loading state management - faster for native
+        const loadingDelay = nativeIntegrationService.isRunningNatively() 
+          ? 100 
+          : (twaEnv.isTWA || twaEnv.isStandalone) ? 1500 : 800;
+        
         setTimeout(() => {
           setIsLoading(false);
         }, loadingDelay);
 
         if (event === 'SIGNED_IN') {
-          logInfo('User signed in successfully', 'AuthContext');
+          logInfo('User signed in successfully', 'AuthContext', {
+            isNative: nativeIntegrationService.isRunningNatively(),
+            userEmail: currentSession?.user?.email
+          });
           if (isAppRoute(location.pathname)) {
             toast.success('Signed in successfully');
           }
@@ -636,7 +656,10 @@ function AuthProviderCore({ children }: { children: ReactNode }) {
     );
 
     supabase.auth.getSession().then(async ({ data: { session: currentSession } }) => {
-      logInfo(`Initial session check: ${currentSession?.user?.email || 'No session'}`, 'AuthContext');
+      logInfo(`Initial session check: ${currentSession?.user?.email || 'No session'}`, 'AuthContext', {
+        isNative: nativeIntegrationService.isRunningNatively(),
+        hasUser: !!currentSession?.user
+      });
       setSession(currentSession);
       setUser(currentSession?.user ?? null);
       
@@ -644,9 +667,15 @@ function AuthProviderCore({ children }: { children: ReactNode }) {
         setSessionCreated(false);
         setCurrentSessionId(null);
         
-        // Increased delay for TWA stability
-        const initialDelay = (isMobileDevice || twaEnv.isTWA || twaEnv.isStandalone) ? 3000 : 2000;
-        logProfile(`Scheduling initial profile creation in ${initialDelay}ms for platform stability`, 'AuthContext');
+        // Reduced delay for native apps, increased for TWA stability
+        const initialDelay = nativeIntegrationService.isRunningNatively() 
+          ? 500 
+          : (isMobileDevice || twaEnv.isTWA || twaEnv.isStandalone) ? 3000 : 2000;
+        
+        logProfile(`Scheduling initial profile creation in ${initialDelay}ms for platform stability`, 'AuthContext', {
+          isNative: nativeIntegrationService.isRunningNatively(),
+          isTWA: twaEnv.isTWA
+        });
         
         setTimeout(() => {
           createOrVerifyProfile(currentSession.user)
@@ -656,8 +685,11 @@ function AuthProviderCore({ children }: { children: ReactNode }) {
         }, initialDelay);
       }
       
-      // Better timing for initialization completion
-      const initDelay = (twaEnv.isTWA || twaEnv.isStandalone) ? 2000 : 1000;
+      // Better timing for initialization completion - faster for native
+      const initDelay = nativeIntegrationService.isRunningNatively() 
+        ? 200 
+        : (twaEnv.isTWA || twaEnv.isStandalone) ? 2000 : 1000;
+      
       setTimeout(() => {
         setIsLoading(false);
         setAuthInitialized(true);

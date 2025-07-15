@@ -74,7 +74,7 @@ export default function Auth() {
   // Determine where to redirect after auth
   const redirectTo = getValidRedirectPath(redirectParam || fromLocation || storedRedirect);
 
-  console.log('Auth page mounted', {
+  console.log('[Auth] Auth page mounted', {
     redirectTo,
     redirectParam,
     fromLocation,
@@ -82,7 +82,9 @@ export default function Auth() {
     hasUser: !!user,
     currentPath: location.pathname,
     onboardingComplete,
-    isNative: nativeIntegrationService.isRunningNatively()
+    isNative: nativeIntegrationService.isRunningNatively(),
+    authLoading,
+    redirecting
   });
 
   useEffect(() => {
@@ -90,30 +92,50 @@ export default function Auth() {
   }, []);
 
   useEffect(() => {
+    // Enhanced navigation logic with better debugging
+    console.log('[Auth] Navigation check:', {
+      hasUser: !!user,
+      authLoading,
+      redirecting,
+      redirectTo,
+      isNative: nativeIntegrationService.isRunningNatively(),
+      onboardingComplete
+    });
+
     // If user is logged in and page has finished initial loading, redirect
     if (user && !authLoading && !redirecting) {
-      console.log('[Auth] User is logged in, redirecting to:', redirectTo);
+      console.log('[Auth] CONDITIONS MET - Starting navigation process');
+      console.log('[Auth] User authenticated, starting redirect to:', redirectTo);
       setRedirecting(true);
 
       // Clean up stored redirect
       localStorage.removeItem('authRedirectTo');
 
-      // Add small delay to ensure state updates before navigation
+      // Determine final destination
+      const finalDestination = nativeIntegrationService.isRunningNatively() 
+        ? '/app/home' 
+        : redirectTo;
+
+      console.log('[Auth] Final destination determined:', finalDestination);
+
+      // Add small delay to ensure state updates and auth context sync
       const timer = setTimeout(() => {
-        // CRITICAL: For native apps, always go to home
-        if (nativeIntegrationService.isRunningNatively()) {
-          console.log('[Auth] Native app - redirecting to home after successful auth');
+        console.log('[Auth] EXECUTING NAVIGATION to:', finalDestination);
+        
+        try {
+          navigate(finalDestination, { replace: true });
+          console.log('[Auth] Navigation called successfully');
+        } catch (error) {
+          console.error('[Auth] Navigation failed:', error);
+          // Fallback navigation
+          console.log('[Auth] Attempting fallback navigation to /app/home');
           navigate('/app/home', { replace: true });
-        } else {
-          // Web behavior
-          console.log('[Auth] Web app - redirecting to:', redirectTo);
-          navigate(redirectTo, { replace: true });
         }
-      }, 500);
+      }, 100); // Reduced delay for faster navigation
 
       return () => clearTimeout(timer);
     }
-  }, [user, authLoading, navigate, redirecting, redirectTo]);
+  }, [user, authLoading, navigate, redirecting, redirectTo, onboardingComplete]);
 
   // If still checking auth state, show loading
   if (authLoading) {
@@ -126,11 +148,9 @@ export default function Auth() {
 
   // If already logged in, redirect appropriately
   if (user) {
-    console.log('[Auth] User already logged in, redirecting');
-    if (nativeIntegrationService.isRunningNatively()) {
-      return <Navigate to="/app/home" replace />;
-    }
-    return <Navigate to={redirectTo} replace />;
+    const destination = nativeIntegrationService.isRunningNatively() ? '/app/home' : redirectTo;
+    console.log('[Auth] User already logged in, immediate redirect to:', destination);
+    return <Navigate to={destination} replace />;
   }
 
   return (
