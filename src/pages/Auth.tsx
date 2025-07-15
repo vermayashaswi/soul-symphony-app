@@ -52,30 +52,28 @@ export default function Auth() {
     }
   }, [searchParams]);
 
-  // Get valid redirect path - CRITICAL: Always go to home after auth in native apps
-  const getValidRedirectPath = (path: string | null) => {
+  // Simplified redirect logic - CRITICAL: Always go to home after auth in native apps
+  const getFinalRedirectPath = () => {
     // CRITICAL: For native apps, always redirect to home after successful login
     if (nativeIntegrationService.isRunningNatively()) {
       console.log('[Auth] Native app detected - redirecting to home after auth');
       return '/app/home';
     }
 
-    if (!path) {
+    // For web, use redirect parameters or default to home
+    const webRedirect = redirectParam || fromLocation || storedRedirect;
+    if (!webRedirect) {
       return '/app/home';
     }
 
     // Normalize legacy paths for web
-    if (path === '/home') return '/app/home';
-    if (path === '/onboarding') return '/app/home'; // After login, go to home not onboarding
+    if (webRedirect === '/home') return '/app/home';
+    if (webRedirect === '/onboarding') return '/app/home';
 
-    return path;
+    return webRedirect;
   };
 
-  // Determine where to redirect after auth
-  const redirectTo = getValidRedirectPath(redirectParam || fromLocation || storedRedirect);
-
   console.log('[Auth] Auth page mounted', {
-    redirectTo,
     redirectParam,
     fromLocation,
     storedRedirect,
@@ -92,12 +90,11 @@ export default function Auth() {
   }, []);
 
   useEffect(() => {
-    // Enhanced navigation logic with better debugging
+    // Simplified navigation logic with enhanced debugging
     console.log('[Auth] Navigation check:', {
       hasUser: !!user,
       authLoading,
       redirecting,
-      redirectTo,
       isNative: nativeIntegrationService.isRunningNatively(),
       onboardingComplete
     });
@@ -105,37 +102,45 @@ export default function Auth() {
     // If user is logged in and page has finished initial loading, redirect
     if (user && !authLoading && !redirecting) {
       console.log('[Auth] CONDITIONS MET - Starting navigation process');
-      console.log('[Auth] User authenticated, starting redirect to:', redirectTo);
       setRedirecting(true);
 
       // Clean up stored redirect
       localStorage.removeItem('authRedirectTo');
 
-      // Determine final destination
-      const finalDestination = nativeIntegrationService.isRunningNatively() 
-        ? '/app/home' 
-        : redirectTo;
-
+      // Get final destination
+      const finalDestination = getFinalRedirectPath();
       console.log('[Auth] Final destination determined:', finalDestination);
 
-      // Add small delay to ensure state updates and auth context sync
-      const timer = setTimeout(() => {
-        console.log('[Auth] EXECUTING NAVIGATION to:', finalDestination);
+      // For native apps, use immediate navigation without delay
+      if (nativeIntegrationService.isRunningNatively()) {
+        console.log('[Auth] NATIVE - Immediate navigation to:', finalDestination);
         
         try {
           navigate(finalDestination, { replace: true });
-          console.log('[Auth] Navigation called successfully');
+          console.log('[Auth] NATIVE - Navigation called successfully');
         } catch (error) {
-          console.error('[Auth] Navigation failed:', error);
-          // Fallback navigation
-          console.log('[Auth] Attempting fallback navigation to /app/home');
-          navigate('/app/home', { replace: true });
+          console.error('[Auth] NATIVE - Navigation failed:', error);
+          // Force navigation to home as fallback
+          console.log('[Auth] NATIVE - Fallback navigation to /app/home');
+          window.location.href = '/app/home';
         }
-      }, 100); // Reduced delay for faster navigation
+      } else {
+        // Web apps can use delayed navigation
+        console.log('[Auth] WEB - Delayed navigation to:', finalDestination);
+        const timer = setTimeout(() => {
+          try {
+            navigate(finalDestination, { replace: true });
+            console.log('[Auth] WEB - Navigation called successfully');
+          } catch (error) {
+            console.error('[Auth] WEB - Navigation failed:', error);
+            navigate('/app/home', { replace: true });
+          }
+        }, 100);
 
-      return () => clearTimeout(timer);
+        return () => clearTimeout(timer);
+      }
     }
-  }, [user, authLoading, navigate, redirecting, redirectTo, onboardingComplete]);
+  }, [user, authLoading, navigate, redirecting, onboardingComplete]);
 
   // If still checking auth state, show loading
   if (authLoading) {
@@ -148,7 +153,7 @@ export default function Auth() {
 
   // If already logged in, redirect appropriately
   if (user) {
-    const destination = nativeIntegrationService.isRunningNatively() ? '/app/home' : redirectTo;
+    const destination = getFinalRedirectPath();
     console.log('[Auth] User already logged in, immediate redirect to:', destination);
     return <Navigate to={destination} replace />;
   }
