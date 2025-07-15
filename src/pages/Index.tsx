@@ -11,6 +11,7 @@ import HomePage from '@/pages/website/HomePage';
 import { TranslatableText } from '@/components/translation/TranslatableText';
 import { useTranslation } from '@/contexts/TranslationContext';
 import { supabase } from '@/integrations/supabase/client';
+import { nativeIntegrationService } from '@/services/nativeIntegrationService';
 
 const Index = () => {
   const navigate = useNavigate();
@@ -25,6 +26,39 @@ const Index = () => {
   const mobileDemo = urlParams.get('mobileDemo') === 'true';
   
   const shouldRenderMobile = isMobile.isMobile || mobileDemo;
+  const isNative = nativeIntegrationService.isRunningNatively();
+
+  // CRITICAL: For native apps, redirect immediately - never show marketing site
+  useEffect(() => {
+    if (isNative) {
+      console.log('[Index] Native app detected, redirecting to app interface');
+      
+      // Check for OAuth callback parameters first
+      const hashParams = new URLSearchParams(window.location.hash.replace('#', ''));
+      const hasOAuthParams = urlParams.has('access_token') || hashParams.has('access_token') ||
+                            urlParams.has('code') || hashParams.has('code') ||
+                            urlParams.has('error') || hashParams.has('error');
+
+      if (hasOAuthParams) {
+        console.log('[Index] OAuth callback detected in native app, redirecting to auth');
+        navigate(`/app/auth${window.location.search}${window.location.hash}`, { replace: true });
+        return;
+      }
+
+      // Redirect based on user status
+      if (!user) {
+        console.log('[Index] No user in native app, redirecting to onboarding');
+        navigate('/app/onboarding', { replace: true });
+      } else if (!onboardingComplete) {
+        console.log('[Index] Onboarding not complete in native app, redirecting to onboarding');
+        navigate('/app/onboarding', { replace: true });
+      } else {
+        console.log('[Index] Native app user ready, redirecting to home');
+        navigate('/app/home', { replace: true });
+      }
+      return;
+    }
+  }, [isNative, user, onboardingComplete, navigate, urlParams]);
 
   // Enhanced tutorial status checking for proper navigation flow
   useEffect(() => {
@@ -140,10 +174,16 @@ const Index = () => {
   
   console.log('[Index] Rendering Index.tsx component, path:', window.location.pathname, {
     hasUser: !!user,
-    onboardingComplete
+    onboardingComplete,
+    isNative
   });
 
-  // Always render the website homepage component when at root URL
+  // For native apps, don't render anything as we redirect immediately
+  if (isNative) {
+    return null;
+  }
+
+  // Always render the website homepage component when at root URL (web only)
   return (
     <>
       <NetworkAwareContent
