@@ -64,6 +64,7 @@ class NativeAuthService {
   }
 
   private getGoogleClientId(): string {
+    // CORRECTED: Use your actual Android client ID
     const androidClientId = '11083941790-vgbdbj6j313ggo6jbt9agp3bvrlilam8.apps.googleusercontent.com';
     console.log('[NativeAuth] Using Android Google Client ID for native auth');
     return androidClientId;

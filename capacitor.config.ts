@@ -4,11 +4,13 @@ const config: CapacitorConfig = {
   appId: 'app.soulo.online',
   appName: 'Soulo',
   webDir: 'dist',
-  // CRITICAL FIX: Remove server configuration - use bundled assets only
   plugins: {
     GoogleAuth: {
       scopes: ['profile', 'email'],
+      // Use your Android client ID for serverClientId
       serverClientId: '11083941790-vgbdbj6j313ggo6jbt9agp3bvrlilam8.apps.googleusercontent.com',
+      // Add your web client ID for hybrid scenarios
+      clientId: '11083941790-oi1vrl8bmsjajc0h1ka4f9q0qjmm80o9.apps.googleusercontent.com',
       forceCodeForRefreshToken: true,
     },
     App: {
