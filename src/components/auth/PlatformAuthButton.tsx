@@ -27,12 +27,49 @@ const PlatformAuthButton: React.FC<PlatformAuthButtonProps> = ({
   const handleGoogleSignIn = async () => {
     try {
       onLoadingChange(true);
+      onError(''); // Clear any previous errors
+
+      console.log('[PlatformAuth] Starting Google sign-in process');
 
       // CRITICAL: Always try native auth first in mobile apps
       if (nativeIntegrationService.isRunningNatively()) {
         console.log('[PlatformAuth] Native environment - using native Google auth');
-        await nativeAuthService.signInWithGoogle();
-        return;
+        
+        // Add timeout for native auth
+        const timeoutPromise = new Promise<never>((_, reject) => {
+          setTimeout(() => {
+            reject(new Error('Native Google authentication timed out'));
+          }, 45000); // 45 seconds timeout
+        });
+
+        const authPromise = nativeAuthService.signInWithGoogle();
+
+        try {
+          await Promise.race([authPromise, timeoutPromise]);
+          console.log('[PlatformAuth] Native Google sign-in completed successfully');
+          return;
+        } catch (nativeError: any) {
+          console.error('[PlatformAuth] Native auth failed:', nativeError);
+          
+          // Enhanced error handling with specific messages
+          let userFriendlyMessage = 'Something went wrong with Google sign-in';
+          
+          if (nativeError.message?.includes('timeout')) {
+            userFriendlyMessage = 'Sign-in timed out. Please try again.';
+          } else if (nativeError.message?.includes('cancelled')) {
+            userFriendlyMessage = 'Sign-in was cancelled. Please try again.';
+          } else if (nativeError.message?.includes('network')) {
+            userFriendlyMessage = 'Network error. Please check your connection and try again.';
+          } else if (nativeError.message?.includes('token')) {
+            userFriendlyMessage = 'Authentication token error. Please try again.';
+          } else if (nativeError.message?.includes('not available')) {
+            userFriendlyMessage = 'Google sign-in is not available on this device.';
+          }
+
+          onError(userFriendlyMessage);
+          toast.error(userFriendlyMessage);
+          throw nativeError;
+        }
       }
 
       // Web fallback
@@ -53,10 +90,18 @@ const PlatformAuthButton: React.FC<PlatformAuthButtonProps> = ({
         throw error;
       }
     } catch (error: any) {
-      console.error('[PlatformAuth] Google sign-in failed:', error);
-      const errorMessage = error.message || 'Google sign-in failed';
-      onError?.(errorMessage);
-      toast.error(errorMessage);
+      console.error('[PlatformAuth] Google sign-in failed:', {
+        message: error.message,
+        stack: error.stack,
+        name: error.name
+      });
+      
+      // Don't show error again if it was already handled above
+      if (!error.message?.includes('Native Google authentication')) {
+        const errorMessage = error.message || 'Google sign-in failed';
+        onError?.(errorMessage);
+        toast.error(errorMessage);
+      }
     } finally {
       onLoadingChange(false);
     }

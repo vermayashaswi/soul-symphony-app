@@ -73,39 +73,82 @@ class NativeAuthService {
   async signInWithGoogle(): Promise<void> {
     try {
       console.log('[NativeAuth] Starting Google sign-in');
+      console.log('[NativeAuth] Environment check:', {
+        isRunningNatively: nativeIntegrationService.isRunningNatively(),
+        isGoogleAuthAvailable: nativeIntegrationService.isGoogleAuthAvailable(),
+        isInitialized: this.isInitialized,
+        hasValidClientId: this.hasValidClientId,
+        initializationError: this.initializationError
+      });
 
       // CRITICAL: Strict native vs web separation
       if (this.shouldUseNativeAuth()) {
         console.log('[NativeAuth] Using native Google Sign-In - no browser redirects');
 
         if (this.initializationError) {
+          console.error('[NativeAuth] Initialization error:', this.initializationError);
           throw new Error(`Native auth not available: ${this.initializationError}`);
         }
 
         if (!this.hasValidClientId) {
+          console.error('[NativeAuth] No valid client ID configured');
           throw new Error('Google Client ID not configured for native auth');
         }
 
+        console.log('[NativeAuth] Calling GoogleAuth.signIn()...');
         const result = await GoogleAuth.signIn();
+        
         console.log('[NativeAuth] Native Google sign-in result:', {
           hasIdToken: !!result.authentication?.idToken,
-          email: result.email
+          hasAccessToken: !!result.authentication?.accessToken,
+          email: result.email,
+          name: result.name,
+          id: result.id
         });
 
+        // Enhanced token validation
         if (!result.authentication?.idToken) {
+          console.error('[NativeAuth] No ID token received from Google:', result);
           throw new Error('No ID token received from Google');
         }
 
-        // Sign in to Supabase with the Google ID token
-        const { data, error } = await supabase.auth.signInWithIdToken({
+        // Validate token format
+        const tokenParts = result.authentication.idToken.split('.');
+        if (tokenParts.length !== 3) {
+          console.error('[NativeAuth] Invalid ID token format:', tokenParts.length);
+          throw new Error('Invalid ID token format received from Google');
+        }
+
+        console.log('[NativeAuth] Token validation passed, calling Supabase...');
+        
+        // Add timeout for Supabase token exchange
+        const timeoutPromise = new Promise<never>((_, reject) => {
+          setTimeout(() => {
+            reject(new Error('Supabase token exchange timed out after 30 seconds'));
+          }, 30000);
+        });
+
+        const supabasePromise = supabase.auth.signInWithIdToken({
           provider: 'google',
           token: result.authentication.idToken,
         });
 
+        const { data, error } = await Promise.race([supabasePromise, timeoutPromise]);
+
         if (error) {
-          console.error('[NativeAuth] Supabase sign-in error:', error);
+          console.error('[NativeAuth] Supabase sign-in error:', {
+            message: error.message,
+            status: error.status,
+            code: error.code || 'unknown'
+          });
           throw error;
         }
+
+        console.log('[NativeAuth] Supabase sign-in successful:', {
+          hasUser: !!data.user,
+          userEmail: data.user?.email,
+          hasSession: !!data.session
+        });
 
         console.log('[NativeAuth] Successfully signed in with Google natively');
         toast.success('Signed in successfully');
@@ -118,7 +161,26 @@ class NativeAuthService {
         throw new Error('Native Google authentication not available');
       }
     } catch (error: any) {
-      console.error('[NativeAuth] Google sign-in failed:', error);
+      console.error('[NativeAuth] Google sign-in failed:', {
+        message: error.message,
+        stack: error.stack,
+        name: error.name,
+        code: error.code || 'unknown'
+      });
+
+      // Enhanced error categorization
+      let errorCategory = 'unknown';
+      if (error.message?.includes('timeout')) {
+        errorCategory = 'timeout';
+      } else if (error.message?.includes('token')) {
+        errorCategory = 'token';
+      } else if (error.message?.includes('network')) {
+        errorCategory = 'network';
+      } else if (error.message?.includes('cancelled')) {
+        errorCategory = 'cancelled';
+      }
+
+      console.error('[NativeAuth] Error category:', errorCategory);
 
       // CRITICAL: No fallback to web OAuth in native apps
       if (this.shouldUseNativeAuth()) {
