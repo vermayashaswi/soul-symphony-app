@@ -1,5 +1,22 @@
 import { toast } from 'sonner';
-import { nativeIntegrationService } from './nativeIntegrationService';
+
+// Simple platform detection to avoid circular dependency
+const getPlatform = (): string => {
+  if (typeof window === 'undefined') return 'node';
+  
+  const { Capacitor } = (window as any);
+  if (Capacitor) {
+    const platform = Capacitor.getPlatform();
+    if (platform === 'ios' || platform === 'android') {
+      return platform;
+    }
+  }
+  
+  const ua = navigator.userAgent;
+  if (ua.includes('Android')) return 'android';
+  if (ua.includes('iPhone') || ua.includes('iPad')) return 'ios';
+  return 'web';
+};
 
 interface MobileError {
   type: 'crash' | 'network' | 'permission' | 'storage' | 'audio' | 'android_webview' | 'capacitor' | 'unknown';
@@ -42,7 +59,7 @@ class MobileErrorHandler {
         message: event.message || event.error?.message || 'Unknown error occurred',
         stack: event.error?.stack,
         timestamp: Date.now(),
-        platform: nativeIntegrationService.getPlatform(),
+        platform: getPlatform(),
         url: window.location.href,
         userAgent: navigator.userAgent
       });
@@ -56,7 +73,7 @@ class MobileErrorHandler {
         message: `Unhandled promise rejection: ${event.reason}`,
         stack: event.reason?.stack,
         timestamp: Date.now(),
-        platform: nativeIntegrationService.getPlatform(),
+        platform: getPlatform(),
         url: window.location.href,
         userAgent: navigator.userAgent
       });
@@ -78,7 +95,7 @@ class MobileErrorHandler {
         message: `Capacitor plugin error: ${event.detail.message || 'Unknown plugin error'}`,
         stack: event.detail.stack,
         timestamp: Date.now(),
-        platform: nativeIntegrationService.getPlatform()
+        platform: getPlatform()
       });
     });
 
@@ -148,7 +165,7 @@ class MobileErrorHandler {
           type: 'crash',
           message: 'Potential app crash detected on previous session',
           timestamp: Date.now(),
-          platform: nativeIntegrationService.getPlatform()
+          platform: getPlatform()
         });
       }
     }
@@ -216,7 +233,7 @@ class MobileErrorHandler {
         type: 'network',
         message: 'Device went offline',
         timestamp: Date.now(),
-        platform: nativeIntegrationService.getPlatform(),
+        platform: getPlatform(),
       });
     });
   }
@@ -227,7 +244,7 @@ class MobileErrorHandler {
       message: error.message || 'An error occurred',
       stack: error.stack,
       timestamp: error.timestamp || Date.now(),
-      platform: error.platform || nativeIntegrationService.getPlatform(),
+      platform: error.platform || getPlatform(),
       appVersion: '1.0.0',
       url: error.url || window.location.href,
       userAgent: error.userAgent || navigator.userAgent,
