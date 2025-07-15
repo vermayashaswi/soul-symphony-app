@@ -1,29 +1,19 @@
-import { useState, useEffect, useRef } from 'react';
-import { Navigate, useNavigate, useLocation, useSearchParams } from 'react-router-dom';
+import { useState, useEffect } from 'react';
+import { Navigate, useLocation, useSearchParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
 import SouloLogo from '@/components/SouloLogo';
-import { useOnboarding } from '@/hooks/use-onboarding';
 import { TranslatableText } from '@/components/translation/TranslatableText';
 import PlatformAuthButton from '@/components/auth/PlatformAuthButton';
 import { nativeIntegrationService } from '@/services/nativeIntegrationService';
-import { Button } from '@/components/ui/button';
 
 export default function Auth() {
   const location = useLocation();
-  const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const [redirecting, setRedirecting] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const { user, isLoading: authLoading } = useAuth();
-  const { onboardingComplete } = useOnboarding();
   const [authError, setAuthError] = useState<string | null>(null);
-  const [navigationAttempts, setNavigationAttempts] = useState(0);
-  const [showEmergencyButton, setShowEmergencyButton] = useState(false);
-  const [navigationDeadlock, setNavigationDeadlock] = useState(false);
-  const navigationTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const lastNavigationAttempt = useRef<number>(0);
 
   const redirectParam = searchParams.get('redirectTo');
   const fromLocation = location.state?.from?.pathname;
@@ -85,141 +75,21 @@ export default function Auth() {
     storedRedirect,
     hasUser: !!user,
     currentPath: location.pathname,
-    onboardingComplete,
     isNative: nativeIntegrationService.isRunningNatively(),
-    authLoading,
-    redirecting
+    authLoading
   });
 
-  // Enhanced navigation logic with deadlock detection and recovery
-  const attemptNavigation = (destination: string, attempt: number = 1) => {
-    console.log(`[Auth] Navigation attempt ${attempt} to:`, destination);
-    
-    const now = Date.now();
-    const timeSinceLastAttempt = now - lastNavigationAttempt.current;
-    
-    // Prevent rapid navigation attempts (potential loop)
-    if (timeSinceLastAttempt < 1000 && attempt > 1) {
-      console.warn('[Auth] Navigation attempt too soon, waiting...');
-      setTimeout(() => attemptNavigation(destination, attempt), 1000);
-      return;
-    }
-    
-    lastNavigationAttempt.current = now;
-    
-    try {
-      console.log(`[Auth] Executing navigation attempt ${attempt}...`);
-      navigate(destination, { replace: true });
-      
-      // Set timeout to detect navigation failure
-      navigationTimeoutRef.current = setTimeout(() => {
-        console.error(`[Auth] Navigation timeout after attempt ${attempt}`);
-        setNavigationAttempts(prev => prev + 1);
-        
-        if (attempt < 3) {
-          console.log(`[Auth] Retrying navigation (attempt ${attempt + 1})`);
-          attemptNavigation(destination, attempt + 1);
-        } else {
-          console.error('[Auth] Navigation failed after 3 attempts, showing emergency options');
-          setNavigationDeadlock(true);
-          setShowEmergencyButton(true);
-          setRedirecting(false);
-          toast.error('Navigation failed. Please use the emergency button to continue.');
-        }
-      }, 2000); // 2 second timeout
-      
-    } catch (error) {
-      console.error(`[Auth] Navigation attempt ${attempt} failed:`, error);
-      
-      if (attempt < 3) {
-        console.log(`[Auth] Retrying navigation due to error (attempt ${attempt + 1})`);
-        setTimeout(() => attemptNavigation(destination, attempt + 1), 1000);
-      } else {
-        console.error('[Auth] All navigation attempts failed, using window.location fallback');
-        
-        // Ultimate fallback - force page navigation
-        try {
-          window.location.href = destination;
-        } catch (windowError) {
-          console.error('[Auth] Even window.location failed:', windowError);
-          setNavigationDeadlock(true);
-          setShowEmergencyButton(true);
-          setRedirecting(false);
-          toast.error('Critical navigation failure. Please refresh the page.');
-        }
-      }
-    }
-  };
-
-  // Clean up navigation timeout on unmount
-  useEffect(() => {
-    return () => {
-      if (navigationTimeoutRef.current) {
-        clearTimeout(navigationTimeoutRef.current);
-      }
-    };
-  }, []);
-
-  // Enhanced navigation effect with deadlock detection
-  useEffect(() => {
-    const isNative = nativeIntegrationService.isRunningNatively();
-    
-    console.log('[Auth] Enhanced navigation check:', {
-      hasUser: !!user,
-      authLoading,
-      redirecting,
-      isNative,
-      onboardingComplete,
-      navigationAttempts,
-      navigationDeadlock,
-      currentPath: location.pathname
-    });
-
-    // Prevent navigation if we're in a deadlock state
-    if (navigationDeadlock) {
-      console.log('[Auth] Navigation deadlock detected, skipping navigation logic');
-      return;
-    }
-
-    // If user is logged in and page has finished initial loading, redirect
-    if (user && !authLoading && !redirecting) {
-      console.log('[Auth] CONDITIONS MET - Starting enhanced navigation process');
-      setRedirecting(true);
-
-      // Clean up stored redirect
-      localStorage.removeItem('authRedirectTo');
-
-      // Get final destination
-      const finalDestination = getFinalRedirectPath();
-      console.log('[Auth] Final destination determined:', finalDestination);
-
-      // Start navigation with enhanced error handling
-      attemptNavigation(finalDestination, 1);
-    }
-  }, [user, authLoading, navigate, redirecting, onboardingComplete, navigationDeadlock]);
-
-  // Emergency navigation handler
-  const handleEmergencyNavigation = () => {
-    console.log('[Auth] Emergency navigation activated');
-    setNavigationDeadlock(false);
-    setShowEmergencyButton(false);
-    setNavigationAttempts(0);
-    
-    const destination = getFinalRedirectPath();
-    console.log('[Auth] Emergency navigation to:', destination);
-    
-    // Force navigation using window.location
-    try {
-      window.location.href = destination;
-    } catch (error) {
-      console.error('[Auth] Emergency navigation failed:', error);
-      toast.error('Emergency navigation failed. Please refresh the page manually.');
-    }
-  };
-
+  // Clear loading state on component mount
   useEffect(() => {
     setIsLoading(false);
   }, []);
+
+  // Clean up stored redirect when user logs in
+  useEffect(() => {
+    if (user) {
+      localStorage.removeItem('authRedirectTo');
+    }
+  }, [user]);
 
   // If still checking auth state, show loading
   if (authLoading) {
@@ -230,7 +100,7 @@ export default function Auth() {
     );
   }
 
-  // If already logged in, redirect appropriately
+  // If already logged in, redirect appropriately using Navigate component
   if (user) {
     const destination = getFinalRedirectPath();
     console.log('[Auth] User already logged in, immediate redirect to:', destination);
@@ -269,50 +139,6 @@ export default function Auth() {
             >
               Dismiss
             </button>
-          </div>
-        )}
-
-        {/* Navigation Status Indicator */}
-        {redirecting && (
-          <div className="mb-4 p-3 border border-blue-200 bg-blue-50 text-blue-700 rounded-md">
-            <p className="text-sm">
-              {navigationDeadlock ? (
-                <>
-                  <span className="font-medium">Navigation failed</span>
-                  <br />
-                  <span className="text-xs">
-                    Navigation attempts: {navigationAttempts}
-                  </span>
-                </>
-              ) : (
-                <>
-                  <span className="font-medium">Redirecting...</span>
-                  <br />
-                  <span className="text-xs">
-                    Attempt {navigationAttempts + 1} - Taking you to the app
-                  </span>
-                </>
-              )}
-            </p>
-          </div>
-        )}
-
-        {/* Emergency Navigation Button */}
-        {showEmergencyButton && (
-          <div className="mb-4 p-4 border border-orange-200 bg-orange-50 text-orange-700 rounded-md">
-            <p className="text-sm mb-3">
-              <span className="font-medium">Navigation Issue Detected</span>
-              <br />
-              <span className="text-xs">
-                The app is having trouble navigating after sign-in. Click the button below to continue manually.
-              </span>
-            </p>
-            <Button
-              onClick={handleEmergencyNavigation}
-              className="w-full bg-orange-600 hover:bg-orange-700 text-white"
-            >
-              Continue to App
-            </Button>
           </div>
         )}
 
