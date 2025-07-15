@@ -22,14 +22,12 @@ class NativeAuthService {
     try {
       console.log('[NativeAuth] Initializing native auth service');
 
-      // Only initialize if we're actually running natively
       if (!nativeIntegrationService.isRunningNatively()) {
         console.log('[NativeAuth] Not running natively - skipping GoogleAuth initialization');
         this.isInitialized = true;
         return;
       }
 
-      // Verify GoogleAuth plugin is available
       if (!nativeIntegrationService.isGoogleAuthAvailable()) {
         console.warn('[NativeAuth] GoogleAuth plugin not available');
         this.initializationError = 'GoogleAuth plugin not available';
@@ -37,7 +35,6 @@ class NativeAuthService {
         return;
       }
 
-      // Check if we have a valid client ID
       const clientId = this.getGoogleClientId();
       if (!clientId || clientId.trim() === '') {
         console.warn('[NativeAuth] No valid Google Client ID configured');
@@ -64,7 +61,7 @@ class NativeAuthService {
   }
 
   private getGoogleClientId(): string {
-    // CORRECTED: Use your actual Android client ID
+    // Use the Android client ID for native auth
     const androidClientId = '11083941790-vgbdbj6j313ggo6jbt9agp3bvrlilam8.apps.googleusercontent.com';
     console.log('[NativeAuth] Using Android Google Client ID for native auth');
     return androidClientId;
@@ -81,7 +78,6 @@ class NativeAuthService {
         initializationError: this.initializationError
       });
 
-      // CRITICAL: Strict native vs web separation
       if (this.shouldUseNativeAuth()) {
         console.log('[NativeAuth] Using native Google Sign-In - no browser redirects');
 
@@ -96,8 +92,28 @@ class NativeAuthService {
         }
 
         console.log('[NativeAuth] Calling GoogleAuth.signIn()...');
-        const result = await GoogleAuth.signIn();
-        
+
+        // ENHANCED: Add proper error handling and retry logic
+        let result;
+        try {
+          result = await GoogleAuth.signIn();
+        } catch (googleError: any) {
+          console.error('[NativeAuth] GoogleAuth.signIn() failed:', googleError);
+
+          // Check for specific Google Auth errors
+          if (googleError.message?.includes('User cancelled')) {
+            console.log('[NativeAuth] User cancelled Google sign-in');
+            toast.info('Sign-in cancelled');
+            return;
+          } else if (googleError.message?.includes('Network')) {
+            throw new Error('Network error during Google sign-in. Please check your connection.');
+          } else if (googleError.message?.includes('Configuration')) {
+            throw new Error('Google sign-in configuration error. Please contact support.');
+          }
+
+          throw new Error(`Google authentication failed: ${googleError.message}`);
+        }
+
         console.log('[NativeAuth] Native Google sign-in result:', {
           hasIdToken: !!result.authentication?.idToken,
           hasAccessToken: !!result.authentication?.accessToken,
@@ -109,22 +125,22 @@ class NativeAuthService {
         // Enhanced token validation
         if (!result.authentication?.idToken) {
           console.error('[NativeAuth] No ID token received from Google:', result);
-          throw new Error('No ID token received from Google');
+          throw new Error('No authentication token received from Google');
         }
 
         // Validate token format
         const tokenParts = result.authentication.idToken.split('.');
         if (tokenParts.length !== 3) {
           console.error('[NativeAuth] Invalid ID token format:', tokenParts.length);
-          throw new Error('Invalid ID token format received from Google');
+          throw new Error('Invalid authentication token format');
         }
 
         console.log('[NativeAuth] Token validation passed, calling Supabase...');
-        
-        // Add timeout for Supabase token exchange
+
+        // ENHANCED: Better timeout and error handling for Supabase
         const timeoutPromise = new Promise<never>((_, reject) => {
           setTimeout(() => {
-            reject(new Error('Supabase token exchange timed out after 30 seconds'));
+            reject(new Error('Authentication timed out. Please try again.'));
           }, 30000);
         });
 
@@ -141,7 +157,17 @@ class NativeAuthService {
             status: error.status,
             code: error.code || 'unknown'
           });
-          throw error;
+
+          // Enhanced Supabase error handling
+          if (error.message?.includes('Invalid token')) {
+            throw new Error('Authentication token was rejected. Please try signing in again.');
+          } else if (error.message?.includes('timeout')) {
+            throw new Error('Authentication timed out. Please check your connection and try again.');
+          } else if (error.message?.includes('network')) {
+            throw new Error('Network error during authentication. Please try again.');
+          }
+
+          throw new Error(`Authentication failed: ${error.message}`);
         }
 
         console.log('[NativeAuth] Supabase sign-in successful:', {
@@ -152,11 +178,9 @@ class NativeAuthService {
 
         console.log('[NativeAuth] Successfully signed in with Google natively');
         toast.success('Signed in successfully');
-
-        // CRITICAL: No redirect needed - auth context will handle navigation
         return;
+
       } else {
-        // CRITICAL FIX: Never fallback to web OAuth in native apps
         console.log('[NativeAuth] Native auth not available - throwing error instead of web fallback');
         throw new Error('Native Google authentication not available');
       }
@@ -168,21 +192,6 @@ class NativeAuthService {
         code: error.code || 'unknown'
       });
 
-      // Enhanced error categorization
-      let errorCategory = 'unknown';
-      if (error.message?.includes('timeout')) {
-        errorCategory = 'timeout';
-      } else if (error.message?.includes('token')) {
-        errorCategory = 'token';
-      } else if (error.message?.includes('network')) {
-        errorCategory = 'network';
-      } else if (error.message?.includes('cancelled')) {
-        errorCategory = 'cancelled';
-      }
-
-      console.error('[NativeAuth] Error category:', errorCategory);
-
-      // CRITICAL: No fallback to web OAuth in native apps
       if (this.shouldUseNativeAuth()) {
         console.log('[NativeAuth] Native auth failed - showing error, no browser fallback');
         this.handleAuthError(error);
@@ -243,14 +252,14 @@ class NativeAuthService {
   private handleAuthError(error: any, provider: string = 'Google'): void {
     let errorMessage = `${provider} sign-in failed`;
 
-    if (error.message?.includes('Client ID not configured')) {
-      errorMessage = `${provider} sign-in is not configured properly.`;
-    } else if (error.message?.includes('redirect_uri_mismatch')) {
-      errorMessage = `${provider} sign-in configuration error. Please check your redirect URLs.`;
-    } else if (error.message?.includes('popup_closed_by_user')) {
+    if (error.message?.includes('cancelled')) {
       errorMessage = 'Sign-in was cancelled';
-    } else if (error.message?.includes('network')) {
+    } else if (error.message?.includes('Network') || error.message?.includes('network')) {
       errorMessage = 'Network error. Please check your connection and try again.';
+    } else if (error.message?.includes('Configuration') || error.message?.includes('configuration')) {
+      errorMessage = `${provider} sign-in configuration error. Please contact support.`;
+    } else if (error.message?.includes('timeout')) {
+      errorMessage = 'Sign-in timed out. Please try again.';
     } else if (error.message?.includes('not available')) {
       errorMessage = `${provider} sign-in is not available. Please try again later.`;
     } else if (error.message) {
