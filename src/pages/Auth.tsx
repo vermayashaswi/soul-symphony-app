@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react';
-import { Navigate, useLocation, useSearchParams } from 'react-router-dom';
+import { useState, useEffect, useRef } from 'react';
+import { Navigate, useLocation, useSearchParams, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
@@ -11,9 +11,14 @@ import { nativeIntegrationService } from '@/services/nativeIntegrationService';
 export default function Auth() {
   const location = useLocation();
   const [searchParams] = useSearchParams();
+  const navigate = useNavigate();
   const [isLoading, setIsLoading] = useState(false);
   const { user, isLoading: authLoading } = useAuth();
   const [authError, setAuthError] = useState<string | null>(null);
+  const [navigationAttempted, setNavigationAttempted] = useState(false);
+  const [showNavigationIndicator, setShowNavigationIndicator] = useState(false);
+  const navigationTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const fallbackTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const redirectParam = searchParams.get('redirectTo');
   const fromLocation = location.state?.from?.pathname;
@@ -84,12 +89,91 @@ export default function Auth() {
     setIsLoading(false);
   }, []);
 
+  // Enhanced user state change detection and navigation
+  useEffect(() => {
+    const isNative = nativeIntegrationService.isRunningNatively();
+    console.log('[Auth] User state changed:', {
+      hasUser: !!user,
+      userId: user?.id,
+      authLoading,
+      navigationAttempted,
+      isNative,
+      currentPath: location.pathname
+    });
+
+    // If user is authenticated and we haven't attempted navigation yet
+    if (user && !authLoading && !navigationAttempted) {
+      console.log('[Auth] User authenticated, initiating navigation...');
+      setNavigationAttempted(true);
+      setShowNavigationIndicator(true);
+      
+      const destination = getFinalRedirectPath();
+      console.log('[Auth] Attempting navigation to:', destination);
+
+      // Clear any existing timeouts
+      if (navigationTimeoutRef.current) {
+        clearTimeout(navigationTimeoutRef.current);
+      }
+      if (fallbackTimeoutRef.current) {
+        clearTimeout(fallbackTimeoutRef.current);
+      }
+
+      // For native apps, add a small delay to ensure proper state synchronization
+      const navigationDelay = isNative ? 500 : 100;
+      
+      navigationTimeoutRef.current = setTimeout(() => {
+        console.log('[Auth] Executing programmatic navigation to:', destination);
+        try {
+          navigate(destination, { replace: true });
+          console.log('[Auth] Navigation executed successfully');
+        } catch (error) {
+          console.error('[Auth] Navigation failed:', error);
+          setAuthError('Navigation failed. Please try refreshing the page.');
+        }
+      }, navigationDelay);
+
+      // Set up fallback navigation for native apps
+      if (isNative) {
+        fallbackTimeoutRef.current = setTimeout(() => {
+          console.log('[Auth] Fallback navigation triggered for native app');
+          try {
+            window.location.href = destination;
+          } catch (error) {
+            console.error('[Auth] Fallback navigation failed:', error);
+          }
+        }, 2000);
+      }
+    }
+
+    // Clean up timeouts on unmount or user state change
+    return () => {
+      if (navigationTimeoutRef.current) {
+        clearTimeout(navigationTimeoutRef.current);
+      }
+      if (fallbackTimeoutRef.current) {
+        clearTimeout(fallbackTimeoutRef.current);
+      }
+    };
+  }, [user, authLoading, navigationAttempted, navigate, location.pathname]);
+
   // Clean up stored redirect when user logs in
   useEffect(() => {
     if (user) {
       localStorage.removeItem('authRedirectTo');
     }
   }, [user]);
+
+  // Component cleanup on unmount
+  useEffect(() => {
+    return () => {
+      if (navigationTimeoutRef.current) {
+        clearTimeout(navigationTimeoutRef.current);
+      }
+      if (fallbackTimeoutRef.current) {
+        clearTimeout(fallbackTimeoutRef.current);
+      }
+    };
+  }, []);
 
   // If still checking auth state, show loading
   if (authLoading) {
@@ -100,10 +184,28 @@ export default function Auth() {
     );
   }
 
-  // If already logged in, redirect appropriately using Navigate component
+  // If already logged in, show navigation indicator or redirect
   if (user) {
     const destination = getFinalRedirectPath();
-    console.log('[Auth] User already logged in, immediate redirect to:', destination);
+    console.log('[Auth] User already logged in, showing navigation state:', {
+      destination,
+      navigationAttempted,
+      showNavigationIndicator
+    });
+    
+    // Show navigation indicator for native apps
+    if (showNavigationIndicator && nativeIntegrationService.isRunningNatively()) {
+      return (
+        <div className="min-h-screen flex items-center justify-center">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+            <p className="text-muted-foreground">Redirecting to your dashboard...</p>
+          </div>
+        </div>
+      );
+    }
+    
+    // Fallback to Navigate component
     return <Navigate to={destination} replace />;
   }
 
