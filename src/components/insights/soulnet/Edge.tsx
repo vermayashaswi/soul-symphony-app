@@ -1,7 +1,7 @@
 
 import React, { useRef, useMemo } from 'react';
 import * as THREE from 'three';
-import '@/types/three-reference.d';  // Fixed import path
+
 import { useFrame } from '@react-three/fiber';
 import { useTheme } from '@/hooks/use-theme';
 

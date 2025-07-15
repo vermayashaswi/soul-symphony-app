@@ -1,7 +1,7 @@
 
 import React, { useRef, useMemo, useState, useEffect } from 'react';
 import * as THREE from 'three';
-import '@/types/three-reference';
+
 import { useFrame } from '@react-three/fiber';
 
 interface NodeMeshProps {
