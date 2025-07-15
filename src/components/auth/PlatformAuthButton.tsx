@@ -4,6 +4,10 @@ import { Button } from '@/components/ui/button';
 import { TranslatableText } from '@/components/translation/TranslatableText';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { signInWithGoogle, signInWithApple } from '@/services/authService';
+import { nativeIntegrationService } from '@/services/nativeIntegrationService';
+import { nativeAuthService } from '@/services/nativeAuthService';
+import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
 
 interface PlatformAuthButtonProps {
   isLoading: boolean;
@@ -22,7 +26,7 @@ const PlatformAuthButton: React.FC<PlatformAuthButtonProps> = ({
 
   const handleGoogleSignIn = async () => {
     try {
-      setIsLoading(true);
+      onLoadingChange(true);
 
       // CRITICAL: Always try native auth first in mobile apps
       if (nativeIntegrationService.isRunningNatively()) {
@@ -54,7 +58,7 @@ const PlatformAuthButton: React.FC<PlatformAuthButtonProps> = ({
       onError?.(errorMessage);
       toast.error(errorMessage);
     } finally {
-      setIsLoading(false);
+      onLoadingChange(false);
     }
   };
 

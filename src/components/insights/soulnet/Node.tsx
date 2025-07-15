@@ -163,8 +163,8 @@ const Node: React.FC<NodeProps> = ({
       }
       
       // Update material color and opacity
-      meshRef.current.material.color.lerp(color, 0.1);
       if (meshRef.current.material instanceof THREE.MeshStandardMaterial) {
+        (meshRef.current.material as THREE.MeshStandardMaterial).color.lerp(color, 0.1);
         meshRef.current.material.opacity = nodeOpacity;
       }
     } catch (error) {

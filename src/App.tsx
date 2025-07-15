@@ -21,6 +21,8 @@ import { twaUpdateService } from './services/twaUpdateService';
 import { nativeAppInitService } from './services/nativeAppInitService';
 import { mobileErrorHandler } from './services/mobileErrorHandler';
 import { mobileOptimizationService } from './services/mobileOptimizationService';
+import { nativeIntegrationService } from './services/nativeIntegrationService';
+import { nativeAuthService } from './services/nativeAuthService';
 
 const App: React.FC = () => {
   const [isInitialized, setIsInitialized] = useState(false);
@@ -33,7 +35,6 @@ const App: React.FC = () => {
       if (nativeIntegrationService.isRunningNatively()) {
           console.log('[App] Initializing native services');
           nativeAuthService.initialize();
-          nativeAuthService.initializeWithCapacitor();
         }
     const initializeApp = async () => {
       try {

@@ -827,18 +827,16 @@ const EmotionBubbles: React.FC<EmotionBubblesProps> = ({
       x: containerSize.width / 2,
       y: containerSize.height / 2
     },
-    show: (item: { position: { x: number; y: number }; size: number }) => ({
+    show: {
       opacity: 1, 
       scale: 1,
-      x: item.position.x - item.size / 2,
-      y: item.position.y - item.size / 2,
       transition: { 
-        type: "spring",
+        type: "spring" as const,
         damping: 12,
         stiffness: 100,
         duration: 0.8
       }
-    }),
+    },
     exit: { 
       opacity: 0, 
       scale: 0,
@@ -859,14 +857,14 @@ const EmotionBubbles: React.FC<EmotionBubblesProps> = ({
       rotate: [0, (Math.random() - 0.5) * 40, 0, (Math.random() - 0.5) * 40, 0],
       transition: {
         duration: 3,
-        ease: "easeInOut"
+        ease: [0.4, 0, 0.2, 1] as const
       }
     } : {
       y: [0, -5, 0, 5, 0],
       transition: {
         duration: 3 + Math.random() * 2,
         repeat: Infinity,
-        ease: "easeInOut",
+        ease: [0.4, 0, 0.2, 1] as const,
         delay: index * 0.1
       }
     };
@@ -922,15 +920,16 @@ const EmotionBubbles: React.FC<EmotionBubblesProps> = ({
               <motion.div
                 key={item.name + index}
                 className="absolute"
-                custom={item}
                 variants={bubbleVariants}
                 initial="hidden"
                 animate="show"
                 exit="exit"
-                whileInView={getFloatingAnimation(index)}
                 style={{
+                  x: item.position.x - item.size / 2,
+                  y: item.position.y - item.size / 2,
                   transition: `all 0.3s ${index * 0.05}s`
                 }}
+                {...getFloatingAnimation(index)}
               >
                 <EmotionBubbleDetail
                   name={item.name}
