@@ -89,7 +89,7 @@ export default function Auth() {
     setIsLoading(false);
   }, []);
 
-  // Enhanced user state change detection and navigation
+  // CRITICAL: Immediate navigation for native apps when user is authenticated
   useEffect(() => {
     const isNative = nativeIntegrationService.isRunningNatively();
     console.log('[Auth] User state changed:', {
@@ -98,17 +98,17 @@ export default function Auth() {
       authLoading,
       navigationAttempted,
       isNative,
-      currentPath: location.pathname
+      currentPath: location.pathname,
+      timestamp: new Date().toISOString()
     });
 
-    // If user is authenticated and we haven't attempted navigation yet
+    // CRITICAL: For native apps, navigate immediately when user is authenticated
     if (user && !authLoading && !navigationAttempted) {
-      console.log('[Auth] User authenticated, initiating navigation...');
+      console.log('[Auth] User authenticated - starting immediate navigation process for native app');
       setNavigationAttempted(true);
-      setShowNavigationIndicator(true);
       
       const destination = getFinalRedirectPath();
-      console.log('[Auth] Attempting navigation to:', destination);
+      console.log('[Auth] Navigation destination determined:', destination);
 
       // Clear any existing timeouts
       if (navigationTimeoutRef.current) {
@@ -118,30 +118,39 @@ export default function Auth() {
         clearTimeout(fallbackTimeoutRef.current);
       }
 
-      // For native apps, add a small delay to ensure proper state synchronization
-      const navigationDelay = isNative ? 500 : 100;
-      
-      navigationTimeoutRef.current = setTimeout(() => {
-        console.log('[Auth] Executing programmatic navigation to:', destination);
-        try {
-          navigate(destination, { replace: true });
-          console.log('[Auth] Navigation executed successfully');
-        } catch (error) {
-          console.error('[Auth] Navigation failed:', error);
-          setAuthError('Navigation failed. Please try refreshing the page.');
-        }
-      }, navigationDelay);
-
-      // Set up fallback navigation for native apps
       if (isNative) {
-        fallbackTimeoutRef.current = setTimeout(() => {
-          console.log('[Auth] Fallback navigation triggered for native app');
+        console.log('[Auth] NATIVE APP: Initiating immediate navigation without delays');
+        setShowNavigationIndicator(true);
+        
+        // For native apps: Navigate immediately with window.location.href for reliability
+        try {
+          console.log('[Auth] NATIVE: Using window.location.href for immediate navigation');
+          window.location.href = destination;
+          console.log('[Auth] NATIVE: window.location.href navigation initiated');
+        } catch (error) {
+          console.error('[Auth] NATIVE: window.location.href failed, trying React Router:', error);
+          // Fallback to React Router
           try {
-            window.location.href = destination;
-          } catch (error) {
-            console.error('[Auth] Fallback navigation failed:', error);
+            navigate(destination, { replace: true });
+            console.log('[Auth] NATIVE: React Router navigation executed as fallback');
+          } catch (navError) {
+            console.error('[Auth] NATIVE: All navigation methods failed:', navError);
+            setAuthError('Navigation failed. Please restart the app.');
           }
-        }, 2000);
+        }
+      } else {
+        console.log('[Auth] WEB APP: Using standard React Router navigation');
+        // For web apps, use standard React Router navigation with small delay
+        navigationTimeoutRef.current = setTimeout(() => {
+          console.log('[Auth] WEB: Executing React Router navigation');
+          try {
+            navigate(destination, { replace: true });
+            console.log('[Auth] WEB: Navigation executed successfully');
+          } catch (error) {
+            console.error('[Auth] WEB: Navigation failed:', error);
+            setAuthError('Navigation failed. Please try refreshing the page.');
+          }
+        }, 100);
       }
     }
 
@@ -184,28 +193,37 @@ export default function Auth() {
     );
   }
 
-  // If already logged in, show navigation indicator or redirect
+  // If already logged in, handle navigation based on platform
   if (user) {
     const destination = getFinalRedirectPath();
-    console.log('[Auth] User already logged in, showing navigation state:', {
+    const isNative = nativeIntegrationService.isRunningNatively();
+    
+    console.log('[Auth] User already logged in, determining navigation approach:', {
       destination,
       navigationAttempted,
-      showNavigationIndicator
+      showNavigationIndicator,
+      isNative,
+      timestamp: new Date().toISOString()
     });
     
-    // Show navigation indicator for native apps
-    if (showNavigationIndicator && nativeIntegrationService.isRunningNatively()) {
+    // For native apps: Always show navigation indicator when user is present
+    if (isNative) {
+      console.log('[Auth] NATIVE: Showing navigation indicator');
       return (
-        <div className="min-h-screen flex items-center justify-center">
-          <div className="text-center">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
-            <p className="text-muted-foreground">Redirecting to your dashboard...</p>
+        <div className="min-h-screen flex items-center justify-center bg-background">
+          <div className="text-center space-y-4">
+            <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-primary mx-auto"></div>
+            <div className="space-y-2">
+              <p className="text-lg font-medium text-foreground">Welcome back!</p>
+              <p className="text-sm text-muted-foreground">Taking you to your dashboard...</p>
+            </div>
           </div>
         </div>
       );
     }
     
-    // Fallback to Navigate component
+    // For web: Use standard React Router navigation
+    console.log('[Auth] WEB: Using Navigate component for redirection');
     return <Navigate to={destination} replace />;
   }
 
