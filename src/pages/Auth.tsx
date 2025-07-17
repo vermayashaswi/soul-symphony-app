@@ -16,9 +16,12 @@ export default function Auth() {
   const { user, isLoading: authLoading } = useAuth();
   const [authError, setAuthError] = useState<string | null>(null);
   const [navigationAttempted, setNavigationAttempted] = useState(false);
+  const [navigationSuccessful, setNavigationSuccessful] = useState(false);
   const [showNavigationIndicator, setShowNavigationIndicator] = useState(false);
   const navigationTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const fallbackTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const navigationRetryCount = useRef(0);
+  const maxNavigationRetries = 3;
 
   const redirectParam = searchParams.get('redirectTo');
   const fromLocation = location.state?.from?.pathname;
@@ -89,22 +92,24 @@ export default function Auth() {
     setIsLoading(false);
   }, []);
 
-  // CRITICAL: Immediate navigation for native apps when user is authenticated
+  // CRITICAL: Immediate navigation for native apps with enhanced state management
   useEffect(() => {
     const isNative = nativeIntegrationService.isRunningNatively();
-    console.log('[Auth] User state changed:', {
+    console.log('[Auth] Navigation Decision Point:', {
       hasUser: !!user,
       userId: user?.id,
       authLoading,
       navigationAttempted,
+      navigationSuccessful,
       isNative,
       currentPath: location.pathname,
+      retryCount: navigationRetryCount.current,
       timestamp: new Date().toISOString()
     });
 
     // CRITICAL: For native apps, navigate immediately when user is authenticated
-    if (user && !authLoading && !navigationAttempted) {
-      console.log('[Auth] User authenticated - starting immediate navigation process for native app');
+    if (user && !authLoading && !navigationAttempted && !navigationSuccessful) {
+      console.log('[Auth] STARTING NAVIGATION PROCESS - User authenticated');
       setNavigationAttempted(true);
       
       const destination = getFinalRedirectPath();
@@ -119,38 +124,74 @@ export default function Auth() {
       }
 
       if (isNative) {
-        console.log('[Auth] NATIVE APP: Initiating immediate navigation without delays');
+        console.log('[Auth] NATIVE APP: Initiating immediate navigation sequence');
         setShowNavigationIndicator(true);
         
-        // For native apps: Navigate immediately with window.location.href for reliability
-        try {
-          console.log('[Auth] NATIVE: Using window.location.href for immediate navigation');
-          window.location.href = destination;
-          console.log('[Auth] NATIVE: window.location.href navigation initiated');
-        } catch (error) {
-          console.error('[Auth] NATIVE: window.location.href failed, trying React Router:', error);
-          // Fallback to React Router
+        // Enhanced navigation with multiple fallback strategies
+        const attemptNavigation = () => {
+          console.log(`[Auth] NATIVE: Navigation attempt #${navigationRetryCount.current + 1}`);
+          
           try {
-            navigate(destination, { replace: true });
-            console.log('[Auth] NATIVE: React Router navigation executed as fallback');
-          } catch (navError) {
-            console.error('[Auth] NATIVE: All navigation methods failed:', navError);
-            setAuthError('Navigation failed. Please restart the app.');
+            // Method 1: window.location.href (most reliable for native)
+            console.log('[Auth] NATIVE: Attempting window.location.href navigation');
+            window.location.href = destination;
+            
+            // Mark as successful immediately for native apps
+            setNavigationSuccessful(true);
+            console.log('[Auth] NATIVE: Navigation initiated successfully');
+            
+            // Verify navigation after a short delay
+            setTimeout(() => {
+              if (location.pathname === '/app/auth') {
+                console.warn('[Auth] NATIVE: Still on auth page, attempting fallback');
+                if (navigationRetryCount.current < maxNavigationRetries) {
+                  navigationRetryCount.current++;
+                  attemptNavigation();
+                } else {
+                  console.error('[Auth] NATIVE: All navigation attempts failed');
+                  setAuthError('Navigation failed. Please restart the app to continue.');
+                }
+              }
+            }, 500);
+            
+          } catch (error) {
+            console.error('[Auth] NATIVE: Primary navigation failed:', error);
+            
+            // Method 2: React Router as immediate fallback
+            try {
+              console.log('[Auth] NATIVE: Attempting React Router fallback');
+              navigate(destination, { replace: true });
+              setNavigationSuccessful(true);
+              console.log('[Auth] NATIVE: React Router fallback executed');
+            } catch (navError) {
+              console.error('[Auth] NATIVE: React Router fallback failed:', navError);
+              
+              // Method 3: Force refresh as last resort
+              if (navigationRetryCount.current < maxNavigationRetries) {
+                navigationRetryCount.current++;
+                setTimeout(attemptNavigation, 1000);
+              } else {
+                console.error('[Auth] NATIVE: All navigation methods exhausted');
+                setAuthError('Navigation failed. Please restart the app.');
+              }
+            }
           }
-        }
+        };
+
+        // Start navigation immediately for native apps
+        attemptNavigation();
+        
       } else {
         console.log('[Auth] WEB APP: Using standard React Router navigation');
-        // For web apps, use standard React Router navigation with small delay
-        navigationTimeoutRef.current = setTimeout(() => {
-          console.log('[Auth] WEB: Executing React Router navigation');
-          try {
-            navigate(destination, { replace: true });
-            console.log('[Auth] WEB: Navigation executed successfully');
-          } catch (error) {
-            console.error('[Auth] WEB: Navigation failed:', error);
-            setAuthError('Navigation failed. Please try refreshing the page.');
-          }
-        }, 100);
+        // For web apps, use standard React Router navigation
+        try {
+          navigate(destination, { replace: true });
+          setNavigationSuccessful(true);
+          console.log('[Auth] WEB: Navigation executed successfully');
+        } catch (error) {
+          console.error('[Auth] WEB: Navigation failed:', error);
+          setAuthError('Navigation failed. Please try refreshing the page.');
+        }
       }
     }
 
@@ -163,7 +204,7 @@ export default function Auth() {
         clearTimeout(fallbackTimeoutRef.current);
       }
     };
-  }, [user, authLoading, navigationAttempted, navigate, location.pathname]);
+  }, [user, authLoading, navigationAttempted, navigationSuccessful, navigate, location.pathname]);
 
   // Clean up stored redirect when user logs in
   useEffect(() => {
@@ -193,30 +234,49 @@ export default function Auth() {
     );
   }
 
-  // If already logged in, handle navigation based on platform
+  // If already logged in, handle navigation based on platform with enhanced state tracking
   if (user) {
     const destination = getFinalRedirectPath();
     const isNative = nativeIntegrationService.isRunningNatively();
     
-    console.log('[Auth] User already logged in, determining navigation approach:', {
+    console.log('[Auth] User Present - Navigation State Check:', {
       destination,
       navigationAttempted,
+      navigationSuccessful,
       showNavigationIndicator,
       isNative,
+      currentPath: location.pathname,
       timestamp: new Date().toISOString()
     });
     
-    // For native apps: Always show navigation indicator when user is present
+    // For native apps: Show enhanced navigation indicator with state feedback
     if (isNative) {
-      console.log('[Auth] NATIVE: Showing navigation indicator');
+      console.log('[Auth] NATIVE: Rendering navigation interface');
       return (
         <div className="min-h-screen flex items-center justify-center bg-background">
-          <div className="text-center space-y-4">
+          <div className="text-center space-y-6">
             <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-primary mx-auto"></div>
             <div className="space-y-2">
               <p className="text-lg font-medium text-foreground">Welcome back!</p>
-              <p className="text-sm text-muted-foreground">Taking you to your dashboard...</p>
+              <p className="text-sm text-muted-foreground">
+                {navigationSuccessful 
+                  ? "Navigation successful - loading your dashboard..." 
+                  : navigationAttempted 
+                  ? "Completing sign-in process..."
+                  : "Taking you to your dashboard..."
+                }
+              </p>
+              {navigationAttempted && navigationRetryCount.current > 0 && (
+                <p className="text-xs text-amber-600">
+                  Retry attempt {navigationRetryCount.current}/{maxNavigationRetries}
+                </p>
+              )}
             </div>
+            {authError && (
+              <div className="mt-4 p-3 bg-red-50 text-red-700 rounded-md text-sm max-w-md">
+                {authError}
+              </div>
+            )}
           </div>
         </div>
       );
