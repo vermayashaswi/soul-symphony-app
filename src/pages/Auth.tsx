@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { Navigate, useLocation, useSearchParams, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { useAuth } from '@/contexts/AuthContext';
@@ -7,6 +7,8 @@ import SouloLogo from '@/components/SouloLogo';
 import { TranslatableText } from '@/components/translation/TranslatableText';
 import PlatformAuthButton from '@/components/auth/PlatformAuthButton';
 import { nativeIntegrationService } from '@/services/nativeIntegrationService';
+import { nativeNavigationService } from '@/services/nativeNavigationService';
+import { useOnboarding } from '@/hooks/use-onboarding';
 
 export default function Auth() {
   const location = useLocation();
@@ -14,14 +16,9 @@ export default function Auth() {
   const navigate = useNavigate();
   const [isLoading, setIsLoading] = useState(false);
   const { user, isLoading: authLoading } = useAuth();
+  const { onboardingComplete, loading: onboardingLoading } = useOnboarding();
   const [authError, setAuthError] = useState<string | null>(null);
-  const [navigationAttempted, setNavigationAttempted] = useState(false);
-  const [navigationSuccessful, setNavigationSuccessful] = useState(false);
-  const [showNavigationIndicator, setShowNavigationIndicator] = useState(false);
-  const navigationTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const fallbackTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const navigationRetryCount = useRef(0);
-  const maxNavigationRetries = 3;
+  const [navigationProcessing, setNavigationProcessing] = useState(false);
 
   const redirectParam = searchParams.get('redirectTo');
   const fromLocation = location.state?.from?.pathname;
@@ -56,7 +53,7 @@ export default function Auth() {
     }
   }, [searchParams]);
 
-  // Simplified redirect logic - CRITICAL: Always go to home after auth in native apps
+  // Determine where to redirect after successful login
   const getFinalRedirectPath = () => {
     // CRITICAL: For native apps, always redirect to home after successful login
     if (nativeIntegrationService.isRunningNatively()) {
@@ -77,156 +74,51 @@ export default function Auth() {
     return webRedirect;
   };
 
-  console.log('[Auth] Auth page mounted', {
-    redirectParam,
-    fromLocation,
-    storedRedirect,
-    hasUser: !!user,
-    currentPath: location.pathname,
-    isNative: nativeIntegrationService.isRunningNatively(),
-    authLoading
-  });
-
-  // Clear loading state on component mount
+  // Log important state for debugging
   useEffect(() => {
-    setIsLoading(false);
-  }, []);
-
-  // CRITICAL: Immediate navigation for native apps with enhanced state management
-  useEffect(() => {
-    const isNative = nativeIntegrationService.isRunningNatively();
-    console.log('[Auth] Navigation Decision Point:', {
+    console.log('[Auth] Auth page state', {
       hasUser: !!user,
       userId: user?.id,
       authLoading,
-      navigationAttempted,
-      navigationSuccessful,
-      isNative,
+      onboardingComplete,
+      onboardingLoading,
+      isNative: nativeIntegrationService.isRunningNatively(),
       currentPath: location.pathname,
-      retryCount: navigationRetryCount.current,
-      timestamp: new Date().toISOString()
+      navigationProcessing
     });
+  }, [user, authLoading, onboardingComplete, onboardingLoading, navigationProcessing, location.pathname]);
 
-    // CRITICAL: For native apps, navigate immediately when user is authenticated
-    if (user && !authLoading && !navigationAttempted && !navigationSuccessful) {
-      console.log('[Auth] STARTING NAVIGATION PROCESS - User authenticated');
-      setNavigationAttempted(true);
+  // Navigation handler for authenticated users
+  useEffect(() => {
+    // Only proceed if we have a user, auth loading is done, and we're not already navigating
+    if (user && !authLoading && !navigationProcessing) {
+      console.log('[Auth] User authenticated, preparing navigation');
+      setNavigationProcessing(true);
       
-      const destination = getFinalRedirectPath();
-      console.log('[Auth] Navigation destination determined:', destination);
-
-      // Clear any existing timeouts
-      if (navigationTimeoutRef.current) {
-        clearTimeout(navigationTimeoutRef.current);
-      }
-      if (fallbackTimeoutRef.current) {
-        clearTimeout(fallbackTimeoutRef.current);
-      }
-
-      if (isNative) {
-        console.log('[Auth] NATIVE APP: Initiating immediate navigation sequence');
-        setShowNavigationIndicator(true);
-        
-        // Enhanced navigation with multiple fallback strategies
-        const attemptNavigation = () => {
-          console.log(`[Auth] NATIVE: Navigation attempt #${navigationRetryCount.current + 1}`);
-          
-          try {
-            // Method 1: window.location.href (most reliable for native)
-            console.log('[Auth] NATIVE: Attempting window.location.href navigation');
-            window.location.href = destination;
-            
-            // Mark as successful immediately for native apps
-            setNavigationSuccessful(true);
-            console.log('[Auth] NATIVE: Navigation initiated successfully');
-            
-            // Verify navigation after a short delay
-            setTimeout(() => {
-              if (location.pathname === '/app/auth') {
-                console.warn('[Auth] NATIVE: Still on auth page, attempting fallback');
-                if (navigationRetryCount.current < maxNavigationRetries) {
-                  navigationRetryCount.current++;
-                  attemptNavigation();
-                } else {
-                  console.error('[Auth] NATIVE: All navigation attempts failed');
-                  setAuthError('Navigation failed. Please restart the app to continue.');
-                }
-              }
-            }, 500);
-            
-          } catch (error) {
-            console.error('[Auth] NATIVE: Primary navigation failed:', error);
-            
-            // Method 2: React Router as immediate fallback
-            try {
-              console.log('[Auth] NATIVE: Attempting React Router fallback');
-              navigate(destination, { replace: true });
-              setNavigationSuccessful(true);
-              console.log('[Auth] NATIVE: React Router fallback executed');
-            } catch (navError) {
-              console.error('[Auth] NATIVE: React Router fallback failed:', navError);
-              
-              // Method 3: Force refresh as last resort
-              if (navigationRetryCount.current < maxNavigationRetries) {
-                navigationRetryCount.current++;
-                setTimeout(attemptNavigation, 1000);
-              } else {
-                console.error('[Auth] NATIVE: All navigation methods exhausted');
-                setAuthError('Navigation failed. Please restart the app.');
-              }
-            }
-          }
-        };
-
-        // Start navigation immediately for native apps
-        attemptNavigation();
-        
-      } else {
-        console.log('[Auth] WEB APP: Using standard React Router navigation');
-        // For web apps, use standard React Router navigation
-        try {
-          navigate(destination, { replace: true });
-          setNavigationSuccessful(true);
-          console.log('[Auth] WEB: Navigation executed successfully');
-        } catch (error) {
-          console.error('[Auth] WEB: Navigation failed:', error);
-          setAuthError('Navigation failed. Please try refreshing the page.');
-        }
-      }
-    }
-
-    // Clean up timeouts on unmount or user state change
-    return () => {
-      if (navigationTimeoutRef.current) {
-        clearTimeout(navigationTimeoutRef.current);
-      }
-      if (fallbackTimeoutRef.current) {
-        clearTimeout(fallbackTimeoutRef.current);
-      }
-    };
-  }, [user, authLoading, navigationAttempted, navigationSuccessful, navigate, location.pathname]);
-
-  // Clean up stored redirect when user logs in
-  useEffect(() => {
-    if (user) {
+      // Clear any stored redirect info
       localStorage.removeItem('authRedirectTo');
+      
+      // Get the destination
+      const destination = getFinalRedirectPath();
+      console.log('[Auth] Navigation destination:', destination);
+
+      // Use simplified navigation based on platform
+      if (nativeIntegrationService.isRunningNatively()) {
+        // For native apps, use our navigation service
+        console.log('[Auth] Using native navigation service');
+        setTimeout(() => {
+          nativeNavigationService.navigateToPath(destination, { replace: true });
+        }, 100); // Small delay to ensure UI state is updated first
+      } else {
+        // For web, use React Router
+        console.log('[Auth] Using web navigation');
+        navigate(destination, { replace: true });
+      }
     }
-  }, [user]);
+  }, [user, authLoading, navigate]);
 
-  // Component cleanup on unmount
-  useEffect(() => {
-    return () => {
-      if (navigationTimeoutRef.current) {
-        clearTimeout(navigationTimeoutRef.current);
-      }
-      if (fallbackTimeoutRef.current) {
-        clearTimeout(fallbackTimeoutRef.current);
-      }
-    };
-  }, []);
-
-  // If still checking auth state, show loading
-  if (authLoading) {
+  // Show loading state while checking auth
+  if (authLoading || onboardingLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
@@ -234,24 +126,10 @@ export default function Auth() {
     );
   }
 
-  // If already logged in, handle navigation based on platform with enhanced state tracking
+  // Handle authenticated users with enhanced navigation interface
   if (user) {
-    const destination = getFinalRedirectPath();
-    const isNative = nativeIntegrationService.isRunningNatively();
-    
-    console.log('[Auth] User Present - Navigation State Check:', {
-      destination,
-      navigationAttempted,
-      navigationSuccessful,
-      showNavigationIndicator,
-      isNative,
-      currentPath: location.pathname,
-      timestamp: new Date().toISOString()
-    });
-    
-    // For native apps: Show enhanced navigation indicator with state feedback
-    if (isNative) {
-      console.log('[Auth] NATIVE: Rendering navigation interface');
+    // For native apps: Show loading indicator during navigation
+    if (nativeIntegrationService.isRunningNatively()) {
       return (
         <div className="min-h-screen flex items-center justify-center bg-background">
           <div className="text-center space-y-6">
@@ -259,18 +137,8 @@ export default function Auth() {
             <div className="space-y-2">
               <p className="text-lg font-medium text-foreground">Welcome back!</p>
               <p className="text-sm text-muted-foreground">
-                {navigationSuccessful 
-                  ? "Navigation successful - loading your dashboard..." 
-                  : navigationAttempted 
-                  ? "Completing sign-in process..."
-                  : "Taking you to your dashboard..."
-                }
+                Taking you to your dashboard...
               </p>
-              {navigationAttempted && navigationRetryCount.current > 0 && (
-                <p className="text-xs text-amber-600">
-                  Retry attempt {navigationRetryCount.current}/{maxNavigationRetries}
-                </p>
-              )}
             </div>
             {authError && (
               <div className="mt-4 p-3 bg-red-50 text-red-700 rounded-md text-sm max-w-md">
@@ -283,10 +151,11 @@ export default function Auth() {
     }
     
     // For web: Use standard React Router navigation
-    console.log('[Auth] WEB: Using Navigate component for redirection');
+    const destination = getFinalRedirectPath();
     return <Navigate to={destination} replace />;
   }
 
+  // Login form for unauthenticated users
   return (
     <div className="min-h-screen bg-background flex flex-col items-center justify-center px-4 py-12">
       <motion.div
