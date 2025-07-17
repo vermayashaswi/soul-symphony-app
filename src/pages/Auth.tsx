@@ -9,6 +9,7 @@ import PlatformAuthButton from '@/components/auth/PlatformAuthButton';
 import { nativeIntegrationService } from '@/services/nativeIntegrationService';
 import { nativeNavigationService } from '@/services/nativeNavigationService';
 import { useOnboarding } from '@/hooks/use-onboarding';
+import { authStateManager } from '@/services/authStateManager';
 
 export default function Auth() {
   const location = useLocation();
@@ -19,13 +20,26 @@ export default function Auth() {
   const { onboardingComplete, loading: onboardingLoading } = useOnboarding();
   const [authError, setAuthError] = useState<string | null>(null);
   const [navigationProcessing, setNavigationProcessing] = useState(false);
+  const [authDebugInfo, setAuthDebugInfo] = useState<any>(null);
 
   const redirectParam = searchParams.get('redirectTo') || searchParams.get('redirect');
   const fromLocation = location.state?.from?.pathname;
   const storedRedirect = typeof window !== 'undefined' ? localStorage.getItem('authRedirectTo') : null;
 
-  // Check for auth errors in URL params
+  // Enhanced error handling and auth state tracking
   useEffect(() => {
+    const checkAuthState = async () => {
+      try {
+        const debugInfo = await authStateManager.getCurrentAuthState();
+        setAuthDebugInfo(debugInfo);
+        console.log('[Auth] Current auth state:', debugInfo);
+      } catch (error) {
+        console.error('[Auth] Error checking auth state:', error);
+      }
+    };
+
+    checkAuthState();
+
     const error = searchParams.get('error');
     const errorDescription = searchParams.get('error_description');
 
@@ -50,6 +64,7 @@ export default function Auth() {
 
       setAuthError(userMessage);
       toast.error(userMessage);
+      authStateManager.handleAuthFailure({ message: userMessage });
     }
   }, [searchParams]);
 
@@ -88,34 +103,29 @@ export default function Auth() {
     });
   }, [user, authLoading, onboardingComplete, onboardingLoading, navigationProcessing, location.pathname]);
 
-  // Navigation handler for authenticated users
+  // Enhanced navigation handling with auth state manager
   useEffect(() => {
-    // Only proceed if we have a user, auth loading is done, and we're not already navigating
     if (user && !authLoading && !navigationProcessing) {
-      console.log('[Auth] User authenticated, preparing navigation');
+      console.log('[Auth] User authenticated, handling navigation with auth state manager');
+      
+      // Check if auth state manager is already processing
+      if (authStateManager.getProcessingState()) {
+        console.log('[Auth] Auth state manager already processing, skipping');
+        return;
+      }
+
       setNavigationProcessing(true);
       
-      // Clear any stored redirect info
-      localStorage.removeItem('authRedirectTo');
+      // Use auth state manager for reliable navigation
+      const storedRedirect = localStorage.getItem('authRedirectTo');
+      authStateManager.handleAuthSuccess(storedRedirect || undefined);
       
-      // Get the destination
-      const destination = getFinalRedirectPath();
-      console.log('[Auth] Navigation destination:', destination);
-
-      // Using setTimeout to break potential circular dependency
+      // Reset navigation processing after delay
       setTimeout(() => {
-        // For native apps, use the navigation service with force flag
-        if (nativeIntegrationService.isRunningNatively()) {
-          console.log('[Auth] Using native navigation to:', destination);
-          nativeNavigationService.navigateToPath(destination, { replace: true, force: true });
-        } else {
-          // For web, use React Router
-          console.log('[Auth] Using web navigation to:', destination);
-          navigate(destination, { replace: true });
-        }
-      }, 300); // Increased delay for native navigation
+        setNavigationProcessing(false);
+      }, 2000);
     }
-  }, [user, authLoading, navigate]);
+  }, [user, authLoading]);
 
   // Show loading state while checking auth
   if (authLoading || onboardingLoading) {
@@ -198,6 +208,8 @@ export default function Auth() {
             onError={(error) => {
               console.error('[Auth] Platform auth error:', error);
               setAuthError(error);
+              authStateManager.handleAuthFailure(error);
+              setNavigationProcessing(false);
             }}
           />
 

@@ -318,17 +318,21 @@ function SettingsContent() {
   };
   
   const handleToggleNotifications = async (checked: boolean) => {
+    console.log('[Settings] Notification toggle clicked:', checked);
     setNotificationsEnabled(checked);
     
     if (checked) {
-      // Request permission using the hook
+      console.log('[Settings] Requesting notification permission...');
+      // Request permission using the enhanced hook
       const permissionGranted = await requestNotificationPermission();
+      console.log('[Settings] Permission result:', permissionGranted);
+      
       if (permissionGranted) {
         setShowNotificationSettings(true);
         toast.success(<TranslatableText text="Notifications enabled! Set your preferences." forceTranslate={true} />);
       } else {
         setNotificationsEnabled(false);
-        toast.error(<TranslatableText text="Notification permission denied" forceTranslate={true} />);
+        toast.error(<TranslatableText text="Notification permission denied. Please check your device settings." forceTranslate={true} />);
       }
     } else {
       toast.info(<TranslatableText text="Notifications disabled" forceTranslate={true} />);
