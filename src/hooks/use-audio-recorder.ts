@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import RecordRTC, { StereoAudioRecorder } from 'recordrtc';
 import { normalizeAudioBlob } from '@/utils/audio/blob-utils';
+import { useMicrophonePermission } from './use-microphone-permission';
 
 interface UseAudioRecorderOptions {
   maxDuration?: number; // in seconds
@@ -15,8 +16,13 @@ export function useAudioRecorder({
   const [recordingTime, setRecordingTime] = useState(0);
   const [audioBlob, setAudioBlob] = useState<Blob | null>(null);
   const [audioLevel, setAudioLevel] = useState(0);
-  const [hasPermission, setHasPermission] = useState<boolean | null>(null);
   const [ripples, setRipples] = useState<number[]>([]);
+  
+  const {
+    permission: micPermission,
+    isSupported: micSupported,
+    requestPermission: requestMicPermission
+  } = useMicrophonePermission();
 
   const recorderRef = useRef<RecordRTC | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -76,6 +82,12 @@ export function useAudioRecorder({
       // Always clean up previous resources first
       cleanupResources();
       
+      // Use the microphone permission hook for native apps
+      const hasNativePermission = await requestMicPermission();
+      if (!hasNativePermission) {
+        return false;
+      }
+      
       const stream = await navigator.mediaDevices.getUserMedia({
         audio: {
           echoCancellation: true,
@@ -87,14 +99,12 @@ export function useAudioRecorder({
       });
       
       streamRef.current = stream;
-      setHasPermission(true);
       return true;
     } catch (error) {
       console.error('[useAudioRecorder] Error requesting permissions:', error);
-      setHasPermission(false);
       return false;
     }
-  }, [noiseReduction, cleanupResources]);
+  }, [noiseReduction, cleanupResources, requestMicPermission]);
 
   // Start analyzing audio levels
   const startAudioAnalysis = useCallback(() => {
@@ -159,7 +169,7 @@ export function useAudioRecorder({
     
     try {
       // Request permissions if not already granted
-      if (hasPermission !== true) {
+      if (micPermission !== 'granted') {
         const permissionGranted = await requestPermissions();
         if (!permissionGranted) {
           throw new Error('Microphone permission denied');
@@ -219,7 +229,7 @@ export function useAudioRecorder({
       console.error('[useAudioRecorder] Error starting recording:', error);
       cleanupResources();
     }
-  }, [isRecording, hasPermission, requestPermissions, cleanupResources, startAudioAnalysis, maxDuration]);
+  }, [isRecording, micPermission, requestPermissions, cleanupResources, startAudioAnalysis, maxDuration]);
 
   // Stop recording
   const stopRecording = useCallback(() => {
@@ -295,7 +305,7 @@ export function useAudioRecorder({
     recordingTime,
     audioBlob,
     audioLevel,
-    hasPermission,
+    hasPermission: micPermission === 'granted',
     ripples,
     startRecording,
     stopRecording,
