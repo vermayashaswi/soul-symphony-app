@@ -13,12 +13,12 @@ export const useNotificationPermission = () => {
       // Check if running natively first
       if (nativeIntegrationService.isRunningNatively()) {
         try {
-          // Use Capacitor's PushNotifications plugin for native apps
-          const pushNotifications = nativeIntegrationService.getPlugin('PushNotifications');
-          if (pushNotifications) {
-            const result = await pushNotifications.checkPermissions();
+          // Use Capacitor's LocalNotifications plugin for local/scheduled notifications
+          const localNotifications = nativeIntegrationService.getPlugin('LocalNotifications');
+          if (localNotifications) {
+            const result = await localNotifications.checkPermissions();
             setIsSupported(true);
-            setPermission(result.receive === 'granted' ? 'granted' : result.receive);
+            setPermission(result.display === 'granted' ? 'granted' : result.display);
             return;
           }
         } catch (error) {
@@ -52,10 +52,10 @@ export const useNotificationPermission = () => {
     try {
       // Try native first if available
       if (nativeIntegrationService.isRunningNatively()) {
-        const pushNotifications = nativeIntegrationService.getPlugin('PushNotifications');
-        if (pushNotifications) {
-          const result = await pushNotifications.requestPermissions();
-          const granted = result.receive === 'granted';
+        const localNotifications = nativeIntegrationService.getPlugin('LocalNotifications');
+        if (localNotifications) {
+          const result = await localNotifications.requestPermissions();
+          const granted = result.display === 'granted';
           setPermission(granted ? 'granted' : 'denied');
           return granted;
         }

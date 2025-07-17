@@ -1,4 +1,5 @@
 import { toast } from '@/hooks/use-toast';
+import { nativeIntegrationService } from './nativeIntegrationService';
 
 // Component mount tracking for safe DOM operations
 const mountedComponents = new Set<string>();
@@ -265,6 +266,53 @@ function clearScheduledNotifications() {
   console.log('All scheduled notifications cleared');
 }
 
+// Schedule native notifications using Capacitor LocalNotifications
+async function scheduleNativeNotifications(times: NotificationTime[]) {
+  if (!nativeIntegrationService.isRunningNatively()) {
+    console.log('Not running natively, skipping native notifications');
+    return;
+  }
+
+  try {
+    const localNotifications = nativeIntegrationService.getPlugin('LocalNotifications');
+    if (!localNotifications) {
+      console.log('LocalNotifications plugin not available');
+      return;
+    }
+
+    // Cancel all existing notifications
+    await localNotifications.cancel({ notifications: [] });
+
+    // Schedule notifications for each selected time
+    const notifications = times.map((time, index) => {
+      const { hour, minute } = TIME_MAPPINGS[time];
+      const scheduledDate = getNextNotificationTime(time);
+      
+      return {
+        id: index + 1,
+        title: 'Journal Reminder 📝',
+        body: "It's time to reflect on your day. Take a moment to journal your thoughts and feelings.",
+        schedule: {
+          at: scheduledDate,
+          repeats: true,
+          every: 'day'
+        },
+        sound: 'default',
+        actionTypeId: 'JOURNAL_REMINDER',
+        extra: {
+          time,
+          scheduledFor: scheduledDate.toISOString()
+        }
+      };
+    });
+
+    await localNotifications.schedule({ notifications });
+    console.log(`Scheduled ${notifications.length} native notifications`);
+  } catch (error) {
+    console.error('Error scheduling native notifications:', error);
+  }
+}
+
 // Main setup function
 export function setupJournalReminder(enabled: boolean, frequency: NotificationFrequency, times: NotificationTime[]) {
   console.log('setupJournalReminder called:', { enabled, frequency, times });
@@ -283,21 +331,28 @@ export function setupJournalReminder(enabled: boolean, frequency: NotificationFr
     return;
   }
   
-  // Request permission first
-  requestNotificationPermission().then(granted => {
-    if (!granted) {
-      console.log('Notification permission not granted, cannot schedule notifications');
-      return;
-    }
-    
-    // Schedule notifications for each selected time
-    times.forEach(time => {
-      const notification = scheduleNotification(time);
-      activeNotifications.push(notification);
+  // Check if running natively first
+  if (nativeIntegrationService.isRunningNatively()) {
+    console.log('Setting up native notifications');
+    scheduleNativeNotifications(times);
+  } else {
+    console.log('Setting up web notifications');
+    // Request permission first for web
+    requestNotificationPermission().then(granted => {
+      if (!granted) {
+        console.log('Notification permission not granted, cannot schedule notifications');
+        return;
+      }
+      
+      // Schedule notifications for each selected time
+      times.forEach(time => {
+        const notification = scheduleNotification(time);
+        activeNotifications.push(notification);
+      });
+      
+      console.log(`Scheduled ${activeNotifications.length} web notifications`);
     });
-    
-    console.log(`Scheduled ${activeNotifications.length} notifications`);
-  });
+  }
 }
 
 // Initialize Capacitor notifications (for mobile) - Updated to avoid build-time import resolution

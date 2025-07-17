@@ -8,6 +8,7 @@ import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import { useTheme } from '@/hooks/use-theme';
 import { setupJournalReminder, initializeCapacitorNotifications, NotificationFrequency, NotificationTime } from '@/services/notificationService';
+import { useNotificationPermission } from '@/hooks/use-notification-permission';
 import { useAuth } from '@/contexts/AuthContext';
 import { useSubscription } from '@/contexts/SubscriptionContext';
 import { supabase } from '@/integrations/supabase/client';
@@ -69,6 +70,7 @@ function SettingsContent() {
   const [notificationsEnabled, setNotificationsEnabled] = useState(false);
   const [notificationTimes, setNotificationTimes] = useState<NotificationTime[]>(['evening']);
   const [showNotificationSettings, setShowNotificationSettings] = useState(false);
+  const { requestPermission: requestNotificationPermission, isGranted: isNotificationPermissionGranted } = useNotificationPermission();
   const { user, signOut } = useAuth();
   const { 
     isPremium, 
@@ -319,20 +321,14 @@ function SettingsContent() {
     setNotificationsEnabled(checked);
     
     if (checked) {
-      // Request permission first
-      if ('Notification' in window) {
-        const permission = await Notification.requestPermission();
-        if (permission === 'granted') {
-          setShowNotificationSettings(true);
-          toast.success(<TranslatableText text="Notifications enabled! Set your preferences." forceTranslate={true} />);
-        } else {
-          setNotificationsEnabled(false);
-          toast.error(<TranslatableText text="Notification permission denied" forceTranslate={true} />);
-        }
-      } else {
-        // For mobile/capacitor
+      // Request permission using the hook
+      const permissionGranted = await requestNotificationPermission();
+      if (permissionGranted) {
         setShowNotificationSettings(true);
-        toast.success(<TranslatableText text="Customize your notification settings" forceTranslate={true} />);
+        toast.success(<TranslatableText text="Notifications enabled! Set your preferences." forceTranslate={true} />);
+      } else {
+        setNotificationsEnabled(false);
+        toast.error(<TranslatableText text="Notification permission denied" forceTranslate={true} />);
       }
     } else {
       toast.info(<TranslatableText text="Notifications disabled" forceTranslate={true} />);
