@@ -12,25 +12,40 @@ export class NativeNavigationService {
 
   /**
    * Navigate to a specific path with native app considerations
+   * @param path Path to navigate to
+   * @param options Navigation options: 
+   *   - replace: Replace current history entry instead of pushing a new one
+   *   - force: Force navigation even if we're already on this path (used for auth redirects)
    */
-  public navigateToPath(path: string, options?: { replace?: boolean }): void {
+  public navigateToPath(path: string, options?: { replace?: boolean; force?: boolean }): void {
     console.log('[NativeNav] Navigating to:', path, 'options:', options);
+    
+    // Skip navigation if we're already on this path and force isn't enabled
+    const currentPath = window.location.pathname;
+    if (currentPath === path && !options?.force) {
+      console.log('[NativeNav] Already on path, skipping navigation');
+      return;
+    }
     
     if (nativeIntegrationService.isRunningNatively()) {
       // For native apps, use location.href for reliable navigation
+      console.log('[NativeNav] Using direct location change for native app');
       if (options?.replace) {
+        console.log('[NativeNav] Replacing location with:', path);
         window.location.replace(path);
       } else {
+        console.log('[NativeNav] Setting location href to:', path);
         window.location.href = path;
       }
     } else {
-      // For web, use normal navigation
+      // For web, use history API
+      console.log('[NativeNav] Using history API for web');
       if (options?.replace) {
         window.history.replaceState(null, '', path);
       } else {
         window.history.pushState(null, '', path);
       }
-      // Trigger a navigation event
+      // Trigger a navigation event to notify React Router
       window.dispatchEvent(new PopStateEvent('popstate'));
     }
   }
@@ -40,7 +55,7 @@ export class NativeNavigationService {
    */
   public navigateToAuthenticatedHome(): void {
     console.log('[NativeNav] Navigating to authenticated home');
-    this.navigateToPath('/app/home', { replace: true });
+    this.navigateToPath('/app/home', { replace: true, force: true });
   }
 
   /**
@@ -48,16 +63,16 @@ export class NativeNavigationService {
    */
   public navigateToOnboarding(): void {
     console.log('[NativeNav] Navigating to onboarding');
-    this.navigateToPath('/app/onboarding', { replace: true });
+    this.navigateToPath('/app/onboarding', { replace: true, force: true });
   }
 
   /**
    * Navigate to auth page
    */
   public navigateToAuth(redirectPath?: string): void {
-    const authPath = redirectPath ? `/app/auth?redirect=${encodeURIComponent(redirectPath)}` : '/app/auth';
+    const authPath = redirectPath ? `/app/auth?redirectTo=${encodeURIComponent(redirectPath)}` : '/app/auth';
     console.log('[NativeNav] Navigating to auth:', authPath);
-    this.navigateToPath(authPath, { replace: true });
+    this.navigateToPath(authPath, { replace: true, force: true });
   }
 
   /**

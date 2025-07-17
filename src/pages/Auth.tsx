@@ -20,7 +20,7 @@ export default function Auth() {
   const [authError, setAuthError] = useState<string | null>(null);
   const [navigationProcessing, setNavigationProcessing] = useState(false);
 
-  const redirectParam = searchParams.get('redirectTo');
+  const redirectParam = searchParams.get('redirectTo') || searchParams.get('redirect');
   const fromLocation = location.state?.from?.pathname;
   const storedRedirect = typeof window !== 'undefined' ? localStorage.getItem('authRedirectTo') : null;
 
@@ -102,18 +102,18 @@ export default function Auth() {
       const destination = getFinalRedirectPath();
       console.log('[Auth] Navigation destination:', destination);
 
-      // Use simplified navigation based on platform
-      if (nativeIntegrationService.isRunningNatively()) {
-        // For native apps, use our navigation service
-        console.log('[Auth] Using native navigation service');
-        setTimeout(() => {
-          nativeNavigationService.navigateToPath(destination, { replace: true });
-        }, 100); // Small delay to ensure UI state is updated first
-      } else {
-        // For web, use React Router
-        console.log('[Auth] Using web navigation');
-        navigate(destination, { replace: true });
-      }
+      // Using setTimeout to break potential circular dependency
+      setTimeout(() => {
+        // For native apps, use the navigation service with force flag
+        if (nativeIntegrationService.isRunningNatively()) {
+          console.log('[Auth] Using native navigation to:', destination);
+          nativeNavigationService.navigateToPath(destination, { replace: true, force: true });
+        } else {
+          // For web, use React Router
+          console.log('[Auth] Using web navigation to:', destination);
+          navigate(destination, { replace: true });
+        }
+      }, 300); // Increased delay for native navigation
     }
   }, [user, authLoading, navigate]);
 
