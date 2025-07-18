@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { Bell, BellOff, AlertCircle } from 'lucide-react';
+import { Bell, BellOff, AlertCircle, Loader2 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { TranslatableText } from '@/components/translation/TranslatableText';
@@ -16,16 +16,41 @@ export const NotificationStatus: React.FC<NotificationStatusProps> = ({
   className, 
   showText = false 
 }) => {
-  const { permission, isGranted, isDenied, requestPermission } = useNotificationPermission();
+  const { 
+    permission, 
+    isGranted, 
+    isDenied, 
+    isDefault,
+    initializationComplete,
+    requestPermission 
+  } = useNotificationPermission();
   const settings = getNotificationSettings();
 
   const getStatusInfo = () => {
+    if (!initializationComplete) {
+      return {
+        icon: Loader2,
+        text: 'Checking...',
+        variant: 'secondary' as const,
+        color: 'text-muted-foreground animate-spin'
+      };
+    }
+
     if (!settings.enabled) {
       return {
         icon: BellOff,
         text: 'Disabled',
         variant: 'secondary' as const,
         color: 'text-muted-foreground'
+      };
+    }
+
+    if (permission === 'unsupported') {
+      return {
+        icon: AlertCircle,
+        text: 'Not Supported',
+        variant: 'destructive' as const,
+        color: 'text-destructive'
       };
     }
 
@@ -65,12 +90,13 @@ export const NotificationStatus: React.FC<NotificationStatusProps> = ({
         <span className="text-sm">
           <TranslatableText text={statusInfo.text} />
         </span>
-        {permission === 'default' && (
+        {isDefault && initializationComplete && (
           <Button
             size="sm"
             variant="outline"
             onClick={requestPermission}
             className="ml-2"
+            disabled={!initializationComplete}
           >
             <TranslatableText text="Enable" />
           </Button>

@@ -1,22 +1,19 @@
-import { nativeIntegrationService } from './nativeIntegrationService';
-
 export type NotificationPermissionState = 'default' | 'granted' | 'denied' | 'unsupported';
 
-interface NotificationPermissionResult {
+export interface NotificationPermissionResult {
   granted: boolean;
   state: NotificationPermissionState;
-  method: 'native' | 'web' | 'unsupported';
-  details?: string;
+  plugin?: string;
+  error?: string;
 }
 
-interface PermissionDebugInfo {
-  nativeSupported: boolean;
-  webSupported: boolean;
-  localNotificationsAvailable: boolean;
-  pushNotificationsAvailable: boolean;
-  currentPermission: NotificationPermissionState;
+export interface PermissionDebugInfo {
+  isNative: boolean;
   platform: string;
-  timestamp: number;
+  nativeStatus: any;
+  webStatus: any;
+  pluginErrors: Array<{ plugin: string; error: string }>;
+  timestamp: string;
 }
 
 class EnhancedNotificationService {
@@ -30,234 +27,268 @@ class EnhancedNotificationService {
     return EnhancedNotificationService.instance;
   }
 
-  private log(message: string, data?: any): void {
+  private async log(message: string, data?: any): Promise<void> {
     if (this.debugEnabled) {
-      console.log(`[EnhancedNotifications] ${message}`, data || '');
+      console.log(`[EnhancedNotificationService] ${message}`, data);
     }
   }
 
-  private error(message: string, error?: any): void {
-    console.error(`[EnhancedNotifications] ${message}`, error || '');
+  private async error(message: string, error?: any): Promise<void> {
+    console.error(`[EnhancedNotificationService] ${message}`, error);
   }
 
-  // Get comprehensive permission debug info
-  private async getPermissionDebugInfo(): Promise<PermissionDebugInfo> {
-    const isNative = nativeIntegrationService.isRunningNatively();
-    const platform = nativeIntegrationService.getPlatform();
-    
-    const debugInfo: PermissionDebugInfo = {
-      nativeSupported: isNative,
-      webSupported: typeof window !== 'undefined' && 'Notification' in window,
-      localNotificationsAvailable: isNative && nativeIntegrationService.isPluginAvailable('LocalNotifications'),
-      pushNotificationsAvailable: isNative && nativeIntegrationService.isPluginAvailable('PushNotifications'),
-      currentPermission: 'default',
-      platform,
-      timestamp: Date.now()
-    };
+  private async isNativeContext(): Promise<boolean> {
+    const { Capacitor } = await import('@capacitor/core');
+    return Capacitor.isNativePlatform();
+  }
 
-    // Get current permission state
+  private async arePluginsAvailable(): Promise<{ local: boolean; push: boolean }> {
     try {
-      if (debugInfo.nativeSupported && debugInfo.localNotificationsAvailable) {
-        const localNotifications = nativeIntegrationService.getPlugin('LocalNotifications');
-        if (localNotifications) {
-          const result = await localNotifications.checkPermissions();
-          debugInfo.currentPermission = this.mapNativePermission(result.display);
-        }
-      } else if (debugInfo.webSupported) {
-        debugInfo.currentPermission = Notification.permission as NotificationPermissionState;
-      } else {
-        debugInfo.currentPermission = 'unsupported';
+      const { Capacitor } = await import('@capacitor/core');
+      
+      if (!Capacitor.isNativePlatform()) {
+        return { local: false, push: false };
       }
+
+      // Check plugin availability by attempting to import them
+      let localAvailable = false;
+      let pushAvailable = false;
+      
+      try {
+        const { LocalNotifications } = await import('@capacitor/local-notifications');
+        // Try to call a simple method to verify the plugin is actually available
+        await LocalNotifications.checkPermissions();
+        localAvailable = true;
+        this.log('LocalNotifications plugin is available');
+      } catch (localError) {
+        this.log('LocalNotifications plugin not available:', localError);
+        localAvailable = false;
+      }
+      
+      try {
+        const { PushNotifications } = await import('@capacitor/push-notifications');
+        // Try to call a simple method to verify the plugin is actually available
+        await PushNotifications.checkPermissions();
+        pushAvailable = true;
+        this.log('PushNotifications plugin is available');
+      } catch (pushError) {
+        this.log('PushNotifications plugin not available:', pushError);
+        pushAvailable = false;
+      }
+      
+      this.log('Plugin availability:', { local: localAvailable, push: pushAvailable });
+      
+      return { local: localAvailable, push: pushAvailable };
     } catch (error) {
-      this.error('Error getting current permission state:', error);
-      debugInfo.currentPermission = 'default';
-    }
-
-    return debugInfo;
-  }
-
-  // Map native permission states to our standard states
-  private mapNativePermission(nativeState: string): NotificationPermissionState {
-    switch (nativeState) {
-      case 'granted':
-        return 'granted';
-      case 'denied':
-        return 'denied';
-      case 'prompt':
-      case 'prompt-with-rationale':
-        return 'default';
-      default:
-        return 'default';
+      this.error('Error checking plugin availability:', error);
+      return { local: false, push: false };
     }
   }
 
-  // Check current notification permission status
-  public async checkPermissionStatus(): Promise<NotificationPermissionState> {
+  async checkPermissionStatus(): Promise<NotificationPermissionState> {
+    this.log('Checking permission status');
+    
     try {
-      this.log('Checking notification permission status');
+      const isNative = await this.isNativeContext();
       
-      const debugInfo = await this.getPermissionDebugInfo();
-      this.log('Permission debug info:', debugInfo);
-      
-      return debugInfo.currentPermission;
+      if (isNative) {
+        this.log('Native platform detected, checking native permissions');
+        
+        const pluginAvailability = await this.arePluginsAvailable();
+        
+        if (!pluginAvailability.local && !pluginAvailability.push) {
+          this.error('No notification plugins available');
+          return 'unsupported';
+        }
+        
+        // Prefer LocalNotifications for local notifications
+        if (pluginAvailability.local) {
+          try {
+            const { LocalNotifications } = await import('@capacitor/local-notifications');
+            const localStatus = await LocalNotifications.checkPermissions();
+            this.log('LocalNotifications permission status:', localStatus);
+            
+            if (localStatus.display === 'granted') {
+              return 'granted';
+            } else if (localStatus.display === 'denied') {
+              return 'denied';
+            } else {
+              return 'default';
+            }
+          } catch (localError) {
+            this.error('LocalNotifications check failed:', localError);
+          }
+        }
+        
+        // Fallback to PushNotifications
+        if (pluginAvailability.push) {
+          try {
+            const { PushNotifications } = await import('@capacitor/push-notifications');
+            const pushStatus = await PushNotifications.checkPermissions();
+            this.log('PushNotifications permission status:', pushStatus);
+            
+            if (pushStatus.receive === 'granted') {
+              return 'granted';
+            } else if (pushStatus.receive === 'denied') {
+              return 'denied';
+            } else {
+              return 'default';
+            }
+          } catch (pushError) {
+            this.error('PushNotifications check failed:', pushError);
+          }
+        }
+        
+        this.error('All native permission checks failed');
+        return 'unsupported';
+      } else {
+        this.log('Web platform detected, checking web permissions');
+        
+        if (!('Notification' in window)) {
+          this.log('Web Notifications API not supported');
+          return 'unsupported';
+        }
+        
+        const permission = Notification.permission;
+        this.log('Web notification permission:', permission);
+        
+        return permission as NotificationPermissionState;
+      }
     } catch (error) {
       this.error('Error checking permission status:', error);
-      return 'default';
+      return 'unsupported';
     }
   }
 
-  // Request notification permissions with proper native/web handling
-  public async requestPermissions(): Promise<NotificationPermissionResult> {
+  async requestPermissions(): Promise<NotificationPermissionResult> {
+    this.log('Permission request initiated');
+    
     try {
-      this.log('Starting permission request process');
+      const debugInfo = await this.getPermissionInfo();
+      this.log('Pre-request debug info:', debugInfo);
+
+      const isNative = await this.isNativeContext();
       
-      const debugInfo = await this.getPermissionDebugInfo();
-      this.log('Initial permission state:', debugInfo);
-
-      // Check if already granted
-      if (debugInfo.currentPermission === 'granted') {
-        this.log('Permission already granted');
-        return {
-          granted: true,
-          state: 'granted',
-          method: debugInfo.nativeSupported ? 'native' : 'web',
-          details: 'Permission already granted'
-        };
-      }
-
-      // Handle native environment
-      if (debugInfo.nativeSupported) {
+      if (isNative) {
+        this.log('Requesting native permissions');
         return await this.requestNativePermissions(debugInfo);
-      }
-
-      // Handle web environment
-      if (debugInfo.webSupported) {
+      } else {
+        this.log('Requesting web permissions');
         return await this.requestWebPermissions();
       }
-
-      // Unsupported environment
-      this.log('Notification permissions not supported in this environment');
-      return {
-        granted: false,
-        state: 'unsupported',
-        method: 'unsupported',
-        details: 'Notifications not supported in this environment'
-      };
-
     } catch (error) {
       this.error('Error requesting permissions:', error);
       return {
         granted: false,
         state: 'denied',
-        method: 'unsupported',
-        details: `Permission request failed: ${error}`
+        error: error instanceof Error ? error.message : 'Unknown error'
       };
     }
   }
 
-  // Handle native permission requests
   private async requestNativePermissions(debugInfo: PermissionDebugInfo): Promise<NotificationPermissionResult> {
-    this.log('Requesting native permissions');
-
-    // CRITICAL: Request both LocalNotifications and PushNotifications in correct order
-    const results: { local?: boolean; push?: boolean } = {};
-
-    // 1. First request LocalNotifications permission
-    if (debugInfo.localNotificationsAvailable) {
+    this.log('Starting native permission request sequence');
+    
+    const pluginAvailability = await this.arePluginsAvailable();
+    
+    if (!pluginAvailability.local && !pluginAvailability.push) {
+      this.error('No notification plugins available for permission request');
+      return {
+        granted: false,
+        state: 'unsupported',
+        error: 'No notification plugins registered'
+      };
+    }
+    
+    // Try LocalNotifications first (preferred for journal reminders)
+    if (pluginAvailability.local) {
       try {
-        this.log('Requesting LocalNotifications permission');
-        const localNotifications = nativeIntegrationService.getPlugin('LocalNotifications');
+        this.log('Attempting LocalNotifications permission request');
+        const { LocalNotifications } = await import('@capacitor/local-notifications');
         
-        if (localNotifications) {
-          const result = await localNotifications.requestPermissions();
-          this.log('LocalNotifications permission result:', result);
-          
-          const granted = result.display === 'granted';
-          results.local = granted;
-          
-          if (!granted) {
-            this.log('LocalNotifications permission denied');
-            return {
-              granted: false,
-              state: 'denied',
-              method: 'native',
-              details: 'Local notifications permission denied'
-            };
-          }
+        const localResult = await LocalNotifications.requestPermissions();
+        this.log('LocalNotifications request result:', localResult);
+        
+        if (localResult.display === 'granted') {
+          this.log('LocalNotifications permission granted');
+          return {
+            granted: true,
+            state: 'granted',
+            plugin: 'LocalNotifications'
+          };
+        } else if (localResult.display === 'denied') {
+          this.log('LocalNotifications permission denied by user');
+          return {
+            granted: false,
+            state: 'denied',
+            plugin: 'LocalNotifications'
+          };
         }
-      } catch (error) {
-        this.error('Error requesting LocalNotifications permission:', error);
-        results.local = false;
+      } catch (localError) {
+        this.error('LocalNotifications request failed:', localError);
       }
     }
-
-    // 2. Then request PushNotifications permission
-    if (debugInfo.pushNotificationsAvailable) {
+    
+    // Try PushNotifications as fallback
+    if (pluginAvailability.push) {
       try {
-        this.log('Requesting PushNotifications permission');
-        const pushNotifications = nativeIntegrationService.getPlugin('PushNotifications');
+        this.log('Attempting PushNotifications permission request');
+        const { PushNotifications } = await import('@capacitor/push-notifications');
         
-        if (pushNotifications) {
-          const result = await pushNotifications.requestPermissions();
-          this.log('PushNotifications permission result:', result);
-          
-          const granted = result.receive === 'granted';
-          results.push = granted;
+        const pushResult = await PushNotifications.requestPermissions();
+        this.log('PushNotifications request result:', pushResult);
+        
+        if (pushResult.receive === 'granted') {
+          this.log('PushNotifications permission granted');
+          return {
+            granted: true,
+            state: 'granted',
+            plugin: 'PushNotifications'
+          };
+        } else if (pushResult.receive === 'denied') {
+          this.log('PushNotifications permission denied by user');
+          return {
+            granted: false,
+            state: 'denied',
+            plugin: 'PushNotifications'
+          };
         }
-      } catch (error) {
-        this.error('Error requesting PushNotifications permission:', error);
-        results.push = false;
+      } catch (pushError) {
+        this.error('PushNotifications request failed:', pushError);
       }
     }
-
-    // Determine final result
-    const hasLocalPermission = results.local !== false;
-    const hasPushPermission = results.push !== false;
-    const overallGranted = hasLocalPermission; // LocalNotifications is more important
-
-    this.log('Native permission request completed:', {
-      local: results.local,
-      push: results.push,
-      overallGranted
-    });
-
+    
+    this.error('All native permission requests failed or were denied');
     return {
-      granted: overallGranted,
-      state: overallGranted ? 'granted' : 'denied',
-      method: 'native',
-      details: `Local: ${results.local}, Push: ${results.push}`
+      granted: false,
+      state: 'denied',
+      error: 'All notification permission requests failed'
     };
   }
 
-  // Handle web permission requests
   private async requestWebPermissions(): Promise<NotificationPermissionResult> {
     this.log('Requesting web notification permission');
-
+    
     try {
       const result = await Notification.requestPermission();
       this.log('Web permission result:', result);
-
-      const granted = result === 'granted';
-
+      
       return {
-        granted,
+        granted: result === 'granted',
         state: result as NotificationPermissionState,
-        method: 'web',
-        details: `Web permission: ${result}`
+        plugin: 'Web'
       };
     } catch (error) {
       this.error('Error requesting web permission:', error);
       return {
         granted: false,
         state: 'denied',
-        method: 'web',
-        details: `Web permission request failed: ${error}`
+        error: error instanceof Error ? error.message : 'Web permission request failed'
       };
     }
   }
 
-  // Test notification delivery
-  public async testNotification(): Promise<boolean> {
+  async testNotification(): Promise<boolean> {
     try {
       this.log('Testing notification delivery');
       
@@ -267,7 +298,7 @@ class EnhancedNotificationService {
         return false;
       }
 
-      const isNative = nativeIntegrationService.isRunningNatively();
+      const isNative = await this.isNativeContext();
       
       if (isNative) {
         return await this.sendNativeTestNotification();
@@ -280,58 +311,134 @@ class EnhancedNotificationService {
     }
   }
 
-  // Send native test notification
+  async getPermissionInfo(): Promise<PermissionDebugInfo> {
+    try {
+      const isNative = await this.isNativeContext();
+      const { Capacitor } = await import('@capacitor/core');
+      const platform = Capacitor.getPlatform();
+      
+      let nativeStatus = null;
+      let webStatus = null;
+      let pluginErrors: any[] = [];
+      
+      if (isNative) {
+        const pluginAvailability = await this.arePluginsAvailable();
+        
+        // Check LocalNotifications
+        if (pluginAvailability.local) {
+          try {
+            const { LocalNotifications } = await import('@capacitor/local-notifications');
+            const localStatus = await LocalNotifications.checkPermissions();
+            nativeStatus = {
+              ...nativeStatus,
+              localNotifications: localStatus,
+              localNotificationsAvailable: true
+            };
+          } catch (error) {
+            pluginErrors.push({ plugin: 'LocalNotifications', error: error instanceof Error ? error.message : 'Unknown error' });
+          }
+        } else {
+          nativeStatus = {
+            ...nativeStatus,
+            localNotificationsAvailable: false
+          };
+          pluginErrors.push({ plugin: 'LocalNotifications', error: 'Plugin not registered' });
+        }
+        
+        // Check PushNotifications
+        if (pluginAvailability.push) {
+          try {
+            const { PushNotifications } = await import('@capacitor/push-notifications');
+            const pushStatus = await PushNotifications.checkPermissions();
+            nativeStatus = {
+              ...nativeStatus,
+              pushNotifications: pushStatus,
+              pushNotificationsAvailable: true
+            };
+          } catch (error) {
+            pluginErrors.push({ plugin: 'PushNotifications', error: error instanceof Error ? error.message : 'Unknown error' });
+          }
+        } else {
+          nativeStatus = {
+            ...nativeStatus,
+            pushNotificationsAvailable: false
+          };
+          pluginErrors.push({ plugin: 'PushNotifications', error: 'Plugin not registered' });
+        }
+      } else {
+        // Web platform
+        webStatus = {
+          supported: 'Notification' in window,
+          permission: 'Notification' in window ? Notification.permission : 'unsupported'
+        };
+      }
+      
+      return {
+        isNative,
+        platform,
+        nativeStatus,
+        webStatus,
+        pluginErrors,
+        timestamp: new Date().toISOString()
+      };
+    } catch (error) {
+      this.error('Error getting permission info:', error);
+      return {
+        isNative: false,
+        platform: 'unknown',
+        nativeStatus: null,
+        webStatus: null,
+        pluginErrors: [{ plugin: 'System', error: error instanceof Error ? error.message : 'Unknown error' }],
+        timestamp: new Date().toISOString()
+      };
+    }
+  }
+
+  setDebugEnabled(enabled: boolean): void {
+    this.debugEnabled = enabled;
+    this.log(`Debug logging ${enabled ? 'enabled' : 'disabled'}`);
+  }
+
   private async sendNativeTestNotification(): Promise<boolean> {
     try {
-      const localNotifications = nativeIntegrationService.getPlugin('LocalNotifications');
+      const pluginAvailability = await this.arePluginsAvailable();
       
-      if (!localNotifications) {
-        this.log('LocalNotifications plugin not available');
-        return false;
+      if (pluginAvailability.local) {
+        const { LocalNotifications } = await import('@capacitor/local-notifications');
+        
+        await LocalNotifications.schedule({
+          notifications: [{
+            title: 'SOULo Notifications',
+            body: 'Notifications are working! You\'re all set up.',
+            id: Date.now(),
+            schedule: { at: new Date(Date.now() + 1000) }
+          }]
+        });
+        
+        this.log('Native test notification scheduled');
+        return true;
       }
-
-      await localNotifications.schedule({
-        notifications: [{
-          title: 'SOULo Notifications',
-          body: 'Notifications are working! You\'re all set up.',
-          id: Date.now(),
-          schedule: { at: new Date(Date.now() + 1000) }
-        }]
-      });
-
-      this.log('Native test notification scheduled');
-      return true;
+      
+      return false;
     } catch (error) {
       this.error('Error sending native test notification:', error);
       return false;
     }
   }
 
-  // Send web test notification
   private async sendWebTestNotification(): Promise<boolean> {
     try {
       new Notification('SOULo Notifications', {
         body: 'Notifications are working! You\'re all set up.',
         icon: '/favicon.ico'
       });
-
+      
       this.log('Web test notification sent');
       return true;
     } catch (error) {
       this.error('Error sending web test notification:', error);
       return false;
     }
-  }
-
-  // Get comprehensive permission status info for debugging
-  public async getPermissionInfo(): Promise<PermissionDebugInfo> {
-    return await this.getPermissionDebugInfo();
-  }
-
-  // Enable/disable debug logging
-  public setDebugEnabled(enabled: boolean): void {
-    this.debugEnabled = enabled;
-    this.log(`Debug logging ${enabled ? 'enabled' : 'disabled'}`);
   }
 }
 

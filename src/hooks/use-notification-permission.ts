@@ -1,6 +1,5 @@
 
 import { useState, useEffect } from 'react';
-import { nativeIntegrationService } from '@/services/nativeIntegrationService';
 import { enhancedNotificationService } from '@/services/enhancedNotificationService';
 
 export type NotificationPermissionState = 'default' | 'granted' | 'denied' | 'unsupported';
