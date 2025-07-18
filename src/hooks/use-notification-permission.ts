@@ -1,8 +1,8 @@
 
 import { useState, useEffect } from 'react';
-import { enhancedNotificationService } from '@/services/enhancedNotificationService';
+import { enhancedNotificationService, NotificationPermissionState } from '@/services/enhancedNotificationService';
 
-export type NotificationPermissionState = 'default' | 'granted' | 'denied' | 'unsupported';
+export { type NotificationPermissionState };
 
 export const useNotificationPermission = () => {
   const [permission, setPermission] = useState<NotificationPermissionState>('default');
@@ -10,29 +10,29 @@ export const useNotificationPermission = () => {
   const [initializationComplete, setInitializationComplete] = useState(false);
   const [debugInfo, setDebugInfo] = useState<any>(null);
 
-  // Enhanced permission checking using the new service
+  // Enhanced permission checking using the enhanced service
   useEffect(() => {
     const checkPermission = async () => {
-      console.log('[Notifications] Checking notification permission status with enhanced service');
+      console.log('[useNotificationPermission] Checking notification permission status with enhanced service');
       try {
         // Get debug info for troubleshooting
         const info = await enhancedNotificationService.getPermissionInfo();
         setDebugInfo(info);
-        console.log('[Notifications] Permission debug info:', info);
+        console.log('[useNotificationPermission] Permission debug info:', info);
         
         // Check current permission status
         const currentPermission = await enhancedNotificationService.checkPermissionStatus();
-        console.log('[Notifications] Current permission status:', currentPermission);
+        console.log('[useNotificationPermission] Current permission status:', currentPermission);
         
         setPermission(currentPermission);
         setIsSupported(currentPermission !== 'unsupported');
       } catch (error) {
-        console.error('[Notifications] Error checking permissions:', error);
+        console.error('[useNotificationPermission] Error checking permissions:', error);
         setPermission('unsupported');
         setIsSupported(false);
       } finally {
         setInitializationComplete(true);
-        console.log('[Notifications] Permission check complete');
+        console.log('[useNotificationPermission] Permission check complete');
       }
     };
 
@@ -40,7 +40,7 @@ export const useNotificationPermission = () => {
   }, []);
 
   const requestPermission = async (): Promise<boolean> => {
-    console.log('[Notifications] Permission request initiated using enhanced service', {
+    console.log('[useNotificationPermission] Permission request initiated using enhanced service', {
       currentPermission: permission,
       isSupported,
       debugInfo
@@ -49,7 +49,7 @@ export const useNotificationPermission = () => {
     try {
       // Use enhanced notification service for permission request
       const result = await enhancedNotificationService.requestPermissions();
-      console.log('[Notifications] Enhanced service permission result:', result);
+      console.log('[useNotificationPermission] Enhanced service permission result:', result);
       
       // Update state based on result
       setPermission(result.state);
@@ -60,7 +60,7 @@ export const useNotificationPermission = () => {
       
       return result.granted;
     } catch (error) {
-      console.error('[Notifications] Error requesting notification permission:', error);
+      console.error('[useNotificationPermission] Error requesting notification permission:', error);
       setPermission('denied');
       return false;
     }

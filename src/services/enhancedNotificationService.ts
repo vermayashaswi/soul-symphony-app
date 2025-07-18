@@ -1,3 +1,4 @@
+
 export type NotificationPermissionState = 'default' | 'granted' | 'denied' | 'unsupported';
 
 export interface NotificationPermissionResult {
@@ -18,7 +19,7 @@ export interface PermissionDebugInfo {
 
 class EnhancedNotificationService {
   private static instance: EnhancedNotificationService;
-  private debugEnabled = true;
+  private debugEnabled = true; // Enable debug by default for mobile development
 
   static getInstance(): EnhancedNotificationService {
     if (!EnhancedNotificationService.instance) {
@@ -38,8 +39,15 @@ class EnhancedNotificationService {
   }
 
   private async isNativeContext(): Promise<boolean> {
-    const { Capacitor } = await import('@capacitor/core');
-    return Capacitor.isNativePlatform();
+    try {
+      const { Capacitor } = await import('@capacitor/core');
+      const isNative = Capacitor.isNativePlatform();
+      this.log(`Native context check: ${isNative}`);
+      return isNative;
+    } catch (error) {
+      this.error('Error checking native context:', error);
+      return false;
+    }
   }
 
   private async arePluginsAvailable(): Promise<{ local: boolean; push: boolean }> {
@@ -47,6 +55,7 @@ class EnhancedNotificationService {
       const { Capacitor } = await import('@capacitor/core');
       
       if (!Capacitor.isNativePlatform()) {
+        this.log('Not on native platform, plugins not available');
         return { local: false, push: false };
       }
 
@@ -59,7 +68,7 @@ class EnhancedNotificationService {
         // Try to call a simple method to verify the plugin is actually available
         await LocalNotifications.checkPermissions();
         localAvailable = true;
-        this.log('LocalNotifications plugin is available');
+        this.log('LocalNotifications plugin is available and functional');
       } catch (localError) {
         this.log('LocalNotifications plugin not available:', localError);
         localAvailable = false;
@@ -70,13 +79,13 @@ class EnhancedNotificationService {
         // Try to call a simple method to verify the plugin is actually available
         await PushNotifications.checkPermissions();
         pushAvailable = true;
-        this.log('PushNotifications plugin is available');
+        this.log('PushNotifications plugin is available and functional');
       } catch (pushError) {
         this.log('PushNotifications plugin not available:', pushError);
         pushAvailable = false;
       }
       
-      this.log('Plugin availability:', { local: localAvailable, push: pushAvailable });
+      this.log('Plugin availability check complete:', { local: localAvailable, push: pushAvailable });
       
       return { local: localAvailable, push: pushAvailable };
     } catch (error) {
@@ -86,7 +95,7 @@ class EnhancedNotificationService {
   }
 
   async checkPermissionStatus(): Promise<NotificationPermissionState> {
-    this.log('Checking permission status');
+    this.log('Starting permission status check');
     
     try {
       const isNative = await this.isNativeContext();
@@ -294,7 +303,7 @@ class EnhancedNotificationService {
       
       const permission = await this.checkPermissionStatus();
       if (permission !== 'granted') {
-        this.log('Cannot test notification - permission not granted');
+        this.log('Cannot test notification - permission not granted:', permission);
         return false;
       }
 
@@ -373,7 +382,7 @@ class EnhancedNotificationService {
         };
       }
       
-      return {
+      const debugInfo = {
         isNative,
         platform,
         nativeStatus,
@@ -381,6 +390,9 @@ class EnhancedNotificationService {
         pluginErrors,
         timestamp: new Date().toISOString()
       };
+      
+      this.log('Generated debug info:', debugInfo);
+      return debugInfo;
     } catch (error) {
       this.error('Error getting permission info:', error);
       return {
@@ -415,10 +427,11 @@ class EnhancedNotificationService {
           }]
         });
         
-        this.log('Native test notification scheduled');
+        this.log('Native test notification scheduled via LocalNotifications');
         return true;
       }
       
+      this.log('No available plugins for native test notification');
       return false;
     } catch (error) {
       this.error('Error sending native test notification:', error);

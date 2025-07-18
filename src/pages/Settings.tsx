@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
-import { User, Bell, Lock, Moon, Sun, Palette, HelpCircle, Shield, Mail, Check as CheckIcon, LogOut, Monitor, Pencil, Save, X, Clock, Calendar, RefreshCw } from 'lucide-react';
+import { User, Bell, Lock, Moon, Sun, Palette, HelpCircle, Shield, Mail, Check as CheckIcon, LogOut, Monitor, Pencil, Save, X, Clock, Calendar, RefreshCw, AlertCircle, CheckCircle, XCircle } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Separator } from "@/components/ui/separator";
@@ -8,7 +8,7 @@ import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import { useTheme } from '@/hooks/use-theme';
 import { setupJournalReminder, initializeCapacitorNotifications, NotificationFrequency, NotificationTime } from '@/services/notificationService';
-import { useNotificationPermission } from '@/hooks/use-notification-permission';
+import { enhancedNotificationService } from '@/services/enhancedNotificationService';
 import { useAuth } from '@/contexts/AuthContext';
 import { useSubscription } from '@/contexts/SubscriptionContext';
 import { supabase } from '@/integrations/supabase/client';
@@ -70,7 +70,9 @@ function SettingsContent() {
   const [notificationsEnabled, setNotificationsEnabled] = useState(false);
   const [notificationTimes, setNotificationTimes] = useState<NotificationTime[]>(['evening']);
   const [showNotificationSettings, setShowNotificationSettings] = useState(false);
-  const { requestPermission: requestNotificationPermission, isGranted: isNotificationPermissionGranted } = useNotificationPermission();
+  const [showNotificationDebug, setShowNotificationDebug] = useState(false);
+  const [notificationPermissionState, setNotificationPermissionState] = useState<string>('checking');
+  const [notificationDebugInfo, setNotificationDebugInfo] = useState<any>(null);
   const { user, signOut } = useAuth();
   const { 
     isPremium, 
@@ -115,6 +117,49 @@ function SettingsContent() {
 
   const { resetTutorial } = useTutorial();
 
+  // Initialize notification state and check permissions using enhanced service
+  useEffect(() => {
+    const initializeNotifications = async () => {
+      console.log('[Settings] Initializing notifications with enhanced service');
+      
+      try {
+        // Get current permission status
+        const permissionState = await enhancedNotificationService.checkPermissionStatus();
+        console.log('[Settings] Current permission state:', permissionState);
+        setNotificationPermissionState(permissionState);
+        
+        // Get debug information
+        const debugInfo = await enhancedNotificationService.getPermissionInfo();
+        console.log('[Settings] Debug info:', debugInfo);
+        setNotificationDebugInfo(debugInfo);
+        
+        // Load stored notification settings
+        const enabled = localStorage.getItem('notification_enabled') === 'true';
+        const times = localStorage.getItem('notification_times');
+        
+        if (enabled && permissionState === 'granted') {
+          setNotificationsEnabled(true);
+        }
+        
+        if (times) {
+          try {
+            const parsedTimes = JSON.parse(times) as NotificationTime[];
+            if (Array.isArray(parsedTimes) && parsedTimes.length > 0) {
+              setNotificationTimes(parsedTimes);
+            }
+          } catch (e) {
+            console.error('Error parsing notification times from localStorage', e);
+          }
+        }
+      } catch (error) {
+        console.error('[Settings] Error initializing notifications:', error);
+        setNotificationPermissionState('error');
+      }
+    };
+
+    initializeNotifications();
+  }, []);
+
   // Debug state logging
   useEffect(() => {
     console.log('[Settings] State update:', {
@@ -124,9 +169,11 @@ function SettingsContent() {
       isLoadingProfile,
       entriesCount: entries.length,
       theme,
-      colorTheme
+      colorTheme,
+      notificationPermissionState,
+      notificationsEnabled
     });
-  }, [user, subscriptionLoading, subscriptionError, isLoadingProfile, entries.length, theme, colorTheme]);
+  }, [user, subscriptionLoading, subscriptionError, isLoadingProfile, entries.length, theme, colorTheme, notificationPermissionState, notificationsEnabled]);
 
   useEffect(() => {
     const calculateMaxStreak = async () => {
@@ -219,36 +266,6 @@ function SettingsContent() {
     fetchUserProfile();
   }, [user]);
 
-  useEffect(() => {
-    const enabled = localStorage.getItem('notification_enabled') === 'true';
-    const times = localStorage.getItem('notification_times');
-    
-    if (enabled) {
-      setNotificationsEnabled(true);
-    }
-    
-    if (times) {
-      try {
-        const parsedTimes = JSON.parse(times) as NotificationTime[];
-        if (Array.isArray(parsedTimes) && parsedTimes.length > 0) {
-          setNotificationTimes(parsedTimes);
-        }
-      } catch (e) {
-        console.error('Error parsing notification times from localStorage', e);
-      }
-    }
-  }, []);
-
-  useEffect(() => {
-    if (notificationsEnabled) {
-      setupJournalReminder(true, 'once', notificationTimes);
-      if (typeof window !== 'undefined' && !('Notification' in window) || 
-          (window.Notification && window.Notification.permission !== 'granted')) {
-        initializeCapacitorNotifications();
-      }
-    }
-  }, [notificationsEnabled, notificationTimes]);
-
   const handleContactSupport = () => {
     const subject = encodeURIComponent("Help me, I don't want to be SOuLO right now");
     const mailtoLink = `mailto:support@soulo.online?subject=${subject}`;
@@ -318,28 +335,79 @@ function SettingsContent() {
   };
   
   const handleToggleNotifications = async (checked: boolean) => {
-    console.log('[Settings] Notification toggle clicked:', checked);
-    setNotificationsEnabled(checked);
+    console.log('[Settings] Enhanced notification toggle clicked:', checked);
     
     if (checked) {
-      console.log('[Settings] Requesting notification permission...');
-      // Request permission using the enhanced hook
-      const permissionGranted = await requestNotificationPermission();
-      console.log('[Settings] Permission result:', permissionGranted);
-      
-      if (permissionGranted) {
-        setShowNotificationSettings(true);
-        toast.success(<TranslatableText text="Notifications enabled! Set your preferences." forceTranslate={true} />);
-      } else {
+      try {
+        console.log('[Settings] Requesting notification permission via enhanced service...');
+        
+        const result = await enhancedNotificationService.requestPermissions();
+        console.log('[Settings] Enhanced permission result:', result);
+        
+        // Update debug info after permission request
+        const newDebugInfo = await enhancedNotificationService.getPermissionInfo();
+        setNotificationDebugInfo(newDebugInfo);
+        setNotificationPermissionState(result.state);
+        
+        if (result.granted) {
+          setNotificationsEnabled(true);
+          setShowNotificationSettings(true);
+          localStorage.setItem('notification_enabled', 'true');
+          
+          toast.success(
+            <div className="flex items-center gap-2">
+              <CheckCircle className="h-4 w-4 text-green-500" />
+              <span>
+                <TranslatableText text="Notifications enabled! Set your preferences." forceTranslate={true} />
+                {result.plugin && (
+                  <div className="text-xs text-muted-foreground mt-1">
+                    Using {result.plugin}
+                  </div>
+                )}
+              </span>
+            </div>
+          );
+        } else {
+          setNotificationsEnabled(false);
+          
+          let errorMessage = "Notification permission denied. ";
+          if (result.error) {
+            errorMessage += result.error;
+          } else if (result.plugin) {
+            errorMessage += `${result.plugin} permission was denied.`;
+          }
+          errorMessage += " Please check your device settings.";
+          
+          toast.error(
+            <div className="flex items-center gap-2">
+              <XCircle className="h-4 w-4 text-red-500" />
+              <span>
+                <TranslatableText text={errorMessage} forceTranslate={true} />
+              </span>
+            </div>
+          );
+        }
+      } catch (error) {
+        console.error('[Settings] Error in notification toggle:', error);
         setNotificationsEnabled(false);
-        toast.error(<TranslatableText text="Notification permission denied. Please check your device settings." forceTranslate={true} />);
+        setNotificationPermissionState('error');
+        
+        toast.error(
+          <div className="flex items-center gap-2">
+            <AlertCircle className="h-4 w-4 text-red-500" />
+            <span>
+              <TranslatableText text="Failed to request notification permission" forceTranslate={true} />
+            </span>
+          </div>
+        );
       }
     } else {
+      setNotificationsEnabled(false);
+      setNotificationPermissionState(await enhancedNotificationService.checkPermissionStatus());
+      localStorage.removeItem('notification_enabled');
+      localStorage.removeItem('notification_times');
+      
       toast.info(<TranslatableText text="Notifications disabled" forceTranslate={true} />);
-      if (typeof window !== 'undefined') {
-        localStorage.removeItem('notification_enabled');
-        localStorage.removeItem('notification_times');
-      }
     }
   };
   
@@ -358,7 +426,13 @@ function SettingsContent() {
       return;
     }
     
+    // Store settings
+    localStorage.setItem('notification_enabled', 'true');
+    localStorage.setItem('notification_times', JSON.stringify(notificationTimes));
+    
+    // Set up reminders using existing service
     setupJournalReminder(true, 'once', notificationTimes);
+    
     toast.success(<TranslatableText text="Notification settings saved" forceTranslate={true} />);
     setShowNotificationSettings(false);
   };
@@ -406,6 +480,54 @@ function SettingsContent() {
         <TranslatableText text={timeLabels} />
       </div>
     );
+  };
+
+  const getPermissionStatusIcon = () => {
+    switch (notificationPermissionState) {
+      case 'granted':
+        return <CheckCircle className="h-4 w-4 text-green-500" />;
+      case 'denied':
+        return <XCircle className="h-4 w-4 text-red-500" />;
+      case 'unsupported':
+        return <AlertCircle className="h-4 w-4 text-orange-500" />;
+      case 'error':
+        return <AlertCircle className="h-4 w-4 text-red-500" />;
+      default:
+        return <Clock className="h-4 w-4 text-blue-500" />;
+    }
+  };
+
+  const getPermissionStatusText = () => {
+    switch (notificationPermissionState) {
+      case 'granted':
+        return 'Granted';
+      case 'denied':
+        return 'Denied';
+      case 'unsupported':
+        return 'Not Supported';
+      case 'error':
+        return 'Error';
+      case 'checking':
+        return 'Checking...';
+      default:
+        return 'Not Set';
+    }
+  };
+
+  const handleTestNotification = async () => {
+    try {
+      console.log('[Settings] Testing notification...');
+      const success = await enhancedNotificationService.testNotification();
+      
+      if (success) {
+        toast.success(<TranslatableText text="Test notification sent!" forceTranslate={true} />);
+      } else {
+        toast.error(<TranslatableText text="Failed to send test notification" forceTranslate={true} />);
+      }
+    } catch (error) {
+      console.error('[Settings] Error testing notification:', error);
+      toast.error(<TranslatableText text="Error testing notification" forceTranslate={true} />);
+    }
   };
 
   const applyCustomColor = () => {
@@ -668,6 +790,7 @@ function SettingsContent() {
               </div>
             </motion.div>
             
+            {/* Enhanced Notifications Section */}
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
@@ -704,6 +827,40 @@ function SettingsContent() {
                     )}
                   </div>
                 </SettingItem>
+                
+                {/* Permission Status Display */}
+                <div className="pt-3">
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-muted-foreground">
+                      <TranslatableText text="Permission Status" />
+                    </span>
+                    <div className="flex items-center gap-2">
+                      {getPermissionStatusIcon()}
+                      <span className="text-foreground">
+                        <TranslatableText text={getPermissionStatusText()} />
+                      </span>
+                    </div>
+                  </div>
+                  
+                  {notificationPermissionState === 'granted' && (
+                    <div className="mt-2 flex gap-2">
+                      <Button 
+                        variant="outline" 
+                        size="sm"
+                        onClick={handleTestNotification}
+                      >
+                        <TranslatableText text="Test Notification" />
+                      </Button>
+                      <Button 
+                        variant="outline" 
+                        size="sm"
+                        onClick={() => setShowNotificationDebug(true)}
+                      >
+                        <TranslatableText text="Debug Info" />
+                      </Button>
+                    </div>
+                  )}
+                </div>
                 
                 {notificationsEnabled && (
                   <div className="pt-2 text-sm text-muted-foreground">
@@ -1104,6 +1261,85 @@ function SettingsContent() {
                 disabled={notificationTimes.length === 0}
               >
                 <TranslatableText text="Save Settings" />
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
+        
+        {/* Debug Dialog */}
+        <Dialog
+          open={showNotificationDebug}
+          onOpenChange={setShowNotificationDebug}
+        >
+          <DialogContent className="max-w-2xl max-h-[80vh] overflow-hidden">
+            <DialogHeader>
+              <DialogTitle>
+                <TranslatableText text="Notification Debug Information" />
+              </DialogTitle>
+              <DialogDescription>
+                <TranslatableText text="Technical details about notification system status" />
+              </DialogDescription>
+            </DialogHeader>
+            
+            <ScrollArea className="h-[60vh] pr-4">
+              <div className="space-y-4 py-2">
+                {notificationDebugInfo && (
+                  <div className="space-y-3">
+                    <div>
+                      <h4 className="font-medium text-sm mb-2">Platform Information</h4>
+                      <div className="bg-muted p-3 rounded-md text-xs space-y-1">
+                        <div>Platform: {notificationDebugInfo.platform}</div>
+                        <div>Native Context: {notificationDebugInfo.isNative ? 'Yes' : 'No'}</div>
+                        <div>Timestamp: {new Date(notificationDebugInfo.timestamp).toLocaleString()}</div>
+                      </div>
+                    </div>
+                    
+                    {notificationDebugInfo.nativeStatus && (
+                      <div>
+                        <h4 className="font-medium text-sm mb-2">Native Plugin Status</h4>
+                        <div className="bg-muted p-3 rounded-md text-xs">
+                          <pre className="whitespace-pre-wrap">
+                            {JSON.stringify(notificationDebugInfo.nativeStatus, null, 2)}
+                          </pre>
+                        </div>
+                      </div>
+                    )}
+                    
+                    {notificationDebugInfo.webStatus && (
+                      <div>
+                        <h4 className="font-medium text-sm mb-2">Web Status</h4>
+                        <div className="bg-muted p-3 rounded-md text-xs">
+                          <pre className="whitespace-pre-wrap">
+                            {JSON.stringify(notificationDebugInfo.webStatus, null, 2)}
+                          </pre>
+                        </div>
+                      </div>
+                    )}
+                    
+                    {notificationDebugInfo.pluginErrors && notificationDebugInfo.pluginErrors.length > 0 && (
+                      <div>
+                        <h4 className="font-medium text-sm mb-2">Plugin Errors</h4>
+                        <div className="bg-red-50 p-3 rounded-md text-xs space-y-2">
+                          {notificationDebugInfo.pluginErrors.map((error: any, index: number) => (
+                            <div key={index} className="border-l-2 border-red-200 pl-2">
+                              <div className="font-medium">{error.plugin}</div>
+                              <div className="text-red-600">{error.error}</div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            </ScrollArea>
+            
+            <div className="flex justify-end">
+              <Button 
+                variant="outline" 
+                onClick={() => setShowNotificationDebug(false)}
+              >
+                <TranslatableText text="Close" />
               </Button>
             </div>
           </DialogContent>
