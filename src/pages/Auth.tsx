@@ -109,39 +109,18 @@ export default function Auth() {
     if (user && !authLoading && !navigationProcessing) {
       console.log('[Auth] User authenticated, handling post-auth navigation');
       
-      // For native apps, prioritize immediate navigation from Auth page
-      if (nativeIntegrationService.isRunningNatively()) {
-        console.log('[Auth] NATIVE: Immediate navigation from Auth page');
-        setNavigationProcessing(true);
-        
-        const finalRedirectPath = getFinalRedirectPath();
-        console.log('[Auth] NATIVE: Navigating to:', finalRedirectPath);
-        
-        // Use direct window.location change for immediate navigation
-        setTimeout(() => {
-          try {
-            console.log('[Auth] NATIVE: Setting window.location.href');
-            window.location.href = finalRedirectPath;
-          } catch (error) {
-            console.error('[Auth] NATIVE: Navigation error, forcing reload:', error);
-            window.location.reload();
-          }
-        }, 100);
-        return;
-      }
-      
-      // Check if auth state manager is already processing for web
+      // Check if auth state manager is already processing
       if (authStateManager.getProcessingState()) {
         console.log('[Auth] Auth state manager already processing, skipping');
         return;
       }
-
+      
       setNavigationProcessing(true);
       
       const finalRedirectPath = getFinalRedirectPath();
       console.log('[Auth] Final redirect path:', finalRedirectPath);
       
-      // For web, use authStateManager
+      // Use authStateManager for navigation (now handles native apps correctly)
       authStateManager.handleAuthSuccess(finalRedirectPath)
         .then(() => {
           console.log('[Auth] Navigation handled by authStateManager');

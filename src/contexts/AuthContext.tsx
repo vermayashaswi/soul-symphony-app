@@ -658,15 +658,12 @@ function AuthProviderCore({ children }: { children: ReactNode }) {
             userEmail: currentSession?.user?.email
           });
           
-          // Show success toast and trigger navigation for all authenticated users
+          // Show success toast and trigger navigation for authenticated users
           toast.success('Signed in successfully');
           
-          // CRITICAL: For native apps, always trigger navigation regardless of current route
-          if (nativeIntegrationService.isRunningNatively()) {
-            console.log('[AuthContext] NATIVE: Triggering immediate navigation after sign in');
-            nativeNavigationService.handleAuthSuccess();
-          } else if (isAppRoute(location.pathname)) {
-            // For web, only trigger navigation if already on app routes
+          // Trigger navigation if we're on an app route (now correctly detects native apps)
+          if (isAppRoute(location.pathname)) {
+            console.log('[AuthContext] On app route, triggering post-auth navigation');
             nativeNavigationService.handleAuthSuccess();
           }
         } else if (event === 'SIGNED_OUT') {

@@ -2,34 +2,47 @@
 import React, { useEffect } from 'react';
 import { Navigate, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
+import { nativeIntegrationService } from '@/services/nativeIntegrationService';
 
 // Instead of checking subdomain, now we check path prefix
 export const isNativeApp = (): boolean => {
   return /native/i.test(window.navigator.userAgent);
 };
 
-// Update the path-based check to be more strict about app routes
+// CRITICAL FIX: Update the path-based check to treat ALL routes as app routes for native apps
 export const isAppRoute = (pathname: string): boolean => {
-  // App routes must start with /app/ or be exactly /app
+  // For native apps, ALL routes are considered app routes
+  if (nativeIntegrationService.isRunningNatively()) {
+    console.log(`isAppRoute check for ${pathname}: true (native app - all routes are app routes)`);
+    return true;
+  }
+  
+  // For web apps, app routes must start with /app/ or be exactly /app
   const isApp = pathname.startsWith('/app/') || pathname === '/app';
-  console.log(`isAppRoute check for ${pathname}: ${isApp}`);
+  console.log(`isAppRoute check for ${pathname}: ${isApp} (web app)`);
   return isApp;
 };
 
 export const isWebsiteRoute = (pathname: string): boolean => {
+  // For native apps, NO routes are website routes - everything is treated as app routes
+  if (nativeIntegrationService.isRunningNatively()) {
+    console.log(`${pathname} is not a website route (native app - all routes are app routes)`);
+    return false;
+  }
+  
   // If it has an app prefix, it's not a website route
   if (isAppRoute(pathname)) {
     console.log(`${pathname} is an app route, so not a website route`);
     return false;
   }
   
-  // For root URL (/), consider it as a website route
+  // For root URL (/), consider it as a website route in web mode
   if (pathname === '/') {
-    console.log(`${pathname} is root, treating as website route`);
+    console.log(`${pathname} is root, treating as website route (web mode)`);
     return true;
   }
   
-  // Explicitly define website routes
+  // Explicitly define website routes for web mode
   const websitePrefixes = ['/', '/about', '/pricing', '/terms', '/privacy', '/blog', '/contact', '/faq', '/download'];
   
   // Check for specific website routes
@@ -37,7 +50,7 @@ export const isWebsiteRoute = (pathname: string): boolean => {
     pathname === prefix || pathname.startsWith(`${prefix}/`)
   );
   
-  console.log(`isWebsiteRoute check for ${pathname}: ${isWebsite}`);
+  console.log(`isWebsiteRoute check for ${pathname}: ${isWebsite} (web mode)`);
   return isWebsite;
 };
 

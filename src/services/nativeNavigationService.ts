@@ -112,19 +112,14 @@ export class NativeNavigationService {
     
     if (nativeIntegrationService.isRunningNatively()) {
       console.log('[NativeNav] Native app detected - using immediate direct navigation');
-      // For native apps, use immediate direct navigation without delays
+      // For native apps, use immediate direct navigation
       try {
         console.log('[NativeNav] Setting window.location.href to /app/home');
         window.location.href = '/app/home';
-        
-        // Fallback: If navigation doesn't happen immediately, force reload
-        setTimeout(() => {
-          console.log('[NativeNav] Fallback: Forcing page reload');
-          window.location.reload();
-        }, 1000);
       } catch (error) {
-        console.error('[NativeNav] Navigation error, forcing reload:', error);
-        window.location.reload();
+        console.error('[NativeNav] Navigation error, using fallback navigation:', error);
+        // Fallback to navigateToPath
+        this.navigateToPath('/app/home', { force: true });
       }
     } else {
       // For web, use standard navigation flow
