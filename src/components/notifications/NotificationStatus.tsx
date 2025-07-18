@@ -4,7 +4,7 @@ import { Bell, BellOff, AlertCircle, Loader2 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { TranslatableText } from '@/components/translation/TranslatableText';
-import { useNotificationPermission } from '@/hooks/use-notification-permission';
+import { useNotificationPermissionSimple } from '@/hooks/use-notification-permission-simple';
 import { getNotificationSettings } from '@/services/notificationService';
 
 interface NotificationStatusProps {
@@ -23,7 +23,7 @@ export const NotificationStatus: React.FC<NotificationStatusProps> = ({
     isDefault,
     initializationComplete,
     requestPermission 
-  } = useNotificationPermission();
+  } = useNotificationPermissionSimple();
   const settings = getNotificationSettings();
 
   const getStatusInfo = () => {

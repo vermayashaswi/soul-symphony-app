@@ -334,7 +334,6 @@ class NativeIntegrationService {
     return this.isActuallyNative && this.isCapacitorReady && !!this.plugins[name];
   }
 
-  // Additional methods for completeness...
   async requestPermissions(permissions: string[]): Promise<{ [key: string]: string }> {
     const results: { [key: string]: string } = {};
 
@@ -351,9 +350,45 @@ class NativeIntegrationService {
         if (permission === 'microphone' && this.plugins.Microphone) {
           const result = await this.plugins.Microphone.requestPermissions();
           results[permission] = result.microphone || 'denied';
-        } else if (permission === 'notifications' && this.plugins.LocalNotifications) {
-          const result = await this.plugins.LocalNotifications.requestPermissions();
-          results[permission] = result.display || 'denied';
+        } else if (permission === 'notifications') {
+          // Try LocalNotifications first (preferred for journal reminders)
+          if (this.plugins.LocalNotifications) {
+            try {
+              console.log('[NativeIntegration] Requesting LocalNotifications permission');
+              const result = await this.plugins.LocalNotifications.requestPermissions();
+              console.log('[NativeIntegration] LocalNotifications result:', result);
+              results[permission] = result.display || 'denied';
+            } catch (localError) {
+              console.warn('[NativeIntegration] LocalNotifications failed, trying PushNotifications:', localError);
+              
+              // Fallback to PushNotifications
+              if (this.plugins.PushNotifications) {
+                try {
+                  const result = await this.plugins.PushNotifications.requestPermissions();
+                  console.log('[NativeIntegration] PushNotifications result:', result);
+                  results[permission] = result.receive || 'denied';
+                } catch (pushError) {
+                  console.error('[NativeIntegration] PushNotifications also failed:', pushError);
+                  results[permission] = 'denied';
+                }
+              } else {
+                results[permission] = 'denied';
+              }
+            }
+          } else if (this.plugins.PushNotifications) {
+            try {
+              console.log('[NativeIntegration] Requesting PushNotifications permission');
+              const result = await this.plugins.PushNotifications.requestPermissions();
+              console.log('[NativeIntegration] PushNotifications result:', result);
+              results[permission] = result.receive || 'denied';
+            } catch (pushError) {
+              console.error('[NativeIntegration] PushNotifications failed:', pushError);
+              results[permission] = 'denied';
+            }
+          } else {
+            console.warn('[NativeIntegration] No notification plugins available');
+            results[permission] = 'denied';
+          }
         } else if (permission === 'push-notifications' && this.plugins.PushNotifications) {
           const result = await this.plugins.PushNotifications.requestPermissions();
           results[permission] = result.receive || 'denied';
@@ -365,6 +400,7 @@ class NativeIntegrationService {
       }
     }
 
+    console.log('[NativeIntegration] Permission results:', results);
     return results;
   }
 
