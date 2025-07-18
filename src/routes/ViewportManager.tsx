@@ -7,12 +7,15 @@ import MobileNavigation from '@/components/MobileNavigation';
 import { isAppRoute, isWebsiteRoute } from './RouteHelpers';
 import { useOnboarding } from '@/hooks/use-onboarding';
 import { forceEnableScrolling } from '@/hooks/use-scroll-restoration';
+import { nativeIntegrationService } from '@/services/nativeIntegrationService';
+import { usePullToRefresh } from '@/hooks/usePullToRefresh';
 
 const ViewportManager: React.FC = () => {
   const location = useLocation();
   const { user } = useAuth();
   const isMobile = useIsMobile();
   const { onboardingComplete } = useOnboarding();
+  const isNative = nativeIntegrationService.isRunningNatively();
   
   // Comprehensive list of routes where navigation should be hidden
   const onboardingOrAuthPaths = [
@@ -29,6 +32,16 @@ const ViewportManager: React.FC = () => {
   // Is this the home page where scrolling should be disabled?
   const isHomePage = location.pathname === '/app/home';
   
+  // Pull-to-refresh for native apps
+  const { refresh } = usePullToRefresh({
+    onRefresh: async () => {
+      console.log('[ViewportManager] Pull-to-refresh triggered');
+      // Refresh page content
+      window.location.reload();
+    },
+    enabled: isNative && isAppRoute(location.pathname) && !isOnboardingOrAuth
+  });
+  
   // Debug log to understand route detection
   console.log('ViewportManager - Path:', location.pathname, {
     isAppRoute: isAppRoute(location.pathname),
@@ -37,11 +50,41 @@ const ViewportManager: React.FC = () => {
     user: !!user,
     isOnboardingOrAuth,
     onboardingComplete,
+    isNative,
     hideNavigation: 
       isOnboardingOrAuth || 
       !user || 
       (location.pathname === '/app' && !onboardingComplete)
   });
+  
+  // Setup native app layout and safe area handling
+  useEffect(() => {
+    if (isNative) {
+      console.log('[ViewportManager] Setting up native app layout');
+      document.body.classList.add('native-app');
+      
+      // Add status bar background for native apps
+      const statusBar = document.createElement('div');
+      statusBar.className = 'native-status-bar';
+      statusBar.id = 'native-status-bar';
+      
+      // Remove existing status bar if present
+      const existingStatusBar = document.getElementById('native-status-bar');
+      if (existingStatusBar) {
+        existingStatusBar.remove();
+      }
+      
+      document.body.appendChild(statusBar);
+      
+      return () => {
+        document.body.classList.remove('native-app');
+        const statusBarEl = document.getElementById('native-status-bar');
+        if (statusBarEl) {
+          statusBarEl.remove();
+        }
+      };
+    }
+  }, [isNative]);
   
   // Ensure proper scrolling behavior on route changes
   useEffect(() => {
@@ -76,10 +119,21 @@ const ViewportManager: React.FC = () => {
     };
   }, [location.pathname, isHomePage]);
   
+  // Get container classes for native app layout
+  const getContainerClasses = () => {
+    const baseClasses = `app-container ${isMobile ? 'mobile-view' : 'desktop-view'} ${isHomePage ? 'overflow-hidden' : 'overflow-x-hidden'}`;
+    
+    if (isNative) {
+      return `${baseClasses} native-app-container`;
+    }
+    
+    return baseClasses;
+  };
+  
   // Render the appropriate layout based on route and device
   return (
     <>
-      <div className={`app-container ${isMobile ? 'mobile-view' : 'desktop-view'} ${isHomePage ? 'overflow-hidden' : 'overflow-x-hidden'}`}>
+      <div className={getContainerClasses()}>
         <Outlet />
       </div>
       
