@@ -85,7 +85,7 @@ class AuthStateManager {
     this.authState.timestamp = Date.now();
 
     mobileErrorHandler.handleError({
-      type: 'auth',
+      type: 'unknown',
       message: `Authentication failed: ${error.message || error}`
     });
   }
