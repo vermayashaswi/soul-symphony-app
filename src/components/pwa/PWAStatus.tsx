@@ -16,6 +16,7 @@ import {
   AlertCircle
 } from 'lucide-react';
 import { serviceWorkerManager, isPWA } from '@/utils/serviceWorker';
+import { pushNotificationService } from '@/services/pushNotificationService';
 import { periodicSyncService } from '@/services/periodicSyncService';
 import { backgroundSyncService } from '@/services/backgroundSyncService';
 import { toast } from 'sonner';
@@ -46,6 +47,7 @@ const PWAStatus: React.FC<PWAStatusProps> = ({ className, compact = false }) => 
   
   const [isOnline, setIsOnline] = useState(navigator.onLine);
   const [pendingSyncCount, setPendingSyncCount] = useState(0);
+  const [pushPermission, setPushPermission] = useState<NotificationPermission>('default');
 
   useEffect(() => {
     checkPWAStatus();
@@ -72,11 +74,17 @@ const PWAStatus: React.FC<PWAStatusProps> = ({ className, compact = false }) => 
       offlineSupport: 'caches' in window,
       backgroundSync: serviceWorkerManager.getCapabilities().backgroundSync,
       periodicSync: periodicSyncService.isSupported(),
-      pushNotifications: false, // Always disabled
+      pushNotifications: pushNotificationService.isSupported(),
       installable: isPWA() || 'BeforeInstallPromptEvent' in window
     };
     
     setStatus(newStatus);
+    
+    // Check push permission
+    if ('Notification' in window) {
+      setPushPermission(Notification.permission);
+    }
+    
     await checkPendingSyncCount();
   };
 
@@ -90,7 +98,16 @@ const PWAStatus: React.FC<PWAStatusProps> = ({ className, compact = false }) => 
   };
 
   const handleEnablePushNotifications = async () => {
-    alert('Notifications are currently disabled in this app version.');
+    try {
+      const subscription = await pushNotificationService.subscribe();
+      if (subscription) {
+        setPushPermission('granted');
+        toast.success('Push notifications enabled!');
+      }
+    } catch (error) {
+      console.error('Failed to enable push notifications:', error);
+      toast.error('Failed to enable push notifications');
+    }
   };
 
   const handleManualSync = async () => {
@@ -130,10 +147,28 @@ const PWAStatus: React.FC<PWAStatusProps> = ({ className, compact = false }) => 
   };
 
   const getPushNotificationBadge = () => {
+    if (pushPermission === 'granted') {
+      return (
+        <Badge variant="default" className="flex items-center gap-1">
+          <Bell className="w-3 h-3" />
+          Enabled
+        </Badge>
+      );
+    }
+    
+    if (pushPermission === 'denied') {
+      return (
+        <Badge variant="destructive" className="flex items-center gap-1">
+          <BellOff className="w-3 h-3" />
+          Blocked
+        </Badge>
+      );
+    }
+    
     return (
-      <Badge variant="secondary" className="flex items-center gap-1">
-        <BellOff className="w-3 h-3" />
-        Disabled
+      <Badge variant="outline" className="flex items-center gap-1">
+        <AlertCircle className="w-3 h-3" />
+        Not Set
       </Badge>
     );
   };
@@ -224,18 +259,26 @@ const PWAStatus: React.FC<PWAStatusProps> = ({ className, compact = false }) => 
           </div>
         )}
 
-        {/* Push Notifications - Always show as disabled */}
-        <div className="space-y-2">
-          <div className="flex items-center justify-between">
-            <span className="text-sm font-medium">Notifications</span>
-            {getPushNotificationBadge()}
+        {/* Push Notifications */}
+        {status.pushNotifications && pushPermission !== 'granted' && (
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="text-sm font-medium">Notifications</span>
+              {getPushNotificationBadge()}
+            </div>
+            {pushPermission === 'default' && (
+              <Button
+                onClick={handleEnablePushNotifications}
+                size="sm"
+                variant="outline"
+                className="w-full"
+              >
+                <Bell className="w-4 h-4 mr-2" />
+                Enable Notifications
+              </Button>
+            )}
           </div>
-          <div className="p-3 bg-muted rounded-lg">
-            <p className="text-xs text-muted-foreground">
-              Notifications are disabled in this app version for improved stability.
-            </p>
-          </div>
-        </div>
+        )}
       </CardContent>
     </Card>
   );

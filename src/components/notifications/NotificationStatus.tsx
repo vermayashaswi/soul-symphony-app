@@ -1,10 +1,11 @@
 
 import React from 'react';
-import { BellOff } from 'lucide-react';
+import { Bell, BellOff, AlertCircle, Loader2 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { TranslatableText } from '@/components/translation/TranslatableText';
-import { useNotificationPermissionSimple } from '@/hooks/use-notification-permission-stub';
-import { getNotificationSettings } from '@/services/notificationServiceStub';
+import { useNotificationPermissionSimple } from '@/hooks/use-notification-permission-simple';
+import { getNotificationSettings } from '@/services/notificationService';
 
 interface NotificationStatusProps {
   className?: string;
@@ -17,18 +18,69 @@ export const NotificationStatus: React.FC<NotificationStatusProps> = ({
 }) => {
   const { 
     permission, 
+    isGranted, 
+    isDenied, 
+    isDefault,
     initializationComplete,
     requestPermission 
   } = useNotificationPermissionSimple();
   const settings = getNotificationSettings();
 
-  const statusInfo = {
-    icon: BellOff,
-    text: 'Disabled',
-    variant: 'secondary' as const,
-    color: 'text-muted-foreground'
+  const getStatusInfo = () => {
+    if (!initializationComplete) {
+      return {
+        icon: Loader2,
+        text: 'Checking...',
+        variant: 'secondary' as const,
+        color: 'text-muted-foreground animate-spin'
+      };
+    }
+
+    if (!settings.enabled) {
+      return {
+        icon: BellOff,
+        text: 'Disabled',
+        variant: 'secondary' as const,
+        color: 'text-muted-foreground'
+      };
+    }
+
+    if (permission === 'unsupported') {
+      return {
+        icon: AlertCircle,
+        text: 'Not Supported',
+        variant: 'destructive' as const,
+        color: 'text-destructive'
+      };
+    }
+
+    if (isDenied) {
+      return {
+        icon: AlertCircle,
+        text: 'Blocked',
+        variant: 'destructive' as const,
+        color: 'text-destructive'
+      };
+    }
+
+    if (isGranted) {
+      return {
+        icon: Bell,
+        text: 'Enabled',
+        variant: 'default' as const,
+        color: 'text-green-600'
+      };
+    }
+
+    return {
+      icon: AlertCircle,
+      text: 'Permission Needed',
+      variant: 'outline' as const,
+      color: 'text-yellow-600'
+    };
   };
 
+  const statusInfo = getStatusInfo();
   const Icon = statusInfo.icon;
 
   if (showText) {
@@ -38,6 +90,17 @@ export const NotificationStatus: React.FC<NotificationStatusProps> = ({
         <span className="text-sm">
           <TranslatableText text={statusInfo.text} />
         </span>
+        {isDefault && initializationComplete && (
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={requestPermission}
+            className="ml-2"
+            disabled={!initializationComplete}
+          >
+            <TranslatableText text="Enable" />
+          </Button>
+        )}
       </div>
     );
   }

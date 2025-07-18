@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from 'react';
 import AppRoutes from './routes/AppRoutes';
 import { Toaster } from "@/components/ui/toaster";
@@ -24,7 +23,6 @@ import { mobileErrorHandler } from './services/mobileErrorHandler';
 import { mobileOptimizationService } from './services/mobileOptimizationService';
 import { nativeIntegrationService } from './services/nativeIntegrationService';
 import { nativeAuthService } from './services/nativeAuthService';
-import { authStateManager } from './services/authStateManager';
 
 const App: React.FC = () => {
   const [isInitialized, setIsInitialized] = useState(false);
@@ -34,14 +32,10 @@ const App: React.FC = () => {
   const { refreshCount, isStuckDetected } = useTWAAutoRefresh();
 
   useEffect(() => {
-    // Initialize native services first
-    if (nativeIntegrationService.isRunningNatively()) {
-      console.log('[App] Initializing native services');
-      nativeAuthService.initialize();
-      // Initialize auth state manager for native apps
-      authStateManager.reset();
-    }
-    
+      if (nativeIntegrationService.isRunningNatively()) {
+          console.log('[App] Initializing native services');
+          nativeAuthService.initialize();
+        }
     const initializeApp = async () => {
       try {
         console.log('[App] Starting app initialization...');
@@ -85,19 +79,6 @@ const App: React.FC = () => {
             // If we're in a native environment, ensure proper routing
             if (initStatus.nativeEnvironment) {
               console.log('[App] Native environment confirmed - app will route to app interface');
-              
-              // Configure status bar for native apps
-              try {
-                if (nativeIntegrationService.isPluginAvailable('StatusBar')) {
-                  const statusBar = nativeIntegrationService.getPlugin('StatusBar');
-                  await statusBar.setStyle({ style: 'light' });
-                  await statusBar.setBackgroundColor({ color: '#8b5cf6' });
-                  await statusBar.setOverlaysWebView({ overlay: false });
-                  console.log('[App] Status bar configured for native app');
-                }
-              } catch (statusBarError) {
-                console.warn('[App] Status bar configuration failed:', statusBarError);
-              }
             }
             
           } else {
@@ -137,7 +118,7 @@ const App: React.FC = () => {
         // Mark app as initialized after a brief delay to ensure smooth startup
         // Shorter delay for native apps to hide splash screen faster
         const isNativeApp = nativeAppInitService.isNativeAppInitialized();
-        const initDelay = isNativeApp ? 100 : (twaEnv.isTWA || twaEnv.isStandalone) ? 1500 : 500;
+        const initDelay = isNativeApp ? 200 : (twaEnv.isTWA || twaEnv.isStandalone) ? 1500 : 500;
         
         console.log('[App] Setting initialization delay:', initDelay, 'ms (native:', isNativeApp, ')');
         

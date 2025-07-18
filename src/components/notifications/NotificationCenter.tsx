@@ -1,11 +1,14 @@
 
-import React, { useState } from 'react';
-import { BellOff, Settings, X } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Bell, BellOff, Settings, X, Check } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Switch } from '@/components/ui/switch';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { TranslatableText } from '@/components/translation/TranslatableText';
+import { getNotificationSettings, testNotification, requestNotificationPermission } from '@/services/notificationService';
+import { toast } from 'sonner';
 
 interface NotificationCenterProps {
   className?: string;
@@ -13,16 +16,73 @@ interface NotificationCenterProps {
 
 export const NotificationCenter: React.FC<NotificationCenterProps> = ({ className }) => {
   const [isOpen, setIsOpen] = useState(false);
+  const [notificationSettings, setNotificationSettings] = useState(getNotificationSettings());
+  const [permissionStatus, setPermissionStatus] = useState<NotificationPermission>('default');
+
+  useEffect(() => {
+    // Check initial permission status
+    if ('Notification' in window) {
+      setPermissionStatus(Notification.permission);
+    }
+    
+    // Listen for permission changes
+    const checkPermission = () => {
+      if ('Notification' in window) {
+        setPermissionStatus(Notification.permission);
+      }
+    };
+    
+    // Check permission periodically
+    const interval = setInterval(checkPermission, 1000);
+    
+    return () => clearInterval(interval);
+  }, []);
+
+  const handleRequestPermission = async () => {
+    const granted = await requestNotificationPermission();
+    if (granted) {
+      toast.success(<TranslatableText text="Notification permission granted!" forceTranslate={true} />);
+      setPermissionStatus('granted');
+    } else {
+      toast.error(<TranslatableText text="Notification permission denied" forceTranslate={true} />);
+    }
+  };
 
   const handleTestNotification = () => {
-    alert('Notifications are currently disabled in this app version.');
+    if (permissionStatus === 'granted') {
+      testNotification();
+      toast.success(<TranslatableText text="Test notification sent!" forceTranslate={true} />);
+    } else {
+      toast.error(<TranslatableText text="Please grant notification permission first" forceTranslate={true} />);
+    }
+  };
+
+  const getPermissionBadge = () => {
+    switch (permissionStatus) {
+      case 'granted':
+        return <Badge variant="default" className="bg-green-500"><TranslatableText text="Enabled" /></Badge>;
+      case 'denied':
+        return <Badge variant="destructive"><TranslatableText text="Blocked" /></Badge>;
+      default:
+        return <Badge variant="secondary"><TranslatableText text="Not Set" /></Badge>;
+    }
+  };
+
+  const getIcon = () => {
+    if (notificationSettings.enabled && permissionStatus === 'granted') {
+      return <Bell className="h-5 w-5" />;
+    }
+    return <BellOff className="h-5 w-5" />;
   };
 
   return (
     <Popover open={isOpen} onOpenChange={setIsOpen}>
       <PopoverTrigger asChild>
         <Button variant="ghost" size="sm" className={className}>
-          <BellOff className="h-5 w-5" />
+          {getIcon()}
+          {notificationSettings.enabled && permissionStatus === 'granted' && (
+            <div className="absolute -top-1 -right-1 h-2 w-2 bg-green-500 rounded-full animate-pulse" />
+          )}
         </Button>
       </PopoverTrigger>
       <PopoverContent className="w-80" align="end">
@@ -46,10 +106,23 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({ classNam
                 <span className="text-sm font-medium">
                   <TranslatableText text="Permission Status" />
                 </span>
-                <Badge variant="secondary">
-                  <TranslatableText text="Disabled" />
-                </Badge>
+                {getPermissionBadge()}
               </div>
+              
+              {permissionStatus !== 'granted' && (
+                <Button
+                  onClick={handleRequestPermission}
+                  size="sm"
+                  className="w-full"
+                  variant={permissionStatus === 'denied' ? 'outline' : 'default'}
+                >
+                  {permissionStatus === 'denied' ? (
+                    <TranslatableText text="Enable in Browser Settings" />
+                  ) : (
+                    <TranslatableText text="Grant Permission" />
+                  )}
+                </Button>
+              )}
             </div>
 
             {/* Current Settings */}
@@ -58,7 +131,13 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({ classNam
                 <TranslatableText text="Current Settings" />
               </span>
               <div className="text-sm text-muted-foreground">
-                <TranslatableText text="Notifications are disabled in this version" />
+                {notificationSettings.enabled ? (
+                  <>
+                    <TranslatableText text="Enabled for:" /> {notificationSettings.times.join(', ')}
+                  </>
+                ) : (
+                  <TranslatableText text="Disabled" />
+                )}
               </div>
             </div>
 
@@ -69,14 +148,15 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({ classNam
                 size="sm"
                 variant="outline"
                 className="w-full"
-                disabled
+                disabled={permissionStatus !== 'granted'}
               >
-                <TranslatableText text="Test Notification (Disabled)" />
+                <TranslatableText text="Test Notification" />
               </Button>
               
               <Button
                 onClick={() => {
                   setIsOpen(false);
+                  // Navigate to settings if needed
                   if (window.location.pathname !== '/app/settings') {
                     window.location.href = '/app/settings';
                   }
@@ -86,16 +166,18 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({ classNam
                 className="w-full"
               >
                 <Settings className="h-4 w-4 mr-2" />
-                <TranslatableText text="Settings" />
+                <TranslatableText text="Notification Settings" />
               </Button>
             </div>
 
-            {/* Info */}
-            <div className="p-3 bg-muted rounded-lg">
-              <p className="text-xs text-muted-foreground">
-                <TranslatableText text="Notifications are currently disabled in this app version for improved stability." />
-              </p>
-            </div>
+            {/* Browser Instructions */}
+            {permissionStatus === 'denied' && (
+              <div className="p-3 bg-muted rounded-lg">
+                <p className="text-xs text-muted-foreground">
+                  <TranslatableText text="To enable notifications, click the lock icon in your browser's address bar and allow notifications for this site." />
+                </p>
+              </div>
+            )}
           </CardContent>
         </Card>
       </PopoverContent>

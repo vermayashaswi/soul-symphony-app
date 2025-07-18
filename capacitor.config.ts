@@ -1,10 +1,10 @@
-
 import { CapacitorConfig } from '@capacitor/cli';
 
 const config: CapacitorConfig = {
   appId: 'app.soulo.online',
   appName: 'Soulo',
   webDir: 'dist',
+  // ADD THIS SERVER CONFIGURATION FOR OAUTH CALLBACKS
   server: {
     androidScheme: 'https'
   },
@@ -16,6 +16,7 @@ const config: CapacitorConfig = {
       forceCodeForRefreshToken: true,
     },
     App: {
+      // CRITICAL: This must match your app ID for deep links
       urlScheme: "app.soulo.online"
     },
     SplashScreen: {
@@ -25,19 +26,18 @@ const config: CapacitorConfig = {
       androidSpinnerStyle: "large",
       iosSpinnerStyle: "small",
       spinnerColor: "#FFFFFF",
-      splashFullScreen: false,
-      splashImmersive: false,
+      splashFullScreen: true,
+      splashImmersive: true,
       splashScreenDelay: 2000
     },
     Keyboard: {
-      resize: "ionic",
+      resize: "body",
       style: "dark",
       resizeOnFullScreen: true
     },
     StatusBar: {
-      style: "light",
-      backgroundColor: "#8b5cf6",
-      overlaysWebView: false
+      style: "dark",
+      backgroundColor: "#000000"
     },
     PushNotifications: {
       presentationOptions: ["badge", "sound", "alert"]
@@ -49,10 +49,10 @@ const config: CapacitorConfig = {
     }
   },
   ios: {
-    contentInset: "automatic",
+    contentInset: "always",
     allowsLinkPreview: false,
     scrollEnabled: true,
-    backgroundColor: "#8b5cf6",
+    backgroundColor: "#FFFFFF",
     scheme: "Soulo",
     preferredContentMode: "mobile"
   },
@@ -60,7 +60,7 @@ const config: CapacitorConfig = {
     allowMixedContent: false,
     captureInput: true,
     webContentsDebuggingEnabled: false,
-    backgroundColor: "#8b5cf6",
+    backgroundColor: "#FFFFFF",
     launchMode: "singleTask",
     orientation: "portrait",
     useLegacyBridge: false,

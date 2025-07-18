@@ -1,10 +1,10 @@
-
 import { CapacitorConfig } from '@capacitor/cli';
 
 const config: CapacitorConfig = {
   appId: 'app.soulo.online',
   appName: 'Soulo Dev',
   webDir: 'dist',
+  // CRITICAL FIX: Remove external server URL - use bundled assets in development too
   plugins: {
     GoogleAuth: {
       scopes: ['profile', 'email'],
@@ -18,21 +18,21 @@ const config: CapacitorConfig = {
       androidSpinnerStyle: "large",
       iosSpinnerStyle: "small",
       spinnerColor: "#FFFFFF",
-      splashFullScreen: false,
-      splashImmersive: false,
+      splashFullScreen: true,
+      splashImmersive: true,
       splashScreenDelay: 2000
     },
     Keyboard: {
-      resize: "ionic",
+      resize: "body",
       style: "dark",
       resizeOnFullScreen: true
     },
     StatusBar: {
-      style: "light",
-      backgroundColor: "#8b5cf6",
-      overlaysWebView: false
+      style: "dark",
+      backgroundColor: "#000000"
     },
     App: {
+      // FIXED: No external URLs - handle deep links properly
       urlScheme: "app.soulo.online"
     },
     PushNotifications: {
@@ -45,18 +45,18 @@ const config: CapacitorConfig = {
     }
   },
   ios: {
-    contentInset: "automatic",
+    contentInset: "always",
     allowsLinkPreview: false,
     scrollEnabled: true,
-    backgroundColor: "#8b5cf6",
+    backgroundColor: "#FFFFFF",
     scheme: "Soulo",
     preferredContentMode: "mobile"
   },
   android: {
-    allowMixedContent: false,
+    allowMixedContent: false, // FIXED: No mixed content in dev
     captureInput: true,
-    webContentsDebuggingEnabled: true,
-    backgroundColor: "#8b5cf6",
+    webContentsDebuggingEnabled: true, // Keep debugging for dev
+    backgroundColor: "#FFFFFF",
     launchMode: "singleTask",
     orientation: "portrait",
     useLegacyBridge: false,

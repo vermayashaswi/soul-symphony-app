@@ -1,4 +1,3 @@
-
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -42,12 +41,6 @@
     --edit-btn-text: 217 91.2% 40%;
     --delete-btn-bg: 0 84.2% 95%;
     --delete-btn-text: 0 84.2% 40%;
-    
-    /* Safe area variables for native apps */
-    --safe-area-inset-top: env(safe-area-inset-top);
-    --safe-area-inset-right: env(safe-area-inset-right);
-    --safe-area-inset-bottom: env(safe-area-inset-bottom);
-    --safe-area-inset-left: env(safe-area-inset-left);
   }
  
   .dark {
@@ -90,32 +83,6 @@
   body {
     @apply bg-background text-foreground;
   }
-  
-  /* Native app safe area support */
-  .native-safe-area {
-    padding-top: var(--safe-area-inset-top);
-    padding-right: var(--safe-area-inset-right);
-    padding-bottom: var(--safe-area-inset-bottom);
-    padding-left: var(--safe-area-inset-left);
-  }
-  
-  /* Status bar background for native apps */
-  .native-status-bar {
-    background-color: #8b5cf6;
-    height: var(--safe-area-inset-top);
-    position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
-    z-index: 9999;
-  }
-  
-  /* App container adjustments for native apps */
-  .native-app-container {
-    padding-top: var(--safe-area-inset-top);
-    min-height: calc(100vh - var(--safe-area-inset-top) - var(--safe-area-inset-bottom));
-  }
-  
   /* Apply theme color to all page headers */
   h1, h2, h3 {
     @apply text-theme-color;
@@ -130,50 +97,6 @@
   [data-radix-popper-content-wrapper] [data-radix-radio-item],
   [data-radix-radio-item] {
     border-radius: 9999px !important;
-  }
-}
-
-/* Pull-to-refresh styles for native apps */
-@layer components {
-  .pull-to-refresh-container {
-    position: relative;
-    overflow: hidden;
-  }
-  
-  .pull-to-refresh-content {
-    transform: translateY(0);
-    transition: transform 0.3s ease;
-  }
-  
-  .pull-to-refresh-indicator {
-    position: absolute;
-    top: -60px;
-    left: 0;
-    right: 0;
-    height: 60px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%);
-    color: white;
-    font-size: 14px;
-    font-weight: 500;
-    z-index: 10;
-  }
-  
-  .pull-to-refresh-spinner {
-    width: 20px;
-    height: 20px;
-    border: 2px solid rgba(255, 255, 255, 0.3);
-    border-top: 2px solid white;
-    border-radius: 50%;
-    animation: spin 1s linear infinite;
-    margin-right: 8px;
-  }
-  
-  @keyframes spin {
-    0% { transform: rotate(0deg); }
-    100% { transform: rotate(360deg); }
   }
 }
 
@@ -399,34 +322,4 @@ body {
 
 .onboarding-language-select [data-radix-select-value] {
   color: white;
-}
-
-/* Native app specific styles */
-.native-app {
-  /* Ensure proper safe area handling */
-  padding-top: var(--safe-area-inset-top);
-  padding-bottom: var(--safe-area-inset-bottom);
-}
-
-.native-app .app-container {
-  /* Ensure content doesn't overlap with status bar */
-  padding-top: var(--safe-area-inset-top);
-  min-height: calc(100vh - var(--safe-area-inset-top) - var(--safe-area-inset-bottom));
-}
-
-/* Native app navigation adjustments */
-.native-app .mobile-nav {
-  padding-bottom: var(--safe-area-inset-bottom);
-}
-
-/* Keyboard handling for native apps */
-.keyboard-visible {
-  /* Adjust layout when keyboard is visible */
-  padding-bottom: 0 !important;
-}
-
-.keyboard-visible .mobile-nav {
-  /* Hide navigation when keyboard is visible */
-  transform: translateY(100%);
-  transition: transform 0.3s ease;
 }

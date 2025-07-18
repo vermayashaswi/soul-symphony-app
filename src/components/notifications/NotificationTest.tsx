@@ -2,8 +2,8 @@
 import React from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
-import { useNotificationPermissionSimple } from '@/hooks/use-notification-permission-stub';
-import { NotificationStatus } from './NotificationStatusStub';
+import { useNotificationPermissionSimple } from '@/hooks/use-notification-permission-simple';
+import { NotificationStatus } from './NotificationStatus';
 import { TranslatableText } from '@/components/translation/TranslatableText';
 
 export const NotificationTest: React.FC = () => {
@@ -15,7 +15,17 @@ export const NotificationTest: React.FC = () => {
   } = useNotificationPermissionSimple();
 
   const sendTestNotification = () => {
-    alert('Notifications are currently disabled in this app version.');
+    if (!isGranted) {
+      console.log('Permission not granted, cannot send test notification');
+      return;
+    }
+
+    if ('Notification' in window) {
+      new Notification('SOULo Test', {
+        body: 'This is a test notification from SOULo app!',
+        icon: '/favicon.ico'
+      });
+    }
   };
 
   return (
@@ -34,14 +44,24 @@ export const NotificationTest: React.FC = () => {
         </div>
         
         <div className="flex flex-col gap-2">
-          <Button 
-            onClick={sendTestNotification}
-            variant="outline"
-            className="w-full"
-            disabled
-          >
-            <TranslatableText text="Notifications Disabled" />
-          </Button>
+          {!isGranted && initializationComplete && (
+            <Button 
+              onClick={requestPermission}
+              variant="outline"
+              className="w-full"
+            >
+              <TranslatableText text="Request Permission" />
+            </Button>
+          )}
+          
+          {isGranted && (
+            <Button 
+              onClick={sendTestNotification}
+              className="w-full"
+            >
+              <TranslatableText text="Send Test Notification" />
+            </Button>
+          )}
         </div>
         
         <div className="text-xs text-muted-foreground">
