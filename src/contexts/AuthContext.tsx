@@ -657,9 +657,16 @@ function AuthProviderCore({ children }: { children: ReactNode }) {
             isNative: nativeIntegrationService.isRunningNatively(),
             userEmail: currentSession?.user?.email
           });
-          if (isAppRoute(location.pathname)) {
-            toast.success('Signed in successfully');
-            // Trigger enhanced navigation for native apps
+          
+          // Show success toast and trigger navigation for all authenticated users
+          toast.success('Signed in successfully');
+          
+          // CRITICAL: For native apps, always trigger navigation regardless of current route
+          if (nativeIntegrationService.isRunningNatively()) {
+            console.log('[AuthContext] NATIVE: Triggering immediate navigation after sign in');
+            nativeNavigationService.handleAuthSuccess();
+          } else if (isAppRoute(location.pathname)) {
+            // For web, only trigger navigation if already on app routes
             nativeNavigationService.handleAuthSuccess();
           }
         } else if (event === 'SIGNED_OUT') {

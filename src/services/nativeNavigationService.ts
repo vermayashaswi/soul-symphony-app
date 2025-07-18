@@ -111,11 +111,21 @@ export class NativeNavigationService {
     console.log('[NativeNav] Handling authentication success');
     
     if (nativeIntegrationService.isRunningNatively()) {
-      console.log('[NativeNav] Native app detected - using direct navigation');
-      // For native apps, use direct location change for most reliable navigation
-      setTimeout(() => {
+      console.log('[NativeNav] Native app detected - using immediate direct navigation');
+      // For native apps, use immediate direct navigation without delays
+      try {
+        console.log('[NativeNav] Setting window.location.href to /app/home');
         window.location.href = '/app/home';
-      }, 100); // Small delay to ensure auth state is settled
+        
+        // Fallback: If navigation doesn't happen immediately, force reload
+        setTimeout(() => {
+          console.log('[NativeNav] Fallback: Forcing page reload');
+          window.location.reload();
+        }, 1000);
+      } catch (error) {
+        console.error('[NativeNav] Navigation error, forcing reload:', error);
+        window.location.reload();
+      }
     } else {
       // For web, use standard navigation flow
       console.log('[NativeNav] Web app detected - using standard navigation');
