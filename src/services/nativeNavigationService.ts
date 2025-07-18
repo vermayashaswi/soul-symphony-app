@@ -2,6 +2,8 @@ import { nativeIntegrationService } from './nativeIntegrationService';
 
 export class NativeNavigationService {
   private static instance: NativeNavigationService;
+  private lastNavigationTime = 0;
+  private readonly NAVIGATION_DEBOUNCE_MS = 500;
 
   public static getInstance(): NativeNavigationService {
     if (!NativeNavigationService.instance) {
@@ -87,19 +89,57 @@ export class NativeNavigationService {
   }
 
   /**
-   * Navigate immediately after authentication success
+   * Navigate immediately after authentication success - OPTIMIZED FOR BUNDLED ASSETS
    * This method bypasses any processing delays for immediate navigation
    */
   public navigateImmediatelyAfterAuth(path: string): void {
+    const now = Date.now();
+    
+    // Debounce to prevent rapid navigation calls
+    if ((now - this.lastNavigationTime) < this.NAVIGATION_DEBOUNCE_MS) {
+      console.log('[NativeNav] Navigation debounced, too rapid');
+      return;
+    }
+    
+    this.lastNavigationTime = now;
     console.log('[NativeNav] Immediate post-auth navigation to:', path);
     
     if (nativeIntegrationService.isRunningNatively()) {
-      // For native apps, use direct location change immediately
+      // For native apps with bundled assets - use direct navigation
       console.log('[NativeNav] Direct native navigation to:', path);
-      window.location.href = path;
+      this.performNativeNavigation(path);
     } else {
       // For web, use standard navigation
       this.navigateToPath(path, { replace: true, force: true });
+    }
+  }
+
+  /**
+   * Optimized native navigation with retry mechanism
+   */
+  private performNativeNavigation(path: string): void {
+    try {
+      console.log('[NativeNav] Performing native navigation to:', path);
+      
+      // For bundled assets, direct window.location change is most reliable
+      window.location.href = path;
+      
+      // Add fallback check after a delay
+      setTimeout(() => {
+        if (window.location.pathname !== path) {
+          console.log('[NativeNav] Navigation verification failed, retrying...');
+          // Retry once more
+          window.location.href = path;
+        }
+      }, 1000);
+      
+    } catch (error) {
+      console.error('[NativeNav] Native navigation error:', error);
+      // Last resort - force page reload to clear any stuck state
+      setTimeout(() => {
+        console.log('[NativeNav] Using fallback reload');
+        window.location.reload();
+      }, 500);
     }
   }
 

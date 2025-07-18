@@ -27,6 +27,9 @@ class AuthStateManager {
   private navigationQueue: NavigationRequest[] = [];
   private lastAuthState: AuthDebugInfo | null = null;
   private debugEnabled = true;
+  private navigationInProgress = false;
+  private lastNavigationTime = 0;
+  private readonly NAVIGATION_DEBOUNCE_MS = 1000;
 
   static getInstance(): AuthStateManager {
     if (!AuthStateManager.instance) {
@@ -37,12 +40,14 @@ class AuthStateManager {
 
   private log(message: string, data?: any) {
     if (this.debugEnabled) {
-      console.log(`[AuthStateManager] ${message}`, data || '');
+      const timestamp = new Date().toISOString().split('T')[1].slice(0, -1);
+      console.log(`[AuthStateManager:${timestamp}] ${message}`, data || '');
     }
   }
 
   private error(message: string, error?: any) {
-    console.error(`[AuthStateManager] ${message}`, error || '');
+    const timestamp = new Date().toISOString().split('T')[1].slice(0, -1);
+    console.error(`[AuthStateManager:${timestamp}] ERROR: ${message}`, error || '');
   }
 
   // Enhanced authentication state debugging
@@ -172,16 +177,26 @@ class AuthStateManager {
     }
   }
 
-  // Handle successful authentication
+  // Handle successful authentication - CENTRALIZED NAVIGATION CONTROL
   public async handleAuthSuccess(redirectPath?: string): Promise<void> {
-    this.log('Handling auth success', { redirectPath });
-
+    const now = Date.now();
+    
+    // Debounce rapid navigation calls
+    if (this.navigationInProgress && (now - this.lastNavigationTime) < this.NAVIGATION_DEBOUNCE_MS) {
+      this.log('Navigation debounced - too rapid', { timeSinceLastNav: now - this.lastNavigationTime });
+      return;
+    }
+    
+    this.log('Handling auth success', { redirectPath, isNative: nativeIntegrationService.isRunningNatively() });
+    
     if (this.isProcessing) {
       this.log('Already processing auth success, skipping');
       return;
     }
 
-    this.setProcessing(true, 3000); // Shorter timeout for auth success
+    this.navigationInProgress = true;
+    this.lastNavigationTime = now;
+    this.setProcessing(true, 5000); // Longer timeout for bundled assets
 
     try {
       // Get current auth state for debugging
@@ -191,7 +206,7 @@ class AuthStateManager {
       if (!debugInfo.sessionExists || !debugInfo.userExists) {
         this.error('Auth success called but no valid session found', debugInfo);
         toast.error('Authentication error. Please try again.');
-        this.queueNavigation('/app/auth');
+        this.executeNavigation('/app/auth');
         return;
       }
 
@@ -207,29 +222,65 @@ class AuthStateManager {
       // Show success message
       toast.success('Welcome! You\'re now logged in.');
 
-      // For native apps, use immediate navigation to prevent getting stuck
-      if (nativeIntegrationService.isRunningNatively()) {
-        this.log('Using immediate navigation for native app');
-        nativeNavigationService.navigateImmediatelyAfterAuth(finalPath);
-      } else {
-        // For web, use the standard queue system
-        this.queueNavigation(finalPath, { replace: true, force: true });
-        await this.processNavigationQueue();
-      }
+      // Execute navigation with retry for native apps
+      await this.executeNavigation(finalPath);
 
     } catch (error) {
       this.error('Error handling auth success:', error);
       toast.error('Something went wrong. Please try again.');
       
-      // Fallback navigation in case of error
-      if (nativeIntegrationService.isRunningNatively()) {
-        nativeNavigationService.navigateImmediatelyAfterAuth('/app/home');
-      } else {
-        this.queueNavigation('/app/auth');
-      }
+      // Fallback navigation
+      await this.executeNavigation('/app/home');
     } finally {
-      // Shorter timeout for processing state
-      setTimeout(() => this.setProcessing(false), 1000);
+      this.navigationInProgress = false;
+      setTimeout(() => this.setProcessing(false), 2000);
+    }
+  }
+
+  // OPTIMIZED NAVIGATION EXECUTION for bundled assets
+  private async executeNavigation(path: string): Promise<void> {
+    this.log('Executing navigation to:', path);
+
+    if (nativeIntegrationService.isRunningNatively()) {
+      // For native apps with bundled assets - use direct navigation with retry
+      let attempts = 0;
+      const maxAttempts = 3;
+      
+      while (attempts < maxAttempts) {
+        try {
+          attempts++;
+          this.log(`Native navigation attempt ${attempts}/${maxAttempts} to: ${path}`);
+          
+          // Use direct window.location.href for bundled assets
+          window.location.href = path;
+          
+          // Add verification delay
+          await new Promise(resolve => setTimeout(resolve, 500));
+          
+          // Check if navigation was successful
+          if (window.location.pathname === path) {
+            this.log('Native navigation successful');
+            return;
+          }
+          
+          if (attempts === maxAttempts) {
+            this.error('Native navigation failed after all attempts');
+            // Force reload as last resort
+            window.location.reload();
+          }
+          
+        } catch (error) {
+          this.error(`Native navigation attempt ${attempts} failed:`, error);
+          if (attempts === maxAttempts) {
+            // Last resort - reload to clear any stuck state
+            window.location.reload();
+          }
+        }
+      }
+    } else {
+      // For web apps - use queue system
+      this.queueNavigation(path, { replace: true, force: true });
+      await this.processNavigationQueue();
     }
   }
 

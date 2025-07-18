@@ -104,10 +104,10 @@ export default function Auth() {
     });
   }, [user, authLoading, onboardingComplete, onboardingLoading, navigationProcessing, location.pathname]);
 
-  // Enhanced navigation handling with immediate navigation for native apps
+  // CENTRALIZED NAVIGATION: Auth page only handles UI, AuthStateManager handles navigation
   useEffect(() => {
     if (user && !authLoading && !navigationProcessing) {
-      console.log('[Auth] User authenticated, handling post-auth navigation');
+      console.log('[Auth] User authenticated, delegating to AuthStateManager for navigation');
       
       // Check if auth state manager is already processing
       if (authStateManager.getProcessingState()) {
@@ -118,20 +118,13 @@ export default function Auth() {
       setNavigationProcessing(true);
       
       const finalRedirectPath = getFinalRedirectPath();
-      console.log('[Auth] Final redirect path:', finalRedirectPath);
+      console.log('[Auth] Delegating navigation to AuthStateManager:', finalRedirectPath);
       
-      // Use authStateManager for navigation (now handles native apps correctly)
+      // CENTRALIZED: Let AuthStateManager handle all navigation logic
       authStateManager.handleAuthSuccess(finalRedirectPath)
-        .then(() => {
-          console.log('[Auth] Navigation handled by authStateManager');
-        })
-        .catch((error) => {
-          console.error('[Auth] Navigation error:', error);
-          // Fallback navigation
-          nativeNavigationService.navigateToPath(finalRedirectPath, { replace: true, force: true });
-        })
         .finally(() => {
-          setNavigationProcessing(false);
+          // Reset processing after a delay to prevent UI flickering
+          setTimeout(() => setNavigationProcessing(false), 2000);
         });
     }
   }, [user, authLoading, navigationProcessing]);

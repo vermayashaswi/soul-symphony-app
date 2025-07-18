@@ -661,11 +661,8 @@ function AuthProviderCore({ children }: { children: ReactNode }) {
           // Show success toast and trigger navigation for authenticated users
           toast.success('Signed in successfully');
           
-          // Trigger navigation if we're on an app route (now correctly detects native apps)
-          if (isAppRoute(location.pathname)) {
-            console.log('[AuthContext] On app route, triggering post-auth navigation');
-            nativeNavigationService.handleAuthSuccess();
-          }
+          // REMOVED: Navigation is now handled centrally by AuthStateManager
+          // AuthContext no longer handles navigation to prevent conflicts
         } else if (event === 'SIGNED_OUT') {
           logInfo('User signed out', 'AuthContext');
           setProfileExistsStatus(null);
