@@ -104,6 +104,26 @@ export class NativeNavigationService {
   }
 
   /**
+   * Handle post-authentication success with direct navigation for native apps
+   * This provides a more reliable redirection than the standard flow
+   */
+  public handleAuthSuccess(): void {
+    console.log('[NativeNav] Handling authentication success');
+    
+    if (nativeIntegrationService.isRunningNatively()) {
+      console.log('[NativeNav] Native app detected - using direct navigation');
+      // For native apps, use direct location change for most reliable navigation
+      setTimeout(() => {
+        window.location.href = '/app/home';
+      }, 100); // Small delay to ensure auth state is settled
+    } else {
+      // For web, use standard navigation flow
+      console.log('[NativeNav] Web app detected - using standard navigation');
+      this.navigateToAuthenticatedHome();
+    }
+  }
+
+  /**
    * Get the current path
    */
   public getCurrentPath(): string {

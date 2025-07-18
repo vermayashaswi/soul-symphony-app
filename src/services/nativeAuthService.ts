@@ -1,6 +1,7 @@
 import { GoogleAuth } from '@codetrix-studio/capacitor-google-auth';
 import { supabase } from '@/integrations/supabase/client';
 import { nativeIntegrationService } from './nativeIntegrationService';
+import { nativeNavigationService } from './nativeNavigationService';
 import { toast } from 'sonner';
 
 class NativeAuthService {
@@ -223,6 +224,8 @@ class NativeAuthService {
         console.log('[NativeAuth] Successfully signed in with Google natively');
         console.log('[NativeAuth] Navigation should now be handled by AuthContext/Auth component');
         toast.success('Signed in successfully');
+        // Trigger enhanced navigation for native apps
+        nativeNavigationService.handleAuthSuccess();
         return;
 
       } else {

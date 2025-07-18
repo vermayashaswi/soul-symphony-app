@@ -22,6 +22,7 @@ import { LocationProvider } from '@/contexts/LocationContext';
 import { detectTWAEnvironment } from '@/utils/twaDetection';
 import { nativeAuthService } from '@/services/nativeAuthService';
 import { nativeIntegrationService } from '@/services/nativeIntegrationService';
+import { nativeNavigationService } from '@/services/nativeNavigationService';
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
@@ -658,6 +659,8 @@ function AuthProviderCore({ children }: { children: ReactNode }) {
           });
           if (isAppRoute(location.pathname)) {
             toast.success('Signed in successfully');
+            // Trigger enhanced navigation for native apps
+            nativeNavigationService.handleAuthSuccess();
           }
         } else if (event === 'SIGNED_OUT') {
           logInfo('User signed out', 'AuthContext');

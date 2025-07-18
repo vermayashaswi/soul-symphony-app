@@ -10,6 +10,7 @@ import { nativeIntegrationService } from '@/services/nativeIntegrationService';
 import { nativeNavigationService } from '@/services/nativeNavigationService';
 import { useOnboarding } from '@/hooks/use-onboarding';
 import { authStateManager } from '@/services/authStateManager';
+import { AuthRedirectFallback } from '@/components/auth/AuthRedirectFallback';
 
 export default function Auth() {
   const location = useLocation();
@@ -176,8 +177,12 @@ export default function Auth() {
     }
     
     // For native apps, navigation is handled in useEffect above
-    // Return null to prevent rendering the login form
-    return null;
+    // Show fallback component with manual redirect option
+    return (
+      <AuthRedirectFallback 
+        onManualRedirect={() => nativeNavigationService.handleAuthSuccess()}
+      />
+    );
   }
 
   // Login form for unauthenticated users
