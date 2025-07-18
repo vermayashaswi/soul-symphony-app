@@ -3,8 +3,6 @@ import React from 'react';
 import { BellOff } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { TranslatableText } from '@/components/translation/TranslatableText';
-import { useNotificationPermissionSimple } from '@/hooks/use-notification-permission-stub';
-import { getNotificationSettings } from '@/services/notificationServiceStub';
 
 interface NotificationStatusProps {
   className?: string;
@@ -15,13 +13,6 @@ export const NotificationStatus: React.FC<NotificationStatusProps> = ({
   className, 
   showText = false 
 }) => {
-  const { 
-    permission, 
-    initializationComplete,
-    requestPermission 
-  } = useNotificationPermissionSimple();
-  const settings = getNotificationSettings();
-
   const statusInfo = {
     icon: BellOff,
     text: 'Disabled',

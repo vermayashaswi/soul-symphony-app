@@ -2,19 +2,11 @@
 import React from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
-import { useNotificationPermissionSimple } from '@/hooks/use-notification-permission-stub';
 import { NotificationStatus } from './NotificationStatusStub';
 import { TranslatableText } from '@/components/translation/TranslatableText';
 
 export const NotificationTest: React.FC = () => {
-  const { 
-    permission, 
-    isGranted, 
-    requestPermission,
-    initializationComplete 
-  } = useNotificationPermissionSimple();
-
-  const sendTestNotification = () => {
+  const handleTestClick = () => {
     alert('Notifications are currently disabled in this app version.');
   };
 
@@ -35,7 +27,7 @@ export const NotificationTest: React.FC = () => {
         
         <div className="flex flex-col gap-2">
           <Button 
-            onClick={sendTestNotification}
+            onClick={handleTestClick}
             variant="outline"
             className="w-full"
             disabled
@@ -45,7 +37,7 @@ export const NotificationTest: React.FC = () => {
         </div>
         
         <div className="text-xs text-muted-foreground">
-          <TranslatableText text={`Permission: ${permission}`} />
+          <TranslatableText text="Permission: unsupported" />
         </div>
       </CardContent>
     </Card>
