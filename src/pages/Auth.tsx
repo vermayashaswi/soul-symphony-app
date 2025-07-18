@@ -103,10 +103,10 @@ export default function Auth() {
     });
   }, [user, authLoading, onboardingComplete, onboardingLoading, navigationProcessing, location.pathname]);
 
-  // Enhanced navigation handling with auth state manager
+  // Enhanced navigation handling with immediate navigation for native apps
   useEffect(() => {
     if (user && !authLoading && !navigationProcessing) {
-      console.log('[Auth] User authenticated, handling navigation with auth state manager');
+      console.log('[Auth] User authenticated, handling post-auth navigation');
       
       // Check if auth state manager is already processing
       if (authStateManager.getProcessingState()) {
@@ -116,53 +116,68 @@ export default function Auth() {
 
       setNavigationProcessing(true);
       
-      // Use auth state manager for reliable navigation
-      const storedRedirect = localStorage.getItem('authRedirectTo');
-      authStateManager.handleAuthSuccess(storedRedirect || undefined);
+      const finalRedirectPath = getFinalRedirectPath();
+      console.log('[Auth] Final redirect path:', finalRedirectPath);
       
-      // Reset navigation processing after delay
-      setTimeout(() => {
-        setNavigationProcessing(false);
-      }, 2000);
+      // For native apps, handle navigation immediately to prevent getting stuck
+      if (nativeIntegrationService.isRunningNatively()) {
+        console.log('[Auth] Native app detected, using immediate navigation');
+        nativeNavigationService.navigateImmediatelyAfterAuth(finalRedirectPath);
+        return;
+      }
+      
+      // For web, use authStateManager
+      authStateManager.handleAuthSuccess(finalRedirectPath)
+        .then(() => {
+          console.log('[Auth] Navigation handled by authStateManager');
+        })
+        .catch((error) => {
+          console.error('[Auth] Navigation error:', error);
+          // Fallback navigation
+          nativeNavigationService.navigateToPath(finalRedirectPath, { replace: true, force: true });
+        })
+        .finally(() => {
+          setNavigationProcessing(false);
+        });
     }
-  }, [user, authLoading]);
+  }, [user, authLoading, navigationProcessing]);
 
   // Show loading state while checking auth
   if (authLoading || onboardingLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+        <div className="text-center space-y-4">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
+          <p className="text-muted-foreground">Checking authentication...</p>
+        </div>
       </div>
     );
   }
 
-  // Handle authenticated users with enhanced navigation interface
-  if (user) {
-    // For native apps: Show loading indicator during navigation
-    if (nativeIntegrationService.isRunningNatively()) {
-      return (
-        <div className="min-h-screen flex items-center justify-center bg-background">
-          <div className="text-center space-y-6">
-            <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-primary mx-auto"></div>
-            <div className="space-y-2">
-              <p className="text-lg font-medium text-foreground">Welcome back!</p>
-              <p className="text-sm text-muted-foreground">
-                Taking you to your dashboard...
-              </p>
-            </div>
-            {authError && (
-              <div className="mt-4 p-3 bg-red-50 text-red-700 rounded-md text-sm max-w-md">
-                {authError}
-              </div>
-            )}
-          </div>
+  // Show minimal loading for navigation processing to prevent getting stuck
+  if (navigationProcessing && !nativeIntegrationService.isRunningNatively()) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center space-y-4">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
+          <p className="text-muted-foreground">Redirecting...</p>
         </div>
-      );
+      </div>
+    );
+  }
+
+  // Handle authenticated users - let the useEffect handle navigation
+  if (user && !navigationProcessing) {
+    const finalRedirectPath = getFinalRedirectPath();
+    
+    // For web apps, use React Router navigation immediately
+    if (!nativeIntegrationService.isRunningNatively()) {
+      return <Navigate to={finalRedirectPath} replace />;
     }
     
-    // For web: Use standard React Router navigation
-    const destination = getFinalRedirectPath();
-    return <Navigate to={destination} replace />;
+    // For native apps, navigation is handled in useEffect above
+    // Return null to prevent rendering the login form
+    return null;
   }
 
   // Login form for unauthenticated users

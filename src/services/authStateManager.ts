@@ -1,5 +1,6 @@
 import { supabase } from '@/integrations/supabase/client';
 import { nativeNavigationService } from './nativeNavigationService';
+import { nativeIntegrationService } from './nativeIntegrationService';
 import { toast } from 'sonner';
 
 interface NavigationRequest {
@@ -175,6 +176,13 @@ class AuthStateManager {
   public async handleAuthSuccess(redirectPath?: string): Promise<void> {
     this.log('Handling auth success', { redirectPath });
 
+    if (this.isProcessing) {
+      this.log('Already processing auth success, skipping');
+      return;
+    }
+
+    this.setProcessing(true, 3000); // Shorter timeout for auth success
+
     try {
       // Get current auth state for debugging
       const debugInfo = await this.getAuthDebugInfo();
@@ -199,15 +207,29 @@ class AuthStateManager {
       // Show success message
       toast.success('Welcome! You\'re now logged in.');
 
-      // Queue navigation with slight delay to ensure everything is ready
-      setTimeout(() => {
-        this.queueNavigation(finalPath, { replace: true });
-      }, 500);
+      // For native apps, use immediate navigation to prevent getting stuck
+      if (nativeIntegrationService.isRunningNatively()) {
+        this.log('Using immediate navigation for native app');
+        nativeNavigationService.navigateImmediatelyAfterAuth(finalPath);
+      } else {
+        // For web, use the standard queue system
+        this.queueNavigation(finalPath, { replace: true, force: true });
+        await this.processNavigationQueue();
+      }
 
     } catch (error) {
       this.error('Error handling auth success:', error);
       toast.error('Something went wrong. Please try again.');
-      this.queueNavigation('/app/auth');
+      
+      // Fallback navigation in case of error
+      if (nativeIntegrationService.isRunningNatively()) {
+        nativeNavigationService.navigateImmediatelyAfterAuth('/app/home');
+      } else {
+        this.queueNavigation('/app/auth');
+      }
+    } finally {
+      // Shorter timeout for processing state
+      setTimeout(() => this.setProcessing(false), 1000);
     }
   }
 

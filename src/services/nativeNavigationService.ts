@@ -27,26 +27,36 @@ export class NativeNavigationService {
       return;
     }
     
+    // Add a small delay for native apps to ensure auth state is settled
+    const performNavigation = () => {
+      if (nativeIntegrationService.isRunningNatively()) {
+        // For native apps, use location.href for reliable navigation
+        console.log('[NativeNav] Using direct location change for native app');
+        if (options?.replace) {
+          console.log('[NativeNav] Replacing location with:', path);
+          window.location.replace(path);
+        } else {
+          console.log('[NativeNav] Setting location href to:', path);
+          window.location.href = path;
+        }
+      } else {
+        // For web, use history API
+        console.log('[NativeNav] Using history API for web');
+        if (options?.replace) {
+          window.history.replaceState(null, '', path);
+        } else {
+          window.history.pushState(null, '', path);
+        }
+        // Trigger a navigation event to notify React Router
+        window.dispatchEvent(new PopStateEvent('popstate'));
+      }
+    };
+
+    // For native apps, add a small delay to prevent race conditions
     if (nativeIntegrationService.isRunningNatively()) {
-      // For native apps, use location.href for reliable navigation
-      console.log('[NativeNav] Using direct location change for native app');
-      if (options?.replace) {
-        console.log('[NativeNav] Replacing location with:', path);
-        window.location.replace(path);
-      } else {
-        console.log('[NativeNav] Setting location href to:', path);
-        window.location.href = path;
-      }
+      setTimeout(performNavigation, 100);
     } else {
-      // For web, use history API
-      console.log('[NativeNav] Using history API for web');
-      if (options?.replace) {
-        window.history.replaceState(null, '', path);
-      } else {
-        window.history.pushState(null, '', path);
-      }
-      // Trigger a navigation event to notify React Router
-      window.dispatchEvent(new PopStateEvent('popstate'));
+      performNavigation();
     }
   }
 
@@ -55,6 +65,7 @@ export class NativeNavigationService {
    */
   public navigateToAuthenticatedHome(): void {
     console.log('[NativeNav] Navigating to authenticated home');
+    // Clear any pending navigation and force immediate navigation
     this.navigateToPath('/app/home', { replace: true, force: true });
   }
 
@@ -73,6 +84,23 @@ export class NativeNavigationService {
     const authPath = redirectPath ? `/app/auth?redirectTo=${encodeURIComponent(redirectPath)}` : '/app/auth';
     console.log('[NativeNav] Navigating to auth:', authPath);
     this.navigateToPath(authPath, { replace: true, force: true });
+  }
+
+  /**
+   * Navigate immediately after authentication success
+   * This method bypasses any processing delays for immediate navigation
+   */
+  public navigateImmediatelyAfterAuth(path: string): void {
+    console.log('[NativeNav] Immediate post-auth navigation to:', path);
+    
+    if (nativeIntegrationService.isRunningNatively()) {
+      // For native apps, use direct location change immediately
+      console.log('[NativeNav] Direct native navigation to:', path);
+      window.location.href = path;
+    } else {
+      // For web, use standard navigation
+      this.navigateToPath(path, { replace: true, force: true });
+    }
   }
 
   /**
