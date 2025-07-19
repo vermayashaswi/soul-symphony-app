@@ -1,10 +1,10 @@
 
 import { Suspense } from 'react';
-import { Toaster } from '@/components/ui/sonner';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ThemeProvider } from '@/hooks/use-theme';
 import { SafeAreaProvider } from '@/components/layout/SafeAreaProvider';
+import { SafeToaster } from '@/components/layout/SafeToaster';
 import AppRoutes from '@/routes/AppRoutes';
 
 const queryClient = new QueryClient();
@@ -19,8 +19,9 @@ function App() {
           <Suspense fallback={<div>Loading...</div>}>
             <SafeAreaProvider>
               <AppRoutes />
-              <Toaster />
             </SafeAreaProvider>
+            {/* Move Toaster inside Suspense but ensure it's after other content */}
+            <SafeToaster />
           </Suspense>
         </TooltipProvider>
       </ThemeProvider>
