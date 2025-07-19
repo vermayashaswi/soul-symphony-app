@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { enhancedNotificationService, NotificationPermissionState } from '@/services/enhancedNotificationService';
-import { toast } from 'sonner';
+import { journalReminderService } from '@/services/journalReminderService';
 
 interface NotificationSettings {
   enabled: boolean;
@@ -16,41 +16,30 @@ export const useNotificationSettings = () => {
   });
   
   const [isLoading, setIsLoading] = useState(true);
-  const [isRequesting, setIsRequesting] = useState(false);
 
-  // Load settings without requesting permissions
+  // Load settings
   const loadSettings = useCallback(async () => {
     try {
-      console.log('[useNotificationSettings] Loading notification settings (checking permissions only)');
+      console.log('[useNotificationSettings] Loading notification settings');
       
-      // Check permission status without requesting
+      // Check permission status
       const permissionState = await enhancedNotificationService.checkPermissionStatus();
       
-      // Load saved settings
-      const savedEnabled = localStorage.getItem('notification_enabled') === 'true';
-      const savedTimes = localStorage.getItem('notification_times');
+      // Get journal reminder settings
+      const reminderSettings = journalReminderService.getSettings();
       
-      let times: string[] = [];
-      if (savedTimes) {
-        try {
-          times = JSON.parse(savedTimes);
-        } catch (e) {
-          console.error('Error parsing saved notification times:', e);
-        }
-      }
-      
-      // Only consider enabled if permission is actually granted
-      const actuallyEnabled = savedEnabled && permissionState === 'granted';
+      // Only consider enabled if permission is granted
+      const actuallyEnabled = reminderSettings.enabled && permissionState === 'granted';
       
       setSettings({
         enabled: actuallyEnabled,
-        times,
+        times: reminderSettings.times,
         permissionState
       });
       
       console.log('[useNotificationSettings] Settings loaded:', {
         enabled: actuallyEnabled,
-        timesCount: times.length,
+        timesCount: reminderSettings.times.length,
         permissionState
       });
       
@@ -66,93 +55,19 @@ export const useNotificationSettings = () => {
     }
   }, []);
 
-  // Request permissions when user explicitly enables notifications
-  const requestPermissionAndEnable = useCallback(async (): Promise<boolean> => {
-    if (isRequesting) {
-      console.log('[useNotificationSettings] Permission request already in progress');
-      return false;
-    }
-    
-    setIsRequesting(true);
-    
-    try {
-      console.log('[useNotificationSettings] User explicitly requested notification permissions');
-      
-      const result = await enhancedNotificationService.requestPermissions();
-      console.log('[useNotificationSettings] Permission request result:', result);
-      
-      if (result.granted) {
-        // Update settings to enabled
-        const newSettings = {
-          ...settings,
-          enabled: true,
-          permissionState: result.state
-        };
-        
-        setSettings(newSettings);
-        localStorage.setItem('notification_enabled', 'true');
-        
-        toast.success('Notification permissions granted!');
-        return true;
-      } else {
-        // Update permission state but keep disabled
-        setSettings(prev => ({
-          ...prev,
-          permissionState: result.state
-        }));
-        
-        toast.error(result.error || 'Notification permission denied');
-        return false;
-      }
-    } catch (error) {
-      console.error('[useNotificationSettings] Error requesting permissions:', error);
-      toast.error('Failed to request notification permissions');
-      return false;
-    } finally {
-      setIsRequesting(false);
-    }
-  }, [settings, isRequesting]);
-
-  // Toggle notifications (request permission if needed)
-  const toggleNotifications = useCallback(async (enable: boolean): Promise<boolean> => {
-    console.log('[useNotificationSettings] Toggle notifications:', enable);
-    
-    if (enable) {
-      // Check if we already have permission
-      if (settings.permissionState === 'granted') {
-        setSettings(prev => ({ ...prev, enabled: true }));
-        localStorage.setItem('notification_enabled', 'true');
-        return true;
-      } else {
-        // Request permission
-        return await requestPermissionAndEnable();
-      }
-    } else {
-      // Disable notifications
-      setSettings(prev => ({ ...prev, enabled: false }));
-      localStorage.setItem('notification_enabled', 'false');
-      return true;
-    }
-  }, [settings.permissionState, requestPermissionAndEnable]);
-
-  // Update notification times
-  const updateTimes = useCallback((times: string[]) => {
-    console.log('[useNotificationSettings] Updating notification times:', times);
-    setSettings(prev => ({ ...prev, times }));
-    localStorage.setItem('notification_times', JSON.stringify(times));
-  }, []);
-
-  // Initialize settings on mount
+  // Initialize on mount
   useEffect(() => {
     loadSettings();
+    
+    // Reload settings every 5 seconds to keep in sync
+    const interval = setInterval(loadSettings, 5000);
+    
+    return () => clearInterval(interval);
   }, [loadSettings]);
 
   return {
     settings,
     isLoading,
-    isRequesting,
-    toggleNotifications,
-    updateTimes,
     refreshPermissionStatus: loadSettings
   };
 };

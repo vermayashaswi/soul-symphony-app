@@ -5,10 +5,8 @@ import {
   detectTWAEnvironment, 
   shouldInterceptBackNavigation, 
   exitTWAApp, 
-  canNavigateBack,
-  isAtSessionBoundary,
   updateSessionAuthStatus,
-  getSessionNavigationState
+  setSessionEntryPoint
 } from '@/utils/twaDetection';
 import { useAuth } from '@/contexts/AuthContext';
 
@@ -33,69 +31,73 @@ export const useTWABackHandler = (options: UseTWABackHandlerOptions = {}): UseTW
   
   const twaEnv = detectTWAEnvironment();
 
-  // Update session state when auth status changes
+  // Update session state when auth status or location changes
   useEffect(() => {
     if (twaEnv.isTWA || twaEnv.isStandalone) {
       updateSessionAuthStatus(!!user, location.pathname);
+      
+      // Set entry point when user first logs in to an app route
+      if (user && location.pathname.startsWith('/app/') && 
+          location.pathname !== '/app/auth' && 
+          location.pathname !== '/app/onboarding') {
+        console.log('[TWA BackHandler] Setting session entry point:', location.pathname);
+        setSessionEntryPoint(location.pathname);
+      }
     }
   }, [user, location.pathname, twaEnv]);
 
-  // Handle popstate events (browser back button) with session awareness
+  // Handle popstate events (browser back button)
   const handlePopState = useCallback((event: PopStateEvent) => {
     if (!twaEnv.isTWA && !twaEnv.isStandalone) return;
-    if (isHandlingBackButton) return; // Prevent multiple triggers
+    if (isHandlingBackButton) return;
     
     setIsHandlingBackButton(true);
     
     const currentPath = window.location.pathname;
-    console.log('[TWA BackHandler] Popstate event for path:', currentPath);
+    console.log('[TWA BackHandler] Popstate event for path:', currentPath, 'User:', !!user);
     
-    if (shouldInterceptBackNavigation(currentPath)) {
-      // Prevent the navigation
+    if (shouldInterceptBackNavigation(currentPath, !!user)) {
+      console.log('[TWA BackHandler] Intercepting back navigation');
       event.preventDefault();
       
-      // Push the current state back to maintain history
+      // Push current state back to maintain history
       window.history.pushState({ intercepted: true }, '', currentPath);
       
-      // Check if we're at session boundary (should exit) or just blocking navigation
-      if (isAtSessionBoundary(currentPath)) {
-        console.log('[TWA BackHandler] At session boundary - showing exit confirmation');
+      // Show exit confirmation for authenticated users at main app routes
+      if (user && (currentPath === '/app/home' || currentPath === '/app/journal' || currentPath === '/app/profile')) {
+        console.log('[TWA BackHandler] Showing exit confirmation for authenticated user');
         setShowExitModal(true);
         options.onExitConfirmation?.();
       } else {
-        console.log('[TWA BackHandler] Blocking navigation back to auth/onboarding');
-        // Don't show exit modal, just block the navigation
-        // User should use proper navigation within the app
+        console.log('[TWA BackHandler] Blocking navigation - user should use proper app navigation');
         options.onBackIntercepted?.();
       }
     }
     
-    // Reset handling flag after a delay
     setTimeout(() => {
       setIsHandlingBackButton(false);
     }, 500);
-  }, [twaEnv, options, isHandlingBackButton]);
+  }, [twaEnv, options, isHandlingBackButton, user]);
 
-  // Handle Android hardware back button with session awareness
+  // Handle Android hardware back button
   useEffect(() => {
     if (!twaEnv.isAndroidTWA) return;
 
     const handleKeyDown = (event: KeyboardEvent) => {
       if (isHandlingBackButton) return;
       
-      // Android back button simulation or actual back key
       if (event.key === 'Escape' || event.keyCode === 27) {
         setIsHandlingBackButton(true);
         
         const currentPath = location.pathname;
-        console.log('[TWA BackHandler] Hardware back button for path:', currentPath);
+        console.log('[TWA BackHandler] Hardware back button for path:', currentPath, 'User:', !!user);
         
-        if (shouldInterceptBackNavigation(currentPath)) {
+        if (shouldInterceptBackNavigation(currentPath, !!user)) {
           event.preventDefault();
           event.stopPropagation();
           
-          if (isAtSessionBoundary(currentPath)) {
-            console.log('[TWA BackHandler] Hardware back at session boundary - showing exit confirmation');
+          if (user && (currentPath === '/app/home' || currentPath === '/app/journal' || currentPath === '/app/profile')) {
+            console.log('[TWA BackHandler] Hardware back - showing exit confirmation');
             setShowExitModal(true);
             options.onExitConfirmation?.();
           } else {
@@ -104,7 +106,6 @@ export const useTWABackHandler = (options: UseTWABackHandlerOptions = {}): UseTW
           }
         }
         
-        // Reset handling flag after a delay
         setTimeout(() => {
           setIsHandlingBackButton(false);
         }, 500);
@@ -113,20 +114,19 @@ export const useTWABackHandler = (options: UseTWABackHandlerOptions = {}): UseTW
 
     document.addEventListener('keydown', handleKeyDown, true);
     return () => document.removeEventListener('keydown', handleKeyDown, true);
-  }, [location.pathname, twaEnv.isAndroidTWA, options, isHandlingBackButton]);
+  }, [location.pathname, twaEnv.isAndroidTWA, options, isHandlingBackButton, user]);
 
-  // Set up popstate listener with session-aware state management
+  // Set up popstate listener
   useEffect(() => {
     if (!twaEnv.isTWA && !twaEnv.isStandalone) return;
 
-    // Add a dummy state to the history for navigation control
     const currentPath = location.pathname;
-    if (shouldInterceptBackNavigation(currentPath)) {
-      console.log('[TWA BackHandler] Setting up session-aware interception for path:', currentPath);
+    if (shouldInterceptBackNavigation(currentPath, !!user)) {
+      console.log('[TWA BackHandler] Setting up interception for path:', currentPath);
       window.history.pushState({ 
         intercepted: true, 
         path: currentPath,
-        sessionAware: true 
+        authenticated: !!user 
       }, '', currentPath);
     }
 
@@ -135,14 +135,13 @@ export const useTWABackHandler = (options: UseTWABackHandlerOptions = {}): UseTW
     return () => {
       window.removeEventListener('popstate', handlePopState);
     };
-  }, [location.pathname, handlePopState, twaEnv]);
+  }, [location.pathname, handlePopState, twaEnv, user]);
 
   const confirmExit = useCallback(() => {
     console.log('[TWA BackHandler] User confirmed app exit');
     setShowExitModal(false);
     setIsHandlingBackButton(false);
     
-    // Exit the TWA app
     setTimeout(() => {
       exitTWAApp();
     }, 100);
@@ -153,14 +152,13 @@ export const useTWABackHandler = (options: UseTWABackHandlerOptions = {}): UseTW
     setShowExitModal(false);
     setIsHandlingBackButton(false);
     
-    // Stay on current page by ensuring history state
     const currentPath = location.pathname;
     window.history.replaceState({ 
       intercepted: true, 
       path: currentPath,
-      sessionAware: true 
+      authenticated: !!user 
     }, '', currentPath);
-  }, [location.pathname]);
+  }, [location.pathname, user]);
 
   return {
     showExitModal,

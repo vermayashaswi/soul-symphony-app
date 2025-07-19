@@ -49,7 +49,6 @@ class NativeAppInitService {
           console.log('[NativeAppInit] Native auth service initialized successfully');
         } catch (authError) {
           console.warn('[NativeAppInit] Native auth initialization failed (non-fatal):', authError);
-          // Don't fail the entire initialization for auth issues
           mobileErrorHandler.handleError({
             type: 'capacitor',
             message: `Native auth init failed: ${authError}`,
@@ -57,14 +56,13 @@ class NativeAppInitService {
           });
         }
 
-        // Step 4: Request necessary permissions
-        await this.requestNativePermissions();
-
-        // Step 5: Setup native-specific event listeners
+        // Step 4: Setup native-specific event listeners
         this.setupNativeEventListeners();
 
-        // Step 6: Configure native UI
+        // Step 5: Configure native UI
         await this.configureNativeUI();
+
+        console.log('[NativeAppInit] Skipping automatic permission requests - will be handled by user action');
       } else {
         console.log('[NativeAppInit] Running in web environment, skipping native-specific initialization');
       }
@@ -81,35 +79,8 @@ class NativeAppInitService {
         context: 'nativeAppInit'
       });
       
-      // Mark as initialized even on failure to prevent retry loops
       this.isInitialized = true;
       return false;
-    }
-  }
-
-  private async requestNativePermissions(): Promise<void> {
-    try {
-      console.log('[NativeAppInit] Requesting native permissions...');
-      
-      const permissions = ['notifications', 'microphone'];
-      const results = await nativeIntegrationService.requestPermissions(permissions);
-      
-      console.log('[NativeAppInit] Permission results:', results);
-      
-      // Handle permission results
-      Object.entries(results).forEach(([permission, status]) => {
-        if (status === 'denied') {
-          console.warn(`[NativeAppInit] ${permission} permission denied`);
-        }
-      });
-
-    } catch (error) {
-      console.warn('[NativeAppInit] Permission request failed:', error);
-      mobileErrorHandler.handleError({
-        type: 'permission',
-        message: `Permission request failed: ${error}`,
-        context: 'nativeAppInit'
-      });
     }
   }
 
@@ -125,10 +96,8 @@ class NativeAppInitService {
           
           if (state.isActive) {
             console.log('[NativeAppInit] App became active');
-            // App became active - good place to refresh data if needed
           } else {
             console.log('[NativeAppInit] App became inactive');
-            // App became inactive - good place to save state
           }
         });
 
@@ -168,7 +137,7 @@ class NativeAppInitService {
       // Configure status bar
       await nativeIntegrationService.showStatusBar();
 
-      // Hide splash screen immediately after app initialization is complete
+      // Hide splash screen after initialization
       const splashPlugin = nativeIntegrationService.getPlugin('SplashScreen');
       if (splashPlugin) {
         console.log('[NativeAppInit] Hiding splash screen...');
@@ -177,7 +146,6 @@ class NativeAppInitService {
           console.log('[NativeAppInit] Splash screen hidden successfully');
         } catch (error) {
           console.warn('[NativeAppInit] Failed to hide splash screen:', error);
-          // Try alternative method
           try {
             await splashPlugin.hide({ fadeOutDuration: 300 });
             console.log('[NativeAppInit] Splash screen hidden with fadeOut');
@@ -185,8 +153,6 @@ class NativeAppInitService {
             console.error('[NativeAppInit] Splash screen hide fallback also failed:', fallbackError);
           }
         }
-      } else {
-        console.warn('[NativeAppInit] SplashScreen plugin not available');
       }
 
     } catch (error) {
@@ -206,17 +172,14 @@ class NativeAppInitService {
       const urlObj = new URL(url);
       const path = urlObj.pathname;
       
-      // Navigate to appropriate route based on deep link
       if (path.includes('/app/')) {
         window.location.href = path;
       } else {
-        // Default to app home
         window.location.href = '/app/home';
       }
       
     } catch (error) {
       console.warn('[NativeAppInit] Deep link handling failed:', error);
-      // Fallback to app home
       window.location.href = '/app/home';
     }
   }
