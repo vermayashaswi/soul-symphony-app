@@ -10,7 +10,6 @@ interface TranslationContextType {
   currentLanguage: string;
   setCurrentLanguage: (language: string) => void;
   setLanguage: (language: string) => void; // Alias for backwards compatibility
-  setInitialLanguage: () => void; // Method to set initial language
   translate: (text: string, sourceLanguage?: string, entryId?: number, forceTranslate?: boolean) => Promise<string | null>;
   isTranslating: boolean;
   clearCache: () => void;
@@ -339,17 +338,10 @@ export const TranslationProvider: React.FC<TranslationProviderProps> = ({ childr
     }
   }, [currentLanguage]);
 
-  const setInitialLanguage = useCallback(() => {
-    // This function is called when app initializes to detect and set language
-    console.log('[TranslationContext] Setting initial language on app startup');
-    // The logic is already in the useEffect above, so this is just a placeholder
-  }, []);
-
   const value: TranslationContextType = {
     currentLanguage: effectiveLanguage, // Use effectiveLanguage to include test override
     setCurrentLanguage: handleLanguageChange,
     setLanguage: handleLanguageChange, // Alias for backwards compatibility
-    setInitialLanguage,
     translate,
     isTranslating,
     clearCache: useCallback(() => {

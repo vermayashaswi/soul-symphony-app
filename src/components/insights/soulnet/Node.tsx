@@ -29,6 +29,7 @@ interface NodeProps {
   forceShowLabels?: boolean;
   effectiveTheme?: 'light' | 'dark';
   isInstantMode?: boolean;
+  // ENHANCED: Coordinated translation props
   getCoordinatedTranslation?: (nodeId: string) => string;
 }
 
@@ -53,10 +54,11 @@ const Node: React.FC<NodeProps> = ({
   const meshRef = useRef<THREE.Mesh>(null);
   const userColorThemeHex = useUserColorThemeHex();
   
+  // ANIMATION: Manual time tracking for pulsing effects
   const [animationTime, setAnimationTime] = useState(0);
   const [isReady, setIsReady] = useState(false);
-  const [isHovered, setIsHovered] = useState(false);
   
+  // Delayed initialization to prevent clock access issues
   useEffect(() => {
     const timer = setTimeout(() => {
       setIsReady(true);
@@ -65,149 +67,152 @@ const Node: React.FC<NodeProps> = ({
     return () => clearTimeout(timer);
   }, []);
 
+  // ENHANCED COORDINATED TRANSLATION: Get coordinated translation for this node with better debugging
   const coordinatedTranslation = useMemo(() => {
     if (getCoordinatedTranslation) {
       const translation = getCoordinatedTranslation(node.id);
+      if (isInstantMode) {
+        console.log(`[Node] ENHANCED COORDINATED INSTANT: Got coordinated translation for ${node.id}: "${translation}" - NO LOADING DELAY`);
+      } else {
+        console.log(`[Node] ENHANCED COORDINATED: Got coordinated translation for ${node.id}: "${translation}"`);
+      }
       return translation;
     }
-    return node.id;
-  }, [node.id, getCoordinatedTranslation]);
+    if (isInstantMode) {
+      console.log(`[Node] ENHANCED COORDINATED INSTANT: No coordinated translation function available for ${node.id} - NO LOADING DELAY`);
+    } else {
+      console.log(`[Node] ENHANCED COORDINATED: No coordinated translation function available for ${node.id}`);
+    }
+    return undefined;
+  }, [node.id, getCoordinatedTranslation, isInstantMode]);
 
-  // ENHANCED: Improved color scheme with better contrast and selection feedback
+  // UPDATED: New darker color scheme implementation
   const color = useMemo(() => {
     if (isSelected) {
-      // Selected state: Bright, high-contrast colors
+      // Selected state: Use darker shades
       if (node.type === 'entity') {
-        return new THREE.Color('#10b981'); // Bright emerald for selected entities
+        return new THREE.Color('#14532d'); // Much darker green for selected entity nodes
       } else {
-        return new THREE.Color('#f59e0b'); // Bright amber for selected emotions
+        return new THREE.Color('#b45309'); // Much darker golden for selected emotion nodes
       }
     }
     
-    if (isHighlighted) {
-      // Highlighted state: Medium brightness
+    if (isHighlighted || (!dimmed && !isSelected)) {
+      // Default state: Use the new darker colors for both highlighted and normal nodes
       if (node.type === 'entity') {
-        return new THREE.Color('#059669'); // Medium emerald for highlighted entities
+        return new THREE.Color('#15803d'); // Darker green for entity nodes (spheres)
       } else {
-        return new THREE.Color('#d97706'); // Medium amber for highlighted emotions
+        return new THREE.Color('#d97706'); // Darker golden for emotion nodes (cubes)
       }
     }
     
-    if (!dimmed) {
-      // Default state: Standard colors
-      if (node.type === 'entity') {
-        return new THREE.Color('#047857'); // Standard emerald for entities
-      } else {
-        return new THREE.Color('#b45309'); // Standard amber for emotions
-      }
-    }
-    
-    // Dimmed state: Subtle gray
-    return new THREE.Color('#64748b');
+    // ENHANCED: 20% lighter colors for dimmed nodes instead of very dark
+    return new THREE.Color(dimmed ? '#3a3a3a' : '#cccccc');
   }, [isSelected, isHighlighted, dimmed, node.type]);
 
-  // ENHANCED: Dynamic scaling with better selection feedback
+  // ENHANCED: More dramatic scale differences for better hierarchy
   const baseNodeScale = useMemo(() => {
-    const baseScale = 1.2;
-    if (isSelected) return baseScale * 1.8; // Much larger for selected
-    if (isHighlighted) return baseScale * 1.4; // Larger for highlighted
-    if (isHovered) return baseScale * 1.1; // Slightly larger on hover
-    if (dimmed) return baseScale * 0.5; // Much smaller for dimmed
+    const baseScale = 1.15;
+    if (isSelected) return baseScale * 1.6; // Even larger for selected
+    if (isHighlighted) return baseScale * 1.3; // Larger for highlighted
+    if (dimmed) return baseScale * 0.6; // Much smaller for dimmed
     return baseScale;
-  }, [isSelected, isHighlighted, isHovered, dimmed]);
+  }, [isSelected, isHighlighted, dimmed]);
 
-  // ENHANCED: Better opacity for visual hierarchy
+  // ENHANCED: Increased opacity for dimmed nodes to 0.05-0.06
   const nodeOpacity = useMemo(() => {
     if (isSelected) return 1.0;
-    if (isHighlighted) return 0.95;
-    if (isHovered) return 0.9;
-    if (dimmed) return 0.15; // More visible when dimmed
-    return 0.85;
-  }, [isSelected, isHighlighted, isHovered, dimmed]);
+    if (isHighlighted) return 0.9;
+    if (dimmed) return 0.05; // Increased from extremely low to 0.05
+    return 0.8;
+  }, [isSelected, isHighlighted, dimmed]);
 
-  // ENHANCED: Improved animation with better performance
+  // PULSATING ANIMATION: Enhanced frame animation with pulsing effects
   useFrame((state, delta) => {
     if (!meshRef.current || !isReady) return;
     
     try {
+      // Manual time tracking instead of clock access
       setAnimationTime(prev => prev + delta);
       
-      if (isSelected || isHighlighted) {
-        // Enhanced pulsing animation for selected/highlighted nodes
-        const pulseBase = isSelected ? 0.3 : 0.2;
-        const pulseSpeed = isSelected ? 3.0 : 2.0;
-        const pulse = Math.sin(animationTime * pulseSpeed) * pulseBase + 1.0;
+      if (isHighlighted) {
+        // PULSATING: Different pulse intensities based on connection state
+        const pulseIntensity = isSelected ? 0.25 : (connectionPercentage > 0 ? connectionPercentage * 0.003 : 0.15);
+        const pulse = Math.sin(animationTime * 2.5) * pulseIntensity + 1.0;
         const targetScale = baseNodeScale * pulse;
         
-        meshRef.current.scale.lerp(new THREE.Vector3(targetScale, targetScale, targetScale), 0.12);
+        // Apply pulsing scale
+        meshRef.current.scale.lerp(new THREE.Vector3(targetScale, targetScale, targetScale), 0.1);
         
-        // Enhanced emissive glow
+        // PULSATING: Emissive glow breathing effect
         if (meshRef.current.material instanceof THREE.MeshStandardMaterial) {
-          const emissiveBase = isSelected ? 1.2 : 0.8;
-          const emissiveIntensity = emissiveBase + Math.sin(animationTime * pulseSpeed) * 0.4;
-          meshRef.current.material.emissiveIntensity = Math.max(0.1, Math.min(2.0, emissiveIntensity));
+          const emissiveIntensity = isSelected 
+            ? 1.0 + Math.sin(animationTime * 3) * 0.3
+            : 0.7 + (connectionPercentage > 0 ? connectionPercentage * 0.005 : 0.2) + Math.sin(animationTime * 3) * 0.2;
+          
+          meshRef.current.material.emissiveIntensity = Math.max(0, Math.min(2, emissiveIntensity));
         }
       } else {
         // Static scale for non-highlighted nodes
-        const targetScale = baseNodeScale;
-        meshRef.current.scale.lerp(new THREE.Vector3(targetScale, targetScale, targetScale), 0.08);
+        const targetScale = dimmed ? baseNodeScale * 0.8 : baseNodeScale;
+        meshRef.current.scale.lerp(new THREE.Vector3(targetScale, targetScale, targetScale), 0.1);
         
         if (meshRef.current.material instanceof THREE.MeshStandardMaterial) {
-          meshRef.current.material.emissiveIntensity = dimmed ? 0 : 0.15;
+          meshRef.current.material.emissiveIntensity = dimmed ? 0 : 0.1;
         }
       }
       
-      // Smooth color and opacity transitions
+      // Update material color and opacity
       if (meshRef.current.material instanceof THREE.MeshStandardMaterial) {
-        meshRef.current.material.color.lerp(color, 0.1);
+        (meshRef.current.material as THREE.MeshStandardMaterial).color.lerp(color, 0.1);
         meshRef.current.material.opacity = nodeOpacity;
       }
     } catch (error) {
-      console.warn("Node animation error:", error);
+      console.warn("Node pulsing animation error:", error);
     }
   });
 
-  // ENHANCED: Improved click handling with proper event handling
   const handleNodeClick = (e: any) => {
     e.stopPropagation();
-    console.log(`[Node] CLICK DETECTED: ${node.id} (${node.type})`);
-    
-    // Add haptic feedback for mobile
-    if (navigator.vibrate) {
-      navigator.vibrate(50);
-    }
-    
     onClick(node.id, e);
   };
 
-  const handlePointerEnter = () => {
-    setIsHovered(true);
-    document.body.style.cursor = 'pointer';
-  };
-
-  const handlePointerLeave = () => {
-    setIsHovered(false);
-    document.body.style.cursor = 'auto';
-  };
-
+  // ENHANCED: Only show labels for highlighted/selected nodes or when forced
   const shouldShowLabel = useMemo(() => {
-    if (dimmed) return false;
-    return forceShowLabels || showLabel || isSelected || isHighlighted || isHovered;
-  }, [forceShowLabels, showLabel, isSelected, isHighlighted, isHovered, dimmed]);
+    if (dimmed) return false; // Never show labels for dimmed nodes
+    return forceShowLabels || showLabel || isSelected || isHighlighted;
+  }, [forceShowLabels, showLabel, isSelected, isHighlighted, dimmed]);
 
+  // ENHANCED INSTANT MODE: Better logging for coordinated translation tracking
+  if (showPercentage && connectionPercentage > 0) {
+    if (isInstantMode) {
+      console.log(`[Node] ENHANCED COORDINATED PULSATING INSTANT MODE: ${node.id} (${node.type}) displays percentage: ${connectionPercentage}% with coordinated translation: "${coordinatedTranslation}" - NO LOADING DELAY`);
+    } else {
+      console.log(`[Node] ENHANCED COORDINATED PULSATING: ${node.id} (${node.type}) should display percentage: ${connectionPercentage}% with coordinated translation: "${coordinatedTranslation}"`);
+    }
+  }
+
+  if (isInstantMode) {
+    console.log(`[Node] ENHANCED DARKER COLORS INSTANT MODE: Rendering ${node.type} node ${node.id} with ${isSelected ? 'SELECTED' : 'DEFAULT'} DARKER ${node.type === 'entity' ? 'GREEN' : 'GOLDEN'} color, enhanced coordinated translation: "${coordinatedTranslation}", base scale ${baseNodeScale.toFixed(2)} - NO LOADING DELAY`);
+  } else {
+    console.log(`[Node] ENHANCED DARKER COLORS: Rendering ${node.type} node ${node.id} with ${isSelected ? 'SELECTED' : 'DEFAULT'} DARKER ${node.type === 'entity' ? 'GREEN' : 'GOLDEN'} color, enhanced coordinated translation: "${coordinatedTranslation}", base scale ${baseNodeScale.toFixed(2)}`);
+  }
+
+  // ENHANCED: Improved geometry sizes to work with the enhanced scale differences
   const renderGeometry = () => {
     if (node.type === 'emotion') {
-      return <boxGeometry args={[1.8, 1.8, 1.8]} />;
+      // Cube for emotion nodes (darker golden)
+      return <boxGeometry args={[1.6, 1.6, 1.6]} />;
     } else {
-      return <sphereGeometry args={[0.9, 32, 32]} />;
+      // Sphere for entity nodes (darker green)
+      return <sphereGeometry args={[0.8, 32, 32]} />;
     }
   };
 
+  // Don't render until ready
   if (!isReady) {
     return null;
   }
-
-  console.log(`[Node] ENHANCED RENDER: ${node.id} - selected: ${isSelected}, highlighted: ${isHighlighted}, showPercentage: ${showPercentage}, percentage: ${connectionPercentage}%`);
 
   return (
     <group>
@@ -215,19 +220,17 @@ const Node: React.FC<NodeProps> = ({
         ref={meshRef}
         position={node.position}
         onClick={handleNodeClick}
-        onPointerEnter={handlePointerEnter}
-        onPointerLeave={handlePointerLeave}
         scale={[baseNodeScale, baseNodeScale, baseNodeScale]}
       >
         {renderGeometry()}
         <meshStandardMaterial 
           color={color} 
-          metalness={0.2} 
-          roughness={0.6}
+          metalness={0.3} 
+          roughness={0.8}
           transparent={true}
           opacity={nodeOpacity}
           emissive={color}
-          emissiveIntensity={isHighlighted ? 1.0 : (dimmed ? 0 : 0.15)}
+          emissiveIntensity={isHighlighted ? 1.2 : (dimmed ? 0 : 0.1)}
         />
       </mesh>
       

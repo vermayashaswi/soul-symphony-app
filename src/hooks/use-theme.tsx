@@ -1,3 +1,4 @@
+
 import { createContext, useContext, useEffect, useState, ReactNode } from "react";
 
 type Theme = 'light' | 'dark' | 'system';
@@ -22,11 +23,8 @@ const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 // Safe localStorage access
 const safeLocalStorageGet = (key: string, defaultValue: string): string => {
   try {
-    const value = localStorage.getItem(key);
-    console.log(`[ThemeProvider] Retrieved ${key}:`, value || 'null (using default)');
-    return value || defaultValue;
-  } catch (error) {
-    console.warn(`[ThemeProvider] localStorage get error for ${key}:`, error);
+    return localStorage.getItem(key) || defaultValue;
+  } catch {
     return defaultValue;
   }
 };
@@ -35,32 +33,24 @@ const safeLocalStorageGet = (key: string, defaultValue: string): string => {
 const safeLocalStorageSet = (key: string, value: string): void => {
   try {
     localStorage.setItem(key, value);
-    console.log(`[ThemeProvider] Stored ${key}:`, value);
-  } catch (error) {
-    console.warn(`[ThemeProvider] localStorage set error for ${key}:`, error);
+  } catch {
+    // Silently fail if localStorage is not available
   }
 };
 
 // Safe media query check
 const safeMediaQueryCheck = (): 'light' | 'dark' => {
   try {
-    const result = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
-    console.log('[ThemeProvider] System theme detected:', result);
-    return result;
-  } catch (error) {
-    console.warn('[ThemeProvider] Media query error:', error);
+    return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+  } catch {
     return 'light';
   }
 };
 
 export function ThemeProvider({ children }: ThemeProviderProps) {
-  console.log('[ThemeProvider] Initializing theme provider');
-  
   // All hooks must be called at the top level, unconditionally
   const [theme, setTheme] = useState<Theme>(() => {
-    const savedTheme = (safeLocalStorageGet('feelosophy-theme', 'system') as Theme) || 'system';
-    console.log('[ThemeProvider] Initial theme:', savedTheme);
-    return savedTheme;
+    return (safeLocalStorageGet('feelosophy-theme', 'system') as Theme) || 'system';
   });
   
   const [systemTheme, setSystemTheme] = useState<'light' | 'dark'>(() => {
@@ -68,34 +58,25 @@ export function ThemeProvider({ children }: ThemeProviderProps) {
   });
   
   const [colorTheme, setColorTheme] = useState<ColorTheme>(() => {
-    const savedColorTheme = (safeLocalStorageGet('feelosophy-color-theme', 'Calm') as ColorTheme) || 'Calm';
-    console.log('[ThemeProvider] Initial color theme:', savedColorTheme);
-    return savedColorTheme;
+    return (safeLocalStorageGet('feelosophy-color-theme', 'Calm') as ColorTheme) || 'Calm';
   });
 
   const [customColor, setCustomColor] = useState<string>(() => {
-    const savedCustomColor = safeLocalStorageGet('feelosophy-custom-color', '#3b82f6');
-    console.log('[ThemeProvider] Initial custom color:', savedCustomColor);
-    return savedCustomColor;
+    return safeLocalStorageGet('feelosophy-custom-color', '#3b82f6');
   });
 
-  // System theme detection
   useEffect(() => {
-    console.log('[ThemeProvider] Setting up system theme detection');
-    
     try {
       const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
       
       const handleChange = (e: MediaQueryListEvent) => {
         const newSystemTheme = e.matches ? 'dark' : 'light';
-        console.log('[ThemeProvider] System theme changed:', newSystemTheme);
         setSystemTheme(newSystemTheme);
         
         if (theme === 'system') {
           const root = window.document.documentElement;
           root.classList.remove('light', 'dark');
           root.classList.add(newSystemTheme);
-          console.log('[ThemeProvider] Applied system theme to root:', newSystemTheme);
         }
       };
       
@@ -105,7 +86,6 @@ export function ThemeProvider({ children }: ThemeProviderProps) {
         const root = window.document.documentElement;
         root.classList.remove('light', 'dark');
         root.classList.add(mediaQuery.matches ? 'dark' : 'light');
-        console.log('[ThemeProvider] Applied initial system theme to root');
       }
       
       mediaQuery.addEventListener('change', handleChange);
@@ -114,29 +94,24 @@ export function ThemeProvider({ children }: ThemeProviderProps) {
         mediaQuery.removeEventListener('change', handleChange);
       };
     } catch (error) {
-      console.error('[ThemeProvider] System theme detection error:', error);
+      console.warn('Theme system theme detection error:', error);
     }
   }, [theme]);
 
-  // Theme application
   useEffect(() => {
-    console.log('[ThemeProvider] Applying theme:', theme, 'system:', systemTheme);
-    
     try {
       const root = window.document.documentElement;
       root.classList.remove('light', 'dark');
       
       if (theme === 'system') {
         root.classList.add(systemTheme);
-        console.log('[ThemeProvider] Applied system theme:', systemTheme);
       } else {
         root.classList.add(theme);
-        console.log('[ThemeProvider] Applied manual theme:', theme);
       }
       
       safeLocalStorageSet('feelosophy-theme', theme);
     } catch (error) {
-      console.error('[ThemeProvider] Theme application error:', error);
+      console.warn('Theme application error:', error);
     }
   }, [theme, systemTheme]);
   
@@ -194,10 +169,7 @@ export function ThemeProvider({ children }: ThemeProviderProps) {
     return [Math.round(h * 360), Math.round(s * 100), Math.round(l * 100)];
   };
 
-  // Color theme application
   useEffect(() => {
-    console.log('[ThemeProvider] Applying color theme:', colorTheme);
-    
     try {
       safeLocalStorageSet('feelosophy-color-theme', colorTheme);
       
@@ -277,18 +249,14 @@ export function ThemeProvider({ children }: ThemeProviderProps) {
         if (!document.getElementById('theme-colors-style')) {
           document.head.appendChild(style);
         }
-        
-        console.log('[ThemeProvider] Applied color theme styles:', primaryHex);
       }
     } catch (error) {
-      console.error('[ThemeProvider] Color theme application error:', error);
+      console.warn('Color theme application error:', error);
     }
   }, [colorTheme, customColor]);
 
-  // Custom color handling
+  // This effect specifically handles when custom color changes
   useEffect(() => {
-    console.log('[ThemeProvider] Custom color changed:', customColor);
-    
     try {
       safeLocalStorageSet('feelosophy-custom-color', customColor);
       
@@ -305,21 +273,12 @@ export function ThemeProvider({ children }: ThemeProviderProps) {
           root.style.setProperty('--primary-h', `${h}`);
           root.style.setProperty('--primary-s', `${s}%`);
           root.style.setProperty('--primary-l', `${l}%`);
-          
-          console.log('[ThemeProvider] Applied custom color:', customColor);
         }
       }
     } catch (error) {
-      console.error('[ThemeProvider] Custom color application error:', error);
+      console.warn('Custom color application error:', error);
     }
   }, [customColor, colorTheme]);
-
-  console.log('[ThemeProvider] Rendering with context values:', {
-    theme,
-    colorTheme,
-    customColor,
-    systemTheme
-  });
 
   return (
     <ThemeContext.Provider value={{ 

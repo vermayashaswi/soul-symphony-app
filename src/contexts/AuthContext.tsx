@@ -762,7 +762,6 @@ function AuthProviderCore({ children }: { children: ReactNode }) {
     session,
     user,
     isLoading,
-    loading: isLoading, // alias for compatibility
     signInWithGoogle,
     signInWithApple,
     signOut,
