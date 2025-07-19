@@ -4,6 +4,7 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { 
   detectTWAEnvironment, 
   shouldInterceptBackNavigation, 
+  shouldShowExitConfirmation,
   exitTWAApp, 
   updateSessionAuthStatus,
   setSessionEntryPoint
@@ -46,7 +47,7 @@ export const useTWABackHandler = (options: UseTWABackHandlerOptions = {}): UseTW
     }
   }, [user, location.pathname, twaEnv]);
 
-  // Handle popstate events (browser back button)
+  // ENHANCED popstate handler with better exit confirmation logic
   const handlePopState = useCallback((event: PopStateEvent) => {
     if (!twaEnv.isTWA && !twaEnv.isStandalone) return;
     if (isHandlingBackButton) return;
@@ -54,7 +55,7 @@ export const useTWABackHandler = (options: UseTWABackHandlerOptions = {}): UseTW
     setIsHandlingBackButton(true);
     
     const currentPath = window.location.pathname;
-    console.log('[TWA BackHandler] Popstate event for path:', currentPath, 'User:', !!user);
+    console.log('[TWA BackHandler] Popstate event for path:', currentPath, 'User:', !!user, 'History length:', window.history.length);
     
     if (shouldInterceptBackNavigation(currentPath, !!user)) {
       console.log('[TWA BackHandler] Intercepting back navigation');
@@ -63,9 +64,9 @@ export const useTWABackHandler = (options: UseTWABackHandlerOptions = {}): UseTW
       // Push current state back to maintain history
       window.history.pushState({ intercepted: true }, '', currentPath);
       
-      // Show exit confirmation for authenticated users at main app routes
-      if (user && (currentPath === '/app/home' || currentPath === '/app/journal' || currentPath === '/app/profile')) {
-        console.log('[TWA BackHandler] Showing exit confirmation for authenticated user');
+      // ENHANCED: Use the new shouldShowExitConfirmation logic
+      if (shouldShowExitConfirmation(currentPath, !!user)) {
+        console.log('[TWA BackHandler] Showing exit confirmation modal');
         setShowExitModal(true);
         options.onExitConfirmation?.();
       } else {
@@ -79,7 +80,7 @@ export const useTWABackHandler = (options: UseTWABackHandlerOptions = {}): UseTW
     }, 500);
   }, [twaEnv, options, isHandlingBackButton, user]);
 
-  // Handle Android hardware back button
+  // ENHANCED Android hardware back button handler
   useEffect(() => {
     if (!twaEnv.isAndroidTWA) return;
 
@@ -96,7 +97,8 @@ export const useTWABackHandler = (options: UseTWABackHandlerOptions = {}): UseTW
           event.preventDefault();
           event.stopPropagation();
           
-          if (user && (currentPath === '/app/home' || currentPath === '/app/journal' || currentPath === '/app/profile')) {
+          // ENHANCED: Use the new shouldShowExitConfirmation logic
+          if (shouldShowExitConfirmation(currentPath, !!user)) {
             console.log('[TWA BackHandler] Hardware back - showing exit confirmation');
             setShowExitModal(true);
             options.onExitConfirmation?.();

@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { Button } from '@/components/ui/button';
 import { TranslatableText } from '@/components/translation/TranslatableText';
@@ -21,8 +20,6 @@ const PlatformAuthButton: React.FC<PlatformAuthButtonProps> = ({
   onError 
 }) => {
   const { isIOS, isAndroid } = useIsMobile();
-
-  // REPLACE the handleGoogleSignIn function with this:
 
   const handleGoogleSignIn = async () => {
     try {
@@ -47,17 +44,20 @@ const PlatformAuthButton: React.FC<PlatformAuthButtonProps> = ({
         try {
           await Promise.race([authPromise, timeoutPromise]);
           console.log('[PlatformAuth] Native Google sign-in completed successfully');
+          // SUCCESS: Don't show any error toast - auth was successful
           return;
         } catch (nativeError: any) {
           console.error('[PlatformAuth] Native auth failed:', nativeError);
           
-          // Enhanced error handling with specific messages
+          // Enhanced error handling - only show toast for REAL failures
+          let shouldShowError = true;
           let userFriendlyMessage = 'Something went wrong with Google sign-in';
           
           if (nativeError.message?.includes('timeout')) {
             userFriendlyMessage = 'Sign-in timed out. Please try again.';
           } else if (nativeError.message?.includes('cancelled')) {
             userFriendlyMessage = 'Sign-in was cancelled. Please try again.';
+            shouldShowError = false; // Don't show error for user cancellation
           } else if (nativeError.message?.includes('network')) {
             userFriendlyMessage = 'Network error. Please check your connection and try again.';
           } else if (nativeError.message?.includes('token')) {
@@ -66,8 +66,11 @@ const PlatformAuthButton: React.FC<PlatformAuthButtonProps> = ({
             userFriendlyMessage = 'Google sign-in is not available on this device.';
           }
 
-          onError(userFriendlyMessage);
-          toast.error(userFriendlyMessage);
+          // FIXED: Only show error toast for actual failures, not cancellations or success scenarios
+          if (shouldShowError) {
+            onError(userFriendlyMessage);
+            toast.error(userFriendlyMessage);
+          }
           throw nativeError;
         }
       }
@@ -96,8 +99,8 @@ const PlatformAuthButton: React.FC<PlatformAuthButtonProps> = ({
         name: error.name
       });
       
-      // Don't show error again if it was already handled above
-      if (!error.message?.includes('Native Google authentication')) {
+      // FIXED: Don't show duplicate error toasts - only show if not already handled
+      if (!error.message?.includes('cancelled') && !error.alreadyHandled) {
         const errorMessage = error.message || 'Google sign-in failed';
         onError?.(errorMessage);
         toast.error(errorMessage);
@@ -106,7 +109,6 @@ const PlatformAuthButton: React.FC<PlatformAuthButtonProps> = ({
       onLoadingChange(false);
     }
   };
-
 
   const handleAppleSignIn = async () => {
     try {
@@ -117,6 +119,7 @@ const PlatformAuthButton: React.FC<PlatformAuthButtonProps> = ({
     } catch (error: any) {
       console.error('Apple ID sign-in error:', error.message);
       onError(error.message);
+      toast.error(error.message);
       onLoadingChange(false);
     }
   };

@@ -30,7 +30,7 @@ class AuthStateManager {
   private navigationInProgress = false;
   private lastNavigationTime = 0;
   private readonly NAVIGATION_DEBOUNCE_MS = 1000;
-  private authSuccessHandled = false; // Prevent duplicate success handling
+  private authSuccessHandled = false;
   private lastSuccessTime = 0;
   private readonly SUCCESS_DEBOUNCE_MS = 2000;
 
@@ -53,7 +53,6 @@ class AuthStateManager {
     console.error(`[AuthStateManager:${timestamp}] ERROR: ${message}`, error || '');
   }
 
-  // Enhanced authentication state debugging
   private async getAuthDebugInfo(): Promise<AuthDebugInfo> {
     try {
       const { data, error } = await supabase.auth.getSession();
@@ -85,7 +84,6 @@ class AuthStateManager {
     }
   }
 
-  // Set processing state with automatic timeout
   public setProcessing(processing: boolean, timeoutMs = 5000): void {
     this.log(`Setting processing state: ${processing}`);
     
@@ -110,7 +108,6 @@ class AuthStateManager {
     return this.isProcessing;
   }
 
-  // Queue navigation request to prevent race conditions
   public queueNavigation(path: string, options?: { replace?: boolean; force?: boolean }): void {
     const request: NavigationRequest = {
       path,
@@ -121,13 +118,11 @@ class AuthStateManager {
     this.log('Queueing navigation request:', request);
     this.navigationQueue.push(request);
 
-    // Process immediately if not currently processing
     if (!this.isProcessing) {
       this.processNavigationQueue();
     }
   }
 
-  // Process queued navigation requests
   private async processNavigationQueue(): Promise<void> {
     if (this.isProcessing || this.navigationQueue.length === 0) {
       return;
@@ -136,16 +131,13 @@ class AuthStateManager {
     this.setProcessing(true, 3000);
 
     try {
-      // Get the most recent navigation request (ignore older ones)
       const request = this.navigationQueue[this.navigationQueue.length - 1];
       this.navigationQueue = [];
 
       this.log('Processing navigation request:', request);
 
-      // Add small delay to ensure auth state has settled
       await new Promise(resolve => setTimeout(resolve, 100));
 
-      // Execute navigation
       nativeNavigationService.navigateToPath(request.path, request.options);
 
       this.log('Navigation completed successfully');
@@ -156,25 +148,16 @@ class AuthStateManager {
     }
   }
 
-  // Reset auth state and clear any pending operations
   public async resetAuthState(): Promise<void> {
     this.log('Resetting auth state');
     
     try {
-      // Clear processing state
       this.setProcessing(false);
-      
-      // Clear navigation queue
       this.navigationQueue = [];
-      
-      // Reset success handling flags
       this.authSuccessHandled = false;
       this.lastSuccessTime = 0;
-      
-      // Clear any stored redirect paths
       localStorage.removeItem('authRedirectTo');
       
-      // Get fresh auth state
       const debugInfo = await this.getAuthDebugInfo();
       this.lastAuthState = debugInfo;
       
@@ -184,11 +167,9 @@ class AuthStateManager {
     }
   }
 
-  // Handle successful authentication - ENHANCED with better error prevention
   public async handleAuthSuccess(redirectPath?: string): Promise<void> {
     const now = Date.now();
     
-    // Prevent duplicate success handling
     if (this.authSuccessHandled && (now - this.lastSuccessTime) < this.SUCCESS_DEBOUNCE_MS) {
       this.log('Auth success already handled recently, skipping', { 
         timeSinceLastSuccess: now - this.lastSuccessTime 
@@ -196,7 +177,6 @@ class AuthStateManager {
       return;
     }
     
-    // Debounce rapid navigation calls
     if (this.navigationInProgress && (now - this.lastNavigationTime) < this.NAVIGATION_DEBOUNCE_MS) {
       this.log('Navigation debounced - too rapid', { timeSinceLastNav: now - this.lastNavigationTime });
       return;
@@ -213,7 +193,6 @@ class AuthStateManager {
       return;
     }
 
-    // Mark as handled to prevent duplicates
     this.authSuccessHandled = true;
     this.lastSuccessTime = now;
     this.navigationInProgress = true;
@@ -221,47 +200,38 @@ class AuthStateManager {
     this.setProcessing(true, 5000);
 
     try {
-      // Get current auth state for debugging
       const debugInfo = await this.getAuthDebugInfo();
       this.lastAuthState = debugInfo;
       
       if (!debugInfo.sessionExists || !debugInfo.userExists) {
         this.error('Auth success called but no valid session found', debugInfo);
-        // Don't show error toast here - this might be a race condition
-        this.log('Session validation failed, but not showing error toast (might be timing issue)');
+        this.log('Session validation failed during auth transition - this is normal, not showing error');
         this.executeNavigation('/app/auth');
         return;
       }
 
       this.log('Valid session confirmed for auth success', debugInfo);
 
-      // Determine redirect path
       const finalPath = this.getFinalRedirectPath(redirectPath);
       this.log('Final redirect path determined:', finalPath);
 
-      // Clear any stored redirect
       localStorage.removeItem('authRedirectTo');
 
-      // Show success message only once
       if (!this.authSuccessHandled || (now - this.lastSuccessTime) > this.SUCCESS_DEBOUNCE_MS) {
         toast.success('Welcome! You\'re now logged in.');
       }
 
-      // Execute navigation with retry for native apps
       await this.executeNavigation(finalPath);
 
     } catch (error) {
       this.error('Error handling auth success:', error);
-      // Only show error toast for real errors, not timing issues
-      if (error instanceof Error && !error.message.includes('session')) {
+      if (error instanceof Error && !error.message.includes('session') && !error.message.includes('transition')) {
         toast.error('Something went wrong. Please try again.');
       }
       
-      // Fallback navigation
       await this.executeNavigation('/app/home');
     } finally {
       this.navigationInProgress = false;
-      // Reset success handled flag after a delay to allow for new auth flows
       setTimeout(() => {
         this.authSuccessHandled = false;
         this.setProcessing(false);
@@ -269,12 +239,10 @@ class AuthStateManager {
     }
   }
 
-  // OPTIMIZED NAVIGATION EXECUTION for bundled assets
   private async executeNavigation(path: string): Promise<void> {
     this.log('Executing navigation to:', path);
 
     if (nativeIntegrationService.isRunningNatively()) {
-      // For native apps with bundled assets - use direct navigation with retry
       let attempts = 0;
       const maxAttempts = 3;
       
@@ -283,13 +251,10 @@ class AuthStateManager {
           attempts++;
           this.log(`Native navigation attempt ${attempts}/${maxAttempts} to: ${path}`);
           
-          // Use direct window.location.href for bundled assets
           window.location.href = path;
           
-          // Add verification delay
           await new Promise(resolve => setTimeout(resolve, 500));
           
-          // Check if navigation was successful
           if (window.location.pathname === path) {
             this.log('Native navigation successful');
             return;
@@ -297,61 +262,49 @@ class AuthStateManager {
           
           if (attempts === maxAttempts) {
             this.error('Native navigation failed after all attempts');
-            // Force reload as last resort
             window.location.reload();
           }
           
         } catch (error) {
           this.error(`Native navigation attempt ${attempts} failed:`, error);
           if (attempts === maxAttempts) {
-            // Last resort - reload to clear any stuck state
             window.location.reload();
           }
         }
       }
     } else {
-      // For web apps - use queue system
       this.queueNavigation(path, { replace: true, force: true });
       await this.processNavigationQueue();
     }
   }
 
-  // Handle authentication failure - ENHANCED to prevent false failures
   public handleAuthFailure(error: any, isRealFailure = true): void {
     this.log('Handling auth failure', { error, isRealFailure });
 
-    // Reset processing state
     this.setProcessing(false);
     this.authSuccessHandled = false;
-
-    // Clear navigation queue
     this.navigationQueue = [];
 
-    // Only show error message for real failures, not timing/validation issues
-    if (isRealFailure) {
-      if (error?.message && !error.message.includes('session') && !error.message.includes('timing')) {
+    if (isRealFailure && error) {
+      if (error.message && 
+          !error.message.includes('session') && 
+          !error.message.includes('timing') &&
+          !error.message.includes('cancelled') &&
+          !error.message.includes('transition')) {
         toast.error(`Authentication failed: ${error.message}`);
-      } else if (error?.message) {
-        this.log('Suppressing non-critical auth error toast:', error.message);
-      } else {
+      } else if (!error.message) {
         toast.error('Authentication failed. Please try again.');
+      } else {
+        this.log('Suppressing non-critical auth error toast:', error.message);
       }
     } else {
       this.log('Auth failure flagged as non-critical, not showing error toast');
     }
 
-    // Ensure we're on the auth page
     this.queueNavigation('/app/auth');
   }
 
-  // Get final redirect path considering various factors
   private getFinalRedirectPath(providedPath?: string): string {
-    // Priority order:
-    // 1. Provided path
-    // 2. Stored redirect path
-    // 3. Check onboarding status
-    // 4. Default to home
-
     if (providedPath && providedPath !== '/app/auth') {
       this.log('Using provided redirect path:', providedPath);
       return providedPath;
@@ -363,7 +316,6 @@ class AuthStateManager {
       return storedRedirect;
     }
 
-    // Check onboarding status
     const onboardingComplete = localStorage.getItem('onboardingComplete') === 'true';
     if (!onboardingComplete) {
       this.log('Redirecting to onboarding - not completed');
@@ -374,28 +326,24 @@ class AuthStateManager {
     return '/app/home';
   }
 
-  // Get current auth debug information
   public async getCurrentAuthState(): Promise<AuthDebugInfo> {
     const debugInfo = await this.getAuthDebugInfo();
     this.lastAuthState = debugInfo;
     return debugInfo;
   }
 
-  // Get last known auth state
   public getLastAuthState(): AuthDebugInfo | null {
     return this.lastAuthState;
   }
 
-  // Check if user needs onboarding
   public async checkOnboardingStatus(): Promise<boolean> {
     try {
       const debugInfo = await this.getAuthDebugInfo();
       
       if (!debugInfo.sessionExists || !debugInfo.userExists) {
-        return false; // Not authenticated, can't check onboarding
+        return false;
       }
 
-      // Check database first
       const { data: profile, error } = await supabase
         .from('profiles')
         .select('onboarding_completed')
@@ -404,14 +352,12 @@ class AuthStateManager {
 
       if (error) {
         this.error('Error checking onboarding status:', error);
-        // Fall back to localStorage
         return localStorage.getItem('onboardingComplete') === 'true';
       }
 
       const isComplete = profile?.onboarding_completed || false;
       this.log('Onboarding status checked:', { isComplete, source: 'database' });
       
-      // Sync with localStorage
       localStorage.setItem('onboardingComplete', isComplete.toString());
       
       return isComplete;
@@ -421,7 +367,6 @@ class AuthStateManager {
     }
   }
 
-  // Enable/disable debug logging
   public setDebugEnabled(enabled: boolean): void {
     this.debugEnabled = enabled;
     this.log(`Debug logging ${enabled ? 'enabled' : 'disabled'}`);
