@@ -3,7 +3,7 @@ import { Suspense } from 'react';
 import { Toaster } from '@/components/ui/sonner';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { ThemeProvider } from 'next-themes';
+import { ThemeProvider } from '@/hooks/use-theme';
 import { SafeAreaProvider } from '@/components/layout/SafeAreaProvider';
 import AppRoutes from '@/routes/AppRoutes';
 
@@ -14,12 +14,7 @@ function App() {
   
   return (
     <QueryClientProvider client={queryClient}>
-      <ThemeProvider
-        attribute="class"
-        defaultTheme="system"
-        enableSystem
-        disableTransitionOnChange
-      >
+      <ThemeProvider>
         <TooltipProvider>
           <Suspense fallback={<div>Loading...</div>}>
             <SafeAreaProvider>
