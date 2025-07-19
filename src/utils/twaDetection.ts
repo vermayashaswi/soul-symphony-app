@@ -78,7 +78,7 @@ export const clearSessionNavigationState = (): void => {
 };
 
 /**
- * Enhanced navigation interception with authentication awareness
+ * ENHANCED navigation interception with better home page handling
  */
 export const shouldInterceptBackNavigation = (currentPath: string, isAuthenticated: boolean): boolean => {
   const twaEnv = detectTWAEnvironment();
@@ -88,23 +88,37 @@ export const shouldInterceptBackNavigation = (currentPath: string, isAuthenticat
     return false;
   }
   
-  console.log('[TWA] Checking back navigation interception:', { currentPath, isAuthenticated });
+  console.log('[TWA] Checking back navigation interception:', { currentPath, isAuthenticated, historyLength: window.history.length });
   
   // For authenticated users
   if (isAuthenticated) {
-    // Intercept back navigation from main app routes to show exit confirmation
-    const mainAppRoutes = ['/app/home', '/app/journal', '/app/profile', '/app/settings'];
-    if (mainAppRoutes.includes(currentPath)) {
-      console.log('[TWA] Intercepting from main app route for exit confirmation');
+    // ENHANCED: Always intercept back navigation from home page for exit confirmation
+    if (currentPath === '/app/home') {
+      console.log('[TWA] Intercepting back navigation from home page for exit confirmation');
       return true;
+    }
+    
+    // Intercept from other main app routes for exit confirmation
+    const mainAppRoutes = ['/app/journal', '/app/profile', '/app/settings'];
+    if (mainAppRoutes.includes(currentPath)) {
+      // Check if we should show exit confirmation based on navigation history
+      const sessionState = getSessionNavigationState();
+      if (sessionState && sessionState.sessionStartPath === currentPath) {
+        console.log('[TWA] Intercepting from session start route for exit confirmation');
+        return true;
+      }
+      
+      // For non-starting routes, allow normal back navigation within the app
+      console.log('[TWA] Allowing normal back navigation within app routes');
+      return false;
     }
     
     // Block navigation back to auth/onboarding when authenticated
     if (currentPath.startsWith('/app/') && 
         currentPath !== '/app/auth' && 
         currentPath !== '/app/onboarding') {
-      console.log('[TWA] Preventing back navigation to auth/onboarding during authenticated session');
-      return true;
+      console.log('[TWA] Standard app route - checking for auth/onboarding prevention');
+      return false; // Allow normal navigation within authenticated app
     }
   } else {
     // For unauthenticated users, block going back from auth/onboarding to prevent loops
@@ -118,15 +132,35 @@ export const shouldInterceptBackNavigation = (currentPath: string, isAuthenticat
 };
 
 /**
+ * Check if the current route should show exit confirmation
+ */
+export const shouldShowExitConfirmation = (currentPath: string, isAuthenticated: boolean): boolean => {
+  if (!isAuthenticated) return false;
+  
+  // Always show exit confirmation from home page
+  if (currentPath === '/app/home') {
+    return true;
+  }
+  
+  // Show exit confirmation from main routes if they are the session start point
+  const mainAppRoutes = ['/app/journal', '/app/profile', '/app/settings'];
+  if (mainAppRoutes.includes(currentPath)) {
+    const sessionState = getSessionNavigationState();
+    return sessionState?.sessionStartPath === currentPath;
+  }
+  
+  return false;
+};
+
+/**
  * Update session authentication status
  */
 export const updateSessionAuthStatus = (isAuthenticated: boolean, currentPath?: string): void => {
   if (isAuthenticated && currentPath && currentPath.startsWith('/app/')) {
-    // User is authenticated in app - maintain or create session state
     const sessionState = getSessionNavigationState();
     
     if (!sessionState || !sessionState.isAuthenticated) {
-      // First time auth or re-auth, set entry point
+      // First time auth or re-auth, set entry point (but not for auth/onboarding)
       if (currentPath !== '/app/auth' && currentPath !== '/app/onboarding') {
         setSessionEntryPoint(currentPath);
       }
@@ -139,7 +173,6 @@ export const updateSessionAuthStatus = (isAuthenticated: boolean, currentPath?: 
       localStorage.setItem('twa_session_state', JSON.stringify(updatedState));
     }
   } else if (!isAuthenticated) {
-    // User logged out, clear session state
     clearSessionNavigationState();
   }
 };
@@ -154,15 +187,12 @@ export const exitTWAApp = (): void => {
     try {
       console.log('[TWA] Attempting to exit app');
       
-      // Clear session state on exit
       clearSessionNavigationState();
       
-      // For TWA, try to close the window
       if (window.close) {
         window.close();
       }
       
-      // Fallback: Navigate to a special exit page
       setTimeout(() => {
         window.location.href = 'about:blank';
       }, 100);
