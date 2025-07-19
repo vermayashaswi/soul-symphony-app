@@ -49,7 +49,8 @@ export const SafeAreaProvider: React.FC<SafeAreaProviderProps> = ({ children }) 
             
             // Calculate safe area insets based on status bar info
             if (info.visible) {
-              detectedInsets.top = info.height || 24; // Default to 24px if height not available
+              // StatusBar info doesn't have height property, so use default
+              detectedInsets.top = 24; // Standard status bar height
               console.log(`[SafeAreaProvider] Status bar height: ${detectedInsets.top}px`);
             }
           } catch (statusBarError) {
