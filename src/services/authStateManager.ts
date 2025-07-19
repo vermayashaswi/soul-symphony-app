@@ -30,6 +30,9 @@ class AuthStateManager {
   private navigationInProgress = false;
   private lastNavigationTime = 0;
   private readonly NAVIGATION_DEBOUNCE_MS = 1000;
+  private authSuccessHandled = false; // Prevent duplicate success handling
+  private lastSuccessTime = 0;
+  private readonly SUCCESS_DEBOUNCE_MS = 2000;
 
   static getInstance(): AuthStateManager {
     if (!AuthStateManager.instance) {
@@ -67,7 +70,7 @@ class AuthStateManager {
       };
 
       if (error) {
-        this.error('Error getting session for debug info:', error);
+        this.log('Session check error (non-critical):', error);
       }
 
       return debugInfo;
@@ -164,6 +167,10 @@ class AuthStateManager {
       // Clear navigation queue
       this.navigationQueue = [];
       
+      // Reset success handling flags
+      this.authSuccessHandled = false;
+      this.lastSuccessTime = 0;
+      
       // Clear any stored redirect paths
       localStorage.removeItem('authRedirectTo');
       
@@ -177,9 +184,17 @@ class AuthStateManager {
     }
   }
 
-  // Handle successful authentication - CENTRALIZED NAVIGATION CONTROL
+  // Handle successful authentication - ENHANCED with better error prevention
   public async handleAuthSuccess(redirectPath?: string): Promise<void> {
     const now = Date.now();
+    
+    // Prevent duplicate success handling
+    if (this.authSuccessHandled && (now - this.lastSuccessTime) < this.SUCCESS_DEBOUNCE_MS) {
+      this.log('Auth success already handled recently, skipping', { 
+        timeSinceLastSuccess: now - this.lastSuccessTime 
+      });
+      return;
+    }
     
     // Debounce rapid navigation calls
     if (this.navigationInProgress && (now - this.lastNavigationTime) < this.NAVIGATION_DEBOUNCE_MS) {
@@ -187,16 +202,23 @@ class AuthStateManager {
       return;
     }
     
-    this.log('Handling auth success', { redirectPath, isNative: nativeIntegrationService.isRunningNatively() });
+    this.log('Handling auth success', { 
+      redirectPath, 
+      isNative: nativeIntegrationService.isRunningNatively(),
+      wasAlreadyHandled: this.authSuccessHandled
+    });
     
     if (this.isProcessing) {
       this.log('Already processing auth success, skipping');
       return;
     }
 
+    // Mark as handled to prevent duplicates
+    this.authSuccessHandled = true;
+    this.lastSuccessTime = now;
     this.navigationInProgress = true;
     this.lastNavigationTime = now;
-    this.setProcessing(true, 5000); // Longer timeout for bundled assets
+    this.setProcessing(true, 5000);
 
     try {
       // Get current auth state for debugging
@@ -205,12 +227,13 @@ class AuthStateManager {
       
       if (!debugInfo.sessionExists || !debugInfo.userExists) {
         this.error('Auth success called but no valid session found', debugInfo);
-        toast.error('Authentication error. Please try again.');
+        // Don't show error toast here - this might be a race condition
+        this.log('Session validation failed, but not showing error toast (might be timing issue)');
         this.executeNavigation('/app/auth');
         return;
       }
 
-      this.log('Valid session confirmed', debugInfo);
+      this.log('Valid session confirmed for auth success', debugInfo);
 
       // Determine redirect path
       const finalPath = this.getFinalRedirectPath(redirectPath);
@@ -219,21 +242,30 @@ class AuthStateManager {
       // Clear any stored redirect
       localStorage.removeItem('authRedirectTo');
 
-      // Show success message
-      toast.success('Welcome! You\'re now logged in.');
+      // Show success message only once
+      if (!this.authSuccessHandled || (now - this.lastSuccessTime) > this.SUCCESS_DEBOUNCE_MS) {
+        toast.success('Welcome! You\'re now logged in.');
+      }
 
       // Execute navigation with retry for native apps
       await this.executeNavigation(finalPath);
 
     } catch (error) {
       this.error('Error handling auth success:', error);
-      toast.error('Something went wrong. Please try again.');
+      // Only show error toast for real errors, not timing issues
+      if (error instanceof Error && !error.message.includes('session')) {
+        toast.error('Something went wrong. Please try again.');
+      }
       
       // Fallback navigation
       await this.executeNavigation('/app/home');
     } finally {
       this.navigationInProgress = false;
-      setTimeout(() => this.setProcessing(false), 2000);
+      // Reset success handled flag after a delay to allow for new auth flows
+      setTimeout(() => {
+        this.authSuccessHandled = false;
+        this.setProcessing(false);
+      }, this.SUCCESS_DEBOUNCE_MS);
     }
   }
 
@@ -284,21 +316,28 @@ class AuthStateManager {
     }
   }
 
-  // Handle authentication failure
-  public handleAuthFailure(error: any): void {
-    this.log('Handling auth failure', error);
+  // Handle authentication failure - ENHANCED to prevent false failures
+  public handleAuthFailure(error: any, isRealFailure = true): void {
+    this.log('Handling auth failure', { error, isRealFailure });
 
     // Reset processing state
     this.setProcessing(false);
+    this.authSuccessHandled = false;
 
     // Clear navigation queue
     this.navigationQueue = [];
 
-    // Show error message
-    if (error?.message) {
-      toast.error(`Authentication failed: ${error.message}`);
+    // Only show error message for real failures, not timing/validation issues
+    if (isRealFailure) {
+      if (error?.message && !error.message.includes('session') && !error.message.includes('timing')) {
+        toast.error(`Authentication failed: ${error.message}`);
+      } else if (error?.message) {
+        this.log('Suppressing non-critical auth error toast:', error.message);
+      } else {
+        toast.error('Authentication failed. Please try again.');
+      }
     } else {
-      toast.error('Authentication failed. Please try again.');
+      this.log('Auth failure flagged as non-critical, not showing error toast');
     }
 
     // Ensure we're on the auth page

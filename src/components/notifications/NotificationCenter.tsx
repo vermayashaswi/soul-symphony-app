@@ -1,12 +1,13 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { Bell, BellOff, Settings, X, AlertCircle, CheckCircle, XCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { TranslatableText } from '@/components/translation/TranslatableText';
-import { enhancedNotificationService, NotificationPermissionState } from '@/services/enhancedNotificationService';
+import { useNotificationSettings } from '@/hooks/use-notification-settings';
+import { enhancedNotificationService } from '@/services/enhancedNotificationService';
 import { toast } from 'sonner';
 
 interface NotificationCenterProps {
@@ -15,100 +16,7 @@ interface NotificationCenterProps {
 
 export const NotificationCenter: React.FC<NotificationCenterProps> = ({ className }) => {
   const [isOpen, setIsOpen] = useState(false);
-  const [permissionStatus, setPermissionStatus] = useState<NotificationPermissionState>('default');
-  const [notificationsEnabled, setNotificationsEnabled] = useState(false);
-  const [notificationTimes, setNotificationTimes] = useState<string[]>([]);
-
-  useEffect(() => {
-    const initializeNotificationCenter = async () => {
-      try {
-        // Check initial permission status
-        const currentPermission = await enhancedNotificationService.checkPermissionStatus();
-        console.log('[NotificationCenter] Current permission state:', currentPermission);
-        setPermissionStatus(currentPermission);
-        
-        // Load stored notification settings
-        const enabled = localStorage.getItem('notification_enabled') === 'true';
-        const times = localStorage.getItem('notification_times');
-        
-        setNotificationsEnabled(enabled && currentPermission === 'granted');
-        
-        if (times) {
-          try {
-            const parsedTimes = JSON.parse(times);
-            if (Array.isArray(parsedTimes)) {
-              setNotificationTimes(parsedTimes);
-            }
-          } catch (e) {
-            console.error('Error parsing notification times', e);
-          }
-        }
-      } catch (error) {
-        console.error('[NotificationCenter] Error initializing:', error);
-        setPermissionStatus('unsupported');
-      }
-    };
-
-    initializeNotificationCenter();
-    
-    // Check permission periodically for changes
-    const interval = setInterval(async () => {
-      try {
-        const currentPermission = await enhancedNotificationService.checkPermissionStatus();
-        setPermissionStatus(currentPermission);
-      } catch (error) {
-        console.error('[NotificationCenter] Error checking permission:', error);
-      }
-    }, 2000);
-    
-    return () => clearInterval(interval);
-  }, []);
-
-  const handleRequestPermission = async () => {
-    try {
-      console.log('[NotificationCenter] Requesting permission via enhanced service');
-      const result = await enhancedNotificationService.requestPermissions();
-      console.log('[NotificationCenter] Permission result:', result);
-      
-      setPermissionStatus(result.state);
-      
-      if (result.granted) {
-        setNotificationsEnabled(true);
-        localStorage.setItem('notification_enabled', 'true');
-        
-        toast.success(
-          <div className="flex items-center gap-2">
-            <CheckCircle className="h-4 w-4 text-green-500" />
-            <span>
-              <TranslatableText text="Notification permission granted!" forceTranslate={true} />
-              {result.plugin && (
-                <div className="text-xs text-muted-foreground mt-1">
-                  Using {result.plugin}
-                </div>
-              )}
-            </span>
-          </div>
-        );
-      } else {
-        let errorMessage = "Notification permission denied";
-        if (result.error) {
-          errorMessage += `: ${result.error}`;
-        }
-        
-        toast.error(
-          <div className="flex items-center gap-2">
-            <XCircle className="h-4 w-4 text-red-500" />
-            <span>
-              <TranslatableText text={errorMessage} forceTranslate={true} />
-            </span>
-          </div>
-        );
-      }
-    } catch (error) {
-      console.error('[NotificationCenter] Error requesting permission:', error);
-      toast.error(<TranslatableText text="Failed to request notification permission" forceTranslate={true} />);
-    }
-  };
+  const { settings, isLoading, isRequesting, toggleNotifications, refreshPermissionStatus } = useNotificationSettings();
 
   const handleTestNotification = async () => {
     try {
@@ -126,8 +34,22 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({ classNam
     }
   };
 
+  const handleToggleNotifications = async () => {
+    if (isRequesting) return;
+    
+    console.log('[NotificationCenter] User toggling notifications:', !settings.enabled);
+    const success = await toggleNotifications(!settings.enabled);
+    
+    if (success) {
+      // Refresh permission status after successful toggle
+      setTimeout(() => {
+        refreshPermissionStatus();
+      }, 1000);
+    }
+  };
+
   const getPermissionBadge = () => {
-    switch (permissionStatus) {
+    switch (settings.permissionState) {
       case 'granted':
         return <Badge variant="default" className="bg-green-500"><TranslatableText text="Enabled" /></Badge>;
       case 'denied':
@@ -140,14 +62,14 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({ classNam
   };
 
   const getIcon = () => {
-    if (notificationsEnabled && permissionStatus === 'granted') {
+    if (settings.enabled && settings.permissionState === 'granted') {
       return <Bell className="h-5 w-5" />;
     }
     return <BellOff className="h-5 w-5" />;
   };
 
   const getPermissionStatusIcon = () => {
-    switch (permissionStatus) {
+    switch (settings.permissionState) {
       case 'granted':
         return <CheckCircle className="h-4 w-4 text-green-500" />;
       case 'denied':
@@ -159,12 +81,20 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({ classNam
     }
   };
 
+  if (isLoading) {
+    return (
+      <Button variant="ghost" size="sm" className={className} disabled>
+        <BellOff className="h-5 w-5 animate-pulse" />
+      </Button>
+    );
+  }
+
   return (
     <Popover open={isOpen} onOpenChange={setIsOpen}>
       <PopoverTrigger asChild>
         <Button variant="ghost" size="sm" className={className}>
           {getIcon()}
-          {notificationsEnabled && permissionStatus === 'granted' && (
+          {settings.enabled && settings.permissionState === 'granted' && (
             <div className="absolute -top-1 -right-1 h-2 w-2 bg-green-500 rounded-full animate-pulse" />
           )}
         </Button>
@@ -196,20 +126,24 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({ classNam
                 </div>
               </div>
               
-              {permissionStatus !== 'granted' && permissionStatus !== 'unsupported' && (
-                <Button
-                  onClick={handleRequestPermission}
-                  size="sm"
-                  className="w-full"
-                  variant={permissionStatus === 'denied' ? 'outline' : 'default'}
-                >
-                  {permissionStatus === 'denied' ? (
-                    <TranslatableText text="Enable in Device Settings" />
-                  ) : (
-                    <TranslatableText text="Grant Permission" />
-                  )}
-                </Button>
-              )}
+              {/* Toggle Button */}
+              <Button
+                onClick={handleToggleNotifications}
+                size="sm"
+                className="w-full"
+                variant={settings.enabled ? 'outline' : 'default'}
+                disabled={isRequesting || settings.permissionState === 'unsupported'}
+              >
+                {isRequesting ? (
+                  <TranslatableText text="Processing..." />
+                ) : settings.enabled ? (
+                  <TranslatableText text="Disable Notifications" />
+                ) : settings.permissionState === 'denied' ? (
+                  <TranslatableText text="Enable in Device Settings" />
+                ) : (
+                  <TranslatableText text="Enable Notifications" />
+                )}
+              </Button>
             </div>
 
             {/* Current Settings */}
@@ -218,9 +152,9 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({ classNam
                 <TranslatableText text="Current Settings" />
               </span>
               <div className="text-sm text-muted-foreground">
-                {notificationsEnabled && permissionStatus === 'granted' ? (
+                {settings.enabled && settings.permissionState === 'granted' ? (
                   <>
-                    <TranslatableText text="Enabled for:" /> {notificationTimes.length > 0 ? notificationTimes.join(', ') : 'Not configured'}
+                    <TranslatableText text="Enabled for:" /> {settings.times.length > 0 ? settings.times.join(', ') : 'Not configured'}
                   </>
                 ) : (
                   <TranslatableText text="Disabled" />
@@ -235,7 +169,7 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({ classNam
                 size="sm"
                 variant="outline"
                 className="w-full"
-                disabled={permissionStatus !== 'granted'}
+                disabled={settings.permissionState !== 'granted'}
               >
                 <TranslatableText text="Test Notification" />
               </Button>
@@ -258,7 +192,7 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({ classNam
             </div>
 
             {/* Browser/Device Instructions */}
-            {permissionStatus === 'denied' && (
+            {settings.permissionState === 'denied' && (
               <div className="p-3 bg-muted rounded-lg">
                 <p className="text-xs text-muted-foreground">
                   <TranslatableText text="To enable notifications, go to your device settings and allow notifications for this app, then refresh the page." />
@@ -266,7 +200,7 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({ classNam
               </div>
             )}
             
-            {permissionStatus === 'unsupported' && (
+            {settings.permissionState === 'unsupported' && (
               <div className="p-3 bg-orange-50 rounded-lg">
                 <p className="text-xs text-muted-foreground">
                   <TranslatableText text="Notifications are not supported on this device or browser." />
