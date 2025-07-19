@@ -157,17 +157,17 @@ const AppRoutes = () => {
         <Route path="/app" element={<AppRootRedirect />} />
 
         {/* Protected App Routes */}
-        <Route path="/app" element={<ProtectedRoute />}>
-          <Route path="home" element={<Home />} />
-          <Route path="journal" element={<Journal />} />
-          <Route path="insights" element={
+        <Route element={<ProtectedRoute />}>
+          <Route path="/app/home" element={<Home />} />
+          <Route path="/app/journal" element={<Journal />} />
+          <Route path="/app/insights" element={
             <React.Suspense fallback={<div className="flex items-center justify-center h-screen">Loading...</div>}>
               <Insights />
             </React.Suspense>
           } />
-          <Route path="chat" element={<Chat />} />
-          <Route path="smart-chat" element={<SmartChat />} />
-          <Route path="settings" element={<Settings />} />
+          <Route path="/app/chat" element={<Chat />} />
+          <Route path="/app/smart-chat" element={<SmartChat />} />
+          <Route path="/app/settings" element={<Settings />} />
         </Route>
 
         {/* Legacy Route Redirects - all app features redirect to /app/ routes */}
