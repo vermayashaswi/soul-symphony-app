@@ -9,6 +9,7 @@ import { Badge } from '@/components/ui/badge';
 import { Clock, Bell, Smartphone, Globe } from 'lucide-react';
 import { toast } from 'sonner';
 import { enhancedNotificationService } from '@/services/enhancedNotificationService';
+import { journalReminderService } from '@/services/journalReminderService';
 import { useTranslation } from '@/contexts/TranslationContext';
 
 const JournalRemindersSettings: React.FC = () => {
@@ -16,7 +17,7 @@ const JournalRemindersSettings: React.FC = () => {
   const [isEnabled, setIsEnabled] = useState(false);
   const [reminderTime, setReminderTime] = useState('19:00');
   const [isLoading, setIsLoading] = useState(false);
-  const [permissionStatus, setPermissionStatus] = useState<'granted' | 'denied' | 'default'>('default');
+  const [permissionStatus, setPermissionStatus] = useState<'granted' | 'denied' | 'default' | 'unsupported'>('default');
   const [isNative, setIsNative] = useState(false);
 
   useEffect(() => {
@@ -34,8 +35,12 @@ const JournalRemindersSettings: React.FC = () => {
   };
 
   const checkEnvironment = async () => {
-    const nativeContext = await enhancedNotificationService.isNativeContext();
-    setIsNative(nativeContext);
+    try {
+      const { Capacitor } = await import('@capacitor/core');
+      setIsNative(Capacitor.isNativePlatform());
+    } catch (error) {
+      setIsNative(false);
+    }
   };
 
   const checkPermissionStatus = async () => {
@@ -51,8 +56,8 @@ const JournalRemindersSettings: React.FC = () => {
     if (enabled && permissionStatus !== 'granted') {
       setIsLoading(true);
       try {
-        const granted = await enhancedNotificationService.requestPermission();
-        if (!granted) {
+        const result = await enhancedNotificationService.requestPermissions();
+        if (!result.granted) {
           toast.error(await translate?.('Permission denied. Please enable notifications in your device settings.', 'en') || 'Permission denied');
           setIsLoading(false);
           return;
@@ -74,7 +79,7 @@ const JournalRemindersSettings: React.FC = () => {
         await scheduleReminder();
         toast.success(await translate?.('Journal reminders enabled', 'en') || 'Reminders enabled');
       } else {
-        await enhancedNotificationService.cancelAllScheduled();
+        await journalReminderService.disableReminders();
         toast.success(await translate?.('Journal reminders disabled', 'en') || 'Reminders disabled');
       }
     } catch (error) {
@@ -103,15 +108,21 @@ const JournalRemindersSettings: React.FC = () => {
 
   const scheduleReminder = async () => {
     try {
-      const [hours, minutes] = reminderTime.split(':').map(Number);
+      // Convert time to closest reminder slot
+      const [hours] = reminderTime.split(':').map(Number);
+      let timeSlot: 'morning' | 'afternoon' | 'evening' | 'night';
       
-      await enhancedNotificationService.scheduleRepeatingNotification({
-        title: await translate?.('Time to journal! 📝', 'en') || 'Time to journal! 📝',
-        body: await translate?.('Take a moment to reflect on your day and record your thoughts.', 'en') || 'Take a moment to reflect on your day.',
-        hour: hours,
-        minute: minutes,
-        identifier: 'daily-journal-reminder'
-      });
+      if (hours >= 6 && hours < 12) {
+        timeSlot = 'morning';
+      } else if (hours >= 12 && hours < 17) {
+        timeSlot = 'afternoon';
+      } else if (hours >= 17 && hours < 22) {
+        timeSlot = 'evening';
+      } else {
+        timeSlot = 'night';
+      }
+      
+      await journalReminderService.requestPermissionsAndSetup([timeSlot]);
     } catch (error) {
       console.error('Error scheduling reminder:', error);
       throw error;
