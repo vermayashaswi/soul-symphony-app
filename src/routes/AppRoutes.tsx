@@ -18,7 +18,7 @@ import FAQPage from '@/pages/website/FAQPage';
 import BlogPage from '@/pages/website/BlogPage';
 import BlogPostPage from '@/pages/website/BlogPostPage';
 import OnboardingScreen from '@/components/onboarding/OnboardingScreen';
-import { RoutingErrorBoundary } from '@/components/routing/RoutingErrorBoundary';
+import { ViewportErrorBoundary } from '@/components/routing/ViewportErrorBoundary';
 import { useAuth } from '@/contexts/AuthContext';
 import { useOnboarding } from '@/hooks/use-onboarding';
 import { nativeIntegrationService } from '@/services/nativeIntegrationService';
@@ -125,7 +125,7 @@ const AppRoutes = () => {
   };
 
   return (
-    <RoutingErrorBoundary>
+    <ViewportErrorBoundary>
       <Routes>
         <Route element={<ViewportManager />}>
           {/* Root Route - context-aware */}
@@ -198,7 +198,7 @@ const AppRoutes = () => {
           } />
         </Route>
       </Routes>
-    </RoutingErrorBoundary>
+    </ViewportErrorBoundary>
   );
 };
 

@@ -11,12 +11,21 @@ import { nativeIntegrationService } from '@/services/nativeIntegrationService';
 import { LoadingScreen } from '@/components/common/LoadingScreen';
 
 const ViewportManager: React.FC = () => {
+  // CRITICAL: All hooks must be called at the top level, unconditionally
   const location = useLocation();
   const { user, isLoading: authLoading } = useAuth();
   const isMobile = useIsMobile();
   const { onboardingComplete } = useOnboarding();
   const [nativeInitialized, setNativeInitialized] = useState(false);
   
+  console.log('[ViewportManager] Rendering with hooks called:', {
+    path: location.pathname,
+    hasUser: !!user,
+    authLoading,
+    onboardingComplete,
+    nativeInitialized
+  });
+
   // Initialize native services
   useEffect(() => {
     const initializeNative = async () => {
@@ -34,38 +43,36 @@ const ViewportManager: React.FC = () => {
     initializeNative();
   }, []);
 
-  // Wait for native initialization to complete
+  // Early returns after all hooks are called
   if (!nativeInitialized) {
     console.log('[ViewportManager] Waiting for native initialization...');
     return <LoadingScreen message="Initializing app..." />;
   }
 
-  // Wait for auth to stabilize
   if (authLoading) {
     console.log('[ViewportManager] Waiting for auth to stabilize...');
     return <LoadingScreen message="Loading user data..." />;
   }
   
-  // Comprehensive list of routes where navigation should be hidden
+  // Calculate derived values
   const onboardingOrAuthPaths = [
     '/app/onboarding',
     '/app/auth',
     '/onboarding',
     '/auth',
-    '/' // Also hide on root path
+    '/'
   ];
   
-  // Check if current path is in the list of paths where navigation should be hidden
   const isOnboardingOrAuth = onboardingOrAuthPaths.includes(location.pathname);
-  
-  // Is this the home page where scrolling should be disabled?
   const isHomePage = location.pathname === '/app/home';
+  const currentIsAppRoute = isAppRoute(location.pathname);
+  const currentIsWebsiteRoute = isWebsiteRoute(location.pathname);
   
   // Debug log to understand route detection
   console.log('[ViewportManager] Route analysis:', {
     path: location.pathname,
-    isAppRoute: isAppRoute(location.pathname),
-    isWebsiteRoute: isWebsiteRoute(location.pathname),
+    isAppRoute: currentIsAppRoute,
+    isWebsiteRoute: currentIsWebsiteRoute,
     isHomePage,
     hasUser: !!user,
     isOnboardingOrAuth,
@@ -80,7 +87,7 @@ const ViewportManager: React.FC = () => {
   // Ensure proper scrolling behavior on route changes
   useEffect(() => {
     // Force enable scrolling on website routes and non-home app routes
-    if (isWebsiteRoute(location.pathname) || (isAppRoute(location.pathname) && !isHomePage)) {
+    if (currentIsWebsiteRoute || (currentIsAppRoute && !isHomePage)) {
       console.log('[ViewportManager] Non-home route detected, ensuring scrolling is enabled');
       forceEnableScrolling();
     }
@@ -108,7 +115,14 @@ const ViewportManager: React.FC = () => {
         document.body.style.left = '';
       }
     };
-  }, [location.pathname, isHomePage]);
+  }, [location.pathname, isHomePage, currentIsWebsiteRoute, currentIsAppRoute]);
+  
+  // Calculate if mobile navigation should show
+  const shouldShowMobileNav = 
+    currentIsAppRoute && 
+    user && 
+    !isOnboardingOrAuth && 
+    onboardingComplete;
   
   // Render the appropriate layout based on route and device
   return (
@@ -117,15 +131,8 @@ const ViewportManager: React.FC = () => {
         <Outlet />
       </div>
       
-      {/* Only display mobile navigation when:
-          1. We're on an app route
-          2. User is logged in
-          3. We're not on onboarding/auth screens
-          4. If we're on /app, we also check if onboarding is complete */}
-      {isAppRoute(location.pathname) && 
-       user && 
-       !isOnboardingOrAuth && 
-       onboardingComplete && (
+      {/* Only display mobile navigation when conditions are met */}
+      {shouldShowMobileNav && (
         <MobileNavigation onboardingComplete={onboardingComplete} />
       )}
     </>
