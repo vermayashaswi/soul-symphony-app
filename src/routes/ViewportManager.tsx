@@ -26,6 +26,20 @@ const ViewportManager: React.FC = () => {
     nativeInitialized
   });
 
+  // Calculate derived values
+  const onboardingOrAuthPaths = [
+    '/app/onboarding',
+    '/app/auth',
+    '/onboarding',
+    '/auth',
+    '/'
+  ];
+  
+  const isOnboardingOrAuth = onboardingOrAuthPaths.includes(location.pathname);
+  const isHomePage = location.pathname === '/app/home';
+  const currentIsAppRoute = isAppRoute(location.pathname);
+  const currentIsWebsiteRoute = isWebsiteRoute(location.pathname);
+
   // Initialize native services
   useEffect(() => {
     const initializeNative = async () => {
@@ -43,47 +57,6 @@ const ViewportManager: React.FC = () => {
     initializeNative();
   }, []);
 
-  // Early returns after all hooks are called
-  if (!nativeInitialized) {
-    console.log('[ViewportManager] Waiting for native initialization...');
-    return <LoadingScreen message="Initializing app..." />;
-  }
-
-  if (authLoading) {
-    console.log('[ViewportManager] Waiting for auth to stabilize...');
-    return <LoadingScreen message="Loading user data..." />;
-  }
-  
-  // Calculate derived values
-  const onboardingOrAuthPaths = [
-    '/app/onboarding',
-    '/app/auth',
-    '/onboarding',
-    '/auth',
-    '/'
-  ];
-  
-  const isOnboardingOrAuth = onboardingOrAuthPaths.includes(location.pathname);
-  const isHomePage = location.pathname === '/app/home';
-  const currentIsAppRoute = isAppRoute(location.pathname);
-  const currentIsWebsiteRoute = isWebsiteRoute(location.pathname);
-  
-  // Debug log to understand route detection
-  console.log('[ViewportManager] Route analysis:', {
-    path: location.pathname,
-    isAppRoute: currentIsAppRoute,
-    isWebsiteRoute: currentIsWebsiteRoute,
-    isHomePage,
-    hasUser: !!user,
-    isOnboardingOrAuth,
-    onboardingComplete,
-    isNative: nativeIntegrationService.isRunningNatively(),
-    hideNavigation: 
-      isOnboardingOrAuth || 
-      !user || 
-      (location.pathname === '/app' && !onboardingComplete)
-  });
-  
   // Ensure proper scrolling behavior on route changes
   useEffect(() => {
     // Force enable scrolling on website routes and non-home app routes
@@ -116,6 +89,33 @@ const ViewportManager: React.FC = () => {
       }
     };
   }, [location.pathname, isHomePage, currentIsWebsiteRoute, currentIsAppRoute]);
+
+  // Debug log to understand route detection
+  console.log('[ViewportManager] Route analysis:', {
+    path: location.pathname,
+    isAppRoute: currentIsAppRoute,
+    isWebsiteRoute: currentIsWebsiteRoute,
+    isHomePage,
+    hasUser: !!user,
+    isOnboardingOrAuth,
+    onboardingComplete,
+    isNative: nativeIntegrationService.isRunningNatively(),
+    hideNavigation: 
+      isOnboardingOrAuth || 
+      !user || 
+      (location.pathname === '/app' && !onboardingComplete)
+  });
+
+  // Early returns after all hooks are called
+  if (!nativeInitialized) {
+    console.log('[ViewportManager] Waiting for native initialization...');
+    return <LoadingScreen message="Initializing app..." />;
+  }
+
+  if (authLoading) {
+    console.log('[ViewportManager] Waiting for auth to stabilize...');
+    return <LoadingScreen message="Loading user data..." />;
+  }
   
   // Calculate if mobile navigation should show
   const shouldShowMobileNav = 
