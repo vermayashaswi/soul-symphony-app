@@ -18,7 +18,6 @@ class NativeIntegrationService {
   private isActuallyNative = false;
   private plugins: { [key: string]: CapacitorPlugin } = {};
   private deviceInfo: DeviceInfo | null = null;
-  private initializationComplete = false;
 
   static getInstance(): NativeIntegrationService {
     if (!NativeIntegrationService.instance) {
@@ -28,48 +27,30 @@ class NativeIntegrationService {
   }
 
   async initialize(): Promise<void> {
-    if (this.initializationComplete) {
-      console.log('[NativeIntegration] Already initialized, skipping');
-      return;
-    }
-
-    console.log('[NativeIntegration] Starting initialization process');
-    console.log('[NativeIntegration] Environment check:', {
-      userAgent: navigator.userAgent,
-      hasCapacitor: typeof (window as any).Capacitor !== 'undefined',
-      platform: (window as any).Capacitor?.getPlatform?.(),
-      hostname: window.location.hostname,
-      origin: window.location.origin
-    });
+    console.log('[NativeIntegration] Initializing native integration service');
 
     try {
       if (this.isCapacitorAvailable()) {
-        console.log('[NativeIntegration] Capacitor detected, initializing...');
+        console.log('[NativeIntegration] Capacitor detected');
         await this.initializeCapacitor();
         await this.detectNativeEnvironment();
       } else {
-        console.log('[NativeIntegration] Running in web environment - no Capacitor detected');
-        this.isActuallyNative = false;
+        console.log('[NativeIntegration] Running in web environment');
       }
 
       await this.initializeDeviceInfo();
 
       if (this.isActuallyNative) {
-        console.log('[NativeIntegration] Native environment confirmed, setting up native features');
         this.setupPluginErrorHandlers();
       }
 
-      this.initializationComplete = true;
-
-      console.log('[NativeIntegration] Initialization complete:', {
+      console.log('[NativeIntegration] Native integration service initialized', {
         capacitorReady: this.isCapacitorReady,
         actuallyNative: this.isActuallyNative,
-        platform: this.getPlatform(),
-        initializationComplete: this.initializationComplete
+        platform: this.getPlatform()
       });
     } catch (error) {
-      console.error('[NativeIntegration] Initialization failed:', error);
-      this.initializationComplete = true; // Mark as complete even if failed to prevent retries
+      console.error('[NativeIntegration] Failed to initialize:', error);
       mobileErrorHandler.handleError({
         type: 'unknown',
         message: `Native integration initialization failed: ${error}`
@@ -78,9 +59,7 @@ class NativeIntegrationService {
   }
 
   private isCapacitorAvailable(): boolean {
-    const hasCapacitor = typeof window !== 'undefined' && !!(window as any).Capacitor;
-    console.log('[NativeIntegration] Capacitor availability check:', hasCapacitor);
-    return hasCapacitor;
+    return typeof window !== 'undefined' && !!(window as any).Capacitor;
   }
 
   private async detectNativeEnvironment(): Promise<void> {
@@ -96,40 +75,31 @@ class NativeIntegrationService {
         // CRITICAL FIX: Only consider it native if platform is 'ios' or 'android'
         this.isActuallyNative = platform === 'ios' || platform === 'android';
 
-        console.log('[NativeIntegration] Platform-based native detection result:', {
-          platform,
-          isActuallyNative: this.isActuallyNative
-        });
+        console.log('[NativeIntegration] Platform-based native detection:', this.isActuallyNative);
 
         if (this.isActuallyNative) {
-          console.log('[NativeIntegration] ✅ CONFIRMED NATIVE ENVIRONMENT - Android/iOS detected');
+          console.log('[NativeIntegration] Confirmed native environment - no browser fallbacks will be used');
 
           // Additional verification for completeness
           try {
             if (Capacitor.Plugins?.Device) {
               const deviceInfo = await Capacitor.Plugins.Device.getInfo();
-              console.log('[NativeIntegration] Device plugin verification:', {
+              console.log('[NativeIntegration] Device plugin confirmed:', {
                 platform: deviceInfo.platform,
-                model: deviceInfo.model,
-                manufacturer: deviceInfo.manufacturer
+                model: deviceInfo.model
               });
             }
           } catch (error) {
-            console.warn('[NativeIntegration] Device plugin verification failed:', error);
+            console.warn('[NativeIntegration] Device plugin check failed:', error);
             // Don't fail the native detection for this
           }
-        } else {
-          console.log('[NativeIntegration] ❌ NOT NATIVE - Platform is:', platform);
         }
       } else {
-        console.log('[NativeIntegration] ❌ NOT NATIVE - Capacitor not detected');
+        console.log('[NativeIntegration] Capacitor not detected - web environment');
         this.isActuallyNative = false;
       }
 
-      console.log('[NativeIntegration] Final native environment status:', {
-        isActuallyNative: this.isActuallyNative,
-        reason: this.isActuallyNative ? 'Capacitor platform is iOS/Android' : 'Not a native platform or no Capacitor'
-      });
+      console.log('[NativeIntegration] Final native environment status:', this.isActuallyNative);
     } catch (error) {
       console.error('[NativeIntegration] Error detecting native environment:', error);
       this.isActuallyNative = false;
@@ -179,12 +149,14 @@ class NativeIntegrationService {
       }
     }
 
-    // Initialize other plugins...
+    // Enhanced StatusBar initialization with overlap prevention
     if (this.plugins.StatusBar) {
       try {
         await this.plugins.StatusBar.setStyle({ style: 'dark' });
         await this.plugins.StatusBar.setBackgroundColor({ color: '#FFFFFF' });
-        console.log('[NativeIntegration] StatusBar plugin initialized');
+        await this.plugins.StatusBar.setOverlaysWebView({ overlay: false });
+        
+        console.log('[NativeIntegration] StatusBar plugin initialized with overlap prevention');
       } catch (error) {
         console.error('[NativeIntegration] StatusBar plugin initialization failed:', error);
         mobileErrorHandler.handleCapacitorError('StatusBar', error.toString());
@@ -330,11 +302,6 @@ class NativeIntegrationService {
 
   // Public methods
   isRunningNatively(): boolean {
-    console.log('[NativeIntegration] isRunningNatively() called:', {
-      result: this.isActuallyNative,
-      initializationComplete: this.initializationComplete,
-      capacitorReady: this.isCapacitorReady
-    });
     return this.isActuallyNative;
   }
 

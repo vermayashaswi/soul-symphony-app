@@ -16,7 +16,6 @@ import { InsightsStatsGrid } from '@/components/insights/InsightsStatsGrid';
 import { InsightsCharts } from '@/components/insights/InsightsCharts';
 import { InsightsEmptyState } from '@/components/insights/InsightsEmptyState';
 import { InsightsLoadingState } from '@/components/insights/InsightsLoadingState';
-import { SafeAreaContainer } from '@/components/layout/SafeAreaContainer';
 
 function InsightsContent() {
   const { user } = useAuth();
@@ -101,11 +100,11 @@ function InsightsContent() {
   const hasAnyEntries = statsInsightsData.entries.length > 0 || statsInsightsData.allEntries.length > 0;
 
   return (
-    <SafeAreaContainer className="min-h-screen pb-20 insights-container">
+    <div className="min-h-screen pb-20 insights-container">
       <TranslationProgressIndicator />
       
       {isSticky && (
-        <div className="fixed top-0 left-0 right-0 z-50 py-3 px-4 bg-background border-b shadow-sm flex justify-center insights-sticky-header safe-area-top">
+        <div className="fixed top-0 left-0 right-0 z-50 py-3 px-4 bg-background border-b shadow-sm flex justify-center insights-sticky-header">
           <div className={cn(
             "w-full flex justify-end",
             isMobile ? "max-w-full px-1" : "max-w-5xl"
@@ -165,7 +164,7 @@ function InsightsContent() {
           </>
         )}
       </div>
-    </SafeAreaContainer>
+    </div>
   );
 }
 
