@@ -1,5 +1,5 @@
 
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Outlet, useLocation, Navigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useIsMobile } from '@/hooks/use-mobile';
@@ -7,12 +7,44 @@ import MobileNavigation from '@/components/MobileNavigation';
 import { isAppRoute, isWebsiteRoute } from './RouteHelpers';
 import { useOnboarding } from '@/hooks/use-onboarding';
 import { forceEnableScrolling } from '@/hooks/use-scroll-restoration';
+import { nativeIntegrationService } from '@/services/nativeIntegrationService';
+import { LoadingScreen } from '@/components/common/LoadingScreen';
 
 const ViewportManager: React.FC = () => {
   const location = useLocation();
-  const { user } = useAuth();
+  const { user, isLoading: authLoading } = useAuth();
   const isMobile = useIsMobile();
   const { onboardingComplete } = useOnboarding();
+  const [nativeInitialized, setNativeInitialized] = useState(false);
+  
+  // Initialize native services
+  useEffect(() => {
+    const initializeNative = async () => {
+      console.log('[ViewportManager] Initializing native services...');
+      try {
+        await nativeIntegrationService.initialize();
+        console.log('[ViewportManager] Native services initialized');
+        setNativeInitialized(true);
+      } catch (error) {
+        console.error('[ViewportManager] Native services initialization failed:', error);
+        setNativeInitialized(true); // Continue anyway
+      }
+    };
+
+    initializeNative();
+  }, []);
+
+  // Wait for native initialization to complete
+  if (!nativeInitialized) {
+    console.log('[ViewportManager] Waiting for native initialization...');
+    return <LoadingScreen message="Initializing app..." />;
+  }
+
+  // Wait for auth to stabilize
+  if (authLoading) {
+    console.log('[ViewportManager] Waiting for auth to stabilize...');
+    return <LoadingScreen message="Loading user data..." />;
+  }
   
   // Comprehensive list of routes where navigation should be hidden
   const onboardingOrAuthPaths = [
@@ -30,13 +62,15 @@ const ViewportManager: React.FC = () => {
   const isHomePage = location.pathname === '/app/home';
   
   // Debug log to understand route detection
-  console.log('ViewportManager - Path:', location.pathname, {
+  console.log('[ViewportManager] Route analysis:', {
+    path: location.pathname,
     isAppRoute: isAppRoute(location.pathname),
     isWebsiteRoute: isWebsiteRoute(location.pathname),
     isHomePage,
-    user: !!user,
+    hasUser: !!user,
     isOnboardingOrAuth,
     onboardingComplete,
+    isNative: nativeIntegrationService.isRunningNatively(),
     hideNavigation: 
       isOnboardingOrAuth || 
       !user || 
@@ -47,13 +81,13 @@ const ViewportManager: React.FC = () => {
   useEffect(() => {
     // Force enable scrolling on website routes and non-home app routes
     if (isWebsiteRoute(location.pathname) || (isAppRoute(location.pathname) && !isHomePage)) {
-      console.log('ViewportManager: Non-home route detected, ensuring scrolling is enabled');
+      console.log('[ViewportManager] Non-home route detected, ensuring scrolling is enabled');
       forceEnableScrolling();
     }
     
     // Disable scrolling on home page
     if (isHomePage) {
-      console.log('ViewportManager: Home page detected, disabling scrolling');
+      console.log('[ViewportManager] Home page detected, disabling scrolling');
       document.body.style.overflow = 'hidden';
       document.body.style.position = 'fixed';
       document.body.style.width = '100%';
