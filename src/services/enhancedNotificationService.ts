@@ -323,6 +323,52 @@ class EnhancedNotificationService {
     }
   }
 
+  // Get comprehensive permission info for debugging
+  async getPermissionInfo(): Promise<any> {
+    try {
+      const isNative = await this.isNativeContext();
+      const pluginAvailability = await this.arePluginsAvailable();
+      const currentPermission = await this.checkPermissionStatus();
+      
+      const info: any = {
+        isNative,
+        pluginAvailability,
+        currentPermission,
+        webSupported: 'Notification' in window,
+        timestamp: new Date().toISOString()
+      };
+      
+      if (isNative) {
+        // Add native-specific debug info
+        try {
+          if (pluginAvailability.local) {
+            const { LocalNotifications } = await import('@capacitor/local-notifications');
+            const localStatus = await LocalNotifications.checkPermissions();
+            info.localNotificationsStatus = localStatus;
+          }
+          
+          if (pluginAvailability.push) {
+            const { PushNotifications } = await import('@capacitor/push-notifications');
+            const pushStatus = await PushNotifications.checkPermissions();
+            info.pushNotificationsStatus = pushStatus;
+          }
+        } catch (error) {
+          info.nativeDebugError = error instanceof Error ? error.message : 'Unknown error';
+        }
+      } else {
+        // Add web-specific debug info
+        info.webNotificationPermission = 'Notification' in window ? Notification.permission : 'not-available';
+      }
+      
+      return info;
+    } catch (error) {
+      return {
+        error: error instanceof Error ? error.message : 'Unknown error',
+        timestamp: new Date().toISOString()
+      };
+    }
+  }
+
   setDebugEnabled(enabled: boolean): void {
     this.debugEnabled = enabled;
   }
