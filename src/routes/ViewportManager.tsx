@@ -4,6 +4,7 @@ import { Outlet, useLocation, Navigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useIsMobile } from '@/hooks/use-mobile';
 import MobileNavigation from '@/components/MobileNavigation';
+import StatusBarManager from '@/components/StatusBarManager';
 import { isAppRoute, isWebsiteRoute } from './RouteHelpers';
 import { useOnboarding } from '@/hooks/use-onboarding';
 import { forceEnableScrolling } from '@/hooks/use-scroll-restoration';
@@ -78,7 +79,7 @@ const ViewportManager: React.FC = () => {
   
   // Render the appropriate layout based on route and device
   return (
-    <>
+    <StatusBarManager>
       <div className={`app-container ${isMobile ? 'mobile-view' : 'desktop-view'} ${isHomePage ? 'overflow-hidden' : 'overflow-x-hidden'}`}>
         <Outlet />
       </div>
@@ -94,7 +95,7 @@ const ViewportManager: React.FC = () => {
        onboardingComplete && (
         <MobileNavigation onboardingComplete={onboardingComplete} />
       )}
-    </>
+    </StatusBarManager>
   );
 };
 

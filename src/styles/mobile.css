@@ -1,19 +1,83 @@
 
+
 /* Mobile-specific styles */
 @media (max-width: 768px) {
-  /* Rounded corners for mobile UI elements */
-  .mobile-chat-interface .rounded-full {
-    border-radius: 9999px !important; /* Force perfect circles */
+  /* STATUS BAR SAFE AREA HANDLING */
+  
+  /* Define status bar height variables for different platforms */
+  :root {
+    --status-bar-height: 0px;
+    --safe-area-inset-top: env(safe-area-inset-top, 0px);
+    --safe-area-inset-bottom: env(safe-area-inset-bottom, 0px);
+    --safe-area-inset-left: env(safe-area-inset-left, 0px);
+    --safe-area-inset-right: env(safe-area-inset-right, 0px);
+    --total-top-padding: max(var(--status-bar-height), var(--safe-area-inset-top));
   }
   
-  /* Add padding to the bottom of the page content to make room for the navigation bar */
+  /* Android-specific status bar handling */
+  .android-device {
+    --status-bar-height: 24px;
+  }
+  
+  /* iOS-specific status bar handling */
+  .ios-device {
+    --status-bar-height: 44px;
+  }
+  
+  /* Apply safe area padding to all main containers */
   .smart-chat-container,
   .journal-container,
   .insights-container,
   .settings-container {
-    padding-bottom: 4.5rem !important; /* Increased to ensure content doesn't get cut off */
+    padding-top: var(--total-top-padding) !important;
+    padding-bottom: max(4.5rem, calc(var(--safe-area-inset-bottom) + 4.5rem)) !important;
+    padding-left: max(8px, var(--safe-area-inset-left)) !important;
+    padding-right: max(8px, var(--safe-area-inset-right)) !important;
+    min-height: 100vh;
+    box-sizing: border-box;
   }
-
+  
+  /* Special handling for fullscreen components like SoulNet */
+  .fixed.inset-0.z-\[9999\] {
+    position: fixed !important;
+    top: var(--total-top-padding) !important;
+    left: var(--safe-area-inset-left) !important;
+    right: var(--safe-area-inset-right) !important;
+    bottom: var(--safe-area-inset-bottom) !important;
+    width: calc(100vw - var(--safe-area-inset-left) - var(--safe-area-inset-right)) !important;
+    height: calc(100vh - var(--total-top-padding) - var(--safe-area-inset-bottom)) !important;
+    z-index: 9998 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    background-color: hsl(var(--background)) !important;
+  }
+  
+  /* Navigation bar safe area */
+  .fixed.bottom-0.left-0.right-0.bg-background.border-t.border-muted {
+    bottom: var(--safe-area-inset-bottom) !important;
+    left: var(--safe-area-inset-left) !important;
+    right: var(--safe-area-inset-right) !important;
+    padding-bottom: var(--safe-area-inset-bottom) !important;
+    z-index: 9999 !important;
+  }
+  
+  /* Chat input container positioning */
+  .mobile-chat-input-container {
+    bottom: calc(4.5rem + var(--safe-area-inset-bottom)) !important;
+    left: var(--safe-area-inset-left) !important;
+    right: var(--safe-area-inset-right) !important;
+  }
+  
+  /* Chat content safe area */
+  .mobile-chat-content {
+    padding-bottom: calc(70px + var(--safe-area-inset-bottom)) !important;
+  }
+  
+  /* Rounded corners for mobile UI elements */
+  .mobile-chat-interface .rounded-full {
+    border-radius: 9999px !important;
+  }
+  
   /* Make cards take full width in mobile view and remove horizontal padding */
   .insights-container .grid-cols-1 > div,
   .insights-container .bg-background,
@@ -29,7 +93,7 @@
   .insights-page-content {
     padding-left: 0 !important;
     padding-right: 0 !important;
-    overflow-x: hidden !important; /* Prevent horizontal scrolling */
+    overflow-x: hidden !important;
   }
   
   /* Remove horizontal margins on cards */
@@ -56,59 +120,6 @@
     padding-right: 0 !important;
     max-width: 100% !important;
     overflow-x: hidden !important;
-  }
-  
-  /* iOS-specific padding for safe areas */
-  @supports (padding: max(0px)) {
-    .smart-chat-container,
-    .journal-container,
-    .insights-container,
-    .settings-container {
-      padding-bottom: max(4.5rem, env(safe-area-inset-bottom) + 3.6rem) !important;
-      padding-left: max(8px, env(safe-area-inset-left) + 0px) !important;
-      padding-right: max(8px, env(safe-area-inset-right) + 0px) !important;
-    }
-  }
-
-  /* SoulNet fullscreen behavior improvements */
-  .fixed.inset-0.z-\[9999\] {
-    position: fixed !important;
-    top: 0 !important;
-    left: 0 !important;
-    right: 0 !important;
-    bottom: 0 !important;
-    width: 100vw !important;
-    height: 100vh !important;
-    z-index: 9998 !important; /* Decreased to be below the navigation bar */
-    margin: 0 !important;
-    padding: 0 !important;
-    background-color: hsl(var(--background)) !important;
-  }
-
-  /* Ensure entity info panel stays on top */
-  .z-\[10000\] {
-    z-index: 10000 !important;
-  }
-
-  /* Make SoulNet visualization clickable and fully interactive */
-  canvas {
-    touch-action: none !important;
-  }
-
-  /* Fix any styling issues with SoulNet info panel on mobile */
-  .absolute.top-2.right-2.p-2.rounded-lg.shadow-lg {
-    z-index: 10000 !important;
-    max-width: 170px !important;
-  }
-
-  /* Ensure the mobile chat input is fully visible */
-  .mobile-chat-input-container {
-    bottom: 4.5rem !important; /* Adjusted to match the increased bottom padding */
-  }
-
-  /* Add more space at the bottom of the chat content */
-  .mobile-chat-content {
-    padding-bottom: 70px !important;
   }
   
   /* Year view calendar compact styling for mobile - Updated dot sizes */
@@ -168,4 +179,22 @@
       height: 16px !important;
     }
   }
+  
+  /* Status bar overlay prevention for web */
+  .status-bar-safe {
+    padding-top: var(--total-top-padding);
+  }
 }
+
+/* Notch and cutout handling for modern devices */
+@supports (padding: max(0px)) {
+  @media (max-width: 768px) {
+    .smart-chat-container,
+    .journal-container,
+    .insights-container,
+    .settings-container {
+      padding-top: max(var(--status-bar-height), env(safe-area-inset-top, 0px)) !important;
+    }
+  }
+}
+

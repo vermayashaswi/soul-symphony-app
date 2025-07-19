@@ -1,10 +1,10 @@
+
 import { CapacitorConfig } from '@capacitor/cli';
 
 const config: CapacitorConfig = {
   appId: 'app.soulo.online',
   appName: 'Soulo',
   webDir: 'dist',
-  // ADD THIS SERVER CONFIGURATION FOR OAUTH CALLBACKS
   server: {
     androidScheme: 'https'
   },
@@ -16,7 +16,6 @@ const config: CapacitorConfig = {
       forceCodeForRefreshToken: true,
     },
     App: {
-      // CRITICAL: This must match your app ID for deep links
       urlScheme: "app.soulo.online"
     },
     SplashScreen: {
@@ -37,7 +36,8 @@ const config: CapacitorConfig = {
     },
     StatusBar: {
       style: "dark",
-      backgroundColor: "#000000"
+      backgroundColor: "#FFFFFF",
+      overlaysWebView: false
     },
     PushNotifications: {
       presentationOptions: ["badge", "sound", "alert"]

@@ -149,12 +149,14 @@ class NativeIntegrationService {
       }
     }
 
-    // Initialize other plugins...
+    // Enhanced StatusBar initialization with overlap prevention
     if (this.plugins.StatusBar) {
       try {
         await this.plugins.StatusBar.setStyle({ style: 'dark' });
         await this.plugins.StatusBar.setBackgroundColor({ color: '#FFFFFF' });
-        console.log('[NativeIntegration] StatusBar plugin initialized');
+        await this.plugins.StatusBar.setOverlaysWebView({ overlay: false });
+        
+        console.log('[NativeIntegration] StatusBar plugin initialized with overlap prevention');
       } catch (error) {
         console.error('[NativeIntegration] StatusBar plugin initialization failed:', error);
         mobileErrorHandler.handleCapacitorError('StatusBar', error.toString());
