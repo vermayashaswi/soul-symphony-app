@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { motion, useAnimation } from 'framer-motion';
-import { useSafeTheme } from '@/hooks/use-safe-theme';
+import { useTheme } from '@/hooks/use-theme';
 import { TranslatableText } from '@/components/translation/TranslatableText';
 import { useTranslation } from '@/contexts/TranslationContext';
 
@@ -148,7 +148,7 @@ const ThemeBubbleAnimation: React.FC<ThemeBubbleAnimationProps> = ({
     velocity: { x: number; y: number };
   }>>([]);
   const [themePool, setThemePool] = useState<ThemeData[]>([]);
-  const { colorTheme, customColor } = useSafeTheme();
+  const { colorTheme, customColor } = useTheme();
   const { currentLanguage, translate } = useTranslation();
   const [translatedThemeData, setTranslatedThemeData] = useState<ThemeData[]>([]);
   

@@ -2,7 +2,7 @@
 import React from 'react';
 import { motion } from 'framer-motion';
 import { cn } from '@/lib/utils';
-import { useSafeTheme } from '@/hooks/use-safe-theme';
+import { useTheme } from '@/hooks/use-theme';
 
 interface EmotionBubbleDetailProps {
   name: string;
@@ -25,7 +25,7 @@ const EmotionBubbleDetail: React.FC<EmotionBubbleDetailProps> = ({
 }) => {
   // Font size is now constant, 2px smaller than the "Trend" text in Mood Calendar
   const fontSize = '14px';
-  const { colorTheme } = useSafeTheme();
+  const { colorTheme } = useTheme();
   
   return (
     <motion.div

@@ -20,7 +20,6 @@ export const StatusBarManager: React.FC<StatusBarManagerProps> = ({ children }) 
             // Configure status bar for light content on dark background
             await statusBarPlugin.setStyle({ style: 'dark' });
             await statusBarPlugin.setBackgroundColor({ color: '#FFFFFF' });
-            // CRITICAL: Ensure status bar does not overlay the web view
             await statusBarPlugin.setOverlaysWebView({ overlay: false });
             
             console.log('[StatusBarManager] Status bar configured successfully');
@@ -48,22 +47,15 @@ export const StatusBarManager: React.FC<StatusBarManagerProps> = ({ children }) 
       if (isAndroid) {
         // Android status bar is typically 24dp, which translates to different px values
         statusBarHeight = '24px';
-        document.body.classList.add('android-device');
       } else if (isIOS) {
         // iOS status bar height varies by device
         statusBarHeight = '44px'; // Safe default for most iOS devices
-        document.body.classList.add('ios-device');
       }
       
       document.documentElement.style.setProperty('--status-bar-height', statusBarHeight);
       document.documentElement.style.setProperty('--safe-area-inset-top', `max(${statusBarHeight}, env(safe-area-inset-top, 0px))`);
       
       console.log('[StatusBarManager] Status bar height set to:', statusBarHeight);
-      
-      // Add debug class to visualize safe areas (remove in production)
-      if (isAndroid || isIOS) {
-        document.body.classList.add('debug-safe-areas');
-      }
     };
 
     initializeStatusBar();
