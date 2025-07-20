@@ -11,9 +11,12 @@ export const StatusBarManager: React.FC<StatusBarManagerProps> = ({ children }) 
     const initializeStatusBar = async () => {
       try {
         const isNative = nativeIntegrationService.isRunningNatively();
+        const isAndroid = /Android/.test(navigator.userAgent);
+        
+        console.log('[StatusBarManager] ANDROID FIX: Initializing with native:', isNative, 'android:', isAndroid);
         
         if (isNative) {
-          console.log('[StatusBarManager] Configuring native status bar...');
+          console.log('[StatusBarManager] ANDROID FIX: Configuring native status bar...');
           
           const statusBarPlugin = nativeIntegrationService.getPlugin('StatusBar');
           if (statusBarPlugin) {
@@ -22,17 +25,17 @@ export const StatusBarManager: React.FC<StatusBarManagerProps> = ({ children }) 
             await statusBarPlugin.setBackgroundColor({ color: '#FFFFFF' });
             await statusBarPlugin.setOverlaysWebView({ overlay: false });
             
-            console.log('[StatusBarManager] Status bar configured successfully');
+            console.log('[StatusBarManager] ANDROID FIX: Status bar configured successfully');
           }
         } else {
-          console.log('[StatusBarManager] Web environment - status bar styling handled by CSS');
+          console.log('[StatusBarManager] ANDROID FIX: Web environment - status bar styling handled by CSS');
         }
         
         // Enhanced safe area detection and CSS variable setup
         updateSafeAreaVariables();
         
       } catch (error) {
-        console.error('[StatusBarManager] Failed to configure status bar:', error);
+        console.error('[StatusBarManager] ANDROID FIX: Failed to configure status bar:', error);
       }
     };
 
@@ -43,11 +46,16 @@ export const StatusBarManager: React.FC<StatusBarManagerProps> = ({ children }) 
                    (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
       
       let statusBarHeight = '0px';
+      let bottomInset = '0px';
       
       if (isAndroid) {
         statusBarHeight = '24px';
+        // ANDROID FIX: Force bottom inset for Android
+        bottomInset = '8px';
         document.documentElement.classList.add('platform-android');
         document.documentElement.classList.remove('platform-ios');
+        
+        console.log('[StatusBarManager] ANDROID FIX: Android platform detected, setting bottom inset to 8px');
       } else if (isIOS) {
         statusBarHeight = '44px';
         document.documentElement.classList.add('platform-ios');
@@ -58,6 +66,11 @@ export const StatusBarManager: React.FC<StatusBarManagerProps> = ({ children }) 
       const root = document.documentElement;
       root.style.setProperty('--status-bar-height', statusBarHeight);
       
+      // ANDROID FIX: Force bottom inset for Android
+      if (isAndroid) {
+        root.style.setProperty('--safe-area-inset-bottom', bottomInset);
+      }
+      
       // Try to get actual safe area values from CSS env() if available
       const computedStyle = getComputedStyle(root);
       const actualTop = computedStyle.getPropertyValue('--safe-area-inset-top') || 'env(safe-area-inset-top, 0px)';
@@ -65,16 +78,25 @@ export const StatusBarManager: React.FC<StatusBarManagerProps> = ({ children }) 
       const actualLeft = computedStyle.getPropertyValue('--safe-area-inset-left') || 'env(safe-area-inset-left, 0px)';
       const actualRight = computedStyle.getPropertyValue('--safe-area-inset-right') || 'env(safe-area-inset-right, 0px)';
       
-      // Update CSS variables with safe area values
+      // ANDROID FIX: For Android, ensure minimum bottom inset
+      if (isAndroid) {
+        const bottomValue = actualBottom.includes('env(') ? bottomInset : actualBottom;
+        root.style.setProperty('--safe-area-inset-bottom', bottomValue);
+        console.log('[StatusBarManager] ANDROID FIX: Forced bottom inset to:', bottomValue);
+      } else {
+        root.style.setProperty('--safe-area-inset-bottom', actualBottom);
+      }
+      
+      // Update other CSS variables
       root.style.setProperty('--safe-area-inset-top', actualTop);
-      root.style.setProperty('--safe-area-inset-bottom', actualBottom);
       root.style.setProperty('--safe-area-inset-left', actualLeft);
       root.style.setProperty('--safe-area-inset-right', actualRight);
       
-      console.log('[StatusBarManager] Safe area variables updated:', {
+      console.log('[StatusBarManager] ANDROID FIX: Safe area variables updated:', {
         statusBarHeight,
+        bottomInset,
         top: actualTop,
-        bottom: actualBottom,
+        bottom: isAndroid ? bottomInset : actualBottom,
         left: actualLeft,
         right: actualRight,
         platform: isAndroid ? 'android' : isIOS ? 'ios' : 'web'
@@ -83,10 +105,14 @@ export const StatusBarManager: React.FC<StatusBarManagerProps> = ({ children }) 
 
     initializeStatusBar();
     
-    // Update on orientation change and resize
+    // Update on orientation change and resize with debounce
+    let updateTimeout: NodeJS.Timeout;
     const handleOrientationChange = () => {
-      console.log('[StatusBarManager] Orientation/resize detected, updating safe area');
-      setTimeout(updateSafeAreaVariables, 100);
+      clearTimeout(updateTimeout);
+      updateTimeout = setTimeout(() => {
+        console.log('[StatusBarManager] ANDROID FIX: Orientation/resize detected, updating safe area');
+        updateSafeAreaVariables();
+      }, 200);
     };
     
     window.addEventListener('orientationchange', handleOrientationChange);
@@ -98,6 +124,7 @@ export const StatusBarManager: React.FC<StatusBarManagerProps> = ({ children }) 
     }
     
     return () => {
+      clearTimeout(updateTimeout);
       window.removeEventListener('orientationchange', handleOrientationChange);
       window.removeEventListener('resize', handleOrientationChange);
       if (window.visualViewport) {

@@ -12,9 +12,12 @@
   left: var(--safe-area-inset-left, 0px);
   right: var(--safe-area-inset-right, 0px);
   
-  /* Ensure navigation height includes safe area */
-  height: calc(var(--nav-bar-height) + var(--safe-area-inset-bottom, 0px));
-  padding-bottom: var(--safe-area-inset-bottom, 0px);
+  /* ANDROID FIX: Force minimum bottom positioning for Android */
+  min-height: var(--nav-bar-height);
+  
+  /* ANDROID FIX: Ensure navigation height includes safe area with fallback */
+  height: calc(var(--nav-bar-height) + max(var(--safe-area-inset-bottom, 0px), env(safe-area-inset-bottom, 0px)));
+  padding-bottom: max(var(--safe-area-inset-bottom, 0px), env(safe-area-inset-bottom, 0px));
   
   /* Prevent any gaps or overlaps */
   margin: 0;
@@ -23,6 +26,18 @@
   /* Ensure proper background coverage */
   background-color: hsl(var(--background));
   border-top: 1px solid hsl(var(--border));
+  
+  /* ANDROID FIX: Force GPU acceleration for better rendering */
+  transform: translateZ(0);
+  will-change: transform;
+}
+
+/* ANDROID FIX: Platform-specific adjustments */
+.platform-android .mobile-navigation {
+  /* Force bottom positioning on Android */
+  bottom: max(0px, var(--safe-area-inset-bottom, 0px));
+  /* Ensure minimum height on Android */
+  min-height: calc(var(--nav-bar-height) + 8px);
 }
 
 /* Navigation content positioning */
@@ -32,15 +47,24 @@
   align-items: center;
   justify-content: space-around;
   padding: 0.5rem 1rem 0.5rem 1rem;
+  
+  /* ANDROID FIX: Ensure proper positioning */
+  position: relative;
+  z-index: 1;
 }
 
 /* Chat input positioning to account for navigation */
 .mobile-chat-input-container {
   position: fixed;
-  bottom: calc(var(--nav-bar-height) + var(--safe-area-inset-bottom, 0px));
+  bottom: calc(var(--nav-bar-height) + max(var(--safe-area-inset-bottom, 0px), env(safe-area-inset-bottom, 0px)));
   left: var(--safe-area-inset-left, 0px);
   right: var(--safe-area-inset-right, 0px);
   z-index: 9998;
+}
+
+/* ANDROID FIX: Platform-specific chat input adjustment */
+.platform-android .mobile-chat-input-container {
+  bottom: calc(var(--nav-bar-height) + max(var(--safe-area-inset-bottom, 0px), 8px));
 }
 
 /* Prevent body scroll on mobile when keyboard is visible */
@@ -53,4 +77,22 @@
 .mobile-navigation * {
   max-width: 100%;
   box-sizing: border-box;
+}
+
+/* ANDROID FIX: Debug helper (remove in production) */
+.mobile-navigation.debug {
+  border: 2px solid red;
+  background-color: rgba(255, 0, 0, 0.1);
+}
+
+.mobile-navigation.debug::before {
+  content: "SafeArea: " attr(data-safe-area-bottom);
+  position: absolute;
+  top: -20px;
+  left: 0;
+  background: red;
+  color: white;
+  font-size: 10px;
+  padding: 2px 4px;
+  z-index: 10000;
 }

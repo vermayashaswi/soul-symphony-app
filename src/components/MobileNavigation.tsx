@@ -26,7 +26,7 @@ const MobileNavigation: React.FC<MobileNavigationProps> = ({ onboardingComplete 
   const { user } = useAuth();
   const { currentLanguage } = useTranslation();
   const { hasActiveSubscription, isTrialActive } = useSubscription();
-  const { safeArea, isNative, applySafeAreaStyles } = useSafeArea();
+  const { safeArea, isNative, isAndroid, applySafeAreaStyles } = useSafeArea();
   const navRef = useRef<HTMLDivElement>(null);
   
   const [renderKey, setRenderKey] = useState(0);
@@ -45,16 +45,22 @@ const MobileNavigation: React.FC<MobileNavigationProps> = ({ onboardingComplete 
   useEffect(() => {
     if (navRef.current) {
       applySafeAreaStyles(navRef.current);
-      console.log('MobileNavigation: Applied safe area styles:', safeArea);
+      
+      // ANDROID FIX: Add debug class for Android
+      if (isAndroid) {
+        navRef.current.classList.add('debug');
+      }
+      
+      console.log('MobileNavigation: ANDROID FIX: Applied safe area styles:', safeArea, 'isAndroid:', isAndroid);
     }
-  }, [safeArea, applySafeAreaStyles]);
+  }, [safeArea, applySafeAreaStyles, isAndroid]);
   
   useEffect(() => {
     const handleVisualViewportResize = () => {
       if (window.visualViewport) {
         const isKeyboard = window.visualViewport.height < window.innerHeight * 0.75;
         setIsKeyboardVisible(isKeyboard);
-        console.log('MobileNavigation: Keyboard visibility changed:', isKeyboard);
+        console.log('MobileNavigation: ANDROID FIX: Keyboard visibility changed:', isKeyboard);
       }
     };
     
@@ -99,7 +105,7 @@ const MobileNavigation: React.FC<MobileNavigationProps> = ({ onboardingComplete 
                           !!user &&
                           onboardingComplete !== false;
     
-    console.log('MobileNavigation visibility check:', { 
+    console.log('MobileNavigation: ANDROID FIX: Visibility check:', { 
       shouldShowNav, 
       isMobile, 
       isNativeApp: isNativeApp(),
@@ -109,18 +115,19 @@ const MobileNavigation: React.FC<MobileNavigationProps> = ({ onboardingComplete 
       hasUser: !!user,
       onboardingComplete,
       safeArea,
-      isNative
+      isNative,
+      isAndroid
     });
     
     setIsVisible(shouldShowNav);
-  }, [location.pathname, isMobile, isKeyboardVisible, isTutorialActive, user, onboardingComplete, currentLanguage, renderKey, safeArea, isNative]);
+  }, [location.pathname, isMobile, isKeyboardVisible, isTutorialActive, user, onboardingComplete, currentLanguage, renderKey, safeArea, isNative, isAndroid]);
   
   if (!isVisible) {
     return null;
   }
   
   if (onboardingComplete === false) {
-    console.log('MobileNavigation: Not rendering due to onboarding status');
+    console.log('MobileNavigation: ANDROID FIX: Not rendering due to onboarding status');
     return null;
   }
   
@@ -139,16 +146,16 @@ const MobileNavigation: React.FC<MobileNavigationProps> = ({ onboardingComplete 
   
   const isPremiumFeatureAccessible = hasActiveSubscription || isTrialActive;
   
-  // Calculate dynamic styles based on safe area
+  // ANDROID FIX: Calculate dynamic styles based on safe area with Android-specific adjustments
   const navigationStyle = {
-    bottom: `${safeArea.bottom}px`,
+    bottom: isAndroid ? `max(${safeArea.bottom}px, 8px)` : `${safeArea.bottom}px`,
     left: `${safeArea.left}px`,
     right: `${safeArea.right}px`,
-    height: `calc(4rem + ${safeArea.bottom}px)`,
-    paddingBottom: `${safeArea.bottom}px`,
+    height: isAndroid ? `calc(4rem + max(${safeArea.bottom}px, 8px))` : `calc(4rem + ${safeArea.bottom}px)`,
+    paddingBottom: isAndroid ? `max(${safeArea.bottom}px, 8px)` : `${safeArea.bottom}px`,
   };
   
-  console.log('MobileNavigation: Rendering with safe area styles:', navigationStyle);
+  console.log('MobileNavigation: ANDROID FIX: Rendering with safe area styles:', navigationStyle);
   
   return (
     <motion.div 
@@ -156,7 +163,8 @@ const MobileNavigation: React.FC<MobileNavigationProps> = ({ onboardingComplete 
       key={`nav-${renderKey}-${currentLanguage}`}
       className={cn(
         "mobile-navigation",
-        isTutorialActive && "opacity-30 pointer-events-none"
+        isTutorialActive && "opacity-30 pointer-events-none",
+        isAndroid && "platform-android"
       )}
       style={navigationStyle}
       initial={{ y: 100 }}

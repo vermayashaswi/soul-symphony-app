@@ -172,9 +172,36 @@ const Node: React.FC<NodeProps> = ({
     }
   });
 
+  // SOUL-NET SELECTION FIX: Enhanced click handler with debug logging
   const handleNodeClick = (e: any) => {
+    console.log(`[Node] SOUL-NET SELECTION FIX: Click event triggered for node ${node.id}`, {
+      nodeId: node.id,
+      nodeType: node.type,
+      isSelected,
+      isHighlighted,
+      dimmed,
+      event: e,
+      position: node.position,
+      connectionPercentage,
+      showPercentage
+    });
+    
+    // Stop event propagation to prevent canvas click
     e.stopPropagation();
-    onClick(node.id, e);
+    
+    // Add vibration feedback if available
+    if (navigator.vibrate) {
+      navigator.vibrate(50);
+      console.log(`[Node] SOUL-NET SELECTION FIX: Vibration triggered for node ${node.id}`);
+    }
+    
+    // Call the onClick handler
+    try {
+      onClick(node.id, e);
+      console.log(`[Node] SOUL-NET SELECTION FIX: onClick handler called successfully for node ${node.id}`);
+    } catch (error) {
+      console.error(`[Node] SOUL-NET SELECTION FIX: Error in onClick handler for node ${node.id}:`, error);
+    }
   };
 
   // ENHANCED: Only show labels for highlighted/selected nodes or when forced
@@ -220,6 +247,16 @@ const Node: React.FC<NodeProps> = ({
         ref={meshRef}
         position={node.position}
         onClick={handleNodeClick}
+        onPointerDown={(e) => {
+          // SOUL-NET SELECTION FIX: Additional event handling for better click detection
+          console.log(`[Node] SOUL-NET SELECTION FIX: Pointer down event for node ${node.id}`);
+          e.stopPropagation();
+        }}
+        onPointerUp={(e) => {
+          // SOUL-NET SELECTION FIX: Additional event handling for better click detection
+          console.log(`[Node] SOUL-NET SELECTION FIX: Pointer up event for node ${node.id}`);
+          e.stopPropagation();
+        }}
         scale={[baseNodeScale, baseNodeScale, baseNodeScale]}
       >
         {renderGeometry()}
