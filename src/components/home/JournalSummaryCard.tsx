@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
-import { useSafeTheme } from '@/hooks/use-safe-theme';
+import { useTheme } from '@/hooks/use-theme';
 import FloatingThemeStrips from './FloatingThemeStrips';
 import { getClientTimeInfo } from '@/services/dateService';
 
@@ -21,7 +21,7 @@ interface ThemeData {
 
 const JournalSummaryCard: React.FC = () => {
   const { user } = useAuth();
-  const { colorTheme, customColor } = useSafeTheme();
+  const { colorTheme, customColor } = useTheme();
   const [summaryData, setSummaryData] = useState<SummaryResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);

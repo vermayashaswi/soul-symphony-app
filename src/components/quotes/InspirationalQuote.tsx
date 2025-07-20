@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useInView } from 'react-intersection-observer';
 import { Quote } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
-import { useSafeTheme } from '@/hooks/use-safe-theme';
+import { useTheme } from '@/hooks/use-theme';
 import { TranslatableText } from '@/components/translation/TranslatableText';
 import { useTranslation } from '@/contexts/TranslationContext';
 
@@ -25,7 +25,7 @@ export const InspirationalQuote: React.FC = () => {
     triggerOnce: false,
     threshold: 0.1,
   });
-  const { colorTheme } = useSafeTheme();
+  const { colorTheme } = useTheme();
   const { currentLanguage } = useTranslation();
   const rotationIntervalRef = useRef<number | null>(null);
   const isTranslatingRef = useRef<boolean>(false);

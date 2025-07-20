@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { Navigate, useLocation, useSearchParams, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
@@ -9,7 +8,7 @@ import { TranslatableText } from '@/components/translation/TranslatableText';
 import PlatformAuthButton from '@/components/auth/PlatformAuthButton';
 import { nativeIntegrationService } from '@/services/nativeIntegrationService';
 import { nativeNavigationService } from '@/services/nativeNavigationService';
-import { useOnboardingState } from '@/hooks/use-onboarding-state';
+import { useOnboarding } from '@/hooks/use-onboarding';
 import { authStateManager } from '@/services/authStateManager';
 import { AuthRedirectFallback } from '@/components/auth/AuthRedirectFallback';
 
@@ -19,16 +18,29 @@ export default function Auth() {
   const navigate = useNavigate();
   const [isLoading, setIsLoading] = useState(false);
   const { user, isLoading: authLoading } = useAuth();
-  const { onboardingComplete, loading: onboardingLoading, isReady } = useOnboardingState(user);
+  const { onboardingComplete, loading: onboardingLoading } = useOnboarding();
   const [authError, setAuthError] = useState<string | null>(null);
   const [navigationProcessing, setNavigationProcessing] = useState(false);
+  const [authDebugInfo, setAuthDebugInfo] = useState<any>(null);
 
   const redirectParam = searchParams.get('redirectTo') || searchParams.get('redirect');
   const fromLocation = location.state?.from?.pathname;
   const storedRedirect = typeof window !== 'undefined' ? localStorage.getItem('authRedirectTo') : null;
 
-  // Enhanced error handling
+  // Enhanced error handling and auth state tracking
   useEffect(() => {
+    const checkAuthState = async () => {
+      try {
+        const debugInfo = await authStateManager.getCurrentAuthState();
+        setAuthDebugInfo(debugInfo);
+        console.log('[Auth] Current auth state:', debugInfo);
+      } catch (error) {
+        console.error('[Auth] Error checking auth state:', error);
+      }
+    };
+
+    checkAuthState();
+
     const error = searchParams.get('error');
     const errorDescription = searchParams.get('error_description');
 
@@ -41,6 +53,7 @@ export default function Auth() {
       newUrl.searchParams.delete('error_description');
       window.history.replaceState({}, '', newUrl.toString());
 
+      // Show user-friendly error message
       let userMessage = 'Sign-in failed';
       if (errorDescription?.includes('redirect_uri_mismatch')) {
         userMessage = 'Google sign-in configuration error. Please try again or contact support.';
@@ -52,75 +65,72 @@ export default function Auth() {
 
       setAuthError(userMessage);
       toast.error(userMessage);
-      authStateManager.handleAuthFailure(new Error(userMessage));
+      authStateManager.handleAuthFailure({ message: userMessage });
     }
   }, [searchParams]);
 
-  // Determine redirect path with native optimization
+  // Determine where to redirect after successful login
   const getFinalRedirectPath = () => {
-    const isNative = nativeIntegrationService.isRunningNatively();
-    
-    if (isNative) {
-      console.log('[Auth] Native app - using /app/home for auth redirect');
+    // CRITICAL: For native apps, always redirect to home after successful login
+    if (nativeIntegrationService.isRunningNatively()) {
+      console.log('[Auth] Native app detected - redirecting to home after auth');
       return '/app/home';
     }
 
+    // For web, use redirect parameters or default to home
     const webRedirect = redirectParam || fromLocation || storedRedirect;
     if (!webRedirect) {
       return '/app/home';
     }
 
-    // Normalize legacy paths
+    // Normalize legacy paths for web
     if (webRedirect === '/home') return '/app/home';
     if (webRedirect === '/onboarding') return '/app/home';
 
     return webRedirect;
   };
 
-  // Enhanced navigation handling for native apps
+  // Log important state for debugging
   useEffect(() => {
-    const handlePostAuthNavigation = () => {
-      if (!user || navigationProcessing) return;
+    console.log('[Auth] Auth page state', {
+      hasUser: !!user,
+      userId: user?.id,
+      authLoading,
+      onboardingComplete,
+      onboardingLoading,
+      isNative: nativeIntegrationService.isRunningNatively(),
+      currentPath: location.pathname,
+      navigationProcessing
+    });
+  }, [user, authLoading, onboardingComplete, onboardingLoading, navigationProcessing, location.pathname]);
 
-      // Wait for onboarding state to be ready before navigation
-      if (onboardingLoading || !isReady) {
-        console.log('[Auth] Waiting for onboarding state to be ready');
+  // CENTRALIZED NAVIGATION: Auth page only handles UI, AuthStateManager handles navigation
+  useEffect(() => {
+    if (user && !authLoading && !navigationProcessing) {
+      console.log('[Auth] User authenticated, delegating to AuthStateManager for navigation');
+      
+      // Check if auth state manager is already processing
+      if (authStateManager.getProcessingState()) {
+        console.log('[Auth] Auth state manager already processing, skipping');
         return;
       }
-
-      console.log('[Auth] User authenticated, processing navigation', {
-        userEmail: user.email,
-        onboardingComplete,
-        isNative: nativeIntegrationService.isRunningNatively()
-      });
       
       setNavigationProcessing(true);
       
-      const finalPath = getFinalRedirectPath();
-      console.log('[Auth] Final redirect path:', finalPath);
+      const finalRedirectPath = getFinalRedirectPath();
+      console.log('[Auth] Delegating navigation to AuthStateManager:', finalRedirectPath);
       
-      const isNative = nativeIntegrationService.isRunningNatively();
-      
-      if (isNative) {
-        console.log('[Auth] Native app - using immediate navigation');
-        // For native apps, use direct navigation
-        setTimeout(() => {
-          window.location.href = finalPath;
-        }, 100);
-      } else {
-        // For web, use React Router navigation
-        console.log('[Auth] Web app - using React Router navigation');
-        setTimeout(() => {
-          navigate(finalPath, { replace: true });
-        }, 200);
-      }
-    };
+      // CENTRALIZED: Let AuthStateManager handle all navigation logic
+      authStateManager.handleAuthSuccess(finalRedirectPath)
+        .finally(() => {
+          // Reset processing after a delay to prevent UI flickering
+          setTimeout(() => setNavigationProcessing(false), 2000);
+        });
+    }
+  }, [user, authLoading, navigationProcessing]);
 
-    handlePostAuthNavigation();
-  }, [user, onboardingComplete, onboardingLoading, isReady, navigationProcessing, navigate]);
-
-  // Show loading while checking auth
-  if (authLoading || onboardingLoading || !isReady) {
+  // Show loading state while checking auth
+  if (authLoading || onboardingLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center space-y-4">
@@ -131,7 +141,7 @@ export default function Auth() {
     );
   }
 
-  // Show navigation processing for web (native handled above)
+  // Show minimal loading for navigation processing to prevent getting stuck
   if (navigationProcessing && !nativeIntegrationService.isRunningNatively()) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -143,15 +153,17 @@ export default function Auth() {
     );
   }
 
-  // Handle authenticated users
+  // Handle authenticated users - let the useEffect handle navigation
   if (user && !navigationProcessing) {
     const finalRedirectPath = getFinalRedirectPath();
     
+    // For web apps, use React Router navigation immediately
     if (!nativeIntegrationService.isRunningNatively()) {
       return <Navigate to={finalRedirectPath} replace />;
     }
     
-    // For native apps, show fallback component
+    // For native apps, navigation is handled in useEffect above
+    // Show fallback component with manual redirect option
     return (
       <AuthRedirectFallback 
         onManualRedirect={() => nativeNavigationService.handleAuthSuccess()}
@@ -183,7 +195,9 @@ export default function Auth() {
 
         {authError && (
           <div className="mb-4 p-3 border border-red-200 bg-red-50 text-red-700 rounded-md">
-            <p className="text-sm">{authError}</p>
+            <p className="text-sm">
+              {authError}
+            </p>
             <button
               onClick={() => setAuthError(null)}
               className="mt-2 text-xs text-red-600 hover:text-red-800 underline"
@@ -200,7 +214,7 @@ export default function Auth() {
             onError={(error) => {
               console.error('[Auth] Platform auth error:', error);
               setAuthError(error);
-              authStateManager.handleAuthFailure(new Error(error));
+              authStateManager.handleAuthFailure(error);
               setNavigationProcessing(false);
             }}
           />
