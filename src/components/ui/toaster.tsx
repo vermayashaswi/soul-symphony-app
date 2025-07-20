@@ -8,14 +8,11 @@ import {
   ToastTitle,
   ToastViewport,
 } from "@/components/ui/toast"
-import { useTheme } from "@/hooks/use-theme"
+import { useSafeTheme } from "@/hooks/use-safe-theme"
 
 export function Toaster() {
   const { toasts } = useToast()
-  const { theme, systemTheme } = useTheme()
-  
-  // Determine if we're in dark mode
-  const isDarkMode = theme === 'dark' || (theme === 'system' && systemTheme === 'dark')
+  const { isDarkMode } = useSafeTheme()
 
   return (
     <ToastProvider>

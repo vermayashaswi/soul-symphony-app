@@ -71,63 +71,63 @@ const Node: React.FC<NodeProps> = ({
   const coordinatedTranslation = useMemo(() => {
     if (getCoordinatedTranslation) {
       const translation = getCoordinatedTranslation(node.id);
-      if (isInstantMode) {
-        console.log(`[Node] ENHANCED COORDINATED INSTANT: Got coordinated translation for ${node.id}: "${translation}" - NO LOADING DELAY`);
-      } else {
-        console.log(`[Node] ENHANCED COORDINATED: Got coordinated translation for ${node.id}: "${translation}"`);
-      }
+      console.log(`[Node] ENHANCED COORDINATED TRANSLATION: Got translation for ${node.id}: "${translation}"`);
       return translation;
     }
-    if (isInstantMode) {
-      console.log(`[Node] ENHANCED COORDINATED INSTANT: No coordinated translation function available for ${node.id} - NO LOADING DELAY`);
-    } else {
-      console.log(`[Node] ENHANCED COORDINATED: No coordinated translation function available for ${node.id}`);
-    }
     return undefined;
-  }, [node.id, getCoordinatedTranslation, isInstantMode]);
+  }, [node.id, getCoordinatedTranslation]);
 
-  // UPDATED: New darker color scheme implementation
+  // ENHANCED: Much more dramatic color scheme with brighter highlights and darker dims
   const color = useMemo(() => {
     if (isSelected) {
-      // Selected state: Use darker shades
+      // ENHANCED: Much brighter selected colors for maximum visibility
       if (node.type === 'entity') {
-        return new THREE.Color('#14532d'); // Much darker green for selected entity nodes
+        return new THREE.Color('#00ff00'); // Bright green for selected entity nodes
       } else {
-        return new THREE.Color('#b45309'); // Much darker golden for selected emotion nodes
+        return new THREE.Color('#ffa500'); // Bright orange for selected emotion nodes
       }
     }
     
-    if (isHighlighted || (!dimmed && !isSelected)) {
-      // Default state: Use the new darker colors for both highlighted and normal nodes
+    if (isHighlighted) {
+      // ENHANCED: Bright highlighted colors
       if (node.type === 'entity') {
-        return new THREE.Color('#15803d'); // Darker green for entity nodes (spheres)
+        return new THREE.Color('#22c55e'); // Bright green for highlighted entity nodes
       } else {
-        return new THREE.Color('#d97706'); // Darker golden for emotion nodes (cubes)
+        return new THREE.Color('#f59e0b'); // Bright yellow for highlighted emotion nodes
       }
     }
     
-    // ENHANCED: 20% lighter colors for dimmed nodes instead of very dark
-    return new THREE.Color(dimmed ? '#3a3a3a' : '#cccccc');
+    if (dimmed) {
+      // ENHANCED: Much darker dimmed colors for dramatic contrast
+      return new THREE.Color('#1a1a1a');
+    }
+    
+    // Default state: moderate visibility
+    if (node.type === 'entity') {
+      return new THREE.Color('#15803d'); // Default green for entity nodes
+    } else {
+      return new THREE.Color('#d97706'); // Default golden for emotion nodes
+    }
   }, [isSelected, isHighlighted, dimmed, node.type]);
 
-  // ENHANCED: More dramatic scale differences for better hierarchy
+  // ENHANCED: Much more dramatic scale differences for better hierarchy
   const baseNodeScale = useMemo(() => {
-    const baseScale = 1.15;
-    if (isSelected) return baseScale * 1.6; // Even larger for selected
-    if (isHighlighted) return baseScale * 1.3; // Larger for highlighted
-    if (dimmed) return baseScale * 0.6; // Much smaller for dimmed
+    const baseScale = 1.2;
+    if (isSelected) return baseScale * 2.0; // Much larger for selected (doubled)
+    if (isHighlighted) return baseScale * 1.5; // Larger for highlighted
+    if (dimmed) return baseScale * 0.4; // Much smaller for dimmed
     return baseScale;
   }, [isSelected, isHighlighted, dimmed]);
 
-  // ENHANCED: Increased opacity for dimmed nodes to 0.05-0.06
+  // ENHANCED: More dramatic opacity differences
   const nodeOpacity = useMemo(() => {
     if (isSelected) return 1.0;
-    if (isHighlighted) return 0.9;
-    if (dimmed) return 0.05; // Increased from extremely low to 0.05
+    if (isHighlighted) return 0.95;
+    if (dimmed) return 0.1; // Much more transparent for dimmed nodes
     return 0.8;
   }, [isSelected, isHighlighted, dimmed]);
 
-  // PULSATING ANIMATION: Enhanced frame animation with pulsing effects
+  // ENHANCED: Much more dramatic pulsing animation
   useFrame((state, delta) => {
     if (!meshRef.current || !isReady) return;
     
@@ -136,35 +136,35 @@ const Node: React.FC<NodeProps> = ({
       setAnimationTime(prev => prev + delta);
       
       if (isHighlighted) {
-        // PULSATING: Different pulse intensities based on connection state
-        const pulseIntensity = isSelected ? 0.25 : (connectionPercentage > 0 ? connectionPercentage * 0.003 : 0.15);
-        const pulse = Math.sin(animationTime * 2.5) * pulseIntensity + 1.0;
+        // ENHANCED: Much more dramatic pulsing effects
+        const pulseIntensity = isSelected ? 0.4 : (connectionPercentage > 0 ? connectionPercentage * 0.006 : 0.25);
+        const pulse = Math.sin(animationTime * 3.0) * pulseIntensity + 1.0;
         const targetScale = baseNodeScale * pulse;
         
-        // Apply pulsing scale
-        meshRef.current.scale.lerp(new THREE.Vector3(targetScale, targetScale, targetScale), 0.1);
+        // Apply dramatic pulsing scale
+        meshRef.current.scale.lerp(new THREE.Vector3(targetScale, targetScale, targetScale), 0.15);
         
-        // PULSATING: Emissive glow breathing effect
+        // ENHANCED: Much brighter emissive glow for highlighted nodes
         if (meshRef.current.material instanceof THREE.MeshStandardMaterial) {
           const emissiveIntensity = isSelected 
-            ? 1.0 + Math.sin(animationTime * 3) * 0.3
-            : 0.7 + (connectionPercentage > 0 ? connectionPercentage * 0.005 : 0.2) + Math.sin(animationTime * 3) * 0.2;
+            ? 1.5 + Math.sin(animationTime * 4) * 0.5 // Much brighter for selected
+            : 1.0 + (connectionPercentage > 0 ? connectionPercentage * 0.01 : 0.3) + Math.sin(animationTime * 3) * 0.3;
           
-          meshRef.current.material.emissiveIntensity = Math.max(0, Math.min(2, emissiveIntensity));
+          meshRef.current.material.emissiveIntensity = Math.max(0, Math.min(3, emissiveIntensity));
         }
       } else {
         // Static scale for non-highlighted nodes
-        const targetScale = dimmed ? baseNodeScale * 0.8 : baseNodeScale;
+        const targetScale = dimmed ? baseNodeScale * 0.6 : baseNodeScale;
         meshRef.current.scale.lerp(new THREE.Vector3(targetScale, targetScale, targetScale), 0.1);
         
         if (meshRef.current.material instanceof THREE.MeshStandardMaterial) {
-          meshRef.current.material.emissiveIntensity = dimmed ? 0 : 0.1;
+          meshRef.current.material.emissiveIntensity = dimmed ? 0 : 0.2;
         }
       }
       
-      // Update material color and opacity
+      // Update material color and opacity with smooth transitions
       if (meshRef.current.material instanceof THREE.MeshStandardMaterial) {
-        (meshRef.current.material as THREE.MeshStandardMaterial).color.lerp(color, 0.1);
+        (meshRef.current.material as THREE.MeshStandardMaterial).color.lerp(color, 0.15);
         meshRef.current.material.opacity = nodeOpacity;
       }
     } catch (error) {
@@ -174,38 +174,35 @@ const Node: React.FC<NodeProps> = ({
 
   const handleNodeClick = (e: any) => {
     e.stopPropagation();
+    console.log(`[Node] ENHANCED NODE CLICK: ${node.id} clicked`);
     onClick(node.id, e);
   };
 
-  // ENHANCED: Only show labels for highlighted/selected nodes or when forced
+  // ENHANCED: Show labels for highlighted/selected nodes with better logic
   const shouldShowLabel = useMemo(() => {
     if (dimmed) return false; // Never show labels for dimmed nodes
     return forceShowLabels || showLabel || isSelected || isHighlighted;
   }, [forceShowLabels, showLabel, isSelected, isHighlighted, dimmed]);
 
-  // ENHANCED INSTANT MODE: Better logging for coordinated translation tracking
+  // ENHANCED: Better debug logging for percentage display
   if (showPercentage && connectionPercentage > 0) {
-    if (isInstantMode) {
-      console.log(`[Node] ENHANCED COORDINATED PULSATING INSTANT MODE: ${node.id} (${node.type}) displays percentage: ${connectionPercentage}% with coordinated translation: "${coordinatedTranslation}" - NO LOADING DELAY`);
-    } else {
-      console.log(`[Node] ENHANCED COORDINATED PULSATING: ${node.id} (${node.type}) should display percentage: ${connectionPercentage}% with coordinated translation: "${coordinatedTranslation}"`);
-    }
+    console.log(`[Node] ENHANCED PERCENTAGE DISPLAY: ${node.id} (${node.type}) shows ${connectionPercentage}% connection to ${selectedNodeId}`);
   }
 
-  if (isInstantMode) {
-    console.log(`[Node] ENHANCED DARKER COLORS INSTANT MODE: Rendering ${node.type} node ${node.id} with ${isSelected ? 'SELECTED' : 'DEFAULT'} DARKER ${node.type === 'entity' ? 'GREEN' : 'GOLDEN'} color, enhanced coordinated translation: "${coordinatedTranslation}", base scale ${baseNodeScale.toFixed(2)} - NO LOADING DELAY`);
-  } else {
-    console.log(`[Node] ENHANCED DARKER COLORS: Rendering ${node.type} node ${node.id} with ${isSelected ? 'SELECTED' : 'DEFAULT'} DARKER ${node.type === 'entity' ? 'GREEN' : 'GOLDEN'} color, enhanced coordinated translation: "${coordinatedTranslation}", base scale ${baseNodeScale.toFixed(2)}`);
-  }
+  // ENHANCED: More detailed debug logging for visual state
+  console.log(`[Node] ENHANCED VISUAL STATE: ${node.id} (${node.type})`);
+  console.log(`  - Selected: ${isSelected}, Highlighted: ${isHighlighted}, Dimmed: ${dimmed}`);
+  console.log(`  - Scale: ${baseNodeScale.toFixed(2)}, Opacity: ${nodeOpacity.toFixed(2)}`);
+  console.log(`  - Color: ${color.getHexString()}, Translation: "${coordinatedTranslation}"`);
 
-  // ENHANCED: Improved geometry sizes to work with the enhanced scale differences
+  // ENHANCED: Larger geometry sizes to work with the enhanced scale differences
   const renderGeometry = () => {
     if (node.type === 'emotion') {
-      // Cube for emotion nodes (darker golden)
-      return <boxGeometry args={[1.6, 1.6, 1.6]} />;
+      // Larger cube for emotion nodes
+      return <boxGeometry args={[1.8, 1.8, 1.8]} />;
     } else {
-      // Sphere for entity nodes (darker green)
-      return <sphereGeometry args={[0.8, 32, 32]} />;
+      // Larger sphere for entity nodes
+      return <sphereGeometry args={[0.9, 32, 32]} />;
     }
   };
 
@@ -225,12 +222,12 @@ const Node: React.FC<NodeProps> = ({
         {renderGeometry()}
         <meshStandardMaterial 
           color={color} 
-          metalness={0.3} 
-          roughness={0.8}
+          metalness={0.2} 
+          roughness={0.6}
           transparent={true}
           opacity={nodeOpacity}
           emissive={color}
-          emissiveIntensity={isHighlighted ? 1.2 : (dimmed ? 0 : 0.1)}
+          emissiveIntensity={isHighlighted ? (isSelected ? 2.0 : 1.5) : (dimmed ? 0 : 0.2)}
         />
       </mesh>
       

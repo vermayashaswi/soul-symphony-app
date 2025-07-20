@@ -1,14 +1,11 @@
 
-import { useTheme } from "@/hooks/use-theme"
+import { useSafeTheme } from "@/hooks/use-safe-theme"
 import { Toaster as Sonner } from "sonner"
 
 type ToasterProps = React.ComponentProps<typeof Sonner>
 
 function Toaster({ ...props }: ToasterProps) {
-  const { theme, systemTheme, colorTheme } = useTheme()
-  
-  // Determine if we're in dark mode
-  const isDarkMode = theme === 'dark' || (theme === 'system' && systemTheme === 'dark')
+  const { isDarkMode } = useSafeTheme()
 
   return (
     <Sonner

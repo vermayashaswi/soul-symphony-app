@@ -28,10 +28,10 @@ const Index = () => {
   const shouldRenderMobile = isMobile.isMobile || mobileDemo;
   const isNative = nativeIntegrationService.isRunningNatively();
 
-  // CRITICAL: For native apps, redirect immediately - never show marketing site
+  // Enhanced native app redirect logic with faster response
   useEffect(() => {
     if (isNative) {
-      console.log('[Index] Native app detected, redirecting to app interface');
+      console.log('[Index] Native app detected - processing redirect');
       
       // Check for OAuth callback parameters first
       const hashParams = new URLSearchParams(window.location.hash.replace('#', ''));
@@ -40,22 +40,26 @@ const Index = () => {
                             urlParams.has('error') || hashParams.has('error');
 
       if (hasOAuthParams) {
-        console.log('[Index] OAuth callback detected in native app, redirecting to auth');
+        console.log('[Index] OAuth callback detected in native app');
+        // Immediate redirect for OAuth callback
         navigate(`/app/auth${window.location.search}${window.location.hash}`, { replace: true });
         return;
       }
 
-      // Redirect based on user status
-      if (!user) {
-        console.log('[Index] No user in native app, redirecting to onboarding');
-        navigate('/app/onboarding', { replace: true });
-      } else if (!onboardingComplete) {
-        console.log('[Index] Onboarding not complete in native app, redirecting to onboarding');
-        navigate('/app/onboarding', { replace: true });
-      } else {
-        console.log('[Index] Native app user ready, redirecting to home');
-        navigate('/app/home', { replace: true });
-      }
+      // For native apps, navigate immediately based on current auth state
+      // Don't wait for all loading states to complete
+      const redirectTarget = user 
+        ? (onboardingComplete ? '/app/home' : '/app/onboarding')
+        : '/app/onboarding';
+      
+      console.log('[Index] Native app redirect:', {
+        hasUser: !!user,
+        onboardingComplete,
+        target: redirectTarget
+      });
+      
+      // Immediate navigation for native
+      navigate(redirectTarget, { replace: true });
       return;
     }
   }, [isNative, user, onboardingComplete, navigate, urlParams]);
