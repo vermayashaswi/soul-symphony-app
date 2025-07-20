@@ -1,5 +1,5 @@
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { useLocation, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Home, MessageCircle, BookOpen, BarChart2, Settings, Crown } from 'lucide-react';
@@ -11,6 +11,7 @@ import { useTutorial } from '@/contexts/TutorialContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTranslation } from '@/contexts/TranslationContext';
 import { useSubscription } from '@/contexts/SubscriptionContext';
+import { useSafeArea } from '@/hooks/use-safe-area';
 
 interface MobileNavigationProps {
   onboardingComplete: boolean | null;
@@ -25,8 +26,9 @@ const MobileNavigation: React.FC<MobileNavigationProps> = ({ onboardingComplete 
   const { user } = useAuth();
   const { currentLanguage } = useTranslation();
   const { hasActiveSubscription, isTrialActive } = useSubscription();
+  const { safeArea, isNative, applySafeAreaStyles } = useSafeArea();
+  const navRef = useRef<HTMLDivElement>(null);
   
-  // Debug: Force component re-render when language changes
   const [renderKey, setRenderKey] = useState(0);
   
   useEffect(() => {
@@ -39,11 +41,20 @@ const MobileNavigation: React.FC<MobileNavigationProps> = ({ onboardingComplete 
     return () => window.removeEventListener('languageChange', handleLanguageChange);
   }, []);
   
+  // Apply safe area styles to the navigation element
+  useEffect(() => {
+    if (navRef.current) {
+      applySafeAreaStyles(navRef.current);
+      console.log('MobileNavigation: Applied safe area styles:', safeArea);
+    }
+  }, [safeArea, applySafeAreaStyles]);
+  
   useEffect(() => {
     const handleVisualViewportResize = () => {
       if (window.visualViewport) {
         const isKeyboard = window.visualViewport.height < window.innerHeight * 0.75;
         setIsKeyboardVisible(isKeyboard);
+        console.log('MobileNavigation: Keyboard visibility changed:', isKeyboard);
       }
     };
     
@@ -97,13 +108,12 @@ const MobileNavigation: React.FC<MobileNavigationProps> = ({ onboardingComplete 
       isOnboardingOrAuth,
       hasUser: !!user,
       onboardingComplete,
-      isTutorialActive,
-      currentLanguage,
-      renderKey
+      safeArea,
+      isNative
     });
     
     setIsVisible(shouldShowNav);
-  }, [location.pathname, isMobile, isKeyboardVisible, isTutorialActive, user, onboardingComplete, currentLanguage, renderKey]);
+  }, [location.pathname, isMobile, isKeyboardVisible, isTutorialActive, user, onboardingComplete, currentLanguage, renderKey, safeArea, isNative]);
   
   if (!isVisible) {
     return null;
@@ -129,31 +139,34 @@ const MobileNavigation: React.FC<MobileNavigationProps> = ({ onboardingComplete 
   
   const isPremiumFeatureAccessible = hasActiveSubscription || isTrialActive;
   
-  console.log('MobileNavigation: Rendering with language:', currentLanguage, 'renderKey:', renderKey);
+  // Calculate dynamic styles based on safe area
+  const navigationStyle = {
+    bottom: `${safeArea.bottom}px`,
+    left: `${safeArea.left}px`,
+    right: `${safeArea.right}px`,
+    height: `calc(4rem + ${safeArea.bottom}px)`,
+    paddingBottom: `${safeArea.bottom}px`,
+  };
+  
+  console.log('MobileNavigation: Rendering with safe area styles:', navigationStyle);
   
   return (
     <motion.div 
-      key={`nav-${renderKey}-${currentLanguage}`} // Force re-render on language change
+      ref={navRef}
+      key={`nav-${renderKey}-${currentLanguage}`}
       className={cn(
-        "fixed bottom-0 left-0 right-0 bg-background border-t border-muted",
+        "mobile-navigation",
         isTutorialActive && "opacity-30 pointer-events-none"
       )}
-      style={{
-        zIndex: 9998,
-        paddingTop: '0.40rem',
-        paddingBottom: 'max(0.40rem, env(safe-area-inset-bottom))',
-        height: 'calc(3.6rem + env(safe-area-inset-bottom))'
-      }}
+      style={navigationStyle}
       initial={{ y: 100 }}
       animate={{ y: 0 }}
       transition={{ duration: 0.3 }}
     >
-      <div className="flex justify-around items-center">
+      <div className="mobile-navigation-content">
         {navItems.map((item) => {
           const isActive = getActiveStatus(item.path);
           const isLocked = item.isPremium && !isPremiumFeatureAccessible;
-          
-          console.log(`MobileNavigation: Rendering nav item "${item.label}" for path ${item.path} with language ${currentLanguage}`);
           
           return (
             <Link
@@ -195,8 +208,6 @@ const MobileNavigation: React.FC<MobileNavigationProps> = ({ onboardingComplete 
                   enableFontScaling={true}
                   scalingContext="mobile-nav"
                   className="block"
-                  onTranslationStart={() => console.log(`MobileNavigation: Translation started for "${item.label}" to ${currentLanguage}`)}
-                  onTranslationEnd={() => console.log(`MobileNavigation: Translation completed for "${item.label}" to ${currentLanguage}`)}
                 />
               </span>
             </Link>

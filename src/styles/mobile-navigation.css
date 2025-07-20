@@ -1,0 +1,56 @@
+
+/* Mobile Navigation Specific Styles */
+.mobile-navigation {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: 9999;
+  
+  /* Use CSS custom properties for safe area handling */
+  bottom: var(--safe-area-inset-bottom, 0px);
+  left: var(--safe-area-inset-left, 0px);
+  right: var(--safe-area-inset-right, 0px);
+  
+  /* Ensure navigation height includes safe area */
+  height: calc(var(--nav-bar-height) + var(--safe-area-inset-bottom, 0px));
+  padding-bottom: var(--safe-area-inset-bottom, 0px);
+  
+  /* Prevent any gaps or overlaps */
+  margin: 0;
+  border: 0;
+  
+  /* Ensure proper background coverage */
+  background-color: hsl(var(--background));
+  border-top: 1px solid hsl(var(--border));
+}
+
+/* Navigation content positioning */
+.mobile-navigation-content {
+  height: var(--nav-bar-height);
+  display: flex;
+  align-items: center;
+  justify-content: space-around;
+  padding: 0.5rem 1rem 0.5rem 1rem;
+}
+
+/* Chat input positioning to account for navigation */
+.mobile-chat-input-container {
+  position: fixed;
+  bottom: calc(var(--nav-bar-height) + var(--safe-area-inset-bottom, 0px));
+  left: var(--safe-area-inset-left, 0px);
+  right: var(--safe-area-inset-right, 0px);
+  z-index: 9998;
+}
+
+/* Prevent body scroll on mobile when keyboard is visible */
+.keyboard-visible .mobile-navigation {
+  display: none;
+}
+
+/* Ensure no horizontal overflow */
+.mobile-navigation,
+.mobile-navigation * {
+  max-width: 100%;
+  box-sizing: border-box;
+}

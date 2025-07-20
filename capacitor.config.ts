@@ -49,12 +49,13 @@ const config: CapacitorConfig = {
     }
   },
   ios: {
-    contentInset: "always",
+    contentInset: "never", // FIXED: Changed from "always" to "never" to prevent extra spacing
     allowsLinkPreview: false,
     scrollEnabled: true,
     backgroundColor: "#FFFFFF",
     scheme: "Soulo",
-    preferredContentMode: "mobile"
+    preferredContentMode: "mobile",
+    handleApplicationURL: true // Enable proper URL handling
   },
   android: {
     allowMixedContent: false,
@@ -68,7 +69,10 @@ const config: CapacitorConfig = {
     overrideUserAgent: "SouloApp/1.0.0 Mobile",
     androidScheme: "https",
     loadOnMainThread: true,
-    handlePermissions: true
+    handlePermissions: true,
+    // Android-specific safe area handling
+    allowNavigationBarColorChange: true,
+    navigationBarColor: "#FFFFFF"
   }
 };
 
