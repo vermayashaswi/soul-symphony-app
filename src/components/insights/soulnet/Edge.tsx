@@ -90,34 +90,34 @@ export const Edge: React.FC<EdgeProps> = ({
     return geometry;
   }, [points]);
 
-  // ENHANCED: Much more dramatic color scheme for edges
+  // ENHANCED: Improved color scheme with 20% lighter colors for dimmed edges
   const getEdgeColor = useMemo(() => {
     if (isHighlighted) {
       return '#ffffff'; // Bright white for highlighted connections
     }
     
     if (dimmed) {
-      // ENHANCED: Much darker colors for dimmed edges
-      return '#0a0a0a';
+      // ENHANCED: 20% lighter colors for dimmed edges instead of very dark
+      return theme === 'light' ? '#4a4a4a' : '#3a3a3a';
     }
     
     // Default state - moderately visible
-    return theme === 'light' ? '#666666' : '#999999';
+    return theme === 'light' ? '#555555' : '#888888';
   }, [isHighlighted, dimmed, theme]);
 
-  // ENHANCED: Much more dramatic opacity differences
+  // ENHANCED: Increased opacity for dimmed edges to 0.05-0.06
   const getEdgeOpacity = useMemo(() => {
     if (isHighlighted) {
-      return 1.0; // Completely opaque for highlighted
+      return 0.95; // Very bright for highlighted
     }
     
     if (dimmed) {
-      // ENHANCED: Much more transparent for dimmed edges
-      return 0.02;
+      // ENHANCED: Increased opacity to 0.05-0.06 range for better visibility
+      return theme === 'light' ? 0.06 : 0.05;
     }
     
     // Default state
-    return theme === 'light' ? 0.3 : 0.15;
+    return theme === 'light' ? 0.25 : 0.08;
   }, [isHighlighted, dimmed, theme]);
 
   useFrame(() => {
@@ -133,9 +133,9 @@ export const Edge: React.FC<EdgeProps> = ({
     }
   });
 
-  // ENHANCED: Much more dramatic thickness differences
-  const baseThickness = isHighlighted ? 4.0 : (dimmed ? 0.1 : 0.5); // Much thicker highlighted, much thinner dimmed
-  const thickness = baseThickness + (value * (isHighlighted ? maxThickness * 2.0 : maxThickness * 0.05));
+  // ENHANCED: Much more dramatic thickness difference
+  const baseThickness = isHighlighted ? 2.5 : 0.3; // Highlighted much thicker, dimmed much thinner
+  const thickness = baseThickness + (value * (isHighlighted ? maxThickness * 1.5 : maxThickness * 0.1));
   
   // Create material with appropriate properties
   const material = useMemo(() => {
@@ -148,10 +148,6 @@ export const Edge: React.FC<EdgeProps> = ({
       depthTest: true,   // Maintain proper depth testing
     });
   }, [getEdgeColor, getEdgeOpacity, thickness]);
-
-  // ENHANCED: Debug logging for edge visual state
-  console.log(`[Edge] ENHANCED EDGE STATE: highlighted: ${isHighlighted}, dimmed: ${dimmed}`);
-  console.log(`  - Color: ${getEdgeColor}, Opacity: ${getEdgeOpacity.toFixed(3)}, Thickness: ${thickness.toFixed(2)}`);
 
   return (
     <group ref={ref}>

@@ -8,26 +8,9 @@ export function useOnboarding() {
   const [loading, setLoading] = useState(true);
   const [displayName, setDisplayName] = useState<string | null>(null);
   const [user, setUser] = useState<User | null>(null);
-  const [isNativeReady, setIsNativeReady] = useState(false);
 
   const checkOnboardingStatus = async () => {
     try {
-      console.log('[Onboarding] Checking onboarding status...', { hasUser: !!user });
-      
-      // For native apps, add stability check
-      const isNative = typeof window !== 'undefined' && 
-        (window.navigator?.userAgent?.includes('CapacitorWebView') || 
-         window.location.protocol === 'capacitor:');
-      
-      if (isNative && !isNativeReady) {
-        console.log('[Onboarding] Native app not ready yet, delaying check');
-        setTimeout(() => {
-          setIsNativeReady(true);
-          checkOnboardingStatus();
-        }, 200);
-        return;
-      }
-      
       setLoading(true);
       
       // For authenticated users, check database first
@@ -75,53 +58,18 @@ export function useOnboarding() {
 
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      console.log('[Onboarding] Auth state changed:', event, { hasUser: !!session?.user });
       setUser(session?.user ?? null);
-      
-      // For native apps, mark as ready
-      const isNative = typeof window !== 'undefined' && 
-        (window.navigator?.userAgent?.includes('CapacitorWebView') || 
-         window.location.protocol === 'capacitor:');
-      
-      if (isNative && !isNativeReady) {
-        setTimeout(() => setIsNativeReady(true), 100);
-      }
+      checkOnboardingStatus();
     });
 
-    // Check initial auth state with native handling
-    const initializeAuth = async () => {
-      try {
-        const { data: { session } } = await supabase.auth.getSession();
-        console.log('[Onboarding] Initial session check:', { hasUser: !!session?.user });
-        setUser(session?.user ?? null);
-        
-        // For native apps, mark as ready
-        const isNative = typeof window !== 'undefined' && 
-          (window.navigator?.userAgent?.includes('CapacitorWebView') || 
-           window.location.protocol === 'capacitor:');
-        
-        if (isNative) {
-          setTimeout(() => setIsNativeReady(true), 100);
-        } else {
-          setIsNativeReady(true);
-        }
-      } catch (error) {
-        console.error('[Onboarding] Error getting initial session:', error);
-        setIsNativeReady(true);
-      }
-    };
-
-    initializeAuth();
+    // Check initial auth state
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setUser(session?.user ?? null);
+      checkOnboardingStatus();
+    });
 
     return () => subscription.unsubscribe();
   }, []);
-
-  // Check onboarding status when user changes or native becomes ready
-  useEffect(() => {
-    if (isNativeReady) {
-      checkOnboardingStatus();
-    }
-  }, [user, isNativeReady]);
 
   const completeOnboarding = async () => {
     try {

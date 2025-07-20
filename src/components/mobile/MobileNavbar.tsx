@@ -36,14 +36,17 @@ const MobileNavbar = () => {
   return (
     <motion.nav
       className={cn(
-        "mobile-navigation-bar bg-background/90 backdrop-blur-md border-t",
-        isTutorialActive && "opacity-30 pointer-events-none"
+        "fixed bottom-0 left-0 right-0 bg-background/90 backdrop-blur-md border-t px-4 py-2",
+        isTutorialActive && "opacity-30 pointer-events-none" // Fade out and disable interaction during tutorial
       )}
+      style={{
+        zIndex: 9998, // Lower z-index than tutorial overlay (9999)
+      }}
       initial={{ y: 100 }}
       animate={{ y: 0 }}
       transition={{ duration: 0.3 }}
     >
-      <div className="flex justify-between items-center px-4 py-2">
+      <div className="flex justify-between items-center">
         <Button 
           variant="ghost" 
           size="icon" 

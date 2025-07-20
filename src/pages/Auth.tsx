@@ -65,7 +65,7 @@ export default function Auth() {
 
       setAuthError(userMessage);
       toast.error(userMessage);
-      authStateManager.handleAuthFailure(new Error(userMessage));
+      authStateManager.handleAuthFailure({ message: userMessage });
     }
   }, [searchParams]);
 
@@ -104,33 +104,30 @@ export default function Auth() {
     });
   }, [user, authLoading, onboardingComplete, onboardingLoading, navigationProcessing, location.pathname]);
 
-  // Handle navigation after successful authentication with native optimization
+  // CENTRALIZED NAVIGATION: Auth page only handles UI, AuthStateManager handles navigation
   useEffect(() => {
-    if (user && !navigationProcessing) {
-      console.log('[Auth] User authenticated, handling navigation', {
-        user: user.email,
-        isNative: nativeIntegrationService.isRunningNatively()
-      });
+    if (user && !authLoading && !navigationProcessing) {
+      console.log('[Auth] User authenticated, delegating to AuthStateManager for navigation');
+      
+      // Check if auth state manager is already processing
+      if (authStateManager.getProcessingState()) {
+        console.log('[Auth] Auth state manager already processing, skipping');
+        return;
+      }
       
       setNavigationProcessing(true);
       
-      const finalPath = getFinalRedirectPath();
-      console.log('[Auth] Final redirect path determined:', finalPath);
+      const finalRedirectPath = getFinalRedirectPath();
+      console.log('[Auth] Delegating navigation to AuthStateManager:', finalRedirectPath);
       
-      // For native apps, navigate immediately
-      if (nativeIntegrationService.isRunningNatively()) {
-        console.log('[Auth] Native app - immediate navigation');
-        setTimeout(() => {
-          window.location.href = finalPath;
-        }, 50);
-      } else {
-        // For web, use shorter delay
-        setTimeout(() => {
-          window.location.href = finalPath;
-        }, 200);
-      }
+      // CENTRALIZED: Let AuthStateManager handle all navigation logic
+      authStateManager.handleAuthSuccess(finalRedirectPath)
+        .finally(() => {
+          // Reset processing after a delay to prevent UI flickering
+          setTimeout(() => setNavigationProcessing(false), 2000);
+        });
     }
-  }, [user, navigationProcessing]);
+  }, [user, authLoading, navigationProcessing]);
 
   // Show loading state while checking auth
   if (authLoading || onboardingLoading) {
@@ -217,7 +214,7 @@ export default function Auth() {
             onError={(error) => {
               console.error('[Auth] Platform auth error:', error);
               setAuthError(error);
-              authStateManager.handleAuthFailure(new Error(error));
+              authStateManager.handleAuthFailure(error);
               setNavigationProcessing(false);
             }}
           />
