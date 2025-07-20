@@ -56,7 +56,7 @@ export const SimplifiedSoulNetVisualization: React.FC<SimplifiedSoulNetVisualiza
   const effectiveTheme = theme === 'system' ? systemTheme : theme;
 
   console.log(`[SimplifiedSoulNetVisualization] COORDINATED THEME: Using app theme context - theme: ${theme}, systemTheme: ${systemTheme}, effective: ${effectiveTheme}`);
-  console.log(`[SimplifiedSoulNetVisualization] COORDINATED INSTANT MODE: Rendering with ${data.nodes.length} nodes, instantReady: ${isInstantReady}`);
+  console.log(`[SimplifiedSoulNetVisualization] COORDINATED INSTANT: Rendering with ${data.nodes.length} nodes, instantReady: ${isInstantReady}`);
 
   // Use Three.js controls for camera
   useFrame(({ camera }) => {
@@ -66,8 +66,27 @@ export const SimplifiedSoulNetVisualization: React.FC<SimplifiedSoulNetVisualiza
     }
   });
 
+  // SOUL-NET SELECTION FIX: Enhanced node click handler with debug logging
+  const handleNodeClick = useCallback((nodeId: string) => {
+    console.log(`[SimplifiedSoulNetVisualization] SOUL-NET SELECTION FIX: Node click received for ${nodeId}`, {
+      currentSelectedNode: selectedNode,
+      nodeId,
+      willToggle: selectedNode === nodeId,
+      isInstantReady
+    });
+    
+    try {
+      onNodeClick(nodeId);
+      console.log(`[SimplifiedSoulNetVisualization] SOUL-NET SELECTION FIX: onNodeClick called successfully for ${nodeId}`);
+    } catch (error) {
+      console.error(`[SimplifiedSoulNetVisualization] SOUL-NET SELECTION FIX: Error in onNodeClick for ${nodeId}:`, error);
+    }
+  }, [selectedNode, onNodeClick, isInstantReady]);
+
   // ENHANCED: Instant highlighting effect with stronger visual hierarchy
   useEffect(() => {
+    console.log(`[SimplifiedSoulNetVisualization] SOUL-NET SELECTION FIX: Selection state changed - selectedNode: ${selectedNode}`);
+    
     if (selectedNode) {
       const connectedNodes = new Set<string>();
       const allOtherNodes = new Set<string>();
@@ -80,7 +99,7 @@ export const SimplifiedSoulNetVisualization: React.FC<SimplifiedSoulNetVisualiza
         });
         connectedNodes.add(selectedNode); // Include the selected node itself
         
-        console.log(`[SimplifiedSoulNetVisualization] COORDINATED INSTANT: Using precomputed connections for ${selectedNode}:`, connectionData.connectedNodes);
+        console.log(`[SimplifiedSoulNetVisualization] SOUL-NET SELECTION FIX: Using precomputed connections for ${selectedNode}:`, connectionData.connectedNodes);
       } else {
         // Fallback to link traversal
         data.links.forEach(link => {
@@ -89,6 +108,8 @@ export const SimplifiedSoulNetVisualization: React.FC<SimplifiedSoulNetVisualiza
             connectedNodes.add(link.target);
           }
         });
+        
+        console.log(`[SimplifiedSoulNetVisualization] SOUL-NET SELECTION FIX: Using link traversal for ${selectedNode}`);
       }
       
       // ENHANCED: All nodes that are NOT connected become dimmed
@@ -98,12 +119,15 @@ export const SimplifiedSoulNetVisualization: React.FC<SimplifiedSoulNetVisualiza
         }
       });
       
+      console.log(`[SimplifiedSoulNetVisualization] SOUL-NET SELECTION FIX: Setting state - highlighted: ${Array.from(connectedNodes).join(', ')}, dimmed: ${Array.from(allOtherNodes).join(', ')}`);
+      
       setHighlightedNodes(connectedNodes);
       setDimmedNodes(allOtherNodes);
       
       console.log(`[SimplifiedSoulNetVisualization] COORDINATED ENHANCED HIERARCHY: Selected ${selectedNode}, highlighting ${connectedNodes.size} nodes, dimming ${allOtherNodes.size} nodes`);
     } else {
       // ENHANCED: When no node is selected, show all nodes normally (no dimming)
+      console.log(`[SimplifiedSoulNetVisualization] SOUL-NET SELECTION FIX: Clearing selection - no node selected`);
       setHighlightedNodes(new Set());
       setDimmedNodes(new Set());
     }
@@ -140,14 +164,14 @@ export const SimplifiedSoulNetVisualization: React.FC<SimplifiedSoulNetVisualiza
         
         const showPercentage = selectedNode !== null && isHighlighted && selectedNode !== node.id && connectionPercentage > 0;
         
-        console.log(`[SimplifiedSoulNetVisualization] COORDINATED ENHANCED HIERARCHY: Node ${node.id} - highlighted: ${isHighlighted}, dimmed: ${isDimmed}, percentage: ${connectionPercentage}%`);
+        console.log(`[SimplifiedSoulNetVisualization] SOUL-NET SELECTION FIX: Rendering node ${node.id} - highlighted: ${isHighlighted}, dimmed: ${isDimmed}, selected: ${selectedNode === node.id}, percentage: ${connectionPercentage}%`);
         
         return (
           <Node
             key={node.id}
             node={node}
             isSelected={selectedNode === node.id}
-            onClick={onNodeClick}
+            onClick={handleNodeClick}
             highlightedNodes={highlightedNodes}
             showLabel={shouldShowLabels && !isDimmed} // Don't show labels for dimmed nodes
             dimmed={isDimmed}
@@ -170,7 +194,7 @@ export const SimplifiedSoulNetVisualization: React.FC<SimplifiedSoulNetVisualiza
         const targetNode = findNodeById(link.target);
         
         if (!sourceNode || !targetNode) {
-          console.warn(`[SimplifiedSoulNetVisualization] COORDINATED: Missing node for link: ${link.source} -> ${link.target}`);
+          console.warn(`[SimplifiedSoulNetVisualization] SOUL-NET SELECTION FIX: Missing node for link: ${link.source} -> ${link.target}`);
           return null;
         }
         
@@ -181,6 +205,8 @@ export const SimplifiedSoulNetVisualization: React.FC<SimplifiedSoulNetVisualiza
         // ENHANCED: Edge is dimmed if EITHER node is dimmed
         const isDimmed = selectedNode !== null && 
           (dimmedNodes.has(link.source) || dimmedNodes.has(link.target));
+        
+        console.log(`[SimplifiedSoulNetVisualization] SOUL-NET SELECTION FIX: Rendering edge ${link.source} -> ${link.target} - highlighted: ${isHighlighted}, dimmed: ${isDimmed}`);
         
         return (
           <Edge

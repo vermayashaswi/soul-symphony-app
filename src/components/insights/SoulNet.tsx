@@ -165,22 +165,36 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
     }
   }, [userId, timeRange, currentLanguage]);
 
-  // ENHANCED: Node selection with state stability
+  // SOUL-NET SELECTION FIX: Enhanced node selection with debug logging
   const handleNodeSelect = useCallback((id: string) => {
-    console.log(`[SoulNet] NODE SELECTED: ${id}`);
+    console.log(`[SoulNet] SOUL-NET SELECTION FIX: Node selection triggered for ${id}`, {
+      currentSelectedEntity: selectedEntity,
+      newNodeId: id,
+      willToggle: selectedEntity === id,
+      willSelect: selectedEntity !== id
+    });
+    
     if (selectedEntity === id) {
+      console.log(`[SoulNet] SOUL-NET SELECTION FIX: Deselecting node ${id}`);
       setSelectedEntity(null);
     } else {
+      console.log(`[SoulNet] SOUL-NET SELECTION FIX: Selecting node ${id}`);
       setSelectedEntity(id);
+      
+      // Haptic feedback
       if (navigator.vibrate) {
         navigator.vibrate(50);
+        console.log(`[SoulNet] SOUL-NET SELECTION FIX: Vibration triggered for node ${id}`);
       }
     }
   }, [selectedEntity]);
 
   const toggleFullScreen = useCallback(() => {
     setIsFullScreen(prev => {
-      if (!prev) setSelectedEntity(null);
+      if (!prev) {
+        console.log(`[SoulNet] SOUL-NET SELECTION FIX: Entering fullscreen, clearing selection`);
+        setSelectedEntity(null);
+      }
       console.log(`[SoulNet] FULLSCREEN TOGGLE: ${!prev}`);
       return !prev;
     });
@@ -195,6 +209,7 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
   }, []);
 
   const handleRetry = useCallback(() => {
+    console.log('[SoulNet] RETRY: Resetting error state');
     setCanvasError(null);
     setRetryCount(0);
     renderingInitialized.current = false;
@@ -365,7 +380,7 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
     );
   };
 
-  console.log(`[SoulNet] FINAL RENDER: ${graphData.nodes.length} nodes, ${graphData.links.length} links, renderingReady: ${renderingReady}`);
+  console.log(`[SoulNet] SOUL-NET SELECTION FIX: Final render - ${graphData.nodes.length} nodes, ${graphData.links.length} links, renderingReady: ${renderingReady}, selectedEntity: ${selectedEntity}`);
 
   return (
     <div className={cn(
@@ -445,7 +460,10 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
                 far: 1000,
                 fov: isFullScreen ? 60 : 50
               }}
-              onPointerMissed={() => setSelectedEntity(null)}
+              onPointerMissed={() => {
+                console.log('[SoulNet] SOUL-NET SELECTION FIX: Canvas pointer missed - clearing selection');
+                setSelectedEntity(null);
+              }}
               gl={{ 
                 preserveDrawingBuffer: true,
                 antialias: !isMobile,
