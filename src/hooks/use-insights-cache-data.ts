@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { format, subMonths, startOfMonth, endOfMonth, isWithinInterval } from 'date-fns';
+import { format, subMonths, startOfMonth, endOfMonth, isWithinInterval, startOfWeek, endOfWeek } from 'date-fns';
 import { TimeRange, AggregatedEmotionData, DominantMood, BiggestImprovement, JournalActivity } from './use-insights-data';
 
 interface CachedInsightsData {
@@ -199,12 +199,22 @@ export const useInsightsCacheData = (
     const effectiveBaseDate = new Date(); // Always use current date for stats
     const { startDate, endDate } = getDateRange(timeRange, effectiveBaseDate);
 
+    console.log(`[statsInsightsData] Time range: ${timeRange}, Base date: ${effectiveBaseDate.toISOString()}, Date range: ${startDate.toISOString()} to ${endDate.toISOString()}`);
+
     // Filter cached entries for the specific time range
     const filteredEntries = cachedData.entries.filter(entry => {
       if (!entry.created_at) return false;
       const entryDate = new Date(entry.created_at);
-      return entryDate >= startDate && entryDate <= endDate;
+      const isInRange = entryDate >= startDate && entryDate <= endDate;
+      
+      if (!isInRange) {
+        console.log(`[statsInsightsData] Entry ${entry.id} created at ${entryDate.toISOString()} is outside range ${startDate.toISOString()} to ${endDate.toISOString()}`);
+      }
+      
+      return isInRange;
     });
+
+    console.log(`[statsInsightsData] Filtered ${filteredEntries.length} entries from ${cachedData.entries.length} cached entries for time range ${timeRange}`);
 
     return {
       entries: filteredEntries,
@@ -233,12 +243,16 @@ export const useInsightsCacheData = (
     const effectiveBaseDate = currentDate || new Date();
     const { startDate, endDate } = getDateRange(timeRange, effectiveBaseDate);
 
+    console.log(`[chartInsightsData] Time range: ${timeRange}, Base date: ${effectiveBaseDate.toISOString()}, Date range: ${startDate.toISOString()} to ${endDate.toISOString()}`);
+
     // Filter cached entries for the specific time range
     const filteredEntries = cachedData.entries.filter(entry => {
       if (!entry.created_at) return false;
       const entryDate = new Date(entry.created_at);
       return entryDate >= startDate && entryDate <= endDate;
     });
+
+    console.log(`[chartInsightsData] Filtered ${filteredEntries.length} entries from ${cachedData.entries.length} cached entries for time range ${timeRange}`);
 
     return {
       entries: filteredEntries,
@@ -270,9 +284,12 @@ export const useInsightsCacheData = (
   };
 };
 
-// Helper functions (keeping existing implementations)
+// Fixed getDateRange function with proper week calculation
 const getDateRange = (timeRange: TimeRange, baseDate: Date = new Date()) => {
   let startDate, endDate;
+  
+  console.log(`[getDateRange] Calculating range for ${timeRange} with base date: ${baseDate.toISOString()}`);
+  
   switch (timeRange) {
     case 'today':
       startDate = new Date(baseDate);
@@ -281,11 +298,13 @@ const getDateRange = (timeRange: TimeRange, baseDate: Date = new Date()) => {
       endDate.setHours(23, 59, 59, 999);
       break;
     case 'week':
-      startDate = new Date(baseDate);
-      startDate.setDate(baseDate.getDate() - baseDate.getDay() + 1);
+      // Use date-fns functions for proper week calculation
+      // Start of week (Monday) and end of week (Sunday)
+      startDate = startOfWeek(baseDate, { weekStartsOn: 1 }); // Monday = 1
+      endDate = endOfWeek(baseDate, { weekStartsOn: 1 });
+      
+      // Set time boundaries
       startDate.setHours(0, 0, 0, 0);
-      endDate = new Date(startDate);
-      endDate.setDate(startDate.getDate() + 6);
       endDate.setHours(23, 59, 59, 999);
       break;
     case 'month':
@@ -297,13 +316,15 @@ const getDateRange = (timeRange: TimeRange, baseDate: Date = new Date()) => {
       endDate = new Date(baseDate.getFullYear(), 11, 31, 23, 59, 59, 999);
       break;
     default:
-      startDate = new Date(baseDate);
-      startDate.setDate(baseDate.getDate() - baseDate.getDay() + 1);
+      // Default to week
+      startDate = startOfWeek(baseDate, { weekStartsOn: 1 });
+      endDate = endOfWeek(baseDate, { weekStartsOn: 1 });
       startDate.setHours(0, 0, 0, 0);
-      endDate = new Date(startDate);
-      endDate.setDate(startDate.getDate() + 6);
       endDate.setHours(23, 59, 59, 999);
   }
+  
+  console.log(`[getDateRange] ${timeRange} range: ${startDate.toISOString()} to ${endDate.toISOString()}`);
+  
   return { startDate, endDate };
 };
 
