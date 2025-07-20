@@ -5,7 +5,7 @@ import { cva, type VariantProps } from "class-variance-authority"
 import { cn } from "@/lib/utils"
 import { useSwipeGesture } from "@/hooks/use-swipe-gesture"
 import { X } from "lucide-react"
-import { useTheme } from "@/hooks/use-theme"
+import { useSafeTheme } from "@/hooks/use-safe-theme"
 
 const ToastProvider = ToastPrimitives.Provider
 
@@ -47,7 +47,7 @@ const Toast = React.forwardRef<
 >(({ className, variant, ...props }, ref) => {
   const toastRef = React.useRef<React.ElementRef<typeof ToastPrimitives.Root>>(null);
   const { onOpenChange } = props;
-  const { colorTheme, theme, systemTheme } = useTheme();
+  const { colorTheme, theme, systemTheme } = useSafeTheme();
   
   const isDarkMode = theme === 'dark' || (theme === 'system' && systemTheme === 'dark');
   

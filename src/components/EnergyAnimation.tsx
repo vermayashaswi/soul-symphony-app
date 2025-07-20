@@ -1,7 +1,7 @@
 
 import React, { useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
-import { useTheme } from '@/hooks/use-theme';
+import { useSafeTheme } from '@/hooks/use-safe-theme';
 
 interface EnergyAnimationProps {
   className?: string;
@@ -15,7 +15,7 @@ const EnergyAnimation: React.FC<EnergyAnimationProps> = ({
   bottomNavOffset = false
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
-  const { colorTheme, customColor } = useTheme();
+  const { colorTheme, customColor } = useSafeTheme();
   
   // Determine the base color to use based on the user's selected theme
   const getThemeColors = () => {

@@ -1,6 +1,6 @@
 
 import React, { useEffect, useRef } from 'react';
-import { useTheme } from '@/hooks/use-theme';
+import { useSafeTheme } from '@/hooks/use-safe-theme';
 
 interface Particle {
   x: number;
@@ -20,7 +20,7 @@ export function ParticleBackground() {
   const animationRef = useRef<number>();
   const mousePos = useRef<{ x: number, y: number } | null>(null);
   const lastTouchTime = useRef<number>(0);
-  const { theme, systemTheme } = useTheme();
+  const { theme, systemTheme } = useSafeTheme();
   
   // Golden color palette for particles
   const goldenColors = [

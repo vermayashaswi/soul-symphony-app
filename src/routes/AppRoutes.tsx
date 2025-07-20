@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import Index from '@/pages/Index';
@@ -18,53 +19,28 @@ import BlogPage from '@/pages/website/BlogPage';
 import BlogPostPage from '@/pages/website/BlogPostPage';
 import OnboardingScreen from '@/components/onboarding/OnboardingScreen';
 import { useAuth } from '@/contexts/AuthContext';
-import { useOnboarding } from '@/hooks/use-onboarding';
+import { useOnboardingState } from '@/hooks/use-onboarding-state';
 import { nativeIntegrationService } from '@/services/nativeIntegrationService';
+import { NativeNavigationGuard } from '@/components/navigation/NativeNavigationGuard';
 
 const AppRoutes = () => {
-  const { user } = useAuth();
-  const { onboardingComplete } = useOnboarding();
+  const { user, isLoading: authLoading } = useAuth();
+  const { onboardingComplete, loading: onboardingLoading, isReady } = useOnboardingState(user);
 
-  // Handle /app root route redirects with native context awareness
+  // Enhanced AppRootRedirect with proper loading states
   const AppRootRedirect = () => {
     const isNative = nativeIntegrationService.isRunningNatively();
 
-    console.log('[AppRoutes] AppRootRedirect - isNative:', isNative, 'user:', !!user, 'onboardingComplete:', onboardingComplete);
+    console.log('[AppRoutes] AppRootRedirect', {
+      isNative,
+      hasUser: !!user,
+      onboardingComplete,
+      authLoading,
+      onboardingLoading,
+      isReady
+    });
 
-    // CRITICAL: For native apps, handle OAuth callback parameters properly
-    if (isNative) {
-      // Check for OAuth callback deep links
-      const urlParams = new URLSearchParams(window.location.search);
-      const hashParams = new URLSearchParams(window.location.hash.replace('#', ''));
-      const hasOAuthParams = urlParams.has('access_token') || hashParams.has('access_token') ||
-                            urlParams.has('code') || hashParams.has('code') ||
-                            urlParams.has('error') || hashParams.has('error');
-
-      if (hasOAuthParams) {
-        console.log('[AppRoutes] OAuth callback detected in native app, processing auth');
-        return <Navigate to={`/app/auth${window.location.search}${window.location.hash}`} replace />;
-      }
-
-      // CRITICAL: For native apps, redirect to appropriate app screens
-      console.log('[AppRoutes] Native environment detected, redirecting to app interface');
-      if (!user) {
-        console.log('[AppRoutes] No user in native app, redirecting to onboarding');
-        return <Navigate to="/app/onboarding" replace />;
-      }
-
-      if (!onboardingComplete) {
-        console.log('[AppRoutes] Onboarding not complete in native app, redirecting to onboarding');
-        return <Navigate to="/app/onboarding" replace />;
-      }
-
-      console.log('[AppRoutes] Native app user authenticated and onboarded, redirecting to home');
-      return <Navigate to="/app/home" replace />;
-    }
-
-    // Web behavior (existing logic)
-    console.log('[AppRoutes] Web environment, using standard flow');
-
-    // Check for web OAuth callback parameters
+    // Handle OAuth callback parameters first
     const urlParams = new URLSearchParams(window.location.search);
     const hashParams = new URLSearchParams(window.location.hash.replace('#', ''));
     const hasOAuthParams = urlParams.has('access_token') || hashParams.has('access_token') ||
@@ -72,10 +48,37 @@ const AppRoutes = () => {
                           urlParams.has('error') || hashParams.has('error');
 
     if (hasOAuthParams) {
-      console.log('[AppRoutes] OAuth callback detected in web, redirecting to auth page');
+      console.log('[AppRoutes] OAuth callback detected, redirecting to auth');
       return <Navigate to={`/app/auth${window.location.search}${window.location.hash}`} replace />;
     }
 
+    // For native apps, use the navigation guard
+    if (isNative) {
+      return (
+        <NativeNavigationGuard
+          onNavigationReady={(path) => {
+            console.log('[AppRoutes] Native navigation ready, redirecting to:', path);
+            window.location.href = path;
+          }}
+        >
+          <div className="min-h-screen flex items-center justify-center">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+          </div>
+        </NativeNavigationGuard>
+      );
+    }
+
+    // For web, wait for all states to be ready before navigation
+    if (authLoading || onboardingLoading || !isReady) {
+      console.log('[AppRoutes] Web app still loading states');
+      return (
+        <div className="min-h-screen flex items-center justify-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+        </div>
+      );
+    }
+
+    // Web navigation logic
     if (!user) {
       return <Navigate to="/app/onboarding" replace />;
     }
@@ -91,23 +94,23 @@ const AppRoutes = () => {
   const RootRedirect = () => {
     const isNative = nativeIntegrationService.isRunningNatively();
 
-    console.log('[AppRoutes] RootRedirect - isNative:', isNative, 'user:', !!user, 'onboardingComplete:', onboardingComplete);
+    console.log('[AppRoutes] RootRedirect', { isNative, hasUser: !!user, onboardingComplete });
 
-    // CRITICAL: For native apps, NEVER show marketing site - always redirect to app
+    // For native apps, NEVER show marketing site - always redirect to app
     if (isNative) {
       console.log('[AppRoutes] Native environment detected at root, redirecting to app');
-      if (!user) {
-        console.log('[AppRoutes] No user in native app, redirecting to onboarding');
-        return <Navigate to="/app/onboarding" replace />;
-      }
-
-      if (!onboardingComplete) {
-        console.log('[AppRoutes] Onboarding not complete in native app, redirecting to onboarding');
-        return <Navigate to="/app/onboarding" replace />;
-      }
-
-      console.log('[AppRoutes] Native app user ready, redirecting to home');
-      return <Navigate to="/app/home" replace />;
+      return (
+        <NativeNavigationGuard
+          onNavigationReady={(path) => {
+            console.log('[AppRoutes] Root native navigation ready, redirecting to:', path);
+            window.location.href = path;
+          }}
+        >
+          <div className="min-h-screen flex items-center justify-center">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+          </div>
+        </NativeNavigationGuard>
+      );
     }
 
     // Web behavior - show marketing site only for web

@@ -4,6 +4,10 @@ interface SafeThemeReturn {
   theme: 'light' | 'dark' | 'system'
   systemTheme: 'light' | 'dark'
   colorTheme: string
+  customColor: string
+  setTheme?: (theme: 'light' | 'dark' | 'system') => void
+  setColorTheme?: (theme: string) => void
+  setCustomColor?: (color: string) => void
   isDarkMode: boolean
 }
 
@@ -13,13 +17,17 @@ interface SafeThemeReturn {
  */
 export function useSafeTheme(): SafeThemeReturn {
   try {
-    const { theme, systemTheme, colorTheme } = useTheme()
+    const { theme, systemTheme, colorTheme, customColor, setTheme, setColorTheme, setCustomColor } = useTheme()
     const isDarkMode = theme === 'dark' || (theme === 'system' && systemTheme === 'dark')
     
     return {
       theme,
       systemTheme,
       colorTheme,
+      customColor,
+      setTheme,
+      setColorTheme,
+      setCustomColor,
       isDarkMode
     }
   } catch (error) {
@@ -31,7 +39,8 @@ export function useSafeTheme(): SafeThemeReturn {
     return {
       theme: 'system',
       systemTheme: systemPrefersDark ? 'dark' : 'light',
-      colorTheme: 'default',
+      colorTheme: 'Calm',
+      customColor: '#3b82f6',
       isDarkMode: systemPrefersDark
     }
   }
