@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useRef, useMemo, useCallback } from 'react';
 import { motion } from 'framer-motion';
-import { useTheme } from '@/hooks/use-theme';
+import { useSafeTheme } from '@/hooks/use-safe-theme';
 import { TranslatableText } from '@/components/translation/TranslatableText';
 import { useTranslation } from '@/contexts/TranslationContext';
 
@@ -25,7 +25,7 @@ const FloatingThemeStrips: React.FC<FloatingThemeStripsProps> = ({
 }) => {
   const [uniqueThemes, setUniqueThemes] = useState<ProcessedThemeData[]>([]);
   const [translatedThemes, setTranslatedThemes] = useState<ProcessedThemeData[]>([]);
-  const { theme } = useTheme();
+  const { theme } = useSafeTheme();
   const [translatedLabel, setTranslatedLabel] = useState<string>("7-day themes");
   const isDarkMode = theme === 'dark';
   

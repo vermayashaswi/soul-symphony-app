@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { format } from 'date-fns';
-import { useTheme } from '@/hooks/use-theme';
+import { useSafeTheme } from '@/hooks/use-safe-theme';
 import { TranslatableText } from '@/components/translation/TranslatableText';
 import { useTranslation } from '@/contexts/TranslationContext';
 import LanguageSelector from '@/components/LanguageSelector';
@@ -12,7 +12,7 @@ import { useTutorial } from '@/contexts/TutorialContext';
 
 const JournalHeader: React.FC = () => {
   const { user } = useAuth();
-  const { theme } = useTheme();
+  const { theme } = useSafeTheme();
   const { displayName } = useUserProfile();
   const { translate } = useTranslation();
   const [journalLabel, setJournalLabel] = useState("Journal");

@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { cn } from '@/lib/utils';
-import { useTheme } from '@/hooks/use-theme';
+import { useSafeTheme } from '@/hooks/use-safe-theme';
 import { Mic } from 'lucide-react';
 
 export type LogoSize = "small" | "normal" | "large" | "medium";
@@ -25,7 +25,7 @@ const SouloLogo = ({
   animate = false,
   utteringWords = false
 }: SouloLogoProps) => {
-  const { colorTheme } = useTheme();
+  const { colorTheme } = useSafeTheme();
   const [animationState, setAnimationState] = useState<'full' | 'soul' | 'none'>('full');
   const [micScale, setMicScale] = useState<number>(1);
   

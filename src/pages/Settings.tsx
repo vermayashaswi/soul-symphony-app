@@ -6,7 +6,7 @@ import { Switch } from "@/components/ui/switch";
 import { Separator } from "@/components/ui/separator";
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
-import { useTheme } from '@/hooks/use-theme';
+import { useSafeTheme } from '@/hooks/use-safe-theme';
 import { setupJournalReminder, initializeCapacitorNotifications, NotificationFrequency, NotificationTime } from '@/services/notificationService';
 import { enhancedNotificationService } from '@/services/enhancedNotificationService';
 import { useAuth } from '@/contexts/AuthContext';
@@ -66,7 +66,7 @@ function SettingItem({ icon: Icon, title, description, children }: SettingItemPr
 function SettingsContent() {
   console.log('[Settings] SettingsContent rendering');
   
-  const { theme, setTheme, colorTheme, setColorTheme, customColor, setCustomColor, systemTheme } = useTheme();
+  const { theme, setTheme, colorTheme, setColorTheme, customColor, setCustomColor, systemTheme } = useSafeTheme();
   const [notificationsEnabled, setNotificationsEnabled] = useState(false);
   const [notificationTimes, setNotificationTimes] = useState<NotificationTime[]>(['evening']);
   const [showNotificationSettings, setShowNotificationSettings] = useState(false);
