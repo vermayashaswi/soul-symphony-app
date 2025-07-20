@@ -133,22 +133,16 @@ const MobileNavigation: React.FC<MobileNavigationProps> = ({ onboardingComplete 
   
   return (
     <motion.div 
-      key={`nav-${renderKey}-${currentLanguage}`} // Force re-render on language change
+      key={`nav-${renderKey}-${currentLanguage}`}
       className={cn(
-        "fixed bottom-0 left-0 right-0 bg-background border-t border-muted",
+        "mobile-navigation-bar bg-background border-t border-muted",
         isTutorialActive && "opacity-30 pointer-events-none"
       )}
-      style={{
-        zIndex: 9998,
-        paddingTop: '0.40rem',
-        paddingBottom: 'max(0.40rem, env(safe-area-inset-bottom))',
-        height: 'calc(3.6rem + env(safe-area-inset-bottom))'
-      }}
       initial={{ y: 100 }}
       animate={{ y: 0 }}
       transition={{ duration: 0.3 }}
     >
-      <div className="flex justify-around items-center">
+      <div className="flex justify-around items-center py-2">
         {navItems.map((item) => {
           const isActive = getActiveStatus(item.path);
           const isLocked = item.isPremium && !isPremiumFeatureAccessible;
@@ -160,7 +154,7 @@ const MobileNavigation: React.FC<MobileNavigationProps> = ({ onboardingComplete 
               key={`${item.path}-${renderKey}`}
               to={item.path}
               className={cn(
-                "flex flex-col items-center py-1 transition-colors relative",
+                "flex flex-col items-center py-1 transition-colors relative min-h-[3rem]",
                 isActive 
                   ? "text-primary" 
                   : isLocked
