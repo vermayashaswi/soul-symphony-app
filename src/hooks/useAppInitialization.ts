@@ -25,14 +25,19 @@ export const useAppInitialization = () => {
     const initializeApp = async () => {
       try {
         console.log('[AppInit] Starting app initialization...');
+        
+        // CRITICAL: Initialize native integration service FIRST before any route checks
+        console.log('[AppInit] Initializing native integration service...');
+        await nativeIntegrationService.initialize();
+        
         const twaEnv = detectTWAEnvironment();
         const isNative = nativeIntegrationService.isRunningNatively();
         
-        // Initialize services based on environment
-        if (isNative) {
-          console.log('[AppInit] Native environment detected - initializing native services');
-          await nativeIntegrationService.initialize();
-        }
+        console.log('[AppInit] Environment detection complete:', {
+          isNative,
+          isTWA: twaEnv.isTWA,
+          isStandalone: twaEnv.isStandalone
+        });
         
         // Initialize journal reminder service
         await journalReminderService.initializeOnAppStart();
