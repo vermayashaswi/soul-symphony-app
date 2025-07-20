@@ -2,7 +2,6 @@
 import React, { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
-import { useTheme } from '@/hooks/use-theme';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { useOnboarding } from '@/hooks/use-onboarding';
 import NetworkAwareContent from '@/components/NetworkAwareContent';
@@ -16,7 +15,6 @@ import { nativeIntegrationService } from '@/services/nativeIntegrationService';
 const Index = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
-  const { colorTheme } = useTheme();
   const isMobile = useIsMobile();
   const { onboardingComplete, checkOnboardingStatus } = useOnboarding();
   const networkStatus = useNetworkStatus();
