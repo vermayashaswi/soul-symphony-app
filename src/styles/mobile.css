@@ -1,5 +1,4 @@
 
-
 /* Mobile-specific styles */
 @media (max-width: 768px) {
   /* STATUS BAR SAFE AREA HANDLING */
@@ -52,13 +51,16 @@
     background-color: hsl(var(--background)) !important;
   }
   
-  /* Navigation bar safe area */
-  .fixed.bottom-0.left-0.right-0.bg-background.border-t.border-muted {
-    bottom: var(--safe-area-inset-bottom) !important;
-    left: var(--safe-area-inset-left) !important;
-    right: var(--safe-area-inset-right) !important;
+  /* FIXED: Navigation bar positioning - stick to bottom with safe area padding inside */
+  .mobile-navigation-bar {
+    position: fixed !important;
+    bottom: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+    z-index: 9998 !important;
     padding-bottom: var(--safe-area-inset-bottom) !important;
-    z-index: 9999 !important;
+    padding-left: var(--safe-area-inset-left) !important;
+    padding-right: var(--safe-area-inset-right) !important;
   }
   
   /* Chat input container positioning */
@@ -138,6 +140,35 @@
     height: 12px !important;
     margin: 1px auto !important;
   }
+  
+  /* DEBUG: Visual indicators for safe area boundaries (remove in production) */
+  .debug-safe-areas {
+    position: relative;
+  }
+  
+  .debug-safe-areas::before {
+    content: '';
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: var(--safe-area-inset-top);
+    background: rgba(255, 0, 0, 0.2);
+    z-index: 10000;
+    pointer-events: none;
+  }
+  
+  .debug-safe-areas::after {
+    content: '';
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: var(--safe-area-inset-bottom);
+    background: rgba(0, 255, 0, 0.2);
+    z-index: 10000;
+    pointer-events: none;
+  }
 }
 
 /* Styles for both mobile and desktop */
@@ -145,11 +176,6 @@
   /* Ensure SoulNet container has proper padding when not in fullscreen */
   .soulnet-container:not(.fixed) {
     margin: 0 8px !important;
-  }
-  
-  /* Fix for mobile navigation to stay on top */
-  .fixed.bottom-0.left-0.right-0.bg-background.border-t.border-muted {
-    z-index: 9999 !important;
   }
   
   /* Year view calendar compact styling - Updated dot sizes */
@@ -197,4 +223,3 @@
     }
   }
 }
-
