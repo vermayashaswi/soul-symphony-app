@@ -7,6 +7,12 @@
   --safe-area-inset-right: env(safe-area-inset-right, 0px);
   --status-bar-height: 0px;
   --nav-bar-height: 4rem;
+  
+  /* Calculated safe areas (fallback values) */
+  --calculated-safe-area-top: var(--safe-area-inset-top);
+  --calculated-safe-area-bottom: var(--safe-area-inset-bottom);
+  --calculated-safe-area-left: var(--safe-area-inset-left);
+  --calculated-safe-area-right: var(--safe-area-inset-right);
 }
 
 /* Platform-specific status bar heights */
@@ -18,21 +24,26 @@
   --status-bar-height: 44px;
 }
 
+/* ANDROID FIX: Ensure minimum safe area for devices without proper env() support */
+.platform-android {
+  --safe-area-inset-bottom: max(env(safe-area-inset-bottom, 0px), 8px);
+}
+
 /* Safe area utilities */
 .safe-area-top {
-  padding-top: max(var(--status-bar-height), var(--safe-area-inset-top)) !important;
+  padding-top: max(var(--status-bar-height), var(--calculated-safe-area-top)) !important;
 }
 
 .safe-area-bottom {
-  padding-bottom: max(var(--nav-bar-height), calc(var(--safe-area-inset-bottom) + var(--nav-bar-height))) !important;
+  padding-bottom: max(var(--nav-bar-height), calc(var(--calculated-safe-area-bottom) + var(--nav-bar-height))) !important;
 }
 
 .safe-area-left {
-  padding-left: max(8px, var(--safe-area-inset-left)) !important;
+  padding-left: max(8px, var(--calculated-safe-area-left)) !important;
 }
 
 .safe-area-right {
-  padding-right: max(8px, var(--safe-area-inset-right)) !important;
+  padding-right: max(8px, var(--calculated-safe-area-right)) !important;
 }
 
 /* Mobile container base styles */
