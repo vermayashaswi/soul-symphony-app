@@ -6,6 +6,7 @@ import { useDebugLog } from "@/utils/debug/DebugContext";
 import { Input } from "@/components/ui/input";
 import { useTutorial } from "@/contexts/TutorialContext";
 import { useTranslation } from "@/contexts/TranslationContext";
+import { keyboardDetectionService, KeyboardState } from "@/services/keyboardDetectionService";
 
 interface MobileChatInputProps {
   onSendMessage: (message: string, isAudio?: boolean) => void;
@@ -21,7 +22,11 @@ export default function MobileChatInput({
   const [inputValue, setInputValue] = useState("");
   const [placeholderText, setPlaceholderText] = useState("Type your message...");
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [isKeyboardVisible, setIsKeyboardVisible] = useState(false);
+  const [keyboardState, setKeyboardState] = useState<KeyboardState>({
+    isVisible: false,
+    height: 0,
+    timestamp: Date.now()
+  });
   const inputRef = useRef<HTMLInputElement>(null);
   const inputContainerRef = useRef<HTMLDivElement>(null);
   const chatDebug = useDebugLog();
@@ -50,92 +55,44 @@ export default function MobileChatInput({
     translatePlaceholder();
   }, [currentLanguage, translate]);
 
+  // Use centralized keyboard detection service
+  useEffect(() => {
+    if (isInChatTutorialStep) return;
+
+    const listenerId = 'mobile-chat-input';
+    
+    keyboardDetectionService.addListener(listenerId, (state: KeyboardState) => {
+      console.log('MobileChatInput: Keyboard state changed:', state);
+      setKeyboardState(state);
+      
+      // Update CSS classes for global styling
+      if (state.isVisible) {
+        document.body.classList.add('keyboard-visible');
+        document.querySelector('.mobile-chat-interface')?.classList.add('keyboard-visible');
+      } else {
+        document.body.classList.remove('keyboard-visible');
+        document.querySelector('.mobile-chat-interface')?.classList.remove('keyboard-visible');
+        
+        // When keyboard closes, ensure we're scrolled to the bottom
+        setTimeout(() => {
+          window.scrollTo({
+            top: document.body.scrollHeight,
+            behavior: 'smooth'
+          });
+        }, 100);
+      }
+    });
+    
+    return () => {
+      keyboardDetectionService.removeListener(listenerId);
+    };
+  }, [isInChatTutorialStep]);
+
   // If we're in step 5 of the tutorial, don't render anything at all
   if (isInChatTutorialStep) {
     console.log("In tutorial step 5 - not rendering chat input at all");
     return null;
   }
-
-  // Effect to ensure input stays visible and detect keyboard
-  useEffect(() => {
-    // Function to detect keyboard visibility with multiple signals
-    const handleVisualViewportResize = () => {
-      if (window.visualViewport) {
-        // More aggressive detection threshold
-        const isKeyboard = window.visualViewport.height < window.innerHeight * 0.75;
-        
-        if (isKeyboardVisible !== isKeyboard) {
-          setIsKeyboardVisible(isKeyboard);
-          
-          // Dispatch events to notify other components about keyboard state
-          const eventName = isKeyboard ? 'keyboardOpen' : 'keyboardClose';
-          window.dispatchEvent(new Event(eventName));
-          
-          // Add class to body and interface for CSS targeting
-          if (isKeyboard) {
-            document.body.classList.add('keyboard-visible');
-            document.querySelector('.mobile-chat-interface')?.classList.add('keyboard-visible');
-          } else {
-            document.body.classList.remove('keyboard-visible');
-            document.querySelector('.mobile-chat-interface')?.classList.remove('keyboard-visible');
-            
-            // When keyboard closes, ensure we're scrolled to the bottom
-            setTimeout(() => {
-              window.scrollTo({
-                top: document.body.scrollHeight,
-                behavior: 'smooth'
-              });
-            }, 100);
-          }
-        }
-      }
-    };
-
-    // Only set up effects if we're not in tutorial step 5
-    if (!isInChatTutorialStep) {
-      // Run immediately and set up listeners
-      handleVisualViewportResize();
-      
-      if (window.visualViewport) {
-        window.visualViewport.addEventListener('resize', handleVisualViewportResize);
-        window.addEventListener('resize', handleVisualViewportResize);
-      }
-      
-      // Also listen for focus events on the input
-      const handleFocus = () => {
-        // Assume keyboard will be visible soon after focus
-        document.body.classList.add('keyboard-visible');
-        document.querySelector('.mobile-chat-interface')?.classList.add('keyboard-visible');
-        
-        // Short delay to ensure keyboard has time to appear
-        setTimeout(() => {
-          if (inputRef.current) {
-            inputRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
-          }
-        }, 300);
-      };
-      
-      const inputElement = inputRef.current;
-      if (inputElement) {
-        inputElement.addEventListener('focus', handleFocus);
-      }
-      
-      return () => {
-        if (window.visualViewport) {
-          window.visualViewport.removeEventListener('resize', handleVisualViewportResize);
-          window.removeEventListener('resize', handleVisualViewportResize);
-        }
-        
-        if (inputElement) {
-          inputElement.removeEventListener('focus', handleFocus);
-        }
-        
-        document.body.classList.remove('keyboard-visible');
-      };
-    }
-    
-    return undefined;
-  }, [isKeyboardVisible, isInChatTutorialStep]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setInputValue(e.target.value);
@@ -175,24 +132,31 @@ export default function MobileChatInput({
     }
   };
 
+  // Calculate bottom positioning based on keyboard state and navigation
+  const getBottomPosition = () => {
+    if (keyboardState.isVisible) {
+      // When keyboard is visible, position at bottom of viewport
+      return '0px';
+    } else {
+      // When keyboard is hidden, position above navigation bar
+      return '64px'; // Standard navigation height + padding
+    }
+  };
+
   return (
     <div 
       ref={inputContainerRef}
-      className={`p-2 border-t border-border flex items-center gap-2 ${
-        isKeyboardVisible ? 'input-keyboard-active' : ''
+      className={`fixed left-0 right-0 z-[60] p-2 border-t border-border flex items-center gap-2 bg-background ${
+        keyboardState.isVisible ? 'input-keyboard-active' : ''
       }`}
       style={{
-        position: 'fixed',
-        bottom: isKeyboardVisible ? 0 : '54px', // Adjusted to be right above navbar
-        left: 0,
-        right: 0,
-        paddingBottom: isKeyboardVisible ? '5px' : '8px',
-        marginBottom: 0,
-        zIndex: 60,
-        boxShadow: '0 -1px 3px rgba(0, 0, 0, 0.07)',
-        transition: 'all 0.2s ease',
-        borderTop: isKeyboardVisible ? '1px solid rgba(0, 0, 0, 0.1)' : 'none',
-        borderBottom: !isKeyboardVisible ? '1px solid rgba(0, 0, 0, 0.1)' : 'none',
+        bottom: getBottomPosition(),
+        paddingBottom: keyboardState.isVisible ? '8px' : '12px',
+        boxShadow: keyboardState.isVisible 
+          ? '0 -2px 8px rgba(0, 0, 0, 0.1)' 
+          : '0 -1px 3px rgba(0, 0, 0, 0.07)',
+        transition: 'all 0.2s ease-out',
+        transform: 'translateZ(0)', // Force GPU acceleration
       }}
     >
       <div className="flex-1 relative">
