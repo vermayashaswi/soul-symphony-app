@@ -1,0 +1,101 @@
+
+/* Android-specific navigation bar styling */
+.platform-android .mobile-navigation {
+  /* Force proper bottom positioning on Android */
+  bottom: max(var(--android-safe-area-bottom, 0px), 8px) !important;
+  
+  /* Ensure proper height calculation */
+  height: calc(var(--nav-bar-height) + max(var(--android-safe-area-bottom, 0px), 8px)) !important;
+  
+  /* Add proper padding */
+  padding-bottom: max(var(--android-safe-area-bottom, 0px), 8px) !important;
+  
+  /* Ensure full width coverage */
+  left: var(--android-safe-area-left, 0px) !important;
+  right: var(--android-safe-area-right, 0px) !important;
+  
+  /* Prevent any visual gaps */
+  border-top: 1px solid hsl(var(--border));
+  background-color: hsl(var(--background));
+  
+  /* Force hardware acceleration */
+  transform: translateZ(0);
+  will-change: transform;
+}
+
+/* Android navigation content positioning */
+.platform-android .mobile-navigation-content {
+  /* Ensure proper vertical centering */
+  height: var(--nav-bar-height);
+  min-height: var(--nav-bar-height);
+  
+  /* Proper spacing */
+  padding: 0.5rem 1rem;
+  
+  /* Flex alignment */
+  display: flex;
+  align-items: center;
+  justify-content: space-around;
+  
+  /* Positioning */
+  position: relative;
+  top: 0;
+  z-index: 1;
+}
+
+/* Android chat input container adjustments */
+.platform-android .mobile-chat-input-container {
+  bottom: calc(var(--nav-bar-height) + max(var(--android-safe-area-bottom, 0px), 8px)) !important;
+  left: var(--android-safe-area-left, 0px) !important;
+  right: var(--android-safe-area-right, 0px) !important;
+}
+
+/* Android-specific viewport adjustments */
+.platform-android .mobile-container {
+  /* Account for Android system bars */
+  padding-top: max(var(--android-safe-area-top, 0px), 24px) !important;
+  padding-bottom: calc(var(--nav-bar-height) + max(var(--android-safe-area-bottom, 0px), 8px)) !important;
+  padding-left: var(--android-safe-area-left, 0px) !important;
+  padding-right: var(--android-safe-area-right, 0px) !important;
+  
+  /* Ensure proper sizing */
+  min-height: 100vh;
+  box-sizing: border-box;
+}
+
+/* Android keyboard handling */
+.platform-android.keyboard-visible .mobile-navigation {
+  /* Hide navigation when keyboard is visible */
+  display: none !important;
+}
+
+/* Android-specific SoulNet fullscreen adjustments */
+.platform-android .fixed.inset-0.z-\[9999\] {
+  /* Proper fullscreen positioning for Android */
+  top: var(--android-safe-area-top, 0px) !important;
+  bottom: var(--android-safe-area-bottom, 0px) !important;
+  left: var(--android-safe-area-left, 0px) !important;
+  right: var(--android-safe-area-right, 0px) !important;
+  
+  /* Calculate proper dimensions */
+  width: calc(100vw - var(--android-safe-area-left, 0px) - var(--android-safe-area-right, 0px)) !important;
+  height: calc(100vh - var(--android-safe-area-top, 0px) - var(--android-safe-area-bottom, 0px)) !important;
+}
+
+/* Debug mode for Android (remove in production) */
+.platform-android .mobile-navigation.debug {
+  border: 2px solid red;
+  background-color: rgba(255, 0, 0, 0.1);
+}
+
+.platform-android .mobile-navigation.debug::before {
+  content: "Android: " attr(data-safe-area-bottom);
+  position: absolute;
+  top: -20px;
+  left: 0;
+  background: red;
+  color: white;
+  font-size: 10px;
+  padding: 2px 4px;
+  z-index: 10000;
+}
