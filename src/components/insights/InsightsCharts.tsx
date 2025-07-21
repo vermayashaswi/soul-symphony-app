@@ -96,6 +96,7 @@ export function InsightsCharts({
         <SoulNet
           userId={userId}
           timeRange={timeRange}
+          onNodeSelect={() => {}}
         />
       </motion.div>
     </>
