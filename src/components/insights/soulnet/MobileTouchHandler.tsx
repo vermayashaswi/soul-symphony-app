@@ -67,17 +67,21 @@ export const MobileTouchHandler: React.FC<MobileTouchHandlerProps> = ({
   // Use touch events on mobile, mouse events on desktop
   if (isTouchDevice) {
     return (
-      <group
-        onTouchStart={handleTouchStart}
-        onTouchEnd={handleTouchEnd}
-      >
-        {children}
+      <group>
+        <mesh
+          onPointerDown={handleTouchStart as any}
+          onPointerUp={handleTouchEnd as any}
+        >
+          <boxGeometry args={[0.1, 0.1, 0.1]} />
+          <meshBasicMaterial transparent opacity={0} />
+          {children}
+        </mesh>
       </group>
     );
   }
 
   return (
-    <group onClick={handleClick}>
+    <group onClick={handleClick as any}>
       {children}
     </group>
   );

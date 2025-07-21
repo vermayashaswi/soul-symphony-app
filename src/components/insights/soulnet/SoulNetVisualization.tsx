@@ -430,18 +430,21 @@ export const SoulNetVisualization: React.FC<SoulNetVisualizationProps> = ({
             node={node}
             isSelected={selectedNode === node.id}
             onClick={handleNodeClick}
-            highlightedNodes={highlightedNodes}
-            showLabel={showLabel}
-            dimmed={dimmed}
-            themeHex={themeHex}
-            selectedNodeId={selectedNode}
-            cameraZoom={cameraZoom}
             isHighlighted={isHighlighted}
+            isDimmed={dimmed}
             connectionPercentage={connectionPercentage}
             showPercentage={showPercentage}
-            forceShowLabels={shouldShowLabels}
+            connectionStrength={connectionStrengths.get(node.id) || 0.5}
+            showLabel={showLabel}
+            themeHex={themeHex}
+            cameraZoom={cameraZoom}
             effectiveTheme="light"
             isInstantMode={true}
+            // Additional props
+            highlightedNodes={highlightedNodes}
+            selectedNodeId={selectedNode}
+            dimmed={dimmed}
+            forceShowLabels={shouldShowLabels}
           />
         );
       })}

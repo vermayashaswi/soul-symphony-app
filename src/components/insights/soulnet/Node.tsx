@@ -29,6 +29,11 @@ interface NodeProps {
   effectiveTheme?: 'light' | 'dark';
   isInstantMode?: boolean;
   getCoordinatedTranslation?: (nodeId: string) => string;
+  // Additional props from SoulNetVisualization
+  highlightedNodes?: Set<string>;
+  selectedNodeId?: string | null;
+  dimmed?: boolean;
+  forceShowLabels?: boolean;
 }
 
 const Node: React.FC<NodeProps> = ({
@@ -45,7 +50,12 @@ const Node: React.FC<NodeProps> = ({
   cameraZoom,
   effectiveTheme = 'light',
   isInstantMode = false,
-  getCoordinatedTranslation
+  getCoordinatedTranslation,
+  // Additional props (with fallbacks)
+  highlightedNodes,
+  selectedNodeId,
+  dimmed,
+  forceShowLabels
 }) => {
   const meshRef = useRef<THREE.Mesh>(null);
   const [animationTime, setAnimationTime] = useState(0);
