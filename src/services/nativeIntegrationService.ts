@@ -136,7 +136,7 @@ class NativeIntegrationService {
           console.log('[NativeIntegration] App state changed:', state);
         });
 
-        // CRITICAL: Handle OAuth callbacks through deep links
+        // Handle OAuth callbacks through deep links with new scheme
         this.plugins.App.addListener('appUrlOpen', (event: any) => {
           console.log('[NativeIntegration] App URL opened:', event.url);
           this.handleDeepLink(event.url);
@@ -242,10 +242,25 @@ class NativeIntegrationService {
     }
   }
 
-  // CRITICAL: Fixed deep link handling for OAuth
+  // Updated deep link handling for new URL scheme
   private handleDeepLink(url: string): void {
     try {
       console.log('[NativeIntegration] Handling deep link URL:', url);
+
+      // Handle both souloapp:// scheme and OAuth callbacks
+      if (url.startsWith('souloapp://')) {
+        // Parse the URL after the scheme
+        const path = url.replace('souloapp://', '');
+        console.log('[NativeIntegration] Soulo app deep link path:', path);
+        
+        // Navigate to the path within the app
+        const appPath = path ? `/app/${path}` : '/app/home';
+        setTimeout(() => {
+          window.history.pushState({}, '', appPath);
+          window.dispatchEvent(new PopStateEvent('popstate'));
+        }, 100);
+        return;
+      }
 
       // Parse the URL to check for OAuth parameters
       const urlObj = new URL(url);

@@ -24,20 +24,12 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
 
-            <!-- CRITICAL FIX: Proper Google OAuth intent filter -->
-            <intent-filter>
-                <action android:name="android.intent.action.VIEW" />
-                <category android:name="android.intent.category.DEFAULT" />
-                <category android:name="android.intent.category.BROWSABLE" />
-                <data android:scheme="com.googleusercontent.apps.11083941790-vgbdbj6j313ggo6jbt9agp3bvrlilam8" />
-            </intent-filter>
-
             <!-- App deep link handling -->
             <intent-filter>
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
-                <data android:scheme="app.soulo.online" />
+                <data android:scheme="souloapp" />
             </intent-filter>
 
         </activity>
