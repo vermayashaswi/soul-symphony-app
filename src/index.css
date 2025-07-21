@@ -1,3 +1,7 @@
+@import './styles/safe-area.css';
+@import './styles/mobile-navigation.css';
+@import './styles/mobile-layout.css';
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;

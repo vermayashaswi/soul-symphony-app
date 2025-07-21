@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { Sheet, SheetContent, SheetHeader, SheetTrigger } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
-import { Menu, X, Plus, BarChart2, Lightbulb, Search, Brain, Trash2 } from "lucide-react";
+import { Menu, Plus, Trash2 } from "lucide-react";
 import MobileChatMessage from "./MobileChatMessage";
 import MobileChatInput from "./MobileChatInput";
 import { supabase } from "@/integrations/supabase/client";
@@ -9,16 +9,15 @@ import { ChatThreadList } from "@/components/chat/ChatThreadList";
 import { motion } from "framer-motion";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
-import { useTranslation } from "@/contexts/TranslationContext";
 import { TranslatableText } from "@/components/translation/TranslatableText";
 import { v4 as uuidv4 } from "uuid";
-import { useDebugLog } from "@/utils/debug/DebugContext";
 import { getThreadMessages, saveMessage } from "@/services/chat";
 import { analyzeQueryTypes } from "@/utils/chat/queryAnalyzer";
 import { processChatMessage } from "@/services/chatService";
-import { MentalHealthInsights } from "@/hooks/use-mental-health-insights";
 import { useChatRealtime } from "@/hooks/use-chat-realtime";
 import { updateThreadProcessingStatus } from "@/utils/chat/threadUtils";
+import { useSafeAreaUnified } from "@/hooks/use-safe-area-unified";
+import { useKeyboardDetection } from "@/hooks/use-keyboard-detection";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -29,6 +28,8 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { BarChart2, Lightbulb, Search, Brain } from "lucide-react";
+import { useTranslation } from "@/contexts/TranslationContext";
 
 // Define the UIChatMessage interface
 interface UIChatMessage {
@@ -44,22 +45,45 @@ interface MobileChatInterfaceProps {
   onSelectThread: (threadId: string) => void;
   onCreateNewThread: () => Promise<string | null>;
   userId?: string;
-  mentalHealthInsights?: MentalHealthInsights;
 }
+
+const suggestionQuestions = [
+  {
+    text: "What were my top emotions last week?",
+    icon: <BarChart2 className="h-4 w-4 flex-shrink-0 mr-2" />
+  },
+  {
+    text: "What time of the day do I usually like journaling?", 
+    icon: <Lightbulb className="h-4 w-4 flex-shrink-0 mr-2" />
+  },
+  {
+    text: "Am i am introvert? Do i like people in general?",
+    icon: <Search className="h-4 w-4 flex-shrink-0 mr-2" />
+  },
+  {
+    text: "What should i particularly do to help my mental health?",
+    icon: <Brain className="h-4 w-4 flex-shrink-0 mr-2" />
+  },
+  {
+    text: "Rate my top 3 negative traits out of 100? What do i do to improve them?",
+    icon: <Brain className="h-4 w-4 flex-shrink-0 mr-2" />
+  }
+];
 
 export default function MobileChatInterface({
   currentThreadId: initialThreadId,
   onSelectThread,
   onCreateNewThread,
   userId,
-  mentalHealthInsights,
 }: MobileChatInterfaceProps) {
   const [messages, setMessages] = useState<UIChatMessage[]>([]);
   const [initialLoading, setInitialLoading] = useState(true);
   const [threadId, setThreadId] = useState<string | null>(initialThreadId || null);
   const [showSuggestions, setShowSuggestions] = useState(true);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [sheetOpen, setSheetOpen] = useState(false);
   const debugLog = useDebugLog();
+  const { translate } = useTranslation();
   
   // Use the realtime hook to track processing status
   const {
@@ -69,35 +93,13 @@ export default function MobileChatInterface({
     setLocalLoading
   } = useChatRealtime(threadId);
   
-  const suggestionQuestions = [
-    {
-      text: "What were my top emotions last week?",
-      icon: <BarChart2 className="h-4 w-4 flex-shrink-0 mr-2" />
-    },
-    {
-      text: "What time of the day do I usually like journaling?", 
-      icon: <Lightbulb className="h-4 w-4 flex-shrink-0 mr-2" />
-    },
-    {
-      text: "Am i am introvert? Do i like people in general?",
-      icon: <Search className="h-4 w-4 flex-shrink-0 mr-2" />
-    },
-    {
-      text: "What should i particularly do to help my mental health?",
-      icon: <Brain className="h-4 w-4 flex-shrink-0 mr-2" />
-    },
-    {
-      text: "Rate my top 3 negative traits out of 100? What do i do to improve them?",
-      icon: <Brain className="h-4 w-4 flex-shrink-0 mr-2" />
-    }
-  ];
   const { toast } = useToast();
   const { user } = useAuth();
-  const { translate } = useTranslation();
-  const [sheetOpen, setSheetOpen] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const loadedThreadRef = useRef<string | null>(null);
+  const { safeArea, isInitialized } = useSafeAreaUnified();
+  const { isKeyboardVisible } = useKeyboardDetection();
 
   useEffect(() => {
     if (threadId) {
@@ -559,8 +561,20 @@ export default function MobileChatInterface({
   // Check if deletion should be disabled - use realtime processing state
   const isDeletionDisabled = isProcessing || processingStatus === 'processing' || isLoading;
 
+  // Apply safe area styles
+  useEffect(() => {
+    if (containerRef.current && isInitialized) {
+      containerRef.current.style.setProperty('--element-safe-area-top', `${safeArea.top}px`);
+      containerRef.current.style.setProperty('--element-safe-area-left', `${safeArea.left}px`);
+      containerRef.current.style.setProperty('--element-safe-area-right', `${safeArea.right}px`);
+    }
+  }, [safeArea, isInitialized]);
+
   return (
-    <div className="mobile-chat-interface h-full flex flex-col relative">
+    <div 
+      ref={containerRef}
+      className="mobile-chat-interface"
+    >
       <div className="sticky top-0 z-40 w-full bg-background border-b">
         <div className="container flex h-14 max-w-screen-lg items-center">
           <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
@@ -623,7 +637,7 @@ export default function MobileChatInterface({
         </div>
       </div>
       
-      <div className="mobile-chat-content flex-1 overflow-y-auto px-2 py-3 space-y-3 flex flex-col pb-20">
+      <div className="mobile-chat-content">
         {initialLoading ? (
           <div className="flex items-center justify-center py-10">
             <div className="animate-spin h-6 w-6 border-2 border-primary border-t-transparent rounded-full"></div>
@@ -692,14 +706,12 @@ export default function MobileChatInterface({
         <div ref={messagesEndRef} />
       </div>
       
-      {/* Updated positioning to avoid overlap with nav bar */}
-      <div className="fixed bottom-14 left-0 right-0 z-50">
-        <MobileChatInput 
-          onSendMessage={handleSendMessage} 
-          isLoading={isLoading || isProcessing}
-          userId={userId || user?.id}
-        />
-      </div>
+      {/* Chat input positioned with new system */}
+      <MobileChatInput 
+        onSendMessage={handleSendMessage} 
+        isLoading={isLoading || isProcessing}
+        userId={userId || user?.id}
+      />
       
       <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
         <AlertDialogContent>
