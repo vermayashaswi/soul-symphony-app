@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 
 import { Canvas } from '@react-three/fiber';
@@ -167,32 +166,33 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
 
   // SOUL-NET SELECTION FIX: Enhanced node selection with debug logging
   const handleNodeSelect = useCallback((id: string) => {
-    console.log(`[SoulNet] SOUL-NET SELECTION FIX: Node selection triggered for ${id}`, {
+    console.log(`[SoulNet] ENHANCED TOUCH: Node selection triggered for ${id}`, {
       currentSelectedEntity: selectedEntity,
       newNodeId: id,
       willToggle: selectedEntity === id,
-      willSelect: selectedEntity !== id
+      willSelect: selectedEntity !== id,
+      isMobile
     });
     
     if (selectedEntity === id) {
-      console.log(`[SoulNet] SOUL-NET SELECTION FIX: Deselecting node ${id}`);
+      console.log(`[SoulNet] ENHANCED TOUCH: Deselecting node ${id}`);
       setSelectedEntity(null);
     } else {
-      console.log(`[SoulNet] SOUL-NET SELECTION FIX: Selecting node ${id}`);
+      console.log(`[SoulNet] ENHANCED TOUCH: Selecting node ${id}`);
       setSelectedEntity(id);
       
-      // Haptic feedback
-      if (navigator.vibrate) {
-        navigator.vibrate(50);
-        console.log(`[SoulNet] SOUL-NET SELECTION FIX: Vibration triggered for node ${id}`);
+      // Enhanced haptic feedback for mobile
+      if (isMobile && navigator.vibrate) {
+        navigator.vibrate(100); // Stronger vibration for selection
+        console.log(`[SoulNet] ENHANCED TOUCH: Enhanced vibration triggered for node ${id}`);
       }
     }
-  }, [selectedEntity]);
+  }, [selectedEntity, isMobile]);
 
   const toggleFullScreen = useCallback(() => {
     setIsFullScreen(prev => {
       if (!prev) {
-        console.log(`[SoulNet] SOUL-NET SELECTION FIX: Entering fullscreen, clearing selection`);
+        console.log(`[SoulNet] ENHANCED TOUCH: Entering fullscreen, clearing selection`);
         setSelectedEntity(null);
       }
       console.log(`[SoulNet] FULLSCREEN TOGGLE: ${!prev}`);
@@ -363,7 +363,7 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
     if (isMobile) {
       return (
         <TranslatableText 
-          text="Drag to rotate • Pinch to zoom • Tap a node to highlight connections" 
+          text="Touch a node to highlight connections • Drag to rotate • Pinch to zoom" 
           forceTranslate={true}
           enableFontScaling={true}
           scalingContext="general"
@@ -372,7 +372,7 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
     }
     return (
       <TranslatableText 
-        text="Drag to rotate • Scroll to zoom • Click a node to highlight connections" 
+        text="Click a node to highlight connections • Drag to rotate • Scroll to zoom" 
         forceTranslate={true}
         enableFontScaling={true}
         scalingContext="general"
@@ -380,7 +380,7 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
     );
   };
 
-  console.log(`[SoulNet] SOUL-NET SELECTION FIX: Final render - ${graphData.nodes.length} nodes, ${graphData.links.length} links, renderingReady: ${renderingReady}, selectedEntity: ${selectedEntity}`);
+  console.log(`[SoulNet] ENHANCED TOUCH: Final render - ${graphData.nodes.length} nodes, ${graphData.links.length} links, renderingReady: ${renderingReady}, selectedEntity: ${selectedEntity}, isMobile: ${isMobile}`);
 
   return (
     <div className={cn(
@@ -442,7 +442,7 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
             </div>
           }
         >
-          {/* Canvas renders only when fully ready */}
+          {/* ENHANCED: Canvas with mobile-optimized settings */}
           {renderingReady && translationComplete && (
             <Canvas
               style={{
@@ -453,6 +453,7 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
                 position: 'relative',
                 zIndex: 5,
                 transition: 'all 0.3s ease-in-out',
+                touchAction: 'none', // Prevent default touch behaviors
               }}
               camera={{ 
                 position: [0, 0, isFullScreen ? 40 : 45],
@@ -461,17 +462,17 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
                 fov: isFullScreen ? 60 : 50
               }}
               onPointerMissed={() => {
-                console.log('[SoulNet] SOUL-NET SELECTION FIX: Canvas pointer missed - clearing selection');
+                console.log('[SoulNet] ENHANCED TOUCH: Canvas pointer missed - clearing selection');
                 setSelectedEntity(null);
               }}
               gl={{ 
                 preserveDrawingBuffer: true,
-                antialias: !isMobile,
+                antialias: !isMobile, // Disable antialiasing on mobile for performance
                 powerPreference: 'high-performance',
                 alpha: true,
                 depth: true,
                 stencil: false,
-                precision: isMobile ? 'mediump' : 'highp'
+                precision: isMobile ? 'mediump' : 'highp' // Lower precision on mobile
               }}
             >
               <SimplifiedSoulNetVisualization
