@@ -1,5 +1,6 @@
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { useTheme } from '@/hooks/use-theme';
 import { Canvas } from '@react-three/fiber';
 import { TimeRange } from '@/hooks/use-insights-data';
 import { useIsMobile } from '@/hooks/use-mobile';
@@ -61,6 +62,7 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
   const isMobile = useIsMobile();
   const themeHex = useUserColorThemeHex();
   const { currentLanguage } = useTranslation();
+  const { theme, systemTheme } = useTheme();
   
   // ENHANCED: Rendering initialization tracking
   const renderingInitialized = useRef(false);
@@ -445,6 +447,7 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
                 themeHex={themeHex}
                 isFullScreen={isFullScreen}
                 shouldShowLabels={true}
+                effectiveTheme={theme === 'system' ? systemTheme : theme}
                 getInstantConnectionPercentage={getInstantConnectionPercentage}
                 getInstantTranslation={getInstantTranslation}
                 getInstantNodeConnections={getInstantNodeConnections}
