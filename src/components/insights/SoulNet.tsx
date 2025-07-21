@@ -30,10 +30,12 @@ interface NodeData {
 }
 
 interface SoulNetProps {
-  journalEntries: JournalEntry[];
+  journalEntries?: JournalEntry[];
   isLoading?: boolean;
   onNodeSelect?: (node: NodeData) => void;
   className?: string;
+  userId?: string;
+  timeRange?: any;
 }
 
 const initialCameraPosition = [0, 0, 20];
@@ -42,16 +44,18 @@ export default function SoulNet({
   journalEntries = [], 
   isLoading = false,
   onNodeSelect,
-  className = ""
+  className = "",
+  userId,
+  timeRange
 }) {
   const [nodes, setNodes] = useState<NodeData[]>([]);
-  const [cameraPosition, setCameraPosition] = useState<[number, number, number]>(initialCameraPosition);
+  const [cameraPosition, setCameraPosition] = useState<[number, number, number]>([0, 0, 20]);
   const [zoom, setZoom] = useState(1);
-  const orbitControlsRef = useRef<OrbitControls>(null);
+  const orbitControlsRef = useRef<any>(null);
   const canvasRef = useRef<HTMLDivElement>(null);
   
   const resetCamera = () => {
-    setCameraPosition(initialCameraPosition);
+    setCameraPosition([0, 0, 20]);
     setZoom(1);
     if (orbitControlsRef.current) {
       orbitControlsRef.current.reset();
@@ -94,7 +98,7 @@ export default function SoulNet({
     const cameraZ = maxDimension / (2 * Math.tan((fov * Math.PI / 180) / 2));
     
     // Set new camera position and zoom
-    setCameraPosition([0, 0, cameraZ * 2]);
+    setCameraPosition([0, 0, cameraZ * 2] as [number, number, number]);
     setZoom(1);
     
     // Update orbit controls

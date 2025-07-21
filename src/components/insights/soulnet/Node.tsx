@@ -2,15 +2,57 @@ import React, { useRef, useState, useCallback } from 'react';
 import { useFrame } from '@react-three/fiber';
 import { Text } from '@react-three/drei';
 import { Vector3 } from 'three';
+import * as THREE from 'three';
 
 interface NodeProps {
-  data: any;
+  data?: any;
+  node?: any;
   radius?: number;
   color?: string;
   onSelect?: (data: any) => void;
+  onClick?: (id: string, e?: any) => void;
+  isSelected?: boolean;
+  isHighlighted?: boolean;
+  isDimmed?: boolean;
+  dimmed?: boolean;
+  connectionPercentage?: number;
+  showPercentage?: boolean;
+  connectionStrength?: number;
+  showLabel?: boolean;
+  themeHex?: string;
+  cameraZoom?: number;
+  effectiveTheme?: string;
+  isInstantMode?: boolean;
+  highlightedNodes?: Set<string>;
+  selectedNodeId?: string;
+  getCoordinatedTranslation?: (nodeId: string) => string;
+  forceShowLabels?: boolean;
 }
 
-const Node: React.FC<NodeProps> = ({ data, radius = 1, color = '#ffffff', onSelect }) => {
+const Node: React.FC<NodeProps> = ({ 
+  data, 
+  node, 
+  radius = 1, 
+  color = '#ffffff', 
+  onSelect,
+  onClick,
+  isSelected = false,
+  isHighlighted = false,
+  isDimmed = false,
+  dimmed = false,
+  connectionPercentage = 0,
+  showPercentage = false,
+  connectionStrength = 0,
+  showLabel = true,
+  themeHex = '#ffffff',
+  cameraZoom = 1,
+  effectiveTheme = 'light',
+  isInstantMode = false,
+  highlightedNodes,
+  selectedNodeId,
+  getCoordinatedTranslation,
+  forceShowLabels = false
+}) => {
   const mesh = useRef<THREE.Mesh>(null);
   const textMesh = useRef<THREE.Mesh>(null);
   const [isHovered, setIsHovered] = useState(false);
@@ -64,12 +106,17 @@ const Node: React.FC<NodeProps> = ({ data, radius = 1, color = '#ffffff', onSele
   const handleClick = useCallback((event) => {
     event.stopPropagation();
     setIsHovered(false);
-    if (onSelect) {
+    if (onSelect && data) {
       onSelect(data);
     }
-  }, [data, onSelect]);
+    if (onClick && (node || data)) {
+      const nodeData = node || data;
+      onClick(nodeData.id || nodeData, event);
+    }
+  }, [data, node, onSelect, onClick]);
 
-  const label = data?.label || 'Unnamed Node';
+  const nodeData = node || data;
+  const label = nodeData?.label || nodeData?.id || 'Unnamed Node';
   const truncated = truncatedLabel(label, 10);
 
   const handlePointerOver = useCallback((event) => {
@@ -93,7 +140,13 @@ const Node: React.FC<NodeProps> = ({ data, radius = 1, color = '#ffffff', onSele
       castShadow
     >
       <sphereGeometry args={[radius, 32, 32]} />
-      <meshStandardMaterial color={isHovered ? '#ff0000' : color} />
+      <meshStandardMaterial color={
+        isHovered ? '#ff0000' : 
+        isSelected ? '#00ff00' :
+        isHighlighted ? '#ffff00' :
+        (isDimmed || dimmed) ? '#888888' :
+        color
+      } />
       <Text
         ref={textMesh}
         position={[0, 1.5, 0]}

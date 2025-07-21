@@ -30,6 +30,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { BarChart2, Lightbulb, Search, Brain } from "lucide-react";
 import { useTranslation } from "@/contexts/TranslationContext";
+import { useDebugLog } from "@/utils/debug/DebugContext";
 
 // Define the UIChatMessage interface
 interface UIChatMessage {
@@ -45,6 +46,7 @@ interface MobileChatInterfaceProps {
   onSelectThread: (threadId: string) => void;
   onCreateNewThread: () => Promise<string | null>;
   userId?: string;
+  mentalHealthInsights?: any;
 }
 
 const suggestionQuestions = [
