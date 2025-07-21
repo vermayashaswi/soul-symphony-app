@@ -495,14 +495,6 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
                   stencil: false,
                   precision: (isMobile || isNativeEnv) ? 'mediump' : 'highp'
                 }}
-                onCreated={({ gl }) => {
-                  console.log(`[SoulNet] Canvas created with WebGL ${gl.getContextAttributes()?.version || '1'}`);
-                  // Additional WebGL optimizations for mobile/native
-                  if (isNativeEnv || isMobile) {
-                    gl.getExtension('OES_vertex_array_object');
-                    gl.getExtension('WEBGL_lose_context');
-                  }
-                }}
               >
                 <SimplifiedSoulNetVisualization
                   data={graphData}
