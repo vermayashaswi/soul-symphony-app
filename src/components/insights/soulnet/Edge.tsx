@@ -1,7 +1,6 @@
 
 import React, { useRef, useMemo } from 'react';
 import * as THREE from 'three';
-
 import { useFrame } from '@react-three/fiber';
 import { useTheme } from '@/hooks/use-theme';
 
@@ -18,18 +17,15 @@ interface EdgeProps {
   endNodeScale?: number;
 }
 
-// Calculate surface connection point for different node types
 const calculateSurfacePoint = (
   center: THREE.Vector3, 
   direction: THREE.Vector3, 
   nodeType: 'entity' | 'emotion', 
   scale: number = 1
 ): THREE.Vector3 => {
-  // Base radius for different node types
   const baseRadius = nodeType === 'entity' ? 0.7 : 0.55;
   const actualRadius = baseRadius * scale;
   
-  // Normalize direction and scale by radius
   const normalizedDirection = direction.clone().normalize();
   return center.clone().add(normalizedDirection.multiplyScalar(actualRadius));
 };
@@ -48,7 +44,6 @@ export const Edge: React.FC<EdgeProps> = ({
 }) => {
   const { theme } = useTheme();
   const ref = useRef<THREE.Group>(null);
-  // Change the ref type to match what react-three-fiber expects
   const lineRef = useRef<THREE.Mesh>(null);
 
   const points = useMemo(() => {
@@ -56,15 +51,12 @@ export const Edge: React.FC<EdgeProps> = ({
       const startVec = new THREE.Vector3(...start);
       const endVec = new THREE.Vector3(...end);
       
-      // Calculate direction vectors for surface connection
       const startToEnd = endVec.clone().sub(startVec);
       const endToStart = startVec.clone().sub(endVec);
       
-      // Get surface connection points instead of center points
       const startSurface = calculateSurfacePoint(startVec, startToEnd, startNodeType, startNodeScale);
       const endSurface = calculateSurfacePoint(endVec, endToStart, endNodeType, endNodeScale);
       
-      // Create control point for smooth curve
       const midPoint = startSurface.clone().add(endSurface).multiplyScalar(0.5);
       const midOffset = 0.5;
       midPoint.y += midOffset;
@@ -84,40 +76,35 @@ export const Edge: React.FC<EdgeProps> = ({
     }
   }, [start, end, startNodeType, endNodeType, startNodeScale, endNodeScale]);
 
-  // Create line geometry once
   const lineGeometry = useMemo(() => {
     const geometry = new THREE.BufferGeometry().setFromPoints(points);
     return geometry;
   }, [points]);
 
-  // ENHANCED: Improved color scheme with 20% lighter colors for dimmed edges
+  // ENHANCED: Improved color scheme for better touch feedback
   const getEdgeColor = useMemo(() => {
     if (isHighlighted) {
       return '#ffffff'; // Bright white for highlighted connections
     }
     
     if (dimmed) {
-      // ENHANCED: 20% lighter colors for dimmed edges instead of very dark
-      return theme === 'light' ? '#4a4a4a' : '#3a3a3a';
+      return theme === 'light' ? '#4a4a4a' : '#3a3a3a'; // Lighter dimmed colors
     }
     
-    // Default state - moderately visible
-    return theme === 'light' ? '#555555' : '#888888';
+    return theme === 'light' ? '#555555' : '#888888'; // Default visibility
   }, [isHighlighted, dimmed, theme]);
 
-  // ENHANCED: Increased opacity for dimmed edges to 0.05-0.06
+  // ENHANCED: Better opacity for mobile visibility
   const getEdgeOpacity = useMemo(() => {
     if (isHighlighted) {
-      return 0.95; // Very bright for highlighted
+      return 0.95; // Very visible for highlighted
     }
     
     if (dimmed) {
-      // ENHANCED: Increased opacity to 0.05-0.06 range for better visibility
-      return theme === 'light' ? 0.06 : 0.05;
+      return theme === 'light' ? 0.08 : 0.06; // Slightly more visible when dimmed
     }
     
-    // Default state
-    return theme === 'light' ? 0.25 : 0.08;
+    return theme === 'light' ? 0.25 : 0.15; // Better default visibility
   }, [isHighlighted, dimmed, theme]);
 
   useFrame(() => {
@@ -133,19 +120,18 @@ export const Edge: React.FC<EdgeProps> = ({
     }
   });
 
-  // ENHANCED: Much more dramatic thickness difference
-  const baseThickness = isHighlighted ? 2.5 : 0.3; // Highlighted much thicker, dimmed much thinner
-  const thickness = baseThickness + (value * (isHighlighted ? maxThickness * 1.5 : maxThickness * 0.1));
+  // ENHANCED: Much more dramatic thickness for better touch feedback
+  const baseThickness = isHighlighted ? 3.0 : 0.2; // Even more dramatic difference
+  const thickness = baseThickness + (value * (isHighlighted ? maxThickness * 2 : maxThickness * 0.1));
   
-  // Create material with appropriate properties
   const material = useMemo(() => {
     return new THREE.LineBasicMaterial({
       color: getEdgeColor,
       transparent: true,
       opacity: getEdgeOpacity,
       linewidth: thickness,
-      depthWrite: false, // Prevent z-fighting
-      depthTest: true,   // Maintain proper depth testing
+      depthWrite: false,
+      depthTest: true,
     });
   }, [getEdgeColor, getEdgeOpacity, thickness]);
 
@@ -154,7 +140,7 @@ export const Edge: React.FC<EdgeProps> = ({
       <primitive 
         object={new THREE.Line(lineGeometry, material)} 
         ref={lineRef}
-        renderOrder={10} // Render edges before nodes
+        renderOrder={10}
       />
     </group>
   );
