@@ -1,5 +1,7 @@
 
 import React, { useRef, useCallback } from 'react';
+import CapacitorTouchHandler from './CapacitorTouchHandler';
+import { nativeIntegrationService } from '@/services/nativeIntegrationService';
 
 interface MobileTouchHandlerProps {
   onNodeClick: (nodeId: string, event: any) => void;
@@ -12,73 +14,34 @@ export const MobileTouchHandler: React.FC<MobileTouchHandlerProps> = ({
   nodeId,
   children
 }) => {
+  const isNativeEnv = nativeIntegrationService.isRunningNatively();
   const touchStartTime = useRef<number>(0);
   const touchStartPos = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
-  const isTouchDevice = 'ontouchstart' in window;
 
-  const handleTouchStart = useCallback((e: React.TouchEvent) => {
-    e.stopPropagation();
-    touchStartTime.current = Date.now();
-    const touch = e.touches[0];
-    touchStartPos.current = { x: touch.clientX, y: touch.clientY };
-    
-    console.log(`[MobileTouchHandler] Touch start for node ${nodeId}`);
-  }, [nodeId]);
+  console.log(`[MobileTouchHandler] Rendering for node ${nodeId}, native: ${isNativeEnv}`);
 
-  const handleTouchEnd = useCallback((e: React.TouchEvent) => {
-    e.stopPropagation();
-    e.preventDefault();
-    
-    const touchDuration = Date.now() - touchStartTime.current;
-    const touch = e.changedTouches[0];
-    const deltaX = Math.abs(touch.clientX - touchStartPos.current.x);
-    const deltaY = Math.abs(touch.clientY - touchStartPos.current.y);
-    const moveDistance = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
-    
-    // Consider it a tap if duration < 300ms and movement < 10px
-    if (touchDuration < 300 && moveDistance < 10) {
-      console.log(`[MobileTouchHandler] Valid tap detected for node ${nodeId}`);
-      
-      // Haptic feedback for mobile
-      if (navigator.vibrate) {
-        navigator.vibrate(50);
-      }
-      
-      // Create synthetic event for Three.js compatibility
-      const syntheticEvent = {
-        ...e,
-        stopPropagation: () => e.stopPropagation(),
-        preventDefault: () => e.preventDefault(),
-        type: 'click',
-        target: e.target,
-        currentTarget: e.currentTarget
-      };
-      
-      onNodeClick(nodeId, syntheticEvent);
-    }
-  }, [nodeId, onNodeClick]);
-
-  const handleClick = useCallback((e: React.MouseEvent) => {
-    e.stopPropagation();
-    console.log(`[MobileTouchHandler] Mouse click for node ${nodeId}`);
-    onNodeClick(nodeId, e);
-  }, [nodeId, onNodeClick]);
-
-  // Use touch events on mobile, mouse events on desktop
-  if (isTouchDevice) {
+  // Use CapacitorTouchHandler for native environments or enhanced touch handling
+  if (isNativeEnv || ('ontouchstart' in window)) {
     return (
-      <group>
-        <mesh
-          onPointerDown={handleTouchStart as any}
-          onPointerUp={handleTouchEnd as any}
-        >
-          <boxGeometry args={[0.1, 0.1, 0.1]} />
-          <meshBasicMaterial transparent opacity={0} />
-          {children}
-        </mesh>
-      </group>
+      <CapacitorTouchHandler
+        nodeId={nodeId}
+        onNodeClick={onNodeClick}
+      >
+        {children}
+      </CapacitorTouchHandler>
     );
   }
+
+  // Fallback for desktop environments
+  const handleClick = useCallback((e: React.MouseEvent) => {
+    try {
+      e.stopPropagation();
+      console.log(`[MobileTouchHandler] Desktop click for node ${nodeId}`);
+      onNodeClick(nodeId, e);
+    } catch (error) {
+      console.error(`[MobileTouchHandler] Error in desktop click for node ${nodeId}:`, error);
+    }
+  }, [nodeId, onNodeClick]);
 
   return (
     <group onClick={handleClick as any}>

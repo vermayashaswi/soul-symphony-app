@@ -30,6 +30,9 @@
   /* ANDROID FIX: Force GPU acceleration for better rendering */
   transform: translateZ(0);
   will-change: transform;
+  
+  /* CRITICAL FIX: Ensure navigation stays visible when keyboard opens */
+  transition: transform 0.2s ease-out, opacity 0.2s ease-out;
 }
 
 /* ANDROID FIX: Platform-specific adjustments */
@@ -38,6 +41,15 @@
   bottom: max(0px, var(--safe-area-inset-bottom, 0px));
   /* Ensure minimum height on Android */
   min-height: calc(var(--nav-bar-height) + 8px);
+  /* CRITICAL: Prevent interference with keyboard */
+  position: fixed !important;
+}
+
+/* CRITICAL FIX: Hide navigation when keyboard is visible */
+.keyboard-visible .mobile-navigation {
+  transform: translateY(100%);
+  opacity: 0;
+  pointer-events: none;
 }
 
 /* Navigation content positioning */
@@ -53,13 +65,21 @@
   z-index: 1;
 }
 
-/* Chat input positioning to account for navigation */
+/* CRITICAL FIX: Chat input positioning to account for navigation */
 .mobile-chat-input-container {
   position: fixed;
-  bottom: calc(var(--nav-bar-height) + max(var(--safe-area-inset-bottom, 0px), env(safe-area-inset-bottom, 0px)));
   left: var(--safe-area-inset-left, 0px);
   right: var(--safe-area-inset-right, 0px);
-  z-index: 9998;
+  z-index: 60; /* Higher than navigation */
+  
+  /* Dynamic bottom positioning based on keyboard state */
+  bottom: 64px; /* Default: above navigation */
+  transition: bottom 0.2s ease-out;
+}
+
+/* CRITICAL FIX: When keyboard is visible, position at viewport bottom */
+.keyboard-visible .mobile-chat-input-container {
+  bottom: 0px;
 }
 
 /* ANDROID FIX: Platform-specific chat input adjustment */
@@ -67,16 +87,45 @@
   bottom: calc(var(--nav-bar-height) + max(var(--safe-area-inset-bottom, 0px), 8px));
 }
 
-/* Prevent body scroll on mobile when keyboard is visible */
-.keyboard-visible .mobile-navigation {
-  display: none;
+.platform-android.keyboard-visible .mobile-chat-input-container {
+  bottom: max(var(--safe-area-inset-bottom, 0px), 8px);
 }
 
-/* Ensure no horizontal overflow */
+/* CRITICAL FIX: Ensure no horizontal overflow */
 .mobile-navigation,
-.mobile-navigation * {
+.mobile-navigation *,
+.mobile-chat-input-container,
+.mobile-chat-input-container * {
   max-width: 100%;
   box-sizing: border-box;
+}
+
+/* ANDROID FIX: Viewport stability */
+@supports (height: 100dvh) {
+  .mobile-navigation {
+    /* Use dynamic viewport height on supported browsers */
+    --vh: 100dvh;
+  }
+}
+
+/* CRITICAL FIX: Z-index layering hierarchy */
+.mobile-navigation {
+  z-index: 9999;
+}
+
+.mobile-chat-input-container {
+  z-index: 10000; /* Always above navigation */
+}
+
+/* Keyboard animation improvements */
+.mobile-navigation {
+  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1),
+              opacity 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.mobile-chat-input-container {
+  transition: bottom 0.3s cubic-bezier(0.4, 0, 0.2, 1),
+              transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 /* ANDROID FIX: Debug helper (remove in production) */
@@ -86,7 +135,7 @@
 }
 
 .mobile-navigation.debug::before {
-  content: "SafeArea: " attr(data-safe-area-bottom);
+  content: "SafeArea: " attr(data-safe-area-bottom) " KB: " attr(data-keyboard-visible);
   position: absolute;
   top: -20px;
   left: 0;
