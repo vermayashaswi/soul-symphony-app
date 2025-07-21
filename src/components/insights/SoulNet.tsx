@@ -5,7 +5,6 @@ import { TimeRange } from '@/hooks/use-insights-data';
 import { useIsMobile } from '@/hooks/use-mobile';
 import SimplifiedSoulNetVisualization from './soulnet/SimplifiedSoulNetVisualization';
 import RenderingErrorBoundary from './soulnet/RenderingErrorBoundary';
-import WebGLContextManager from './soulnet/WebGLContextManager';
 import { LoadingState } from './soulnet/LoadingState';
 import { EmptyState } from './soulnet/EmptyState';
 import { FullscreenWrapper } from './soulnet/FullscreenWrapper';
@@ -17,8 +16,6 @@ import { useTranslation } from '@/contexts/TranslationContext';
 import { useInstantSoulNetData } from '@/hooks/useInstantSoulNetData';
 import { EnhancedSoulNetPreloadService } from '@/services/enhancedSoulNetPreloadService';
 import { translationService } from '@/services/translationService';
-import { useTheme } from '@/hooks/use-theme';
-import { nativeIntegrationService } from '@/services/nativeIntegrationService';
 
 interface SoulNetProps {
   userId: string | undefined;
@@ -61,41 +58,14 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
   const [canvasError, setCanvasError] = useState<Error | null>(null);
   const [retryCount, setRetryCount] = useState(0);
   const [renderingReady, setRenderingReady] = useState(false);
-  const [webglStable, setWebglStable] = useState(true);
   const isMobile = useIsMobile();
   const themeHex = useUserColorThemeHex();
   const { currentLanguage } = useTranslation();
-  const { theme, systemTheme } = useTheme();
-  const effectiveTheme = theme === 'system' ? systemTheme : theme;
-  const isNativeEnv = nativeIntegrationService.isRunningNatively();
   
   // ENHANCED: Rendering initialization tracking
   const renderingInitialized = useRef(false);
   const lastTimeRange = useRef<string>(timeRange);
   const lastLanguage = useRef<string>(currentLanguage);
-
-  console.log(`[SoulNet] Environment detection - Native: ${isNativeEnv}, Mobile: ${isMobile}, Platform: ${nativeIntegrationService.getPlatform()}`);
-
-  // Setup error event listeners for better debugging
-  useEffect(() => {
-    const handleSoulNetError = (event: CustomEvent) => {
-      console.error('[SoulNet] Custom error event received:', event.detail);
-      // You could show a toast here if needed
-    };
-
-    const handleTouchError = (event: CustomEvent) => {
-      console.error('[SoulNet] Touch error event received:', event.detail);
-      // Handle touch-specific errors
-    };
-
-    window.addEventListener('soulnet-node-error', handleSoulNetError as EventListener);
-    window.addEventListener('soulnet-touch-error', handleTouchError as EventListener);
-
-    return () => {
-      window.removeEventListener('soulnet-node-error', handleSoulNetError as EventListener);
-      window.removeEventListener('soulnet-touch-error', handleTouchError as EventListener);
-    };
-  }, []);
 
   // ENHANCED: Track parameter changes for immediate reset
   useEffect(() => {
@@ -142,10 +112,7 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
     translationProgress,
     translationComplete,
     renderingReady,
-    renderingInitialized: renderingInitialized.current,
-    effectiveTheme,
-    webglStable,
-    isNativeEnv
+    renderingInitialized: renderingInitialized.current
   });
 
   // ENHANCED: Rendering initialization with proper dependencies
@@ -156,18 +123,12 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
       graphData.nodes.length > 0 && 
       !renderingInitialized.current &&
       !loading &&
-      !isTranslating &&
-      webglStable;
+      !isTranslating;
 
     if (shouldInitializeRendering) {
       console.log("[SoulNet] INITIALIZING RENDERING: All conditions met");
-      
-      // Add delay for native environment to ensure WebView stability
-      const delay = isNativeEnv ? 200 : 100;
-      setTimeout(() => {
-        setRenderingReady(true);
-        renderingInitialized.current = true;
-      }, delay);
+      setRenderingReady(true);
+      renderingInitialized.current = true;
     }
     
     // Reset rendering on data issues
@@ -181,7 +142,7 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
       setRenderingReady(false);
       renderingInitialized.current = false;
     }
-  }, [isInstantReady, translationComplete, graphData.nodes.length, loading, error, isTranslating, webglStable, isNativeEnv]);
+  }, [isInstantReady, translationComplete, graphData.nodes.length, loading, error, isTranslating]);
 
   // ENHANCED: Manual cache refresh handler
   const handleManualRefresh = useCallback(() => {
@@ -189,12 +150,11 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
       console.log('[SoulNet] MANUAL REFRESH: Forcing cache invalidation');
       EnhancedSoulNetPreloadService.forceInvalidateCache(userId, timeRange, currentLanguage);
       
-      // Reset all states
+      // Reset rendering state
       setRenderingReady(false);
       renderingInitialized.current = false;
       setCanvasError(null);
       setRetryCount(0);
-      setWebglStable(true);
       
       // Trigger page reload to ensure fresh data
       window.location.reload();
@@ -220,21 +180,7 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
     console.log('[SoulNet] RETRY: Resetting error state');
     setCanvasError(null);
     setRetryCount(0);
-    setWebglStable(true);
     renderingInitialized.current = false;
-  }, []);
-
-  const handleContextLost = useCallback(() => {
-    console.log('[SoulNet] WebGL context lost');
-    setWebglStable(false);
-    setRenderingReady(false);
-    renderingInitialized.current = false;
-  }, []);
-
-  const handleContextRestored = useCallback(() => {
-    console.log('[SoulNet] WebGL context restored');
-    setWebglStable(true);
-    // Don't immediately set rendering ready, let the normal flow handle it
   }, []);
 
   // ENHANCED: Show translation loading with manual refresh option
@@ -402,7 +348,7 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
     );
   };
 
-  console.log(`[SoulNet] Final render - ${graphData.nodes.length} nodes, ${graphData.links.length} links, renderingReady: ${renderingReady}, webglStable: ${webglStable}`);
+  console.log(`[SoulNet] Final render - ${graphData.nodes.length} nodes, ${graphData.links.length} links, renderingReady: ${renderingReady}`);
 
   return (
     <div className={cn(
@@ -415,104 +361,98 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
         isFullScreen={isFullScreen}
         toggleFullScreen={toggleFullScreen}
       >
-        <WebGLContextManager
-          onContextLost={handleContextLost}
-          onContextRestored={handleContextRestored}
-        >
-          <RenderingErrorBoundary
-            onError={handleCanvasError}
-            fallback={
-              <div className="flex items-center justify-center p-10 bg-gray-100 dark:bg-gray-800 rounded-lg">
-                <div className="text-center">
-                  <h3 className="text-lg font-medium">
+        <RenderingErrorBoundary
+          onError={handleCanvasError}
+          fallback={
+            <div className="flex items-center justify-center p-10 bg-gray-100 dark:bg-gray-800 rounded-lg">
+              <div className="text-center">
+                <h3 className="text-lg font-medium">
+                  <TranslatableText 
+                    text="Visualization Error" 
+                    forceTranslate={true}
+                    enableFontScaling={true}
+                    scalingContext="general"
+                  />
+                </h3>
+                <p className="text-muted-foreground mt-2">
+                  <TranslatableText 
+                    text="The 3D visualization encountered an error." 
+                    forceTranslate={true}
+                    enableFontScaling={true}
+                    scalingContext="general"
+                  />
+                </p>
+                <div className="space-x-2 mt-4">
+                  <button 
+                    className="px-4 py-2 bg-primary text-white rounded-lg"
+                    onClick={handleRetry}
+                  >
                     <TranslatableText 
-                      text="Visualization Error" 
+                      text="Retry" 
                       forceTranslate={true}
                       enableFontScaling={true}
                       scalingContext="general"
                     />
-                  </h3>
-                  <p className="text-muted-foreground mt-2">
+                  </button>
+                  <button 
+                    className="px-4 py-2 bg-gray-600 text-white rounded-lg"
+                    onClick={handleManualRefresh}
+                  >
                     <TranslatableText 
-                      text="The 3D visualization encountered an error." 
+                      text="Force Refresh" 
                       forceTranslate={true}
                       enableFontScaling={true}
                       scalingContext="general"
                     />
-                  </p>
-                  <div className="space-x-2 mt-4">
-                    <button 
-                      className="px-4 py-2 bg-primary text-white rounded-lg"
-                      onClick={handleRetry}
-                    >
-                      <TranslatableText 
-                        text="Retry" 
-                        forceTranslate={true}
-                        enableFontScaling={true}
-                        scalingContext="general"
-                      />
-                    </button>
-                    <button 
-                      className="px-4 py-2 bg-gray-600 text-white rounded-lg"
-                      onClick={handleManualRefresh}
-                    >
-                      <TranslatableText 
-                        text="Force Refresh" 
-                        forceTranslate={true}
-                        enableFontScaling={true}
-                        scalingContext="general"
-                      />
-                    </button>
-                  </div>
+                  </button>
                 </div>
               </div>
-            }
-          >
-            {/* Canvas renders only when fully ready and WebGL is stable */}
-            {renderingReady && translationComplete && webglStable && (
-              <Canvas
-                style={{
-                  width: '100%',
-                  height: '100%',
-                  maxWidth: isFullScreen ? 'none' : '800px',
-                  maxHeight: isFullScreen ? 'none' : '500px',
-                  position: 'relative',
-                  zIndex: 5,
-                  transition: 'all 0.3s ease-in-out',
-                }}
-                camera={{ 
-                  position: [0, 0, isFullScreen ? 40 : 45],
-                  near: 1, 
-                  far: 1000,
-                  fov: isFullScreen ? 60 : 50
-                }}
-                gl={{ 
-                  preserveDrawingBuffer: true,
-                  antialias: !isMobile && !isNativeEnv, // Disable antialiasing on mobile and native for better performance
-                  powerPreference: isNativeEnv ? 'low-power' : 'high-performance',
-                  alpha: true,
-                  depth: true,
-                  stencil: false,
-                  precision: (isMobile || isNativeEnv) ? 'mediump' : 'highp'
-                }}
-              >
-                <SimplifiedSoulNetVisualization
-                  data={graphData}
-                  selectedNode={null} // Managed internally now
-                  onNodeClick={() => {}} // Managed internally now
-                  themeHex={themeHex}
-                  isFullScreen={isFullScreen}
-                  shouldShowLabels={true}
-                  effectiveTheme={effectiveTheme}
-                  getInstantConnectionPercentage={getInstantConnectionPercentage}
-                  getInstantTranslation={getInstantTranslation}
-                  getInstantNodeConnections={getInstantNodeConnections}
-                  isInstantReady={isInstantReady}
-                />
-              </Canvas>
-            )}
-          </RenderingErrorBoundary>
-        </WebGLContextManager>
+            </div>
+          }
+        >
+          {/* Canvas renders only when fully ready */}
+          {renderingReady && translationComplete && (
+            <Canvas
+              style={{
+                width: '100%',
+                height: '100%',
+                maxWidth: isFullScreen ? 'none' : '800px',
+                maxHeight: isFullScreen ? 'none' : '500px',
+                position: 'relative',
+                zIndex: 5,
+                transition: 'all 0.3s ease-in-out',
+              }}
+              camera={{ 
+                position: [0, 0, isFullScreen ? 40 : 45],
+                near: 1, 
+                far: 1000,
+                fov: isFullScreen ? 60 : 50
+              }}
+              gl={{ 
+                preserveDrawingBuffer: true,
+                antialias: !isMobile,
+                powerPreference: 'high-performance',
+                alpha: true,
+                depth: true,
+                stencil: false,
+                precision: isMobile ? 'mediump' : 'highp'
+              }}
+            >
+              <SimplifiedSoulNetVisualization
+                data={graphData}
+                selectedNode={null} // Managed internally now
+                onNodeClick={() => {}} // Managed internally now
+                themeHex={themeHex}
+                isFullScreen={isFullScreen}
+                shouldShowLabels={true}
+                getInstantConnectionPercentage={getInstantConnectionPercentage}
+                getInstantTranslation={getInstantTranslation}
+                getInstantNodeConnections={getInstantNodeConnections}
+                isInstantReady={isInstantReady}
+              />
+            </Canvas>
+          )}
+        </RenderingErrorBoundary>
       </FullscreenWrapper>
       
       {!isFullScreen && (

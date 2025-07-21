@@ -30,17 +30,14 @@ const config: CapacitorConfig = {
       splashScreenDelay: 2000
     },
     Keyboard: {
-      resize: "ionic", // CRITICAL FIX: Changed from "body" to "ionic" for better Android handling
+      resize: "body",
       style: "dark",
-      resizeOnFullScreen: true,
-      // ANDROID FIX: Additional keyboard configuration
-      scrollAssist: true,
-      hideFormAccessoryBar: false
+      resizeOnFullScreen: true
     },
     StatusBar: {
       style: "dark",
       backgroundColor: "#FFFFFF",
-      overlaysWebView: false // CRITICAL: Prevents status bar overlap
+      overlaysWebView: false
     },
     PushNotifications: {
       presentationOptions: ["badge", "sound", "alert"]
@@ -52,13 +49,13 @@ const config: CapacitorConfig = {
     }
   },
   ios: {
-    contentInset: "never",
+    contentInset: "never", // FIXED: Changed from "always" to "never" to prevent extra spacing
     allowsLinkPreview: false,
     scrollEnabled: true,
     backgroundColor: "#FFFFFF",
     scheme: "Soulo",
     preferredContentMode: "mobile",
-    handleApplicationURL: true
+    handleApplicationURL: true // Enable proper URL handling
   },
   android: {
     allowMixedContent: false,
@@ -73,12 +70,9 @@ const config: CapacitorConfig = {
     androidScheme: "https",
     loadOnMainThread: true,
     handlePermissions: true,
-    // ANDROID FIX: Enhanced Android configuration
+    // Android-specific safe area handling
     allowNavigationBarColorChange: true,
-    navigationBarColor: "#FFFFFF",
-    // CRITICAL: Improved keyboard handling
-    mixedContentMode: "compatibility",
-    themeColor: "#8b5cf6"
+    navigationBarColor: "#FFFFFF"
   }
 };
 
