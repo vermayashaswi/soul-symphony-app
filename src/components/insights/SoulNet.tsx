@@ -1,5 +1,6 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
 
+import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { useTheme } from '@/hooks/use-theme';
 import { Canvas } from '@react-three/fiber';
 import { TimeRange } from '@/hooks/use-insights-data';
 import { useIsMobile } from '@/hooks/use-mobile';
@@ -60,8 +61,8 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
   const [renderingReady, setRenderingReady] = useState(false);
   const isMobile = useIsMobile();
   const themeHex = useUserColorThemeHex();
-  const [selectedEntity, setSelectedEntity] = useState<string | null>(null);
   const { currentLanguage } = useTranslation();
+  const { theme, systemTheme } = useTheme();
   
   // ENHANCED: Rendering initialization tracking
   const renderingInitialized = useRef(false);
@@ -76,7 +77,6 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
       // Immediate rendering reset on parameter change
       setRenderingReady(false);
       renderingInitialized.current = false;
-      setSelectedEntity(null);
       
       lastTimeRange.current = timeRange;
       lastLanguage.current = currentLanguage;
@@ -155,7 +155,6 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
       // Reset rendering state
       setRenderingReady(false);
       renderingInitialized.current = false;
-      setSelectedEntity(null);
       setCanvasError(null);
       setRetryCount(0);
       
@@ -164,37 +163,8 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
     }
   }, [userId, timeRange, currentLanguage]);
 
-  // SOUL-NET SELECTION FIX: Enhanced node selection with debug logging
-  const handleNodeSelect = useCallback((id: string) => {
-    console.log(`[SoulNet] ENHANCED TOUCH: Node selection triggered for ${id}`, {
-      currentSelectedEntity: selectedEntity,
-      newNodeId: id,
-      willToggle: selectedEntity === id,
-      willSelect: selectedEntity !== id,
-      isMobile
-    });
-    
-    if (selectedEntity === id) {
-      console.log(`[SoulNet] ENHANCED TOUCH: Deselecting node ${id}`);
-      setSelectedEntity(null);
-    } else {
-      console.log(`[SoulNet] ENHANCED TOUCH: Selecting node ${id}`);
-      setSelectedEntity(id);
-      
-      // Enhanced haptic feedback for mobile
-      if (isMobile && navigator.vibrate) {
-        navigator.vibrate(100); // Stronger vibration for selection
-        console.log(`[SoulNet] ENHANCED TOUCH: Enhanced vibration triggered for node ${id}`);
-      }
-    }
-  }, [selectedEntity, isMobile]);
-
   const toggleFullScreen = useCallback(() => {
     setIsFullScreen(prev => {
-      if (!prev) {
-        console.log(`[SoulNet] ENHANCED TOUCH: Entering fullscreen, clearing selection`);
-        setSelectedEntity(null);
-      }
       console.log(`[SoulNet] FULLSCREEN TOGGLE: ${!prev}`);
       return !prev;
     });
@@ -363,7 +333,7 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
     if (isMobile) {
       return (
         <TranslatableText 
-          text="Touch a node to highlight connections • Drag to rotate • Pinch to zoom" 
+          text="Drag to rotate • Pinch to zoom • Tap a node to highlight connections" 
           forceTranslate={true}
           enableFontScaling={true}
           scalingContext="general"
@@ -372,7 +342,7 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
     }
     return (
       <TranslatableText 
-        text="Click a node to highlight connections • Drag to rotate • Scroll to zoom" 
+        text="Drag to rotate • Scroll to zoom • Click a node to highlight connections" 
         forceTranslate={true}
         enableFontScaling={true}
         scalingContext="general"
@@ -380,7 +350,7 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
     );
   };
 
-  console.log(`[SoulNet] ENHANCED TOUCH: Final render - ${graphData.nodes.length} nodes, ${graphData.links.length} links, renderingReady: ${renderingReady}, selectedEntity: ${selectedEntity}, isMobile: ${isMobile}`);
+  console.log(`[SoulNet] Final render - ${graphData.nodes.length} nodes, ${graphData.links.length} links, renderingReady: ${renderingReady}`);
 
   return (
     <div className={cn(
@@ -442,7 +412,7 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
             </div>
           }
         >
-          {/* ENHANCED: Canvas with mobile-optimized settings */}
+          {/* Canvas renders only when fully ready */}
           {renderingReady && translationComplete && (
             <Canvas
               style={{
@@ -453,7 +423,6 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
                 position: 'relative',
                 zIndex: 5,
                 transition: 'all 0.3s ease-in-out',
-                touchAction: 'none', // Prevent default touch behaviors
               }}
               camera={{ 
                 position: [0, 0, isFullScreen ? 40 : 45],
@@ -461,27 +430,24 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
                 far: 1000,
                 fov: isFullScreen ? 60 : 50
               }}
-              onPointerMissed={() => {
-                console.log('[SoulNet] ENHANCED TOUCH: Canvas pointer missed - clearing selection');
-                setSelectedEntity(null);
-              }}
               gl={{ 
                 preserveDrawingBuffer: true,
-                antialias: !isMobile, // Disable antialiasing on mobile for performance
+                antialias: !isMobile,
                 powerPreference: 'high-performance',
                 alpha: true,
                 depth: true,
                 stencil: false,
-                precision: isMobile ? 'mediump' : 'highp' // Lower precision on mobile
+                precision: isMobile ? 'mediump' : 'highp'
               }}
             >
               <SimplifiedSoulNetVisualization
                 data={graphData}
-                selectedNode={selectedEntity}
-                onNodeClick={handleNodeSelect}
+                selectedNode={null} // Managed internally now
+                onNodeClick={() => {}} // Managed internally now
                 themeHex={themeHex}
                 isFullScreen={isFullScreen}
                 shouldShowLabels={true}
+                effectiveTheme={theme === 'system' ? systemTheme : theme}
                 getInstantConnectionPercentage={getInstantConnectionPercentage}
                 getInstantTranslation={getInstantTranslation}
                 getInstantNodeConnections={getInstantNodeConnections}

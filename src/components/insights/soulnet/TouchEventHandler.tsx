@@ -1,198 +1,169 @@
 
-import React, { useRef, useEffect, useCallback } from 'react';
+import React, { useRef, useCallback, useEffect } from 'react';
+import { useFrame, useThree } from '@react-three/fiber';
 import * as THREE from 'three';
-import { useThree } from '@react-three/fiber';
 
 interface TouchEventHandlerProps {
-  onNodeSelect: (nodeId: string | null) => void;
-  nodes: Array<{
-    id: string;
-    position: [number, number, number];
-    type: 'entity' | 'emotion';
-  }>;
-  enabled: boolean;
+  onNodeSelect: (nodeId: string, position: THREE.Vector3) => void;
+  onNodeDeselect: () => void;
+  nodes: Array<{ id: string; position: THREE.Vector3 }>;
+  children: React.ReactNode;
 }
 
 export const TouchEventHandler: React.FC<TouchEventHandlerProps> = ({
   onNodeSelect,
+  onNodeDeselect,
   nodes,
-  enabled
+  children
 }) => {
-  const { camera, gl, scene } = useThree();
-  const raycaster = useRef(new THREE.Raycaster());
-  const mouse = useRef(new THREE.Vector2());
-  const touchStartTime = useRef(0);
-  const touchStartPosition = useRef({ x: 0, y: 0 });
-  const isDragging = useRef(false);
-  const dragThreshold = 10; // pixels
-  const tapTimeThreshold = 500; // milliseconds
+  const { camera, size } = useThree();
+  const raycaster = new THREE.Raycaster();
+  const touchStartRef = useRef<{ x: number; y: number; time: number } | null>(null);
+  const isCapacitorNative = useRef(false);
 
-  // Enhanced raycasting with mobile-optimized settings
-  const setupRaycaster = useCallback(() => {
-    raycaster.current.params.Points = { threshold: 0.3 };
-    raycaster.current.params.Line = { threshold: 0.3 };
-    raycaster.current.far = 1000;
-    raycaster.current.near = 0.1;
+  useEffect(() => {
+    // Detect if running in Capacitor native environment
+    isCapacitorNative.current = !!(window as any).Capacitor && 
+      ((window as any).Capacitor.getPlatform() === 'android' || 
+       (window as any).Capacitor.getPlatform() === 'ios');
+    
+    console.log('[TouchEventHandler] Native detection:', isCapacitorNative.current);
   }, []);
 
-  useEffect(() => {
-    setupRaycaster();
-  }, [setupRaycaster]);
+  const getIntersectedNode = useCallback((clientX: number, clientY: number) => {
+    const rect = (document.querySelector('canvas') as HTMLCanvasElement)?.getBoundingClientRect();
+    if (!rect) return null;
 
-  // Convert screen coordinates to normalized device coordinates
-  const getMousePosition = useCallback((clientX: number, clientY: number) => {
-    const rect = gl.domElement.getBoundingClientRect();
+    // Convert screen coordinates to normalized device coordinates
     const x = ((clientX - rect.left) / rect.width) * 2 - 1;
     const y = -((clientY - rect.top) / rect.height) * 2 + 1;
-    return { x, y };
-  }, [gl.domElement]);
 
-  // Manual raycasting to find intersected nodes
-  const performRaycast = useCallback((screenX: number, screenY: number): string | null => {
-    const mousePos = getMousePosition(screenX, screenY);
-    mouse.current.set(mousePos.x, mousePos.y);
-    
-    raycaster.current.setFromCamera(mouse.current, camera);
-    
-    // Check intersection with each node manually
+    const mouse = new THREE.Vector2(x, y);
+    raycaster.setFromCamera(mouse, camera);
+
+    // Find closest node within selection threshold
+    const threshold = 0.5; // Increased threshold for mobile touch
+    let closestNode = null;
+    let closestDistance = Infinity;
+
     for (const node of nodes) {
-      const nodePosition = new THREE.Vector3(...node.position);
-      const nodeRadius = node.type === 'entity' ? 0.8 : 1.15; // Match node geometry sizes
-      
-      // Calculate distance from ray to node center
-      const ray = raycaster.current.ray;
-      const distance = ray.distanceToPoint(nodePosition);
-      
-      if (distance <= nodeRadius) {
-        console.log(`[TouchEventHandler] Node ${node.id} intersected at distance ${distance}`);
-        return node.id;
+      const distance = raycaster.ray.distanceToPoint(node.position);
+      if (distance < threshold && distance < closestDistance) {
+        closestDistance = distance;
+        closestNode = node;
       }
     }
-    
-    return null;
-  }, [camera, nodes, getMousePosition]);
 
-  // Handle touch start
-  const handleTouchStart = useCallback((event: TouchEvent) => {
-    if (!enabled || event.touches.length !== 1) return;
-    
+    console.log('[TouchEventHandler] Node intersection check:', {
+      clientX,
+      clientY,
+      normalizedX: x,
+      normalizedY: y,
+      closestNode: closestNode?.id,
+      distance: closestDistance
+    });
+
+    return closestNode;
+  }, [camera, raycaster, nodes]);
+
+  const handleTouchStart = useCallback((event: React.TouchEvent) => {
     event.preventDefault();
     event.stopPropagation();
-    
+
     const touch = event.touches[0];
-    touchStartTime.current = Date.now();
-    touchStartPosition.current = { x: touch.clientX, y: touch.clientY };
-    isDragging.current = false;
-    
-    console.log('[TouchEventHandler] Touch start detected', {
+    if (!touch) return;
+
+    touchStartRef.current = {
       x: touch.clientX,
       y: touch.clientY,
-      timestamp: touchStartTime.current
-    });
-  }, [enabled]);
+      time: Date.now()
+    };
 
-  // Handle touch move
-  const handleTouchMove = useCallback((event: TouchEvent) => {
-    if (!enabled || event.touches.length !== 1) return;
-    
-    const touch = event.touches[0];
-    const deltaX = Math.abs(touch.clientX - touchStartPosition.current.x);
-    const deltaY = Math.abs(touch.clientY - touchStartPosition.current.y);
-    
-    if (deltaX > dragThreshold || deltaY > dragThreshold) {
-      isDragging.current = true;
-      console.log('[TouchEventHandler] Touch drag detected', { deltaX, deltaY });
-    }
-  }, [enabled, dragThreshold]);
+    console.log('[TouchEventHandler] Touch start:', touchStartRef.current);
+  }, []);
 
-  // Handle touch end
-  const handleTouchEnd = useCallback((event: TouchEvent) => {
-    if (!enabled) return;
-    
+  const handleTouchEnd = useCallback((event: React.TouchEvent) => {
     event.preventDefault();
     event.stopPropagation();
-    
-    const touchEndTime = Date.now();
-    const touchDuration = touchEndTime - touchStartTime.current;
-    
-    console.log('[TouchEventHandler] Touch end detected', {
-      duration: touchDuration,
-      isDragging: isDragging.current,
-      threshold: tapTimeThreshold
+
+    const touchStart = touchStartRef.current;
+    if (!touchStart) return;
+
+    const touch = event.changedTouches[0];
+    if (!touch) return;
+
+    const touchEnd = {
+      x: touch.clientX,
+      y: touch.clientY,
+      time: Date.now()
+    };
+
+    // Check if this was a tap (not a drag)
+    const deltaX = Math.abs(touchEnd.x - touchStart.x);
+    const deltaY = Math.abs(touchEnd.y - touchStart.y);
+    const deltaTime = touchEnd.time - touchStart.time;
+
+    const isTap = deltaX < 10 && deltaY < 10 && deltaTime < 300;
+
+    console.log('[TouchEventHandler] Touch end:', {
+      touchEnd,
+      deltaX,
+      deltaY,
+      deltaTime,
+      isTap
     });
-    
-    // Only process as tap if it's not a drag and within time threshold
-    if (!isDragging.current && touchDuration < tapTimeThreshold) {
-      const intersectedNodeId = performRaycast(
-        touchStartPosition.current.x,
-        touchStartPosition.current.y
-      );
+
+    if (isTap) {
+      const intersectedNode = getIntersectedNode(touchEnd.x, touchEnd.y);
       
-      console.log('[TouchEventHandler] Tap detected, intersected node:', intersectedNodeId);
-      
-      if (intersectedNodeId) {
-        // Add haptic feedback
-        if (navigator.vibrate) {
-          navigator.vibrate(50);
-        }
-        onNodeSelect(intersectedNodeId);
+      if (intersectedNode) {
+        console.log('[TouchEventHandler] Node selected:', intersectedNode.id);
+        onNodeSelect(intersectedNode.id, intersectedNode.position);
       } else {
-        onNodeSelect(null);
+        console.log('[TouchEventHandler] Background tapped - deselecting');
+        onNodeDeselect();
       }
     }
-    
-    // Reset state
-    isDragging.current = false;
-    touchStartTime.current = 0;
-  }, [enabled, tapTimeThreshold, performRaycast, onNodeSelect]);
 
-  // Handle mouse events for desktop fallback
-  const handleMouseClick = useCallback((event: MouseEvent) => {
-    if (!enabled) return;
-    
+    touchStartRef.current = null;
+  }, [getIntersectedNode, onNodeSelect, onNodeDeselect]);
+
+  const handleMouseClick = useCallback((event: React.MouseEvent) => {
+    if (isCapacitorNative.current) return; // Skip mouse events in native environment
+
     event.preventDefault();
     event.stopPropagation();
+
+    const intersectedNode = getIntersectedNode(event.clientX, event.clientY);
     
-    console.log('[TouchEventHandler] Mouse click detected', {
-      x: event.clientX,
-      y: event.clientY
-    });
-    
-    const intersectedNodeId = performRaycast(event.clientX, event.clientY);
-    
-    if (intersectedNodeId) {
-      onNodeSelect(intersectedNodeId);
+    if (intersectedNode) {
+      console.log('[TouchEventHandler] Mouse click - Node selected:', intersectedNode.id);
+      onNodeSelect(intersectedNode.id, intersectedNode.position);
     } else {
-      onNodeSelect(null);
+      console.log('[TouchEventHandler] Mouse click - Background clicked - deselecting');
+      onNodeDeselect();
     }
-  }, [enabled, performRaycast, onNodeSelect]);
+  }, [getIntersectedNode, onNodeSelect, onNodeDeselect]);
 
-  // Set up event listeners
-  useEffect(() => {
-    const canvas = gl.domElement;
-    
-    if (enabled) {
-      // Touch events
-      canvas.addEventListener('touchstart', handleTouchStart, { passive: false });
-      canvas.addEventListener('touchmove', handleTouchMove, { passive: false });
-      canvas.addEventListener('touchend', handleTouchEnd, { passive: false });
-      
-      // Mouse events for desktop fallback
-      canvas.addEventListener('click', handleMouseClick, { passive: false });
-      
-      console.log('[TouchEventHandler] Event listeners added');
-    }
-    
-    return () => {
-      canvas.removeEventListener('touchstart', handleTouchStart);
-      canvas.removeEventListener('touchmove', handleTouchMove);
-      canvas.removeEventListener('touchend', handleTouchEnd);
-      canvas.removeEventListener('click', handleMouseClick);
-      console.log('[TouchEventHandler] Event listeners removed');
-    };
-  }, [enabled, handleTouchStart, handleTouchMove, handleTouchEnd, handleMouseClick, gl.domElement]);
-
-  return null; // This component doesn't render anything
+  return (
+    <mesh
+      onPointerDown={(event: any) => {
+        event.stopPropagation();
+        handleTouchStart(event);
+      }}
+      onPointerUp={(event: any) => {
+        event.stopPropagation();
+        handleTouchEnd(event);
+      }}
+      onClick={(event: any) => {
+        if (!isCapacitorNative.current) {
+          handleMouseClick(event);
+        }
+      }}
+    >
+      <boxGeometry args={[100, 100, 100]} />
+      <meshBasicMaterial transparent opacity={0} />
+      {children}
+    </mesh>
+  );
 };
-
-export default TouchEventHandler;
