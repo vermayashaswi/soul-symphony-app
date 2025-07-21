@@ -67,9 +67,26 @@
   bottom: calc(var(--nav-bar-height) + max(var(--safe-area-inset-bottom, 0px), 8px));
 }
 
-/* Prevent body scroll on mobile when keyboard is visible */
-.keyboard-visible .mobile-navigation {
-  display: none;
+/* When keyboard is visible, position chat input at bottom of screen */
+.mobile-chat-input-container.keyboard-visible {
+  bottom: max(var(--safe-area-inset-bottom, 0px), env(safe-area-inset-bottom, 0px));
+}
+
+/* ANDROID FIX: Keyboard visible chat input adjustment */
+.platform-android .mobile-chat-input-container.keyboard-visible {
+  bottom: max(var(--safe-area-inset-bottom, 0px), 8px);
+}
+
+/* When keyboard is visible, hide navigation with transition */
+.mobile-navigation.keyboard-visible {
+  transform: translateY(100%);
+  transition: transform 0.3s ease-in-out;
+}
+
+/* Ensure navigation is visible when keyboard is not active */
+.mobile-navigation:not(.keyboard-visible) {
+  transform: translateY(0);
+  transition: transform 0.3s ease-in-out;
 }
 
 /* Ensure no horizontal overflow */

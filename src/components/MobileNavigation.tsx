@@ -100,7 +100,6 @@ const MobileNavigation: React.FC<MobileNavigationProps> = ({ onboardingComplete 
     const isOnboardingOrAuth = onboardingOrAuthPaths.includes(location.pathname);
     
     const shouldShowNav = (isMobile || isNativeApp()) && 
-                          !isKeyboardVisible && 
                           !isOnboardingOrAuth &&
                           !!user &&
                           onboardingComplete !== false;
@@ -164,7 +163,8 @@ const MobileNavigation: React.FC<MobileNavigationProps> = ({ onboardingComplete 
       className={cn(
         "mobile-navigation",
         isTutorialActive && "opacity-30 pointer-events-none",
-        isAndroid && "platform-android"
+        isAndroid && "platform-android",
+        isKeyboardVisible && "keyboard-visible"
       )}
       style={navigationStyle}
       initial={{ y: 100 }}
