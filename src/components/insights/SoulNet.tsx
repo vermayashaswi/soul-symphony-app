@@ -1,6 +1,5 @@
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-
 import { Canvas } from '@react-three/fiber';
 import { TimeRange } from '@/hooks/use-insights-data';
 import { useIsMobile } from '@/hooks/use-mobile';
@@ -61,7 +60,6 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
   const [renderingReady, setRenderingReady] = useState(false);
   const isMobile = useIsMobile();
   const themeHex = useUserColorThemeHex();
-  const [selectedEntity, setSelectedEntity] = useState<string | null>(null);
   const { currentLanguage } = useTranslation();
   
   // ENHANCED: Rendering initialization tracking
@@ -77,7 +75,6 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
       // Immediate rendering reset on parameter change
       setRenderingReady(false);
       renderingInitialized.current = false;
-      setSelectedEntity(null);
       
       lastTimeRange.current = timeRange;
       lastLanguage.current = currentLanguage;
@@ -156,7 +153,6 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
       // Reset rendering state
       setRenderingReady(false);
       renderingInitialized.current = false;
-      setSelectedEntity(null);
       setCanvasError(null);
       setRetryCount(0);
       
@@ -165,36 +161,8 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
     }
   }, [userId, timeRange, currentLanguage]);
 
-  // SOUL-NET SELECTION FIX: Enhanced node selection with debug logging
-  const handleNodeSelect = useCallback((id: string) => {
-    console.log(`[SoulNet] SOUL-NET SELECTION FIX: Node selection triggered for ${id}`, {
-      currentSelectedEntity: selectedEntity,
-      newNodeId: id,
-      willToggle: selectedEntity === id,
-      willSelect: selectedEntity !== id
-    });
-    
-    if (selectedEntity === id) {
-      console.log(`[SoulNet] SOUL-NET SELECTION FIX: Deselecting node ${id}`);
-      setSelectedEntity(null);
-    } else {
-      console.log(`[SoulNet] SOUL-NET SELECTION FIX: Selecting node ${id}`);
-      setSelectedEntity(id);
-      
-      // Haptic feedback
-      if (navigator.vibrate) {
-        navigator.vibrate(50);
-        console.log(`[SoulNet] SOUL-NET SELECTION FIX: Vibration triggered for node ${id}`);
-      }
-    }
-  }, [selectedEntity]);
-
   const toggleFullScreen = useCallback(() => {
     setIsFullScreen(prev => {
-      if (!prev) {
-        console.log(`[SoulNet] SOUL-NET SELECTION FIX: Entering fullscreen, clearing selection`);
-        setSelectedEntity(null);
-      }
       console.log(`[SoulNet] FULLSCREEN TOGGLE: ${!prev}`);
       return !prev;
     });
@@ -380,7 +348,7 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
     );
   };
 
-  console.log(`[SoulNet] SOUL-NET SELECTION FIX: Final render - ${graphData.nodes.length} nodes, ${graphData.links.length} links, renderingReady: ${renderingReady}, selectedEntity: ${selectedEntity}`);
+  console.log(`[SoulNet] Final render - ${graphData.nodes.length} nodes, ${graphData.links.length} links, renderingReady: ${renderingReady}`);
 
   return (
     <div className={cn(
@@ -460,10 +428,6 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
                 far: 1000,
                 fov: isFullScreen ? 60 : 50
               }}
-              onPointerMissed={() => {
-                console.log('[SoulNet] SOUL-NET SELECTION FIX: Canvas pointer missed - clearing selection');
-                setSelectedEntity(null);
-              }}
               gl={{ 
                 preserveDrawingBuffer: true,
                 antialias: !isMobile,
@@ -476,8 +440,8 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
             >
               <SimplifiedSoulNetVisualization
                 data={graphData}
-                selectedNode={selectedEntity}
-                onNodeClick={handleNodeSelect}
+                selectedNode={null} // Managed internally now
+                onNodeClick={() => {}} // Managed internally now
                 themeHex={themeHex}
                 isFullScreen={isFullScreen}
                 shouldShowLabels={true}

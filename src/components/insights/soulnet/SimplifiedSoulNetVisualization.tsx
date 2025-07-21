@@ -6,6 +6,8 @@ import * as THREE from 'three';
 import { useTheme } from '@/hooks/use-theme';
 import Node from './Node';
 import Edge from './Edge';
+import NodeSelectionManager from './NodeSelectionManager';
+import ConnectionCalculator from './ConnectionCalculator';
 
 interface NodeData {
   id: string;
@@ -28,7 +30,6 @@ interface SimplifiedSoulNetVisualizationProps {
   themeHex: string;
   isFullScreen: boolean;
   shouldShowLabels: boolean;
-  // COORDINATED: Enhanced instant data access functions
   getInstantConnectionPercentage?: (selectedNode: string, targetNode: string) => number;
   getInstantTranslation?: (nodeId: string) => string;
   getInstantNodeConnections?: (nodeId: string) => any;
@@ -47,18 +48,13 @@ export const SimplifiedSoulNetVisualization: React.FC<SimplifiedSoulNetVisualiza
   getInstantNodeConnections = () => ({ connectedNodes: [], totalStrength: 0, averageStrength: 0 }),
   isInstantReady = false
 }) => {
-  const [highlightedNodes, setHighlightedNodes] = useState<Set<string>>(new Set());
-  const [dimmedNodes, setDimmedNodes] = useState<Set<string>>(new Set());
   const [cameraZoom, setCameraZoom] = useState(45);
-  
-  // UPDATED: Use app's theme context instead of system theme detection
   const { theme, systemTheme } = useTheme();
   const effectiveTheme = theme === 'system' ? systemTheme : theme;
 
-  console.log(`[SimplifiedSoulNetVisualization] COORDINATED THEME: Using app theme context - theme: ${theme}, systemTheme: ${systemTheme}, effective: ${effectiveTheme}`);
-  console.log(`[SimplifiedSoulNetVisualization] COORDINATED INSTANT: Rendering with ${data.nodes.length} nodes, instantReady: ${isInstantReady}`);
+  console.log(`[SimplifiedSoulNetVisualization] Rendering with ${data.nodes.length} nodes, selected: ${selectedNode}, instantReady: ${isInstantReady}`);
 
-  // Use Three.js controls for camera
+  // Track camera zoom
   useFrame(({ camera }) => {
     const newZoom = camera.position.length();
     if (Math.abs(newZoom - cameraZoom) > 0.1) {
@@ -66,162 +62,112 @@ export const SimplifiedSoulNetVisualization: React.FC<SimplifiedSoulNetVisualiza
     }
   });
 
-  // SOUL-NET SELECTION FIX: Enhanced node click handler with debug logging
-  const handleNodeClick = useCallback((nodeId: string) => {
-    console.log(`[SimplifiedSoulNetVisualization] SOUL-NET SELECTION FIX: Node click received for ${nodeId}`, {
-      currentSelectedNode: selectedNode,
-      nodeId,
-      willToggle: selectedNode === nodeId,
-      isInstantReady
-    });
-    
-    try {
-      onNodeClick(nodeId);
-      console.log(`[SimplifiedSoulNetVisualization] SOUL-NET SELECTION FIX: onNodeClick called successfully for ${nodeId}`);
-    } catch (error) {
-      console.error(`[SimplifiedSoulNetVisualization] SOUL-NET SELECTION FIX: Error in onNodeClick for ${nodeId}:`, error);
-    }
-  }, [selectedNode, onNodeClick, isInstantReady]);
-
-  // ENHANCED: Instant highlighting effect with stronger visual hierarchy
-  useEffect(() => {
-    console.log(`[SimplifiedSoulNetVisualization] SOUL-NET SELECTION FIX: Selection state changed - selectedNode: ${selectedNode}`);
-    
-    if (selectedNode) {
-      const connectedNodes = new Set<string>();
-      const allOtherNodes = new Set<string>();
-      
-      // Use instant connection data if available
-      if (isInstantReady) {
-        const connectionData = getInstantNodeConnections(selectedNode);
-        connectionData.connectedNodes.forEach((nodeId: string) => {
-          connectedNodes.add(nodeId);
-        });
-        connectedNodes.add(selectedNode); // Include the selected node itself
-        
-        console.log(`[SimplifiedSoulNetVisualization] SOUL-NET SELECTION FIX: Using precomputed connections for ${selectedNode}:`, connectionData.connectedNodes);
-      } else {
-        // Fallback to link traversal
-        data.links.forEach(link => {
-          if (link.source === selectedNode || link.target === selectedNode) {
-            connectedNodes.add(link.source);
-            connectedNodes.add(link.target);
-          }
-        });
-        
-        console.log(`[SimplifiedSoulNetVisualization] SOUL-NET SELECTION FIX: Using link traversal for ${selectedNode}`);
-      }
-      
-      // ENHANCED: All nodes that are NOT connected become dimmed
-      data.nodes.forEach(node => {
-        if (!connectedNodes.has(node.id)) {
-          allOtherNodes.add(node.id);
-        }
-      });
-      
-      console.log(`[SimplifiedSoulNetVisualization] SOUL-NET SELECTION FIX: Setting state - highlighted: ${Array.from(connectedNodes).join(', ')}, dimmed: ${Array.from(allOtherNodes).join(', ')}`);
-      
-      setHighlightedNodes(connectedNodes);
-      setDimmedNodes(allOtherNodes);
-      
-      console.log(`[SimplifiedSoulNetVisualization] COORDINATED ENHANCED HIERARCHY: Selected ${selectedNode}, highlighting ${connectedNodes.size} nodes, dimming ${allOtherNodes.size} nodes`);
-    } else {
-      // ENHANCED: When no node is selected, show all nodes normally (no dimming)
-      console.log(`[SimplifiedSoulNetVisualization] SOUL-NET SELECTION FIX: Clearing selection - no node selected`);
-      setHighlightedNodes(new Set());
-      setDimmedNodes(new Set());
-    }
-  }, [selectedNode, data.links, data.nodes, isInstantReady, getInstantNodeConnections]);
-
   // Helper function to find node by id
   const findNodeById = useCallback((nodeId: string): NodeData | undefined => {
     return data.nodes.find(node => node.id === nodeId);
   }, [data.nodes]);
 
   return (
-    <>
-      {/* ENHANCED: Brighter ambient lighting for better visibility of highlighted elements */}
-      <ambientLight intensity={0.8} />
-      <directionalLight position={[10, 10, 5]} intensity={1.2} />
-      <OrbitControls 
-        enablePan={true} 
-        enableZoom={true} 
-        enableRotate={true}
-        minDistance={15}
-        maxDistance={120}
-        enableDamping={true}
-        dampingFactor={0.05}
-      />
-      
-      {data.nodes.map((node) => {
-        const isHighlighted = highlightedNodes.has(node.id);
-        const isDimmed = dimmedNodes.has(node.id);
-        
-        // COORDINATED INSTANT connection percentage - no loading delay
-        const connectionPercentage = selectedNode && isHighlighted && selectedNode !== node.id
-          ? getInstantConnectionPercentage(selectedNode, node.id)
-          : 0;
-        
-        const showPercentage = selectedNode !== null && isHighlighted && selectedNode !== node.id && connectionPercentage > 0;
-        
-        console.log(`[SimplifiedSoulNetVisualization] SOUL-NET SELECTION FIX: Rendering node ${node.id} - highlighted: ${isHighlighted}, dimmed: ${isDimmed}, selected: ${selectedNode === node.id}, percentage: ${connectionPercentage}%`);
-        
-        return (
-          <Node
-            key={node.id}
-            node={node}
-            isSelected={selectedNode === node.id}
-            onClick={handleNodeClick}
-            highlightedNodes={highlightedNodes}
-            showLabel={shouldShowLabels && !isDimmed} // Don't show labels for dimmed nodes
-            dimmed={isDimmed}
-            themeHex={themeHex}
-            selectedNodeId={selectedNode}
-            cameraZoom={cameraZoom}
-            isHighlighted={isHighlighted}
-            connectionPercentage={connectionPercentage}
-            showPercentage={showPercentage}
-            forceShowLabels={false} // Let the dimming logic control this
-            effectiveTheme={effectiveTheme}
-            isInstantMode={isInstantReady}
-            getCoordinatedTranslation={getInstantTranslation}
-          />
-        );
-      })}
-      
-      {data.links.map((link, index) => {
-        const sourceNode = findNodeById(link.source);
-        const targetNode = findNodeById(link.target);
-        
-        if (!sourceNode || !targetNode) {
-          console.warn(`[SimplifiedSoulNetVisualization] SOUL-NET SELECTION FIX: Missing node for link: ${link.source} -> ${link.target}`);
-          return null;
-        }
-        
-        // ENHANCED: Edge is highlighted only if BOTH nodes are highlighted
-        const isHighlighted = selectedNode !== null && 
-          (highlightedNodes.has(link.source) && highlightedNodes.has(link.target));
-        
-        // ENHANCED: Edge is dimmed if EITHER node is dimmed
-        const isDimmed = selectedNode !== null && 
-          (dimmedNodes.has(link.source) || dimmedNodes.has(link.target));
-        
-        console.log(`[SimplifiedSoulNetVisualization] SOUL-NET SELECTION FIX: Rendering edge ${link.source} -> ${link.target} - highlighted: ${isHighlighted}, dimmed: ${isDimmed}`);
-        
-        return (
-          <Edge
-            key={`${link.source}-${link.target}-${index}`}
-            start={sourceNode.position}
-            end={targetNode.position}
-            value={link.value}
-            isHighlighted={isHighlighted}
-            dimmed={isDimmed}
-            startNodeType={sourceNode.type}
-            endNodeType={targetNode.type}
-          />
-        );
-      })}
-    </>
+    <NodeSelectionManager>
+      {({ selectedNodeId, handleNodeSelect, clearSelection }) => (
+        <ConnectionCalculator selectedNodeId={selectedNodeId} links={data.links}>
+          {({ connectedNodes, getConnectionPercentage, getConnectionStrength }) => (
+            <>
+              {/* Enhanced lighting for better visibility */}
+              <ambientLight intensity={0.8} />
+              <directionalLight position={[10, 10, 5]} intensity={1.2} />
+              
+              <OrbitControls 
+                enablePan={true} 
+                enableZoom={true} 
+                enableRotate={true}
+                minDistance={15}
+                maxDistance={120}
+                enableDamping={true}
+                dampingFactor={0.05}
+                onChange={clearSelection}
+              />
+              
+              {/* Render nodes */}
+              {data.nodes.map((node) => {
+                const isSelected = selectedNodeId === node.id;
+                const isHighlighted = connectedNodes.has(node.id);
+                const isDimmed = selectedNodeId !== null && !connectedNodes.has(node.id);
+                
+                const connectionPercentage = selectedNodeId && isHighlighted && selectedNodeId !== node.id
+                  ? getConnectionPercentage(node.id)
+                  : 0;
+                
+                const connectionStrength = selectedNodeId && isHighlighted
+                  ? getConnectionStrength(node.id)
+                  : 0.5;
+                
+                const showPercentage = selectedNodeId !== null && 
+                                      isHighlighted && 
+                                      selectedNodeId !== node.id && 
+                                      connectionPercentage > 0;
+                
+                console.log(`[SimplifiedSoulNetVisualization] Node ${node.id} - selected: ${isSelected}, highlighted: ${isHighlighted}, dimmed: ${isDimmed}, percentage: ${connectionPercentage}%`);
+                
+                return (
+                  <Node
+                    key={node.id}
+                    node={node}
+                    isSelected={isSelected}
+                    onClick={handleNodeSelect}
+                    isHighlighted={isHighlighted}
+                    isDimmed={isDimmed}
+                    connectionPercentage={connectionPercentage}
+                    showPercentage={showPercentage}
+                    connectionStrength={connectionStrength}
+                    showLabel={shouldShowLabels && !isDimmed}
+                    themeHex={themeHex}
+                    cameraZoom={cameraZoom}
+                    effectiveTheme={effectiveTheme}
+                    isInstantMode={isInstantReady}
+                    getCoordinatedTranslation={getInstantTranslation}
+                  />
+                );
+              })}
+              
+              {/* Render edges */}
+              {data.links.map((link, index) => {
+                const sourceNode = findNodeById(link.source);
+                const targetNode = findNodeById(link.target);
+                
+                if (!sourceNode || !targetNode) {
+                  console.warn(`[SimplifiedSoulNetVisualization] Missing node for link: ${link.source} -> ${link.target}`);
+                  return null;
+                }
+                
+                // Edge is highlighted only if BOTH nodes are connected
+                const isHighlighted = selectedNodeId !== null && 
+                  (connectedNodes.has(link.source) && connectedNodes.has(link.target));
+                
+                // Edge is dimmed if EITHER node is dimmed
+                const isDimmed = selectedNodeId !== null && 
+                  (!connectedNodes.has(link.source) || !connectedNodes.has(link.target));
+                
+                console.log(`[SimplifiedSoulNetVisualization] Edge ${link.source} -> ${link.target} - highlighted: ${isHighlighted}, dimmed: ${isDimmed}`);
+                
+                return (
+                  <Edge
+                    key={`${link.source}-${link.target}-${index}`}
+                    start={sourceNode.position}
+                    end={targetNode.position}
+                    value={link.value}
+                    isHighlighted={isHighlighted}
+                    dimmed={isDimmed}
+                    startNodeType={sourceNode.type}
+                    endNodeType={targetNode.type}
+                  />
+                );
+              })}
+            </>
+          )}
+        </ConnectionCalculator>
+      )}
+    </NodeSelectionManager>
   );
 };
 
