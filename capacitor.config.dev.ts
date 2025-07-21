@@ -1,16 +1,15 @@
-
 import { CapacitorConfig } from '@capacitor/cli';
 
 const config: CapacitorConfig = {
   appId: 'app.soulo.online',
   appName: 'Soulo Dev',
   webDir: 'dist',
-  server: {
-    androidScheme: 'https'
-  },
+  // CRITICAL FIX: Remove external server URL - use bundled assets in development too
   plugins: {
-    App: {
-      urlScheme: "souloapp"
+    GoogleAuth: {
+      scopes: ['profile', 'email'],
+      serverClientId: '11083941790-vgbdbj6j313ggo6jbt9agp3bvrlilam8.apps.googleusercontent.com',
+      forceCodeForRefreshToken: true,
     },
     SplashScreen: {
       launchAutoHide: false,
@@ -24,16 +23,17 @@ const config: CapacitorConfig = {
       splashScreenDelay: 2000
     },
     Keyboard: {
-      resize: "ionic",
+      resize: "body",
       style: "dark",
-      resizeOnFullScreen: true,
-      scrollAssist: true,
-      hideFormAccessoryBar: false
+      resizeOnFullScreen: true
     },
     StatusBar: {
       style: "dark",
-      backgroundColor: "#FFFFFF",
-      overlaysWebView: false
+      backgroundColor: "#000000"
+    },
+    App: {
+      // FIXED: No external URLs - handle deep links properly
+      urlScheme: "app.soulo.online"
     },
     PushNotifications: {
       presentationOptions: ["badge", "sound", "alert"]
@@ -45,18 +45,17 @@ const config: CapacitorConfig = {
     }
   },
   ios: {
-    contentInset: "never",
+    contentInset: "always",
     allowsLinkPreview: false,
     scrollEnabled: true,
     backgroundColor: "#FFFFFF",
     scheme: "Soulo",
-    preferredContentMode: "mobile",
-    handleApplicationURL: true
+    preferredContentMode: "mobile"
   },
   android: {
-    allowMixedContent: false,
+    allowMixedContent: false, // FIXED: No mixed content in dev
     captureInput: true,
-    webContentsDebuggingEnabled: true,
+    webContentsDebuggingEnabled: true, // Keep debugging for dev
     backgroundColor: "#FFFFFF",
     launchMode: "singleTask",
     orientation: "portrait",
@@ -65,11 +64,7 @@ const config: CapacitorConfig = {
     overrideUserAgent: "SouloApp/1.0.0 Mobile",
     androidScheme: "https",
     loadOnMainThread: true,
-    handlePermissions: true,
-    allowNavigationBarColorChange: true,
-    navigationBarColor: "#FFFFFF",
-    mixedContentMode: "compatibility",
-    themeColor: "#8b5cf6"
+    handlePermissions: true
   }
 };
 

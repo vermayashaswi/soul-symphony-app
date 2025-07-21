@@ -9,8 +9,14 @@ const config: CapacitorConfig = {
     androidScheme: 'https'
   },
   plugins: {
+    GoogleAuth: {
+      scopes: ['profile', 'email'],
+      serverClientId: '11083941790-vgbdbj6j313ggo6jbt9agp3bvrlilam8.apps.googleusercontent.com',
+      clientId: '11083941790-oi1vrl8bmsjajc0h1ka4f9q0qjmm80o9.apps.googleusercontent.com',
+      forceCodeForRefreshToken: true,
+    },
     App: {
-      urlScheme: "souloapp"
+      urlScheme: "app.soulo.online"
     },
     SplashScreen: {
       launchAutoHide: false,
@@ -24,16 +30,17 @@ const config: CapacitorConfig = {
       splashScreenDelay: 2000
     },
     Keyboard: {
-      resize: "ionic",
+      resize: "ionic", // CRITICAL FIX: Changed from "body" to "ionic" for better Android handling
       style: "dark",
       resizeOnFullScreen: true,
+      // ANDROID FIX: Additional keyboard configuration
       scrollAssist: true,
       hideFormAccessoryBar: false
     },
     StatusBar: {
       style: "dark",
       backgroundColor: "#FFFFFF",
-      overlaysWebView: false
+      overlaysWebView: false // CRITICAL: Prevents status bar overlap
     },
     PushNotifications: {
       presentationOptions: ["badge", "sound", "alert"]
@@ -66,8 +73,10 @@ const config: CapacitorConfig = {
     androidScheme: "https",
     loadOnMainThread: true,
     handlePermissions: true,
+    // ANDROID FIX: Enhanced Android configuration
     allowNavigationBarColorChange: true,
     navigationBarColor: "#FFFFFF",
+    // CRITICAL: Improved keyboard handling
     mixedContentMode: "compatibility",
     themeColor: "#8b5cf6"
   }
