@@ -47,7 +47,13 @@ export const useSafeArea = () => {
           console.log('[useSafeArea] Original insets:', { top, bottom, left, right });
           
           // Try multiple detection methods
-          const detectionMethods = [
+          interface DetectionResult {
+            envBottom?: number;
+            vpBottom?: number;
+            whBottom?: number;
+          }
+          
+          const detectionMethods: (() => DetectionResult)[] = [
             () => {
               // Method 1: CSS env() function
               const testDiv = document.createElement('div');
@@ -85,7 +91,7 @@ export const useSafeArea = () => {
             }
           ];
           
-          const detectionResults = detectionMethods.map(method => {
+          const detectionResults: DetectionResult[] = detectionMethods.map(method => {
             try {
               return method();
             } catch (error) {
