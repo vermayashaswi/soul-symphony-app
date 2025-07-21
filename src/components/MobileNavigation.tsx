@@ -31,6 +31,7 @@ const MobileNavigation: React.FC<MobileNavigationProps> = ({ onboardingComplete 
   
   const [renderKey, setRenderKey] = useState(0);
   
+  // Handle language changes
   useEffect(() => {
     const handleLanguageChange = () => {
       console.log('MobileNavigation: Language change detected, forcing re-render');
@@ -45,32 +46,38 @@ const MobileNavigation: React.FC<MobileNavigationProps> = ({ onboardingComplete 
   useEffect(() => {
     if (navRef.current) {
       applySafeAreaStyles(navRef.current);
-      
-      // ANDROID FIX: Add debug class for Android
-      if (isAndroid) {
-        navRef.current.classList.add('debug');
-      }
-      
-      console.log('MobileNavigation: ANDROID FIX: Applied safe area styles:', safeArea, 'isAndroid:', isAndroid);
+      console.log('MobileNavigation: Applied safe area styles:', safeArea);
     }
-  }, [safeArea, applySafeAreaStyles, isAndroid]);
+  }, [safeArea, applySafeAreaStyles]);
   
+  // Keyboard detection
   useEffect(() => {
-    const handleVisualViewportResize = () => {
+    const handleKeyboardDetection = () => {
       if (window.visualViewport) {
-        const isKeyboard = window.visualViewport.height < window.innerHeight * 0.75;
-        setIsKeyboardVisible(isKeyboard);
-        console.log('MobileNavigation: ANDROID FIX: Keyboard visibility changed:', isKeyboard);
+        const heightDifference = window.innerHeight - window.visualViewport.height;
+        const isKeyboard = heightDifference > 150; // More reliable threshold
+        
+        if (isKeyboard !== isKeyboardVisible) {
+          setIsKeyboardVisible(isKeyboard);
+          console.log('MobileNavigation: Keyboard visibility changed:', isKeyboard);
+          
+          // Dispatch events for other components
+          const eventName = isKeyboard ? 'keyboardOpen' : 'keyboardClose';
+          window.dispatchEvent(new Event(eventName));
+        }
       }
     };
     
-    handleVisualViewportResize();
+    // Initial check
+    handleKeyboardDetection();
     
+    // Set up listeners
     if (window.visualViewport) {
-      window.visualViewport.addEventListener('resize', handleVisualViewportResize);
-      window.addEventListener('resize', handleVisualViewportResize);
+      window.visualViewport.addEventListener('resize', handleKeyboardDetection);
     }
+    window.addEventListener('resize', handleKeyboardDetection);
     
+    // Custom event listeners
     const handleKeyboardOpen = () => setIsKeyboardVisible(true);
     const handleKeyboardClose = () => setIsKeyboardVisible(false);
     
@@ -79,15 +86,15 @@ const MobileNavigation: React.FC<MobileNavigationProps> = ({ onboardingComplete 
     
     return () => {
       if (window.visualViewport) {
-        window.visualViewport.removeEventListener('resize', handleVisualViewportResize);
-        window.removeEventListener('resize', handleVisualViewportResize);
+        window.visualViewport.removeEventListener('resize', handleKeyboardDetection);
       }
-      
+      window.removeEventListener('resize', handleKeyboardDetection);
       window.removeEventListener('keyboardOpen', handleKeyboardOpen);
       window.removeEventListener('keyboardClose', handleKeyboardClose);
     };
-  }, []);
+  }, [isKeyboardVisible]);
   
+  // Visibility logic
   useEffect(() => {
     const onboardingOrAuthPaths = [
       '/app/onboarding',
@@ -104,7 +111,7 @@ const MobileNavigation: React.FC<MobileNavigationProps> = ({ onboardingComplete 
                           !!user &&
                           onboardingComplete !== false;
     
-    console.log('MobileNavigation: ANDROID FIX: Visibility check:', { 
+    console.log('MobileNavigation: Visibility check:', { 
       shouldShowNav, 
       isMobile, 
       isNativeApp: isNativeApp(),
@@ -113,24 +120,17 @@ const MobileNavigation: React.FC<MobileNavigationProps> = ({ onboardingComplete 
       isOnboardingOrAuth,
       hasUser: !!user,
       onboardingComplete,
-      safeArea,
-      isNative,
-      isAndroid
+      safeArea
     });
     
     setIsVisible(shouldShowNav);
-  }, [location.pathname, isMobile, isKeyboardVisible, isTutorialActive, user, onboardingComplete, currentLanguage, renderKey, safeArea, isNative, isAndroid]);
+  }, [location.pathname, isMobile, isKeyboardVisible, isTutorialActive, user, onboardingComplete, currentLanguage, renderKey, safeArea]);
   
-  if (!isVisible) {
+  if (!isVisible || onboardingComplete === false) {
     return null;
   }
   
-  if (onboardingComplete === false) {
-    console.log('MobileNavigation: ANDROID FIX: Not rendering due to onboarding status');
-    return null;
-  }
-  
-  // Navigation items with English text for translation
+  // Navigation items
   const navItems = [
     { path: '/app/home', icon: Home, label: 'Home', isPremium: false },
     { path: '/app/journal', icon: BookOpen, label: 'Journal', isPremium: false },
@@ -145,16 +145,7 @@ const MobileNavigation: React.FC<MobileNavigationProps> = ({ onboardingComplete 
   
   const isPremiumFeatureAccessible = hasActiveSubscription || isTrialActive;
   
-  // ANDROID FIX: Calculate dynamic styles based on safe area with Android-specific adjustments
-  const navigationStyle = {
-    bottom: isAndroid ? `max(${safeArea.bottom}px, 8px)` : `${safeArea.bottom}px`,
-    left: `${safeArea.left}px`,
-    right: `${safeArea.right}px`,
-    height: isAndroid ? `calc(4rem + max(${safeArea.bottom}px, 8px))` : `calc(4rem + ${safeArea.bottom}px)`,
-    paddingBottom: isAndroid ? `max(${safeArea.bottom}px, 8px)` : `${safeArea.bottom}px`,
-  };
-  
-  console.log('MobileNavigation: ANDROID FIX: Rendering with safe area styles:', navigationStyle);
+  console.log('MobileNavigation: Rendering with:', { safeArea, isAndroid, isKeyboardVisible });
   
   return (
     <motion.div 
@@ -166,7 +157,6 @@ const MobileNavigation: React.FC<MobileNavigationProps> = ({ onboardingComplete 
         isAndroid && "platform-android",
         isKeyboardVisible && "keyboard-visible"
       )}
-      style={navigationStyle}
       initial={{ y: 100 }}
       animate={{ y: 0 }}
       transition={{ duration: 0.3 }}

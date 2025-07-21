@@ -623,7 +623,7 @@ export default function MobileChatInterface({
         </div>
       </div>
       
-      <div className="mobile-chat-content flex-1 overflow-y-auto px-2 py-3 space-y-3 flex flex-col pb-20">
+      <div className="mobile-chat-content flex-1 overflow-y-auto px-2 py-3 space-y-3 flex flex-col">
         {initialLoading ? (
           <div className="flex items-center justify-center py-10">
             <div className="animate-spin h-6 w-6 border-2 border-primary border-t-transparent rounded-full"></div>
@@ -692,14 +692,11 @@ export default function MobileChatInterface({
         <div ref={messagesEndRef} />
       </div>
       
-      {/* Updated positioning to avoid overlap with nav bar */}
-      <div className="fixed bottom-14 left-0 right-0 z-50">
-        <MobileChatInput 
-          onSendMessage={handleSendMessage} 
-          isLoading={isLoading || isProcessing}
-          userId={userId || user?.id}
-        />
-      </div>
+      <MobileChatInput 
+        onSendMessage={handleSendMessage} 
+        isLoading={isLoading || isProcessing}
+        userId={userId || user?.id}
+      />
       
       <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
         <AlertDialogContent>

@@ -8,21 +8,26 @@
   /* Fullscreen components like SoulNet */
   .fixed.inset-0.z-\[9999\] {
     position: fixed !important;
-    top: var(--safe-area-inset-top) !important;
-    left: var(--safe-area-inset-left) !important;
-    right: var(--safe-area-inset-right) !important;
-    bottom: var(--safe-area-inset-bottom) !important;
-    width: calc(100vw - var(--safe-area-inset-left) - var(--safe-area-inset-right)) !important;
-    height: calc(100vh - var(--safe-area-inset-top) - var(--safe-area-inset-bottom)) !important;
+    top: var(--calculated-safe-area-top) !important;
+    left: var(--calculated-safe-area-left) !important;
+    right: var(--calculated-safe-area-right) !important;
+    bottom: var(--calculated-safe-area-bottom) !important;
+    width: calc(100vw - var(--calculated-safe-area-left) - var(--calculated-safe-area-right)) !important;
+    height: calc(100vh - var(--calculated-safe-area-top) - var(--calculated-safe-area-bottom)) !important;
     z-index: 9998 !important;
     margin: 0 !important;
     padding: 0 !important;
     background-color: hsl(var(--background)) !important;
   }
   
-  /* Chat content safe area */
+  /* Chat content safe area - ensure proper bottom padding */
   .mobile-chat-content {
-    padding-bottom: calc(var(--nav-bar-height) + var(--safe-area-inset-bottom) + 1rem) !important;
+    padding-bottom: calc(var(--nav-bar-height) + 1rem) !important;
+  }
+  
+  /* When keyboard is visible, reduce bottom padding */
+  .keyboard-visible .mobile-chat-content {
+    padding-bottom: 1rem !important;
   }
   
   /* Insights page optimizations */
@@ -91,15 +96,23 @@ html, body {
   }
 }
 
-/* Notch and cutout handling for modern devices */
+/* Enhanced notch and cutout handling for modern devices */
 @supports (padding: max(0px)) {
   @media (max-width: 768px) {
     .smart-chat-container,
     .journal-container,
     .insights-container,
     .settings-container {
-      padding-top: max(var(--status-bar-height), env(safe-area-inset-top, 0px)) !important;
-      padding-bottom: max(var(--nav-bar-height), calc(env(safe-area-inset-bottom, 0px) + var(--nav-bar-height))) !important;
+      padding-top: max(var(--status-bar-height), var(--calculated-safe-area-top)) !important;
+      padding-bottom: max(var(--nav-bar-height), calc(var(--calculated-safe-area-bottom) + var(--nav-bar-height))) !important;
+    }
+    
+    /* When keyboard is visible, adjust container padding */
+    .keyboard-visible .smart-chat-container,
+    .keyboard-visible .journal-container,
+    .keyboard-visible .insights-container,
+    .keyboard-visible .settings-container {
+      padding-bottom: var(--calculated-safe-area-bottom) !important;
     }
   }
 }
