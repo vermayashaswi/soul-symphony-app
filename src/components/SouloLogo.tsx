@@ -25,7 +25,17 @@ const SouloLogo = ({
   animate = false,
   utteringWords = false
 }: SouloLogoProps) => {
-  const { colorTheme } = useTheme();
+  // Conditionally use theme hook only when needed and available
+  let colorTheme = null;
+  try {
+    if (useColorTheme) {
+      const themeData = useTheme();
+      colorTheme = themeData.colorTheme;
+    }
+  } catch (error) {
+    // If useTheme is called outside ThemeProvider, ignore and use default styling
+    console.warn('[SouloLogo] useTheme called outside ThemeProvider context, using default styling');
+  }
   const [animationState, setAnimationState] = useState<'full' | 'soul' | 'none'>('full');
   const [micScale, setMicScale] = useState<number>(1);
   
