@@ -12,7 +12,6 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useTranslation } from '@/contexts/TranslationContext';
 import { useSubscription } from '@/contexts/SubscriptionContext';
 import { useSafeArea } from '@/hooks/use-safe-area';
-import { keyboardDetectionService, KeyboardState } from '@/services/keyboardDetectionService';
 
 interface MobileNavigationProps {
   onboardingComplete: boolean | null;
@@ -22,11 +21,7 @@ const MobileNavigation: React.FC<MobileNavigationProps> = ({ onboardingComplete 
   const location = useLocation();
   const isMobile = useIsMobile();
   const [isVisible, setIsVisible] = useState(false);
-  const [keyboardState, setKeyboardState] = useState<KeyboardState>({
-    isVisible: false,
-    height: 0,
-    timestamp: Date.now()
-  });
+  const [isKeyboardVisible, setIsKeyboardVisible] = useState(false);
   const { isActive: isTutorialActive } = useTutorial();
   const { user } = useAuth();
   const { currentLanguage } = useTranslation();
@@ -51,25 +46,45 @@ const MobileNavigation: React.FC<MobileNavigationProps> = ({ onboardingComplete 
     if (navRef.current) {
       applySafeAreaStyles(navRef.current);
       
+      // ANDROID FIX: Add debug class for Android
       if (isAndroid) {
         navRef.current.classList.add('debug');
       }
       
-      console.log('MobileNavigation: Applied safe area styles:', safeArea, 'isAndroid:', isAndroid);
+      console.log('MobileNavigation: ANDROID FIX: Applied safe area styles:', safeArea, 'isAndroid:', isAndroid);
     }
   }, [safeArea, applySafeAreaStyles, isAndroid]);
   
-  // Use centralized keyboard detection service
   useEffect(() => {
-    const listenerId = 'mobile-navigation';
+    const handleVisualViewportResize = () => {
+      if (window.visualViewport) {
+        const isKeyboard = window.visualViewport.height < window.innerHeight * 0.75;
+        setIsKeyboardVisible(isKeyboard);
+        console.log('MobileNavigation: ANDROID FIX: Keyboard visibility changed:', isKeyboard);
+      }
+    };
     
-    keyboardDetectionService.addListener(listenerId, (state: KeyboardState) => {
-      console.log('MobileNavigation: Keyboard state changed:', state);
-      setKeyboardState(state);
-    });
+    handleVisualViewportResize();
+    
+    if (window.visualViewport) {
+      window.visualViewport.addEventListener('resize', handleVisualViewportResize);
+      window.addEventListener('resize', handleVisualViewportResize);
+    }
+    
+    const handleKeyboardOpen = () => setIsKeyboardVisible(true);
+    const handleKeyboardClose = () => setIsKeyboardVisible(false);
+    
+    window.addEventListener('keyboardOpen', handleKeyboardOpen);
+    window.addEventListener('keyboardClose', handleKeyboardClose);
     
     return () => {
-      keyboardDetectionService.removeListener(listenerId);
+      if (window.visualViewport) {
+        window.visualViewport.removeEventListener('resize', handleVisualViewportResize);
+        window.removeEventListener('resize', handleVisualViewportResize);
+      }
+      
+      window.removeEventListener('keyboardOpen', handleKeyboardOpen);
+      window.removeEventListener('keyboardClose', handleKeyboardClose);
     };
   }, []);
   
@@ -85,18 +100,17 @@ const MobileNavigation: React.FC<MobileNavigationProps> = ({ onboardingComplete 
     const isOnboardingOrAuth = onboardingOrAuthPaths.includes(location.pathname);
     
     const shouldShowNav = (isMobile || isNativeApp()) && 
-                          !keyboardState.isVisible && 
+                          !isKeyboardVisible && 
                           !isOnboardingOrAuth &&
                           !!user &&
                           onboardingComplete !== false;
     
-    console.log('MobileNavigation: Visibility check:', { 
+    console.log('MobileNavigation: ANDROID FIX: Visibility check:', { 
       shouldShowNav, 
       isMobile, 
       isNativeApp: isNativeApp(),
       path: location.pathname,
-      keyboardVisible: keyboardState.isVisible,
-      keyboardHeight: keyboardState.height,
+      isKeyboardVisible,
       isOnboardingOrAuth,
       hasUser: !!user,
       onboardingComplete,
@@ -106,14 +120,14 @@ const MobileNavigation: React.FC<MobileNavigationProps> = ({ onboardingComplete 
     });
     
     setIsVisible(shouldShowNav);
-  }, [location.pathname, isMobile, keyboardState, isTutorialActive, user, onboardingComplete, currentLanguage, renderKey, safeArea, isNative, isAndroid]);
+  }, [location.pathname, isMobile, isKeyboardVisible, isTutorialActive, user, onboardingComplete, currentLanguage, renderKey, safeArea, isNative, isAndroid]);
   
   if (!isVisible) {
     return null;
   }
   
   if (onboardingComplete === false) {
-    console.log('MobileNavigation: Not rendering due to onboarding status');
+    console.log('MobileNavigation: ANDROID FIX: Not rendering due to onboarding status');
     return null;
   }
   
@@ -132,18 +146,16 @@ const MobileNavigation: React.FC<MobileNavigationProps> = ({ onboardingComplete 
   
   const isPremiumFeatureAccessible = hasActiveSubscription || isTrialActive;
   
-  // Calculate dynamic styles with improved Android handling
+  // ANDROID FIX: Calculate dynamic styles based on safe area with Android-specific adjustments
   const navigationStyle = {
     bottom: isAndroid ? `max(${safeArea.bottom}px, 8px)` : `${safeArea.bottom}px`,
     left: `${safeArea.left}px`,
     right: `${safeArea.right}px`,
     height: isAndroid ? `calc(4rem + max(${safeArea.bottom}px, 8px))` : `calc(4rem + ${safeArea.bottom}px)`,
     paddingBottom: isAndroid ? `max(${safeArea.bottom}px, 8px)` : `${safeArea.bottom}px`,
-    zIndex: 9999,
-    transform: 'translateZ(0)', // Force GPU acceleration
   };
   
-  console.log('MobileNavigation: Rendering with styles:', navigationStyle, 'keyboard:', keyboardState);
+  console.log('MobileNavigation: ANDROID FIX: Rendering with safe area styles:', navigationStyle);
   
   return (
     <motion.div 
@@ -155,17 +167,9 @@ const MobileNavigation: React.FC<MobileNavigationProps> = ({ onboardingComplete 
         isAndroid && "platform-android"
       )}
       style={navigationStyle}
-      initial={{ y: 100, opacity: 0 }}
-      animate={{ 
-        y: 0, 
-        opacity: 1,
-        transition: { duration: 0.3, ease: "easeOut" }
-      }}
-      exit={{ 
-        y: 100, 
-        opacity: 0,
-        transition: { duration: 0.2 }
-      }}
+      initial={{ y: 100 }}
+      animate={{ y: 0 }}
+      transition={{ duration: 0.3 }}
     >
       <div className="mobile-navigation-content">
         {navItems.map((item) => {

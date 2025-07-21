@@ -1,4 +1,3 @@
-
 {
 	"appId": "app.soulo.online",
 	"appName": "Soulo",
@@ -17,7 +16,7 @@
 			"forceCodeForRefreshToken": true
 		},
 		"App": {
-			"urlScheme": "souloapp"
+			"urlScheme": "app.soulo.online"
 		},
 		"SplashScreen": {
 			"launchAutoHide": false,
@@ -31,16 +30,13 @@
 			"splashScreenDelay": 2000
 		},
 		"Keyboard": {
-			"resize": "ionic",
+			"resize": "body",
 			"style": "dark",
-			"resizeOnFullScreen": true,
-			"scrollAssist": true,
-			"hideFormAccessoryBar": false
+			"resizeOnFullScreen": true
 		},
 		"StatusBar": {
 			"style": "dark",
-			"backgroundColor": "#FFFFFF",
-			"overlaysWebView": false
+			"backgroundColor": "#000000"
 		},
 		"PushNotifications": {
 			"presentationOptions": [
@@ -56,13 +52,12 @@
 		}
 	},
 	"ios": {
-		"contentInset": "never",
+		"contentInset": "always",
 		"allowsLinkPreview": false,
 		"scrollEnabled": true,
 		"backgroundColor": "#FFFFFF",
 		"scheme": "Soulo",
-		"preferredContentMode": "mobile",
-		"handleApplicationURL": true
+		"preferredContentMode": "mobile"
 	},
 	"android": {
 		"allowMixedContent": false,
@@ -76,10 +71,6 @@
 		"overrideUserAgent": "SouloApp/1.0.0 Mobile",
 		"androidScheme": "https",
 		"loadOnMainThread": true,
-		"handlePermissions": true,
-		"allowNavigationBarColorChange": true,
-		"navigationBarColor": "#FFFFFF",
-		"mixedContentMode": "compatibility",
-		"themeColor": "#8b5cf6"
+		"handlePermissions": true
 	}
 }

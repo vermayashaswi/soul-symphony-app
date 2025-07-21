@@ -16,7 +16,7 @@ const config: CapacitorConfig = {
       forceCodeForRefreshToken: true,
     },
     App: {
-      urlScheme: "souloapp"
+      urlScheme: "app.soulo.online"
     },
     SplashScreen: {
       launchAutoHide: false,
@@ -30,11 +30,9 @@ const config: CapacitorConfig = {
       splashScreenDelay: 2000
     },
     Keyboard: {
-      resize: "ionic",
+      resize: "body",
       style: "dark",
-      resizeOnFullScreen: true,
-      scrollAssist: true,
-      hideFormAccessoryBar: false
+      resizeOnFullScreen: true
     },
     StatusBar: {
       style: "dark",
@@ -51,13 +49,13 @@ const config: CapacitorConfig = {
     }
   },
   ios: {
-    contentInset: "never",
+    contentInset: "never", // FIXED: Changed from "always" to "never" to prevent extra spacing
     allowsLinkPreview: false,
     scrollEnabled: true,
     backgroundColor: "#FFFFFF",
     scheme: "Soulo",
     preferredContentMode: "mobile",
-    handleApplicationURL: true
+    handleApplicationURL: true // Enable proper URL handling
   },
   android: {
     allowMixedContent: false,
@@ -72,10 +70,9 @@ const config: CapacitorConfig = {
     androidScheme: "https",
     loadOnMainThread: true,
     handlePermissions: true,
+    // Android-specific safe area handling
     allowNavigationBarColorChange: true,
-    navigationBarColor: "#FFFFFF",
-    mixedContentMode: "compatibility",
-    themeColor: "#8b5cf6"
+    navigationBarColor: "#FFFFFF"
   }
 };
 
