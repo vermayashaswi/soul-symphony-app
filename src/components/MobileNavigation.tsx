@@ -1,17 +1,18 @@
 
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { useLocation, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Home, MessageCircle, BookOpen, BarChart2, Settings, Crown } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { isNativeApp } from '@/routes/RouteHelpers';
+import { isNativeApp, isAppRoute } from '@/routes/RouteHelpers';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { TranslatableText } from '@/components/translation/TranslatableText';
 import { useTutorial } from '@/contexts/TutorialContext';
 import { useAuth } from '@/contexts/AuthContext';
+import { useTranslation } from '@/contexts/TranslationContext';
 import { useSubscription } from '@/contexts/SubscriptionContext';
-import { useSafeAreaUnified } from '@/hooks/use-safe-area-unified';
-import { useKeyboardDetection } from '@/hooks/use-keyboard-detection';
+import { useSafeArea } from '@/hooks/use-safe-area';
+import { keyboardDetectionService, KeyboardState } from '@/services/keyboardDetectionService';
 
 interface MobileNavigationProps {
   onboardingComplete: boolean | null;
@@ -20,37 +21,103 @@ interface MobileNavigationProps {
 const MobileNavigation: React.FC<MobileNavigationProps> = ({ onboardingComplete }) => {
   const location = useLocation();
   const isMobile = useIsMobile();
+  const [isVisible, setIsVisible] = useState(false);
+  const [keyboardState, setKeyboardState] = useState<KeyboardState>({
+    isVisible: false,
+    height: 0,
+    timestamp: Date.now()
+  });
   const { isActive: isTutorialActive } = useTutorial();
   const { user } = useAuth();
+  const { currentLanguage } = useTranslation();
   const { hasActiveSubscription, isTrialActive } = useSubscription();
-  const { safeArea, isNative, isAndroid, isInitialized } = useSafeAreaUnified();
-  const { isKeyboardVisible } = useKeyboardDetection();
+  const { safeArea, isNative, isAndroid, applySafeAreaStyles } = useSafeArea();
   const navRef = useRef<HTMLDivElement>(null);
   
-  // Apply safe area styles to navigation
+  const [renderKey, setRenderKey] = useState(0);
+  
   useEffect(() => {
-    if (navRef.current && isInitialized) {
-      navRef.current.style.setProperty('--element-safe-area-bottom', `${safeArea.bottom}px`);
-      navRef.current.style.setProperty('--element-safe-area-left', `${safeArea.left}px`);
-      navRef.current.style.setProperty('--element-safe-area-right', `${safeArea.right}px`);
+    const handleLanguageChange = () => {
+      console.log('MobileNavigation: Language change detected, forcing re-render');
+      setRenderKey(prev => prev + 1);
+    };
+    
+    window.addEventListener('languageChange', handleLanguageChange);
+    return () => window.removeEventListener('languageChange', handleLanguageChange);
+  }, []);
+  
+  // Apply safe area styles to the navigation element
+  useEffect(() => {
+    if (navRef.current) {
+      applySafeAreaStyles(navRef.current);
       
-      console.log('[MobileNavigation] Applied safe area styles:', safeArea);
+      if (isAndroid) {
+        navRef.current.classList.add('debug');
+      }
+      
+      console.log('MobileNavigation: Applied safe area styles:', safeArea, 'isAndroid:', isAndroid);
     }
-  }, [safeArea, isInitialized]);
+  }, [safeArea, applySafeAreaStyles, isAndroid]);
   
-  // Determine visibility
-  const shouldShow = (isMobile || isNativeApp()) && 
-                    !isKeyboardVisible && 
-                    !!user &&
-                    onboardingComplete !== false &&
-                    !location.pathname.includes('/onboarding') &&
-                    !location.pathname.includes('/auth') &&
-                    location.pathname !== '/';
+  // Use centralized keyboard detection service
+  useEffect(() => {
+    const listenerId = 'mobile-navigation';
+    
+    keyboardDetectionService.addListener(listenerId, (state: KeyboardState) => {
+      console.log('MobileNavigation: Keyboard state changed:', state);
+      setKeyboardState(state);
+    });
+    
+    return () => {
+      keyboardDetectionService.removeListener(listenerId);
+    };
+  }, []);
   
-  if (!shouldShow) {
+  useEffect(() => {
+    const onboardingOrAuthPaths = [
+      '/app/onboarding',
+      '/app/auth',
+      '/onboarding',
+      '/auth',
+      '/'
+    ];
+    
+    const isOnboardingOrAuth = onboardingOrAuthPaths.includes(location.pathname);
+    
+    const shouldShowNav = (isMobile || isNativeApp()) && 
+                          !keyboardState.isVisible && 
+                          !isOnboardingOrAuth &&
+                          !!user &&
+                          onboardingComplete !== false;
+    
+    console.log('MobileNavigation: Visibility check:', { 
+      shouldShowNav, 
+      isMobile, 
+      isNativeApp: isNativeApp(),
+      path: location.pathname,
+      keyboardVisible: keyboardState.isVisible,
+      keyboardHeight: keyboardState.height,
+      isOnboardingOrAuth,
+      hasUser: !!user,
+      onboardingComplete,
+      safeArea,
+      isNative,
+      isAndroid
+    });
+    
+    setIsVisible(shouldShowNav);
+  }, [location.pathname, isMobile, keyboardState, isTutorialActive, user, onboardingComplete, currentLanguage, renderKey, safeArea, isNative, isAndroid]);
+  
+  if (!isVisible) {
     return null;
   }
   
+  if (onboardingComplete === false) {
+    console.log('MobileNavigation: Not rendering due to onboarding status');
+    return null;
+  }
+  
+  // Navigation items with English text for translation
   const navItems = [
     { path: '/app/home', icon: Home, label: 'Home', isPremium: false },
     { path: '/app/journal', icon: BookOpen, label: 'Journal', isPremium: false },
@@ -65,17 +132,40 @@ const MobileNavigation: React.FC<MobileNavigationProps> = ({ onboardingComplete 
   
   const isPremiumFeatureAccessible = hasActiveSubscription || isTrialActive;
   
+  // Calculate dynamic styles with improved Android handling
+  const navigationStyle = {
+    bottom: isAndroid ? `max(${safeArea.bottom}px, 8px)` : `${safeArea.bottom}px`,
+    left: `${safeArea.left}px`,
+    right: `${safeArea.right}px`,
+    height: isAndroid ? `calc(4rem + max(${safeArea.bottom}px, 8px))` : `calc(4rem + ${safeArea.bottom}px)`,
+    paddingBottom: isAndroid ? `max(${safeArea.bottom}px, 8px)` : `${safeArea.bottom}px`,
+    zIndex: 9999,
+    transform: 'translateZ(0)', // Force GPU acceleration
+  };
+  
+  console.log('MobileNavigation: Rendering with styles:', navigationStyle, 'keyboard:', keyboardState);
+  
   return (
     <motion.div 
       ref={navRef}
+      key={`nav-${renderKey}-${currentLanguage}`}
       className={cn(
         "mobile-navigation",
         isTutorialActive && "opacity-30 pointer-events-none",
         isAndroid && "platform-android"
       )}
-      initial={{ y: 100 }}
-      animate={{ y: 0 }}
-      transition={{ duration: 0.3 }}
+      style={navigationStyle}
+      initial={{ y: 100, opacity: 0 }}
+      animate={{ 
+        y: 0, 
+        opacity: 1,
+        transition: { duration: 0.3, ease: "easeOut" }
+      }}
+      exit={{ 
+        y: 100, 
+        opacity: 0,
+        transition: { duration: 0.2 }
+      }}
     >
       <div className="mobile-navigation-content">
         {navItems.map((item) => {
@@ -84,7 +174,7 @@ const MobileNavigation: React.FC<MobileNavigationProps> = ({ onboardingComplete 
           
           return (
             <Link
-              key={item.path}
+              key={`${item.path}-${renderKey}`}
               to={item.path}
               className={cn(
                 "flex flex-col items-center py-1 transition-colors relative",
@@ -115,7 +205,14 @@ const MobileNavigation: React.FC<MobileNavigationProps> = ({ onboardingComplete 
                 "text-xs mt-0.5 min-w-0 max-w-full",
                 isLocked && "opacity-60"
               )}>
-                <TranslatableText text={item.label} />
+                <TranslatableText 
+                  key={`${item.label}-${renderKey}-${currentLanguage}`}
+                  text={item.label} 
+                  forceTranslate={true}
+                  enableFontScaling={true}
+                  scalingContext="mobile-nav"
+                  className="block"
+                />
               </span>
             </Link>
           );
