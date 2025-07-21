@@ -3,7 +3,6 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useFrame } from '@react-three/fiber';
 import { OrbitControls } from '@react-three/drei';
 import * as THREE from 'three';
-import { useTheme } from '@/hooks/use-theme';
 import Node from './Node';
 import Edge from './Edge';
 import NodeSelectionManager from './NodeSelectionManager';
@@ -30,6 +29,7 @@ interface SimplifiedSoulNetVisualizationProps {
   themeHex: string;
   isFullScreen: boolean;
   shouldShowLabels: boolean;
+  effectiveTheme: 'light' | 'dark';
   getInstantConnectionPercentage?: (selectedNode: string, targetNode: string) => number;
   getInstantTranslation?: (nodeId: string) => string;
   getInstantNodeConnections?: (nodeId: string) => any;
@@ -43,16 +43,15 @@ export const SimplifiedSoulNetVisualization: React.FC<SimplifiedSoulNetVisualiza
   themeHex,
   isFullScreen,
   shouldShowLabels,
+  effectiveTheme,
   getInstantConnectionPercentage = () => 0,
   getInstantTranslation = (id: string) => id,
   getInstantNodeConnections = () => ({ connectedNodes: [], totalStrength: 0, averageStrength: 0 }),
   isInstantReady = false
 }) => {
   const [cameraZoom, setCameraZoom] = useState(45);
-  const { theme, systemTheme } = useTheme();
-  const effectiveTheme = theme === 'system' ? systemTheme : theme;
 
-  console.log(`[SimplifiedSoulNetVisualization] Rendering with ${data.nodes.length} nodes, selected: ${selectedNode}, instantReady: ${isInstantReady}`);
+  console.log(`[SimplifiedSoulNetVisualization] Rendering with ${data.nodes.length} nodes, selected: ${selectedNode}, instantReady: ${isInstantReady}, theme: ${effectiveTheme}`);
 
   // Track camera zoom
   useFrame(({ camera }) => {
