@@ -1,16 +1,16 @@
 
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useFrame } from '@react-three/fiber';
 import { OrbitControls } from '@react-three/drei';
 import * as THREE from 'three';
+import { useTheme } from '@/hooks/use-theme';
 import Node from './Node';
 import Edge from './Edge';
-import { NodeSelectionManager } from './NodeSelectionManager';
+import NodeSelectionManager from './NodeSelectionManager';
 import ConnectionCalculator from './ConnectionCalculator';
 
 interface NodeData {
   id: string;
-  label?: string;
   type: 'entity' | 'emotion';
   value: number;
   color: string;
@@ -21,7 +21,6 @@ interface LinkData {
   source: string;
   target: string;
   value: number;
-  strength?: number;
 }
 
 interface SimplifiedSoulNetVisualizationProps {
@@ -31,7 +30,6 @@ interface SimplifiedSoulNetVisualizationProps {
   themeHex: string;
   isFullScreen: boolean;
   shouldShowLabels: boolean;
-  effectiveTheme?: 'light' | 'dark';
   getInstantConnectionPercentage?: (selectedNode: string, targetNode: string) => number;
   getInstantTranslation?: (nodeId: string) => string;
   getInstantNodeConnections?: (nodeId: string) => any;
@@ -45,15 +43,16 @@ export const SimplifiedSoulNetVisualization: React.FC<SimplifiedSoulNetVisualiza
   themeHex,
   isFullScreen,
   shouldShowLabels,
-  effectiveTheme = 'light',
   getInstantConnectionPercentage = () => 0,
   getInstantTranslation = (id: string) => id,
   getInstantNodeConnections = () => ({ connectedNodes: [], totalStrength: 0, averageStrength: 0 }),
   isInstantReady = false
 }) => {
   const [cameraZoom, setCameraZoom] = useState(45);
+  const { theme, systemTheme } = useTheme();
+  const effectiveTheme = theme === 'system' ? systemTheme : theme;
 
-  console.log(`[SimplifiedSoulNetVisualization] Rendering with ${data.nodes.length} nodes, theme: ${effectiveTheme}, instantReady: ${isInstantReady}`);
+  console.log(`[SimplifiedSoulNetVisualization] Rendering with ${data.nodes.length} nodes, selected: ${selectedNode}, instantReady: ${isInstantReady}`);
 
   // Track camera zoom
   useFrame(({ camera }) => {
@@ -68,43 +67,9 @@ export const SimplifiedSoulNetVisualization: React.FC<SimplifiedSoulNetVisualiza
     return data.nodes.find(node => node.id === nodeId);
   }, [data.nodes]);
 
-  // Calculate connection strengths
-  const connectionStrengths = useMemo(() => {
-    const strengths = new Map<string, number>();
-    data.nodes.forEach(node => {
-      strengths.set(node.id, 0.5);
-    });
-    data.links.forEach(link => {
-      const strength = link.value || 0.5;
-      strengths.set(link.source, Math.max(strengths.get(link.source) || 0, strength));
-      strengths.set(link.target, Math.max(strengths.get(link.target) || 0, strength));
-    });
-    return strengths;
-  }, [data.nodes, data.links]);
-
-  // Convert nodes to Three.js format
-  const threeNodes = useMemo(() => {
-    return data.nodes.map(node => ({
-      id: node.id,
-      position: new THREE.Vector3(...node.position)
-    }));
-  }, [data.nodes]);
-
-  // Convert links to include strength
-  const linksWithStrength = useMemo(() => {
-    return data.links.map(link => ({
-      ...link,
-      strength: link.value || 0.5
-    }));
-  }, [data.links]);
-
   return (
-    <NodeSelectionManager
-      nodes={threeNodes}
-      links={linksWithStrength}
-      connectionStrengths={connectionStrengths}
-    >
-      {({ selectedNodeId, onNodeSelect, onNodeDeselect }) => (
+    <NodeSelectionManager>
+      {({ selectedNodeId, handleNodeSelect, clearSelection }) => (
         <ConnectionCalculator selectedNodeId={selectedNodeId} links={data.links}>
           {({ connectedNodes, getConnectionPercentage, getConnectionStrength }) => (
             <>
@@ -120,7 +85,7 @@ export const SimplifiedSoulNetVisualization: React.FC<SimplifiedSoulNetVisualiza
                 maxDistance={120}
                 enableDamping={true}
                 dampingFactor={0.05}
-                onChange={onNodeDeselect}
+                onChange={clearSelection}
               />
               
               {/* Render nodes */}
@@ -147,13 +112,9 @@ export const SimplifiedSoulNetVisualization: React.FC<SimplifiedSoulNetVisualiza
                 return (
                   <Node
                     key={node.id}
-                    node={{
-                      id: node.id,
-                      label: node.id,
-                      position: new THREE.Vector3(...node.position)
-                    }}
+                    node={node}
                     isSelected={isSelected}
-                    onClick={() => onNodeSelect(node.id, new THREE.Vector3(...node.position))}
+                    onClick={handleNodeSelect}
                     isHighlighted={isHighlighted}
                     isDimmed={isDimmed}
                     connectionPercentage={connectionPercentage}

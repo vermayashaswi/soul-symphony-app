@@ -1,14 +1,11 @@
 
-/* Import Android-specific styles */
-@import './android-navigation.css';
-
 /* Import focused mobile stylesheets */
 @import './safe-area.css';
 @import './mobile-navigation.css';
 
 /* Mobile-specific styles - remaining rules */
 @media (max-width: 768px) {
-  /* Enhanced fullscreen components like SoulNet */
+  /* Fullscreen components like SoulNet */
   .fixed.inset-0.z-\[9999\] {
     position: fixed !important;
     top: var(--safe-area-inset-top) !important;
@@ -23,12 +20,12 @@
     background-color: hsl(var(--background)) !important;
   }
   
-  /* Enhanced chat content safe area */
+  /* Chat content safe area */
   .mobile-chat-content {
     padding-bottom: calc(var(--nav-bar-height) + var(--safe-area-inset-bottom) + 1rem) !important;
   }
   
-  /* Improved insights page optimizations */
+  /* Insights page optimizations */
   .insights-container .grid-cols-1 > div,
   .insights-container .bg-background,
   .insights-container .mb-8 > div {
@@ -54,7 +51,7 @@
     padding: 0 !important;
   }
   
-  /* Enhanced year view calendar compact styling */
+  /* Year view calendar compact styling */
   .compact-table-mobile {
     table-layout: fixed !important;
     font-size: 10px !important;
@@ -72,12 +69,11 @@
   }
 }
 
-/* Enhanced horizontal scrolling prevention */
+/* Prevent horizontal scrolling at the root level */
 html, body {
   overflow-x: hidden !important;
   width: 100% !important;
   position: relative !important;
-  max-width: 100% !important;
 }
 
 #root {
@@ -85,10 +81,9 @@ html, body {
   padding-right: 0 !important;
   max-width: 100% !important;
   overflow-x: hidden !important;
-  width: 100% !important;
 }
 
-/* Enhanced desktop year view - larger dots */
+/* Desktop year view - larger dots */
 @media (min-width: 769px) {
   .compact-year-view div.rounded-full {
     width: 16px !important;
@@ -96,7 +91,7 @@ html, body {
   }
 }
 
-/* Enhanced notch and cutout handling for modern devices */
+/* Notch and cutout handling for modern devices */
 @supports (padding: max(0px)) {
   @media (max-width: 768px) {
     .smart-chat-container,
@@ -106,29 +101,5 @@ html, body {
       padding-top: max(var(--status-bar-height), env(safe-area-inset-top, 0px)) !important;
       padding-bottom: max(var(--nav-bar-height), calc(env(safe-area-inset-bottom, 0px) + var(--nav-bar-height))) !important;
     }
-  }
-}
-
-/* Touch optimization for mobile */
-@media (max-width: 768px) {
-  /* Improve touch target sizes */
-  button, 
-  [role="button"],
-  .mobile-navigation a {
-    min-height: 44px !important;
-    min-width: 44px !important;
-  }
-  
-  /* Optimize scroll performance */
-  .scroll-container {
-    -webkit-overflow-scrolling: touch;
-    overflow-scrolling: touch;
-  }
-  
-  /* Prevent zoom on form inputs */
-  input,
-  select,
-  textarea {
-    font-size: 16px !important;
   }
 }
