@@ -6,6 +6,7 @@ import { useDebugLog } from "@/utils/debug/DebugContext";
 import { Input } from "@/components/ui/input";
 import { useTutorial } from "@/contexts/TutorialContext";
 import { useTranslation } from "@/contexts/TranslationContext";
+import { cn } from "@/lib/utils";
 
 interface MobileChatInputProps {
   onSendMessage: (message: string, isAudio?: boolean) => void;
@@ -178,21 +179,14 @@ export default function MobileChatInput({
   return (
     <div 
       ref={inputContainerRef}
-      className={`p-2 border-t border-border flex items-center gap-2 ${
-        isKeyboardVisible ? 'input-keyboard-active' : ''
-      }`}
+      className={cn(
+        "mobile-chat-input-container",
+        "p-2 border-t border-border flex items-center gap-2 bg-background",
+        isKeyboardVisible && 'keyboard-visible'
+      )}
       style={{
-        position: 'fixed',
-        bottom: isKeyboardVisible ? 0 : '54px', // Adjusted to be right above navbar
-        left: 0,
-        right: 0,
-        paddingBottom: isKeyboardVisible ? '5px' : '8px',
-        marginBottom: 0,
-        zIndex: 60,
-        boxShadow: '0 -1px 3px rgba(0, 0, 0, 0.07)',
         transition: 'all 0.2s ease',
-        borderTop: isKeyboardVisible ? '1px solid rgba(0, 0, 0, 0.1)' : 'none',
-        borderBottom: !isKeyboardVisible ? '1px solid rgba(0, 0, 0, 0.1)' : 'none',
+        boxShadow: '0 -2px 8px rgba(0, 0, 0, 0.1)',
       }}
     >
       <div className="flex-1 relative">
