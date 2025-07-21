@@ -16,7 +16,8 @@ export const TouchEventHandler: React.FC<TouchEventHandlerProps> = ({
   nodes,
   children
 }) => {
-  const { camera, raycaster, size } = useThree();
+  const { camera, size } = useThree();
+  const raycaster = new THREE.Raycaster();
   const touchStartRef = useRef<{ x: number; y: number; time: number } | null>(null);
   const isCapacitorNative = useRef(false);
 
@@ -145,12 +146,24 @@ export const TouchEventHandler: React.FC<TouchEventHandlerProps> = ({
   }, [getIntersectedNode, onNodeSelect, onNodeDeselect]);
 
   return (
-    <group
-      onTouchStart={handleTouchStart}
-      onTouchEnd={handleTouchEnd}
-      onClick={handleMouseClick}
+    <mesh
+      onPointerDown={(event: any) => {
+        event.stopPropagation();
+        handleTouchStart(event);
+      }}
+      onPointerUp={(event: any) => {
+        event.stopPropagation();
+        handleTouchEnd(event);
+      }}
+      onClick={(event: any) => {
+        if (!isCapacitorNative.current) {
+          handleMouseClick(event);
+        }
+      }}
     >
+      <boxGeometry args={[100, 100, 100]} />
+      <meshBasicMaterial transparent opacity={0} />
       {children}
-    </group>
+    </mesh>
   );
 };

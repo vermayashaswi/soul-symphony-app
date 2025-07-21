@@ -3,12 +3,12 @@ import { Canvas, useFrame } from '@react-three/fiber';
 import { OrbitControls, PerspectiveCamera } from '@react-three/drei';
 import * as THREE from 'three';
 
-import { Node } from './Node';
+import Node from './Node';
 import { Link } from './Link';
 import { TouchEventHandler } from './TouchEventHandler';
 import { NodeSelectionManager } from './NodeSelectionManager';
 import { ConnectionPercentageDisplay } from './ConnectionPercentageDisplay';
-import { ConnectionCalculator } from './ConnectionCalculator';
+import ConnectionCalculator from './ConnectionCalculator';
 import { useIsMobile } from '@/hooks/use-mobile';
 
 interface SoulNetNode {
@@ -119,20 +119,7 @@ const SoulNetVisualization: React.FC<SoulNetVisualizationProps> = ({
   return (
     <div className="w-full h-full relative">
       <Canvas
-        ref={canvasRef}
-        className="w-full h-full"
-        dpr={[1, 2]}
-        performance={{ min: 0.5 }}
-        gl={{
-          antialias: !isMobile,
-          alpha: true,
-          powerPreference: 'high-performance'
-        }}
-        onCreated={({ gl }) => {
-          if (isNativeApp) {
-            gl.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-          }
-        }}
+        style={{ width: '100%', height: '100%' }}
       >
         <PerspectiveCamera
           makeDefault
