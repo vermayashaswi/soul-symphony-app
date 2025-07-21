@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Canvas } from '@react-three/fiber';
 import { TimeRange } from '@/hooks/use-insights-data';
@@ -16,6 +15,7 @@ import { useTranslation } from '@/contexts/TranslationContext';
 import { useInstantSoulNetData } from '@/hooks/useInstantSoulNetData';
 import { EnhancedSoulNetPreloadService } from '@/services/enhancedSoulNetPreloadService';
 import { translationService } from '@/services/translationService';
+import { useTheme } from '@/hooks/use-theme';
 
 interface SoulNetProps {
   userId: string | undefined;
@@ -61,6 +61,8 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
   const isMobile = useIsMobile();
   const themeHex = useUserColorThemeHex();
   const { currentLanguage } = useTranslation();
+  const { theme, systemTheme } = useTheme();
+  const effectiveTheme = theme === 'system' ? systemTheme : theme;
   
   // ENHANCED: Rendering initialization tracking
   const renderingInitialized = useRef(false);
@@ -112,7 +114,8 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
     translationProgress,
     translationComplete,
     renderingReady,
-    renderingInitialized: renderingInitialized.current
+    renderingInitialized: renderingInitialized.current,
+    effectiveTheme
   });
 
   // ENHANCED: Rendering initialization with proper dependencies
@@ -445,6 +448,7 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
                 themeHex={themeHex}
                 isFullScreen={isFullScreen}
                 shouldShowLabels={true}
+                effectiveTheme={effectiveTheme}
                 getInstantConnectionPercentage={getInstantConnectionPercentage}
                 getInstantTranslation={getInstantTranslation}
                 getInstantNodeConnections={getInstantNodeConnections}
