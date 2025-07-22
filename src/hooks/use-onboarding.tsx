@@ -9,9 +9,10 @@ export function useOnboarding() {
   const [displayName, setDisplayName] = useState<string | null>(null);
   const [user, setUser] = useState<User | null>(null);
 
-  const checkOnboardingStatus = async () => {
+  const checkOnboardingStatus = async (): Promise<boolean> => {
     try {
       setLoading(true);
+      let isComplete = false;
       
       // For authenticated users, check database first
       if (user) {
@@ -26,11 +27,12 @@ export function useOnboarding() {
         if (error) {
           console.error('[Onboarding] Error fetching profile:', error);
           // Fallback to localStorage
-          const isComplete = localStorage.getItem('onboardingComplete') === 'true';
+          isComplete = localStorage.getItem('onboardingComplete') === 'true';
           setOnboardingComplete(isComplete);
         } else {
           console.log('[Onboarding] Profile data:', profile);
-          setOnboardingComplete(profile.onboarding_completed || false);
+          isComplete = profile.onboarding_completed || false;
+          setOnboardingComplete(isComplete);
           if (profile.display_name) {
             setDisplayName(profile.display_name);
           }
@@ -38,7 +40,7 @@ export function useOnboarding() {
       } else {
         // For unauthenticated users, use localStorage
         console.log('[Onboarding] Checking localStorage for unauthenticated user');
-        const isComplete = localStorage.getItem('onboardingComplete') === 'true';
+        isComplete = localStorage.getItem('onboardingComplete') === 'true';
         setOnboardingComplete(isComplete);
         
         const name = localStorage.getItem('user_display_name');
@@ -46,11 +48,14 @@ export function useOnboarding() {
           setDisplayName(name);
         }
       }
+      
+      return isComplete;
     } catch (error) {
       console.error('[Onboarding] Error in checkOnboardingStatus:', error);
       // Fallback to localStorage
       const isComplete = localStorage.getItem('onboardingComplete') === 'true';
       setOnboardingComplete(isComplete);
+      return isComplete;
     } finally {
       setLoading(false);
     }
