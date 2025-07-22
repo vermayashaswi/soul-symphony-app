@@ -5,7 +5,20 @@ import { Toaster as Sonner } from "sonner"
 type ToasterProps = React.ComponentProps<typeof Sonner>
 
 function Toaster({ ...props }: ToasterProps) {
-  const { theme, systemTheme, colorTheme } = useTheme()
+  // Safely access theme context with fallback
+  let theme = 'light';
+  let systemTheme = 'light';
+  let colorTheme = 'blue';
+  
+  try {
+    const themeContext = useTheme();
+    theme = themeContext.theme;
+    systemTheme = themeContext.systemTheme;
+    colorTheme = themeContext.colorTheme;
+  } catch (error) {
+    // Fallback to default values if theme context isn't available
+    console.warn('Theme context not available, using defaults');
+  }
   
   // Determine if we're in dark mode
   const isDarkMode = theme === 'dark' || (theme === 'system' && systemTheme === 'dark')
