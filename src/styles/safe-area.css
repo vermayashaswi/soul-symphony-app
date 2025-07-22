@@ -9,40 +9,35 @@
   --nav-bar-height: 4rem;
   --keyboard-height: 0px;
   
-  /* Calculated safe areas (fallback values) */
+  /* Calculated safe areas */
   --calculated-safe-area-top: var(--safe-area-inset-top);
   --calculated-safe-area-bottom: var(--safe-area-inset-bottom);
   --calculated-safe-area-left: var(--safe-area-inset-left);
   --calculated-safe-area-right: var(--safe-area-inset-right);
 }
 
-/* Platform-specific status bar heights */
+/* Platform detection and adjustments */
 .platform-android {
   --status-bar-height: 24px;
+  /* Ensure minimum safe area bottom for navigation gestures */
+  --safe-area-inset-bottom: max(env(safe-area-inset-bottom, 0px), 12px);
+  --calculated-safe-area-bottom: max(env(safe-area-inset-bottom, 0px), 12px);
 }
 
 .platform-ios {
   --status-bar-height: 44px;
 }
 
-/* ANDROID FIX: Ensure minimum safe area for devices without proper env() support */
-.platform-android {
-  --safe-area-inset-bottom: max(env(safe-area-inset-bottom, 0px), 8px);
-}
-
-/* Keyboard state adjustments */
+/* Keyboard state management */
 .keyboard-visible {
-  /* When keyboard is visible, safe area bottom should not interfere with positioning */
   --effective-safe-area-bottom: 0px;
 }
 
 .keyboard-visible.platform-ios {
-  /* iOS still needs safe area even with keyboard */
   --effective-safe-area-bottom: var(--calculated-safe-area-bottom);
 }
 
 .keyboard-visible.platform-android {
-  /* Android should ignore safe area when keyboard is visible */
   --effective-safe-area-bottom: 0px;
 }
 
@@ -52,7 +47,7 @@
 }
 
 .safe-area-bottom {
-  padding-bottom: max(var(--nav-bar-height), calc(var(--calculated-safe-area-bottom) + var(--nav-bar-height))) !important;
+  padding-bottom: var(--calculated-safe-area-bottom) !important;
 }
 
 .safe-area-left {
@@ -66,8 +61,10 @@
 /* Mobile container base styles */
 .mobile-container {
   min-height: 100vh;
+  min-height: 100dvh;
   box-sizing: border-box;
   overflow-x: hidden;
+  position: relative;
 }
 
 /* Apply safe areas to main app containers */
@@ -75,14 +72,5 @@
 .journal-container,
 .insights-container,
 .settings-container {
-  @apply safe-area-top safe-area-bottom safe-area-left safe-area-right mobile-container;
-}
-
-/* Keyboard-specific adjustments for containers */
-.keyboard-visible .smart-chat-container,
-.keyboard-visible .journal-container,
-.keyboard-visible .insights-container,
-.keyboard-visible .settings-container {
-  /* Adjust bottom padding when keyboard is visible */
-  padding-bottom: var(--effective-safe-area-bottom, 0px) !important;
+  @apply safe-area-top safe-area-left safe-area-right mobile-container;
 }

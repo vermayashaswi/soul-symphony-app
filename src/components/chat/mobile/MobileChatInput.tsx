@@ -7,7 +7,6 @@ import { Input } from "@/components/ui/input";
 import { useTutorial } from "@/contexts/TutorialContext";
 import { useTranslation } from "@/contexts/TranslationContext";
 import { cn } from "@/lib/utils";
-import { useSafeArea } from "@/hooks/use-safe-area";
 import { useKeyboardDetection } from "@/hooks/use-keyboard-detection";
 
 interface MobileChatInputProps {
@@ -29,15 +28,12 @@ export default function MobileChatInput({
   const chatDebug = useDebugLog();
   const { isActive, isInStep } = useTutorial();
   const { translate, currentLanguage } = useTranslation();
-  const { applySafeAreaStyles } = useSafeArea();
   
-  // Use the new keyboard detection hook
   const { isKeyboardVisible, keyboardHeight, platform, isNative } = useKeyboardDetection();
   
-  // Check if we're in step 5 (chat question step)
   const isInChatTutorialStep = isActive && isInStep(5);
 
-  // Translate placeholder text when language changes
+  // Translate placeholder
   useEffect(() => {
     const translatePlaceholder = async () => {
       try {
@@ -56,57 +52,27 @@ export default function MobileChatInput({
     translatePlaceholder();
   }, [currentLanguage, translate]);
 
-  // Apply safe area styles to input container
+  // Handle keyboard state changes
   useEffect(() => {
-    if (inputContainerRef.current) {
-      applySafeAreaStyles(inputContainerRef.current);
-    }
-  }, [applySafeAreaStyles]);
-
-  // Handle keyboard state changes and update CSS classes
-  useEffect(() => {
-    console.log('[MobileChatInput] Keyboard state changed:', { 
+    console.log('[MobileChatInput] Keyboard state:', { 
       isVisible: isKeyboardVisible, 
       height: keyboardHeight, 
       platform, 
       isNative 
     });
     
-    // Update CSS classes for styling
-    const chatInterface = document.querySelector('.mobile-chat-interface');
-    if (chatInterface) {
-      chatInterface.classList.toggle('keyboard-visible', isKeyboardVisible);
-    }
-    
-    // Apply platform-specific classes
-    document.body.classList.toggle('keyboard-visible', isKeyboardVisible);
-    document.body.classList.toggle(`platform-${platform}`, true);
-    
-    if (isKeyboardVisible) {
-      // When keyboard opens, ensure input stays focused and scroll to bottom
+    if (isKeyboardVisible && inputRef.current) {
+      // Ensure input stays focused and scroll to bottom
       setTimeout(() => {
-        if (inputRef.current) {
-          // Scroll the chat content to bottom
-          const chatContent = document.querySelector('.mobile-chat-content');
-          if (chatContent) {
-            chatContent.scrollTop = chatContent.scrollHeight;
-          }
+        const chatContent = document.querySelector('.mobile-chat-content');
+        if (chatContent) {
+          chatContent.scrollTop = chatContent.scrollHeight;
         }
-      }, 100);
-    } else {
-      // When keyboard closes, scroll to bottom to show latest messages
-      setTimeout(() => {
-        window.scrollTo({
-          top: document.body.scrollHeight,
-          behavior: 'smooth'
-        });
       }, 100);
     }
   }, [isKeyboardVisible, keyboardHeight, platform, isNative]);
 
-  // If we're in step 5 of the tutorial, don't render anything at all
   if (isInChatTutorialStep) {
-    console.log("In tutorial step 5 - not rendering chat input at all");
     return null;
   }
 
@@ -130,7 +96,6 @@ export default function MobileChatInput({
         chatDebug.addEvent("User Message", `Preparing to send: "${trimmedValue.substring(0, 30)}${trimmedValue.length > 30 ? '...' : ''}"`, "info");
         setIsSubmitting(true);
         
-        chatDebug.addEvent("Send Message", "Calling onSendMessage handler", "info");
         onSendMessage(trimmedValue);
         
         setInputValue("");
@@ -153,16 +118,13 @@ export default function MobileChatInput({
       ref={inputContainerRef}
       className={cn(
         "mobile-chat-input-container",
-        "p-2 border-t border-border flex items-center gap-2 bg-background",
+        "flex items-center gap-3",
         isKeyboardVisible && 'keyboard-visible',
         platform === 'android' && 'platform-android',
         platform === 'ios' && 'platform-ios'
       )}
-      style={{
-        boxShadow: '0 -2px 8px rgba(0, 0, 0, 0.1)',
-      }}
     >
-      <div className="flex-1 relative">
+      <div className="flex-1">
         <Input
           ref={inputRef}
           type="text"
@@ -170,26 +132,24 @@ export default function MobileChatInput({
           onChange={handleInputChange}
           onKeyDown={handleKeyPress}
           placeholder={placeholderText}
-          className="w-full pr-10 focus:outline-none focus:ring-2 focus:ring-primary border-2 border-primary/40 shadow-[0_0_8px_rgba(155,135,245,0.5)] bg-background text-foreground"
+          className="w-full border-2 border-primary/40 focus:border-primary shadow-sm bg-background text-foreground"
           disabled={isLoading || isSubmitting}
         />
       </div>
       
-      <div className="flex-shrink-0 flex items-center">
-        <Button
-          type="button"
-          size="icon"
-          className="h-8 w-8 rounded-full flex items-center justify-center"
-          onClick={handleSendMessage}
-          disabled={isLoading || isSubmitting || !inputValue.trim()}
-        >
-          {isSubmitting || isLoading ? (
-            <Loader2 className="h-4 w-4 animate-spin" />
-          ) : (
-            <Send className="h-4 w-4" />
-          )}
-        </Button>
-      </div>
+      <Button
+        type="button"
+        size="icon"
+        className="h-10 w-10 rounded-full shrink-0"
+        onClick={handleSendMessage}
+        disabled={isLoading || isSubmitting || !inputValue.trim()}
+      >
+        {isSubmitting || isLoading ? (
+          <Loader2 className="h-4 w-4 animate-spin" />
+        ) : (
+          <Send className="h-4 w-4" />
+        )}
+      </Button>
     </div>
   );
 }
