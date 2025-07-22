@@ -4,6 +4,7 @@
   --keyboard-height: 0px;
   --nav-bar-height: 4rem;
   --chat-input-height: 72px;
+  --debug-mobile: 0; /* Set to 1 to enable debug mode */
 }
 
 /* Mobile Navigation Base */
@@ -25,7 +26,7 @@
 }
 
 /* Platform-specific navigation adjustments */
-.platform-android .mobile-navigation {
+body.platform-android .mobile-navigation {
   padding-bottom: max(var(--calculated-safe-area-bottom, 0px), 12px);
 }
 
@@ -81,33 +82,34 @@
 }
 
 /* Platform-specific input positioning */
-.platform-android .mobile-chat-input-container {
+body.platform-android .mobile-chat-input-container {
   bottom: calc(var(--nav-bar-height) + max(var(--calculated-safe-area-bottom, 0px), 12px));
 }
 
 /* KEYBOARD VISIBLE STATES - Hide navigation and reposition input */
-.mobile-navigation.keyboard-visible {
+/* Higher specificity to ensure these rules take precedence */
+body.keyboard-visible .mobile-navigation {
   transform: translateY(100%) !important;
   transition: transform 0.15s ease-in-out !important;
 }
 
-.mobile-chat-input-container.keyboard-visible {
+body.keyboard-visible .mobile-chat-input-container {
   /* Position input at bottom when keyboard is visible */
   bottom: 0px !important;
   transition: none !important;
 }
 
 /* Platform-specific keyboard adjustments for input */
-.mobile-chat-input-container.keyboard-visible.platform-ios {
+body.keyboard-visible.platform-ios .mobile-chat-input-container {
   bottom: var(--calculated-safe-area-bottom, env(safe-area-inset-bottom, 0px)) !important;
 }
 
-.mobile-chat-input-container.keyboard-visible.platform-android {
+body.keyboard-visible.platform-android .mobile-chat-input-container {
   bottom: 0px !important;
 }
 
 /* KEYBOARD VISIBLE - Content adjustments */
-.mobile-chat-content.keyboard-visible {
+body.keyboard-visible .mobile-chat-content {
   /* Only account for input when keyboard is visible */
   padding-bottom: calc(var(--chat-input-height) + 0.5rem) !important;
   transition: padding-bottom 0.2s ease-in-out;
@@ -149,11 +151,20 @@
   box-sizing: border-box;
 }
 
-/* Debug helpers - remove in production */
-.debug-mobile .mobile-chat-input-container {
-  border: 2px solid red !important;
+/* Debug helpers - conditional based on CSS variable */
+.mobile-chat-input-container {
+  border: calc(var(--debug-mobile) * 2px) solid red;
 }
 
-.debug-mobile .mobile-navigation {
-  border: 2px solid blue !important;
+.mobile-navigation {
+  border: calc(var(--debug-mobile) * 2px) solid blue;
+}
+
+/* Force visibility states for debugging */
+[data-debug-keyboard="true"] .mobile-navigation {
+  border: 3px solid orange !important;
+}
+
+[data-debug-keyboard="true"] .mobile-chat-input-container {
+  border: 3px solid purple !important;
 }
