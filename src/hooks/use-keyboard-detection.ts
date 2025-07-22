@@ -182,7 +182,7 @@ export const useKeyboardDetection = () => {
       document.body.classList.remove('keyboard-visible');
       document.documentElement.style.removeProperty('--keyboard-height');
     };
-  }, [updateKeyboardDetection, platform]);
+  }, [updateKeyboardState, platform]);
 
   return {
     isKeyboardVisible: keyboardState.isVisible,
