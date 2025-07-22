@@ -12,7 +12,19 @@ import { useTheme } from "@/hooks/use-theme"
 
 export function Toaster() {
   const { toasts } = useToast()
-  const { theme, systemTheme } = useTheme()
+  
+  // Safely access theme context with fallback
+  let theme = 'light';
+  let systemTheme = 'light';
+  
+  try {
+    const themeContext = useTheme();
+    theme = themeContext.theme;
+    systemTheme = themeContext.systemTheme;
+  } catch (error) {
+    // Fallback to default values if theme context isn't available
+    console.warn('Theme context not available in toaster, using defaults');
+  }
   
   // Determine if we're in dark mode
   const isDarkMode = theme === 'dark' || (theme === 'system' && systemTheme === 'dark')
