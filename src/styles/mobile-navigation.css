@@ -57,7 +57,7 @@
   -webkit-overflow-scrolling: touch;
   padding: 0.5rem;
   /* Dynamic padding based on navigation and input visibility */
-  padding-bottom: calc(var(--chat-input-height) + var(--nav-bar-height) + var(--calculated-safe-area-bottom, 0px));
+  padding-bottom: calc(var(--chat-input-height) + var(--nav-bar-height) + var(--calculated-safe-area-bottom, 0px) + 0.5rem);
   transition: padding-bottom 0.2s ease-in-out;
 }
 
@@ -74,7 +74,7 @@
   height: var(--chat-input-height);
   box-sizing: border-box;
   
-  /* Position directly above navigation */
+  /* Position directly above navigation by default */
   bottom: calc(var(--nav-bar-height) + var(--calculated-safe-area-bottom, env(safe-area-inset-bottom, 0px)));
   
   transition: bottom 0.2s ease-in-out;
@@ -85,37 +85,31 @@
   bottom: calc(var(--nav-bar-height) + max(var(--calculated-safe-area-bottom, 0px), 12px));
 }
 
-/* KEYBOARD VISIBLE STATES - Hide navigation completely */
-body.keyboard-visible .mobile-navigation,
-.keyboard-visible .mobile-navigation {
-  transform: translateY(100%);
-  transition: transform 0.15s ease-in-out;
+/* KEYBOARD VISIBLE STATES - Hide navigation and reposition input */
+.mobile-navigation.keyboard-visible {
+  transform: translateY(100%) !important;
+  transition: transform 0.15s ease-in-out !important;
 }
 
-/* KEYBOARD VISIBLE - Input positioning */
-body.keyboard-visible .mobile-chat-input-container,
-.keyboard-visible .mobile-chat-input-container {
-  /* Position input directly above keyboard */
+.mobile-chat-input-container.keyboard-visible {
+  /* Position input at bottom when keyboard is visible */
   bottom: 0px !important;
   transition: none !important;
 }
 
-/* Platform-specific keyboard adjustments */
-.platform-ios.keyboard-visible .mobile-chat-input-container,
-body.platform-ios.keyboard-visible .mobile-chat-input-container {
+/* Platform-specific keyboard adjustments for input */
+.mobile-chat-input-container.keyboard-visible.platform-ios {
   bottom: var(--calculated-safe-area-bottom, env(safe-area-inset-bottom, 0px)) !important;
 }
 
-.platform-android.keyboard-visible .mobile-chat-input-container,
-body.platform-android.keyboard-visible .mobile-chat-input-container {
+.mobile-chat-input-container.keyboard-visible.platform-android {
   bottom: 0px !important;
 }
 
 /* KEYBOARD VISIBLE - Content adjustments */
-body.keyboard-visible .mobile-chat-content,
-.keyboard-visible .mobile-chat-content {
+.mobile-chat-content.keyboard-visible {
   /* Only account for input when keyboard is visible */
-  padding-bottom: var(--chat-input-height) !important;
+  padding-bottom: calc(var(--chat-input-height) + 0.5rem) !important;
   transition: padding-bottom 0.2s ease-in-out;
 }
 

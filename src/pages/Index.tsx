@@ -1,4 +1,3 @@
-
 import React, { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
@@ -76,8 +75,18 @@ const Index = () => {
       try {
         console.log('[Index] Checking user status for tutorial navigation, user:', user.id);
         
-        // First ensure onboarding status is checked from authoritative source
-        const isOnboardingComplete = await checkOnboardingStatus();
+        // Use the auth synchronizer for reliable status checking
+        const { authStateSynchronizer } = await import('@/services/authStateSynchronizer');
+        
+        // Ensure profile exists
+        await authStateSynchronizer.ensureProfileExists(user.id, user.email);
+        
+        // Get authoritative onboarding status
+        const isOnboardingComplete = await authStateSynchronizer.syncOnboardingStatus(user.id, {
+          forceSync: true
+        });
+        
+        console.log('[Index] Onboarding status checked:', { isOnboardingComplete });
         
         // Check if user has completed onboarding
         if (isOnboardingComplete) {
@@ -129,7 +138,7 @@ const Index = () => {
     };
     
     handleTutorialNavigation();
-  }, [user, checkOnboardingStatus, isNative]);
+  }, [user, isNative]);
 
   // Handle explicit app redirects only - ONLY for web users
   useEffect(() => {

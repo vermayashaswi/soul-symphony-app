@@ -28,7 +28,6 @@ const MobileNavigation: React.FC<MobileNavigationProps> = ({ onboardingComplete 
   const { hasActiveSubscription, isTrialActive } = useSubscription();
   const { safeArea, isNative, isAndroid, applySafeAreaStyles } = useSafeArea();
   
-  // Use the new keyboard detection hook
   const { isKeyboardVisible, keyboardHeight, platform } = useKeyboardDetection();
   
   const navRef = useRef<HTMLDivElement>(null);
@@ -53,16 +52,22 @@ const MobileNavigation: React.FC<MobileNavigationProps> = ({ onboardingComplete 
     }
   }, [safeArea, applySafeAreaStyles]);
   
-  // Handle keyboard state changes
+  // Handle keyboard visibility changes
   useEffect(() => {
+    if (!navRef.current) return;
+    
+    const nav = navRef.current;
+    nav.classList.toggle('keyboard-visible', isKeyboardVisible);
+    
     console.log('MobileNavigation: Keyboard state changed:', { 
       isVisible: isKeyboardVisible, 
       height: keyboardHeight, 
-      platform 
+      platform,
+      navHidden: isKeyboardVisible
     });
   }, [isKeyboardVisible, keyboardHeight, platform]);
   
-  // Visibility logic
+  // Visibility logic - hide when keyboard is visible or on auth/onboarding pages
   useEffect(() => {
     const onboardingOrAuthPaths = [
       '/app/onboarding',
@@ -74,14 +79,14 @@ const MobileNavigation: React.FC<MobileNavigationProps> = ({ onboardingComplete 
     
     const isOnboardingOrAuth = onboardingOrAuthPaths.includes(location.pathname);
     
-    const shouldShowNav = (isMobile || isNativeApp()) && 
+    const shouldShowNav = (isMobile.isMobile || isNativeApp()) && 
                           !isOnboardingOrAuth &&
                           !!user &&
                           onboardingComplete !== false;
     
     console.log('MobileNavigation: Visibility check:', { 
       shouldShowNav, 
-      isMobile, 
+      isMobile: isMobile.isMobile, 
       isNativeApp: isNativeApp(),
       path: location.pathname,
       isKeyboardVisible,
@@ -92,7 +97,7 @@ const MobileNavigation: React.FC<MobileNavigationProps> = ({ onboardingComplete 
     });
     
     setIsVisible(shouldShowNav);
-  }, [location.pathname, isMobile, isKeyboardVisible, isTutorialActive, user, onboardingComplete, currentLanguage, renderKey, safeArea]);
+  }, [location.pathname, isMobile.isMobile, isKeyboardVisible, isTutorialActive, user, onboardingComplete, currentLanguage, renderKey, safeArea]);
   
   if (!isVisible || onboardingComplete === false) {
     return null;
@@ -112,14 +117,6 @@ const MobileNavigation: React.FC<MobileNavigationProps> = ({ onboardingComplete 
   };
   
   const isPremiumFeatureAccessible = hasActiveSubscription || isTrialActive;
-  
-  console.log('MobileNavigation: Rendering with keyboard state:', { 
-    safeArea, 
-    isAndroid, 
-    isKeyboardVisible, 
-    keyboardHeight, 
-    platform 
-  });
   
   return (
     <motion.div 
