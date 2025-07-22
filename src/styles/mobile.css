@@ -1,77 +1,108 @@
 
-/* Mobile-specific styles */
-.mobile-container {
-  min-height: 100vh;
-  min-height: 100dvh;
-  box-sizing: border-box;
-  overflow-x: hidden;
-  position: relative;
-}
+/* Import focused mobile stylesheets */
+@import './safe-area.css';
+@import './mobile-navigation.css';
 
-/* Mobile layout utilities */
-.mobile-safe-area {
-  padding-top: env(safe-area-inset-top, 0px);
-  padding-bottom: env(safe-area-inset-bottom, 0px);
-  padding-left: env(safe-area-inset-left, 0px);
-  padding-right: env(safe-area-inset-right, 0px);
-}
-
-/* Mobile text scaling */
-.mobile-text {
-  font-size: 16px; /* Prevent zoom on iOS */
-}
-
-/* Mobile input styling */
-.mobile-input {
-  font-size: 16px;
-  border-radius: 8px;
-  padding: 12px;
-}
-
-/* Mobile button styling */
-.mobile-button {
-  min-height: 44px;
-  min-width: 44px;
-  touch-action: manipulation;
-}
-
-/* Remove conflicting keyboard styles that were overriding navigation */
-/* These are now properly handled in mobile-navigation.css */
-
-/* Mobile scrolling improvements */
-.mobile-scroll {
-  -webkit-overflow-scrolling: touch;
-  overflow-y: auto;
-}
-
-/* Disable text selection on mobile UI elements */
-.mobile-ui {
-  -webkit-user-select: none;
-  -moz-user-select: none;
-  -ms-user-select: none;
-  user-select: none;
-  -webkit-touch-callout: none;
-}
-
-/* Mobile tap highlights */
-.mobile-tap {
-  -webkit-tap-highlight-color: rgba(0, 0, 0, 0.1);
-}
-
-/* Mobile viewport fixes */
-@supports (height: 100dvh) {
-  .mobile-container {
-    min-height: 100dvh;
+/* Mobile-specific styles - remaining rules */
+@media (max-width: 768px) {
+  /* Fullscreen components like SoulNet */
+  .fixed.inset-0.z-\[9999\] {
+    position: fixed;
+    top: var(--calculated-safe-area-top);
+    left: var(--calculated-safe-area-left);
+    right: var(--calculated-safe-area-right);
+    bottom: var(--calculated-safe-area-bottom);
+    width: calc(100vw - var(--calculated-safe-area-left) - var(--calculated-safe-area-right));
+    height: calc(100vh - var(--calculated-safe-area-top) - var(--calculated-safe-area-bottom));
+    z-index: 9998;
+    margin: 0;
+    padding: 0;
+    background-color: hsl(var(--background));
+  }
+  
+  /* Insights page optimizations */
+  .insights-container .grid-cols-1 > div,
+  .insights-container .bg-background,
+  .insights-container .mb-8 > div {
+    width: 100%;
+    max-width: 100%;
+    margin-left: 0;
+    margin-right: 0;
+    border-radius: 10px;
+  }
+  
+  .insights-page-content {
+    padding-left: 0;
+    padding-right: 0;
+    overflow-x: hidden;
+  }
+  
+  .insights-container .max-w-5xl > div {
+    margin-left: 0;
+    margin-right: 0;
+  }
+  
+  .insights-container .mb-8 .bg-background .rounded-xl:not(.fixed) {
+    padding: 0;
+  }
+  
+  /* Year view calendar compact styling */
+  .compact-table-mobile {
+    table-layout: fixed;
+    font-size: 10px;
+  }
+  
+  .compact-table-mobile th,
+  .compact-table-mobile td {
+    padding: 1px;
+  }
+  
+  .compact-table-mobile div.rounded-full {
+    width: 12px;
+    height: 12px;
+    margin: 1px auto;
   }
 }
 
-/* Debug helper for mobile development */
-.debug-mobile-bounds {
-  border: 2px solid red !important;
-  background: rgba(255, 0, 0, 0.1) !important;
+/* Prevent horizontal scrolling at the root level */
+html, body {
+  overflow-x: hidden;
+  width: 100%;
+  position: relative;
 }
 
-.debug-mobile-keyboard {
-  border: 2px solid blue !important;
-  background: rgba(0, 0, 255, 0.1) !important;
+#root {
+  padding-left: 0;
+  padding-right: 0;
+  max-width: 100%;
+  overflow-x: hidden;
+}
+
+/* Desktop year view - larger dots */
+@media (min-width: 769px) {
+  .compact-year-view div.rounded-full {
+    width: 16px;
+    height: 16px;
+  }
+}
+
+/* Enhanced notch and cutout handling for modern devices */
+@supports (padding: max(0px)) {
+  @media (max-width: 768px) {
+    .smart-chat-container,
+    .journal-container,
+    .insights-container,
+    .settings-container {
+      padding-top: max(var(--status-bar-height), var(--calculated-safe-area-top));
+      padding-bottom: max(var(--nav-bar-height), calc(var(--calculated-safe-area-bottom) + var(--nav-bar-height)));
+    }
+    
+    /* When keyboard is visible, adjust container padding */
+    .keyboard-visible .smart-chat-container,
+    .keyboard-visible .journal-container,
+    .keyboard-visible .insights-container,
+    .keyboard-visible .settings-container {
+      padding-bottom: var(--calculated-safe-area-bottom);
+    }
+  }
 }
