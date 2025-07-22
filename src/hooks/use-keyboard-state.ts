@@ -36,7 +36,7 @@ export const useKeyboardState = () => {
     document.body.classList.toggle('keyboard-visible', isVisible);
     document.documentElement.style.setProperty('--keyboard-height', `${height}px`);
     
-    // Update specific components with class toggles
+    // FIXED: Update ALL matching elements, not just the first one
     const elementsToUpdate = [
       '.mobile-navigation',
       '.mobile-chat-interface',
@@ -45,10 +45,31 @@ export const useKeyboardState = () => {
     ];
     
     elementsToUpdate.forEach(selector => {
-      const element = document.querySelector(selector);
-      if (element) {
+      const elements = document.querySelectorAll(selector); // Changed from querySelector
+      console.log(`[KeyboardState] Found ${elements.length} elements for selector: ${selector}`);
+      
+      elements.forEach((element, index) => {
         element.classList.toggle('keyboard-visible', isVisible);
-      }
+        console.log(`[KeyboardState] Updated element ${index + 1}/${elements.length} for ${selector}`);
+      });
+    });
+    
+    // Apply platform-specific classes to all navigation elements
+    const navElements = document.querySelectorAll('.mobile-navigation');
+    const inputElements = document.querySelectorAll('.mobile-chat-input-container');
+    
+    // Get platform info from body classes
+    const isAndroid = document.body.classList.contains('platform-android');
+    const isIOS = document.body.classList.contains('platform-ios');
+    
+    navElements.forEach(nav => {
+      nav.classList.toggle('platform-android', isAndroid);
+      nav.classList.toggle('platform-ios', isIOS);
+    });
+    
+    inputElements.forEach(input => {
+      input.classList.toggle('platform-android', isAndroid);
+      input.classList.toggle('platform-ios', isIOS);
     });
     
     // Dispatch custom events for components that need to react
@@ -56,6 +77,8 @@ export const useKeyboardState = () => {
     window.dispatchEvent(new CustomEvent(eventName, { 
       detail: { height, isVisible } 
     }));
+    
+    console.log(`[KeyboardState] Dispatched ${eventName} event with height: ${height}`);
   }, []);
 
   return {

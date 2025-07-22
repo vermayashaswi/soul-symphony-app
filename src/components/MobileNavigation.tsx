@@ -52,18 +52,27 @@ const MobileNavigation: React.FC<MobileNavigationProps> = ({ onboardingComplete 
     }
   }, [safeArea, applySafeAreaStyles]);
   
-  // Handle keyboard visibility changes
+  // IMPROVED: Handle keyboard visibility with better coordination
   useEffect(() => {
     if (!navRef.current) return;
     
     const nav = navRef.current;
-    nav.classList.toggle('keyboard-visible', isKeyboardVisible);
     
-    console.log('MobileNavigation: Keyboard state changed:', { 
+    // Prevent race conditions by ensuring only this component manages these classes
+    nav.classList.toggle('keyboard-visible', isKeyboardVisible);
+    nav.classList.toggle(`platform-${platform}`, true);
+    
+    // Add debug attributes for visual debugging
+    nav.setAttribute('data-debug', 'true');
+    nav.setAttribute('data-keyboard-visible', isKeyboardVisible.toString());
+    nav.setAttribute('data-platform', platform);
+    
+    console.log('[MobileNavigation] Keyboard state applied:', { 
       isVisible: isKeyboardVisible, 
       height: keyboardHeight, 
       platform,
-      navHidden: isKeyboardVisible
+      navHidden: isKeyboardVisible,
+      elementClasses: nav.className
     });
   }, [isKeyboardVisible, keyboardHeight, platform]);
   
@@ -84,7 +93,7 @@ const MobileNavigation: React.FC<MobileNavigationProps> = ({ onboardingComplete 
                           !!user &&
                           onboardingComplete !== false;
     
-    console.log('MobileNavigation: Visibility check:', { 
+    console.log('[MobileNavigation] Visibility check:', { 
       shouldShowNav, 
       isMobile: isMobile.isMobile, 
       isNativeApp: isNativeApp(),
@@ -126,8 +135,8 @@ const MobileNavigation: React.FC<MobileNavigationProps> = ({ onboardingComplete 
         "mobile-navigation",
         isTutorialActive && "opacity-30 pointer-events-none",
         isAndroid && "platform-android",
-        platform === 'ios' && "platform-ios",
-        isKeyboardVisible && "keyboard-visible"
+        platform === 'ios' && "platform-ios"
+        // Note: keyboard-visible class is managed by useKeyboardDetection hook
       )}
       initial={{ y: 100 }}
       animate={{ y: 0 }}

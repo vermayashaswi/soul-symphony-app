@@ -79,22 +79,30 @@ export default function MobileChatInput({
     }
   }, [isKeyboardVisible, keyboardHeight, platform, isNative, isReady]);
 
-  // Apply container classes based on keyboard state
+  // IMPROVED: Apply container classes with better coordination
   useEffect(() => {
     if (!inputContainerRef.current || !isReady) return;
     
     const container = inputContainerRef.current;
     
-    // Apply appropriate classes for keyboard state and platform
+    // Apply keyboard state and platform classes (let the hook manage these)
+    // These classes are managed by useKeyboardState hook, but we ensure they're present
     container.classList.toggle('keyboard-visible', isKeyboardVisible);
     container.classList.toggle(`platform-${platform}`, true);
+    
+    // Add debug attributes for visual debugging
+    container.setAttribute('data-debug', 'true');
+    container.setAttribute('data-keyboard-visible', isKeyboardVisible.toString());
+    container.setAttribute('data-platform', platform);
+    container.setAttribute('data-keyboard-height', keyboardHeight.toString());
     
     console.log('[MobileChatInput] Updated container classes:', {
       keyboardVisible: isKeyboardVisible,
       platform,
+      height: keyboardHeight,
       classes: container.className
     });
-  }, [isKeyboardVisible, platform, isReady]);
+  }, [isKeyboardVisible, platform, keyboardHeight, isReady]);
 
   if (isInChatTutorialStep) {
     return null;
@@ -156,9 +164,7 @@ export default function MobileChatInput({
       className={cn(
         "mobile-chat-input-container",
         "flex items-center gap-3",
-        isKeyboardVisible && 'keyboard-visible',
-        platform === 'android' && 'platform-android',
-        platform === 'ios' && 'platform-ios',
+        // Note: keyboard-visible and platform classes are managed by useKeyboardState hook
         !isReady && 'opacity-0'
       )}
     >
