@@ -2,41 +2,33 @@
 /* Mobile Navigation Specific Styles */
 :root {
   --keyboard-height: 0px;
-  --nav-bar-height: 3.6rem;
+  --nav-bar-height: 4rem;
 }
 
+/* Mobile Navigation Base */
 .mobile-navigation {
   position: fixed;
   bottom: 0;
   left: 0;
   right: 0;
   z-index: 9999;
-  
-  /* Dynamic bottom positioning based on safe area and keyboard state */
-  bottom: var(--calculated-safe-area-bottom, env(safe-area-inset-bottom, 0px));
-  
-  /* Fixed height navigation */
   height: var(--nav-bar-height);
-  
-  /* Ensure proper background coverage */
   background-color: hsl(var(--background));
   border-top: 1px solid hsl(var(--border));
-  
-  /* Force GPU acceleration for better rendering */
   transform: translateZ(0);
   will-change: transform;
-  
-  /* Smooth transitions */
   transition: transform 0.2s ease-in-out;
+  
+  /* Default positioning with safe area */
+  padding-bottom: var(--calculated-safe-area-bottom, env(safe-area-inset-bottom, 0px));
 }
 
-/* ANDROID FIX: Platform-specific adjustments */
+/* Platform-specific navigation adjustments */
 .platform-android .mobile-navigation {
-  /* Ensure minimum bottom spacing on Android */
-  bottom: max(var(--calculated-safe-area-bottom, 0px), 8px);
+  padding-bottom: max(var(--calculated-safe-area-bottom, 0px), 12px);
 }
 
-/* Navigation content positioning */
+/* Navigation content */
 .mobile-navigation-content {
   height: var(--nav-bar-height);
   display: flex;
@@ -47,104 +39,82 @@
   z-index: 1;
 }
 
-/* Chat input positioning - COMPLETELY REWRITTEN */
+/* Chat Interface Container */
+.mobile-chat-interface {
+  position: relative;
+  height: 100vh;
+  height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* Chat Content Area */
+.mobile-chat-content {
+  flex: 1;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  padding: 0.5rem;
+  /* Space for input + navigation */
+  padding-bottom: calc(80px + var(--nav-bar-height) + var(--calculated-safe-area-bottom, 0px));
+}
+
+/* Chat Input Container */
 .mobile-chat-input-container {
   position: fixed;
   left: 0;
   right: 0;
   z-index: 9998;
-  
-  /* Default position: above navigation with safe area */
-  bottom: calc(var(--nav-bar-height) + var(--calculated-safe-area-bottom, env(safe-area-inset-bottom, 0px)));
-  
-  /* Smooth transitions for position changes */
-  transition: bottom 0.2s ease-in-out;
-  
-  /* Ensure proper background and styling */
   background-color: hsl(var(--background));
   border-top: 1px solid hsl(var(--border));
   box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.1);
+  padding: 0.75rem;
+  
+  /* Position above navigation with safe area */
+  bottom: calc(var(--nav-bar-height) + var(--calculated-safe-area-bottom, env(safe-area-inset-bottom, 0px)));
+  
+  transition: bottom 0.2s ease-in-out;
 }
 
-/* ANDROID FIX: Platform-specific chat input adjustment */
+/* Platform-specific input positioning */
 .platform-android .mobile-chat-input-container {
-  bottom: calc(var(--nav-bar-height) + max(var(--calculated-safe-area-bottom, 0px), 8px));
+  bottom: calc(var(--nav-bar-height) + max(var(--calculated-safe-area-bottom, 0px), 12px));
 }
 
-/* KEYBOARD VISIBLE STATES - The critical fix */
+/* KEYBOARD VISIBLE STATES */
+body.keyboard-visible .mobile-navigation,
+.keyboard-visible .mobile-navigation {
+  /* Hide navigation completely when keyboard is visible */
+  transform: translateY(100%);
+  transition: transform 0.15s ease-in-out;
+}
+
 body.keyboard-visible .mobile-chat-input-container,
 .keyboard-visible .mobile-chat-input-container {
-  /* When keyboard is visible, position directly above keyboard with NO gap */
+  /* Position input directly above keyboard */
   bottom: 0px !important;
-  /* Remove transition for immediate positioning */
   transition: none !important;
 }
 
 /* Platform-specific keyboard adjustments */
-.platform-android.keyboard-visible .mobile-chat-input-container,
-body.platform-android.keyboard-visible .mobile-chat-input-container {
-  /* Android: stick directly to keyboard, no safe area */
-  bottom: 0px !important;
-}
-
 .platform-ios.keyboard-visible .mobile-chat-input-container,
 body.platform-ios.keyboard-visible .mobile-chat-input-container {
-  /* iOS: account for safe area even with keyboard */
   bottom: var(--calculated-safe-area-bottom, env(safe-area-inset-bottom, 0px)) !important;
 }
 
-/* NAVIGATION HIDING - Complete hiding when keyboard is visible */
-body.keyboard-visible .mobile-navigation,
-.keyboard-visible .mobile-navigation {
-  /* Hide navigation completely by moving it below viewport */
-  transform: translateY(calc(100% + var(--calculated-safe-area-bottom, env(safe-area-inset-bottom, 0px)))) !important;
-  /* Remove transition delay for immediate hiding */
-  transition: transform 0.1s ease-in-out !important;
+.platform-android.keyboard-visible .mobile-chat-input-container,
+body.platform-android.keyboard-visible .mobile-chat-input-container {
+  bottom: 0px !important;
 }
 
-/* Ensure navigation is visible when keyboard is not active */
-.mobile-navigation:not(.keyboard-visible) {
-  transform: translateY(0);
-}
-
-/* Chat content adjustments */
-.mobile-chat-content {
-  /* Default bottom padding to account for input + navigation */
-  padding-bottom: calc(var(--nav-bar-height) + 80px) !important;
-  /* Ensure smooth scrolling */
-  overflow-y: auto;
-  -webkit-overflow-scrolling: touch;
-}
-
+/* Keyboard visible content adjustments */
 body.keyboard-visible .mobile-chat-content,
 .keyboard-visible .mobile-chat-content {
-  /* When keyboard is visible, reduce padding since navigation is hidden */
+  /* Reduce padding when keyboard is visible and navigation is hidden */
   padding-bottom: 80px !important;
 }
 
-/* Additional mobile chat interface improvements */
-.mobile-chat-interface {
-  position: relative;
-  height: 100vh;
-  display: flex;
-  flex-direction: column;
-}
-
-.mobile-chat-interface.keyboard-visible {
-  /* Adjust interface when keyboard is visible */
-  height: 100vh;
-}
-
-/* Ensure no horizontal overflow */
-.mobile-navigation,
-.mobile-navigation *,
-.mobile-chat-input-container,
-.mobile-chat-input-container * {
-  max-width: 100%;
-  box-sizing: border-box;
-}
-
-/* Enhanced scrolling behavior for mobile chat */
+/* Enhanced scrolling */
 .mobile-chat-content::-webkit-scrollbar {
   display: none;
 }
@@ -154,7 +124,7 @@ body.keyboard-visible .mobile-chat-content,
   scrollbar-width: none;
 }
 
-/* Improved touch targets for mobile */
+/* Touch targets */
 .mobile-chat-input-container button {
   min-height: 44px;
   min-width: 44px;
@@ -164,55 +134,18 @@ body.keyboard-visible .mobile-chat-content,
   min-height: 44px;
 }
 
-/* Safe area inset handling for various devices */
-@supports (padding: max(0px)) {
-  .mobile-navigation {
-    padding-bottom: max(var(--calculated-safe-area-bottom, 0px), env(safe-area-inset-bottom, 0px));
-  }
-  
-  .mobile-chat-input-container {
-    padding-bottom: max(var(--calculated-safe-area-bottom, 0px), env(safe-area-inset-bottom, 0px));
+/* Viewport fixes */
+@supports (height: 100dvh) {
+  .mobile-chat-interface {
+    height: 100dvh;
   }
 }
 
-/* Viewport height fixes for mobile browsers */
-.mobile-chat-interface {
-  height: 100vh;
-  height: 100dvh; /* Dynamic viewport height where supported */
-}
-
-/* Enhanced debug styles for development */
-.mobile-navigation.debug {
-  border: 2px solid red;
-  background-color: rgba(255, 0, 0, 0.1);
-}
-
-.mobile-navigation.debug::before {
-  content: "KB:" var(--keyboard-height) " SA:" attr(data-safe-area-bottom);
-  position: absolute;
-  top: -25px;
-  left: 0;
-  background: red;
-  color: white;
-  font-size: 10px;
-  padding: 2px 4px;
-  z-index: 10000;
-  white-space: nowrap;
-}
-
-/* Input container debug */
-.mobile-chat-input-container.debug {
-  border: 2px solid blue;
-}
-
-.mobile-chat-input-container.debug::before {
-  content: "Input - KB:" var(--keyboard-height);
-  position: absolute;
-  top: -20px;
-  left: 0;
-  background: blue;
-  color: white;
-  font-size: 10px;
-  padding: 2px 4px;
-  z-index: 10000;
+/* Prevent horizontal overflow */
+.mobile-navigation,
+.mobile-navigation *,
+.mobile-chat-input-container,
+.mobile-chat-input-container * {
+  max-width: 100%;
+  box-sizing: border-box;
 }

@@ -30,7 +30,7 @@ const config: CapacitorConfig = {
       splashScreenDelay: 2000
     },
     Keyboard: {
-      resize: "body",
+      resize: "ionic",
       style: "dark",
       resizeOnFullScreen: true
     },
@@ -49,13 +49,13 @@ const config: CapacitorConfig = {
     }
   },
   ios: {
-    contentInset: "never", // FIXED: Changed from "always" to "never" to prevent extra spacing
+    contentInset: "never",
     allowsLinkPreview: false,
     scrollEnabled: true,
     backgroundColor: "#FFFFFF",
     scheme: "Soulo",
     preferredContentMode: "mobile",
-    handleApplicationURL: true // Enable proper URL handling
+    handleApplicationURL: true
   },
   android: {
     allowMixedContent: false,
@@ -70,7 +70,6 @@ const config: CapacitorConfig = {
     androidScheme: "https",
     loadOnMainThread: true,
     handlePermissions: true,
-    // Android-specific safe area handling
     allowNavigationBarColorChange: true,
     navigationBarColor: "#FFFFFF"
   }
