@@ -43,34 +43,44 @@ const Index = () => {
         return;
       }
 
-      // Redirect based on user status
+      // Redirect based on user status with improved onboarding check
       if (!user) {
         console.log('[Index] No user in native app, redirecting to onboarding');
         navigate('/app/onboarding', { replace: true });
-      } else if (!onboardingComplete) {
-        console.log('[Index] Onboarding not complete in native app, redirecting to onboarding');
-        navigate('/app/onboarding', { replace: true });
       } else {
-        console.log('[Index] Native app user ready, redirecting to home');
-        navigate('/app/home', { replace: true });
+        // Check both localStorage and database for onboarding status
+        checkOnboardingStatus().then((isComplete) => {
+          if (!isComplete) {
+            console.log('[Index] Onboarding not complete in native app, redirecting to onboarding');
+            navigate('/app/onboarding', { replace: true });
+          } else {
+            console.log('[Index] Native app user ready, redirecting to home');
+            navigate('/app/home', { replace: true });
+          }
+        }).catch(() => {
+          // Fallback to onboarding if check fails
+          navigate('/app/onboarding', { replace: true });
+        });
       }
       return;
     }
-  }, [isNative, user, onboardingComplete, navigate, urlParams]);
+  }, [isNative, user, navigate, urlParams, checkOnboardingStatus]);
 
-  // Enhanced tutorial status checking for proper navigation flow
+  // Enhanced tutorial status checking for proper navigation flow - ONLY for web users
   useEffect(() => {
+    if (isNative) return; // Skip for native apps
+
     const handleTutorialNavigation = async () => {
       if (!user) return;
       
       try {
         console.log('[Index] Checking user status for tutorial navigation, user:', user.id);
         
-        // First ensure onboarding status is checked
-        await checkOnboardingStatus();
+        // First ensure onboarding status is checked from authoritative source
+        const isOnboardingComplete = await checkOnboardingStatus();
         
         // Check if user has completed onboarding
-        if (onboardingComplete) {
+        if (isOnboardingComplete) {
           console.log('[Index] User completed onboarding, checking tutorial status');
           
           // Check tutorial completion status
@@ -119,21 +129,25 @@ const Index = () => {
     };
     
     handleTutorialNavigation();
-  }, [user, checkOnboardingStatus, onboardingComplete]);
+  }, [user, checkOnboardingStatus, isNative]);
 
-  // Handle explicit app redirects only
+  // Handle explicit app redirects only - ONLY for web users
   useEffect(() => {
+    if (isNative) return; // Skip for native apps
+
     // Only redirect to app if explicitly requested with a URL parameter
     if (urlParams.has('app')) {
       console.log('[Index] User explicitly requested app with ?app parameter');
       
       if (user) {
         console.log('[Index] User is logged in, redirecting to appropriate app page');
-        if (onboardingComplete) {
-          navigate('/app/home');
-        } else {
-          navigate('/app/onboarding');
-        }
+        checkOnboardingStatus().then((isComplete) => {
+          if (isComplete) {
+            navigate('/app/home');
+          } else {
+            navigate('/app/onboarding');
+          }
+        });
       } else {
         navigate('/app/auth');
       }
@@ -143,7 +157,7 @@ const Index = () => {
     if (urlParams.has('insights')) {
       navigate('/app/insights');
     }
-  }, [user, navigate, urlParams, onboardingComplete]);
+  }, [user, navigate, urlParams, checkOnboardingStatus, isNative]);
 
   useEffect(() => {
     // Pre-translate common strings used on the index page

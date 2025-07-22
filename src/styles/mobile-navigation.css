@@ -3,6 +3,7 @@
 :root {
   --keyboard-height: 0px;
   --nav-bar-height: 4rem;
+  --chat-input-height: 72px;
 }
 
 /* Mobile Navigation Base */
@@ -55,11 +56,12 @@
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
   padding: 0.5rem;
-  /* Space for input + navigation */
-  padding-bottom: calc(80px + var(--nav-bar-height) + var(--calculated-safe-area-bottom, 0px));
+  /* Dynamic padding based on navigation and input visibility */
+  padding-bottom: calc(var(--chat-input-height) + var(--nav-bar-height) + var(--calculated-safe-area-bottom, 0px));
+  transition: padding-bottom 0.2s ease-in-out;
 }
 
-/* Chat Input Container */
+/* Chat Input Container - Fixed positioning above navigation */
 .mobile-chat-input-container {
   position: fixed;
   left: 0;
@@ -69,8 +71,10 @@
   border-top: 1px solid hsl(var(--border));
   box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.1);
   padding: 0.75rem;
+  height: var(--chat-input-height);
+  box-sizing: border-box;
   
-  /* Position above navigation with safe area */
+  /* Position directly above navigation */
   bottom: calc(var(--nav-bar-height) + var(--calculated-safe-area-bottom, env(safe-area-inset-bottom, 0px)));
   
   transition: bottom 0.2s ease-in-out;
@@ -81,14 +85,14 @@
   bottom: calc(var(--nav-bar-height) + max(var(--calculated-safe-area-bottom, 0px), 12px));
 }
 
-/* KEYBOARD VISIBLE STATES */
+/* KEYBOARD VISIBLE STATES - Hide navigation completely */
 body.keyboard-visible .mobile-navigation,
 .keyboard-visible .mobile-navigation {
-  /* Hide navigation completely when keyboard is visible */
   transform: translateY(100%);
   transition: transform 0.15s ease-in-out;
 }
 
+/* KEYBOARD VISIBLE - Input positioning */
 body.keyboard-visible .mobile-chat-input-container,
 .keyboard-visible .mobile-chat-input-container {
   /* Position input directly above keyboard */
@@ -107,11 +111,12 @@ body.platform-android.keyboard-visible .mobile-chat-input-container {
   bottom: 0px !important;
 }
 
-/* Keyboard visible content adjustments */
+/* KEYBOARD VISIBLE - Content adjustments */
 body.keyboard-visible .mobile-chat-content,
 .keyboard-visible .mobile-chat-content {
-  /* Reduce padding when keyboard is visible and navigation is hidden */
-  padding-bottom: 80px !important;
+  /* Only account for input when keyboard is visible */
+  padding-bottom: var(--chat-input-height) !important;
+  transition: padding-bottom 0.2s ease-in-out;
 }
 
 /* Enhanced scrolling */
@@ -124,7 +129,7 @@ body.keyboard-visible .mobile-chat-content,
   scrollbar-width: none;
 }
 
-/* Touch targets */
+/* Touch targets - Ensure minimum sizes for mobile */
 .mobile-chat-input-container button {
   min-height: 44px;
   min-width: 44px;
@@ -148,4 +153,13 @@ body.keyboard-visible .mobile-chat-content,
 .mobile-chat-input-container * {
   max-width: 100%;
   box-sizing: border-box;
+}
+
+/* Debug helpers - remove in production */
+.debug-mobile .mobile-chat-input-container {
+  border: 2px solid red !important;
+}
+
+.debug-mobile .mobile-navigation {
+  border: 2px solid blue !important;
 }
