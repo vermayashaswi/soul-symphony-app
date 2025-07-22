@@ -132,7 +132,8 @@ export const useKeyboardDetection = () => {
     const handleFocus = (e: FocusEvent) => {
       const target = e.target as HTMLElement;
       if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA')) {
-        console.log('[KeyboardDetection] Input focused:', target.tagName, target.type);
+        const inputType = target.tagName === 'INPUT' ? (target as HTMLInputElement).type : 'textarea';
+        console.log('[KeyboardDetection] Input focused:', target.tagName, inputType);
         // More aggressive detection on focus for mobile devices
         setTimeout(handleKeyboardDetection, platform === 'ios' ? 300 : 200);
       }
