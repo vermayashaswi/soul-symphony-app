@@ -12,6 +12,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useTranslation } from '@/contexts/TranslationContext';
 import { useSubscription } from '@/contexts/SubscriptionContext';
 import { useSafeArea } from '@/hooks/use-safe-area';
+import { useKeyboardDetection } from '@/hooks/use-keyboard-detection';
 
 interface MobileNavigationProps {
   onboardingComplete: boolean | null;
@@ -21,14 +22,16 @@ const MobileNavigation: React.FC<MobileNavigationProps> = ({ onboardingComplete 
   const location = useLocation();
   const isMobile = useIsMobile();
   const [isVisible, setIsVisible] = useState(false);
-  const [isKeyboardVisible, setIsKeyboardVisible] = useState(false);
   const { isActive: isTutorialActive } = useTutorial();
   const { user } = useAuth();
   const { currentLanguage } = useTranslation();
   const { hasActiveSubscription, isTrialActive } = useSubscription();
   const { safeArea, isNative, isAndroid, applySafeAreaStyles } = useSafeArea();
-  const navRef = useRef<HTMLDivElement>(null);
   
+  // Use the new keyboard detection hook
+  const { isKeyboardVisible, keyboardHeight, platform } = useKeyboardDetection();
+  
+  const navRef = useRef<HTMLDivElement>(null);
   const [renderKey, setRenderKey] = useState(0);
   
   // Handle language changes
@@ -50,49 +53,14 @@ const MobileNavigation: React.FC<MobileNavigationProps> = ({ onboardingComplete 
     }
   }, [safeArea, applySafeAreaStyles]);
   
-  // Keyboard detection
+  // Handle keyboard state changes
   useEffect(() => {
-    const handleKeyboardDetection = () => {
-      if (window.visualViewport) {
-        const heightDifference = window.innerHeight - window.visualViewport.height;
-        const isKeyboard = heightDifference > 150; // More reliable threshold
-        
-        if (isKeyboard !== isKeyboardVisible) {
-          setIsKeyboardVisible(isKeyboard);
-          console.log('MobileNavigation: Keyboard visibility changed:', isKeyboard);
-          
-          // Dispatch events for other components
-          const eventName = isKeyboard ? 'keyboardOpen' : 'keyboardClose';
-          window.dispatchEvent(new Event(eventName));
-        }
-      }
-    };
-    
-    // Initial check
-    handleKeyboardDetection();
-    
-    // Set up listeners
-    if (window.visualViewport) {
-      window.visualViewport.addEventListener('resize', handleKeyboardDetection);
-    }
-    window.addEventListener('resize', handleKeyboardDetection);
-    
-    // Custom event listeners
-    const handleKeyboardOpen = () => setIsKeyboardVisible(true);
-    const handleKeyboardClose = () => setIsKeyboardVisible(false);
-    
-    window.addEventListener('keyboardOpen', handleKeyboardOpen);
-    window.addEventListener('keyboardClose', handleKeyboardClose);
-    
-    return () => {
-      if (window.visualViewport) {
-        window.visualViewport.removeEventListener('resize', handleKeyboardDetection);
-      }
-      window.removeEventListener('resize', handleKeyboardDetection);
-      window.removeEventListener('keyboardOpen', handleKeyboardOpen);
-      window.removeEventListener('keyboardClose', handleKeyboardClose);
-    };
-  }, [isKeyboardVisible]);
+    console.log('MobileNavigation: Keyboard state changed:', { 
+      isVisible: isKeyboardVisible, 
+      height: keyboardHeight, 
+      platform 
+    });
+  }, [isKeyboardVisible, keyboardHeight, platform]);
   
   // Visibility logic
   useEffect(() => {
@@ -145,7 +113,13 @@ const MobileNavigation: React.FC<MobileNavigationProps> = ({ onboardingComplete 
   
   const isPremiumFeatureAccessible = hasActiveSubscription || isTrialActive;
   
-  console.log('MobileNavigation: Rendering with:', { safeArea, isAndroid, isKeyboardVisible });
+  console.log('MobileNavigation: Rendering with keyboard state:', { 
+    safeArea, 
+    isAndroid, 
+    isKeyboardVisible, 
+    keyboardHeight, 
+    platform 
+  });
   
   return (
     <motion.div 
@@ -155,6 +129,7 @@ const MobileNavigation: React.FC<MobileNavigationProps> = ({ onboardingComplete 
         "mobile-navigation",
         isTutorialActive && "opacity-30 pointer-events-none",
         isAndroid && "platform-android",
+        platform === 'ios' && "platform-ios",
         isKeyboardVisible && "keyboard-visible"
       )}
       initial={{ y: 100 }}

@@ -8,6 +8,7 @@ import { useTutorial } from "@/contexts/TutorialContext";
 import { useTranslation } from "@/contexts/TranslationContext";
 import { cn } from "@/lib/utils";
 import { useSafeArea } from "@/hooks/use-safe-area";
+import { useKeyboardDetection } from "@/hooks/use-keyboard-detection";
 
 interface MobileChatInputProps {
   onSendMessage: (message: string, isAudio?: boolean) => void;
@@ -23,13 +24,15 @@ export default function MobileChatInput({
   const [inputValue, setInputValue] = useState("");
   const [placeholderText, setPlaceholderText] = useState("Type your message...");
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [isKeyboardVisible, setIsKeyboardVisible] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const inputContainerRef = useRef<HTMLDivElement>(null);
   const chatDebug = useDebugLog();
   const { isActive, isInStep } = useTutorial();
   const { translate, currentLanguage } = useTranslation();
   const { applySafeAreaStyles } = useSafeArea();
+  
+  // Use the new keyboard detection hook
+  const { isKeyboardVisible, keyboardHeight, platform, isNative } = useKeyboardDetection();
   
   // Check if we're in step 5 (chat question step)
   const isInChatTutorialStep = isActive && isInStep(5);
@@ -60,78 +63,46 @@ export default function MobileChatInput({
     }
   }, [applySafeAreaStyles]);
 
-  // Enhanced keyboard detection
+  // Handle keyboard state changes and update CSS classes
   useEffect(() => {
-    if (isInChatTutorialStep) return;
-
-    const handleKeyboardDetection = () => {
-      if (window.visualViewport) {
-        const heightDifference = window.innerHeight - window.visualViewport.height;
-        const isKeyboard = heightDifference > 150;
-        
-        if (isKeyboard !== isKeyboardVisible) {
-          setIsKeyboardVisible(isKeyboard);
-          console.log('MobileChatInput: Keyboard visibility changed:', isKeyboard);
-          
-          // Dispatch events to notify other components
-          const eventName = isKeyboard ? 'keyboardOpen' : 'keyboardClose';
-          window.dispatchEvent(new Event(eventName));
-          
-          // Update body classes for CSS targeting
-          document.body.classList.toggle('keyboard-visible', isKeyboard);
-          document.querySelector('.mobile-chat-interface')?.classList.toggle('keyboard-visible', isKeyboard);
-          
-          if (!isKeyboard) {
-            // When keyboard closes, ensure we're scrolled to the bottom
-            setTimeout(() => {
-              window.scrollTo({
-                top: document.body.scrollHeight,
-                behavior: 'smooth'
-              });
-            }, 100);
-          }
-        }
-      }
-    };
-
-    // Initial check and setup listeners
-    handleKeyboardDetection();
+    console.log('[MobileChatInput] Keyboard state changed:', { 
+      isVisible: isKeyboardVisible, 
+      height: keyboardHeight, 
+      platform, 
+      isNative 
+    });
     
-    if (window.visualViewport) {
-      window.visualViewport.addEventListener('resize', handleKeyboardDetection);
+    // Update CSS classes for styling
+    const chatInterface = document.querySelector('.mobile-chat-interface');
+    if (chatInterface) {
+      chatInterface.classList.toggle('keyboard-visible', isKeyboardVisible);
     }
-    window.addEventListener('resize', handleKeyboardDetection);
     
-    // Focus event handling
-    const handleFocus = () => {
-      document.body.classList.add('keyboard-visible');
-      document.querySelector('.mobile-chat-interface')?.classList.add('keyboard-visible');
-      
+    // Apply platform-specific classes
+    document.body.classList.toggle('keyboard-visible', isKeyboardVisible);
+    document.body.classList.toggle(`platform-${platform}`, true);
+    
+    if (isKeyboardVisible) {
+      // When keyboard opens, ensure input stays focused and scroll to bottom
       setTimeout(() => {
         if (inputRef.current) {
-          inputRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          // Scroll the chat content to bottom
+          const chatContent = document.querySelector('.mobile-chat-content');
+          if (chatContent) {
+            chatContent.scrollTop = chatContent.scrollHeight;
+          }
         }
-      }, 300);
-    };
-    
-    const inputElement = inputRef.current;
-    if (inputElement) {
-      inputElement.addEventListener('focus', handleFocus);
+      }, 100);
+    } else {
+      // When keyboard closes, scroll to bottom to show latest messages
+      setTimeout(() => {
+        window.scrollTo({
+          top: document.body.scrollHeight,
+          behavior: 'smooth'
+        });
+      }, 100);
     }
-    
-    return () => {
-      if (window.visualViewport) {
-        window.visualViewport.removeEventListener('resize', handleKeyboardDetection);
-      }
-      window.removeEventListener('resize', handleKeyboardDetection);
-      
-      if (inputElement) {
-        inputElement.removeEventListener('focus', handleFocus);
-      }
-      
-      document.body.classList.remove('keyboard-visible');
-    };
-  }, [isKeyboardVisible, isInChatTutorialStep]);
+  }, [isKeyboardVisible, keyboardHeight, platform, isNative]);
 
   // If we're in step 5 of the tutorial, don't render anything at all
   if (isInChatTutorialStep) {
@@ -183,10 +154,11 @@ export default function MobileChatInput({
       className={cn(
         "mobile-chat-input-container",
         "p-2 border-t border-border flex items-center gap-2 bg-background",
-        isKeyboardVisible && 'keyboard-visible'
+        isKeyboardVisible && 'keyboard-visible',
+        platform === 'android' && 'platform-android',
+        platform === 'ios' && 'platform-ios'
       )}
       style={{
-        transition: 'all 0.2s ease',
         boxShadow: '0 -2px 8px rgba(0, 0, 0, 0.1)',
       }}
     >
@@ -220,4 +192,4 @@ export default function MobileChatInput({
       </div>
     </div>
   );
-};
+}
