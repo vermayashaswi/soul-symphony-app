@@ -5,8 +5,6 @@ import { cva, type VariantProps } from "class-variance-authority"
 import { cn } from "@/lib/utils"
 import { useSwipeGesture } from "@/hooks/use-swipe-gesture"
 import { X } from "lucide-react"
-import { useTheme } from "@/hooks/use-theme"
-
 const ToastProvider = ToastPrimitives.Provider
 
 const ToastViewport = React.forwardRef<
@@ -47,23 +45,6 @@ const Toast = React.forwardRef<
 >(({ className, variant, ...props }, ref) => {
   const toastRef = React.useRef<React.ElementRef<typeof ToastPrimitives.Root>>(null);
   const { onOpenChange } = props;
-  
-  // Safely access theme context with fallback
-  let colorTheme = 'blue';
-  let theme = 'light';
-  let systemTheme = 'light';
-  
-  try {
-    const themeContext = useTheme();
-    colorTheme = themeContext.colorTheme;
-    theme = themeContext.theme;
-    systemTheme = themeContext.systemTheme;
-  } catch (error) {
-    // Fallback to default values if theme context isn't available
-    console.warn('Theme context not available in toast, using defaults');
-  }
-  
-  const isDarkMode = theme === 'dark' || (theme === 'system' && systemTheme === 'dark');
   
   useSwipeGesture(toastRef as React.RefObject<HTMLElement>, {
     onSwipeLeft: () => onOpenChange?.(false),

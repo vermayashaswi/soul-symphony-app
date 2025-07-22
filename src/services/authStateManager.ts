@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 import { nativeNavigationService } from './nativeNavigationService';
 import { nativeIntegrationService } from './nativeIntegrationService';
@@ -353,29 +352,15 @@ class AuthStateManager {
         return false;
       }
 
-      // Check database first for authoritative status
-      const { data: profile, error } = await supabase
-        .from('profiles')
-        .select('onboarding_completed')
-        .eq('id', debugInfo.userId)
-        .single();
-
-      let isComplete = false;
-
-      if (error) {
-        this.error('Error checking onboarding status from database:', error);
-        // Fallback to localStorage
-        isComplete = localStorage.getItem('onboardingComplete') === 'true';
-        this.log('Using localStorage onboarding status as fallback:', isComplete);
-      } else {
-        isComplete = profile?.onboarding_completed || false;
-        this.log('Onboarding status from database:', { isComplete, userId: debugInfo.userId });
-        
-        // Sync localStorage with database
-        localStorage.setItem('onboardingComplete', isComplete.toString());
-      }
+      // Use the new synchronizer for reliable status checking
+      const { authStateSynchronizer } = await import('./authStateSynchronizer');
+      const isComplete = await authStateSynchronizer.syncOnboardingStatus(debugInfo.userId!, {
+        forceSync: true
+      });
       
+      this.log('Onboarding status verified:', { isComplete, userId: debugInfo.userId });
       return isComplete;
+      
     } catch (error) {
       this.error('Failed to verify onboarding status:', error);
       return localStorage.getItem('onboardingComplete') === 'true';

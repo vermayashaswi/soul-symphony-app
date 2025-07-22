@@ -1,87 +1,11 @@
 
-import { useState, useEffect, useCallback } from 'react';
-
-interface KeyboardState {
-  isVisible: boolean;
-  height: number;
-  previousHeight: number;
-}
+import { useEffect } from 'react';
+import { usePlatformDetection } from './use-platform-detection';
+import { useKeyboardState } from './use-keyboard-state';
 
 export const useKeyboardDetection = () => {
-  const [keyboardState, setKeyboardState] = useState<KeyboardState>({
-    isVisible: false,
-    height: 0,
-    previousHeight: 0
-  });
-
-  const [isNative, setIsNative] = useState(false);
-  const [platform, setPlatform] = useState<'android' | 'ios' | 'web'>('web');
-  const [isReady, setIsReady] = useState(false);
-
-  // Platform detection - run once on mount
-  useEffect(() => {
-    const userAgent = navigator.userAgent.toLowerCase();
-    const isAndroid = userAgent.includes('android');
-    const isIOS = /iphone|ipad|ipod/.test(userAgent);
-    const nativeApp = window.location.href.includes('capacitor://') || 
-                     window.location.href.includes('ionic://') ||
-                     (window as any).Capacitor?.isNative;
-
-    setIsNative(nativeApp);
-    setPlatform(isAndroid ? 'android' : isIOS ? 'ios' : 'web');
-    
-    // Set platform classes immediately
-    document.body.classList.toggle('platform-android', isAndroid);
-    document.body.classList.toggle('platform-ios', isIOS);
-    document.body.classList.toggle('platform-native', nativeApp);
-    
-    console.log('[KeyboardDetection] Platform detected:', { isAndroid, isIOS, nativeApp });
-    setIsReady(true);
-  }, []);
-
-  const updateKeyboardState = useCallback((isVisible: boolean, height: number = 0) => {
-    setKeyboardState(prev => {
-      if (prev.isVisible === isVisible && prev.height === height) {
-        return prev;
-      }
-      
-      console.log('[KeyboardDetection] State change:', { 
-        from: { visible: prev.isVisible, height: prev.height },
-        to: { visible: isVisible, height }
-      });
-      
-      return {
-        isVisible,
-        height,
-        previousHeight: prev.height
-      };
-    });
-
-    // Update CSS classes and variables
-    document.body.classList.toggle('keyboard-visible', isVisible);
-    document.documentElement.style.setProperty('--keyboard-height', `${height}px`);
-    
-    // Update specific components with class toggles
-    const elementsToUpdate = [
-      '.mobile-navigation',
-      '.mobile-chat-interface',
-      '.mobile-chat-input-container',
-      '.mobile-chat-content'
-    ];
-    
-    elementsToUpdate.forEach(selector => {
-      const element = document.querySelector(selector);
-      if (element) {
-        element.classList.toggle('keyboard-visible', isVisible);
-      }
-    });
-    
-    // Dispatch custom events for components that need to react
-    const eventName = isVisible ? 'keyboardOpen' : 'keyboardClose';
-    window.dispatchEvent(new CustomEvent(eventName, { 
-      detail: { height, platform, isNative } 
-    }));
-  }, [platform, isNative]);
+  const { platform, isNative, isReady } = usePlatformDetection();
+  const { keyboardState, updateKeyboardState } = useKeyboardState();
 
   useEffect(() => {
     if (!isReady) return;

@@ -1,3 +1,4 @@
+
 import React, { useState, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Send, Loader2 } from "lucide-react";
@@ -51,7 +52,7 @@ export default function MobileChatInput({
     translatePlaceholder();
   }, [currentLanguage, translate]);
 
-  // Handle keyboard state changes
+  // Handle keyboard state changes and ensure proper scrolling
   useEffect(() => {
     if (!isReady) return;
     
@@ -78,13 +79,13 @@ export default function MobileChatInput({
     }
   }, [isKeyboardVisible, keyboardHeight, platform, isNative, isReady]);
 
-  // Handle container positioning based on keyboard state
+  // Apply container classes based on keyboard state
   useEffect(() => {
     if (!inputContainerRef.current || !isReady) return;
     
     const container = inputContainerRef.current;
     
-    // Apply appropriate classes for keyboard state
+    // Apply appropriate classes for keyboard state and platform
     container.classList.toggle('keyboard-visible', isKeyboardVisible);
     container.classList.toggle(`platform-${platform}`, true);
     
