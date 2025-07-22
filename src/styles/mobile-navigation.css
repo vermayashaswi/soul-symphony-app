@@ -4,7 +4,6 @@
   --keyboard-height: 0px;
   --nav-bar-height: 4rem;
   --chat-input-height: 72px;
-  --debug-mobile: 0; /* Set to 1 to enable debug mode */
 }
 
 /* Mobile Navigation Base */
@@ -26,7 +25,7 @@
 }
 
 /* Platform-specific navigation adjustments */
-body.platform-android .mobile-navigation {
+.platform-android .mobile-navigation {
   padding-bottom: max(var(--calculated-safe-area-bottom, 0px), 12px);
 }
 
@@ -82,34 +81,33 @@ body.platform-android .mobile-navigation {
 }
 
 /* Platform-specific input positioning */
-body.platform-android .mobile-chat-input-container {
+.platform-android .mobile-chat-input-container {
   bottom: calc(var(--nav-bar-height) + max(var(--calculated-safe-area-bottom, 0px), 12px));
 }
 
 /* KEYBOARD VISIBLE STATES - Hide navigation and reposition input */
-/* Higher specificity to ensure these rules take precedence */
-body.keyboard-visible .mobile-navigation {
+.mobile-navigation.keyboard-visible {
   transform: translateY(100%) !important;
   transition: transform 0.15s ease-in-out !important;
 }
 
-body.keyboard-visible .mobile-chat-input-container {
+.mobile-chat-input-container.keyboard-visible {
   /* Position input at bottom when keyboard is visible */
   bottom: 0px !important;
   transition: none !important;
 }
 
 /* Platform-specific keyboard adjustments for input */
-body.keyboard-visible.platform-ios .mobile-chat-input-container {
+.mobile-chat-input-container.keyboard-visible.platform-ios {
   bottom: var(--calculated-safe-area-bottom, env(safe-area-inset-bottom, 0px)) !important;
 }
 
-body.keyboard-visible.platform-android .mobile-chat-input-container {
+.mobile-chat-input-container.keyboard-visible.platform-android {
   bottom: 0px !important;
 }
 
 /* KEYBOARD VISIBLE - Content adjustments */
-body.keyboard-visible .mobile-chat-content {
+.mobile-chat-content.keyboard-visible {
   /* Only account for input when keyboard is visible */
   padding-bottom: calc(var(--chat-input-height) + 0.5rem) !important;
   transition: padding-bottom 0.2s ease-in-out;
@@ -151,20 +149,11 @@ body.keyboard-visible .mobile-chat-content {
   box-sizing: border-box;
 }
 
-/* Debug helpers - conditional based on CSS variable */
-.mobile-chat-input-container {
-  border: calc(var(--debug-mobile) * 2px) solid red;
+/* Debug helpers - remove in production */
+.debug-mobile .mobile-chat-input-container {
+  border: 2px solid red !important;
 }
 
-.mobile-navigation {
-  border: calc(var(--debug-mobile) * 2px) solid blue;
-}
-
-/* Force visibility states for debugging */
-[data-debug-keyboard="true"] .mobile-navigation {
-  border: 3px solid orange !important;
-}
-
-[data-debug-keyboard="true"] .mobile-chat-input-container {
-  border: 3px solid purple !important;
+.debug-mobile .mobile-navigation {
+  border: 2px solid blue !important;
 }

@@ -52,33 +52,16 @@ export default function MobileChatInput({
     translatePlaceholder();
   }, [currentLanguage, translate]);
 
-  // Enhanced keyboard state handling with better coordination
+  // Handle keyboard state changes and ensure proper scrolling
   useEffect(() => {
-    if (!isReady || !inputContainerRef.current) return;
+    if (!isReady) return;
     
-    const container = inputContainerRef.current;
-    
-    console.log('[MobileChatInput] Keyboard state change:', { 
+    console.log('[MobileChatInput] Keyboard state:', { 
       isVisible: isKeyboardVisible, 
       height: keyboardHeight, 
       platform, 
-      isNative,
-      containerBottom: getComputedStyle(container).bottom
+      isNative 
     });
-    
-    // Apply keyboard state classes and attributes
-    container.classList.toggle('keyboard-visible', isKeyboardVisible);
-    container.setAttribute('data-keyboard-visible', isKeyboardVisible.toString());
-    container.setAttribute('data-keyboard-height', keyboardHeight.toString());
-    
-    // Force immediate positioning for keyboard state
-    if (isKeyboardVisible) {
-      container.style.bottom = platform === 'ios' 
-        ? 'var(--calculated-safe-area-bottom, env(safe-area-inset-bottom, 0px))' 
-        : '0px';
-    } else {
-      container.style.bottom = '';
-    }
     
     // Ensure proper scrolling when keyboard opens
     if (isKeyboardVisible && inputRef.current) {
@@ -88,33 +71,30 @@ export default function MobileChatInput({
           chatContent.scrollTop = chatContent.scrollHeight;
         }
         
-        // Ensure input stays focused and visible
+        // Ensure input stays focused
         if (inputRef.current && document.activeElement !== inputRef.current) {
           inputRef.current.focus();
-          inputRef.current.scrollIntoView({ 
-            behavior: 'smooth', 
-            block: 'nearest' 
-          });
         }
       }, 100);
     }
   }, [isKeyboardVisible, keyboardHeight, platform, isNative, isReady]);
 
-  // Platform-specific class application
+  // Apply container classes based on keyboard state
   useEffect(() => {
     if (!inputContainerRef.current || !isReady) return;
     
     const container = inputContainerRef.current;
     
-    // Apply platform classes
+    // Apply appropriate classes for keyboard state and platform
+    container.classList.toggle('keyboard-visible', isKeyboardVisible);
     container.classList.toggle(`platform-${platform}`, true);
     
-    console.log('[MobileChatInput] Platform classes applied:', {
+    console.log('[MobileChatInput] Updated container classes:', {
+      keyboardVisible: isKeyboardVisible,
       platform,
-      classes: container.className,
-      isReady
+      classes: container.className
     });
-  }, [platform, isReady]);
+  }, [isKeyboardVisible, platform, isReady]);
 
   if (isInChatTutorialStep) {
     return null;
@@ -181,13 +161,6 @@ export default function MobileChatInput({
         platform === 'ios' && 'platform-ios',
         !isReady && 'opacity-0'
       )}
-      style={{
-        // Inline styles for immediate keyboard positioning
-        bottom: isKeyboardVisible 
-          ? (platform === 'ios' ? 'var(--calculated-safe-area-bottom, env(safe-area-inset-bottom, 0px))' : '0px')
-          : undefined,
-        transition: isKeyboardVisible ? 'none' : 'bottom 0.2s ease-in-out'
-      }}
     >
       <div className="flex-1">
         <Input

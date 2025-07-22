@@ -28,7 +28,7 @@ const MobileNavigation: React.FC<MobileNavigationProps> = ({ onboardingComplete 
   const { hasActiveSubscription, isTrialActive } = useSubscription();
   const { safeArea, isNative, isAndroid, applySafeAreaStyles } = useSafeArea();
   
-  const { isKeyboardVisible, keyboardHeight, platform, isReady } = useKeyboardDetection();
+  const { isKeyboardVisible, keyboardHeight, platform } = useKeyboardDetection();
   
   const navRef = useRef<HTMLDivElement>(null);
   const [renderKey, setRenderKey] = useState(0);
@@ -52,36 +52,22 @@ const MobileNavigation: React.FC<MobileNavigationProps> = ({ onboardingComplete 
     }
   }, [safeArea, applySafeAreaStyles]);
   
-  // Enhanced keyboard visibility handling with better coordination
+  // Handle keyboard visibility changes
   useEffect(() => {
-    if (!navRef.current || !isReady) return;
+    if (!navRef.current) return;
     
     const nav = navRef.current;
-    
-    // Apply keyboard state classes
     nav.classList.toggle('keyboard-visible', isKeyboardVisible);
-    nav.setAttribute('data-keyboard-visible', isKeyboardVisible.toString());
-    nav.setAttribute('data-keyboard-height', keyboardHeight.toString());
     
     console.log('MobileNavigation: Keyboard state changed:', { 
       isVisible: isKeyboardVisible, 
       height: keyboardHeight, 
       platform,
-      navElement: nav.className,
-      navTransform: getComputedStyle(nav).transform,
-      navBottom: getComputedStyle(nav).bottom
+      navHidden: isKeyboardVisible
     });
-    
-    // Force a style recalculation to ensure CSS changes are applied
-    if (isKeyboardVisible) {
-      nav.style.transform = 'translateY(100%)';
-    } else {
-      nav.style.transform = '';
-    }
-    
-  }, [isKeyboardVisible, keyboardHeight, platform, isReady]);
+  }, [isKeyboardVisible, keyboardHeight, platform]);
   
-  // Visibility logic - enhanced to work better with keyboard detection
+  // Visibility logic - hide when keyboard is visible or on auth/onboarding pages
   useEffect(() => {
     const onboardingOrAuthPaths = [
       '/app/onboarding',
@@ -93,12 +79,10 @@ const MobileNavigation: React.FC<MobileNavigationProps> = ({ onboardingComplete 
     
     const isOnboardingOrAuth = onboardingOrAuthPaths.includes(location.pathname);
     
-    // Navigation should be visible when all conditions are met AND keyboard is not visible
     const shouldShowNav = (isMobile.isMobile || isNativeApp()) && 
                           !isOnboardingOrAuth &&
                           !!user &&
-                          onboardingComplete !== false &&
-                          isReady; // Wait for keyboard detection to be ready
+                          onboardingComplete !== false;
     
     console.log('MobileNavigation: Visibility check:', { 
       shouldShowNav, 
@@ -109,14 +93,12 @@ const MobileNavigation: React.FC<MobileNavigationProps> = ({ onboardingComplete 
       isOnboardingOrAuth,
       hasUser: !!user,
       onboardingComplete,
-      isReady,
       safeArea
     });
     
     setIsVisible(shouldShowNav);
-  }, [location.pathname, isMobile.isMobile, isKeyboardVisible, isTutorialActive, user, onboardingComplete, currentLanguage, renderKey, safeArea, isReady]);
+  }, [location.pathname, isMobile.isMobile, isKeyboardVisible, isTutorialActive, user, onboardingComplete, currentLanguage, renderKey, safeArea]);
   
-  // Don't render if not visible or onboarding incomplete
   if (!isVisible || onboardingComplete === false) {
     return null;
   }
@@ -148,13 +130,8 @@ const MobileNavigation: React.FC<MobileNavigationProps> = ({ onboardingComplete 
         isKeyboardVisible && "keyboard-visible"
       )}
       initial={{ y: 100 }}
-      animate={{ y: isKeyboardVisible ? 100 : 0 }} // Explicit animation control
-      transition={{ duration: 0.15, ease: "easeInOut" }}
-      style={{
-        // Inline styles for immediate effect during keyboard transitions
-        transform: isKeyboardVisible ? 'translateY(100%)' : 'translateY(0)',
-        transition: 'transform 0.15s ease-in-out'
-      }}
+      animate={{ y: 0 }}
+      transition={{ duration: 0.3 }}
     >
       <div className="mobile-navigation-content">
         {navItems.map((item) => {
