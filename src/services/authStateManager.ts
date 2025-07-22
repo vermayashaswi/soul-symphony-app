@@ -1,3 +1,4 @@
+
 import { supabase } from '@/integrations/supabase/client';
 import { nativeNavigationService } from './nativeNavigationService';
 import { nativeIntegrationService } from './nativeIntegrationService';
@@ -212,7 +213,10 @@ class AuthStateManager {
 
       this.log('Valid session confirmed for auth success', debugInfo);
 
-      const finalPath = this.getFinalRedirectPath(redirectPath);
+      // Enhanced onboarding status check with database verification
+      const onboardingComplete = await this.verifyOnboardingStatus();
+      
+      const finalPath = this.getFinalRedirectPath(redirectPath, onboardingComplete);
       this.log('Final redirect path determined:', finalPath);
 
       localStorage.removeItem('authRedirectTo');
@@ -304,7 +308,7 @@ class AuthStateManager {
     this.queueNavigation('/app/auth');
   }
 
-  private getFinalRedirectPath(providedPath?: string): string {
+  private getFinalRedirectPath(providedPath?: string, onboardingComplete?: boolean): string {
     if (providedPath && providedPath !== '/app/auth') {
       this.log('Using provided redirect path:', providedPath);
       return providedPath;
@@ -316,8 +320,12 @@ class AuthStateManager {
       return storedRedirect;
     }
 
-    const onboardingComplete = localStorage.getItem('onboardingComplete') === 'true';
-    if (!onboardingComplete) {
+    // Use verified onboarding status if provided, otherwise check localStorage
+    const isOnboardingComplete = onboardingComplete !== undefined 
+      ? onboardingComplete 
+      : localStorage.getItem('onboardingComplete') === 'true';
+      
+    if (!isOnboardingComplete) {
       this.log('Redirecting to onboarding - not completed');
       return '/app/onboarding';
     }
@@ -336,35 +344,46 @@ class AuthStateManager {
     return this.lastAuthState;
   }
 
-  public async checkOnboardingStatus(): Promise<boolean> {
+  private async verifyOnboardingStatus(): Promise<boolean> {
     try {
       const debugInfo = await this.getAuthDebugInfo();
       
       if (!debugInfo.sessionExists || !debugInfo.userExists) {
+        this.log('No valid session for onboarding check');
         return false;
       }
 
+      // Check database first for authoritative status
       const { data: profile, error } = await supabase
         .from('profiles')
         .select('onboarding_completed')
         .eq('id', debugInfo.userId)
         .single();
 
-      if (error) {
-        this.error('Error checking onboarding status:', error);
-        return localStorage.getItem('onboardingComplete') === 'true';
-      }
+      let isComplete = false;
 
-      const isComplete = profile?.onboarding_completed || false;
-      this.log('Onboarding status checked:', { isComplete, source: 'database' });
-      
-      localStorage.setItem('onboardingComplete', isComplete.toString());
+      if (error) {
+        this.error('Error checking onboarding status from database:', error);
+        // Fallback to localStorage
+        isComplete = localStorage.getItem('onboardingComplete') === 'true';
+        this.log('Using localStorage onboarding status as fallback:', isComplete);
+      } else {
+        isComplete = profile?.onboarding_completed || false;
+        this.log('Onboarding status from database:', { isComplete, userId: debugInfo.userId });
+        
+        // Sync localStorage with database
+        localStorage.setItem('onboardingComplete', isComplete.toString());
+      }
       
       return isComplete;
     } catch (error) {
-      this.error('Failed to check onboarding status:', error);
+      this.error('Failed to verify onboarding status:', error);
       return localStorage.getItem('onboardingComplete') === 'true';
     }
+  }
+
+  public async checkOnboardingStatus(): Promise<boolean> {
+    return this.verifyOnboardingStatus();
   }
 
   public setDebugEnabled(enabled: boolean): void {

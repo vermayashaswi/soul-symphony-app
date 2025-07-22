@@ -1,4 +1,3 @@
-
 import React, { useState, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Send, Loader2 } from "lucide-react";
@@ -29,7 +28,7 @@ export default function MobileChatInput({
   const { isActive, isInStep } = useTutorial();
   const { translate, currentLanguage } = useTranslation();
   
-  const { isKeyboardVisible, keyboardHeight, platform, isNative } = useKeyboardDetection();
+  const { isKeyboardVisible, keyboardHeight, platform, isNative, isReady } = useKeyboardDetection();
   
   const isInChatTutorialStep = isActive && isInStep(5);
 
@@ -54,6 +53,8 @@ export default function MobileChatInput({
 
   // Handle keyboard state changes
   useEffect(() => {
+    if (!isReady) return;
+    
     console.log('[MobileChatInput] Keyboard state:', { 
       isVisible: isKeyboardVisible, 
       height: keyboardHeight, 
@@ -61,16 +62,38 @@ export default function MobileChatInput({
       isNative 
     });
     
+    // Ensure proper scrolling when keyboard opens
     if (isKeyboardVisible && inputRef.current) {
-      // Ensure input stays focused and scroll to bottom
       setTimeout(() => {
         const chatContent = document.querySelector('.mobile-chat-content');
         if (chatContent) {
           chatContent.scrollTop = chatContent.scrollHeight;
         }
+        
+        // Ensure input stays focused
+        if (inputRef.current && document.activeElement !== inputRef.current) {
+          inputRef.current.focus();
+        }
       }, 100);
     }
-  }, [isKeyboardVisible, keyboardHeight, platform, isNative]);
+  }, [isKeyboardVisible, keyboardHeight, platform, isNative, isReady]);
+
+  // Handle container positioning based on keyboard state
+  useEffect(() => {
+    if (!inputContainerRef.current || !isReady) return;
+    
+    const container = inputContainerRef.current;
+    
+    // Apply appropriate classes for keyboard state
+    container.classList.toggle('keyboard-visible', isKeyboardVisible);
+    container.classList.toggle(`platform-${platform}`, true);
+    
+    console.log('[MobileChatInput] Updated container classes:', {
+      keyboardVisible: isKeyboardVisible,
+      platform,
+      classes: container.className
+    });
+  }, [isKeyboardVisible, platform, isReady]);
 
   if (isInChatTutorialStep) {
     return null;
@@ -87,6 +110,17 @@ export default function MobileChatInput({
     }
   };
 
+  const handleInputFocus = () => {
+    console.log('[MobileChatInput] Input focused');
+    // Slight delay to ensure keyboard detection fires first
+    setTimeout(() => {
+      const chatContent = document.querySelector('.mobile-chat-content');
+      if (chatContent) {
+        chatContent.scrollTop = chatContent.scrollHeight;
+      }
+    }, 200);
+  };
+
   const handleSendMessage = async () => {
     if (isLoading || isSubmitting) return;
 
@@ -99,6 +133,8 @@ export default function MobileChatInput({
         onSendMessage(trimmedValue);
         
         setInputValue("");
+        
+        // Keep focus on input after sending
         if (inputRef.current) {
           inputRef.current.focus();
         }
@@ -121,7 +157,8 @@ export default function MobileChatInput({
         "flex items-center gap-3",
         isKeyboardVisible && 'keyboard-visible',
         platform === 'android' && 'platform-android',
-        platform === 'ios' && 'platform-ios'
+        platform === 'ios' && 'platform-ios',
+        !isReady && 'opacity-0'
       )}
     >
       <div className="flex-1">
@@ -131,6 +168,7 @@ export default function MobileChatInput({
           value={inputValue}
           onChange={handleInputChange}
           onKeyDown={handleKeyPress}
+          onFocus={handleInputFocus}
           placeholder={placeholderText}
           className="w-full border-2 border-primary/40 focus:border-primary shadow-sm bg-background text-foreground"
           disabled={isLoading || isSubmitting}
