@@ -2,6 +2,7 @@
 /* Mobile Navigation Specific Styles */
 :root {
   --keyboard-height: 0px;
+  --nav-bar-height: 3.6rem;
 }
 
 .mobile-navigation {
@@ -58,6 +59,11 @@
   
   /* Smooth transitions for position changes */
   transition: bottom 0.2s ease-in-out;
+  
+  /* Ensure proper background and styling */
+  background-color: hsl(var(--background));
+  border-top: 1px solid hsl(var(--border));
+  box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.1);
 }
 
 /* ANDROID FIX: Platform-specific chat input adjustment */
@@ -66,6 +72,7 @@
 }
 
 /* KEYBOARD VISIBLE STATES - The critical fix */
+body.keyboard-visible .mobile-chat-input-container,
 .keyboard-visible .mobile-chat-input-container {
   /* When keyboard is visible, position directly above keyboard with NO gap */
   bottom: 0px !important;
@@ -74,17 +81,20 @@
 }
 
 /* Platform-specific keyboard adjustments */
-.platform-android.keyboard-visible .mobile-chat-input-container {
+.platform-android.keyboard-visible .mobile-chat-input-container,
+body.platform-android.keyboard-visible .mobile-chat-input-container {
   /* Android: stick directly to keyboard, no safe area */
   bottom: 0px !important;
 }
 
-.platform-ios.keyboard-visible .mobile-chat-input-container {
+.platform-ios.keyboard-visible .mobile-chat-input-container,
+body.platform-ios.keyboard-visible .mobile-chat-input-container {
   /* iOS: account for safe area even with keyboard */
   bottom: var(--calculated-safe-area-bottom, env(safe-area-inset-bottom, 0px)) !important;
 }
 
 /* NAVIGATION HIDING - Complete hiding when keyboard is visible */
+body.keyboard-visible .mobile-navigation,
 .keyboard-visible .mobile-navigation {
   /* Hide navigation completely by moving it below viewport */
   transform: translateY(calc(100% + var(--calculated-safe-area-bottom, env(safe-area-inset-bottom, 0px)))) !important;
@@ -101,18 +111,74 @@
 .mobile-chat-content {
   /* Default bottom padding to account for input + navigation */
   padding-bottom: calc(var(--nav-bar-height) + 80px) !important;
+  /* Ensure smooth scrolling */
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
 }
 
+body.keyboard-visible .mobile-chat-content,
 .keyboard-visible .mobile-chat-content {
   /* When keyboard is visible, reduce padding since navigation is hidden */
   padding-bottom: 80px !important;
 }
 
+/* Additional mobile chat interface improvements */
+.mobile-chat-interface {
+  position: relative;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.mobile-chat-interface.keyboard-visible {
+  /* Adjust interface when keyboard is visible */
+  height: 100vh;
+}
+
 /* Ensure no horizontal overflow */
 .mobile-navigation,
-.mobile-navigation * {
+.mobile-navigation *,
+.mobile-chat-input-container,
+.mobile-chat-input-container * {
   max-width: 100%;
   box-sizing: border-box;
+}
+
+/* Enhanced scrolling behavior for mobile chat */
+.mobile-chat-content::-webkit-scrollbar {
+  display: none;
+}
+
+.mobile-chat-content {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+/* Improved touch targets for mobile */
+.mobile-chat-input-container button {
+  min-height: 44px;
+  min-width: 44px;
+}
+
+.mobile-chat-input-container input {
+  min-height: 44px;
+}
+
+/* Safe area inset handling for various devices */
+@supports (padding: max(0px)) {
+  .mobile-navigation {
+    padding-bottom: max(var(--calculated-safe-area-bottom, 0px), env(safe-area-inset-bottom, 0px));
+  }
+  
+  .mobile-chat-input-container {
+    padding-bottom: max(var(--calculated-safe-area-bottom, 0px), env(safe-area-inset-bottom, 0px));
+  }
+}
+
+/* Viewport height fixes for mobile browsers */
+.mobile-chat-interface {
+  height: 100vh;
+  height: 100dvh; /* Dynamic viewport height where supported */
 }
 
 /* Enhanced debug styles for development */
