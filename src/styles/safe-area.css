@@ -7,6 +7,7 @@
   --safe-area-inset-right: env(safe-area-inset-right, 0px);
   --status-bar-height: 0px;
   --nav-bar-height: 4rem;
+  --keyboard-height: 0px;
   
   /* Calculated safe areas (fallback values) */
   --calculated-safe-area-top: var(--safe-area-inset-top);
@@ -27,6 +28,22 @@
 /* ANDROID FIX: Ensure minimum safe area for devices without proper env() support */
 .platform-android {
   --safe-area-inset-bottom: max(env(safe-area-inset-bottom, 0px), 8px);
+}
+
+/* Keyboard state adjustments */
+.keyboard-visible {
+  /* When keyboard is visible, safe area bottom should not interfere with positioning */
+  --effective-safe-area-bottom: 0px;
+}
+
+.keyboard-visible.platform-ios {
+  /* iOS still needs safe area even with keyboard */
+  --effective-safe-area-bottom: var(--calculated-safe-area-bottom);
+}
+
+.keyboard-visible.platform-android {
+  /* Android should ignore safe area when keyboard is visible */
+  --effective-safe-area-bottom: 0px;
 }
 
 /* Safe area utilities */
@@ -59,4 +76,13 @@
 .insights-container,
 .settings-container {
   @apply safe-area-top safe-area-bottom safe-area-left safe-area-right mobile-container;
+}
+
+/* Keyboard-specific adjustments for containers */
+.keyboard-visible .smart-chat-container,
+.keyboard-visible .journal-container,
+.keyboard-visible .insights-container,
+.keyboard-visible .settings-container {
+  /* Adjust bottom padding when keyboard is visible */
+  padding-bottom: var(--effective-safe-area-bottom, 0px) !important;
 }

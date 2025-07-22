@@ -47,7 +47,21 @@ const Toast = React.forwardRef<
 >(({ className, variant, ...props }, ref) => {
   const toastRef = React.useRef<React.ElementRef<typeof ToastPrimitives.Root>>(null);
   const { onOpenChange } = props;
-  const { colorTheme, theme, systemTheme } = useTheme();
+  
+  // Safely access theme context with fallback
+  let colorTheme = 'blue';
+  let theme = 'light';
+  let systemTheme = 'light';
+  
+  try {
+    const themeContext = useTheme();
+    colorTheme = themeContext.colorTheme;
+    theme = themeContext.theme;
+    systemTheme = themeContext.systemTheme;
+  } catch (error) {
+    // Fallback to default values if theme context isn't available
+    console.warn('Theme context not available in toast, using defaults');
+  }
   
   const isDarkMode = theme === 'dark' || (theme === 'system' && systemTheme === 'dark');
   
