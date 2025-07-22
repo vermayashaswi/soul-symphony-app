@@ -1,27 +1,11 @@
 
-import { useTheme } from "@/hooks/use-theme"
 import { Toaster as Sonner } from "sonner"
 
 type ToasterProps = React.ComponentProps<typeof Sonner>
 
 function Toaster({ ...props }: ToasterProps) {
-  // Safely access theme context with fallback
-  let theme = 'light';
-  let systemTheme = 'light';
-  let colorTheme = 'blue';
-  
-  try {
-    const themeContext = useTheme();
-    theme = themeContext.theme;
-    systemTheme = themeContext.systemTheme;
-    colorTheme = themeContext.colorTheme;
-  } catch (error) {
-    // Fallback to default values if theme context isn't available
-    console.warn('Theme context not available, using defaults');
-  }
-  
-  // Determine if we're in dark mode
-  const isDarkMode = theme === 'dark' || (theme === 'system' && systemTheme === 'dark')
+  // Use light theme as default - theme will be handled by CSS custom properties
+  const isDarkMode = false
 
   return (
     <Sonner
