@@ -16,12 +16,16 @@ import { useTranslation } from '@/contexts/TranslationContext';
 import { motion } from 'framer-motion';
 
 interface JournalEntry {
-  id: string;
-  title: string;
-  content: string;
-  mood: string;
+  id: number;
   created_at: string;
-  tags: string[];
+  user_id: string;
+  "transcription text"?: string;
+  "refined text"?: string;
+  master_themes?: string[];
+  emotions?: any;
+  sentiment?: string;
+  audio_url?: string;
+  duration?: number;
 }
 
 const Journal = () => {
@@ -47,7 +51,7 @@ const Journal = () => {
     try {
       setLoading(true);
       const { data, error } = await supabase
-        .from('journal_entries')
+        .from('Journal Entries')
         .select('*')
         .eq('user_id', user?.id)
         .order('created_at', { ascending: false });
@@ -71,24 +75,23 @@ const Journal = () => {
     navigate('/app/journal/new');
   };
 
-  const handleEntryClick = (entryId: string) => {
+  const handleEntryClick = (entryId: number) => {
     navigate(`/app/journal/${entryId}`);
   };
 
   const filteredEntries = entries.filter(entry => {
-    const matchesSearch = entry.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                         entry.content.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesMood = filterMood === 'all' || entry.mood === filterMood;
+    const content = entry["refined text"] || entry["transcription text"] || '';
+    const title = content.substring(0, 50) || 'Untitled Entry';
+    const matchesSearch = title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                         content.toLowerCase().includes(searchQuery.toLowerCase());
+    const matchesMood = filterMood === 'all' || entry.sentiment === filterMood;
     return matchesSearch && matchesMood;
   });
 
-  const moodColors = {
-    happy: 'bg-green-100 text-green-800',
-    sad: 'bg-blue-100 text-blue-800',
-    angry: 'bg-red-100 text-red-800',
-    anxious: 'bg-yellow-100 text-yellow-800',
-    calm: 'bg-purple-100 text-purple-800',
-    excited: 'bg-orange-100 text-orange-800',
+  const sentimentColors = {
+    positive: 'bg-green-100 text-green-800',
+    negative: 'bg-red-100 text-red-800',
+    neutral: 'bg-gray-100 text-gray-800',
     default: 'bg-gray-100 text-gray-800'
   };
 
@@ -141,13 +144,10 @@ const Journal = () => {
               onChange={(e) => setFilterMood(e.target.value)}
               className="px-3 py-2 border rounded-md bg-background"
             >
-              <option value="all">All Moods</option>
-              <option value="happy">Happy</option>
-              <option value="sad">Sad</option>
-              <option value="angry">Angry</option>
-              <option value="anxious">Anxious</option>
-              <option value="calm">Calm</option>
-              <option value="excited">Excited</option>
+            <option value="all">All Sentiments</option>
+              <option value="positive">Positive</option>
+              <option value="neutral">Neutral</option>
+              <option value="negative">Negative</option>
             </select>
           </div>
         </div>
@@ -184,13 +184,18 @@ const Journal = () => {
                 >
                   <CardHeader className="pb-3">
                     <div className="flex items-center justify-between">
-                      <CardTitle className="text-lg">{entry.title}</CardTitle>
+                      <CardTitle className="text-lg">
+                        {(entry["refined text"] || entry["transcription text"] || 'Untitled Entry').substring(0, 50)}
+                        {(entry["refined text"] || entry["transcription text"] || '').length > 50 && '...'}
+                      </CardTitle>
                       <div className="flex items-center gap-2">
-                        <Badge 
-                          className={moodColors[entry.mood as keyof typeof moodColors] || moodColors.default}
-                        >
-                          {entry.mood}
-                        </Badge>
+                        {entry.sentiment && (
+                          <Badge 
+                            className={sentimentColors[entry.sentiment as keyof typeof sentimentColors] || sentimentColors.default}
+                          >
+                            {entry.sentiment}
+                          </Badge>
+                        )}
                         <span className="text-sm text-muted-foreground">
                           {format(new Date(entry.created_at), 'MMM d, yyyy')}
                         </span>
@@ -199,14 +204,14 @@ const Journal = () => {
                   </CardHeader>
                   <CardContent>
                     <p className="text-muted-foreground line-clamp-3">
-                      {entry.content.substring(0, 150)}
-                      {entry.content.length > 150 && '...'}
+                      {(entry["refined text"] || entry["transcription text"] || '').substring(0, 150)}
+                      {(entry["refined text"] || entry["transcription text"] || '').length > 150 && '...'}
                     </p>
-                    {entry.tags && entry.tags.length > 0 && (
+                    {entry.master_themes && entry.master_themes.length > 0 && (
                       <div className="flex flex-wrap gap-1 mt-3">
-                        {entry.tags.map((tag, tagIndex) => (
-                          <Badge key={tagIndex} variant="secondary" className="text-xs">
-                            #{tag}
+                        {entry.master_themes.map((theme, themeIndex) => (
+                          <Badge key={themeIndex} variant="secondary" className="text-xs">
+                            #{theme}
                           </Badge>
                         ))}
                       </div>

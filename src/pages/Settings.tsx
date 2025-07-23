@@ -19,7 +19,20 @@ import { useIsMobile } from '@/hooks/use-mobile';
 const Settings = () => {
   const { user, signOut } = useAuth();
   const { theme, setTheme } = useTheme();
-  const { currentLanguage, setLanguage, availableLanguages } = useTranslation();
+  const { currentLanguage, setLanguage } = useTranslation();
+  
+  const availableLanguages = [
+    { code: 'en', name: 'English' },
+    { code: 'es', name: 'Español' },
+    { code: 'fr', name: 'Français' },
+    { code: 'de', name: 'Deutsch' },
+    { code: 'it', name: 'Italiano' },
+    { code: 'pt', name: 'Português' },
+    { code: 'ru', name: 'Русский' },
+    { code: 'ja', name: '日本語' },
+    { code: 'ko', name: '한국어' },
+    { code: 'zh', name: '中文' },
+  ];
   const { toast } = useToast();
   const navigate = useNavigate();
   const isMobile = useIsMobile();
