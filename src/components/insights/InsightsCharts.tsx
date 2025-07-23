@@ -8,14 +8,14 @@ import { cn } from '@/lib/utils';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { TranslatableText } from '@/components/translation/TranslatableText';
 import { TimeRange } from '@/hooks/use-insights-data';
-import { InsightsData } from '@/hooks/use-insights-cache-data';
+import { ProcessedInsightsData } from '@/hooks/use-insights-cache-data';
 import LazySoulNet from './soulnet/LazySoulNet';
-import { EmotionChart } from './EmotionChart';
-import { MoodCalendar } from './MoodCalendar';
+import { EmotionChart } from '@/components/EmotionChart';
+import MoodCalendar from './MoodCalendar';
 
 interface InsightsChartsProps {
   timeRange: TimeRange;
-  chartInsightsData: InsightsData;
+  chartInsightsData: ProcessedInsightsData;
   emotionChartDate: Date;
   moodCalendarDate: Date;
   onEmotionChartNavigate: (date: Date) => void;
@@ -43,10 +43,10 @@ export const InsightsCharts: React.FC<InsightsChartsProps> = ({
       icon: TrendingUp,
       component: (
         <EmotionChart
-          data={chartInsightsData.entries}
-          timeRange={timeRange}
-          selectedDate={emotionChartDate}
-          onNavigate={onEmotionChartNavigate}
+          timeframe={timeRange}
+          aggregatedData={chartInsightsData.aggregatedEmotionData}
+          currentDate={emotionChartDate}
+          onTimeRangeNavigate={onEmotionChartNavigate}
         />
       )
     },
@@ -56,10 +56,13 @@ export const InsightsCharts: React.FC<InsightsChartsProps> = ({
       icon: Calendar,
       component: (
         <MoodCalendar
-          data={chartInsightsData.entries}
+          sentimentData={chartInsightsData.entries.map(entry => ({
+            date: new Date(entry.created_at),
+            sentiment: entry.emotion_analysis?.sentiment || 0
+          }))}
           timeRange={timeRange}
-          selectedDate={moodCalendarDate}
-          onNavigate={onMoodCalendarNavigate}
+          currentDate={moodCalendarDate}
+          onTimeRangeNavigate={onMoodCalendarNavigate}
         />
       )
     },
@@ -76,6 +79,7 @@ export const InsightsCharts: React.FC<InsightsChartsProps> = ({
     }
   ], [
     chartInsightsData.entries,
+    chartInsightsData.aggregatedEmotionData,
     timeRange,
     emotionChartDate,
     moodCalendarDate,
