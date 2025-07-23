@@ -100,7 +100,7 @@ function InsightsContent() {
   const hasAnyEntries = statsInsightsData.entries.length > 0 || statsInsightsData.allEntries.length > 0;
 
   return (
-    <div className="min-h-screen pb-20 insights-container">
+    <div className="min-h-screen pb-20 insights-container safe-area-top">
       <TranslationProgressIndicator />
       
       {isSticky && (
