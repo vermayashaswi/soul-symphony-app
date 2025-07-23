@@ -74,3 +74,89 @@
 .settings-container {
   @apply safe-area-top safe-area-left safe-area-right mobile-container;
 }
+
+/* Ensure proper safe area handling for all page containers */
+.journal-container,
+.insights-container,
+.settings-container {
+  padding-top: max(var(--status-bar-height), var(--calculated-safe-area-top));
+  padding-left: max(16px, var(--calculated-safe-area-left));
+  padding-right: max(16px, var(--calculated-safe-area-right));
+  padding-bottom: max(16px, var(--calculated-safe-area-bottom));
+}
+
+/* Chat page specific safe area handling */
+.smart-chat-container {
+  padding-top: max(var(--status-bar-height), var(--calculated-safe-area-top));
+  padding-left: 0; /* Chat has its own padding system */
+  padding-right: 0; /* Chat has its own padding system */
+  padding-bottom: 0; /* Chat has its own bottom handling */
+}
+
+/* Mobile chat interface safe area handling */
+.mobile-chat-interface {
+  height: 100vh;
+  height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.mobile-chat-interface .mobile-chat-content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px;
+  padding-top: 8px; /* Header handles top padding */
+  padding-left: max(16px, var(--calculated-safe-area-left));
+  padding-right: max(16px, var(--calculated-safe-area-right));
+  padding-bottom: 8px;
+}
+
+.mobile-chat-interface .mobile-chat-input-container {
+  background: hsl(var(--background));
+  border-top: 1px solid hsl(var(--border));
+  padding: 16px;
+  padding-left: max(16px, var(--calculated-safe-area-left));
+  padding-right: max(16px, var(--calculated-safe-area-right));
+  padding-bottom: max(16px, calc(var(--calculated-safe-area-bottom) + 8px));
+}
+
+/* Platform-specific adjustments for mobile chat */
+.platform-android .mobile-chat-input-container {
+  padding-bottom: max(16px, calc(var(--calculated-safe-area-bottom) + 8px));
+}
+
+.platform-ios .mobile-chat-input-container {
+  padding-bottom: max(16px, calc(var(--calculated-safe-area-bottom) + 8px));
+}
+
+/* Keyboard state adjustments */
+.keyboard-visible .mobile-chat-input-container {
+  padding-bottom: 16px;
+}
+
+.keyboard-visible.platform-ios .mobile-chat-input-container {
+  padding-bottom: max(16px, var(--calculated-safe-area-bottom));
+}
+
+.keyboard-visible.platform-android .mobile-chat-input-container {
+  padding-bottom: 16px;
+}
+
+/* Ensure consistent header safe area handling */
+.mobile-chat-interface .sticky.top-0 {
+  padding-top: max(var(--status-bar-height), var(--calculated-safe-area-top));
+  padding-left: max(16px, var(--calculated-safe-area-left));
+  padding-right: max(16px, var(--calculated-safe-area-right));
+}
+
+/* Handle fullscreen components like SoulNet */
+.fullscreen-overlay {
+  position: fixed;
+  top: var(--calculated-safe-area-top);
+  left: var(--calculated-safe-area-left);
+  right: var(--calculated-safe-area-right);
+  bottom: var(--calculated-safe-area-bottom);
+  z-index: 9999;
+  background: hsl(var(--background));
+}
