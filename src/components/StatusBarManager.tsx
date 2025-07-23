@@ -16,16 +16,18 @@ export const StatusBarManager: React.FC<StatusBarManagerProps> = ({ children }) 
         console.log('[StatusBarManager] ANDROID FIX: Initializing with native:', isNative, 'android:', isAndroid);
         
         if (isNative) {
-          console.log('[StatusBarManager] ANDROID FIX: Configuring native status bar...');
+          console.log('[StatusBarManager] Configuring native status bar for immersive experience...');
+          
+          // Hide status bar for full-screen immersive experience
+          await nativeIntegrationService.hideStatusBar();
           
           const statusBarPlugin = nativeIntegrationService.getPlugin('StatusBar');
           if (statusBarPlugin) {
-            // Configure status bar for proper safe area handling
+            // Configure status bar to overlay web view for true full-screen
+            await statusBarPlugin.setOverlaysWebView({ overlay: true });
             await statusBarPlugin.setStyle({ style: 'dark' });
-            await statusBarPlugin.setBackgroundColor({ color: '#FFFFFF' });
-            await statusBarPlugin.setOverlaysWebView({ overlay: false });
             
-            console.log('[StatusBarManager] ANDROID FIX: Status bar configured successfully');
+            console.log('[StatusBarManager] Status bar hidden and configured for immersive experience');
           }
         } else {
           console.log('[StatusBarManager] ANDROID FIX: Web environment - status bar styling handled by CSS');
