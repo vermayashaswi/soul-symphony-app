@@ -19,6 +19,8 @@ interface ScheduledReminder {
 class JournalReminderService {
   private static instance: JournalReminderService;
   private activeReminders: ScheduledReminder[] = [];
+  private healthCheckInterval?: number;
+  private readonly HEALTH_CHECK_INTERVAL = 60 * 60 * 1000; // 1 hour
   
   // Time mappings for reminders
   private readonly TIME_MAPPINGS: Record<JournalReminderTime, { hour: number; minute: number }> = {
@@ -76,6 +78,9 @@ class JournalReminderService {
     // Clear all active reminders
     this.clearAllReminders();
     
+    // Stop health check
+    this.stopHealthCheck();
+    
     // Save disabled state
     this.saveSettings({ enabled: false, times: [] });
     
@@ -96,6 +101,9 @@ class JournalReminderService {
     } else {
       this.setupWebReminders(times);
     }
+    
+    // Start health check to monitor reminder status
+    this.startHealthCheck();
   }
 
   private async setupNativeReminders(times: JournalReminderTime[]): Promise<void> {
@@ -223,11 +231,27 @@ class JournalReminderService {
     const next = new Date();
     const { hour, minute } = this.TIME_MAPPINGS[time];
     
+    // Create exact target time
     next.setHours(hour, minute, 0, 0);
     
-    // If the time has already passed today, schedule for tomorrow
-    if (next <= now) {
+    // Add buffer for timing precision - if we're within 2 minutes of the target, schedule for tomorrow
+    const bufferMs = 2 * 60 * 1000; // 2 minutes
+    const timeDiff = next.getTime() - now.getTime();
+    
+    if (timeDiff <= bufferMs) {
       next.setDate(next.getDate() + 1);
+      this.log(`Reminder ${time} scheduled for tomorrow due to timing buffer`, {
+        now: now.toLocaleString(),
+        originally: new Date().setHours(hour, minute, 0, 0),
+        scheduled: next.toLocaleString(),
+        timeDiff: timeDiff
+      });
+    } else {
+      this.log(`Reminder ${time} scheduled for today`, {
+        now: now.toLocaleString(),
+        scheduled: next.toLocaleString(),
+        timeDiff: timeDiff
+      });
     }
     
     return next;
@@ -352,6 +376,61 @@ class JournalReminderService {
       window.focus();
       notification.close();
     };
+  }
+
+  // Health check to ensure reminders are still active
+  private startHealthCheck(): void {
+    this.stopHealthCheck(); // Clear any existing interval
+    
+    this.healthCheckInterval = window.setInterval(async () => {
+      try {
+        await this.performHealthCheck();
+      } catch (error) {
+        this.error('Error during health check:', error);
+      }
+    }, this.HEALTH_CHECK_INTERVAL);
+    
+    this.log('Health check started');
+  }
+
+  private stopHealthCheck(): void {
+    if (this.healthCheckInterval) {
+      clearInterval(this.healthCheckInterval);
+      this.healthCheckInterval = undefined;
+      this.log('Health check stopped');
+    }
+  }
+
+  private async performHealthCheck(): Promise<void> {
+    const settings = this.getSettings();
+    
+    if (!settings.enabled || settings.times.length === 0) {
+      this.log('Reminders disabled, stopping health check');
+      this.stopHealthCheck();
+      return;
+    }
+
+    // Check permission status
+    const permissionState = await enhancedNotificationService.checkPermissionStatus();
+    if (permissionState !== 'granted') {
+      this.log('Permissions lost during health check, disabling reminders');
+      await this.disableReminders();
+      return;
+    }
+
+    // Verify active reminders are still scheduled correctly
+    if (this.activeReminders.length !== settings.times.length) {
+      this.log('Reminder count mismatch detected, reinitializing', {
+        expected: settings.times.length,
+        active: this.activeReminders.length
+      });
+      await this.setupReminders(settings.times);
+    }
+
+    this.log('Health check passed', {
+      activeReminders: this.activeReminders.length,
+      expectedReminders: settings.times.length
+    });
   }
 
   // Initialize reminders on app start if enabled
