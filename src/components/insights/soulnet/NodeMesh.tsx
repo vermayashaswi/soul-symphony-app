@@ -1,6 +1,7 @@
 
 import React, { useRef, useMemo, useState, useEffect } from 'react';
 import * as THREE from 'three';
+
 import { useFrame } from '@react-three/fiber';
 
 interface NodeMeshProps {
@@ -35,7 +36,6 @@ export const NodeMesh: React.FC<NodeMeshProps> = ({
   const meshRef = useRef<THREE.Mesh>(null);
   const [animationTime, setAnimationTime] = useState(0);
   const [isReady, setIsReady] = useState(false);
-  const color = useMemo(() => new THREE.Color(displayColor), [displayColor]);
   
   // Delayed initialization to prevent clock access issues
   useEffect(() => {
@@ -54,7 +54,7 @@ export const NodeMesh: React.FC<NodeMeshProps> = ({
     [type]
   );
 
-  // FIXED: Animation with manual time tracking and mobile support
+  // Safe animation with manual time tracking
   useFrame((state, delta) => {
     if (!meshRef.current || !isReady) return;
     
@@ -65,10 +65,7 @@ export const NodeMesh: React.FC<NodeMeshProps> = ({
       if (isHighlighted) {
         const pulseIntensity = isSelected ? 0.25 : (connectionStrength * 0.2);
         const pulse = Math.sin(animationTime * 2.5) * pulseIntensity + 1.1;
-        const targetScale = scale * pulse;
-        
-        // Apply pulsing scale with smoother transitions
-        meshRef.current.scale.lerp(new THREE.Vector3(targetScale, targetScale, targetScale), 0.15);
+        meshRef.current.scale.set(scale * pulse, scale * pulse, scale * pulse);
         
         // Safe material updates
         if (meshRef.current.material instanceof THREE.MeshStandardMaterial) {
@@ -77,17 +74,13 @@ export const NodeMesh: React.FC<NodeMeshProps> = ({
             : 0.7 + (connectionStrength * 0.3) + Math.sin(animationTime * 3) * 0.2;
           
           meshRef.current.material.emissiveIntensity = Math.max(0, Math.min(2, emissiveIntensity));
-          meshRef.current.material.color.lerp(color, 0.1);
         }
       } else {
         const targetScale = dimmed ? scale * 0.8 : scale;
-        
-        // Apply static scale with smoother transitions
-        meshRef.current.scale.lerp(new THREE.Vector3(targetScale, targetScale, targetScale), 0.15);
+        meshRef.current.scale.set(targetScale, targetScale, targetScale);
         
         if (meshRef.current.material instanceof THREE.MeshStandardMaterial) {
           meshRef.current.material.emissiveIntensity = dimmed ? 0 : 0.1;
-          meshRef.current.material.color.lerp(color, 0.1);
         }
       }
     } catch (error) {
@@ -95,17 +88,20 @@ export const NodeMesh: React.FC<NodeMeshProps> = ({
     }
   });
 
-  // FIXED: Better opacity calculation for mobile visibility
+  // Safe opacity calculation
   const nodeOpacity = useMemo(() => {
-    if (isSelected) return 1.0;
-    if (isHighlighted) return 0.9; 
-    return dimmed ? 0.05 : 0.8; // Very dim for non-highlighted nodes
+    if (isHighlighted) {
+      return isSelected ? 0.9 : 0.4;
+    }
+    return dimmed ? 0.4 : 0.85;
   }, [isHighlighted, isSelected, dimmed]);
 
   // Don't render until ready
   if (!isReady) {
     return null;
   }
+
+  console.log(`[NodeMesh] ENHANCED: Rendering ${type} mesh with enhanced scale ${scale.toFixed(2)}`);
 
   return (
     <mesh
@@ -115,14 +111,8 @@ export const NodeMesh: React.FC<NodeMeshProps> = ({
         e.stopPropagation();
         onClick(e);
       }}
-      onPointerDown={(e) => {
-        e.stopPropagation();
-        onPointerDown(e);
-      }}
-      onPointerUp={(e) => {
-        e.stopPropagation();
-        onPointerUp(e);
-      }}
+      onPointerDown={onPointerDown}
+      onPointerUp={onPointerUp}
       onPointerOut={onPointerOut}
       onPointerLeave={onPointerLeave}
       renderOrder={1}
@@ -136,7 +126,7 @@ export const NodeMesh: React.FC<NodeMeshProps> = ({
         emissiveIntensity={isHighlighted ? 1.2 : (dimmed ? 0 : 0.1)}
         roughness={0.3}
         metalness={0.4}
-        depthWrite={true}
+        depthWrite={false}
       />
     </mesh>
   );
