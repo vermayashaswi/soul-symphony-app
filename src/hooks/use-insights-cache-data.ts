@@ -13,7 +13,7 @@ interface CachedInsightsData {
   };
 }
 
-interface ProcessedInsightsData {
+export interface ProcessedInsightsData {
   entries: any[];
   allEntries: any[];
   dominantMood: DominantMood | null;
