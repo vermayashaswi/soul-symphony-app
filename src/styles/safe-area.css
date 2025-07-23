@@ -80,5 +80,5 @@
 .journal-container.safe-area-top,
 .insights-container.safe-area-top,
 .settings-container.safe-area-top {
-  @apply safe-area-top;
+  padding-top: max(var(--status-bar-height), var(--calculated-safe-area-top)) !important;
 }
