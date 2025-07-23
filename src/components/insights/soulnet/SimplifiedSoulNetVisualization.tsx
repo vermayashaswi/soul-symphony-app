@@ -52,8 +52,18 @@ export const SimplifiedSoulNetVisualization: React.FC<SimplifiedSoulNetVisualiza
   const [cameraZoom, setCameraZoom] = useState(45);
   
   // UPDATED: Use app's theme context instead of system theme detection
-  const { theme, systemTheme } = useTheme();
-  const effectiveTheme = theme === 'system' ? systemTheme : theme;
+  // Defensive theme access
+  let theme: 'light' | 'dark' | 'system' = 'light';
+  let systemTheme: 'light' | 'dark' = 'light';
+  try {
+    const themeData = useTheme();
+    theme = themeData.theme;
+    systemTheme = themeData.systemTheme;
+  } catch (error) {
+    console.warn('Theme provider not available, using default theme');
+  }
+  
+  const effectiveTheme: 'light' | 'dark' = theme === 'system' ? systemTheme : (theme as 'light' | 'dark');
 
   console.log(`[SimplifiedSoulNetVisualization] COORDINATED THEME: Using app theme context - theme: ${theme}, systemTheme: ${systemTheme}, effective: ${effectiveTheme}`);
   console.log(`[SimplifiedSoulNetVisualization] COORDINATED INSTANT: Rendering with ${data.nodes.length} nodes, instantReady: ${isInstantReady}`);

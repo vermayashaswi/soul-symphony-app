@@ -46,7 +46,15 @@ export const Edge: React.FC<EdgeProps> = ({
   startNodeScale = 1,
   endNodeScale = 1
 }) => {
-  const { theme } = useTheme();
+  // Defensive theme access
+  let theme = 'light';
+  try {
+    const themeData = useTheme();
+    theme = themeData.theme;
+  } catch (error) {
+    console.warn('Theme provider not available, using default theme');
+  }
+  
   const ref = useRef<THREE.Group>(null);
   // Change the ref type to match what react-three-fiber expects
   const lineRef = useRef<THREE.Mesh>(null);

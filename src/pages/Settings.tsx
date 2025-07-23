@@ -66,7 +66,27 @@ function SettingItem({ icon: Icon, title, description, children }: SettingItemPr
 function SettingsContent() {
   console.log('[Settings] SettingsContent rendering');
   
-  const { theme, setTheme, colorTheme, setColorTheme, customColor, setCustomColor, systemTheme } = useTheme();
+  // Defensive theme access
+  let theme = 'light';
+  let setTheme = (t: any) => {};
+  let colorTheme = 'Calm';
+  let setColorTheme = (t: any) => {};
+  let customColor = '#3b82f6';
+  let setCustomColor = (c: any) => {};
+  let systemTheme = 'light';
+  
+  try {
+    const themeData = useTheme();
+    theme = themeData.theme;
+    setTheme = themeData.setTheme;
+    colorTheme = themeData.colorTheme;
+    setColorTheme = themeData.setColorTheme;
+    customColor = themeData.customColor;
+    setCustomColor = themeData.setCustomColor;
+    systemTheme = themeData.systemTheme;
+  } catch (error) {
+    console.warn('Theme provider not available, using defaults');
+  }
   const [notificationsEnabled, setNotificationsEnabled] = useState(false);
   const [notificationTimes, setNotificationTimes] = useState<NotificationTime[]>(['evening']);
   const [showNotificationSettings, setShowNotificationSettings] = useState(false);
