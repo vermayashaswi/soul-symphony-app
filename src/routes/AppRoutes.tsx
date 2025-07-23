@@ -45,23 +45,19 @@ const AppRoutes = () => {
         return <Navigate to={`/app/auth${window.location.search}${window.location.hash}`} replace />;
       }
 
-      // CRITICAL: For native apps, redirect to appropriate app screens
+      // CRITICAL: For native apps, prioritize authentication status
       console.log('[AppRoutes] Native environment detected, redirecting to app interface');
       if (!user) {
         console.log('[AppRoutes] No user in native app, redirecting to onboarding');
         return <Navigate to="/app/onboarding" replace />;
       }
 
-      if (!onboardingComplete) {
-        console.log('[AppRoutes] Onboarding not complete in native app, redirecting to onboarding');
-        return <Navigate to="/app/onboarding" replace />;
-      }
-
-      console.log('[AppRoutes] Native app user authenticated and onboarded, redirecting to home');
+      // If user is authenticated, go directly to home (ignore database onboarding flag)
+      console.log('[AppRoutes] Native app user authenticated, redirecting to home');
       return <Navigate to="/app/home" replace />;
     }
 
-    // Web behavior (existing logic)
+    // Web behavior - prioritize authentication status over onboarding flag
     console.log('[AppRoutes] Web environment, using standard flow');
 
     // Check for web OAuth callback parameters
@@ -80,10 +76,7 @@ const AppRoutes = () => {
       return <Navigate to="/app/onboarding" replace />;
     }
 
-    if (!onboardingComplete) {
-      return <Navigate to="/app/onboarding" replace />;
-    }
-
+    // If user is authenticated, go directly to home (ignore database onboarding flag)
     return <Navigate to="/app/home" replace />;
   };
 
@@ -101,11 +94,7 @@ const AppRoutes = () => {
         return <Navigate to="/app/onboarding" replace />;
       }
 
-      if (!onboardingComplete) {
-        console.log('[AppRoutes] Onboarding not complete in native app, redirecting to onboarding');
-        return <Navigate to="/app/onboarding" replace />;
-      }
-
+      // If user is authenticated, go directly to home (ignore database onboarding flag)
       console.log('[AppRoutes] Native app user ready, redirecting to home');
       return <Navigate to="/app/home" replace />;
     }

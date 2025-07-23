@@ -2,7 +2,17 @@
 import { useTheme } from '@/hooks/use-theme';
 
 export function useUserColorThemeHex() {
-  const { colorTheme, customColor } = useTheme();
+  // Defensive theme access
+  let colorTheme = 'Default';
+  let customColor = '#3b82f6';
+  
+  try {
+    const themeData = useTheme();
+    colorTheme = themeData.colorTheme;
+    customColor = themeData.customColor;
+  } catch (error) {
+    console.warn('Theme provider not available, using default colors');
+  }
   switch (colorTheme) {
     case 'Default':
       return '#3b82f6';
