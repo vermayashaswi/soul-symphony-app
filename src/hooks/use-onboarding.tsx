@@ -2,7 +2,6 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { User } from '@supabase/supabase-js';
-import { authStateSynchronizer } from '@/services/authStateSynchronizer';
 
 export function useOnboarding() {
   const [onboardingComplete, setOnboardingComplete] = useState<boolean | null>(null);
@@ -15,21 +14,28 @@ export function useOnboarding() {
       setLoading(true);
       let isComplete = false;
       
-      // For authenticated users, use the enhanced synchronizer
+      // For authenticated users, check database first
       if (user) {
-        console.log('[Onboarding] Checking status for authenticated user with enhanced sync:', user.id);
+        console.log('[Onboarding] Checking status for authenticated user:', user.id);
         
-        // Use the enhanced synchronizer that accounts for tutorial completion
-        isComplete = await authStateSynchronizer.syncOnboardingStatus(user.id, {
-          forceSync: true
-        });
+        const { data: profile, error } = await supabase
+          .from('profiles')
+          .select('onboarding_completed, display_name')
+          .eq('id', user.id)
+          .single();
         
-        setOnboardingComplete(isComplete);
-        
-        // Also sync display name
-        const storedName = localStorage.getItem('user_display_name');
-        if (storedName) {
-          setDisplayName(storedName);
+        if (error) {
+          console.error('[Onboarding] Error fetching profile:', error);
+          // Fallback to localStorage
+          isComplete = localStorage.getItem('onboardingComplete') === 'true';
+          setOnboardingComplete(isComplete);
+        } else {
+          console.log('[Onboarding] Profile data:', profile);
+          isComplete = profile.onboarding_completed || false;
+          setOnboardingComplete(isComplete);
+          if (profile.display_name) {
+            setDisplayName(profile.display_name);
+          }
         }
       } else {
         // For unauthenticated users, use localStorage
