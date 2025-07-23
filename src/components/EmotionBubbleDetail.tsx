@@ -25,7 +25,15 @@ const EmotionBubbleDetail: React.FC<EmotionBubbleDetailProps> = ({
 }) => {
   // Font size is now constant, 2px smaller than the "Trend" text in Mood Calendar
   const fontSize = '14px';
-  const { colorTheme } = useTheme();
+  // Defensive hook usage to prevent runtime errors during app initialization
+  let colorTheme = 'Default';
+  
+  try {
+    const themeData = useTheme();
+    colorTheme = themeData.colorTheme;
+  } catch (error) {
+    console.warn('EmotionBubbleDetail: ThemeProvider not ready, using defaults');
+  }
   
   return (
     <motion.div

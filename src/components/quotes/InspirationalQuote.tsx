@@ -25,7 +25,15 @@ export const InspirationalQuote: React.FC = () => {
     triggerOnce: false,
     threshold: 0.1,
   });
-  const { colorTheme } = useTheme();
+  // Defensive hook usage to prevent runtime errors during app initialization
+  let colorTheme = 'Default';
+  
+  try {
+    const themeData = useTheme();
+    colorTheme = themeData.colorTheme;
+  } catch (error) {
+    console.warn('InspirationalQuote: ThemeProvider not ready, using defaults');
+  }
   const { currentLanguage } = useTranslation();
   const rotationIntervalRef = useRef<number | null>(null);
   const isTranslatingRef = useRef<boolean>(false);

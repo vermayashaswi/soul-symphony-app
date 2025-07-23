@@ -20,7 +20,17 @@ export function ParticleBackground() {
   const animationRef = useRef<number>();
   const mousePos = useRef<{ x: number, y: number } | null>(null);
   const lastTouchTime = useRef<number>(0);
-  const { theme, systemTheme } = useTheme();
+  // Defensive hook usage to prevent runtime errors during app initialization
+  let theme = 'light';
+  let systemTheme = 'light';
+  
+  try {
+    const themeData = useTheme();
+    theme = themeData.theme;
+    systemTheme = themeData.systemTheme;
+  } catch (error) {
+    console.warn('ParticleBackground: ThemeProvider not ready, using defaults');
+  }
   
   // Golden color palette for particles
   const goldenColors = [

@@ -148,7 +148,17 @@ const ThemeBubbleAnimation: React.FC<ThemeBubbleAnimationProps> = ({
     velocity: { x: number; y: number };
   }>>([]);
   const [themePool, setThemePool] = useState<ThemeData[]>([]);
-  const { colorTheme, customColor } = useTheme();
+  // Defensive hook usage to prevent runtime errors during app initialization
+  let colorTheme = 'Default';
+  let customColor = '#3b82f6';
+  
+  try {
+    const themeData = useTheme();
+    colorTheme = themeData.colorTheme;
+    customColor = themeData.customColor || '#3b82f6';
+  } catch (error) {
+    console.warn('ThemeBubbleAnimation: ThemeProvider not ready, using defaults');
+  }
   const { currentLanguage, translate } = useTranslation();
   const [translatedThemeData, setTranslatedThemeData] = useState<ThemeData[]>([]);
   

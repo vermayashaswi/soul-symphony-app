@@ -26,7 +26,17 @@ const ParticleAvatar: React.FC<ParticleAvatarProps> = ({
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const animationRef = useRef<number>();
   const particlesRef = useRef<Particle[]>([]);
-  const { colorTheme, customColor } = useTheme();
+  // Defensive hook usage to prevent runtime errors during app initialization
+  let colorTheme = 'Default';
+  let customColor = '#3b82f6';
+  
+  try {
+    const themeData = useTheme();
+    colorTheme = themeData.colorTheme;
+    customColor = themeData.customColor || '#3b82f6';
+  } catch (error) {
+    console.warn('ParticleAvatar: ThemeProvider not ready, using defaults');
+  }
   const [themeColor, setThemeColor] = useState('#8b5cf6');
 
   // Get theme color

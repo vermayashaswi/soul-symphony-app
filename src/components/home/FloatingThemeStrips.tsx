@@ -25,7 +25,15 @@ const FloatingThemeStrips: React.FC<FloatingThemeStripsProps> = ({
 }) => {
   const [uniqueThemes, setUniqueThemes] = useState<ProcessedThemeData[]>([]);
   const [translatedThemes, setTranslatedThemes] = useState<ProcessedThemeData[]>([]);
-  const { theme } = useTheme();
+  // Defensive hook usage to prevent runtime errors during app initialization
+  let theme = 'light';
+  
+  try {
+    const themeData = useTheme();
+    theme = themeData.theme;
+  } catch (error) {
+    console.warn('FloatingThemeStrips: ThemeProvider not ready, using defaults');
+  }
   const [translatedLabel, setTranslatedLabel] = useState<string>("7-day themes");
   const isDarkMode = theme === 'dark';
   

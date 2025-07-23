@@ -12,7 +12,15 @@ import { useTutorial } from '@/contexts/TutorialContext';
 
 const JournalHeader: React.FC = () => {
   const { user } = useAuth();
-  const { theme } = useTheme();
+  // Defensive hook usage to prevent runtime errors during app initialization
+  let theme = 'light';
+  
+  try {
+    const themeData = useTheme();
+    theme = themeData.theme;
+  } catch (error) {
+    console.warn('JournalHeader: ThemeProvider not ready, using defaults');
+  }
   const { displayName } = useUserProfile();
   const { translate } = useTranslation();
   const [journalLabel, setJournalLabel] = useState("Journal");
