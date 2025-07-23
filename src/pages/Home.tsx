@@ -113,7 +113,7 @@ const Home = () => {
     <div 
       className="min-h-screen bg-background text-foreground relative overflow-hidden"
       style={{ 
-        // Always apply fixed positioning on home page with safe area awareness
+        // Always apply fixed positioning on home page (not just during tutorial)
         touchAction: 'none',
         overflow: 'hidden',
         position: 'fixed',
@@ -122,12 +122,7 @@ const Home = () => {
         right: 0,
         bottom: 0,
         width: '100%',
-        height: '100%',
-        // Apply safe area insets as padding for content positioning
-        paddingTop: 'var(--calculated-safe-area-top)',
-        paddingBottom: 'var(--calculated-safe-area-bottom)',
-        paddingLeft: 'var(--calculated-safe-area-left)',
-        paddingRight: 'var(--calculated-safe-area-right)'
+        height: '100%'
       }}
     >
       {/* Background elements including animations */}
