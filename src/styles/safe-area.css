@@ -72,5 +72,13 @@
 .journal-container,
 .insights-container,
 .settings-container {
-  @apply safe-area-top safe-area-left safe-area-right mobile-container;
+  @apply safe-area-left safe-area-right mobile-container;
+}
+
+/* Apply safe-area-top specifically for pages that need it */
+.smart-chat-container.safe-area-top,
+.journal-container.safe-area-top,
+.insights-container.safe-area-top,
+.settings-container.safe-area-top {
+  padding-top: max(var(--status-bar-height), var(--calculated-safe-area-top)) !important;
 }

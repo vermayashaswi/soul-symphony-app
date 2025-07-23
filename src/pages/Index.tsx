@@ -10,12 +10,13 @@ import { TranslatableText } from '@/components/translation/TranslatableText';
 import { useTranslation } from '@/contexts/TranslationContext';
 import { supabase } from '@/integrations/supabase/client';
 import { nativeIntegrationService } from '@/services/nativeIntegrationService';
+import { authStateSynchronizer } from '@/services/authStateSynchronizer';
 
 const Index = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
   const isMobile = useIsMobile();
-  const { onboardingComplete, checkOnboardingStatus } = useOnboarding();
+  const { checkOnboardingStatus } = useOnboarding();
   const networkStatus = useNetworkStatus();
   const { translate } = useTranslation();
 
@@ -25,10 +26,10 @@ const Index = () => {
   const shouldRenderMobile = isMobile.isMobile || mobileDemo;
   const isNative = nativeIntegrationService.isRunningNatively();
 
-  // CRITICAL: For native apps, redirect immediately - never show marketing site
+  // CRITICAL: For native apps, redirect immediately with improved state recovery
   useEffect(() => {
     if (isNative) {
-      console.log('[Index] Native app detected, redirecting to app interface');
+      console.log('[Index] Native app detected, using enhanced state recovery');
       
       // Check for OAuth callback parameters first
       const hashParams = new URLSearchParams(window.location.hash.replace('#', ''));
@@ -42,28 +43,29 @@ const Index = () => {
         return;
       }
 
-      // Redirect based on user status with improved onboarding check
+      // Enhanced state recovery for native apps
       if (!user) {
         console.log('[Index] No user in native app, redirecting to onboarding');
         navigate('/app/onboarding', { replace: true });
       } else {
-        // Check both localStorage and database for onboarding status
-        checkOnboardingStatus().then((isComplete) => {
-          if (!isComplete) {
-            console.log('[Index] Onboarding not complete in native app, redirecting to onboarding');
-            navigate('/app/onboarding', { replace: true });
+        // Use enhanced auth state recovery
+        authStateSynchronizer.recoverAuthState(user.id).then(({ onboardingComplete, shouldRedirect, redirectPath }) => {
+          console.log('[Index] Auth state recovered:', { onboardingComplete, shouldRedirect, redirectPath });
+          
+          if (shouldRedirect) {
+            navigate(redirectPath, { replace: true });
           } else {
-            console.log('[Index] Native app user ready, redirecting to home');
+            console.log('[Index] Native app user ready, staying on current path or going to home');
             navigate('/app/home', { replace: true });
           }
-        }).catch(() => {
-          // Fallback to onboarding if check fails
+        }).catch((error) => {
+          console.error('[Index] Auth state recovery failed:', error);
           navigate('/app/onboarding', { replace: true });
         });
       }
       return;
     }
-  }, [isNative, user, navigate, urlParams, checkOnboardingStatus]);
+  }, [isNative, user, navigate, urlParams]);
 
   // Enhanced tutorial status checking for proper navigation flow - ONLY for web users
   useEffect(() => {
@@ -195,7 +197,6 @@ const Index = () => {
   
   console.log('[Index] Rendering Index.tsx component, path:', window.location.pathname, {
     hasUser: !!user,
-    onboardingComplete,
     isNative
   });
 

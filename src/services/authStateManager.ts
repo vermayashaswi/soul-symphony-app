@@ -1,6 +1,7 @@
 import { supabase } from '@/integrations/supabase/client';
 import { nativeNavigationService } from './nativeNavigationService';
 import { nativeIntegrationService } from './nativeIntegrationService';
+import { authStateSynchronizer } from './authStateSynchronizer';
 import { toast } from 'sonner';
 
 interface NavigationRequest {
@@ -182,7 +183,7 @@ class AuthStateManager {
       return;
     }
     
-    this.log('Handling auth success', { 
+    this.log('Handling auth success with enhanced onboarding logic', { 
       redirectPath, 
       isNative: nativeIntegrationService.isRunningNatively(),
       wasAlreadyHandled: this.authSuccessHandled
@@ -212,11 +213,11 @@ class AuthStateManager {
 
       this.log('Valid session confirmed for auth success', debugInfo);
 
-      // Enhanced onboarding status check with database verification
-      const onboardingComplete = await this.verifyOnboardingStatus();
+      // Use enhanced state recovery for better onboarding detection
+      const { onboardingComplete, redirectPath: computedPath } = await authStateSynchronizer.recoverAuthState(debugInfo.userId!);
       
-      const finalPath = this.getFinalRedirectPath(redirectPath, onboardingComplete);
-      this.log('Final redirect path determined:', finalPath);
+      const finalPath = this.getFinalRedirectPath(redirectPath, onboardingComplete, computedPath);
+      this.log('Final redirect path determined with enhanced logic:', finalPath);
 
       localStorage.removeItem('authRedirectTo');
 
@@ -307,7 +308,7 @@ class AuthStateManager {
     this.queueNavigation('/app/auth');
   }
 
-  private getFinalRedirectPath(providedPath?: string, onboardingComplete?: boolean): string {
+  private getFinalRedirectPath(providedPath?: string, onboardingComplete?: boolean, computedPath?: string): string {
     if (providedPath && providedPath !== '/app/auth') {
       this.log('Using provided redirect path:', providedPath);
       return providedPath;
@@ -317,6 +318,12 @@ class AuthStateManager {
     if (storedRedirect && storedRedirect !== '/app/auth') {
       this.log('Using stored redirect path:', storedRedirect);
       return storedRedirect;
+    }
+
+    // Use computed path from enhanced state recovery if available
+    if (computedPath) {
+      this.log('Using computed redirect path from state recovery:', computedPath);
+      return computedPath;
     }
 
     // Use verified onboarding status if provided, otherwise check localStorage
@@ -352,13 +359,12 @@ class AuthStateManager {
         return false;
       }
 
-      // Use the new synchronizer for reliable status checking
-      const { authStateSynchronizer } = await import('./authStateSynchronizer');
+      // Use the enhanced synchronizer for reliable status checking
       const isComplete = await authStateSynchronizer.syncOnboardingStatus(debugInfo.userId!, {
         forceSync: true
       });
       
-      this.log('Onboarding status verified:', { isComplete, userId: debugInfo.userId });
+      this.log('Onboarding status verified with enhanced logic:', { isComplete, userId: debugInfo.userId });
       return isComplete;
       
     } catch (error) {
