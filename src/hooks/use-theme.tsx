@@ -298,8 +298,6 @@ export function ThemeProvider({ children }: ThemeProviderProps) {
 export function useTheme() {
   const context = useContext(ThemeContext);
   if (context === undefined) {
-    // More detailed error with debugging info
-    console.error("useTheme called outside ThemeProvider. Call stack:", new Error().stack);
     throw new Error("useTheme must be used within a ThemeProvider");
   }
   return context;

@@ -54,16 +54,12 @@ export const StatusBarManager: React.FC<StatusBarManagerProps> = ({ children }) 
         bottomInset = '8px';
         document.documentElement.classList.add('platform-android');
         document.documentElement.classList.remove('platform-ios');
-        document.body.classList.add('platform-android');
-        document.body.classList.remove('platform-ios');
         
         console.log('[StatusBarManager] ANDROID FIX: Android platform detected, setting bottom inset to 8px');
       } else if (isIOS) {
         statusBarHeight = '44px';
         document.documentElement.classList.add('platform-ios');
         document.documentElement.classList.remove('platform-android');
-        document.body.classList.add('platform-ios');
-        document.body.classList.remove('platform-android');
       }
       
       // Set CSS custom properties for safe area handling
@@ -95,12 +91,6 @@ export const StatusBarManager: React.FC<StatusBarManagerProps> = ({ children }) 
       root.style.setProperty('--safe-area-inset-top', actualTop);
       root.style.setProperty('--safe-area-inset-left', actualLeft);
       root.style.setProperty('--safe-area-inset-right', actualRight);
-      
-      // Update calculated safe area variables
-      root.style.setProperty('--calculated-safe-area-top', actualTop);
-      root.style.setProperty('--calculated-safe-area-bottom', isAndroid ? bottomInset : actualBottom);
-      root.style.setProperty('--calculated-safe-area-left', actualLeft);
-      root.style.setProperty('--calculated-safe-area-right', actualRight);
       
       console.log('[StatusBarManager] ANDROID FIX: Safe area variables updated:', {
         statusBarHeight,
