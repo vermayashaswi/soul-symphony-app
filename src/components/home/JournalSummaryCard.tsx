@@ -21,7 +21,17 @@ interface ThemeData {
 
 const JournalSummaryCard: React.FC = () => {
   const { user } = useAuth();
-  const { colorTheme, customColor } = useTheme();
+  // Defensive hook usage to prevent runtime errors during app initialization
+  let colorTheme = 'Default';
+  let customColor = '#3b82f6';
+  
+  try {
+    const themeData = useTheme();
+    colorTheme = themeData.colorTheme;
+    customColor = themeData.customColor || '#3b82f6';
+  } catch (error) {
+    console.warn('JournalSummaryCard: ThemeProvider not ready, using defaults');
+  }
   const [summaryData, setSummaryData] = useState<SummaryResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);

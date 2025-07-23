@@ -15,7 +15,17 @@ const EnergyAnimation: React.FC<EnergyAnimationProps> = ({
   bottomNavOffset = false
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
-  const { colorTheme, customColor } = useTheme();
+  // Defensive hook usage to prevent runtime errors during app initialization
+  let colorTheme = 'Default';
+  let customColor = '#3b82f6';
+  
+  try {
+    const themeData = useTheme();
+    colorTheme = themeData.colorTheme;
+    customColor = themeData.customColor || '#3b82f6';
+  } catch (error) {
+    console.warn('EnergyAnimation: ThemeProvider not ready, using defaults');
+  }
   
   // Determine the base color to use based on the user's selected theme
   const getThemeColors = () => {
