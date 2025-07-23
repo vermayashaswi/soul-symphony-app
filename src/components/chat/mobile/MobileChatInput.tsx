@@ -1,3 +1,4 @@
+
 import React, { useState, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Send, Loader2 } from "lucide-react";
@@ -55,7 +56,7 @@ export default function MobileChatInput({
   useEffect(() => {
     if (!isReady) return;
     
-    console.log('[MobileChatInput] PHASE 2 FIX: Keyboard state:', { 
+    console.log('[MobileChatInput] Keyboard state:', { 
       isVisible: isKeyboardVisible, 
       height: keyboardHeight, 
       platform, 
@@ -78,23 +79,24 @@ export default function MobileChatInput({
     }
   }, [isKeyboardVisible, keyboardHeight, platform, isNative, isReady]);
 
-  // PHASE 2 FIX: Remove debug attributes to prevent green border
+  // IMPROVED: Apply container classes with better coordination
   useEffect(() => {
     if (!inputContainerRef.current || !isReady) return;
     
     const container = inputContainerRef.current;
     
     // Apply keyboard state and platform classes (let the hook manage these)
+    // These classes are managed by useKeyboardState hook, but we ensure they're present
     container.classList.toggle('keyboard-visible', isKeyboardVisible);
     container.classList.toggle(`platform-${platform}`, true);
     
-    // PHASE 2 FIX: Remove debug attributes that cause green border
-    // container.setAttribute('data-debug', 'true'); // REMOVED
-    // container.setAttribute('data-keyboard-visible', isKeyboardVisible.toString()); // REMOVED
-    // container.setAttribute('data-platform', platform); // REMOVED
-    // container.setAttribute('data-keyboard-height', keyboardHeight.toString()); // REMOVED
+    // Add debug attributes for visual debugging
+    container.setAttribute('data-debug', 'true');
+    container.setAttribute('data-keyboard-visible', isKeyboardVisible.toString());
+    container.setAttribute('data-platform', platform);
+    container.setAttribute('data-keyboard-height', keyboardHeight.toString());
     
-    console.log('[MobileChatInput] PHASE 2 FIX: Container updated without debug attributes:', {
+    console.log('[MobileChatInput] Updated container classes:', {
       keyboardVisible: isKeyboardVisible,
       platform,
       height: keyboardHeight,
@@ -118,7 +120,7 @@ export default function MobileChatInput({
   };
 
   const handleInputFocus = () => {
-    console.log('[MobileChatInput] PHASE 2 FIX: Input focused');
+    console.log('[MobileChatInput] Input focused');
     // Slight delay to ensure keyboard detection fires first
     setTimeout(() => {
       const chatContent = document.querySelector('.mobile-chat-content');
@@ -162,7 +164,7 @@ export default function MobileChatInput({
       className={cn(
         "mobile-chat-input-container",
         "flex items-center gap-3",
-        // PHASE 2 FIX: Ensure proper keyboard handling without debug styling
+        // Note: keyboard-visible and platform classes are managed by useKeyboardState hook
         !isReady && 'opacity-0'
       )}
     >
