@@ -140,7 +140,7 @@ const ChatInput: React.FC<ChatInputProps> = ({
             value={message}
             onChange={handleTextareaChange}
             placeholder={placeholderText}
-            className="min-h-[24px] h-[32px] text-sm md:text-base resize-none rounded-full pl-4 pr-12 py-0 shadow-sm border-muted bg-background text-foreground overflow-hidden"
+            className="min-h-[24px] h-[32px] text-sm md:text-base resize-none rounded-full pl-4 pr-12 py-0 shadow-sm border-muted bg-background text-foreground overflow-hidden focus:outline-none focus:ring-0 focus:border-muted"
             disabled={isLoading}
             onKeyDown={(e) => {
               if (e.key === 'Enter' && !e.shiftKey) {

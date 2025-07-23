@@ -23,6 +23,7 @@ import { mobileErrorHandler } from './services/mobileErrorHandler';
 import { mobileOptimizationService } from './services/mobileOptimizationService';
 import { nativeIntegrationService } from './services/nativeIntegrationService';
 import { nativeAuthService } from './services/nativeAuthService';
+import { useAppInitialization } from './hooks/useAppInitialization';
 
 const App: React.FC = () => {
   const [isInitialized, setIsInitialized] = useState(false);
@@ -30,6 +31,7 @@ const App: React.FC = () => {
   const [initializationError, setInitializationError] = useState<string | null>(null);
   const twaEnv = detectTWAEnvironment();
   const { refreshCount, isStuckDetected } = useTWAAutoRefresh();
+  const appInitialization = useAppInitialization();
 
   useEffect(() => {
       if (nativeIntegrationService.isRunningNatively()) {

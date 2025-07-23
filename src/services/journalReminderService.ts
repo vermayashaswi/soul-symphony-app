@@ -206,9 +206,14 @@ class JournalReminderService {
       window.focus();
       notification.close();
       
-      // Navigate to journal if not already there
-      if (window.location.pathname !== '/app/journal') {
-        window.location.href = '/app/journal';
+      // Check if user is signed in by looking for auth token
+      const hasAuth = localStorage.getItem('sb-' + window.location.hostname.replace(/\./g, '-') + '-auth-token') !== null;
+      
+      // Navigate based on auth status
+      if (hasAuth) {
+        window.location.href = '/app/home';
+      } else {
+        window.location.href = '/app/onboarding';
       }
     };
   }
