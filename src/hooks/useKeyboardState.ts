@@ -55,7 +55,7 @@ export const useKeyboardState = () => {
     };
 
     // Listen for Capacitor keyboard events
-    if (window.Capacitor && window.Capacitor.Plugins.Keyboard) {
+    if (window.Capacitor?.Plugins?.Keyboard) {
       window.Capacitor.Plugins.Keyboard.addListener('keyboardWillShow', handleKeyboardShow);
       window.Capacitor.Plugins.Keyboard.addListener('keyboardWillHide', handleKeyboardHide);
     }
@@ -87,7 +87,7 @@ export const useKeyboardState = () => {
 
     // Cleanup
     return () => {
-      if (window.Capacitor && window.Capacitor.Plugins.Keyboard) {
+      if (window.Capacitor?.Plugins?.Keyboard) {
         window.Capacitor.Plugins.Keyboard.removeAllListeners();
       }
       window.removeEventListener('resize', handleResize);
