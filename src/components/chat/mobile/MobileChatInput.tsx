@@ -177,7 +177,7 @@ export default function MobileChatInput({
           onKeyDown={handleKeyPress}
           onFocus={handleInputFocus}
           placeholder={placeholderText}
-          className="w-full border border-muted shadow-sm bg-background text-foreground focus:ring-1 focus:ring-muted focus:border-muted"
+          className="w-full border border-muted shadow-sm bg-background text-foreground focus:outline-none focus:ring-0 focus:border-muted"
           disabled={isLoading || isSubmitting}
         />
       </div>
