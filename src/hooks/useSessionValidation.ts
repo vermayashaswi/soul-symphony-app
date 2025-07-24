@@ -2,6 +2,8 @@ import { useState, useEffect } from 'react';
 import { Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 import { nativeIntegrationService } from '@/services/nativeIntegrationService';
+import { sessionStorageManager } from '@/utils/sessionStorage';
+import { debugLogger } from '@/utils/debugLogger';
 
 interface SessionValidationState {
   session: Session | null;
@@ -22,37 +24,45 @@ export const useSessionValidation = () => {
 
   const validateStoredSession = (): Session | null => {
     try {
-      const storedSession = localStorage.getItem('sb-kwnwhgucnzqxndzjayyq-auth-token');
-      if (!storedSession) return null;
-
-      const sessionData = JSON.parse(storedSession);
+      debugLogger.log('ValidateStoredSession:Start', {});
       
-      // Validate session structure and expiry
-      if (sessionData?.access_token && sessionData?.expires_at) {
-        const now = Date.now() / 1000;
-        if (sessionData.expires_at > now) {
-          console.log('[useSessionValidation] Valid stored session found');
-          return sessionData as Session;
-        } else {
-          console.log('[useSessionValidation] Stored session expired');
-        }
+      const sessionData = sessionStorageManager.getStoredSession();
+      if (!sessionData) {
+        debugLogger.log('ValidateStoredSession:NoData', {});
+        return null;
       }
+
+      const isValid = sessionStorageManager.validateSession(sessionData);
       
-      return null;
+      debugLogger.logSessionValidation('ValidateStoredSession:Result', sessionData, isValid);
+      
+      if (isValid) {
+        console.log('[useSessionValidation] Valid stored session found');
+        return sessionData as Session;
+      } else {
+        console.log('[useSessionValidation] Stored session invalid or expired');
+        return null;
+      }
     } catch (error) {
-      console.warn('[useSessionValidation] Error validating stored session:', error);
+      debugLogger.logError('ValidateStoredSession:Error', error);
       return null;
     }
   };
 
   const checkSession = async () => {
     try {
+      debugLogger.log('CheckSession:Start', { isNative });
       console.log('[useSessionValidation] Starting session validation...');
       
       // For native apps, try synchronous validation first
       if (isNative) {
+        debugLogger.log('CheckSession:NativePath', {});
         const storedSession = validateStoredSession();
         if (storedSession) {
+          debugLogger.log('CheckSession:NativeSuccess', { 
+            sessionExists: true, 
+            userExists: !!storedSession.user 
+          });
           setState({
             session: storedSession,
             isLoading: false,
@@ -61,12 +71,15 @@ export const useSessionValidation = () => {
           });
           return storedSession;
         }
+        debugLogger.log('CheckSession:NativeFallback', {});
       }
 
       // Async validation fallback
+      debugLogger.log('CheckSession:AsyncPath', {});
       const { data: { session }, error } = await supabase.auth.getSession();
       
       if (error) {
+        debugLogger.logError('CheckSession:SupabaseError', error);
         console.error('[useSessionValidation] Session validation error:', error);
         setState({
           session: null,
@@ -79,6 +92,7 @@ export const useSessionValidation = () => {
 
       const isValid = !!session?.user && !!session?.access_token;
       
+      debugLogger.logSessionValidation('CheckSession:Complete', session, isValid);
       console.log('[useSessionValidation] Session validation complete:', {
         hasSession: !!session,
         isValid,
@@ -94,6 +108,7 @@ export const useSessionValidation = () => {
 
       return session;
     } catch (error) {
+      debugLogger.logError('CheckSession:UnexpectedError', error);
       console.error('[useSessionValidation] Validation failed:', error);
       setState({
         session: null,
