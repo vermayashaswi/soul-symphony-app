@@ -26,6 +26,7 @@ import { useAppInitialization } from './hooks/useAppInitialization';
 import { UnifiedLoadingOverlay } from './components/loading/UnifiedLoadingOverlay';
 import { loadingStateManager, LoadingPriority } from './services/loadingStateManager';
 import { ThemeProvider } from './hooks/use-theme';
+import { AuthProvider } from './contexts/AuthContext';
 
 const App: React.FC = () => {
   const [isInitialized, setIsInitialized] = useState(false);
@@ -290,20 +291,22 @@ const App: React.FC = () => {
   return (
     <ErrorBoundary onError={handleAppError}>
       <ThemeProvider>
-        <FeatureFlagsProvider>
-          <SubscriptionProvider>
-            <TutorialProvider>
-              <TWAWrapper>
-                <UnifiedLoadingOverlay />
-                <JournalProcessingInitializer />
-                <AppRoutes key={isInitialized ? 'initialized' : 'initializing'} />
-                <TutorialOverlay />
-                <Toaster />
-                <SonnerToaster position="top-right" />
-              </TWAWrapper>
-            </TutorialProvider>
-          </SubscriptionProvider>
-        </FeatureFlagsProvider>
+        <AuthProvider>
+          <FeatureFlagsProvider>
+            <SubscriptionProvider>
+              <TutorialProvider>
+                <TWAWrapper>
+                  <UnifiedLoadingOverlay />
+                  <JournalProcessingInitializer />
+                  <AppRoutes key={isInitialized ? 'initialized' : 'initializing'} />
+                  <TutorialOverlay />
+                  <Toaster />
+                  <SonnerToaster position="top-right" />
+                </TWAWrapper>
+              </TutorialProvider>
+            </SubscriptionProvider>
+          </FeatureFlagsProvider>
+        </AuthProvider>
       </ThemeProvider>
     </ErrorBoundary>
   );

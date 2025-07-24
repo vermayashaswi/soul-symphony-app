@@ -270,11 +270,31 @@ function AuthProviderCore({ children }: { children: ReactNode }) {
     }
   };
 
-  // Initialize auth state
+  // Initialize auth state with timeout and recovery
   useEffect(() => {
+    let authTimeout: NodeJS.Timeout;
+    let isMounted = true;
+    
     const initializeAuth = async () => {
       console.log('[AuthContext] Initializing authentication...');
       loadingStateManager.setLoading('auth-session', LoadingPriority.HIGH, 'Checking authentication...');
+      
+      // Set a timeout to prevent infinite loading
+      authTimeout = setTimeout(() => {
+        if (isMounted) {
+          console.warn('[AuthContext] Auth initialization timeout - using emergency recovery');
+          setIsLoading(false);
+          loadingStateManager.clearLoading('auth-session');
+          
+          // Emergency recovery: check for any stored session
+          const storedSession = validateStoredSession();
+          if (storedSession) {
+            console.log('[AuthContext] Emergency recovery: found stored session');
+            setSession(storedSession);
+            setUser(storedSession.user);
+          }
+        }
+      }, 8000); // 8 second timeout
       
       try {
         // For native apps, try synchronous validation first for faster loading
@@ -286,15 +306,27 @@ function AuthProviderCore({ children }: { children: ReactNode }) {
             setUser(storedSession.user);
             setIsLoading(false);
             loadingStateManager.clearLoading('auth-session');
+            clearTimeout(authTimeout);
             return;
           }
         }
 
-        // Fallback to async validation
-        const { data: { session: currentSession }, error } = await supabase.auth.getSession();
+        // Fallback to async validation with promise race
+        const sessionPromise = supabase.auth.getSession();
+        const timeoutPromise = new Promise((_, reject) => 
+          setTimeout(() => reject(new Error('Session fetch timeout')), 5000)
+        );
+        
+        const { data: { session: currentSession }, error } = await Promise.race([
+          sessionPromise,
+          timeoutPromise
+        ]) as any;
+        
+        if (!isMounted) return;
         
         if (error) {
           console.error('[AuthContext] Session validation error:', error);
+          // Don't fail completely, allow user to proceed
         } else {
           console.log('[AuthContext] Session validation complete:', {
             hasSession: !!currentSession,
@@ -305,13 +337,33 @@ function AuthProviderCore({ children }: { children: ReactNode }) {
         }
       } catch (error) {
         console.error('[AuthContext] Auth initialization failed:', error);
+        
+        if (isMounted) {
+          // Try emergency recovery
+          const storedSession = validateStoredSession();
+          if (storedSession) {
+            console.log('[AuthContext] Error recovery: using stored session');
+            setSession(storedSession);
+            setUser(storedSession.user);
+          }
+        }
       } finally {
-        setIsLoading(false);
-        loadingStateManager.clearLoading('auth-session');
+        if (isMounted) {
+          setIsLoading(false);
+          loadingStateManager.clearLoading('auth-session');
+          clearTimeout(authTimeout);
+        }
       }
     };
 
     initializeAuth();
+    
+    return () => {
+      isMounted = false;
+      if (authTimeout) {
+        clearTimeout(authTimeout);
+      }
+    };
   }, [isNative, validateStoredSession]);
 
   // Set up auth state listener
