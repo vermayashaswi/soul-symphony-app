@@ -9,49 +9,36 @@ export const isNativeApp = (): boolean => {
   return /native/i.test(window.navigator.userAgent);
 };
 
-// Cached route results to prevent repeated computations
-const routeCache = new Map<string, boolean>();
-
 // CRITICAL FIX: Update the path-based check to treat ALL routes as app routes for native apps
 export const isAppRoute = (pathname: string): boolean => {
-  const cacheKey = `app_${pathname}`;
-  if (routeCache.has(cacheKey)) {
-    return routeCache.get(cacheKey)!;
-  }
-  
   // For native apps, ALL routes are considered app routes
   if (nativeIntegrationService.isRunningNatively()) {
-    routeCache.set(cacheKey, true);
+    console.log(`isAppRoute check for ${pathname}: true (native app - all routes are app routes)`);
     return true;
   }
   
   // For web apps, app routes must start with /app/ or be exactly /app
   const isApp = pathname.startsWith('/app/') || pathname === '/app';
-  routeCache.set(cacheKey, isApp);
+  console.log(`isAppRoute check for ${pathname}: ${isApp} (web app)`);
   return isApp;
 };
 
 export const isWebsiteRoute = (pathname: string): boolean => {
-  const cacheKey = `website_${pathname}`;
-  if (routeCache.has(cacheKey)) {
-    return routeCache.get(cacheKey)!;
-  }
-  
   // For native apps, NO routes are website routes - everything is treated as app routes
   if (nativeIntegrationService.isRunningNatively()) {
-    routeCache.set(cacheKey, false);
+    console.log(`${pathname} is not a website route (native app - all routes are app routes)`);
     return false;
   }
   
   // If it has an app prefix, it's not a website route
   if (isAppRoute(pathname)) {
-    routeCache.set(cacheKey, false);
+    console.log(`${pathname} is an app route, so not a website route`);
     return false;
   }
   
   // For root URL (/), consider it as a website route in web mode
   if (pathname === '/') {
-    routeCache.set(cacheKey, true);
+    console.log(`${pathname} is root, treating as website route (web mode)`);
     return true;
   }
   
@@ -63,7 +50,7 @@ export const isWebsiteRoute = (pathname: string): boolean => {
     pathname === prefix || pathname.startsWith(`${prefix}/`)
   );
   
-  routeCache.set(cacheKey, isWebsite);
+  console.log(`isWebsiteRoute check for ${pathname}: ${isWebsite} (web mode)`);
   return isWebsite;
 };
 

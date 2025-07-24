@@ -34,8 +34,7 @@ import { TranslatableText } from '@/components/translation/TranslatableText';
 import { useTranslation } from '@/contexts/TranslationContext';
 import { useTutorial } from '@/contexts/TutorialContext';
 import { DeleteAllEntriesSection } from '@/components/settings/DeleteAllEntriesSection';
-import { AuthDebugComponent } from '@/components/debug/AuthDebugComponent';
-
+import { SessionDebugPanel } from '@/components/debug/SessionDebugPanel';
 
 interface SettingItemProps {
   icon: React.ElementType;
@@ -67,9 +66,6 @@ function SettingItem({ icon: Icon, title, description, children }: SettingItemPr
 
 function SettingsContent() {
   console.log('[Settings] SettingsContent rendering');
-  
-  // Add debug flag for development
-  const showDebug = true; // Set to false in production
   
   // Defensive theme access
   let theme = 'light';
@@ -585,8 +581,6 @@ function SettingsContent() {
           </div>
           
           <div className="space-y-6">
-            {/* Debug component for troubleshooting */}
-            {process.env.NODE_ENV === 'development' && <AuthDebugComponent />}
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
@@ -989,6 +983,20 @@ function SettingsContent() {
               <DeleteAllEntriesSection />
             </motion.div>
             
+            {process.env.NODE_ENV === 'development' && (
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.3, delay: 0.5 }}
+                className="bg-background rounded-xl p-6 shadow-sm border"
+              >
+                <h2 className="text-xl font-semibold mb-4 text-theme-color">
+                  Session Debug (Development Only)
+                </h2>
+                
+                <SessionDebugPanel />
+              </motion.div>
+            )}
             
             <div className="py-4 text-center text-sm text-muted-foreground">
               <p className="flex items-center justify-center gap-1">

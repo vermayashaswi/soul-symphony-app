@@ -30,8 +30,7 @@ export const PremiumFeatureGuard: React.FC<PremiumFeatureGuardProps> = ({
     isLoading,
     tier,
     status,
-    isTrialEligible,
-    isPremium
+    isTrialEligible
   } = useSubscription();
   const navigate = useNavigate();
   const [isSubscriptionModalOpen, setIsSubscriptionModalOpen] = useState(false);
@@ -45,8 +44,8 @@ export const PremiumFeatureGuard: React.FC<PremiumFeatureGuardProps> = ({
     );
   }
 
-  // Enhanced debug logging for troubleshooting
-  console.log('[PremiumFeatureGuard] Subscription status:', {
+  // Debug logging for troubleshooting
+  console.log('[PremiumFeatureGuard] Subscription check:', {
     feature,
     hasActiveSubscription,
     isTrialActive,
@@ -54,17 +53,12 @@ export const PremiumFeatureGuard: React.FC<PremiumFeatureGuardProps> = ({
     status,
     trialEndDate: trialEndDate?.toISOString(),
     daysRemaining: daysRemainingInTrial,
-    isTrialEligible,
-    isPremium
+    isTrialEligible
   });
 
-  // CRITICAL: Enhanced access logic - check both subscription and trial properly
-  const shouldGrantAccess = hasActiveSubscription || 
-                           (tier === 'premium' && status === 'trial' && isTrialActive) ||
-                           (isPremium && isTrialActive);
-
-  if (shouldGrantAccess) {
-    console.log('[PremiumFeatureGuard] Access granted - user has valid subscription/trial');
+  // Allow access if user has active subscription or active trial
+  if (hasActiveSubscription) {
+    console.log('[PremiumFeatureGuard] Access granted - user has active subscription or trial');
     return <>{children}</>;
   }
 
