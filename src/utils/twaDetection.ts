@@ -19,24 +19,17 @@ export interface SessionNavigationState {
 
 /**
  * Detects if the app is running in a TWA environment
- * Enhanced for better Android APK detection
  */
 export const detectTWAEnvironment = (): TWAEnvironment => {
   const userAgent = navigator.userAgent.toLowerCase();
   const isAndroid = /android/i.test(userAgent);
   
-  // Enhanced detection for Android APKs and Capacitor environments
   const isTWA = 
     window.matchMedia('(display-mode: standalone)').matches ||
     userAgent.includes('wv') ||
-    (window as any).Capacitor?.isNative ||
-    (window as any).Capacitor?.platform ||
-    window.location.href.includes('capacitor://') ||
-    (isAndroid && !window.location.href.includes('http')) ||
     (isAndroid && userAgent.includes('chrome') && !userAgent.includes('mobile safari'));
 
-  const isStandalone = window.matchMedia('(display-mode: standalone)').matches ||
-                      (window as any).Capacitor?.isNative;
+  const isStandalone = window.matchMedia('(display-mode: standalone)').matches;
   
   return {
     isTWA,
