@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 import { nativeIntegrationService } from '@/services/nativeIntegrationService';
+import { loadingStateManager, LoadingPriority } from '@/services/loadingStateManager';
 
 interface SessionValidationState {
   session: Session | null;
@@ -48,11 +49,13 @@ export const useSessionValidation = () => {
   const checkSession = async () => {
     try {
       console.log('[useSessionValidation] Starting session validation...');
+      loadingStateManager.setLoading('session-validation', LoadingPriority.HIGH, 'Validating session...');
       
       // For native apps, try synchronous validation first
       if (isNative) {
         const storedSession = validateStoredSession();
         if (storedSession) {
+          loadingStateManager.clearLoading('session-validation');
           setState({
             session: storedSession,
             isLoading: false,
@@ -68,6 +71,7 @@ export const useSessionValidation = () => {
       
       if (error) {
         console.error('[useSessionValidation] Session validation error:', error);
+        loadingStateManager.clearLoading('session-validation');
         setState({
           session: null,
           isLoading: false,
@@ -85,6 +89,7 @@ export const useSessionValidation = () => {
         userId: session?.user?.id
       });
 
+      loadingStateManager.clearLoading('session-validation');
       setState({
         session,
         isLoading: false,
@@ -95,6 +100,7 @@ export const useSessionValidation = () => {
       return session;
     } catch (error) {
       console.error('[useSessionValidation] Validation failed:', error);
+      loadingStateManager.clearLoading('session-validation');
       setState({
         session: null,
         isLoading: false,
@@ -107,7 +113,10 @@ export const useSessionValidation = () => {
 
   const refreshSession = async () => {
     setState(prev => ({ ...prev, isLoading: true }));
-    return await checkSession();
+    loadingStateManager.setLoading('session-refresh', LoadingPriority.HIGH, 'Refreshing session...');
+    const result = await checkSession();
+    loadingStateManager.clearLoading('session-refresh');
+    return result;
   };
 
   useEffect(() => {

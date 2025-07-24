@@ -4,6 +4,7 @@ import { Navigate, useLocation, Outlet } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { detectTWAEnvironment } from '@/utils/twaDetection';
 import { useSession } from '@/providers/SessionProvider';
+import { loadingStateManager, LoadingPriority } from '@/services/loadingStateManager';
 
 const ProtectedRoute: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
@@ -12,14 +13,18 @@ const ProtectedRoute: React.FC = () => {
   const { recordActivity } = useSession();
   
   useEffect(() => {
+    loadingStateManager.setLoading('auth-check', LoadingPriority.CRITICAL, 'Checking authentication...');
+    
     const checkAuth = async () => {
       try {
         const { data } = await supabase.auth.getSession();
         setUser(data.session?.user || null);
         setIsLoading(false);
+        loadingStateManager.clearLoading('auth-check');
       } catch (error) {
         console.error('Error checking authentication in ProtectedRoute:', error);
         setIsLoading(false);
+        loadingStateManager.clearLoading('auth-check');
       }
     };
     
@@ -28,9 +33,13 @@ const ProtectedRoute: React.FC = () => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       setUser(session?.user || null);
       setIsLoading(false);
+      loadingStateManager.clearLoading('auth-check');
     });
     
-    return () => subscription.unsubscribe();
+    return () => {
+      subscription.unsubscribe();
+      loadingStateManager.clearLoading('auth-check');
+    };
   }, []);
   
   useEffect(() => {
@@ -52,11 +61,8 @@ const ProtectedRoute: React.FC = () => {
   }, [user, isLoading, location, recordActivity]);
   
   if (isLoading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
-      </div>
-    );
+    // Loading state is now handled by UnifiedLoadingOverlay
+    return null;
   }
   
   if (!user) {
