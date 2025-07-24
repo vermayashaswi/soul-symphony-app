@@ -3,6 +3,7 @@ import AppRoutes from './routes/AppRoutes';
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as SonnerToaster } from "@/components/ui/sonner";
 import { SubscriptionProvider } from '@/contexts/SubscriptionContext';
+import { TranslationLoadingOverlay } from '@/components/translation/TranslationLoadingOverlay';
 import { JournalProcessingInitializer } from './app/journal-processing-init';
 import { TutorialProvider } from './contexts/TutorialContext';
 import TutorialOverlay from './components/tutorial/TutorialOverlay';
@@ -14,6 +15,7 @@ import './styles/tutorial.css';
 import { FeatureFlagsProvider } from "./contexts/FeatureFlagsContext";
 import { SessionProvider } from "./providers/SessionProvider";
 import TWAWrapper from './components/twa/TWAWrapper';
+import TWAInitializationWrapper from './components/twa/TWAInitializationWrapper';
 import { detectTWAEnvironment } from './utils/twaDetection';
 import { useTWAAutoRefresh } from './hooks/useTWAAutoRefresh';
 import { twaUpdateService } from './services/twaUpdateService';
@@ -23,10 +25,6 @@ import { mobileOptimizationService } from './services/mobileOptimizationService'
 import { nativeIntegrationService } from './services/nativeIntegrationService';
 import { nativeAuthService } from './services/nativeAuthService';
 import { useAppInitialization } from './hooks/useAppInitialization';
-import { UnifiedLoadingOverlay } from './components/loading/UnifiedLoadingOverlay';
-import { loadingStateManager, LoadingPriority } from './services/loadingStateManager';
-import { ThemeProvider } from './hooks/use-theme';
-import { AuthProvider } from './contexts/AuthContext';
 
 const App: React.FC = () => {
   const [isInitialized, setIsInitialized] = useState(false);
@@ -44,7 +42,6 @@ const App: React.FC = () => {
     const initializeApp = async () => {
       try {
         console.log('[App] Starting app initialization...');
-        loadingStateManager.setLoading('app-init', LoadingPriority.CRITICAL, 'Starting Soul Symphony...');
         
         // Clean up any malformed paths
         const currentPath = window.location.pathname;
@@ -130,13 +127,11 @@ const App: React.FC = () => {
         
         setTimeout(() => {
           console.log('[App] App initialization completed - setting isInitialized to true');
-          loadingStateManager.clearLoading('app-init');
           setIsInitialized(true);
         }, initDelay);
 
       } catch (error) {
         console.error('[App] Critical initialization error:', error);
-        loadingStateManager.clearLoading('app-init');
         setInitializationError(error.toString());
         mobileErrorHandler.handleError({
           type: 'crash',
@@ -290,24 +285,22 @@ const App: React.FC = () => {
 
   return (
     <ErrorBoundary onError={handleAppError}>
-      <ThemeProvider>
-        <AuthProvider>
-          <FeatureFlagsProvider>
-            <SubscriptionProvider>
-              <TutorialProvider>
-                <TWAWrapper>
-                  <UnifiedLoadingOverlay />
-                  <JournalProcessingInitializer />
-                  <AppRoutes key={isInitialized ? 'initialized' : 'initializing'} />
-                  <TutorialOverlay />
-                  <Toaster />
-                  <SonnerToaster position="top-right" />
-                </TWAWrapper>
-              </TutorialProvider>
-            </SubscriptionProvider>
-          </FeatureFlagsProvider>
-        </AuthProvider>
-      </ThemeProvider>
+      <FeatureFlagsProvider>
+        <SubscriptionProvider>
+          <TutorialProvider>
+            <TWAWrapper>
+              <TWAInitializationWrapper>
+                <TranslationLoadingOverlay />
+                <JournalProcessingInitializer />
+                <AppRoutes key={isInitialized ? 'initialized' : 'initializing'} />
+                <TutorialOverlay />
+                <Toaster />
+                <SonnerToaster position="top-right" />
+              </TWAInitializationWrapper>
+            </TWAWrapper>
+          </TutorialProvider>
+        </SubscriptionProvider>
+      </FeatureFlagsProvider>
     </ErrorBoundary>
   );
 };

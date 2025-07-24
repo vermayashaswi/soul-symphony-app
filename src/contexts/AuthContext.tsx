@@ -1,5 +1,5 @@
 
-import { createContext, useContext, useState, useEffect, ReactNode, useCallback, useMemo } from 'react';
+import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { Session, User } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
@@ -14,385 +14,628 @@ import {
   signOut as signOutService,
   refreshSession as refreshSessionService
 } from '@/services/authService';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { debugLogger, logInfo, logError, logAuthError, logProfile, logAuth } from '@/components/debug/DebugPanel';
+import { isAppRoute } from '@/routes/RouteHelpers';
+import { useLocation } from 'react-router-dom';
 import { LocationProvider } from '@/contexts/LocationContext';
 import { detectTWAEnvironment } from '@/utils/twaDetection';
 import { nativeAuthService } from '@/services/nativeAuthService';
 import { nativeIntegrationService } from '@/services/nativeIntegrationService';
-import { authStateManager } from '@/services/authStateManager';
-import { loadingStateManager, LoadingPriority } from '@/services/loadingStateManager';
+import { nativeNavigationService } from '@/services/nativeNavigationService';
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
+
+const MAX_AUTO_PROFILE_ATTEMPTS = 2; // Reduced for TWA stability
+const BASE_RETRY_DELAY = 2000; // Increased delay
 
 function AuthProviderCore({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [profileCreationInProgress, setProfileCreationInProgress] = useState(false);
   const [profileCreationAttempts, setProfileCreationAttempts] = useState(0);
-  const navigate = useNavigate();
+  const [lastProfileAttemptTime, setLastProfileAttemptTime] = useState<number>(0);
+  const [isMobileDevice, setIsMobileDevice] = useState(false);
+  const [profileExistsStatus, setProfileExistsStatus] = useState<boolean | null>(null);
+  const [profileCreationComplete, setProfileCreationComplete] = useState(false);
+  const [autoRetryTimeoutId, setAutoRetryTimeoutId] = useState<NodeJS.Timeout | null>(null);
+  // Session tracking state removed - now handled by SessionProvider
+  const [authInitialized, setAuthInitialized] = useState(false);
+  const [authStateStable, setAuthStateStable] = useState(false);
   const location = useLocation();
-  const isNative = useMemo(() => nativeIntegrationService.isRunningNatively(), []);
-  const twaEnv = useMemo(() => detectTWAEnvironment(), []);
+  const twaEnv = detectTWAEnvironment();
 
   // Initialize native services
   useEffect(() => {
-    const initializeNativeServices = async () => {
-      if (isNative) {
-        console.log('[AuthContext] Initializing native services');
-        loadingStateManager.setLoading('auth-init', LoadingPriority.CRITICAL, 'Initializing authentication...');
-        
-        try {
-          await nativeIntegrationService.initialize();
-          await nativeAuthService.initialize();
-          console.log('[AuthContext] Native services initialized');
-        } catch (error) {
-          console.error('[AuthContext] Failed to initialize native services:', error);
-        } finally {
-          loadingStateManager.clearLoading('auth-init');
+       // Initialize native auth service and deep link handling
+        if (nativeIntegrationService.isRunningNatively()) {
+          nativeAuthService.initialize();
         }
+    const initializeNativeServices = async () => {
+      try {
+        console.log('[AuthContext] Initializing native services');
+        await nativeIntegrationService.initialize();
+        await nativeAuthService.initialize();
+        console.log('[AuthContext] Native services initialized');
+      } catch (error) {
+        console.error('[AuthContext] Failed to initialize native services:', error);
       }
     };
 
     initializeNativeServices();
-  }, [isNative]);
+  }, []);
 
-  // Enhanced session validation for native apps
-  const validateStoredSession = useCallback((): Session | null => {
+  const detectUserLanguage = (): string => {
+    const browserLanguage = navigator.language || navigator.languages?.[0] || 'en';
+    const languageCode = browserLanguage.split('-')[0].toLowerCase();
+    const supportedLanguages = ['en', 'es', 'fr', 'de', 'it', 'pt', 'ru', 'zh', 'ja', 'ko', 'ar', 'hi', 'bn'];
+    return supportedLanguages.includes(languageCode) ? languageCode : 'en';
+  };
+
+  const getReferrer = (): string | null => {
+    const referrer = document.referrer;
+    if (!referrer) return null;
+    
     try {
-      const storedSession = localStorage.getItem('sb-kwnwhgucnzqxndzjayyq-auth-token');
-      if (!storedSession) return null;
-
-      const sessionData = JSON.parse(storedSession);
+      const referrerUrl = new URL(referrer);
+      const currentUrl = new URL(window.location.href);
       
-      if (sessionData?.access_token && sessionData?.expires_at) {
-        const now = Date.now() / 1000;
-        if (sessionData.expires_at > now) {
-          console.log('[AuthContext] Valid stored session found');
-          return sessionData as Session;
-        } else {
-          console.log('[AuthContext] Stored session expired');
+      if (referrerUrl.hostname !== currentUrl.hostname) {
+        return referrer;
+      }
+    } catch (error) {
+      console.warn('Error parsing referrer URL:', error);
+    }
+    
+    return null;
+  };
+
+  // Session creation now handled by SessionProvider/SessionManager
+  // Remove old session creation logic - this will be handled by the new SessionProvider
+
+  // Conversion tracking now handled by SessionProvider
+  // Remove this function as it's now managed by the SessionProvider
+
+  useEffect(() => {
+    const checkMobile = () => {
+      const userAgent = navigator.userAgent || navigator.vendor || (window as any).opera;
+      const isMobile = /android|webos|iphone|ipad|ipod|blackberry|iemobile|opera mini/i.test(userAgent.toLowerCase());
+      setIsMobileDevice(isMobile);
+      logInfo(`Detected ${isMobile ? 'mobile' : 'desktop'} device`, 'AuthContext');
+    };
+
+    checkMobile();
+    
+    return () => {
+      if (autoRetryTimeoutId) {
+        clearTimeout(autoRetryTimeoutId);
+      }
+    };
+  }, [autoRetryTimeoutId]);
+
+  const ensureProfileExists = async (forceRetry = false): Promise<boolean> => {
+    if (!user || (profileCreationInProgress && !forceRetry)) {
+      logProfile(`Profile check skipped: ${!user ? 'No user' : 'Already in progress'}`, 'AuthContext');
+      return false;
+    }
+    
+    if (profileExistsStatus === true || profileCreationComplete) {
+      logProfile('Profile already verified as existing', 'AuthContext');
+      return true;
+    }
+    
+    const now = Date.now();
+    if (!forceRetry && now - lastProfileAttemptTime < 5000) { // Increased delay for TWA
+      logProfile('Skipping profile check - too soon after last attempt', 'AuthContext');
+      return profileExistsStatus || false;
+    }
+    
+    try {
+      setProfileCreationInProgress(true);
+      setLastProfileAttemptTime(now);
+      setProfileCreationAttempts(prev => prev + 1);
+      
+      logProfile(`Attempt #${profileCreationAttempts + 1} to ensure profile exists for user: ${user.id}`, 'AuthContext', {
+        userEmail: user.email,
+        provider: user.app_metadata?.provider,
+        hasUserMetadata: !!user.user_metadata,
+        userMetadataKeys: user.user_metadata ? Object.keys(user.user_metadata) : []
+      });
+      
+      const result = await ensureProfileExistsService(user);
+      
+      if (result) {
+        logProfile('Profile created or verified successfully', 'AuthContext');
+        setProfileCreationAttempts(0);
+        setProfileExistsStatus(true);
+        setProfileCreationComplete(true);
+        debugLogger.setLastProfileError(null);
+        
+        // Session creation now handled by SessionProvider
+        
+        return true;
+      } else {
+        const errorMsg = `Profile creation failed on attempt #${profileCreationAttempts + 1}`;
+        logAuthError(errorMsg, 'AuthContext');
+        debugLogger.setLastProfileError(errorMsg);
+        setProfileExistsStatus(false);
+        
+        const maxAttempts = MAX_AUTO_PROFILE_ATTEMPTS;
+        
+        if (profileCreationAttempts < maxAttempts) {
+          const nextAttemptDelay = BASE_RETRY_DELAY * Math.pow(1.5, profileCreationAttempts);
+          logProfile(`Scheduling automatic retry in ${nextAttemptDelay}ms`, 'AuthContext');
+          
+          if (autoRetryTimeoutId) {
+            clearTimeout(autoRetryTimeoutId);
+          }
+          
+          const timeoutId = setTimeout(() => {
+            logProfile(`Executing automatic retry #${profileCreationAttempts + 1}`, 'AuthContext');
+            setAutoRetryTimeoutId(null);
+            ensureProfileExists(true).catch(e => {
+              logAuthError(`Auto-retry failed: ${e.message}`, 'AuthContext', e);
+            });
+          }, nextAttemptDelay);
+          
+          setAutoRetryTimeoutId(timeoutId);
         }
       }
       
-      return null;
-    } catch (error) {
-      console.warn('[AuthContext] Error validating stored session:', error);
-      return null;
-    }
-  }, []);
-
-  const ensureProfileExists = async (forceRetry = false): Promise<boolean> => {
-    if (!user) return false;
-    if (profileCreationAttempts >= 3 && !forceRetry) return false;
-
-    try {
-      console.log('[AuthContext] Ensuring profile exists for user:', user.id);
-      
-      const { data: existingProfile, error: fetchError } = await supabase
-        .from('profiles')
-        .select('id')
-        .eq('id', user.id)
-        .maybeSingle();
-
-      if (fetchError && fetchError.message !== 'Row not found') {
-        throw fetchError;
-      }
-
-      if (existingProfile) {
-        console.log('[AuthContext] Profile already exists');
-        return true;
-      }
-
-      // Create profile
-      const { error: insertError } = await supabase
-        .from('profiles')
-        .insert({
-          id: user.id,
-          email: user.email,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString()
-        });
-
-      if (insertError) {
-        throw insertError;
-      }
-
-      console.log('[AuthContext] Profile created successfully');
-      return true;
-    } catch (error) {
-      console.error('[AuthContext] Profile creation failed:', error);
-      setProfileCreationAttempts(prev => prev + 1);
-      
-      // Retry with exponential backoff
-      if (profileCreationAttempts < 3) {
-        const delay = Math.pow(2, profileCreationAttempts) * 1000;
-        setTimeout(() => ensureProfileExists(false), delay);
-      }
-      
+      return result;
+    } catch (error: any) {
+      const errorMsg = `Error in ensureProfileExists: ${error.message}`;
+      logAuthError(errorMsg, 'AuthContext', error);
+      debugLogger.setLastProfileError(errorMsg);
+      setProfileExistsStatus(false);
       return false;
+    } finally {
+      setProfileCreationInProgress(false);
     }
   };
 
   const updateUserProfile = async (metadata: Record<string, any>): Promise<boolean> => {
-    try {
-      if (!user) return false;
-      
-      loadingStateManager.setLoading('profile-update', LoadingPriority.MEDIUM, 'Updating profile...');
-      
-      const { error } = await supabase.auth.updateUser({
-        data: metadata
-      });
-
-      if (error) {
-        throw error;
+    logProfile(`Updating user profile metadata`, 'AuthContext', { metadataKeys: Object.keys(metadata) });
+    
+    if (!metadata.timezone) {
+      try {
+        metadata.timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+        logProfile(`Adding detected timezone to metadata: ${metadata.timezone}`, 'AuthContext');
+      } catch (error) {
+        logError('Could not detect timezone', 'AuthContext', error);
       }
-
-      return true;
-    } catch (error) {
-      console.error('[AuthContext] Profile update failed:', error);
-      return false;
-    } finally {
-      loadingStateManager.clearLoading('profile-update');
     }
+    
+    const result = await updateUserProfileService(user, metadata);
+    if (result) {
+      const { data } = await supabase.auth.getUser();
+      if (data.user) {
+        setUser(data.user);
+        logProfile('User profile updated successfully', 'AuthContext');
+        
+        // Conversion tracking now handled by SessionProvider
+      }
+    } else {
+      logAuthError('Failed to update user profile', 'AuthContext');
+    }
+    return result;
   };
 
   const signInWithGoogle = async (): Promise<void> => {
+    setIsLoading(true);
+    logInfo('Initiating Google sign-in', 'AuthContext', { 
+      origin: window.location.origin,
+      pathname: window.location.pathname
+    });
+    
     try {
-      loadingStateManager.setLoading('auth-google', LoadingPriority.HIGH, 'Signing in with Google...');
+      await signInWithGoogleService();
+      logInfo('Google sign-in initiated', 'AuthContext');
       
-      // Try native auth first if available
-      if (isNative) {
-        console.log('[AuthContext] Using native Google authentication');
-        await nativeAuthService.signInWithGoogle();
-      } else {
-        console.log('[AuthContext] Using web Google authentication');
-        await signInWithGoogleService();
-      }
-    } catch (error) {
-      console.error('[AuthContext] Google sign-in failed:', error);
-      throw error;
-    } finally {
-      loadingStateManager.clearLoading('auth-google');
+      // Conversion tracking now handled by SessionProvider
+    } catch (error: any) {
+      logAuthError(`Google sign-in failed: ${error.message}`, 'AuthContext', error);
+      setIsLoading(false);
     }
   };
 
   const signInWithApple = async (): Promise<void> => {
+    setIsLoading(true);
+    logInfo('Initiating Apple ID sign-in', 'AuthContext', { 
+      origin: window.location.origin,
+      pathname: window.location.pathname
+    });
+    
     try {
-      loadingStateManager.setLoading('auth-apple', LoadingPriority.HIGH, 'Signing in with Apple...');
+      await signInWithAppleService();
+      logInfo('Apple ID sign-in initiated', 'AuthContext');
       
-      if (isNative) {
-        console.log('[AuthContext] Using native Apple authentication');
-        await nativeAuthService.signInWithApple();
-      } else {
-        console.log('[AuthContext] Using web Apple authentication');
-        await signInWithAppleService();
-      }
-    } catch (error) {
-      console.error('[AuthContext] Apple sign-in failed:', error);
-      throw error;
-    } finally {
-      loadingStateManager.clearLoading('auth-apple');
+      // Conversion tracking now handled by SessionProvider
+    } catch (error: any) {
+      logAuthError(`Apple ID sign-in failed: ${error.message}`, 'AuthContext', error);
+      setIsLoading(false);
     }
   };
 
   const signInWithEmail = async (email: string, password: string): Promise<void> => {
+    setIsLoading(true);
+    logInfo('Initiating email sign-in', 'AuthContext', { 
+      email,
+      origin: window.location.origin,
+      pathname: window.location.pathname
+    });
+    
     try {
-      loadingStateManager.setLoading('auth-email', LoadingPriority.HIGH, 'Signing in...');
       await signInWithEmailService(email, password);
-    } catch (error) {
-      console.error('[AuthContext] Email sign-in failed:', error);
-      throw error;
-    } finally {
-      loadingStateManager.clearLoading('auth-email');
+      logInfo('Email sign-in initiated', 'AuthContext');
+      
+      // Conversion tracking now handled by SessionProvider
+    } catch (error: any) {
+      logAuthError(`Email sign-in failed: ${error.message}`, 'AuthContext', error);
+      setIsLoading(false);
     }
   };
 
   const signUp = async (email: string, password: string): Promise<void> => {
+    setIsLoading(true);
+    logInfo('Initiating sign-up', 'AuthContext', { 
+      email,
+      origin: window.location.origin,
+      pathname: window.location.pathname
+    });
+    
     try {
-      loadingStateManager.setLoading('auth-signup', LoadingPriority.HIGH, 'Creating account...');
       await signUpService(email, password);
-    } catch (error) {
-      console.error('[AuthContext] Sign-up failed:', error);
-      throw error;
-    } finally {
-      loadingStateManager.clearLoading('auth-signup');
+      logInfo('Sign-up initiated', 'AuthContext');
+      
+      // Conversion tracking now handled by SessionProvider
+    } catch (error: any) {
+      logAuthError(`Sign-up failed: ${error.message}`, 'AuthContext', error);
+      setIsLoading(false);
     }
   };
 
   const resetPassword = async (email: string): Promise<void> => {
+    setIsLoading(true);
+    logInfo('Initiating password reset', 'AuthContext', { 
+      email,
+      origin: window.location.origin,
+      pathname: window.location.pathname
+    });
+    
     try {
-      loadingStateManager.setLoading('auth-reset', LoadingPriority.HIGH, 'Sending reset email...');
       await resetPasswordService(email);
-    } catch (error) {
-      console.error('[AuthContext] Password reset failed:', error);
-      throw error;
-    } finally {
-      loadingStateManager.clearLoading('auth-reset');
+      logInfo('Password reset initiated', 'AuthContext');
+    } catch (error: any) {
+      logAuthError(`Password reset failed: ${error.message}`, 'AuthContext', error);
+      setIsLoading(false);
     }
   };
 
   const signOut = async (): Promise<void> => {
     try {
-      loadingStateManager.setLoading('auth-signout', LoadingPriority.HIGH, 'Signing out...');
+      console.log('[AuthContext] Attempting to sign out user');
       
-      if (isNative) {
-        await nativeAuthService.signOut();
-      } else {
-        await signOutService(navigate);
-      }
+      // Conversion tracking now handled by SessionProvider
       
-      // Clear local state
+      // Clear local state immediately
       setSession(null);
       setUser(null);
-      setProfileCreationAttempts(0);
+      setProfileExistsStatus(null);
+      setProfileCreationComplete(false);
+      // Session ID tracking now handled by SessionProvider
+      setAuthStateStable(false);
       
-      // Clear auth state manager
-      authStateManager.resetAuthState();
-    } catch (error) {
-      console.error('[AuthContext] Sign-out failed:', error);
-      throw error;
-    } finally {
-      loadingStateManager.clearLoading('auth-signout');
+      // Call the sign out service
+      await signOutService((path: string) => {
+        console.log(`[AuthContext] Redirecting to ${path} after signout`);
+        // Always redirect to onboarding after logout
+        window.location.href = '/app/onboarding';
+      });
+    } catch (error: any) {
+      console.error('[AuthContext] Error during sign out:', error);
+      toast.error(`Error signing out: ${error.message}`);
+      
+      // Even if signout fails, redirect to onboarding
+      window.location.href = '/app/onboarding';
     }
   };
 
   const refreshSession = async (): Promise<void> => {
     try {
-      loadingStateManager.setLoading('auth-refresh', LoadingPriority.MEDIUM, 'Refreshing session...');
-      const refreshedSession = await refreshSessionService();
-      setSession(refreshedSession);
-      setUser(refreshedSession?.user ?? null);
+      const currentSession = await refreshSessionService();
+      setSession(currentSession);
+      setUser(currentSession?.user ?? null);
     } catch (error) {
-      console.error('[AuthContext] Session refresh failed:', error);
-      throw error;
-    } finally {
-      loadingStateManager.clearLoading('auth-refresh');
     }
   };
 
-  // Initialize auth state with timeout and recovery
-  useEffect(() => {
-    let authTimeout: NodeJS.Timeout;
-    let isMounted = true;
+  const createOrVerifyProfile = async (currentUser: User): Promise<boolean> => {
+    if (profileCreationInProgress || profileCreationComplete) {
+      logProfile(`Profile creation skipped: ${profileCreationInProgress ? 'In progress' : 'Already complete'}`, 'AuthContext');
+      return profileExistsStatus || false;
+    }
     
-    const initializeAuth = async () => {
-      console.log('[AuthContext] Initializing authentication...');
-      loadingStateManager.setLoading('auth-session', LoadingPriority.HIGH, 'Checking authentication...');
+    if (profileExistsStatus === true) {
+      logProfile('Profile already exists, skipping creation', 'AuthContext');
+      return true;
+    }
+    
+    try {
+      setProfileCreationInProgress(true);
+      setProfileCreationAttempts(prev => prev + 1);
       
-      // Set a timeout to prevent infinite loading
-      authTimeout = setTimeout(() => {
-        if (isMounted) {
-          console.warn('[AuthContext] Auth initialization timeout - using emergency recovery');
-          setIsLoading(false);
-          loadingStateManager.clearLoading('auth-session');
+      logProfile(`Attempt #${profileCreationAttempts + 1} to create profile for user: ${currentUser.email}`, 'AuthContext', {
+        userProvider: currentUser.app_metadata?.provider,
+        userMetadataKeys: currentUser.user_metadata ? Object.keys(currentUser.user_metadata) : []
+      });
+      
+      // Increased delay for TWA stability
+      if (isMobileDevice || twaEnv.isTWA || twaEnv.isStandalone) {
+        logProfile('Mobile/TWA device detected, adding stabilization delay', 'AuthContext');
+        await new Promise(resolve => setTimeout(resolve, 2000));
+      }
+      
+      const profileCreated = await ensureProfileExistsService(currentUser);
+      
+      if (profileCreated) {
+        logProfile(`Profile created or verified for user: ${currentUser.email}`, 'AuthContext');
+        setProfileCreationAttempts(0);
+        setProfileExistsStatus(true);
+        setProfileCreationComplete(true);
+          debugLogger.setLastProfileError(null);
           
-          // Emergency recovery: check for any stored session
-          const storedSession = validateStoredSession();
-          if (storedSession) {
-            console.log('[AuthContext] Emergency recovery: found stored session');
-            setSession(storedSession);
-            setUser(storedSession.user);
+          // Session creation now handled by SessionProvider
+        
+        return true;
+      } else {
+        logAuthError('First attempt to create profile failed, retrying once...', 'AuthContext');
+        
+        await new Promise(resolve => setTimeout(resolve, 2500)); // Increased retry delay
+        
+        const retryResult = await ensureProfileExistsService(currentUser);
+        if (retryResult) {
+          logProfile(`Profile created or verified on retry for user: ${currentUser.email}`, 'AuthContext');
+          setProfileCreationAttempts(0);
+          setProfileExistsStatus(true);
+          setProfileCreationComplete(true);
+          debugLogger.setLastProfileError(null);
+          
+          // Session creation now handled by SessionProvider
+          
+          return true;
+        }
+        
+        const errorMsg = `Failed to create profile after retry for user: ${currentUser.email}`;
+        logAuthError(errorMsg, 'AuthContext');
+        debugLogger.setLastProfileError(errorMsg);
+        setProfileExistsStatus(false);
+        
+        const maxAttempts = MAX_AUTO_PROFILE_ATTEMPTS;
+        
+        if (profileCreationAttempts < maxAttempts) {
+          const nextAttemptDelay = BASE_RETRY_DELAY * Math.pow(1.5, profileCreationAttempts);
+          logProfile(`Scheduling automatic retry in ${nextAttemptDelay}ms`, 'AuthContext');
+          
+          if (autoRetryTimeoutId) {
+            clearTimeout(autoRetryTimeoutId);
           }
+          
+          const timeoutId = setTimeout(() => {
+            logProfile(`Executing automatic retry #${profileCreationAttempts + 1}`, 'AuthContext');
+            setAutoRetryTimeoutId(null);
+            ensureProfileExists(true).catch(e => {
+              logAuthError(`Auto-retry failed: ${e.message}`, 'AuthContext', e);
+            });
+          }, nextAttemptDelay);
+          
+          setAutoRetryTimeoutId(timeoutId);
         }
-      }, 8000); // 8 second timeout
-      
-      try {
-        // For native apps, try synchronous validation first for faster loading
-        if (isNative) {
-          const storedSession = validateStoredSession();
-          if (storedSession) {
-            console.log('[AuthContext] Using validated stored session');
-            setSession(storedSession);
-            setUser(storedSession.user);
-            setIsLoading(false);
-            loadingStateManager.clearLoading('auth-session');
-            clearTimeout(authTimeout);
-            return;
-          }
-        }
-
-        // Fallback to async validation with promise race
-        const sessionPromise = supabase.auth.getSession();
-        const timeoutPromise = new Promise((_, reject) => 
-          setTimeout(() => reject(new Error('Session fetch timeout')), 5000)
-        );
         
-        const { data: { session: currentSession }, error } = await Promise.race([
-          sessionPromise,
-          timeoutPromise
-        ]) as any;
-        
-        if (!isMounted) return;
-        
-        if (error) {
-          console.error('[AuthContext] Session validation error:', error);
-          // Don't fail completely, allow user to proceed
-        } else {
-          console.log('[AuthContext] Session validation complete:', {
-            hasSession: !!currentSession,
-            userId: currentSession?.user?.id
-          });
-          setSession(currentSession);
-          setUser(currentSession?.user ?? null);
-        }
-      } catch (error) {
-        console.error('[AuthContext] Auth initialization failed:', error);
-        
-        if (isMounted) {
-          // Try emergency recovery
-          const storedSession = validateStoredSession();
-          if (storedSession) {
-            console.log('[AuthContext] Error recovery: using stored session');
-            setSession(storedSession);
-            setUser(storedSession.user);
-          }
-        }
-      } finally {
-        if (isMounted) {
-          setIsLoading(false);
-          loadingStateManager.clearLoading('auth-session');
-          clearTimeout(authTimeout);
-        }
+        return false;
       }
-    };
+    } catch (error: any) {
+      const errorMsg = `Error in profile creation: ${error.message}`;
+      logAuthError(errorMsg, 'AuthContext', error);
+      debugLogger.setLastProfileError(errorMsg);
+      setProfileExistsStatus(false);
+      return false;
+    } finally {
+      setProfileCreationInProgress(false);
+    }
+  };
 
-    initializeAuth();
-    
-    return () => {
-      isMounted = false;
-      if (authTimeout) {
-        clearTimeout(authTimeout);
-      }
-    };
-  }, [isNative, validateStoredSession]);
-
-  // Set up auth state listener
   useEffect(() => {
+    if (authInitialized) return;
+    
+    logInfo("Setting up auth state listener", 'AuthContext');
+    
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, currentSession) => {
-        console.log('[AuthContext] Auth state changed:', event, !!currentSession);
+        logInfo(`Auth state changed: ${event}, user: ${currentSession?.user?.email}`, 'AuthContext', {
+          isNative: nativeIntegrationService.isRunningNatively(),
+          event,
+          hasUser: !!currentSession?.user,
+          userId: currentSession?.user?.id
+        });
+        
+        // Prevent loops by checking if this is the same session
+        if (currentSession?.access_token === session?.access_token && event !== 'SIGNED_OUT') {
+          logInfo('Same session detected, skipping processing', 'AuthContext');
+          return;
+        }
         
         setSession(currentSession);
         setUser(currentSession?.user ?? null);
         
-        if (event === 'SIGNED_IN' && currentSession?.user) {
-          // Trigger profile creation in background without blocking UI
+        // Mark auth state as stable after processing - faster for native
+        if (!authStateStable) {
+          const stabilityDelay = nativeIntegrationService.isRunningNatively() ? 200 : 1000;
           setTimeout(() => {
-            ensureProfileExists(false);
-          }, 100);
-          
-          toast.success('Signed in successfully');
+            setAuthStateStable(true);
+          }, stabilityDelay);
         }
         
-        if (event === 'SIGNED_OUT') {
-          setProfileCreationAttempts(0);
-          authStateManager.resetAuthState();
+        // Session tracking now handled by SessionProvider
+        if (event === 'SIGNED_IN' && currentSession?.user) {
+          
+          // CRITICAL: For native apps, decouple profile creation from navigation
+          const isNative = nativeIntegrationService.isRunningNatively();
+          
+          if (isNative) {
+            console.log('[AuthContext] NATIVE: Starting background profile creation - navigation not blocked');
+            
+            // Immediate navigation trigger - don't wait for profile
+            setTimeout(() => {
+              logProfile('NATIVE: Profile creation started in background', 'AuthContext', {
+                userId: currentSession.user.id,
+                provider: currentSession.user.app_metadata?.provider
+              });
+              
+              createOrVerifyProfile(currentSession.user)
+                .then(success => {
+                  if (success) {
+                    logProfile('NATIVE: Background profile creation completed successfully', 'AuthContext');
+                  } else {
+                    logProfile('NATIVE: Background profile creation failed - will retry', 'AuthContext');
+                  }
+                })
+                .catch(error => {
+                  logAuthError(`NATIVE: Background profile creation error: ${error.message}`, 'AuthContext', error);
+                });
+            }, 100); // Minimal delay for native
+            
+          } else {
+            // Web: Use existing logic with longer delays for stability
+            const initialDelay = (isMobileDevice || twaEnv.isTWA || twaEnv.isStandalone) ? 3000 : 2000;
+            
+            logProfile(`WEB: Scheduling profile creation in ${initialDelay}ms for platform stability`, 'AuthContext', {
+              isTWA: twaEnv.isTWA,
+              isStandalone: twaEnv.isStandalone
+            });
+            
+            setTimeout(() => {
+              createOrVerifyProfile(currentSession.user)
+                .catch(error => {
+                  logAuthError(`WEB: Error in initial profile creation: ${error.message}`, 'AuthContext', error);
+                });
+            }, initialDelay);
+          }
+
+          // Conversion tracking now handled by SessionProvider
+        }
+        
+        // Improved loading state management - immediate for native, faster for web
+        const loadingDelay = nativeIntegrationService.isRunningNatively() 
+          ? 50  // Almost immediate for native to enable navigation
+          : (twaEnv.isTWA || twaEnv.isStandalone) ? 1500 : 800;
+        
+        setTimeout(() => {
+          setIsLoading(false);
+        }, loadingDelay);
+
+        if (event === 'SIGNED_IN') {
+          logInfo('User signed in successfully', 'AuthContext', {
+            isNative: nativeIntegrationService.isRunningNatively(),
+            userEmail: currentSession?.user?.email
+          });
+          
+          // Show success toast and trigger navigation for authenticated users
+          toast.success('Signed in successfully');
+          
+          // REMOVED: Navigation is now handled centrally by AuthStateManager
+          // AuthContext no longer handles navigation to prevent conflicts
+        } else if (event === 'SIGNED_OUT') {
+          logInfo('User signed out', 'AuthContext');
+          setProfileExistsStatus(null);
+          setProfileCreationComplete(false);
+          setAuthStateStable(false);
+          debugLogger.setLastProfileError(null);
+          
+          if (autoRetryTimeoutId) {
+            clearTimeout(autoRetryTimeoutId);
+            setAutoRetryTimeoutId(null);
+          }
+          
+          if (isAppRoute(location.pathname)) {
+            toast.info('Signed out');
+          }
         }
       }
     );
 
-    return () => subscription.unsubscribe();
-  }, []);
+    supabase.auth.getSession().then(async ({ data: { session: currentSession } }) => {
+      logInfo(`Initial session check: ${currentSession?.user?.email || 'No session'}`, 'AuthContext', {
+        isNative: nativeIntegrationService.isRunningNatively(),
+        hasUser: !!currentSession?.user
+      });
+      setSession(currentSession);
+      setUser(currentSession?.user ?? null);
+      
+      if (currentSession?.user) {
+        // Session tracking now handled by SessionProvider
+        
+        // CRITICAL: For native apps, decouple profile creation from initial load
+        const isNative = nativeIntegrationService.isRunningNatively();
+        
+        if (isNative) {
+          console.log('[AuthContext] NATIVE: Starting initial background profile creation');
+          
+          // Immediate profile creation for native - don't block UI
+          setTimeout(() => {
+            logProfile('NATIVE: Initial profile creation started in background', 'AuthContext', {
+              userId: currentSession.user.id
+            });
+            
+            createOrVerifyProfile(currentSession.user)
+              .then(success => {
+                if (success) {
+                  logProfile('NATIVE: Initial background profile creation completed', 'AuthContext');
+                } else {
+                  logProfile('NATIVE: Initial background profile creation failed', 'AuthContext');
+                }
+              })
+              .catch(error => {
+                logAuthError(`NATIVE: Initial background profile creation error: ${error.message}`, 'AuthContext', error);
+              });
+          }, 100);
+          
+        } else {
+          // Web: Use existing logic with stability delays
+          const initialDelay = (isMobileDevice || twaEnv.isTWA || twaEnv.isStandalone) ? 3000 : 2000;
+          
+          logProfile(`WEB: Scheduling initial profile creation in ${initialDelay}ms for platform stability`, 'AuthContext', {
+            isTWA: twaEnv.isTWA
+          });
+          
+          setTimeout(() => {
+            createOrVerifyProfile(currentSession.user)
+              .catch(error => {
+                logAuthError(`WEB: Error in initial profile creation: ${error.message}`, 'AuthContext', error);
+              });
+          }, initialDelay);
+        }
+      }
+      
+      // Better timing for initialization completion - immediate for native
+      const initDelay = nativeIntegrationService.isRunningNatively() 
+        ? 100  // Much faster for native
+        : (twaEnv.isTWA || twaEnv.isStandalone) ? 2000 : 1000;
+      
+      setTimeout(() => {
+        setIsLoading(false);
+        setAuthInitialized(true);
+        setAuthStateStable(true);
+      }, initDelay);
+    });
+
+    return () => {
+      subscription.unsubscribe();
+      if (autoRetryTimeoutId) {
+        clearTimeout(autoRetryTimeoutId);
+      }
+    };
+  }, [authInitialized, isMobileDevice, location.pathname, twaEnv.isTWA, twaEnv.isStandalone]);
 
   const value = {
     session,

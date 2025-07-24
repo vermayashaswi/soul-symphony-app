@@ -44,19 +44,61 @@ port = 54326
 serve_port = 54327
 
 # Enhanced intelligent edge functions with database schema awareness
+[functions.analyze-emotions]
+verify_jwt = true
+
+[functions.analyze-sentiment]
+verify_jwt = true
+
+[functions.batch-analyze-sentiment]
+verify_jwt = true
+
+[functions.batch-extract-entities]
+verify_jwt = true
+
 [functions.chat-query-classifier]
 verify_jwt = true
 
-[functions.intelligent-query-planner]
+[functions.chat-with-rag]
+verify_jwt = true
+
+[functions.combine-segment-responses]
+verify_jwt = true
+
+[functions.generate-missing-embeddings]
+verify_jwt = true
+
+[functions.gpt-master-orchestrator]
 verify_jwt = true
 
 [functions.gpt-search-orchestrator]
 verify_jwt = true
 
+[functions.inspirational-quotes]
+verify_jwt = false
+
+[functions.intelligent-query-planner]
+verify_jwt = true
+
 [functions.intelligent-response-generator]
 verify_jwt = true
 
-[functions.gpt-master-orchestrator]
+[functions.journal-summary]
+verify_jwt = true
+
+[functions.revenuecat-webhook]
+verify_jwt = false
+
+[functions.segment-complex-query]
+verify_jwt = true
+
+[functions.set-api-key]
+verify_jwt = true
+
+[functions.smart-chat]
+verify_jwt = true
+
+[functions.smart-query-planner]
 verify_jwt = true
 
 [functions.translate-text]

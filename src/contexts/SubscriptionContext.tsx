@@ -72,13 +72,20 @@ export const SubscriptionProvider: React.FC<{ children: ReactNode }> = ({ childr
         throw statusError;
       }
 
-      if (statusData && statusData.length > 0) {
-        const subscriptionData = statusData[0];
+      if (statusData && typeof statusData === 'object' && !Array.isArray(statusData)) {
+        // Cast to the expected structure from our RPC function
+        const subscriptionData = statusData as {
+          subscription_tier: string;
+          subscription_status: string;
+          trial_ends_at: string | null;
+          is_trial_active: boolean;
+          is_premium: boolean;
+        };
         
         // Map subscription tier - ensure only 'free' or 'premium'
-        const userTier = (subscriptionData.current_tier === 'premium') ? 'premium' : 'free';
-        const userStatus = (subscriptionData.current_status as SubscriptionStatus) || 'free';
-        const userTrialEndDate = subscriptionData.trial_end_date ? new Date(subscriptionData.trial_end_date) : null;
+        const userTier = (subscriptionData.subscription_tier === 'premium') ? 'premium' : 'free';
+        const userStatus = (subscriptionData.subscription_status as SubscriptionStatus) || 'free';
+        const userTrialEndDate = subscriptionData.trial_ends_at ? new Date(subscriptionData.trial_ends_at) : null;
         const userIsTrialActive = subscriptionData.is_trial_active || false;
         
         setTier(userTier);
@@ -90,7 +97,7 @@ export const SubscriptionProvider: React.FC<{ children: ReactNode }> = ({ childr
           status: userStatus,
           trialEndDate: userTrialEndDate,
           isTrialActive: userIsTrialActive,
-          isPremium: subscriptionData.is_premium_access
+          isPremium: subscriptionData.is_premium
         });
       } else {
         // Fallback to direct profile query if function fails

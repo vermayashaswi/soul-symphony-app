@@ -1,5 +1,4 @@
 import { nativeIntegrationService } from './nativeIntegrationService';
-import { loadingStateManager } from './loadingStateManager';
 
 export class NativeNavigationService {
   private static instance: NativeNavigationService;
@@ -105,13 +104,6 @@ export class NativeNavigationService {
     this.lastNavigationTime = now;
     console.log('[NativeNav] Immediate post-auth navigation to:', path);
     
-    // Clear any loading states that might cause blank screens
-    try {
-      loadingStateManager.clearAll();
-    } catch (error) {
-      console.warn('[NativeNav] Failed to clear loading states:', error);
-    }
-    
     if (nativeIntegrationService.isRunningNatively()) {
       // For native apps with bundled assets - use direct navigation
       console.log('[NativeNav] Direct native navigation to:', path);
@@ -153,23 +145,16 @@ export class NativeNavigationService {
 
   /**
    * Handle post-authentication success with session-aware navigation
-   * Enhanced for reliable native app redirection - PREVENTS BLANK SCREEN
+   * Enhanced for reliable native app redirection
    */
   public handleAuthSuccess(): void {
     console.log('[NativeNav] Handling authentication success');
     
-    // Clear any stuck loading states that might cause blank screens
-    try {
-      loadingStateManager.clearAll();
-    } catch (error) {
-      console.warn('[NativeNav] Failed to clear loading states:', error);
-    }
-    
     if (nativeIntegrationService.isRunningNatively()) {
-      console.log('[NativeNav] Native app detected - using direct navigation to prevent blank screen');
+      console.log('[NativeNav] Native app detected - using session-aware navigation');
       
-      // For native apps, use immediate navigation to prevent blank screen
-      this.performNativeNavigation('/app/home');
+      // Validate session before navigation
+      this.validateSessionAndNavigate('/app/home');
     } else {
       // For web, use standard navigation flow
       console.log('[NativeNav] Web app detected - using standard navigation');
