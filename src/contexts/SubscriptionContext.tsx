@@ -60,6 +60,21 @@ export const SubscriptionProvider: React.FC<{ children: ReactNode }> = ({ childr
       const { error: cleanupError } = await supabase.rpc('cleanup_expired_trials');
       if (cleanupError) {
         console.warn('[SubscriptionContext] Cleanup function error:', cleanupError);
+      } else {
+        console.log('[SubscriptionContext] Cleanup function completed successfully');
+      }
+      
+      // TEST: Verify auth context is working with RLS
+      try {
+        const { data: authTest, error: authTestError } = await supabase.auth.getUser();
+        console.log('[SubscriptionContext] Auth test:', {
+          hasAuthUser: !!authTest?.user,
+          authUserId: authTest?.user?.id,
+          matchesContextUser: authTest?.user?.id === user.id,
+          authError: authTestError?.message
+        });
+      } catch (authError) {
+        console.error('[SubscriptionContext] Auth test failed:', authError);
       }
       
       // Use the comprehensive subscription status function
