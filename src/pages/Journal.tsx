@@ -16,6 +16,7 @@ import { TranslatableText } from '@/components/translation/TranslatableText';
 import { JournalEntry } from '@/types/journal';
 import JournalSearch from '@/components/journal/JournalSearch';
 import { setProcessingIntent } from '@/utils/journal/processing-intent';
+import { JournalDebugComponent } from '@/components/debug/JournalDebugComponent';
 
 const logInfo = (message: string, source: string) => {
   console.log(`[${source}] ${message}`);
@@ -913,6 +914,8 @@ const Journal = () => {
           </>
         ) : (
           <>
+            {process.env.NODE_ENV === 'development' && <JournalDebugComponent />}
+            
             {showRetryButton && (
               <div className="mb-6 p-4 border border-amber-200 bg-amber-50 dark:bg-amber-900/20 dark:border-amber-800 rounded-lg">
                 <div className="flex flex-col gap-3">

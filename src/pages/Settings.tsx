@@ -34,6 +34,7 @@ import { TranslatableText } from '@/components/translation/TranslatableText';
 import { useTranslation } from '@/contexts/TranslationContext';
 import { useTutorial } from '@/contexts/TutorialContext';
 import { DeleteAllEntriesSection } from '@/components/settings/DeleteAllEntriesSection';
+import { AuthDebugComponent } from '@/components/debug/AuthDebugComponent';
 
 
 interface SettingItemProps {
@@ -66,6 +67,9 @@ function SettingItem({ icon: Icon, title, description, children }: SettingItemPr
 
 function SettingsContent() {
   console.log('[Settings] SettingsContent rendering');
+  
+  // Add debug flag for development
+  const showDebug = true; // Set to false in production
   
   // Defensive theme access
   let theme = 'light';
@@ -581,6 +585,8 @@ function SettingsContent() {
           </div>
           
           <div className="space-y-6">
+            {/* Debug component for troubleshooting */}
+            {process.env.NODE_ENV === 'development' && <AuthDebugComponent />}
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
