@@ -18,9 +18,16 @@ export const usePlatformDetection = (): PlatformInfo => {
     const userAgent = navigator.userAgent.toLowerCase();
     const isAndroid = userAgent.includes('android');
     const isIOS = /iphone|ipad|ipod/.test(userAgent);
+    
+    // Enhanced native app detection for Android APKs and Capacitor
     const nativeApp = window.location.href.includes('capacitor://') || 
                      window.location.href.includes('ionic://') ||
-                     (window as any).Capacitor?.isNative;
+                     (window as any).Capacitor?.isNative ||
+                     (window as any).Capacitor?.platform ||
+                     (isAndroid && window.location.href.includes('file://')) ||
+                     (isAndroid && !window.location.href.includes('http')) ||
+                     userAgent.includes('wv') || // WebView indicator
+                     userAgent.includes('version/') && isAndroid; // Android WebView
 
     const platform = isAndroid ? 'android' : isIOS ? 'ios' : 'web';
     

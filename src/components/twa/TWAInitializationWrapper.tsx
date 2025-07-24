@@ -2,6 +2,8 @@
 import React from 'react';
 import { useTWAInitialization } from '@/hooks/useTWAInitialization';
 import { useTWAAutoRefresh } from '@/hooks/useTWAAutoRefresh';
+import { useEmergencyNavigation } from '@/hooks/useEmergencyNavigation';
+import { nativeIntegrationService } from '@/services/nativeIntegrationService';
 
 interface TWAInitializationWrapperProps {
   children: React.ReactNode;
@@ -10,6 +12,14 @@ interface TWAInitializationWrapperProps {
 const TWAInitializationWrapper: React.FC<TWAInitializationWrapperProps> = ({ children }) => {
   const { isLoading, initializationComplete, isTWAEnvironment, hasTimedOut } = useTWAInitialization();
   const { isStuckDetected, refreshCount } = useTWAAutoRefresh();
+  const { forceRecovery } = useEmergencyNavigation({ maxStuckTime: 8000 });
+  
+  const isNativeAndroid = nativeIntegrationService.isRunningNatively();
+
+  // For native Android, skip initialization loading completely
+  if (isNativeAndroid) {
+    return <>{children}</>;
+  }
 
   // Only show loading in TWA environment and only if still initializing
   if (isTWAEnvironment && isLoading && !initializationComplete) {
@@ -30,10 +40,13 @@ const TWAInitializationWrapper: React.FC<TWAInitializationWrapperProps> = ({ chi
               Taking longer than expected...
             </p>
           )}
-          {isStuckDetected && (
-            <p className="text-xs text-muted-foreground/70">
-              Auto-refresh in progress...
-            </p>
+          {(hasTimedOut || isStuckDetected) && (
+            <button 
+              onClick={() => forceRecovery()}
+              className="mt-4 px-4 py-2 bg-primary text-primary-foreground rounded-md text-sm hover:bg-primary/90"
+            >
+              Continue to App
+            </button>
           )}
         </div>
       </div>
