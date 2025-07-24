@@ -937,6 +937,10 @@ export type Database = {
         }
         Returns: number
       }
+      check_database_health: {
+        Args: Record<PropertyKey, never>
+        Returns: Json
+      }
       check_journal_entry_ownership: {
         Args: { entry_id_param: number }
         Returns: boolean
@@ -1485,6 +1489,10 @@ export type Database = {
           themes: string[]
           emotions: Json
         }[]
+      }
+      perform_database_maintenance: {
+        Args: Record<PropertyKey, never>
+        Returns: Json
       }
       regenerate_missing_data_for_entry: {
         Args: { target_entry_id: number }
