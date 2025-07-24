@@ -21,8 +21,7 @@ export function useAudioRecorder({
   const {
     permission: micPermission,
     isSupported: micSupported,
-    requestPermission: requestMicPermission,
-    revalidatePermission
+    requestPermission: requestMicPermission
   } = useMicrophonePermission();
 
   const recorderRef = useRef<RecordRTC | null>(null);
@@ -307,12 +306,10 @@ export function useAudioRecorder({
     audioBlob,
     audioLevel,
     hasPermission: micPermission === 'granted',
-    permission: micPermission,
     ripples,
     startRecording,
     stopRecording,
     requestPermissions,
-    resetRecording,
-    revalidatePermission
+    resetRecording
   };
 }

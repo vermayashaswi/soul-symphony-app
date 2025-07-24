@@ -184,24 +184,15 @@ function removeUrlParams(url, paramsToRemove) {
   return urlObj.toString();
 }
 
-// Store for active journal reminders
-let activeJournalReminders = new Map();
-
-// Handle service worker updates and journal reminders
+// Handle service worker updates more aggressively
 self.addEventListener('message', (event) => {
   console.log('[SW] Message received:', event.data);
   
-  const { type, payload } = event.data || {};
-  
-  if (type === 'SKIP_WAITING') {
+  if (event.data && event.data.type === 'SKIP_WAITING') {
     self.skipWaiting();
-  } else if (type === 'CLEAR_CACHE') {
+  } else if (event.data && event.data.type === 'CLEAR_CACHE') {
     // Clear all caches when requested
     event.waitUntil(clearAllCaches());
-  } else if (type === 'SCHEDULE_JOURNAL_REMINDER') {
-    handleScheduleJournalReminder(event, payload);
-  } else if (type === 'CLEAR_JOURNAL_REMINDERS') {
-    handleClearJournalReminders(event);
   }
 });
 
@@ -509,188 +500,20 @@ self.addEventListener('push', (event) => {
   }
 });
 
-// Handle journal reminder scheduling
-function handleScheduleJournalReminder(event, payload) {
-  const { time, delay, timestamp } = payload;
-  
-  try {
-    // Clear any existing reminder for this time
-    const existingId = `journal-reminder-${time}`;
-    if (activeJournalReminders.has(existingId)) {
-      clearTimeout(activeJournalReminders.get(existingId));
-    }
-    
-    // Schedule new reminder
-    const timeoutId = setTimeout(() => {
-      showJournalReminderNotification(time);
-      activeJournalReminders.delete(existingId);
-    }, delay);
-    
-    activeJournalReminders.set(existingId, timeoutId);
-    
-    console.log('[SW] Journal reminder scheduled:', {
-      time,
-      delay,
-      scheduledAt: new Date(timestamp + delay).toISOString()
-    });
-    
-    // Send confirmation back to app
-    if (event.source) {
-      event.source.postMessage({
-        type: 'JOURNAL_REMINDER_SCHEDULED',
-        payload: {
-          time,
-          delay,
-          scheduledAt: timestamp + delay,
-          success: true
-        }
-      });
-    }
-    
-  } catch (error) {
-    console.error('[SW] Error scheduling journal reminder:', error);
-    
-    if (event.source) {
-      event.source.postMessage({
-        type: 'JOURNAL_REMINDER_ERROR',
-        payload: {
-          time,
-          error: error.message
-        }
-      });
-    }
-  }
-}
-
-// Handle clearing all journal reminders
-function handleClearJournalReminders(event) {
-  try {
-    // Clear all active timeouts
-    for (const [id, timeoutId] of activeJournalReminders.entries()) {
-      clearTimeout(timeoutId);
-      console.log('[SW] Cleared journal reminder:', id);
-    }
-    
-    activeJournalReminders.clear();
-    console.log('[SW] All journal reminders cleared');
-    
-    if (event.source) {
-      event.source.postMessage({
-        type: 'JOURNAL_REMINDERS_CLEARED',
-        payload: { success: true }
-      });
-    }
-    
-  } catch (error) {
-    console.error('[SW] Error clearing journal reminders:', error);
-  }
-}
-
-// Show journal reminder notification
-function showJournalReminderNotification(time) {
-  const title = getJournalReminderTitle(time);
-  const options = {
-    body: getJournalReminderBody(time),
-    icon: '/lovable-uploads/31ed88ef-f596-4b91-ba58-a4175eebe779.png',
-    badge: '/lovable-uploads/31ed88ef-f596-4b91-ba58-a4175eebe779.png',
-    vibrate: [200, 100, 200],
-    data: {
-      type: 'journal-reminder',
-      time: time,
-      url: '/app/voice-entry'
-    },
-    actions: [
-      {
-        action: 'record',
-        title: 'Start Recording',
-        icon: '/lovable-uploads/31ed88ef-f596-4b91-ba58-a4175eebe779.png'
-      },
-      {
-        action: 'dismiss',
-        title: 'Later',
-        icon: '/lovable-uploads/31ed88ef-f596-4b91-ba58-a4175eebe779.png'
-      }
-    ],
-    requireInteraction: true,
-    tag: `journal-reminder-${time}`
-  };
-  
-  console.log('[SW] Showing journal reminder notification:', { title, time });
-  
-  self.registration.showNotification(title, options)
-    .then(() => {
-      console.log('[SW] Journal reminder notification shown successfully');
-    })
-    .catch((error) => {
-      console.error('[SW] Error showing journal reminder notification:', error);
-    });
-}
-
-// Get notification title based on time
-function getJournalReminderTitle(time) {
-  const titles = {
-    morning: "🌅 Good Morning! Time for your journal",
-    afternoon: "☀️ Afternoon reflection time",
-    evening: "🌙 Evening journal reminder",
-    night: "✨ End your day with journaling"
-  };
-  
-  return titles[time] || "📝 Time to journal";
-}
-
-// Get notification body based on time
-function getJournalReminderBody(time) {
-  const bodies = {
-    morning: "Start your day by recording your thoughts and intentions",
-    afternoon: "Take a moment to reflect on your day so far",
-    evening: "Capture your evening thoughts and experiences", 
-    night: "Reflect on your day before you rest"
-  };
-  
-  return bodies[time] || "Tap to open Soulo and start voice journaling";
-}
-
 // Handle notification clicks
 self.addEventListener('notificationclick', (event) => {
-  console.log('[SW] Notification click received:', event.notification.data);
+  console.log('[SW] Notification click received');
   
   event.notification.close();
   
-  const action = event.action;
-  const data = event.notification.data || {};
-  
-  let targetUrl = '/app';
-  
-  if (data.type === 'journal-reminder') {
-    targetUrl = data.url || '/app/voice-entry';
-    
-    if (action === 'record') {
-      targetUrl = '/app/voice-entry';
-    }
-  }
-  
-  if (action === 'open' || action === 'record' || !action) {
+  if (event.action === 'open' || !event.action) {
     event.waitUntil(
-      clients.matchAll({ type: 'window' }).then((clientList) => {
-        // Try to focus existing window
-        for (const client of clientList) {
-          if (client.url.includes('/app') && 'focus' in client) {
-            client.focus();
-            client.navigate(targetUrl);
-            return;
-          }
-        }
-        
-        // Open new window if no existing app window
-        if (clients.openWindow) {
-          return clients.openWindow(targetUrl);
-        }
-      })
+      clients.openWindow('/app')
     );
-  } else if (action === 'dismiss') {
+  } else if (event.action === 'dismiss') {
     // Just close the notification
     console.log('[SW] Notification dismissed');
   }
 });
 
-console.log('[SW] Enhanced service worker script loaded v2 with journal reminders');
+console.log('[SW] Enhanced service worker script loaded v2');

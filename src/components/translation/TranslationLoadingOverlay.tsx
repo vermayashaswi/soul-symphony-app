@@ -1,7 +1,8 @@
 
-import React, { useEffect } from 'react';
+import React from 'react';
 import { useTranslation } from '@/contexts/TranslationContext';
-import { loadingStateManager, LoadingPriority } from '@/services/loadingStateManager';
+import { motion, AnimatePresence } from 'framer-motion';
+import { Progress } from '@/components/ui/progress';
 
 export function TranslationLoadingOverlay() {
   // Safe access to the translation context with default values
@@ -17,19 +18,24 @@ export function TranslationLoadingOverlay() {
     return null; // Return nothing if context isn't available yet
   }
 
-  // Register with unified loading manager
-  useEffect(() => {
-    if (isTranslating) {
-      loadingStateManager.setLoading('translation', LoadingPriority.MEDIUM, `Translating content... ${translationProgress}%`);
-    } else {
-      loadingStateManager.clearLoading('translation');
-    }
-
-    return () => {
-      loadingStateManager.clearLoading('translation');
-    };
-  }, [isTranslating, translationProgress]);
-
-  // This component no longer renders its own UI - handled by UnifiedLoadingOverlay
-  return null;
+  return (
+    <AnimatePresence>
+      {isTranslating && (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          className="fixed inset-0 bg-background/80 backdrop-blur-sm z-50 flex flex-col items-center justify-center"
+        >
+          <div className="flex flex-col items-center gap-6 max-w-md mx-auto px-4">
+            <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
+            <Progress value={translationProgress} className="w-full" />
+            <p className="text-sm text-muted-foreground">
+              Translating content... {translationProgress}%
+            </p>
+          </div>
+        </motion.div>
+      )}
+    </AnimatePresence>
+  );
 }

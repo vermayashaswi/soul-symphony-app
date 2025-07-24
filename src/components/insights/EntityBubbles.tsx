@@ -33,16 +33,7 @@ const EntityBubbles: React.FC<EntityBubblesProps> = ({
   const [highlightedEntity, setHighlightedEntity] = useState<string | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const [dimensions, setDimensions] = useState({ width: 300, height: 300 }); // Default dimensions
-  
-  // Defensive theme access
-  let theme = 'light';
-  try {
-    const themeData = useTheme();
-    theme = themeData.theme;
-  } catch (error) {
-    console.warn('Theme provider not available, using default theme');
-  }
-  
+  const { theme } = useTheme();
   const isMobile = useIsMobile();
   
   // Calculate date range based on timeRange

@@ -1,5 +1,4 @@
 import { nativeIntegrationService } from './nativeIntegrationService';
-import { loadingStateManager } from './loadingStateManager';
 
 export class NativeNavigationService {
   private static instance: NativeNavigationService;
@@ -105,13 +104,6 @@ export class NativeNavigationService {
     this.lastNavigationTime = now;
     console.log('[NativeNav] Immediate post-auth navigation to:', path);
     
-    // Clear any loading states that might cause blank screens
-    try {
-      loadingStateManager.clearAll();
-    } catch (error) {
-      console.warn('[NativeNav] Failed to clear loading states:', error);
-    }
-    
     if (nativeIntegrationService.isRunningNatively()) {
       // For native apps with bundled assets - use direct navigation
       console.log('[NativeNav] Direct native navigation to:', path);
@@ -152,56 +144,27 @@ export class NativeNavigationService {
   }
 
   /**
-   * Handle post-authentication success with session-aware navigation
-   * Enhanced for reliable native app redirection - PREVENTS BLANK SCREEN
+   * Handle post-authentication success with direct navigation for native apps
+   * This provides a more reliable redirection than the standard flow
    */
   public handleAuthSuccess(): void {
     console.log('[NativeNav] Handling authentication success');
     
-    // Clear any stuck loading states that might cause blank screens
-    try {
-      loadingStateManager.clearAll();
-    } catch (error) {
-      console.warn('[NativeNav] Failed to clear loading states:', error);
-    }
-    
     if (nativeIntegrationService.isRunningNatively()) {
-      console.log('[NativeNav] Native app detected - using direct navigation to prevent blank screen');
-      
-      // For native apps, use immediate navigation to prevent blank screen
-      this.performNativeNavigation('/app/home');
+      console.log('[NativeNav] Native app detected - using immediate direct navigation');
+      // For native apps, use immediate direct navigation
+      try {
+        console.log('[NativeNav] Setting window.location.href to /app/home');
+        window.location.href = '/app/home';
+      } catch (error) {
+        console.error('[NativeNav] Navigation error, using fallback navigation:', error);
+        // Fallback to navigateToPath
+        this.navigateToPath('/app/home', { force: true });
+      }
     } else {
       // For web, use standard navigation flow
       console.log('[NativeNav] Web app detected - using standard navigation');
       this.navigateToAuthenticatedHome();
-    }
-  }
-
-  /**
-   * Validate session exists before navigating (for native apps)
-   */
-  private validateSessionAndNavigate(targetPath: string): void {
-    try {
-      // Check if we have a valid session in storage
-      const storedSession = localStorage.getItem('sb-kwnwhgucnzqxndzjayyq-auth-token');
-      
-      if (storedSession) {
-        const sessionData = JSON.parse(storedSession);
-        const now = Date.now() / 1000;
-        
-        if (sessionData?.access_token && sessionData?.expires_at && sessionData.expires_at > now) {
-          console.log('[NativeNav] Valid session confirmed, proceeding with navigation');
-          this.performNativeNavigation(targetPath);
-          return;
-        }
-      }
-      
-      console.log('[NativeNav] No valid session found, using fallback navigation');
-      this.performNativeNavigation(targetPath);
-      
-    } catch (error) {
-      console.error('[NativeNav] Session validation error, using direct navigation:', error);
-      this.performNativeNavigation(targetPath);
     }
   }
 

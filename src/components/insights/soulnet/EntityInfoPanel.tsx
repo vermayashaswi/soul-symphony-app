@@ -10,14 +10,7 @@ interface EntityInfoPanelProps {
 }
 
 export const EntityInfoPanel: React.FC<EntityInfoPanelProps> = ({ selectedEntity, entityData }) => {
-  // Defensive theme access
-  let theme = 'light';
-  try {
-    const themeData = useTheme();
-    theme = themeData.theme;
-  } catch (error) {
-    console.warn('Theme provider not available, using default theme');
-  }
+  const { theme } = useTheme();
   
   if (!selectedEntity || !entityData[selectedEntity]) return null;
   const entityInfo = entityData[selectedEntity];

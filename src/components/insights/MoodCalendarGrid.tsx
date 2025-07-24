@@ -33,15 +33,7 @@ const getSentimentLabel = (sentiment: number): string => {
 };
 
 const MoodCalendarGrid: React.FC<MoodCalendarGridProps> = ({ sentimentData, timeRange, currentDate }) => {
-  // Defensive theme access
-  let theme = 'light';
-  try {
-    const themeData = useTheme();
-    theme = themeData.theme;
-  } catch (error) {
-    console.warn('Theme provider not available, using default theme');
-  }
-  
+  const { theme } = useTheme();
   const isMobile = useIsMobile();
   const { currentLanguage } = useTranslation();
   

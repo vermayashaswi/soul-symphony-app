@@ -96,15 +96,7 @@ const CustomTooltip = ({ active, payload, label }: any) => {
 
 // Accepts currentDate and onTimeRangeNavigate from props
 const MoodCalendar: React.FC<MoodCalendarProps> = ({ sentimentData, timeRange, currentDate: propCurrentDate, onTimeRangeNavigate }) => {
-  // Defensive theme access
-  let theme = 'light';
-  try {
-    const themeData = useTheme();
-    theme = themeData.theme;
-  } catch (error) {
-    console.warn('Theme provider not available, using default theme');
-  }
-  
+  const { theme } = useTheme();
   const isMobile = useIsMobile();
   const { currentLanguage } = useTranslation();
   const [viewMode, setViewMode] = useState<ViewMode>('chart');

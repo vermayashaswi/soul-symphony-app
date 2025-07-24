@@ -166,13 +166,13 @@
   border-color: red;
 }
 
-/* Debug input state - disabled to remove visual artifacts */
+/* Debug input state */
 .mobile-chat-input-container[data-debug="true"] {
-  /* border: 3px solid green; */
+  border: 3px solid green;
 }
 
 .mobile-chat-input-container.keyboard-visible[data-debug="true"] {
-  /* border-color: orange; */
+  border-color: orange;
 }
 
 /* Debug content state */

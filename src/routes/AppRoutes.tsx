@@ -17,48 +17,101 @@ import FAQPage from '@/pages/website/FAQPage';
 import BlogPage from '@/pages/website/BlogPage';
 import BlogPostPage from '@/pages/website/BlogPostPage';
 import OnboardingScreen from '@/components/onboarding/OnboardingScreen';
-import SessionRouter from '@/components/routing/SessionRouter';
 import { useAuth } from '@/contexts/AuthContext';
+import { useOnboarding } from '@/hooks/use-onboarding';
 import { nativeIntegrationService } from '@/services/nativeIntegrationService';
 
 const AppRoutes = () => {
   const { user } = useAuth();
+  const { onboardingComplete } = useOnboarding();
 
-  // Enhanced app root redirect - simplified
+  // Handle /app root route redirects with native context awareness
   const AppRootRedirect = () => {
     const isNative = nativeIntegrationService.isRunningNatively();
 
+    console.log('[AppRoutes] AppRootRedirect - isNative:', isNative, 'user:', !!user, 'onboardingComplete:', onboardingComplete);
+
+    // CRITICAL: For native apps, handle OAuth callback parameters properly
     if (isNative) {
-      // For native apps, always redirect to app content
-      if (user) {
-        return <Navigate to="/app/home" replace />;
-      } else {
+      // Check for OAuth callback deep links
+      const urlParams = new URLSearchParams(window.location.search);
+      const hashParams = new URLSearchParams(window.location.hash.replace('#', ''));
+      const hasOAuthParams = urlParams.has('access_token') || hashParams.has('access_token') ||
+                            urlParams.has('code') || hashParams.has('code') ||
+                            urlParams.has('error') || hashParams.has('error');
+
+      if (hasOAuthParams) {
+        console.log('[AppRoutes] OAuth callback detected in native app, processing auth');
+        return <Navigate to={`/app/auth${window.location.search}${window.location.hash}`} replace />;
+      }
+
+      // CRITICAL: For native apps, redirect to appropriate app screens
+      console.log('[AppRoutes] Native environment detected, redirecting to app interface');
+      if (!user) {
+        console.log('[AppRoutes] No user in native app, redirecting to onboarding');
         return <Navigate to="/app/onboarding" replace />;
       }
+
+      if (!onboardingComplete) {
+        console.log('[AppRoutes] Onboarding not complete in native app, redirecting to onboarding');
+        return <Navigate to="/app/onboarding" replace />;
+      }
+
+      console.log('[AppRoutes] Native app user authenticated and onboarded, redirecting to home');
+      return <Navigate to="/app/home" replace />;
     }
 
-    // Web behavior - check auth status
+    // Web behavior (existing logic)
+    console.log('[AppRoutes] Web environment, using standard flow');
+
+    // Check for web OAuth callback parameters
+    const urlParams = new URLSearchParams(window.location.search);
+    const hashParams = new URLSearchParams(window.location.hash.replace('#', ''));
+    const hasOAuthParams = urlParams.has('access_token') || hashParams.has('access_token') ||
+                          urlParams.has('code') || hashParams.has('code') ||
+                          urlParams.has('error') || hashParams.has('error');
+
+    if (hasOAuthParams) {
+      console.log('[AppRoutes] OAuth callback detected in web, redirecting to auth page');
+      return <Navigate to={`/app/auth${window.location.search}${window.location.hash}`} replace />;
+    }
+
     if (!user) {
+      return <Navigate to="/app/onboarding" replace />;
+    }
+
+    if (!onboardingComplete) {
       return <Navigate to="/app/onboarding" replace />;
     }
 
     return <Navigate to="/app/home" replace />;
   };
 
-  // Root redirect - simplified
+  // Handle root route redirects with native context
   const RootRedirect = () => {
     const isNative = nativeIntegrationService.isRunningNatively();
 
+    console.log('[AppRoutes] RootRedirect - isNative:', isNative, 'user:', !!user, 'onboardingComplete:', onboardingComplete);
+
+    // CRITICAL: For native apps, NEVER show marketing site - always redirect to app
     if (isNative) {
-      // Native apps: always redirect to app
-      if (user) {
-        return <Navigate to="/app/home" replace />;
-      } else {
+      console.log('[AppRoutes] Native environment detected at root, redirecting to app');
+      if (!user) {
+        console.log('[AppRoutes] No user in native app, redirecting to onboarding');
         return <Navigate to="/app/onboarding" replace />;
       }
+
+      if (!onboardingComplete) {
+        console.log('[AppRoutes] Onboarding not complete in native app, redirecting to onboarding');
+        return <Navigate to="/app/onboarding" replace />;
+      }
+
+      console.log('[AppRoutes] Native app user ready, redirecting to home');
+      return <Navigate to="/app/home" replace />;
     }
 
-    // Web: show marketing site
+    // Web behavior - show marketing site only for web
+    console.log('[AppRoutes] Web environment, showing marketing site');
     return <Index />;
   };
 
@@ -97,16 +150,8 @@ const AppRoutes = () => {
 
         {/* App Routes */}
         {/* Public app routes (no auth required) */}
-        <Route path="/app/onboarding" element={
-          <SessionRouter>
-            <OnboardingScreen />
-          </SessionRouter>
-        } />
-        <Route path="/app/auth" element={
-          <SessionRouter>
-            <Auth />
-          </SessionRouter>
-        } />
+        <Route path="/app/onboarding" element={<OnboardingScreen />} />
+        <Route path="/app/auth" element={<Auth />} />
 
         {/* Root app route with smart redirect */}
         <Route path="/app" element={<AppRootRedirect />} />

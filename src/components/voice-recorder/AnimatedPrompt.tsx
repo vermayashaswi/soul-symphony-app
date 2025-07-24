@@ -10,15 +10,7 @@ interface AnimatedPromptProps {
 
 export const AnimatedPrompt: React.FC<AnimatedPromptProps> = ({ show }) => {
   const [isVisible, setIsVisible] = useState(false);
-  
-  // Defensive theme access
-  let theme = 'light';
-  try {
-    const themeData = useTheme();
-    theme = themeData.theme;
-  } catch (error) {
-    console.warn('Theme provider not available, using default theme');
-  }
+  const { theme } = useTheme();
   
   useEffect(() => {
     // Small delay to make sure the animation runs properly

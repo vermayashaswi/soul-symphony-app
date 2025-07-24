@@ -190,7 +190,7 @@ export class SessionTrackingService {
   }
 
   /**
-   * Create or update user session with enhanced tracking using SessionManager
+   * Create or update user session with enhanced tracking
    */
   static async createUserSession(data: SessionTrackingData): Promise<string | null> {
     try {
@@ -203,18 +203,30 @@ export class SessionTrackingService {
         language: data.language,
       });
 
-      // Use the new SessionManager for comprehensive session tracking
-      const { sessionManager } = await import('./sessionManager');
-      
-      const sessionId = await sessionManager.startSession(data.userId, {
-        entryPage: data.entryPage,
-        deviceType: data.deviceType,
-        userAgent: data.userAgent,
-        appVersion: '1.0.0' // This could be derived from build metadata
-      });
+      const { data: sessionId, error } = await supabase
+        .rpc('enhanced_manage_user_session', {
+          p_user_id: data.userId,
+          p_device_type: data.deviceType,
+          p_user_agent: data.userAgent,
+          p_entry_page: data.entryPage,
+          p_last_active_page: data.lastActivePage,
+          p_language: data.language,
+          p_referrer: data.referrer,
+          p_ip_address: data.ipAddress,
+          p_country_code: data.countryCode,
+          p_currency: data.currency,
+          p_utm_source: data.utmSource,
+          p_utm_medium: data.utmMedium,
+          p_utm_campaign: data.utmCampaign,
+          p_utm_term: data.utmTerm,
+          p_utm_content: data.utmContent,
+          p_gclid: data.gclid,
+          p_fbclid: data.fbclid,
+          p_attribution_data: data.attributionData || {},
+        });
 
-      if (!sessionId) {
-        console.error('SessionManager failed to create session');
+      if (error) {
+        console.error('Error creating enhanced user session:', error);
         return null;
       }
 
