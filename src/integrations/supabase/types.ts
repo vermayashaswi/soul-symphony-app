@@ -1497,6 +1497,10 @@ export type Database = {
         Args: { target_entry_id: number }
         Returns: Json
       }
+      setup_user_trial_fallback: {
+        Args: { user_id: string }
+        Returns: Json
+      }
       store_user_query: {
         Args:
           | Record<PropertyKey, never>
