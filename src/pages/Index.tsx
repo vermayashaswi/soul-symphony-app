@@ -28,7 +28,7 @@ const Index = () => {
   // CRITICAL: For native apps, redirect immediately - never show marketing site
   useEffect(() => {
     if (isNative) {
-      console.log('[Index] Native app detected, redirecting to app interface');
+      console.log('[Index] Native app detected, immediate redirect needed');
       
       // Check for OAuth callback parameters first
       const hashParams = new URLSearchParams(window.location.hash.replace('#', ''));
@@ -42,28 +42,17 @@ const Index = () => {
         return;
       }
 
-      // Redirect based on user status with improved onboarding check
-      if (!user) {
-        console.log('[Index] No user in native app, redirecting to onboarding');
-        navigate('/app/onboarding', { replace: true });
+      // Immediate redirect to app/home for authenticated users, onboarding for others
+      if (user) {
+        console.log('[Index] Native app with user, redirecting to home immediately');
+        navigate('/app/home', { replace: true });
       } else {
-        // Check both localStorage and database for onboarding status
-        checkOnboardingStatus().then((isComplete) => {
-          if (!isComplete) {
-            console.log('[Index] Onboarding not complete in native app, redirecting to onboarding');
-            navigate('/app/onboarding', { replace: true });
-          } else {
-            console.log('[Index] Native app user ready, redirecting to home');
-            navigate('/app/home', { replace: true });
-          }
-        }).catch(() => {
-          // Fallback to onboarding if check fails
-          navigate('/app/onboarding', { replace: true });
-        });
+        console.log('[Index] Native app without user, redirecting to onboarding');
+        navigate('/app/onboarding', { replace: true });
       }
       return;
     }
-  }, [isNative, user, navigate, urlParams, checkOnboardingStatus]);
+  }, [isNative, user, navigate, urlParams]);
 
   // Enhanced tutorial status checking for proper navigation flow - ONLY for web users
   useEffect(() => {

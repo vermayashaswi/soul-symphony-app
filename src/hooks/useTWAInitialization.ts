@@ -32,7 +32,24 @@ export const useTWAInitialization = () => {
     isTWAEnvironment 
   } = useTWAAutoRefresh();
 
+  // Check if we're in a native Android environment
+  const isNativeAndroid = (window as any).Capacitor?.isNative || 
+                         navigator.userAgent.toLowerCase().includes('wv') ||
+                         window.location.href.includes('capacitor://');
+
   useEffect(() => {
+    // For native Android apps, complete initialization immediately
+    if (isNativeAndroid) {
+      console.log('[TWA Init] Native Android detected, completing initialization immediately');
+      setInitState({
+        isInitialized: true,
+        isLoading: false,
+        initializationComplete: true,
+        hasTimedOut: false
+      });
+      return;
+    }
+
     // Only run initialization once and only in TWA environment
     if (initializationStartedRef.current || (!twaEnv.isTWA && !twaEnv.isStandalone)) {
       // For non-TWA environments, complete initialization immediately
@@ -48,17 +65,14 @@ export const useTWAInitialization = () => {
     }
     
     initializationStartedRef.current = true;
-    console.log('[TWA Init] Starting TWA initialization process with auto-refresh monitoring', {
+    console.log('[TWA Init] Starting TWA initialization process', {
       isTWA: twaEnv.isTWA,
       isStandalone: twaEnv.isStandalone,
       authLoading,
       hasUser: !!user
     });
 
-    // Start auto-refresh monitoring
-    startStuckDetection();
-
-    // Set a timeout to prevent infinite loading
+    // For TWA environments, use shorter timeout and simpler logic
     initTimeoutRef.current = setTimeout(() => {
       console.log('[TWA Init] Initialization timeout reached, forcing completion');
       setInitState(prev => ({
@@ -68,28 +82,24 @@ export const useTWAInitialization = () => {
         initializationComplete: true,
         hasTimedOut: true
       }));
-      
-      // Stop auto-refresh monitoring since we're completing initialization
-      stopStuckDetection();
-    }, 8000);
+    }, 3000); // Reduced from 8000ms
 
     return () => {
       if (initTimeoutRef.current) {
         clearTimeout(initTimeoutRef.current);
         initTimeoutRef.current = null;
       }
-      stopStuckDetection();
     };
-  }, [twaEnv.isTWA, twaEnv.isStandalone, startStuckDetection, stopStuckDetection]);
+  }, [twaEnv.isTWA, twaEnv.isStandalone, isNativeAndroid]);
 
-  // Handle auth stabilization
+  // Handle auth stabilization for TWA (skip for native Android)
   useEffect(() => {
-    if (!twaEnv.isTWA && !twaEnv.isStandalone) return;
+    if (isNativeAndroid || (!twaEnv.isTWA && !twaEnv.isStandalone)) return;
     
     // Auth is considered stabilized when loading stops
     if (!authLoading && !authStabilizedRef.current) {
       authStabilizedRef.current = true;
-      console.log('[TWA Init] Auth has stabilized, completing initialization');
+      console.log('[TWA Init] Auth has stabilized, completing initialization immediately');
       
       // Clear any existing timeout
       if (initTimeoutRef.current) {
@@ -97,20 +107,15 @@ export const useTWAInitialization = () => {
         initTimeoutRef.current = null;
       }
       
-      // Add a small delay for TWA stability
-      setTimeout(() => {
-        setInitState(prev => ({
-          ...prev,
-          isInitialized: true,
-          isLoading: false,
-          initializationComplete: true
-        }));
-        
-        // Reset auto-refresh state since initialization completed successfully
-        resetRefreshState();
-      }, 1000);
+      // Complete initialization immediately for better performance
+      setInitState(prev => ({
+        ...prev,
+        isInitialized: true,
+        isLoading: false,
+        initializationComplete: true
+      }));
     }
-  }, [authLoading, twaEnv.isTWA, twaEnv.isStandalone, resetRefreshState]);
+  }, [authLoading, twaEnv.isTWA, twaEnv.isStandalone, isNativeAndroid]);
 
   // Reset initialization state when auth state changes significantly
   useEffect(() => {
