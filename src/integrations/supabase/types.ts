@@ -988,6 +988,14 @@ export type Database = {
         Args: { p_user_id: string }
         Returns: Json
       }
+      enhanced_check_rate_limit: {
+        Args: {
+          p_user_id: string
+          p_ip_address: unknown
+          p_function_name: string
+        }
+        Returns: Json
+      }
       enhanced_manage_user_session: {
         Args:
           | {
