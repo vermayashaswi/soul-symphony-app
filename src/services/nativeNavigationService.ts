@@ -144,16 +144,17 @@ export class NativeNavigationService {
   }
 
   /**
-   * Handle post-authentication success with simplified navigation
-   * Optimized for native apps to avoid stuck states
+   * Handle post-authentication success with session-aware navigation
+   * Enhanced for reliable native app redirection
    */
   public handleAuthSuccess(): void {
     console.log('[NativeNav] Handling authentication success');
     
     if (nativeIntegrationService.isRunningNatively()) {
-      console.log('[NativeNav] Native app detected - immediate navigation to home');
-      // For native apps, navigate immediately without delays or session validation
-      this.navigateToPath('/app/home', { replace: true, force: true });
+      console.log('[NativeNav] Native app detected - using session-aware navigation');
+      
+      // Validate session before navigation
+      this.validateSessionAndNavigate('/app/home');
     } else {
       // For web, use standard navigation flow
       console.log('[NativeNav] Web app detected - using standard navigation');
