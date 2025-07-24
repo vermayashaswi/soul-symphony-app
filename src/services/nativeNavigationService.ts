@@ -144,27 +144,49 @@ export class NativeNavigationService {
   }
 
   /**
-   * Handle post-authentication success with direct navigation for native apps
-   * This provides a more reliable redirection than the standard flow
+   * Handle post-authentication success with session-aware navigation
+   * Enhanced for reliable native app redirection
    */
   public handleAuthSuccess(): void {
     console.log('[NativeNav] Handling authentication success');
     
     if (nativeIntegrationService.isRunningNatively()) {
-      console.log('[NativeNav] Native app detected - using immediate direct navigation');
-      // For native apps, use immediate direct navigation
-      try {
-        console.log('[NativeNav] Setting window.location.href to /app/home');
-        window.location.href = '/app/home';
-      } catch (error) {
-        console.error('[NativeNav] Navigation error, using fallback navigation:', error);
-        // Fallback to navigateToPath
-        this.navigateToPath('/app/home', { force: true });
-      }
+      console.log('[NativeNav] Native app detected - using session-aware navigation');
+      
+      // Validate session before navigation
+      this.validateSessionAndNavigate('/app/home');
     } else {
       // For web, use standard navigation flow
       console.log('[NativeNav] Web app detected - using standard navigation');
       this.navigateToAuthenticatedHome();
+    }
+  }
+
+  /**
+   * Validate session exists before navigating (for native apps)
+   */
+  private validateSessionAndNavigate(targetPath: string): void {
+    try {
+      // Check if we have a valid session in storage
+      const storedSession = localStorage.getItem('sb-kwnwhgucnzqxndzjayyq-auth-token');
+      
+      if (storedSession) {
+        const sessionData = JSON.parse(storedSession);
+        const now = Date.now() / 1000;
+        
+        if (sessionData?.access_token && sessionData?.expires_at && sessionData.expires_at > now) {
+          console.log('[NativeNav] Valid session confirmed, proceeding with navigation');
+          this.performNativeNavigation(targetPath);
+          return;
+        }
+      }
+      
+      console.log('[NativeNav] No valid session found, using fallback navigation');
+      this.performNativeNavigation(targetPath);
+      
+    } catch (error) {
+      console.error('[NativeNav] Session validation error, using direct navigation:', error);
+      this.performNativeNavigation(targetPath);
     }
   }
 

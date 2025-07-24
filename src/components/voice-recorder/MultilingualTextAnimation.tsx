@@ -32,7 +32,14 @@ const languages = [
 ];
 
 export function LanguageBackground({ contained = false }: { contained?: boolean }) {
-  const { theme } = useTheme();
+  // Defensive theme access
+  let theme = 'light';
+  try {
+    const themeData = useTheme();
+    theme = themeData.theme;
+  } catch (error) {
+    console.warn('Theme provider not available, using default theme');
+  }
   
   return (
     <div className="absolute inset-0 overflow-hidden">
@@ -71,7 +78,14 @@ export function LanguageBackground({ contained = false }: { contained?: boolean 
 }
 
 export function AnimatedPrompt() {
-  const { theme } = useTheme();
+  // Defensive theme access
+  let theme = 'light';
+  try {
+    const themeData = useTheme();
+    theme = themeData.theme;
+  } catch (error) {
+    console.warn('Theme provider not available, using default theme');
+  }
   
   return (
     <div className="relative w-full h-full flex items-center justify-center">

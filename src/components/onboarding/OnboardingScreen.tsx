@@ -770,7 +770,16 @@ const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ onComplete }) => {
   const [currentStep, setCurrentStep] = useState(0);
   const [name, setName] = useState('');
   const navigate = useNavigate();
-  const { setColorTheme } = useTheme();
+  
+  // Defensive theme access
+  let setColorTheme = (theme: any) => {};
+  try {
+    const themeData = useTheme();
+    setColorTheme = themeData.setColorTheme;
+  } catch (error) {
+    console.warn('Theme provider not available, using default setColorTheme');
+  }
+  
   const contentRef = useRef<HTMLDivElement>(null);
   const { user } = useAuth();
   

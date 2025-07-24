@@ -13,6 +13,7 @@ import { toast } from 'sonner';
 import './styles/emoji.css';
 import './styles/tutorial.css';
 import { FeatureFlagsProvider } from "./contexts/FeatureFlagsContext";
+import { SessionProvider } from "./providers/SessionProvider";
 import TWAWrapper from './components/twa/TWAWrapper';
 import TWAInitializationWrapper from './components/twa/TWAInitializationWrapper';
 import { detectTWAEnvironment } from './utils/twaDetection';

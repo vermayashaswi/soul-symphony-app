@@ -27,7 +27,15 @@ interface LineChartProps {
 
 const CustomDot = (props: any) => {
   const { cx, cy, stroke, strokeWidth, r, value } = props;
-  const { theme } = useTheme();
+  
+  // Defensive theme access
+  let theme = 'light';
+  try {
+    const themeData = useTheme();
+    theme = themeData.theme;
+  } catch (error) {
+    console.warn('Theme provider not available, using default theme');
+  }
   
   if (value === null) return null;
   
@@ -94,7 +102,15 @@ const EmotionLineLabel = (props: any) => {
 };
 
 export const LineChart = ({ data, visibleEmotions, onLegendClick }: LineChartProps) => {
-  const { theme } = useTheme();
+  // Defensive theme access
+  let theme = 'light';
+  try {
+    const themeData = useTheme();
+    theme = themeData.theme;
+  } catch (error) {
+    console.warn('Theme provider not available, using default theme');
+  }
+  
   const isMobile = useIsMobile();
 
   const allEmotions = Object.keys(data[0] || {})

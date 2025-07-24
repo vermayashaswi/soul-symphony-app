@@ -122,7 +122,8 @@ const MobileNavigation: React.FC<MobileNavigationProps> = ({ onboardingComplete 
   ];
 
   const getActiveStatus = (path: string) => {
-    return location.pathname.startsWith(path);
+    // FIX: Use exact path matching to prevent multiple items appearing active
+    return location.pathname === path;
   };
   
   const isPremiumFeatureAccessible = hasActiveSubscription || isTrialActive;
@@ -170,7 +171,7 @@ const MobileNavigation: React.FC<MobileNavigationProps> = ({ onboardingComplete 
                 )}
                 {isActive && (
                   <motion.div
-                    layoutId="mobileNavIndicator"
+                    layoutId={`mobileNavIndicator-${item.path}`}
                     className="absolute -bottom-1 left-1/2 transform -translate-x-1/2 w-1 h-1 bg-primary rounded-full"
                     transition={{ type: "spring", bounce: 0.3 }}
                   />

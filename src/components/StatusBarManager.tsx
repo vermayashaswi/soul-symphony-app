@@ -41,6 +41,38 @@ export const StatusBarManager: React.FC<StatusBarManagerProps> = ({ children }) 
       }
     };
 
+    // FIX: Re-hide status bar when app becomes visible/active
+    const handleVisibilityChange = async () => {
+      if (!document.hidden && nativeIntegrationService.isRunningNatively()) {
+        console.log('[StatusBarManager] App became visible, re-hiding status bar');
+        try {
+          await nativeIntegrationService.hideStatusBar();
+          const statusBarPlugin = nativeIntegrationService.getPlugin('StatusBar');
+          if (statusBarPlugin) {
+            await statusBarPlugin.setOverlaysWebView({ overlay: true });
+          }
+        } catch (error) {
+          console.error('[StatusBarManager] Failed to re-hide status bar:', error);
+        }
+      }
+    };
+
+    const handleAppStateChange = async (event: any) => {
+      console.log('[StatusBarManager] App state changed:', event);
+      if (event?.isActive && nativeIntegrationService.isRunningNatively()) {
+        console.log('[StatusBarManager] App resumed, re-hiding status bar');
+        try {
+          await nativeIntegrationService.hideStatusBar();
+          const statusBarPlugin = nativeIntegrationService.getPlugin('StatusBar');
+          if (statusBarPlugin) {
+            await statusBarPlugin.setOverlaysWebView({ overlay: true });
+          }
+        } catch (error) {
+          console.error('[StatusBarManager] Failed to re-hide status bar on resume:', error);
+        }
+      }
+    };
+
     const updateSafeAreaVariables = () => {
       // Detect platform and set appropriate CSS variables
       const isAndroid = /Android/.test(navigator.userAgent);
@@ -107,6 +139,16 @@ export const StatusBarManager: React.FC<StatusBarManagerProps> = ({ children }) 
 
     initializeStatusBar();
     
+    // FIX: Add listeners for app visibility and focus changes
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('focus', handleVisibilityChange);
+    
+    // Add native app state listeners if available
+    const appPlugin = nativeIntegrationService.getPlugin('App');
+    if (appPlugin) {
+      appPlugin.addListener('appStateChange', handleAppStateChange);
+    }
+    
     // Update on orientation change and resize with debounce
     let updateTimeout: NodeJS.Timeout;
     const handleOrientationChange = () => {
@@ -114,6 +156,10 @@ export const StatusBarManager: React.FC<StatusBarManagerProps> = ({ children }) 
       updateTimeout = setTimeout(() => {
         console.log('[StatusBarManager] ANDROID FIX: Orientation/resize detected, updating safe area');
         updateSafeAreaVariables();
+        // Also re-hide status bar on orientation change
+        if (nativeIntegrationService.isRunningNatively()) {
+          handleVisibilityChange();
+        }
       }, 200);
     };
     
@@ -127,8 +173,17 @@ export const StatusBarManager: React.FC<StatusBarManagerProps> = ({ children }) 
     
     return () => {
       clearTimeout(updateTimeout);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('focus', handleVisibilityChange);
       window.removeEventListener('orientationchange', handleOrientationChange);
       window.removeEventListener('resize', handleOrientationChange);
+      
+      // Remove native app state listeners
+      const appPlugin = nativeIntegrationService.getPlugin('App');
+      if (appPlugin) {
+        appPlugin.removeAllListeners();
+      }
+      
       if (window.visualViewport) {
         window.visualViewport.removeEventListener('resize', handleOrientationChange);
       }

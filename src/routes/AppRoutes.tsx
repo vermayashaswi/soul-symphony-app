@@ -17,19 +17,22 @@ import FAQPage from '@/pages/website/FAQPage';
 import BlogPage from '@/pages/website/BlogPage';
 import BlogPostPage from '@/pages/website/BlogPostPage';
 import OnboardingScreen from '@/components/onboarding/OnboardingScreen';
+import SessionRouter from '@/components/routing/SessionRouter';
 import { useAuth } from '@/contexts/AuthContext';
 import { useOnboarding } from '@/hooks/use-onboarding';
+import { useSessionValidation } from '@/hooks/useSessionValidation';
 import { nativeIntegrationService } from '@/services/nativeIntegrationService';
 
 const AppRoutes = () => {
   const { user } = useAuth();
   const { onboardingComplete } = useOnboarding();
+  const { session: validatedSession, isValid: hasValidSession, isLoading: sessionLoading } = useSessionValidation();
 
-  // Handle /app root route redirects with native context awareness
+  // Enhanced app root redirect with session validation
   const AppRootRedirect = () => {
     const isNative = nativeIntegrationService.isRunningNatively();
 
-    console.log('[AppRoutes] AppRootRedirect - isNative:', isNative, 'user:', !!user, 'onboardingComplete:', onboardingComplete);
+    console.log('[AppRoutes] AppRootRedirect - isNative:', isNative, 'user:', !!user, 'validatedSession:', !!validatedSession, 'hasValidSession:', hasValidSession);
 
     // CRITICAL: For native apps, handle OAuth callback parameters properly
     if (isNative) {
@@ -45,23 +48,27 @@ const AppRoutes = () => {
         return <Navigate to={`/app/auth${window.location.search}${window.location.hash}`} replace />;
       }
 
-      // CRITICAL: For native apps, redirect to appropriate app screens
-      console.log('[AppRoutes] Native environment detected, redirecting to app interface');
-      if (!user) {
-        console.log('[AppRoutes] No user in native app, redirecting to onboarding');
+      // ENHANCED: For native apps, prioritize validated session over user context
+      console.log('[AppRoutes] Native environment detected, checking session validation');
+      
+      // If we have a validated session, go directly to home
+      if (hasValidSession && validatedSession) {
+        console.log('[AppRoutes] Native app with validated session, redirecting to home');
+        return <Navigate to="/app/home" replace />;
+      }
+      
+      // Fallback to user context check
+      if (!user && !validatedSession) {
+        console.log('[AppRoutes] No user or session in native app, redirecting to onboarding');
         return <Navigate to="/app/onboarding" replace />;
       }
 
-      if (!onboardingComplete) {
-        console.log('[AppRoutes] Onboarding not complete in native app, redirecting to onboarding');
-        return <Navigate to="/app/onboarding" replace />;
-      }
-
-      console.log('[AppRoutes] Native app user authenticated and onboarded, redirecting to home');
+      // If user exists but session validation is still loading, go to home anyway
+      console.log('[AppRoutes] Native app user authenticated, redirecting to home');
       return <Navigate to="/app/home" replace />;
     }
 
-    // Web behavior (existing logic)
+    // Web behavior - prioritize authentication status over onboarding flag
     console.log('[AppRoutes] Web environment, using standard flow');
 
     // Check for web OAuth callback parameters
@@ -76,36 +83,36 @@ const AppRoutes = () => {
       return <Navigate to={`/app/auth${window.location.search}${window.location.hash}`} replace />;
     }
 
-    if (!user) {
+    if (!user && !validatedSession) {
       return <Navigate to="/app/onboarding" replace />;
     }
 
-    if (!onboardingComplete) {
-      return <Navigate to="/app/onboarding" replace />;
-    }
-
+    // If user is authenticated, go directly to home (ignore database onboarding flag)
     return <Navigate to="/app/home" replace />;
   };
 
-  // Handle root route redirects with native context
+  // Enhanced root redirect with session validation
   const RootRedirect = () => {
     const isNative = nativeIntegrationService.isRunningNatively();
 
-    console.log('[AppRoutes] RootRedirect - isNative:', isNative, 'user:', !!user, 'onboardingComplete:', onboardingComplete);
+    console.log('[AppRoutes] RootRedirect - isNative:', isNative, 'user:', !!user, 'validatedSession:', !!validatedSession);
 
     // CRITICAL: For native apps, NEVER show marketing site - always redirect to app
     if (isNative) {
-      console.log('[AppRoutes] Native environment detected at root, redirecting to app');
-      if (!user) {
-        console.log('[AppRoutes] No user in native app, redirecting to onboarding');
+      console.log('[AppRoutes] Native environment detected at root, checking session');
+      
+      // Prioritize validated session for immediate routing
+      if (hasValidSession && validatedSession) {
+        console.log('[AppRoutes] Native app with validated session, redirecting to home');
+        return <Navigate to="/app/home" replace />;
+      }
+      
+      if (!user && !validatedSession) {
+        console.log('[AppRoutes] No user or session in native app, redirecting to onboarding');
         return <Navigate to="/app/onboarding" replace />;
       }
 
-      if (!onboardingComplete) {
-        console.log('[AppRoutes] Onboarding not complete in native app, redirecting to onboarding');
-        return <Navigate to="/app/onboarding" replace />;
-      }
-
+      // If user exists, go to home
       console.log('[AppRoutes] Native app user ready, redirecting to home');
       return <Navigate to="/app/home" replace />;
     }
@@ -150,8 +157,16 @@ const AppRoutes = () => {
 
         {/* App Routes */}
         {/* Public app routes (no auth required) */}
-        <Route path="/app/onboarding" element={<OnboardingScreen />} />
-        <Route path="/app/auth" element={<Auth />} />
+        <Route path="/app/onboarding" element={
+          <SessionRouter>
+            <OnboardingScreen />
+          </SessionRouter>
+        } />
+        <Route path="/app/auth" element={
+          <SessionRouter>
+            <Auth />
+          </SessionRouter>
+        } />
 
         {/* Root app route with smart redirect */}
         <Route path="/app" element={<AppRootRedirect />} />

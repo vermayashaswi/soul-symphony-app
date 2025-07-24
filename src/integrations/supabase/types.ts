@@ -767,31 +767,47 @@ export type Database = {
       }
       user_sessions: {
         Row: {
+          app_launch_count: number | null
+          app_version: string | null
           attribution_data: Json | null
+          background_start_time: string | null
+          background_time: unknown | null
+          battery_level: number | null
           browser_info: Json | null
           conversion_events: Json | null
           country_code: string | null
+          crash_count: number | null
           created_at: string
           currency: string | null
           device_fingerprint: string | null
           device_type: string | null
           entry_page: string | null
+          error_count: number | null
           fbclid: string | null
+          foreground_start_time: string | null
+          foreground_time: unknown | null
           gclid: string | null
           id: string
+          inactivity_duration: unknown | null
           ip_address: string | null
           is_active: boolean | null
           language: string | null
           last_active_page: string | null
           last_activity: string | null
+          last_renewal_at: string | null
           location: string | null
+          memory_usage: number | null
+          network_state: string | null
           page_views: number | null
           platform: string | null
           referrer: string | null
           session_duration: unknown | null
           session_end: string | null
           session_fingerprint: string | null
+          session_quality_score: number | null
+          session_renewal_count: number | null
           session_start: string
+          session_state: string | null
           session_timeout: string | null
           user_agent: string | null
           user_id: string
@@ -802,31 +818,47 @@ export type Database = {
           utm_term: string | null
         }
         Insert: {
+          app_launch_count?: number | null
+          app_version?: string | null
           attribution_data?: Json | null
+          background_start_time?: string | null
+          background_time?: unknown | null
+          battery_level?: number | null
           browser_info?: Json | null
           conversion_events?: Json | null
           country_code?: string | null
+          crash_count?: number | null
           created_at?: string
           currency?: string | null
           device_fingerprint?: string | null
           device_type?: string | null
           entry_page?: string | null
+          error_count?: number | null
           fbclid?: string | null
+          foreground_start_time?: string | null
+          foreground_time?: unknown | null
           gclid?: string | null
           id?: string
+          inactivity_duration?: unknown | null
           ip_address?: string | null
           is_active?: boolean | null
           language?: string | null
           last_active_page?: string | null
           last_activity?: string | null
+          last_renewal_at?: string | null
           location?: string | null
+          memory_usage?: number | null
+          network_state?: string | null
           page_views?: number | null
           platform?: string | null
           referrer?: string | null
           session_duration?: unknown | null
           session_end?: string | null
           session_fingerprint?: string | null
+          session_quality_score?: number | null
+          session_renewal_count?: number | null
           session_start?: string
+          session_state?: string | null
           session_timeout?: string | null
           user_agent?: string | null
           user_id: string
@@ -837,31 +869,47 @@ export type Database = {
           utm_term?: string | null
         }
         Update: {
+          app_launch_count?: number | null
+          app_version?: string | null
           attribution_data?: Json | null
+          background_start_time?: string | null
+          background_time?: unknown | null
+          battery_level?: number | null
           browser_info?: Json | null
           conversion_events?: Json | null
           country_code?: string | null
+          crash_count?: number | null
           created_at?: string
           currency?: string | null
           device_fingerprint?: string | null
           device_type?: string | null
           entry_page?: string | null
+          error_count?: number | null
           fbclid?: string | null
+          foreground_start_time?: string | null
+          foreground_time?: unknown | null
           gclid?: string | null
           id?: string
+          inactivity_duration?: unknown | null
           ip_address?: string | null
           is_active?: boolean | null
           language?: string | null
           last_active_page?: string | null
           last_activity?: string | null
+          last_renewal_at?: string | null
           location?: string | null
+          memory_usage?: number | null
+          network_state?: string | null
           page_views?: number | null
           platform?: string | null
           referrer?: string | null
           session_duration?: unknown | null
           session_end?: string | null
           session_fingerprint?: string | null
+          session_quality_score?: number | null
+          session_renewal_count?: number | null
           session_start?: string
+          session_state?: string | null
           session_timeout?: string | null
           user_agent?: string | null
           user_id?: string
@@ -878,6 +926,17 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      calculate_session_quality_score: {
+        Args: {
+          p_session_duration: unknown
+          p_page_views: number
+          p_crash_count: number
+          p_error_count: number
+          p_background_time: unknown
+          p_foreground_time: unknown
+        }
+        Returns: number
+      }
       check_journal_entry_ownership: {
         Args: { entry_id_param: number }
         Returns: boolean
@@ -985,6 +1044,24 @@ export type Database = {
               p_device_fingerprint?: string
               p_platform?: string
             }
+        Returns: string
+      }
+      enhanced_session_manager: {
+        Args: {
+          p_user_id: string
+          p_action: string
+          p_device_type?: string
+          p_user_agent?: string
+          p_entry_page?: string
+          p_last_active_page?: string
+          p_session_fingerprint?: string
+          p_app_version?: string
+          p_network_state?: string
+          p_battery_level?: number
+          p_memory_usage?: number
+          p_platform?: string
+          p_additional_data?: Json
+        }
         Returns: string
       }
       execute_dynamic_query: {

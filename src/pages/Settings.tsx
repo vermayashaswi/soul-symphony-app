@@ -34,6 +34,7 @@ import { TranslatableText } from '@/components/translation/TranslatableText';
 import { useTranslation } from '@/contexts/TranslationContext';
 import { useTutorial } from '@/contexts/TutorialContext';
 import { DeleteAllEntriesSection } from '@/components/settings/DeleteAllEntriesSection';
+import { SessionDebugPanel } from '@/components/debug/SessionDebugPanel';
 
 interface SettingItemProps {
   icon: React.ElementType;
@@ -66,7 +67,27 @@ function SettingItem({ icon: Icon, title, description, children }: SettingItemPr
 function SettingsContent() {
   console.log('[Settings] SettingsContent rendering');
   
-  const { theme, setTheme, colorTheme, setColorTheme, customColor, setCustomColor, systemTheme } = useTheme();
+  // Defensive theme access
+  let theme = 'light';
+  let setTheme = (t: any) => {};
+  let colorTheme = 'Calm';
+  let setColorTheme = (t: any) => {};
+  let customColor = '#3b82f6';
+  let setCustomColor = (c: any) => {};
+  let systemTheme = 'light';
+  
+  try {
+    const themeData = useTheme();
+    theme = themeData.theme;
+    setTheme = themeData.setTheme;
+    colorTheme = themeData.colorTheme;
+    setColorTheme = themeData.setColorTheme;
+    customColor = themeData.customColor;
+    setCustomColor = themeData.setCustomColor;
+    systemTheme = themeData.systemTheme;
+  } catch (error) {
+    console.warn('Theme provider not available, using defaults');
+  }
   const [notificationsEnabled, setNotificationsEnabled] = useState(false);
   const [notificationTimes, setNotificationTimes] = useState<NotificationTime[]>(['evening']);
   const [showNotificationSettings, setShowNotificationSettings] = useState(false);
@@ -961,6 +982,21 @@ function SettingsContent() {
               
               <DeleteAllEntriesSection />
             </motion.div>
+            
+            {process.env.NODE_ENV === 'development' && (
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.3, delay: 0.5 }}
+                className="bg-background rounded-xl p-6 shadow-sm border"
+              >
+                <h2 className="text-xl font-semibold mb-4 text-theme-color">
+                  Session Debug (Development Only)
+                </h2>
+                
+                <SessionDebugPanel />
+              </motion.div>
+            )}
             
             <div className="py-4 text-center text-sm text-muted-foreground">
               <p className="flex items-center justify-center gap-1">
