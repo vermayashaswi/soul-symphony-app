@@ -284,56 +284,57 @@ export const updateUserProfile = async (user: User | null, metadata: Record<stri
 };
 
 /**
- * Starts a trial for a user (if eligible)
+ * Enhanced trial setup with fallback for native apps
  */
 export const startUserTrial = async (userId: string): Promise<boolean> => {
   try {
-    logProfile('Starting trial for user', 'ProfileService', { userId });
-    
-    // Check eligibility first
-    const { data: isEligible, error: eligibilityError } = await supabase
-      .rpc('is_trial_eligible', {
-        user_id_param: userId
-      });
+    console.log('🎯 [ProfileService] Starting trial setup for user:', userId);
 
-    if (eligibilityError) {
-      logError(`Error checking trial eligibility: ${eligibilityError.message}`, 'ProfileService', eligibilityError);
-      return false;
+    // Try the new fallback function first
+    const { data: fallbackResult, error: fallbackError } = await supabase.rpc(
+      'setup_user_trial_fallback',
+      { user_id: userId }
+    );
+
+    if (!fallbackError && fallbackResult && typeof fallbackResult === 'object' && 'success' in fallbackResult && fallbackResult.success) {
+      console.log('✅ [ProfileService] Trial setup completed via fallback function');
+      logProfile('Trial started via fallback function', 'ProfileService', fallbackResult);
+      return true;
     }
 
-    if (!isEligible) {
-      logProfile('User is not eligible for trial', 'ProfileService');
-      return false;
-    }
+    console.log('🔄 [ProfileService] Fallback function failed, trying direct update...');
+    logProfile('Fallback function failed, using direct update', 'ProfileService', { fallbackError });
 
-    // Start the trial - Updated to use 14 days instead of 7
+    // Fallback to direct profile update
     const trialEndDate = new Date();
-    trialEndDate.setDate(trialEndDate.getDate() + 14); // Changed from 7 to 14 days
+    trialEndDate.setDate(trialEndDate.getDate() + 14);
 
-    const { error: updateError } = await supabase
+    const { data, error } = await supabase
       .from('profiles')
       .update({
-        subscription_status: 'trial',
-        subscription_tier: 'premium', // Set to premium during trial
-        is_premium: true,
         trial_ends_at: trialEndDate.toISOString(),
+        subscription_status: 'trial',
+        subscription_tier: 'premium',
+        is_premium: true,
         updated_at: new Date().toISOString()
       })
-      .eq('id', userId);
+      .eq('id', userId)
+      .select('trial_ends_at, subscription_status')
+      .single();
 
-    if (updateError) {
-      logError(`Error starting trial: ${updateError.message}`, 'ProfileService', updateError);
+    if (error) {
+      console.error('❌ [ProfileService] Failed to start trial via direct update:', error);
+      logError(`Failed to start trial via direct update: ${error.message}`, 'ProfileService', error);
       return false;
     }
 
-    logProfile('Trial started successfully', 'ProfileService', {
-      userId,
-      trialEndDate: trialEndDate.toISOString()
-    });
-    
+    console.log('✅ [ProfileService] Trial started successfully via direct update:', data);
+    logProfile('Trial started successfully via direct update', 'ProfileService', data);
     return true;
-  } catch (error: any) {
-    logError(`Error in startUserTrial: ${error.message}`, 'ProfileService', error);
+
+  } catch (error) {
+    console.error('❌ [ProfileService] Unexpected error in startUserTrial:', error);
+    logError(`Unexpected error in startUserTrial: ${error}`, 'ProfileService', error);
     return false;
   }
 };
