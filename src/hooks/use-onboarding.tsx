@@ -74,7 +74,7 @@ export function useOnboarding() {
     });
 
     return () => subscription.unsubscribe();
-  }, []);
+  }, [user]); // Add user dependency to prevent infinite loop
 
   const completeOnboarding = async () => {
     try {
