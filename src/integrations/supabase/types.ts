@@ -988,6 +988,14 @@ export type Database = {
         Args: { p_user_id: string }
         Returns: Json
       }
+      enhanced_check_rate_limit: {
+        Args: {
+          p_user_id: string
+          p_ip_address: unknown
+          p_function_name: string
+        }
+        Returns: Json
+      }
       enhanced_manage_user_session: {
         Args:
           | {
@@ -1487,6 +1495,10 @@ export type Database = {
       }
       regenerate_missing_data_for_entry: {
         Args: { target_entry_id: number }
+        Returns: Json
+      }
+      setup_user_trial_fallback: {
+        Args: { user_id: string }
         Returns: Json
       }
       store_user_query: {
