@@ -32,31 +32,28 @@ export const SessionRouter: React.FC<SessionRouterProps> = ({
   useEffect(() => {
     let mounted = true;
 
-    const checkSession = async () => {
-      try {
-        console.log('[SessionRouter] Checking session state...');
-        
+  const checkSession = async () => {
+    try {
+      console.log('[SessionRouter] Checking session state...');
+      
+      // Add timeout protection
+      const timeoutPromise = new Promise((_, reject) => {
+        setTimeout(() => reject(new Error('Session check timeout')), 5000);
+      });
+      
+      const sessionPromise = (async () => {
         // For native apps, try to get session synchronously first from localStorage
         if (isNative) {
           try {
             const storedSession = localStorage.getItem('sb-kwnwhgucnzqxndzjayyq-auth-token');
             if (storedSession) {
               const sessionData = JSON.parse(storedSession);
-              console.log('[SessionRouter] Found stored session data in native app');
               
               // Quick validation of stored session
               if (sessionData?.access_token && sessionData?.expires_at) {
                 const now = Date.now() / 1000;
                 if (sessionData.expires_at > now) {
-                  console.log('[SessionRouter] Session appears valid, proceeding');
-                  if (mounted) {
-                    setSessionState({
-                      session: sessionData as Session,
-                      loading: false,
-                      checked: true
-                    });
-                  }
-                  return;
+                  return sessionData as Session;
                 }
               }
             }
@@ -72,30 +69,35 @@ export const SessionRouter: React.FC<SessionRouterProps> = ({
           console.error('[SessionRouter] Session check error:', error);
         }
 
-        console.log('[SessionRouter] Session check result:', {
-          hasSession: !!session,
-          userId: session?.user?.id,
-          isNative
-        });
+        return session;
+      })();
+      
+      const session = await Promise.race([sessionPromise, timeoutPromise]) as Session | null;
 
-        if (mounted) {
-          setSessionState({
-            session,
-            loading: false,
-            checked: true
-          });
-        }
-      } catch (error) {
-        console.error('[SessionRouter] Session check failed:', error);
-        if (mounted) {
-          setSessionState({
-            session: null,
-            loading: false,
-            checked: true
-          });
-        }
+      console.log('[SessionRouter] Session check result:', {
+        hasSession: !!session,
+        userId: session?.user?.id,
+        isNative
+      });
+
+      if (mounted) {
+        setSessionState({
+          session,
+          loading: false,
+          checked: true
+        });
       }
-    };
+    } catch (error) {
+      console.error('[SessionRouter] Session check failed:', error);
+      if (mounted) {
+        setSessionState({
+          session: null,
+          loading: false,
+          checked: true
+        });
+      }
+    }
+  };
 
     checkSession();
 
