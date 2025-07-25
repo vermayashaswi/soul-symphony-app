@@ -15,16 +15,18 @@ import './styles/emoji.css';
 import './styles/tutorial.css';
 import { memoryMonitor } from './services/memoryMonitor';
 
-// Lazy load heavy providers and components
+// Lazy load only heavy UI components, keep providers sync
 const AppRoutes = lazy(() => import('./routes/AppRoutes'));
-const SubscriptionProvider = lazy(() => import('@/contexts/SubscriptionContext').then(m => ({ default: m.SubscriptionProvider })));
 const TranslationLoadingOverlay = lazy(() => import('@/components/translation/TranslationLoadingOverlay').then(m => ({ default: m.TranslationLoadingOverlay })));
 const JournalProcessingInitializer = lazy(() => import('./app/journal-processing-init').then(m => ({ default: m.JournalProcessingInitializer })));
-const TutorialProvider = lazy(() => import('./contexts/TutorialContext').then(m => ({ default: m.TutorialProvider })));
 const TutorialOverlay = lazy(() => import('./components/tutorial/TutorialOverlay'));
-const FeatureFlagsProvider = lazy(() => import("./contexts/FeatureFlagsContext").then(m => ({ default: m.FeatureFlagsProvider })));
-const TWAWrapper = lazy(() => import('./components/twa/TWAWrapper'));
-const TWAInitializationWrapper = lazy(() => import('./components/twa/TWAInitializationWrapper'));
+
+// Import providers synchronously to avoid timing issues
+import { SubscriptionProvider } from '@/contexts/SubscriptionContext';
+import { TutorialProvider } from './contexts/TutorialContext';
+import { FeatureFlagsProvider } from "./contexts/FeatureFlagsContext";
+import TWAWrapper from './components/twa/TWAWrapper';
+import TWAInitializationWrapper from './components/twa/TWAInitializationWrapper';
 
 // Loading fallback component
 const LoadingFallback = () => (
@@ -233,38 +235,30 @@ const App: React.FC = () => {
 
   return (
     <ErrorBoundary>
-      <Suspense fallback={<LoadingFallback />}>
-        <FeatureFlagsProvider>
-          <Suspense fallback={<LoadingFallback />}>
-            <SubscriptionProvider>
-              <Suspense fallback={<LoadingFallback />}>
-                <TutorialProvider>
-                  <Suspense fallback={<LoadingFallback />}>
-                    <TWAWrapper>
-                      <TWAInitializationWrapper>
-                        <Suspense fallback={<LoadingFallback />}>
-                          <TranslationLoadingOverlay />
-                        </Suspense>
-                        <Suspense fallback={<LoadingFallback />}>
-                          <JournalProcessingInitializer />
-                        </Suspense>
-                        <Suspense fallback={<LoadingFallback />}>
-                          <AppRoutes key={isInitialized ? 'initialized' : 'initializing'} />
-                        </Suspense>
-                        <Suspense fallback={<LoadingFallback />}>
-                          <TutorialOverlay />
-                        </Suspense>
-                        <Toaster />
-                        <SonnerToaster position="top-right" />
-                      </TWAInitializationWrapper>
-                    </TWAWrapper>
-                  </Suspense>
-                </TutorialProvider>
-              </Suspense>
-            </SubscriptionProvider>
-          </Suspense>
-        </FeatureFlagsProvider>
-      </Suspense>
+      <FeatureFlagsProvider>
+        <SubscriptionProvider>
+          <TutorialProvider>
+            <TWAWrapper>
+              <TWAInitializationWrapper>
+                <Suspense fallback={<LoadingFallback />}>
+                  <TranslationLoadingOverlay />
+                </Suspense>
+                <Suspense fallback={<LoadingFallback />}>
+                  <JournalProcessingInitializer />
+                </Suspense>
+                <Suspense fallback={<LoadingFallback />}>
+                  <AppRoutes key={isInitialized ? 'initialized' : 'initializing'} />
+                </Suspense>
+                <Suspense fallback={<LoadingFallback />}>
+                  <TutorialOverlay />
+                </Suspense>
+                <Toaster />
+                <SonnerToaster position="top-right" />
+              </TWAInitializationWrapper>
+            </TWAWrapper>
+          </TutorialProvider>
+        </SubscriptionProvider>
+      </FeatureFlagsProvider>
     </ErrorBoundary>
   );
 };

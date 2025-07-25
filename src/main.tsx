@@ -203,25 +203,18 @@ const initializeApp = async () => {
 // Start initialization
 initializeApp();
 
-// Optimized provider hierarchy - reduced nesting
-const AppProviders: React.FC<{ children: React.ReactNode }> = ({ children }) => (
+ReactDOM.createRoot(document.getElementById('root')!).render(
   <BrowserRouter>
     <ThemeProvider>
       <ContextReadinessProvider>
         <TranslationProvider>
           <SessionProvider enableDebug={false}>
             <AuthProvider>
-              {children}
+              <App />
             </AuthProvider>
           </SessionProvider>
         </TranslationProvider>
       </ContextReadinessProvider>
     </ThemeProvider>
   </BrowserRouter>
-);
-
-ReactDOM.createRoot(document.getElementById('root')!).render(
-  <AppProviders>
-    <App />
-  </AppProviders>
 )
