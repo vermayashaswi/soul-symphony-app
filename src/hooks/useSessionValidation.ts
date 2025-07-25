@@ -16,6 +16,8 @@ export const useSessionValidation = () => {
     isValid: false,
     error: null
   });
+  
+  const [timeoutReached, setTimeoutReached] = useState(false);
 
   const checkSession = async () => {
     try {
@@ -69,10 +71,24 @@ export const useSessionValidation = () => {
 
   useEffect(() => {
     checkSession();
+    
+    // Add timeout protection to prevent infinite loading
+    const timeout = setTimeout(() => {
+      console.log('[useSessionValidation] Timeout reached, forcing completion');
+      setTimeoutReached(true);
+      setState(prev => ({
+        ...prev,
+        isLoading: false,
+        error: prev.error || 'Session validation timeout'
+      }));
+    }, 10000); // 10 second timeout
+    
+    return () => clearTimeout(timeout);
   }, []);
 
   return {
     ...state,
-    refreshSession
+    refreshSession,
+    timeoutReached
   };
 };
