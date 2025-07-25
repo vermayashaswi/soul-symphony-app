@@ -1,18 +1,12 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
-import { useSessionTracking } from '@/hooks/useSessionTracking';
-import { SessionState, SessionMetrics } from '@/services/sessionManager';
+import { useOptimizedSessionTracking } from '@/hooks/useOptimizedSessionTracking';
 
 interface SessionContextType {
-  currentSession: SessionState | null;
-  sessionMetrics: SessionMetrics | null;
+  sessionState: { id: string | null; isActive: boolean; startTime: number };
   isInitialized: boolean;
-  isSessionActive: boolean;
-  recordActivity: () => void;
-  recordError: (error: Error) => void;
-  recordCrash: () => void;
-  trackConversion: (eventType: string, eventData?: Record<string, any>) => Promise<void>;
-  updateSessionState: () => void;
-  updateSessionMetrics: () => void;
+  circuitBreakerState: string;
+  resetCircuitBreaker: () => void;
+  sessionEvents: string[];
 }
 
 const SessionContext = createContext<SessionContextType | null>(null);
@@ -28,88 +22,29 @@ export const SessionProvider: React.FC<SessionProviderProps> = ({
 }) => {
   const [sessionEvents, setSessionEvents] = useState<string[]>([]);
 
-  const sessionTracking = useSessionTracking({
+  const sessionTracking = useOptimizedSessionTracking({
     enableDebug,
-    trackPageViews: true,
-    enableHeartbeat: true,
-    onSessionStart: (sessionId) => {
-      setSessionEvents(prev => [...prev, `Session started: ${sessionId}`]);
-      if (enableDebug) {
-        console.log('[SessionProvider] Session started:', sessionId);
-      }
-    },
-    onSessionEnd: (sessionId, metrics) => {
-      setSessionEvents(prev => [...prev, `Session ended: ${sessionId}`]);
-      if (enableDebug) {
-        console.log('[SessionProvider] Session ended:', { sessionId, metrics });
-      }
-    }
+    deferLocationDetection: true,
+    skipUTMTracking: true
   });
 
-  // Global error handling for session tracking
+  // Lightweight error tracking
   useEffect(() => {
-    const handleGlobalError = (event: ErrorEvent) => {
-      if (sessionTracking.isSessionActive) {
-        sessionTracking.recordError(new Error(event.message || 'Unknown error'));
-        
-        if (enableDebug) {
-          console.log('[SessionProvider] Global error recorded:', event.message);
-        }
-      }
-    };
+    if (enableDebug) {
+      console.log('[SessionProvider] Optimized session tracking active');
+    }
+  }, [enableDebug]);
 
-    const handleUnhandledRejection = (event: PromiseRejectionEvent) => {
-      if (sessionTracking.isSessionActive) {
-        sessionTracking.recordError(new Error(event.reason?.toString() || 'Unhandled promise rejection'));
-        
-        if (enableDebug) {
-          console.log('[SessionProvider] Unhandled rejection recorded:', event.reason);
-        }
-      }
-    };
-
-    window.addEventListener('error', handleGlobalError);
-    window.addEventListener('unhandledrejection', handleUnhandledRejection);
-
-    return () => {
-      window.removeEventListener('error', handleGlobalError);
-      window.removeEventListener('unhandledrejection', handleUnhandledRejection);
-    };
-  }, [sessionTracking.isSessionActive, sessionTracking.recordError, enableDebug]);
-
-  // Track critical app events as conversions
-  useEffect(() => {
-    const trackAppEvents = async () => {
-      if (!sessionTracking.isSessionActive) return;
-
-      // Track app-specific conversion events
-      const criticalActions = [
-        // Journal-related events
-        'journal_entry_created',
-        'journal_entry_analyzed', 
-        'theme_explored',
-        'emotion_tracked',
-        
-        // User engagement events
-        'profile_completed',
-        'onboarding_finished',
-        'chat_conversation_started',
-        'premium_upgrade'
-      ];
-
-      // You could listen for these events from other parts of the app
-      // and track them as conversions automatically
-    };
-
-    trackAppEvents();
-  }, [sessionTracking.isSessionActive]);
-
-  const contextValue: SessionContextType = {
-    ...sessionTracking
+  const value: SessionContextType = {
+    sessionState: sessionTracking.sessionState,
+    isInitialized: sessionTracking.isInitialized,
+    circuitBreakerState: sessionTracking.circuitBreakerState,
+    resetCircuitBreaker: sessionTracking.resetCircuitBreaker,
+    sessionEvents
   };
 
   return (
-    <SessionContext.Provider value={contextValue}>
+    <SessionContext.Provider value={value}>
       {children}
     </SessionContext.Provider>
   );

@@ -155,15 +155,14 @@ class MobileOptimizationService {
   }
 
   private setupMemoryManagement(): void {
-    // Clean up unused resources periodically
-    setInterval(() => {
+    // Clean up unused resources when app goes to background
+    document.addEventListener('visibilitychange', () => {
       if (document.visibilityState === 'hidden') {
-        // Clean up when app is in background
         this.cleanupResources();
       }
-    }, 30000); // Every 30 seconds
+    });
 
-    // Listen for memory pressure warnings
+    // Less aggressive memory monitoring (reduced from 10s to 60s)
     if ('memory' in performance) {
       setInterval(() => {
         const memInfo = (performance as any).memory;
@@ -171,15 +170,16 @@ class MobileOptimizationService {
           const usedMB = memInfo.usedJSHeapSize / 1048576;
           const totalMB = memInfo.totalJSHeapSize / 1048576;
           
-          if (usedMB / totalMB > 0.9) {
-            console.warn('[MobileOptimization] High memory usage detected:', {
+          // Only warn if memory usage is critically high (increased threshold)
+          if (usedMB / totalMB > 0.95) {
+            console.warn('[MobileOptimization] Critical memory usage detected:', {
               used: `${usedMB.toFixed(2)}MB`,
               total: `${totalMB.toFixed(2)}MB`
             });
             this.cleanupResources();
           }
         }
-      }, 10000); // Check every 10 seconds
+      }, 60000); // Check every 60 seconds instead of 10
     }
   }
 
