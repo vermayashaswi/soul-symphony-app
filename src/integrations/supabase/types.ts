@@ -937,6 +937,10 @@ export type Database = {
         }
         Returns: number
       }
+      check_database_health: {
+        Args: Record<PropertyKey, never>
+        Returns: Json
+      }
       check_journal_entry_ownership: {
         Args: { entry_id_param: number }
         Returns: boolean
@@ -978,7 +982,7 @@ export type Database = {
       }
       cleanup_expired_trials: {
         Args: Record<PropertyKey, never>
-        Returns: undefined
+        Returns: Json
       }
       close_user_session: {
         Args: { p_session_id: string; p_user_id: string }
@@ -986,6 +990,14 @@ export type Database = {
       }
       delete_all_user_journal_entries: {
         Args: { p_user_id: string }
+        Returns: Json
+      }
+      enhanced_check_rate_limit: {
+        Args: {
+          p_user_id: string
+          p_ip_address: unknown
+          p_function_name: string
+        }
         Returns: Json
       }
       enhanced_manage_user_session: {
@@ -1219,14 +1231,7 @@ export type Database = {
       }
       get_user_subscription_status: {
         Args: { user_id_param: string }
-        Returns: {
-          current_status: string
-          current_tier: string
-          is_premium_access: boolean
-          trial_end_date: string
-          is_trial_active: boolean
-          days_remaining: number
-        }[]
+        Returns: Json
       }
       insert_sample_journal_entries: {
         Args: { target_user_id: string }
@@ -1485,8 +1490,16 @@ export type Database = {
           emotions: Json
         }[]
       }
+      perform_database_maintenance: {
+        Args: Record<PropertyKey, never>
+        Returns: Json
+      }
       regenerate_missing_data_for_entry: {
         Args: { target_entry_id: number }
+        Returns: Json
+      }
+      setup_user_trial_fallback: {
+        Args: { user_id: string }
         Returns: Json
       }
       store_user_query: {
