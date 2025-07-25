@@ -111,36 +111,6 @@ export const SessionProvider: React.FC<SessionProviderProps> = ({
   return (
     <SessionContext.Provider value={contextValue}>
       {children}
-      {enableDebug && (
-        <div 
-          style={{ 
-            position: 'fixed', 
-            bottom: 0, 
-            right: 0, 
-            background: 'rgba(0,0,0,0.8)', 
-            color: 'white', 
-            padding: '10px',
-            fontSize: '12px',
-            maxWidth: '300px',
-            maxHeight: '200px',
-            overflow: 'auto',
-            zIndex: 9999
-          }}
-        >
-          <div><strong>Session Debug Panel</strong></div>
-          <div>Active: {sessionTracking.isSessionActive ? 'Yes' : 'No'}</div>
-          <div>ID: {sessionTracking.currentSession?.id?.substring(0, 8) || 'None'}</div>
-          <div>State: {sessionTracking.currentSession?.state || 'None'}</div>
-          <div>Page Views: {sessionTracking.currentSession?.pageViews || 0}</div>
-          <div>Quality: {sessionTracking.currentSession?.qualityScore?.toFixed(2) || 'N/A'}</div>
-          {sessionTracking.sessionMetrics && (
-            <div>Duration: {Math.round(sessionTracking.sessionMetrics.duration / 1000)}s</div>
-          )}
-          <div style={{ marginTop: '5px', fontSize: '10px' }}>
-            Recent events: {sessionEvents.slice(-3).join(', ')}
-          </div>
-        </div>
-      )}
     </SessionContext.Provider>
   );
 };
