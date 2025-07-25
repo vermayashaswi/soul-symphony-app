@@ -12,20 +12,23 @@ const ProtectedRoute: React.FC = () => {
   const { recordActivity } = useSession();
   
   useEffect(() => {
+    // Simplified auth check
     const checkAuth = async () => {
       try {
         const { data } = await supabase.auth.getSession();
         setUser(data.session?.user || null);
         setIsLoading(false);
       } catch (error) {
-        console.error('Error checking authentication in ProtectedRoute:', error);
+        console.error('[ProtectedRoute] Auth check failed:', error);
         setIsLoading(false);
       }
     };
     
     checkAuth();
     
+    // Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      console.log(`[ProtectedRoute] Auth changed: ${event}`, !!session?.user);
       setUser(session?.user || null);
       setIsLoading(false);
     });
@@ -34,22 +37,11 @@ const ProtectedRoute: React.FC = () => {
   }, []);
   
   useEffect(() => {
-    if (!isLoading && !user) {
-      console.log("[ProtectedRoute] No user detected, should redirect to onboarding", {
-        path: location.pathname,
-        isLoading,
-        hasUser: !!user
-      });
-    } else if (!isLoading && user) {
-      console.log("[ProtectedRoute] User authenticated, allowing access", {
-        path: location.pathname,
-        userEmail: user.email
-      });
-      
-      // Record activity when user accesses protected routes
+    if (!isLoading && user) {
+      console.log('[ProtectedRoute] User authenticated, recording activity');
       recordActivity();
     }
-  }, [user, isLoading, location, recordActivity]);
+  }, [user, isLoading, recordActivity]);
   
   if (isLoading) {
     return (

@@ -448,185 +448,65 @@ function AuthProviderCore({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (authInitialized) return;
     
-    logInfo("Setting up auth state listener", 'AuthContext');
+    logInfo("Setting up simplified auth state listener", 'AuthContext');
     
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, currentSession) => {
-        logInfo(`Auth state changed: ${event}, user: ${currentSession?.user?.email}`, 'AuthContext', {
-          isNative: nativeIntegrationService.isRunningNatively(),
-          event,
+        logInfo(`Auth state changed: ${event}`, 'AuthContext', {
           hasUser: !!currentSession?.user,
           userId: currentSession?.user?.id
         });
         
-        // Prevent loops by checking if this is the same session
-        if (currentSession?.access_token === session?.access_token && event !== 'SIGNED_OUT') {
-          logInfo('Same session detected, skipping processing', 'AuthContext');
-          return;
-        }
-        
+        // Immediate state updates - no delays
         setSession(currentSession);
         setUser(currentSession?.user ?? null);
+        setIsLoading(false);
+        setAuthStateStable(true);
         
-        // Mark auth state as stable after processing - faster for native
-        if (!authStateStable) {
-          const stabilityDelay = nativeIntegrationService.isRunningNatively() ? 200 : 1000;
-          setTimeout(() => {
-            setAuthStateStable(true);
-          }, stabilityDelay);
-        }
-        
-        // Session tracking now handled by SessionProvider
         if (event === 'SIGNED_IN' && currentSession?.user) {
+          logInfo('User signed in - starting background profile creation', 'AuthContext');
           
-          // CRITICAL: For native apps, decouple profile creation from navigation
-          const isNative = nativeIntegrationService.isRunningNatively();
-          
-          if (isNative) {
-            console.log('[AuthContext] NATIVE: Starting background profile creation - navigation not blocked');
-            
-            // Immediate navigation trigger - don't wait for profile
-            setTimeout(() => {
-              logProfile('NATIVE: Profile creation started in background', 'AuthContext', {
-                userId: currentSession.user.id,
-                provider: currentSession.user.app_metadata?.provider
-              });
-              
-              createOrVerifyProfile(currentSession.user)
-                .then(success => {
-                  if (success) {
-                    logProfile('NATIVE: Background profile creation completed successfully', 'AuthContext');
-                  } else {
-                    logProfile('NATIVE: Background profile creation failed - will retry', 'AuthContext');
-                  }
-                })
-                .catch(error => {
-                  logAuthError(`NATIVE: Background profile creation error: ${error.message}`, 'AuthContext', error);
-                });
-            }, 100); // Minimal delay for native
-            
-          } else {
-            // Web: Use existing logic with longer delays for stability
-            const initialDelay = (isMobileDevice || twaEnv.isTWA || twaEnv.isStandalone) ? 3000 : 2000;
-            
-            logProfile(`WEB: Scheduling profile creation in ${initialDelay}ms for platform stability`, 'AuthContext', {
-              isTWA: twaEnv.isTWA,
-              isStandalone: twaEnv.isStandalone
+          // Non-blocking profile creation
+          setTimeout(() => {
+            createOrVerifyProfile(currentSession.user).catch(error => {
+              logAuthError(`Background profile creation error: ${error.message}`, 'AuthContext', error);
             });
-            
-            setTimeout(() => {
-              createOrVerifyProfile(currentSession.user)
-                .catch(error => {
-                  logAuthError(`WEB: Error in initial profile creation: ${error.message}`, 'AuthContext', error);
-                });
-            }, initialDelay);
-          }
-
-          // Conversion tracking now handled by SessionProvider
-        }
-        
-        // Improved loading state management - immediate for native, faster for web
-        const loadingDelay = nativeIntegrationService.isRunningNatively() 
-          ? 50  // Almost immediate for native to enable navigation
-          : (twaEnv.isTWA || twaEnv.isStandalone) ? 1500 : 800;
-        
-        setTimeout(() => {
-          setIsLoading(false);
-        }, loadingDelay);
-
-        if (event === 'SIGNED_IN') {
-          logInfo('User signed in successfully', 'AuthContext', {
-            isNative: nativeIntegrationService.isRunningNatively(),
-            userEmail: currentSession?.user?.email
-          });
+          }, 500); // Short delay for stability
           
-          // Show success toast and trigger navigation for authenticated users
           toast.success('Signed in successfully');
           
-          // REMOVED: Navigation is now handled centrally by AuthStateManager
-          // AuthContext no longer handles navigation to prevent conflicts
         } else if (event === 'SIGNED_OUT') {
           logInfo('User signed out', 'AuthContext');
           setProfileExistsStatus(null);
           setProfileCreationComplete(false);
           setAuthStateStable(false);
-          debugLogger.setLastProfileError(null);
           
           if (autoRetryTimeoutId) {
             clearTimeout(autoRetryTimeoutId);
             setAutoRetryTimeoutId(null);
           }
-          
-          if (isAppRoute(location.pathname)) {
-            toast.info('Signed out');
-          }
         }
       }
     );
 
+    // Initial session check - simplified
     supabase.auth.getSession().then(async ({ data: { session: currentSession } }) => {
-      logInfo(`Initial session check: ${currentSession?.user?.email || 'No session'}`, 'AuthContext', {
-        isNative: nativeIntegrationService.isRunningNatively(),
-        hasUser: !!currentSession?.user
-      });
+      logInfo(`Initial session check: ${currentSession?.user?.email || 'No session'}`, 'AuthContext');
+      
       setSession(currentSession);
       setUser(currentSession?.user ?? null);
+      setIsLoading(false);
+      setAuthInitialized(true);
+      setAuthStateStable(true);
       
       if (currentSession?.user) {
-        // Session tracking now handled by SessionProvider
-        
-        // CRITICAL: For native apps, decouple profile creation from initial load
-        const isNative = nativeIntegrationService.isRunningNatively();
-        
-        if (isNative) {
-          console.log('[AuthContext] NATIVE: Starting initial background profile creation');
-          
-          // Immediate profile creation for native - don't block UI
-          setTimeout(() => {
-            logProfile('NATIVE: Initial profile creation started in background', 'AuthContext', {
-              userId: currentSession.user.id
-            });
-            
-            createOrVerifyProfile(currentSession.user)
-              .then(success => {
-                if (success) {
-                  logProfile('NATIVE: Initial background profile creation completed', 'AuthContext');
-                } else {
-                  logProfile('NATIVE: Initial background profile creation failed', 'AuthContext');
-                }
-              })
-              .catch(error => {
-                logAuthError(`NATIVE: Initial background profile creation error: ${error.message}`, 'AuthContext', error);
-              });
-          }, 100);
-          
-        } else {
-          // Web: Use existing logic with stability delays
-          const initialDelay = (isMobileDevice || twaEnv.isTWA || twaEnv.isStandalone) ? 3000 : 2000;
-          
-          logProfile(`WEB: Scheduling initial profile creation in ${initialDelay}ms for platform stability`, 'AuthContext', {
-            isTWA: twaEnv.isTWA
+        // Background profile creation
+        setTimeout(() => {
+          createOrVerifyProfile(currentSession.user).catch(error => {
+            logAuthError(`Initial profile creation error: ${error.message}`, 'AuthContext', error);
           });
-          
-          setTimeout(() => {
-            createOrVerifyProfile(currentSession.user)
-              .catch(error => {
-                logAuthError(`WEB: Error in initial profile creation: ${error.message}`, 'AuthContext', error);
-              });
-          }, initialDelay);
-        }
+        }, 500);
       }
-      
-      // Better timing for initialization completion - immediate for native
-      const initDelay = nativeIntegrationService.isRunningNatively() 
-        ? 100  // Much faster for native
-        : (twaEnv.isTWA || twaEnv.isStandalone) ? 2000 : 1000;
-      
-      setTimeout(() => {
-        setIsLoading(false);
-        setAuthInitialized(true);
-        setAuthStateStable(true);
-      }, initDelay);
     });
 
     return () => {
@@ -635,7 +515,7 @@ function AuthProviderCore({ children }: { children: ReactNode }) {
         clearTimeout(autoRetryTimeoutId);
       }
     };
-  }, [authInitialized, isMobileDevice, location.pathname, twaEnv.isTWA, twaEnv.isStandalone]);
+  }, [authInitialized]);
 
   const value = {
     session,

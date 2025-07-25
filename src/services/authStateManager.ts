@@ -171,21 +171,13 @@ class AuthStateManager {
     const now = Date.now();
     
     if (this.authSuccessHandled && (now - this.lastSuccessTime) < this.SUCCESS_DEBOUNCE_MS) {
-      this.log('Auth success already handled recently, skipping', { 
-        timeSinceLastSuccess: now - this.lastSuccessTime 
-      });
-      return;
-    }
-    
-    if (this.navigationInProgress && (now - this.lastNavigationTime) < this.NAVIGATION_DEBOUNCE_MS) {
-      this.log('Navigation debounced - too rapid', { timeSinceLastNav: now - this.lastNavigationTime });
+      this.log('Auth success already handled recently, skipping');
       return;
     }
     
     this.log('Handling auth success', { 
       redirectPath, 
-      isNative: nativeIntegrationService.isRunningNatively(),
-      wasAlreadyHandled: this.authSuccessHandled
+      isNative: nativeIntegrationService.isRunningNatively()
     });
     
     if (this.isProcessing) {
