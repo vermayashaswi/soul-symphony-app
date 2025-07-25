@@ -24,7 +24,7 @@ const JournalSummaryCard: React.FC = () => {
   // Use non-blocking summary hook
   const { data: summaryData, loading: summaryLoading, fromCache } = useNonBlockingJournalSummary(7);
   
-  // Defensive hook usage to prevent runtime errors during app initialization
+  // Defensive theme hook usage to prevent runtime errors during app initialization
   let colorTheme = 'Default';
   let customColor = '#3b82f6';
   
@@ -33,7 +33,7 @@ const JournalSummaryCard: React.FC = () => {
     colorTheme = themeData.colorTheme;
     customColor = themeData.customColor || '#3b82f6';
   } catch (error) {
-    console.warn('JournalSummaryCard: ThemeProvider not ready, using defaults');
+    // ThemeProvider not ready, using defaults - this is expected during initialization
   }
   
   const [themeData, setThemeData] = useState<ThemeData[]>([]);

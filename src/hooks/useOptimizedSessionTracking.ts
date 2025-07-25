@@ -30,7 +30,16 @@ export const useOptimizedSessionTracking = (options: OptimizedSessionOptions = {
     skipUTMTracking = true
   } = options;
 
-  const { user } = useAuth();
+  // Defensive auth hook usage - don't crash if AuthProvider not available
+  let user = null;
+  try {
+    const authData = useAuth();
+    user = authData?.user;
+  } catch (error) {
+    if (enableDebug) {
+      console.warn('[OptimizedSession] AuthProvider not available yet');
+    }
+  }
   const [sessionState, setSessionState] = useState<SessionState>({
     id: null,
     isActive: false,
