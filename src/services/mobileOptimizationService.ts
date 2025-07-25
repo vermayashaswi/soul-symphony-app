@@ -19,20 +19,20 @@ class MobileOptimizationService {
     try {
       console.log('[MobileOptimization] Initializing mobile optimizations');
 
-      // Apply mobile-specific CSS optimizations
+      // Critical optimizations first
       this.applyMobileCSSOptimizations();
-
-      // Setup touch event optimizations
-      this.setupTouchOptimizations();
-
-      // Setup performance monitoring
-      this.setupPerformanceMonitoring();
-
-      // Setup memory management
       this.setupMemoryManagement();
-
-      // Setup viewport optimizations
-      this.setupViewportOptimizations();
+      
+      // Defer non-critical optimizations
+      setTimeout(() => {
+        try {
+          this.setupTouchOptimizations();
+          this.setupPerformanceMonitoring();
+          this.setupViewportOptimizations();
+        } catch (error) {
+          console.warn('[MobileOptimization] Deferred optimizations failed:', error);
+        }
+      }, 200);
 
       this.isInitialized = true;
       console.log('[MobileOptimization] Mobile optimizations initialized');

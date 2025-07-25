@@ -18,86 +18,51 @@ import { pushNotificationService } from './services/pushNotificationService'
 import { mobileErrorHandler } from './services/mobileErrorHandler'
 import { mobileOptimizationService } from './services/mobileOptimizationService'
 
-// Enhanced Font Loading System
+// Memory-optimized deferred font loading
 const initializeFontSystem = async () => {
-  console.log('[FontSystem] Starting font initialization...');
+  // Check if we're in low memory situation
+  const isLowMemory = (performance as any).memory && 
+    (performance as any).memory.usedJSHeapSize > 50 * 1024 * 1024; // 50MB threshold
   
-  // Core fonts that must be loaded
-  const coreFonts = [
-    'Inter',
-    'Noto Sans',
-    'Noto Sans Devanagari',
-    'Noto Sans Arabic',
-    'Noto Sans SC',
-    'Noto Sans JP',
-    'Noto Sans KR',
-    'Noto Sans Bengali',
-    'Noto Sans Thai'
-  ];
-  
-  // Font loading with timeout and retry
-  const loadFontWithRetry = async (fontFamily: string, retries = 3): Promise<boolean> => {
-    for (let i = 0; i < retries; i++) {
-      try {
-        if (document.fonts && document.fonts.check) {
-          const isLoaded = document.fonts.check(`12px "${fontFamily}"`);
-          if (isLoaded) {
-            console.log(`[FontSystem] ${fontFamily} already loaded`);
-            return true;
-          }
-          
-          // Wait for font to load with timeout
-          const fontFace = new FontFace(fontFamily, `local("${fontFamily}")`);
-          await Promise.race([
-            fontFace.load(),
-            new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout')), 3000))
-          ]);
-          
-          console.log(`[FontSystem] ${fontFamily} loaded successfully`);
-          return true;
-        }
-      } catch (error) {
-        console.warn(`[FontSystem] Attempt ${i + 1} failed for ${fontFamily}:`, error);
-        if (i < retries - 1) {
-          await new Promise(resolve => setTimeout(resolve, 500));
-        }
-      }
-    }
-    
-    console.error(`[FontSystem] Failed to load ${fontFamily} after ${retries} attempts`);
-    return false;
-  };
-  
-  // Load core fonts
-  const fontPromises = coreFonts.map(font => loadFontWithRetry(font));
+  if (isLowMemory) {
+    console.log('[FontSystem] Low memory detected, skipping font loading');
+    (window as any).__SOULO_FONTS_READY__ = true;
+    window.dispatchEvent(new CustomEvent('fontsReady', { detail: { skipped: true } }));
+    return;
+  }
+
+  // Load only essential fonts
+  const essentialFonts = ['Inter']; // Only load primary font
   
   try {
-    // Wait for document fonts ready with timeout
-    await Promise.race([
-      document.fonts ? document.fonts.ready : Promise.resolve(),
-      new Promise(resolve => setTimeout(resolve, 5000))
-    ]);
-    
-    const results = await Promise.allSettled(fontPromises);
-    const loadedCount = results.filter(result => result.status === 'fulfilled' && result.value).length;
-    
-    console.log(`[FontSystem] Font loading complete: ${loadedCount}/${coreFonts.length} fonts loaded`);
-    
-    // Set global font ready flag
-    (window as any).__SOULO_FONTS_READY__ = true;
-    
-    // Dispatch font ready event
-    window.dispatchEvent(new CustomEvent('fontsReady', { 
-      detail: { 
-        loadedCount, 
-        totalCount: coreFonts.length,
-        timestamp: Date.now()
-      } 
-    }));
+    // Quick check if fonts are already available
+    if (document.fonts?.check?.('12px "Inter"')) {
+      (window as any).__SOULO_FONTS_READY__ = true;
+      window.dispatchEvent(new CustomEvent('fontsReady', { detail: { cached: true } }));
+      return;
+    }
+
+    // Defer font loading to after initial render
+    setTimeout(async () => {
+      try {
+        await Promise.race([
+          document.fonts?.ready || Promise.resolve(),
+          new Promise(resolve => setTimeout(resolve, 2000)) // Reduced timeout
+        ]);
+        
+        (window as any).__SOULO_FONTS_READY__ = true;
+        window.dispatchEvent(new CustomEvent('fontsReady', { 
+          detail: { loadedCount: 1, totalCount: 1 } 
+        }));
+      } catch (error) {
+        console.warn('[FontSystem] Deferred font loading failed:', error);
+        (window as any).__SOULO_FONTS_READY__ = true;
+        window.dispatchEvent(new CustomEvent('fontsReady', { detail: { error } }));
+      }
+    }, 100); // Load fonts after initial render
     
   } catch (error) {
-    console.error('[FontSystem] Font initialization error:', error);
-    // Set ready flag anyway to prevent hanging
+    console.warn('[FontSystem] Font system error:', error);
     (window as any).__SOULO_FONTS_READY__ = true;
     window.dispatchEvent(new CustomEvent('fontsReady', { detail: { error } }));
   }
@@ -188,38 +153,49 @@ const initializePWA = async () => {
   }
 };
 
-// Initialize systems
+// Memory-optimized app initialization
 const initializeApp = async () => {
   try {
-    // Initialize font system first
-    await initializeFontSystem();
+    console.log('[App] Starting optimized initialization...');
     
-    // Initialize viewport fix
-    fixViewportHeight();
+    // Phase 1: Critical path only
+    fixViewportHeight(); // Synchronous, essential for mobile
     
-    // Initialize mobile optimizations early
-    await mobileOptimizationService.initialize();
+    // Platform detection (lightweight)
+    const isAndroid = /Android/.test(navigator.userAgent);
+    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || 
+        (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
     
-    // Initialize PWA features
-    await initializePWA();
+    if (isIOS) document.documentElement.classList.add('ios-device');
+    if (isAndroid) document.documentElement.classList.add('android-device');
     
-    // Detect iOS and set a class on the HTML element
-    if (/iPad|iPhone|iPod/.test(navigator.userAgent) || 
-        (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)) {
-      document.documentElement.classList.add('ios-device');
-    }
+    // Phase 2: Deferred non-critical initializations
+    const deferredInit = async () => {
+      try {
+        // Initialize in sequence to avoid memory spikes
+        await initializeFontSystem();
+        await new Promise(resolve => setTimeout(resolve, 50)); // Small breathing room
+        
+        await mobileOptimizationService.initialize();
+        await new Promise(resolve => setTimeout(resolve, 50));
+        
+        await initializePWA();
+        
+        console.log('[App] Deferred initialization complete');
+      } catch (error) {
+        console.warn('[App] Deferred initialization failed:', error);
+      }
+    };
     
-    // Detect Android and set a class
-    if (/Android/.test(navigator.userAgent)) {
-      document.documentElement.classList.add('android-device');
-    }
+    // Start deferred initialization after a delay
+    setTimeout(deferredInit, 200);
     
-    console.log('[App] Initialization complete');
+    console.log('[App] Critical path initialization complete');
   } catch (error) {
-    console.error('[App] Initialization failed:', error);
+    console.error('[App] Critical initialization failed:', error);
     mobileErrorHandler.handleError({
       type: 'crash',
-      message: `App initialization failed: ${error}`
+      message: `Critical app initialization failed: ${error}`
     });
   }
 };
@@ -227,20 +203,25 @@ const initializeApp = async () => {
 // Start initialization
 initializeApp();
 
-ReactDOM.createRoot(document.getElementById('root')!).render(
-  <React.StrictMode>
-    <BrowserRouter>
+// Optimized provider hierarchy - reduced nesting
+const AppProviders: React.FC<{ children: React.ReactNode }> = ({ children }) => (
+  <BrowserRouter>
+    <ThemeProvider>
       <ContextReadinessProvider>
-        <ThemeProvider>
-          <TranslationProvider>
-            <SessionProvider enableDebug={false}>
-              <AuthProvider>
-                <App />
-              </AuthProvider>
-            </SessionProvider>
-          </TranslationProvider>
-        </ThemeProvider>
+        <TranslationProvider>
+          <SessionProvider enableDebug={false}>
+            <AuthProvider>
+              {children}
+            </AuthProvider>
+          </SessionProvider>
+        </TranslationProvider>
       </ContextReadinessProvider>
-    </BrowserRouter>
-  </React.StrictMode>,
+    </ThemeProvider>
+  </BrowserRouter>
+);
+
+ReactDOM.createRoot(document.getElementById('root')!).render(
+  <AppProviders>
+    <App />
+  </AppProviders>
 )
