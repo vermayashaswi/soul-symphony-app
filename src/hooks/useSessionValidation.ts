@@ -19,9 +19,8 @@ export const useSessionValidation = () => {
 
   const checkSession = async () => {
     try {
-      console.log('[useSessionValidation] Starting simplified session validation...');
+      console.log('[useSessionValidation] Starting session validation...');
       
-      // Use only Supabase's getSession for consistency
       const { data: { session }, error } = await supabase.auth.getSession();
       
       if (error) {

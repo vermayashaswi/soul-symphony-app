@@ -365,39 +365,6 @@ export type Database = {
         }
         Relationships: []
       }
-      phone_verifications: {
-        Row: {
-          attempts: number | null
-          created_at: string | null
-          expires_at: string
-          id: string
-          phone_number: string
-          user_id: string | null
-          verification_code: string
-          verified: boolean | null
-        }
-        Insert: {
-          attempts?: number | null
-          created_at?: string | null
-          expires_at: string
-          id?: string
-          phone_number: string
-          user_id?: string | null
-          verification_code: string
-          verified?: boolean | null
-        }
-        Update: {
-          attempts?: number | null
-          created_at?: string | null
-          expires_at?: string
-          id?: string
-          phone_number?: string
-          user_id?: string | null
-          verification_code?: string
-          verified?: boolean | null
-        }
-        Relationships: []
-      }
       profiles: {
         Row: {
           avatar_url: string | null
@@ -409,9 +376,6 @@ export type Database = {
           is_premium: boolean | null
           journal_focus_areas: string[] | null
           onboarding_completed: boolean | null
-          phone_number: string | null
-          phone_verified: boolean | null
-          phone_verified_at: string | null
           reminder_settings: Json | null
           revenuecat_entitlements: Json | null
           subscription_status: string | null
@@ -432,9 +396,6 @@ export type Database = {
           is_premium?: boolean | null
           journal_focus_areas?: string[] | null
           onboarding_completed?: boolean | null
-          phone_number?: string | null
-          phone_verified?: boolean | null
-          phone_verified_at?: string | null
           reminder_settings?: Json | null
           revenuecat_entitlements?: Json | null
           subscription_status?: string | null
@@ -455,9 +416,6 @@ export type Database = {
           is_premium?: boolean | null
           journal_focus_areas?: string[] | null
           onboarding_completed?: boolean | null
-          phone_number?: string | null
-          phone_verified?: boolean | null
-          phone_verified_at?: string | null
           reminder_settings?: Json | null
           revenuecat_entitlements?: Json | null
           subscription_status?: string | null
