@@ -2,7 +2,6 @@ import React, { useEffect, useState } from 'react';
 import AppRoutes from './routes/AppRoutes';
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as SonnerToaster } from "@/components/ui/sonner";
-import { ThemeProvider } from "@/components/theme-provider";
 import { SubscriptionProvider } from '@/contexts/SubscriptionContext';
 import { TranslationLoadingOverlay } from '@/components/translation/TranslationLoadingOverlay';
 import { JournalProcessingInitializer } from './app/journal-processing-init';
@@ -285,26 +284,24 @@ const App: React.FC = () => {
   }
 
   return (
-    <ThemeProvider defaultTheme="system" storageKey="soulo-theme">
-      <ErrorBoundary onError={handleAppError}>
-        <FeatureFlagsProvider>
-          <SubscriptionProvider>
-            <TutorialProvider>
-              <TWAWrapper>
-                <TWAInitializationWrapper>
-                  <TranslationLoadingOverlay />
-                  <JournalProcessingInitializer />
-                  <AppRoutes key={isInitialized ? 'initialized' : 'initializing'} />
-                  <TutorialOverlay />
-                  <Toaster />
-                  <SonnerToaster position="top-right" />
-                </TWAInitializationWrapper>
-              </TWAWrapper>
-            </TutorialProvider>
-          </SubscriptionProvider>
-        </FeatureFlagsProvider>
-      </ErrorBoundary>
-    </ThemeProvider>
+    <ErrorBoundary onError={handleAppError}>
+      <FeatureFlagsProvider>
+        <SubscriptionProvider>
+          <TutorialProvider>
+            <TWAWrapper>
+              <TWAInitializationWrapper>
+                <TranslationLoadingOverlay />
+                <JournalProcessingInitializer />
+                <AppRoutes key={isInitialized ? 'initialized' : 'initializing'} />
+                <TutorialOverlay />
+                <Toaster />
+                <SonnerToaster position="top-right" />
+              </TWAInitializationWrapper>
+            </TWAWrapper>
+          </TutorialProvider>
+        </SubscriptionProvider>
+      </FeatureFlagsProvider>
+    </ErrorBoundary>
   );
 };
 
