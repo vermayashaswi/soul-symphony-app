@@ -62,7 +62,7 @@
 	"android": {
 		"allowMixedContent": false,
 		"captureInput": true,
-		"webContentsDebuggingEnabled": false,
+		"webContentsDebuggingEnabled": true,
 		"backgroundColor": "#FFFFFF",
 		"launchMode": "singleTask",
 		"orientation": "portrait",
@@ -71,6 +71,11 @@
 		"overrideUserAgent": "SouloApp/1.0.0 Mobile",
 		"androidScheme": "https",
 		"loadOnMainThread": true,
-		"handlePermissions": true
+		"handlePermissions": true,
+		"hardwareAccelerated": true,
+		"mixedContentMode": "compatibility",
+		"thirdPartyCookiesEnabled": false,
+		"webViewInitialScale": 100,
+		"webViewZoomEnabled": false
 	}
 }

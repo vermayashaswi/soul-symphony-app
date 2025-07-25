@@ -1,30 +1,39 @@
-import React, { useEffect, useState } from 'react';
-import AppRoutes from './routes/AppRoutes';
+import React, { useEffect, useState, Suspense, lazy } from 'react';
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as SonnerToaster } from "@/components/ui/sonner";
-import { SubscriptionProvider } from '@/contexts/SubscriptionContext';
-import { TranslationLoadingOverlay } from '@/components/translation/TranslationLoadingOverlay';
-import { JournalProcessingInitializer } from './app/journal-processing-init';
-import { TutorialProvider } from './contexts/TutorialContext';
-import TutorialOverlay from './components/tutorial/TutorialOverlay';
-import ErrorBoundary from './components/insights/ErrorBoundary';
-import { preloadCriticalImages } from './utils/imagePreloader';
-import { toast } from 'sonner';
-import './styles/emoji.css';
-import './styles/tutorial.css';
-import { FeatureFlagsProvider } from "./contexts/FeatureFlagsContext";
-import { SessionProvider } from "./providers/SessionProvider";
-import TWAWrapper from './components/twa/TWAWrapper';
-import TWAInitializationWrapper from './components/twa/TWAInitializationWrapper';
+import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { detectTWAEnvironment } from './utils/twaDetection';
 import { useTWAAutoRefresh } from './hooks/useTWAAutoRefresh';
 import { twaUpdateService } from './services/twaUpdateService';
 import { nativeAppInitService } from './services/nativeAppInitService';
 import { mobileErrorHandler } from './services/mobileErrorHandler';
-import { mobileOptimizationService } from './services/mobileOptimizationService';
 import { nativeIntegrationService } from './services/nativeIntegrationService';
 import { nativeAuthService } from './services/nativeAuthService';
 import { useAppInitialization } from './hooks/useAppInitialization';
+import { toast } from 'sonner';
+import './styles/emoji.css';
+import './styles/tutorial.css';
+import { memoryMonitor } from './services/memoryMonitor';
+
+// Lazy load only heavy UI components, keep providers sync
+const AppRoutes = lazy(() => import('./routes/AppRoutes'));
+const TranslationLoadingOverlay = lazy(() => import('@/components/translation/TranslationLoadingOverlay').then(m => ({ default: m.TranslationLoadingOverlay })));
+const JournalProcessingInitializer = lazy(() => import('./app/journal-processing-init').then(m => ({ default: m.JournalProcessingInitializer })));
+const TutorialOverlay = lazy(() => import('./components/tutorial/TutorialOverlay'));
+
+// Import providers synchronously to avoid timing issues
+import { SubscriptionProvider } from '@/contexts/SubscriptionContext';
+import { TutorialProvider } from './contexts/TutorialContext';
+import { FeatureFlagsProvider } from "./contexts/FeatureFlagsContext";
+import TWAWrapper from './components/twa/TWAWrapper';
+import TWAInitializationWrapper from './components/twa/TWAInitializationWrapper';
+
+// Loading fallback component
+const LoadingFallback = () => (
+  <div className="min-h-screen flex items-center justify-center bg-background">
+    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+  </div>
+);
 
 const App: React.FC = () => {
   const [isInitialized, setIsInitialized] = useState(false);
@@ -35,107 +44,48 @@ const App: React.FC = () => {
   const appInitialization = useAppInitialization();
 
   useEffect(() => {
-      if (nativeIntegrationService.isRunningNatively()) {
-          console.log('[App] Initializing native services');
-          nativeAuthService.initialize();
-        }
     const initializeApp = async () => {
       try {
-        console.log('[App] Starting app initialization...');
+        console.log('[App] Starting optimized app initialization...');
+        
+        // Start memory monitoring early
+        memoryMonitor.startMonitoring();
         
         // Clean up any malformed paths
         const currentPath = window.location.pathname;
-        
-        // Fix incorrectly formatted URLs that have domains or external references in the path
         if (currentPath.includes('https://') || currentPath.includes('soulo.online')) {
           window.history.replaceState(null, '', '/');
         }
         
-        // Apply a CSS class to the document body for theme-specific overrides
-        document.body.classList.add('app-initialized');
-        
-        // Initialize mobile optimization service first
-        try {
-          console.log('[App] Initializing mobile optimization service...');
-          await mobileOptimizationService.initialize();
-          console.log('[App] Mobile optimization service initialized');
-        } catch (error) {
-          console.warn('[App] Mobile optimization failed:', error);
-          mobileErrorHandler.handleError({
-            type: 'unknown',
-            message: `Mobile optimization failed: ${error}`
-          });
+        // Critical path: Initialize only essential services first
+        if (nativeIntegrationService.isRunningNatively()) {
+          console.log('[App] Initializing native services');
+          nativeAuthService.initialize();
         }
         
-        // Initialize native app using the new service
-        try {
-          console.log('[App] Initializing native app service...');
-          const nativeInitSuccess = await nativeAppInitService.initialize();
-          
-          if (nativeInitSuccess) {
-            console.log('[App] Native app initialization completed successfully');
-            
-            // Get initialization status for debugging
-            const initStatus = await nativeAppInitService.getInitializationStatus();
-            console.log('[App] Native app initialization status:', initStatus);
-            
-            // If we're in a native environment, ensure proper routing
-            if (initStatus.nativeEnvironment) {
-              console.log('[App] Native environment confirmed - app will route to app interface');
-            }
-            
-          } else {
-            console.warn('[App] Native app initialization failed, continuing with web fallback');
-          }
-        } catch (error) {
-          console.warn('[App] Native app initialization error:', error);
-          mobileErrorHandler.handleError({
-            type: 'capacitor',
-            message: `Native app init failed: ${error}`
-          });
-        }
+        await nativeAppInitService.initialize();
         
-        // Initialize TWA update service
-        if (twaEnv.isTWA || twaEnv.isStandalone) {
-          console.log('[App] Initializing TWA update service');
+        // Mark as initialized for UI to show immediately
+        setIsInitialized(true);
+        
+        // Defer non-critical initializations
+        setTimeout(async () => {
           try {
-            twaUpdateService.init();
+            if (twaEnv.isTWA || twaEnv.isStandalone) {
+              await twaUpdateService.init();
+            }
+            console.log('[App] Deferred initialization complete');
           } catch (error) {
-            console.warn('[App] TWA update service failed:', error);
-            mobileErrorHandler.handleError({
-              type: 'unknown',
-              message: `TWA update service failed: ${error}`
-            });
+            console.warn('[App] Deferred initialization failed:', error);
           }
-        }
+        }, 500);
         
-        // Preload critical images including the chat avatar
-        try {
-          console.log('[App] Preloading critical images...');
-          preloadCriticalImages();
-        } catch (error) {
-          console.warn('Failed to preload some images:', error);
-          // Non-critical error, continue app initialization
-        }
-
-        // Mark app as initialized after a brief delay to ensure smooth startup
-        // Shorter delay for native apps to hide splash screen faster
-        const isNativeApp = nativeAppInitService.isNativeAppInitialized();
-        const initDelay = isNativeApp ? 200 : (twaEnv.isTWA || twaEnv.isStandalone) ? 1500 : 500;
-        
-        console.log('[App] Setting initialization delay:', initDelay, 'ms (native:', isNativeApp, ')');
-        
-        setTimeout(() => {
-          console.log('[App] App initialization completed - setting isInitialized to true');
-          setIsInitialized(true);
-        }, initDelay);
-
       } catch (error) {
         console.error('[App] Critical initialization error:', error);
         setInitializationError(error.toString());
         mobileErrorHandler.handleError({
           type: 'crash',
-          message: `App initialization failed: ${error}`
+          message: `Critical app initialization failed: ${error}`
         });
       }
     };
@@ -284,16 +234,24 @@ const App: React.FC = () => {
   }
 
   return (
-    <ErrorBoundary onError={handleAppError}>
+    <ErrorBoundary>
       <FeatureFlagsProvider>
         <SubscriptionProvider>
           <TutorialProvider>
             <TWAWrapper>
               <TWAInitializationWrapper>
-                <TranslationLoadingOverlay />
-                <JournalProcessingInitializer />
-                <AppRoutes key={isInitialized ? 'initialized' : 'initializing'} />
-                <TutorialOverlay />
+                <Suspense fallback={<LoadingFallback />}>
+                  <TranslationLoadingOverlay />
+                </Suspense>
+                <Suspense fallback={<LoadingFallback />}>
+                  <JournalProcessingInitializer />
+                </Suspense>
+                <Suspense fallback={<LoadingFallback />}>
+                  <AppRoutes key={isInitialized ? 'initialized' : 'initializing'} />
+                </Suspense>
+                <Suspense fallback={<LoadingFallback />}>
+                  <TutorialOverlay />
+                </Suspense>
                 <Toaster />
                 <SonnerToaster position="top-right" />
               </TWAInitializationWrapper>
