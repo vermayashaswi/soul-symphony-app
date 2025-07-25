@@ -31,17 +31,29 @@ export const SessionRouter: React.FC<SessionRouterProps> = ({
 
   useEffect(() => {
     let mounted = true;
+    
+    // Emergency timeout to prevent infinite loading
+    const emergencyTimeout = setTimeout(() => {
+      console.warn('[SessionRouter] Emergency timeout triggered - forcing session completion');
+      if (mounted) {
+        setSessionState({
+          session: null,
+          loading: false,
+          checked: true
+        });
+      }
+    }, 8000); // 8 second emergency timeout
 
-  const checkSession = async () => {
-    try {
-      console.log('[SessionRouter] Checking session state...');
-      
-      // Add timeout protection
-      const timeoutPromise = new Promise((_, reject) => {
-        setTimeout(() => reject(new Error('Session check timeout')), 5000);
-      });
-      
-      const sessionPromise = (async () => {
+    const checkSession = async () => {
+      try {
+        console.log('[SessionRouter] Checking session state...');
+        
+        // Add timeout protection with reduced time
+        const timeoutPromise = new Promise((_, reject) => {
+          setTimeout(() => reject(new Error('Session check timeout')), 3000);
+        });
+        
+        const sessionPromise = (async () => {
         // For native apps, try to get session synchronously first from localStorage
         if (isNative) {
           try {
@@ -103,6 +115,7 @@ export const SessionRouter: React.FC<SessionRouterProps> = ({
 
     return () => {
       mounted = false;
+      clearTimeout(emergencyTimeout);
     };
   }, [isNative]);
 

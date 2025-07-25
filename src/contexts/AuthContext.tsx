@@ -113,80 +113,45 @@ function AuthProviderCore({ children }: { children: ReactNode }) {
     };
   }, [autoRetryTimeoutId]);
 
+  // Simplified profile creation - non-blocking
   const ensureProfileExists = async (forceRetry = false): Promise<boolean> => {
-    if (!user || (profileCreationInProgress && !forceRetry)) {
-      logProfile(`Profile check skipped: ${!user ? 'No user' : 'Already in progress'}`, 'AuthContext');
+    if (!user) {
+      logProfile('Profile check skipped: No user', 'AuthContext');
       return false;
     }
     
+    // Don't block if profile creation is already complete or verified
     if (profileExistsStatus === true || profileCreationComplete) {
       logProfile('Profile already verified as existing', 'AuthContext');
       return true;
     }
     
-    const now = Date.now();
-    if (!forceRetry && now - lastProfileAttemptTime < 5000) { // Increased delay for TWA
-      logProfile('Skipping profile check - too soon after last attempt', 'AuthContext');
+    // Non-blocking check - don't wait if already in progress unless forced
+    if (profileCreationInProgress && !forceRetry) {
+      logProfile('Profile creation already in progress', 'AuthContext');
       return profileExistsStatus || false;
     }
     
     try {
       setProfileCreationInProgress(true);
-      setLastProfileAttemptTime(now);
-      setProfileCreationAttempts(prev => prev + 1);
-      
-      logProfile(`Attempt #${profileCreationAttempts + 1} to ensure profile exists for user: ${user.id}`, 'AuthContext', {
-        userEmail: user.email,
-        provider: user.app_metadata?.provider,
-        hasUserMetadata: !!user.user_metadata,
-        userMetadataKeys: user.user_metadata ? Object.keys(user.user_metadata) : []
-      });
+      logProfile(`Simple profile check for user: ${user.id}`, 'AuthContext');
       
       const result = await ensureProfileExistsService(user);
       
       if (result) {
         logProfile('Profile created or verified successfully', 'AuthContext');
-        setProfileCreationAttempts(0);
         setProfileExistsStatus(true);
         setProfileCreationComplete(true);
         debugLogger.setLastProfileError(null);
-        
-        // Session creation now handled by SessionProvider
-        
         return true;
       } else {
-        const errorMsg = `Profile creation failed on attempt #${profileCreationAttempts + 1}`;
-        logAuthError(errorMsg, 'AuthContext');
-        debugLogger.setLastProfileError(errorMsg);
+        logProfile('Profile creation failed - non-critical', 'AuthContext');
         setProfileExistsStatus(false);
-        
-        const maxAttempts = MAX_AUTO_PROFILE_ATTEMPTS;
-        
-        if (profileCreationAttempts < maxAttempts) {
-          const nextAttemptDelay = BASE_RETRY_DELAY * Math.pow(1.5, profileCreationAttempts);
-          logProfile(`Scheduling automatic retry in ${nextAttemptDelay}ms`, 'AuthContext');
-          
-          if (autoRetryTimeoutId) {
-            clearTimeout(autoRetryTimeoutId);
-          }
-          
-          const timeoutId = setTimeout(() => {
-            logProfile(`Executing automatic retry #${profileCreationAttempts + 1}`, 'AuthContext');
-            setAutoRetryTimeoutId(null);
-            ensureProfileExists(true).catch(e => {
-              logAuthError(`Auto-retry failed: ${e.message}`, 'AuthContext', e);
-            });
-          }, nextAttemptDelay);
-          
-          setAutoRetryTimeoutId(timeoutId);
-        }
+        // Don't retry automatically - just continue with app
+        return false;
       }
-      
-      return result;
     } catch (error: any) {
-      const errorMsg = `Error in ensureProfileExists: ${error.message}`;
-      logAuthError(errorMsg, 'AuthContext', error);
-      debugLogger.setLastProfileError(errorMsg);
+      logProfile(`Profile check error (non-critical): ${error.message}`, 'AuthContext');
       setProfileExistsStatus(false);
       return false;
     } finally {
@@ -500,12 +465,12 @@ function AuthProviderCore({ children }: { children: ReactNode }) {
       setAuthStateStable(true);
       
       if (currentSession?.user) {
-        // Background profile creation
-        setTimeout(() => {
-          createOrVerifyProfile(currentSession.user).catch(error => {
-            logAuthError(`Initial profile creation error: ${error.message}`, 'AuthContext', error);
-          });
-        }, 500);
+        logProfile('User signed in, starting non-blocking profile check', 'AuthContext');
+        
+        // Non-blocking profile creation
+        ensureProfileExists().catch(error => {
+          logProfile(`Profile check failed (non-critical): ${error.message}`, 'AuthContext');
+        });
       }
     });
 

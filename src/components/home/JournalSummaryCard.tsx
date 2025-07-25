@@ -68,32 +68,42 @@ const JournalSummaryCard: React.FC = () => {
         setLoading(true);
         setError(null);
         
-        // Get client timezone info from centralized service
-        const clientInfo = getClientTimeInfo();
+        // Add timeout protection for the entire operation
+        const timeoutPromise = new Promise((_, reject) => 
+          setTimeout(() => reject(new Error('Summary fetch timeout')), 8000)
+        );
         
-        console.log('JournalSummaryCard: Client timezone info', clientInfo);
-        
-        // Fetch journal summary with error handling
-        let summaryData;
-        try {
-          const { data, error: summaryError } = await supabase.functions.invoke('journal-summary', {
-            body: { 
-              userId: user.id, 
-              days: 7,
-              clientTimeInfo: clientInfo 
+        const fetchPromise = (async () => {
+          // Fetch journal summary with robust error handling
+          let summaryData;
+          try {
+            const { data, error: summaryError } = await supabase.functions.invoke('journal-summary', {
+              body: { userId: user.id, days: 7 }
+            });
+            
+            if (summaryError) {
+              console.warn('Journal summary failed, using fallback:', summaryError);
+              summaryData = {
+                summary: "Welcome to your journal summary.",
+                topEntities: [],
+                hasEntries: false
+              };
+            } else {
+              summaryData = data;
             }
-          });
-          
-          if (summaryError) {
-            console.error('Error fetching journal summary:', summaryError);
-            setError('Failed to load your journal summary');
-          } else {
-            summaryData = data;
+          } catch (summaryFetchError) {
+            console.warn('Journal summary fetch exception, using fallback:', summaryFetchError);
+            summaryData = {
+              summary: "Ready to start your journaling journey",
+              topEntities: [],
+              hasEntries: false
+            };
           }
-        } catch (summaryFetchError) {
-          console.error('Exception in journal summary fetch:', summaryFetchError);
-          setError('Failed to connect to the journal summary service');
-        }
+          
+          return summaryData;
+        })();
+        
+        const summaryData = await Promise.race([fetchPromise, timeoutPromise]);
         
         // Calculate date 7 days ago for filtering - use our new service
         const sevenDaysAgo = new Date();
