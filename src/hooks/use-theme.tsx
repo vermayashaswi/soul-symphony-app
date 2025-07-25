@@ -326,3 +326,6 @@ export function useTheme() {
     };
   }
 }
+
+// Export a default useTheme to override any external theme hooks that might be conflicting
+export default useTheme;
