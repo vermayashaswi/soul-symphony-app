@@ -22,6 +22,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useOnboarding } from '@/hooks/use-onboarding';
 import { useSessionValidation } from '@/hooks/useSessionValidation';
 import { nativeIntegrationService } from '@/services/nativeIntegrationService';
+import { LoadingStateProvider } from '@/contexts/LoadingStateContext';
 
 const AppRoutes = () => {
   const { user } = useAuth();
@@ -114,8 +115,9 @@ const AppRoutes = () => {
   };
 
   return (
-    <Routes>
-      <Route element={<ViewportManager />}>
+    <LoadingStateProvider>
+      <Routes>
+        <Route element={<ViewportManager />}>
         {/* Root Route - context-aware */}
         <Route path="/" element={<RootRedirect />} />
 
@@ -192,8 +194,9 @@ const AppRoutes = () => {
           <Navigate to="/app/home" replace /> :
           <NotFound />
         } />
-      </Route>
-    </Routes>
+        </Route>
+      </Routes>
+    </LoadingStateProvider>
   );
 };
 
