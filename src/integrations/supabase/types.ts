@@ -1597,7 +1597,9 @@ export type Database = {
         Returns: undefined
       }
       upsert_journal_embedding: {
-        Args: { entry_id: number; embedding_vector: string }
+        Args:
+          | { entry_id: number; embedding_vector: string }
+          | { entry_id: number; embedding_vector: string }
         Returns: undefined
       }
       validate_phone_number: {
