@@ -365,6 +365,39 @@ export type Database = {
         }
         Relationships: []
       }
+      phone_verifications: {
+        Row: {
+          attempts: number | null
+          created_at: string | null
+          expires_at: string
+          id: string
+          phone_number: string
+          user_id: string | null
+          verification_code: string
+          verified: boolean | null
+        }
+        Insert: {
+          attempts?: number | null
+          created_at?: string | null
+          expires_at: string
+          id?: string
+          phone_number: string
+          user_id?: string | null
+          verification_code: string
+          verified?: boolean | null
+        }
+        Update: {
+          attempts?: number | null
+          created_at?: string | null
+          expires_at?: string
+          id?: string
+          phone_number?: string
+          user_id?: string | null
+          verification_code?: string
+          verified?: boolean | null
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           avatar_url: string | null
@@ -937,6 +970,10 @@ export type Database = {
         }
         Returns: number
       }
+      check_database_health: {
+        Args: Record<PropertyKey, never>
+        Returns: Json
+      }
       check_journal_entry_ownership: {
         Args: { entry_id_param: number }
         Returns: boolean
@@ -978,14 +1015,34 @@ export type Database = {
       }
       cleanup_expired_trials: {
         Args: Record<PropertyKey, never>
-        Returns: undefined
+        Returns: Json
       }
       close_user_session: {
         Args: { p_session_id: string; p_user_id: string }
         Returns: boolean
       }
+      comprehensive_cleanup: {
+        Args: Record<PropertyKey, never>
+        Returns: Json
+      }
+      create_user_session: {
+        Args: {
+          p_user_id: string
+          p_device_info?: Json
+          p_location_info?: Json
+        }
+        Returns: string
+      }
       delete_all_user_journal_entries: {
         Args: { p_user_id: string }
+        Returns: Json
+      }
+      enhanced_check_rate_limit: {
+        Args: {
+          p_user_id: string
+          p_ip_address: unknown
+          p_function_name: string
+        }
         Returns: Json
       }
       enhanced_manage_user_session: {
@@ -1045,6 +1102,15 @@ export type Database = {
               p_platform?: string
             }
         Returns: string
+      }
+      enhanced_rate_limit_check: {
+        Args: {
+          p_user_id: string
+          p_action: string
+          p_per_minute?: number
+          p_per_hour?: number
+        }
+        Returns: Json
       }
       enhanced_session_manager: {
         Args: {
@@ -1217,16 +1283,13 @@ export type Database = {
           sample_entries: Json
         }[]
       }
+      get_user_profile_with_trial: {
+        Args: { p_user_id: string }
+        Returns: Json
+      }
       get_user_subscription_status: {
         Args: { user_id_param: string }
-        Returns: {
-          current_status: string
-          current_tier: string
-          is_premium_access: boolean
-          trial_end_date: string
-          is_trial_active: boolean
-          days_remaining: number
-        }[]
+        Returns: Json
       }
       insert_sample_journal_entries: {
         Args: { target_user_id: string }
@@ -1485,8 +1548,24 @@ export type Database = {
           emotions: Json
         }[]
       }
+      perform_database_maintenance: {
+        Args: Record<PropertyKey, never>
+        Returns: Json
+      }
       regenerate_missing_data_for_entry: {
         Args: { target_entry_id: number }
+        Returns: Json
+      }
+      security_audit: {
+        Args: Record<PropertyKey, never>
+        Returns: Json
+      }
+      send_phone_verification: {
+        Args: { p_phone_number: string; p_user_id?: string }
+        Returns: Json
+      }
+      setup_user_trial_fallback: {
+        Args: { user_id: string }
         Returns: Json
       }
       store_user_query: {
@@ -1520,6 +1599,10 @@ export type Database = {
       upsert_journal_embedding: {
         Args: { entry_id: number; embedding_vector: string }
         Returns: undefined
+      }
+      validate_phone_number: {
+        Args: { phone_number: string }
+        Returns: boolean
       }
       verify_phone_code: {
         Args: { p_phone_number: string; p_code: string; p_user_id?: string }

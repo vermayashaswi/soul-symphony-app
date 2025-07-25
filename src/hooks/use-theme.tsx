@@ -296,24 +296,33 @@ export function ThemeProvider({ children }: ThemeProviderProps) {
 }
 
 export function useTheme() {
-  const context = useContext(ThemeContext);
-  if (context === undefined) {
-    console.error('[useTheme] ThemeProvider context is undefined. This usually happens when:');
-    console.error('1. useTheme is called outside of a ThemeProvider');
-    console.error('2. ThemeProvider is not mounted yet');
-    console.error('3. There\'s a timing issue during app initialization');
-    console.error('Current component stack:', new Error().stack);
-    
-    // Instead of throwing, return safe defaults to prevent app crash
+  try {
+    const context = useContext(ThemeContext);
+    if (context === undefined) {
+      console.warn('[useTheme] ThemeProvider context is undefined, returning safe defaults');
+      // Return safe defaults to prevent app crash
+      return {
+        theme: 'system' as const,
+        setTheme: () => {},
+        colorTheme: 'Default' as const,
+        setColorTheme: () => {},
+        customColor: '#3b82f6',
+        setCustomColor: () => {},
+        systemTheme: 'light' as const,
+      };
+    }
+    return context;
+  } catch (error) {
+    console.warn('[useTheme] Error accessing theme context, returning safe defaults:', error);
+    // Return safe defaults to prevent app crash
     return {
       theme: 'system' as const,
       setTheme: () => {},
-      colorTheme: 'Calm' as const,
+      colorTheme: 'Default' as const,
       setColorTheme: () => {},
-      customColor: '#8b5cf6',
+      customColor: '#3b82f6',
       setCustomColor: () => {},
       systemTheme: 'light' as const,
     };
   }
-  return context;
 }
