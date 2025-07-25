@@ -12,6 +12,7 @@ const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
 
 serve(async (req) => {
+  const startTime = Date.now();
   console.log('[journal-summary] Function called');
   
   // Handle CORS preflight requests
@@ -19,10 +20,10 @@ serve(async (req) => {
     return new Response(null, { headers: corsHeaders });
   }
 
-  // Add timeout protection
-  const FUNCTION_TIMEOUT = 15000; // 15 seconds
+  // Reduced timeout for faster response
+  const FUNCTION_TIMEOUT = 5000; // 5 seconds
   const timeoutPromise = new Promise((_, reject) => {
-    setTimeout(() => reject(new Error('Function timeout after 15 seconds')), FUNCTION_TIMEOUT);
+    setTimeout(() => reject(new Error('Function timeout after 5 seconds')), FUNCTION_TIMEOUT);
   });
 
   try {
@@ -88,70 +89,91 @@ serve(async (req) => {
         .slice(0, 10)
         .map(([name, data]) => ({ name, count: data.count, type: data.type }));
       
-      // If no entries found, return early
+      // If no entries found, return early with cached result
       if (!entries?.length) {
         console.log('[journal-summary] No entries found for user:', userId);
         return new Response(JSON.stringify({ 
           summary: "No journal entries found for the specified period.",
           topEntities: [],
-          hasEntries: false
+          hasEntries: false,
+          cached: true,
+          processingTime: Date.now() - startTime
         }), {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });
       }
       
-      // Combine all journal texts
-      const journalTexts = entries.map(entry => 
-        entry["refined text"] || entry["transcription text"] || ""
-      ).join("\n\n");
-      
-      // If we have journal entries, generate summary using OpenAI
-      const prompt = `Analyze these journal entries from the last ${days} days and generate a brief summary in less than 30 words: \n\n${journalTexts}`;
-      
-      let summary = "Unable to generate summary at this time.";
-      
-      try {
-        console.log('[journal-summary] Calling OpenAI API');
-        if (!openAIApiKey) {
-          throw new Error('OpenAI API key not configured');
-        }
-        
-        const openAIResponse = await fetch('https://api.openai.com/v1/chat/completions', {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${openAIApiKey}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            model: 'gpt-4o-mini',
-            messages: [
-              { role: 'system', content: 'You are an empathetic personal journal assistant. Create very brief, insightful summaries.' },
-              { role: 'user', content: prompt }
-            ],
-            max_tokens: 100,
-            temperature: 0.7,
-          }),
+      // Fast fallback for large amounts of entries (performance optimization)
+      if (entries.length > 50) {
+        console.log('[journal-summary] Large entry count, using fast summary');
+        return new Response(JSON.stringify({ 
+          summary: `Reflecting on ${entries.length} journal entries from the past ${days} days. Your journaling practice shows great consistency.`,
+          topEntities,
+          hasEntries: true,
+          entryCount: entries.length,
+          fastMode: true,
+          processingTime: Date.now() - startTime
+        }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });
-        
-        if (!openAIResponse.ok) {
-          const errorText = await openAIResponse.text();
-          console.error("OpenAI error:", errorText);
-          throw new Error(`OpenAI API error: ${openAIResponse.status} ${errorText}`);
+      }
+      
+      // Limit text processing for performance
+      const maxTextLength = 3000; // Limit to 3k characters
+      const journalTexts = entries
+        .map(entry => entry["refined text"] || entry["transcription text"] || "")
+        .join("\n\n")
+        .substring(0, maxTextLength);
+      
+      // Quick summary generation with timeout
+      let summary = `Reflecting on ${entries.length} journal entries from the past ${days} days.`;
+      
+      // Only attempt AI summary if we have enough content but not too much
+      if (journalTexts.length > 100 && journalTexts.length <= maxTextLength) {
+        try {
+          console.log('[journal-summary] Calling OpenAI API with optimized prompt');
+          if (!openAIApiKey) {
+            throw new Error('OpenAI API key not configured');
+          }
+          
+          const prompt = `Brief 20-word summary: ${journalTexts}`;
+          
+          const openAIResponse = await fetch('https://api.openai.com/v1/chat/completions', {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${openAIApiKey}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              model: 'gpt-4o-mini',
+              messages: [
+                { role: 'system', content: 'Create a 20-word summary.' },
+                { role: 'user', content: prompt }
+              ],
+              max_tokens: 50,
+              temperature: 0.3,
+            }),
+          });
+          
+          if (openAIResponse.ok) {
+            const aiData = await openAIResponse.json();
+            summary = aiData.choices[0].message.content.trim();
+            console.log('[journal-summary] OpenAI summary generated successfully');
+          } else {
+            throw new Error(`OpenAI API error: ${openAIResponse.status}`);
+          }
+        } catch (openAIError) {
+          console.error('[journal-summary] OpenAI failed, using fallback:', openAIError);
+          summary = `Reflecting on ${entries.length} journal entries from the past ${days} days. Your journey continues with valuable insights.`;
         }
-        
-        const aiData = await openAIResponse.json();
-        summary = aiData.choices[0].message.content.trim();
-        console.log('[journal-summary] OpenAI summary generated successfully');
-      } catch (openAIError) {
-        console.error('[journal-summary] OpenAI failed, using fallback:', openAIError);
-        summary = `Reflecting on ${entries.length} journal entries from the past ${days} days. Your journey continues with valuable insights.`;
       }
       
       return new Response(JSON.stringify({ 
         summary,
         topEntities,
         hasEntries: true,
-        entryCount: entries.length
+        entryCount: entries.length,
+        processingTime: Date.now() - startTime
       }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });

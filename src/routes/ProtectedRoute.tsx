@@ -1,15 +1,13 @@
-
 import React, { useState, useEffect } from 'react';
 import { Navigate, useLocation, Outlet } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
-import { detectTWAEnvironment } from '@/utils/twaDetection';
 import { useSession } from '@/providers/SessionProvider';
 
 const ProtectedRoute: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [user, setUser] = useState<any>(null);
   const location = useLocation();
-  const { recordActivity } = useSession();
+  const { sessionState } = useSession();
   
   useEffect(() => {
     // Simplified auth check
@@ -37,11 +35,11 @@ const ProtectedRoute: React.FC = () => {
   }, []);
   
   useEffect(() => {
+    // Simplified activity tracking
     if (!isLoading && user) {
-      console.log('[ProtectedRoute] User authenticated, recording activity');
-      recordActivity();
+      console.log('[ProtectedRoute] User authenticated, session active:', sessionState.isActive);
     }
-  }, [user, isLoading, recordActivity]);
+  }, [user, isLoading, sessionState.isActive, location.pathname]);
   
   if (isLoading) {
     return (

@@ -61,14 +61,12 @@ class LoadingCoordinator {
     };
 
     this.activeLoaders.set(id, loadingState);
-    console.log(`[LoadingCoordinator] Started loading: ${component} (${id})`);
     
-    // Set timeout if specified
-    if (timeout) {
-      setTimeout(() => {
-        this.stopLoading(id, 'timeout');
-      }, timeout);
-    }
+    // Reduced timeout for faster response
+    const defaultTimeout = timeout || 5000; // 5 seconds default
+    setTimeout(() => {
+      this.stopLoading(id, 'timeout');
+    }, defaultTimeout);
 
     this.notify();
     return id;
