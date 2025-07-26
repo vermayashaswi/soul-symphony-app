@@ -25,15 +25,10 @@ const SouloLogo = ({
   animate = false,
   utteringWords = false
 }: SouloLogoProps) => {
-  // Defensive hook usage to prevent runtime errors during app initialization
-  let colorTheme = 'Default';
-  
-  try {
-    const themeData = useTheme();
-    colorTheme = themeData.colorTheme;
-  } catch (error) {
-    console.warn('SouloLogo: ThemeProvider not ready, using defaults');
-  }
+  // Use theme hook with safe defaults when ThemeProvider not available
+  const themeData = useTheme();
+  const colorTheme = themeData.colorTheme;
+  const hasThemeProvider = themeData.theme !== 'system' || themeData.colorTheme !== 'Calm'; // Basic heuristic
   const [animationState, setAnimationState] = useState<'full' | 'soul' | 'none'>('full');
   const [micScale, setMicScale] = useState<number>(1);
   
@@ -45,8 +40,8 @@ const SouloLogo = ({
     medium: "w-5.5 h-5.5 mx-0.5", // Added medium size
   };
   
-  // Apply color theme if useColorTheme is true
-  const themeTextClass = useColorTheme ? "text-primary" : "";
+  // Apply color theme only if useColorTheme is true AND we have a theme provider
+  const themeTextClass = useColorTheme && hasThemeProvider ? "text-primary" : "";
 
   useEffect(() => {
     if (!animate) return;

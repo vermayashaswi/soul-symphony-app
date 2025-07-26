@@ -281,15 +281,18 @@ export function ThemeProvider({ children }: ThemeProviderProps) {
   }, [customColor, colorTheme]);
 
   return (
-    <ThemeContext.Provider value={{ 
-      theme, 
-      setTheme, 
-      colorTheme, 
-      setColorTheme, 
-      customColor, 
-      setCustomColor,
-      systemTheme 
-    }}>
+    <ThemeContext.Provider 
+      value={{ 
+        theme, 
+        setTheme, 
+        colorTheme, 
+        setColorTheme, 
+        customColor, 
+        setCustomColor,
+        systemTheme 
+      }}
+      data-theme-provider="true"
+    >
       {children}
     </ThemeContext.Provider>
   );
@@ -298,21 +301,22 @@ export function ThemeProvider({ children }: ThemeProviderProps) {
 export function useTheme() {
   const context = useContext(ThemeContext);
   if (context === undefined) {
-    console.error('[useTheme] ThemeProvider context is undefined. This usually happens when:');
-    console.error('1. useTheme is called outside of a ThemeProvider');
-    console.error('2. ThemeProvider is not mounted yet');
-    console.error('3. There\'s a timing issue during app initialization');
-    console.error('Current component stack:', new Error().stack);
+    // Add detailed debugging to identify the problematic component  
+    const componentStack = new Error().stack;
+    const componentTrace = componentStack?.split('\n').slice(1, 6).join('\n') || 'No stack trace available';
+    
+    console.warn('[useTheme] ThemeProvider context not available - returning safe defaults');
+    console.debug('[useTheme] Component trace:', componentTrace);
+    console.debug('[useTheme] URL:', window.location.pathname);
     
     // Return safe defaults instead of throwing to prevent app crash
-    console.warn('[useTheme] Returning safe defaults to prevent app crash');
     return {
       theme: 'system' as const,
-      setTheme: () => console.warn('[useTheme] setTheme called outside ThemeProvider'),
+      setTheme: () => console.debug('[useTheme] setTheme called outside ThemeProvider'),
       colorTheme: 'Calm' as const,
-      setColorTheme: () => console.warn('[useTheme] setColorTheme called outside ThemeProvider'),
+      setColorTheme: () => console.debug('[useTheme] setColorTheme called outside ThemeProvider'),
       customColor: '#8b5cf6',
-      setCustomColor: () => console.warn('[useTheme] setCustomColor called outside ThemeProvider'),
+      setCustomColor: () => console.debug('[useTheme] setCustomColor called outside ThemeProvider'),
       systemTheme: 'light' as const,
     };
   }
