@@ -2,6 +2,7 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { User } from '@supabase/supabase-js';
+import { nativeIntegrationService } from '@/services/nativeIntegrationService';
 
 export function useOnboarding() {
   const [onboardingComplete, setOnboardingComplete] = useState<boolean | null>(null);
@@ -10,9 +11,17 @@ export function useOnboarding() {
   const [user, setUser] = useState<User | null>(null);
 
   const checkOnboardingStatus = async (): Promise<boolean> => {
+    const isNative = nativeIntegrationService.isRunningNatively();
     try {
       setLoading(true);
       let isComplete = false;
+      
+      console.log('[Onboarding] DEBUG: Checking status for user:', {
+        userId: user?.id,
+        isNative,
+        userExists: !!user,
+        timestamp: new Date().toISOString()
+      });
       
       // For authenticated users, check database first
       if (user) {
@@ -26,11 +35,24 @@ export function useOnboarding() {
         
         if (error) {
           console.error('[Onboarding] Error fetching profile:', error);
+          console.error('[Onboarding] DEBUG: Profile fetch error details:', {
+            errorCode: error.code,
+            errorMessage: error.message,
+            isNative,
+            userId: user.id
+          });
           // Fallback to localStorage
           isComplete = localStorage.getItem('onboardingComplete') === 'true';
+          console.log('[Onboarding] DEBUG: Using localStorage fallback:', isComplete);
           setOnboardingComplete(isComplete);
         } else {
           console.log('[Onboarding] Profile data:', profile);
+          console.log('[Onboarding] DEBUG: Profile fetch success:', {
+            onboardingCompleted: profile.onboarding_completed,
+            hasDisplayName: !!profile.display_name,
+            isNative,
+            userId: user.id
+          });
           isComplete = profile.onboarding_completed || false;
           setOnboardingComplete(isComplete);
           if (profile.display_name) {
@@ -40,6 +62,10 @@ export function useOnboarding() {
       } else {
         // For unauthenticated users, use localStorage
         console.log('[Onboarding] Checking localStorage for unauthenticated user');
+        console.log('[Onboarding] DEBUG: No authenticated user, checking localStorage:', {
+          isNative,
+          localStorage: localStorage.getItem('onboardingComplete')
+        });
         isComplete = localStorage.getItem('onboardingComplete') === 'true';
         setOnboardingComplete(isComplete);
         
@@ -48,6 +74,13 @@ export function useOnboarding() {
           setDisplayName(name);
         }
       }
+      
+      console.log('[Onboarding] DEBUG: Final onboarding status:', {
+        isComplete,
+        userId: user?.id,
+        isNative,
+        method: user ? 'database' : 'localStorage'
+      });
       
       return isComplete;
     } catch (error) {

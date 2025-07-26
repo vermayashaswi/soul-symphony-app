@@ -103,7 +103,7 @@ const MobileNavigation: React.FC<MobileNavigationProps> = ({ onboardingComplete 
     
     const finalVisibility = shouldShowNav || fallbackVisible;
     
-    console.log('[MobileNavigation] Enhanced visibility check:', { 
+    console.log('[MobileNavigation] DEBUG: Enhanced visibility check:', { 
       shouldShowNav, 
       fallbackVisible,
       finalVisibility,
@@ -115,7 +115,13 @@ const MobileNavigation: React.FC<MobileNavigationProps> = ({ onboardingComplete 
       hasUser: !!user,
       onboardingComplete: onboardingComplete,
       onboardingCompleteType: typeof onboardingComplete,
-      safeArea
+      safeArea,
+      // Additional debug details
+      userEmail: user?.email,
+      onboardingPaths: ['/app/onboarding', '/app/auth', '/onboarding', '/auth', '/'],
+      isOnAppRoute: location.pathname.startsWith('/app/'),
+      nativeEnvironment: isNativeApp(),
+      timestamp: new Date().toISOString()
     });
     
     setIsVisible(finalVisibility);
