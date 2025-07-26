@@ -76,7 +76,7 @@ const MobileNavigation: React.FC<MobileNavigationProps> = ({ onboardingComplete 
     });
   }, [isKeyboardVisible, keyboardHeight, platform]);
   
-  // Visibility logic - hide when keyboard is visible or on auth/onboarding pages
+  // Enhanced visibility logic - with fallback for null onboardingComplete
   useEffect(() => {
     const onboardingOrAuthPaths = [
       '/app/onboarding',
@@ -88,27 +88,41 @@ const MobileNavigation: React.FC<MobileNavigationProps> = ({ onboardingComplete 
     
     const isOnboardingOrAuth = onboardingOrAuthPaths.includes(location.pathname);
     
+    // Enhanced logic with fallback for onboardingComplete === null
     const shouldShowNav = (isMobile.isMobile || isNativeApp()) && 
                           !isOnboardingOrAuth &&
                           !!user &&
-                          onboardingComplete !== false;
+                          onboardingComplete !== false; // Keep existing logic but add fallback below
     
-    console.log('[MobileNavigation] Visibility check:', { 
+    // FALLBACK: If onboardingComplete is null and user is authenticated, show nav anyway
+    const fallbackVisible = (isMobile.isMobile || isNativeApp()) && 
+                            !isOnboardingOrAuth &&
+                            !!user &&
+                            onboardingComplete === null &&
+                            location.pathname.startsWith('/app/');
+    
+    const finalVisibility = shouldShowNav || fallbackVisible;
+    
+    console.log('[MobileNavigation] Enhanced visibility check:', { 
       shouldShowNav, 
+      fallbackVisible,
+      finalVisibility,
       isMobile: isMobile.isMobile, 
       isNativeApp: isNativeApp(),
       path: location.pathname,
       isKeyboardVisible,
       isOnboardingOrAuth,
       hasUser: !!user,
-      onboardingComplete,
+      onboardingComplete: onboardingComplete,
+      onboardingCompleteType: typeof onboardingComplete,
       safeArea
     });
     
-    setIsVisible(shouldShowNav);
+    setIsVisible(finalVisibility);
   }, [location.pathname, isMobile.isMobile, isKeyboardVisible, isTutorialActive, user, onboardingComplete, currentLanguage, renderKey, safeArea]);
   
-  if (!isVisible || onboardingComplete === false) {
+  // Only hide if explicitly false, not if null (loading)
+  if (!isVisible) {
     return null;
   }
   
