@@ -3,7 +3,7 @@ import React from 'react';
 import { Link } from 'react-router-dom';
 import { Apple, Play, Mail, Twitter, Instagram, Linkedin } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import SouloLogo from '@/components/SouloLogo';
+import SouloLogoSafe from '@/components/SouloLogoSafe';
 import { TranslatableText } from '@/components/translation/TranslatableText';
 
 const Footer = () => {
@@ -89,7 +89,7 @@ const Footer = () => {
           {/* Brand Section */}
           <div className="lg:col-span-2">
             <div className="mb-6">
-              <SouloLogo size="large" useColorTheme={false} className="mb-4" />
+              <SouloLogoSafe size="large" useColorTheme={false} disableTheme={true} className="mb-4" />
             </div>
             <p className="text-gray-300 mb-6 leading-relaxed max-w-md">
               <TranslatableText text="Transform your mental wellness with AI-powered voice journaling. Speak your thoughts, understand your emotions, and grow every day." />

@@ -1,32 +1,31 @@
+
 import React, { useState, useEffect } from 'react';
 import { Navigate, useLocation, Outlet } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
+import { detectTWAEnvironment } from '@/utils/twaDetection';
 import { useSession } from '@/providers/SessionProvider';
 
 const ProtectedRoute: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [user, setUser] = useState<any>(null);
   const location = useLocation();
-  const { sessionState } = useSession();
+  const { recordActivity } = useSession();
   
   useEffect(() => {
-    // Simplified auth check
     const checkAuth = async () => {
       try {
         const { data } = await supabase.auth.getSession();
         setUser(data.session?.user || null);
         setIsLoading(false);
       } catch (error) {
-        console.error('[ProtectedRoute] Auth check failed:', error);
+        console.error('Error checking authentication in ProtectedRoute:', error);
         setIsLoading(false);
       }
     };
     
     checkAuth();
     
-    // Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      console.log(`[ProtectedRoute] Auth changed: ${event}`, !!session?.user);
       setUser(session?.user || null);
       setIsLoading(false);
     });
@@ -35,11 +34,22 @@ const ProtectedRoute: React.FC = () => {
   }, []);
   
   useEffect(() => {
-    // Simplified activity tracking
-    if (!isLoading && user) {
-      console.log('[ProtectedRoute] User authenticated, session active:', sessionState.isActive);
+    if (!isLoading && !user) {
+      console.log("[ProtectedRoute] No user detected, should redirect to onboarding", {
+        path: location.pathname,
+        isLoading,
+        hasUser: !!user
+      });
+    } else if (!isLoading && user) {
+      console.log("[ProtectedRoute] User authenticated, allowing access", {
+        path: location.pathname,
+        userEmail: user.email
+      });
+      
+      // Record activity when user accesses protected routes
+      recordActivity();
     }
-  }, [user, isLoading, sessionState.isActive, location.pathname]);
+  }, [user, isLoading, location, recordActivity]);
   
   if (isLoading) {
     return (

@@ -22,37 +22,56 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useOnboarding } from '@/hooks/use-onboarding';
 import { useSessionValidation } from '@/hooks/useSessionValidation';
 import { nativeIntegrationService } from '@/services/nativeIntegrationService';
-import { LoadingStateProvider } from '@/contexts/LoadingStateContext';
 
 const AppRoutes = () => {
   const { user } = useAuth();
   const { onboardingComplete } = useOnboarding();
-  const { session: validatedSession, isValid: hasValidSession, isLoading: sessionLoading, timeoutReached } = useSessionValidation();
+  const { session: validatedSession, isValid: hasValidSession, isLoading: sessionLoading } = useSessionValidation();
 
-  // Simplified app root redirect with timeout protection
+  // Enhanced app root redirect with session validation
   const AppRootRedirect = () => {
     const isNative = nativeIntegrationService.isRunningNatively();
 
-    // Add timeout protection to prevent infinite loading
-    if (sessionLoading && !timeoutReached) {
-      return (
-        <div className="flex items-center justify-center min-h-screen bg-background">
-          <div className="flex flex-col items-center space-y-4">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-            <p className="text-sm text-muted-foreground">Loading...</p>
-          </div>
-        </div>
-      );
+    console.log('[AppRoutes] AppRootRedirect - isNative:', isNative, 'user:', !!user, 'validatedSession:', !!validatedSession, 'hasValidSession:', hasValidSession);
+
+    // CRITICAL: For native apps, handle OAuth callback parameters properly
+    if (isNative) {
+      // Check for OAuth callback deep links
+      const urlParams = new URLSearchParams(window.location.search);
+      const hashParams = new URLSearchParams(window.location.hash.replace('#', ''));
+      const hasOAuthParams = urlParams.has('access_token') || hashParams.has('access_token') ||
+                            urlParams.has('code') || hashParams.has('code') ||
+                            urlParams.has('error') || hashParams.has('error');
+
+      if (hasOAuthParams) {
+        console.log('[AppRoutes] OAuth callback detected in native app, processing auth');
+        return <Navigate to={`/app/auth${window.location.search}${window.location.hash}`} replace />;
+      }
+
+      // ENHANCED: For native apps, prioritize validated session over user context
+      console.log('[AppRoutes] Native environment detected, checking session validation');
+      
+      // If we have a validated session, go directly to home
+      if (hasValidSession && validatedSession) {
+        console.log('[AppRoutes] Native app with validated session, redirecting to home');
+        return <Navigate to="/app/home" replace />;
+      }
+      
+      // Fallback to user context check
+      if (!user && !validatedSession) {
+        console.log('[AppRoutes] No user or session in native app, redirecting to onboarding');
+        return <Navigate to="/app/onboarding" replace />;
+      }
+
+      // If user exists but session validation is still loading, go to home anyway
+      console.log('[AppRoutes] Native app user authenticated, redirecting to home');
+      return <Navigate to="/app/home" replace />;
     }
 
-    console.log('[AppRoutes] AppRootRedirect - routing decision:', {
-      isNative,
-      hasUser: !!user,
-      hasValidSession,
-      timeoutReached
-    });
+    // Web behavior - prioritize authentication status over onboarding flag
+    console.log('[AppRoutes] Web environment, using standard flow');
 
-    // Check for OAuth callback parameters
+    // Check for web OAuth callback parameters
     const urlParams = new URLSearchParams(window.location.search);
     const hashParams = new URLSearchParams(window.location.hash.replace('#', ''));
     const hasOAuthParams = urlParams.has('access_token') || hashParams.has('access_token') ||
@@ -60,64 +79,52 @@ const AppRoutes = () => {
                           urlParams.has('error') || hashParams.has('error');
 
     if (hasOAuthParams) {
+      console.log('[AppRoutes] OAuth callback detected in web, redirecting to auth page');
       return <Navigate to={`/app/auth${window.location.search}${window.location.hash}`} replace />;
     }
 
-    // For native apps
-    if (isNative) {
-      if (hasValidSession || user) {
-        return <Navigate to="/app/home" replace />;
-      }
+    if (!user && !validatedSession) {
       return <Navigate to="/app/onboarding" replace />;
     }
 
-    // For web apps
-    if (!user && !hasValidSession) {
-      return <Navigate to="/app/onboarding" replace />;
-    }
-
+    // If user is authenticated, go directly to home (ignore database onboarding flag)
     return <Navigate to="/app/home" replace />;
   };
 
-  // Simplified root redirect with timeout protection  
+  // Enhanced root redirect with session validation
   const RootRedirect = () => {
     const isNative = nativeIntegrationService.isRunningNatively();
 
-    // Add timeout protection
-    if (sessionLoading && !timeoutReached) {
-      return (
-        <div className="flex items-center justify-center min-h-screen bg-background">
-          <div className="flex flex-col items-center space-y-4">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-            <p className="text-sm text-muted-foreground">Loading...</p>
-          </div>
-        </div>
-      );
-    }
+    console.log('[AppRoutes] RootRedirect - isNative:', isNative, 'user:', !!user, 'validatedSession:', !!validatedSession);
 
-    console.log('[AppRoutes] RootRedirect - routing decision:', {
-      isNative,
-      hasUser: !!user,
-      hasValidSession,
-      timeoutReached
-    });
-
-    // For native apps, NEVER show marketing site - always redirect to app
+    // CRITICAL: For native apps, NEVER show marketing site - always redirect to app
     if (isNative) {
-      if (hasValidSession || user) {
+      console.log('[AppRoutes] Native environment detected at root, checking session');
+      
+      // Prioritize validated session for immediate routing
+      if (hasValidSession && validatedSession) {
+        console.log('[AppRoutes] Native app with validated session, redirecting to home');
         return <Navigate to="/app/home" replace />;
       }
-      return <Navigate to="/app/onboarding" replace />;
+      
+      if (!user && !validatedSession) {
+        console.log('[AppRoutes] No user or session in native app, redirecting to onboarding');
+        return <Navigate to="/app/onboarding" replace />;
+      }
+
+      // If user exists, go to home
+      console.log('[AppRoutes] Native app user ready, redirecting to home');
+      return <Navigate to="/app/home" replace />;
     }
 
     // Web behavior - show marketing site only for web
+    console.log('[AppRoutes] Web environment, showing marketing site');
     return <Index />;
   };
 
   return (
-    <LoadingStateProvider>
-      <Routes>
-        <Route element={<ViewportManager />}>
+    <Routes>
+      <Route element={<ViewportManager />}>
         {/* Root Route - context-aware */}
         <Route path="/" element={<RootRedirect />} />
 
@@ -194,9 +201,8 @@ const AppRoutes = () => {
           <Navigate to="/app/home" replace /> :
           <NotFound />
         } />
-        </Route>
-      </Routes>
-    </LoadingStateProvider>
+      </Route>
+    </Routes>
   );
 };
 

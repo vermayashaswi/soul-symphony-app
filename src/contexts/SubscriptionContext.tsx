@@ -72,8 +72,8 @@ export const SubscriptionProvider: React.FC<{ children: ReactNode }> = ({ childr
         throw statusError;
       }
 
-      if (statusData && Array.isArray(statusData) && statusData.length > 0) {
-        const subscriptionData = statusData[0] as any;
+      if (statusData && statusData.length > 0) {
+        const subscriptionData = statusData[0];
         
         // Map subscription tier - ensure only 'free' or 'premium'
         const userTier = (subscriptionData.current_tier === 'premium') ? 'premium' : 'free';

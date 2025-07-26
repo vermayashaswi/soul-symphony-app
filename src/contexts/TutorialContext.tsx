@@ -286,53 +286,68 @@ export const TutorialProvider: React.FC<{ children: ReactNode }> = ({ children }
     }
   }, [location.pathname, pendingTutorialStart, currentStep, steps, isInitialized]);
   
-  // Simplified tutorial initialization
+  // Check if tutorial should be active based on user's profile and current route
   useEffect(() => {
-    if (!isInitialized) return;
+    if (!isInitialized) return; // NEW: Don't check tutorial until initialized
     
     const checkTutorialStatus = async () => {
       if (!user || tutorialChecked) return;
       
       try {
-        console.log('[TutorialContext] Simple tutorial check for user:', user.id);
+        console.log('[TutorialContext] Checking tutorial status for user:', user.id);
         
-        // Use timeout to prevent hanging
-        const timeoutPromise = new Promise((_, reject) => 
-          setTimeout(() => reject(new Error('Tutorial check timeout')), 3000)
-        );
-        
-        const queryPromise = supabase
+        const { data, error } = await supabase
           .from('profiles')
           .select('tutorial_completed, tutorial_step')
           .eq('id', user.id)
           .single();
         
-        const { data, error } = await Promise.race([queryPromise, timeoutPromise]) as any;
-        
         if (error) {
-          console.log('[TutorialContext] Tutorial check failed, continuing anyway:', error.message);
+          console.error('[TutorialContext] Error fetching tutorial status:', error);
           setTutorialChecked(true);
           return;
         }
         
         const shouldActivate = data?.tutorial_completed === 'NO';
+        const startingStep = data?.tutorial_step || 0;
         
-        if (shouldActivate && isAppRoute(location.pathname)) {
-          console.log('[TutorialContext] Activating tutorial');
-          setCurrentStep(data?.tutorial_step || 0);
-          setIsActive(true);
+        console.log('[TutorialContext] Tutorial status check result:', {
+          shouldActivate,
+          startingStep,
+          tutorialCompleted: data?.tutorial_completed,
+          currentPath: location.pathname,
+          isAppRoute: isAppRoute(location.pathname)
+        });
+        
+        if (shouldActivate) {
+          console.log('[TutorialContext] Tutorial should be activated at step:', startingStep);
+          setCurrentStep(startingStep);
+          
+          // Reset highlighting manager for fresh start
+          highlightingManager.reset();
+          
+          // Always start tutorial, but handle navigation properly
+          if (isAppRoute(location.pathname)) {
+            console.log('[TutorialContext] On app route, activating tutorial immediately');
+            setIsActive(true);
+          } else {
+            console.log('[TutorialContext] Not on app route, will navigate and then activate');
+            setPendingTutorialStart(true);
+            navigationManager.startNavigation('/app/home', startingStep);
+            navigate('/app/home');
+          }
         }
         
         setTutorialCompleted(data?.tutorial_completed === 'YES');
         setTutorialChecked(true);
       } catch (error) {
-        console.log('[TutorialContext] Tutorial check failed (non-critical):', error);
+        console.error('[TutorialContext] Error in tutorial check:', error);
         setTutorialChecked(true);
       }
     };
     
     checkTutorialStatus();
-  }, [user, location.pathname, tutorialChecked, isInitialized]);
+  }, [user, location.pathname, tutorialChecked, navigate, isInitialized]);
   
   // ENHANCED: Helper function to check for target elements using new highlighting system
   const checkForTargetElementEnhanced = (stepData: TutorialStep) => {
