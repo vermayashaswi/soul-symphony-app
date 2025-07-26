@@ -1247,7 +1247,13 @@ export type Database = {
       }
       get_user_subscription_status: {
         Args: { user_id_param: string }
-        Returns: Json
+        Returns: {
+          current_tier: string
+          current_status: string
+          trial_end_date: string
+          is_trial_active: boolean
+          is_premium_access: boolean
+        }[]
       }
       insert_sample_journal_entries: {
         Args: { target_user_id: string }
