@@ -31,10 +31,9 @@ class NativeAppInitService {
 
   private async performInitialization(): Promise<boolean> {
     try {
-      console.log('[NativeAppInit] Starting native app initialization...');
+      console.log('[NativeAppInit] Starting optimized native app initialization...');
 
-      // Step 1: Initialize native integration service
-      console.log('[NativeAppInit] Initializing native integration...');
+      // Step 1: Initialize native integration service (fast)
       await nativeIntegrationService.initialize();
 
       // Step 2: Check if we're actually running natively
@@ -42,33 +41,20 @@ class NativeAppInitService {
       console.log('[NativeAppInit] Native environment detected:', isActuallyNative);
 
       if (isActuallyNative) {
-        // Step 3: Initialize native auth service only if truly native
-        console.log('[NativeAppInit] Initializing native auth service...');
-        try {
-          await nativeAuthService.initialize();
-          console.log('[NativeAppInit] Native auth service initialized successfully');
-        } catch (authError) {
-          console.warn('[NativeAppInit] Native auth initialization failed (non-fatal):', authError);
-          mobileErrorHandler.handleError({
-            type: 'capacitor',
-            message: `Native auth init failed: ${authError}`,
-            context: 'nativeAppInit'
-          });
-        }
-
-        // Step 4: Setup native-specific event listeners
+        // Step 3: Initialize auth service asynchronously (non-blocking)
+        this.initializeAuthServiceAsync();
+        
+        // Step 4: Setup event listeners (fast, synchronous)
         this.setupNativeEventListeners();
 
-        // Step 5: Configure native UI
-        await this.configureNativeUI();
-
-        console.log('[NativeAppInit] Skipping automatic permission requests - will be handled by user action');
+        // Step 5: Configure UI asynchronously (non-blocking)
+        this.configureNativeUIAsync();
       } else {
         console.log('[NativeAppInit] Running in web environment, skipping native-specific initialization');
       }
 
       this.isInitialized = true;
-      console.log('[NativeAppInit] Native app initialization completed successfully');
+      console.log('[NativeAppInit] Native app initialization completed successfully (optimized)');
       return true;
 
     } catch (error) {
@@ -79,8 +65,32 @@ class NativeAppInitService {
         context: 'nativeAppInit'
       });
       
-      this.isInitialized = true;
+      this.isInitialized = true; // Don't block app startup
       return false;
+    }
+  }
+
+  private async initializeAuthServiceAsync(): Promise<void> {
+    try {
+      console.log('[NativeAppInit] Initializing native auth service (async)...');
+      await nativeAuthService.initialize();
+      console.log('[NativeAppInit] Native auth service initialized successfully');
+    } catch (error) {
+      console.warn('[NativeAppInit] Native auth initialization failed (non-fatal):', error);
+      mobileErrorHandler.handleError({
+        type: 'capacitor',
+        message: `Native auth init failed: ${error}`,
+        context: 'nativeAppInit'
+      });
+    }
+  }
+
+  private async configureNativeUIAsync(): Promise<void> {
+    try {
+      console.log('[NativeAppInit] Configuring native UI (async)...');
+      await this.configureNativeUI();
+    } catch (error) {
+      console.warn('[NativeAppInit] Native UI configuration failed (non-fatal):', error);
     }
   }
 
