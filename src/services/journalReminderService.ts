@@ -1,7 +1,6 @@
+
 import { enhancedNotificationService } from './enhancedNotificationService';
-import { enhancedPlatformService } from './enhancedPlatformService';
-import { serviceWorkerManager } from '@/utils/serviceWorker';
-import { LocalNotifications } from '@capacitor/local-notifications';
+import { nativeIntegrationService } from './nativeIntegrationService';
 
 export type JournalReminderTime = 'morning' | 'afternoon' | 'evening' | 'night';
 
@@ -15,7 +14,6 @@ interface ScheduledReminder {
   time: JournalReminderTime;
   scheduledFor: Date;
   timeoutId?: number;
-  strategy: 'native' | 'serviceWorker' | 'web';
 }
 
 class JournalReminderService {
@@ -23,7 +21,6 @@ class JournalReminderService {
   private activeReminders: ScheduledReminder[] = [];
   private healthCheckInterval?: number;
   private readonly HEALTH_CHECK_INTERVAL = 60 * 60 * 1000; // 1 hour
-  private isInitialized = false;
   
   // Time mappings for reminders
   private readonly TIME_MAPPINGS: Record<JournalReminderTime, { hour: number; minute: number }> = {
@@ -52,10 +49,7 @@ class JournalReminderService {
     this.log('User requested journal reminder setup', { times });
     
     try {
-      // Initialize platform detection first
-      await this.ensureInitialized();
-      
-      // Request notification permissions
+      // Request notification permissions first
       const permissionResult = await enhancedNotificationService.requestPermissions();
       
       if (!permissionResult.granted) {
@@ -68,7 +62,7 @@ class JournalReminderService {
       // Save settings
       this.saveSettings({ enabled: true, times });
       
-      // Setup reminders using hybrid strategy
+      // Setup reminders
       await this.setupReminders(times);
       
       return true;
@@ -82,30 +76,17 @@ class JournalReminderService {
     this.log('Disabling journal reminders');
     
     // Clear all active reminders
-    await this.clearAllReminders();
+    this.clearAllReminders();
     
     // Stop health check
     this.stopHealthCheck();
     
     // Save disabled state
     this.saveSettings({ enabled: false, times: [] });
-  }
-
-  private async ensureInitialized(): Promise<void> {
-    if (this.isInitialized) {
-      return;
-    }
-
-    this.log('Initializing journal reminder service');
     
-    try {
-      // Initialize platform detection
-      await enhancedPlatformService.detectPlatform();
-      this.isInitialized = true;
-      this.log('Service initialized successfully');
-    } catch (error) {
-      this.error('Failed to initialize service:', error);
-      throw error;
+    // Cancel native notifications if applicable
+    if (nativeIntegrationService.isRunningNatively()) {
+      await this.cancelNativeReminders();
     }
   }
 
@@ -113,25 +94,12 @@ class JournalReminderService {
     this.log('Setting up reminders for times:', times);
     
     // Clear existing reminders first
-    await this.clearAllReminders();
+    this.clearAllReminders();
     
-    // Determine best notification strategy
-    const strategy = enhancedPlatformService.getBestNotificationStrategy();
-    this.log('Using notification strategy:', strategy);
-    
-    switch (strategy) {
-      case 'native':
-        await this.setupNativeReminders(times);
-        break;
-      case 'serviceWorker':
-        await this.setupServiceWorkerReminders(times);
-        break;
-      case 'web':
-        this.setupWebReminders(times);
-        break;
-      default:
-        this.error('No notification strategy available');
-        return;
+    if (nativeIntegrationService.isRunningNatively()) {
+      await this.setupNativeReminders(times);
+    } else {
+      this.setupWebReminders(times);
     }
     
     // Start health check to monitor reminder status
@@ -142,8 +110,15 @@ class JournalReminderService {
     try {
       this.log('Setting up native reminders');
       
+      const localNotifications = nativeIntegrationService.getPlugin('LocalNotifications');
+      if (!localNotifications) {
+        this.log('LocalNotifications plugin not available, falling back to web');
+        this.setupWebReminders(times);
+        return;
+      }
+
       // Cancel existing notifications
-      await LocalNotifications.cancel({ notifications: [] });
+      await localNotifications.cancel({ notifications: [] });
 
       // Schedule new notifications
       const notifications = times.map((time, index) => {
@@ -151,8 +126,8 @@ class JournalReminderService {
         
         return {
           id: index + 1,
-          title: this.getNotificationTitle(time),
-          body: this.getNotificationBody(time),
+          title: 'Journal Reminder 📝',
+          body: "Time to reflect on your day. Open SOULo and capture your thoughts.",
           schedule: {
             at: scheduledDate,
             repeats: true,
@@ -168,58 +143,11 @@ class JournalReminderService {
         };
       });
 
-      await LocalNotifications.schedule({ notifications });
-      
-      // Track reminders
-      times.forEach(time => {
-        this.activeReminders.push({
-          id: `native-${time}`,
-          time,
-          scheduledFor: this.getNextReminderTime(time),
-          strategy: 'native'
-        });
-      });
-      
+      await localNotifications.schedule({ notifications });
       this.log(`Scheduled ${notifications.length} native reminders`);
       
     } catch (error) {
       this.error('Error setting up native reminders:', error);
-      // Fallback to service worker reminders
-      await this.setupServiceWorkerReminders(times);
-    }
-  }
-
-  private async setupServiceWorkerReminders(times: JournalReminderTime[]): Promise<void> {
-    try {
-      this.log('Setting up service worker reminders');
-      
-      // Clear any existing service worker reminders
-      await serviceWorkerManager.clearJournalReminders();
-      
-      // Schedule reminders through service worker
-      for (const time of times) {
-        const scheduledFor = this.getNextReminderTime(time);
-        const delay = scheduledFor.getTime() - Date.now();
-        
-        const success = await serviceWorkerManager.scheduleJournalReminder(time, delay);
-        
-        if (success) {
-          this.activeReminders.push({
-            id: `sw-${time}`,
-            time,
-            scheduledFor,
-            strategy: 'serviceWorker'
-          });
-          this.log(`Scheduled service worker reminder for ${time} at ${scheduledFor.toLocaleString()}`);
-        } else {
-          this.error(`Failed to schedule service worker reminder for ${time}`);
-        }
-      }
-      
-      this.log(`Scheduled ${this.activeReminders.length} service worker reminders`);
-      
-    } catch (error) {
-      this.error('Error setting up service worker reminders:', error);
       // Fallback to web reminders
       this.setupWebReminders(times);
     }
@@ -237,7 +165,7 @@ class JournalReminderService {
   }
 
   private scheduleWebReminder(time: JournalReminderTime): ScheduledReminder {
-    const id = `web-${time}-${Date.now()}`;
+    const id = `${time}-${Date.now()}`;
     const scheduledFor = this.getNextReminderTime(time);
     
     this.log(`Scheduling web reminder for ${time} at ${scheduledFor.toLocaleString()}`);
@@ -257,13 +185,7 @@ class JournalReminderService {
       }
     }, timeoutMs);
     
-    return { 
-      id, 
-      time, 
-      scheduledFor, 
-      timeoutId,
-      strategy: 'web'
-    };
+    return { id, time, scheduledFor, timeoutId };
   }
 
   private showWebNotification(time: JournalReminderTime): void {
@@ -272,8 +194,8 @@ class JournalReminderService {
       return;
     }
 
-    const notification = new Notification(this.getNotificationTitle(time), {
-      body: this.getNotificationBody(time),
+    const notification = new Notification('Journal Reminder 📝', {
+      body: "Time to reflect on your day. Open SOULo and capture your thoughts.",
       icon: '/favicon.ico',
       badge: '/favicon.ico',
       tag: `journal-reminder-${time}`,
@@ -292,31 +214,16 @@ class JournalReminderService {
       window.focus();
       notification.close();
       
-      // Navigate to voice entry
-      window.location.href = '/app/voice-entry';
+      // Check if user is signed in by looking for auth token
+      const hasAuth = localStorage.getItem('sb-' + window.location.hostname.replace(/\./g, '-') + '-auth-token') !== null;
+      
+      // Navigate based on auth status
+      if (hasAuth) {
+        window.location.href = '/app/home';
+      } else {
+        window.location.href = '/app/onboarding';
+      }
     };
-  }
-
-  private getNotificationTitle(time: JournalReminderTime): string {
-    const titles = {
-      morning: "🌅 Good Morning! Time for your journal",
-      afternoon: "☀️ Afternoon reflection time",
-      evening: "🌙 Evening journal reminder",
-      night: "✨ End your day with journaling"
-    };
-    
-    return titles[time] || "📝 Time to journal";
-  }
-
-  private getNotificationBody(time: JournalReminderTime): string {
-    const bodies = {
-      morning: "Start your day by recording your thoughts and intentions",
-      afternoon: "Take a moment to reflect on your day so far",
-      evening: "Capture your evening thoughts and experiences", 
-      night: "Reflect on your day before you rest"
-    };
-    
-    return bodies[time] || "Tap to open Soulo and start voice journaling";
   }
 
   private getNextReminderTime(time: JournalReminderTime): Date {
@@ -350,30 +257,28 @@ class JournalReminderService {
     return next;
   }
 
-  private async clearAllReminders(): Promise<void> {
+  private clearAllReminders(): void {
     this.log('Clearing all active reminders');
     
-    // Clear web timeouts
     this.activeReminders.forEach(reminder => {
       if (reminder.timeoutId) {
         clearTimeout(reminder.timeoutId);
       }
     });
     
-    // Clear service worker reminders
-    await serviceWorkerManager.clearJournalReminders();
-    
-    // Clear native reminders if running natively
-    if (enhancedPlatformService.canUseNativeNotifications()) {
-      try {
-        await LocalNotifications.cancel({ notifications: [] });
-        this.log('Cancelled all native reminders');
-      } catch (error) {
-        this.error('Error cancelling native reminders:', error);
-      }
-    }
-    
     this.activeReminders = [];
+  }
+
+  private async cancelNativeReminders(): Promise<void> {
+    try {
+      const localNotifications = nativeIntegrationService.getPlugin('LocalNotifications');
+      if (localNotifications) {
+        await localNotifications.cancel({ notifications: [] });
+        this.log('Cancelled all native reminders');
+      }
+    } catch (error) {
+      this.error('Error cancelling native reminders:', error);
+    }
   }
 
   private saveSettings(settings: JournalReminderSettings): void {
@@ -402,8 +307,6 @@ class JournalReminderService {
     this.log('Testing journal reminder');
     
     try {
-      await this.ensureInitialized();
-      
       const permissionState = await enhancedNotificationService.checkPermissionStatus();
       
       if (permissionState !== 'granted') {
@@ -411,17 +314,10 @@ class JournalReminderService {
         return false;
       }
 
-      const strategy = enhancedPlatformService.getBestNotificationStrategy();
-      
-      switch (strategy) {
-        case 'native':
-          return await this.testNativeReminder();
-        case 'serviceWorker':
-        case 'web':
-          return this.testWebReminder();
-        default:
-          this.error('No notification strategy available for testing');
-          return false;
+      if (nativeIntegrationService.isRunningNatively()) {
+        return await this.testNativeReminder();
+      } else {
+        return this.testWebReminder();
       }
     } catch (error) {
       this.error('Error testing reminder:', error);
@@ -431,7 +327,13 @@ class JournalReminderService {
 
   private async testNativeReminder(): Promise<boolean> {
     try {
-      await LocalNotifications.schedule({
+      const localNotifications = nativeIntegrationService.getPlugin('LocalNotifications');
+      if (!localNotifications) {
+        this.log('LocalNotifications not available, testing web reminder');
+        return this.testWebReminder();
+      }
+
+      await localNotifications.schedule({
         notifications: [{
           id: 999,
           title: 'Test Journal Reminder 🧪',
@@ -533,26 +435,20 @@ class JournalReminderService {
 
   // Initialize reminders on app start if enabled
   async initializeOnAppStart(): Promise<void> {
-    try {
-      await this.ensureInitialized();
+    const settings = this.getSettings();
+    
+    if (settings.enabled && settings.times.length > 0) {
+      this.log('Initializing reminders on app start', settings);
       
-      const settings = this.getSettings();
+      // Check if permissions are still granted
+      const permissionState = await enhancedNotificationService.checkPermissionStatus();
       
-      if (settings.enabled && settings.times.length > 0) {
-        this.log('Initializing reminders on app start', settings);
-        
-        // Check if permissions are still granted
-        const permissionState = await enhancedNotificationService.checkPermissionStatus();
-        
-        if (permissionState === 'granted') {
-          await this.setupReminders(settings.times);
-        } else {
-          this.log('Permissions no longer granted, disabling reminders');
-          this.saveSettings({ enabled: false, times: [] });
-        }
+      if (permissionState === 'granted') {
+        await this.setupReminders(settings.times);
+      } else {
+        this.log('Permissions no longer granted, disabling reminders');
+        this.saveSettings({ enabled: false, times: [] });
       }
-    } catch (error) {
-      this.error('Error initializing reminders on app start:', error);
     }
   }
 }

@@ -19,20 +19,20 @@ class MobileOptimizationService {
     try {
       console.log('[MobileOptimization] Initializing mobile optimizations');
 
-      // Critical optimizations first
+      // Apply mobile-specific CSS optimizations
       this.applyMobileCSSOptimizations();
+
+      // Setup touch event optimizations
+      this.setupTouchOptimizations();
+
+      // Setup performance monitoring
+      this.setupPerformanceMonitoring();
+
+      // Setup memory management
       this.setupMemoryManagement();
-      
-      // Defer non-critical optimizations
-      setTimeout(() => {
-        try {
-          this.setupTouchOptimizations();
-          this.setupPerformanceMonitoring();
-          this.setupViewportOptimizations();
-        } catch (error) {
-          console.warn('[MobileOptimization] Deferred optimizations failed:', error);
-        }
-      }, 200);
+
+      // Setup viewport optimizations
+      this.setupViewportOptimizations();
 
       this.isInitialized = true;
       console.log('[MobileOptimization] Mobile optimizations initialized');
@@ -155,14 +155,15 @@ class MobileOptimizationService {
   }
 
   private setupMemoryManagement(): void {
-    // Clean up unused resources when app goes to background
-    document.addEventListener('visibilitychange', () => {
+    // Clean up unused resources periodically
+    setInterval(() => {
       if (document.visibilityState === 'hidden') {
+        // Clean up when app is in background
         this.cleanupResources();
       }
-    });
+    }, 30000); // Every 30 seconds
 
-    // Less aggressive memory monitoring (reduced from 10s to 60s)
+    // Listen for memory pressure warnings
     if ('memory' in performance) {
       setInterval(() => {
         const memInfo = (performance as any).memory;
@@ -170,16 +171,15 @@ class MobileOptimizationService {
           const usedMB = memInfo.usedJSHeapSize / 1048576;
           const totalMB = memInfo.totalJSHeapSize / 1048576;
           
-          // Only warn if memory usage is critically high (increased threshold)
-          if (usedMB / totalMB > 0.95) {
-            console.warn('[MobileOptimization] Critical memory usage detected:', {
+          if (usedMB / totalMB > 0.9) {
+            console.warn('[MobileOptimization] High memory usage detected:', {
               used: `${usedMB.toFixed(2)}MB`,
               total: `${totalMB.toFixed(2)}MB`
             });
             this.cleanupResources();
           }
         }
-      }, 60000); // Check every 60 seconds instead of 10
+      }, 10000); // Check every 10 seconds
     }
   }
 

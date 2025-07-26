@@ -3,7 +3,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { useTheme } from '@/hooks/use-theme';
 import FloatingThemeStrips from './FloatingThemeStrips';
-import { useNonBlockingJournalSummary } from '@/hooks/useNonBlockingJournalSummary';
+import { getClientTimeInfo } from '@/services/dateService';
 
 interface SummaryResponse {
   summary: string | null;
@@ -21,10 +21,7 @@ interface ThemeData {
 
 const JournalSummaryCard: React.FC = () => {
   const { user } = useAuth();
-  // Use non-blocking summary hook
-  const { data: summaryData, loading: summaryLoading, fromCache } = useNonBlockingJournalSummary(7);
-  
-  // Defensive theme hook usage to prevent runtime errors during app initialization
+  // Defensive hook usage to prevent runtime errors during app initialization
   let colorTheme = 'Default';
   let customColor = '#3b82f6';
   
@@ -33,12 +30,16 @@ const JournalSummaryCard: React.FC = () => {
     colorTheme = themeData.colorTheme;
     customColor = themeData.customColor || '#3b82f6';
   } catch (error) {
-    // ThemeProvider not ready, using defaults - this is expected during initialization
+    console.warn('JournalSummaryCard: ThemeProvider not ready, using defaults');
   }
-  
+  const [summaryData, setSummaryData] = useState<SummaryResponse | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [themeData, setThemeData] = useState<ThemeData[]>([]);
   const [isReady, setIsReady] = useState(false);
-  const [themeLoading, setThemeLoading] = useState(false);
+  const [retryCount, setRetryCount] = useState(0);
+  const MAX_RETRIES = 3;
+  const RETRY_DELAY = 2000; // 2 seconds
 
   const getThemeColorHex = (): string => {
     switch (colorTheme) {
@@ -59,43 +60,64 @@ const JournalSummaryCard: React.FC = () => {
     }
   };
 
-  // Optimized theme data fetching
   useEffect(() => {
-    const fetchThemeData = async () => {
-      if (!user?.id || themeLoading) return;
+    const fetchSummary = async () => {
+      if (!user?.id) return;
       
       try {
-        setThemeLoading(true);
+        setLoading(true);
+        setError(null);
         
-        // Fast timeout for theme data (non-critical)
-        const timeoutPromise = new Promise<never>((_, reject) => 
-          setTimeout(() => reject(new Error('Theme fetch timeout')), 2000)
-        );
+        // Get client timezone info from centralized service
+        const clientInfo = getClientTimeInfo();
         
+        console.log('JournalSummaryCard: Client timezone info', clientInfo);
+        
+        // Fetch journal summary with error handling
+        let summaryData;
+        try {
+          const { data, error: summaryError } = await supabase.functions.invoke('journal-summary', {
+            body: { 
+              userId: user.id, 
+              days: 7,
+              clientTimeInfo: clientInfo 
+            }
+          });
+          
+          if (summaryError) {
+            console.error('Error fetching journal summary:', summaryError);
+            setError('Failed to load your journal summary');
+          } else {
+            summaryData = data;
+          }
+        } catch (summaryFetchError) {
+          console.error('Exception in journal summary fetch:', summaryFetchError);
+          setError('Failed to connect to the journal summary service');
+        }
+        
+        // Calculate date 7 days ago for filtering - use our new service
         const sevenDaysAgo = new Date();
         sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
         
-        const fetchPromise = supabase
-          .from('Journal Entries')
-          .select('master_themes, sentiment')
-          .eq('user_id', user.id)
-          .gte('created_at', sevenDaysAgo.toISOString())
-          .not('master_themes', 'is', null)
-          .limit(20); // Limit for performance
-        
         try {
-          const { data: journalEntries, error: entriesError } = await Promise.race([
-            fetchPromise,
-            timeoutPromise
-          ]);
+          // Fetch journal entries for theme data with proper date formatting
+          const { data: journalEntries, error: entriesError } = await supabase
+            .from('Journal Entries')
+            .select('master_themes, sentiment')
+            .eq('user_id', user.id)
+            .gte('created_at', sevenDaysAgo.toISOString())
+            .not('master_themes', 'is', null);
+          
+          console.log('JournalSummaryCard: Fetched journal entries', {
+            entriesCount: journalEntries?.length || 0,
+            error: entriesError?.message,
+            dateFilter: sevenDaysAgo.toISOString()
+          });
           
           if (entriesError) {
-            console.warn('Theme data fetch failed:', entriesError);
-            setThemeData(getFallbackThemeData());
-            return;
-          }
-          
-          if (journalEntries && journalEntries.length > 0) {
+            console.error('Error fetching master themes:', entriesError);
+          } else if (journalEntries && journalEntries.length > 0) {
+            // Process journal entries to extract theme data
             const themesWithSentiment: ThemeData[] = [];
             
             journalEntries.forEach(entry => {
@@ -113,28 +135,54 @@ const JournalSummaryCard: React.FC = () => {
               }
             });
             
-            setThemeData(themesWithSentiment.length > 0 ? themesWithSentiment : getFallbackThemeData());
+            console.log('JournalSummaryCard: Processed theme data', { 
+              count: themesWithSentiment.length,
+              samples: themesWithSentiment.slice(0, 3).map(t => t.theme)
+            });
+            
+            // Ensure we have valid data before setting state
+            if (themesWithSentiment.length > 0) {
+              setThemeData(themesWithSentiment);
+            } else {
+              console.log('JournalSummaryCard: No valid theme data after processing');
+              // Set some fallback data to ensure smooth UI experience
+              setThemeData(getFallbackThemeData());
+            }
           } else {
+            console.log('JournalSummaryCard: No journal entries with themes found');
+            // Set fallback data
             setThemeData(getFallbackThemeData());
           }
-        } catch (timeoutError) {
-          console.warn('Theme data timeout, using fallback');
+        } catch (entriesFetchError) {
+          console.error('Error fetching or processing journal entries:', entriesFetchError);
+          // Set fallback data
           setThemeData(getFallbackThemeData());
         }
-      } catch (error) {
-        console.warn('Theme data error:', error);
+        
+        if (summaryData) {
+          setSummaryData(summaryData);
+        }
+      } catch (err) {
+        console.error('Exception in journal summary fetch:', err);
+        setError('Unexpected error loading your journal summary');
+        // Use fallback data for theme display
         setThemeData(getFallbackThemeData());
+        
+        // If we've tried less than MAX_RETRIES times, try again after a delay
+        if (retryCount < MAX_RETRIES) {
+          console.log(`JournalSummaryCard: Retry attempt ${retryCount + 1} of ${MAX_RETRIES} in ${RETRY_DELAY}ms`);
+          setRetryCount(count => count + 1);
+          setTimeout(() => fetchSummary(), RETRY_DELAY); 
+          return;
+        }
       } finally {
-        setThemeLoading(false);
+        setLoading(false);
         setIsReady(true);
       }
     };
-
-    // Defer theme data loading to not block initial render
-    setTimeout(() => {
-      fetchThemeData();
-    }, 100);
-  }, [user?.id]);
+    
+    fetchSummary();
+  }, [user?.id, retryCount]);
 
   // Helper function to get fallback theme data
   const getFallbackThemeData = (): ThemeData[] => {
@@ -145,16 +193,15 @@ const JournalSummaryCard: React.FC = () => {
     ];
   };
 
-  // Show immediately with fallback data to prevent blocking
-  useEffect(() => {
-    if (!isReady && !themeLoading) {
-      // Set fallback data immediately to show something
-      setThemeData(getFallbackThemeData());
-      setIsReady(true);
-    }
-  }, [themeLoading]);
+  // Don't render anything until we're ready
+  if (!isReady) {
+    return null;
+  }
 
-  // Always render something to prevent layout shift
+  // If there's an error, log it but still render the component (it might recover with theme data)
+  if (error) {
+    console.error('JournalSummaryCard error:', error);
+  }
 
   // Provide a default empty array if themeData is falsy to avoid rendering issues
   const safeThemeData = themeData || [];
@@ -162,10 +209,12 @@ const JournalSummaryCard: React.FC = () => {
 
   return (
     <div className="h-full w-full">
-      <FloatingThemeStrips 
-        themesData={safeThemeData} 
-        themeColor={themeColor}
-      />
+      {isReady && !loading && (
+        <FloatingThemeStrips 
+          themesData={safeThemeData} 
+          themeColor={themeColor}
+        />
+      )}
     </div>
   );
 };

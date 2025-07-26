@@ -60,7 +60,7 @@ const config: CapacitorConfig = {
   android: {
     allowMixedContent: false,
     captureInput: true,
-    webContentsDebuggingEnabled: true, // Enable for debugging renderer crashes
+    webContentsDebuggingEnabled: false,
     backgroundColor: "#FFFFFF",
     launchMode: "singleTask",
     orientation: "portrait",
@@ -71,14 +71,7 @@ const config: CapacitorConfig = {
     loadOnMainThread: true,
     handlePermissions: true,
     allowNavigationBarColorChange: true,
-    navigationBarColor: "#FFFFFF",
-    // Memory optimization settings
-    hardwareAccelerated: true,
-    mixedContentMode: "compatibility",
-    thirdPartyCookiesEnabled: false,
-    // WebView memory settings
-    webViewInitialScale: 100,
-    webViewZoomEnabled: false
+    navigationBarColor: "#FFFFFF"
   }
 };
 
