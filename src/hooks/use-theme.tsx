@@ -48,6 +48,8 @@ const safeMediaQueryCheck = (): 'light' | 'dark' => {
 };
 
 export function ThemeProvider({ children }: ThemeProviderProps) {
+  const [isInitialized, setIsInitialized] = useState(false);
+  
   // Simplified state management for better memory efficiency
   const [theme, setTheme] = useState<Theme>(() => {
     try {
@@ -80,6 +82,11 @@ export function ThemeProvider({ children }: ThemeProviderProps) {
       return '#3b82f6';
     }
   });
+
+  // Initialize provider
+  useEffect(() => {
+    setIsInitialized(true);
+  }, []);
 
   // Optimized media query listener with cleanup
   useEffect(() => {
@@ -223,6 +230,11 @@ export function ThemeProvider({ children }: ThemeProviderProps) {
     return () => clearTimeout(timeoutId);
   }, [customColor]);
 
+  // Don't render children until provider is initialized
+  if (!isInitialized) {
+    return null;
+  }
+
   return (
     <ThemeContext.Provider value={{ 
       theme, 
@@ -242,7 +254,7 @@ export function useTheme() {
   try {
     const context = useContext(ThemeContext);
     if (context === undefined) {
-      console.warn('[useTheme] ThemeProvider context is undefined, returning safe defaults');
+      console.warn('[useTheme] ThemeProvider context is undefined, returning safe defaults. Call stack:', new Error().stack);
       // Return safe defaults to prevent app crash
       return {
         theme: 'system' as const,
@@ -256,7 +268,8 @@ export function useTheme() {
     }
     return context;
   } catch (error) {
-    console.warn('[useTheme] Error accessing theme context, returning safe defaults:', error);
+    console.error('[useTheme] Error accessing theme context, returning safe defaults. Error:', error);
+    console.error('[useTheme] Call stack:', new Error().stack);
     // Return safe defaults to prevent app crash
     return {
       theme: 'system' as const,
