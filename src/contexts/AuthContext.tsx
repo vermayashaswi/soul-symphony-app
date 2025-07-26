@@ -17,6 +17,7 @@ import {
 import { debugLogger, logInfo, logError, logAuthError, logProfile, logAuth } from '@/components/debug/DebugPanel';
 import { isAppRoute } from '@/routes/RouteHelpers';
 import { useLocation } from 'react-router-dom';
+import { SessionTrackingService } from '@/services/sessionTrackingService';
 import { LocationProvider } from '@/contexts/LocationContext';
 import { detectTWAEnvironment } from '@/utils/twaDetection';
 import { nativeAuthService } from '@/services/nativeAuthService';
@@ -39,7 +40,8 @@ function AuthProviderCore({ children }: { children: ReactNode }) {
   const [profileExistsStatus, setProfileExistsStatus] = useState<boolean | null>(null);
   const [profileCreationComplete, setProfileCreationComplete] = useState(false);
   const [autoRetryTimeoutId, setAutoRetryTimeoutId] = useState<NodeJS.Timeout | null>(null);
-  // Session tracking state removed - now handled by SessionProvider
+  const [sessionCreated, setSessionCreated] = useState(false);
+  const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
   const [authInitialized, setAuthInitialized] = useState(false);
   const [authStateStable, setAuthStateStable] = useState(false);
   const location = useLocation();
@@ -90,11 +92,89 @@ function AuthProviderCore({ children }: { children: ReactNode }) {
     return null;
   };
 
-  // Session creation now handled by SessionProvider/SessionManager
-  // Remove old session creation logic - this will be handled by the new SessionProvider
+  const createUserSession = async (userId: string): Promise<boolean> => {
+    try {
+      console.log('Creating enhanced user session for user:', userId);
+      
+      if (currentSessionId) {
+        console.log('Session already exists for user, skipping creation');
+        return true;
+      }
+      
+      const deviceType = /mobile|android|iphone|ipad|ipod/i.test(navigator.userAgent) ? 'mobile' : 'desktop';
+      const userLanguage = detectUserLanguage();
+      const referrer = getReferrer();
+      const utmParams = SessionTrackingService.extractUtmParameters();
+      
+      let locationData = null;
+      try {
+        locationData = await SessionTrackingService.detectLocation();
+        console.log('Location detected:', locationData);
+      } catch (error) {
+        console.warn('Location detection failed:', error);
+      }
+      
+      const sessionData = {
+        userId,
+        deviceType,
+        userAgent: navigator.userAgent,
+        entryPage: window.location.pathname,
+        lastActivePage: window.location.pathname,
+        language: userLanguage,
+        referrer,
+        countryCode: locationData?.country,
+        currency: locationData?.currency,
+        utmSource: utmParams.utm_source,
+        utmMedium: utmParams.utm_medium,
+        utmCampaign: utmParams.utm_campaign,
+        utmTerm: utmParams.utm_term,
+        utmContent: utmParams.utm_content,
+        gclid: utmParams.gclid,
+        fbclid: utmParams.fbclid,
+        attributionData: {
+          detectedAt: new Date().toISOString(),
+          userAgent: navigator.userAgent.substring(0, 200),
+          screen: {
+            width: window.screen?.width,
+            height: window.screen?.height,
+          },
+          viewport: {
+            width: window.innerWidth,
+            height: window.innerHeight,
+          },
+        },
+      };
+      
+      console.log('Creating session with enhanced tracking data:', {
+        deviceType: sessionData.deviceType,
+        language: sessionData.language,
+        countryCode: sessionData.countryCode,
+        currency: sessionData.currency,
+        utmSource: sessionData.utmSource,
+        hasLocation: !!locationData,
+      });
+      
+      const sessionId = await SessionTrackingService.createUserSession(sessionData);
+      
+      if (sessionId) {
+        setCurrentSessionId(sessionId);
+        console.log('Enhanced user session created successfully with ID:', sessionId);
+        return true;
+      } else {
+        console.error('Failed to create enhanced user session');
+        return false;
+      }
+    } catch (e) {
+      console.error('Exception creating enhanced user session:', e);
+      return false;
+    }
+  };
 
-  // Conversion tracking now handled by SessionProvider
-  // Remove this function as it's now managed by the SessionProvider
+  const trackConversion = async (eventType: string, eventData: Record<string, any> = {}) => {
+    if (currentSessionId) {
+      await SessionTrackingService.trackConversion(currentSessionId, eventType, eventData);
+    }
+  };
 
   useEffect(() => {
     const checkMobile = () => {
@@ -151,7 +231,12 @@ function AuthProviderCore({ children }: { children: ReactNode }) {
         setProfileCreationComplete(true);
         debugLogger.setLastProfileError(null);
         
-        // Session creation now handled by SessionProvider
+        if (!sessionCreated) {
+          const sessionSuccess = await createUserSession(user.id);
+          if (sessionSuccess) {
+            setSessionCreated(true);
+          }
+        }
         
         return true;
       } else {
@@ -213,7 +298,10 @@ function AuthProviderCore({ children }: { children: ReactNode }) {
         setUser(data.user);
         logProfile('User profile updated successfully', 'AuthContext');
         
-        // Conversion tracking now handled by SessionProvider
+        await trackConversion('profile_updated', { 
+          updatedFields: Object.keys(metadata),
+          timestamp: new Date().toISOString(),
+        });
       }
     } else {
       logAuthError('Failed to update user profile', 'AuthContext');
@@ -232,7 +320,10 @@ function AuthProviderCore({ children }: { children: ReactNode }) {
       await signInWithGoogleService();
       logInfo('Google sign-in initiated', 'AuthContext');
       
-      // Conversion tracking now handled by SessionProvider
+      await trackConversion('sign_in_attempt', { 
+        method: 'google',
+        timestamp: new Date().toISOString(),
+      });
     } catch (error: any) {
       logAuthError(`Google sign-in failed: ${error.message}`, 'AuthContext', error);
       setIsLoading(false);
@@ -250,7 +341,10 @@ function AuthProviderCore({ children }: { children: ReactNode }) {
       await signInWithAppleService();
       logInfo('Apple ID sign-in initiated', 'AuthContext');
       
-      // Conversion tracking now handled by SessionProvider
+      await trackConversion('sign_in_attempt', { 
+        method: 'apple',
+        timestamp: new Date().toISOString(),
+      });
     } catch (error: any) {
       logAuthError(`Apple ID sign-in failed: ${error.message}`, 'AuthContext', error);
       setIsLoading(false);
@@ -269,7 +363,10 @@ function AuthProviderCore({ children }: { children: ReactNode }) {
       await signInWithEmailService(email, password);
       logInfo('Email sign-in initiated', 'AuthContext');
       
-      // Conversion tracking now handled by SessionProvider
+      await trackConversion('sign_in_attempt', { 
+        method: 'email',
+        timestamp: new Date().toISOString(),
+      });
     } catch (error: any) {
       logAuthError(`Email sign-in failed: ${error.message}`, 'AuthContext', error);
       setIsLoading(false);
@@ -288,7 +385,10 @@ function AuthProviderCore({ children }: { children: ReactNode }) {
       await signUpService(email, password);
       logInfo('Sign-up initiated', 'AuthContext');
       
-      // Conversion tracking now handled by SessionProvider
+      await trackConversion('sign_up_attempt', { 
+        method: 'email',
+        timestamp: new Date().toISOString(),
+      });
     } catch (error: any) {
       logAuthError(`Sign-up failed: ${error.message}`, 'AuthContext', error);
       setIsLoading(false);
@@ -316,14 +416,16 @@ function AuthProviderCore({ children }: { children: ReactNode }) {
     try {
       console.log('[AuthContext] Attempting to sign out user');
       
-      // Conversion tracking now handled by SessionProvider
+      await trackConversion('sign_out', {
+        timestamp: new Date().toISOString(),
+      });
       
       // Clear local state immediately
       setSession(null);
       setUser(null);
       setProfileExistsStatus(null);
       setProfileCreationComplete(false);
-      // Session ID tracking now handled by SessionProvider
+      setCurrentSessionId(null);
       setAuthStateStable(false);
       
       // Call the sign out service
@@ -383,9 +485,14 @@ function AuthProviderCore({ children }: { children: ReactNode }) {
         setProfileCreationAttempts(0);
         setProfileExistsStatus(true);
         setProfileCreationComplete(true);
-          debugLogger.setLastProfileError(null);
-          
-          // Session creation now handled by SessionProvider
+        debugLogger.setLastProfileError(null);
+        
+        if (!sessionCreated) {
+          const sessionSuccess = await createUserSession(currentUser.id);
+          if (sessionSuccess) {
+            setSessionCreated(true);
+          }
+        }
         
         return true;
       } else {
@@ -401,7 +508,12 @@ function AuthProviderCore({ children }: { children: ReactNode }) {
           setProfileCreationComplete(true);
           debugLogger.setLastProfileError(null);
           
-          // Session creation now handled by SessionProvider
+          if (!sessionCreated) {
+            const sessionSuccess = await createUserSession(currentUser.id);
+            if (sessionSuccess) {
+              setSessionCreated(true);
+            }
+          }
           
           return true;
         }
@@ -476,8 +588,10 @@ function AuthProviderCore({ children }: { children: ReactNode }) {
           }, stabilityDelay);
         }
         
-        // Session tracking now handled by SessionProvider
+        // Reset session tracking on new session
         if (event === 'SIGNED_IN' && currentSession?.user) {
+          setSessionCreated(false);
+          setCurrentSessionId(null);
           
           // CRITICAL: For native apps, decouple profile creation from navigation
           const isNative = nativeIntegrationService.isRunningNatively();
@@ -522,7 +636,11 @@ function AuthProviderCore({ children }: { children: ReactNode }) {
             }, initialDelay);
           }
 
-          // Conversion tracking now handled by SessionProvider
+          await trackConversion('sign_in_success', {
+            method: currentSession.user.app_metadata?.provider || 'unknown',
+            timestamp: new Date().toISOString(),
+            isNative: nativeIntegrationService.isRunningNatively()
+          });
         }
         
         // Improved loading state management - immediate for native, faster for web
@@ -549,6 +667,8 @@ function AuthProviderCore({ children }: { children: ReactNode }) {
           logInfo('User signed out', 'AuthContext');
           setProfileExistsStatus(null);
           setProfileCreationComplete(false);
+          setSessionCreated(false);
+          setCurrentSessionId(null);
           setAuthStateStable(false);
           debugLogger.setLastProfileError(null);
           
@@ -573,7 +693,8 @@ function AuthProviderCore({ children }: { children: ReactNode }) {
       setUser(currentSession?.user ?? null);
       
       if (currentSession?.user) {
-        // Session tracking now handled by SessionProvider
+        setSessionCreated(false);
+        setCurrentSessionId(null);
         
         // CRITICAL: For native apps, decouple profile creation from initial load
         const isNative = nativeIntegrationService.isRunningNatively();
