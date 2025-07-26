@@ -1,20 +1,20 @@
 import React from 'react';
 import { useDebugInitialization } from '@/hooks/useDebugInitialization';
 import { useAuth } from '@/contexts/AuthContext';
-import { useOnboarding } from '@/hooks/use-onboarding';
+import { useAppInitialization } from '@/contexts/AppInitializationContext';
 import { useJournalEntries } from '@/hooks/use-journal-entries';
 import { motion } from 'framer-motion';
 
 export const InitializationDebugOverlay: React.FC = () => {
   const initState = useDebugInitialization();
   const { user } = useAuth();
-  const { onboardingComplete, loading: onboardingLoading } = useOnboarding();
+  const { onboardingComplete, isOnboardingLoading } = useAppInitialization();
   const { entries, loading: journalLoading, error: journalError } = useJournalEntries(user?.id, 0, !!user);
 
   // Enhanced detection of issues
   const hasJournalIssues = user && !journalLoading && entries.length === 0 && !journalError;
   const hasNavigationIssues = user && onboardingComplete && initState.isNativeApp;
-  const hasOnboardingIssues = user && onboardingComplete === null && !onboardingLoading;
+  const hasOnboardingIssues = user && onboardingComplete === null && !isOnboardingLoading;
   
   // Only show in development or when there are errors/timeouts/specific issues
   const shouldShow = process.env.NODE_ENV === 'development' || 
@@ -96,10 +96,10 @@ export const InitializationDebugOverlay: React.FC = () => {
         <div className="flex justify-between items-center">
           <span>Onboarding:</span>
           <span className={
-            onboardingLoading ? 'text-yellow-600' :
-            onboardingComplete ? 'text-green-600' : 'text-orange-600'
+            isOnboardingLoading ? 'text-yellow-600' :
+             onboardingComplete ? 'text-green-600' : 'text-orange-600'
           }>
-            {onboardingLoading ? '⏳ Loading' : 
+            {isOnboardingLoading ? '⏳ Loading' : 
              onboardingComplete ? '✅ Complete' : '🔄 Pending'}
           </span>
         </div>

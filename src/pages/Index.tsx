@@ -2,7 +2,7 @@ import React, { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useIsMobile } from '@/hooks/use-mobile';
-import { useOnboarding } from '@/hooks/use-onboarding';
+import { useAppInitialization } from '@/contexts/AppInitializationContext';
 import NetworkAwareContent from '@/components/NetworkAwareContent';
 import { useNetworkStatus } from '@/utils/network';
 import HomePage from '@/pages/website/HomePage';
@@ -16,7 +16,7 @@ const Index = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
   const isMobile = useIsMobile();
-  const { onboardingComplete, checkOnboardingStatus } = useOnboarding();
+  const { onboardingComplete, isInitialized } = useAppInitialization();
   const networkStatus = useNetworkStatus();
   const { translate } = useTranslation();
 
@@ -28,7 +28,7 @@ const Index = () => {
 
   // CRITICAL: For native apps, redirect immediately - never show marketing site
   useEffect(() => {
-    if (isNative) {
+    if (isNative && isInitialized) {
       console.log('[Index] Native app detected, redirecting to app interface');
       
       // Check for OAuth callback parameters first
@@ -43,28 +43,20 @@ const Index = () => {
         return;
       }
 
-      // Redirect based on user status with improved onboarding check
+      // Redirect based on user status using centralized state
       if (!user) {
         console.log('[Index] No user in native app, redirecting to onboarding');
         navigate('/app/onboarding', { replace: true });
+      } else if (onboardingComplete) {
+        console.log('[Index] Native app user ready, redirecting to home');
+        navigate('/app/home', { replace: true });
       } else {
-        // Check both localStorage and database for onboarding status
-        checkOnboardingStatus().then((isComplete) => {
-          if (!isComplete) {
-            console.log('[Index] Onboarding not complete in native app, redirecting to onboarding');
-            navigate('/app/onboarding', { replace: true });
-          } else {
-            console.log('[Index] Native app user ready, redirecting to home');
-            navigate('/app/home', { replace: true });
-          }
-        }).catch(() => {
-          // Fallback to onboarding if check fails
-          navigate('/app/onboarding', { replace: true });
-        });
+        console.log('[Index] Onboarding not complete in native app, redirecting to onboarding');
+        navigate('/app/onboarding', { replace: true });
       }
       return;
     }
-  }, [isNative, user, navigate, urlParams, checkOnboardingStatus]);
+  }, [isNative, user, onboardingComplete, isInitialized, navigate, urlParams]);
 
   // Enhanced tutorial status checking for proper navigation flow - ONLY for web users
   useEffect(() => {
@@ -151,13 +143,11 @@ const Index = () => {
       
       if (user) {
         console.log('[Index] User is logged in, redirecting to appropriate app page');
-        checkOnboardingStatus().then((isComplete) => {
-          if (isComplete) {
-            navigate('/app/home');
-          } else {
-            navigate('/app/onboarding');
-          }
-        });
+        if (onboardingComplete) {
+          navigate('/app/home');
+        } else {
+          navigate('/app/onboarding');
+        }
       } else {
         navigate('/app/auth');
       }
@@ -167,7 +157,7 @@ const Index = () => {
     if (urlParams.has('insights')) {
       navigate('/app/insights');
     }
-  }, [user, navigate, urlParams, checkOnboardingStatus, isNative]);
+  }, [user, navigate, urlParams, onboardingComplete, isNative]);
 
   useEffect(() => {
     // Pre-translate common strings used on the index page

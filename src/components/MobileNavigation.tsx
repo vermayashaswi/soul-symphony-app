@@ -13,12 +13,10 @@ import { useTranslation } from '@/contexts/TranslationContext';
 import { useSubscription } from '@/contexts/SubscriptionContext';
 import { useSafeArea } from '@/hooks/use-safe-area';
 import { useKeyboardDetection } from '@/hooks/use-keyboard-detection';
+import { useAppInitialization } from '@/contexts/AppInitializationContext';
 
-interface MobileNavigationProps {
-  onboardingComplete: boolean | null;
-}
-
-const MobileNavigation: React.FC<MobileNavigationProps> = ({ onboardingComplete }) => {
+const MobileNavigation: React.FC = () => {
+  const { onboardingComplete } = useAppInitialization();
   const location = useLocation();
   const isMobile = useIsMobile();
   const [isVisible, setIsVisible] = useState(false);
