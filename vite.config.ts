@@ -29,11 +29,13 @@ export default defineConfig(({ mode }) => ({
     include: ['react', 'react-dom'],
     force: true // Force re-optimization after React version update
   },
-  // Force cache busting for theme-related changes
+  // Force complete cache busting
   define: {
-    __THEME_DEBUG__: JSON.stringify(Date.now()),
+    __THEME_DEBUG__: JSON.stringify(`REBUILD_${Date.now()}`),
     __APP_MANIFEST_PATH__: JSON.stringify('/app/manifest.json')
   },
+  // Clear all caches
+  cacheDir: '.vite/cache-cleared',
   // Ensure that Vite correctly resolves Node.js built-in modules
   build: {
     commonjsOptions: {

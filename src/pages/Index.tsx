@@ -10,6 +10,7 @@ import { TranslatableText } from '@/components/translation/TranslatableText';
 import { useTranslation } from '@/contexts/TranslationContext';
 import { supabase } from '@/integrations/supabase/client';
 import { nativeIntegrationService } from '@/services/nativeIntegrationService';
+import SafeMarketingWrapper from '@/components/SafeMarketingWrapper';
 
 const Index = () => {
   const navigate = useNavigate();
@@ -206,7 +207,7 @@ const Index = () => {
 
   // Always render the website homepage component when at root URL (web only)
   return (
-    <>
+    <SafeMarketingWrapper>
       <NetworkAwareContent
         lowBandwidthFallback={
           <div className="flex flex-col items-center justify-center min-h-screen p-4">
@@ -240,7 +241,7 @@ const Index = () => {
       >
         <HomePage />
       </NetworkAwareContent>
-    </>
+    </SafeMarketingWrapper>
   );
 };
 
