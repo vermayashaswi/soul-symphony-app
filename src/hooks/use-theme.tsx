@@ -304,14 +304,15 @@ export function useTheme() {
     console.error('3. There\'s a timing issue during app initialization');
     console.error('Current component stack:', new Error().stack);
     
-    // Instead of throwing, return safe defaults to prevent app crash
+    // Return safe defaults instead of throwing to prevent app crash
+    console.warn('[useTheme] Returning safe defaults to prevent app crash');
     return {
       theme: 'system' as const,
-      setTheme: () => {},
+      setTheme: () => console.warn('[useTheme] setTheme called outside ThemeProvider'),
       colorTheme: 'Calm' as const,
-      setColorTheme: () => {},
+      setColorTheme: () => console.warn('[useTheme] setColorTheme called outside ThemeProvider'),
       customColor: '#8b5cf6',
-      setCustomColor: () => {},
+      setCustomColor: () => console.warn('[useTheme] setCustomColor called outside ThemeProvider'),
       systemTheme: 'light' as const,
     };
   }
