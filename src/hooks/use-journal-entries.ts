@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { JournalEntry } from '@/types/journal';
 import { checkUserProfile, createUserProfile, fetchJournalEntries } from '@/services/journalService';
+import { nativeIntegrationService } from '@/services/nativeIntegrationService';
 
 type UseJournalEntriesReturn = {
   entries: JournalEntry[];
@@ -235,8 +236,13 @@ export function useJournalEntries(
 
   // IMPORTANT: Fix - Declare fetchEntries after verifyUserProfile
   const fetchEntries = useCallback(async () => {
+    const isNative = nativeIntegrationService.isRunningNatively();
+    
     if (!userId) {
-      console.log('[useJournalEntries] No user ID provided for fetching entries');
+      console.log('[useJournalEntries] DEBUG: No user ID provided for fetching entries:', {
+        isNative,
+        timestamp: new Date().toISOString()
+      });
       setLoading(false);
       setEntries([]);
       initialFetchDoneRef.current = true;
@@ -244,9 +250,16 @@ export function useJournalEntries(
     }
     
     // IMPROVED FIX: Better logging and state management during fetch
-    console.log('[useJournalEntries] Starting fetch, currently fetching:', isFetchingRef.current, 
-                'cached entries:', globalEntriesCache.entries.length,
-                'refreshKey:', refreshKey);
+    console.log('[useJournalEntries] DEBUG: Starting fetch with details:', {
+      currentlyFetching: isFetchingRef.current,
+      cachedEntries: globalEntriesCache.entries.length,
+      refreshKey,
+      userId,
+      isNative,
+      isProfileChecked,
+      profileExists,
+      timestamp: new Date().toISOString()
+    });
     
     // Check if there was a recently deleted or updated entry ID
     const hasRecentDeletion = globalEntriesCache.lastDeletedEntryId !== null || 
@@ -330,7 +343,15 @@ export function useJournalEntries(
         setLoading(true);
       }
       
-      console.log(`[useJournalEntries] Fetching entries for user ID: ${userId} (fetch #${fetchCount + 1})`);
+      console.log(`[useJournalEntries] DEBUG: Initiating database fetch:`, {
+        userId,
+        fetchNumber: fetchCount + 1,
+        isNative,
+        hasCache: globalEntriesCache.entries.length > 0,
+        cacheValid: Date.now() < globalEntriesCache.cacheExpiryTime,
+        profileExists,
+        isProfileChecked
+      });
       
       if (fetchTimeoutRef.current) {
         clearTimeout(fetchTimeoutRef.current);
