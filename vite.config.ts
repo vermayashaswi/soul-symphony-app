@@ -7,6 +7,7 @@ import { componentTagger } from "lovable-tagger";
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }) => ({
   server: {
+    force: true,
     host: "::",
     port: 8080,
     allowedHosts: [
@@ -26,7 +27,7 @@ export default defineConfig(({ mode }) => ({
   },
   optimizeDeps: {
     exclude: ['lovable-tagger'],
-    include: ['react', 'react-dom'],
+    include: ['react', 'react-dom', 'react-dom/client'],
     force: true
   },
   esbuild: {
