@@ -4,7 +4,7 @@ import { motion } from 'framer-motion';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Link } from 'react-router-dom';
-import SouloLogo from '@/components/SouloLogo';
+import SouloLogoSafe from '@/components/SouloLogoSafe';
 import ParticleBackground from '@/components/ParticleBackground';
 import Navbar from '@/components/Navbar';
 
@@ -77,7 +77,7 @@ const AppDownload = () => {
         >
           <h1 className="text-4xl md:text-5xl font-bold mb-6 flex items-center justify-center">
             <span className="text-foreground dark:text-white">Download</span> 
-            <SouloLogo className="ml-2" useColorTheme={true} animate={true} />
+            <SouloLogoSafe className="ml-2" useColorTheme={true} animate={true} disableTheme={true} />
           </h1>
           <p className="text-xl max-w-2xl mx-auto text-primary mb-8">
             SOULo is available exclusively as a mobile app for iOS and Android

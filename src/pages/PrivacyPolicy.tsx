@@ -1,7 +1,7 @@
 
 import React from 'react';
 import { ScrollArea } from "@/components/ui/scroll-area";
-import SouloLogo from '@/components/SouloLogo';
+import SouloLogoSafe from '@/components/SouloLogoSafe';
 import { Link } from 'react-router-dom';
 
 export default function PrivacyPolicy() {
@@ -10,7 +10,7 @@ export default function PrivacyPolicy() {
       <div className="max-w-3xl mx-auto px-4 py-12">
         <div className="mb-8 flex flex-col items-center">
           <Link to="/" className="inline-flex items-center gap-2 mb-8">
-            <SouloLogo useColorTheme={true} />
+            <SouloLogoSafe useColorTheme={true} disableTheme={true} />
           </Link>
           <h1 className="text-3xl font-bold mb-2 text-theme-color text-center">Privacy Policy</h1>
           <p className="text-muted-foreground text-center">How we protect your data and privacy</p>

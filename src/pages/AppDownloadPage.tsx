@@ -3,7 +3,7 @@ import { motion } from 'framer-motion';
 import { Apple, PlayIcon, ArrowRight, Shield, Mic, Brain, Download } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Link } from 'react-router-dom';
-import SouloLogo from '@/components/SouloLogo';
+import SouloLogoSafe from '@/components/SouloLogoSafe';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/website/Footer';
 
@@ -251,7 +251,7 @@ const AppDownloadPage = () => {
       <section className="py-16">
         <div className="container mx-auto max-w-6xl px-4">
           <div className="bg-card border border-primary/10 rounded-xl p-8 md:p-10 text-center shadow-sm">
-            <SouloLogo size="large" useColorTheme={true} className="mx-auto mb-6" />
+            <SouloLogoSafe size="large" useColorTheme={true} disableTheme={true} className="mx-auto mb-6" />
             <h2 className="text-2xl md:text-3xl font-bold mb-4">Ready to Discover Yourself?</h2>
             <p className="text-muted-foreground mb-8 max-w-2xl mx-auto">
               Download SOULo today and begin your journey of self-expression, reflection, and growth.
