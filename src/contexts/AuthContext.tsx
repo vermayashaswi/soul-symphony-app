@@ -18,14 +18,14 @@ import { debugLogger, logInfo, logError, logAuthError, logProfile, logAuth } fro
 import { isAppRoute } from '@/routes/RouteHelpers';
 import { useLocation } from 'react-router-dom';
 import { LocationProvider } from '@/contexts/LocationContext';
-import { detectTWAEnvironment } from '@/utils/twaDetection';
+
 import { nativeAuthService } from '@/services/nativeAuthService';
 import { nativeIntegrationService } from '@/services/nativeIntegrationService';
 import { nativeNavigationService } from '@/services/nativeNavigationService';
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-const MAX_AUTO_PROFILE_ATTEMPTS = 2; // Reduced for TWA stability
+const MAX_AUTO_PROFILE_ATTEMPTS = 2; // Reduced for native app stability
 const BASE_RETRY_DELAY = 2000; // Increased delay
 
 function AuthProviderCore({ children }: { children: ReactNode }) {
@@ -43,7 +43,6 @@ function AuthProviderCore({ children }: { children: ReactNode }) {
   const [authInitialized, setAuthInitialized] = useState(false);
   const [authStateStable, setAuthStateStable] = useState(false);
   const location = useLocation();
-  const twaEnv = detectTWAEnvironment();
 
   // Initialize native services
   useEffect(() => {
@@ -125,7 +124,7 @@ function AuthProviderCore({ children }: { children: ReactNode }) {
     }
     
     const now = Date.now();
-    if (!forceRetry && now - lastProfileAttemptTime < 5000) { // Increased delay for TWA
+    if (!forceRetry && now - lastProfileAttemptTime < 5000) { // Increased delay for native apps
       logProfile('Skipping profile check - too soon after last attempt', 'AuthContext');
       return profileExistsStatus || false;
     }
@@ -370,9 +369,9 @@ function AuthProviderCore({ children }: { children: ReactNode }) {
         userMetadataKeys: currentUser.user_metadata ? Object.keys(currentUser.user_metadata) : []
       });
       
-      // Increased delay for TWA stability
-      if (isMobileDevice || twaEnv.isTWA || twaEnv.isStandalone) {
-        logProfile('Mobile/TWA device detected, adding stabilization delay', 'AuthContext');
+      // Increased delay for native app stability
+      if (isMobileDevice || nativeIntegrationService.isRunningNatively()) {
+        logProfile('Mobile/Native device detected, adding stabilization delay', 'AuthContext');
         await new Promise(resolve => setTimeout(resolve, 2000));
       }
       
@@ -507,12 +506,9 @@ function AuthProviderCore({ children }: { children: ReactNode }) {
             
           } else {
             // Web: Use existing logic with longer delays for stability
-            const initialDelay = (isMobileDevice || twaEnv.isTWA || twaEnv.isStandalone) ? 3000 : 2000;
+            const initialDelay = isMobileDevice ? 3000 : 2000;
             
-            logProfile(`WEB: Scheduling profile creation in ${initialDelay}ms for platform stability`, 'AuthContext', {
-              isTWA: twaEnv.isTWA,
-              isStandalone: twaEnv.isStandalone
-            });
+            logProfile(`WEB: Scheduling profile creation in ${initialDelay}ms for platform stability`, 'AuthContext');
             
             setTimeout(() => {
               createOrVerifyProfile(currentSession.user)
@@ -528,7 +524,7 @@ function AuthProviderCore({ children }: { children: ReactNode }) {
         // Improved loading state management - immediate for native, faster for web
         const loadingDelay = nativeIntegrationService.isRunningNatively() 
           ? 50  // Almost immediate for native to enable navigation
-          : (twaEnv.isTWA || twaEnv.isStandalone) ? 1500 : 800;
+          : 800;
         
         setTimeout(() => {
           setIsLoading(false);
@@ -602,11 +598,9 @@ function AuthProviderCore({ children }: { children: ReactNode }) {
           
         } else {
           // Web: Use existing logic with stability delays
-          const initialDelay = (isMobileDevice || twaEnv.isTWA || twaEnv.isStandalone) ? 3000 : 2000;
+          const initialDelay = isMobileDevice ? 3000 : 2000;
           
-          logProfile(`WEB: Scheduling initial profile creation in ${initialDelay}ms for platform stability`, 'AuthContext', {
-            isTWA: twaEnv.isTWA
-          });
+          logProfile(`WEB: Scheduling initial profile creation in ${initialDelay}ms for platform stability`, 'AuthContext');
           
           setTimeout(() => {
             createOrVerifyProfile(currentSession.user)
@@ -620,7 +614,7 @@ function AuthProviderCore({ children }: { children: ReactNode }) {
       // Better timing for initialization completion - immediate for native
       const initDelay = nativeIntegrationService.isRunningNatively() 
         ? 100  // Much faster for native
-        : (twaEnv.isTWA || twaEnv.isStandalone) ? 2000 : 1000;
+        : 1000;
       
       setTimeout(() => {
         setIsLoading(false);
@@ -635,7 +629,7 @@ function AuthProviderCore({ children }: { children: ReactNode }) {
         clearTimeout(autoRetryTimeoutId);
       }
     };
-  }, [authInitialized, isMobileDevice, location.pathname, twaEnv.isTWA, twaEnv.isStandalone]);
+  }, [authInitialized, isMobileDevice, location.pathname]);
 
   const value = {
     session,

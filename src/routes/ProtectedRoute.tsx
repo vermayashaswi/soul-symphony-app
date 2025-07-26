@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { Navigate, useLocation, Outlet } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
-import { detectTWAEnvironment } from '@/utils/twaDetection';
+import { nativeIntegrationService } from '@/services/nativeIntegrationService';
 import { useSession } from '@/providers/SessionProvider';
 
 const ProtectedRoute: React.FC = () => {
@@ -27,8 +27,8 @@ const ProtectedRoute: React.FC = () => {
         console.error('Error checking authentication in ProtectedRoute:', error);
         
         // For timeout errors in native apps, try localStorage fallback
-        const twaEnv = detectTWAEnvironment();
-        if ((twaEnv.isTWA || twaEnv.isStandalone) && error instanceof Error && error.message.includes('timeout')) {
+        const isNative = nativeIntegrationService.isRunningNatively();
+        if (isNative && error instanceof Error && error.message.includes('timeout')) {
           try {
             const storedToken = localStorage.getItem('sb-kwnwhgucnzqxndzjayyq-auth-token');
             if (storedToken) {

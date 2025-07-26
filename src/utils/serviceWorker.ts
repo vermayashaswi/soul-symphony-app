@@ -1,5 +1,5 @@
 /**
- * Service Worker Registration and Management - Enhanced for TWA Updates
+ * Service Worker Registration and Management - Enhanced for Native App Updates
  */
 
 export interface SwRegistrationResult {
@@ -244,12 +244,12 @@ export const serviceWorkerManager = new ServiceWorkerManager();
  * Initialize service worker with enhanced update handling
  */
 export async function initializeServiceWorker(): Promise<SwRegistrationResult> {
-  // Always register in TWA environment for update handling
-  const twaEnv = window.matchMedia('(display-mode: standalone)').matches ||
-                (window.navigator as any).standalone === true;
+  // Always register in native/standalone environment for update handling
+  const isStandalone = window.matchMedia('(display-mode: standalone)').matches ||
+                      (window.navigator as any).standalone === true;
   
-  if (process.env.NODE_ENV === 'development' && !localStorage.getItem('enableSW') && !twaEnv) {
-    console.log('[SW] Service worker disabled in development (not TWA)');
+  if (process.env.NODE_ENV === 'development' && !localStorage.getItem('enableSW') && !isStandalone) {
+    console.log('[SW] Service worker disabled in development (not standalone)');
     return { success: false, error: new Error('Disabled in development') };
   }
 
