@@ -7,7 +7,6 @@ import JournalContent from '@/components/home/JournalContent';
 import BackgroundElements from '@/components/home/BackgroundElements';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
-import { TemporaryDebugPanel } from '@/components/debug/TemporaryDebugPanel';
 
 const Home = () => {
   const { isActive, currentStep, steps, navigationState, startTutorial } = useTutorial();
@@ -139,9 +138,6 @@ const Home = () => {
       <div className={`relative ${isInWelcomeTutorialStep ? 'z-[9999]' : 'z-20'} flex flex-col`}>
         <JournalHeader />
       </div>
-      
-      {/* Temporary debug panel for development/native debugging */}
-      <TemporaryDebugPanel />
     </div>
   );
 };

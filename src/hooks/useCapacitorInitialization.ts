@@ -21,15 +21,12 @@ export const useCapacitorInitialization = () => {
   const initializationStartedRef = useRef(false);
   const initTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const authStabilizedRef = useRef(false);
-  const emergencyTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
-    const isNative = nativeIntegrationService.isRunningNatively();
-    
-    // For non-native environments, complete initialization immediately
-    if (!isNative) {
-      if (!initState.initializationComplete) {
-        console.log('[Capacitor Init] Non-native environment, completing immediately');
+    // Only run initialization once and only in native environment
+    if (initializationStartedRef.current || !nativeIntegrationService.isRunningNatively()) {
+      // For non-native environments, complete initialization immediately
+      if (!nativeIntegrationService.isRunningNatively() && !initState.initializationComplete) {
         setInitState(prev => ({
           ...prev,
           isInitialized: true,
@@ -39,32 +36,17 @@ export const useCapacitorInitialization = () => {
       }
       return;
     }
-
-    // Only run initialization once for native environment
-    if (initializationStartedRef.current) {
-      return;
-    }
     
     initializationStartedRef.current = true;
-    console.log('[Capacitor Init] Starting native initialization process', {
-      isNative,
+    console.log('[Capacitor Init] Starting Capacitor initialization process', {
+      isNative: nativeIntegrationService.isRunningNatively(),
       authLoading,
       hasUser: !!user
     });
 
-    // Progressive timeout system
-    // First timeout: Auth stabilization (shorter)
+    // Set a timeout to prevent infinite loading
     initTimeoutRef.current = setTimeout(() => {
-      console.log('[Capacitor Init] Auth stabilization timeout (5s), checking state');
-      if (!authStabilizedRef.current && !authLoading) {
-        console.log('[Capacitor Init] Force auth stabilization');
-        authStabilizedRef.current = true;
-      }
-    }, 5000);
-
-    // Emergency timeout: Force completion (longer) 
-    emergencyTimeoutRef.current = setTimeout(() => {
-      console.warn('[Capacitor Init] EMERGENCY timeout reached (12s), forcing completion');
+      console.log('[Capacitor Init] Initialization timeout reached, forcing completion');
       setInitState(prev => ({
         ...prev,
         isInitialized: true,
@@ -72,47 +54,32 @@ export const useCapacitorInitialization = () => {
         initializationComplete: true,
         hasTimedOut: true
       }));
-    }, 12000);
+    }, 8000);
 
     return () => {
       if (initTimeoutRef.current) {
         clearTimeout(initTimeoutRef.current);
         initTimeoutRef.current = null;
       }
-      if (emergencyTimeoutRef.current) {
-        clearTimeout(emergencyTimeoutRef.current);
-        emergencyTimeoutRef.current = null;
-      }
     };
-  }, []);
+  }, [nativeIntegrationService.isRunningNatively()]);
 
-  // Enhanced auth stabilization with faster completion
+  // Handle auth stabilization
   useEffect(() => {
     if (!nativeIntegrationService.isRunningNatively()) return;
     
-    // Auth is considered stabilized when loading stops OR when we have a user
-    const shouldStabilize = (!authLoading && !authStabilizedRef.current) || 
-                           (!!user && !authStabilizedRef.current);
-    
-    if (shouldStabilize) {
+    // Auth is considered stabilized when loading stops
+    if (!authLoading && !authStabilizedRef.current) {
       authStabilizedRef.current = true;
-      console.log('[Capacitor Init] Auth stabilized', { 
-        authLoading, 
-        hasUser: !!user,
-        reason: !authLoading ? 'loading_stopped' : 'user_available'
-      });
+      console.log('[Capacitor Init] Auth has stabilized, completing initialization');
       
-      // Clear timeouts
+      // Clear any existing timeout
       if (initTimeoutRef.current) {
         clearTimeout(initTimeoutRef.current);
         initTimeoutRef.current = null;
       }
-      if (emergencyTimeoutRef.current) {
-        clearTimeout(emergencyTimeoutRef.current);
-        emergencyTimeoutRef.current = null;
-      }
       
-      // Faster completion for better UX
+      // Add a small delay for Capacitor stability
       setTimeout(() => {
         setInitState(prev => ({
           ...prev,
@@ -120,20 +87,17 @@ export const useCapacitorInitialization = () => {
           isLoading: false,
           initializationComplete: true
         }));
-      }, 300); // Reduced from 1000ms to 300ms
+      }, 1000);
     }
-  }, [authLoading, user]);
+  }, [authLoading]);
 
   // Reset initialization state when auth state changes significantly
   useEffect(() => {
     if (!nativeIntegrationService.isRunningNatively()) return;
     
-    // If user changes (login/logout), reset auth stabilization but only if not already complete
-    if (!initState.initializationComplete) {
-      authStabilizedRef.current = false;
-      console.log('[Capacitor Init] User changed, resetting stabilization');
-    }
-  }, [user?.id, initState.initializationComplete]);
+    // If user changes (login/logout), reset auth stabilization
+    authStabilizedRef.current = false;
+  }, [user?.id]);
 
   return {
     ...initState,

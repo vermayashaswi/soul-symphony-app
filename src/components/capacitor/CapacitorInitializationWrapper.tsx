@@ -8,10 +8,8 @@ interface CapacitorInitializationWrapperProps {
 const CapacitorInitializationWrapper: React.FC<CapacitorInitializationWrapperProps> = ({ children }) => {
   const { isLoading, initializationComplete, isNativeEnvironment, hasTimedOut } = useCapacitorInitialization();
 
-  // Enhanced loading state with more context
+  // Only show loading in native environment and only if still initializing
   if (isNativeEnvironment && isLoading && !initializationComplete) {
-    console.log('[CapacitorWrapper] Showing loading screen', { isLoading, initializationComplete, hasTimedOut });
-    
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
         <div className="flex flex-col items-center space-y-4">
@@ -27,22 +25,11 @@ const CapacitorInitializationWrapper: React.FC<CapacitorInitializationWrapperPro
               Taking longer than expected...
             </p>
           )}
-          
-          {/* Emergency bypass for debugging */}
-          {hasTimedOut && process.env.NODE_ENV === 'development' && (
-            <button 
-              onClick={() => window.location.reload()}
-              className="mt-4 px-4 py-2 bg-red-600 text-white rounded text-sm"
-            >
-              Force Restart (Debug)
-            </button>
-          )}
         </div>
       </div>
     );
   }
 
-  console.log('[CapacitorWrapper] Rendering children', { isNativeEnvironment, isLoading, initializationComplete });
   return <>{children}</>;
 };
 

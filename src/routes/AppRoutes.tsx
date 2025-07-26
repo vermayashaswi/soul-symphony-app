@@ -22,8 +22,6 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useOnboarding } from '@/hooks/use-onboarding';
 import { useSessionValidation } from '@/hooks/useSessionValidation';
 import { nativeIntegrationService } from '@/services/nativeIntegrationService';
-import { InitializationDebugOverlay } from '@/components/debug/InitializationDebugOverlay';
-import { NativeDiagnosticsPanel } from '@/components/debug/NativeDiagnosticsPanel';
 
 const AppRoutes = () => {
   const { user } = useAuth();
@@ -125,13 +123,10 @@ const AppRoutes = () => {
   };
 
   return (
-    <>
-      <InitializationDebugOverlay />
-      <NativeDiagnosticsPanel />
-      <Routes>
-        <Route element={<ViewportManager />}>
-          {/* Root Route - context-aware */}
-          <Route path="/" element={<RootRedirect />} />
+    <Routes>
+      <Route element={<ViewportManager />}>
+        {/* Root Route - context-aware */}
+        <Route path="/" element={<RootRedirect />} />
 
         {/* Website Routes - only accessible in web context */}
         <Route path="/privacy-policy" element={
@@ -206,9 +201,8 @@ const AppRoutes = () => {
           <Navigate to="/app/home" replace /> :
           <NotFound />
         } />
-        </Route>
-      </Routes>
-    </>
+      </Route>
+    </Routes>
   );
 };
 

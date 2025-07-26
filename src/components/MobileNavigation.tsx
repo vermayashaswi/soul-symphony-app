@@ -13,10 +13,12 @@ import { useTranslation } from '@/contexts/TranslationContext';
 import { useSubscription } from '@/contexts/SubscriptionContext';
 import { useSafeArea } from '@/hooks/use-safe-area';
 import { useKeyboardDetection } from '@/hooks/use-keyboard-detection';
-import { useAppInitialization } from '@/contexts/AppInitializationContext';
 
-const MobileNavigation: React.FC = () => {
-  const { onboardingComplete } = useAppInitialization();
+interface MobileNavigationProps {
+  onboardingComplete: boolean | null;
+}
+
+const MobileNavigation: React.FC<MobileNavigationProps> = ({ onboardingComplete }) => {
   const location = useLocation();
   const isMobile = useIsMobile();
   const [isVisible, setIsVisible] = useState(false);
@@ -74,7 +76,7 @@ const MobileNavigation: React.FC = () => {
     });
   }, [isKeyboardVisible, keyboardHeight, platform]);
   
-  // Enhanced visibility logic - with fallback for null onboardingComplete
+  // Visibility logic - hide when keyboard is visible or on auth/onboarding pages
   useEffect(() => {
     const onboardingOrAuthPaths = [
       '/app/onboarding',
@@ -86,47 +88,27 @@ const MobileNavigation: React.FC = () => {
     
     const isOnboardingOrAuth = onboardingOrAuthPaths.includes(location.pathname);
     
-    // Enhanced logic with fallback for onboardingComplete === null
     const shouldShowNav = (isMobile.isMobile || isNativeApp()) && 
                           !isOnboardingOrAuth &&
                           !!user &&
-                          onboardingComplete !== false; // Keep existing logic but add fallback below
+                          onboardingComplete !== false;
     
-    // FALLBACK: If onboardingComplete is null and user is authenticated, show nav anyway
-    const fallbackVisible = (isMobile.isMobile || isNativeApp()) && 
-                            !isOnboardingOrAuth &&
-                            !!user &&
-                            onboardingComplete === null &&
-                            location.pathname.startsWith('/app/');
-    
-    const finalVisibility = shouldShowNav || fallbackVisible;
-    
-    console.log('[MobileNavigation] DEBUG: Enhanced visibility check:', { 
+    console.log('[MobileNavigation] Visibility check:', { 
       shouldShowNav, 
-      fallbackVisible,
-      finalVisibility,
       isMobile: isMobile.isMobile, 
       isNativeApp: isNativeApp(),
       path: location.pathname,
       isKeyboardVisible,
       isOnboardingOrAuth,
       hasUser: !!user,
-      onboardingComplete: onboardingComplete,
-      onboardingCompleteType: typeof onboardingComplete,
-      safeArea,
-      // Additional debug details
-      userEmail: user?.email,
-      onboardingPaths: ['/app/onboarding', '/app/auth', '/onboarding', '/auth', '/'],
-      isOnAppRoute: location.pathname.startsWith('/app/'),
-      nativeEnvironment: isNativeApp(),
-      timestamp: new Date().toISOString()
+      onboardingComplete,
+      safeArea
     });
     
-    setIsVisible(finalVisibility);
+    setIsVisible(shouldShowNav);
   }, [location.pathname, isMobile.isMobile, isKeyboardVisible, isTutorialActive, user, onboardingComplete, currentLanguage, renderKey, safeArea]);
   
-  // Only hide if explicitly false, not if null (loading)
-  if (!isVisible) {
+  if (!isVisible || onboardingComplete === false) {
     return null;
   }
   

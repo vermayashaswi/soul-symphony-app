@@ -14,7 +14,6 @@ import './styles/emoji.css';
 import './styles/tutorial.css';
 import { FeatureFlagsProvider } from "./contexts/FeatureFlagsContext";
 import { SessionProvider } from "./providers/SessionProvider";
-import { AppInitializationProvider } from '@/contexts/AppInitializationContext';
 import CapacitorWrapper from './components/capacitor/CapacitorWrapper';
 import CapacitorInitializationWrapper from './components/capacitor/CapacitorInitializationWrapper';
 import { nativeAppInitService } from './services/nativeAppInitService';
@@ -257,24 +256,22 @@ const App: React.FC = () => {
   return (
     <ErrorBoundary onError={handleAppError}>
       <FeatureFlagsProvider>
-        <AppInitializationProvider>
-          <SubscriptionProvider>
-            <TutorialProvider>
-              <SessionProvider>
-                <CapacitorWrapper>
-                  <CapacitorInitializationWrapper>
-                    <TranslationLoadingOverlay />
-                    <JournalProcessingInitializer />
-                    <AppRoutes key={isInitialized ? 'initialized' : 'initializing'} />
-                    <TutorialOverlay />
-                    <Toaster />
-                    <SonnerToaster position="top-right" />
-                  </CapacitorInitializationWrapper>
-                </CapacitorWrapper>
-              </SessionProvider>
-            </TutorialProvider>
-          </SubscriptionProvider>
-        </AppInitializationProvider>
+        <SubscriptionProvider>
+          <TutorialProvider>
+            <SessionProvider>
+              <CapacitorWrapper>
+                <CapacitorInitializationWrapper>
+                  <TranslationLoadingOverlay />
+                  <JournalProcessingInitializer />
+                  <AppRoutes key={isInitialized ? 'initialized' : 'initializing'} />
+                  <TutorialOverlay />
+                  <Toaster />
+                  <SonnerToaster position="top-right" />
+                </CapacitorInitializationWrapper>
+              </CapacitorWrapper>
+            </SessionProvider>
+          </TutorialProvider>
+        </SubscriptionProvider>
       </FeatureFlagsProvider>
     </ErrorBoundary>
   );
