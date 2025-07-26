@@ -54,8 +54,44 @@ export const SubscriptionProvider: React.FC<{ children: ReactNode }> = ({ childr
       setIsLoading(true);
       setError(null);
       
-      console.log('[SubscriptionContext] Fetching subscription data for user:', user.id);
+      console.log('[SubscriptionContext] Optimized subscription fetch for user:', user.id);
       
+      // Use optimized auth handler for comprehensive status check
+      try {
+        const { data: handlerResult, error: handlerError } = await supabase.functions.invoke('optimized-auth-handler', {
+          body: {
+            operation: 'verify_profile',
+            user_id: user.id
+          }
+        });
+
+        if (!handlerError && handlerResult?.subscription_data) {
+          const subscriptionData = handlerResult.subscription_data;
+          
+          // Map subscription data from optimized handler
+          const userTier = (subscriptionData.current_tier === 'premium') ? 'premium' : 'free';
+          const userStatus = (subscriptionData.current_status as SubscriptionStatus) || 'free';
+          const userTrialEndDate = subscriptionData.trial_end_date ? new Date(subscriptionData.trial_end_date) : null;
+          
+          setTier(userTier);
+          setStatus(userStatus);
+          setTrialEndDate(userTrialEndDate);
+          setIsTrialEligible(handlerResult.trial_eligible || false);
+          
+          console.log('[SubscriptionContext] Updated from optimized handler:', {
+            tier: userTier,
+            status: userStatus,
+            trialEndDate: userTrialEndDate,
+            isTrialActive: subscriptionData.is_trial_active || false
+          });
+          
+          return; // Exit early if handler succeeded
+        }
+      } catch (handlerError) {
+        console.warn('[SubscriptionContext] Optimized handler fallback to direct functions');
+      }
+
+      // Fallback to direct database functions
       // First call the cleanup function to ensure expired trials are processed
       const { error: cleanupError } = await supabase.rpc('cleanup_expired_trials');
       if (cleanupError) {
@@ -129,7 +165,7 @@ export const SubscriptionProvider: React.FC<{ children: ReactNode }> = ({ childr
         }
       }
 
-      // Check trial eligibility
+      // Check trial eligibility using optimized function
       if (user.id) {
         const { data: eligibilityData, error: eligibilityError } = await supabase
           .rpc('is_trial_eligible', {

@@ -5,6 +5,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { AuthContextType } from '@/types/auth';
 import { ensureProfileExists as ensureProfileExistsService, updateUserProfile as updateUserProfileService } from '@/services/profileService';
+import { optimizedProfileService } from '@/services/optimizedProfileService';
 import { 
   signInWithGoogle as signInWithGoogleService,
   signInWithApple as signInWithAppleService,
@@ -124,7 +125,7 @@ function AuthProviderCore({ children }: { children: ReactNode }) {
     }
     
     const now = Date.now();
-    if (!forceRetry && now - lastProfileAttemptTime < 5000) { // Increased delay for native apps
+    if (!forceRetry && now - lastProfileAttemptTime < 3000) { // Reduced delay for better performance
       logProfile('Skipping profile check - too soon after last attempt', 'AuthContext');
       return profileExistsStatus || false;
     }
@@ -134,54 +135,82 @@ function AuthProviderCore({ children }: { children: ReactNode }) {
       setLastProfileAttemptTime(now);
       setProfileCreationAttempts(prev => prev + 1);
       
-      logProfile(`Attempt #${profileCreationAttempts + 1} to ensure profile exists for user: ${user.id}`, 'AuthContext', {
+      logProfile(`Optimized profile attempt #${profileCreationAttempts + 1} for user: ${user.id}`, 'AuthContext', {
         userEmail: user.email,
         provider: user.app_metadata?.provider,
-        hasUserMetadata: !!user.user_metadata,
-        userMetadataKeys: user.user_metadata ? Object.keys(user.user_metadata) : []
+        isNative: nativeIntegrationService.isRunningNatively()
       });
       
-      const result = await ensureProfileExistsService(user);
+      // Use optimized profile service first, fallback to original if needed
+      const optimizedResult = await optimizedProfileService.createOrVerifyProfile(user);
       
-      if (result) {
-        logProfile('Profile created or verified successfully', 'AuthContext');
+      if (optimizedResult.success) {
+        logProfile(`Optimized profile ${optimizedResult.action} successfully`, 'AuthContext');
         setProfileCreationAttempts(0);
         setProfileExistsStatus(true);
         setProfileCreationComplete(true);
         debugLogger.setLastProfileError(null);
         
-        // Session creation now handled by SessionProvider
+        // Call optimized auth handler for additional setup
+        try {
+          await supabase.functions.invoke('optimized-auth-handler', {
+            body: {
+              operation: 'optimize_auth_flow',
+              user_id: user.id,
+              session_data: {
+                user: user,
+                session_fingerprint: `${user.id}_${Date.now()}`
+              }
+            }
+          });
+        } catch (authHandlerError) {
+          console.warn('[AuthContext] Auth handler optimization failed:', authHandlerError);
+        }
         
         return true;
       } else {
-        const errorMsg = `Profile creation failed on attempt #${profileCreationAttempts + 1}`;
-        logAuthError(errorMsg, 'AuthContext');
-        debugLogger.setLastProfileError(errorMsg);
-        setProfileExistsStatus(false);
+        // Fallback to original service
+        logProfile('Fallback to original profile service', 'AuthContext');
+        const result = await ensureProfileExistsService(user);
         
-        const maxAttempts = MAX_AUTO_PROFILE_ATTEMPTS;
-        
-        if (profileCreationAttempts < maxAttempts) {
-          const nextAttemptDelay = BASE_RETRY_DELAY * Math.pow(1.5, profileCreationAttempts);
-          logProfile(`Scheduling automatic retry in ${nextAttemptDelay}ms`, 'AuthContext');
+        if (result) {
+          logProfile('Profile created or verified successfully (fallback)', 'AuthContext');
+          setProfileCreationAttempts(0);
+          setProfileExistsStatus(true);
+          setProfileCreationComplete(true);
+          debugLogger.setLastProfileError(null);
+          return true;
+        } else {
+          const errorMsg = `Profile creation failed on attempt #${profileCreationAttempts + 1}`;
+          logAuthError(errorMsg, 'AuthContext');
+          debugLogger.setLastProfileError(errorMsg);
+          setProfileExistsStatus(false);
           
-          if (autoRetryTimeoutId) {
-            clearTimeout(autoRetryTimeoutId);
+          // Reduced retry attempts for better UX
+          const maxAttempts = Math.min(MAX_AUTO_PROFILE_ATTEMPTS, 2);
+          
+          if (profileCreationAttempts < maxAttempts) {
+            const nextAttemptDelay = BASE_RETRY_DELAY * Math.pow(1.2, profileCreationAttempts); // Reduced exponential factor
+            logProfile(`Scheduling automatic retry in ${nextAttemptDelay}ms`, 'AuthContext');
+            
+            if (autoRetryTimeoutId) {
+              clearTimeout(autoRetryTimeoutId);
+            }
+            
+            const timeoutId = setTimeout(() => {
+              logProfile(`Executing automatic retry #${profileCreationAttempts + 1}`, 'AuthContext');
+              setAutoRetryTimeoutId(null);
+              ensureProfileExists(true).catch(e => {
+                logAuthError(`Auto-retry failed: ${e.message}`, 'AuthContext', e);
+              });
+            }, nextAttemptDelay);
+            
+            setAutoRetryTimeoutId(timeoutId);
           }
           
-          const timeoutId = setTimeout(() => {
-            logProfile(`Executing automatic retry #${profileCreationAttempts + 1}`, 'AuthContext');
-            setAutoRetryTimeoutId(null);
-            ensureProfileExists(true).catch(e => {
-              logAuthError(`Auto-retry failed: ${e.message}`, 'AuthContext', e);
-            });
-          }, nextAttemptDelay);
-          
-          setAutoRetryTimeoutId(timeoutId);
+          return false;
         }
       }
-      
-      return result;
     } catch (error: any) {
       const errorMsg = `Error in ensureProfileExists: ${error.message}`;
       logAuthError(errorMsg, 'AuthContext', error);
