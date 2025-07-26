@@ -258,16 +258,18 @@ const App: React.FC = () => {
       <FeatureFlagsProvider>
         <SubscriptionProvider>
           <TutorialProvider>
-            <CapacitorWrapper>
-              <CapacitorInitializationWrapper>
-                <TranslationLoadingOverlay />
-                <JournalProcessingInitializer />
-                <AppRoutes key={isInitialized ? 'initialized' : 'initializing'} />
-                <TutorialOverlay />
-                <Toaster />
-                <SonnerToaster position="top-right" />
-              </CapacitorInitializationWrapper>
-            </CapacitorWrapper>
+            <SessionProvider>
+              <CapacitorWrapper>
+                <CapacitorInitializationWrapper>
+                  <TranslationLoadingOverlay />
+                  <JournalProcessingInitializer />
+                  <AppRoutes key={isInitialized ? 'initialized' : 'initializing'} />
+                  <TutorialOverlay />
+                  <Toaster />
+                  <SonnerToaster position="top-right" />
+                </CapacitorInitializationWrapper>
+              </CapacitorWrapper>
+            </SessionProvider>
           </TutorialProvider>
         </SubscriptionProvider>
       </FeatureFlagsProvider>
