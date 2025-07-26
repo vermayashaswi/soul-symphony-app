@@ -14,11 +14,37 @@ const ProtectedRoute: React.FC = () => {
   useEffect(() => {
     const checkAuth = async () => {
       try {
-        const { data } = await supabase.auth.getSession();
-        setUser(data.session?.user || null);
+        // Add timeout for session check in native apps
+        const sessionPromise = supabase.auth.getSession();
+        const timeoutPromise = new Promise((_, reject) => 
+          setTimeout(() => reject(new Error('Session check timeout')), 10000)
+        );
+
+        const { data } = await Promise.race([sessionPromise, timeoutPromise]) as any;
+        setUser(data?.session?.user || null);
         setIsLoading(false);
       } catch (error) {
         console.error('Error checking authentication in ProtectedRoute:', error);
+        
+        // For timeout errors in native apps, try localStorage fallback
+        const twaEnv = detectTWAEnvironment();
+        if ((twaEnv.isTWA || twaEnv.isStandalone) && error instanceof Error && error.message.includes('timeout')) {
+          try {
+            const storedToken = localStorage.getItem('sb-kwnwhgucnzqxndzjayyq-auth-token');
+            if (storedToken) {
+              const sessionData = JSON.parse(storedToken);
+              if (sessionData?.user && sessionData.expires_at > Date.now() / 1000) {
+                console.log('[ProtectedRoute] Using stored session as fallback');
+                setUser(sessionData.user);
+                setIsLoading(false);
+                return;
+              }
+            }
+          } catch (localError) {
+            console.warn('[ProtectedRoute] Could not parse stored session:', localError);
+          }
+        }
+        
         setIsLoading(false);
       }
     };
@@ -26,6 +52,7 @@ const ProtectedRoute: React.FC = () => {
     checkAuth();
     
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      console.log('[ProtectedRoute] Auth state changed:', event, !!session);
       setUser(session?.user || null);
       setIsLoading(false);
     });
