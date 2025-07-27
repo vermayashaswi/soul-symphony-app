@@ -7,6 +7,7 @@ import { Suspense, lazy, useMemo } from 'react';
 import OptimizedViewportManager from './OptimizedViewportManager';
 
 // Lazy load components
+const IndexPage = lazy(() => import('@/pages/Index'));
 const HomePage = lazy(() => import('@/pages/Home'));
 const AuthPage = lazy(() => import('@/pages/Auth'));
 const JournalCapturePage = lazy(() => import('@/pages/Journal'));
@@ -177,7 +178,14 @@ export default function OptimizedAppRoutes() {
       {/* Website routes (only for web, not native) */}
       {!isNative && (
         <>
-          <Route path="/" element={<Navigate to="/app/home" replace />} />
+          <Route 
+            path="/" 
+            element={
+              <Suspense fallback={<PageLoader />}>
+                <IndexPage />
+              </Suspense>
+            } 
+          />
           <Route path="*" element={<Navigate to="/app/home" replace />} />
         </>
       )}
