@@ -1,7 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
 import { cn } from '@/lib/utils';
-import { useTheme } from '@/hooks/use-theme';
 import { Mic } from 'lucide-react';
 
 export type LogoSize = "small" | "normal" | "large" | "medium";
@@ -25,15 +24,8 @@ const SouloLogo = ({
   animate = false,
   utteringWords = false
 }: SouloLogoProps) => {
-  // Defensive hook usage to prevent runtime errors during app initialization
+  // Use safe defaults to prevent theme provider errors during initialization
   let colorTheme = 'Default';
-  
-  try {
-    const themeData = useTheme();
-    colorTheme = themeData.colorTheme;
-  } catch (error) {
-    console.warn('SouloLogo: ThemeProvider not ready, using defaults');
-  }
   const [animationState, setAnimationState] = useState<'full' | 'soul' | 'none'>('full');
   const [micScale, setMicScale] = useState<number>(1);
   
