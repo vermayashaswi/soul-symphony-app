@@ -163,6 +163,12 @@ export const signUp = async (email: string, password: string): Promise<void> => 
  */
 export const resetPassword = async (email: string): Promise<void> => {
   try {
+    // Security fix: Add email format validation
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      throw new Error('Invalid email format');
+    }
+
     const { error } = await supabase.auth.resetPasswordForEmail(email);
 
     if (error) {
