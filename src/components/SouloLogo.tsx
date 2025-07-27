@@ -25,24 +25,14 @@ const SouloLogo = ({
   animate = false,
   utteringWords = false
 }: SouloLogoProps) => {
-  // Defensive theme access to prevent runtime errors during app initialization
-  console.log('[SouloLogo] Component called with:', { useColorTheme, size, className });
-  console.log('[SouloLogo] Current route:', window.location.pathname);
-  
+  // Defensive hook usage to prevent runtime errors during app initialization
   let colorTheme = 'Default';
   
-  if (useColorTheme) {
-    console.log('[SouloLogo] Attempting to use theme...');
-    try {
-      const themeData = useTheme();
-      colorTheme = themeData.colorTheme;
-      console.log('[SouloLogo] Successfully got theme:', colorTheme);
-    } catch (error) {
-      console.error('[SouloLogo] ERROR: Failed to get theme:', error);
-      console.log('[SouloLogo] ThemeProvider not available, using defaults');
-    }
-  } else {
-    console.log('[SouloLogo] Skipping theme usage (useColorTheme=false)');
+  try {
+    const themeData = useTheme();
+    colorTheme = themeData.colorTheme;
+  } catch (error) {
+    console.warn('SouloLogo: ThemeProvider not ready, using defaults');
   }
   const [animationState, setAnimationState] = useState<'full' | 'soul' | 'none'>('full');
   const [micScale, setMicScale] = useState<number>(1);

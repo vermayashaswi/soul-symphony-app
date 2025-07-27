@@ -183,7 +183,7 @@ export const deleteChatMessage = async (messageId: string, userId: string): Prom
 // Legacy function aliases for backward compatibility
 export const getThreadMessages = getChatMessages;
 
-// Updated saveMessage function with correct signature
+// Updated saveMessage function with content sanitization
 export const saveMessage = async (
   threadId: string, 
   content: string, 
@@ -199,13 +199,21 @@ export const saveMessage = async (
     return null;
   }
 
+  // Sanitize message content to prevent XSS
+  const sanitizedContent = content
+    .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '') // Remove script tags
+    .replace(/javascript:/gi, '') // Remove javascript: URLs
+    .replace(/on\w+="[^"]*"/gi, '') // Remove event handlers
+    .replace(/on\w+='[^']*'/gi, '') // Remove event handlers (single quotes)
+    .trim();
+
   const additionalData: Partial<ChatMessage> = {};
   if (references) additionalData.reference_entries = references;
   if (hasNumericResult !== undefined) additionalData.has_numeric_result = hasNumericResult;
   if (isInteractive) additionalData.isInteractive = isInteractive;
   if (interactiveOptions) additionalData.interactiveOptions = interactiveOptions;
 
-  return createChatMessage(threadId, content, sender, userId, additionalData);
+  return createChatMessage(threadId, sanitizedContent, sender, userId, additionalData);
 };
 
 // Thread management functions

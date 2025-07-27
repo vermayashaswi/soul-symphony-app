@@ -1,21 +1,32 @@
 
 
--- This file contains database fixes that were applied via migration
--- All phone verification functionality has been removed
--- Session management has been simplified
--- Authentication flow has been streamlined for native app compatibility
+-- Update the auto_start_trial trigger to set subscription_tier to 'premium' during trial
+CREATE OR REPLACE FUNCTION public.auto_start_trial()
+RETURNS trigger
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $function$
+BEGIN
+  -- Only set trial for new users (not updates)
+  IF TG_OP = 'INSERT' THEN
+    -- Set trial period to 14 days from now (updated from 7 days)
+    NEW.trial_ends_at = NOW() + INTERVAL '14 days';
+    NEW.subscription_status = 'trial';
+    NEW.subscription_tier = 'premium'; -- Fixed: Set to premium during trial
+    NEW.is_premium = true; -- Grant premium access during trial
+  END IF;
+  
+  RETURN NEW;
+END;
+$function$;
 
--- The auto_start_trial function is now the primary profile setup trigger
--- It correctly sets subscription_tier to 'premium' during the 14-day trial period
--- Users get premium access during trial as intended
-
--- Key changes made:
--- 1. Removed all phone verification functions and tables
--- 2. Simplified user_sessions table (removed complex tracking columns)  
--- 3. Fixed RLS policies to require authentication
--- 4. Streamlined session management
--- 5. Removed complex rate limiting and API usage tracking
-
--- These changes should resolve the native app authentication issues
--- while maintaining security and functionality.
+-- Also update any existing trial users that might have incorrect tier
+UPDATE public.profiles 
+SET 
+  subscription_tier = 'premium',
+  updated_at = NOW()
+WHERE 
+  subscription_status = 'trial' 
+  AND is_premium = true 
+  AND subscription_tier = 'free';
 

@@ -35,7 +35,6 @@ import { useTranslation } from '@/contexts/TranslationContext';
 import { useTutorial } from '@/contexts/TutorialContext';
 import { DeleteAllEntriesSection } from '@/components/settings/DeleteAllEntriesSection';
 
-
 interface SettingItemProps {
   icon: React.ElementType;
   title: string;
@@ -982,7 +981,6 @@ function SettingsContent() {
               
               <DeleteAllEntriesSection />
             </motion.div>
-            
             
             <div className="py-4 text-center text-sm text-muted-foreground">
               <p className="flex items-center justify-center gap-1">

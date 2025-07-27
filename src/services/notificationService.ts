@@ -355,7 +355,7 @@ export function setupJournalReminder(enabled: boolean, frequency: NotificationFr
   }
 }
 
-// Initialize Capacitor notifications (for mobile) - Updated to avoid build-time import resolution
+// Initialize Capacitor notifications (for mobile) - Secure dynamic import
 export function initializeCapacitorNotifications() {
   console.log('initializeCapacitorNotifications called');
   
@@ -363,10 +363,8 @@ export function initializeCapacitorNotifications() {
   if (typeof window !== 'undefined' && (window as any).Capacitor) {
     console.log('Detected Capacitor environment, attempting to load local notifications');
     
-    // Use eval to prevent Vite from trying to resolve the import at build time
-    const dynamicImport = new Function('specifier', 'return import(specifier)');
-    
-    dynamicImport('@capacitor/local-notifications')
+    // Secure dynamic import without Function constructor
+    import('@capacitor/local-notifications')
       .then((module: any) => {
         const { LocalNotifications } = module;
         console.log('Successfully loaded Capacitor LocalNotifications');
