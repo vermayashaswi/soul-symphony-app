@@ -1345,6 +1345,14 @@ export type Database = {
         Args: { user_id: string }
         Returns: Json
       }
+      simple_session_manager: {
+        Args: {
+          p_user_id: string
+          p_device_type?: string
+          p_entry_page?: string
+        }
+        Returns: string
+      }
       store_user_query: {
         Args:
           | Record<PropertyKey, never>
