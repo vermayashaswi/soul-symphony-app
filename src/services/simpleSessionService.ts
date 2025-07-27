@@ -45,22 +45,14 @@ export class SimpleSessionService {
   }
 
   /**
-   * Update session activity
+   * Update session activity (simplified)
    */
   async updateActivity(userId: string): Promise<void> {
     try {
-      const { data: currentSession } = await supabase
-        .from('user_sessions')
-        .select('page_views')
-        .eq('user_id', userId)
-        .eq('is_active', true)
-        .single();
-
       await supabase
         .from('user_sessions')
         .update({ 
-          last_activity: new Date().toISOString(),
-          page_views: (currentSession?.page_views || 0) + 1
+          last_activity: new Date().toISOString()
         })
         .eq('user_id', userId)
         .eq('is_active', true);
