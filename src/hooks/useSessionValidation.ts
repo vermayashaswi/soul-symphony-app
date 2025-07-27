@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 import { nativeIntegrationService } from '@/services/nativeIntegrationService';
+import { authTokenStorage } from '@/utils/authTokenStorage';
 
 interface SessionValidationState {
   session: Session | null;
@@ -22,7 +23,8 @@ export const useSessionValidation = () => {
 
   const validateStoredSession = (): Session | null => {
     try {
-      const storedSession = localStorage.getItem('sb-kwnwhgucnzqxndzjayyq-auth-token');
+      // Use secure token storage instead of direct localStorage access
+      const storedSession = authTokenStorage.getAuthToken();
       if (!storedSession) return null;
 
       const sessionData = JSON.parse(storedSession);

@@ -3,6 +3,7 @@ import { Navigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { Session } from '@supabase/supabase-js';
 import { nativeIntegrationService } from '@/services/nativeIntegrationService';
+import { authTokenStorage } from '@/utils/authTokenStorage';
 
 interface SessionRouterProps {
   children: React.ReactNode;
@@ -39,7 +40,7 @@ export const SessionRouter: React.FC<SessionRouterProps> = ({
         // For native apps, try to get session synchronously first from localStorage
         if (isNative) {
           try {
-            const storedSession = localStorage.getItem('sb-kwnwhgucnzqxndzjayyq-auth-token');
+            const storedSession = authTokenStorage.getAuthToken();
             if (storedSession) {
               const sessionData = JSON.parse(storedSession);
               console.log('[SessionRouter] Found stored session data in native app');
