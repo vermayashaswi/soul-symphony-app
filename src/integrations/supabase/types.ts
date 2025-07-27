@@ -14,54 +14,6 @@ export type Database = {
   }
   public: {
     Tables: {
-      api_usage: {
-        Row: {
-          cost_usd: number | null
-          created_at: string
-          endpoint: string | null
-          error_message: string | null
-          function_name: string
-          id: string
-          ip_address: unknown | null
-          request_method: string | null
-          response_time_ms: number | null
-          status_code: number | null
-          tokens_used: number | null
-          updated_at: string
-          user_id: string | null
-        }
-        Insert: {
-          cost_usd?: number | null
-          created_at?: string
-          endpoint?: string | null
-          error_message?: string | null
-          function_name: string
-          id?: string
-          ip_address?: unknown | null
-          request_method?: string | null
-          response_time_ms?: number | null
-          status_code?: number | null
-          tokens_used?: number | null
-          updated_at?: string
-          user_id?: string | null
-        }
-        Update: {
-          cost_usd?: number | null
-          created_at?: string
-          endpoint?: string | null
-          error_message?: string | null
-          function_name?: string
-          id?: string
-          ip_address?: unknown | null
-          request_method?: string | null
-          response_time_ms?: number | null
-          status_code?: number | null
-          tokens_used?: number | null
-          updated_at?: string
-          user_id?: string | null
-        }
-        Relationships: []
-      }
       chat_messages: {
         Row: {
           analysis_data: Json | null
@@ -307,45 +259,6 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
-      }
-      openai_usage: {
-        Row: {
-          completion_tokens: number | null
-          cost_usd: number | null
-          created_at: string
-          function_name: string | null
-          id: string
-          model: string
-          prompt_tokens: number | null
-          request_id: string | null
-          total_tokens: number | null
-          user_id: string | null
-        }
-        Insert: {
-          completion_tokens?: number | null
-          cost_usd?: number | null
-          created_at?: string
-          function_name?: string | null
-          id?: string
-          model: string
-          prompt_tokens?: number | null
-          request_id?: string | null
-          total_tokens?: number | null
-          user_id?: string | null
-        }
-        Update: {
-          completion_tokens?: number | null
-          cost_usd?: number | null
-          created_at?: string
-          function_name?: string | null
-          id?: string
-          model?: string
-          prompt_tokens?: number | null
-          request_id?: string | null
-          total_tokens?: number | null
-          user_id?: string | null
-        }
-        Relationships: []
       }
       profiles: {
         Row: {
@@ -701,88 +614,52 @@ export type Database = {
       }
       user_sessions: {
         Row: {
-          country_code: string | null
           created_at: string
-          currency: string | null
           device_type: string | null
           entry_page: string | null
-          fbclid: string | null
-          gclid: string | null
           id: string
           ip_address: string | null
           is_active: boolean | null
-          language: string | null
           last_active_page: string | null
           last_activity: string | null
-          location: string | null
           page_views: number | null
           platform: string | null
-          referrer: string | null
           session_end: string | null
           session_start: string
           user_agent: string | null
           user_id: string
-          utm_campaign: string | null
-          utm_content: string | null
-          utm_medium: string | null
-          utm_source: string | null
-          utm_term: string | null
         }
         Insert: {
-          country_code?: string | null
           created_at?: string
-          currency?: string | null
           device_type?: string | null
           entry_page?: string | null
-          fbclid?: string | null
-          gclid?: string | null
           id?: string
           ip_address?: string | null
           is_active?: boolean | null
-          language?: string | null
           last_active_page?: string | null
           last_activity?: string | null
-          location?: string | null
           page_views?: number | null
           platform?: string | null
-          referrer?: string | null
           session_end?: string | null
           session_start?: string
           user_agent?: string | null
           user_id: string
-          utm_campaign?: string | null
-          utm_content?: string | null
-          utm_medium?: string | null
-          utm_source?: string | null
-          utm_term?: string | null
         }
         Update: {
-          country_code?: string | null
           created_at?: string
-          currency?: string | null
           device_type?: string | null
           entry_page?: string | null
-          fbclid?: string | null
-          gclid?: string | null
           id?: string
           ip_address?: string | null
           is_active?: boolean | null
-          language?: string | null
           last_active_page?: string | null
           last_activity?: string | null
-          location?: string | null
           page_views?: number | null
           platform?: string | null
-          referrer?: string | null
           session_end?: string | null
           session_start?: string
           user_agent?: string | null
           user_id?: string
-          utm_campaign?: string | null
-          utm_content?: string | null
-          utm_medium?: string | null
-          utm_source?: string | null
-          utm_term?: string | null
         }
         Relationships: []
       }
@@ -791,17 +668,6 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      calculate_session_quality_score: {
-        Args: {
-          p_session_duration: unknown
-          p_page_views: number
-          p_crash_count: number
-          p_error_count: number
-          p_background_time: unknown
-          p_foreground_time: unknown
-        }
-        Returns: number
-      }
       check_database_health: {
         Args: Record<PropertyKey, never>
         Returns: Json
@@ -809,14 +675,6 @@ export type Database = {
       check_journal_entry_ownership: {
         Args: { entry_id_param: number }
         Returns: boolean
-      }
-      check_rate_limit: {
-        Args: {
-          p_user_id: string
-          p_ip_address: unknown
-          p_function_name: string
-        }
-        Returns: Json
       }
       check_table_columns: {
         Args: { table_name: string }
@@ -887,28 +745,6 @@ export type Database = {
             }
         Returns: string
       }
-      enhanced_session_manager: {
-        Args: {
-          p_user_id: string
-          p_action: string
-          p_device_type?: string
-          p_user_agent?: string
-          p_entry_page?: string
-          p_last_active_page?: string
-          p_session_fingerprint?: string
-          p_app_version?: string
-          p_network_state?: string
-          p_battery_level?: number
-          p_memory_usage?: number
-          p_platform?: string
-          p_additional_data?: Json
-        }
-        Returns: string
-      }
-      execute_dynamic_query: {
-        Args: { query_text: string; param_values?: string[] }
-        Returns: Json
-      }
       get_active_themes: {
         Args: Record<PropertyKey, never>
         Returns: {
@@ -917,10 +753,6 @@ export type Database = {
           description: string
           display_order: number
         }[]
-      }
-      get_attribution_analytics: {
-        Args: { p_start_date?: string; p_end_date?: string }
-        Returns: Json
       }
       get_entity_emotion_statistics: {
         Args: {
@@ -1082,27 +914,6 @@ export type Database = {
       is_trial_eligible: {
         Args: { user_id_param: string }
         Returns: boolean
-      }
-      log_api_usage: {
-        Args: {
-          p_user_id?: string
-          p_ip_address?: unknown
-          p_function_name?: string
-          p_endpoint?: string
-          p_request_method?: string
-          p_status_code?: number
-          p_response_time_ms?: number
-          p_tokens_used?: number
-          p_cost_usd?: number
-          p_rate_limit_hit?: boolean
-          p_rate_limit_type?: string
-          p_user_agent?: string
-          p_referer?: string
-          p_request_payload_size?: number
-          p_response_payload_size?: number
-          p_error_message?: string
-        }
-        Returns: string
       }
       manage_user_session: {
         Args: {
@@ -1337,10 +1148,6 @@ export type Database = {
         Args: { target_entry_id: number }
         Returns: Json
       }
-      security_audit: {
-        Args: Record<PropertyKey, never>
-        Returns: Json
-      }
       setup_user_trial_fallback: {
         Args: { user_id: string }
         Returns: Json
@@ -1369,14 +1176,6 @@ export type Database = {
         Args: { table_name: string }
         Returns: boolean
       }
-      track_conversion_event: {
-        Args: {
-          p_session_id: string
-          p_event_type: string
-          p_event_data?: Json
-        }
-        Returns: boolean
-      }
       update_session_activity: {
         Args: { p_session_id: string; p_page?: string; p_language?: string }
         Returns: undefined
@@ -1386,10 +1185,6 @@ export type Database = {
           | { entry_id: number; embedding_vector: string }
           | { entry_id: number; embedding_vector: string }
         Returns: undefined
-      }
-      validate_phone_number: {
-        Args: { phone_number: string }
-        Returns: boolean
       }
     }
     Enums: {
