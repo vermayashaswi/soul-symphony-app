@@ -40,8 +40,7 @@ const ViewportManager: React.FC = () => {
     onboardingComplete,
     hideNavigation: 
       isOnboardingOrAuth || 
-      !user || 
-      (location.pathname === '/app' && !onboardingComplete)
+      !user
   });
   
   // Ensure proper scrolling behavior on route changes
@@ -87,13 +86,11 @@ const ViewportManager: React.FC = () => {
       {/* Only display mobile navigation when:
           1. We're on an app route
           2. User is logged in
-          3. We're not on onboarding/auth screens
-          4. If we're on /app, we also check if onboarding is complete */}
+          3. We're not on onboarding/auth screens */}
       {isAppRoute(location.pathname) && 
        user && 
-       !isOnboardingOrAuth && 
-       onboardingComplete && (
-        <MobileNavigation onboardingComplete={onboardingComplete} />
+       !isOnboardingOrAuth && (
+        <MobileNavigation />
       )}
     </StatusBarManager>
   );
