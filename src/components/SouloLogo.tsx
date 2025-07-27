@@ -25,14 +25,16 @@ const SouloLogo = ({
   animate = false,
   utteringWords = false
 }: SouloLogoProps) => {
-  // Defensive hook usage to prevent runtime errors during app initialization
+  // Defensive theme access to prevent runtime errors during app initialization
   let colorTheme = 'Default';
   
-  try {
-    const themeData = useTheme();
-    colorTheme = themeData.colorTheme;
-  } catch (error) {
-    console.warn('SouloLogo: ThemeProvider not ready, using defaults');
+  if (useColorTheme) {
+    try {
+      const themeData = useTheme();
+      colorTheme = themeData.colorTheme;
+    } catch (error) {
+      console.warn('SouloLogo: ThemeProvider not available, using defaults');
+    }
   }
   const [animationState, setAnimationState] = useState<'full' | 'soul' | 'none'>('full');
   const [micScale, setMicScale] = useState<number>(1);
