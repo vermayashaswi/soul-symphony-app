@@ -1,18 +1,12 @@
 
-import { useTheme } from '@/hooks/use-theme';
-
 export function useUserColorThemeHex() {
-  // Defensive theme access
+  // Return safe defaults without using theme context
+  // This prevents the hook from throwing when ThemeProvider isn't available
   let colorTheme = 'Default';
   let customColor = '#3b82f6';
   
-  try {
-    const themeData = useTheme();
-    colorTheme = themeData.colorTheme;
-    customColor = themeData.customColor;
-  } catch (error) {
-    console.warn('Theme provider not available, using default colors');
-  }
+  // For now, just use defaults to prevent the error
+  // TODO: Implement proper theme integration once provider is stable
   switch (colorTheme) {
     case 'Default':
       return '#3b82f6';
