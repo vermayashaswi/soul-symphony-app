@@ -1,5 +1,5 @@
 
-import React, { useEffect } from 'react';
+import React, { useEffect, useMemo } from 'react';
 import { Navigate, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { nativeIntegrationService } from '@/services/nativeIntegrationService';
@@ -9,49 +9,66 @@ export const isNativeApp = (): boolean => {
   return /native/i.test(window.navigator.userAgent);
 };
 
+// Memoized route checking to prevent unnecessary re-computations
+const isNativeCache = new Map<string, boolean>();
+const isAppRouteCache = new Map<string, boolean>();
+
 // CRITICAL FIX: Update the path-based check to treat ALL routes as app routes for native apps
 export const isAppRoute = (pathname: string): boolean => {
+  // Check cache first
+  if (isAppRouteCache.has(pathname)) {
+    return isAppRouteCache.get(pathname)!;
+  }
+  
+  let result: boolean;
+  
   // For native apps, ALL routes are considered app routes
   if (nativeIntegrationService.isRunningNatively()) {
-    console.log(`isAppRoute check for ${pathname}: true (native app - all routes are app routes)`);
-    return true;
+    result = true;
+  } else {
+    // For web apps, app routes must start with /app/ or be exactly /app
+    result = pathname.startsWith('/app/') || pathname === '/app';
   }
   
-  // For web apps, app routes must start with /app/ or be exactly /app
-  const isApp = pathname.startsWith('/app/') || pathname === '/app';
-  console.log(`isAppRoute check for ${pathname}: ${isApp} (web app)`);
-  return isApp;
+  // Cache the result
+  isAppRouteCache.set(pathname, result);
+  return result;
 };
 
+const websiteRouteCache = new Map<string, boolean>();
+
 export const isWebsiteRoute = (pathname: string): boolean => {
+  // Check cache first
+  if (websiteRouteCache.has(pathname)) {
+    return websiteRouteCache.get(pathname)!;
+  }
+  
+  let result: boolean;
+  
   // For native apps, NO routes are website routes - everything is treated as app routes
   if (nativeIntegrationService.isRunningNatively()) {
-    console.log(`${pathname} is not a website route (native app - all routes are app routes)`);
-    return false;
+    result = false;
+  } else {
+    // If it has an app prefix, it's not a website route
+    if (isAppRoute(pathname)) {
+      result = false;
+    } else if (pathname === '/') {
+      // For root URL (/), consider it as a website route in web mode
+      result = true;
+    } else {
+      // Explicitly define website routes for web mode
+      const websitePrefixes = ['/', '/about', '/pricing', '/terms', '/privacy', '/blog', '/contact', '/faq', '/download'];
+      
+      // Check for specific website routes
+      result = websitePrefixes.some(prefix => 
+        pathname === prefix || pathname.startsWith(`${prefix}/`)
+      );
+    }
   }
   
-  // If it has an app prefix, it's not a website route
-  if (isAppRoute(pathname)) {
-    console.log(`${pathname} is an app route, so not a website route`);
-    return false;
-  }
-  
-  // For root URL (/), consider it as a website route in web mode
-  if (pathname === '/') {
-    console.log(`${pathname} is root, treating as website route (web mode)`);
-    return true;
-  }
-  
-  // Explicitly define website routes for web mode
-  const websitePrefixes = ['/', '/about', '/pricing', '/terms', '/privacy', '/blog', '/contact', '/faq', '/download'];
-  
-  // Check for specific website routes
-  const isWebsite = websitePrefixes.some(prefix => 
-    pathname === prefix || pathname.startsWith(`${prefix}/`)
-  );
-  
-  console.log(`isWebsiteRoute check for ${pathname}: ${isWebsite} (web mode)`);
-  return isWebsite;
+  // Cache the result
+  websiteRouteCache.set(pathname, result);
+  return result;
 };
 
 export const getBaseUrl = (): string => {
@@ -86,17 +103,9 @@ export const AppRouteWrapper = ({
   const navigate = useNavigate();
   const location = useLocation();
   
-  console.log('AppRouteWrapper rendering:', location.pathname, { 
-    requiresAuth, 
-    userExists: !!user,
-    isAppRoute: isAppRoute(location.pathname)
-  });
   
   useEffect(() => {
     if (requiresAuth && !user) {
-      console.log('Protected route accessed without auth, redirecting to auth');
-      
-      // Redirect to /app/auth
       navigate('/app/auth', { 
         state: { from: location },
         replace: true
@@ -128,7 +137,6 @@ export const RedirectRoute = ({ to }: { to: string }) => {
   if (to.startsWith('http')) {
     // For external redirects, use a useEffect to navigate
     useEffect(() => {
-      console.log('RedirectRoute: Redirecting to external URL:', to);
       window.location.replace(to);
     }, [to]);
     
@@ -140,6 +148,5 @@ export const RedirectRoute = ({ to }: { to: string }) => {
   }
   
   // For internal redirects, use Navigate
-  console.log('RedirectRoute: Redirecting to internal path:', to);
   return <Navigate to={to} replace />;
 };
