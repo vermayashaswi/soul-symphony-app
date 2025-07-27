@@ -26,16 +26,8 @@ export default defineConfig(({ mode }) => ({
   },
   optimizeDeps: {
     exclude: ['lovable-tagger'],
-    include: ['react', 'react-dom'],
-    force: true // Force re-optimization after React version update
+    include: ['react', 'react-dom']
   },
-  // Force complete cache busting
-  define: {
-    __THEME_DEBUG__: JSON.stringify(`REBUILD_${Date.now()}`),
-    __APP_MANIFEST_PATH__: JSON.stringify('/app/manifest.json')
-  },
-  // Clear all caches
-  cacheDir: '.vite/cache-cleared',
   // Ensure that Vite correctly resolves Node.js built-in modules
   build: {
     commonjsOptions: {
@@ -54,5 +46,9 @@ export default defineConfig(({ mode }) => ({
     }
   },
   // Configure public directory handling for manifest
-  publicDir: 'public'
+  publicDir: 'public',
+  // Add custom handling for manifest.json in app path
+  define: {
+    __APP_MANIFEST_PATH__: JSON.stringify('/app/manifest.json')
+  }
 }));

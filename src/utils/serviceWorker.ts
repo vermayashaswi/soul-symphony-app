@@ -1,5 +1,5 @@
 /**
- * Service Worker Registration and Management - Enhanced for Native App Updates
+ * Service Worker Registration and Management - Enhanced for TWA Updates
  */
 
 export interface SwRegistrationResult {
@@ -196,6 +196,10 @@ class ServiceWorkerManager {
     
     if (event.data.type === 'JOURNAL_SYNC_STATUS') {
       this.handleJournalSyncStatus(event.data.payload);
+    } else if (event.data.type === 'JOURNAL_REMINDER_SCHEDULED') {
+      this.handleJournalReminderScheduled(event.data.payload);
+    } else if (event.data.type === 'JOURNAL_REMINDER_ERROR') {
+      this.handleJournalReminderError(event.data.payload);
     }
   }
 
@@ -210,6 +214,69 @@ class ServiceWorkerManager {
       window.dispatchEvent(new CustomEvent('journalSyncSuccess', {
         detail: { entry }
       }));
+    }
+  }
+
+  /**
+   * Handle journal reminder scheduled confirmation
+   */
+  private handleJournalReminderScheduled(payload: any) {
+    console.log('[SW] Journal reminder scheduled:', payload);
+    window.dispatchEvent(new CustomEvent('journalReminderScheduled', {
+      detail: payload
+    }));
+  }
+
+  /**
+   * Handle journal reminder errors
+   */
+  private handleJournalReminderError(payload: any) {
+    console.error('[SW] Journal reminder error:', payload);
+    window.dispatchEvent(new CustomEvent('journalReminderError', {
+      detail: payload
+    }));
+  }
+
+  /**
+   * Schedule journal reminder through service worker
+   */
+  async scheduleJournalReminder(time: string, delay: number): Promise<boolean> {
+    if (!this.registration || !this.registration.active) {
+      console.warn('[SW] No active service worker for reminder scheduling');
+      return false;
+    }
+
+    try {
+      this.registration.active.postMessage({
+        type: 'SCHEDULE_JOURNAL_REMINDER',
+        payload: { time, delay, timestamp: Date.now() }
+      });
+      
+      console.log('[SW] Journal reminder schedule request sent:', { time, delay });
+      return true;
+    } catch (error) {
+      console.error('[SW] Failed to schedule journal reminder:', error);
+      return false;
+    }
+  }
+
+  /**
+   * Clear all journal reminders in service worker
+   */
+  async clearJournalReminders(): Promise<void> {
+    if (!this.registration || !this.registration.active) {
+      console.warn('[SW] No active service worker for clearing reminders');
+      return;
+    }
+
+    try {
+      this.registration.active.postMessage({
+        type: 'CLEAR_JOURNAL_REMINDERS'
+      });
+      
+      console.log('[SW] Journal reminder clear request sent');
+    } catch (error) {
+      console.error('[SW] Failed to clear journal reminders:', error);
     }
   }
 
@@ -244,12 +311,12 @@ export const serviceWorkerManager = new ServiceWorkerManager();
  * Initialize service worker with enhanced update handling
  */
 export async function initializeServiceWorker(): Promise<SwRegistrationResult> {
-  // Always register in native/standalone environment for update handling
-  const isStandalone = window.matchMedia('(display-mode: standalone)').matches ||
-                      (window.navigator as any).standalone === true;
+  // Always register in TWA environment for update handling
+  const twaEnv = window.matchMedia('(display-mode: standalone)').matches ||
+                (window.navigator as any).standalone === true;
   
-  if (process.env.NODE_ENV === 'development' && !localStorage.getItem('enableSW') && !isStandalone) {
-    console.log('[SW] Service worker disabled in development (not standalone)');
+  if (process.env.NODE_ENV === 'development' && !localStorage.getItem('enableSW') && !twaEnv) {
+    console.log('[SW] Service worker disabled in development (not TWA)');
     return { success: false, error: new Error('Disabled in development') };
   }
 

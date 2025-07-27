@@ -5,7 +5,6 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { AuthContextType } from '@/types/auth';
 import { ensureProfileExists as ensureProfileExistsService, updateUserProfile as updateUserProfileService } from '@/services/profileService';
-import { optimizedProfileService } from '@/services/optimizedProfileService';
 import { 
   signInWithGoogle as signInWithGoogleService,
   signInWithApple as signInWithAppleService,
@@ -19,14 +18,14 @@ import { debugLogger, logInfo, logError, logAuthError, logProfile, logAuth } fro
 import { isAppRoute } from '@/routes/RouteHelpers';
 import { useLocation } from 'react-router-dom';
 import { LocationProvider } from '@/contexts/LocationContext';
-
+import { detectTWAEnvironment } from '@/utils/twaDetection';
 import { nativeAuthService } from '@/services/nativeAuthService';
 import { nativeIntegrationService } from '@/services/nativeIntegrationService';
 import { nativeNavigationService } from '@/services/nativeNavigationService';
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-const MAX_AUTO_PROFILE_ATTEMPTS = 2; // Reduced for native app stability
+const MAX_AUTO_PROFILE_ATTEMPTS = 2; // Reduced for TWA stability
 const BASE_RETRY_DELAY = 2000; // Increased delay
 
 function AuthProviderCore({ children }: { children: ReactNode }) {
@@ -44,6 +43,7 @@ function AuthProviderCore({ children }: { children: ReactNode }) {
   const [authInitialized, setAuthInitialized] = useState(false);
   const [authStateStable, setAuthStateStable] = useState(false);
   const location = useLocation();
+  const twaEnv = detectTWAEnvironment();
 
   // Initialize native services
   useEffect(() => {
@@ -125,7 +125,7 @@ function AuthProviderCore({ children }: { children: ReactNode }) {
     }
     
     const now = Date.now();
-    if (!forceRetry && now - lastProfileAttemptTime < 3000) { // Reduced delay for better performance
+    if (!forceRetry && now - lastProfileAttemptTime < 5000) { // Increased delay for TWA
       logProfile('Skipping profile check - too soon after last attempt', 'AuthContext');
       return profileExistsStatus || false;
     }
@@ -135,82 +135,54 @@ function AuthProviderCore({ children }: { children: ReactNode }) {
       setLastProfileAttemptTime(now);
       setProfileCreationAttempts(prev => prev + 1);
       
-      logProfile(`Optimized profile attempt #${profileCreationAttempts + 1} for user: ${user.id}`, 'AuthContext', {
+      logProfile(`Attempt #${profileCreationAttempts + 1} to ensure profile exists for user: ${user.id}`, 'AuthContext', {
         userEmail: user.email,
         provider: user.app_metadata?.provider,
-        isNative: nativeIntegrationService.isRunningNatively()
+        hasUserMetadata: !!user.user_metadata,
+        userMetadataKeys: user.user_metadata ? Object.keys(user.user_metadata) : []
       });
       
-      // Use optimized profile service first, fallback to original if needed
-      const optimizedResult = await optimizedProfileService.createOrVerifyProfile(user);
+      const result = await ensureProfileExistsService(user);
       
-      if (optimizedResult.success) {
-        logProfile(`Optimized profile ${optimizedResult.action} successfully`, 'AuthContext');
+      if (result) {
+        logProfile('Profile created or verified successfully', 'AuthContext');
         setProfileCreationAttempts(0);
         setProfileExistsStatus(true);
         setProfileCreationComplete(true);
         debugLogger.setLastProfileError(null);
         
-        // Call optimized auth handler for additional setup
-        try {
-          await supabase.functions.invoke('optimized-auth-handler', {
-            body: {
-              operation: 'optimize_auth_flow',
-              user_id: user.id,
-              session_data: {
-                user: user,
-                session_fingerprint: `${user.id}_${Date.now()}`
-              }
-            }
-          });
-        } catch (authHandlerError) {
-          console.warn('[AuthContext] Auth handler optimization failed:', authHandlerError);
-        }
+        // Session creation now handled by SessionProvider
         
         return true;
       } else {
-        // Fallback to original service
-        logProfile('Fallback to original profile service', 'AuthContext');
-        const result = await ensureProfileExistsService(user);
+        const errorMsg = `Profile creation failed on attempt #${profileCreationAttempts + 1}`;
+        logAuthError(errorMsg, 'AuthContext');
+        debugLogger.setLastProfileError(errorMsg);
+        setProfileExistsStatus(false);
         
-        if (result) {
-          logProfile('Profile created or verified successfully (fallback)', 'AuthContext');
-          setProfileCreationAttempts(0);
-          setProfileExistsStatus(true);
-          setProfileCreationComplete(true);
-          debugLogger.setLastProfileError(null);
-          return true;
-        } else {
-          const errorMsg = `Profile creation failed on attempt #${profileCreationAttempts + 1}`;
-          logAuthError(errorMsg, 'AuthContext');
-          debugLogger.setLastProfileError(errorMsg);
-          setProfileExistsStatus(false);
+        const maxAttempts = MAX_AUTO_PROFILE_ATTEMPTS;
+        
+        if (profileCreationAttempts < maxAttempts) {
+          const nextAttemptDelay = BASE_RETRY_DELAY * Math.pow(1.5, profileCreationAttempts);
+          logProfile(`Scheduling automatic retry in ${nextAttemptDelay}ms`, 'AuthContext');
           
-          // Reduced retry attempts for better UX
-          const maxAttempts = Math.min(MAX_AUTO_PROFILE_ATTEMPTS, 2);
-          
-          if (profileCreationAttempts < maxAttempts) {
-            const nextAttemptDelay = BASE_RETRY_DELAY * Math.pow(1.2, profileCreationAttempts); // Reduced exponential factor
-            logProfile(`Scheduling automatic retry in ${nextAttemptDelay}ms`, 'AuthContext');
-            
-            if (autoRetryTimeoutId) {
-              clearTimeout(autoRetryTimeoutId);
-            }
-            
-            const timeoutId = setTimeout(() => {
-              logProfile(`Executing automatic retry #${profileCreationAttempts + 1}`, 'AuthContext');
-              setAutoRetryTimeoutId(null);
-              ensureProfileExists(true).catch(e => {
-                logAuthError(`Auto-retry failed: ${e.message}`, 'AuthContext', e);
-              });
-            }, nextAttemptDelay);
-            
-            setAutoRetryTimeoutId(timeoutId);
+          if (autoRetryTimeoutId) {
+            clearTimeout(autoRetryTimeoutId);
           }
           
-          return false;
+          const timeoutId = setTimeout(() => {
+            logProfile(`Executing automatic retry #${profileCreationAttempts + 1}`, 'AuthContext');
+            setAutoRetryTimeoutId(null);
+            ensureProfileExists(true).catch(e => {
+              logAuthError(`Auto-retry failed: ${e.message}`, 'AuthContext', e);
+            });
+          }, nextAttemptDelay);
+          
+          setAutoRetryTimeoutId(timeoutId);
         }
       }
+      
+      return result;
     } catch (error: any) {
       const errorMsg = `Error in ensureProfileExists: ${error.message}`;
       logAuthError(errorMsg, 'AuthContext', error);
@@ -398,9 +370,9 @@ function AuthProviderCore({ children }: { children: ReactNode }) {
         userMetadataKeys: currentUser.user_metadata ? Object.keys(currentUser.user_metadata) : []
       });
       
-      // Increased delay for native app stability
-      if (isMobileDevice || nativeIntegrationService.isRunningNatively()) {
-        logProfile('Mobile/Native device detected, adding stabilization delay', 'AuthContext');
+      // Increased delay for TWA stability
+      if (isMobileDevice || twaEnv.isTWA || twaEnv.isStandalone) {
+        logProfile('Mobile/TWA device detected, adding stabilization delay', 'AuthContext');
         await new Promise(resolve => setTimeout(resolve, 2000));
       }
       
@@ -535,9 +507,12 @@ function AuthProviderCore({ children }: { children: ReactNode }) {
             
           } else {
             // Web: Use existing logic with longer delays for stability
-            const initialDelay = isMobileDevice ? 3000 : 2000;
+            const initialDelay = (isMobileDevice || twaEnv.isTWA || twaEnv.isStandalone) ? 3000 : 2000;
             
-            logProfile(`WEB: Scheduling profile creation in ${initialDelay}ms for platform stability`, 'AuthContext');
+            logProfile(`WEB: Scheduling profile creation in ${initialDelay}ms for platform stability`, 'AuthContext', {
+              isTWA: twaEnv.isTWA,
+              isStandalone: twaEnv.isStandalone
+            });
             
             setTimeout(() => {
               createOrVerifyProfile(currentSession.user)
@@ -553,7 +528,7 @@ function AuthProviderCore({ children }: { children: ReactNode }) {
         // Improved loading state management - immediate for native, faster for web
         const loadingDelay = nativeIntegrationService.isRunningNatively() 
           ? 50  // Almost immediate for native to enable navigation
-          : 800;
+          : (twaEnv.isTWA || twaEnv.isStandalone) ? 1500 : 800;
         
         setTimeout(() => {
           setIsLoading(false);
@@ -627,9 +602,11 @@ function AuthProviderCore({ children }: { children: ReactNode }) {
           
         } else {
           // Web: Use existing logic with stability delays
-          const initialDelay = isMobileDevice ? 3000 : 2000;
+          const initialDelay = (isMobileDevice || twaEnv.isTWA || twaEnv.isStandalone) ? 3000 : 2000;
           
-          logProfile(`WEB: Scheduling initial profile creation in ${initialDelay}ms for platform stability`, 'AuthContext');
+          logProfile(`WEB: Scheduling initial profile creation in ${initialDelay}ms for platform stability`, 'AuthContext', {
+            isTWA: twaEnv.isTWA
+          });
           
           setTimeout(() => {
             createOrVerifyProfile(currentSession.user)
@@ -643,7 +620,7 @@ function AuthProviderCore({ children }: { children: ReactNode }) {
       // Better timing for initialization completion - immediate for native
       const initDelay = nativeIntegrationService.isRunningNatively() 
         ? 100  // Much faster for native
-        : 1000;
+        : (twaEnv.isTWA || twaEnv.isStandalone) ? 2000 : 1000;
       
       setTimeout(() => {
         setIsLoading(false);
@@ -658,7 +635,7 @@ function AuthProviderCore({ children }: { children: ReactNode }) {
         clearTimeout(autoRetryTimeoutId);
       }
     };
-  }, [authInitialized, isMobileDevice, location.pathname]);
+  }, [authInitialized, isMobileDevice, location.pathname, twaEnv.isTWA, twaEnv.isStandalone]);
 
   const value = {
     session,

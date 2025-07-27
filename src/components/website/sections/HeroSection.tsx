@@ -2,7 +2,7 @@
 import React, { Suspense, lazy } from 'react';
 import { Apple, Play, Shield, Check } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import SouloLogoSafe from '@/components/SouloLogoSafe';
+import SouloLogo from '@/components/SouloLogo';
 import { motion } from 'framer-motion';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { PhoneVoiceAnimation } from '@/components/website/PhoneVoiceAnimation';

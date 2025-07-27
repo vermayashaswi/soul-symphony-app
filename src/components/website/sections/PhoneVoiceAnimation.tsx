@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Brain, Mic, MessageSquare, LineChart, ArrowRight, TrendingUp } from 'lucide-react';
 import { TranslatableText } from '@/components/translation/TranslatableText';
-import SouloLogoSafe from '@/components/SouloLogoSafe';
+import SouloLogo from '@/components/SouloLogo';
 import EmotionBubblesDemo from '@/components/website/EmotionBubblesDemo';
 import SentimentChartDemo from '@/components/website/SentimentChartDemo';
 
@@ -38,7 +38,7 @@ const PhoneVoiceAnimation = () => {
         <div className="absolute top-0 left-1/2 transform -translate-x-1/2 w-32 h-6 bg-black rounded-b-xl z-10"></div>
         <div className="absolute inset-0 bg-gradient-to-br from-gray-900 to-gray-800 flex flex-col">
           <div className="h-14 bg-gradient-to-r from-primary/80 to-purple-600/80 flex items-center justify-center">
-            <SouloLogoSafe size="small" useColorTheme={true} disableTheme={true} />
+            <SouloLogo size="small" useColorTheme={true} />
           </div>
           <div className="flex-1 p-4 flex flex-col">
             {animationStage === 0 && (

@@ -14,8 +14,11 @@ import './styles/emoji.css';
 import './styles/tutorial.css';
 import { FeatureFlagsProvider } from "./contexts/FeatureFlagsContext";
 import { SessionProvider } from "./providers/SessionProvider";
-import CapacitorWrapper from './components/capacitor/CapacitorWrapper';
-import CapacitorInitializationWrapper from './components/capacitor/CapacitorInitializationWrapper';
+import TWAWrapper from './components/twa/TWAWrapper';
+import TWAInitializationWrapper from './components/twa/TWAInitializationWrapper';
+import { detectTWAEnvironment } from './utils/twaDetection';
+import { useTWAAutoRefresh } from './hooks/useTWAAutoRefresh';
+import { twaUpdateService } from './services/twaUpdateService';
 import { nativeAppInitService } from './services/nativeAppInitService';
 import { mobileErrorHandler } from './services/mobileErrorHandler';
 import { mobileOptimizationService } from './services/mobileOptimizationService';
@@ -27,6 +30,8 @@ const App: React.FC = () => {
   const [isInitialized, setIsInitialized] = useState(false);
   const [emergencyRecovery, setEmergencyRecovery] = useState(false);
   const [initializationError, setInitializationError] = useState<string | null>(null);
+  const twaEnv = detectTWAEnvironment();
+  const { refreshCount, isStuckDetected } = useTWAAutoRefresh();
   const appInitialization = useAppInitialization();
 
   useEffect(() => {
@@ -90,7 +95,19 @@ const App: React.FC = () => {
           });
         }
         
-        // Native app services are already initialized above
+        // Initialize TWA update service
+        if (twaEnv.isTWA || twaEnv.isStandalone) {
+          console.log('[App] Initializing TWA update service');
+          try {
+            twaUpdateService.init();
+          } catch (error) {
+            console.warn('[App] TWA update service failed:', error);
+            mobileErrorHandler.handleError({
+              type: 'unknown',
+              message: `TWA update service failed: ${error}`
+            });
+          }
+        }
         
         // Preload critical images including the chat avatar
         try {
@@ -104,7 +121,7 @@ const App: React.FC = () => {
         // Mark app as initialized after a brief delay to ensure smooth startup
         // Shorter delay for native apps to hide splash screen faster
         const isNativeApp = nativeAppInitService.isNativeAppInitialized();
-        const initDelay = isNativeApp ? 200 : 500;
+        const initDelay = isNativeApp ? 200 : (twaEnv.isTWA || twaEnv.isStandalone) ? 1500 : 500;
         
         console.log('[App] Setting initialization delay:', initDelay, 'ms (native:', isNativeApp, ')');
         
@@ -125,10 +142,11 @@ const App: React.FC = () => {
 
     initializeApp();
 
-    // Emergency recovery mechanism for native apps that get stuck
-    if (nativeIntegrationService.isRunningNatively()) {
+    // Emergency recovery mechanism for TWA apps that get stuck
+    if (twaEnv.isTWA || twaEnv.isStandalone) {
       const recoveryTimeout = setTimeout(() => {
-        if (!isInitialized) {
+        // Only trigger emergency recovery if auto-refresh hasn't already handled it
+        if (!isStuckDetected && refreshCount === 0 && !isInitialized) {
           console.warn('[App] Emergency recovery triggered - forcing app initialization');
           mobileErrorHandler.handleError({
             type: 'crash',
@@ -141,9 +159,14 @@ const App: React.FC = () => {
 
       return () => {
         clearTimeout(recoveryTimeout);
+        twaUpdateService.destroy();
       };
     }
-  }, [isInitialized]);
+
+    return () => {
+      twaUpdateService.destroy();
+    };
+  }, [twaEnv.isTWA, twaEnv.isStandalone, isStuckDetected, refreshCount, isInitialized]);
 
   const handleAppError = (error: Error, errorInfo: any) => {
     console.error('Application-level error:', error, errorInfo);
@@ -164,8 +187,10 @@ const App: React.FC = () => {
       timestamp: new Date().toISOString(),
       userAgent: navigator.userAgent,
       url: window.location.href,
+      isTWA: twaEnv.isTWA || twaEnv.isStandalone,
       isNative: nativeAppInitService.isNativeAppInitialized(),
-      emergencyRecovery
+      emergencyRecovery,
+      autoRefreshCount: refreshCount
     };
     
     console.error('Detailed error info:', errorData);
@@ -173,8 +198,8 @@ const App: React.FC = () => {
     // Show user-friendly error notification
     toast.error('Something went wrong. The app will try to recover automatically.');
 
-    // Trigger emergency recovery for native apps if needed
-    if (nativeIntegrationService.isRunningNatively() && !emergencyRecovery) {
+    // Trigger emergency recovery for TWA if needed and auto-refresh hasn't been tried
+    if ((twaEnv.isTWA || twaEnv.isStandalone) && !emergencyRecovery && refreshCount === 0) {
       console.log('[App] Triggering emergency recovery due to error');
       setEmergencyRecovery(true);
     }
@@ -221,7 +246,7 @@ const App: React.FC = () => {
     );
   }
 
-  // Emergency recovery UI for native apps
+  // Emergency recovery UI for TWA apps
   if (emergencyRecovery) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
@@ -231,6 +256,11 @@ const App: React.FC = () => {
           <p className="text-muted-foreground">
             The app encountered an issue and is recovering. Please wait a moment...
           </p>
+          {refreshCount > 0 && (
+            <p className="text-sm text-muted-foreground">
+              Auto-refresh attempts: {refreshCount}
+            </p>
+          )}
           <div className="flex flex-col space-y-2 w-full">
             <button 
               onClick={() => window.location.reload()} 
@@ -258,18 +288,16 @@ const App: React.FC = () => {
       <FeatureFlagsProvider>
         <SubscriptionProvider>
           <TutorialProvider>
-            <SessionProvider>
-              <CapacitorWrapper>
-                <CapacitorInitializationWrapper>
-                  <TranslationLoadingOverlay />
-                  <JournalProcessingInitializer />
-                  <AppRoutes key={isInitialized ? 'initialized' : 'initializing'} />
-                  <TutorialOverlay />
-                  <Toaster />
-                  <SonnerToaster position="top-right" />
-                </CapacitorInitializationWrapper>
-              </CapacitorWrapper>
-            </SessionProvider>
+            <TWAWrapper>
+              <TWAInitializationWrapper>
+                <TranslationLoadingOverlay />
+                <JournalProcessingInitializer />
+                <AppRoutes key={isInitialized ? 'initialized' : 'initializing'} />
+                <TutorialOverlay />
+                <Toaster />
+                <SonnerToaster position="top-right" />
+              </TWAInitializationWrapper>
+            </TWAWrapper>
           </TutorialProvider>
         </SubscriptionProvider>
       </FeatureFlagsProvider>
