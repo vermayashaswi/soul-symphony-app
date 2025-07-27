@@ -30,7 +30,7 @@ const Navbar = () => {
     <nav className="fixed top-0 left-0 right-0 z-50 bg-white/90 backdrop-blur-md border-b border-gray-100 px-4 py-3 shadow-sm">
       <div className="container mx-auto flex justify-between items-center">
         <Link to="/" className="flex items-center">
-          <SouloLogo size="normal" useColorTheme={true} />
+          <SouloLogo size="normal" useColorTheme={false} />
         </Link>
 
         {/* Desktop Navigation */}
