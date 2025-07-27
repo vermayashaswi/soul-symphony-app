@@ -17,25 +17,39 @@ class MobileOptimizationService {
     if (this.isInitialized) return;
 
     try {
-      console.log('[MobileOptimization] Initializing mobile optimizations');
+      const isNative = (window as any).Capacitor?.isNativePlatform?.();
+      console.log('[MobileOptimization] Initializing mobile optimizations', { isNative });
 
-      // Apply mobile-specific CSS optimizations
-      this.applyMobileCSSOptimizations();
+      // For native apps, delay optimization setup to avoid interference with startup
+      if (isNative) {
+        setTimeout(() => {
+          this.applyMobileCSSOptimizations();
+          this.setupTouchOptimizations();
+          this.setupPerformanceMonitoring();
+          this.setupMemoryManagement();
+          this.setupViewportOptimizations();
+          console.log('[MobileOptimization] Native app optimizations initialized');
+        }, 2000); // 2 second delay for native apps
+      } else {
+        // Apply mobile-specific CSS optimizations
+        this.applyMobileCSSOptimizations();
 
-      // Setup touch event optimizations
-      this.setupTouchOptimizations();
+        // Setup touch event optimizations
+        this.setupTouchOptimizations();
 
-      // Setup performance monitoring
-      this.setupPerformanceMonitoring();
+        // Setup performance monitoring
+        this.setupPerformanceMonitoring();
 
-      // Setup memory management
-      this.setupMemoryManagement();
+        // Setup memory management
+        this.setupMemoryManagement();
 
-      // Setup viewport optimizations
-      this.setupViewportOptimizations();
+        // Setup viewport optimizations
+        this.setupViewportOptimizations();
+        
+        console.log('[MobileOptimization] Web app optimizations initialized');
+      }
 
       this.isInitialized = true;
-      console.log('[MobileOptimization] Mobile optimizations initialized');
 
     } catch (error) {
       console.error('[MobileOptimization] Failed to initialize:', error);
@@ -155,13 +169,19 @@ class MobileOptimizationService {
   }
 
   private setupMemoryManagement(): void {
+    const isNative = (window as any).Capacitor?.isNativePlatform?.();
+    
+    // Adjust monitoring frequency based on environment
+    const cleanupInterval = isNative ? 60000 : 30000; // Less frequent for native
+    const memoryCheckInterval = isNative ? 30000 : 10000; // Less frequent for native
+    
     // Clean up unused resources periodically
     setInterval(() => {
       if (document.visibilityState === 'hidden') {
         // Clean up when app is in background
         this.cleanupResources();
       }
-    }, 30000); // Every 30 seconds
+    }, cleanupInterval);
 
     // Listen for memory pressure warnings
     if ('memory' in performance) {
@@ -171,15 +191,19 @@ class MobileOptimizationService {
           const usedMB = memInfo.usedJSHeapSize / 1048576;
           const totalMB = memInfo.totalJSHeapSize / 1048576;
           
-          if (usedMB / totalMB > 0.9) {
+          // More lenient threshold for native apps
+          const threshold = isNative ? 0.95 : 0.9;
+          
+          if (usedMB / totalMB > threshold) {
             console.warn('[MobileOptimization] High memory usage detected:', {
               used: `${usedMB.toFixed(2)}MB`,
-              total: `${totalMB.toFixed(2)}MB`
+              total: `${totalMB.toFixed(2)}MB`,
+              environment: isNative ? 'native' : 'web'
             });
             this.cleanupResources();
           }
         }
-      }, 10000); // Check every 10 seconds
+      }, memoryCheckInterval);
     }
   }
 

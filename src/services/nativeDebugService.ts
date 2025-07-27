@@ -46,14 +46,24 @@ class NativeDebugService {
       debugInfo.isNative = nativeIntegrationService.isRunningNatively();
       debugInfo.environment = debugInfo.isNative ? 'native' : 'web';
 
-      // Capacitor info
+      // Capacitor info - improved detection
       if (typeof window !== 'undefined' && (window as any).Capacitor) {
-        debugInfo.isCapacitorReady = true;
         const capacitor = (window as any).Capacitor;
+        
+        // Check if Capacitor is actually ready and has plugins
+        debugInfo.isCapacitorReady = !!(capacitor.Plugins && Object.keys(capacitor.Plugins).length > 0);
         
         if (capacitor.Plugins) {
           debugInfo.plugins = Object.keys(capacitor.Plugins);
         }
+        
+        // Additional Capacitor status info
+        console.log('[NativeDebug] Capacitor status:', {
+          available: !!capacitor,
+          pluginsAvailable: !!capacitor.Plugins,
+          pluginCount: capacitor.Plugins ? Object.keys(capacitor.Plugins).length : 0,
+          isReady: debugInfo.isCapacitorReady
+        });
       }
 
       // Auth info

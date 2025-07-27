@@ -62,20 +62,36 @@ class SimpleNativeInitService {
     try {
       console.log('[SimpleInit] Starting simplified initialization...');
 
-      // Step 1: Initialize native integration
+      // Step 1: Initialize native integration with timeout
       console.log('[SimpleInit] Step 1: Initializing native integration');
-      await nativeIntegrationService.initialize();
+      
+      const initTimeout = new Promise<never>((_, reject) => {
+        setTimeout(() => reject(new Error('Initialization timeout')), 15000);
+      });
+      
+      await Promise.race([
+        nativeIntegrationService.initialize(),
+        initTimeout
+      ]);
       
       const isNative = nativeIntegrationService.isRunningNatively();
       this.initState.nativeEnvironment = isNative;
       
       console.log('[SimpleInit] Native environment detected:', isNative);
 
-      // Step 2: Initialize auth only if native
+      // Step 2: Initialize auth only if native (with fallback)
       if (isNative) {
-        console.log('[SimpleInit] Step 2: Initializing native auth');
-        await nativeAuthService.initialize();
-        this.initState.authReady = true;
+        try {
+          console.log('[SimpleInit] Step 2: Initializing native auth');
+          await Promise.race([
+            nativeAuthService.initialize(),
+            new Promise<void>((resolve) => setTimeout(resolve, 5000)) // 5s timeout for auth
+          ]);
+          this.initState.authReady = true;
+        } catch (authError) {
+          console.warn('[SimpleInit] Auth initialization failed, continuing without auth:', authError);
+          this.initState.authReady = false;
+        }
       } else {
         console.log('[SimpleInit] Skipping auth init - not native environment');
         this.initState.authReady = false;
