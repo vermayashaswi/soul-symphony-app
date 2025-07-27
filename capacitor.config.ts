@@ -21,23 +21,19 @@ const config: CapacitorConfig = {
     SplashScreen: {
       launchAutoHide: false,
       backgroundColor: "#8b5cf6",
-      showSpinner: true,
-      androidSpinnerStyle: "large",
-      iosSpinnerStyle: "small",
-      spinnerColor: "#FFFFFF",
-      splashFullScreen: true,
-      splashImmersive: true,
-      splashScreenDelay: 2000
+      showSpinner: false,
+      splashFullScreen: false,
+      splashImmersive: false,
+      splashScreenDelay: 1000
     },
     Keyboard: {
-      resize: "ionic",
+      resize: "body",
       style: "dark",
       resizeOnFullScreen: true
     },
     StatusBar: {
       style: "dark",
-      backgroundColor: "#000000",
-      overlaysWebView: true
+      backgroundColor: "#8b5cf6"
     },
     PushNotifications: {
       presentationOptions: ["badge", "sound", "alert"]
@@ -49,29 +45,25 @@ const config: CapacitorConfig = {
     }
   },
   ios: {
-    contentInset: "never",
+    contentInset: "automatic",
     allowsLinkPreview: false,
     scrollEnabled: true,
-    backgroundColor: "#FFFFFF",
+    backgroundColor: "#8b5cf6",
     scheme: "Soulo",
-    preferredContentMode: "mobile",
-    handleApplicationURL: true
+    preferredContentMode: "mobile"
   },
   android: {
     allowMixedContent: false,
     captureInput: true,
-    webContentsDebuggingEnabled: false,
-    backgroundColor: "#FFFFFF",
-    launchMode: "singleTask",
+    webContentsDebuggingEnabled: true,
+    backgroundColor: "#8b5cf6",
+    launchMode: "singleTop",
     orientation: "portrait",
     useLegacyBridge: false,
     appendUserAgent: "SouloApp",
-    overrideUserAgent: "SouloApp/1.0.0 Mobile",
     androidScheme: "https",
-    loadOnMainThread: true,
-    handlePermissions: true,
-    allowNavigationBarColorChange: true,
-    navigationBarColor: "#FFFFFF"
+    loadOnMainThread: false,
+    handlePermissions: true
   }
 };
 
