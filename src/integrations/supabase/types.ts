@@ -14,6 +14,72 @@ export type Database = {
   }
   public: {
     Tables: {
+      api_usage: {
+        Row: {
+          cost_usd: number | null
+          created_at: string
+          endpoint: string | null
+          error_message: string | null
+          function_name: string
+          id: string
+          ip_address: unknown | null
+          rate_limit_hit: boolean | null
+          rate_limit_type: string | null
+          referer: string | null
+          request_method: string | null
+          request_payload_size: number | null
+          response_payload_size: number | null
+          response_time_ms: number | null
+          status_code: number | null
+          tokens_used: number | null
+          updated_at: string
+          user_agent: string | null
+          user_id: string | null
+        }
+        Insert: {
+          cost_usd?: number | null
+          created_at?: string
+          endpoint?: string | null
+          error_message?: string | null
+          function_name: string
+          id?: string
+          ip_address?: unknown | null
+          rate_limit_hit?: boolean | null
+          rate_limit_type?: string | null
+          referer?: string | null
+          request_method?: string | null
+          request_payload_size?: number | null
+          response_payload_size?: number | null
+          response_time_ms?: number | null
+          status_code?: number | null
+          tokens_used?: number | null
+          updated_at?: string
+          user_agent?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          cost_usd?: number | null
+          created_at?: string
+          endpoint?: string | null
+          error_message?: string | null
+          function_name?: string
+          id?: string
+          ip_address?: unknown | null
+          rate_limit_hit?: boolean | null
+          rate_limit_type?: string | null
+          referer?: string | null
+          request_method?: string | null
+          request_payload_size?: number | null
+          response_payload_size?: number | null
+          response_time_ms?: number | null
+          status_code?: number | null
+          tokens_used?: number | null
+          updated_at?: string
+          user_agent?: string | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       chat_messages: {
         Row: {
           analysis_data: Json | null
@@ -260,6 +326,45 @@ export type Database = {
           },
         ]
       }
+      openai_usage: {
+        Row: {
+          completion_tokens: number | null
+          cost_usd: number | null
+          created_at: string
+          function_name: string | null
+          id: string
+          model: string
+          prompt_tokens: number | null
+          request_id: string | null
+          total_tokens: number | null
+          user_id: string | null
+        }
+        Insert: {
+          completion_tokens?: number | null
+          cost_usd?: number | null
+          created_at?: string
+          function_name?: string | null
+          id?: string
+          model: string
+          prompt_tokens?: number | null
+          request_id?: string | null
+          total_tokens?: number | null
+          user_id?: string | null
+        }
+        Update: {
+          completion_tokens?: number | null
+          cost_usd?: number | null
+          created_at?: string
+          function_name?: string | null
+          id?: string
+          model?: string
+          prompt_tokens?: number | null
+          request_id?: string | null
+          total_tokens?: number | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           avatar_url: string | null
@@ -271,6 +376,9 @@ export type Database = {
           is_premium: boolean | null
           journal_focus_areas: string[] | null
           onboarding_completed: boolean | null
+          phone_number: string | null
+          phone_verified: boolean | null
+          phone_verified_at: string | null
           reminder_settings: Json | null
           revenuecat_entitlements: Json | null
           subscription_status: string | null
@@ -291,6 +399,9 @@ export type Database = {
           is_premium?: boolean | null
           journal_focus_areas?: string[] | null
           onboarding_completed?: boolean | null
+          phone_number?: string | null
+          phone_verified?: boolean | null
+          phone_verified_at?: string | null
           reminder_settings?: Json | null
           revenuecat_entitlements?: Json | null
           subscription_status?: string | null
@@ -311,6 +422,9 @@ export type Database = {
           is_premium?: boolean | null
           journal_focus_areas?: string[] | null
           onboarding_completed?: boolean | null
+          phone_number?: string | null
+          phone_verified?: boolean | null
+          phone_verified_at?: string | null
           reminder_settings?: Json | null
           revenuecat_entitlements?: Json | null
           subscription_status?: string | null
@@ -383,6 +497,45 @@ export type Database = {
           tutorial_completed?: string | null
           tutorial_step?: number | null
           updated_at?: string | null
+        }
+        Relationships: []
+      }
+      rate_limit_config: {
+        Row: {
+          created_at: string
+          function_name: string | null
+          id: number
+          is_active: boolean | null
+          limit_type: string
+          requests_per_day: number | null
+          requests_per_hour: number | null
+          requests_per_minute: number | null
+          rule_name: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          function_name?: string | null
+          id?: number
+          is_active?: boolean | null
+          limit_type: string
+          requests_per_day?: number | null
+          requests_per_hour?: number | null
+          requests_per_minute?: number | null
+          rule_name: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          function_name?: string | null
+          id?: number
+          is_active?: boolean | null
+          limit_type?: string
+          requests_per_day?: number | null
+          requests_per_hour?: number | null
+          requests_per_minute?: number | null
+          rule_name?: string
+          updated_at?: string
         }
         Relationships: []
       }
@@ -614,52 +767,157 @@ export type Database = {
       }
       user_sessions: {
         Row: {
+          app_launch_count: number | null
+          app_version: string | null
+          attribution_data: Json | null
+          background_start_time: string | null
+          background_time: unknown | null
+          battery_level: number | null
+          browser_info: Json | null
+          conversion_events: Json | null
+          country_code: string | null
+          crash_count: number | null
           created_at: string
+          currency: string | null
+          device_fingerprint: string | null
           device_type: string | null
           entry_page: string | null
+          error_count: number | null
+          fbclid: string | null
+          foreground_start_time: string | null
+          foreground_time: unknown | null
+          gclid: string | null
           id: string
+          inactivity_duration: unknown | null
           ip_address: string | null
           is_active: boolean | null
+          language: string | null
           last_active_page: string | null
           last_activity: string | null
+          last_renewal_at: string | null
+          location: string | null
+          memory_usage: number | null
+          network_state: string | null
           page_views: number | null
           platform: string | null
+          referrer: string | null
+          session_duration: unknown | null
           session_end: string | null
+          session_fingerprint: string | null
+          session_quality_score: number | null
+          session_renewal_count: number | null
           session_start: string
+          session_state: string | null
+          session_timeout: string | null
           user_agent: string | null
           user_id: string
+          utm_campaign: string | null
+          utm_content: string | null
+          utm_medium: string | null
+          utm_source: string | null
+          utm_term: string | null
         }
         Insert: {
+          app_launch_count?: number | null
+          app_version?: string | null
+          attribution_data?: Json | null
+          background_start_time?: string | null
+          background_time?: unknown | null
+          battery_level?: number | null
+          browser_info?: Json | null
+          conversion_events?: Json | null
+          country_code?: string | null
+          crash_count?: number | null
           created_at?: string
+          currency?: string | null
+          device_fingerprint?: string | null
           device_type?: string | null
           entry_page?: string | null
+          error_count?: number | null
+          fbclid?: string | null
+          foreground_start_time?: string | null
+          foreground_time?: unknown | null
+          gclid?: string | null
           id?: string
+          inactivity_duration?: unknown | null
           ip_address?: string | null
           is_active?: boolean | null
+          language?: string | null
           last_active_page?: string | null
           last_activity?: string | null
+          last_renewal_at?: string | null
+          location?: string | null
+          memory_usage?: number | null
+          network_state?: string | null
           page_views?: number | null
           platform?: string | null
+          referrer?: string | null
+          session_duration?: unknown | null
           session_end?: string | null
+          session_fingerprint?: string | null
+          session_quality_score?: number | null
+          session_renewal_count?: number | null
           session_start?: string
+          session_state?: string | null
+          session_timeout?: string | null
           user_agent?: string | null
           user_id: string
+          utm_campaign?: string | null
+          utm_content?: string | null
+          utm_medium?: string | null
+          utm_source?: string | null
+          utm_term?: string | null
         }
         Update: {
+          app_launch_count?: number | null
+          app_version?: string | null
+          attribution_data?: Json | null
+          background_start_time?: string | null
+          background_time?: unknown | null
+          battery_level?: number | null
+          browser_info?: Json | null
+          conversion_events?: Json | null
+          country_code?: string | null
+          crash_count?: number | null
           created_at?: string
+          currency?: string | null
+          device_fingerprint?: string | null
           device_type?: string | null
           entry_page?: string | null
+          error_count?: number | null
+          fbclid?: string | null
+          foreground_start_time?: string | null
+          foreground_time?: unknown | null
+          gclid?: string | null
           id?: string
+          inactivity_duration?: unknown | null
           ip_address?: string | null
           is_active?: boolean | null
+          language?: string | null
           last_active_page?: string | null
           last_activity?: string | null
+          last_renewal_at?: string | null
+          location?: string | null
+          memory_usage?: number | null
+          network_state?: string | null
           page_views?: number | null
           platform?: string | null
+          referrer?: string | null
+          session_duration?: unknown | null
           session_end?: string | null
+          session_fingerprint?: string | null
+          session_quality_score?: number | null
+          session_renewal_count?: number | null
           session_start?: string
+          session_state?: string | null
+          session_timeout?: string | null
           user_agent?: string | null
           user_id?: string
+          utm_campaign?: string | null
+          utm_content?: string | null
+          utm_medium?: string | null
+          utm_source?: string | null
+          utm_term?: string | null
         }
         Relationships: []
       }
@@ -668,13 +926,32 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      check_database_health: {
-        Args: Record<PropertyKey, never>
-        Returns: Json
+      calculate_session_quality_score: {
+        Args: {
+          p_session_duration: unknown
+          p_page_views: number
+          p_crash_count: number
+          p_error_count: number
+          p_background_time: unknown
+          p_foreground_time: unknown
+        }
+        Returns: number
       }
       check_journal_entry_ownership: {
         Args: { entry_id_param: number }
         Returns: boolean
+      }
+      check_rate_limit: {
+        Args: {
+          p_user_id: string
+          p_ip_address: unknown
+          p_function_name: string
+        }
+        Returns: Json
+      }
+      check_sms_rate_limit: {
+        Args: { p_phone_number: string; p_user_id?: string }
+        Returns: Json
       }
       check_table_columns: {
         Args: { table_name: string }
@@ -691,21 +968,21 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: undefined
       }
+      cleanup_expired_phone_verifications: {
+        Args: Record<PropertyKey, never>
+        Returns: undefined
+      }
       cleanup_expired_sessions: {
         Args: Record<PropertyKey, never>
         Returns: number
       }
       cleanup_expired_trials: {
         Args: Record<PropertyKey, never>
-        Returns: Json
+        Returns: undefined
       }
       close_user_session: {
         Args: { p_session_id: string; p_user_id: string }
         Returns: boolean
-      }
-      comprehensive_cleanup: {
-        Args: Record<PropertyKey, never>
-        Returns: Json
       }
       delete_all_user_journal_entries: {
         Args: { p_user_id: string }
@@ -743,7 +1020,53 @@ export type Database = {
               p_fbclid?: string
               p_attribution_data?: Json
             }
+          | {
+              p_user_id: string
+              p_device_type: string
+              p_user_agent: string
+              p_entry_page: string
+              p_last_active_page: string
+              p_language?: string
+              p_referrer?: string
+              p_ip_address?: string
+              p_country_code?: string
+              p_currency?: string
+              p_utm_source?: string
+              p_utm_medium?: string
+              p_utm_campaign?: string
+              p_utm_term?: string
+              p_utm_content?: string
+              p_gclid?: string
+              p_fbclid?: string
+              p_attribution_data?: Json
+              p_session_fingerprint?: string
+              p_browser_info?: Json
+              p_device_fingerprint?: string
+              p_platform?: string
+            }
         Returns: string
+      }
+      enhanced_session_manager: {
+        Args: {
+          p_user_id: string
+          p_action: string
+          p_device_type?: string
+          p_user_agent?: string
+          p_entry_page?: string
+          p_last_active_page?: string
+          p_session_fingerprint?: string
+          p_app_version?: string
+          p_network_state?: string
+          p_battery_level?: number
+          p_memory_usage?: number
+          p_platform?: string
+          p_additional_data?: Json
+        }
+        Returns: string
+      }
+      execute_dynamic_query: {
+        Args: { query_text: string; param_values?: string[] }
+        Returns: Json
       }
       get_active_themes: {
         Args: Record<PropertyKey, never>
@@ -753,6 +1076,10 @@ export type Database = {
           description: string
           display_order: number
         }[]
+      }
+      get_attribution_analytics: {
+        Args: { p_start_date?: string; p_end_date?: string }
+        Returns: Json
       }
       get_entity_emotion_statistics: {
         Args: {
@@ -890,18 +1217,15 @@ export type Database = {
           sample_entries: Json
         }[]
       }
-      get_user_profile_with_trial: {
-        Args: { p_user_id: string }
-        Returns: Json
-      }
       get_user_subscription_status: {
         Args: { user_id_param: string }
         Returns: {
-          current_tier: string
           current_status: string
+          current_tier: string
+          is_premium_access: boolean
           trial_end_date: string
           is_trial_active: boolean
-          is_premium_access: boolean
+          days_remaining: number
         }[]
       }
       insert_sample_journal_entries: {
@@ -914,6 +1238,27 @@ export type Database = {
       is_trial_eligible: {
         Args: { user_id_param: string }
         Returns: boolean
+      }
+      log_api_usage: {
+        Args: {
+          p_user_id?: string
+          p_ip_address?: unknown
+          p_function_name?: string
+          p_endpoint?: string
+          p_request_method?: string
+          p_status_code?: number
+          p_response_time_ms?: number
+          p_tokens_used?: number
+          p_cost_usd?: number
+          p_rate_limit_hit?: boolean
+          p_rate_limit_type?: string
+          p_user_agent?: string
+          p_referer?: string
+          p_request_payload_size?: number
+          p_response_payload_size?: number
+          p_error_message?: string
+        }
+        Returns: string
       }
       manage_user_session: {
         Args: {
@@ -1140,25 +1485,9 @@ export type Database = {
           emotions: Json
         }[]
       }
-      perform_database_maintenance: {
-        Args: Record<PropertyKey, never>
-        Returns: Json
-      }
       regenerate_missing_data_for_entry: {
         Args: { target_entry_id: number }
         Returns: Json
-      }
-      setup_user_trial_fallback: {
-        Args: { user_id: string }
-        Returns: Json
-      }
-      simple_session_manager: {
-        Args: {
-          p_user_id: string
-          p_device_type?: string
-          p_entry_page?: string
-        }
-        Returns: string
       }
       store_user_query: {
         Args:
@@ -1176,15 +1505,25 @@ export type Database = {
         Args: { table_name: string }
         Returns: boolean
       }
+      track_conversion_event: {
+        Args: {
+          p_session_id: string
+          p_event_type: string
+          p_event_data?: Json
+        }
+        Returns: boolean
+      }
       update_session_activity: {
         Args: { p_session_id: string; p_page?: string; p_language?: string }
         Returns: undefined
       }
       upsert_journal_embedding: {
-        Args:
-          | { entry_id: number; embedding_vector: string }
-          | { entry_id: number; embedding_vector: string }
+        Args: { entry_id: number; embedding_vector: string }
         Returns: undefined
+      }
+      verify_phone_code: {
+        Args: { p_phone_number: string; p_code: string; p_user_id?: string }
+        Returns: Json
       }
     }
     Enums: {

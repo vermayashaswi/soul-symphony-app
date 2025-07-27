@@ -233,7 +233,7 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
       <ContextReadinessProvider>
         <ThemeProvider>
           <TranslationProvider>
-            <SessionProvider>
+            <SessionProvider enableDebug={true}>
               <AuthProvider>
                 <App />
               </AuthProvider>

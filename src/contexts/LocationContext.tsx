@@ -1,4 +1,6 @@
+
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { SessionTrackingService } from '@/services/sessionTrackingService';
 
 interface LocationData {
   country: string;
@@ -31,18 +33,18 @@ export function LocationProvider({ children }: { children: ReactNode }) {
       setIsLoading(true);
       setError(null);
       
-      console.log('[LocationContext] Starting simplified location detection');
+      console.log('[LocationContext] Starting location detection');
       
-      // Simplified location detection using browser timezone
-      const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
-      const detectedLocation: LocationData = {
-        country: 'DEFAULT',
-        currency: 'USD',
-        timezone: timezone || 'UTC'
-      };
+      // Use the existing SessionTrackingService for consistent detection
+      const detectedLocation = await SessionTrackingService.detectLocation();
       
-      console.log('[LocationContext] Location detected:', detectedLocation);
-      setLocationData(detectedLocation);
+      if (detectedLocation) {
+        console.log('[LocationContext] Location detected:', detectedLocation);
+        setLocationData(detectedLocation);
+      } else {
+        console.log('[LocationContext] Using default location');
+        setLocationData(DEFAULT_LOCATION);
+      }
     } catch (err) {
       console.error('[LocationContext] Location detection failed:', err);
       setError(err instanceof Error ? err.message : 'Location detection failed');

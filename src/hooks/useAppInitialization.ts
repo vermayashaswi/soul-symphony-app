@@ -20,6 +20,8 @@ export const useAppInitialization = () => {
   useEffect(() => {
     const initializeApp = async () => {
       try {
+        console.log('[AppInit] Initializing app services...');
+        
         // Initialize service worker for background notifications
         await initializeServiceWorker();
         
@@ -28,12 +30,15 @@ export const useAppInitialization = () => {
         
         // Initialize journal reminder service
         await journalReminderService.initializeOnAppStart();
+        
+        console.log('[AppInit] App initialization completed');
         setState({
           isInitialized: true,
           isInitializing: false,
           error: null
         });
       } catch (error) {
+        console.error('[AppInit] App initialization failed:', error);
         setState({
           isInitialized: false,
           isInitializing: false,

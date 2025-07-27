@@ -11,27 +11,28 @@ import Auth from '@/pages/Auth';
 import Settings from '@/pages/Settings';
 import AppDownload from '@/pages/AppDownload';
 import NotFound from '@/pages/NotFound';
-import OptimizedViewportManager from './OptimizedViewportManager';
+import ViewportManager from './ViewportManager';
 import PrivacyPolicyPage from '@/pages/legal/PrivacyPolicyPage';
 import FAQPage from '@/pages/website/FAQPage';
 import BlogPage from '@/pages/website/BlogPage';
 import BlogPostPage from '@/pages/website/BlogPostPage';
 import OnboardingScreen from '@/components/onboarding/OnboardingScreen';
 import SessionRouter from '@/components/routing/SessionRouter';
-import { useOptimizedAuth } from '@/hooks/useOptimizedAuth';
-import { useSimpleOnboarding } from '@/hooks/useSimpleOnboarding';
-import { optimizedRouteService } from '@/services/optimizedRouteService';
+import { useAuth } from '@/contexts/AuthContext';
+import { useOnboarding } from '@/hooks/use-onboarding';
+import { useSessionValidation } from '@/hooks/useSessionValidation';
 import { nativeIntegrationService } from '@/services/nativeIntegrationService';
 
 const AppRoutes = () => {
-  const { user, isAuthenticated, hasValidSession } = useOptimizedAuth();
-  const { onboardingComplete } = useSimpleOnboarding();
+  const { user } = useAuth();
+  const { onboardingComplete } = useOnboarding();
+  const { session: validatedSession, isValid: hasValidSession, isLoading: sessionLoading } = useSessionValidation();
 
-  // Enhanced app root redirect with optimized checks
+  // Enhanced app root redirect with session validation
   const AppRootRedirect = () => {
-    const isNative = optimizedRouteService.isNativeApp();
+    const isNative = nativeIntegrationService.isRunningNatively();
 
-    console.log('[AppRoutes] AppRootRedirect - isNative:', isNative, 'user:', !!user, 'hasValidSession:', hasValidSession);
+    console.log('[AppRoutes] AppRootRedirect - isNative:', isNative, 'user:', !!user, 'validatedSession:', !!validatedSession, 'hasValidSession:', hasValidSession);
 
     // CRITICAL: For native apps, handle OAuth callback parameters properly
     if (isNative) {
@@ -47,18 +48,18 @@ const AppRoutes = () => {
         return <Navigate to={`/app/auth${window.location.search}${window.location.hash}`} replace />;
       }
 
-      // For native apps, use optimized auth checks
-      console.log('[AppRoutes] Native environment detected, checking auth status');
+      // ENHANCED: For native apps, prioritize validated session over user context
+      console.log('[AppRoutes] Native environment detected, checking session validation');
       
-      // If authenticated, go directly to home
-      if (isAuthenticated && hasValidSession) {
-        console.log('[AppRoutes] Native app authenticated, redirecting to home');
+      // If we have a validated session, go directly to home
+      if (hasValidSession && validatedSession) {
+        console.log('[AppRoutes] Native app with validated session, redirecting to home');
         return <Navigate to="/app/home" replace />;
       }
       
-      // If no authentication, go to onboarding
-      if (!isAuthenticated) {
-        console.log('[AppRoutes] No auth in native app, redirecting to onboarding');
+      // Fallback to user context check
+      if (!user && !validatedSession) {
+        console.log('[AppRoutes] No user or session in native app, redirecting to onboarding');
         return <Navigate to="/app/onboarding" replace />;
       }
 
@@ -82,7 +83,7 @@ const AppRoutes = () => {
       return <Navigate to={`/app/auth${window.location.search}${window.location.hash}`} replace />;
     }
 
-    if (!isAuthenticated) {
+    if (!user && !validatedSession) {
       return <Navigate to="/app/onboarding" replace />;
     }
 
@@ -90,24 +91,24 @@ const AppRoutes = () => {
     return <Navigate to="/app/home" replace />;
   };
 
-  // Enhanced root redirect with optimized checks
+  // Enhanced root redirect with session validation
   const RootRedirect = () => {
-    const isNative = optimizedRouteService.isNativeApp();
+    const isNative = nativeIntegrationService.isRunningNatively();
 
-    console.log('[AppRoutes] RootRedirect - isNative:', isNative, 'user:', !!user, 'isAuthenticated:', isAuthenticated);
+    console.log('[AppRoutes] RootRedirect - isNative:', isNative, 'user:', !!user, 'validatedSession:', !!validatedSession);
 
     // CRITICAL: For native apps, NEVER show marketing site - always redirect to app
     if (isNative) {
       console.log('[AppRoutes] Native environment detected at root, checking session');
       
-      // Use optimized auth status for immediate routing
-      if (isAuthenticated && hasValidSession) {
-        console.log('[AppRoutes] Native app authenticated, redirecting to home');
+      // Prioritize validated session for immediate routing
+      if (hasValidSession && validatedSession) {
+        console.log('[AppRoutes] Native app with validated session, redirecting to home');
         return <Navigate to="/app/home" replace />;
       }
       
-      if (!isAuthenticated) {
-        console.log('[AppRoutes] No auth in native app, redirecting to onboarding');
+      if (!user && !validatedSession) {
+        console.log('[AppRoutes] No user or session in native app, redirecting to onboarding');
         return <Navigate to="/app/onboarding" replace />;
       }
 
@@ -123,33 +124,33 @@ const AppRoutes = () => {
 
   return (
     <Routes>
-      <Route element={<OptimizedViewportManager />}>
+      <Route element={<ViewportManager />}>
         {/* Root Route - context-aware */}
         <Route path="/" element={<RootRedirect />} />
 
         {/* Website Routes - only accessible in web context */}
         <Route path="/privacy-policy" element={
-          optimizedRouteService.isNativeApp() ?
+          nativeIntegrationService.isRunningNatively() ?
           <Navigate to="/app/home" replace /> :
           <PrivacyPolicyPage />
         } />
         <Route path="/faq" element={
-          optimizedRouteService.isNativeApp() ?
+          nativeIntegrationService.isRunningNatively() ?
           <Navigate to="/app/home" replace /> :
           <FAQPage />
         } />
         <Route path="/download" element={
-          optimizedRouteService.isNativeApp() ?
+          nativeIntegrationService.isRunningNatively() ?
           <Navigate to="/app/home" replace /> :
           <AppDownload />
         } />
         <Route path="/blog" element={
-          optimizedRouteService.isNativeApp() ?
+          nativeIntegrationService.isRunningNatively() ?
           <Navigate to="/app/home" replace /> :
           <BlogPage />
         } />
         <Route path="/blog/:slug" element={
-          optimizedRouteService.isNativeApp() ?
+          nativeIntegrationService.isRunningNatively() ?
           <Navigate to="/app/home" replace /> :
           <BlogPostPage />
         } />
@@ -196,7 +197,7 @@ const AppRoutes = () => {
 
         {/* Catch-all route - context-aware */}
         <Route path="*" element={
-          optimizedRouteService.isNativeApp() ?
+          nativeIntegrationService.isRunningNatively() ?
           <Navigate to="/app/home" replace /> :
           <NotFound />
         } />

@@ -5,16 +5,16 @@ import { nativeIntegrationService } from './nativeIntegrationService';
 import { nativeAuthService } from './nativeAuthService';
 
 /**
- * Gets the redirect URL for authentication - simplified for native app compatibility
+ * Gets the redirect URL for authentication
  */
 export const getRedirectUrl = (): string => {
-  // For native apps, use the app URL scheme
+  // CRITICAL FIX: For native apps, never use external URLs
   if (nativeIntegrationService.isRunningNatively()) {
     console.log('[AuthService] Native app detected - using app URL scheme for redirect');
     return 'app.soulo.online://oauth/callback';
   }
 
-  // For web, use current origin with /app/auth
+  // For web, use current origin
   return `${window.location.origin}/app/auth`;
 };
 
