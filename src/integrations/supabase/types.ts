@@ -23,17 +23,11 @@ export type Database = {
           function_name: string
           id: string
           ip_address: unknown | null
-          rate_limit_hit: boolean | null
-          rate_limit_type: string | null
-          referer: string | null
           request_method: string | null
-          request_payload_size: number | null
-          response_payload_size: number | null
           response_time_ms: number | null
           status_code: number | null
           tokens_used: number | null
           updated_at: string
-          user_agent: string | null
           user_id: string | null
         }
         Insert: {
@@ -44,17 +38,11 @@ export type Database = {
           function_name: string
           id?: string
           ip_address?: unknown | null
-          rate_limit_hit?: boolean | null
-          rate_limit_type?: string | null
-          referer?: string | null
           request_method?: string | null
-          request_payload_size?: number | null
-          response_payload_size?: number | null
           response_time_ms?: number | null
           status_code?: number | null
           tokens_used?: number | null
           updated_at?: string
-          user_agent?: string | null
           user_id?: string | null
         }
         Update: {
@@ -65,17 +53,11 @@ export type Database = {
           function_name?: string
           id?: string
           ip_address?: unknown | null
-          rate_limit_hit?: boolean | null
-          rate_limit_type?: string | null
-          referer?: string | null
           request_method?: string | null
-          request_payload_size?: number | null
-          response_payload_size?: number | null
           response_time_ms?: number | null
           status_code?: number | null
           tokens_used?: number | null
           updated_at?: string
-          user_agent?: string | null
           user_id?: string | null
         }
         Relationships: []
@@ -491,45 +473,6 @@ export type Database = {
         }
         Relationships: []
       }
-      rate_limit_config: {
-        Row: {
-          created_at: string
-          function_name: string | null
-          id: number
-          is_active: boolean | null
-          limit_type: string
-          requests_per_day: number | null
-          requests_per_hour: number | null
-          requests_per_minute: number | null
-          rule_name: string
-          updated_at: string
-        }
-        Insert: {
-          created_at?: string
-          function_name?: string | null
-          id?: number
-          is_active?: boolean | null
-          limit_type: string
-          requests_per_day?: number | null
-          requests_per_hour?: number | null
-          requests_per_minute?: number | null
-          rule_name: string
-          updated_at?: string
-        }
-        Update: {
-          created_at?: string
-          function_name?: string | null
-          id?: number
-          is_active?: boolean | null
-          limit_type?: string
-          requests_per_day?: number | null
-          requests_per_hour?: number | null
-          requests_per_minute?: number | null
-          rule_name?: string
-          updated_at?: string
-        }
-        Relationships: []
-      }
       revenuecat_customers: {
         Row: {
           created_at: string
@@ -758,48 +701,25 @@ export type Database = {
       }
       user_sessions: {
         Row: {
-          app_launch_count: number | null
-          app_version: string | null
-          attribution_data: Json | null
-          background_start_time: string | null
-          background_time: unknown | null
-          battery_level: number | null
-          browser_info: Json | null
-          conversion_events: Json | null
           country_code: string | null
-          crash_count: number | null
           created_at: string
           currency: string | null
-          device_fingerprint: string | null
           device_type: string | null
           entry_page: string | null
-          error_count: number | null
           fbclid: string | null
-          foreground_start_time: string | null
-          foreground_time: unknown | null
           gclid: string | null
           id: string
-          inactivity_duration: unknown | null
           ip_address: string | null
           is_active: boolean | null
           language: string | null
           last_active_page: string | null
           last_activity: string | null
-          last_renewal_at: string | null
           location: string | null
-          memory_usage: number | null
-          network_state: string | null
           page_views: number | null
           platform: string | null
           referrer: string | null
-          session_duration: unknown | null
           session_end: string | null
-          session_fingerprint: string | null
-          session_quality_score: number | null
-          session_renewal_count: number | null
           session_start: string
-          session_state: string | null
-          session_timeout: string | null
           user_agent: string | null
           user_id: string
           utm_campaign: string | null
@@ -809,48 +729,25 @@ export type Database = {
           utm_term: string | null
         }
         Insert: {
-          app_launch_count?: number | null
-          app_version?: string | null
-          attribution_data?: Json | null
-          background_start_time?: string | null
-          background_time?: unknown | null
-          battery_level?: number | null
-          browser_info?: Json | null
-          conversion_events?: Json | null
           country_code?: string | null
-          crash_count?: number | null
           created_at?: string
           currency?: string | null
-          device_fingerprint?: string | null
           device_type?: string | null
           entry_page?: string | null
-          error_count?: number | null
           fbclid?: string | null
-          foreground_start_time?: string | null
-          foreground_time?: unknown | null
           gclid?: string | null
           id?: string
-          inactivity_duration?: unknown | null
           ip_address?: string | null
           is_active?: boolean | null
           language?: string | null
           last_active_page?: string | null
           last_activity?: string | null
-          last_renewal_at?: string | null
           location?: string | null
-          memory_usage?: number | null
-          network_state?: string | null
           page_views?: number | null
           platform?: string | null
           referrer?: string | null
-          session_duration?: unknown | null
           session_end?: string | null
-          session_fingerprint?: string | null
-          session_quality_score?: number | null
-          session_renewal_count?: number | null
           session_start?: string
-          session_state?: string | null
-          session_timeout?: string | null
           user_agent?: string | null
           user_id: string
           utm_campaign?: string | null
@@ -860,48 +757,25 @@ export type Database = {
           utm_term?: string | null
         }
         Update: {
-          app_launch_count?: number | null
-          app_version?: string | null
-          attribution_data?: Json | null
-          background_start_time?: string | null
-          background_time?: unknown | null
-          battery_level?: number | null
-          browser_info?: Json | null
-          conversion_events?: Json | null
           country_code?: string | null
-          crash_count?: number | null
           created_at?: string
           currency?: string | null
-          device_fingerprint?: string | null
           device_type?: string | null
           entry_page?: string | null
-          error_count?: number | null
           fbclid?: string | null
-          foreground_start_time?: string | null
-          foreground_time?: unknown | null
           gclid?: string | null
           id?: string
-          inactivity_duration?: unknown | null
           ip_address?: string | null
           is_active?: boolean | null
           language?: string | null
           last_active_page?: string | null
           last_activity?: string | null
-          last_renewal_at?: string | null
           location?: string | null
-          memory_usage?: number | null
-          network_state?: string | null
           page_views?: number | null
           platform?: string | null
           referrer?: string | null
-          session_duration?: unknown | null
           session_end?: string | null
-          session_fingerprint?: string | null
-          session_quality_score?: number | null
-          session_renewal_count?: number | null
           session_start?: string
-          session_state?: string | null
-          session_timeout?: string | null
           user_agent?: string | null
           user_id?: string
           utm_campaign?: string | null
@@ -944,10 +818,6 @@ export type Database = {
         }
         Returns: Json
       }
-      check_sms_rate_limit: {
-        Args: { p_phone_number: string; p_user_id?: string }
-        Returns: Json
-      }
       check_table_columns: {
         Args: { table_name: string }
         Returns: {
@@ -960,10 +830,6 @@ export type Database = {
         Returns: boolean
       }
       check_trial_expiry: {
-        Args: Record<PropertyKey, never>
-        Returns: undefined
-      }
-      cleanup_expired_phone_verifications: {
         Args: Record<PropertyKey, never>
         Returns: undefined
       }
@@ -983,24 +849,8 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: Json
       }
-      create_user_session: {
-        Args: {
-          p_user_id: string
-          p_device_info?: Json
-          p_location_info?: Json
-        }
-        Returns: string
-      }
       delete_all_user_journal_entries: {
         Args: { p_user_id: string }
-        Returns: Json
-      }
-      enhanced_check_rate_limit: {
-        Args: {
-          p_user_id: string
-          p_ip_address: unknown
-          p_function_name: string
-        }
         Returns: Json
       }
       enhanced_manage_user_session: {
@@ -1035,40 +885,7 @@ export type Database = {
               p_fbclid?: string
               p_attribution_data?: Json
             }
-          | {
-              p_user_id: string
-              p_device_type: string
-              p_user_agent: string
-              p_entry_page: string
-              p_last_active_page: string
-              p_language?: string
-              p_referrer?: string
-              p_ip_address?: string
-              p_country_code?: string
-              p_currency?: string
-              p_utm_source?: string
-              p_utm_medium?: string
-              p_utm_campaign?: string
-              p_utm_term?: string
-              p_utm_content?: string
-              p_gclid?: string
-              p_fbclid?: string
-              p_attribution_data?: Json
-              p_session_fingerprint?: string
-              p_browser_info?: Json
-              p_device_fingerprint?: string
-              p_platform?: string
-            }
         Returns: string
-      }
-      enhanced_rate_limit_check: {
-        Args: {
-          p_user_id: string
-          p_action: string
-          p_per_minute?: number
-          p_per_hour?: number
-        }
-        Returns: Json
       }
       enhanced_session_manager: {
         Args: {
@@ -1524,10 +1341,6 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: Json
       }
-      send_phone_verification: {
-        Args: { p_phone_number: string; p_user_id?: string }
-        Returns: Json
-      }
       setup_user_trial_fallback: {
         Args: { user_id: string }
         Returns: Json
@@ -1569,10 +1382,6 @@ export type Database = {
       validate_phone_number: {
         Args: { phone_number: string }
         Returns: boolean
-      }
-      verify_phone_code: {
-        Args: { p_phone_number: string; p_code: string; p_user_id?: string }
-        Returns: Json
       }
     }
     Enums: {
