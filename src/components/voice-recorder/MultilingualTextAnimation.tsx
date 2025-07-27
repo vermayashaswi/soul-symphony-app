@@ -77,41 +77,4 @@ export function LanguageBackground({ contained = false }: { contained?: boolean 
   );
 }
 
-export function AnimatedPrompt() {
-  // Defensive theme access
-  let theme = 'light';
-  try {
-    const themeData = useTheme();
-    theme = themeData.theme;
-  } catch (error) {
-    console.warn('Theme provider not available, using default theme');
-  }
-  
-  return (
-    <div className="relative w-full h-full flex items-center justify-center">
-      <motion.div
-        initial={{ opacity: 0, y: 10 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5 }}
-        className="text-center mb-3"
-      >
-        <h3 
-          className="text-lg font-medium mb-1"
-          style={{
-            color: theme === 'dark' ? "#fff" : undefined,
-          }}
-        >
-          Speak in any language!!
-        </h3>
-        <p 
-          className="text-sm opacity-80"
-          style={{
-            color: theme === 'dark' ? "rgba(255, 255, 255, 0.8)" : undefined,
-          }}
-        >
-          I'll transcribe and analyze your voice recording
-        </p>
-      </motion.div>
-    </div>
-  );
-}
+// AnimatedPrompt component moved to separate file: src/components/voice-recorder/AnimatedPrompt.tsx
