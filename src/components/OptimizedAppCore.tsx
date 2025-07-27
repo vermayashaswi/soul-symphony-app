@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { BrowserRouter } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { Toaster } from 'sonner';
-import { ThemeProvider } from 'next-themes';
+import { ThemeProvider } from '@/hooks/use-theme';
 import { OptimizedAuthProvider } from '@/contexts/OptimizedAuthContext';
 import { OptimizedSubscriptionProvider } from '@/contexts/OptimizedSubscriptionContext';
 import { TutorialProvider } from '@/contexts/TutorialContext';
@@ -62,7 +62,7 @@ export function OptimizedAppCore() {
 
   return (
     <QueryClientProvider client={queryClient}>
-      <ThemeProvider attribute="class" defaultTheme="dark" enableSystem>
+      <ThemeProvider>
         <BrowserRouter>
           <OptimizedAuthProvider>
             <OptimizedSubscriptionProvider>
