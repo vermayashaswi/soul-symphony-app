@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { Toaster } from 'sonner';
-import { ThemeProvider } from '@/hooks/use-theme';
+
 import { OptimizedAuthProvider } from '@/contexts/OptimizedAuthContext';
 import { OptimizedSubscriptionProvider } from '@/contexts/OptimizedSubscriptionContext';
 import { TutorialProvider } from '@/contexts/TutorialContext';
@@ -62,21 +62,19 @@ export function OptimizedAppCore() {
 
   return (
     <QueryClientProvider client={queryClient}>
-      <ThemeProvider>
-        <OptimizedAuthProvider>
-          <OptimizedSubscriptionProvider>
-            <TutorialProvider>
-              <OptimizedAppRoutes />
-              <Toaster 
-                position="top-center"
-                expand={false}
-                richColors
-                closeButton
-              />
-            </TutorialProvider>
-          </OptimizedSubscriptionProvider>
-        </OptimizedAuthProvider>
-      </ThemeProvider>
+      <OptimizedAuthProvider>
+        <OptimizedSubscriptionProvider>
+          <TutorialProvider>
+            <OptimizedAppRoutes />
+            <Toaster 
+              position="top-center"
+              expand={false}
+              richColors
+              closeButton
+            />
+          </TutorialProvider>
+        </OptimizedSubscriptionProvider>
+      </OptimizedAuthProvider>
     </QueryClientProvider>
   );
 }
