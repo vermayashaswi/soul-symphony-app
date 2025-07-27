@@ -6,6 +6,7 @@ import './index.css'
 import './styles/mobile.css' // Import mobile-specific styles
 import './styles/tutorial.css' // Import tutorial-specific styles
 import { AuthProvider } from './contexts/AuthContext'
+import { BrowserRouter } from 'react-router-dom'
 import { SessionProvider } from './providers/SessionProvider'
 
 import { TranslationProvider } from './contexts/TranslationContext'
@@ -232,11 +233,13 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
     <ContextReadinessProvider>
       <ThemeProvider>
         <TranslationProvider>
-          <SessionProvider>
-            <AuthProvider>
-              <App />
-            </AuthProvider>
-          </SessionProvider>
+          <BrowserRouter>
+            <SessionProvider>
+              <AuthProvider>
+                <App />
+              </AuthProvider>
+            </SessionProvider>
+          </BrowserRouter>
         </TranslationProvider>
       </ThemeProvider>
     </ContextReadinessProvider>

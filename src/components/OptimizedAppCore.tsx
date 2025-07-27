@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { BrowserRouter } from 'react-router-dom';
+
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { Toaster } from 'sonner';
 import { ThemeProvider } from '@/hooks/use-theme';
@@ -63,21 +63,19 @@ export function OptimizedAppCore() {
   return (
     <QueryClientProvider client={queryClient}>
       <ThemeProvider>
-        <BrowserRouter>
-          <OptimizedAuthProvider>
-            <OptimizedSubscriptionProvider>
-              <TutorialProvider>
-                <OptimizedAppRoutes />
-                <Toaster 
-                  position="top-center"
-                  expand={false}
-                  richColors
-                  closeButton
-                />
-              </TutorialProvider>
-            </OptimizedSubscriptionProvider>
-          </OptimizedAuthProvider>
-        </BrowserRouter>
+        <OptimizedAuthProvider>
+          <OptimizedSubscriptionProvider>
+            <TutorialProvider>
+              <OptimizedAppRoutes />
+              <Toaster 
+                position="top-center"
+                expand={false}
+                richColors
+                closeButton
+              />
+            </TutorialProvider>
+          </OptimizedSubscriptionProvider>
+        </OptimizedAuthProvider>
       </ThemeProvider>
     </QueryClientProvider>
   );
