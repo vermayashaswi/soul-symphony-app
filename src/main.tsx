@@ -5,12 +5,12 @@ import App from './App.tsx'
 import './index.css'
 import './styles/mobile.css' // Import mobile-specific styles
 import './styles/tutorial.css' // Import tutorial-specific styles
-import { AuthProvider } from './contexts/AuthContext';
-import { SessionProvider } from './providers/SessionProvider';
-import { TranslationProvider } from './contexts/TranslationContext';
-import { ContextReadinessProvider } from './contexts/ContextReadinessManager';
-import { ThemeProvider } from './hooks/use-theme';
-import { BrowserRouter } from 'react-router-dom';
+import { AuthProvider } from './contexts/AuthContext'
+import { SessionProvider } from './providers/SessionProvider'
+import { BrowserRouter } from 'react-router-dom'
+import { TranslationProvider } from './contexts/TranslationContext'
+import { ContextReadinessProvider } from './contexts/ContextReadinessManager'
+import { ThemeProvider } from './hooks/use-theme'
 import { initializeServiceWorker } from './utils/serviceWorker'
 import { backgroundSyncService } from './services/backgroundSyncService'
 import { periodicSyncService } from './services/periodicSyncService'
@@ -229,18 +229,18 @@ initializeApp();
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
-    <ContextReadinessProvider>
-      <ThemeProvider>
-        <TranslationProvider>
-          <BrowserRouter>
+    <BrowserRouter>
+      <ContextReadinessProvider>
+        <ThemeProvider>
+          <TranslationProvider>
             <SessionProvider>
               <AuthProvider>
                 <App />
               </AuthProvider>
             </SessionProvider>
-          </BrowserRouter>
-        </TranslationProvider>
-      </ThemeProvider>
-    </ContextReadinessProvider>
+          </TranslationProvider>
+        </ThemeProvider>
+      </ContextReadinessProvider>
+    </BrowserRouter>
   </React.StrictMode>,
 )
