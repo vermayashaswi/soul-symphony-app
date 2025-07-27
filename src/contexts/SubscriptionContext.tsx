@@ -72,8 +72,8 @@ export const SubscriptionProvider: React.FC<{ children: ReactNode }> = ({ childr
         throw statusError;
       }
 
-      if (statusData && Array.isArray(statusData) && statusData.length > 0) {
-        const subscriptionData = statusData[0] as any;
+      if (statusData && statusData.length > 0) {
+        const subscriptionData = statusData[0];
         
         // Map subscription tier - ensure only 'free' or 'premium'
         const userTier = (subscriptionData.current_tier === 'premium') ? 'premium' : 'free';
@@ -90,7 +90,7 @@ export const SubscriptionProvider: React.FC<{ children: ReactNode }> = ({ childr
           status: userStatus,
           trialEndDate: userTrialEndDate,
           isTrialActive: userIsTrialActive,
-          isPremium: subscriptionData.is_premium_access || false
+          isPremium: subscriptionData.is_premium_access
         });
       } else {
         // Fallback to direct profile query if function fails

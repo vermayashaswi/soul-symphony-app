@@ -6,14 +6,14 @@ import { useIsMobile } from '@/hooks/use-mobile';
 import MobileNavigation from '@/components/MobileNavigation';
 import StatusBarManager from '@/components/StatusBarManager';
 import { isAppRoute, isWebsiteRoute } from './RouteHelpers';
-import { useAppInitialization } from '@/contexts/AppInitializationContext';
+import { useOnboarding } from '@/hooks/use-onboarding';
 import { forceEnableScrolling } from '@/hooks/use-scroll-restoration';
 
 const ViewportManager: React.FC = () => {
   const location = useLocation();
   const { user } = useAuth();
   const isMobile = useIsMobile();
-  const { onboardingComplete } = useAppInitialization();
+  const { onboardingComplete } = useOnboarding();
   
   // Comprehensive list of routes where navigation should be hidden
   const onboardingOrAuthPaths = [
@@ -93,7 +93,7 @@ const ViewportManager: React.FC = () => {
        user && 
        !isOnboardingOrAuth && 
        onboardingComplete && (
-        <MobileNavigation />
+        <MobileNavigation onboardingComplete={onboardingComplete} />
       )}
     </StatusBarManager>
   );

@@ -2,7 +2,6 @@
 import React, { useState, useEffect } from 'react';
 import { cn } from '@/lib/utils';
 import { useTheme } from '@/hooks/use-theme';
-import { useMarketingTheme } from '@/hooks/use-marketing-theme';
 import { Mic } from 'lucide-react';
 
 export type LogoSize = "small" | "normal" | "large" | "medium";
@@ -26,26 +25,15 @@ const SouloLogo = ({
   animate = false,
   utteringWords = false
 }: SouloLogoProps) => {
-  // Always call both hooks (Rules of Hooks requirement)
-  let appTheme;
-  let marketingTheme;
+  // Defensive hook usage to prevent runtime errors during app initialization
+  let colorTheme = 'Default';
   
   try {
-    appTheme = useTheme();
-  } catch {
-    appTheme = { colorTheme: 'Calm' };
+    const themeData = useTheme();
+    colorTheme = themeData.colorTheme;
+  } catch (error) {
+    console.warn('SouloLogo: ThemeProvider not ready, using defaults');
   }
-  
-  try {
-    marketingTheme = useMarketingTheme();
-  } catch {
-    marketingTheme = { colorTheme: 'Calm' };
-  }
-  
-  // Detect context and use appropriate theme
-  const isAppRoute = typeof window !== 'undefined' && window.location.pathname.startsWith('/app');
-  const colorTheme = isAppRoute ? appTheme.colorTheme : marketingTheme.colorTheme;
-  const hasThemeProvider = isAppRoute;
   const [animationState, setAnimationState] = useState<'full' | 'soul' | 'none'>('full');
   const [micScale, setMicScale] = useState<number>(1);
   
@@ -57,8 +45,8 @@ const SouloLogo = ({
     medium: "w-5.5 h-5.5 mx-0.5", // Added medium size
   };
   
-  // Apply color theme only if useColorTheme is true AND we have a theme provider
-  const themeTextClass = useColorTheme && hasThemeProvider ? "text-primary" : "";
+  // Apply color theme if useColorTheme is true
+  const themeTextClass = useColorTheme ? "text-primary" : "";
 
   useEffect(() => {
     if (!animate) return;

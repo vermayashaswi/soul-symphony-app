@@ -47,13 +47,12 @@ export const useSessionValidation = () => {
 
   const checkSession = async () => {
     try {
-      console.log('[useSessionValidation] Starting session validation...', { isNative });
+      console.log('[useSessionValidation] Starting session validation...');
       
-      // For native apps, prioritize stored session validation
+      // For native apps, try synchronous validation first
       if (isNative) {
         const storedSession = validateStoredSession();
         if (storedSession) {
-          console.log('[useSessionValidation] Using valid stored session for native app');
           setState({
             session: storedSession,
             isLoading: false,
@@ -61,40 +60,14 @@ export const useSessionValidation = () => {
             error: null
           });
           return storedSession;
-        } else {
-          console.log('[useSessionValidation] No valid stored session found for native app');
         }
       }
 
-      // Async validation with reduced timeout for better UX
-      const sessionPromise = supabase.auth.getSession();
-      const timeoutPromise = new Promise((_, reject) => 
-        setTimeout(() => reject(new Error('Session validation timeout')), isNative ? 5000 : 8000)
-      );
-
-      const { data: { session }, error } = await Promise.race([
-        sessionPromise,
-        timeoutPromise
-      ]) as any;
+      // Async validation fallback
+      const { data: { session }, error } = await supabase.auth.getSession();
       
       if (error) {
         console.error('[useSessionValidation] Session validation error:', error);
-        
-        // Enhanced native fallback logic
-        if (isNative) {
-          const localSession = validateStoredSession();
-          if (localSession) {
-            console.log('[useSessionValidation] Using local session fallback for error case');
-            setState({
-              session: localSession,
-              isLoading: false,
-              isValid: true,
-              error: null
-            });
-            return localSession;
-          }
-        }
-        
         setState({
           session: null,
           isLoading: false,
@@ -109,8 +82,7 @@ export const useSessionValidation = () => {
       console.log('[useSessionValidation] Session validation complete:', {
         hasSession: !!session,
         isValid,
-        userId: session?.user?.id,
-        isNative
+        userId: session?.user?.id
       });
 
       setState({
@@ -123,24 +95,6 @@ export const useSessionValidation = () => {
       return session;
     } catch (error) {
       console.error('[useSessionValidation] Validation failed:', error);
-      
-      // Enhanced timeout fallback for native apps
-      if (isNative && error instanceof Error && error.message?.includes('timeout')) {
-        const localSession = validateStoredSession();
-        if (localSession) {
-          console.log('[useSessionValidation] Using timeout fallback session');
-          setState({
-            session: localSession,
-            isLoading: false,
-            isValid: true,
-            error: null
-          });
-          return localSession;
-        } else {
-          console.log('[useSessionValidation] No fallback session available for timeout');
-        }
-      }
-      
       setState({
         session: null,
         isLoading: false,

@@ -345,22 +345,19 @@ class AuthStateManager {
 
   private async verifyOnboardingStatus(): Promise<boolean> {
     try {
-      const debugInfo = await this.getAuthDebugInfo();
+      // Simple check using localStorage and database
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('onboarding_completed')
+        .eq('id', await supabase.auth.getUser().then(u => u.data.user?.id))
+        .single();
       
-      if (!debugInfo.sessionExists || !debugInfo.userExists) {
-        this.log('No valid session for onboarding check');
-        return false;
+      if (profile?.onboarding_completed) {
+        localStorage.setItem('onboardingComplete', 'true');
+        return true;
       }
-
-      // Use the new synchronizer for reliable status checking
-      const { authStateSynchronizer } = await import('./authStateSynchronizer');
-      const isComplete = await authStateSynchronizer.syncOnboardingStatus(debugInfo.userId!, {
-        forceSync: true
-      });
       
-      this.log('Onboarding status verified:', { isComplete, userId: debugInfo.userId });
-      return isComplete;
-      
+      return localStorage.getItem('onboardingComplete') === 'true';
     } catch (error) {
       this.error('Failed to verify onboarding status:', error);
       return localStorage.getItem('onboardingComplete') === 'true';

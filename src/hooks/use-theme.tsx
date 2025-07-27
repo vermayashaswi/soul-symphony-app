@@ -281,18 +281,15 @@ export function ThemeProvider({ children }: ThemeProviderProps) {
   }, [customColor, colorTheme]);
 
   return (
-    <ThemeContext.Provider 
-      value={{ 
-        theme, 
-        setTheme, 
-        colorTheme, 
-        setColorTheme, 
-        customColor, 
-        setCustomColor,
-        systemTheme 
-      }}
-      data-theme-provider="true"
-    >
+    <ThemeContext.Provider value={{ 
+      theme, 
+      setTheme, 
+      colorTheme, 
+      setColorTheme, 
+      customColor, 
+      setCustomColor,
+      systemTheme 
+    }}>
       {children}
     </ThemeContext.Provider>
   );
@@ -301,29 +298,21 @@ export function ThemeProvider({ children }: ThemeProviderProps) {
 export function useTheme() {
   const context = useContext(ThemeContext);
   if (context === undefined) {
-    // CRITICAL DEBUGGING: Log everything to identify the problem component
-    console.error('🚨 THEME ERROR DEBUGGING:');
-    console.error('URL:', window.location.href);
-    console.error('Pathname:', window.location.pathname);
-    console.error('Stack trace:', new Error().stack);
+    console.error('[useTheme] ThemeProvider context is undefined. This usually happens when:');
+    console.error('1. useTheme is called outside of a ThemeProvider');
+    console.error('2. ThemeProvider is not mounted yet');
+    console.error('3. There\'s a timing issue during app initialization');
+    console.error('Current component stack:', new Error().stack);
     
-    // Log the current React component tree for debugging
-    const componentTrace = new Error().stack?.split('\n').slice(1, 10).join('\n') || 'No stack';
-    console.error('Component trace:', componentTrace);
-    
-    // Add timestamp to ensure this is the latest version
-    console.error('Debug timestamp:', Date.now());
-    console.error('Force rebuild check:', '__THEME_DEBUG__');
-    
-    // Return safe defaults to prevent crash but still identify the issue
-    console.warn('⚠️ Returning safe defaults to prevent app crash');
+    // CRITICAL FIX: Return safe defaults to prevent app crash
+    console.warn('[useTheme] Returning safe defaults to prevent app crash');
     return {
       theme: 'system' as const,
-      setTheme: () => console.debug('[SAFE] setTheme called'),
-      colorTheme: 'Calm' as const,
-      setColorTheme: () => console.debug('[SAFE] setColorTheme called'),
-      customColor: '#8b5cf6',
-      setCustomColor: () => console.debug('[SAFE] setCustomColor called'),
+      setTheme: () => {},
+      colorTheme: 'Default' as const,
+      setColorTheme: () => {},
+      customColor: '#3b82f6',
+      setCustomColor: () => {},
       systemTheme: 'light' as const,
     };
   }
