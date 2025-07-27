@@ -32,8 +32,9 @@ const config: CapacitorConfig = {
       resizeOnFullScreen: true
     },
     StatusBar: {
-      style: "dark",
-      backgroundColor: "#8b5cf6"
+      style: "light",
+      backgroundColor: "#8b5cf6",
+      overlaysWebView: false
     },
     PushNotifications: {
       presentationOptions: ["badge", "sound", "alert"]

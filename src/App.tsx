@@ -14,12 +14,12 @@ import './styles/tutorial.css';
 import { FeatureFlagsProvider } from "./contexts/FeatureFlagsContext";
 import TWAWrapper from './components/twa/TWAWrapper';
 import TWAInitializationWrapper from './components/twa/TWAInitializationWrapper';
-import { useSimpleNativeInit } from './hooks/useSimpleNativeInit';
+import { useNativeAppInitialization } from './hooks/useNativeAppInitialization';
 import { useAppInitialization } from './hooks/useAppInitialization';
 import { NativeDebugPanel } from './components/debug/NativeDebugPanel';
 
 const App: React.FC = () => {
-  const nativeInit = useSimpleNativeInit();
+  const nativeInit = useNativeAppInitialization();
   const appInitialization = useAppInitialization();
 
   // Simplified initialization check
@@ -35,7 +35,7 @@ const App: React.FC = () => {
       timestamp: new Date().toISOString(),
       userAgent: navigator.userAgent,
       url: window.location.href,
-      isNative: nativeInit.nativeEnvironment,
+      isNative: nativeInit.isNativeApp,
       initState: nativeInit
     };
     
@@ -94,7 +94,7 @@ const App: React.FC = () => {
           <p className="text-muted-foreground">
             Initializing your voice journaling experience...
           </p>
-          {nativeInit.nativeEnvironment && (
+          {nativeInit.isNativeApp && (
             <p className="text-sm text-muted-foreground">
               Native app mode detected
             </p>
