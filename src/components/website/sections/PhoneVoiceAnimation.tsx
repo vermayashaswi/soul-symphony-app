@@ -38,7 +38,7 @@ const PhoneVoiceAnimation = () => {
         <div className="absolute top-0 left-1/2 transform -translate-x-1/2 w-32 h-6 bg-black rounded-b-xl z-10"></div>
         <div className="absolute inset-0 bg-gradient-to-br from-gray-900 to-gray-800 flex flex-col">
           <div className="h-14 bg-gradient-to-r from-primary/80 to-purple-600/80 flex items-center justify-center">
-            <SouloLogo size="small" useColorTheme={true} />
+            <SouloLogo size="small" useColorTheme={false} />
           </div>
           <div className="flex-1 p-4 flex flex-col">
             {animationStage === 0 && (
