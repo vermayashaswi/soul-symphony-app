@@ -1,7 +1,6 @@
 
 import React, { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { useTheme } from '@/hooks/use-theme';
 import { TranslatableText } from '@/components/translation/TranslatableText';
 
 interface AnimatedPromptProps {
@@ -11,14 +10,8 @@ interface AnimatedPromptProps {
 export const AnimatedPrompt: React.FC<AnimatedPromptProps> = ({ show }) => {
   const [isVisible, setIsVisible] = useState(false);
   
-  // Defensive theme access
-  let theme = 'light';
-  try {
-    const themeData = useTheme();
-    theme = themeData.theme;
-  } catch (error) {
-    console.warn('Theme provider not available, using default theme');
-  }
+  // Use safe defaults to prevent theme provider errors during initialization
+  const theme = 'light';
   
   useEffect(() => {
     // Small delay to make sure the animation runs properly
