@@ -14,12 +14,12 @@ import './styles/tutorial.css';
 import { FeatureFlagsProvider } from "./contexts/FeatureFlagsContext";
 import TWAWrapper from './components/twa/TWAWrapper';
 import TWAInitializationWrapper from './components/twa/TWAInitializationWrapper';
-import { useNativeAppInitialization } from './hooks/useNativeAppInitialization';
+import { useSimpleNativeInit } from './hooks/useSimpleNativeInit';
 import { useAppInitialization } from './hooks/useAppInitialization';
 import { NativeDebugPanel } from './components/debug/NativeDebugPanel';
 
 const App: React.FC = () => {
-  const nativeInit = useNativeAppInitialization();
+  const nativeInit = useSimpleNativeInit();
   const appInitialization = useAppInitialization();
 
   // Simplified initialization check
@@ -64,10 +64,7 @@ const App: React.FC = () => {
           </details>
           <div className="flex flex-col space-y-2 w-full">
             <button 
-              onClick={() => {
-                nativeInit.reset();
-                window.location.reload();
-              }}
+              onClick={() => window.location.reload()}
               className="px-4 py-2 bg-primary text-primary-foreground rounded-md"
             >
               Retry Initialization

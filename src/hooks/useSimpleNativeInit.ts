@@ -1,60 +1,52 @@
-/**
- * Simplified Native Initialization Hook
- * Replaces complex initialization chain with streamlined approach
- */
-
+// Simplified native initialization aligned with web patterns
 import { useEffect, useState } from 'react';
-import { simpleNativeInitService, SimpleInitState } from '@/services/simpleNativeInitService';
+import { nativeIntegrationService } from '@/services/nativeIntegrationService';
+
+interface SimpleNativeInitState {
+  isInitialized: boolean;
+  isNativeApp: boolean;
+  error: string | null;
+}
 
 export const useSimpleNativeInit = () => {
-  const [initState, setInitState] = useState<SimpleInitState>(
-    simpleNativeInitService.getInitState()
-  );
+  const [state, setState] = useState<SimpleNativeInitState>({
+    isInitialized: false,
+    isNativeApp: false,
+    error: null
+  });
 
   useEffect(() => {
-    let mounted = true;
-
     const initializeNative = async () => {
       try {
         console.log('[SimpleNativeInit] Starting initialization...');
         
-        const success = await simpleNativeInitService.initialize();
+        // Simple initialization - just check if we're native
+        const isNative = nativeIntegrationService.isRunningNatively();
         
-        if (mounted) {
-          const newState = simpleNativeInitService.getInitState();
-          setInitState(newState);
-          
-          if (success) {
-            console.log('[SimpleNativeInit] Initialization completed successfully');
-          } else {
-            console.error('[SimpleNativeInit] Initialization failed');
-          }
+        if (isNative) {
+          console.log('[SimpleNativeInit] Native environment detected, initializing...');
+          await nativeIntegrationService.initialize();
         }
+        
+        setState({
+          isInitialized: true,
+          isNativeApp: isNative,
+          error: null
+        });
+        
+        console.log('[SimpleNativeInit] Initialization complete:', { isNative });
       } catch (error) {
-        console.error('[SimpleNativeInit] Initialization error:', error);
-        
-        if (mounted) {
-          const newState = simpleNativeInitService.getInitState();
-          setInitState(newState);
-        }
+        console.error('[SimpleNativeInit] Initialization failed:', error);
+        setState({
+          isInitialized: true, // Still mark as initialized to not block the app
+          isNativeApp: false,
+          error: error instanceof Error ? error.message : 'Unknown error'
+        });
       }
     };
 
-    // Only initialize once
-    if (!initState.isInitialized && !initState.isInitializing) {
-      initializeNative();
-    }
-
-    return () => {
-      mounted = false;
-    };
+    initializeNative();
   }, []);
 
-  return {
-    ...initState,
-    reset: () => {
-      simpleNativeInitService.reset();
-      setInitState(simpleNativeInitService.getInitState());
-    }
-  };
+  return state;
 };
