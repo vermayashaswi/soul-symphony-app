@@ -21,6 +21,7 @@ export function useAudioRecorder({
   const {
     permission: micPermission,
     isSupported: micSupported,
+    isCheckingPermission,
     requestPermission: requestMicPermission,
     revalidatePermission
   } = useMicrophonePermission();
@@ -306,8 +307,9 @@ export function useAudioRecorder({
     recordingTime,
     audioBlob,
     audioLevel,
-    hasPermission: micPermission === 'granted',
+    hasPermission: isCheckingPermission ? null : micPermission === 'granted',
     permission: micPermission,
+    isCheckingPermission,
     ripples,
     startRecording,
     stopRecording,

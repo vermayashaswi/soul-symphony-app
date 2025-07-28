@@ -76,7 +76,7 @@ export const SimplifiedSoulNetVisualization: React.FC<SimplifiedSoulNetVisualiza
     }
   });
 
-  // FIXED: Node click handler with proper event handling and mobile support
+  // FIXED: Node click handler with proper error handling and mobile compatibility
   const handleNodeClick = useCallback((nodeId: string) => {
     console.log(`[SimplifiedSoulNetVisualization] SOUL-NET SELECTION FIX: Node click received for ${nodeId}`, {
       currentSelectedNode: selectedNode,
@@ -91,13 +91,24 @@ export const SimplifiedSoulNetVisualization: React.FC<SimplifiedSoulNetVisualiza
         navigator.vibrate(50);
       }
       
-      // Apply delayed state update to avoid race conditions in React state updates
-      setTimeout(() => {
-        onNodeClick(nodeId);
-        console.log(`[SimplifiedSoulNetVisualization] SOUL-NET SELECTION FIX: onNodeClick called successfully for ${nodeId}`);
-      }, 10);
+      // Improved error handling and state management
+      requestAnimationFrame(() => {
+        try {
+          onNodeClick(nodeId);
+          console.log(`[SimplifiedSoulNetVisualization] SOUL-NET SELECTION FIX: onNodeClick called successfully for ${nodeId}`);
+        } catch (error) {
+          console.error(`[SimplifiedSoulNetVisualization] SOUL-NET SELECTION FIX: Error in onNodeClick callback for ${nodeId}:`, error);
+          // Prevent app crash by catching callback errors
+        }
+      });
     } catch (error) {
-      console.error(`[SimplifiedSoulNetVisualization] SOUL-NET SELECTION FIX: Error in onNodeClick for ${nodeId}:`, error);
+      console.error(`[SimplifiedSoulNetVisualization] SOUL-NET SELECTION FIX: Error in handleNodeClick for ${nodeId}:`, error);
+      // Graceful degradation - try direct call as fallback
+      try {
+        onNodeClick(nodeId);
+      } catch (fallbackError) {
+        console.error(`[SimplifiedSoulNetVisualization] SOUL-NET SELECTION FIX: Fallback call also failed for ${nodeId}:`, fallbackError);
+      }
     }
   }, [selectedNode, onNodeClick, isInstantReady]);
 

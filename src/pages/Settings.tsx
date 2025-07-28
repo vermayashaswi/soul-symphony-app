@@ -93,6 +93,7 @@ function SettingsContent() {
   const [notificationTimes, setNotificationTimes] = useState<NotificationTime[]>(['evening']);
   const [showNotificationSettings, setShowNotificationSettings] = useState(false);
   const [showNotificationDebug, setShowNotificationDebug] = useState(false);
+  const [backgroundDiagnostics, setBackgroundDiagnostics] = useState<any>(null);
   const [notificationPermissionState, setNotificationPermissionState] = useState<string>('checking');
   const [notificationDebugInfo, setNotificationDebugInfo] = useState<any>(null);
   const { user, signOut } = useAuth();
@@ -154,6 +155,17 @@ function SettingsContent() {
         const debugInfo = await enhancedNotificationService.getPermissionInfo();
         console.log('[Settings] Debug info:', debugInfo);
         setNotificationDebugInfo(debugInfo);
+        
+        // Background diagnostics - verify local time accuracy
+        const diagnostics = {
+          localTime: new Date().toLocaleString(),
+          timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+          utcOffset: new Date().getTimezoneOffset(),
+          scheduledNotifications: debugInfo.nativeStatus?.scheduled || [],
+          timestamp: Date.now()
+        };
+        setBackgroundDiagnostics(diagnostics);
+        console.log('[Settings] Background diagnostics:', diagnostics);
         
         // Load stored notification settings
         const enabled = localStorage.getItem('notification_enabled') === 'true';
@@ -902,7 +914,22 @@ function SettingsContent() {
                       <Button 
                         variant="outline" 
                         size="sm"
-                        onClick={() => setShowNotificationDebug(true)}
+                        onClick={async () => {
+                          // Run background diagnostics instead of showing debug UI
+                          const newDebugInfo = await enhancedNotificationService.getPermissionInfo();
+                          const diagnostics = {
+                            localTime: new Date().toLocaleString(),
+                            timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+                            utcOffset: new Date().getTimezoneOffset(),
+                            scheduledNotifications: newDebugInfo.nativeStatus?.scheduled || [],
+                            timestamp: Date.now()
+                          };
+                          setBackgroundDiagnostics(diagnostics);
+                          console.log('[Settings] Background diagnostics completed:', diagnostics);
+                          
+                          // Show a brief toast instead of debug modal
+                          toast.success("Diagnostics completed - check console for details");
+                        }}
                       >
                         <TranslatableText text="Debug Info" />
                       </Button>
@@ -1317,83 +1344,7 @@ function SettingsContent() {
         </Dialog>
         
         {/* Debug Dialog */}
-        <Dialog
-          open={showNotificationDebug}
-          onOpenChange={setShowNotificationDebug}
-        >
-          <DialogContent className="max-w-2xl max-h-[80vh] overflow-hidden">
-            <DialogHeader>
-              <DialogTitle>
-                <TranslatableText text="Notification Debug Information" />
-              </DialogTitle>
-              <DialogDescription>
-                <TranslatableText text="Technical details about notification system status" />
-              </DialogDescription>
-            </DialogHeader>
-            
-            <ScrollArea className="h-[60vh] pr-4">
-              <div className="space-y-4 py-2">
-                {notificationDebugInfo && (
-                  <div className="space-y-3">
-                    <div>
-                      <h4 className="font-medium text-sm mb-2">Platform Information</h4>
-                      <div className="bg-muted p-3 rounded-md text-xs space-y-1">
-                        <div>Platform: {notificationDebugInfo.platform}</div>
-                        <div>Native Context: {notificationDebugInfo.isNative ? 'Yes' : 'No'}</div>
-                        <div>Timestamp: {new Date(notificationDebugInfo.timestamp).toLocaleString()}</div>
-                      </div>
-                    </div>
-                    
-                    {notificationDebugInfo.nativeStatus && (
-                      <div>
-                        <h4 className="font-medium text-sm mb-2">Native Plugin Status</h4>
-                        <div className="bg-muted p-3 rounded-md text-xs">
-                          <pre className="whitespace-pre-wrap">
-                            {JSON.stringify(notificationDebugInfo.nativeStatus, null, 2)}
-                          </pre>
-                        </div>
-                      </div>
-                    )}
-                    
-                    {notificationDebugInfo.webStatus && (
-                      <div>
-                        <h4 className="font-medium text-sm mb-2">Web Status</h4>
-                        <div className="bg-muted p-3 rounded-md text-xs">
-                          <pre className="whitespace-pre-wrap">
-                            {JSON.stringify(notificationDebugInfo.webStatus, null, 2)}
-                          </pre>
-                        </div>
-                      </div>
-                    )}
-                    
-                    {notificationDebugInfo.pluginErrors && notificationDebugInfo.pluginErrors.length > 0 && (
-                      <div>
-                        <h4 className="font-medium text-sm mb-2">Plugin Errors</h4>
-                        <div className="bg-red-50 p-3 rounded-md text-xs space-y-2">
-                          {notificationDebugInfo.pluginErrors.map((error: any, index: number) => (
-                            <div key={index} className="border-l-2 border-red-200 pl-2">
-                              <div className="font-medium">{error.plugin}</div>
-                              <div className="text-red-600">{error.error}</div>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
-            </ScrollArea>
-            
-            <div className="flex justify-end">
-              <Button 
-                variant="outline" 
-                onClick={() => setShowNotificationDebug(false)}
-              >
-                <TranslatableText text="Close" />
-              </Button>
-            </div>
-          </DialogContent>
-        </Dialog>
+        {/* Removed comprehensive debug modal - now using background diagnostics */}
         
         <Dialog
           open={showColorPicker}

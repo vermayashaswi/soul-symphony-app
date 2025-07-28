@@ -49,6 +49,7 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className, update
     audioBlob,
     audioLevel,
     hasPermission,
+    isCheckingPermission,
     ripples,
     startRecording,
     stopRecording,
@@ -430,7 +431,7 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className, update
                   onSeek={seekTo}
                 />
               </div>
-            ) : hasPermission === false ? (
+            ) : !isCheckingPermission && hasPermission === false ? (
               <motion.p
                 key="permission"
                 initial={{ opacity: 0, y: 10 }}

@@ -34,20 +34,46 @@ export function LocationProvider({ children }: { children: ReactNode }) {
       
       console.log('[LocationContext] Starting location detection');
       
-      // Simple location detection fallback
-      const detectedLocation = null; // Simplified - no external service needed
+      // Enhanced location detection with timezone
+      const detectedLocation: LocationData = {
+        country: 'DEFAULT',
+        currency: 'USD',
+        timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC'
+      };
       
-      if (detectedLocation) {
-        console.log('[LocationContext] Location detected:', detectedLocation);
-        setLocationData(detectedLocation);
-      } else {
-        console.log('[LocationContext] Using default location');
-        setLocationData(DEFAULT_LOCATION);
+      // Try to detect country from navigator language
+      if (navigator.language) {
+        const languageRegion = navigator.language.split('-')[1];
+        if (languageRegion) {
+          // Map common language regions to countries and currencies
+          const regionMap: Record<string, { country: string; currency: string }> = {
+            'IN': { country: 'IN', currency: 'INR' },
+            'US': { country: 'US', currency: 'USD' },
+            'GB': { country: 'GB', currency: 'GBP' },
+            'CA': { country: 'CA', currency: 'CAD' },
+            'AU': { country: 'AU', currency: 'AUD' },
+            // Add more mappings as needed
+          };
+          
+          const regionData = regionMap[languageRegion.toUpperCase()];
+          if (regionData) {
+            detectedLocation.country = regionData.country;
+            detectedLocation.currency = regionData.currency;
+          }
+        }
       }
+      
+      console.log('[LocationContext] Location detected:', detectedLocation);
+      setLocationData(detectedLocation);
     } catch (err) {
       console.error('[LocationContext] Location detection failed:', err);
       setError(err instanceof Error ? err.message : 'Location detection failed');
-      setLocationData(DEFAULT_LOCATION);
+      const fallbackLocation: LocationData = {
+        country: 'DEFAULT',
+        currency: 'USD',
+        timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC'
+      };
+      setLocationData(fallbackLocation);
     } finally {
       setIsLoading(false);
     }
