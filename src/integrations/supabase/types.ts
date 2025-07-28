@@ -812,6 +812,10 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: Json
       }
+      debug_user_auth: {
+        Args: { user_id_param?: string }
+        Returns: Json
+      }
       delete_all_user_journal_entries: {
         Args: { p_user_id: string }
         Returns: Json
@@ -849,6 +853,10 @@ export type Database = {
               p_attribution_data?: Json
             }
         Returns: string
+      }
+      ensure_user_profile: {
+        Args: { p_user_id: string }
+        Returns: Json
       }
       execute_dynamic_query: {
         Args: { query_text: string }
