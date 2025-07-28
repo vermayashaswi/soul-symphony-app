@@ -170,71 +170,73 @@ class AuthStateManager {
   public async handleAuthSuccess(redirectPath?: string): Promise<void> {
     const now = Date.now();
     
+    // Simplified debouncing - only check if recently handled
     if (this.authSuccessHandled && (now - this.lastSuccessTime) < this.SUCCESS_DEBOUNCE_MS) {
-      this.log('Auth success already handled recently, skipping', { 
-        timeSinceLastSuccess: now - this.lastSuccessTime 
-      });
-      return;
-    }
-    
-    if (this.navigationInProgress && (now - this.lastNavigationTime) < this.NAVIGATION_DEBOUNCE_MS) {
-      this.log('Navigation debounced - too rapid', { timeSinceLastNav: now - this.lastNavigationTime });
+      this.log('Auth success already handled recently, skipping');
       return;
     }
     
     this.log('Handling auth success', { 
       redirectPath, 
-      isNative: nativeIntegrationService.isRunningNatively(),
-      wasAlreadyHandled: this.authSuccessHandled
+      isNative: nativeIntegrationService.isRunningNatively()
     });
     
-    if (this.isProcessing) {
-      this.log('Already processing auth success, skipping');
-      return;
-    }
-
     this.authSuccessHandled = true;
     this.lastSuccessTime = now;
-    this.navigationInProgress = true;
-    this.lastNavigationTime = now;
-    this.setProcessing(true, 5000);
+    this.setProcessing(true, 8000); // Increased timeout for database operations
 
     try {
-      const debugInfo = await this.getAuthDebugInfo();
-      this.lastAuthState = debugInfo;
+      // Add retry logic for session validation
+      let debugInfo: AuthDebugInfo | null = null;
+      let attempts = 0;
+      const maxAttempts = 3;
       
-      if (!debugInfo.sessionExists || !debugInfo.userExists) {
-        this.error('Auth success called but no valid session found', debugInfo);
-        this.log('Session validation failed during auth transition - this is normal, not showing error');
+      while (attempts < maxAttempts && !debugInfo?.sessionExists) {
+        attempts++;
+        this.log(`Session validation attempt ${attempts}/${maxAttempts}`);
+        
+        debugInfo = await this.getAuthDebugInfo();
+        this.lastAuthState = debugInfo;
+        
+        if (!debugInfo.sessionExists || !debugInfo.userExists) {
+          if (attempts < maxAttempts) {
+            await new Promise(resolve => setTimeout(resolve, 1000));
+          }
+        }
+      }
+      
+      if (!debugInfo?.sessionExists || !debugInfo?.userExists) {
+        this.log('No valid session found after retries - redirecting to auth');
         this.executeNavigation('/app/auth');
         return;
       }
 
-      this.log('Valid session confirmed for auth success', debugInfo);
+      this.log('Valid session confirmed', { userId: debugInfo.userId });
 
-      // Enhanced onboarding status check with database verification
-      const onboardingComplete = await this.verifyOnboardingStatus();
+      // Simplified onboarding check with fallback
+      let onboardingComplete = false;
+      try {
+        onboardingComplete = await this.verifyOnboardingStatus();
+      } catch (error) {
+        this.error('Onboarding check failed, using localStorage fallback:', error);
+        onboardingComplete = localStorage.getItem('onboardingComplete') === 'true';
+      }
       
       const finalPath = this.getFinalRedirectPath(redirectPath, onboardingComplete);
-      this.log('Final redirect path determined:', finalPath);
+      this.log('Navigating to:', finalPath);
 
       localStorage.removeItem('authRedirectTo');
-
-      if (!this.authSuccessHandled || (now - this.lastSuccessTime) > this.SUCCESS_DEBOUNCE_MS) {
-        toast.success('Welcome! You\'re now logged in.');
-      }
+      toast.success('Welcome! You\'re now logged in.');
 
       await this.executeNavigation(finalPath);
 
     } catch (error) {
       this.error('Error handling auth success:', error);
-      if (error instanceof Error && !error.message.includes('session') && !error.message.includes('transition')) {
-        toast.error('Something went wrong. Please try again.');
-      }
       
+      // Fallback to home page on any error
       await this.executeNavigation('/app/home');
     } finally {
-      this.navigationInProgress = false;
+      // Reset state after a delay
       setTimeout(() => {
         this.authSuccessHandled = false;
         this.setProcessing(false);
