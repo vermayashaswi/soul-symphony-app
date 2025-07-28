@@ -34,6 +34,7 @@ import { TranslatableText } from '@/components/translation/TranslatableText';
 import { useTranslation } from '@/contexts/TranslationContext';
 import { useTutorial } from '@/contexts/TutorialContext';
 import { DeleteAllEntriesSection } from '@/components/settings/DeleteAllEntriesSection';
+import { UserDebugInfo } from '@/components/settings/UserDebugInfo';
 
 
 interface SettingItemProps {
@@ -458,6 +459,32 @@ function SettingsContent() {
     setShowNotificationSettings(false);
   };
 
+  // Helper function to get next reminder time for debugging
+  const getNextReminderTime = (time: string): Date | null => {
+    const now = new Date();
+    const tomorrow = new Date(now);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    
+    let hour = 0;
+    switch (time) {
+      case 'morning': hour = 8; break;
+      case 'afternoon': hour = 14; break;
+      case 'evening': hour = 19; break;
+      case 'night': hour = 22; break;
+      default: return null;
+    }
+    
+    const nextTime = new Date(now);
+    nextTime.setHours(hour, 0, 0, 0);
+    
+    // If the time has passed today, set it for tomorrow
+    if (nextTime <= now) {
+      nextTime.setDate(nextTime.getDate() + 1);
+    }
+    
+    return nextTime;
+  };
+
   const cancelNotificationSettings = () => {
     // Get the current state from localStorage to determine what to reset to
     const storedEnabled = localStorage.getItem('notification_enabled') === 'true';
@@ -879,6 +906,7 @@ function SettingsContent() {
                       >
                         <TranslatableText text="Debug Info" />
                       </Button>
+                      <UserDebugInfo />
                     </div>
                   )}
                 </div>

@@ -336,6 +336,60 @@ class NativeIntegrationService {
     return this.isActuallyNative && this.isCapacitorReady && !!this.plugins[name];
   }
 
+  async checkPermissions(permissions: string[]): Promise<{ [key: string]: string }> {
+    const results: { [key: string]: string } = {};
+
+    if (!this.isActuallyNative) {
+      console.log('[NativeIntegration] Permission checks not available in web environment');
+      permissions.forEach(permission => {
+        results[permission] = 'granted';
+      });
+      return results;
+    }
+
+    for (const permission of permissions) {
+      try {
+        if (permission === 'microphone' && this.plugins.Microphone) {
+          const result = await this.plugins.Microphone.checkPermissions();
+          results[permission] = result.microphone || 'prompt';
+        } else if (permission === 'notifications') {
+          if (this.plugins.LocalNotifications) {
+            try {
+              const result = await this.plugins.LocalNotifications.checkPermissions();
+              results[permission] = result.display || 'prompt';
+            } catch (localError) {
+              if (this.plugins.PushNotifications) {
+                try {
+                  const result = await this.plugins.PushNotifications.checkPermissions();
+                  results[permission] = result.receive || 'prompt';
+                } catch (pushError) {
+                  results[permission] = 'prompt';
+                }
+              } else {
+                results[permission] = 'prompt';
+              }
+            }
+          } else if (this.plugins.PushNotifications) {
+            try {
+              const result = await this.plugins.PushNotifications.checkPermissions();
+              results[permission] = result.receive || 'prompt';
+            } catch (pushError) {
+              results[permission] = 'prompt';
+            }
+          } else {
+            results[permission] = 'prompt';
+          }
+        }
+      } catch (error) {
+        console.error(`[NativeIntegration] Failed to check ${permission} permission:`, error);
+        results[permission] = 'prompt';
+      }
+    }
+
+    console.log('[NativeIntegration] Permission check results:', results);
+    return results;
+  }
+
   async requestPermissions(permissions: string[]): Promise<{ [key: string]: string }> {
     const results: { [key: string]: string } = {};
 

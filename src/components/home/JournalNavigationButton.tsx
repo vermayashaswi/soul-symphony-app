@@ -100,7 +100,7 @@ const JournalNavigationButton: React.FC = () => {
         className="journal-arrow-button"
         style={{
           position: 'fixed',
-          top: 'calc(45% - 20px)',
+          top: '50%',
           left: '50%',
           transform: 'translate(-50%, -50%)',
           zIndex: isInArrowTutorialStep ? 10000 : 40,
