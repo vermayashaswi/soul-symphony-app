@@ -2,16 +2,19 @@
 import { useTheme } from '@/hooks/use-theme';
 
 export function useUserColorThemeHex() {
-  // Defensive theme access
+  // Defensive theme access with null check
   let colorTheme = 'Default';
   let customColor = '#3b82f6';
   
   try {
     const themeData = useTheme();
-    colorTheme = themeData.colorTheme;
-    customColor = themeData.customColor;
+    if (themeData) {
+      colorTheme = themeData.colorTheme || 'Default';
+      customColor = themeData.customColor || '#3b82f6';
+    }
   } catch (error) {
-    console.warn('Theme provider not available, using default colors');
+    // Theme provider not available, using default colors
+    // This is expected during SSR or before ThemeProvider is mounted
   }
   switch (colorTheme) {
     case 'Default':

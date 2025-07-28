@@ -57,7 +57,7 @@
   -webkit-overflow-scrolling: touch;
   padding: 0.5rem;
   /* Dynamic padding based on navigation and input visibility */
-  padding-bottom: calc(var(--chat-input-height) + var(--nav-bar-height) + var(--calculated-safe-area-bottom, 0px) + 0.5rem);
+  padding-bottom: calc(var(--chat-input-height) + var(--nav-bar-height) + 0.5rem);
   transition: padding-bottom 0.2s ease-in-out;
 }
 
@@ -70,19 +70,19 @@
   background-color: hsl(var(--background));
   border-top: 1px solid hsl(var(--border));
   box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.1);
-  padding: 0.75rem;
+  padding: 0;
   height: var(--chat-input-height);
   box-sizing: border-box;
   
-  /* Position directly above navigation by default */
-  bottom: calc(var(--nav-bar-height) + var(--calculated-safe-area-bottom, env(safe-area-inset-bottom, 0px)));
+  /* Position directly above navigation with no gap */
+  bottom: var(--nav-bar-height);
   
   transition: bottom 0.2s ease-in-out;
 }
 
 /* Platform-specific input positioning */
 .mobile-chat-input-container.platform-android {
-  bottom: calc(var(--nav-bar-height) + max(var(--calculated-safe-area-bottom, 0px), 12px));
+  bottom: var(--nav-bar-height);
 }
 
 /* =============================================== */
