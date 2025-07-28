@@ -764,6 +764,7 @@ export type Database = {
           platform: string | null
           session_end: string | null
           session_start: string
+          session_timeout: string | null
           user_agent: string | null
           user_id: string
         }
@@ -780,6 +781,7 @@ export type Database = {
           platform?: string | null
           session_end?: string | null
           session_start?: string
+          session_timeout?: string | null
           user_agent?: string | null
           user_id: string
         }
@@ -796,6 +798,7 @@ export type Database = {
           platform?: string | null
           session_end?: string | null
           session_start?: string
+          session_timeout?: string | null
           user_agent?: string | null
           user_id?: string
         }
@@ -840,6 +843,10 @@ export type Database = {
       close_user_session: {
         Args: { p_session_id: string; p_user_id: string }
         Returns: boolean
+      }
+      comprehensive_auth_cleanup: {
+        Args: Record<PropertyKey, never>
+        Returns: Json
       }
       comprehensive_cleanup: {
         Args: Record<PropertyKey, never>
