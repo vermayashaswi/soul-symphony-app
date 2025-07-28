@@ -750,60 +750,6 @@ export type Database = {
           },
         ]
       }
-      user_sessions: {
-        Row: {
-          created_at: string
-          device_type: string | null
-          entry_page: string | null
-          id: string
-          ip_address: string | null
-          is_active: boolean | null
-          last_active_page: string | null
-          last_activity: string | null
-          page_views: number | null
-          platform: string | null
-          session_end: string | null
-          session_start: string
-          session_timeout: string | null
-          user_agent: string | null
-          user_id: string
-        }
-        Insert: {
-          created_at?: string
-          device_type?: string | null
-          entry_page?: string | null
-          id?: string
-          ip_address?: string | null
-          is_active?: boolean | null
-          last_active_page?: string | null
-          last_activity?: string | null
-          page_views?: number | null
-          platform?: string | null
-          session_end?: string | null
-          session_start?: string
-          session_timeout?: string | null
-          user_agent?: string | null
-          user_id: string
-        }
-        Update: {
-          created_at?: string
-          device_type?: string | null
-          entry_page?: string | null
-          id?: string
-          ip_address?: string | null
-          is_active?: boolean | null
-          last_active_page?: string | null
-          last_activity?: string | null
-          page_views?: number | null
-          platform?: string | null
-          session_end?: string | null
-          session_start?: string
-          session_timeout?: string | null
-          user_agent?: string | null
-          user_id?: string
-        }
-        Relationships: []
-      }
     }
     Views: {
       [_ in never]: never
@@ -1307,14 +1253,6 @@ export type Database = {
       }
       reset_user_auth: {
         Args: { target_user_id: string }
-        Returns: Json
-      }
-      safe_session_manager: {
-        Args: {
-          p_user_id: string
-          p_device_type?: string
-          p_entry_page?: string
-        }
         Returns: Json
       }
       setup_user_trial_fallback: {

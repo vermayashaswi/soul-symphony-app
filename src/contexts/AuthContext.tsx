@@ -459,11 +459,6 @@ function AuthProviderCore({ children }: { children: ReactNode }) {
           userId: currentSession?.user?.id
         });
         
-        // For native apps, add a small delay to prevent race conditions
-        if (nativeIntegrationService.isRunningNatively() && event !== 'SIGNED_OUT') {
-          await new Promise(resolve => setTimeout(resolve, 100));
-        }
-        
         // Prevent loops by checking if this is the same session
         if (currentSession?.access_token === session?.access_token && event !== 'SIGNED_OUT') {
           logInfo('Same session detected, skipping processing', 'AuthContext');
