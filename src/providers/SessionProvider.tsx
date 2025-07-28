@@ -27,6 +27,8 @@ export const SessionProvider: React.FC<SessionProviderProps> = ({
   enableDebug = false 
 }) => {
   const [sessionEvents, setSessionEvents] = useState<string[]>([]);
+  const [sessionError, setSessionError] = useState<string | null>(null);
+  const [isStuckLoading, setIsStuckLoading] = useState(false);
 
   const sessionTracking = useSessionTracking({
     enableDebug,
@@ -34,6 +36,8 @@ export const SessionProvider: React.FC<SessionProviderProps> = ({
     enableHeartbeat: true,
     onSessionStart: (sessionId) => {
       setSessionEvents(prev => [...prev, `Session started: ${sessionId}`]);
+      setSessionError(null); // Clear any previous errors
+      setIsStuckLoading(false);
       if (enableDebug) {
         console.log('[SessionProvider] Session started:', sessionId);
       }
@@ -45,6 +49,19 @@ export const SessionProvider: React.FC<SessionProviderProps> = ({
       }
     }
   });
+
+  // Add timeout detection for stuck loading states
+  useEffect(() => {
+    if (!sessionTracking.isInitialized && !sessionError) {
+      const stuckTimeout = setTimeout(() => {
+        console.warn('[SessionProvider] Session initialization timeout detected');
+        setIsStuckLoading(true);
+        setSessionError('Session initialization is taking longer than expected');
+      }, 10000); // 10 second timeout
+
+      return () => clearTimeout(stuckTimeout);
+    }
+  }, [sessionTracking.isInitialized, sessionError]);
 
   // Global error handling for session tracking
   useEffect(() => {
