@@ -155,8 +155,8 @@ export const useSessionTracking = (options: UseSessionTrackingOptions = {}) => {
         updateSessionState();
         updateSessionMetrics();
         
-        if (onSessionStart) {
-          onSessionStart(sessionId);
+        if (onSessionStart && sessionId) {
+          onSessionStart(sessionId.id);
         }
 
         if (enableDebug) {
@@ -164,7 +164,7 @@ export const useSessionTracking = (options: UseSessionTrackingOptions = {}) => {
         }
 
         // Track initial conversion event
-        await SessionTrackingService.trackConversion(sessionId, 'session_start', {
+        await SessionTrackingService.trackConversion('session_start', {
           entryPage: window.location.pathname,
           deviceType: deviceInfo.deviceType,
           ...locationData,
@@ -180,7 +180,7 @@ export const useSessionTracking = (options: UseSessionTrackingOptions = {}) => {
     if (!sessionStartedRef.current) return;
 
     try {
-      const metrics = sessionManager.getSessionMetrics();
+      const metrics = await sessionManager.getSessionMetrics();
       await sessionManager.terminateSession();
       
       sessionStartedRef.current = false;
@@ -199,13 +199,13 @@ export const useSessionTracking = (options: UseSessionTrackingOptions = {}) => {
     }
   };
 
-  const updateSessionState = () => {
-    const session = sessionManager.getCurrentSession();
+  const updateSessionState = async () => {
+    const session = await sessionManager.getCurrentSession();
     setCurrentSession(session);
   };
 
-  const updateSessionMetrics = () => {
-    const metrics = sessionManager.getSessionMetrics();
+  const updateSessionMetrics = async () => {
+    const metrics = await sessionManager.getSessionMetrics();
     setSessionMetrics(metrics);
   };
 
@@ -246,7 +246,7 @@ export const useSessionTracking = (options: UseSessionTrackingOptions = {}) => {
 
   const trackConversion = async (eventType: string, eventData: Record<string, any> = {}) => {
     if (currentSession?.id) {
-      await SessionTrackingService.trackConversion(currentSession.id, eventType, eventData);
+      await SessionTrackingService.trackConversion(eventType, eventData, currentSession.id);
     }
   };
 
