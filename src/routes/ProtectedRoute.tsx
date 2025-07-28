@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { Navigate, useLocation, Outlet } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
-import { detectTWAEnvironment } from '@/utils/twaDetection';
+
 
 const ProtectedRoute: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);

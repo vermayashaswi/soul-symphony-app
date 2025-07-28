@@ -13,11 +13,6 @@ import { toast } from 'sonner';
 import './styles/emoji.css';
 import './styles/tutorial.css';
 import { FeatureFlagsProvider } from "./contexts/FeatureFlagsContext";
-import TWAWrapper from './components/twa/TWAWrapper';
-import TWAInitializationWrapper from './components/twa/TWAInitializationWrapper';
-import { detectTWAEnvironment } from './utils/twaDetection';
-import { useTWAAutoRefresh } from './hooks/useTWAAutoRefresh';
-import { twaUpdateService } from './services/twaUpdateService';
 import { nativeAppInitService } from './services/nativeAppInitService';
 import { mobileErrorHandler } from './services/mobileErrorHandler';
 import { mobileOptimizationService } from './services/mobileOptimizationService';
@@ -27,17 +22,15 @@ import { useAppInitialization } from './hooks/useAppInitialization';
 
 const App: React.FC = () => {
   const [isInitialized, setIsInitialized] = useState(false);
-  const [emergencyRecovery, setEmergencyRecovery] = useState(false);
   const [initializationError, setInitializationError] = useState<string | null>(null);
-  const twaEnv = detectTWAEnvironment();
-  const { refreshCount, isStuckDetected } = useTWAAutoRefresh();
   const appInitialization = useAppInitialization();
 
   useEffect(() => {
-      if (nativeIntegrationService.isRunningNatively()) {
-          console.log('[App] Initializing native services');
-          nativeAuthService.initialize();
-        }
+    if (nativeIntegrationService.isRunningNatively()) {
+      console.log('[App] Initializing native services');
+      nativeAuthService.initialize();
+    }
+    
     const initializeApp = async () => {
       try {
         console.log('[App] Starting app initialization...');
@@ -94,20 +87,6 @@ const App: React.FC = () => {
           });
         }
         
-        // Initialize TWA update service
-        if (twaEnv.isTWA || twaEnv.isStandalone) {
-          console.log('[App] Initializing TWA update service');
-          try {
-            twaUpdateService.init();
-          } catch (error) {
-            console.warn('[App] TWA update service failed:', error);
-            mobileErrorHandler.handleError({
-              type: 'unknown',
-              message: `TWA update service failed: ${error}`
-            });
-          }
-        }
-        
         // Preload critical images including the chat avatar
         try {
           console.log('[App] Preloading critical images...');
@@ -120,7 +99,7 @@ const App: React.FC = () => {
         // Mark app as initialized after a brief delay to ensure smooth startup
         // Shorter delay for native apps to hide splash screen faster
         const isNativeApp = nativeAppInitService.isNativeAppInitialized();
-        const initDelay = isNativeApp ? 200 : (twaEnv.isTWA || twaEnv.isStandalone) ? 1500 : 500;
+        const initDelay = isNativeApp ? 200 : 500;
         
         console.log('[App] Setting initialization delay:', initDelay, 'ms (native:', isNativeApp, ')');
         
@@ -140,32 +119,7 @@ const App: React.FC = () => {
     };
 
     initializeApp();
-
-    // Emergency recovery mechanism for TWA apps that get stuck
-    if (twaEnv.isTWA || twaEnv.isStandalone) {
-      const recoveryTimeout = setTimeout(() => {
-        // Only trigger emergency recovery if auto-refresh hasn't already handled it
-        if (!isStuckDetected && refreshCount === 0 && !isInitialized) {
-          console.warn('[App] Emergency recovery triggered - forcing app initialization');
-          mobileErrorHandler.handleError({
-            type: 'crash',
-            message: 'App initialization timeout - emergency recovery triggered'
-          });
-          setEmergencyRecovery(true);
-          setIsInitialized(true);
-        }
-      }, 25000); // 25 second emergency timeout for mobile
-
-      return () => {
-        clearTimeout(recoveryTimeout);
-        twaUpdateService.destroy();
-      };
-    }
-
-    return () => {
-      twaUpdateService.destroy();
-    };
-  }, [twaEnv.isTWA, twaEnv.isStandalone, isStuckDetected, refreshCount, isInitialized]);
+  }, []);
 
   const handleAppError = (error: Error, errorInfo: any) => {
     console.error('Application-level error:', error, errorInfo);
@@ -186,22 +140,13 @@ const App: React.FC = () => {
       timestamp: new Date().toISOString(),
       userAgent: navigator.userAgent,
       url: window.location.href,
-      isTWA: twaEnv.isTWA || twaEnv.isStandalone,
-      isNative: nativeAppInitService.isNativeAppInitialized(),
-      emergencyRecovery,
-      autoRefreshCount: refreshCount
+      isNative: nativeAppInitService.isNativeAppInitialized()
     };
     
     console.error('Detailed error info:', errorData);
 
     // Show user-friendly error notification
     toast.error('Something went wrong. The app will try to recover automatically.');
-
-    // Trigger emergency recovery for TWA if needed and auto-refresh hasn't been tried
-    if ((twaEnv.isTWA || twaEnv.isStandalone) && !emergencyRecovery && refreshCount === 0) {
-      console.log('[App] Triggering emergency recovery due to error');
-      setEmergencyRecovery(true);
-    }
   };
 
   // Show initialization error screen
@@ -245,58 +190,17 @@ const App: React.FC = () => {
     );
   }
 
-  // Emergency recovery UI for TWA apps
-  if (emergencyRecovery) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
-        <div className="flex flex-col items-center space-y-4 p-6 text-center max-w-md">
-          <div className="text-2xl animate-spin">🔄</div>
-          <h2 className="text-xl font-semibold">App Recovery</h2>
-          <p className="text-muted-foreground">
-            The app encountered an issue and is recovering. Please wait a moment...
-          </p>
-          {refreshCount > 0 && (
-            <p className="text-sm text-muted-foreground">
-              Auto-refresh attempts: {refreshCount}
-            </p>
-          )}
-          <div className="flex flex-col space-y-2 w-full">
-            <button 
-              onClick={() => window.location.reload()} 
-              className="px-4 py-2 bg-primary text-primary-foreground rounded-md"
-            >
-              Refresh App
-            </button>
-            <button 
-              onClick={() => {
-                localStorage.clear();
-                window.location.reload();
-              }}
-              className="px-4 py-2 bg-red-600 text-white rounded-md text-sm"
-            >
-              Reset App Data
-            </button>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
   return (
     <ErrorBoundary onError={handleAppError}>
       <FeatureFlagsProvider>
         <SubscriptionProvider>
           <TutorialProvider>
-            <TWAWrapper>
-              <TWAInitializationWrapper>
-                <TranslationLoadingOverlay />
-                <JournalProcessingInitializer />
-                <AppRoutes key={isInitialized ? 'initialized' : 'initializing'} />
-                <TutorialOverlay />
-                <Toaster />
-                <SonnerToaster position="top-right" />
-              </TWAInitializationWrapper>
-            </TWAWrapper>
+            <TranslationLoadingOverlay />
+            <JournalProcessingInitializer />
+            <AppRoutes key={isInitialized ? 'initialized' : 'initializing'} />
+            <TutorialOverlay />
+            <Toaster />
+            <SonnerToaster position="top-right" />
           </TutorialProvider>
         </SubscriptionProvider>
       </FeatureFlagsProvider>

@@ -22,7 +22,7 @@ class JournalReminderService {
   private static instance: JournalReminderService;
   private activeReminders: ScheduledReminder[] = [];
   private healthCheckInterval?: number;
-  private readonly HEALTH_CHECK_INTERVAL = 60 * 60 * 1000; // 1 hour
+  private readonly HEALTH_CHECK_INTERVAL = 6 * 60 * 60 * 1000; // 6 hours
   private isInitialized = false;
   
   // Time mappings for reminders
@@ -154,9 +154,7 @@ class JournalReminderService {
           title: this.getNotificationTitle(time),
           body: this.getNotificationBody(time),
           schedule: {
-            at: scheduledDate,
-            repeats: true,
-            every: 'day' as const
+            at: scheduledDate
           },
           sound: 'default',
           actionTypeId: 'JOURNAL_REMINDER',
@@ -180,6 +178,9 @@ class JournalReminderService {
         });
       });
       
+      // Set up automatic rescheduling for the next day
+      this.setupNativeRescheduling(times);
+      
       this.log(`Scheduled ${notifications.length} native reminders`);
       
     } catch (error) {
@@ -187,6 +188,53 @@ class JournalReminderService {
       // Fallback to service worker reminders
       await this.setupServiceWorkerReminders(times);
     }
+  }
+
+  private setupNativeRescheduling(times: JournalReminderTime[]): void {
+    this.log('Setting up native rescheduling for next day');
+    
+    // Schedule reminders for the next day using web timeouts
+    times.forEach(time => {
+      const todayTarget = this.getNextReminderTime(time);
+      const tomorrowTarget = new Date(todayTarget);
+      tomorrowTarget.setDate(tomorrowTarget.getDate() + 1);
+      
+      const timeoutMs = tomorrowTarget.getTime() - Date.now();
+      
+      const timeoutId = window.setTimeout(async () => {
+        this.log(`Rescheduling native reminder for ${time}`);
+        
+        try {
+          // Schedule the notification for tomorrow
+          const scheduledDate = this.getNextReminderTime(time);
+          await LocalNotifications.schedule({
+            notifications: [{
+              id: times.indexOf(time) + 1,
+              title: this.getNotificationTitle(time),
+              body: this.getNotificationBody(time),
+              schedule: {
+                at: scheduledDate
+              },
+              sound: 'default',
+              actionTypeId: 'JOURNAL_REMINDER',
+              extra: {
+                time,
+                scheduledFor: scheduledDate.toISOString(),
+                action: 'open_journal'
+              }
+            }]
+          });
+          
+          // Reschedule for the day after that
+          this.setupNativeRescheduling([time]);
+          
+        } catch (error) {
+          this.error(`Error rescheduling native reminder for ${time}:`, error);
+        }
+      }, timeoutMs);
+      
+      this.log(`Set up rescheduling timeout for ${time} in ${Math.round(timeoutMs / 1000 / 60 / 60)} hours`);
+    });
   }
 
   private async setupServiceWorkerReminders(times: JournalReminderTime[]): Promise<void> {
@@ -327,8 +375,8 @@ class JournalReminderService {
     // Create exact target time
     next.setHours(hour, minute, 0, 0);
     
-    // Add buffer for timing precision - if we're within 2 minutes of the target, schedule for tomorrow
-    const bufferMs = 2 * 60 * 1000; // 2 minutes
+    // Add buffer for timing precision - if we're within 30 seconds of the target, schedule for tomorrow
+    const bufferMs = 30 * 1000; // 30 seconds
     const timeDiff = next.getTime() - now.getTime();
     
     if (timeDiff <= bufferMs) {

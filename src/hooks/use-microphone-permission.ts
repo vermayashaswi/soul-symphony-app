@@ -44,18 +44,24 @@ export const useMicrophonePermission = () => {
   };
 
   const checkPermission = async () => {
-    // Check if running natively first
+    // For native environments, we need to try accessing the microphone to check permission
     if (nativeIntegrationService.isRunningNatively()) {
+      setIsSupported(true);
       try {
-        // Try to use native permissions API
-        const result = await nativeIntegrationService.requestPermissions(['microphone']);
-        if (result && result.microphone) {
-          setIsSupported(true);
-          setPermission(result.microphone === 'granted' ? 'granted' : 'denied');
+        // On native, directly check if we can access microphone without UI prompt
+        // This works because native environments typically have persistent permission states
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        stream.getTracks().forEach(track => track.stop());
+        setPermission('granted');
+        return;
+      } catch (error: any) {
+        if (error.name === 'NotAllowedError' || error.name === 'PermissionDeniedError') {
+          setPermission('denied');
           return;
         }
-      } catch (error) {
-        console.error('Error checking native microphone permission:', error);
+        // For other errors, assume we need to request permission
+        setPermission('default');
+        return;
       }
     }
 
