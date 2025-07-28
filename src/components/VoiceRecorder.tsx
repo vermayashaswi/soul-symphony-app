@@ -387,6 +387,7 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className, update
               isRecording={isRecording}
               isProcessing={isProcessing}
               hasPermission={hasPermission}
+              isCheckingPermission={isCheckingPermission}
               onRecordingStart={async () => {
                 console.log('[VoiceRecorder] Starting new recording');
                 await ensureAllToastsCleared();

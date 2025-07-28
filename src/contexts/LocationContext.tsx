@@ -35,33 +35,56 @@ export function LocationProvider({ children }: { children: ReactNode }) {
       console.log('[LocationContext] Starting location detection');
       
       // Enhanced location detection with timezone
-      const detectedLocation: LocationData = {
-        country: 'DEFAULT',
-        currency: 'USD',
-        timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC'
+      const detectedTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
+      console.log('[LocationContext] Detected timezone:', detectedTimezone);
+
+      let detectedCountry = 'DEFAULT';
+      let detectedCurrency = 'USD';
+
+      // Timezone-based country mapping (enhanced version)
+      const timezoneCountryMap: Record<string, { country: string; currency: string }> = {
+        'Asia/Kolkata': { country: 'IN', currency: 'INR' },
+        'Asia/Calcutta': { country: 'IN', currency: 'INR' },
+        'America/New_York': { country: 'US', currency: 'USD' },
+        'America/Los_Angeles': { country: 'US', currency: 'USD' },
+        'America/Chicago': { country: 'US', currency: 'USD' },
+        'America/Denver': { country: 'US', currency: 'USD' },
+        'Europe/London': { country: 'GB', currency: 'GBP' },
+        'America/Toronto': { country: 'CA', currency: 'CAD' },
+        'America/Vancouver': { country: 'CA', currency: 'CAD' },
+        'Australia/Sydney': { country: 'AU', currency: 'AUD' },
+        'Australia/Melbourne': { country: 'AU', currency: 'AUD' },
       };
-      
-      // Try to detect country from navigator language
-      if (navigator.language) {
-        const languageRegion = navigator.language.split('-')[1];
-        if (languageRegion) {
-          // Map common language regions to countries and currencies
-          const regionMap: Record<string, { country: string; currency: string }> = {
-            'IN': { country: 'IN', currency: 'INR' },
-            'US': { country: 'US', currency: 'USD' },
-            'GB': { country: 'GB', currency: 'GBP' },
-            'CA': { country: 'CA', currency: 'CAD' },
-            'AU': { country: 'AU', currency: 'AUD' },
-            // Add more mappings as needed
-          };
-          
-          const regionData = regionMap[languageRegion.toUpperCase()];
-          if (regionData) {
-            detectedLocation.country = regionData.country;
-            detectedLocation.currency = regionData.currency;
-          }
+
+      const timezoneMatch = timezoneCountryMap[detectedTimezone];
+      if (timezoneMatch) {
+        detectedCountry = timezoneMatch.country;
+        detectedCurrency = timezoneMatch.currency;
+      } else {
+        // Fallback to language-based detection
+        const language = navigator.language || navigator.languages?.[0] || 'en-US';
+        const region = language.split('-')[1]?.toUpperCase();
+        
+        const regionMap: Record<string, { country: string; currency: string }> = {
+          'IN': { country: 'IN', currency: 'INR' },
+          'US': { country: 'US', currency: 'USD' },
+          'GB': { country: 'GB', currency: 'GBP' },
+          'CA': { country: 'CA', currency: 'CAD' },
+          'AU': { country: 'AU', currency: 'AUD' },
+        };
+
+        const regionMatch = regionMap[region || ''];
+        if (regionMatch) {
+          detectedCountry = regionMatch.country;
+          detectedCurrency = regionMatch.currency;
         }
       }
+
+      const detectedLocation: LocationData = {
+        country: detectedCountry,
+        currency: detectedCurrency,
+        timezone: detectedTimezone
+      };
       
       console.log('[LocationContext] Location detected:', detectedLocation);
       setLocationData(detectedLocation);
