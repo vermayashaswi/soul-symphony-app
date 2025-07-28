@@ -18,6 +18,7 @@ import BlogPage from '@/pages/website/BlogPage';
 import BlogPostPage from '@/pages/website/BlogPostPage';
 import OnboardingScreen from '@/components/onboarding/OnboardingScreen';
 import SessionRouter from '@/components/routing/SessionRouter';
+import AppLoadingScreen from '@/components/routing/AppLoadingScreen';
 import { useAuth } from '@/contexts/AuthContext';
 import { useOnboarding } from '@/hooks/use-onboarding';
 import { nativeIntegrationService } from '@/services/nativeIntegrationService';
@@ -26,11 +27,17 @@ const AppRoutes = () => {
   const { user, session, isLoading } = useAuth();
   const { onboardingComplete } = useOnboarding();
 
-  // Enhanced app root redirect with session validation
+  // Enhanced app root redirect with proper loading state handling
   const AppRootRedirect = () => {
     const isNative = nativeIntegrationService.isRunningNatively();
 
-    console.log('[AppRoutes] AppRootRedirect - isNative:', isNative, 'user:', !!user, 'session:', !!session);
+    console.log('[AppRoutes] AppRootRedirect - isNative:', isNative, 'user:', !!user, 'session:', !!session, 'isLoading:', isLoading);
+
+    // CRITICAL: Wait for auth state to be loaded before making routing decisions
+    if (isLoading) {
+      console.log('[AppRoutes] Auth state still loading, showing loading screen');
+      return <AppLoadingScreen message="Loading authentication state..." isNative={isNative} />;
+    }
 
     // CRITICAL: For native apps, handle OAuth callback parameters properly
     if (isNative) {
@@ -46,7 +53,7 @@ const AppRoutes = () => {
         return <Navigate to={`/app/auth${window.location.search}${window.location.hash}`} replace />;
       }
 
-      // Simplified: Just check for user/session
+      // Now that auth is loaded, check for user/session
       if (!user) {
         console.log('[AppRoutes] No user in native app, redirecting to onboarding');
         return <Navigate to="/app/onboarding" replace />;
@@ -79,11 +86,17 @@ const AppRoutes = () => {
     return <Navigate to="/app/home" replace />;
   };
 
-  // Enhanced root redirect with session validation
+  // Enhanced root redirect with proper loading state handling
   const RootRedirect = () => {
     const isNative = nativeIntegrationService.isRunningNatively();
 
-    console.log('[AppRoutes] RootRedirect - isNative:', isNative, 'user:', !!user, 'session:', !!session);
+    console.log('[AppRoutes] RootRedirect - isNative:', isNative, 'user:', !!user, 'session:', !!session, 'isLoading:', isLoading);
+
+    // CRITICAL: Wait for auth state to be loaded before making routing decisions
+    if (isLoading) {
+      console.log('[AppRoutes] Auth state still loading in RootRedirect, showing loading screen');
+      return <AppLoadingScreen message="Initializing application..." isNative={isNative} />;
+    }
 
     // CRITICAL: For native apps, NEVER show marketing site - always redirect to app
     if (isNative) {
