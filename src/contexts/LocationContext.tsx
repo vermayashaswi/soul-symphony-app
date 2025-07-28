@@ -1,6 +1,5 @@
 
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { SessionTrackingService } from '@/services/sessionTrackingService';
 
 interface LocationData {
   country: string;
@@ -35,8 +34,8 @@ export function LocationProvider({ children }: { children: ReactNode }) {
       
       console.log('[LocationContext] Starting location detection');
       
-      // Use the existing SessionTrackingService for consistent detection
-      const detectedLocation = await SessionTrackingService.detectLocation();
+      // Simple location detection fallback
+      const detectedLocation = null; // Simplified - no external service needed
       
       if (detectedLocation) {
         console.log('[LocationContext] Location detected:', detectedLocation);

@@ -750,60 +750,6 @@ export type Database = {
           },
         ]
       }
-      user_sessions: {
-        Row: {
-          created_at: string
-          device_type: string | null
-          entry_page: string | null
-          id: string
-          ip_address: string | null
-          is_active: boolean | null
-          last_active_page: string | null
-          last_activity: string | null
-          page_views: number | null
-          platform: string | null
-          session_end: string | null
-          session_start: string
-          session_timeout: string | null
-          user_agent: string | null
-          user_id: string
-        }
-        Insert: {
-          created_at?: string
-          device_type?: string | null
-          entry_page?: string | null
-          id?: string
-          ip_address?: string | null
-          is_active?: boolean | null
-          last_active_page?: string | null
-          last_activity?: string | null
-          page_views?: number | null
-          platform?: string | null
-          session_end?: string | null
-          session_start?: string
-          session_timeout?: string | null
-          user_agent?: string | null
-          user_id: string
-        }
-        Update: {
-          created_at?: string
-          device_type?: string | null
-          entry_page?: string | null
-          id?: string
-          ip_address?: string | null
-          is_active?: boolean | null
-          last_active_page?: string | null
-          last_activity?: string | null
-          page_views?: number | null
-          platform?: string | null
-          session_end?: string | null
-          session_start?: string
-          session_timeout?: string | null
-          user_agent?: string | null
-          user_id?: string
-        }
-        Relationships: []
-      }
     }
     Views: {
       [_ in never]: never
