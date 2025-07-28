@@ -9,43 +9,36 @@ export const isNativeApp = (): boolean => {
   return /native/i.test(window.navigator.userAgent);
 };
 
-// Add global flag for route logging
-declare global {
-  interface Window {
-    __SOULO_ROUTE_LOGGED?: boolean;
-  }
-}
-
-// Simplified route detection to prevent infinite loops
+// CRITICAL FIX: Update the path-based check to treat ALL routes as app routes for native apps
 export const isAppRoute = (pathname: string): boolean => {
   // For native apps, ALL routes are considered app routes
   if (nativeIntegrationService.isRunningNatively()) {
-    // Only log once per session to prevent spam
-    if (!window.__SOULO_ROUTE_LOGGED) {
-      console.log(`[Route] Native app detected - all routes are app routes`);
-      window.__SOULO_ROUTE_LOGGED = true;
-    }
+    console.log(`isAppRoute check for ${pathname}: true (native app - all routes are app routes)`);
     return true;
   }
   
   // For web apps, app routes must start with /app/ or be exactly /app
   const isApp = pathname.startsWith('/app/') || pathname === '/app';
+  console.log(`isAppRoute check for ${pathname}: ${isApp} (web app)`);
   return isApp;
 };
 
 export const isWebsiteRoute = (pathname: string): boolean => {
   // For native apps, NO routes are website routes - everything is treated as app routes
   if (nativeIntegrationService.isRunningNatively()) {
+    console.log(`${pathname} is not a website route (native app - all routes are app routes)`);
     return false;
   }
   
   // If it has an app prefix, it's not a website route
   if (isAppRoute(pathname)) {
+    console.log(`${pathname} is an app route, so not a website route`);
     return false;
   }
   
   // For root URL (/), consider it as a website route in web mode
   if (pathname === '/') {
+    console.log(`${pathname} is root, treating as website route (web mode)`);
     return true;
   }
   
@@ -57,6 +50,7 @@ export const isWebsiteRoute = (pathname: string): boolean => {
     pathname === prefix || pathname.startsWith(`${prefix}/`)
   );
   
+  console.log(`isWebsiteRoute check for ${pathname}: ${isWebsite} (web mode)`);
   return isWebsite;
 };
 

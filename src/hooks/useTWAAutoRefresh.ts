@@ -25,12 +25,6 @@ export const useTWAAutoRefresh = () => {
 
   // Start monitoring for stuck loader
   const startStuckDetection = () => {
-    // Don't interfere with native Capacitor apps
-    if ((window as any).Capacitor?.isNativePlatform?.()) {
-      console.log('[TWA AutoRefresh] Skipping - native Capacitor app detected');
-      return;
-    }
-    
     if (!twaEnv.isTWA && !twaEnv.isStandalone) return;
     
     initializationStartTimeRef.current = Date.now();

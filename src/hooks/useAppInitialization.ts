@@ -1,6 +1,8 @@
 
 import { useEffect, useState } from 'react';
 import { journalReminderService } from '@/services/journalReminderService';
+import { initializeServiceWorker } from '@/utils/serviceWorker';
+import { enhancedPlatformService } from '@/services/enhancedPlatformService';
 
 interface AppInitializationState {
   isInitialized: boolean;
@@ -19,6 +21,12 @@ export const useAppInitialization = () => {
     const initializeApp = async () => {
       try {
         console.log('[AppInit] Initializing app services...');
+        
+        // Initialize service worker for background notifications
+        await initializeServiceWorker();
+        
+        // Initialize platform detection
+        await enhancedPlatformService.detectPlatform();
         
         // Initialize journal reminder service
         await journalReminderService.initializeOnAppStart();

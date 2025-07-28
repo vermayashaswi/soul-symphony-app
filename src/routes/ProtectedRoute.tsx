@@ -3,11 +3,13 @@ import React, { useState, useEffect } from 'react';
 import { Navigate, useLocation, Outlet } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { detectTWAEnvironment } from '@/utils/twaDetection';
+import { useSession } from '@/providers/SessionProvider';
 
 const ProtectedRoute: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [user, setUser] = useState<any>(null);
   const location = useLocation();
+  const { recordActivity } = useSession();
   
   useEffect(() => {
     const checkAuth = async () => {
@@ -43,8 +45,11 @@ const ProtectedRoute: React.FC = () => {
         path: location.pathname,
         userEmail: user.email
       });
+      
+      // Record activity when user accesses protected routes
+      recordActivity();
     }
-  }, [user, isLoading, location]);
+  }, [user, isLoading, location, recordActivity]);
   
   if (isLoading) {
     return (
