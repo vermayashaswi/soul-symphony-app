@@ -6,15 +6,16 @@ export function useUserColorThemeHex() {
   let colorTheme = 'Default';
   let customColor = '#3b82f6';
   
+  // Use a try-catch that actually prevents the error from propagating
   try {
     const themeData = useTheme();
-    if (themeData) {
+    if (themeData && typeof themeData === 'object') {
       colorTheme = themeData.colorTheme || 'Default';
       customColor = themeData.customColor || '#3b82f6';
     }
   } catch (error) {
-    // Theme provider not available, using default colors
-    // This is expected during SSR or before ThemeProvider is mounted
+    // Silently handle the case where ThemeProvider is not available
+    // This prevents the error from bubbling up during SSR or initial render
   }
   switch (colorTheme) {
     case 'Default':

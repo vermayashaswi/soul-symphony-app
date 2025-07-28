@@ -20,6 +20,17 @@ interface ThemeContextType {
 
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 
+// Default theme values for fallback
+const defaultThemeValues: ThemeContextType = {
+  theme: 'system',
+  setTheme: () => {},
+  colorTheme: 'Default',
+  setColorTheme: () => {},
+  customColor: '#3b82f6',
+  setCustomColor: () => {},
+  systemTheme: 'light',
+};
+
 // Safe localStorage access
 const safeLocalStorageGet = (key: string, defaultValue: string): string => {
   try {
@@ -296,24 +307,24 @@ export function ThemeProvider({ children }: ThemeProviderProps) {
 }
 
 export function useTheme() {
-  const context = useContext(ThemeContext);
-  if (context === undefined) {
-    console.error('[useTheme] ThemeProvider context is undefined. This usually happens when:');
-    console.error('1. useTheme is called outside of a ThemeProvider');
-    console.error('2. ThemeProvider is not mounted yet');
-    console.error('3. There\'s a timing issue during app initialization');
-    console.error('Current component stack:', new Error().stack);
-    
-    // Instead of throwing, return safe defaults to prevent app crash
-    return {
-      theme: 'system' as const,
-      setTheme: () => {},
-      colorTheme: 'Calm' as const,
-      setColorTheme: () => {},
-      customColor: '#8b5cf6',
-      setCustomColor: () => {},
-      systemTheme: 'light' as const,
-    };
+  // Add early return for server-side rendering or non-React environments
+  if (typeof window === 'undefined' || typeof useContext === 'undefined') {
+    return defaultThemeValues;
   }
-  return context;
+
+  try {
+    const context = useContext(ThemeContext);
+    if (context === undefined) {
+      // Instead of just warning, throw the proper error to be caught by defensive components
+      throw new Error('useTheme must be used within a ThemeProvider');
+    }
+    return context;
+  } catch (error) {
+    // Only return defaults if this is a genuine context error, otherwise re-throw
+    if (error.message?.includes('useTheme must be used within a ThemeProvider')) {
+      console.warn('[useTheme] ThemeProvider not found, using fallback values');
+      return defaultThemeValues;
+    }
+    throw error;
+  }
 }

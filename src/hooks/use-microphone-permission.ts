@@ -6,6 +6,7 @@ export type MicrophonePermissionState = 'default' | 'granted' | 'denied' | 'unsu
 export const useMicrophonePermission = () => {
   const [permission, setPermission] = useState<MicrophonePermissionState>('default');
   const [isSupported, setIsSupported] = useState(false);
+  const [isCheckingPermission, setIsCheckingPermission] = useState(true);
 
   const checkWebPermission = async () => {
     try {
@@ -44,47 +45,52 @@ export const useMicrophonePermission = () => {
   };
 
   const checkPermission = async () => {
-    // For native environments, check using native permission API first
-    if (nativeIntegrationService.isRunningNatively()) {
-      setIsSupported(true);
-      try {
-        // First check if we have native permission without accessing microphone
-        const nativePermissions = await nativeIntegrationService.checkPermissions(['microphone']);
-        if (nativePermissions && nativePermissions.microphone) {
-          console.log('[useMicrophonePermission] Native permission state:', nativePermissions.microphone);
-          if (nativePermissions.microphone === 'granted') {
-            setPermission('granted');
-            return;
-          } else if (nativePermissions.microphone === 'denied') {
+    setIsCheckingPermission(true);
+    try {
+      // For native environments, check using native permission API first
+      if (nativeIntegrationService.isRunningNatively()) {
+        setIsSupported(true);
+        try {
+          // First check if we have native permission without accessing microphone
+          const nativePermissions = await nativeIntegrationService.checkPermissions(['microphone']);
+          if (nativePermissions && nativePermissions.microphone) {
+            console.log('[useMicrophonePermission] Native permission state:', nativePermissions.microphone);
+            if (nativePermissions.microphone === 'granted') {
+              setPermission('granted');
+              return;
+            } else if (nativePermissions.microphone === 'denied') {
+              setPermission('denied');
+              return;
+            }
+          }
+          
+          // Fallback: try to access microphone if permission status is unclear
+          const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+          stream.getTracks().forEach(track => track.stop());
+          setPermission('granted');
+          return;
+        } catch (error: any) {
+          if (error.name === 'NotAllowedError' || error.name === 'PermissionDeniedError') {
             setPermission('denied');
             return;
           }
-        }
-        
-        // Fallback: try to access microphone if permission status is unclear
-        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-        stream.getTracks().forEach(track => track.stop());
-        setPermission('granted');
-        return;
-      } catch (error: any) {
-        if (error.name === 'NotAllowedError' || error.name === 'PermissionDeniedError') {
-          setPermission('denied');
+          // For other errors, assume we need to request permission
+          setPermission('default');
           return;
         }
-        // For other errors, assume we need to request permission
-        setPermission('default');
-        return;
       }
-    }
 
-    // Fallback to web API
-    if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
-      setIsSupported(true);
-      // Check actual permission state for web
-      await checkWebPermission();
-    } else {
-      setIsSupported(false);
-      setPermission('unsupported');
+      // Fallback to web API
+      if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+        setIsSupported(true);
+        // Check actual permission state for web
+        await checkWebPermission();
+      } else {
+        setIsSupported(false);
+        setPermission('unsupported');
+      }
+    } finally {
+      setIsCheckingPermission(false);
     }
   };
 
@@ -145,6 +151,7 @@ export const useMicrophonePermission = () => {
   return {
     permission,
     isSupported,
+    isCheckingPermission,
     isGranted,
     isDenied,
     isDefault,

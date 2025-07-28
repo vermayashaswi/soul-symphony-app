@@ -198,7 +198,7 @@ export const SubscriptionManagement: React.FC = () => {
                   </p>
                   {!pricingLoading && (
                     <div className="text-xs text-muted-foreground mb-2">
-                      {pricing.country} - {pricing.price}/month
+                      {pricing.country} - {pricing.currency} {pricing.price}/month
                     </div>
                   )}
                   <Button 

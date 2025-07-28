@@ -10,6 +10,7 @@ interface RecordingButtonProps {
   isRecording: boolean;
   isProcessing: boolean;
   hasPermission: boolean | null;
+  isCheckingPermission?: boolean;
   onRecordingStart: () => void;
   onRecordingStop: () => void;
   onPermissionRequest: () => void;
@@ -22,6 +23,7 @@ export function RecordingButton({
   isRecording,
   isProcessing,
   hasPermission,
+  isCheckingPermission = false,
   onRecordingStart,
   onRecordingStop,
   onPermissionRequest,
@@ -38,7 +40,8 @@ export function RecordingButton({
     return null;
   }
   
-  if (hasPermission === false) {
+  // Don't show permission denied state while checking permission
+  if (!isCheckingPermission && hasPermission === false) {
     return (
       <motion.button
         onClick={onPermissionRequest}
