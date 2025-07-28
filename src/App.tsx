@@ -17,6 +17,7 @@ import { SessionProvider } from "./providers/SessionProvider";
 import { SessionLoadingFallback } from "./components/session/SessionLoadingFallback";
 import TWAWrapper from './components/twa/TWAWrapper';
 import TWAInitializationWrapper from './components/twa/TWAInitializationWrapper';
+import { NativeSessionFallback } from './components/native/NativeSessionFallback';
 import { detectTWAEnvironment } from './utils/twaDetection';
 import { useTWAAutoRefresh } from './hooks/useTWAAutoRefresh';
 import { twaUpdateService } from './services/twaUpdateService';
@@ -287,24 +288,26 @@ const App: React.FC = () => {
   return (
     <ErrorBoundary onError={handleAppError}>
       <SessionProvider enableDebug={true}>
-        <SessionLoadingFallback>
-          <FeatureFlagsProvider>
-            <SubscriptionProvider>
-              <TutorialProvider>
-                <TWAWrapper>
-                  <TWAInitializationWrapper>
-                    <TranslationLoadingOverlay />
-                    <JournalProcessingInitializer />
-                    <AppRoutes key={isInitialized ? 'initialized' : 'initializing'} />
-                    <TutorialOverlay />
-                    <Toaster />
-                    <SonnerToaster position="top-right" />
-                  </TWAInitializationWrapper>
-                </TWAWrapper>
-              </TutorialProvider>
-            </SubscriptionProvider>
-          </FeatureFlagsProvider>
-        </SessionLoadingFallback>
+        <NativeSessionFallback>
+          <SessionLoadingFallback>
+            <FeatureFlagsProvider>
+              <SubscriptionProvider>
+                <TutorialProvider>
+                  <TWAWrapper>
+                    <TWAInitializationWrapper>
+                      <TranslationLoadingOverlay />
+                      <JournalProcessingInitializer />
+                      <AppRoutes key={isInitialized ? 'initialized' : 'initializing'} />
+                      <TutorialOverlay />
+                      <Toaster />
+                      <SonnerToaster position="top-right" />
+                    </TWAInitializationWrapper>
+                  </TWAWrapper>
+                </TutorialProvider>
+              </SubscriptionProvider>
+            </FeatureFlagsProvider>
+          </SessionLoadingFallback>
+        </NativeSessionFallback>
       </SessionProvider>
     </ErrorBoundary>
   );

@@ -4,6 +4,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { sessionManager, SessionState, SessionMetrics } from '@/services/sessionManager';
 import { SessionTrackingService } from '@/services/sessionTrackingService';
 import { usePlatformDetection } from '@/hooks/use-platform-detection';
+import { nativeIntegrationService } from '@/services/nativeIntegrationService';
 
 interface UseSessionTrackingOptions {
   enableDebug?: boolean;
@@ -291,6 +292,7 @@ export const useSessionTracking = (options: UseSessionTrackingOptions = {}) => {
     sessionMetrics,
     isInitialized,
     isSessionActive: sessionStartedRef.current,
+    isNative: nativeIntegrationService.isRunningNatively(),
     recordActivity,
     recordError,
     recordCrash,

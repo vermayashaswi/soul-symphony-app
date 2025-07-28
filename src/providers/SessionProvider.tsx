@@ -9,6 +9,7 @@ interface SessionContextType {
   sessionMetrics: SessionMetrics | null;
   isInitialized: boolean;
   isSessionActive: boolean;
+  isNative: boolean;
   recordActivity: () => void;
   recordError: (error: Error) => void;
   recordCrash: () => void;
@@ -56,14 +57,17 @@ export const SessionProvider: React.FC<SessionProviderProps> = ({
     }
   });
 
-  // Add timeout detection for stuck loading states
+  // Optimized timeout detection for native apps
   useEffect(() => {
     if (!sessionTracking.isInitialized && !sessionError) {
+      // Shorter timeout for native apps to prevent indefinite loading
+      const timeoutDuration = sessionTracking.isNative ? 3000 : 10000;
+      
       const stuckTimeout = setTimeout(() => {
-        console.warn('[SessionProvider] Session initialization timeout detected');
+        console.warn(`[SessionProvider] Session initialization timeout detected after ${timeoutDuration}ms`);
         setIsStuckLoading(true);
-        setSessionError('Session initialization is taking longer than expected');
-      }, 10000); // 10 second timeout
+        setSessionError('Session taking longer than expected. This might be a connectivity issue.');
+      }, timeoutDuration);
 
       return () => clearTimeout(stuckTimeout);
     }
@@ -131,6 +135,17 @@ export const SessionProvider: React.FC<SessionProviderProps> = ({
     console.log('[SessionProvider] Retrying session initialization...');
     setSessionError(null);
     setIsStuckLoading(false);
+    
+    // For native apps, also clear any potentially corrupted localStorage
+    if (sessionTracking.isNative) {
+      try {
+        localStorage.removeItem('sb-kwnwhgucnzqxndzjayyq-auth-token');
+        console.log('[SessionProvider] Cleared stored session for native retry');
+      } catch (error) {
+        console.warn('[SessionProvider] Could not clear stored session:', error);
+      }
+    }
+    
     // Force re-initialization by clearing any cached state
     sessionTracking.updateSessionState();
     toast.success('Retrying session initialization...');
