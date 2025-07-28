@@ -226,17 +226,71 @@ const initializeApp = async () => {
 // Start initialization
 initializeApp();
 
+// Error boundary specifically for theme provider issues
+interface ThemeErrorBoundaryState {
+  hasError: boolean;
+}
+
+interface ThemeErrorBoundaryProps {
+  children: React.ReactNode;
+}
+
+class ThemeErrorBoundary extends React.Component<ThemeErrorBoundaryProps, ThemeErrorBoundaryState> {
+  constructor(props: ThemeErrorBoundaryProps) {
+    super(props);
+    this.state = { hasError: false };
+  }
+
+  static getDerivedStateFromError(error: any): ThemeErrorBoundaryState | null {
+    // Check if this is the specific theme provider error
+    if (error?.message?.includes('useTheme must be used within a ThemeProvider')) {
+      console.warn('[ThemeErrorBoundary] Caught theme provider error, attempting recovery');
+      return { hasError: true };
+    }
+    return null;
+  }
+
+  componentDidCatch(error: any, errorInfo: any) {
+    if (error?.message?.includes('useTheme must be used within a ThemeProvider')) {
+      console.error('[ThemeErrorBoundary] Theme provider error caught:', error, errorInfo);
+      // Force a re-render after a short delay to allow providers to initialize
+      setTimeout(() => {
+        this.setState({ hasError: false });
+      }, 100);
+    }
+  }
+
+  render() {
+    if (this.state.hasError) {
+      // Return a minimal loading state while providers initialize
+      return React.createElement('div', { 
+        style: { 
+          display: 'flex', 
+          alignItems: 'center', 
+          justifyContent: 'center', 
+          height: '100vh',
+          fontFamily: 'Inter, sans-serif'
+        } 
+      }, 'Loading...');
+    }
+
+    return this.props.children;
+  }
+}
+
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
     <BrowserRouter>
       <ContextReadinessProvider>
-        <ThemeProvider>
-          <TranslationProvider>
-            <AuthProvider>
-              <App />
-            </AuthProvider>
-          </TranslationProvider>
-        </ThemeProvider>
+        <ThemeErrorBoundary>
+          <ThemeProvider>
+            <TranslationProvider>
+              <AuthProvider>
+                <App />
+              </AuthProvider>
+            </TranslationProvider>
+          </ThemeProvider>
+        </ThemeErrorBoundary>
       </ContextReadinessProvider>
     </BrowserRouter>
   </React.StrictMode>,

@@ -307,15 +307,24 @@ export function ThemeProvider({ children }: ThemeProviderProps) {
 }
 
 export function useTheme() {
+  // Add early return for server-side rendering or non-React environments
+  if (typeof window === 'undefined' || typeof useContext === 'undefined') {
+    return defaultThemeValues;
+  }
+
   try {
     const context = useContext(ThemeContext);
     if (context === undefined) {
-      console.warn('[useTheme] ThemeProvider context is undefined, using fallback values');
-      return defaultThemeValues;
+      // Instead of just warning, throw the proper error to be caught by defensive components
+      throw new Error('useTheme must be used within a ThemeProvider');
     }
     return context;
   } catch (error) {
-    console.warn('[useTheme] Error accessing ThemeContext, using fallback values:', error);
-    return defaultThemeValues;
+    // Only return defaults if this is a genuine context error, otherwise re-throw
+    if (error.message?.includes('useTheme must be used within a ThemeProvider')) {
+      console.warn('[useTheme] ThemeProvider not found, using fallback values');
+      return defaultThemeValues;
+    }
+    throw error;
   }
 }
