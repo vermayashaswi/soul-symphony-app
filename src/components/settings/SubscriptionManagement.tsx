@@ -189,10 +189,12 @@ export const SubscriptionManagement: React.FC = () => {
                 </div>
               )}
 
-              {!isPremium && !error && (
+              {(!isPremium || isTrialActive) && !error && (
                 <div className="bg-muted/50 rounded-lg p-3 border">
                   <p className="text-sm text-muted-foreground mb-3">
-                    <TranslatableText text="Upgrade to Premium for unlimited journaling, advanced insights, and more features." />
+                    <TranslatableText text={isTrialActive 
+                      ? "Upgrade to continue Premium features after your trial ends." 
+                      : "Upgrade to Premium for unlimited journaling, advanced insights, and more features."} />
                   </p>
                   {!pricingLoading && (
                     <div className="text-xs text-muted-foreground mb-2">
@@ -205,7 +207,7 @@ export const SubscriptionManagement: React.FC = () => {
                     disabled={pricingLoading}
                   >
                     <Crown className="h-4 w-4 mr-2" />
-                    <TranslatableText text="Upgrade to Premium" />
+                    <TranslatableText text={isTrialActive ? "Upgrade Before Trial Ends" : "Upgrade to Premium"} />
                   </Button>
                 </div>
               )}
