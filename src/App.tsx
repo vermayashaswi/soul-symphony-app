@@ -287,28 +287,26 @@ const App: React.FC = () => {
 
   return (
     <ErrorBoundary onError={handleAppError}>
-      <SessionProvider enableDebug={true}>
-        <NativeSessionFallback>
-          <SessionLoadingFallback>
-            <FeatureFlagsProvider>
-              <SubscriptionProvider>
-                <TutorialProvider>
-                  <TWAWrapper>
-                    <TWAInitializationWrapper>
-                      <TranslationLoadingOverlay />
-                      <JournalProcessingInitializer />
-                      <AppRoutes key={isInitialized ? 'initialized' : 'initializing'} />
-                      <TutorialOverlay />
-                      <Toaster />
-                      <SonnerToaster position="top-right" />
-                    </TWAInitializationWrapper>
-                  </TWAWrapper>
-                </TutorialProvider>
-              </SubscriptionProvider>
-            </FeatureFlagsProvider>
-          </SessionLoadingFallback>
-        </NativeSessionFallback>
-      </SessionProvider>
+      <NativeSessionFallback>
+        <SessionLoadingFallback>
+          <FeatureFlagsProvider>
+            <SubscriptionProvider>
+              <TutorialProvider>
+                <TWAWrapper>
+                  <TWAInitializationWrapper>
+                    <TranslationLoadingOverlay />
+                    <JournalProcessingInitializer />
+                    <AppRoutes key={isInitialized ? 'initialized' : 'initializing'} />
+                    <TutorialOverlay />
+                    <Toaster />
+                    <SonnerToaster position="top-right" />
+                  </TWAInitializationWrapper>
+                </TWAWrapper>
+              </TutorialProvider>
+            </SubscriptionProvider>
+          </FeatureFlagsProvider>
+        </SessionLoadingFallback>
+      </NativeSessionFallback>
     </ErrorBoundary>
   );
 };
