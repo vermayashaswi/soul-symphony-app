@@ -56,6 +56,39 @@ export type Database = {
         }
         Relationships: []
       }
+      auth_errors: {
+        Row: {
+          context: string | null
+          created_at: string | null
+          error_message: string
+          error_type: string
+          id: string
+          resolved: boolean | null
+          updated_at: string | null
+          user_id: string | null
+        }
+        Insert: {
+          context?: string | null
+          created_at?: string | null
+          error_message: string
+          error_type: string
+          id?: string
+          resolved?: boolean | null
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          context?: string | null
+          created_at?: string | null
+          error_message?: string
+          error_type?: string
+          id?: string
+          resolved?: boolean | null
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       chat_messages: {
         Row: {
           analysis_data: Json | null
@@ -813,7 +846,7 @@ export type Database = {
         Returns: Json
       }
       debug_user_auth: {
-        Args: { user_id_param?: string }
+        Args: { target_user_id: string }
         Returns: Json
       }
       delete_all_user_journal_entries: {
@@ -1265,6 +1298,10 @@ export type Database = {
         Args: { target_entry_id: number }
         Returns: Json
       }
+      reset_user_auth: {
+        Args: { target_user_id: string }
+        Returns: Json
+      }
       setup_user_trial_fallback: {
         Args: { user_id: string }
         Returns: Json
@@ -1292,6 +1329,10 @@ export type Database = {
       table_exists: {
         Args: { table_name: string }
         Returns: boolean
+      }
+      test_auth_flow: {
+        Args: { test_user_id: string }
+        Returns: Json
       }
       update_session_activity: {
         Args: { p_session_id: string; p_page?: string; p_language?: string }
