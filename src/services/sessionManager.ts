@@ -52,24 +52,38 @@ class SessionManager {
 
       this.log('Starting session for user', { userId, deviceInfo });
 
-      // Call the simple_session_manager function to create a new session
-      const { data: sessionId, error } = await supabase.rpc('simple_session_manager', {
+      // Use the safer session manager function with error handling
+      const { data: result, error } = await supabase.rpc('safe_session_manager', {
         p_user_id: userId,
-        p_device_type: deviceInfo?.platform || 'unknown',
+        p_device_type: deviceInfo?.platform || 'web',
         p_entry_page: deviceInfo?.entryPage || window.location.pathname
       });
 
       if (error) {
-        console.error('[SessionManager] Error creating session:', error);
-        return null;
+        console.error('[SessionManager] Session creation failed with error:', error);
+        // Fallback to direct insertion if RPC fails
+        return await this.createSessionFallback(userId, deviceInfo);
       }
 
-      this.currentSessionId = sessionId;
-      this.log('Session created successfully', { sessionId });
+      // Type assertion for the RPC response
+      const sessionResult = result as { success: boolean; session_id?: string; error?: string } | null;
+
+      if (!sessionResult?.success) {
+        this.log('Session creation unsuccessful:', sessionResult);
+        return await this.createSessionFallback(userId, deviceInfo);
+      }
+
+      if (!sessionResult.session_id) {
+        this.log('No session ID returned from successful creation');
+        return await this.createSessionFallback(userId, deviceInfo);
+      }
+
+      this.currentSessionId = sessionResult.session_id;
+      this.log('Session created successfully', { sessionId: sessionResult.session_id });
 
       // Return session state
       return {
-        id: sessionId,
+        id: sessionResult.session_id,
         userId,
         isActive: true,
         startTime: new Date(),
@@ -80,6 +94,52 @@ class SessionManager {
       };
     } catch (error) {
       console.error('[SessionManager] Error in startSession:', error);
+      
+      // Try fallback session creation
+      if (userId) {
+        return await this.createSessionFallback(userId, deviceInfo);
+      }
+      
+      return null;
+    }
+  }
+
+  private async createSessionFallback(userId: string, deviceInfo?: any): Promise<SessionState | null> {
+    try {
+      this.log('Using fallback session creation for user:', userId);
+      
+      // Simple direct insertion as fallback
+      const { data: session, error } = await supabase
+        .from('user_sessions')
+        .insert({
+          user_id: userId,
+          device_type: deviceInfo?.platform || 'web',
+          entry_page: deviceInfo?.entryPage || window.location.pathname,
+          last_activity: new Date().toISOString()
+        })
+        .select()
+        .single();
+
+      if (error) {
+        console.error('[SessionManager] Fallback session creation failed:', error);
+        return null;
+      }
+
+      this.currentSessionId = session.id;
+      this.log('Fallback session created:', session.id);
+
+      return {
+        id: session.id,
+        userId: session.user_id,
+        isActive: true,
+        startTime: new Date(session.session_start),
+        lastActivity: new Date(session.last_activity),
+        state: 'active',
+        pageViews: session.page_views || 1,
+        qualityScore: 0
+      };
+    } catch (error) {
+      console.error('[SessionManager] Fallback session creation error:', error);
       return null;
     }
   }

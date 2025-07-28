@@ -1,6 +1,8 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { useSessionTracking } from '@/hooks/useSessionTracking';
+import { useLoadingTimeout } from '@/hooks/useLoadingTimeout';
 import { SessionState, SessionMetrics } from '@/services/sessionManager';
+import { toast } from 'sonner';
 
 interface SessionContextType {
   currentSession: SessionState | null;
@@ -13,6 +15,10 @@ interface SessionContextType {
   trackConversion: (eventType: string, eventData?: Record<string, any>) => Promise<void>;
   updateSessionState: () => void;
   updateSessionMetrics: () => void;
+  // Add error and loading states
+  sessionError: string | null;
+  isStuckLoading: boolean;
+  retryInitialization: () => void;
 }
 
 const SessionContext = createContext<SessionContextType | null>(null);
@@ -121,8 +127,20 @@ export const SessionProvider: React.FC<SessionProviderProps> = ({
     trackAppEvents();
   }, [sessionTracking.isSessionActive]);
 
+  const retryInitialization = () => {
+    console.log('[SessionProvider] Retrying session initialization...');
+    setSessionError(null);
+    setIsStuckLoading(false);
+    // Force re-initialization by clearing any cached state
+    sessionTracking.updateSessionState();
+    toast.success('Retrying session initialization...');
+  };
+
   const contextValue: SessionContextType = {
-    ...sessionTracking
+    ...sessionTracking,
+    sessionError,
+    isStuckLoading,
+    retryInitialization
   };
 
   return (

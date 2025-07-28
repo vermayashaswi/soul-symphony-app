@@ -1309,6 +1309,14 @@ export type Database = {
         Args: { target_user_id: string }
         Returns: Json
       }
+      safe_session_manager: {
+        Args: {
+          p_user_id: string
+          p_device_type?: string
+          p_entry_page?: string
+        }
+        Returns: Json
+      }
       setup_user_trial_fallback: {
         Args: { user_id: string }
         Returns: Json
