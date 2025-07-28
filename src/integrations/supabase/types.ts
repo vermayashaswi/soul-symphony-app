@@ -14,6 +14,48 @@ export type Database = {
   }
   public: {
     Tables: {
+      api_usage: {
+        Row: {
+          created_at: string
+          endpoint: string
+          id: string
+          ip_address: string | null
+          method: string
+          request_size: number | null
+          response_size: number | null
+          response_time_ms: number | null
+          status_code: number | null
+          user_agent: string | null
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          endpoint: string
+          id?: string
+          ip_address?: string | null
+          method: string
+          request_size?: number | null
+          response_size?: number | null
+          response_time_ms?: number | null
+          status_code?: number | null
+          user_agent?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          endpoint?: string
+          id?: string
+          ip_address?: string | null
+          method?: string
+          request_size?: number | null
+          response_size?: number | null
+          response_time_ms?: number | null
+          status_code?: number | null
+          user_agent?: string | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       chat_messages: {
         Row: {
           analysis_data: Json | null
@@ -260,6 +302,39 @@ export type Database = {
           },
         ]
       }
+      openai_usage: {
+        Row: {
+          cost_usd: number | null
+          created_at: string
+          id: string
+          model: string
+          request_type: string | null
+          session_id: string | null
+          tokens_used: number
+          user_id: string | null
+        }
+        Insert: {
+          cost_usd?: number | null
+          created_at?: string
+          id?: string
+          model: string
+          request_type?: string | null
+          session_id?: string | null
+          tokens_used: number
+          user_id?: string | null
+        }
+        Update: {
+          cost_usd?: number | null
+          created_at?: string
+          id?: string
+          model?: string
+          request_type?: string | null
+          session_id?: string | null
+          tokens_used?: number
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           avatar_url: string | null
@@ -383,6 +458,36 @@ export type Database = {
           tutorial_completed?: string | null
           tutorial_step?: number | null
           updated_at?: string | null
+        }
+        Relationships: []
+      }
+      rate_limits: {
+        Row: {
+          created_at: string
+          endpoint: string
+          id: string
+          ip_address: string | null
+          request_count: number
+          user_id: string | null
+          window_start: string
+        }
+        Insert: {
+          created_at?: string
+          endpoint: string
+          id?: string
+          ip_address?: string | null
+          request_count?: number
+          user_id?: string | null
+          window_start?: string
+        }
+        Update: {
+          created_at?: string
+          endpoint?: string
+          id?: string
+          ip_address?: string | null
+          request_count?: number
+          user_id?: string | null
+          window_start?: string
         }
         Relationships: []
       }
@@ -744,6 +849,10 @@ export type Database = {
               p_attribution_data?: Json
             }
         Returns: string
+      }
+      execute_dynamic_query: {
+        Args: { query_text: string }
+        Returns: Json
       }
       get_active_themes: {
         Args: Record<PropertyKey, never>

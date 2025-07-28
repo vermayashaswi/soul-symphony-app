@@ -14,7 +14,11 @@ import { useSubscription } from '@/contexts/SubscriptionContext';
 import { useSafeArea } from '@/hooks/use-safe-area';
 import { useKeyboardDetection } from '@/hooks/use-keyboard-detection';
 
-const MobileNavigation: React.FC = () => {
+interface MobileNavigationProps {
+  onboardingComplete: boolean | null;
+}
+
+const MobileNavigation: React.FC<MobileNavigationProps> = ({ onboardingComplete }) => {
   const location = useLocation();
   const isMobile = useIsMobile();
   const [isVisible, setIsVisible] = useState(false);
@@ -86,7 +90,8 @@ const MobileNavigation: React.FC = () => {
     
     const shouldShowNav = (isMobile.isMobile || isNativeApp()) && 
                           !isOnboardingOrAuth &&
-                          !!user;
+                          !!user &&
+                          onboardingComplete !== false;
     
     console.log('[MobileNavigation] Visibility check:', { 
       shouldShowNav, 
@@ -96,13 +101,14 @@ const MobileNavigation: React.FC = () => {
       isKeyboardVisible,
       isOnboardingOrAuth,
       hasUser: !!user,
+      onboardingComplete,
       safeArea
     });
     
     setIsVisible(shouldShowNav);
-  }, [location.pathname, isMobile.isMobile, isKeyboardVisible, isTutorialActive, user, currentLanguage, renderKey, safeArea]);
+  }, [location.pathname, isMobile.isMobile, isKeyboardVisible, isTutorialActive, user, onboardingComplete, currentLanguage, renderKey, safeArea]);
   
-  if (!isVisible) {
+  if (!isVisible || onboardingComplete === false) {
     return null;
   }
   

@@ -1,6 +1,7 @@
 
 import React from 'react';
 import { motion } from 'framer-motion';
+import { useTheme } from '@/hooks/use-theme';
 
 const languages = [
   "Speak in any language!!",
@@ -31,15 +32,21 @@ const languages = [
 ];
 
 export function LanguageBackground({ contained = false }: { contained?: boolean }) {
-  // Use safe defaults to prevent theme provider errors during initialization
-  const theme = 'light';
+  // Defensive theme access
+  let theme = 'light';
+  try {
+    const themeData = useTheme();
+    theme = themeData.theme;
+  } catch (error) {
+    console.warn('Theme provider not available, using default theme');
+  }
   
   return (
     <div className="absolute inset-0 overflow-hidden">
       {languages.map((text, i) => (
         <motion.div
           key={i}
-          className="absolute pointer-events-none select-none whitespace-nowrap text-sm text-foreground"
+          className="absolute pointer-events-none select-none whitespace-nowrap text-sm"
           initial={{
             x: contained ? `${Math.random() * 100}%` : `${100 + Math.random() * 100}%`,
             y: contained ? `${Math.random() * 100}%` : `${Math.random() * 100}%`,
@@ -59,6 +66,9 @@ export function LanguageBackground({ contained = false }: { contained?: boolean 
             repeatDelay: languages.length * 1.5,
             ease: "easeInOut",
           }}
+          style={{
+            color: theme === 'dark' ? "#fff" : undefined,
+          }}
         >
           {text}
         </motion.div>
@@ -68,8 +78,14 @@ export function LanguageBackground({ contained = false }: { contained?: boolean 
 }
 
 export function AnimatedPrompt() {
-  // Use safe defaults to prevent theme provider errors during initialization
-  const theme = 'light';
+  // Defensive theme access
+  let theme = 'light';
+  try {
+    const themeData = useTheme();
+    theme = themeData.theme;
+  } catch (error) {
+    console.warn('Theme provider not available, using default theme');
+  }
   
   return (
     <div className="relative w-full h-full flex items-center justify-center">
@@ -79,10 +95,20 @@ export function AnimatedPrompt() {
         transition={{ duration: 0.5 }}
         className="text-center mb-3"
       >
-        <h3 className="text-lg font-medium mb-1 text-foreground">
+        <h3 
+          className="text-lg font-medium mb-1"
+          style={{
+            color: theme === 'dark' ? "#fff" : undefined,
+          }}
+        >
           Speak in any language!!
         </h3>
-        <p className="text-sm opacity-80 text-muted-foreground">
+        <p 
+          className="text-sm opacity-80"
+          style={{
+            color: theme === 'dark' ? "rgba(255, 255, 255, 0.8)" : undefined,
+          }}
+        >
           I'll transcribe and analyze your voice recording
         </p>
       </motion.div>

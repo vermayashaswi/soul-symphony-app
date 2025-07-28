@@ -190,7 +190,7 @@ export class SessionTrackingService {
   }
 
   /**
-   * Create or update user session with enhanced tracking
+   * Create or update user session with enhanced tracking using SessionManager
    */
   static async createUserSession(data: SessionTrackingData): Promise<string | null> {
     try {
@@ -203,30 +203,18 @@ export class SessionTrackingService {
         language: data.language,
       });
 
-      const { data: sessionId, error } = await supabase
-        .rpc('enhanced_manage_user_session', {
-          p_user_id: data.userId,
-          p_device_type: data.deviceType,
-          p_user_agent: data.userAgent,
-          p_entry_page: data.entryPage,
-          p_last_active_page: data.lastActivePage,
-          p_language: data.language,
-          p_referrer: data.referrer,
-          p_ip_address: data.ipAddress,
-          p_country_code: data.countryCode,
-          p_currency: data.currency,
-          p_utm_source: data.utmSource,
-          p_utm_medium: data.utmMedium,
-          p_utm_campaign: data.utmCampaign,
-          p_utm_term: data.utmTerm,
-          p_utm_content: data.utmContent,
-          p_gclid: data.gclid,
-          p_fbclid: data.fbclid,
-          p_attribution_data: data.attributionData || {},
-        });
+      // Use the new SessionManager for comprehensive session tracking
+      const { sessionManager } = await import('./sessionManager');
+      
+      const sessionId = await sessionManager.startSession(data.userId, {
+        entryPage: data.entryPage,
+        deviceType: data.deviceType,
+        userAgent: data.userAgent,
+        appVersion: '1.0.0' // This could be derived from build metadata
+      });
 
-      if (error) {
-        console.error('Error creating enhanced user session:', error);
+      if (!sessionId) {
+        console.error('SessionManager failed to create session');
         return null;
       }
 
@@ -239,25 +227,44 @@ export class SessionTrackingService {
   }
 
   /**
-   * Track conversion event (simplified for security)
+   * Track conversion event
    */
   static async trackConversion(sessionId: string, eventType: string, eventData: Record<string, any> = {}): Promise<void> {
     try {
-      console.log('Conversion event tracked:', eventType, eventData);
-      // Note: Database function removed for security - implement via edge function if needed
+      const { error } = await supabase
+        .rpc('track_conversion_event', {
+          p_session_id: sessionId,
+          p_event_type: eventType,
+          p_event_data: eventData,
+        });
+
+      if (error) {
+        console.error('Error tracking conversion event:', error);
+      } else {
+        console.log('Conversion event tracked:', eventType, eventData);
+      }
     } catch (error) {
       console.error('Exception tracking conversion event:', error);
     }
   }
 
   /**
-   * Get attribution analytics (simplified for security)
+   * Get attribution analytics
    */
   static async getAttributionAnalytics(startDate?: string, endDate?: string) {
     try {
-      console.log('Attribution analytics requested for period:', startDate, endDate);
-      // Note: Database function removed for security - implement via edge function if needed
-      return null;
+      const { data, error } = await supabase
+        .rpc('get_attribution_analytics', {
+          p_start_date: startDate,
+          p_end_date: endDate,
+        });
+
+      if (error) {
+        console.error('Error getting attribution analytics:', error);
+        return null;
+      }
+
+      return data;
     } catch (error) {
       console.error('Exception getting attribution analytics:', error);
       return null;

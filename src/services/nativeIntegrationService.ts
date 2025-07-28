@@ -108,21 +108,12 @@ class NativeIntegrationService {
 
   private async initializeCapacitor(): Promise<void> {
     try {
-      console.log('[NativeIntegration] Starting Capacitor initialization...');
-      
-      // Wait for Capacitor to be ready with timeout
-      const capacitorReady = await this.waitForCapacitorReady();
-      
-      if (!capacitorReady) {
-        console.warn('[NativeIntegration] Capacitor not available after timeout');
-        return;
-      }
-
       const { Capacitor } = (window as any);
 
       if (Capacitor && Capacitor.Plugins) {
         this.plugins = Capacitor.Plugins;
-        
+        this.isCapacitorReady = true;
+
         console.log('[NativeIntegration] Available Capacitor plugins:', Object.keys(this.plugins));
 
         if (this.isActuallyNative) {
@@ -130,45 +121,11 @@ class NativeIntegrationService {
         } else {
           console.log('[NativeIntegration] Skipping native plugin initialization - running in web environment');
         }
-        
-        // Set ready flag AFTER all initialization is complete
-        this.isCapacitorReady = true;
-        console.log('[NativeIntegration] Capacitor initialization completed successfully');
       }
     } catch (error) {
       console.error('[NativeIntegration] Capacitor initialization failed:', error);
-      this.isCapacitorReady = false;
       mobileErrorHandler.handleCapacitorError('Core', error.toString());
     }
-  }
-
-  private async waitForCapacitorReady(): Promise<boolean> {
-    return new Promise((resolve) => {
-      const maxWait = 10000; // 10 seconds
-      const checkInterval = 100; // Check every 100ms
-      let elapsed = 0;
-
-      const check = () => {
-        const { Capacitor } = (window as any);
-        
-        if (Capacitor && Capacitor.Plugins) {
-          console.log('[NativeIntegration] Capacitor is ready');
-          resolve(true);
-          return;
-        }
-
-        elapsed += checkInterval;
-        if (elapsed >= maxWait) {
-          console.warn('[NativeIntegration] Capacitor ready timeout');
-          resolve(false);
-          return;
-        }
-
-        setTimeout(check, checkInterval);
-      };
-
-      check();
-    });
   }
 
   private async initializeCorePlugins(): Promise<void> {

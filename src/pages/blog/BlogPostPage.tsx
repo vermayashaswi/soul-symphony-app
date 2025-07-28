@@ -9,7 +9,6 @@ import { Card, CardContent } from '@/components/ui/card';
 import { blogPosts, BlogPost } from '@/data/blogPosts';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/website/Footer';
-import ReactMarkdown from 'react-markdown';
 
 const BlogPostPage = () => {
   const { slug } = useParams<{ slug: string }>();
@@ -151,10 +150,8 @@ const BlogPostPage = () => {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ duration: 0.5, delay: 0.5 }}
-          >
-            {/* Security fix: Use React Markdown instead of dangerouslySetInnerHTML */}
-            <ReactMarkdown>{post.content}</ReactMarkdown>
-          </motion.article>
+            dangerouslySetInnerHTML={{ __html: post.content }}
+          />
           
           <div className="mt-12 pt-6 border-t border-primary/10">
             <h3 className="text-lg font-semibold mb-3">Tags:</h3>

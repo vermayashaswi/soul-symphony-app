@@ -61,9 +61,3 @@ verify_jwt = true
 
 [functions.translate-text]
 verify_jwt = false
-
-[functions.weather-api]
-verify_jwt = true
-
-[functions.push-config]
-verify_jwt = true

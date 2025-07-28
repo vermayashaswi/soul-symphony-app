@@ -1,6 +1,5 @@
 import { serviceWorkerManager } from '@/utils/serviceWorker';
 import { toast } from 'sonner';
-import { supabase } from '@/integrations/supabase/client';
 
 export interface PushSubscriptionData {
   endpoint: string;
@@ -31,7 +30,7 @@ export interface NotificationPayload {
 
 class PushNotificationService {
   private static instance: PushNotificationService;
-  private vapidPublicKey: string | null = null;
+  private vapidPublicKey = 'BMxGp7l5C1XnRIAr2oPKcLqvOjCDQOhNPJWGw8HXKsF9X9A1dKZb4rUwVyPjCDj3J5F7P2Y8GhQzW3N1SzX4V6R';
   private subscription: PushSubscription | null = null;
 
   static getInstance(): PushNotificationService {
@@ -65,24 +64,6 @@ class PushNotificationService {
   }
 
   /**
-   * Get VAPID public key from secure edge function
-   */
-  private async getVapidPublicKey(): Promise<string> {
-    if (this.vapidPublicKey) {
-      return this.vapidPublicKey;
-    }
-
-    const { data, error } = await supabase.functions.invoke('push-config');
-    
-    if (error || !data.success) {
-      throw new Error('Failed to get push notification configuration');
-    }
-
-    this.vapidPublicKey = data.vapidPublicKey;
-    return this.vapidPublicKey;
-  }
-
-  /**
    * Subscribe to push notifications
    */
   async subscribe(): Promise<PushSubscription | null> {
@@ -109,9 +90,6 @@ class PushNotificationService {
         throw new Error('No service worker registration available');
       }
 
-      // Get VAPID key securely
-      const vapidKey = await this.getVapidPublicKey();
-
       // Check for existing subscription
       let subscription = await registration.pushManager.getSubscription();
       
@@ -119,7 +97,7 @@ class PushNotificationService {
         // Create new subscription
         subscription = await registration.pushManager.subscribe({
           userVisibleOnly: true,
-          applicationServerKey: this.urlBase64ToUint8Array(vapidKey)
+          applicationServerKey: this.urlBase64ToUint8Array(this.vapidPublicKey)
         });
       }
 
