@@ -163,7 +163,7 @@ export default function MobileChatInput({
       ref={inputContainerRef}
       className={cn(
         "mobile-chat-input-container",
-        "flex items-center gap-3",
+        "flex items-center gap-3 p-3",
         // Note: keyboard-visible and platform classes are managed by useKeyboardState hook
         !isReady && 'opacity-0'
       )}
