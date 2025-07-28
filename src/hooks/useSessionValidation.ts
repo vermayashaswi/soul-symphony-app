@@ -22,47 +22,25 @@ export const useSessionValidation = () => {
 
   const validateStoredSession = (): Session | null => {
     try {
-      // For native apps, avoid synchronous localStorage access issues
-      if (isNative && typeof window === 'undefined') {
-        console.log('[useSessionValidation] Skipping localStorage in native environment');
-        return null;
-      }
-
       const storedSession = localStorage.getItem('sb-kwnwhgucnzqxndzjayyq-auth-token');
-      if (!storedSession) {
-        console.log('[useSessionValidation] No stored session found');
-        return null;
-      }
+      if (!storedSession) return null;
 
       const sessionData = JSON.parse(storedSession);
       
-      // Enhanced validation for session structure
-      if (sessionData?.access_token && sessionData?.expires_at && sessionData?.user) {
+      // Validate session structure and expiry
+      if (sessionData?.access_token && sessionData?.expires_at) {
         const now = Date.now() / 1000;
         if (sessionData.expires_at > now) {
-          console.log('[useSessionValidation] Valid stored session found', {
-            userId: sessionData.user?.id,
-            expiresIn: sessionData.expires_at - now
-          });
+          console.log('[useSessionValidation] Valid stored session found');
           return sessionData as Session;
         } else {
           console.log('[useSessionValidation] Stored session expired');
-          // Clean up expired session
-          localStorage.removeItem('sb-kwnwhgucnzqxndzjayyq-auth-token');
         }
-      } else {
-        console.log('[useSessionValidation] Invalid session structure');
       }
       
       return null;
     } catch (error) {
       console.warn('[useSessionValidation] Error validating stored session:', error);
-      // Clean up corrupted session data
-      try {
-        localStorage.removeItem('sb-kwnwhgucnzqxndzjayyq-auth-token');
-      } catch (cleanupError) {
-        console.warn('[useSessionValidation] Failed to cleanup corrupted session:', cleanupError);
-      }
       return null;
     }
   };

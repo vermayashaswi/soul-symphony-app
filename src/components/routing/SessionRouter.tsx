@@ -31,26 +31,24 @@ export const SessionRouter: React.FC<SessionRouterProps> = ({
 
   useEffect(() => {
     let mounted = true;
-    let timeoutId: NodeJS.Timeout | null = null;
 
     const checkSession = async () => {
       try {
-        console.log('[SessionRouter] Starting session check...');
+        console.log('[SessionRouter] Checking session state...');
         
-        // For native apps, use optimized session validation
+        // For native apps, try to get session synchronously first from localStorage
         if (isNative) {
           try {
             const storedSession = localStorage.getItem('sb-kwnwhgucnzqxndzjayyq-auth-token');
             if (storedSession) {
               const sessionData = JSON.parse(storedSession);
+              console.log('[SessionRouter] Found stored session data in native app');
               
-              // Enhanced validation with buffer time
-              if (sessionData?.access_token && sessionData?.expires_at && sessionData?.user) {
+              // Quick validation of stored session
+              if (sessionData?.access_token && sessionData?.expires_at) {
                 const now = Date.now() / 1000;
-                const buffer = 60; // 60 second buffer
-                
-                if (sessionData.expires_at > (now + buffer)) {
-                  console.log('[SessionRouter] Valid stored session found for native app');
+                if (sessionData.expires_at > now) {
+                  console.log('[SessionRouter] Session appears valid, proceeding');
                   if (mounted) {
                     setSessionState({
                       session: sessionData as Session,
@@ -59,62 +57,22 @@ export const SessionRouter: React.FC<SessionRouterProps> = ({
                     });
                   }
                   return;
-                } else {
-                  console.log('[SessionRouter] Stored session expired or expiring soon, clearing');
-                  localStorage.removeItem('sb-kwnwhgucnzqxndzjayyq-auth-token');
                 }
               }
             }
           } catch (error) {
             console.warn('[SessionRouter] Error reading stored session:', error);
-            // Clean up corrupted session data
-            try {
-              localStorage.removeItem('sb-kwnwhgucnzqxndzjayyq-auth-token');
-            } catch (cleanupError) {
-              console.warn('[SessionRouter] Failed to cleanup corrupted session');
-            }
           }
         }
 
-        // Add timeout for native apps to prevent infinite loading
-        if (isNative) {
-          timeoutId = setTimeout(() => {
-            console.warn('[SessionRouter] Session check timeout for native app');
-            if (mounted) {
-              setSessionState({
-                session: null,
-                loading: false,
-                checked: true
-              });
-            }
-          }, 3000); // 3 second timeout for native
-        }
-
-        // Async session check with shorter timeout for native
-        const controller = new AbortController();
-        const timeoutDuration = isNative ? 2000 : 5000;
-        
-        const timeoutPromise = new Promise((_, reject) =>
-          setTimeout(() => reject(new Error('Session check timeout')), timeoutDuration)
-        );
-
-        const sessionPromise = supabase.auth.getSession();
-        
-        const { data: { session }, error } = await Promise.race([
-          sessionPromise,
-          timeoutPromise
-        ]) as { data: { session: Session | null }, error: any };
-        
-        if (timeoutId) {
-          clearTimeout(timeoutId);
-          timeoutId = null;
-        }
+        // Fallback to async session check
+        const { data: { session }, error } = await supabase.auth.getSession();
         
         if (error) {
           console.error('[SessionRouter] Session check error:', error);
         }
 
-        console.log('[SessionRouter] Session check completed:', {
+        console.log('[SessionRouter] Session check result:', {
           hasSession: !!session,
           userId: session?.user?.id,
           isNative
@@ -129,9 +87,6 @@ export const SessionRouter: React.FC<SessionRouterProps> = ({
         }
       } catch (error) {
         console.error('[SessionRouter] Session check failed:', error);
-        if (timeoutId) {
-          clearTimeout(timeoutId);
-        }
         if (mounted) {
           setSessionState({
             session: null,
@@ -146,9 +101,6 @@ export const SessionRouter: React.FC<SessionRouterProps> = ({
 
     return () => {
       mounted = false;
-      if (timeoutId) {
-        clearTimeout(timeoutId);
-      }
     };
   }, [isNative]);
 

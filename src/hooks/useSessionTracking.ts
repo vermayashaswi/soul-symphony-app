@@ -3,8 +3,6 @@ import { useLocation } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { sessionManager, SessionState, SessionMetrics } from '@/services/sessionManager';
 import { SessionTrackingService } from '@/services/sessionTrackingService';
-import { usePlatformDetection } from '@/hooks/use-platform-detection';
-import { nativeIntegrationService } from '@/services/nativeIntegrationService';
 
 interface UseSessionTrackingOptions {
   enableDebug?: boolean;
@@ -24,7 +22,6 @@ export const useSessionTracking = (options: UseSessionTrackingOptions = {}) => {
   } = options;
 
   const location = useLocation();
-  const platformInfo = usePlatformDetection();
   const [currentSession, setCurrentSession] = useState<SessionState | null>(null);
   const [sessionMetrics, setSessionMetrics] = useState<SessionMetrics | null>(null);
   const [isInitialized, setIsInitialized] = useState(false);
@@ -145,56 +142,34 @@ export const useSessionTracking = (options: UseSessionTrackingOptions = {}) => {
       const locationData = await SessionTrackingService.detectLocation();
       const utmParams = SessionTrackingService.extractUtmParameters();
 
-      if (enableDebug) {
-        console.log('[useSessionTracking] Starting session with platform info:', {
-          platform: deviceInfo.platform,
-          isNative: deviceInfo.isNative,
-          deviceType: deviceInfo.deviceType,
-          entryPage: window.location.pathname,
-          userAgent: navigator.userAgent.substring(0, 100) + '...'
-        });
-      }
-
-      // Start session using SessionManager with complete device info
-      const sessionData = await sessionManager.startSession(userId, {
+      // Start session using SessionManager
+      const sessionId = await sessionManager.startSession(userId, {
         entryPage: window.location.pathname,
-        platform: deviceInfo.platform,
         deviceType: deviceInfo.deviceType,
-        isNative: deviceInfo.isNative,
         userAgent: navigator.userAgent,
-        appVersion: getAppVersion(),
-        locationData,
-        utmParams
+        appVersion: getAppVersion()
       });
 
-      if (sessionData) {
+      if (sessionId) {
         sessionStartedRef.current = true;
         updateSessionState();
         updateSessionMetrics();
         
-        if (onSessionStart && sessionData) {
-          onSessionStart(sessionData.id);
+        if (onSessionStart && sessionId) {
+          onSessionStart(sessionId.id);
         }
 
         if (enableDebug) {
-          console.log('[useSessionTracking] Session started successfully:', {
-            sessionId: sessionData.id,
-            platform: deviceInfo.platform,
-            isNative: deviceInfo.isNative
-          });
+          console.log('[useSessionTracking] Session started successfully:', sessionId);
         }
 
-        // Track initial conversion event with platform information
+        // Track initial conversion event
         await SessionTrackingService.trackConversion('session_start', {
           entryPage: window.location.pathname,
-          platform: deviceInfo.platform,
           deviceType: deviceInfo.deviceType,
-          isNative: deviceInfo.isNative,
           ...locationData,
           ...utmParams
-        }, userId);
-      } else {
-        console.warn('[useSessionTracking] Session creation returned null/undefined');
+        });
       }
     } catch (error) {
       console.error('[useSessionTracking] Error starting session:', error);
@@ -235,30 +210,18 @@ export const useSessionTracking = (options: UseSessionTrackingOptions = {}) => {
   };
 
   const getDeviceInfo = () => {
-    // Use platform detection if available, otherwise fallback to user agent parsing
-    if (platformInfo.isReady) {
-      return {
-        deviceType: platformInfo.platform,
-        isNative: platformInfo.isNative,
-        platform: platformInfo.platform
-      };
-    }
-
-    // Fallback to user agent detection
     const userAgent = navigator.userAgent.toLowerCase();
-    let deviceType = 'web';
+    let deviceType = 'desktop';
 
     if (/android/i.test(userAgent)) {
-      deviceType = 'android';
+      deviceType = 'mobile';
     } else if (/iphone|ipad|ipod/i.test(userAgent)) {
-      deviceType = 'ios';
+      deviceType = 'mobile';
+    } else if (/tablet/i.test(userAgent)) {
+      deviceType = 'tablet';
     }
 
-    return { 
-      deviceType,
-      isNative: false,
-      platform: deviceType
-    };
+    return { deviceType };
   };
 
   const getAppVersion = (): string => {
@@ -292,7 +255,6 @@ export const useSessionTracking = (options: UseSessionTrackingOptions = {}) => {
     sessionMetrics,
     isInitialized,
     isSessionActive: sessionStartedRef.current,
-    isNative: nativeIntegrationService.isRunningNatively(),
     recordActivity,
     recordError,
     recordCrash,

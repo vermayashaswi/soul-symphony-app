@@ -1,25 +1,18 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { useSessionTracking } from '@/hooks/useSessionTracking';
-import { useLoadingTimeout } from '@/hooks/useLoadingTimeout';
 import { SessionState, SessionMetrics } from '@/services/sessionManager';
-import { toast } from 'sonner';
 
 interface SessionContextType {
   currentSession: SessionState | null;
   sessionMetrics: SessionMetrics | null;
   isInitialized: boolean;
   isSessionActive: boolean;
-  isNative: boolean;
   recordActivity: () => void;
   recordError: (error: Error) => void;
   recordCrash: () => void;
   trackConversion: (eventType: string, eventData?: Record<string, any>) => Promise<void>;
   updateSessionState: () => void;
   updateSessionMetrics: () => void;
-  // Add error and loading states
-  sessionError: string | null;
-  isStuckLoading: boolean;
-  retryInitialization: () => void;
 }
 
 const SessionContext = createContext<SessionContextType | null>(null);
@@ -34,8 +27,6 @@ export const SessionProvider: React.FC<SessionProviderProps> = ({
   enableDebug = false 
 }) => {
   const [sessionEvents, setSessionEvents] = useState<string[]>([]);
-  const [sessionError, setSessionError] = useState<string | null>(null);
-  const [isStuckLoading, setIsStuckLoading] = useState(false);
 
   const sessionTracking = useSessionTracking({
     enableDebug,
@@ -43,8 +34,6 @@ export const SessionProvider: React.FC<SessionProviderProps> = ({
     enableHeartbeat: true,
     onSessionStart: (sessionId) => {
       setSessionEvents(prev => [...prev, `Session started: ${sessionId}`]);
-      setSessionError(null); // Clear any previous errors
-      setIsStuckLoading(false);
       if (enableDebug) {
         console.log('[SessionProvider] Session started:', sessionId);
       }
@@ -56,22 +45,6 @@ export const SessionProvider: React.FC<SessionProviderProps> = ({
       }
     }
   });
-
-  // Optimized timeout detection for native apps
-  useEffect(() => {
-    if (!sessionTracking.isInitialized && !sessionError) {
-      // Shorter timeout for native apps to prevent indefinite loading
-      const timeoutDuration = sessionTracking.isNative ? 3000 : 10000;
-      
-      const stuckTimeout = setTimeout(() => {
-        console.warn(`[SessionProvider] Session initialization timeout detected after ${timeoutDuration}ms`);
-        setIsStuckLoading(true);
-        setSessionError('Session taking longer than expected. This might be a connectivity issue.');
-      }, timeoutDuration);
-
-      return () => clearTimeout(stuckTimeout);
-    }
-  }, [sessionTracking.isInitialized, sessionError]);
 
   // Global error handling for session tracking
   useEffect(() => {
@@ -131,31 +104,8 @@ export const SessionProvider: React.FC<SessionProviderProps> = ({
     trackAppEvents();
   }, [sessionTracking.isSessionActive]);
 
-  const retryInitialization = () => {
-    console.log('[SessionProvider] Retrying session initialization...');
-    setSessionError(null);
-    setIsStuckLoading(false);
-    
-    // For native apps, also clear any potentially corrupted localStorage
-    if (sessionTracking.isNative) {
-      try {
-        localStorage.removeItem('sb-kwnwhgucnzqxndzjayyq-auth-token');
-        console.log('[SessionProvider] Cleared stored session for native retry');
-      } catch (error) {
-        console.warn('[SessionProvider] Could not clear stored session:', error);
-      }
-    }
-    
-    // Force re-initialization by clearing any cached state
-    sessionTracking.updateSessionState();
-    toast.success('Retrying session initialization...');
-  };
-
   const contextValue: SessionContextType = {
-    ...sessionTracking,
-    sessionError,
-    isStuckLoading,
-    retryInitialization
+    ...sessionTracking
   };
 
   return (
