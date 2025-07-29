@@ -141,9 +141,12 @@ export const Edge: React.FC<EdgeProps> = ({
     }
   });
 
-  // ENHANCED: Much more dramatic thickness difference
-  const baseThickness = isHighlighted ? 2.5 : 0.3; // Highlighted much thicker, dimmed much thinner
-  const thickness = baseThickness + (value * (isHighlighted ? maxThickness * 1.5 : maxThickness * 0.1));
+  // FIXED: Even more dramatic thickness difference with percentage-based scaling
+  const baseThickness = isHighlighted ? 4.0 : 0.2; // Much thicker for highlighted, very thin for dimmed
+  const valueMultiplier = Math.max(0.1, Math.min(2.0, value)); // Scale based on connection value
+  const thickness = baseThickness * valueMultiplier;
+  
+  console.log(`[Edge] THICKNESS: ${start} -> ${end}, value=${value}, highlighted=${isHighlighted}, dimmed=${dimmed}, thickness=${thickness}`);
   
   // Create material with appropriate properties
   const material = useMemo(() => {

@@ -446,6 +446,7 @@ export class EnhancedSoulNetPreloadService {
     graphData: { nodes: NodeData[], links: LinkData[] },
     percentageMap: Map<string, number>
   ): void {
+    console.log(`[EnhancedSoulNetPreloadService] PERCENTAGE CALCULATION: Starting with ${graphData.links.length} links`);
     const nodeConnectionTotals = new Map<string, number>();
     
     graphData.links.forEach(link => {
@@ -456,6 +457,8 @@ export class EnhancedSoulNetPreloadService {
       nodeConnectionTotals.set(link.target, targetTotal + link.value);
     });
 
+    console.log(`[EnhancedSoulNetPreloadService] PERCENTAGE CALCULATION: Node totals computed for ${nodeConnectionTotals.size} nodes`);
+
     graphData.links.forEach(link => {
       const sourceTotal = nodeConnectionTotals.get(link.source) || 1;
       const targetTotal = nodeConnectionTotals.get(link.target) || 1;
@@ -465,7 +468,11 @@ export class EnhancedSoulNetPreloadService {
       
       const targetPercentage = Math.round((link.value / targetTotal) * 100);
       percentageMap.set(`${link.target}-${link.source}`, targetPercentage);
+      
+      console.log(`[EnhancedSoulNetPreloadService] PERCENTAGE: ${link.source}->${link.target}: ${sourcePercentage}%, ${link.target}->${link.source}: ${targetPercentage}%`);
     });
+    
+    console.log(`[EnhancedSoulNetPreloadService] PERCENTAGE CALCULATION: Complete with ${percentageMap.size} percentage mappings`);
   }
 
   // ENHANCED: Stricter cache validation
