@@ -20,6 +20,8 @@ import { MentalHealthInsights } from "@/hooks/use-mental-health-insights";
 import { useChatRealtime } from "@/hooks/use-chat-realtime";
 import { updateThreadProcessingStatus } from "@/utils/chat/threadUtils";
 import { useKeyboardDetection } from "@/hooks/use-keyboard-detection";
+import { usePlatformDetection } from "@/hooks/use-platform-detection";
+import { cn } from "@/lib/utils";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -70,6 +72,7 @@ export default function MobileChatInterface({
   } = useChatRealtime(threadId);
   
   const { isKeyboardVisible } = useKeyboardDetection();
+  const { platform } = usePlatformDetection();
   
   const suggestionQuestions = [
     {
@@ -513,7 +516,11 @@ export default function MobileChatInterface({
       </div>
       
       {/* Chat Content */}
-      <div className="mobile-chat-content">
+      <div className={cn(
+        "mobile-chat-content",
+        isKeyboardVisible && "keyboard-visible",
+        `platform-${platform}`
+      )}>
         {initialLoading ? (
           <div className="flex items-center justify-center py-10">
             <div className="animate-spin h-6 w-6 border-2 border-primary border-t-transparent rounded-full"></div>

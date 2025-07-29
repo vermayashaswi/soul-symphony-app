@@ -68,8 +68,15 @@ class JournalReminderService {
       // Save settings
       this.saveSettings({ enabled: true, times });
       
-      // Setup reminders using hybrid strategy
+      // Setup reminders with simplified strategy
       await this.setupReminders(times);
+      
+      // Immediate verification that reminders are scheduled
+      const verified = await this.verifyScheduledReminders(times);
+      if (!verified) {
+        this.error('Failed to verify scheduled reminders');
+        return false;
+      }
       
       return true;
     } catch (error) {
@@ -101,6 +108,7 @@ class JournalReminderService {
     try {
       // Initialize platform detection
       await enhancedPlatformService.detectPlatform();
+      this.setupAppLifecycleHandlers();
       this.isInitialized = true;
       this.log('Service initialized successfully');
     } catch (error) {
@@ -115,23 +123,15 @@ class JournalReminderService {
     // Clear existing reminders first
     await this.clearAllReminders();
     
-    // Determine best notification strategy
+    // Use simplified strategy - prefer native, fallback to web only
     const strategy = enhancedPlatformService.getBestNotificationStrategy();
     this.log('Using notification strategy:', strategy);
     
-    switch (strategy) {
-      case 'native':
-        await this.setupNativeReminders(times);
-        break;
-      case 'serviceWorker':
-        await this.setupServiceWorkerReminders(times);
-        break;
-      case 'web':
-        this.setupWebReminders(times);
-        break;
-      default:
-        this.error('No notification strategy available');
-        return;
+    if (strategy === 'native') {
+      await this.setupNativeReminders(times);
+    } else {
+      // Simplified fallback - only use web reminders
+      this.setupWebReminders(times);
     }
     
     // Start health check to monitor reminder status
@@ -369,33 +369,19 @@ class JournalReminderService {
 
   private getNextReminderTime(time: JournalReminderTime): Date {
     const now = new Date();
-    const next = new Date();
     const { hour, minute } = this.TIME_MAPPINGS[time];
     
-    // Create exact target time
-    next.setHours(hour, minute, 0, 0);
+    // Start with today's target time
+    const today = new Date();
+    today.setHours(hour, minute, 0, 0);
     
-    // Add buffer for timing precision - if we're within 30 seconds of the target, schedule for tomorrow
-    const bufferMs = 30 * 1000; // 30 seconds
-    const timeDiff = next.getTime() - now.getTime();
-    
-    if (timeDiff <= bufferMs) {
-      next.setDate(next.getDate() + 1);
-      this.log(`Reminder ${time} scheduled for tomorrow due to timing buffer`, {
-        now: now.toLocaleString(),
-        originally: new Date().setHours(hour, minute, 0, 0),
-        scheduled: next.toLocaleString(),
-        timeDiff: timeDiff
-      });
-    } else {
-      this.log(`Reminder ${time} scheduled for today`, {
-        now: now.toLocaleString(),
-        scheduled: next.toLocaleString(),
-        timeDiff: timeDiff
-      });
+    // If today's time has already passed, schedule for tomorrow
+    if (today.getTime() <= now.getTime()) {
+      today.setDate(today.getDate() + 1);
     }
     
-    return next;
+    this.log(`Reminder ${time} scheduled for ${today.toLocaleString()}`);
+    return today;
   }
 
   private async clearAllReminders(): Promise<void> {
@@ -576,6 +562,56 @@ class JournalReminderService {
     this.log('Health check passed', {
       activeReminders: this.activeReminders.length,
       expectedReminders: settings.times.length
+    });
+  }
+
+  private async verifyScheduledReminders(times: JournalReminderTime[]): Promise<boolean> {
+    this.log('Verifying scheduled reminders');
+    
+    // Check if we have the expected number of active reminders
+    if (this.activeReminders.length !== times.length) {
+      this.error(`Reminder count mismatch: expected ${times.length}, got ${this.activeReminders.length}`);
+      return false;
+    }
+    
+    // Verify each reminder is properly scheduled
+    for (const time of times) {
+      const reminder = this.activeReminders.find(r => r.time === time);
+      if (!reminder) {
+        this.error(`Missing reminder for time: ${time}`);
+        return false;
+      }
+      
+      // Check if the scheduled time is in the future
+      if (reminder.scheduledFor.getTime() <= Date.now()) {
+        this.error(`Reminder for ${time} scheduled in the past: ${reminder.scheduledFor.toLocaleString()}`);
+        return false;
+      }
+    }
+    
+    this.log('All reminders verified successfully');
+    return true;
+  }
+
+  // Add app lifecycle handlers for better persistence
+  private setupAppLifecycleHandlers(): void {
+    // Handle visibility change (app backgrounding/foregrounding)
+    document.addEventListener('visibilitychange', () => {
+      if (!document.hidden) {
+        // App came to foreground, verify reminders
+        setTimeout(async () => {
+          const settings = this.getSettings();
+          if (settings.enabled && settings.times.length > 0) {
+            this.log('App foregrounded, checking reminders');
+            await this.setupReminders(settings.times);
+          }
+        }, 1000);
+      }
+    });
+
+    // Handle page unload (app closing)
+    window.addEventListener('beforeunload', () => {
+      this.log('App closing, preserving reminder settings');
     });
   }
 

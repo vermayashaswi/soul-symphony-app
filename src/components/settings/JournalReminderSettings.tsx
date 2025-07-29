@@ -1,14 +1,11 @@
 
-import React, { useState, useEffect } from 'react';
-import { Bell, Clock, TestTube } from 'lucide-react';
-import { Button } from '@/components/ui/button';
+import React, { useState } from 'react';
+import { Bell, Clock } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
-import { Badge } from '@/components/ui/badge';
 import { TranslatableText } from '@/components/translation/TranslatableText';
 import { journalReminderService, JournalReminderTime } from '@/services/journalReminderService';
-import { enhancedNotificationService } from '@/services/enhancedNotificationService';
 import { toast } from 'sonner';
 
 const TIME_OPTIONS: { value: JournalReminderTime; label: string; time: string }[] = [
@@ -20,18 +17,7 @@ const TIME_OPTIONS: { value: JournalReminderTime; label: string; time: string }[
 
 export const JournalReminderSettings: React.FC = () => {
   const [settings, setSettings] = useState(journalReminderService.getSettings());
-  const [permissionState, setPermissionState] = useState<'default' | 'granted' | 'denied' | 'unsupported'>('default');
   const [isLoading, setIsLoading] = useState(false);
-  const [isTesting, setIsTesting] = useState(false);
-
-  useEffect(() => {
-    loadPermissionState();
-  }, []);
-
-  const loadPermissionState = async () => {
-    const state = await enhancedNotificationService.checkPermissionStatus();
-    setPermissionState(state);
-  };
 
   const handleToggleEnabled = async (enabled: boolean) => {
     if (isLoading) return;
@@ -53,7 +39,6 @@ export const JournalReminderSettings: React.FC = () => {
         if (success) {
           setSettings(prev => ({ ...prev, enabled: true }));
           toast.success('Journal reminders enabled!');
-          await loadPermissionState();
         } else {
           toast.error('Failed to enable reminders. Please check your notification settings.');
         }
@@ -87,40 +72,6 @@ export const JournalReminderSettings: React.FC = () => {
     }
   };
 
-  const handleTestReminder = async () => {
-    if (isTesting) return;
-    
-    setIsTesting(true);
-    
-    try {
-      console.log('[JournalReminderSettings] Testing reminder');
-      const success = await journalReminderService.testReminder();
-      
-      if (success) {
-        toast.success('Test reminder sent! Check your notifications.');
-      } else {
-        toast.error('Failed to send test reminder. Please check your notification permissions.');
-      }
-    } catch (error) {
-      console.error('[JournalReminderSettings] Error testing reminder:', error);
-      toast.error('Error sending test reminder');
-    } finally {
-      setIsTesting(false);
-    }
-  };
-
-  const getPermissionBadge = () => {
-    switch (permissionState) {
-      case 'granted':
-        return <Badge variant="default" className="bg-green-500">Granted</Badge>;
-      case 'denied':
-        return <Badge variant="destructive">Denied</Badge>;
-      case 'unsupported':
-        return <Badge variant="secondary">Not Supported</Badge>;
-      default:
-        return <Badge variant="secondary">Not Set</Badge>;
-    }
-  };
 
   return (
     <Card>
@@ -131,19 +82,6 @@ export const JournalReminderSettings: React.FC = () => {
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
-        {/* Permission Status */}
-        <div className="flex items-center justify-between">
-          <div>
-            <Label className="text-sm font-medium">
-              <TranslatableText text="Notification Permission" />
-            </Label>
-            <p className="text-xs text-muted-foreground">
-              <TranslatableText text="Required to send journal reminders" />
-            </p>
-          </div>
-          {getPermissionBadge()}
-        </div>
-
         {/* Main Toggle */}
         <div className="flex items-center justify-between">
           <div>
@@ -158,7 +96,7 @@ export const JournalReminderSettings: React.FC = () => {
             id="reminders-enabled"
             checked={settings.enabled}
             onCheckedChange={handleToggleEnabled}
-            disabled={isLoading || permissionState === 'unsupported'}
+            disabled={isLoading}
           />
         </div>
 
@@ -198,36 +136,6 @@ export const JournalReminderSettings: React.FC = () => {
           </div>
         )}
 
-        {/* Test Button */}
-        {settings.enabled && permissionState === 'granted' && (
-          <Button
-            onClick={handleTestReminder}
-            variant="outline"
-            size="sm"
-            disabled={isTesting}
-            className="w-full"
-          >
-            <TestTube className="h-4 w-4 mr-2" />
-            <TranslatableText text={isTesting ? "Sending Test..." : "Test Reminder"} />
-          </Button>
-        )}
-
-        {/* Help Text */}
-        {permissionState === 'denied' && (
-          <div className="p-3 bg-orange-50 border border-orange-200 rounded-lg">
-            <p className="text-sm text-orange-800">
-              <TranslatableText text="Notifications are blocked. Please allow notifications in your device settings and refresh the app." />
-            </p>
-          </div>
-        )}
-
-        {permissionState === 'unsupported' && (
-          <div className="p-3 bg-gray-50 border border-gray-200 rounded-lg">
-            <p className="text-sm text-gray-700">
-              <TranslatableText text="Notifications are not supported on this device or browser." />
-            </p>
-          </div>
-        )}
 
         {settings.enabled && settings.times.length === 0 && (
           <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">

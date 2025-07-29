@@ -2,8 +2,10 @@
 /* Mobile Navigation Specific Styles */
 :root {
   --keyboard-height: 0px;
+  --safe-keyboard-height: 0px;
   --nav-bar-height: 4rem;
   --chat-input-height: 72px;
+  --mobile-nav-height: var(--nav-bar-height);
 }
 
 /* Mobile Navigation Base */
@@ -66,55 +68,72 @@
   position: fixed;
   left: 0;
   right: 0;
-  z-index: 9998;
-  background-color: hsl(var(--background));
+  z-index: 100;
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(8px);
   border-top: 1px solid hsl(var(--border));
   box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.1);
-  padding: 0;
-  height: var(--chat-input-height);
+  padding: 1rem;
+  height: auto;
+  min-height: var(--chat-input-height);
   box-sizing: border-box;
   
-  /* Position directly above navigation with no gap */
-  bottom: var(--nav-bar-height);
+  /* Position directly above navigation with safe area */
+  bottom: calc(var(--nav-bar-height) + env(safe-area-inset-bottom));
   
-  transition: bottom 0.2s ease-in-out;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  transform: translateY(0);
+}
+
+/* Dark mode support */
+.dark .mobile-chat-input-container {
+  background: rgba(0, 0, 0, 0.95);
 }
 
 /* Platform-specific input positioning */
 .mobile-chat-input-container.platform-android {
-  bottom: var(--nav-bar-height);
+  bottom: calc(var(--nav-bar-height) + 0.5rem);
+}
+
+.mobile-chat-input-container.platform-ios {
+  bottom: calc(var(--nav-bar-height) + env(safe-area-inset-bottom));
 }
 
 /* =============================================== */
-/* KEYBOARD VISIBLE STATES - CONSOLIDATED STYLES  */
+/* SIMPLIFIED KEYBOARD POSITIONING SYSTEM        */
 /* =============================================== */
 
-/* Hide navigation completely when keyboard is visible */
-.mobile-navigation.keyboard-visible {
+/* Hide navigation when keyboard is visible */
+.mobile-navigation.keyboard-visible,
+body.keyboard-visible .mobile-navigation {
   transform: translateY(100%);
-  transition: transform 0.15s ease-in-out;
-  pointer-events: none;
+  transition: transform 0.2s ease-out;
 }
 
-/* Reposition input to bottom when keyboard is visible */
+/* Input positioning handled by direct DOM manipulation in useKeyboardDetection */
+.mobile-chat-input-container {
+  transition: transform 0.2s ease-out;
+  will-change: transform;
+  z-index: 110;
+}
+
+/* Enhanced visual state when keyboard is active */
 .mobile-chat-input-container.keyboard-visible {
-  bottom: 0px;
-  transition: none;
+  background: rgba(255, 255, 255, 0.98);
+  backdrop-filter: blur(12px);
+  box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.15);
+  border-bottom: none;
+  padding: 0.75rem 1rem 0.5rem 1rem;
 }
 
-/* Platform-specific keyboard adjustments for input */
-.mobile-chat-input-container.keyboard-visible.platform-ios {
-  bottom: var(--calculated-safe-area-bottom, env(safe-area-inset-bottom, 0px));
+.dark .mobile-chat-input-container.keyboard-visible {
+  background: rgba(0, 0, 0, 0.98);
 }
 
-.mobile-chat-input-container.keyboard-visible.platform-android {
-  bottom: 0px;
-}
-
-/* Content adjustments when keyboard is visible */
-.mobile-chat-content.keyboard-visible {
-  padding-bottom: calc(var(--chat-input-height) + 0.5rem);
-  transition: padding-bottom 0.2s ease-in-out;
+/* Content padding adjustment when keyboard is visible */
+body.keyboard-visible .mobile-chat-content {
+  padding-bottom: calc(var(--keyboard-height, 0px) + var(--chat-input-height) + 1rem);
+  transition: padding-bottom 0.2s ease-out;
 }
 
 /* Enhanced scrolling */
@@ -157,14 +176,14 @@
 /* DEBUG HELPERS - Visual indicators               */
 /* =============================================== */
 
-/* Debug navigation state */
-.mobile-navigation[data-debug="true"] {
+/* Debug navigation state - DISABLED */
+/* .mobile-navigation[data-debug="true"] {
   border: 3px solid blue;
 }
 
 .mobile-navigation.keyboard-visible[data-debug="true"] {
   border-color: red;
-}
+} */
 
 /* Debug input state - disabled to remove visual artifacts */
 .mobile-chat-input-container[data-debug="true"] {
@@ -184,8 +203,8 @@
   background-color: rgba(255, 0, 255, 0.1);
 }
 
-/* Platform indicators */
-.platform-android[data-debug="true"]::before {
+/* Platform indicators - DISABLED */
+/* .platform-android[data-debug="true"]::before {
   content: "ANDROID";
   position: absolute;
   top: 0;
@@ -207,4 +226,4 @@
   padding: 2px 4px;
   font-size: 10px;
   z-index: 10000;
-}
+} */
