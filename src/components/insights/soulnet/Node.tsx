@@ -173,7 +173,7 @@ const Node: React.FC<NodeProps> = ({
     console.log(`[Node] SOUL-NET SELECTION FIX: Pointer leave event for node ${node.id}`);
   };
 
-  // FIXED: Show labels for selected node and all connected nodes
+  // ENHANCED: Only show labels for highlighted/selected nodes or when forced
   const shouldShowLabel = useMemo(() => {
     if (dimmed) return false; // Never show labels for dimmed nodes
     return forceShowLabels || showLabel || isSelected || isHighlighted;

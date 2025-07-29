@@ -233,7 +233,7 @@ export const SimplifiedSoulNetVisualization: React.FC<SimplifiedSoulNetVisualiza
             isSelected={selectedNode === node.id}
             onClick={handleNodeClick}
             highlightedNodes={highlightedNodes}
-            showLabel={shouldShowLabels && (isHighlighted || selectedNode === node.id)} // Show labels for selected and highlighted nodes
+            showLabel={shouldShowLabels && (isHighlighted || !selectedNode || selectedNode === node.id)} // Show labels for highlighted, selected, or when no selection
             dimmed={isDimmed}
             themeHex={themeHex}
             selectedNodeId={selectedNode}

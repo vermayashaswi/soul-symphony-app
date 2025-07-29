@@ -31,11 +31,11 @@ export const ConnectionPercentage: React.FC<ConnectionPercentageProps> = ({
     return null;
   }
 
-  // SOLUTION 9: Enhanced positioning for percentage display
+  // Position in front of the node with enhanced Z offset
   const labelPosition: [number, number, number] = [
-    position[0] + 0.5, // Slightly offset to right for better visibility
-    position[1] + offsetY + 0.5, // Above the node with proper offset
-    position[2] + 0.1 // Small Z offset to prevent z-fighting
+    position[0],
+    position[1],
+    position[2] + 3.0 // Further increased Z offset for maximum visibility
   ];
 
   console.log(`[ConnectionPercentage] Enhanced final render: "${formattedPercentage}" at`, labelPosition);
@@ -44,14 +44,14 @@ export const ConnectionPercentage: React.FC<ConnectionPercentageProps> = ({
     <ReliableText
       text={formattedPercentage}
       position={labelPosition}
-      color="#60a5fa" // Bright blue color for better visibility
-      size={0.5} // Larger size for better readability
+      color="#ffffff"
+      size={0.4} // Slightly larger size
       visible={true}
-      renderOrder={30} // Higher render order than labels
+      renderOrder={25} // Even higher render order
       bold={true}
-      outlineWidth={0.1} // Thick outline for maximum contrast
+      outlineWidth={0.08} // Maximum outline for visibility
       outlineColor="#000000"
-      maxWidth={8}
+      maxWidth={10}
     />
   );
 };
