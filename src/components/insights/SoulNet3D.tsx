@@ -187,7 +187,7 @@ function EmotionNode({
       
       {/* Node Label */}
       <BillboardText
-        position={[0, -1, 0]}
+        position={[0, -0.7, 0]}
         fontSize={0.3}
         color={isFaded ? '#666666' : '#ffffff'}
         anchorX="center"
@@ -201,7 +201,7 @@ function EmotionNode({
       {/* Percentage Label for connected nodes */}
       {(isSelected || isConnected) && node.percentage && (
         <BillboardText
-          position={[0, -1.5, 0]}
+          position={[0, -1.05, 0]}
           fontSize={0.25}
           color="#ffd93d"
           anchorX="center"
@@ -299,8 +299,8 @@ function Scene3D({ data, selectedNodeId, onNodeClick, isMobile, getTranslatedTex
   }, [selectedNodeId, data.links]);
 
   useEffect(() => {
-    // Set initial camera position
-    camera.position.set(0, 0, 15);
+    // Set initial camera position - 0.8 * maxDistance (50) for initial zoom level
+    camera.position.set(0, 0, 40);
   }, [camera]);
 
   const handleNodeClick = useCallback((nodeId: string) => {
@@ -655,7 +655,7 @@ export function SoulNet3D({ timeRange, insightsData, userId, onTimeRangeChange }
       {translationsComplete ? (
         <Canvas
           style={{ height: canvasHeight }}
-          camera={{ position: [0, 0, 15], fov: 75 }}
+          camera={{ position: [0, 0, 40], fov: 75 }}
           gl={{ 
             antialias: true, 
             alpha: true,
