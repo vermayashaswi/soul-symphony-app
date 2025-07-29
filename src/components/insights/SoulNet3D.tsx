@@ -313,8 +313,8 @@ function Scene3D({ data, selectedNodeId, onNodeClick, isMobile, getTranslatedTex
   }, [selectedNodeId, data.links]);
 
   useEffect(() => {
-    // Set initial camera position - 0.8 * maxDistance (50) for initial zoom level
-    camera.position.set(0, 0, 40);
+    // Set initial camera position (1.3x closer: 40 / 1.3 ≈ 30.8)
+    camera.position.set(0, 0, 30.8);
   }, [camera]);
 
   const handleNodeClick = useCallback((nodeId: string) => {
@@ -406,15 +406,6 @@ function Scene3D({ data, selectedNodeId, onNodeClick, isMobile, getTranslatedTex
         }}
       />
 
-      {/* Invisible plane for background clicks */}
-      <mesh 
-        position={[0, 0, -10]}
-        onClick={handleBackgroundClick}
-        visible={false}
-      >
-        <planeGeometry args={[200, 200]} />
-        <meshBasicMaterial transparent opacity={0} />
-      </mesh>
 
       {/* Fog for depth */}
       <fog attach="fog" args={['#1a1a2e', 20, 100]} />
@@ -583,26 +574,63 @@ export function SoulNet3D({ timeRange, insightsData, userId, onTimeRangeChange }
     setSelectedNodeId(nodeId);
     
     if (nodeId) {
-      // Calculate percentages for connected nodes
-      const connectedNodes = processedData.links
-        .filter(link => link.source === nodeId || link.target === nodeId)
-        .map(link => link.source === nodeId ? link.target : link.source);
+      const selectedNode = processedData.nodes.find(n => n.id === nodeId);
       
-      const totalIntensity = processedData.links
-        .filter(link => link.source === nodeId || link.target === nodeId)
-        .reduce((sum, link) => sum + link.strength, 0);
+      if (selectedNode?.type === 'emotion') {
+        // For emotion nodes, calculate percentages for connected themes
+        const connectedThemes = processedData.links
+          .filter(link => link.target === nodeId)
+          .map(link => link.source);
+        
+        const totalConnectionScore = processedData.links
+          .filter(link => link.target === nodeId)
+          .reduce((sum, link) => sum + link.strength, 0);
 
-      // Update node percentages
-      processedData.nodes.forEach(node => {
-        if (connectedNodes.includes(node.id)) {
-          const link = processedData.links.find(l => 
-            (l.source === nodeId && l.target === node.id) || 
-            (l.target === nodeId && l.source === node.id)
-          );
-          if (link && totalIntensity > 0) {
-            node.percentage = (link.strength / totalIntensity) * 100;
+        // Update theme node percentages
+        processedData.nodes.forEach(node => {
+          if (connectedThemes.includes(node.id)) {
+            const link = processedData.links.find(l => 
+              l.target === nodeId && l.source === node.id
+            );
+            if (link && totalConnectionScore > 0) {
+              node.percentage = (link.strength / totalConnectionScore) * 100;
+            }
+          } else {
+            node.percentage = undefined;
           }
-        }
+        });
+        
+        // Clear percentage for the selected emotion node itself
+        selectedNode.percentage = undefined;
+      } else {
+        // For theme nodes, use existing logic
+        const connectedNodes = processedData.links
+          .filter(link => link.source === nodeId || link.target === nodeId)
+          .map(link => link.source === nodeId ? link.target : link.source);
+        
+        const totalIntensity = processedData.links
+          .filter(link => link.source === nodeId || link.target === nodeId)
+          .reduce((sum, link) => sum + link.strength, 0);
+
+        // Update node percentages
+        processedData.nodes.forEach(node => {
+          if (connectedNodes.includes(node.id)) {
+            const link = processedData.links.find(l => 
+              (l.source === nodeId && l.target === node.id) || 
+              (l.target === nodeId && l.source === node.id)
+            );
+            if (link && totalIntensity > 0) {
+              node.percentage = (link.strength / totalIntensity) * 100;
+            }
+          } else {
+            node.percentage = undefined;
+          }
+        });
+      }
+    } else {
+      // Clear all percentages when no node is selected
+      processedData.nodes.forEach(node => {
+        node.percentage = undefined;
       });
     }
   }, [processedData]);
@@ -623,7 +651,7 @@ export function SoulNet3D({ timeRange, insightsData, userId, onTimeRangeChange }
 
   const containerClass = isFullscreen 
     ? "fixed inset-0 z-50 bg-background"
-    : "relative w-full bg-card/50 rounded-lg border overflow-hidden";
+    : "relative w-full bg-card/50 rounded-lg border overflow-hidden px-[10%]";
   
   // Increase height by 30%
   const canvasHeight = isFullscreen 
@@ -656,7 +684,8 @@ export function SoulNet3D({ timeRange, insightsData, userId, onTimeRangeChange }
       {translationsComplete ? (
         <Canvas
           style={{ height: canvasHeight }}
-          camera={{ position: [0, 0, 40], fov: 75 }}
+          camera={{ position: [0, 0, 30.8], fov: 75 }}
+          onPointerMissed={() => setSelectedNodeId(null)}
           gl={{ 
             antialias: true, 
             alpha: true,
