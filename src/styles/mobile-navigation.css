@@ -2,8 +2,10 @@
 /* Mobile Navigation Specific Styles */
 :root {
   --keyboard-height: 0px;
+  --safe-keyboard-height: 0px;
   --nav-bar-height: 4rem;
   --chat-input-height: 72px;
+  --mobile-nav-height: var(--nav-bar-height);
 }
 
 /* Mobile Navigation Base */
@@ -66,23 +68,35 @@
   position: fixed;
   left: 0;
   right: 0;
-  z-index: 9998;
-  background-color: hsl(var(--background));
+  z-index: 100;
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(8px);
   border-top: 1px solid hsl(var(--border));
   box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.1);
-  padding: 0;
-  height: var(--chat-input-height);
+  padding: 1rem;
+  height: auto;
+  min-height: var(--chat-input-height);
   box-sizing: border-box;
   
-  /* Position directly above navigation with no gap */
-  bottom: var(--nav-bar-height);
+  /* Position directly above navigation with safe area */
+  bottom: calc(var(--nav-bar-height) + env(safe-area-inset-bottom));
   
-  transition: bottom 0.2s ease-in-out;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  transform: translateY(0);
+}
+
+/* Dark mode support */
+.dark .mobile-chat-input-container {
+  background: rgba(0, 0, 0, 0.95);
 }
 
 /* Platform-specific input positioning */
 .mobile-chat-input-container.platform-android {
-  bottom: var(--nav-bar-height);
+  bottom: calc(var(--nav-bar-height) + 0.5rem);
+}
+
+.mobile-chat-input-container.platform-ios {
+  bottom: calc(var(--nav-bar-height) + env(safe-area-inset-bottom));
 }
 
 /* =============================================== */
@@ -92,29 +106,38 @@
 /* Hide navigation completely when keyboard is visible */
 .mobile-navigation.keyboard-visible {
   transform: translateY(100%);
-  transition: transform 0.15s ease-in-out;
+  opacity: 0;
   pointer-events: none;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-/* Reposition input to bottom when keyboard is visible */
+/* Reposition input above keyboard when visible */
 .mobile-chat-input-container.keyboard-visible {
-  bottom: 0px;
-  transition: none;
+  bottom: var(--keyboard-height, 0px);
+  z-index: 110;
+  transform: translateY(0);
+  background: rgba(255, 255, 255, 0.98);
+  backdrop-filter: blur(12px);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.dark .mobile-chat-input-container.keyboard-visible {
+  background: rgba(0, 0, 0, 0.98);
 }
 
 /* Platform-specific keyboard adjustments for input */
-.mobile-chat-input-container.keyboard-visible.platform-ios {
-  bottom: var(--calculated-safe-area-bottom, env(safe-area-inset-bottom, 0px));
+.platform-android .mobile-chat-input-container.keyboard-visible {
+  bottom: var(--keyboard-height, 0px);
 }
 
-.mobile-chat-input-container.keyboard-visible.platform-android {
-  bottom: 0px;
+.platform-ios .mobile-chat-input-container.keyboard-visible {
+  bottom: var(--keyboard-height, 0px);
 }
 
 /* Content adjustments when keyboard is visible */
 .mobile-chat-content.keyboard-visible {
-  padding-bottom: calc(var(--chat-input-height) + 0.5rem);
-  transition: padding-bottom 0.2s ease-in-out;
+  padding-bottom: calc(var(--safe-keyboard-height, 280px) + var(--chat-input-height) + 1rem);
+  transition: padding-bottom 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 /* Enhanced scrolling */

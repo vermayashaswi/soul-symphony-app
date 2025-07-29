@@ -42,6 +42,10 @@ export const useKeyboardDetection = () => {
             });
             
             updateKeyboardState(keyboardVisible, keyboardVisible ? heightDifference : 0);
+            
+            // Set CSS variables for dynamic positioning
+            document.documentElement.style.setProperty('--keyboard-height', `${keyboardVisible ? heightDifference : 0}px`);
+            document.documentElement.style.setProperty('--safe-keyboard-height', `${keyboardVisible ? Math.max(heightDifference, 280) : 0}px`);
           } else {
             // Fallback detection using window resize
             const currentHeight = window.innerHeight;
@@ -53,8 +57,12 @@ export const useKeyboardDetection = () => {
             
             if (heightDifference > showThreshold) {
               updateKeyboardState(true, heightDifference);
+              document.documentElement.style.setProperty('--keyboard-height', `${heightDifference}px`);
+              document.documentElement.style.setProperty('--safe-keyboard-height', `${Math.max(heightDifference, 280)}px`);
             } else if (heightDifference < hideThreshold) {
               updateKeyboardState(false, 0);
+              document.documentElement.style.setProperty('--keyboard-height', '0px');
+              document.documentElement.style.setProperty('--safe-keyboard-height', '0px');
             }
             
             console.log('[KeyboardDetection] Fallback detection:', {

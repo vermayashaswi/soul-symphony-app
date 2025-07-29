@@ -163,10 +163,15 @@ export default function MobileChatInput({
       ref={inputContainerRef}
       className={cn(
         "mobile-chat-input-container",
-        "flex items-center gap-3 p-3",
-        // Note: keyboard-visible and platform classes are managed by useKeyboardState hook
+        "flex items-center gap-3",
+        isKeyboardVisible && "keyboard-visible",
+        `platform-${platform}`,
         !isReady && 'opacity-0'
       )}
+      style={{
+        '--keyboard-height': `${keyboardHeight}px`,
+        '--safe-keyboard-height': `${Math.max(keyboardHeight, 280)}px`,
+      } as React.CSSProperties}
     >
       <div className="flex-1">
         <Input
