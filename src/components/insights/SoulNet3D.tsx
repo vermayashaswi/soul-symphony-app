@@ -1,10 +1,10 @@
 import React, { useRef, useMemo, useState, useCallback, useEffect } from 'react';
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
-import { OrbitControls, Text, Billboard } from '@react-three/drei';
+import { OrbitControls } from '@react-three/drei';
+import { animated, useSpring } from '@react-spring/three';
 import * as THREE from 'three';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Maximize2, Minimize2 } from 'lucide-react';
-import { TranslatableText } from '../translation/TranslatableText';
 import { Button } from '../ui/button';
 import { useIsMobile } from '../../hooks/use-mobile';
 import { useR3FTranslation, useR3FTranslations } from '../../hooks/useR3FTranslation';
@@ -59,7 +59,7 @@ function filterDataByTimeRange(data: any, timeRange: any) {
       startDate = new Date(now.getTime() - 365 * 24 * 60 * 60 * 1000);
       break;
     default:
-      return data; // No filtering for custom ranges or unrecognized values
+      return data;
   }
   
   const filteredEntries = data.allEntries.filter((entry: any) => {
@@ -73,7 +73,7 @@ function filterDataByTimeRange(data: any, timeRange: any) {
   };
 }
 
-// 3D Node Components
+// 3D Node Components with React Spring animations
 function ThemeNode({ 
   node, 
   isSelected, 
@@ -93,26 +93,30 @@ function ThemeNode({
   const [hovered, setHovered] = useState(false);
   const { translatedText } = useR3FTranslation(node.label);
 
+  // Smooth animations with React Spring
+  const { scale, color } = useSpring({
+    scale: isSelected || isConnected ? 1.2 : isFaded ? 0.6 : 1,
+    color: isSelected ? '#ff6b6b' : isConnected ? '#4ecdc4' : '#667eea',
+    config: { tension: 300, friction: 30 }
+  });
+
   useFrame((state) => {
     if (meshRef.current) {
-      // Rotation animation
-      meshRef.current.rotation.y += 0.01;
+      meshRef.current.rotation.y += 0.008;
       
-      // Pulsing animation for selected/connected nodes
       if (isSelected || isConnected) {
-        const pulse = Math.sin(state.clock.elapsedTime * 3) * 0.1 + 1;
-        meshRef.current.scale.setScalar(pulse);
+        const pulse = Math.sin(state.clock.elapsedTime * 2) * 0.05 + 1;
+        meshRef.current.scale.setScalar(scale.get() * pulse);
       } else {
-        meshRef.current.scale.setScalar(isFaded ? 0.3 : 1);
+        meshRef.current.scale.setScalar(scale.get());
       }
     }
   });
 
-  const color = isSelected ? '#ff6b6b' : isConnected ? '#4ecdc4' : '#667eea';
-  const opacity = isFaded ? 0.2 : 1;
+  const opacity = isFaded ? 0.3 : 1;
 
   return (
-    <group position={position}>
+    <animated.group position={position}>
       <mesh
         ref={meshRef}
         onClick={onClick}
@@ -120,47 +124,15 @@ function ThemeNode({
         onPointerOut={() => setHovered(false)}
       >
         <sphereGeometry args={[0.5 + node.intensity * 0.3, 32, 32]} />
-        <meshStandardMaterial 
-          color={color} 
+        <animated.meshStandardMaterial 
+          color={color}
           transparent 
           opacity={opacity}
           emissive={isSelected || isConnected ? color : '#000000'}
-          emissiveIntensity={isSelected || isConnected ? 0.2 : 0}
+          emissiveIntensity={isSelected || isConnected ? 0.15 : 0}
         />
       </mesh>
-      
-      {/* Node Label - Billboard ensures it always faces the camera */}
-      <Billboard follow={true} lockX={false} lockY={false} lockZ={false}>
-        <Text
-          position={[0, -1, 0]}
-          fontSize={0.3}
-          color={isFaded ? '#666666' : '#ffffff'}
-          anchorX="center"
-          anchorY="middle"
-          outlineWidth={0.02}
-          outlineColor="#000000"
-        >
-          {translatedText}
-        </Text>
-      </Billboard>
-
-      {/* Percentage Label for connected nodes */}
-      {(isSelected || isConnected) && node.percentage && (
-        <Billboard follow={true} lockX={false} lockY={false} lockZ={false}>
-          <Text
-            position={[0, -1.5, 0]}
-            fontSize={0.25}
-            color="#ffd93d"
-            anchorX="center"
-            anchorY="middle"
-            outlineWidth={0.02}
-            outlineColor="#000000"
-          >
-            {`${node.percentage.toFixed(1)}%`}
-          </Text>
-        </Billboard>
-      )}
-    </group>
+    </animated.group>
   );
 }
 
@@ -183,27 +155,31 @@ function EmotionNode({
   const [hovered, setHovered] = useState(false);
   const { translatedText } = useR3FTranslation(node.label);
 
+  // Smooth animations with React Spring
+  const { scale, color } = useSpring({
+    scale: isSelected || isConnected ? 1.2 : isFaded ? 0.6 : 1,
+    color: isSelected ? '#ff6b6b' : isConnected ? '#4ecdc4' : '#a78bfa',
+    config: { tension: 300, friction: 30 }
+  });
+
   useFrame((state) => {
     if (meshRef.current) {
-      // Rotation animation
-      meshRef.current.rotation.x += 0.008;
-      meshRef.current.rotation.y += 0.01;
+      meshRef.current.rotation.x += 0.006;
+      meshRef.current.rotation.y += 0.008;
       
-      // Pulsing animation for selected/connected nodes
       if (isSelected || isConnected) {
-        const pulse = Math.sin(state.clock.elapsedTime * 3) * 0.1 + 1;
-        meshRef.current.scale.setScalar(pulse);
+        const pulse = Math.sin(state.clock.elapsedTime * 2) * 0.05 + 1;
+        meshRef.current.scale.setScalar(scale.get() * pulse);
       } else {
-        meshRef.current.scale.setScalar(isFaded ? 0.3 : 1);
+        meshRef.current.scale.setScalar(scale.get());
       }
     }
   });
 
-  const color = isSelected ? '#ff6b6b' : isConnected ? '#4ecdc4' : '#a78bfa';
-  const opacity = isFaded ? 0.2 : 1;
+  const opacity = isFaded ? 0.3 : 1;
 
   return (
-    <group position={position}>
+    <animated.group position={position}>
       <mesh
         ref={meshRef}
         onClick={onClick}
@@ -211,47 +187,15 @@ function EmotionNode({
         onPointerOut={() => setHovered(false)}
       >
         <boxGeometry args={[0.6 + node.intensity * 0.4, 0.6 + node.intensity * 0.4, 0.6 + node.intensity * 0.4]} />
-        <meshStandardMaterial 
-          color={color} 
+        <animated.meshStandardMaterial 
+          color={color}
           transparent 
           opacity={opacity}
           emissive={isSelected || isConnected ? color : '#000000'}
-          emissiveIntensity={isSelected || isConnected ? 0.2 : 0}
+          emissiveIntensity={isSelected || isConnected ? 0.15 : 0}
         />
       </mesh>
-      
-      {/* Node Label - Billboard ensures it always faces the camera */}
-      <Billboard follow={true} lockX={false} lockY={false} lockZ={false}>
-        <Text
-          position={[0, -1, 0]}
-          fontSize={0.3}
-          color={isFaded ? '#666666' : '#ffffff'}
-          anchorX="center"
-          anchorY="middle"
-          outlineWidth={0.02}
-          outlineColor="#000000"
-        >
-          {translatedText}
-        </Text>
-      </Billboard>
-
-      {/* Percentage Label for connected nodes */}
-      {(isSelected || isConnected) && node.percentage && (
-        <Billboard follow={true} lockX={false} lockY={false} lockZ={false}>
-          <Text
-            position={[0, -1.5, 0]}
-            fontSize={0.25}
-            color="#ffd93d"
-            anchorX="center"
-            anchorY="middle"
-            outlineWidth={0.02}
-            outlineColor="#000000"
-          >
-            {`${node.percentage.toFixed(1)}%`}
-          </Text>
-        </Billboard>
-      )}
-    </group>
+    </animated.group>
   );
 }
 
@@ -297,7 +241,7 @@ function ConnectionLines({
         const material = new THREE.LineBasicMaterial({
           color: isHighlighted ? '#ffd93d' : '#ffffff',
           transparent: true,
-          opacity: isFaded ? 0.1 : (isHighlighted ? 1 : 0.6)
+          opacity: isFaded ? 0.15 : (isHighlighted ? 0.9 : 0.5)
         });
         
         const line = new THREE.Line(geometry, material);
@@ -310,14 +254,115 @@ function ConnectionLines({
   );
 }
 
+// Screen-space HTML labels component
+function NodeLabels({ 
+  nodes, 
+  selectedNodeId, 
+  connectedNodeIds,
+  camera,
+  size 
+}: {
+  nodes: SoulNet3DNode[];
+  selectedNodeId: string | null;
+  connectedNodeIds: Set<string>;
+  camera: THREE.Camera;
+  size: { width: number; height: number };
+}) {
+  const [screenPositions, setScreenPositions] = useState<{ [key: string]: { x: number; y: number; visible: boolean } }>({});
+
+  useFrame(() => {
+    const newPositions: { [key: string]: { x: number; y: number; visible: boolean } } = {};
+    
+    nodes.forEach(node => {
+      const vector = new THREE.Vector3(...node.position);
+      vector.project(camera);
+      
+      const x = (vector.x * 0.5 + 0.5) * size.width;
+      const y = (vector.y * -0.5 + 0.5) * size.height;
+      const visible = vector.z < 1;
+      
+      newPositions[node.id] = { x, y, visible };
+    });
+    
+    setScreenPositions(newPositions);
+  });
+
+  return (
+    <div className="absolute inset-0 pointer-events-none">
+      {nodes.map(node => {
+        const pos = screenPositions[node.id];
+        if (!pos || !pos.visible) return null;
+
+        const isSelected = selectedNodeId === node.id;
+        const isConnected = connectedNodeIds.has(node.id);
+        const isFaded = selectedNodeId !== null && !isSelected && !isConnected;
+
+        return (
+          <div
+            key={node.id}
+            className={`absolute text-center transition-all duration-300 ${
+              isFaded ? 'opacity-30' : 'opacity-100'
+            }`}
+            style={{
+              left: pos.x - 40,
+              top: pos.y + 30,
+              width: 80,
+              fontSize: '12px',
+              color: isFaded ? '#666666' : '#ffffff',
+              textShadow: '1px 1px 2px rgba(0,0,0,0.8)',
+              fontWeight: isSelected || isConnected ? 'bold' : 'normal'
+            }}
+          >
+            <div>{node.label}</div>
+            {(isSelected || isConnected) && node.percentage && (
+              <div style={{ color: '#ffd93d', fontSize: '10px' }}>
+                {`${node.percentage.toFixed(1)}%`}
+              </div>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+// Background click handler component
+function BackgroundClickHandler({ onBackgroundClick }: { onBackgroundClick: () => void }) {
+  const { camera, gl, scene } = useThree();
+  const raycaster = useMemo(() => new THREE.Raycaster(), []);
+
+  useEffect(() => {
+    const handleClick = (event: MouseEvent) => {
+      const mouse = new THREE.Vector2();
+      mouse.x = (event.clientX / gl.domElement.clientWidth) * 2 - 1;
+      mouse.y = -(event.clientY / gl.domElement.clientHeight) * 2 + 1;
+
+      raycaster.setFromCamera(mouse, camera);
+      const intersects = raycaster.intersectObjects(scene.children, true);
+
+      // If no mesh objects are intersected, it's a background click
+      const meshIntersects = intersects.filter(intersect => intersect.object.type === 'Mesh');
+      if (meshIntersects.length === 0) {
+        onBackgroundClick();
+      }
+    };
+
+    gl.domElement.addEventListener('click', handleClick);
+    return () => gl.domElement.removeEventListener('click', handleClick);
+  }, [camera, gl, scene, raycaster, onBackgroundClick]);
+
+  return null;
+}
+
 // 3D Scene Component
-function Scene3D({ data, selectedNodeId, onNodeClick, isMobile }: {
+function Scene3D({ data, selectedNodeId, onNodeClick, onBackgroundClick, isMobile }: {
   data: SoulNet3DData;
   selectedNodeId: string | null;
   onNodeClick: (nodeId: string | null) => void;
+  onBackgroundClick: () => void;
   isMobile: boolean;
 }) {
-  const { camera } = useThree();
+  const { camera, size } = useThree();
 
   const connectedNodeIds = useMemo(() => {
     if (!selectedNodeId) return new Set<string>();
@@ -334,7 +379,6 @@ function Scene3D({ data, selectedNodeId, onNodeClick, isMobile }: {
   }, [selectedNodeId, data.links]);
 
   useEffect(() => {
-    // Set initial camera position
     camera.position.set(0, 0, 15);
   }, [camera]);
 
@@ -349,6 +393,9 @@ function Scene3D({ data, selectedNodeId, onNodeClick, isMobile }: {
       <pointLight position={[10, 10, 10]} intensity={1} />
       <pointLight position={[-10, -10, -10]} intensity={0.5} />
       <hemisphereLight args={["#ffffff", "#606060", 0.6]} />
+
+      {/* Background click handler */}
+      <BackgroundClickHandler onBackgroundClick={onBackgroundClick} />
 
       {/* Nodes */}
       {data.nodes.map(node => {
@@ -391,6 +438,15 @@ function Scene3D({ data, selectedNodeId, onNodeClick, isMobile }: {
         connectedNodeIds={connectedNodeIds}
       />
 
+      {/* Screen-space labels */}
+      <NodeLabels 
+        nodes={data.nodes}
+        selectedNodeId={selectedNodeId}
+        connectedNodeIds={connectedNodeIds}
+        camera={camera}
+        size={size}
+      />
+
       {/* Controls */}
       <OrbitControls 
         enablePan={true}
@@ -399,9 +455,9 @@ function Scene3D({ data, selectedNodeId, onNodeClick, isMobile }: {
         minDistance={5}
         maxDistance={50}
         autoRotate={selectedNodeId === null}
-        autoRotateSpeed={0.5}
+        autoRotateSpeed={0.3}
         enableDamping={true}
-        dampingFactor={0.05}
+        dampingFactor={0.08}
         screenSpacePanning={false}
         minPolarAngle={0}
         maxPolarAngle={Math.PI}
@@ -435,17 +491,16 @@ export function SoulNet3D({ timeRange, insightsData, userId }: SoulNet3DProps) {
   // Pre-load translations for key UI text
   const uiTexts = [
     "Soul Network - 3D Visualization",
-    "No theme-emotion connections found for the selected time period.",
-    "Connected elements show percentage distribution"
+    "No theme-emotion connections found for the selected time period."
   ];
   const mobileInteractionText = isMobile 
-    ? "Tap themes (spheres) or emotions (cubes) to explore connections. Use touch to rotate, pinch to zoom, and drag to pan."
-    : "Click themes (spheres) or emotions (cubes) to explore connections. Use mouse to rotate, zoom, and pan.";
+    ? "Tap themes (spheres) or emotions (cubes) to explore connections. Touch to rotate, pinch to zoom, drag to pan."
+    : "Click themes (spheres) or emotions (cubes) to explore connections. Mouse to rotate, zoom, and pan.";
   
   const allTexts = [...uiTexts, mobileInteractionText];
   const { translatedTexts, isLoading: translationsLoading } = useR3FTranslations(allTexts);
 
-  // Process data from themeemotion column
+  // Process data with simplified Y-axis positioning
   const processedData = useMemo((): SoulNet3DData => {
     if (!filteredData?.allEntries?.length) {
       return { nodes: [], links: [] };
@@ -479,13 +534,10 @@ export function SoulNet3D({ timeRange, insightsData, userId }: SoulNet3DProps) {
               emotionData.totalIntensity += intensityValue;
               
               themeTotal += intensityValue;
-              
-              // Update emotion intensity
               emotionIntensities.set(emotion, (emotionIntensities.get(emotion) || 0) + intensityValue);
             });
           }
 
-          // Update theme intensity
           themeIntensities.set(theme, (themeIntensities.get(theme) || 0) + themeTotal);
         });
       }
@@ -495,12 +547,15 @@ export function SoulNet3D({ timeRange, insightsData, userId }: SoulNet3DProps) {
     const nodes: SoulNet3DNode[] = [];
     const links: SoulNet3DLink[] = [];
     
-    // Generate theme nodes - positioned between Y -2 to +2
+    // Theme Y-axis pattern: 0, -1, +1, -2, +2
+    const themeYPattern = [0, -1, 1, -2, 2];
+    
+    // Generate theme nodes
     const themes = Array.from(themeEmotionMap.keys());
     themes.forEach((theme, index) => {
       const angle = (index / themes.length) * Math.PI * 2;
       const radius = 6;
-      const yPos = -2 + (4 * (index / Math.max(themes.length - 1, 1))); // Spread between -2 and +2
+      const yPos = themeYPattern[index % themeYPattern.length];
       
       nodes.push({
         id: theme,
@@ -516,6 +571,9 @@ export function SoulNet3D({ timeRange, insightsData, userId }: SoulNet3DProps) {
       });
     });
 
+    // Emotion Y-axis pattern: -4, +4, -6, +6, -8, +8
+    const emotionYPattern = [-4, 4, -6, 6, -8, 8];
+
     // Generate emotion nodes and links
     themeEmotionMap.forEach((emotions, theme) => {
       const themeNode = nodes.find(n => n.id === theme);
@@ -530,16 +588,10 @@ export function SoulNet3D({ timeRange, insightsData, userId }: SoulNet3DProps) {
         // Calculate percentage for this emotion relative to the theme
         const percentage = totalThemeIntensity > 0 ? (data.totalIntensity / totalThemeIntensity) * 100 : 0;
         
-        // Position emotions around their theme - Y between -8 to -3 and +3 to +8
+        // Position emotions around their theme with pattern Y positioning
         const angle = (index / emotionArray.length) * Math.PI * 2;
         const distance = 2 + data.totalIntensity * 0.5;
-        
-        // Alternate between negative (-8 to -3) and positive (+3 to +8) Y ranges
-        const isNegativeRange = index % 2 === 0;
-        const rangePosition = index / emotionArray.length;
-        const yPos = isNegativeRange 
-          ? -8 + (rangePosition * 5) // -8 to -3
-          : 3 + (rangePosition * 5);  // +3 to +8
+        const yPos = emotionYPattern[index % emotionYPattern.length];
         
         const emotionNode: SoulNet3DNode = {
           id: emotionId,
@@ -598,6 +650,10 @@ export function SoulNet3D({ timeRange, insightsData, userId }: SoulNet3DProps) {
     }
   }, [processedData]);
 
+  const handleBackgroundClick = useCallback(() => {
+    setSelectedNodeId(null);
+  }, []);
+
   const toggleFullscreen = useCallback(() => {
     setIsFullscreen(!isFullscreen);
   }, [isFullscreen]);
@@ -625,10 +681,9 @@ export function SoulNet3D({ timeRange, insightsData, userId }: SoulNet3DProps) {
     ? "fixed inset-0 z-50 bg-background"
     : "relative w-full bg-card/50 rounded-lg border overflow-hidden";
   
-  // Increase container height by 25%
   const canvasHeight = isFullscreen 
     ? "100vh" 
-    : isMobile ? "500px" : "750px"; // 400px -> 500px (+25%), 600px -> 750px (+25%)
+    : isMobile ? "500px" : "750px";
 
   return (
     <motion.div 
@@ -652,11 +707,11 @@ export function SoulNet3D({ timeRange, insightsData, userId }: SoulNet3DProps) {
         </Button>
       </div>
 
-      {/* Instructions - Updated for mobile touch gestures */}
+      {/* Instructions */}
       {selectedNodeId === null && (
         <div className="absolute bottom-4 left-4 right-4 z-10">
           <div className="bg-background/80 backdrop-blur-sm rounded-lg p-3 text-sm text-muted-foreground text-center">
-            {translatedTexts[3] || mobileInteractionText}
+            {translatedTexts[2] || mobileInteractionText}
           </div>
         </div>
       )}
@@ -675,30 +730,10 @@ export function SoulNet3D({ timeRange, insightsData, userId }: SoulNet3DProps) {
           data={processedData}
           selectedNodeId={selectedNodeId}
           onNodeClick={handleNodeClick}
+          onBackgroundClick={handleBackgroundClick}
           isMobile={isMobile}
         />
       </Canvas>
-
-      {/* Selected Node Info */}
-      <AnimatePresence>
-        {selectedNodeId && (
-          <motion.div
-            className="absolute top-20 left-4 bg-background/90 backdrop-blur-sm rounded-lg p-4 max-w-xs"
-            initial={{ opacity: 0, x: -50 }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: -50 }}
-          >
-            <div className="text-sm">
-              <div className="font-semibold mb-2">
-                {processedData.nodes.find(n => n.id === selectedNodeId)?.label || ""}
-              </div>
-              <div className="text-muted-foreground">
-                {translatedTexts[2] || "Connected elements show percentage distribution"}
-              </div>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
     </motion.div>
   );
 }
