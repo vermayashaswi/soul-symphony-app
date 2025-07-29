@@ -4,7 +4,7 @@ import { motion } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import EmotionChart from '@/components/EmotionChart';
 import MoodCalendar from '@/components/insights/MoodCalendar';
-import { SoulNet } from '@/components/insights/SoulNet';
+import { SoulNet3D } from '@/components/insights/SoulNet3D';
 
 import { TimeRange } from '@/hooks/use-insights-data';
 import { useIsMobile } from '@/hooks/use-mobile';
@@ -94,7 +94,7 @@ export function InsightsCharts({
           isMobile ? "px-2" : "px-0"
         )}
       >
-        <SoulNet 
+        <SoulNet3D 
           timeRange={timeRange}
           insightsData={chartInsightsData}
           userId={userId}
