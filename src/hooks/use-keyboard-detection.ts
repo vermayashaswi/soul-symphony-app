@@ -11,9 +11,10 @@ export const useKeyboardDetection = () => {
     if (!isReady) return;
 
     let detectionTimeout: NodeJS.Timeout;
+    let lastViewportHeight = window.innerHeight;
     let isDetecting = false;
     
-    const detectKeyboard = () => {
+    const handleKeyboardDetection = () => {
       if (isDetecting) return;
       isDetecting = true;
       
@@ -21,70 +22,73 @@ export const useKeyboardDetection = () => {
       
       detectionTimeout = setTimeout(() => {
         try {
-          const windowHeight = window.innerHeight;
-          const viewportHeight = window.visualViewport?.height || windowHeight;
-          const heightDiff = windowHeight - viewportHeight;
-          
-          // Simplified threshold detection
-          const threshold = platform === 'ios' ? 60 : 80;
-          const isVisible = heightDiff > threshold;
-          const keyboardHeight = isVisible ? heightDiff : 0;
-          
-          console.log('[KeyboardDetection] Simple detection:', {
-            platform,
-            windowHeight,
-            viewportHeight,
-            heightDiff,
-            isVisible,
-            keyboardHeight
-          });
-          
-          updateKeyboardState(isVisible, keyboardHeight);
-          
-          // Direct DOM manipulation for input positioning
-          const chatInput = document.querySelector('.mobile-chat-input-container');
-          if (chatInput) {
-            if (isVisible) {
-              const translateY = -keyboardHeight;
-              (chatInput as HTMLElement).style.transform = `translateY(${translateY}px)`;
-              (chatInput as HTMLElement).style.transition = 'transform 0.2s ease-out';
-            } else {
-              (chatInput as HTMLElement).style.transform = 'translateY(0px)';
-              (chatInput as HTMLElement).style.transition = 'transform 0.2s ease-out';
+          if (window.visualViewport) {
+            // Use Visual Viewport API (preferred method)
+            const viewportHeight = window.visualViewport.height;
+            const windowHeight = window.innerHeight;
+            const heightDifference = windowHeight - viewportHeight;
+            
+            // Platform-specific thresholds
+            const threshold = platform === 'android' ? 150 : platform === 'ios' ? 100 : 120;
+            const keyboardVisible = heightDifference > threshold;
+            
+            console.log('[KeyboardDetection] Visual viewport check:', {
+              windowHeight,
+              viewportHeight,
+              heightDifference,
+              threshold,
+              keyboardVisible,
+              platform
+            });
+            
+            updateKeyboardState(keyboardVisible, keyboardVisible ? heightDifference : 0);
+          } else {
+            // Fallback detection using window resize
+            const currentHeight = window.innerHeight;
+            const heightDifference = lastViewportHeight - currentHeight;
+            
+            // More conservative thresholds for fallback
+            const showThreshold = platform === 'android' ? 200 : 150;
+            const hideThreshold = -50;
+            
+            if (heightDifference > showThreshold) {
+              updateKeyboardState(true, heightDifference);
+            } else if (heightDifference < hideThreshold) {
+              updateKeyboardState(false, 0);
             }
+            
+            console.log('[KeyboardDetection] Fallback detection:', {
+              lastHeight: lastViewportHeight,
+              currentHeight,
+              heightDifference,
+              keyboardVisible: heightDifference > showThreshold
+            });
           }
-          
-          // Set CSS variables for additional styling
-          document.documentElement.style.setProperty('--keyboard-height', `${keyboardHeight}px`);
-          
-          // Toggle body classes
-          document.body.classList.toggle('keyboard-visible', isVisible);
-          document.body.classList.toggle(`keyboard-${platform}`, isVisible);
-          
-          // Dispatch custom events for components that need to react
-          window.dispatchEvent(new CustomEvent('keyboardPositionUpdate', {
-            detail: { isVisible, keyboardHeight, translateY: isVisible ? -keyboardHeight : 0 }
-          }));
-          
         } catch (error) {
-          console.error('[KeyboardDetection] Error:', error);
+          console.error('[KeyboardDetection] Error during detection:', error);
         } finally {
           isDetecting = false;
         }
-      }, 10); // Faster response
+      }, 50);
     };
+
+    // Store initial height
+    lastViewportHeight = window.innerHeight;
 
     // Visual viewport listeners (preferred)
     if (window.visualViewport) {
-      window.visualViewport.addEventListener('resize', detectKeyboard);
+      window.visualViewport.addEventListener('resize', handleKeyboardDetection);
     }
     
     // Fallback listeners
-    window.addEventListener('resize', detectKeyboard);
+    window.addEventListener('resize', handleKeyboardDetection);
     
     // Handle orientation changes with delay
     const handleOrientationChange = () => {
-      setTimeout(detectKeyboard, 500);
+      setTimeout(() => {
+        lastViewportHeight = window.innerHeight;
+        handleKeyboardDetection();
+      }, 500);
     };
     
     window.addEventListener('orientationchange', handleOrientationChange);
@@ -93,39 +97,32 @@ export const useKeyboardDetection = () => {
     const handleFocus = (e: FocusEvent) => {
       const target = e.target as HTMLElement;
       if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA')) {
-        console.log('[KeyboardDetection] Input focused');
-        setTimeout(detectKeyboard, 250);
+        console.log('[KeyboardDetection] Input focused, checking keyboard state');
+        setTimeout(handleKeyboardDetection, 300);
       }
     };
     
     const handleBlur = () => {
-      console.log('[KeyboardDetection] Input blurred');
-      setTimeout(detectKeyboard, 100);
+      console.log('[KeyboardDetection] Input blurred, checking keyboard state');
+      setTimeout(handleKeyboardDetection, 100);
     };
     
     document.addEventListener('focusin', handleFocus);
     document.addEventListener('focusout', handleBlur);
 
     // Initial check
-    detectKeyboard();
+    handleKeyboardDetection();
 
     return () => {
       if (detectionTimeout) clearTimeout(detectionTimeout);
       
       if (window.visualViewport) {
-        window.visualViewport.removeEventListener('resize', detectKeyboard);
+        window.visualViewport.removeEventListener('resize', handleKeyboardDetection);
       }
-      window.removeEventListener('resize', detectKeyboard);
+      window.removeEventListener('resize', handleKeyboardDetection);
       window.removeEventListener('orientationchange', handleOrientationChange);
       document.removeEventListener('focusin', handleFocus);
       document.removeEventListener('focusout', handleBlur);
-      
-      // Clean up DOM manipulation
-      const chatInput = document.querySelector('.mobile-chat-input-container');
-      if (chatInput) {
-        (chatInput as HTMLElement).style.transform = '';
-        (chatInput as HTMLElement).style.transition = '';
-      }
       
       // Clean up CSS
       document.body.classList.remove('keyboard-visible');
