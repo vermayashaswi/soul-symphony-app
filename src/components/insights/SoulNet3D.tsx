@@ -14,10 +14,9 @@ import { BillboardText } from './BillboardText';
 // Types
 interface SoulNet3DNode {
   id: string;
-  label: string;
+  name: string;
   type: 'theme' | 'emotion';
   intensity: number;
-  connections: number;
   position: [number, number, number];
   percentage?: number;
 }
@@ -26,7 +25,6 @@ interface SoulNet3DLink {
   source: string;
   target: string;
   strength: number;
-  percentage: number;
 }
 
 interface SoulNet3DData {
@@ -113,7 +111,7 @@ function ThemeNode({
           outlineWidth={theme === 'light' ? 0 : 0.02}
           outlineColor={theme === 'light' ? 'transparent' : '#000000'}
         >
-          {getTranslatedText(node.label)}
+          {getTranslatedText(node.name)}
         </BillboardText>
       )}
 
@@ -207,7 +205,7 @@ function EmotionNode({
           outlineWidth={theme === 'light' ? 0 : 0.02}
           outlineColor={theme === 'light' ? 'transparent' : '#000000'}
         >
-          {getTranslatedText(node.label)}
+          {getTranslatedText(node.name)}
         </BillboardText>
       )}
 
@@ -451,118 +449,108 @@ export function SoulNet3D({ timeRange, insightsData, userId, onTimeRangeChange }
     // Filter entries based on timeRange - use entries instead of allEntries for time filtering
     const filteredEntries = insightsData?.entries || insightsData?.allEntries || [];
 
-    const themeEmotionMap = new Map<string, Map<string, { count: number; totalIntensity: number }>>();
-    const themeIntensities = new Map<string, number>();
-    const emotionIntensities = new Map<string, number>();
+    const nodes: SoulNet3DNode[] = [];
+    const links: SoulNet3DLink[] = [];
+
+    // Step 1: Collect all themes and emotions with their intensities
+    const themeMap = new Map<string, { totalIntensity: number; count: number }>();
+    const emotionMap = new Map<string, { totalIntensity: number; count: number }>();
+    const themeEmotionConnections = new Map<string, Map<string, { intensity: number; count: number }>>();
 
     // Process themeemotion data using filtered entries
     filteredEntries.forEach((entry: any) => {
       if (entry.themeemotion && typeof entry.themeemotion === 'object') {
         Object.entries(entry.themeemotion).forEach(([theme, emotions]: [string, any]) => {
-          if (!themeEmotionMap.has(theme)) {
-            themeEmotionMap.set(theme, new Map());
+          
+          // Update theme intensity
+          if (!themeMap.has(theme)) {
+            themeMap.set(theme, { totalIntensity: 0, count: 0 });
           }
           
-          const themeMap = themeEmotionMap.get(theme)!;
-          let themeTotal = 0;
-
           if (emotions && typeof emotions === 'object') {
             Object.entries(emotions).forEach(([emotion, intensity]: [string, any]) => {
               const intensityValue = typeof intensity === 'number' ? intensity : 0;
               
-              if (!themeMap.has(emotion)) {
-                themeMap.set(emotion, { count: 0, totalIntensity: 0 });
+              // Update global emotion intensity
+              if (!emotionMap.has(emotion)) {
+                emotionMap.set(emotion, { totalIntensity: 0, count: 0 });
               }
-              
-              const emotionData = themeMap.get(emotion)!;
-              emotionData.count += 1;
+              const emotionData = emotionMap.get(emotion)!;
               emotionData.totalIntensity += intensityValue;
+              emotionData.count += 1;
               
-              themeTotal += intensityValue;
+              // Update theme intensity
+              const themeData = themeMap.get(theme)!;
+              themeData.totalIntensity += intensityValue;
+              themeData.count += 1;
               
-              // Update emotion intensity
-              emotionIntensities.set(emotion, (emotionIntensities.get(emotion) || 0) + intensityValue);
+              // Track theme-emotion connections
+              if (!themeEmotionConnections.has(theme)) {
+                themeEmotionConnections.set(theme, new Map());
+              }
+              const themeConnections = themeEmotionConnections.get(theme)!;
+              if (!themeConnections.has(emotion)) {
+                themeConnections.set(emotion, { intensity: 0, count: 0 });
+              }
+              const connectionData = themeConnections.get(emotion)!;
+              connectionData.intensity += intensityValue;
+              connectionData.count += 1;
             });
           }
-
-          // Update theme intensity
-          themeIntensities.set(theme, (themeIntensities.get(theme) || 0) + themeTotal);
         });
       }
     });
 
-    // Create nodes and calculate positions
-    const nodes: SoulNet3DNode[] = [];
-    const links: SoulNet3DLink[] = [];
-    
-    // Generate theme nodes with new Y positioning pattern
-    const themes = Array.from(themeEmotionMap.keys());
-    const themeYPattern = [-2, 2, -1, 1]; // Repeating pattern
-    
+    // Step 2: Create unique theme nodes (outer circle)
+    const themes = Array.from(themeMap.keys());
     themes.forEach((theme, index) => {
-      const angle = (index / themes.length) * Math.PI * 2;
-      const radius = 6;
-      const yPosition = themeYPattern[index % themeYPattern.length];
+      const angle = (index / themes.length) * 2 * Math.PI;
+      const radius = 18; // Themes in outer circle
+      const themeData = themeMap.get(theme)!;
       
       nodes.push({
         id: theme,
-        label: theme,
+        name: theme,
         type: 'theme',
-        intensity: Math.min((themeIntensities.get(theme) || 0) / 10, 1),
-        connections: themeEmotionMap.get(theme)?.size || 0,
+        intensity: Math.min(themeData.totalIntensity / 10, 1),
         position: [
           Math.cos(angle) * radius,
-          yPosition,
-          Math.sin(angle) * radius
+          Math.sin(angle) * radius,
+          0 // Themes at z=0
         ]
       });
     });
 
-    // Generate emotion nodes and links with new Y positioning pattern
-    const emotionYPattern = [-5, 5, -6.5, 6.5, -8, 8, -9.5, 9.5]; // Repeating pattern
-    let emotionCounter = 0;
-    
-    themeEmotionMap.forEach((emotions, theme) => {
-      const themeNode = nodes.find(n => n.id === theme);
-      if (!themeNode) return;
+    // Step 3: Create unique emotion nodes (inner circle)
+    const emotions = Array.from(emotionMap.keys());
+    emotions.forEach((emotion, index) => {
+      const angle = (index / emotions.length) * 2 * Math.PI;
+      const radius = 10; // Emotions in inner circle
+      const emotionData = emotionMap.get(emotion)!;
+      
+      nodes.push({
+        id: emotion,
+        name: emotion,
+        type: 'emotion',
+        intensity: Math.min(emotionData.totalIntensity / Math.max(emotionData.count, 1), 1),
+        position: [
+          Math.cos(angle) * radius,
+          Math.sin(angle) * radius,
+          -3 // Emotions slightly behind themes
+        ]
+      });
+    });
 
-      const emotionArray = Array.from(emotions.entries());
-      const totalThemeIntensity = emotionArray.reduce((sum, [, data]) => sum + data.totalIntensity, 0);
-
-      emotionArray.forEach(([emotion, data], index) => {
-        const emotionId = `${theme}-${emotion}`;
+    // Step 4: Create links from themes to emotions
+    themeEmotionConnections.forEach((emotionConnections, theme) => {
+      emotionConnections.forEach((connectionData, emotion) => {
+        // Calculate link strength based on emotion's intensity for this theme
+        const linkStrength = connectionData.intensity / Math.max(connectionData.count, 1);
         
-        // Calculate percentage for this emotion relative to the theme
-        const percentage = totalThemeIntensity > 0 ? (data.totalIntensity / totalThemeIntensity) * 100 : 0;
-        
-        // Position emotions around their theme
-        const angle = (index / emotionArray.length) * Math.PI * 2;
-        const distance = 2 + data.totalIntensity * 0.5;
-        const yPosition = emotionYPattern[emotionCounter % emotionYPattern.length];
-        emotionCounter++;
-        
-        const emotionNode: SoulNet3DNode = {
-          id: emotionId,
-          label: emotion,
-          type: 'emotion',
-          intensity: Math.min(data.totalIntensity / 5, 1),
-          connections: 1,
-          position: [
-            themeNode.position[0] + Math.cos(angle) * distance,
-            yPosition,
-            themeNode.position[2] + Math.sin(angle) * distance
-          ],
-          percentage
-        };
-
-        nodes.push(emotionNode);
-
-        // Create link
         links.push({
           source: theme,
-          target: emotionId,
-          strength: Math.min(data.totalIntensity / 5, 1),
-          percentage
+          target: emotion,
+          strength: Math.min(linkStrength, 1)
         });
       });
     });
@@ -720,7 +708,7 @@ export function SoulNet3D({ timeRange, insightsData, userId, onTimeRangeChange }
           >
             <div className="text-sm">
               <div className="font-semibold">
-                {getTranslatedText(processedData.nodes.find(n => n.id === selectedNodeId)?.label || "")}
+                {getTranslatedText(processedData.nodes.find(n => n.id === selectedNodeId)?.name || "")}
               </div>
             </div>
           </motion.div>
