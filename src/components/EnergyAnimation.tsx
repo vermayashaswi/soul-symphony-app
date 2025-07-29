@@ -96,11 +96,11 @@ const EnergyAnimation: React.FC<EnergyAnimationProps> = ({
       ref={containerRef}
       className={`absolute ${fullScreen ? 'fixed inset-0' : 'w-full h-full'} 
                  ${bottomNavOffset ? 'bottom-16' : 'bottom-0'} 
-                 left-0 right-0 top-0 overflow-hidden opacity-70 z-0 ${className}`}
+                 left-0 right-0 ${bottomNavOffset ? 'top-0' : 'top-0'} overflow-hidden opacity-70 z-0 ${className}`}
       style={{ pointerEvents: 'none' }} // Ensure the animation doesn't interfere with user interactions
     >
       {/* Glowing center with enhanced blur */}
-      <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-10">
+      <div className={`absolute left-1/2 transform -translate-x-1/2 ${bottomNavOffset ? 'top-1/2 -translate-y-8' : 'top-1/2 -translate-y-1/2'} z-10`}>
         <div 
           className="w-32 h-32 rounded-full blur-3xl opacity-70"
           style={{ backgroundColor: colors.pulse }}
@@ -112,7 +112,11 @@ const EnergyAnimation: React.FC<EnergyAnimationProps> = ({
       {[...Array(15)].map((_, index) => (
         <motion.div
           key={index}
-          className="absolute top-1/2 left-1/2 rounded-full"
+          className={`absolute left-1/2 rounded-full ${bottomNavOffset ? 'top-1/2' : 'top-1/2'}`}
+          style={{
+            transform: bottomNavOffset ? 'translateY(-32px)' : undefined,
+            background: `radial-gradient(circle, ${colors.main} 0%, ${colors.secondary} 50%, ${colors.tertiary} 100%)`
+          }}
           initial={{ 
             width: 40, 
             height: 40, 
@@ -126,9 +130,6 @@ const EnergyAnimation: React.FC<EnergyAnimationProps> = ({
             x: -500, 
             y: -500, 
             opacity: 0
-          }}
-          style={{
-            background: `radial-gradient(circle, ${colors.main} 0%, ${colors.secondary} 50%, ${colors.tertiary} 100%)`
           }}
           transition={{ 
             repeat: Infinity, 
@@ -158,7 +159,11 @@ const EnergyAnimation: React.FC<EnergyAnimationProps> = ({
       {[...Array(24)].map((_, index) => (
         <motion.div
           key={`small-${index}`}
-          className="absolute top-1/2 left-1/2 rounded-full"
+          className={`absolute left-1/2 rounded-full ${bottomNavOffset ? 'top-1/2' : 'top-1/2'}`}
+          style={{
+            transform: bottomNavOffset ? 'translateY(-32px)' : undefined,
+            background: `radial-gradient(circle, rgba(255,255,255,0.8) 0%, ${colors.light} 50%, ${colors.tertiary} 100%)`
+          }}
           initial={{ 
             width: 20, 
             height: 20, 
@@ -172,9 +177,6 @@ const EnergyAnimation: React.FC<EnergyAnimationProps> = ({
             x: -350, 
             y: -350, 
             opacity: 0
-          }}
-          style={{
-            background: `radial-gradient(circle, rgba(255,255,255,0.8) 0%, ${colors.light} 50%, ${colors.tertiary} 100%)`
           }}
           transition={{ 
             repeat: Infinity, 
@@ -190,7 +192,8 @@ const EnergyAnimation: React.FC<EnergyAnimationProps> = ({
       {[...Array(40)].map((_, index) => (
         <motion.div
           key={`particle-${index}`}
-          className="absolute top-1/2 left-1/2 rounded-full bg-white/80"
+          className={`absolute left-1/2 rounded-full bg-white/80 ${bottomNavOffset ? 'top-1/2' : 'top-1/2'}`}
+          style={{ transform: bottomNavOffset ? 'translateY(-32px)' : undefined }}
           initial={{ 
             width: 3, 
             height: 3, 

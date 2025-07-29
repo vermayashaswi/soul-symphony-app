@@ -206,7 +206,7 @@ export const SimplifiedSoulNetVisualization: React.FC<SimplifiedSoulNetVisualiza
             isSelected={selectedNode === node.id}
             onClick={handleNodeClick}
             highlightedNodes={highlightedNodes}
-            showLabel={shouldShowLabels && (isHighlighted || !selectedNode)} // Show labels for highlighted nodes or when no selection
+            showLabel={shouldShowLabels && (isHighlighted || !selectedNode || selectedNode === node.id)} // Show labels for highlighted, selected, or when no selection
             dimmed={isDimmed}
             themeHex={themeHex}
             selectedNodeId={selectedNode}
@@ -231,13 +231,15 @@ export const SimplifiedSoulNetVisualization: React.FC<SimplifiedSoulNetVisualiza
           return null;
         }
         
-        // FIXED: Edge is highlighted only if BOTH nodes are highlighted
-        const isHighlighted = selectedNode !== null && 
-          highlightedNodes.has(link.source) && highlightedNodes.has(link.target);
+        // FIXED: Edge is highlighted if it connects to the selected node OR both nodes are highlighted
+        const connectsToSelected = selectedNode !== null && 
+          (link.source === selectedNode || link.target === selectedNode);
+        const bothNodesHighlighted = highlightedNodes.has(link.source) && highlightedNodes.has(link.target);
+        const isHighlighted = connectsToSelected || bothNodesHighlighted;
         
-        // FIXED: Edge is dimmed if EITHER node is dimmed
+        // FIXED: Edge is dimmed only if both nodes are dimmed (not connected to selection)
         const isDimmed = selectedNode !== null && 
-          (dimmedNodes.has(link.source) || dimmedNodes.has(link.target));
+          dimmedNodes.has(link.source) && dimmedNodes.has(link.target);
         
         return (
           <Edge

@@ -187,12 +187,23 @@ export const useInstantSoulNetData = (
     } finally {
       setLoading(false);
     }
-  }, [userId, timeRange, currentLanguage, cacheKey]);
+  }, [userId, timeRange, currentLanguage]); // Removed cacheKey to prevent loops
 
-  // Trigger data fetching
+  // Trigger data fetching with improved dependency management
   useEffect(() => {
-    fetchFreshData();
-  }, [fetchFreshData]);
+    let isMounted = true;
+    
+    const fetchData = async () => {
+      if (!isMounted) return;
+      await fetchFreshData();
+    };
+    
+    fetchData();
+    
+    return () => {
+      isMounted = false;
+    };
+  }, [userId, timeRange, currentLanguage]); // Remove fetchFreshData from deps to prevent loops
 
   // ENHANCED: Optimized getter functions
   const getInstantConnectionPercentage = useCallback((selectedNode: string, targetNode: string): number => {
