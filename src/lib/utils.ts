@@ -24,7 +24,7 @@ export function debounce<T extends (...args: any[]) => any>(
   };
 }
 
-// Helper function for precise keyboard positioning
+// Helper function for precise keyboard positioning (legacy - replaced by direct DOM manipulation)
 export function calculateKeyboardPosition(
   keyboardHeight: number, 
   platform: 'android' | 'ios' | 'web'
@@ -40,4 +40,17 @@ export function calculateKeyboardPosition(
   
   const adjustment = adjustments[platform] || 1;
   return Math.max(keyboardHeight - adjustment, 0);
+}
+
+// Debug helper for keyboard positioning
+export function debugKeyboardPosition(isVisible: boolean, keyboardHeight: number, platform: string) {
+  console.log('[KeyboardDebug] State:', {
+    isVisible,
+    keyboardHeight,
+    platform,
+    timestamp: new Date().toISOString(),
+    windowHeight: window.innerHeight,
+    viewportHeight: window.visualViewport?.height || window.innerHeight,
+    element: document.querySelector('.mobile-chat-input-container')?.getBoundingClientRect()
+  });
 }

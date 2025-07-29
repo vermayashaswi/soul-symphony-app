@@ -52,7 +52,7 @@ export default function MobileChatInput({
     translatePlaceholder();
   }, [currentLanguage, translate]);
 
-  // Handle keyboard state changes and ensure proper scrolling
+  // Enhanced scrolling and keyboard synchronization
   useEffect(() => {
     if (!isReady) return;
     
@@ -63,7 +63,7 @@ export default function MobileChatInput({
       isNative 
     });
     
-    // Ensure proper scrolling when keyboard opens
+    // Ensure proper scrolling when keyboard state changes
     if (isKeyboardVisible && inputRef.current) {
       setTimeout(() => {
         const chatContent = document.querySelector('.mobile-chat-content');
@@ -75,45 +75,21 @@ export default function MobileChatInput({
         if (inputRef.current && document.activeElement !== inputRef.current) {
           inputRef.current.focus();
         }
-      }, 100);
+      }, 150);
     }
   }, [isKeyboardVisible, keyboardHeight, platform, isNative, isReady]);
 
-  // Enhanced positioning and gap elimination
+  // Apply keyboard visible class and platform classes
   useEffect(() => {
     if (!inputContainerRef.current || !isReady) return;
     
     const container = inputContainerRef.current;
     
-    // Apply keyboard state and platform classes
+    // Apply classes for CSS styling
     container.classList.toggle('keyboard-visible', isKeyboardVisible);
     container.classList.toggle(`platform-${platform}`, true);
     
-    // Force immediate positioning update to eliminate gaps
-    if (isKeyboardVisible && keyboardHeight > 0) {
-      const adjustment = platform === 'android' ? 1 : platform === 'ios' ? 2 : 1;
-      const finalBottom = Math.max(keyboardHeight - adjustment, 0);
-      
-      container.style.bottom = `${finalBottom}px`;
-      container.style.transform = 'translateY(0)';
-      container.style.marginBottom = '0';
-      container.style.borderBottom = 'none';
-      
-      console.log('[MobileChatInput] Keyboard positioning applied:', {
-        keyboardHeight,
-        adjustment,
-        finalBottom,
-        platform
-      });
-    } else {
-      // Reset to default positioning when keyboard is hidden
-      container.style.bottom = '';
-      container.style.transform = '';
-      container.style.marginBottom = '';
-      container.style.borderBottom = '';
-    }
-    
-    // Debug attributes
+    // Debug attributes for troubleshooting
     container.setAttribute('data-keyboard-visible', isKeyboardVisible.toString());
     container.setAttribute('data-platform', platform);
     container.setAttribute('data-keyboard-height', keyboardHeight.toString());
