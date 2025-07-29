@@ -1,6 +1,6 @@
 import React, { useRef, useMemo, useState, useCallback, useEffect } from 'react';
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
-import { OrbitControls, Text } from '@react-three/drei';
+import { OrbitControls } from '@react-three/drei';
 import * as THREE from 'three';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Maximize2, Minimize2 } from 'lucide-react';
@@ -8,6 +8,7 @@ import { TranslatableText } from '../translation/TranslatableText';
 import { Button } from '../ui/button';
 import { useIsMobile } from '../../hooks/use-mobile';
 import { useR3FBulkTranslation } from '../../hooks/useR3FBulkTranslation';
+import { BillboardText } from './BillboardText';
 
 // Types
 interface SoulNet3DNode {
@@ -97,7 +98,7 @@ function ThemeNode({
       </mesh>
       
       {/* Node Label */}
-      <Text
+      <BillboardText
         position={[0, -1, 0]}
         fontSize={0.3}
         color={isFaded ? '#666666' : '#ffffff'}
@@ -107,11 +108,11 @@ function ThemeNode({
         outlineColor="#000000"
       >
         {getTranslatedText(node.label)}
-      </Text>
+      </BillboardText>
 
       {/* Percentage Label for connected nodes */}
       {(isSelected || isConnected) && node.percentage && (
-        <Text
+        <BillboardText
           position={[0, -1.5, 0]}
           fontSize={0.25}
           color="#ffd93d"
@@ -121,7 +122,7 @@ function ThemeNode({
           outlineColor="#000000"
         >
           {`${node.percentage.toFixed(1)}%`}
-        </Text>
+        </BillboardText>
       )}
     </group>
   );
@@ -185,7 +186,7 @@ function EmotionNode({
       </mesh>
       
       {/* Node Label */}
-      <Text
+      <BillboardText
         position={[0, -1, 0]}
         fontSize={0.3}
         color={isFaded ? '#666666' : '#ffffff'}
@@ -195,11 +196,11 @@ function EmotionNode({
         outlineColor="#000000"
       >
         {getTranslatedText(node.label)}
-      </Text>
+      </BillboardText>
 
       {/* Percentage Label for connected nodes */}
       {(isSelected || isConnected) && node.percentage && (
-        <Text
+        <BillboardText
           position={[0, -1.5, 0]}
           fontSize={0.25}
           color="#ffd93d"
@@ -209,7 +210,7 @@ function EmotionNode({
           outlineColor="#000000"
         >
           {`${node.percentage.toFixed(1)}%`}
-        </Text>
+        </BillboardText>
       )}
     </group>
   );
