@@ -1,14 +1,13 @@
 import React, { useRef, useMemo, useState, useCallback, useEffect } from 'react';
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
-import { OrbitControls } from '@react-three/drei';
-import { animated, useSpring } from '@react-spring/three';
+import { OrbitControls, Text } from '@react-three/drei';
 import * as THREE from 'three';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Maximize2, Minimize2 } from 'lucide-react';
+import { TranslatableText } from '../translation/TranslatableText';
 import { Button } from '../ui/button';
 import { useIsMobile } from '../../hooks/use-mobile';
-import { useR3FTranslation, useR3FTranslations } from '../../hooks/useR3FTranslation';
-import { NodeLabels3D } from './Text3D';
+import { useR3FTranslation } from '../../hooks/useR3FTranslation';
 
 // Types
 interface SoulNet3DNode {
@@ -39,42 +38,7 @@ interface SoulNet3DProps {
   userId?: string;
 }
 
-// Helper function to filter data by time range
-function filterDataByTimeRange(data: any, timeRange: any) {
-  if (!data?.allEntries || !timeRange) return data;
-  
-  const now = new Date();
-  let startDate: Date;
-  
-  switch (timeRange) {
-    case 'day':
-      startDate = new Date(now.getTime() - 24 * 60 * 60 * 1000);
-      break;
-    case 'week':
-      startDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-      break;
-    case 'month':
-      startDate = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
-      break;
-    case 'year':
-      startDate = new Date(now.getTime() - 365 * 24 * 60 * 60 * 1000);
-      break;
-    default:
-      return data;
-  }
-  
-  const filteredEntries = data.allEntries.filter((entry: any) => {
-    const entryDate = new Date(entry.created_at);
-    return entryDate >= startDate && entryDate <= now;
-  });
-  
-  return {
-    ...data,
-    allEntries: filteredEntries
-  };
-}
-
-// 3D Node Components with React Spring animations
+// 3D Node Components
 function ThemeNode({ 
   node, 
   isSelected, 
@@ -92,31 +56,28 @@ function ThemeNode({
 }) {
   const meshRef = useRef<THREE.Mesh>(null);
   const [hovered, setHovered] = useState(false);
-
-  // Smooth animations with React Spring
-  const { scale, color } = useSpring({
-    scale: isSelected || isConnected ? 1.2 : isFaded ? 0.6 : 1,
-    color: isSelected ? '#ff6b6b' : isConnected ? '#4ecdc4' : '#667eea',
-    config: { tension: 300, friction: 30 }
-  });
+  const { translatedText } = useR3FTranslation(node.label);
 
   useFrame((state) => {
     if (meshRef.current) {
-      meshRef.current.rotation.y += 0.008;
+      // Rotation animation
+      meshRef.current.rotation.y += 0.01;
       
+      // Pulsing animation for selected/connected nodes
       if (isSelected || isConnected) {
-        const pulse = Math.sin(state.clock.elapsedTime * 2) * 0.05 + 1;
-        meshRef.current.scale.setScalar(scale.get() * pulse);
+        const pulse = Math.sin(state.clock.elapsedTime * 3) * 0.1 + 1;
+        meshRef.current.scale.setScalar(pulse);
       } else {
-        meshRef.current.scale.setScalar(scale.get());
+        meshRef.current.scale.setScalar(isFaded ? 0.3 : 1);
       }
     }
   });
 
-  const opacity = isFaded ? 0.3 : 1;
+  const color = isSelected ? '#ff6b6b' : isConnected ? '#4ecdc4' : '#667eea';
+  const opacity = isFaded ? 0.2 : 1;
 
   return (
-    <animated.group position={position}>
+    <group position={position}>
       <mesh
         ref={meshRef}
         onClick={onClick}
@@ -124,15 +85,43 @@ function ThemeNode({
         onPointerOut={() => setHovered(false)}
       >
         <sphereGeometry args={[0.5 + node.intensity * 0.3, 32, 32]} />
-        <animated.meshStandardMaterial 
-          color={color}
+        <meshStandardMaterial 
+          color={color} 
           transparent 
           opacity={opacity}
           emissive={isSelected || isConnected ? color : '#000000'}
-          emissiveIntensity={isSelected || isConnected ? 0.15 : 0}
+          emissiveIntensity={isSelected || isConnected ? 0.2 : 0}
         />
       </mesh>
-    </animated.group>
+      
+      {/* Node Label */}
+      <Text
+        position={[0, -1, 0]}
+        fontSize={0.3}
+        color={isFaded ? '#666666' : '#ffffff'}
+        anchorX="center"
+        anchorY="middle"
+        outlineWidth={0.02}
+        outlineColor="#000000"
+      >
+        {translatedText}
+      </Text>
+
+      {/* Percentage Label for connected nodes */}
+      {(isSelected || isConnected) && node.percentage && (
+        <Text
+          position={[0, -1.5, 0]}
+          fontSize={0.25}
+          color="#ffd93d"
+          anchorX="center"
+          anchorY="middle"
+          outlineWidth={0.02}
+          outlineColor="#000000"
+        >
+          {`${node.percentage.toFixed(1)}%`}
+        </Text>
+      )}
+    </group>
   );
 }
 
@@ -153,32 +142,29 @@ function EmotionNode({
 }) {
   const meshRef = useRef<THREE.Mesh>(null);
   const [hovered, setHovered] = useState(false);
-
-  // Smooth animations with React Spring
-  const { scale, color } = useSpring({
-    scale: isSelected || isConnected ? 1.2 : isFaded ? 0.6 : 1,
-    color: isSelected ? '#ff6b6b' : isConnected ? '#4ecdc4' : '#a78bfa',
-    config: { tension: 300, friction: 30 }
-  });
+  const { translatedText } = useR3FTranslation(node.label);
 
   useFrame((state) => {
     if (meshRef.current) {
-      meshRef.current.rotation.x += 0.006;
-      meshRef.current.rotation.y += 0.008;
+      // Rotation animation
+      meshRef.current.rotation.x += 0.008;
+      meshRef.current.rotation.y += 0.01;
       
+      // Pulsing animation for selected/connected nodes
       if (isSelected || isConnected) {
-        const pulse = Math.sin(state.clock.elapsedTime * 2) * 0.05 + 1;
-        meshRef.current.scale.setScalar(scale.get() * pulse);
+        const pulse = Math.sin(state.clock.elapsedTime * 3) * 0.1 + 1;
+        meshRef.current.scale.setScalar(pulse);
       } else {
-        meshRef.current.scale.setScalar(scale.get());
+        meshRef.current.scale.setScalar(isFaded ? 0.3 : 1);
       }
     }
   });
 
-  const opacity = isFaded ? 0.3 : 1;
+  const color = isSelected ? '#ff6b6b' : isConnected ? '#4ecdc4' : '#a78bfa';
+  const opacity = isFaded ? 0.2 : 1;
 
   return (
-    <animated.group position={position}>
+    <group position={position}>
       <mesh
         ref={meshRef}
         onClick={onClick}
@@ -186,15 +172,43 @@ function EmotionNode({
         onPointerOut={() => setHovered(false)}
       >
         <boxGeometry args={[0.6 + node.intensity * 0.4, 0.6 + node.intensity * 0.4, 0.6 + node.intensity * 0.4]} />
-        <animated.meshStandardMaterial 
-          color={color}
+        <meshStandardMaterial 
+          color={color} 
           transparent 
           opacity={opacity}
           emissive={isSelected || isConnected ? color : '#000000'}
-          emissiveIntensity={isSelected || isConnected ? 0.15 : 0}
+          emissiveIntensity={isSelected || isConnected ? 0.2 : 0}
         />
       </mesh>
-    </animated.group>
+      
+      {/* Node Label */}
+      <Text
+        position={[0, -1, 0]}
+        fontSize={0.3}
+        color={isFaded ? '#666666' : '#ffffff'}
+        anchorX="center"
+        anchorY="middle"
+        outlineWidth={0.02}
+        outlineColor="#000000"
+      >
+        {translatedText}
+      </Text>
+
+      {/* Percentage Label for connected nodes */}
+      {(isSelected || isConnected) && node.percentage && (
+        <Text
+          position={[0, -1.5, 0]}
+          fontSize={0.25}
+          color="#ffd93d"
+          anchorX="center"
+          anchorY="middle"
+          outlineWidth={0.02}
+          outlineColor="#000000"
+        >
+          {`${node.percentage.toFixed(1)}%`}
+        </Text>
+      )}
+    </group>
   );
 }
 
@@ -237,17 +251,13 @@ function ConnectionLines({
 
         const geometry = new THREE.BufferGeometry().setFromPoints(points);
         
-        const material = new THREE.LineDashedMaterial({
-          color: isHighlighted ? '#ffd93d' : '#999999',
+        const material = new THREE.LineBasicMaterial({
+          color: isHighlighted ? '#ffd93d' : '#ffffff',
           transparent: true,
-          opacity: isFaded ? 0.15 : (isHighlighted ? 0.9 : 0.3),
-          linewidth: 0.5,
-          dashSize: 0.1,
-          gapSize: 0.1
+          opacity: isFaded ? 0.1 : (isHighlighted ? 1 : 0.6)
         });
         
         const line = new THREE.Line(geometry, material);
-        line.computeLineDistances(); // Required for dashed lines
         
         return (
           <primitive key={`${link.source}-${link.target}`} object={line} />
@@ -257,43 +267,11 @@ function ConnectionLines({
   );
 }
 
-// 3D Text Labels Component (using troika-three-text)
-// This replaces the problematic screen-space HTML labels
-
-// Background click handler component
-function BackgroundClickHandler({ onBackgroundClick }: { onBackgroundClick: () => void }) {
-  const { camera, gl, scene } = useThree();
-  const raycaster = useMemo(() => new THREE.Raycaster(), []);
-
-  useEffect(() => {
-    const handleClick = (event: MouseEvent) => {
-      const mouse = new THREE.Vector2();
-      mouse.x = (event.clientX / gl.domElement.clientWidth) * 2 - 1;
-      mouse.y = -(event.clientY / gl.domElement.clientHeight) * 2 + 1;
-
-      raycaster.setFromCamera(mouse, camera);
-      const intersects = raycaster.intersectObjects(scene.children, true);
-
-      // If no mesh objects are intersected, it's a background click
-      const meshIntersects = intersects.filter(intersect => intersect.object.type === 'Mesh');
-      if (meshIntersects.length === 0) {
-        onBackgroundClick();
-      }
-    };
-
-    gl.domElement.addEventListener('click', handleClick);
-    return () => gl.domElement.removeEventListener('click', handleClick);
-  }, [camera, gl, scene, raycaster, onBackgroundClick]);
-
-  return null;
-}
-
 // 3D Scene Component
-function Scene3D({ data, selectedNodeId, onNodeClick, onBackgroundClick, isMobile }: {
+function Scene3D({ data, selectedNodeId, onNodeClick, isMobile }: {
   data: SoulNet3DData;
   selectedNodeId: string | null;
   onNodeClick: (nodeId: string | null) => void;
-  onBackgroundClick: () => void;
   isMobile: boolean;
 }) {
   const { camera } = useThree();
@@ -313,6 +291,7 @@ function Scene3D({ data, selectedNodeId, onNodeClick, onBackgroundClick, isMobil
   }, [selectedNodeId, data.links]);
 
   useEffect(() => {
+    // Set initial camera position
     camera.position.set(0, 0, 15);
   }, [camera]);
 
@@ -327,9 +306,6 @@ function Scene3D({ data, selectedNodeId, onNodeClick, onBackgroundClick, isMobil
       <pointLight position={[10, 10, 10]} intensity={1} />
       <pointLight position={[-10, -10, -10]} intensity={0.5} />
       <hemisphereLight args={["#ffffff", "#606060", 0.6]} />
-
-      {/* Background click handler */}
-      <BackgroundClickHandler onBackgroundClick={onBackgroundClick} />
 
       {/* Nodes */}
       {data.nodes.map(node => {
@@ -372,14 +348,6 @@ function Scene3D({ data, selectedNodeId, onNodeClick, onBackgroundClick, isMobil
         connectedNodeIds={connectedNodeIds}
       />
 
-      {/* 3D Text Labels */}
-      <NodeLabels3D
-        nodes={data.nodes}
-        selectedNodeId={selectedNodeId}
-        connectedNodeIds={connectedNodeIds}
-        cameraDistance={camera.position.length()}
-      />
-
       {/* Controls */}
       <OrbitControls 
         enablePan={true}
@@ -388,9 +356,9 @@ function Scene3D({ data, selectedNodeId, onNodeClick, onBackgroundClick, isMobil
         minDistance={5}
         maxDistance={50}
         autoRotate={selectedNodeId === null}
-        autoRotateSpeed={0.3}
+        autoRotateSpeed={0.5}
         enableDamping={true}
-        dampingFactor={0.08}
+        dampingFactor={0.05}
         screenSpacePanning={false}
         minPolarAngle={0}
         maxPolarAngle={Math.PI}
@@ -416,26 +384,9 @@ export function SoulNet3D({ timeRange, insightsData, userId }: SoulNet3DProps) {
   const mobileDetection = useIsMobile();
   const isMobile = mobileDetection.isMobile;
 
-  // Filter data based on time range
-  const filteredData = useMemo(() => {
-    return filterDataByTimeRange(insightsData, timeRange);
-  }, [insightsData, timeRange]);
-
-  // Pre-load translations for key UI text
-  const uiTexts = [
-    "Soul Network - 3D Visualization",
-    "No theme-emotion connections found for the selected time period."
-  ];
-  const mobileInteractionText = isMobile 
-    ? "Tap themes (spheres) or emotions (cubes) to explore connections. Touch to rotate, pinch to zoom, drag to pan."
-    : "Click themes (spheres) or emotions (cubes) to explore connections. Mouse to rotate, zoom, and pan.";
-  
-  const allTexts = [...uiTexts, mobileInteractionText];
-  const { translatedTexts } = useR3FTranslations(allTexts);
-
-  // Process data with simplified Y-axis positioning
+  // Process data from themeemotion column
   const processedData = useMemo((): SoulNet3DData => {
-    if (!filteredData?.allEntries?.length) {
+    if (!insightsData?.allEntries?.length) {
       return { nodes: [], links: [] };
     }
 
@@ -444,7 +395,7 @@ export function SoulNet3D({ timeRange, insightsData, userId }: SoulNet3DProps) {
     const emotionIntensities = new Map<string, number>();
 
     // Process themeemotion data
-    filteredData.allEntries.forEach((entry: any) => {
+    insightsData.allEntries.forEach((entry: any) => {
       if (entry.themeemotion && typeof entry.themeemotion === 'object') {
         Object.entries(entry.themeemotion).forEach(([theme, emotions]: [string, any]) => {
           if (!themeEmotionMap.has(theme)) {
@@ -467,10 +418,13 @@ export function SoulNet3D({ timeRange, insightsData, userId }: SoulNet3DProps) {
               emotionData.totalIntensity += intensityValue;
               
               themeTotal += intensityValue;
+              
+              // Update emotion intensity
               emotionIntensities.set(emotion, (emotionIntensities.get(emotion) || 0) + intensityValue);
             });
           }
 
+          // Update theme intensity
           themeIntensities.set(theme, (themeIntensities.get(theme) || 0) + themeTotal);
         });
       }
@@ -480,15 +434,11 @@ export function SoulNet3D({ timeRange, insightsData, userId }: SoulNet3DProps) {
     const nodes: SoulNet3DNode[] = [];
     const links: SoulNet3DLink[] = [];
     
-    // Theme Y-axis pattern: -1, +1, -2, +2, -1, +1, ... (4-element cycle)
-    const themeYPattern = [-1, 1, -2, 2];
-    
     // Generate theme nodes
     const themes = Array.from(themeEmotionMap.keys());
     themes.forEach((theme, index) => {
       const angle = (index / themes.length) * Math.PI * 2;
-      const radius = 8; // Radial distance 'a' = 8
-      const yPos = themeYPattern[index % themeYPattern.length];
+      const radius = 6;
       
       nodes.push({
         id: theme,
@@ -498,17 +448,13 @@ export function SoulNet3D({ timeRange, insightsData, userId }: SoulNet3DProps) {
         connections: themeEmotionMap.get(theme)?.size || 0,
         position: [
           Math.cos(angle) * radius,
-          yPos,
+          0,
           Math.sin(angle) * radius
         ]
       });
     });
 
-    // Emotion Y-axis pattern: -5, +5, -6, +6, -7, +7, -8, +8, -9, +9 (10-element cycle)
-    const emotionYPattern = [-5, 5, -6, 6, -7, 7, -8, 8, -9, 9];
-
     // Generate emotion nodes and links
-    let globalEmotionIndex = 0; // Track global emotion index for Y positioning
     themeEmotionMap.forEach((emotions, theme) => {
       const themeNode = nodes.find(n => n.id === theme);
       if (!themeNode) return;
@@ -522,12 +468,9 @@ export function SoulNet3D({ timeRange, insightsData, userId }: SoulNet3DProps) {
         // Calculate percentage for this emotion relative to the theme
         const percentage = totalThemeIntensity > 0 ? (data.totalIntensity / totalThemeIntensity) * 100 : 0;
         
-        // Position emotions with radial distances based on Y position
+        // Position emotions around their theme
         const angle = (index / emotionArray.length) * Math.PI * 2;
-        const yPos = emotionYPattern[globalEmotionIndex % emotionYPattern.length];
-        
-        // Use different radial distances based on Y position: b=12 for +Y, c=16 for -Y
-        const radialDistance = yPos > 0 ? 12 : 16;
+        const distance = 2 + data.totalIntensity * 0.5;
         
         const emotionNode: SoulNet3DNode = {
           id: emotionId,
@@ -536,14 +479,12 @@ export function SoulNet3D({ timeRange, insightsData, userId }: SoulNet3DProps) {
           intensity: Math.min(data.totalIntensity / 5, 1),
           connections: 1,
           position: [
-            Math.cos(angle) * radialDistance,
-            yPos,
-            Math.sin(angle) * radialDistance
+            themeNode.position[0] + Math.cos(angle) * distance,
+            Math.sin(index * 0.5) * 2,
+            themeNode.position[2] + Math.sin(angle) * distance
           ],
           percentage
         };
-        
-        globalEmotionIndex++;
 
         nodes.push(emotionNode);
 
@@ -558,7 +499,7 @@ export function SoulNet3D({ timeRange, insightsData, userId }: SoulNet3DProps) {
     });
 
     return { nodes, links };
-  }, [filteredData]);
+  }, [insightsData]);
 
   const handleNodeClick = useCallback((nodeId: string | null) => {
     setSelectedNodeId(nodeId);
@@ -588,35 +529,15 @@ export function SoulNet3D({ timeRange, insightsData, userId }: SoulNet3DProps) {
     }
   }, [processedData]);
 
-  const handleBackgroundClick = useCallback(() => {
-    setSelectedNodeId(null);
-  }, []);
-
   const toggleFullscreen = useCallback(() => {
     setIsFullscreen(!isFullscreen);
   }, [isFullscreen]);
-
-  const connectedNodeIds = useMemo(() => {
-    if (!selectedNodeId) return new Set<string>();
-    
-    const connected = new Set<string>();
-    processedData.links.forEach(link => {
-      if (link.source === selectedNodeId) {
-        connected.add(link.target);
-      } else if (link.target === selectedNodeId) {
-        connected.add(link.source);
-      }
-    });
-    return connected;
-  }, [selectedNodeId, processedData.links]);
-
-  // No longer show loading state for translations to prevent language switching issues
 
   if (processedData.nodes.length === 0) {
     return (
       <div className="flex items-center justify-center h-96 bg-card/50 rounded-lg border">
         <p className="text-muted-foreground">
-          {translatedTexts[1] || "No theme-emotion connections found for the selected time period."}
+          <TranslatableText text="No theme-emotion connections found for the selected time period." />
         </p>
       </div>
     );
@@ -628,7 +549,7 @@ export function SoulNet3D({ timeRange, insightsData, userId }: SoulNet3DProps) {
   
   const canvasHeight = isFullscreen 
     ? "100vh" 
-    : isMobile ? "500px" : "750px";
+    : isMobile ? "400px" : "600px";
 
   return (
     <motion.div 
@@ -640,7 +561,7 @@ export function SoulNet3D({ timeRange, insightsData, userId }: SoulNet3DProps) {
       {/* Header */}
       <div className="absolute top-4 left-4 right-4 z-10 flex items-center justify-between">
         <h3 className="text-lg font-semibold text-foreground">
-          {translatedTexts[0] || "Soul Network - 3D Visualization"}
+          <TranslatableText text="Soul Network - 3D Visualization" />
         </h3>
         <Button
           variant="ghost"
@@ -656,7 +577,7 @@ export function SoulNet3D({ timeRange, insightsData, userId }: SoulNet3DProps) {
       {selectedNodeId === null && (
         <div className="absolute bottom-4 left-4 right-4 z-10">
           <div className="bg-background/80 backdrop-blur-sm rounded-lg p-3 text-sm text-muted-foreground text-center">
-            {translatedTexts[2] || mobileInteractionText}
+            <TranslatableText text="Click on themes (spheres) or emotions (cubes) to explore connections. Use mouse to rotate, zoom, and pan." />
           </div>
         </div>
       )}
@@ -675,10 +596,30 @@ export function SoulNet3D({ timeRange, insightsData, userId }: SoulNet3DProps) {
           data={processedData}
           selectedNodeId={selectedNodeId}
           onNodeClick={handleNodeClick}
-          onBackgroundClick={handleBackgroundClick}
           isMobile={isMobile}
         />
       </Canvas>
+
+      {/* Selected Node Info */}
+      <AnimatePresence>
+        {selectedNodeId && (
+          <motion.div
+            className="absolute top-20 left-4 bg-background/90 backdrop-blur-sm rounded-lg p-4 max-w-xs"
+            initial={{ opacity: 0, x: -50 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: -50 }}
+          >
+            <div className="text-sm">
+              <div className="font-semibold mb-2">
+                <TranslatableText text={processedData.nodes.find(n => n.id === selectedNodeId)?.label || ""} />
+              </div>
+              <div className="text-muted-foreground">
+                <TranslatableText text="Connected elements show percentage distribution" />
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </motion.div>
   );
 }
