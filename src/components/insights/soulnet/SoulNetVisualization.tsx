@@ -300,9 +300,9 @@ export const SoulNetVisualization: React.FC<SoulNetVisualizationProps> = ({
   const shouldDim = !!selectedNode;
 
   // Custom node click handler
-  const handleNodeClick = (id: string, e: any) => {
-    console.log(`[SoulNetVisualization] Node clicked: ${id}`);
-    onNodeClick(id);
+  const handleNodeClick = (node: NodeData) => {
+    console.log(`[SoulNetVisualization] Node clicked: ${node.id}`);
+    onNodeClick(node.id);
   };
 
   if (!validData || !validData.nodes || !validData.links) {
@@ -437,11 +437,7 @@ export const SoulNetVisualization: React.FC<SoulNetVisualizationProps> = ({
             selectedNodeId={selectedNode}
             cameraZoom={cameraZoom}
             isHighlighted={isHighlighted}
-            connectionPercentage={connectionPercentage}
-            showPercentage={showPercentage}
-            forceShowLabels={shouldShowLabels}
-            effectiveTheme="light"
-            isInstantMode={true}
+            theme="light"
           />
         );
       })}
