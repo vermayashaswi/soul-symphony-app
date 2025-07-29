@@ -33,17 +33,14 @@ export const NodeMesh: React.FC<NodeMeshProps> = ({
   onPointerLeave,
 }) => {
   const meshRef = useRef<THREE.Mesh>(null);
-  const [animationTime, setAnimationTime] = useState(0);
-  const [isReady, setIsReady] = useState(false);
   const color = useMemo(() => new THREE.Color(displayColor), [displayColor]);
   
-  // Delayed initialization to prevent clock access issues
+  // Simplified initialization - no delayed state
+  const [isMounted, setIsMounted] = useState(true);
+  
   useEffect(() => {
-    const timer = setTimeout(() => {
-      setIsReady(true);
-    }, 100);
-    
-    return () => clearTimeout(timer);
+    setIsMounted(true);
+    return () => setIsMounted(false);
   }, []);
   
   // ENHANCED: Updated geometry creation for 15% larger nodes
@@ -54,40 +51,35 @@ export const NodeMesh: React.FC<NodeMeshProps> = ({
     [type]
   );
 
-  // FIXED: Animation with manual time tracking and mobile support
-  useFrame((state, delta) => {
-    if (!meshRef.current || !isReady) return;
+  // SIMPLIFIED: Safe animation without complex state management
+  useFrame((state) => {
+    if (!meshRef.current || !isMounted) return;
     
     try {
-      // Manual time tracking instead of clock access
-      setAnimationTime(prev => prev + delta);
+      const time = state.clock.elapsedTime;
       
       if (isHighlighted) {
-        const pulseIntensity = isSelected ? 0.25 : (connectionStrength * 0.2);
-        const pulse = Math.sin(animationTime * 2.5) * pulseIntensity + 1.1;
+        const pulseIntensity = isSelected ? 0.15 : (connectionStrength * 0.1);
+        const pulse = Math.sin(time * 2) * pulseIntensity + 1.05;
         const targetScale = scale * pulse;
         
-        // Apply pulsing scale with smoother transitions
-        meshRef.current.scale.lerp(new THREE.Vector3(targetScale, targetScale, targetScale), 0.15);
+        // Direct scale update without lerping
+        meshRef.current.scale.setScalar(targetScale);
         
-        // Safe material updates
+        // Simplified material updates
         if (meshRef.current.material instanceof THREE.MeshStandardMaterial) {
           const emissiveIntensity = isSelected 
-            ? 1.0 + Math.sin(animationTime * 3) * 0.3
-            : 0.7 + (connectionStrength * 0.3) + Math.sin(animationTime * 3) * 0.2;
+            ? 0.8 + Math.sin(time * 2.5) * 0.2
+            : 0.5 + (connectionStrength * 0.2);
           
-          meshRef.current.material.emissiveIntensity = Math.max(0, Math.min(2, emissiveIntensity));
-          meshRef.current.material.color.lerp(color, 0.1);
+          meshRef.current.material.emissiveIntensity = Math.max(0, Math.min(1.5, emissiveIntensity));
         }
       } else {
         const targetScale = dimmed ? scale * 0.8 : scale;
-        
-        // Apply static scale with smoother transitions
-        meshRef.current.scale.lerp(new THREE.Vector3(targetScale, targetScale, targetScale), 0.15);
+        meshRef.current.scale.setScalar(targetScale);
         
         if (meshRef.current.material instanceof THREE.MeshStandardMaterial) {
           meshRef.current.material.emissiveIntensity = dimmed ? 0 : 0.1;
-          meshRef.current.material.color.lerp(color, 0.1);
         }
       }
     } catch (error) {
@@ -102,8 +94,8 @@ export const NodeMesh: React.FC<NodeMeshProps> = ({
     return dimmed ? 0.25 : 0.8; // Increased from 0.15 to 0.25 for better visibility of dimmed nodes
   }, [isHighlighted, isSelected, dimmed]);
 
-  // Don't render until ready
-  if (!isReady) {
+  // Render immediately - no delay needed
+  if (!isMounted) {
     return null;
   }
 
