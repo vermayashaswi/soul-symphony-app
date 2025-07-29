@@ -13,71 +13,86 @@ export const useKeyboardDetection = () => {
     let detectionTimeout: NodeJS.Timeout;
     let lastViewportHeight = window.innerHeight;
     let isDetecting = false;
+    let measurementAttempts = 0;
+    
+    const getMeasurements = () => {
+      const windowHeight = window.innerHeight;
+      const documentHeight = document.documentElement.clientHeight;
+      const viewportHeight = window.visualViewport?.height || windowHeight;
+      const screenHeight = window.screen?.height || windowHeight;
+      
+      return {
+        windowHeight,
+        documentHeight,
+        viewportHeight,
+        screenHeight,
+        heightDifference: windowHeight - viewportHeight,
+        documentDifference: documentHeight - viewportHeight
+      };
+    };
     
     const handleKeyboardDetection = () => {
       if (isDetecting) return;
       isDetecting = true;
+      measurementAttempts++;
       
       if (detectionTimeout) clearTimeout(detectionTimeout);
       
       detectionTimeout = setTimeout(() => {
         try {
-          if (window.visualViewport) {
-            // Use Visual Viewport API (preferred method)
-            const viewportHeight = window.visualViewport.height;
-            const windowHeight = window.innerHeight;
-            const heightDifference = windowHeight - viewportHeight;
-            
-            // Platform-specific thresholds
-            const threshold = platform === 'android' ? 150 : platform === 'ios' ? 100 : 120;
-            const keyboardVisible = heightDifference > threshold;
-            
-            console.log('[KeyboardDetection] Visual viewport check:', {
-              windowHeight,
-              viewportHeight,
-              heightDifference,
-              threshold,
-              keyboardVisible,
-              platform
-            });
-            
-            updateKeyboardState(keyboardVisible, keyboardVisible ? heightDifference : 0);
-            
-            // Set CSS variables for dynamic positioning
-            document.documentElement.style.setProperty('--keyboard-height', `${keyboardVisible ? heightDifference : 0}px`);
-            document.documentElement.style.setProperty('--safe-keyboard-height', `${keyboardVisible ? Math.max(heightDifference, 280) : 0}px`);
+          const measurements = getMeasurements();
+          const { windowHeight, viewportHeight, heightDifference } = measurements;
+          
+          // Improved platform-specific thresholds and logic
+          let threshold: number;
+          let keyboardHeight: number;
+          let keyboardVisible: boolean;
+          
+          if (platform === 'android') {
+            // Android: More aggressive detection, account for status bar
+            threshold = 100;
+            keyboardHeight = heightDifference;
+            keyboardVisible = heightDifference > threshold;
+          } else if (platform === 'ios') {
+            // iOS: Account for safe areas and home indicator
+            threshold = 80;
+            keyboardHeight = heightDifference;
+            keyboardVisible = heightDifference > threshold;
           } else {
-            // Fallback detection using window resize
-            const currentHeight = window.innerHeight;
-            const heightDifference = lastViewportHeight - currentHeight;
-            
-            // More conservative thresholds for fallback
-            const showThreshold = platform === 'android' ? 200 : 150;
-            const hideThreshold = -50;
-            
-            if (heightDifference > showThreshold) {
-              updateKeyboardState(true, heightDifference);
-              document.documentElement.style.setProperty('--keyboard-height', `${heightDifference}px`);
-              document.documentElement.style.setProperty('--safe-keyboard-height', `${Math.max(heightDifference, 280)}px`);
-            } else if (heightDifference < hideThreshold) {
-              updateKeyboardState(false, 0);
-              document.documentElement.style.setProperty('--keyboard-height', '0px');
-              document.documentElement.style.setProperty('--safe-keyboard-height', '0px');
-            }
-            
-            console.log('[KeyboardDetection] Fallback detection:', {
-              lastHeight: lastViewportHeight,
-              currentHeight,
-              heightDifference,
-              keyboardVisible: heightDifference > showThreshold
-            });
+            // Web fallback
+            threshold = 120;
+            keyboardHeight = heightDifference;
+            keyboardVisible = heightDifference > threshold;
           }
+          
+          // Ensure keyboard height is never negative and add small buffer
+          const finalKeyboardHeight = keyboardVisible ? Math.max(keyboardHeight - 2, 0) : 0;
+          
+          console.log('[KeyboardDetection] Enhanced detection:', {
+            platform,
+            measurements,
+            threshold,
+            keyboardVisible,
+            finalKeyboardHeight,
+            attempt: measurementAttempts
+          });
+          
+          updateKeyboardState(keyboardVisible, finalKeyboardHeight);
+          
+          // Set CSS variables with precise measurements
+          document.documentElement.style.setProperty('--keyboard-height', `${finalKeyboardHeight}px`);
+          document.documentElement.style.setProperty('--safe-keyboard-height', `${keyboardVisible ? Math.max(finalKeyboardHeight, 280) : 0}px`);
+          
+          // Add body classes for additional styling hooks
+          document.body.classList.toggle('keyboard-visible', keyboardVisible);
+          document.body.classList.toggle(`keyboard-${platform}`, keyboardVisible);
+          
         } catch (error) {
           console.error('[KeyboardDetection] Error during detection:', error);
         } finally {
           isDetecting = false;
         }
-      }, 50);
+      }, 30); // Reduced timeout for faster response
     };
 
     // Store initial height

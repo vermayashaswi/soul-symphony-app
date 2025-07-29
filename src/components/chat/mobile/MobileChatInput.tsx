@@ -79,29 +79,45 @@ export default function MobileChatInput({
     }
   }, [isKeyboardVisible, keyboardHeight, platform, isNative, isReady]);
 
-  // IMPROVED: Apply container classes with better coordination
+  // Enhanced positioning and gap elimination
   useEffect(() => {
     if (!inputContainerRef.current || !isReady) return;
     
     const container = inputContainerRef.current;
     
-    // Apply keyboard state and platform classes (let the hook manage these)
-    // These classes are managed by useKeyboardState hook, but we ensure they're present
+    // Apply keyboard state and platform classes
     container.classList.toggle('keyboard-visible', isKeyboardVisible);
     container.classList.toggle(`platform-${platform}`, true);
     
-    // Debug attributes - DISABLED for production
-    // container.setAttribute('data-debug', 'true');
+    // Force immediate positioning update to eliminate gaps
+    if (isKeyboardVisible && keyboardHeight > 0) {
+      const adjustment = platform === 'android' ? 1 : platform === 'ios' ? 2 : 1;
+      const finalBottom = Math.max(keyboardHeight - adjustment, 0);
+      
+      container.style.bottom = `${finalBottom}px`;
+      container.style.transform = 'translateY(0)';
+      container.style.marginBottom = '0';
+      container.style.borderBottom = 'none';
+      
+      console.log('[MobileChatInput] Keyboard positioning applied:', {
+        keyboardHeight,
+        adjustment,
+        finalBottom,
+        platform
+      });
+    } else {
+      // Reset to default positioning when keyboard is hidden
+      container.style.bottom = '';
+      container.style.transform = '';
+      container.style.marginBottom = '';
+      container.style.borderBottom = '';
+    }
+    
+    // Debug attributes
     container.setAttribute('data-keyboard-visible', isKeyboardVisible.toString());
     container.setAttribute('data-platform', platform);
     container.setAttribute('data-keyboard-height', keyboardHeight.toString());
     
-    console.log('[MobileChatInput] Updated container classes:', {
-      keyboardVisible: isKeyboardVisible,
-      platform,
-      height: keyboardHeight,
-      classes: container.className
-    });
   }, [isKeyboardVisible, platform, keyboardHeight, isReady]);
 
   if (isInChatTutorialStep) {
