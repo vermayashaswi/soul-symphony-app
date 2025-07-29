@@ -254,7 +254,7 @@ function ConnectionLines({
   );
 }
 
-// Screen-space HTML labels component
+// Screen-space HTML labels component (moved outside Canvas)
 function NodeLabels({ 
   nodes, 
   selectedNodeId, 
@@ -265,27 +265,43 @@ function NodeLabels({
   nodes: SoulNet3DNode[];
   selectedNodeId: string | null;
   connectedNodeIds: Set<string>;
-  camera: THREE.Camera;
+  camera: THREE.Camera | null;
   size: { width: number; height: number };
 }) {
   const [screenPositions, setScreenPositions] = useState<{ [key: string]: { x: number; y: number; visible: boolean } }>({});
 
-  useFrame(() => {
-    const newPositions: { [key: string]: { x: number; y: number; visible: boolean } } = {};
-    
-    nodes.forEach(node => {
-      const vector = new THREE.Vector3(...node.position);
-      vector.project(camera);
+  useEffect(() => {
+    if (!camera) return;
+
+    const updatePositions = () => {
+      const newPositions: { [key: string]: { x: number; y: number; visible: boolean } } = {};
       
-      const x = (vector.x * 0.5 + 0.5) * size.width;
-      const y = (vector.y * -0.5 + 0.5) * size.height;
-      const visible = vector.z < 1;
+      nodes.forEach(node => {
+        const vector = new THREE.Vector3(...node.position);
+        vector.project(camera);
+        
+        const x = (vector.x * 0.5 + 0.5) * size.width;
+        const y = (vector.y * -0.5 + 0.5) * size.height;
+        const visible = vector.z < 1;
+        
+        newPositions[node.id] = { x, y, visible };
+      });
       
-      newPositions[node.id] = { x, y, visible };
-    });
+      setScreenPositions(newPositions);
+    };
+
+    // Update positions on animation frame
+    const animate = () => {
+      updatePositions();
+      requestAnimationFrame(animate);
+    };
     
-    setScreenPositions(newPositions);
-  });
+    const animationId = requestAnimationFrame(animate);
+    
+    return () => {
+      cancelAnimationFrame(animationId);
+    };
+  }, [camera, nodes, size]);
 
   return (
     <div className="absolute inset-0 pointer-events-none">
@@ -355,12 +371,13 @@ function BackgroundClickHandler({ onBackgroundClick }: { onBackgroundClick: () =
 }
 
 // 3D Scene Component
-function Scene3D({ data, selectedNodeId, onNodeClick, onBackgroundClick, isMobile }: {
+function Scene3D({ data, selectedNodeId, onNodeClick, onBackgroundClick, isMobile, onCameraUpdate }: {
   data: SoulNet3DData;
   selectedNodeId: string | null;
   onNodeClick: (nodeId: string | null) => void;
   onBackgroundClick: () => void;
   isMobile: boolean;
+  onCameraUpdate?: (camera: THREE.Camera, size: { width: number; height: number }) => void;
 }) {
   const { camera, size } = useThree();
 
@@ -381,6 +398,12 @@ function Scene3D({ data, selectedNodeId, onNodeClick, onBackgroundClick, isMobil
   useEffect(() => {
     camera.position.set(0, 0, 15);
   }, [camera]);
+
+  useEffect(() => {
+    if (onCameraUpdate) {
+      onCameraUpdate(camera, size);
+    }
+  }, [camera, size, onCameraUpdate]);
 
   const handleNodeClick = useCallback((nodeId: string) => {
     onNodeClick(selectedNodeId === nodeId ? null : nodeId);
@@ -438,15 +461,6 @@ function Scene3D({ data, selectedNodeId, onNodeClick, onBackgroundClick, isMobil
         connectedNodeIds={connectedNodeIds}
       />
 
-      {/* Screen-space labels */}
-      <NodeLabels 
-        nodes={data.nodes}
-        selectedNodeId={selectedNodeId}
-        connectedNodeIds={connectedNodeIds}
-        camera={camera}
-        size={size}
-      />
-
       {/* Controls */}
       <OrbitControls 
         enablePan={true}
@@ -480,6 +494,8 @@ function Scene3D({ data, selectedNodeId, onNodeClick, onBackgroundClick, isMobil
 export function SoulNet3D({ timeRange, insightsData, userId }: SoulNet3DProps) {
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [camera, setCamera] = useState<THREE.Camera | null>(null);
+  const [canvasSize, setCanvasSize] = useState({ width: 0, height: 0 });
   const mobileDetection = useIsMobile();
   const isMobile = mobileDetection.isMobile;
 
@@ -658,6 +674,25 @@ export function SoulNet3D({ timeRange, insightsData, userId }: SoulNet3DProps) {
     setIsFullscreen(!isFullscreen);
   }, [isFullscreen]);
 
+  const handleCameraUpdate = useCallback((camera: THREE.Camera, size: { width: number; height: number }) => {
+    setCamera(camera);
+    setCanvasSize(size);
+  }, []);
+
+  const connectedNodeIds = useMemo(() => {
+    if (!selectedNodeId) return new Set<string>();
+    
+    const connected = new Set<string>();
+    processedData.links.forEach(link => {
+      if (link.source === selectedNodeId) {
+        connected.add(link.target);
+      } else if (link.target === selectedNodeId) {
+        connected.add(link.source);
+      }
+    });
+    return connected;
+  }, [selectedNodeId, processedData.links]);
+
   // Show loading state while translations are loading
   if (translationsLoading) {
     return (
@@ -732,8 +767,20 @@ export function SoulNet3D({ timeRange, insightsData, userId }: SoulNet3DProps) {
           onNodeClick={handleNodeClick}
           onBackgroundClick={handleBackgroundClick}
           isMobile={isMobile}
+          onCameraUpdate={handleCameraUpdate}
         />
       </Canvas>
+
+      {/* Screen-space labels outside Canvas */}
+      {camera && canvasSize.width > 0 && (
+        <NodeLabels 
+          nodes={processedData.nodes}
+          selectedNodeId={selectedNodeId}
+          connectedNodeIds={connectedNodeIds}
+          camera={camera}
+          size={canvasSize}
+        />
+      )}
     </motion.div>
   );
 }
