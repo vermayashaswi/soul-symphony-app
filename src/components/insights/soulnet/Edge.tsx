@@ -46,7 +46,14 @@ export const Edge: React.FC<EdgeProps> = ({
   startNodeScale = 1,
   endNodeScale = 1
 }) => {
-  const { theme } = useTheme();
+  // Defensive theme access
+  let theme = 'light';
+  try {
+    const themeData = useTheme();
+    theme = themeData.theme;
+  } catch (error) {
+    console.warn('Theme provider not available, using default theme');
+  }
   
   const ref = useRef<THREE.Group>(null);
   // Change the ref type to match what react-three-fiber expects
@@ -91,29 +98,35 @@ export const Edge: React.FC<EdgeProps> = ({
     return geometry;
   }, [points]);
 
+  // ENHANCED: Improved color scheme with 20% lighter colors for dimmed edges
   const getEdgeColor = useMemo(() => {
     if (isHighlighted) {
-      return theme === 'light' ? '#2563eb' : '#ffffff';
+      return '#ffffff'; // Bright white for highlighted connections
     }
     
     if (dimmed) {
-      return theme === 'light' ? '#d1d5db' : '#374151';
+      // ENHANCED: 20% lighter colors for dimmed edges instead of very dark
+      return theme === 'light' ? '#4a4a4a' : '#3a3a3a';
     }
     
-    return theme === 'light' ? '#9ca3af' : '#6b7280';
+    // Default state - moderately visible
+    return theme === 'light' ? '#555555' : '#888888';
   }, [isHighlighted, dimmed, theme]);
 
+  // ENHANCED: Increased opacity for dimmed edges to 0.05-0.06
   const getEdgeOpacity = useMemo(() => {
     if (isHighlighted) {
-      return 1.0;
+      return 0.95; // Very bright for highlighted
     }
     
     if (dimmed) {
-      return 0.2;
+      // ENHANCED: Increased opacity to 0.05-0.06 range for better visibility
+      return theme === 'light' ? 0.06 : 0.05;
     }
     
-    return 0.6;
-  }, [isHighlighted, dimmed]);
+    // Default state
+    return theme === 'light' ? 0.25 : 0.08;
+  }, [isHighlighted, dimmed, theme]);
 
   useFrame(() => {
     try {
@@ -128,20 +141,9 @@ export const Edge: React.FC<EdgeProps> = ({
     }
   });
 
-  const thickness = useMemo(() => {
-    const baseThickness = 0.05;
-    const valueMultiplier = Math.max(0.6, Math.min(2.0, value / 10));
-    
-    if (isHighlighted) {
-      return baseThickness * valueMultiplier * 2.5;
-    }
-    
-    if (dimmed) {
-      return baseThickness * valueMultiplier * 0.5;
-    }
-    
-    return baseThickness * valueMultiplier;
-  }, [value, isHighlighted, dimmed]);
+  // ENHANCED: Much more dramatic thickness difference
+  const baseThickness = isHighlighted ? 2.5 : 0.3; // Highlighted much thicker, dimmed much thinner
+  const thickness = baseThickness + (value * (isHighlighted ? maxThickness * 1.5 : maxThickness * 0.1));
   
   // Create material with appropriate properties
   const material = useMemo(() => {

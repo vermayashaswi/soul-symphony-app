@@ -205,31 +205,12 @@ export const useInstantSoulNetData = (
     };
   }, [userId, timeRange, currentLanguage]); // Remove fetchFreshData from deps to prevent loops
 
-  // ENHANCED: Optimized getter functions with better debugging
+  // ENHANCED: Optimized getter functions
   const getInstantConnectionPercentage = useCallback((selectedNode: string, targetNode: string): number => {
-    if (!selectedNode || selectedNode === targetNode) {
-      console.log(`[useInstantSoulNetData] PERCENTAGE: Invalid input - selectedNode=${selectedNode}, targetNode=${targetNode}`);
-      return 0;
-    }
-    
-    if (connectionPercentages.size === 0) {
-      console.log(`[useInstantSoulNetData] PERCENTAGE: No connection percentages loaded yet`);
-      return 0;
-    }
+    if (!selectedNode || selectedNode === targetNode || connectionPercentages.size === 0) return 0;
     
     const key = `${selectedNode}-${targetNode}`;
-    const percentage = connectionPercentages.get(key) || 0;
-    console.log(`[useInstantSoulNetData] PERCENTAGE: ${key} = ${percentage}%`);
-    
-    // Also try reverse direction if no direct match
-    if (percentage === 0) {
-      const reverseKey = `${targetNode}-${selectedNode}`;
-      const reversePercentage = connectionPercentages.get(reverseKey) || 0;
-      console.log(`[useInstantSoulNetData] PERCENTAGE: Reverse check ${reverseKey} = ${reversePercentage}%`);
-      return reversePercentage;
-    }
-    
-    return percentage;
+    return connectionPercentages.get(key) || 0;
   }, [connectionPercentages]);
 
   const getInstantTranslation = useCallback((nodeId: string): string => {

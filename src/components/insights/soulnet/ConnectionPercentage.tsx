@@ -17,7 +17,7 @@ export const ConnectionPercentage: React.FC<ConnectionPercentageProps> = ({
   offsetY = 1.0,
   nodeType = 'emotion'
 }) => {
-  console.log(`[ConnectionPercentage] ENHANCED: Displaying ${percentage}% for ${nodeType} node at`, position);
+  console.log(`[ConnectionPercentage] Enhanced percentage display: ${percentage}% at`, position, 'visible:', isVisible);
 
   // Round to nearest integer and format
   const formattedPercentage = useMemo(() => {
@@ -27,34 +27,31 @@ export const ConnectionPercentage: React.FC<ConnectionPercentageProps> = ({
 
   // Skip rendering if not visible or percentage is 0
   if (!isVisible || percentage <= 0) {
-    console.log(`[ConnectionPercentage] ENHANCED: Not rendering - visible=${isVisible}, percentage=${percentage}`);
+    console.log(`[ConnectionPercentage] Not rendering: visible=${isVisible}, percentage=${percentage}`);
     return null;
   }
 
-  // ENHANCED: Better positioning based on node type and size
-  const labelPosition: [number, number, number] = useMemo(() => {
-    const baseOffset = nodeType === 'entity' ? 1.8 : 1.5; // Entities (spheres) are slightly larger
-    return [
-      position[0] + baseOffset, // Position to the right to avoid overlap
-      position[1] + offsetY, // Slight upward offset
-      position[2] + 2.0 // Forward offset for visibility
-    ];
-  }, [position, offsetY, nodeType]);
+  // Position in front of the node with enhanced Z offset
+  const labelPosition: [number, number, number] = [
+    position[0],
+    position[1],
+    position[2] + 3.0 // Further increased Z offset for maximum visibility
+  ];
 
-  console.log(`[ConnectionPercentage] ENHANCED: Rendering "${formattedPercentage}" at`, labelPosition, 'for', nodeType);
+  console.log(`[ConnectionPercentage] Enhanced final render: "${formattedPercentage}" at`, labelPosition);
 
   return (
     <ReliableText
       text={formattedPercentage}
       position={labelPosition}
       color="#ffffff"
-      size={0.45} // Slightly larger for better readability
+      size={0.4} // Slightly larger size
       visible={true}
-      renderOrder={30} // Highest render order to appear on top
+      renderOrder={25} // Even higher render order
       bold={true}
-      outlineWidth={0.1} // Strong outline for visibility
+      outlineWidth={0.08} // Maximum outline for visibility
       outlineColor="#000000"
-      maxWidth={8}
+      maxWidth={10}
     />
   );
 };

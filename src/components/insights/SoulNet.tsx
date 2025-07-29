@@ -481,6 +481,10 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
                 themeHex={themeHex}
                 isFullScreen={isFullScreen}
                 shouldShowLabels={true}
+                getInstantConnectionPercentage={getInstantConnectionPercentage}
+                getInstantTranslation={getInstantTranslation}
+                getInstantNodeConnections={getInstantNodeConnections}
+                isInstantReady={isInstantReady}
               />
             </Canvas>
           )}
