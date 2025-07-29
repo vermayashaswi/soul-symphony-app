@@ -1,9 +1,8 @@
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useFrame } from '@react-three/fiber';
 import { OrbitControls } from '@react-three/drei';
 import * as THREE from 'three';
-import { useTheme } from '@/hooks/use-theme';
 import Node from './Node';
 import Edge from './Edge';
 
@@ -51,22 +50,17 @@ export const SimplifiedSoulNetVisualization: React.FC<SimplifiedSoulNetVisualiza
   const [dimmedNodes, setDimmedNodes] = useState<Set<string>>(new Set());
   const [cameraZoom, setCameraZoom] = useState(45);
   
-  // UPDATED: Use app's theme context instead of system theme detection
-  // Defensive theme access
-  let theme: 'light' | 'dark' | 'system' = 'light';
-  let systemTheme: 'light' | 'dark' = 'light';
-  try {
-    const themeData = useTheme();
-    theme = themeData.theme;
-    systemTheme = themeData.systemTheme;
-  } catch (error) {
-    console.warn('Theme provider not available, using default theme');
-  }
-  
-  const effectiveTheme: 'light' | 'dark' = theme === 'system' ? systemTheme : (theme as 'light' | 'dark');
+  // ENHANCED: Determine effective theme from themeHex instead of useTheme
+  const effectiveTheme: 'light' | 'dark' = useMemo(() => {
+    // Parse theme from themeHex color value
+    if (themeHex === '#000000' || themeHex.toLowerCase().includes('dark')) {
+      return 'dark';
+    }
+    return 'light';
+  }, [themeHex]);
 
-  console.log(`[SimplifiedSoulNetVisualization] COORDINATED THEME: Using app theme context - theme: ${theme}, systemTheme: ${systemTheme}, effective: ${effectiveTheme}`);
-  console.log(`[SimplifiedSoulNetVisualization] COORDINATED INSTANT: Rendering with ${data.nodes.length} nodes, instantReady: ${isInstantReady}`);
+  console.log(`[SimplifiedSoulNetVisualization] ENHANCED THEME: Using theme from themeHex: ${themeHex}, effective: ${effectiveTheme}`);
+  console.log(`[SimplifiedSoulNetVisualization] ENHANCED INSTANT: Rendering with ${data.nodes.length} nodes, instantReady: ${isInstantReady}`);
 
   // Use Three.js controls for camera
   useFrame(({ camera }) => {

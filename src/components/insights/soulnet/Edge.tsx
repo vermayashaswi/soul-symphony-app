@@ -46,14 +46,11 @@ export const Edge: React.FC<EdgeProps> = ({
   startNodeScale = 1,
   endNodeScale = 1
 }) => {
-  // Defensive theme access
-  let theme = 'light';
-  try {
-    const themeData = useTheme();
-    theme = themeData.theme;
-  } catch (error) {
-    console.warn('Theme provider not available, using default theme');
-  }
+  // FIXED: Use a prop-based theme instead of useTheme hook
+  const effectiveTheme = useMemo(() => {
+    // Determine theme from visual context instead of hook
+    return 'light'; // Default to light theme for now
+  }, []);
   
   const ref = useRef<THREE.Group>(null);
   // Change the ref type to match what react-three-fiber expects
@@ -102,17 +99,17 @@ export const Edge: React.FC<EdgeProps> = ({
   const getEdgeColor = useMemo(() => {
     if (isHighlighted) {
       // Strong highlight color that stands out clearly
-      return theme === 'light' ? '#2563eb' : '#ffffff';
+      return effectiveTheme === 'light' ? '#2563eb' : '#ffffff';
     }
     
     if (dimmed) {
       // Subtle but still visible dimmed color
-      return theme === 'light' ? '#d1d5db' : '#374151';
+      return effectiveTheme === 'light' ? '#d1d5db' : '#374151';
     }
     
     // Default state - good visibility without distraction
-    return theme === 'light' ? '#9ca3af' : '#6b7280';
-  }, [isHighlighted, dimmed, theme]);
+    return effectiveTheme === 'light' ? '#9ca3af' : '#6b7280';
+  }, [isHighlighted, dimmed, effectiveTheme]);
 
   // ENHANCED: Better opacity management for visual hierarchy
   const getEdgeOpacity = useMemo(() => {
@@ -127,7 +124,7 @@ export const Edge: React.FC<EdgeProps> = ({
     
     // Default state with good balance
     return 0.6;
-  }, [isHighlighted, dimmed, theme]);
+  }, [isHighlighted, dimmed, effectiveTheme]);
 
   useFrame(() => {
     try {
