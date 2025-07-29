@@ -62,8 +62,8 @@ const MobileNavigation: React.FC<MobileNavigationProps> = ({ onboardingComplete 
     nav.classList.toggle('keyboard-visible', isKeyboardVisible);
     nav.classList.toggle(`platform-${platform}`, true);
     
-    // Add debug attributes for visual debugging
-    nav.setAttribute('data-debug', 'true');
+    // Debug attributes - DISABLED for production
+    // nav.setAttribute('data-debug', 'true');
     nav.setAttribute('data-keyboard-visible', isKeyboardVisible.toString());
     nav.setAttribute('data-platform', platform);
     

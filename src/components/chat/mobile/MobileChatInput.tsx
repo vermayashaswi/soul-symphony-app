@@ -90,8 +90,8 @@ export default function MobileChatInput({
     container.classList.toggle('keyboard-visible', isKeyboardVisible);
     container.classList.toggle(`platform-${platform}`, true);
     
-    // Add debug attributes for visual debugging
-    container.setAttribute('data-debug', 'true');
+    // Debug attributes - DISABLED for production
+    // container.setAttribute('data-debug', 'true');
     container.setAttribute('data-keyboard-visible', isKeyboardVisible.toString());
     container.setAttribute('data-platform', platform);
     container.setAttribute('data-keyboard-height', keyboardHeight.toString());

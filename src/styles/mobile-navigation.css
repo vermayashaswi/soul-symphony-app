@@ -157,14 +157,14 @@
 /* DEBUG HELPERS - Visual indicators               */
 /* =============================================== */
 
-/* Debug navigation state */
-.mobile-navigation[data-debug="true"] {
+/* Debug navigation state - DISABLED */
+/* .mobile-navigation[data-debug="true"] {
   border: 3px solid blue;
 }
 
 .mobile-navigation.keyboard-visible[data-debug="true"] {
   border-color: red;
-}
+} */
 
 /* Debug input state - disabled to remove visual artifacts */
 .mobile-chat-input-container[data-debug="true"] {
@@ -184,8 +184,8 @@
   background-color: rgba(255, 0, 255, 0.1);
 }
 
-/* Platform indicators */
-.platform-android[data-debug="true"]::before {
+/* Platform indicators - DISABLED */
+/* .platform-android[data-debug="true"]::before {
   content: "ANDROID";
   position: absolute;
   top: 0;
@@ -207,4 +207,4 @@
   padding: 2px 4px;
   font-size: 10px;
   z-index: 10000;
-}
+} */
