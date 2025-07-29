@@ -281,7 +281,7 @@ function Scene3D({ data, selectedNodeId, onNodeClick, isMobile, getTranslatedTex
   isMobile: boolean;
   getTranslatedText: (text: string) => string;
 }) {
-  const { camera } = useThree();
+  const { camera, gl, scene } = useThree();
 
   const connectedNodeIds = useMemo(() => {
     if (!selectedNodeId) return new Set<string>();
@@ -304,6 +304,13 @@ function Scene3D({ data, selectedNodeId, onNodeClick, isMobile, getTranslatedTex
 
   const handleNodeClick = useCallback((nodeId: string) => {
     onNodeClick(selectedNodeId === nodeId ? null : nodeId);
+  }, [selectedNodeId, onNodeClick]);
+
+  // Handle clicking on background to deselect
+  const handleBackgroundClick = useCallback(() => {
+    if (selectedNodeId) {
+      onNodeClick(null);
+    }
   }, [selectedNodeId, onNodeClick]);
 
   return (
@@ -380,6 +387,16 @@ function Scene3D({ data, selectedNodeId, onNodeClick, isMobile, getTranslatedTex
         }}
       />
 
+      {/* Invisible plane for background clicks */}
+      <mesh 
+        position={[0, 0, -10]}
+        onClick={handleBackgroundClick}
+        visible={false}
+      >
+        <planeGeometry args={[200, 200]} />
+        <meshBasicMaterial transparent opacity={0} />
+      </mesh>
+
       {/* Fog for depth */}
       <fog attach="fog" args={['#1a1a2e', 20, 100]} />
     </>
@@ -414,18 +431,21 @@ export function SoulNet3D({ timeRange, insightsData, userId, onTimeRangeChange }
   // Use bulk translation for all labels
   const { getTranslatedText, isComplete: translationsComplete } = useR3FBulkTranslation(uniqueLabels);
 
-  // Process data from themeemotion column
+  // Process data from themeemotion column with time filtering
   const processedData = useMemo((): SoulNet3DData => {
     if (!insightsData?.allEntries?.length) {
       return { nodes: [], links: [] };
     }
 
+    // Filter entries based on timeRange - use entries instead of allEntries for time filtering
+    const filteredEntries = insightsData?.entries || insightsData?.allEntries || [];
+
     const themeEmotionMap = new Map<string, Map<string, { count: number; totalIntensity: number }>>();
     const themeIntensities = new Map<string, number>();
     const emotionIntensities = new Map<string, number>();
 
-    // Process themeemotion data
-    insightsData.allEntries.forEach((entry: any) => {
+    // Process themeemotion data using filtered entries
+    filteredEntries.forEach((entry: any) => {
       if (entry.themeemotion && typeof entry.themeemotion === 'object') {
         Object.entries(entry.themeemotion).forEach(([theme, emotions]: [string, any]) => {
           if (!themeEmotionMap.has(theme)) {
@@ -612,14 +632,20 @@ export function SoulNet3D({ timeRange, insightsData, userId, onTimeRangeChange }
         </Button>
       </div>
 
-      {/* Instructions */}
-      {selectedNodeId === null && (
+      {/* Mobile Instructions - Always visible on mobile */}
+      {isMobile && (
         <div className="absolute bottom-4 left-4 right-4 z-10">
           <div className="bg-background/80 backdrop-blur-sm rounded-lg p-3 text-sm text-muted-foreground text-center">
-            <TranslatableText text={isMobile 
-              ? "Tap on themes (spheres) or emotions (cubes) to explore connections. Touch to rotate, pinch to zoom." 
-              : "Click on themes (spheres) or emotions (cubes) to explore connections. Use mouse to rotate, zoom, and pan."
-            } />
+            <TranslatableText text="Tap themes (spheres) or emotions (cubes) to explore. Touch to rotate, pinch to zoom. Tap background to deselect." />
+          </div>
+        </div>
+      )}
+
+      {/* Desktop Instructions - Only when no node selected */}
+      {!isMobile && selectedNodeId === null && (
+        <div className="absolute bottom-4 left-4 right-4 z-10">
+          <div className="bg-background/80 backdrop-blur-sm rounded-lg p-3 text-sm text-muted-foreground text-center">
+            <TranslatableText text="Click on themes (spheres) or emotions (cubes) to explore connections. Use mouse to rotate, zoom, and pan. Click background to deselect." />
           </div>
         </div>
       )}
@@ -661,11 +687,8 @@ export function SoulNet3D({ timeRange, insightsData, userId, onTimeRangeChange }
             exit={{ opacity: 0, x: -50 }}
           >
             <div className="text-sm">
-              <div className="font-semibold mb-2">
+              <div className="font-semibold">
                 {getTranslatedText(processedData.nodes.find(n => n.id === selectedNodeId)?.label || "")}
-              </div>
-              <div className="text-muted-foreground">
-                <TranslatableText text="Connected elements show percentage distribution" />
               </div>
             </div>
           </motion.div>
