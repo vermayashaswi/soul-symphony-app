@@ -141,9 +141,9 @@ export const Edge: React.FC<EdgeProps> = ({
     }
   });
 
-  // FIXED: Even more dramatic thickness difference with percentage-based scaling
-  const baseThickness = isHighlighted ? 4.0 : 0.2; // Much thicker for highlighted, very thin for dimmed
-  const valueMultiplier = Math.max(0.1, Math.min(2.0, value)); // Scale based on connection value
+  // FIXED: Proper thickness calculation proportional to connection strength
+  const baseThickness = isHighlighted ? 2.0 : 0.1; // Base thickness for highlighted vs normal
+  const valueMultiplier = Math.max(0.2, Math.min(3.0, value * 2)); // Connection strength multiplier
   const thickness = baseThickness * valueMultiplier;
   
   console.log(`[Edge] THICKNESS: ${start} -> ${end}, value=${value}, highlighted=${isHighlighted}, dimmed=${dimmed}, thickness=${thickness}`);

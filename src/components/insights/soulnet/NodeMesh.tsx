@@ -87,11 +87,11 @@ export const NodeMesh: React.FC<NodeMeshProps> = ({
     }
   });
 
-  // FIXED: Better opacity handling for highlighting effect
+  // FIXED: Proper opacity for selection behavior - 75% transparency for non-connected nodes
   const nodeOpacity = useMemo(() => {
     if (isSelected) return 1.0;
-    if (isHighlighted) return 0.95; 
-    return dimmed ? 0.25 : 0.8; // Increased from 0.15 to 0.25 for better visibility of dimmed nodes
+    if (isHighlighted) return 1.0; // Full opacity for connected nodes
+    return dimmed ? 0.25 : 0.8; // 75% transparency (0.25) for non-connected nodes when selection is active
   }, [isHighlighted, isSelected, dimmed]);
 
   // Render immediately - no delay needed
