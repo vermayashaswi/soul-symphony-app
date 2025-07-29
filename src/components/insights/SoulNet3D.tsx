@@ -92,7 +92,6 @@ function ThemeNode({
 }) {
   const meshRef = useRef<THREE.Mesh>(null);
   const [hovered, setHovered] = useState(false);
-  const { translatedText } = useR3FTranslation(node.label);
 
   // Smooth animations with React Spring
   const { scale, color } = useSpring({
@@ -154,7 +153,6 @@ function EmotionNode({
 }) {
   const meshRef = useRef<THREE.Mesh>(null);
   const [hovered, setHovered] = useState(false);
-  const { translatedText } = useR3FTranslation(node.label);
 
   // Smooth animations with React Spring
   const { scale, color } = useSpring({
@@ -506,8 +504,8 @@ export function SoulNet3D({ timeRange, insightsData, userId }: SoulNet3DProps) {
       });
     });
 
-    // Emotion Y-axis pattern: -3, +3, -4, +4, -5, +5, -6, +6, -7, +7, -3, +3, ... (12-element cycle)
-    const emotionYPattern = [-3, 3, -4, 4, -5, 5, -6, 6, -7, 7, -3, 3];
+    // Emotion Y-axis pattern: -5, +5, -6, +6, -7, +7, -8, +8, -9, +9 (10-element cycle)
+    const emotionYPattern = [-5, 5, -6, 6, -7, 7, -8, 8, -9, 9];
 
     // Generate emotion nodes and links
     let globalEmotionIndex = 0; // Track global emotion index for Y positioning

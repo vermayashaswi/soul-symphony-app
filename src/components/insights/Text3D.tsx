@@ -3,6 +3,7 @@ import { useFrame } from '@react-three/fiber';
 import { animated, useSpring } from '@react-spring/three';
 import { Text } from '@react-three/drei';
 import * as THREE from 'three';
+import { useR3FTranslations } from '../../hooks/useR3FTranslation';
 
 interface Text3DProps {
   text: string;
@@ -138,6 +139,10 @@ export function NodeLabels3D({
   connectedNodeIds,
   cameraDistance = 15
 }: NodeLabels3DProps) {
+  // Get all node labels for translation
+  const nodeLabels = useMemo(() => nodes.map(node => node.label), [nodes]);
+  const { translatedTexts } = useR3FTranslations(nodeLabels);
+
   // Calculate adaptive text size based on camera distance
   const textSize = useMemo(() => {
     const baseSize = 0.3;
@@ -147,10 +152,13 @@ export function NodeLabels3D({
 
   return (
     <group>
-      {nodes.map(node => {
+      {nodes.map((node, index) => {
         const isSelected = selectedNodeId === node.id;
         const isConnected = connectedNodeIds.has(node.id);
         const isFaded = selectedNodeId !== null && !isSelected && !isConnected;
+
+        // Use translated text or fallback to original
+        const translatedText = translatedTexts[index] || node.label;
 
         // Position label slightly above/below the node based on type
         const labelOffset: [number, number, number] = [
@@ -168,7 +176,7 @@ export function NodeLabels3D({
         return (
           <Text3D
             key={node.id}
-            text={node.label}
+            text={translatedText}
             position={labelPosition}
             size={textSize}
             isSelected={isSelected}
