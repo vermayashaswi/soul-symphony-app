@@ -1,7 +1,5 @@
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { EnhancedSoulNetPreloadService } from '@/services/enhancedSoulNetPreloadService';
-import { SoulNetPreloadService } from '@/services/soulnetPreloadService';
 
 /**
  * Utility functions to fix journal entry data issues
@@ -14,33 +12,6 @@ export interface DataFixResult {
   message: string;
 }
 
-/**
- * Clears all Soul-Net caches to force fresh data fetching
- */
-export const clearAllSoulNetCaches = (): void => {
-  console.log('[DataFixer] Clearing all Soul-Net caches');
-  
-  try {
-    // Clear enhanced service cache
-    EnhancedSoulNetPreloadService.clearInstantCache();
-    
-    // Clear regular service cache
-    SoulNetPreloadService.clearCache();
-    
-    // Clear any other related localStorage items
-    Object.keys(localStorage).forEach(key => {
-      if (key.includes('soulnet') || key.includes('soul-net')) {
-        localStorage.removeItem(key);
-      }
-    });
-    
-    toast.success('Soul-Net caches cleared successfully');
-    console.log('[DataFixer] All Soul-Net caches cleared');
-  } catch (error) {
-    console.error('[DataFixer] Error clearing caches:', error);
-    toast.error('Failed to clear caches');
-  }
-};
 
 /**
  * Regenerates missing data for a specific journal entry

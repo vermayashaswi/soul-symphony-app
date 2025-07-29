@@ -1,8 +1,6 @@
 
 import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react';
 import { onDemandTranslationCache } from '@/utils/website-translations';
-import { SoulNetPreloadService } from '@/services/soulnetPreloadService';
-import { EnhancedSoulNetPreloadService } from '@/services/enhancedSoulNetPreloadService';
 import { translationService } from '@/services/translationService';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -16,8 +14,6 @@ interface TranslationContextType {
   getCachedTranslation: (text: string) => string | null;
   translationProgress?: number;
   prefetchTranslationsForRoute?: (route: string) => Promise<void>;
-  prefetchSoulNetTranslations: (userId: string, timeRange: string) => Promise<void>;
-  isSoulNetTranslating: boolean;
   setTestLanguageForDevelopment?: (language: string | null) => void; // For development testing
 }
 
@@ -30,7 +26,7 @@ interface TranslationProviderProps {
 export const TranslationProvider: React.FC<TranslationProviderProps> = ({ children }) => {
   const [currentLanguage, setCurrentLanguage] = useState<string>('en');
   const [isTranslating, setIsTranslating] = useState<boolean>(false);
-  const [isSoulNetTranslating, setIsSoulNetTranslating] = useState<boolean>(false);
+  
   const [translationCache, setTranslationCache] = useState<Record<string, string>>({});
   
   // Development mode for testing translations
@@ -43,15 +39,6 @@ export const TranslationProvider: React.FC<TranslationProviderProps> = ({ childr
   
   const effectiveLanguage = testLanguageOverride || currentLanguage;
 
-  // APP-LEVEL: Set up translation service integration on context initialization
-  useEffect(() => {
-    console.log('[TranslationContext] APP-LEVEL: Setting up translation service integration');
-    
-    // Register translation service with EnhancedSoulNetPreloadService
-    EnhancedSoulNetPreloadService.setAppLevelTranslationService(translationService);
-    
-    console.log('[TranslationContext] APP-LEVEL: Translation service integration complete');
-  }, []);
 
   // Load language from localStorage or browser default
   useEffect(() => {
@@ -77,27 +64,6 @@ export const TranslationProvider: React.FC<TranslationProviderProps> = ({ childr
     console.log('[TranslationContext] Initialized with language:', browserLanguage, 'supported:', supportedLanguages.includes(browserLanguage));
   }, []);
 
-  const prefetchSoulNetTranslations = useCallback(async (userId: string, timeRange: string): Promise<void> => {
-    if (currentLanguage === 'en') {
-      console.log('[TranslationContext] Skipping SoulNet pre-translation for English');
-      return;
-    }
-
-    console.log(`[TranslationContext] APP-LEVEL: Pre-translating SoulNet data for ${userId}, ${timeRange}, ${currentLanguage}`);
-    
-    try {
-      setIsSoulNetTranslating(true);
-      
-      // ENHANCED: Use enhanced preload service for better translation coordination
-      await EnhancedSoulNetPreloadService.preloadInstantData(userId, timeRange, currentLanguage);
-      
-      console.log('[TranslationContext] APP-LEVEL: SoulNet pre-translation completed successfully');
-    } catch (error) {
-      console.error('[TranslationContext] APP-LEVEL: Error pre-translating SoulNet data:', error);
-    } finally {
-      setIsSoulNetTranslating(false);
-    }
-  }, [currentLanguage]);
 
   const handleLanguageChange = useCallback(async (language: string) => {
     console.log('[TranslationContext] 🌍 LANGUAGE CHANGE INITIATED:', { 
@@ -112,11 +78,6 @@ export const TranslationProvider: React.FC<TranslationProviderProps> = ({ childr
       return language;
     });
     
-    // Set loading state for SoulNet translations
-    if (language !== 'en') {
-      setIsSoulNetTranslating(true);
-      console.log('[TranslationContext] 🔄 SoulNet translating state set to true');
-    }
     
     // Save to localStorage for persistence
     try {
@@ -129,8 +90,6 @@ export const TranslationProvider: React.FC<TranslationProviderProps> = ({ childr
     // Clear translation caches immediately
     setTranslationCache({});
     onDemandTranslationCache.clearAll();
-    EnhancedSoulNetPreloadService.clearInstantCache();
-    SoulNetPreloadService.clearCache();
     
     console.log('[TranslationContext] 🧹 Cleared all translation caches for language:', language);
     
@@ -139,7 +98,7 @@ export const TranslationProvider: React.FC<TranslationProviderProps> = ({ childr
       detail: { 
         language,
         previousLanguage: currentLanguage,
-        isSoulNetTranslating: language !== 'en',
+        
         timestamp: Date.now()
       } 
     });
@@ -150,11 +109,6 @@ export const TranslationProvider: React.FC<TranslationProviderProps> = ({ childr
       window.dispatchEvent(event);
     }, 0);
     
-    // If English, stop SoulNet translating immediately
-    if (language === 'en') {
-      setIsSoulNetTranslating(false);
-      console.log('[TranslationContext] ✅ SoulNet translating state set to false for English');
-    }
     
     console.log('[TranslationContext] ✅ Language change completed:', language);
   }, [currentLanguage]);
@@ -302,7 +256,7 @@ export const TranslationProvider: React.FC<TranslationProviderProps> = ({ childr
     // Get common route texts for prefetching - can be expanded
     const routeTexts = {
       '/': ['Home', 'Download on App Store', 'Your Voice, Your Journey'],
-      '/insights': ['Insights', 'Discover patterns', 'Soul-Net Visualization', 'Dominant Mood'],
+      '/insights': ['Insights', 'Discover patterns', 'Dominant Mood'],
       '/journal': ['Journal', 'New Entry', 'Search', 'Recent Entries']
     };
     
@@ -348,14 +302,10 @@ export const TranslationProvider: React.FC<TranslationProviderProps> = ({ childr
       console.log('[TranslationContext] APP-LEVEL: Clearing all translation caches');
       setTranslationCache({});
       onDemandTranslationCache.clearAll();
-      EnhancedSoulNetPreloadService.clearInstantCache();
-      SoulNetPreloadService.clearCache();
     }, []),
     getCachedTranslation,
     translationProgress: isTranslating ? 50 : 100,
     prefetchTranslationsForRoute,
-    prefetchSoulNetTranslations,
-    isSoulNetTranslating,
     setTestLanguageForDevelopment
   };
 

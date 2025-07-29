@@ -57,7 +57,7 @@ const INSIGHTS_PAGE_TEXTS = [
   'Go to Journal',
   'No emotional data found',
   '* Click on a legend item to focus on that emotion',
-  'Soul-Net Visualization',
+  
   'Explore the connections in your emotional landscape',
   'Sun',
   'Mon', 

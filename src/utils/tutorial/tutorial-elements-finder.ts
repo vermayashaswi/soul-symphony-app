@@ -65,13 +65,6 @@ export const MOOD_CALENDAR_SELECTORS = [
   '.mood-visualization'
 ];
 
-export const SOULNET_SELECTORS = [
-  'canvas',
-  '.soul-net-container',
-  '.soulnet-visualization',
-  '[class*="soul-net"]',
-  '.bg-background.rounded-xl.shadow-sm.border.w-full'
-];
 
 // ENHANCED: Improved highlighting function with new manager
 export const findAndHighlightElement = (
@@ -88,7 +81,7 @@ export const findAndHighlightElement = (
   else if (highlightClass.includes('insights-header')) stepId = 6;
   else if (highlightClass.includes('emotion-chart')) stepId = 7;
   else if (highlightClass.includes('mood-calendar')) stepId = 8;
-  else if (highlightClass.includes('soul-net')) stepId = 9;
+  
   
   const classesToApply = ['tutorial-target', highlightClass];
   

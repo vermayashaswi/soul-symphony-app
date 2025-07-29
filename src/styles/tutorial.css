@@ -189,7 +189,7 @@ body.tutorial-active {
 .insights-header-highlight.tutorial-target,
 .emotion-chart-highlight.tutorial-target,
 .mood-calendar-highlight.tutorial-target,
-.soul-net-highlight.tutorial-target {
+{
   z-index: 10000 !important;
   position: relative !important;
   box-shadow: 0 0 35px 20px var(--color-theme) !important; 
@@ -282,7 +282,7 @@ body.tutorial-active[data-current-step="5"] button:has(.lucide-mic) {
   cursor: default !important;
 }
 
-/* UPDATED: Chat UI styling for step 5 - TRANSPARENT backgrounds to avoid covering Soul-Net */
+/* UPDATED: Chat UI styling for step 5 - TRANSPARENT backgrounds */
 body.tutorial-active[data-current-step="5"] .chat-messages-container {
   opacity: 1 !important;
   background-color: transparent !important;

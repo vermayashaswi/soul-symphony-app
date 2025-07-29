@@ -271,7 +271,7 @@ class TutorialHighlightingManager {
       'insights-header-highlight',
       'emotion-chart-highlight',
       'mood-calendar-highlight',
-      'soul-net-highlight',
+      
       'empty-chat-suggestion',
       'tutorial-record-entry-button'
     ];

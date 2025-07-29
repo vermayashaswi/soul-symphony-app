@@ -69,7 +69,7 @@ const languages = [
 ];
 
 const LanguageSelector = () => {
-  const { currentLanguage, setLanguage, isTranslating, prefetchSoulNetTranslations } = useTranslation();
+  const { currentLanguage, setLanguage, isTranslating } = useTranslation();
   const { user } = useAuth();
   const [isOpen, setIsOpen] = useState(false);
 
@@ -89,22 +89,6 @@ const LanguageSelector = () => {
       return;
     }
     
-    // If user is logged in and language is not English, pre-translate SoulNet data for ALL time ranges
-    if (user && languageCode !== 'en') {
-      try {
-        console.log('🌍 LanguageSelector: 🔄 Pre-translating SoulNet data for:', languageCode);
-        const timeRanges = ['today', 'week', 'month', 'year'];
-        const preloadPromises = timeRanges.map(timeRange => 
-          prefetchSoulNetTranslations(user.id, timeRange)
-        );
-        
-        // Execute all pre-translations in parallel for better performance
-        await Promise.allSettled(preloadPromises);
-        console.log('🌍 LanguageSelector: ✅ Completed pre-translation for all time ranges');
-      } catch (error) {
-        console.error('🌍 LanguageSelector: ❌ Failed to pre-translate SoulNet data:', error);
-      }
-    }
     
     setIsOpen(false);
     

@@ -10,7 +10,6 @@ import {
   INSIGHTS_HEADER_SELECTORS,
   EMOTION_CHART_SELECTORS,
   MOOD_CALENDAR_SELECTORS,
-  SOULNET_SELECTORS,
   findAndHighlightElement,
   logPotentialTutorialElements
 } from '@/utils/tutorial/tutorial-elements-finder';
@@ -156,19 +155,6 @@ const initialTutorialSteps: TutorialStep[] = [
     waitForElement: true,
     infographicType: 'mood-calendar'
   },
-  {
-    id: 9,
-    title: 'Soul-Net Visualization',
-    content: 'Explore neural connections between life areas and emotions to see how different aspects of your life influence your emotional state.',
-    targetElement: 'canvas',
-    alternativeSelectors: SOULNET_SELECTORS,
-    position: 'top',
-    showNextButton: true,
-    showSkipButton: true,
-    navigateTo: '/app/insights',
-    waitForElement: true,
-    infographicType: 'soul-net'
-  }
 ];
 
 // Provider component that wraps the app
@@ -382,7 +368,7 @@ export const TutorialProvider: React.FC<{ children: ReactNode }> = ({ children }
         stepData.id === 6 ? 'insights-header-highlight' :
         stepData.id === 7 ? 'emotion-chart-highlight' :
         stepData.id === 8 ? 'mood-calendar-highlight' :
-        stepData.id === 9 ? 'soul-net-highlight' : ''
+        ''
       );
       
       if (!found) {
