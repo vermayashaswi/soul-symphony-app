@@ -1,4 +1,3 @@
-
 import React, { useRef, useMemo } from 'react';
 import * as THREE from 'three';
 
@@ -55,11 +54,10 @@ export const Edge: React.FC<EdgeProps> = ({
     console.warn('Theme provider not available, using default theme');
   }
   
-  const ref = useRef<THREE.Group>(null);
-  // Change the ref type to match what react-three-fiber expects
-  const lineRef = useRef<THREE.Mesh>(null);
+  const meshRef = useRef<THREE.Mesh>(null);
 
-  const points = useMemo(() => {
+  // SOLUTION 1: Use TubeGeometry for visible thickness
+  const tubeGeometry = useMemo(() => {
     try {
       const startVec = new THREE.Vector3(...start);
       const endVec = new THREE.Vector3(...end);
@@ -82,92 +80,93 @@ export const Edge: React.FC<EdgeProps> = ({
         midPoint,
         endSurface
       );
-      return curve.getPoints(30);
+      
+      // Calculate thickness based on connection strength and highlighting
+      const baseThickness = isHighlighted ? 0.08 : 0.015; // Much thicker base for visibility
+      const valueMultiplier = Math.max(0.3, Math.min(2.5, value * 1.5)); // Connection strength multiplier
+      const radius = baseThickness * valueMultiplier;
+      
+      console.log(`[Edge] TUBE GEOMETRY: ${start} -> ${end}, value=${value}, highlighted=${isHighlighted}, dimmed=${dimmed}, radius=${radius}`);
+      
+      // Create tube geometry from curve
+      return new THREE.TubeGeometry(curve, 20, radius, 8, false);
     } catch (error) {
-      console.error("Error creating edge points:", error);
-      return [
-        new THREE.Vector3(0, 0, 0),
-        new THREE.Vector3(0, 0.1, 0)
-      ];
+      console.error("Error creating tube geometry:", error);
+      // Fallback to simple cylinder
+      return new THREE.CylinderGeometry(0.02, 0.02, 1, 8);
     }
-  }, [start, end, startNodeType, endNodeType, startNodeScale, endNodeScale]);
+  }, [start, end, startNodeType, endNodeType, startNodeScale, endNodeScale, value, isHighlighted, dimmed]);
 
-  // Create line geometry once
-  const lineGeometry = useMemo(() => {
-    const geometry = new THREE.BufferGeometry().setFromPoints(points);
-    return geometry;
-  }, [points]);
-
-  // ENHANCED: Improved color scheme with 20% lighter colors for dimmed edges
-  const getEdgeColor = useMemo(() => {
+  // SOLUTION 2: Enhanced color and opacity system
+  const edgeColor = useMemo(() => {
     if (isHighlighted) {
-      return '#ffffff'; // Bright white for highlighted connections
+      return '#60a5fa'; // Bright blue for highlighted connections
     }
     
     if (dimmed) {
-      // ENHANCED: 20% lighter colors for dimmed edges instead of very dark
-      return theme === 'light' ? '#4a4a4a' : '#3a3a3a';
+      return theme === 'light' ? '#9ca3af' : '#6b7280'; // Medium gray for dimmed
     }
     
-    // Default state - moderately visible
-    return theme === 'light' ? '#555555' : '#888888';
+    // Default state - subtle but visible
+    return theme === 'light' ? '#d1d5db' : '#4b5563';
   }, [isHighlighted, dimmed, theme]);
 
-  // ENHANCED: Increased opacity for dimmed edges to 0.05-0.06
-  const getEdgeOpacity = useMemo(() => {
+  const edgeOpacity = useMemo(() => {
     if (isHighlighted) {
-      return 0.95; // Very bright for highlighted
+      return 0.9; // Very visible for highlighted
     }
     
     if (dimmed) {
-      // ENHANCED: Increased opacity to 0.05-0.06 range for better visibility
-      return theme === 'light' ? 0.06 : 0.05;
+      return 0.3; // 50% opacity for dimmed (not 75% like nodes)
     }
     
     // Default state
-    return theme === 'light' ? 0.25 : 0.08;
+    return 0.6; // Moderate visibility for default
   }, [isHighlighted, dimmed, theme]);
 
+  // SOLUTION 3: Enhanced material with emissive properties
+  const tubeMaterial = useMemo(() => {
+    return new THREE.MeshStandardMaterial({
+      color: edgeColor,
+      transparent: true,
+      opacity: edgeOpacity,
+      emissive: isHighlighted ? edgeColor : '#000000',
+      emissiveIntensity: isHighlighted ? 0.3 : 0,
+      roughness: 0.4,
+      metalness: 0.2,
+      depthWrite: true,
+      depthTest: true,
+    });
+  }, [edgeColor, edgeOpacity, isHighlighted]);
+
+  // Update material properties on each frame for smooth transitions
   useFrame(() => {
+    if (!meshRef.current || !meshRef.current.material) return;
+    
     try {
-      if (!lineRef.current || !lineRef.current.material) return;
+      const material = meshRef.current.material as THREE.MeshStandardMaterial;
+      material.opacity = edgeOpacity;
+      material.color.set(edgeColor);
       
-      if (lineRef.current.material instanceof THREE.LineBasicMaterial) {
-        lineRef.current.material.opacity = getEdgeOpacity;
-        lineRef.current.material.color.set(getEdgeColor);
+      if (isHighlighted) {
+        material.emissive.set(edgeColor);
+        material.emissiveIntensity = 0.3;
+      } else {
+        material.emissive.set('#000000');
+        material.emissiveIntensity = 0;
       }
     } catch (error) {
       console.error("Error in Edge useFrame:", error);
     }
   });
 
-  // FIXED: Proper thickness calculation proportional to connection strength
-  const baseThickness = isHighlighted ? 2.0 : 0.1; // Base thickness for highlighted vs normal
-  const valueMultiplier = Math.max(0.2, Math.min(3.0, value * 2)); // Connection strength multiplier
-  const thickness = baseThickness * valueMultiplier;
-  
-  console.log(`[Edge] THICKNESS: ${start} -> ${end}, value=${value}, highlighted=${isHighlighted}, dimmed=${dimmed}, thickness=${thickness}`);
-  
-  // Create material with appropriate properties
-  const material = useMemo(() => {
-    return new THREE.LineBasicMaterial({
-      color: getEdgeColor,
-      transparent: true,
-      opacity: getEdgeOpacity,
-      linewidth: thickness,
-      depthWrite: false, // Prevent z-fighting
-      depthTest: true,   // Maintain proper depth testing
-    });
-  }, [getEdgeColor, getEdgeOpacity, thickness]);
-
   return (
-    <group ref={ref}>
-      <primitive 
-        object={new THREE.Line(lineGeometry, material)} 
-        ref={lineRef}
-        renderOrder={10} // Render edges before nodes
-      />
-    </group>
+    <mesh
+      ref={meshRef}
+      geometry={tubeGeometry}
+      material={tubeMaterial}
+      renderOrder={5} // Render edges before nodes but after background
+    />
   );
 };
 

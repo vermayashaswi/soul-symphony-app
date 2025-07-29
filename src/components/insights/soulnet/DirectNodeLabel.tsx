@@ -90,17 +90,12 @@ export const DirectNodeLabel: React.FC<DirectNodeLabelProps> = ({
     return fixedPercentageSize;
   }, [id]);
 
-  // UPDATED: Solid white text for dark theme, solid black text for light theme
+  // SOLUTION 8: High-contrast colors for label visibility
   const textColor = useMemo(() => {
-    const color = effectiveTheme === 'dark' ? '#ffffff' : '#000000';
-    
-    if (isInstantMode) {
-      console.log(`[DirectNodeLabel] APP-LEVEL INSTANT: SOLID TEXT COLOR for ${id}: ${color} (theme: ${effectiveTheme})`);
-    } else {
-      console.log(`[DirectNodeLabel] APP-LEVEL: SOLID TEXT COLOR for ${id}: ${color} (theme: ${effectiveTheme})`);
-    }
-    return color;
-  }, [effectiveTheme, id, isInstantMode]);
+    if (isSelected) return '#ffd700'; // Gold for selected (matches node emissive)
+    if (isHighlighted) return '#ffffff'; // Bright white for connected nodes
+    return '#e5e5e5'; // Light gray for default (higher contrast than #cccccc)
+  }, [isSelected, isHighlighted]);
 
   // UPDATED: Percentage text also uses solid color for theme
   const percentageColor = useMemo(() => {

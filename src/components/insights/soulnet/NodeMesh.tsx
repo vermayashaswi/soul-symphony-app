@@ -43,43 +43,50 @@ export const NodeMesh: React.FC<NodeMeshProps> = ({
     return () => setIsMounted(false);
   }, []);
   
-  // ENHANCED: Updated geometry creation for 15% larger nodes
+  // SOLUTION 4: Enhanced geometry for better visual states
   const Geometry = useMemo(() => 
     type === 'entity'
-      ? <sphereGeometry args={[1.38, 16, 16]} /> // Increased from 1.2 by 15%
-      : <boxGeometry args={[2.3, 2.3, 2.3]} />, // Increased from 2.0 by 15%
+      ? <sphereGeometry args={[1.2, 20, 20]} /> // Higher quality spheres
+      : <boxGeometry args={[2.0, 2.0, 2.0]} />, // Standard size cubes
     [type]
   );
 
-  // SIMPLIFIED: Safe animation without complex state management
+  // SOLUTION 5: Enhanced visual state system with proper scaling
   useFrame((state) => {
     if (!meshRef.current || !isMounted) return;
     
     try {
       const time = state.clock.elapsedTime;
       
-      if (isHighlighted) {
-        const pulseIntensity = isSelected ? 0.15 : (connectionStrength * 0.1);
-        const pulse = Math.sin(time * 2) * pulseIntensity + 1.05;
-        const targetScale = scale * pulse;
+      if (isSelected) {
+        // Selected node: bright gold glow, 1.8x scale, intense pulse
+        const pulse = Math.sin(time * 3) * 0.1 + 1.8;
+        meshRef.current.scale.setScalar(scale * pulse);
         
-        // Direct scale update without lerping
-        meshRef.current.scale.setScalar(targetScale);
-        
-        // Simplified material updates
         if (meshRef.current.material instanceof THREE.MeshStandardMaterial) {
-          const emissiveIntensity = isSelected 
-            ? 0.8 + Math.sin(time * 2.5) * 0.2
-            : 0.5 + (connectionStrength * 0.2);
-          
-          meshRef.current.material.emissiveIntensity = Math.max(0, Math.min(1.5, emissiveIntensity));
+          meshRef.current.material.emissiveIntensity = 1.2 + Math.sin(time * 3) * 0.3;
+        }
+      } else if (isHighlighted) {
+        // Connected nodes: bright colors, 1.4x scale, moderate pulse
+        const pulse = Math.sin(time * 2) * 0.05 + 1.4;
+        meshRef.current.scale.setScalar(scale * pulse);
+        
+        if (meshRef.current.material instanceof THREE.MeshStandardMaterial) {
+          meshRef.current.material.emissiveIntensity = 0.8 + Math.sin(time * 2) * 0.2;
+        }
+      } else if (dimmed) {
+        // Dimmed nodes: 0.7x scale, no pulse, minimal glow
+        meshRef.current.scale.setScalar(scale * 0.7);
+        
+        if (meshRef.current.material instanceof THREE.MeshStandardMaterial) {
+          meshRef.current.material.emissiveIntensity = 0;
         }
       } else {
-        const targetScale = dimmed ? scale * 0.8 : scale;
-        meshRef.current.scale.setScalar(targetScale);
+        // Default nodes: normal scale, subtle glow
+        meshRef.current.scale.setScalar(scale);
         
         if (meshRef.current.material instanceof THREE.MeshStandardMaterial) {
-          meshRef.current.material.emissiveIntensity = dimmed ? 0 : 0.1;
+          meshRef.current.material.emissiveIntensity = 0.1;
         }
       }
     } catch (error) {
@@ -87,11 +94,11 @@ export const NodeMesh: React.FC<NodeMeshProps> = ({
     }
   });
 
-  // FIXED: Proper opacity for selection behavior - 75% transparency for non-connected nodes
+  // SOLUTION 6: Fixed opacity system - 50% for dimmed (not 75%)
   const nodeOpacity = useMemo(() => {
-    if (isSelected) return 1.0;
-    if (isHighlighted) return 1.0; // Full opacity for connected nodes
-    return dimmed ? 0.25 : 0.8; // 75% transparency (0.25) for non-connected nodes when selection is active
+    if (isSelected) return 1.0; // Selected: fully opaque
+    if (isHighlighted) return 1.0; // Connected: fully opaque
+    return dimmed ? 0.5 : 0.8; // Dimmed: 50% opacity (was 25%), Default: 80%
   }, [isHighlighted, isSelected, dimmed]);
 
   // Render immediately - no delay needed
@@ -124,10 +131,10 @@ export const NodeMesh: React.FC<NodeMeshProps> = ({
         color={displayColor}
         transparent={true}
         opacity={nodeOpacity}
-        emissive={displayColor}
-        emissiveIntensity={isHighlighted ? 1.2 : (dimmed ? 0 : 0.1)}
-        roughness={0.3}
-        metalness={0.4}
+        emissive={isSelected ? '#ffd700' : (isHighlighted ? displayColor : '#000000')} // Gold for selected
+        emissiveIntensity={isSelected ? 1.2 : (isHighlighted ? 0.8 : (dimmed ? 0 : 0.1))}
+        roughness={0.2}
+        metalness={0.6}
         depthWrite={true}
       />
     </mesh>
