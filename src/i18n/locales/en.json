@@ -50,14 +50,6 @@
     "neutral": "Neutral",
     "negative": "Negative",
     "noData": "No data available for this timeframe",
-    "soulNet": {
-      "title": "Soul-Net",
-      "description": "Explore connections between life areas and emotions in your journal",
-      "loading": "Loading visualization...",
-      "noConnections": "No connections found",
-      "addMore": "Add more journal entries to visualize connections between life areas and emotions in your journaling.",
-      "dragInfo": "Drag to rotate • Scroll to zoom • Tap/Click a node to highlight connections"
-    },
     "lifeAreas": {
       "title": "Life Areas",
       "description": "Important areas mentioned in your journal",

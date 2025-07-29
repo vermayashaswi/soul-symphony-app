@@ -10,7 +10,7 @@ export const TUTORIAL_CLASSES = [
   'insights-header-highlight', 
   'emotion-chart-highlight',
   'mood-calendar-highlight', 
-  'soul-net-highlight', 
+   
   'empty-chat-suggestion',
   'tutorial-record-entry-button' // Added new class
 ];

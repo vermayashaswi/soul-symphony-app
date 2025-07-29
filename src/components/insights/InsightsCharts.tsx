@@ -4,7 +4,7 @@ import { motion } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import EmotionChart from '@/components/EmotionChart';
 import MoodCalendar from '@/components/insights/MoodCalendar';
-import SoulNet from '@/components/insights/SoulNet';
+
 import { TimeRange } from '@/hooks/use-insights-data';
 import { useIsMobile } from '@/hooks/use-mobile';
 
@@ -84,20 +84,6 @@ export function InsightsCharts({
         />
       </motion.div>
       
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.4, delay: 0.5 }}
-        className={cn(
-          "mb-8",
-          isMobile ? "px-2" : "px-0"
-        )}
-      >
-        <SoulNet
-          userId={userId}
-          timeRange={timeRange}
-        />
-      </motion.div>
     </>
   );
 }

@@ -5,7 +5,7 @@
 
 /* Mobile-specific styles - remaining rules */
 @media (max-width: 768px) {
-  /* Fullscreen components like SoulNet */
+  /* Fullscreen components */
   .fixed.inset-0.z-\[9999\] {
     position: fixed;
     top: var(--calculated-safe-area-top);

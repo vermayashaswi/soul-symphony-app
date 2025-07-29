@@ -50,14 +50,6 @@
     "neutral": "Neutral",
     "negative": "Negativo", 
     "noData": "No hay datos disponibles para este período de tiempo",
-    "soulNet": {
-      "title": "Visualización SoulNet",
-      "description": "Explora conexiones entre entidades y emociones en tu diario",
-      "loading": "Cargando visualización...",
-      "noConnections": "No se encontraron conexiones",
-      "addMore": "Agrega más entradas en tu diario para visualizar conexiones entre entidades y emociones.",
-      "dragInfo": "<b>Arrastra</b> para rotar • <b>Desplázate</b> para hacer zoom • <b>Toca/Haz clic</b> en un nodo para resaltar conexiones"
-    }
   },
   "toasts": {
     "success": "Éxito",

@@ -5,7 +5,7 @@ import { Book, ChartLine, Calendar, GridIcon } from 'lucide-react';
 import { TranslatableText } from '@/components/translation/TranslatableText';
 
 // Define the different infographic types
-export type InfographicType = 'insights-overview' | 'emotion-trends' | 'mood-calendar' | 'soul-net';
+export type InfographicType = 'insights-overview' | 'emotion-trends' | 'mood-calendar';
 
 interface TutorialInfographicProps {
   type: InfographicType;
@@ -256,66 +256,6 @@ const TutorialInfographic: React.FC<TutorialInfographicProps> = ({ type, classNa
           </div>
         );
       
-      case 'soul-net':
-        return (
-          <div className="p-4 flex flex-col items-center">
-            <div className="mb-3 flex items-center justify-center w-full">
-              <h3 className="text-white text-lg font-semibold">
-                <TranslatableText text="Soul-Net Visualization" forceTranslate={true} />
-              </h3>
-              <GridIcon className="ml-2 text-[#9b87f5]" size={iconSize} />
-            </div>
-            <div className="w-full h-[140px] relative">
-              {/* Center node */}
-              <div className="absolute top-[50%] left-[50%] transform -translate-x-1/2 -translate-y-1/2">
-                <div className="w-12 h-12 rounded-full bg-[#9b87f5] flex items-center justify-center">
-                  <span className="text-xs text-white font-medium">
-                    <TranslatableText text="YOU" forceTranslate={true} />
-                  </span>
-                </div>
-              </div>
-              
-              {/* Connections and nodes */}
-              <svg className="absolute inset-0 h-full w-full">
-                {/* Connections */}
-                <line x1="50%" y1="50%" x2="30%" y2="30%" stroke={colors.primary} strokeWidth="2" />
-                <line x1="50%" y1="50%" x2="70%" y2="30%" stroke={colors.skyBlue} strokeWidth="2" />
-                <line x1="50%" y1="50%" x2="30%" y2="70%" stroke={colors.light} strokeWidth="2" />
-                <line x1="50%" y1="50%" x2="70%" y2="70%" stroke={colors.tertiary} strokeWidth="2" />
-                <line x1="50%" y1="50%" x2="15%" y2="50%" stroke={colors.brightBlue} strokeWidth="2" />
-                <line x1="50%" y1="50%" x2="85%" y2="50%" stroke={colors.secondary} strokeWidth="2" />
-                
-                {/* Emotion/Life area nodes */}
-                <circle cx="30%" cy="30%" r="15" fill={colors.primary} />
-                <circle cx="70%" cy="30%" r="15" fill={colors.skyBlue} />
-                <circle cx="30%" cy="70%" r="15" fill={colors.light} />
-                <circle cx="70%" cy="70%" r="15" fill={colors.tertiary} />
-                <circle cx="15%" cy="50%" r="15" fill={colors.brightBlue} />
-                <circle cx="85%" cy="50%" r="15" fill={colors.secondary} />
-              </svg>
-              
-              {/* Node labels */}
-              <div className="absolute text-[10px] text-white font-medium" style={{ top: '25%', left: '28%', transform: 'translate(-50%, -50%)' }}>
-                <TranslatableText text="Work" forceTranslate={true} />
-              </div>
-              <div className="absolute text-[10px] text-white font-medium" style={{ top: '25%', left: '72%', transform: 'translate(-50%, -50%)' }}>
-                <TranslatableText text="Health" forceTranslate={true} />
-              </div>
-              <div className="absolute text-[10px] text-white font-medium" style={{ top: '75%', left: '28%', transform: 'translate(-50%, -50%)' }}>
-                <TranslatableText text="Family" forceTranslate={true} />
-              </div>
-              <div className="absolute text-[10px] text-white font-medium" style={{ top: '75%', left: '72%', transform: 'translate(-50%, -50%)' }}>
-                <TranslatableText text="Joy" forceTranslate={true} />
-              </div>
-              <div className="absolute text-[10px] text-white font-medium" style={{ top: '50%', left: '15%', transform: 'translate(-50%, -50%)' }}>
-                <TranslatableText text="Stress" forceTranslate={true} />
-              </div>
-              <div className="absolute text-[10px] text-white font-medium" style={{ top: '50%', left: '85%', transform: 'translate(-50%, -50%)' }}>
-                <TranslatableText text="Peace" forceTranslate={true} />
-              </div>
-            </div>
-          </div>
-        );
       
       default:
         return (

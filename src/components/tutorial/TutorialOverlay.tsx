@@ -11,7 +11,6 @@ import {
   INSIGHTS_HEADER_SELECTORS,
   EMOTION_CHART_SELECTORS,
   MOOD_CALENDAR_SELECTORS,
-  SOULNET_SELECTORS,
   findAndHighlightElement,
   logPotentialTutorialElements,
   applyTutorialHighlight
@@ -175,9 +174,9 @@ const TutorialOverlay: React.FC = () => {
   // Helper function to setup chat visibility for step 5 - UPDATED to use transparent backgrounds
   const setupChatVisibilityForStep5 = () => {
     try {
-      console.log('[TutorialOverlay] Setting up transparent chat visibility for step 5 (Soul-Net fix)');
+      console.log('[TutorialOverlay] Setting up transparent chat visibility for step 5');
       
-      // Use TRANSPARENT backgrounds instead of solid colors to avoid covering Soul-Net
+      // Use TRANSPARENT backgrounds instead of solid colors
       const chatContainers = document.querySelectorAll('.smart-chat-container, .mobile-chat-interface, .chat-messages-container');
       chatContainers.forEach(container => {
         if (container instanceof HTMLElement) {
@@ -316,10 +315,6 @@ const TutorialOverlay: React.FC = () => {
           console.warn('[TutorialOverlay] Failed to find mood calendar with any selector');
         }
       }
-      else if (currentStepData.id === 9) {
-        // Step 9: Soul-Net
-        applySoulNetHighlighting();
-      }
     } catch (error) {
       console.error(`[TutorialOverlay] Error in applyEnhancedStepHighlighting for step ${currentStepData.id}:`, error);
     }
@@ -441,62 +436,6 @@ const TutorialOverlay: React.FC = () => {
     }
   };
 
-  // Helper function for Soul-Net highlighting with debugging
-  const applySoulNetHighlighting = () => {
-    try {
-      console.log('[TutorialOverlay] Setting up highlight for soul-net visualization (step 9)');
-      
-      // First highlight the Soul-Net container
-      const found = findAndHighlightElement(SOULNET_SELECTORS, 'soul-net-highlight');
-      
-      if (!found) {
-        console.warn('[TutorialOverlay] Failed to find soul-net visualization with any selector');
-      } else {
-        console.log('[TutorialOverlay] Successfully highlighted Soul-Net visualization for step 9');
-      }
-      
-      // Add specific debugging for Soul-Net labels after a delay
-      setTimeout(() => {
-        console.log('[TutorialOverlay] Step 9: Debugging Soul-Net label visibility');
-        
-        // Check if Soul-Net canvas is present and visible
-        const soulnetContainer = document.querySelector('[class*="soul-net"], [class*="soulnet"], .bg-background.rounded-xl.shadow-sm.border.w-full');
-        if (soulnetContainer) {
-          console.log('[TutorialOverlay] Found Soul-Net container:', soulnetContainer);
-          
-          // Look for canvas element
-          const canvas = soulnetContainer.querySelector('canvas');
-          if (canvas) {
-            console.log('[TutorialOverlay] Found Soul-Net canvas:', canvas.style);
-            
-            // Force canvas to be visible and properly sized
-            canvas.style.display = 'block';
-            canvas.style.visibility = 'visible';
-            canvas.style.opacity = '1';
-            canvas.style.width = '100%';
-            canvas.style.height = '500px';
-            
-            // Trigger a resize event to ensure proper rendering
-            window.dispatchEvent(new Event('resize'));
-            
-            console.log('[TutorialOverlay] Applied visibility fixes to Soul-Net canvas');
-          } else {
-            console.warn('[TutorialOverlay] No canvas found in Soul-Net container');
-          }
-        } else {
-          console.warn('[TutorialOverlay] No Soul-Net container found for step 9');
-        }
-        
-        // Dispatch custom event to force Soul-Net to show labels
-        window.dispatchEvent(new CustomEvent('tutorial-soul-net-debug', {
-          detail: { step: 9, forceShowLabels: true }
-        }));
-        
-      }, 1000);
-    } catch (error) {
-      console.error('[TutorialOverlay] Error in applySoulNetHighlighting:', error);
-    }
-  };
 
   // If tutorial should not be shown, don't render anything
   if (!shouldShowTutorial) {

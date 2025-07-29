@@ -26,7 +26,7 @@ interface SubscriptionModalProps {
 const PREMIUM_FEATURES = [
   'Unlimited AI chat conversations - Access to the intelligent chat assistant',
   'Advanced emotional insights & analytics - Deep pattern analysis and trends',
-  'Interactive SoulNet visualization - 3D network of your emotional connections',
+  
   'Detailed mood tracking & calendar - Comprehensive mood analysis over time',
   'Priority customer support - Faster response times for help'
 ];
