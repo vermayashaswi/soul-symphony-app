@@ -239,13 +239,17 @@ function ConnectionLines({
 
         const geometry = new THREE.BufferGeometry().setFromPoints(points);
         
-        const material = new THREE.LineBasicMaterial({
-          color: isHighlighted ? '#ffd93d' : '#ffffff',
+        const material = new THREE.LineDashedMaterial({
+          color: isHighlighted ? '#ffd93d' : '#999999',
           transparent: true,
-          opacity: isFaded ? 0.15 : (isHighlighted ? 0.9 : 0.5)
+          opacity: isFaded ? 0.15 : (isHighlighted ? 0.9 : 0.3),
+          linewidth: 0.5,
+          dashSize: 0.1,
+          gapSize: 0.1
         });
         
         const line = new THREE.Line(geometry, material);
+        line.computeLineDistances(); // Required for dashed lines
         
         return (
           <primitive key={`${link.source}-${link.target}`} object={line} />
@@ -429,7 +433,7 @@ export function SoulNet3D({ timeRange, insightsData, userId }: SoulNet3DProps) {
     : "Click themes (spheres) or emotions (cubes) to explore connections. Mouse to rotate, zoom, and pan.";
   
   const allTexts = [...uiTexts, mobileInteractionText];
-  const { translatedTexts, isLoading: translationsLoading } = useR3FTranslations(allTexts);
+  const { translatedTexts } = useR3FTranslations(allTexts);
 
   // Process data with simplified Y-axis positioning
   const processedData = useMemo((): SoulNet3DData => {
@@ -478,14 +482,14 @@ export function SoulNet3D({ timeRange, insightsData, userId }: SoulNet3DProps) {
     const nodes: SoulNet3DNode[] = [];
     const links: SoulNet3DLink[] = [];
     
-    // Theme Y-axis pattern: 0, -1, +1, -2, +2
-    const themeYPattern = [0, -1, 1, -2, 2];
+    // Theme Y-axis pattern: -1, +1, -2, +2, -1, +1, ... (4-element cycle)
+    const themeYPattern = [-1, 1, -2, 2];
     
     // Generate theme nodes
     const themes = Array.from(themeEmotionMap.keys());
     themes.forEach((theme, index) => {
       const angle = (index / themes.length) * Math.PI * 2;
-      const radius = 6;
+      const radius = 8; // Radial distance 'a' = 8
       const yPos = themeYPattern[index % themeYPattern.length];
       
       nodes.push({
@@ -502,10 +506,11 @@ export function SoulNet3D({ timeRange, insightsData, userId }: SoulNet3DProps) {
       });
     });
 
-    // Emotion Y-axis pattern: -4, +4, -6, +6, -8, +8
-    const emotionYPattern = [-4, 4, -6, 6, -8, 8];
+    // Emotion Y-axis pattern: -3, +3, -4, +4, -5, +5, -6, +6, -7, +7, -3, +3, ... (12-element cycle)
+    const emotionYPattern = [-3, 3, -4, 4, -5, 5, -6, 6, -7, 7, -3, 3];
 
     // Generate emotion nodes and links
+    let globalEmotionIndex = 0; // Track global emotion index for Y positioning
     themeEmotionMap.forEach((emotions, theme) => {
       const themeNode = nodes.find(n => n.id === theme);
       if (!themeNode) return;
@@ -519,10 +524,12 @@ export function SoulNet3D({ timeRange, insightsData, userId }: SoulNet3DProps) {
         // Calculate percentage for this emotion relative to the theme
         const percentage = totalThemeIntensity > 0 ? (data.totalIntensity / totalThemeIntensity) * 100 : 0;
         
-        // Position emotions around their theme with pattern Y positioning
+        // Position emotions with radial distances based on Y position
         const angle = (index / emotionArray.length) * Math.PI * 2;
-        const distance = 2 + data.totalIntensity * 0.5;
-        const yPos = emotionYPattern[index % emotionYPattern.length];
+        const yPos = emotionYPattern[globalEmotionIndex % emotionYPattern.length];
+        
+        // Use different radial distances based on Y position: b=12 for +Y, c=16 for -Y
+        const radialDistance = yPos > 0 ? 12 : 16;
         
         const emotionNode: SoulNet3DNode = {
           id: emotionId,
@@ -531,12 +538,14 @@ export function SoulNet3D({ timeRange, insightsData, userId }: SoulNet3DProps) {
           intensity: Math.min(data.totalIntensity / 5, 1),
           connections: 1,
           position: [
-            themeNode.position[0] + Math.cos(angle) * distance,
+            Math.cos(angle) * radialDistance,
             yPos,
-            themeNode.position[2] + Math.sin(angle) * distance
+            Math.sin(angle) * radialDistance
           ],
           percentage
         };
+        
+        globalEmotionIndex++;
 
         nodes.push(emotionNode);
 
@@ -603,14 +612,7 @@ export function SoulNet3D({ timeRange, insightsData, userId }: SoulNet3DProps) {
     return connected;
   }, [selectedNodeId, processedData.links]);
 
-  // Show loading state while translations are loading
-  if (translationsLoading) {
-    return (
-      <div className="flex items-center justify-center h-96 bg-card/50 rounded-lg border">
-        <p className="text-muted-foreground">Loading visualization...</p>
-      </div>
-    );
-  }
+  // No longer show loading state for translations to prevent language switching issues
 
   if (processedData.nodes.length === 0) {
     return (
