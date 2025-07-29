@@ -50,7 +50,8 @@ function ThemeNode({
   onClick, 
   position,
   getTranslatedText,
-  selectedNodeId
+  selectedNodeId,
+  theme
 }: {
   node: SoulNet3DNode;
   isSelected: boolean;
@@ -60,10 +61,10 @@ function ThemeNode({
   position: [number, number, number];
   getTranslatedText: (text: string) => string;
   selectedNodeId: string | null;
+  theme: string;
 }) {
   const meshRef = useRef<THREE.Mesh>(null);
   const [hovered, setHovered] = useState(false);
-  const { theme } = useTheme();
 
   useFrame((state) => {
     if (meshRef.current) {
@@ -142,7 +143,8 @@ function EmotionNode({
   onClick, 
   position,
   getTranslatedText,
-  selectedNodeId
+  selectedNodeId,
+  theme
 }: {
   node: SoulNet3DNode;
   isSelected: boolean;
@@ -152,10 +154,10 @@ function EmotionNode({
   position: [number, number, number];
   getTranslatedText: (text: string) => string;
   selectedNodeId: string | null;
+  theme: string;
 }) {
   const meshRef = useRef<THREE.Mesh>(null);
   const [hovered, setHovered] = useState(false);
-  const { theme } = useTheme();
 
   useFrame((state) => {
     if (meshRef.current) {
@@ -286,12 +288,13 @@ function ConnectionLines({
 }
 
 // 3D Scene Component
-function Scene3D({ data, selectedNodeId, onNodeClick, isMobile, getTranslatedText }: {
+function Scene3D({ data, selectedNodeId, onNodeClick, isMobile, getTranslatedText, theme }: {
   data: SoulNet3DData;
   selectedNodeId: string | null;
   onNodeClick: (nodeId: string | null) => void;
   isMobile: boolean;
   getTranslatedText: (text: string) => string;
+  theme: string;
 }) {
   const { camera, gl, scene } = useThree();
 
@@ -351,6 +354,7 @@ function Scene3D({ data, selectedNodeId, onNodeClick, isMobile, getTranslatedTex
               onClick={() => handleNodeClick(node.id)}
               getTranslatedText={getTranslatedText}
               selectedNodeId={selectedNodeId}
+              theme={theme}
             />
           );
         } else {
@@ -365,6 +369,7 @@ function Scene3D({ data, selectedNodeId, onNodeClick, isMobile, getTranslatedTex
               onClick={() => handleNodeClick(node.id)}
               getTranslatedText={getTranslatedText}
               selectedNodeId={selectedNodeId}
+              theme={theme}
             />
           );
         }
@@ -423,6 +428,7 @@ export function SoulNet3D({ timeRange, insightsData, userId, onTimeRangeChange }
   const [isFullscreen, setIsFullscreen] = useState(false);
   const mobileDetection = useIsMobile();
   const isMobile = mobileDetection.isMobile;
+  const { theme } = useTheme();
 
   // Extract unique labels for translation
   const uniqueLabels = useMemo(() => {
@@ -663,6 +669,7 @@ export function SoulNet3D({ timeRange, insightsData, userId, onTimeRangeChange }
             onNodeClick={handleNodeClick}
             isMobile={isMobile}
             getTranslatedText={getTranslatedText}
+            theme={theme}
           />
         </Canvas>
       ) : (
