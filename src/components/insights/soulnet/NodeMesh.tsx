@@ -95,11 +95,11 @@ export const NodeMesh: React.FC<NodeMeshProps> = ({
     }
   });
 
-  // FIXED: Much lower opacity for effective dimming
+  // FIXED: Better opacity handling for highlighting effect
   const nodeOpacity = useMemo(() => {
     if (isSelected) return 1.0;
-    if (isHighlighted) return 0.9; 
-    return dimmed ? 0.15 : 0.8; // Increased from 0.05 to 0.15 for better visibility but still effective dimming
+    if (isHighlighted) return 0.95; 
+    return dimmed ? 0.25 : 0.8; // Increased from 0.15 to 0.25 for better visibility of dimmed nodes
   }, [isHighlighted, isSelected, dimmed]);
 
   // Don't render until ready

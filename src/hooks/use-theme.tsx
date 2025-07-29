@@ -315,16 +315,14 @@ export function useTheme() {
   try {
     const context = useContext(ThemeContext);
     if (context === undefined) {
-      // Instead of just warning, throw the proper error to be caught by defensive components
-      throw new Error('useTheme must be used within a ThemeProvider');
-    }
-    return context;
-  } catch (error) {
-    // Only return defaults if this is a genuine context error, otherwise re-throw
-    if (error.message?.includes('useTheme must be used within a ThemeProvider')) {
+      // Return default values instead of throwing an error to prevent blank screens
       console.warn('[useTheme] ThemeProvider not found, using fallback values');
       return defaultThemeValues;
     }
-    throw error;
+    return context;
+  } catch (error) {
+    // Return defaults for any context-related errors
+    console.warn('[useTheme] Error accessing theme context, using fallback values:', error);
+    return defaultThemeValues;
   }
 }

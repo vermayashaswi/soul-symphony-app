@@ -120,24 +120,45 @@ export const SimplifiedSoulNetVisualization: React.FC<SimplifiedSoulNetVisualiza
       const connectedNodes = new Set<string>();
       const allOtherNodes = new Set<string>();
       
-      // Use instant connection data if available
-      if (isInstantReady) {
-        const connectionData = getInstantNodeConnections(selectedNode);
-        
-        // Always add the selected node itself
-        connectedNodes.add(selectedNode);
-        
-        // Add all connected nodes from precomputed data
-        connectionData.connectedNodes.forEach((nodeId: string) => {
-          connectedNodes.add(nodeId);
-        });
-        
-        console.log(`[SimplifiedSoulNetVisualization] SOUL-NET SELECTION FIX: Using precomputed connections for ${selectedNode}:`, 
-          connectionData.connectedNodes.length > 0 ? connectionData.connectedNodes : 'No connections');
+      // Always add the selected node itself
+      connectedNodes.add(selectedNode);
+      
+      // Use instant connection data if available, otherwise fallback to link traversal
+      if (isInstantReady && getInstantNodeConnections) {
+        try {
+          const connectionData = getInstantNodeConnections(selectedNode);
+          console.log(`[SimplifiedSoulNetVisualization] SOUL-NET SELECTION FIX: Connection data for ${selectedNode}:`, connectionData);
+          
+          // Add all connected nodes from precomputed data
+          if (connectionData && connectionData.connectedNodes) {
+            connectionData.connectedNodes.forEach((nodeId: string) => {
+              connectedNodes.add(nodeId);
+            });
+            console.log(`[SimplifiedSoulNetVisualization] SOUL-NET SELECTION FIX: Using precomputed connections for ${selectedNode}: ${connectionData.connectedNodes.length} connections`);
+          } else {
+            console.log(`[SimplifiedSoulNetVisualization] SOUL-NET SELECTION FIX: No connection data found, falling back to link traversal`);
+            // Fallback to link traversal if instant data is incomplete
+            data.links.forEach(link => {
+              if (link.source === selectedNode) {
+                connectedNodes.add(link.target);
+              } else if (link.target === selectedNode) {
+                connectedNodes.add(link.source);
+              }
+            });
+          }
+        } catch (error) {
+          console.error(`[SimplifiedSoulNetVisualization] SOUL-NET SELECTION FIX: Error getting instant connections, falling back to link traversal:`, error);
+          // Fallback to link traversal on error
+          data.links.forEach(link => {
+            if (link.source === selectedNode) {
+              connectedNodes.add(link.target);
+            } else if (link.target === selectedNode) {
+              connectedNodes.add(link.source);
+            }
+          });
+        }
       } else {
         // Fallback to link traversal
-        connectedNodes.add(selectedNode); // Add the selected node itself
-        
         data.links.forEach(link => {
           if (link.source === selectedNode) {
             connectedNodes.add(link.target);
@@ -145,7 +166,6 @@ export const SimplifiedSoulNetVisualization: React.FC<SimplifiedSoulNetVisualiza
             connectedNodes.add(link.source);
           }
         });
-        
         console.log(`[SimplifiedSoulNetVisualization] SOUL-NET SELECTION FIX: Using link traversal for ${selectedNode}, found ${connectedNodes.size} connected nodes`);
       }
       
@@ -192,12 +212,19 @@ export const SimplifiedSoulNetVisualization: React.FC<SimplifiedSoulNetVisualiza
         const isHighlighted = highlightedNodes.has(node.id);
         const isDimmed = dimmedNodes.has(node.id);
         
-        // FIXED: Correct connection percentage calculation
-        const connectionPercentage = selectedNode && isHighlighted && selectedNode !== node.id
-          ? getInstantConnectionPercentage(selectedNode, node.id)
-          : 0;
+        // FIXED: Correct connection percentage calculation with better error handling
+        let connectionPercentage = 0;
+        try {
+          if (selectedNode && isHighlighted && selectedNode !== node.id && getInstantConnectionPercentage) {
+            connectionPercentage = getInstantConnectionPercentage(selectedNode, node.id);
+            console.log(`[SimplifiedSoulNetVisualization] SOUL-NET PERCENTAGE FIX: ${selectedNode} -> ${node.id}: ${connectionPercentage}%`);
+          }
+        } catch (error) {
+          console.error(`[SimplifiedSoulNetVisualization] SOUL-NET PERCENTAGE FIX: Error getting percentage for ${selectedNode} -> ${node.id}:`, error);
+        }
         
         const showPercentage = selectedNode !== null && isHighlighted && selectedNode !== node.id && connectionPercentage > 0;
+        console.log(`[SimplifiedSoulNetVisualization] SOUL-NET PERCENTAGE FIX: ${node.id} showPercentage=${showPercentage}, percentage=${connectionPercentage}`);
         
         return (
           <Node
