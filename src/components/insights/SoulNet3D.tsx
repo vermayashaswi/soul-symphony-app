@@ -8,6 +8,7 @@ import { TranslatableText } from '../translation/TranslatableText';
 import { Button } from '../ui/button';
 import { useIsMobile } from '../../hooks/use-mobile';
 import { useR3FBulkTranslation } from '../../hooks/useR3FBulkTranslation';
+import { useTheme } from '@/hooks/use-theme';
 import { BillboardText } from './BillboardText';
 
 // Types
@@ -48,7 +49,8 @@ function ThemeNode({
   isFaded, 
   onClick, 
   position,
-  getTranslatedText
+  getTranslatedText,
+  selectedNodeId
 }: {
   node: SoulNet3DNode;
   isSelected: boolean;
@@ -57,9 +59,11 @@ function ThemeNode({
   onClick: () => void;
   position: [number, number, number];
   getTranslatedText: (text: string) => string;
+  selectedNodeId: string | null;
 }) {
   const meshRef = useRef<THREE.Mesh>(null);
   const [hovered, setHovered] = useState(false);
+  const { theme } = useTheme();
 
   useFrame((state) => {
     if (meshRef.current) {
@@ -97,24 +101,26 @@ function ThemeNode({
         />
       </mesh>
       
-      {/* Node Label */}
-      <BillboardText
-        position={[0, -1, 0]}
-        fontSize={0.3}
-        color={isFaded ? '#666666' : '#ffffff'}
-        anchorX="center"
-        anchorY="middle"
-        outlineWidth={0.02}
-        outlineColor="#000000"
-      >
-        {getTranslatedText(node.label)}
-      </BillboardText>
+      {/* Node Label - Hide if node is faded (unselected when another node is selected) */}
+      {(!selectedNodeId || isSelected || isConnected) && (
+        <BillboardText
+          position={[0, -1, 0]}
+          fontSize={0.375}
+          color={theme === 'light' ? '#000000' : '#ffffff'}
+          anchorX="center"
+          anchorY="middle"
+          outlineWidth={theme === 'light' ? 0 : 0.02}
+          outlineColor={theme === 'light' ? 'transparent' : '#000000'}
+        >
+          {getTranslatedText(node.label)}
+        </BillboardText>
+      )}
 
       {/* Percentage Label for connected nodes */}
       {(isSelected || isConnected) && node.percentage && (
         <BillboardText
           position={[0, -1.5, 0]}
-          fontSize={0.25}
+          fontSize={0.3125}
           color="#ffd93d"
           anchorX="center"
           anchorY="middle"
@@ -135,7 +141,8 @@ function EmotionNode({
   isFaded, 
   onClick, 
   position,
-  getTranslatedText
+  getTranslatedText,
+  selectedNodeId
 }: {
   node: SoulNet3DNode;
   isSelected: boolean;
@@ -144,9 +151,11 @@ function EmotionNode({
   onClick: () => void;
   position: [number, number, number];
   getTranslatedText: (text: string) => string;
+  selectedNodeId: string | null;
 }) {
   const meshRef = useRef<THREE.Mesh>(null);
   const [hovered, setHovered] = useState(false);
+  const { theme } = useTheme();
 
   useFrame((state) => {
     if (meshRef.current) {
@@ -185,24 +194,26 @@ function EmotionNode({
         />
       </mesh>
       
-      {/* Node Label */}
-      <BillboardText
-        position={[0, -0.7, 0]}
-        fontSize={0.3}
-        color={isFaded ? '#666666' : '#ffffff'}
-        anchorX="center"
-        anchorY="middle"
-        outlineWidth={0.02}
-        outlineColor="#000000"
-      >
-        {getTranslatedText(node.label)}
-      </BillboardText>
+      {/* Node Label - Hide if node is faded (unselected when another node is selected) */}
+      {(!selectedNodeId || isSelected || isConnected) && (
+        <BillboardText
+          position={[0, -0.7, 0]}
+          fontSize={0.375}
+          color={theme === 'light' ? '#000000' : '#ffffff'}
+          anchorX="center"
+          anchorY="middle"
+          outlineWidth={theme === 'light' ? 0 : 0.02}
+          outlineColor={theme === 'light' ? 'transparent' : '#000000'}
+        >
+          {getTranslatedText(node.label)}
+        </BillboardText>
+      )}
 
       {/* Percentage Label for connected nodes */}
       {(isSelected || isConnected) && node.percentage && (
         <BillboardText
           position={[0, -1.05, 0]}
-          fontSize={0.25}
+          fontSize={0.3125}
           color="#ffd93d"
           anchorX="center"
           anchorY="middle"
@@ -339,6 +350,7 @@ function Scene3D({ data, selectedNodeId, onNodeClick, isMobile, getTranslatedTex
               isFaded={isFaded}
               onClick={() => handleNodeClick(node.id)}
               getTranslatedText={getTranslatedText}
+              selectedNodeId={selectedNodeId}
             />
           );
         } else {
@@ -352,6 +364,7 @@ function Scene3D({ data, selectedNodeId, onNodeClick, isMobile, getTranslatedTex
               isFaded={isFaded}
               onClick={() => handleNodeClick(node.id)}
               getTranslatedText={getTranslatedText}
+              selectedNodeId={selectedNodeId}
             />
           );
         }
@@ -621,7 +634,7 @@ export function SoulNet3D({ timeRange, insightsData, userId, onTimeRangeChange }
       {/* Header */}
       <div className="absolute top-4 left-4 right-4 z-10 flex items-center justify-between">
         <h3 className="text-lg font-semibold text-foreground">
-          <TranslatableText text="Soul Network - 3D Visualization" />
+          <TranslatableText text="Soul-Net" />
         </h3>
         <Button
           variant="ghost"
@@ -632,24 +645,6 @@ export function SoulNet3D({ timeRange, insightsData, userId, onTimeRangeChange }
           {isFullscreen ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
         </Button>
       </div>
-
-      {/* Mobile Instructions - Always visible on mobile */}
-      {isMobile && (
-        <div className="absolute bottom-4 left-4 right-4 z-10">
-          <div className="bg-background/80 backdrop-blur-sm rounded-lg p-3 text-sm text-muted-foreground text-center">
-            <TranslatableText text="Tap themes (spheres) or emotions (cubes) to explore. Touch to rotate, pinch to zoom. Tap background to deselect." />
-          </div>
-        </div>
-      )}
-
-      {/* Desktop Instructions - Only when no node selected */}
-      {!isMobile && selectedNodeId === null && (
-        <div className="absolute bottom-4 left-4 right-4 z-10">
-          <div className="bg-background/80 backdrop-blur-sm rounded-lg p-3 text-sm text-muted-foreground text-center">
-            <TranslatableText text="Click on themes (spheres) or emotions (cubes) to explore connections. Use mouse to rotate, zoom, and pan. Click background to deselect." />
-          </div>
-        </div>
-      )}
 
       {/* 3D Canvas - Only render when translations are complete */}
       {translationsComplete ? (
