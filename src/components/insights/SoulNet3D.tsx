@@ -7,6 +7,7 @@ import { Maximize2, Minimize2 } from 'lucide-react';
 import { TranslatableText } from '../translation/TranslatableText';
 import { Button } from '../ui/button';
 import { useIsMobile } from '../../hooks/use-mobile';
+import { useR3FTranslation } from '../../hooks/useR3FTranslation';
 
 // Types
 interface SoulNet3DNode {
@@ -55,6 +56,7 @@ function ThemeNode({
 }) {
   const meshRef = useRef<THREE.Mesh>(null);
   const [hovered, setHovered] = useState(false);
+  const { translatedText } = useR3FTranslation(node.label);
 
   useFrame((state) => {
     if (meshRef.current) {
@@ -102,7 +104,7 @@ function ThemeNode({
         outlineWidth={0.02}
         outlineColor="#000000"
       >
-        <TranslatableText text={node.label} />
+        {translatedText}
       </Text>
 
       {/* Percentage Label for connected nodes */}
@@ -140,6 +142,7 @@ function EmotionNode({
 }) {
   const meshRef = useRef<THREE.Mesh>(null);
   const [hovered, setHovered] = useState(false);
+  const { translatedText } = useR3FTranslation(node.label);
 
   useFrame((state) => {
     if (meshRef.current) {
@@ -188,7 +191,7 @@ function EmotionNode({
         outlineWidth={0.02}
         outlineColor="#000000"
       >
-        <TranslatableText text={node.label} />
+        {translatedText}
       </Text>
 
       {/* Percentage Label for connected nodes */}
