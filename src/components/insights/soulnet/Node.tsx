@@ -173,11 +173,26 @@ const Node: React.FC<NodeProps> = ({
     console.log(`[Node] SOUL-NET SELECTION FIX: Pointer leave event for node ${node.id}`);
   };
 
-  // ENHANCED: Only show labels for highlighted/selected nodes or when forced
+  // ENHANCED: Improved label visibility logic with proper hierarchy
   const shouldShowLabel = useMemo(() => {
-    if (dimmed) return false; // Never show labels for dimmed nodes
-    return forceShowLabels || showLabel || isSelected || isHighlighted;
-  }, [forceShowLabels, showLabel, isSelected, isHighlighted, dimmed]);
+    // Force show labels takes highest priority
+    if (forceShowLabels) return true;
+    
+    // Never show labels for dimmed (non-connected) nodes
+    if (dimmed) return false;
+    
+    // Always show label for selected node
+    if (isSelected) return true;
+    
+    // Show label for highlighted (connected) nodes when a selection exists
+    if (selectedNodeId && highlightedNodes.has(node.id)) return true;
+    
+    // Show labels when no selection exists (default state)
+    if (!selectedNodeId) return showLabel;
+    
+    // Default fallback
+    return showLabel;
+  }, [showLabel, isSelected, selectedNodeId, highlightedNodes, node.id, dimmed, forceShowLabels]);
 
   // ENHANCED INSTANT MODE: Better logging for coordinated translation tracking
   if (showPercentage && connectionPercentage > 0) {

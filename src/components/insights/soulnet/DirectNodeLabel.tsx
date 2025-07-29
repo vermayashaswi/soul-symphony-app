@@ -185,19 +185,19 @@ export const DirectNodeLabel: React.FC<DirectNodeLabelProps> = ({
         useCoordinatedTranslation={!!coordinatedTranslation}
       />
       
-      {/* Enhanced side-positioned percentage text with theme-aware color */}
+      {/* ENHANCED: High-visibility percentage display with strong contrast */}
       {showPercentage && connectionPercentage > 0 && (
         <SimpleText
-          text={`${connectionPercentage}%`}
+          text={`${Math.round(connectionPercentage)}%`}
           position={percentagePosition}
           color={percentageColor}
           size={percentageTextSize}
           visible={true}
-          renderOrder={16}
+          renderOrder={20} // Higher render order for better visibility
           bold={true}
-          outlineWidth={0}
-          outlineColor={undefined}
-          maxWidth={200}
+          outlineWidth={0.08} // Strong outline for visibility
+          outlineColor="#000000"
+          maxWidth={150}
           enableWrapping={false}
         />
       )}
