@@ -633,7 +633,7 @@ export function SoulNet3D({ timeRange, insightsData, userId, onTimeRangeChange }
     >
       {/* Header */}
       <div className="absolute top-4 left-4 right-4 z-10 flex items-center justify-between">
-        <h3 className="text-lg font-semibold text-foreground">
+        <h3 className="text-lg font-semibold">
           <TranslatableText text="Soul-Net" />
         </h3>
         <Button
