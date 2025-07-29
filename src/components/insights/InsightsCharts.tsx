@@ -20,6 +20,7 @@ interface InsightsChartsProps {
   moodCalendarDate: Date;
   onEmotionChartNavigate: (date: Date) => void;
   onMoodCalendarNavigate: (date: Date) => void;
+  onTimeRangeChange?: (timeRange: TimeRange) => void;
   userId?: string;
 }
 
@@ -30,6 +31,7 @@ export function InsightsCharts({
   moodCalendarDate,
   onEmotionChartNavigate,
   onMoodCalendarNavigate,
+  onTimeRangeChange,
   userId
 }: InsightsChartsProps) {
   const isMobile = useIsMobile();
@@ -98,6 +100,7 @@ export function InsightsCharts({
           timeRange={timeRange}
           insightsData={chartInsightsData}
           userId={userId}
+          onTimeRangeChange={onTimeRangeChange}
         />
       </motion.div>
       

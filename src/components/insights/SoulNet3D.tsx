@@ -7,7 +7,7 @@ import { Maximize2, Minimize2 } from 'lucide-react';
 import { TranslatableText } from '../translation/TranslatableText';
 import { Button } from '../ui/button';
 import { useIsMobile } from '../../hooks/use-mobile';
-import { useR3FTranslation } from '../../hooks/useR3FTranslation';
+import { useR3FBulkTranslation } from '../../hooks/useR3FBulkTranslation';
 
 // Types
 interface SoulNet3DNode {
@@ -36,6 +36,7 @@ interface SoulNet3DProps {
   timeRange: any;
   insightsData: any;
   userId?: string;
+  onTimeRangeChange?: (timeRange: any) => void;
 }
 
 // 3D Node Components
@@ -45,7 +46,8 @@ function ThemeNode({
   isConnected, 
   isFaded, 
   onClick, 
-  position 
+  position,
+  getTranslatedText
 }: {
   node: SoulNet3DNode;
   isSelected: boolean;
@@ -53,10 +55,10 @@ function ThemeNode({
   isFaded: boolean;
   onClick: () => void;
   position: [number, number, number];
+  getTranslatedText: (text: string) => string;
 }) {
   const meshRef = useRef<THREE.Mesh>(null);
   const [hovered, setHovered] = useState(false);
-  const { translatedText } = useR3FTranslation(node.label);
 
   useFrame((state) => {
     if (meshRef.current) {
@@ -104,7 +106,7 @@ function ThemeNode({
         outlineWidth={0.02}
         outlineColor="#000000"
       >
-        {translatedText}
+        {getTranslatedText(node.label)}
       </Text>
 
       {/* Percentage Label for connected nodes */}
@@ -131,7 +133,8 @@ function EmotionNode({
   isConnected, 
   isFaded, 
   onClick, 
-  position 
+  position,
+  getTranslatedText
 }: {
   node: SoulNet3DNode;
   isSelected: boolean;
@@ -139,10 +142,10 @@ function EmotionNode({
   isFaded: boolean;
   onClick: () => void;
   position: [number, number, number];
+  getTranslatedText: (text: string) => string;
 }) {
   const meshRef = useRef<THREE.Mesh>(null);
   const [hovered, setHovered] = useState(false);
-  const { translatedText } = useR3FTranslation(node.label);
 
   useFrame((state) => {
     if (meshRef.current) {
@@ -191,7 +194,7 @@ function EmotionNode({
         outlineWidth={0.02}
         outlineColor="#000000"
       >
-        {translatedText}
+        {getTranslatedText(node.label)}
       </Text>
 
       {/* Percentage Label for connected nodes */}
@@ -251,13 +254,16 @@ function ConnectionLines({
 
         const geometry = new THREE.BufferGeometry().setFromPoints(points);
         
-        const material = new THREE.LineBasicMaterial({
-          color: isHighlighted ? '#ffd93d' : '#ffffff',
+        const material = new THREE.LineDashedMaterial({
+          color: isHighlighted ? '#ffd93d' : '#999999',
           transparent: true,
-          opacity: isFaded ? 0.1 : (isHighlighted ? 1 : 0.6)
+          opacity: isFaded ? 0.05 : (isHighlighted ? 1 : 0.2),
+          dashSize: 0.1,
+          gapSize: 0.05
         });
         
         const line = new THREE.Line(geometry, material);
+        line.computeLineDistances(); // Required for dashed lines
         
         return (
           <primitive key={`${link.source}-${link.target}`} object={line} />
@@ -268,11 +274,12 @@ function ConnectionLines({
 }
 
 // 3D Scene Component
-function Scene3D({ data, selectedNodeId, onNodeClick, isMobile }: {
+function Scene3D({ data, selectedNodeId, onNodeClick, isMobile, getTranslatedText }: {
   data: SoulNet3DData;
   selectedNodeId: string | null;
   onNodeClick: (nodeId: string | null) => void;
   isMobile: boolean;
+  getTranslatedText: (text: string) => string;
 }) {
   const { camera } = useThree();
 
@@ -323,6 +330,7 @@ function Scene3D({ data, selectedNodeId, onNodeClick, isMobile }: {
               isConnected={isConnected}
               isFaded={isFaded}
               onClick={() => handleNodeClick(node.id)}
+              getTranslatedText={getTranslatedText}
             />
           );
         } else {
@@ -335,6 +343,7 @@ function Scene3D({ data, selectedNodeId, onNodeClick, isMobile }: {
               isConnected={isConnected}
               isFaded={isFaded}
               onClick={() => handleNodeClick(node.id)}
+              getTranslatedText={getTranslatedText}
             />
           );
         }
@@ -378,11 +387,32 @@ function Scene3D({ data, selectedNodeId, onNodeClick, isMobile }: {
 }
 
 // Main SoulNet3D Component
-export function SoulNet3D({ timeRange, insightsData, userId }: SoulNet3DProps) {
+export function SoulNet3D({ timeRange, insightsData, userId, onTimeRangeChange }: SoulNet3DProps) {
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const mobileDetection = useIsMobile();
   const isMobile = mobileDetection.isMobile;
+
+  // Extract unique labels for translation
+  const uniqueLabels = useMemo(() => {
+    if (!insightsData?.allEntries?.length) return [];
+    
+    const labels = new Set<string>();
+    insightsData.allEntries.forEach((entry: any) => {
+      if (entry.themeemotion && typeof entry.themeemotion === 'object') {
+        Object.entries(entry.themeemotion).forEach(([theme, emotions]: [string, any]) => {
+          labels.add(theme);
+          if (emotions && typeof emotions === 'object') {
+            Object.keys(emotions).forEach(emotion => labels.add(emotion));
+          }
+        });
+      }
+    });
+    return Array.from(labels);
+  }, [insightsData]);
+
+  // Use bulk translation for all labels
+  const { getTranslatedText, isComplete: translationsComplete } = useR3FBulkTranslation(uniqueLabels);
 
   // Process data from themeemotion column
   const processedData = useMemo((): SoulNet3DData => {
@@ -434,11 +464,14 @@ export function SoulNet3D({ timeRange, insightsData, userId }: SoulNet3DProps) {
     const nodes: SoulNet3DNode[] = [];
     const links: SoulNet3DLink[] = [];
     
-    // Generate theme nodes
+    // Generate theme nodes with new Y positioning pattern
     const themes = Array.from(themeEmotionMap.keys());
+    const themeYPattern = [-2, 2, -1, 1]; // Repeating pattern
+    
     themes.forEach((theme, index) => {
       const angle = (index / themes.length) * Math.PI * 2;
       const radius = 6;
+      const yPosition = themeYPattern[index % themeYPattern.length];
       
       nodes.push({
         id: theme,
@@ -448,13 +481,16 @@ export function SoulNet3D({ timeRange, insightsData, userId }: SoulNet3DProps) {
         connections: themeEmotionMap.get(theme)?.size || 0,
         position: [
           Math.cos(angle) * radius,
-          0,
+          yPosition,
           Math.sin(angle) * radius
         ]
       });
     });
 
-    // Generate emotion nodes and links
+    // Generate emotion nodes and links with new Y positioning pattern
+    const emotionYPattern = [-5, 5, -6.5, 6.5, -8, 8, -9.5, 9.5]; // Repeating pattern
+    let emotionCounter = 0;
+    
     themeEmotionMap.forEach((emotions, theme) => {
       const themeNode = nodes.find(n => n.id === theme);
       if (!themeNode) return;
@@ -471,6 +507,8 @@ export function SoulNet3D({ timeRange, insightsData, userId }: SoulNet3DProps) {
         // Position emotions around their theme
         const angle = (index / emotionArray.length) * Math.PI * 2;
         const distance = 2 + data.totalIntensity * 0.5;
+        const yPosition = emotionYPattern[emotionCounter % emotionYPattern.length];
+        emotionCounter++;
         
         const emotionNode: SoulNet3DNode = {
           id: emotionId,
@@ -480,7 +518,7 @@ export function SoulNet3D({ timeRange, insightsData, userId }: SoulNet3DProps) {
           connections: 1,
           position: [
             themeNode.position[0] + Math.cos(angle) * distance,
-            Math.sin(index * 0.5) * 2,
+            yPosition,
             themeNode.position[2] + Math.sin(angle) * distance
           ],
           percentage
@@ -499,7 +537,7 @@ export function SoulNet3D({ timeRange, insightsData, userId }: SoulNet3DProps) {
     });
 
     return { nodes, links };
-  }, [insightsData]);
+  }, [insightsData, timeRange]);
 
   const handleNodeClick = useCallback((nodeId: string | null) => {
     setSelectedNodeId(nodeId);
@@ -547,9 +585,10 @@ export function SoulNet3D({ timeRange, insightsData, userId }: SoulNet3DProps) {
     ? "fixed inset-0 z-50 bg-background"
     : "relative w-full bg-card/50 rounded-lg border overflow-hidden";
   
+  // Increase height by 30%
   const canvasHeight = isFullscreen 
     ? "100vh" 
-    : isMobile ? "400px" : "600px";
+    : isMobile ? "520px" : "780px";
 
   return (
     <motion.div 
@@ -577,28 +616,40 @@ export function SoulNet3D({ timeRange, insightsData, userId }: SoulNet3DProps) {
       {selectedNodeId === null && (
         <div className="absolute bottom-4 left-4 right-4 z-10">
           <div className="bg-background/80 backdrop-blur-sm rounded-lg p-3 text-sm text-muted-foreground text-center">
-            <TranslatableText text="Click on themes (spheres) or emotions (cubes) to explore connections. Use mouse to rotate, zoom, and pan." />
+            <TranslatableText text={isMobile 
+              ? "Tap on themes (spheres) or emotions (cubes) to explore connections. Touch to rotate, pinch to zoom." 
+              : "Click on themes (spheres) or emotions (cubes) to explore connections. Use mouse to rotate, zoom, and pan."
+            } />
           </div>
         </div>
       )}
 
-      {/* 3D Canvas */}
-      <Canvas
-        style={{ height: canvasHeight }}
-        camera={{ position: [0, 0, 15], fov: 75 }}
-        gl={{ 
-          antialias: true, 
-          alpha: true,
-          powerPreference: "high-performance"
-        }}
-      >
-        <Scene3D 
-          data={processedData}
-          selectedNodeId={selectedNodeId}
-          onNodeClick={handleNodeClick}
-          isMobile={isMobile}
-        />
-      </Canvas>
+      {/* 3D Canvas - Only render when translations are complete */}
+      {translationsComplete ? (
+        <Canvas
+          style={{ height: canvasHeight }}
+          camera={{ position: [0, 0, 15], fov: 75 }}
+          gl={{ 
+            antialias: true, 
+            alpha: true,
+            powerPreference: "high-performance"
+          }}
+        >
+          <Scene3D 
+            data={processedData}
+            selectedNodeId={selectedNodeId}
+            onNodeClick={handleNodeClick}
+            isMobile={isMobile}
+            getTranslatedText={getTranslatedText}
+          />
+        </Canvas>
+      ) : (
+        <div className="flex items-center justify-center" style={{ height: canvasHeight }}>
+          <div className="text-muted-foreground">
+            <TranslatableText text="Loading visualization..." />
+          </div>
+        </div>
+      )}
 
       {/* Selected Node Info */}
       <AnimatePresence>
@@ -611,7 +662,7 @@ export function SoulNet3D({ timeRange, insightsData, userId }: SoulNet3DProps) {
           >
             <div className="text-sm">
               <div className="font-semibold mb-2">
-                <TranslatableText text={processedData.nodes.find(n => n.id === selectedNodeId)?.label || ""} />
+                {getTranslatedText(processedData.nodes.find(n => n.id === selectedNodeId)?.label || "")}
               </div>
               <div className="text-muted-foreground">
                 <TranslatableText text="Connected elements show percentage distribution" />

@@ -159,6 +159,7 @@ function InsightsContent() {
               moodCalendarDate={moodCalendarDate}
               onEmotionChartNavigate={handleEmotionChartNavigate}
               onMoodCalendarNavigate={handleMoodCalendarNavigate}
+              onTimeRangeChange={(newTimeRange) => handleTimeRangeChange(newTimeRange)}
               userId={user?.id}
             />
           </>
