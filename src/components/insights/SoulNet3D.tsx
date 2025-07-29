@@ -8,6 +8,7 @@ import { Maximize2, Minimize2 } from 'lucide-react';
 import { Button } from '../ui/button';
 import { useIsMobile } from '../../hooks/use-mobile';
 import { useR3FTranslation, useR3FTranslations } from '../../hooks/useR3FTranslation';
+import { NodeLabels3D } from './Text3D';
 
 // Types
 interface SoulNet3DNode {
@@ -254,77 +255,8 @@ function ConnectionLines({
   );
 }
 
-// Screen-space HTML labels component
-function NodeLabels({ 
-  nodes, 
-  selectedNodeId, 
-  connectedNodeIds,
-  camera,
-  size 
-}: {
-  nodes: SoulNet3DNode[];
-  selectedNodeId: string | null;
-  connectedNodeIds: Set<string>;
-  camera: THREE.Camera;
-  size: { width: number; height: number };
-}) {
-  const [screenPositions, setScreenPositions] = useState<{ [key: string]: { x: number; y: number; visible: boolean } }>({});
-
-  useFrame(() => {
-    const newPositions: { [key: string]: { x: number; y: number; visible: boolean } } = {};
-    
-    nodes.forEach(node => {
-      const vector = new THREE.Vector3(...node.position);
-      vector.project(camera);
-      
-      const x = (vector.x * 0.5 + 0.5) * size.width;
-      const y = (vector.y * -0.5 + 0.5) * size.height;
-      const visible = vector.z < 1;
-      
-      newPositions[node.id] = { x, y, visible };
-    });
-    
-    setScreenPositions(newPositions);
-  });
-
-  return (
-    <div className="absolute inset-0 pointer-events-none">
-      {nodes.map(node => {
-        const pos = screenPositions[node.id];
-        if (!pos || !pos.visible) return null;
-
-        const isSelected = selectedNodeId === node.id;
-        const isConnected = connectedNodeIds.has(node.id);
-        const isFaded = selectedNodeId !== null && !isSelected && !isConnected;
-
-        return (
-          <div
-            key={node.id}
-            className={`absolute text-center transition-all duration-300 ${
-              isFaded ? 'opacity-30' : 'opacity-100'
-            }`}
-            style={{
-              left: pos.x - 40,
-              top: pos.y + 30,
-              width: 80,
-              fontSize: '12px',
-              color: isFaded ? '#666666' : '#ffffff',
-              textShadow: '1px 1px 2px rgba(0,0,0,0.8)',
-              fontWeight: isSelected || isConnected ? 'bold' : 'normal'
-            }}
-          >
-            <div>{node.label}</div>
-            {(isSelected || isConnected) && node.percentage && (
-              <div style={{ color: '#ffd93d', fontSize: '10px' }}>
-                {`${node.percentage.toFixed(1)}%`}
-              </div>
-            )}
-          </div>
-        );
-      })}
-    </div>
-  );
-}
+// 3D Text Labels Component (using troika-three-text)
+// This replaces the problematic screen-space HTML labels
 
 // Background click handler component
 function BackgroundClickHandler({ onBackgroundClick }: { onBackgroundClick: () => void }) {
@@ -362,7 +294,7 @@ function Scene3D({ data, selectedNodeId, onNodeClick, onBackgroundClick, isMobil
   onBackgroundClick: () => void;
   isMobile: boolean;
 }) {
-  const { camera, size } = useThree();
+  const { camera } = useThree();
 
   const connectedNodeIds = useMemo(() => {
     if (!selectedNodeId) return new Set<string>();
@@ -438,13 +370,12 @@ function Scene3D({ data, selectedNodeId, onNodeClick, onBackgroundClick, isMobil
         connectedNodeIds={connectedNodeIds}
       />
 
-      {/* Screen-space labels */}
-      <NodeLabels 
+      {/* 3D Text Labels */}
+      <NodeLabels3D
         nodes={data.nodes}
         selectedNodeId={selectedNodeId}
         connectedNodeIds={connectedNodeIds}
-        camera={camera}
-        size={size}
+        cameraDistance={camera.position.length()}
       />
 
       {/* Controls */}
@@ -657,6 +588,20 @@ export function SoulNet3D({ timeRange, insightsData, userId }: SoulNet3DProps) {
   const toggleFullscreen = useCallback(() => {
     setIsFullscreen(!isFullscreen);
   }, [isFullscreen]);
+
+  const connectedNodeIds = useMemo(() => {
+    if (!selectedNodeId) return new Set<string>();
+    
+    const connected = new Set<string>();
+    processedData.links.forEach(link => {
+      if (link.source === selectedNodeId) {
+        connected.add(link.target);
+      } else if (link.target === selectedNodeId) {
+        connected.add(link.source);
+      }
+    });
+    return connected;
+  }, [selectedNodeId, processedData.links]);
 
   // Show loading state while translations are loading
   if (translationsLoading) {
