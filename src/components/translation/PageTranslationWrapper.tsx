@@ -5,7 +5,7 @@ import { JournalTranslationProvider } from './JournalTranslationProvider';
 import { ChatTranslationProvider } from './ChatTranslationProvider';
 import { SettingsTranslationProvider } from './SettingsTranslationProvider';
 import { InsightsTranslationProvider } from '../insights/InsightsTranslationProvider';
-import { TranslationProgressIndicator } from '../insights/TranslationProgressIndicator';
+import { GenericTranslationProgress } from './GenericTranslationProgress';
 
 interface PageTranslationWrapperProps {
   children: ReactNode;
@@ -42,8 +42,86 @@ export const PageTranslationWrapper: React.FC<PageTranslationWrapperProps> = ({ 
 
   return (
     <TranslationProvider>
-      <TranslationProgressIndicator />
-      {children}
+      {(function() {
+        // Get translation state based on provider type
+        if (pathname.includes('/home')) {
+          const HomeProvider = TranslationProvider as any;
+          return (
+            <>
+              <HomeProvider.Consumer>
+                {(value: any) => (
+                  <GenericTranslationProgress 
+                    isTranslating={value?.isTranslating || false}
+                    progress={value?.progress || 0}
+                  />
+                )}
+              </HomeProvider.Consumer>
+              {children}
+            </>
+          );
+        } else if (pathname.includes('/journal')) {
+          const JournalProvider = TranslationProvider as any;
+          return (
+            <>
+              <JournalProvider.Consumer>
+                {(value: any) => (
+                  <GenericTranslationProgress 
+                    isTranslating={value?.isTranslating || false}
+                    progress={value?.progress || 0}
+                  />
+                )}
+              </JournalProvider.Consumer>
+              {children}
+            </>
+          );
+        } else if (pathname.includes('/chat') || pathname.includes('/smart-chat')) {
+          const ChatProvider = TranslationProvider as any;
+          return (
+            <>
+              <ChatProvider.Consumer>
+                {(value: any) => (
+                  <GenericTranslationProgress 
+                    isTranslating={value?.isTranslating || false}
+                    progress={value?.progress || 0}
+                  />
+                )}
+              </ChatProvider.Consumer>
+              {children}
+            </>
+          );
+        } else if (pathname.includes('/settings')) {
+          const SettingsProvider = TranslationProvider as any;
+          return (
+            <>
+              <SettingsProvider.Consumer>
+                {(value: any) => (
+                  <GenericTranslationProgress 
+                    isTranslating={value?.isTranslating || false}
+                    progress={value?.progress || 0}
+                  />
+                )}
+              </SettingsProvider.Consumer>
+              {children}
+            </>
+          );
+        } else if (pathname.includes('/insights')) {
+          const InsightsProvider = TranslationProvider as any;
+          return (
+            <>
+              <InsightsProvider.Consumer>
+                {(value: any) => (
+                  <GenericTranslationProgress 
+                    isTranslating={value?.isTranslating || false}
+                    progress={value?.progress || 0}
+                  />
+                )}
+              </InsightsProvider.Consumer>
+              {children}
+            </>
+          );
+        }
+        return children;
+      })()}
     </TranslationProvider>
   );
 };

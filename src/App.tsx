@@ -3,7 +3,7 @@ import AppRoutes from './routes/AppRoutes';
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as SonnerToaster } from "@/components/ui/sonner";
 import { SubscriptionProvider } from '@/contexts/SubscriptionContext';
-import { TranslationLoadingOverlay } from '@/components/translation/TranslationLoadingOverlay';
+
 import { JournalProcessingInitializer } from './app/journal-processing-init';
 import { TutorialProvider } from './contexts/TutorialContext';
 import TutorialOverlay from './components/tutorial/TutorialOverlay';
@@ -195,7 +195,7 @@ const App: React.FC = () => {
       <FeatureFlagsProvider>
         <SubscriptionProvider>
           <TutorialProvider>
-            <TranslationLoadingOverlay />
+            
             <JournalProcessingInitializer />
             <AppRoutes key={isInitialized ? 'initialized' : 'initializing'} />
             <TutorialOverlay />
