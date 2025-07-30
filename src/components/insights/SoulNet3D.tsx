@@ -418,7 +418,15 @@ export function SoulNet3D({ timeRange, insightsData, userId, onTimeRangeChange }
   const [isFullscreen, setIsFullscreen] = useState(false);
   const mobileDetection = useIsMobile();
   const isMobile = mobileDetection.isMobile;
-  const { theme } = useTheme();
+  
+  // Defensive theme access with fallback
+  let theme = 'dark';
+  try {
+    const themeContext = useTheme();
+    theme = themeContext.theme;
+  } catch (error) {
+    console.warn('SoulNet3D: ThemeProvider not ready, using default theme');
+  }
 
   // Extract unique labels for translation
   const uniqueLabels = useMemo(() => {
