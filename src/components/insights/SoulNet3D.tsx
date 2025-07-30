@@ -515,7 +515,7 @@ export function SoulNet3D({ timeRange, insightsData, userId, onTimeRangeChange }
     const themeZPattern = [-1, 1, -2, 2]; // Z-plane pattern for themes
     themes.forEach((theme, index) => {
       const angle = (index / themes.length) * 2 * Math.PI;
-      const radius = 8; // Themes in inner circle
+      const radius = 4.8; // Themes in inner circle
       const themeData = themeMap.get(theme)!;
       const zIndex = themeZPattern[index % themeZPattern.length];
       
@@ -537,7 +537,7 @@ export function SoulNet3D({ timeRange, insightsData, userId, onTimeRangeChange }
     const emotionZPattern = [-3.5, 3.5, -5, 5, -6.5, 6.5, -8, 8]; // Z-plane pattern for emotions
     emotions.forEach((emotion, index) => {
       const angle = (index / emotions.length) * 2 * Math.PI;
-      const radius = 12; // Emotions in outer circle
+      const radius = 7.2; // Emotions in outer circle
       const emotionData = emotionMap.get(emotion)!;
       const zIndex = emotionZPattern[index % emotionZPattern.length];
       
