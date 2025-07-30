@@ -68,9 +68,19 @@ const SmartChat = () => {
   };
 
   const handleCreateNewThread = async (): Promise<string | null> => {
-    if (!user?.id) return null;
+    if (!user?.id) {
+      console.error('[SmartChat] Cannot create thread: user not authenticated');
+      toast({
+        title: "Authentication required",
+        description: "Please sign in to create a new conversation",
+        variant: "destructive"
+      });
+      return null;
+    }
     
     try {
+      console.log('[SmartChat] Creating new thread for user:', user.id);
+      
       const newThreadId = uuidv4();
       const { error } = await supabase
         .from('chat_threads')
@@ -79,11 +89,12 @@ const SmartChat = () => {
           user_id: user.id,
           title: "New Conversation",
           created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString()
+          updated_at: new Date().toISOString(),
+          processing_status: 'idle'
         });
       
       if (error) {
-        console.error("Error creating new thread:", error);
+        console.error("[SmartChat] Error creating new thread:", error);
         toast({
           title: "Error",
           description: "Failed to create new conversation",
@@ -92,11 +103,17 @@ const SmartChat = () => {
         return null;
       }
       
+      console.log('[SmartChat] Successfully created new thread:', newThreadId);
       setCurrentThreadId(newThreadId);
       localStorage.setItem("lastActiveChatThreadId", newThreadId);
       return newThreadId;
     } catch (error) {
-      console.error("Error creating new thread:", error);
+      console.error("[SmartChat] Exception creating new thread:", error);
+      toast({
+        title: "Error", 
+        description: "Failed to create new conversation",
+        variant: "destructive"
+      });
       return null;
     }
   };
