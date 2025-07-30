@@ -103,7 +103,7 @@ function ThemeNode({
       {/* Node Label - Hide if node is faded (unselected when another node is selected) */}
       {(!selectedNodeId || isSelected || isConnected) && (
         <BillboardText
-          position={[0, -1, 0]}
+          position={[0, 0, -1]}
           fontSize={0.375}
           color={theme === 'light' ? '#000000' : '#ffffff'}
           anchorX="center"
@@ -118,7 +118,7 @@ function ThemeNode({
       {/* Percentage Label for connected nodes */}
       {(isSelected || isConnected) && node.percentage && (
         <BillboardText
-          position={[0, -1.5, 0]}
+          position={[0, 0, -1.5]}
           fontSize={0.3125}
           color="#ffd93d"
           anchorX="center"
@@ -197,7 +197,7 @@ function EmotionNode({
       {/* Node Label - Hide if node is faded (unselected when another node is selected) */}
       {(!selectedNodeId || isSelected || isConnected) && (
         <BillboardText
-          position={[0, -0.7, 0]}
+          position={[0, 0, -0.7]}
           fontSize={0.375}
           color={theme === 'light' ? '#000000' : '#ffffff'}
           anchorX="center"
@@ -212,7 +212,7 @@ function EmotionNode({
       {/* Percentage Label for connected nodes */}
       {(isSelected || isConnected) && node.percentage && (
         <BillboardText
-          position={[0, -1.05, 0]}
+          position={[0, 0, -1.05]}
           fontSize={0.3125}
           color="#ffd93d"
           anchorX="center"
@@ -311,8 +311,9 @@ function Scene3D({ data, selectedNodeId, onNodeClick, isMobile, getTranslatedTex
   }, [selectedNodeId, data.links]);
 
   useEffect(() => {
-    // Set initial camera position (1.3x closer: 40 / 1.3 ≈ 30.8)
-    camera.position.set(0, 0, 30.8);
+    // Set camera position to look up the Z-axis (new orientation: Z points up)
+    camera.position.set(0, -30.8, 0);
+    camera.up.set(0, 0, 1); // Set up vector to Z axis
   }, [camera]);
 
   const handleNodeClick = useCallback((nodeId: string) => {
@@ -517,8 +518,8 @@ export function SoulNet3D({ timeRange, insightsData, userId, onTimeRangeChange }
         intensity: Math.min(themeData.totalIntensity / 10, 1),
         position: [
           Math.cos(angle) * radius,
-          Math.sin(angle) * radius,
-          zIndex
+          zIndex,
+          Math.sin(angle) * radius
         ]
       });
     });
@@ -539,8 +540,8 @@ export function SoulNet3D({ timeRange, insightsData, userId, onTimeRangeChange }
         intensity: Math.min(emotionData.totalIntensity / Math.max(emotionData.count, 1), 1),
         position: [
           Math.cos(angle) * radius,
-          Math.sin(angle) * radius,
-          zIndex
+          zIndex,
+          Math.sin(angle) * radius
         ]
       });
     });
@@ -676,7 +677,7 @@ export function SoulNet3D({ timeRange, insightsData, userId, onTimeRangeChange }
       {translationsComplete ? (
         <Canvas
           style={{ height: canvasHeight }}
-          camera={{ position: [0, 0, 30.8], fov: 75 }}
+          camera={{ position: [0, -30.8, 0], fov: 75, up: [0, 0, 1] }}
           onPointerMissed={() => setSelectedNodeId(null)}
           gl={{ 
             antialias: true, 

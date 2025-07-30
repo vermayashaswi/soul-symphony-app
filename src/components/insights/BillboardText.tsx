@@ -43,28 +43,8 @@ export const BillboardText: React.FC<BillboardTextProps> = ({
     if (now - lastUpdateRef.current < UPDATE_INTERVAL) return;
     lastUpdateRef.current = now;
     
-    // Robust billboard algorithm that prevents upside-down text
-    const textPosition = meshRef.current.getWorldPosition(new THREE.Vector3());
-    const cameraPosition = camera.position.clone();
-    
-    // Calculate direction from text to camera
-    const direction = cameraPosition.sub(textPosition).normalize();
-    
-    // Get camera's up vector (world up in most cases)
-    const up = camera.up.clone().normalize();
-    
-    // Calculate right vector using cross product
-    const right = new THREE.Vector3().crossVectors(up, direction).normalize();
-    
-    // Recalculate up vector to ensure orthogonality
-    const correctedUp = new THREE.Vector3().crossVectors(direction, right).normalize();
-    
-    // Create rotation matrix from these vectors
-    const matrix = new THREE.Matrix4();
-    matrix.makeBasis(right, correctedUp, direction);
-    
-    // Apply the rotation to the text group
-    meshRef.current.setRotationFromMatrix(matrix);
+    // Simple and reliable billboard algorithm using lookAt
+    meshRef.current.lookAt(camera.position);
   });
 
   return (
