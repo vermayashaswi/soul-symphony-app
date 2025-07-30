@@ -31,15 +31,19 @@ export const optimizeGoogleAvatarUrl = (url: string, size: number = 192): string
     urlObj.searchParams.delete('size');
     
     // Add optimized size parameter
-    urlObj.searchParams.set('sz', size.toString());
+    urlObj.searchParams.set('s', size.toString());
     
-    // Add cache busting and quality parameters for better loading
-    urlObj.searchParams.set('c', 'c'); // Center crop
+    // Force high quality and center crop
+    urlObj.searchParams.set('c', 'k');
+    
+    // Add cache-busting parameter for better reliability
+    urlObj.searchParams.set('_cb', Date.now().toString());
     
     return urlObj.toString();
   } catch (error) {
     console.warn('Failed to optimize Google avatar URL:', error);
-    return url;
+    // Return original URL with fallback size parameter
+    return url.includes('?') ? `${url}&s=${size}` : `${url}?s=${size}`;
   }
 };
 
@@ -61,8 +65,8 @@ export const getOptimizedAvatarUrl = (avatarUrl: string | null | undefined, size
   try {
     new URL(avatarUrl);
     return avatarUrl;
-  } catch {
-    console.warn('Invalid avatar URL provided:', avatarUrl);
+  } catch (error) {
+    console.warn('Invalid avatar URL provided:', avatarUrl, error);
     return undefined;
   }
 };
@@ -95,14 +99,21 @@ export const createRetryAvatarUrl = (url: string, retryCount: number = 0): strin
   try {
     const urlObj = new URL(url);
     
-    if (retryCount > 0) {
-      // Add cache-busting parameter for retries
-      urlObj.searchParams.set('retry', retryCount.toString());
-      urlObj.searchParams.set('t', Date.now().toString());
+    // Add retry parameter
+    urlObj.searchParams.set('retry', retryCount.toString());
+    
+    // Add timestamp for cache busting
+    urlObj.searchParams.set('t', Date.now().toString());
+    
+    // For Google avatars, also update the cache-busting parameter
+    if (isGoogleAvatarUrl(url)) {
+      urlObj.searchParams.set('_cb', Date.now().toString());
     }
     
     return urlObj.toString();
   } catch {
-    return url;
+    // If URL parsing fails, append as query string
+    const separator = url.includes('?') ? '&' : '?';
+    return `${url}${separator}retry=${retryCount}&t=${Date.now()}`;
   }
 };

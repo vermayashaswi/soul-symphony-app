@@ -15,6 +15,15 @@ export interface AnimationDimensions {
 }
 
 /**
+ * Detects if the app is running in a Capacitor native environment
+ */
+function isCapacitorNative(): boolean {
+  return typeof window !== 'undefined' && 
+         (window as any).Capacitor && 
+         (window as any).Capacitor.isNativePlatform();
+}
+
+/**
  * Calculates the center point of the concentric circle animation
  * taking into account the container dimensions and bottom navigation offset
  */
@@ -25,9 +34,12 @@ export function getAnimationCenter(
 ): CircleCenter {
   const effectiveHeight = bottomNavOffset ? containerHeight - 64 : containerHeight; // 64px for bottom nav
   
+  // Add additional offset for Capacitor native apps to account for status bar/navigation differences
+  const capacitorOffset = isCapacitorNative() ? 15 : 0;
+  
   return {
     x: containerWidth / 2,
-    y: effectiveHeight / 2
+    y: effectiveHeight / 2 - capacitorOffset
   };
 }
 

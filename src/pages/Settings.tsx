@@ -34,11 +34,6 @@ import { TranslatableText } from '@/components/translation/TranslatableText';
 import { useTranslation } from '@/contexts/TranslationContext';
 import { useTutorial } from '@/contexts/TutorialContext';
 import { DeleteAllEntriesSection } from '@/components/settings/DeleteAllEntriesSection';
-import { UserDebugInfo } from '@/components/settings/UserDebugInfo';
-import { ProfilePictureUpload } from '@/components/settings/ProfilePictureUpload';
-import { EnhancedProfilePictureUpload } from '@/components/settings/EnhancedProfilePictureUpload';
-import { useAvatarManager } from '@/hooks/useAvatarManager';
-import { EnhancedAvatar } from '@/components/avatar/EnhancedAvatar';
 
 
 interface SettingItemProps {
@@ -125,8 +120,6 @@ function SettingsContent() {
   const [isLoadingProfile, setIsLoadingProfile] = useState(true);
   const [nameError, setNameError] = useState<string | null>(null);
   
-  // Enhanced avatar management
-  const { avatarData, refreshAvatar } = useAvatarManager();
   
   const MAX_NAME_LENGTH = 25;
   
@@ -650,36 +643,17 @@ function SettingsContent() {
               
               <div className="flex flex-col sm:flex-row gap-6 items-center sm:items-start">
                 <div className="flex flex-col items-center space-y-4">
-                  <EnhancedAvatar
-                    src={avatarData.avatarUrl}
-                    fallbackText={user?.email || ''}
-                    size="xl"
-                    className="mb-2"
-                    showLoadingState={true}
-                    onLoadError={(error) => console.warn('[Settings] Avatar load error:', error)}
-                  />
+                  <Avatar className="h-24 w-24">
+                    <AvatarImage 
+                      src={user?.user_metadata?.avatar_url} 
+                      alt="Profile picture"
+                    />
+                    <AvatarFallback className="text-lg">
+                      {user?.email?.charAt(0).toUpperCase() || 'U'}
+                    </AvatarFallback>
+                  </Avatar>
                   
-                  {/* Enhanced Avatar Upload Component */}
-                  <EnhancedProfilePictureUpload onAvatarUpdate={refreshAvatar} />
                   
-                  {/* Avatar Debug Info (only in development) */}
-                  {process.env.NODE_ENV === 'development' && (
-                    <div className="text-xs text-muted-foreground text-center space-y-1">
-                      <div>Source: {avatarData.source}</div>
-                      {avatarData.error && (
-                        <div className="text-destructive">Error: {avatarData.error}</div>
-                      )}
-                      <details className="cursor-pointer">
-                        <summary>Debug Info</summary>
-                        <div className="mt-1 text-left bg-muted p-2 rounded text-xs">
-                          <div>User Metadata: {avatarData.debugInfo.userMetadataUrl || 'None'}</div>
-                          <div>Profile DB: {avatarData.debugInfo.profileUrl || 'None'}</div>
-                          <div>Optimized: {avatarData.debugInfo.optimizedUrl || 'None'}</div>
-                          <div>Updated: {new Date(avatarData.debugInfo.lastUpdated).toLocaleTimeString()}</div>
-                        </div>
-                      </details>
-                    </div>
-                  )}
                 </div>
                 
                 <div className="flex-1 space-y-4 text-center sm:text-left">
@@ -930,40 +904,6 @@ function SettingsContent() {
                     </div>
                   </div>
                   
-                  {notificationPermissionState === 'granted' && (
-                    <div className="mt-2 flex gap-2">
-                      <Button 
-                        variant="outline" 
-                        size="sm"
-                        onClick={handleTestNotification}
-                      >
-                        <TranslatableText text="Test Notification" />
-                      </Button>
-                      <Button 
-                        variant="outline" 
-                        size="sm"
-                        onClick={async () => {
-                          // Run background diagnostics instead of showing debug UI
-                          const newDebugInfo = await enhancedNotificationService.getPermissionInfo();
-                          const diagnostics = {
-                            localTime: new Date().toLocaleString(),
-                            timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-                            utcOffset: new Date().getTimezoneOffset(),
-                            scheduledNotifications: newDebugInfo.nativeStatus?.scheduled || [],
-                            timestamp: Date.now()
-                          };
-                          setBackgroundDiagnostics(diagnostics);
-                          console.log('[Settings] Background diagnostics completed:', diagnostics);
-                          
-                          // Show a brief toast instead of debug modal
-                          toast.success("Diagnostics completed - check console for details");
-                        }}
-                      >
-                        <TranslatableText text="Debug Info" />
-                      </Button>
-                      <UserDebugInfo />
-                    </div>
-                  )}
                 </div>
                 
                 {notificationsEnabled && (
