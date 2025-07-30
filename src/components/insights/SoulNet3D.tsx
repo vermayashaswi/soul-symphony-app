@@ -8,15 +8,15 @@ import { TranslatableText } from '../translation/TranslatableText';
 import { Button } from '../ui/button';
 import { useIsMobile } from '../../hooks/use-mobile';
 import { useR3FBulkTranslation } from '../../hooks/useR3FBulkTranslation';
+import { useTheme } from '@/hooks/use-theme';
 import { BillboardText } from './BillboardText';
 
 // Types
 interface SoulNet3DNode {
   id: string;
-  label: string;
+  name: string;
   type: 'theme' | 'emotion';
   intensity: number;
-  connections: number;
   position: [number, number, number];
   percentage?: number;
 }
@@ -25,7 +25,6 @@ interface SoulNet3DLink {
   source: string;
   target: string;
   strength: number;
-  percentage: number;
 }
 
 interface SoulNet3DData {
@@ -48,7 +47,9 @@ function ThemeNode({
   isFaded, 
   onClick, 
   position,
-  getTranslatedText
+  getTranslatedText,
+  selectedNodeId,
+  theme
 }: {
   node: SoulNet3DNode;
   isSelected: boolean;
@@ -57,6 +58,8 @@ function ThemeNode({
   onClick: () => void;
   position: [number, number, number];
   getTranslatedText: (text: string) => string;
+  selectedNodeId: string | null;
+  theme: string;
 }) {
   const meshRef = useRef<THREE.Mesh>(null);
   const [hovered, setHovered] = useState(false);
@@ -97,24 +100,26 @@ function ThemeNode({
         />
       </mesh>
       
-      {/* Node Label */}
-      <BillboardText
-        position={[0, -1, 0]}
-        fontSize={0.3}
-        color={isFaded ? '#666666' : '#ffffff'}
-        anchorX="center"
-        anchorY="middle"
-        outlineWidth={0.02}
-        outlineColor="#000000"
-      >
-        {getTranslatedText(node.label)}
-      </BillboardText>
+      {/* Node Label - Hide if node is faded (unselected when another node is selected) */}
+      {(!selectedNodeId || isSelected || isConnected) && (
+        <BillboardText
+          position={[0, 0, -1]}
+          fontSize={0.375}
+          color={theme === 'light' ? '#000000' : '#ffffff'}
+          anchorX="center"
+          anchorY="middle"
+          outlineWidth={theme === 'light' ? 0 : 0.02}
+          outlineColor={theme === 'light' ? 'transparent' : '#000000'}
+        >
+          {getTranslatedText(node.name)}
+        </BillboardText>
+      )}
 
       {/* Percentage Label for connected nodes */}
       {(isSelected || isConnected) && node.percentage && (
         <BillboardText
-          position={[0, -1.5, 0]}
-          fontSize={0.25}
+          position={[0, 0, -1.5]}
+          fontSize={0.3125}
           color="#ffd93d"
           anchorX="center"
           anchorY="middle"
@@ -135,7 +140,9 @@ function EmotionNode({
   isFaded, 
   onClick, 
   position,
-  getTranslatedText
+  getTranslatedText,
+  selectedNodeId,
+  theme
 }: {
   node: SoulNet3DNode;
   isSelected: boolean;
@@ -144,6 +151,8 @@ function EmotionNode({
   onClick: () => void;
   position: [number, number, number];
   getTranslatedText: (text: string) => string;
+  selectedNodeId: string | null;
+  theme: string;
 }) {
   const meshRef = useRef<THREE.Mesh>(null);
   const [hovered, setHovered] = useState(false);
@@ -185,24 +194,26 @@ function EmotionNode({
         />
       </mesh>
       
-      {/* Node Label */}
-      <BillboardText
-        position={[0, -0.7, 0]}
-        fontSize={0.3}
-        color={isFaded ? '#666666' : '#ffffff'}
-        anchorX="center"
-        anchorY="middle"
-        outlineWidth={0.02}
-        outlineColor="#000000"
-      >
-        {getTranslatedText(node.label)}
-      </BillboardText>
+      {/* Node Label - Hide if node is faded (unselected when another node is selected) */}
+      {(!selectedNodeId || isSelected || isConnected) && (
+        <BillboardText
+          position={[0, 0, -0.7]}
+          fontSize={0.375}
+          color={theme === 'light' ? '#000000' : '#ffffff'}
+          anchorX="center"
+          anchorY="middle"
+          outlineWidth={theme === 'light' ? 0 : 0.02}
+          outlineColor={theme === 'light' ? 'transparent' : '#000000'}
+        >
+          {getTranslatedText(node.name)}
+        </BillboardText>
+      )}
 
       {/* Percentage Label for connected nodes */}
       {(isSelected || isConnected) && node.percentage && (
         <BillboardText
-          position={[0, -1.05, 0]}
-          fontSize={0.25}
+          position={[0, 0, -1.05]}
+          fontSize={0.3125}
           color="#ffd93d"
           anchorX="center"
           anchorY="middle"
@@ -275,12 +286,13 @@ function ConnectionLines({
 }
 
 // 3D Scene Component
-function Scene3D({ data, selectedNodeId, onNodeClick, isMobile, getTranslatedText }: {
+function Scene3D({ data, selectedNodeId, onNodeClick, isMobile, getTranslatedText, theme }: {
   data: SoulNet3DData;
   selectedNodeId: string | null;
   onNodeClick: (nodeId: string | null) => void;
   isMobile: boolean;
   getTranslatedText: (text: string) => string;
+  theme: string;
 }) {
   const { camera, gl, scene } = useThree();
 
@@ -299,8 +311,9 @@ function Scene3D({ data, selectedNodeId, onNodeClick, isMobile, getTranslatedTex
   }, [selectedNodeId, data.links]);
 
   useEffect(() => {
-    // Set initial camera position - 0.8 * maxDistance (50) for initial zoom level
-    camera.position.set(0, 0, 40);
+    // Set camera position to look up the Z-axis (new orientation: Z points up)
+    camera.position.set(0, -30.8, 0);
+    camera.up.set(0, 0, 1); // Set up vector to Z axis
   }, [camera]);
 
   const handleNodeClick = useCallback((nodeId: string) => {
@@ -339,6 +352,8 @@ function Scene3D({ data, selectedNodeId, onNodeClick, isMobile, getTranslatedTex
               isFaded={isFaded}
               onClick={() => handleNodeClick(node.id)}
               getTranslatedText={getTranslatedText}
+              selectedNodeId={selectedNodeId}
+              theme={theme}
             />
           );
         } else {
@@ -352,6 +367,8 @@ function Scene3D({ data, selectedNodeId, onNodeClick, isMobile, getTranslatedTex
               isFaded={isFaded}
               onClick={() => handleNodeClick(node.id)}
               getTranslatedText={getTranslatedText}
+              selectedNodeId={selectedNodeId}
+              theme={theme}
             />
           );
         }
@@ -388,15 +405,6 @@ function Scene3D({ data, selectedNodeId, onNodeClick, isMobile, getTranslatedTex
         }}
       />
 
-      {/* Invisible plane for background clicks */}
-      <mesh 
-        position={[0, 0, -10]}
-        onClick={handleBackgroundClick}
-        visible={false}
-      >
-        <planeGeometry args={[200, 200]} />
-        <meshBasicMaterial transparent opacity={0} />
-      </mesh>
 
       {/* Fog for depth */}
       <fog attach="fog" args={['#1a1a2e', 20, 100]} />
@@ -410,6 +418,15 @@ export function SoulNet3D({ timeRange, insightsData, userId, onTimeRangeChange }
   const [isFullscreen, setIsFullscreen] = useState(false);
   const mobileDetection = useIsMobile();
   const isMobile = mobileDetection.isMobile;
+  
+  // Defensive theme access with fallback
+  let theme = 'dark';
+  try {
+    const themeContext = useTheme();
+    theme = themeContext.theme;
+  } catch (error) {
+    console.warn('SoulNet3D: ThemeProvider not ready, using default theme');
+  }
 
   // Extract unique labels for translation
   const uniqueLabels = useMemo(() => {
@@ -441,118 +458,112 @@ export function SoulNet3D({ timeRange, insightsData, userId, onTimeRangeChange }
     // Filter entries based on timeRange - use entries instead of allEntries for time filtering
     const filteredEntries = insightsData?.entries || insightsData?.allEntries || [];
 
-    const themeEmotionMap = new Map<string, Map<string, { count: number; totalIntensity: number }>>();
-    const themeIntensities = new Map<string, number>();
-    const emotionIntensities = new Map<string, number>();
+    const nodes: SoulNet3DNode[] = [];
+    const links: SoulNet3DLink[] = [];
+
+    // Step 1: Collect all themes and emotions with their intensities
+    const themeMap = new Map<string, { totalIntensity: number; count: number }>();
+    const emotionMap = new Map<string, { totalIntensity: number; count: number }>();
+    const themeEmotionConnections = new Map<string, Map<string, { intensity: number; count: number }>>();
 
     // Process themeemotion data using filtered entries
     filteredEntries.forEach((entry: any) => {
       if (entry.themeemotion && typeof entry.themeemotion === 'object') {
         Object.entries(entry.themeemotion).forEach(([theme, emotions]: [string, any]) => {
-          if (!themeEmotionMap.has(theme)) {
-            themeEmotionMap.set(theme, new Map());
+          
+          // Update theme intensity
+          if (!themeMap.has(theme)) {
+            themeMap.set(theme, { totalIntensity: 0, count: 0 });
           }
           
-          const themeMap = themeEmotionMap.get(theme)!;
-          let themeTotal = 0;
-
           if (emotions && typeof emotions === 'object') {
             Object.entries(emotions).forEach(([emotion, intensity]: [string, any]) => {
               const intensityValue = typeof intensity === 'number' ? intensity : 0;
               
-              if (!themeMap.has(emotion)) {
-                themeMap.set(emotion, { count: 0, totalIntensity: 0 });
+              // Update global emotion intensity
+              if (!emotionMap.has(emotion)) {
+                emotionMap.set(emotion, { totalIntensity: 0, count: 0 });
               }
-              
-              const emotionData = themeMap.get(emotion)!;
-              emotionData.count += 1;
+              const emotionData = emotionMap.get(emotion)!;
               emotionData.totalIntensity += intensityValue;
+              emotionData.count += 1;
               
-              themeTotal += intensityValue;
+              // Update theme intensity
+              const themeData = themeMap.get(theme)!;
+              themeData.totalIntensity += intensityValue;
+              themeData.count += 1;
               
-              // Update emotion intensity
-              emotionIntensities.set(emotion, (emotionIntensities.get(emotion) || 0) + intensityValue);
+              // Track theme-emotion connections
+              if (!themeEmotionConnections.has(theme)) {
+                themeEmotionConnections.set(theme, new Map());
+              }
+              const themeConnections = themeEmotionConnections.get(theme)!;
+              if (!themeConnections.has(emotion)) {
+                themeConnections.set(emotion, { intensity: 0, count: 0 });
+              }
+              const connectionData = themeConnections.get(emotion)!;
+              connectionData.intensity += intensityValue;
+              connectionData.count += 1;
             });
           }
-
-          // Update theme intensity
-          themeIntensities.set(theme, (themeIntensities.get(theme) || 0) + themeTotal);
         });
       }
     });
 
-    // Create nodes and calculate positions
-    const nodes: SoulNet3DNode[] = [];
-    const links: SoulNet3DLink[] = [];
-    
-    // Generate theme nodes with new Y positioning pattern
-    const themes = Array.from(themeEmotionMap.keys());
-    const themeYPattern = [-2, 2, -1, 1]; // Repeating pattern
-    
+    // Step 2: Create unique theme nodes (inner circle)
+    const themes = Array.from(themeMap.keys());
+    const themeZPattern = [-1, 1, -2, 2]; // Z-plane pattern for themes
     themes.forEach((theme, index) => {
-      const angle = (index / themes.length) * Math.PI * 2;
-      const radius = 6;
-      const yPosition = themeYPattern[index % themeYPattern.length];
+      const angle = (index / themes.length) * 2 * Math.PI;
+      const radius = 4.8; // Themes in inner circle
+      const themeData = themeMap.get(theme)!;
+      const zIndex = themeZPattern[index % themeZPattern.length];
       
       nodes.push({
         id: theme,
-        label: theme,
+        name: theme,
         type: 'theme',
-        intensity: Math.min((themeIntensities.get(theme) || 0) / 10, 1),
-        connections: themeEmotionMap.get(theme)?.size || 0,
+        intensity: Math.min(themeData.totalIntensity / 10, 1),
         position: [
           Math.cos(angle) * radius,
-          yPosition,
+          zIndex,
           Math.sin(angle) * radius
         ]
       });
     });
 
-    // Generate emotion nodes and links with new Y positioning pattern
-    const emotionYPattern = [-5, 5, -6.5, 6.5, -8, 8, -9.5, 9.5]; // Repeating pattern
-    let emotionCounter = 0;
-    
-    themeEmotionMap.forEach((emotions, theme) => {
-      const themeNode = nodes.find(n => n.id === theme);
-      if (!themeNode) return;
+    // Step 3: Create unique emotion nodes (outer circle)
+    const emotions = Array.from(emotionMap.keys());
+    const emotionZPattern = [-3.5, 3.5, -5, 5, -6.5, 6.5, -8, 8]; // Z-plane pattern for emotions
+    emotions.forEach((emotion, index) => {
+      const angle = (index / emotions.length) * 2 * Math.PI;
+      const radius = 7.2; // Emotions in outer circle
+      const emotionData = emotionMap.get(emotion)!;
+      const zIndex = emotionZPattern[index % emotionZPattern.length];
+      
+      nodes.push({
+        id: emotion,
+        name: emotion,
+        type: 'emotion',
+        intensity: Math.min(emotionData.totalIntensity / Math.max(emotionData.count, 1), 1),
+        position: [
+          Math.cos(angle) * radius,
+          zIndex,
+          Math.sin(angle) * radius
+        ]
+      });
+    });
 
-      const emotionArray = Array.from(emotions.entries());
-      const totalThemeIntensity = emotionArray.reduce((sum, [, data]) => sum + data.totalIntensity, 0);
-
-      emotionArray.forEach(([emotion, data], index) => {
-        const emotionId = `${theme}-${emotion}`;
+    // Step 4: Create links from themes to emotions
+    themeEmotionConnections.forEach((emotionConnections, theme) => {
+      emotionConnections.forEach((connectionData, emotion) => {
+        // Calculate link strength based on emotion's intensity for this theme
+        const linkStrength = connectionData.intensity / Math.max(connectionData.count, 1);
         
-        // Calculate percentage for this emotion relative to the theme
-        const percentage = totalThemeIntensity > 0 ? (data.totalIntensity / totalThemeIntensity) * 100 : 0;
-        
-        // Position emotions around their theme
-        const angle = (index / emotionArray.length) * Math.PI * 2;
-        const distance = 2 + data.totalIntensity * 0.5;
-        const yPosition = emotionYPattern[emotionCounter % emotionYPattern.length];
-        emotionCounter++;
-        
-        const emotionNode: SoulNet3DNode = {
-          id: emotionId,
-          label: emotion,
-          type: 'emotion',
-          intensity: Math.min(data.totalIntensity / 5, 1),
-          connections: 1,
-          position: [
-            themeNode.position[0] + Math.cos(angle) * distance,
-            yPosition,
-            themeNode.position[2] + Math.sin(angle) * distance
-          ],
-          percentage
-        };
-
-        nodes.push(emotionNode);
-
-        // Create link
         links.push({
           source: theme,
-          target: emotionId,
-          strength: Math.min(data.totalIntensity / 5, 1),
-          percentage
+          target: emotion,
+          strength: Math.min(linkStrength, 1)
         });
       });
     });
@@ -564,26 +575,63 @@ export function SoulNet3D({ timeRange, insightsData, userId, onTimeRangeChange }
     setSelectedNodeId(nodeId);
     
     if (nodeId) {
-      // Calculate percentages for connected nodes
-      const connectedNodes = processedData.links
-        .filter(link => link.source === nodeId || link.target === nodeId)
-        .map(link => link.source === nodeId ? link.target : link.source);
+      const selectedNode = processedData.nodes.find(n => n.id === nodeId);
       
-      const totalIntensity = processedData.links
-        .filter(link => link.source === nodeId || link.target === nodeId)
-        .reduce((sum, link) => sum + link.strength, 0);
+      if (selectedNode?.type === 'emotion') {
+        // For emotion nodes, calculate percentages for connected themes
+        const connectedThemes = processedData.links
+          .filter(link => link.target === nodeId)
+          .map(link => link.source);
+        
+        const totalConnectionScore = processedData.links
+          .filter(link => link.target === nodeId)
+          .reduce((sum, link) => sum + link.strength, 0);
 
-      // Update node percentages
-      processedData.nodes.forEach(node => {
-        if (connectedNodes.includes(node.id)) {
-          const link = processedData.links.find(l => 
-            (l.source === nodeId && l.target === node.id) || 
-            (l.target === nodeId && l.source === node.id)
-          );
-          if (link && totalIntensity > 0) {
-            node.percentage = (link.strength / totalIntensity) * 100;
+        // Update theme node percentages
+        processedData.nodes.forEach(node => {
+          if (connectedThemes.includes(node.id)) {
+            const link = processedData.links.find(l => 
+              l.target === nodeId && l.source === node.id
+            );
+            if (link && totalConnectionScore > 0) {
+              node.percentage = (link.strength / totalConnectionScore) * 100;
+            }
+          } else {
+            node.percentage = undefined;
           }
-        }
+        });
+        
+        // Clear percentage for the selected emotion node itself
+        selectedNode.percentage = undefined;
+      } else {
+        // For theme nodes, use existing logic
+        const connectedNodes = processedData.links
+          .filter(link => link.source === nodeId || link.target === nodeId)
+          .map(link => link.source === nodeId ? link.target : link.source);
+        
+        const totalIntensity = processedData.links
+          .filter(link => link.source === nodeId || link.target === nodeId)
+          .reduce((sum, link) => sum + link.strength, 0);
+
+        // Update node percentages
+        processedData.nodes.forEach(node => {
+          if (connectedNodes.includes(node.id)) {
+            const link = processedData.links.find(l => 
+              (l.source === nodeId && l.target === node.id) || 
+              (l.target === nodeId && l.source === node.id)
+            );
+            if (link && totalIntensity > 0) {
+              node.percentage = (link.strength / totalIntensity) * 100;
+            }
+          } else {
+            node.percentage = undefined;
+          }
+        });
+      }
+    } else {
+      // Clear all percentages when no node is selected
+      processedData.nodes.forEach(node => {
+        node.percentage = undefined;
       });
     }
   }, [processedData]);
@@ -604,7 +652,7 @@ export function SoulNet3D({ timeRange, insightsData, userId, onTimeRangeChange }
 
   const containerClass = isFullscreen 
     ? "fixed inset-0 z-50 bg-background"
-    : "relative w-full bg-card/50 rounded-lg border overflow-hidden";
+    : "relative w-full bg-card/50 rounded-lg border overflow-hidden px-[10%]";
   
   // Increase height by 30%
   const canvasHeight = isFullscreen 
@@ -620,8 +668,8 @@ export function SoulNet3D({ timeRange, insightsData, userId, onTimeRangeChange }
     >
       {/* Header */}
       <div className="absolute top-4 left-4 right-4 z-10 flex items-center justify-between">
-        <h3 className="text-lg font-semibold text-foreground">
-          <TranslatableText text="Soul Network - 3D Visualization" />
+        <h3 className="text-lg font-semibold">
+          <TranslatableText text="Soul-Net" />
         </h3>
         <Button
           variant="ghost"
@@ -633,29 +681,12 @@ export function SoulNet3D({ timeRange, insightsData, userId, onTimeRangeChange }
         </Button>
       </div>
 
-      {/* Mobile Instructions - Always visible on mobile */}
-      {isMobile && (
-        <div className="absolute bottom-4 left-4 right-4 z-10">
-          <div className="bg-background/80 backdrop-blur-sm rounded-lg p-3 text-sm text-muted-foreground text-center">
-            <TranslatableText text="Tap themes (spheres) or emotions (cubes) to explore. Touch to rotate, pinch to zoom. Tap background to deselect." />
-          </div>
-        </div>
-      )}
-
-      {/* Desktop Instructions - Only when no node selected */}
-      {!isMobile && selectedNodeId === null && (
-        <div className="absolute bottom-4 left-4 right-4 z-10">
-          <div className="bg-background/80 backdrop-blur-sm rounded-lg p-3 text-sm text-muted-foreground text-center">
-            <TranslatableText text="Click on themes (spheres) or emotions (cubes) to explore connections. Use mouse to rotate, zoom, and pan. Click background to deselect." />
-          </div>
-        </div>
-      )}
-
       {/* 3D Canvas - Only render when translations are complete */}
       {translationsComplete ? (
         <Canvas
           style={{ height: canvasHeight }}
-          camera={{ position: [0, 0, 40], fov: 75 }}
+          camera={{ position: [0, -30.8, 0], fov: 75, up: [0, 0, 1] }}
+          onPointerMissed={() => setSelectedNodeId(null)}
           gl={{ 
             antialias: true, 
             alpha: true,
@@ -668,6 +699,7 @@ export function SoulNet3D({ timeRange, insightsData, userId, onTimeRangeChange }
             onNodeClick={handleNodeClick}
             isMobile={isMobile}
             getTranslatedText={getTranslatedText}
+            theme={theme}
           />
         </Canvas>
       ) : (
@@ -689,7 +721,7 @@ export function SoulNet3D({ timeRange, insightsData, userId, onTimeRangeChange }
           >
             <div className="text-sm">
               <div className="font-semibold">
-                {getTranslatedText(processedData.nodes.find(n => n.id === selectedNodeId)?.label || "")}
+                {getTranslatedText(processedData.nodes.find(n => n.id === selectedNodeId)?.name || "")}
               </div>
             </div>
           </motion.div>
