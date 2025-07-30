@@ -34,8 +34,6 @@ import { TranslatableText } from '@/components/translation/TranslatableText';
 import { useTranslation } from '@/contexts/TranslationContext';
 import { useTutorial } from '@/contexts/TutorialContext';
 import { DeleteAllEntriesSection } from '@/components/settings/DeleteAllEntriesSection';
-import { UserDebugInfo } from '@/components/settings/UserDebugInfo';
-import { ProfilePictureUpload } from '@/components/settings/ProfilePictureUpload';
 
 
 interface SettingItemProps {
@@ -655,7 +653,7 @@ function SettingsContent() {
                     </AvatarFallback>
                   </Avatar>
                   
-                  <ProfilePictureUpload />
+                  
                 </div>
                 
                 <div className="flex-1 space-y-4 text-center sm:text-left">
@@ -906,40 +904,6 @@ function SettingsContent() {
                     </div>
                   </div>
                   
-                  {notificationPermissionState === 'granted' && (
-                    <div className="mt-2 flex gap-2">
-                      <Button 
-                        variant="outline" 
-                        size="sm"
-                        onClick={handleTestNotification}
-                      >
-                        <TranslatableText text="Test Notification" />
-                      </Button>
-                      <Button 
-                        variant="outline" 
-                        size="sm"
-                        onClick={async () => {
-                          // Run background diagnostics instead of showing debug UI
-                          const newDebugInfo = await enhancedNotificationService.getPermissionInfo();
-                          const diagnostics = {
-                            localTime: new Date().toLocaleString(),
-                            timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-                            utcOffset: new Date().getTimezoneOffset(),
-                            scheduledNotifications: newDebugInfo.nativeStatus?.scheduled || [],
-                            timestamp: Date.now()
-                          };
-                          setBackgroundDiagnostics(diagnostics);
-                          console.log('[Settings] Background diagnostics completed:', diagnostics);
-                          
-                          // Show a brief toast instead of debug modal
-                          toast.success("Diagnostics completed - check console for details");
-                        }}
-                      >
-                        <TranslatableText text="Debug Info" />
-                      </Button>
-                      <UserDebugInfo />
-                    </div>
-                  )}
                 </div>
                 
                 {notificationsEnabled && (
