@@ -501,12 +501,14 @@ export function SoulNet3D({ timeRange, insightsData, userId, onTimeRangeChange }
       }
     });
 
-    // Step 2: Create unique theme nodes (outer circle)
+    // Step 2: Create unique theme nodes (inner circle)
     const themes = Array.from(themeMap.keys());
+    const themeZPattern = [-1, 1, -2, 2]; // Z-plane pattern for themes
     themes.forEach((theme, index) => {
       const angle = (index / themes.length) * 2 * Math.PI;
-      const radius = 18; // Themes in outer circle
+      const radius = 12; // Themes in inner circle
       const themeData = themeMap.get(theme)!;
+      const zIndex = themeZPattern[index % themeZPattern.length];
       
       nodes.push({
         id: theme,
@@ -516,17 +518,19 @@ export function SoulNet3D({ timeRange, insightsData, userId, onTimeRangeChange }
         position: [
           Math.cos(angle) * radius,
           Math.sin(angle) * radius,
-          0 // Themes at z=0
+          zIndex
         ]
       });
     });
 
-    // Step 3: Create unique emotion nodes (inner circle)
+    // Step 3: Create unique emotion nodes (outer circle)
     const emotions = Array.from(emotionMap.keys());
+    const emotionZPattern = [-3.5, 3.5, -5, 5, -6.5, 6.5, -8, 8]; // Z-plane pattern for emotions
     emotions.forEach((emotion, index) => {
       const angle = (index / emotions.length) * 2 * Math.PI;
-      const radius = 10; // Emotions in inner circle
+      const radius = 20; // Emotions in outer circle
       const emotionData = emotionMap.get(emotion)!;
+      const zIndex = emotionZPattern[index % emotionZPattern.length];
       
       nodes.push({
         id: emotion,
@@ -536,7 +540,7 @@ export function SoulNet3D({ timeRange, insightsData, userId, onTimeRangeChange }
         position: [
           Math.cos(angle) * radius,
           Math.sin(angle) * radius,
-          -3 // Emotions slightly behind themes
+          zIndex
         ]
       });
     });
