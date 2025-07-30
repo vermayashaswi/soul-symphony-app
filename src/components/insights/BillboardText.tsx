@@ -2,6 +2,7 @@ import React, { useRef, useMemo } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';
 import { Text } from '@react-three/drei';
 import * as THREE from 'three';
+import { simplifiedFontService } from '@/services/simplifiedFontService';
 
 interface BillboardTextProps {
   children: string;
@@ -31,6 +32,9 @@ export const BillboardText: React.FC<BillboardTextProps> = ({
   
   // Memoize the position as a Vector3 for performance
   const positionVector = useMemo(() => new THREE.Vector3(...position), [position]);
+  
+  // Get font URL from font service
+  const fontUrl = useMemo(() => simplifiedFontService.getFontUrl(children), [children]);
   
   // Track last update to limit frequency
   const lastUpdateRef = useRef(0);
@@ -76,12 +80,16 @@ export const BillboardText: React.FC<BillboardTextProps> = ({
   return (
     <group ref={meshRef} position={positionVector}>
       <Text
+        font={fontUrl}
         fontSize={fontSize}
         color={color}
         maxWidth={maxWidth}
         textAlign={textAlign}
         anchorX={anchorX}
         anchorY={anchorY}
+        onError={(error) => {
+          console.error('Font loading error:', error);
+        }}
         {...props}
       >
         {children}
