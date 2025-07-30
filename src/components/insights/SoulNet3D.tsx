@@ -104,7 +104,7 @@ function ThemeNode({
       {(!selectedNodeId || isSelected || isConnected) && (
         <BillboardText
           position={[0, 0, -1]}
-          fontSize={0.375}
+          fontSize={0.5625}
           color={theme === 'light' ? '#000000' : '#ffffff'}
           anchorX="center"
           anchorY="middle"
@@ -119,7 +119,7 @@ function ThemeNode({
       {(isSelected || isConnected) && node.percentage && (
         <BillboardText
           position={[0, 0, -1.5]}
-          fontSize={0.3125}
+          fontSize={0.46875}
           color="#ffd93d"
           anchorX="center"
           anchorY="middle"
@@ -198,7 +198,7 @@ function EmotionNode({
       {(!selectedNodeId || isSelected || isConnected) && (
         <BillboardText
           position={[0, 0, -0.7]}
-          fontSize={0.375}
+          fontSize={0.5625}
           color={theme === 'light' ? '#000000' : '#ffffff'}
           anchorX="center"
           anchorY="middle"
@@ -213,7 +213,7 @@ function EmotionNode({
       {(isSelected || isConnected) && node.percentage && (
         <BillboardText
           position={[0, 0, -1.05]}
-          fontSize={0.3125}
+          fontSize={0.46875}
           color="#ffd93d"
           anchorX="center"
           anchorY="middle"
