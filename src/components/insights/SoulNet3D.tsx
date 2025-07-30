@@ -10,6 +10,7 @@ import { useIsMobile } from '../../hooks/use-mobile';
 import { useR3FBulkTranslation } from '../../hooks/useR3FBulkTranslation';
 import { useTheme } from '@/hooks/use-theme';
 import { BillboardText } from './BillboardText';
+import { preloadCritical3DFonts } from '../../utils/imagePreloader';
 
 // Types
 interface SoulNet3DNode {
@@ -416,8 +417,16 @@ function Scene3D({ data, selectedNodeId, onNodeClick, isMobile, getTranslatedTex
 export function SoulNet3D({ timeRange, insightsData, userId, onTimeRangeChange }: SoulNet3DProps) {
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [fontsLoaded, setFontsLoaded] = useState(false);
   const mobileDetection = useIsMobile();
   const isMobile = mobileDetection.isMobile;
+
+  // Preload 3D fonts on component mount
+  useEffect(() => {
+    preloadCritical3DFonts().finally(() => {
+      setFontsLoaded(true);
+    });
+  }, []);
   
   // Defensive theme access with fallback
   let theme = 'dark';
@@ -681,8 +690,8 @@ export function SoulNet3D({ timeRange, insightsData, userId, onTimeRangeChange }
         </Button>
       </div>
 
-      {/* 3D Canvas - Only render when translations are complete */}
-      {translationsComplete ? (
+      {/* 3D Canvas - Only render when translations and fonts are ready */}
+      {translationsComplete && fontsLoaded ? (
         <Canvas
           style={{ height: canvasHeight }}
           camera={{ position: [0, -30.8, 0], fov: 75, up: [0, 0, 1] }}
