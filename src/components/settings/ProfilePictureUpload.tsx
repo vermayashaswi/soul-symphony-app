@@ -122,6 +122,9 @@ export function ProfilePictureUpload() {
         // Release the object URL to free memory
         URL.revokeObjectURL(selectedImage);
         setSelectedImage(null);
+        
+        // Force page refresh to show new avatar immediately
+        window.location.reload();
       } else {
         toast.error('Failed to update profile');
       }
