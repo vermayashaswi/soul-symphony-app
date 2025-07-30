@@ -8,7 +8,6 @@ import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
-import { Slider } from "@/components/ui/slider";
 
 export function ProfilePictureUpload() {
   const { user, updateUserProfile } = useAuth();
@@ -147,10 +146,6 @@ export function ProfilePictureUpload() {
     }
   };
 
-  // Handle zoom changes from the slider
-  const handleZoomChange = (value: number[]) => {
-    setZoom(value[0]);
-  };
 
   // Improved touch and mouse event handlers for image manipulation
   useEffect(() => {
@@ -265,13 +260,6 @@ export function ProfilePictureUpload() {
 
   return (
     <div className="flex flex-col items-center">
-      <Avatar className="h-24 w-24 mb-4 relative">
-        <AvatarImage src={avatarUrl} />
-        <AvatarFallback>
-          {user?.email?.substring(0, 2).toUpperCase() || "U"}
-        </AvatarFallback>
-      </Avatar>
-      
       <div className="relative">
         <Button 
           variant="outline" 
@@ -301,7 +289,7 @@ export function ProfilePictureUpload() {
           <DialogHeader>
             <DialogTitle>Adjust Your Profile Picture</DialogTitle>
             <DialogDescription>
-              Drag to position and use the slider to zoom your profile picture.
+              Drag to position and pinch to zoom your profile picture.
             </DialogDescription>
           </DialogHeader>
           
@@ -327,21 +315,6 @@ export function ProfilePictureUpload() {
                   />
                 </div>
               )}
-            </div>
-            
-            <div className="w-full space-y-2">
-              <div className="flex items-center justify-between">
-                <span className="text-sm text-muted-foreground">Zoom</span>
-                <span className="text-sm text-muted-foreground">{(zoom * 100).toFixed(0)}%</span>
-              </div>
-              <Slider 
-                defaultValue={[1]} 
-                min={0.5} 
-                max={3} 
-                step={0.1} 
-                value={[zoom]}
-                onValueChange={handleZoomChange}
-              />
             </div>
             
             <p className="text-sm text-muted-foreground text-center">
