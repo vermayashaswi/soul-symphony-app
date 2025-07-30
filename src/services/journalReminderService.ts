@@ -140,27 +140,32 @@ class JournalReminderService {
 
   private async setupNativeReminders(times: JournalReminderTime[]): Promise<void> {
     try {
-      this.log('Setting up native reminders');
+      this.log('Setting up native reminders with daily recurrence');
       
       // Cancel existing notifications
       await LocalNotifications.cancel({ notifications: [] });
 
-      // Schedule new notifications
+      // Schedule recurring daily notifications
       const notifications = times.map((time, index) => {
-        const scheduledDate = this.getNextReminderTime(time);
+        const { hour, minute } = this.TIME_MAPPINGS[time];
         
         return {
           id: index + 1,
           title: this.getNotificationTitle(time),
           body: this.getNotificationBody(time),
           schedule: {
-            at: scheduledDate
+            at: new Date(Date.now() + 5000), // First notification in 5 seconds for immediate test
+            every: 'day' as const,
+            on: {
+              hour,
+              minute
+            }
           },
           sound: 'default',
           actionTypeId: 'JOURNAL_REMINDER',
           extra: {
             time,
-            scheduledFor: scheduledDate.toISOString(),
+            scheduledDaily: true,
             action: 'open_journal'
           }
         };
@@ -168,8 +173,12 @@ class JournalReminderService {
 
       await LocalNotifications.schedule({ notifications });
       
+      // Verify notifications were scheduled
+      const pending = await LocalNotifications.getPending();
+      this.log(`Scheduled ${notifications.length} notifications, verified ${pending.notifications.length} pending`);
+      
       // Track reminders
-      times.forEach(time => {
+      times.forEach((time, index) => {
         this.activeReminders.push({
           id: `native-${time}`,
           time,
@@ -178,10 +187,12 @@ class JournalReminderService {
         });
       });
       
-      // Set up automatic rescheduling for the next day
-      this.setupNativeRescheduling(times);
+      // Verify scheduling was successful
+      if (pending.notifications.length !== notifications.length) {
+        throw new Error(`Notification scheduling verification failed: expected ${notifications.length}, got ${pending.notifications.length}`);
+      }
       
-      this.log(`Scheduled ${notifications.length} native reminders`);
+      this.log(`Successfully scheduled ${notifications.length} native recurring reminders`);
       
     } catch (error) {
       this.error('Error setting up native reminders:', error);
@@ -190,51 +201,41 @@ class JournalReminderService {
     }
   }
 
-  private setupNativeRescheduling(times: JournalReminderTime[]): void {
-    this.log('Setting up native rescheduling for next day');
-    
-    // Schedule reminders for the next day using web timeouts
-    times.forEach(time => {
-      const todayTarget = this.getNextReminderTime(time);
-      const tomorrowTarget = new Date(todayTarget);
-      tomorrowTarget.setDate(tomorrowTarget.getDate() + 1);
+  // Native notifications now use daily recurrence, no manual rescheduling needed
+  private async verifyNativeNotifications(times: JournalReminderTime[]): Promise<boolean> {
+    try {
+      const pending = await LocalNotifications.getPending();
+      this.log(`Verifying native notifications: ${pending.notifications.length} pending`);
       
-      const timeoutMs = tomorrowTarget.getTime() - Date.now();
+      // Check that we have the expected number of notifications
+      if (pending.notifications.length !== times.length) {
+        this.error(`Native notification count mismatch: expected ${times.length}, got ${pending.notifications.length}`);
+        return false;
+      }
       
-      const timeoutId = window.setTimeout(async () => {
-        this.log(`Rescheduling native reminder for ${time}`);
+      // Verify each notification has the correct configuration
+      for (let i = 0; i < times.length; i++) {
+        const time = times[i];
+        const notification = pending.notifications.find(n => n.extra?.time === time);
         
-        try {
-          // Schedule the notification for tomorrow
-          const scheduledDate = this.getNextReminderTime(time);
-          await LocalNotifications.schedule({
-            notifications: [{
-              id: times.indexOf(time) + 1,
-              title: this.getNotificationTitle(time),
-              body: this.getNotificationBody(time),
-              schedule: {
-                at: scheduledDate
-              },
-              sound: 'default',
-              actionTypeId: 'JOURNAL_REMINDER',
-              extra: {
-                time,
-                scheduledFor: scheduledDate.toISOString(),
-                action: 'open_journal'
-              }
-            }]
-          });
-          
-          // Reschedule for the day after that
-          this.setupNativeRescheduling([time]);
-          
-        } catch (error) {
-          this.error(`Error rescheduling native reminder for ${time}:`, error);
+        if (!notification) {
+          this.error(`Missing native notification for time: ${time}`);
+          return false;
         }
-      }, timeoutMs);
+        
+        if (!notification.extra?.scheduledDaily) {
+          this.error(`Native notification for ${time} not configured for daily recurrence`);
+          return false;
+        }
+      }
       
-      this.log(`Set up rescheduling timeout for ${time} in ${Math.round(timeoutMs / 1000 / 60 / 60)} hours`);
-    });
+      this.log('All native notifications verified successfully');
+      return true;
+      
+    } catch (error) {
+      this.error('Error verifying native notifications:', error);
+      return false;
+    }
   }
 
   private async setupServiceWorkerReminders(times: JournalReminderTime[]): Promise<void> {
@@ -400,8 +401,19 @@ class JournalReminderService {
     // Clear native reminders if running natively
     if (enhancedPlatformService.canUseNativeNotifications()) {
       try {
+        // Get pending notifications first for logging
+        const pending = await LocalNotifications.getPending();
+        this.log(`Cancelling ${pending.notifications.length} native notifications`);
+        
         await LocalNotifications.cancel({ notifications: [] });
-        this.log('Cancelled all native reminders');
+        
+        // Verify cancellation
+        const afterCancel = await LocalNotifications.getPending();
+        if (afterCancel.notifications.length > 0) {
+          this.error(`Failed to cancel all notifications: ${afterCancel.notifications.length} still pending`);
+        } else {
+          this.log('Successfully cancelled all native reminders');
+        }
       } catch (error) {
         this.error('Error cancelling native reminders:', error);
       }
@@ -430,6 +442,42 @@ class JournalReminderService {
     }
     
     return { enabled, times };
+  }
+
+  // Debug method to get current notification status
+  async getNotificationStatus(): Promise<{
+    settings: JournalReminderSettings;
+    activeReminders: number;
+    pendingNativeNotifications: number;
+    permissionState: string;
+    strategy: string;
+    isNativeSupported: boolean;
+  }> {
+    await this.ensureInitialized();
+    
+    const settings = this.getSettings();
+    const permissionState = await enhancedNotificationService.checkPermissionStatus();
+    const strategy = enhancedPlatformService.getBestNotificationStrategy();
+    const isNativeSupported = enhancedPlatformService.canUseNativeNotifications();
+    
+    let pendingNativeNotifications = 0;
+    if (isNativeSupported) {
+      try {
+        const pending = await LocalNotifications.getPending();
+        pendingNativeNotifications = pending.notifications.length;
+      } catch (error) {
+        this.error('Error getting pending notifications:', error);
+      }
+    }
+    
+    return {
+      settings,
+      activeReminders: this.activeReminders.length,
+      pendingNativeNotifications,
+      permissionState,
+      strategy,
+      isNativeSupported
+    };
   }
 
   async testReminder(): Promise<boolean> {
@@ -465,17 +513,37 @@ class JournalReminderService {
 
   private async testNativeReminder(): Promise<boolean> {
     try {
+      // Schedule a test notification for 3 seconds from now
       await LocalNotifications.schedule({
         notifications: [{
           id: 999,
           title: 'Test Journal Reminder 🧪',
           body: 'This is a test reminder. Your journal reminders are working!',
-          schedule: { at: new Date(Date.now() + 2000) }, // 2 seconds from now
+          schedule: { at: new Date(Date.now() + 3000) }, // 3 seconds from now
           extra: { test: true }
         }]
       });
 
-      this.log('Native test reminder scheduled');
+      // Verify it was scheduled
+      const pending = await LocalNotifications.getPending();
+      const testNotification = pending.notifications.find(n => n.id === 999);
+      
+      if (!testNotification) {
+        throw new Error('Test notification was not found in pending notifications');
+      }
+
+      this.log('Native test reminder scheduled and verified');
+      
+      // Clean up test notification after 10 seconds
+      setTimeout(async () => {
+        try {
+          await LocalNotifications.cancel({ notifications: [{ id: 999 }] });
+          this.log('Test notification cleaned up');
+        } catch (error) {
+          this.error('Error cleaning up test notification:', error);
+        }
+      }, 10000);
+      
       return true;
     } catch (error) {
       this.error('Error with native test reminder:', error);
@@ -550,13 +618,46 @@ class JournalReminderService {
       return;
     }
 
-    // Verify active reminders are still scheduled correctly
-    if (this.activeReminders.length !== settings.times.length) {
-      this.log('Reminder count mismatch detected, reinitializing', {
-        expected: settings.times.length,
-        active: this.activeReminders.length
-      });
-      await this.setupReminders(settings.times);
+    // For native notifications, check system-level pending notifications
+    if (enhancedPlatformService.canUseNativeNotifications()) {
+      try {
+        const pending = await LocalNotifications.getPending();
+        const expectedCount = settings.times.length;
+        
+        if (pending.notifications.length !== expectedCount) {
+          this.log(`Native notification health check failed: expected ${expectedCount}, found ${pending.notifications.length}. Reinitializing.`);
+          await this.setupReminders(settings.times);
+          return;
+        }
+        
+        // Verify each expected notification exists
+        for (const time of settings.times) {
+          const notification = pending.notifications.find(n => n.extra?.time === time);
+          if (!notification) {
+            this.log(`Missing native notification for ${time}. Reinitializing.`);
+            await this.setupReminders(settings.times);
+            return;
+          }
+        }
+        
+        this.log('Native notification health check passed', {
+          pendingNotifications: pending.notifications.length,
+          expectedReminders: settings.times.length
+        });
+        
+      } catch (error) {
+        this.error('Error during native notification health check:', error);
+        await this.setupReminders(settings.times);
+      }
+    } else {
+      // For non-native reminders, verify active reminders count
+      if (this.activeReminders.length !== settings.times.length) {
+        this.log('Reminder count mismatch detected, reinitializing', {
+          expected: settings.times.length,
+          active: this.activeReminders.length
+        });
+        await this.setupReminders(settings.times);
+      }
     }
 
     this.log('Health check passed', {
@@ -574,6 +675,14 @@ class JournalReminderService {
       return false;
     }
     
+    // For native notifications, verify with the system
+    if (enhancedPlatformService.canUseNativeNotifications()) {
+      const nativeVerified = await this.verifyNativeNotifications(times);
+      if (!nativeVerified) {
+        return false;
+      }
+    }
+    
     // Verify each reminder is properly scheduled
     for (const time of times) {
       const reminder = this.activeReminders.find(r => r.time === time);
@@ -582,8 +691,8 @@ class JournalReminderService {
         return false;
       }
       
-      // Check if the scheduled time is in the future
-      if (reminder.scheduledFor.getTime() <= Date.now()) {
+      // For non-native reminders, check if the scheduled time is in the future
+      if (reminder.strategy !== 'native' && reminder.scheduledFor.getTime() <= Date.now()) {
         this.error(`Reminder for ${time} scheduled in the past: ${reminder.scheduledFor.toLocaleString()}`);
         return false;
       }

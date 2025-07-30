@@ -19,6 +19,7 @@ const JournalRemindersSettings: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [permissionStatus, setPermissionStatus] = useState<'granted' | 'denied' | 'default' | 'unsupported'>('default');
   const [isNative, setIsNative] = useState(false);
+  const [debugInfo, setDebugInfo] = useState<string | null>(null);
 
   useEffect(() => {
     loadSettings();
@@ -129,6 +130,31 @@ const JournalRemindersSettings: React.FC = () => {
     }
   };
 
+  const handleDebugCheck = async () => {
+    try {
+      const status = await journalReminderService.getNotificationStatus();
+      setDebugInfo(JSON.stringify(status, null, 2));
+    } catch (error) {
+      setDebugInfo(`Error getting status: ${error.message}`);
+    }
+  };
+
+  const handleTestNotification = async () => {
+    try {
+      const success = await journalReminderService.testReminder();
+      if (success) {
+        setDebugInfo('Test notification scheduled successfully');
+        toast.success('Test notification sent!');
+      } else {
+        setDebugInfo('Test notification failed');
+        toast.error('Test notification failed');
+      }
+    } catch (error) {
+      setDebugInfo(`Test notification error: ${error.message}`);
+      toast.error('Test notification error');
+    }
+  };
+
   const getPermissionBadge = () => {
     switch (permissionStatus) {
       case 'granted':
@@ -222,6 +248,24 @@ const JournalRemindersSettings: React.FC = () => {
             </ul>
           </div>
         )}
+
+        {/* Debug Section */}
+        <div className="space-y-4 border-t pt-4">
+          <div className="flex gap-2">
+            <Button onClick={handleDebugCheck} variant="outline" size="sm">
+              Check Status
+            </Button>
+            <Button onClick={handleTestNotification} variant="outline" size="sm">
+              Test Notification
+            </Button>
+          </div>
+          
+          {debugInfo && (
+            <div className="text-xs bg-muted p-3 rounded-md overflow-auto max-h-40">
+              <pre className="whitespace-pre-wrap">{debugInfo}</pre>
+            </div>
+          )}
+        </div>
       </CardContent>
     </Card>
   );
