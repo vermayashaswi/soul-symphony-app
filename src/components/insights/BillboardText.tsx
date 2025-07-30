@@ -35,23 +35,34 @@ export const BillboardText: React.FC<BillboardTextProps> = ({
   // Memoize the position as a Vector3 for performance
   const positionVector = useMemo(() => new THREE.Vector3(...position), [position]);
   
-  // Load appropriate font based on text content
+  // Load appropriate font based on text content with timeout
   useEffect(() => {
+    setIsLoading(true);
+    
+    // Set timeout to force rendering even if font fails
+    const fontTimeout = setTimeout(() => {
+      console.warn('BillboardText: Font loading timeout for text:', children);
+      setFontUrl(null); // Use default font
+      setIsLoading(false);
+    }, 1500); // 1.5 second timeout
+
     const loadFont = async () => {
       try {
-        setIsLoading(true);
         const url = simplifiedFontService.getFontUrl(children);
         setFontUrl(url);
+        clearTimeout(fontTimeout);
+        setIsLoading(false);
       } catch (error) {
-        console.error('Error loading font for text:', children, error);
-        // Fallback to default font
-        setFontUrl(null);
-      } finally {
+        console.warn('BillboardText: Error loading font for text:', children, error);
+        clearTimeout(fontTimeout);
+        setFontUrl(null); // Use default font
         setIsLoading(false);
       }
     };
 
     loadFont();
+
+    return () => clearTimeout(fontTimeout);
   }, [children]);
   
   // Track last update to limit frequency
