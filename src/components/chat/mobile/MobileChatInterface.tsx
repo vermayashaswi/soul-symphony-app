@@ -18,7 +18,7 @@ import { analyzeQueryTypes } from "@/utils/chat/queryAnalyzer";
 import { processChatMessage } from "@/services/chatService";
 import { MentalHealthInsights } from "@/hooks/use-mental-health-insights";
 import { useChatRealtime } from "@/hooks/use-chat-realtime";
-import { updateThreadProcessingStatus } from "@/utils/chat/threadUtils";
+import { updateThreadProcessingStatus, generateThreadTitle } from "@/utils/chat/threadUtils";
 import { useKeyboardDetection } from "@/hooks/use-keyboard-detection";
 import {
   AlertDialog,
@@ -277,6 +277,23 @@ export default function MobileChatInterface({
       
       const savedUserMessage = await saveMessage(currentThreadId, message, 'user', user.id);
       
+      // Generate title for the first message in a thread
+      if (isFirstMessage && savedUserMessage) {
+        try {
+          const generatedTitle = await generateThreadTitle(currentThreadId, user.id);
+          if (generatedTitle) {
+            // Dispatch event to update sidebar
+            window.dispatchEvent(
+              new CustomEvent('threadTitleUpdated', {
+                detail: { threadId: currentThreadId, title: generatedTitle }
+              })
+            );
+          }
+        } catch (titleError) {
+          console.warn('Failed to generate thread title:', titleError);
+        }
+      }
+      
       window.dispatchEvent(
         new CustomEvent('messageCreated', { 
           detail: { 
@@ -316,19 +333,7 @@ export default function MobileChatInterface({
         response.hasNumericResult || false
       );
       
-      if (messages.length === 0) {
-        const truncatedTitle = message.length > 30 
-          ? message.substring(0, 30) + "..." 
-          : message;
-          
-        await supabase
-          .from('chat_threads')
-          .update({ 
-            title: truncatedTitle,
-            updated_at: new Date().toISOString()
-          })
-          .eq('id', currentThreadId);
-      }
+      // Note: Title generation is now handled automatically after first message is saved
       
       await supabase
         .from('chat_threads')

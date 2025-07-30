@@ -25,7 +25,7 @@ import DebugPanel from "@/components/debug/DebugPanel";
 import { useToast } from "@/hooks/use-toast";
 import { useTranslation } from "@/contexts/TranslationContext";
 import { useChatRealtime } from "@/hooks/use-chat-realtime";
-import { updateThreadProcessingStatus, createProcessingMessage, updateProcessingMessage } from "@/utils/chat/threadUtils";
+import { updateThreadProcessingStatus, createProcessingMessage, updateProcessingMessage, generateThreadTitle } from "@/utils/chat/threadUtils";
 import { MentalHealthInsights } from "@/hooks/use-mental-health-insights";
 import VoiceRecordingButton from "./VoiceRecordingButton";
 import { ChatMessage } from "@/types/chat";
@@ -241,6 +241,9 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({ mentalHealthIns
       // Update thread processing status to 'processing'
       await updateThreadProcessingStatus(threadId, 'processing');
       
+      // Check if this is the first message in the thread
+      const isFirstMessage = chatHistory.length === 1; // Only the temp message we just added
+      
       // Save the user message
       let savedUserMessage: ChatMessage | null = null;
       try {
@@ -257,6 +260,26 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({ mentalHealthIns
               role: savedUserMessage!.role as 'user' | 'assistant' | 'error'
             } : msg
           ));
+          
+          // Generate title for the first message in a thread
+          if (isFirstMessage) {
+            try {
+              debugLog.addEvent("Title Generation", "Generating thread title after first message", "info");
+              const generatedTitle = await generateThreadTitle(threadId, user.id);
+              if (generatedTitle) {
+                // Dispatch event to update sidebar
+                window.dispatchEvent(
+                  new CustomEvent('threadTitleUpdated', {
+                    detail: { threadId, title: generatedTitle }
+                  })
+                );
+                debugLog.addEvent("Title Generation", `Generated title: ${generatedTitle}`, "success");
+              }
+            } catch (titleError) {
+              debugLog.addEvent("Title Generation", `Failed to generate title: ${titleError instanceof Error ? titleError.message : "Unknown error"}`, "error");
+              console.warn('Failed to generate thread title:', titleError);
+            }
+          }
         } else {
           debugLog.addEvent("Database", "Failed to save user message - null response", "error");
           throw new Error("Failed to save message");
