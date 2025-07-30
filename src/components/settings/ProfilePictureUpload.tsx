@@ -17,6 +17,11 @@ export function ProfilePictureUpload() {
   const [showImageEditor, setShowImageEditor] = useState(false);
   const [position, setPosition] = useState({ x: 0, y: 0 });
   const [zoom, setZoom] = useState(1);
+  
+  // Refs for event handlers to avoid stale closures
+  const positionRef = useRef({ x: 0, y: 0 });
+  const zoomRef = useRef(1);
+  
   const imageRef = useRef<HTMLImageElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -26,6 +31,17 @@ export function ProfilePictureUpload() {
   
   // Get the avatar URL from the user metadata or default to an empty string
   const avatarUrl = user?.user_metadata?.avatar_url || '';
+
+  // Helper function to update both state and refs
+  const updatePosition = (newPosition: { x: number; y: number }) => {
+    positionRef.current = newPosition;
+    setPosition(newPosition);
+  };
+
+  const updateZoom = (newZoom: number) => {
+    zoomRef.current = newZoom;
+    setZoom(newZoom);
+  };
 
   const handleImageSelect = async (event: React.ChangeEvent<HTMLInputElement>) => {
     try {
@@ -40,6 +56,8 @@ export function ProfilePictureUpload() {
       // Reset position and zoom for new image
       setPosition({ x: 0, y: 0 });
       setZoom(1);
+      positionRef.current = { x: 0, y: 0 };
+      zoomRef.current = 1;
     } catch (error: any) {
       console.error('Error selecting image:', error.message);
       toast.error(`Error selecting image: ${error.message}`);
@@ -211,8 +229,8 @@ export function ProfilePictureUpload() {
         // Single touch - move the image
         const touch = e.touches[0];
         startPosRef.current = {
-          x: touch.clientX - position.x,
-          y: touch.clientY - position.y
+          x: touch.clientX - positionRef.current.x,
+          y: touch.clientY - positionRef.current.y
         };
         isDraggingRef.current = true;
       } else if (e.touches.length === 2) {
@@ -233,7 +251,7 @@ export function ProfilePictureUpload() {
         const touch = e.touches[0];
         const newX = touch.clientX - startPosRef.current.x;
         const newY = touch.clientY - startPosRef.current.y;
-        setPosition({ x: newX, y: newY });
+        updatePosition({ x: newX, y: newY });
       } else if (e.touches.length === 2 && lastTouchDistance.current !== null) {
         // Two touches - pinch to zoom
         const dist = Math.hypot(
@@ -243,9 +261,9 @@ export function ProfilePictureUpload() {
         
         const delta = dist - lastTouchDistance.current;
         // Adjust the zoom sensitivity for better control
-        const newZoom = Math.max(0.5, Math.min(3, zoom + delta * 0.01));
+        const newZoom = Math.max(0.5, Math.min(3, zoomRef.current + delta * 0.01));
         
-        setZoom(newZoom);
+        updateZoom(newZoom);
         lastTouchDistance.current = dist;
       }
     };
@@ -263,8 +281,8 @@ export function ProfilePictureUpload() {
       e.preventDefault();
       console.log('Mouse down detected');
       isDraggingRef.current = true;
-      startX = e.clientX - position.x;
-      startY = e.clientY - position.y;
+      startX = e.clientX - positionRef.current.x;
+      startY = e.clientY - positionRef.current.y;
       imageContainer.style.cursor = 'grabbing';
     };
 
@@ -273,7 +291,7 @@ export function ProfilePictureUpload() {
       
       const newX = e.clientX - startX;
       const newY = e.clientY - startY;
-      setPosition({ x: newX, y: newY });
+      updatePosition({ x: newX, y: newY });
     };
 
     const handleMouseUp = () => {
@@ -285,8 +303,8 @@ export function ProfilePictureUpload() {
       e.preventDefault();
       console.log('Wheel event detected');
       const delta = e.deltaY * -0.01;
-      const newZoom = Math.max(0.5, Math.min(3, zoom + delta));
-      setZoom(newZoom);
+      const newZoom = Math.max(0.5, Math.min(3, zoomRef.current + delta));
+      updateZoom(newZoom);
     };
 
     const attachListeners = () => {
