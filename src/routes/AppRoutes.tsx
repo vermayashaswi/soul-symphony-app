@@ -22,7 +22,6 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useOnboarding } from '@/hooks/use-onboarding';
 import { useSessionValidation } from '@/hooks/useSessionValidation';
 import { nativeIntegrationService } from '@/services/nativeIntegrationService';
-import { PageTranslationWrapper } from '@/components/translation/PageTranslationWrapper';
 
 const AppRoutes = () => {
   const { user } = useAuth();
@@ -174,38 +173,16 @@ const AppRoutes = () => {
 
         {/* Protected App Routes */}
         <Route path="/app" element={<ProtectedRoute />}>
-          <Route path="home" element={
-            <PageTranslationWrapper>
-              <Home />
-            </PageTranslationWrapper>
-          } />
-          <Route path="journal" element={
-            <PageTranslationWrapper>
-              <Journal />
-            </PageTranslationWrapper>
-          } />
+          <Route path="home" element={<Home />} />
+          <Route path="journal" element={<Journal />} />
           <Route path="insights" element={
             <React.Suspense fallback={<div className="flex items-center justify-center h-screen">Loading...</div>}>
-              <PageTranslationWrapper>
-                <Insights />
-              </PageTranslationWrapper>
+              <Insights />
             </React.Suspense>
           } />
-          <Route path="chat" element={
-            <PageTranslationWrapper>
-              <Chat />
-            </PageTranslationWrapper>
-          } />
-          <Route path="smart-chat" element={
-            <PageTranslationWrapper>
-              <SmartChat />
-            </PageTranslationWrapper>
-          } />
-          <Route path="settings" element={
-            <PageTranslationWrapper>
-              <Settings />
-            </PageTranslationWrapper>
-          } />
+          <Route path="chat" element={<Chat />} />
+          <Route path="smart-chat" element={<SmartChat />} />
+          <Route path="settings" element={<Settings />} />
         </Route>
 
         {/* Legacy Route Redirects - all app features redirect to /app/ routes */}
