@@ -12,6 +12,7 @@ import { Slider } from "@/components/ui/slider";
 
 export function ProfilePictureUpload() {
   const { user, updateUserProfile } = useAuth();
+  const [uploadError, setUploadError] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const [showImageEditor, setShowImageEditor] = useState(false);
