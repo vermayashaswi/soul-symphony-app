@@ -185,14 +185,27 @@ export function ProfilePictureUpload() {
   };
 
 
-  // Improved touch and mouse event handlers for image manipulation
+  // Setup event listeners for image manipulation - only when editor is shown and image is ready
   useEffect(() => {
     const imageContainer = containerRef.current;
-    if (!imageContainer || !showImageEditor) return;
+    const image = imageRef.current;
+    
+    if (!imageContainer || !showImageEditor || !selectedImage) {
+      console.log('Event listeners not attached:', { 
+        hasContainer: !!imageContainer, 
+        showEditor: showImageEditor, 
+        hasImage: !!selectedImage 
+      });
+      return;
+    }
 
-    // Touch handlers
+    let listenersAttached = false;
+    let cleanupFunction: (() => void) | null = null;
+
+    // Touch handlers - defined at useEffect scope so they're accessible everywhere
     const handleTouchStart = (e: TouchEvent) => {
       e.preventDefault(); // Prevent scrolling
+      console.log('Touch start detected');
       
       if (e.touches.length === 1) {
         // Single touch - move the image
@@ -248,6 +261,7 @@ export function ProfilePictureUpload() {
 
     const handleMouseDown = (e: MouseEvent) => {
       e.preventDefault();
+      console.log('Mouse down detected');
       isDraggingRef.current = true;
       startX = e.clientX - position.x;
       startY = e.clientY - position.y;
@@ -269,32 +283,74 @@ export function ProfilePictureUpload() {
 
     const handleWheel = (e: WheelEvent) => {
       e.preventDefault();
+      console.log('Wheel event detected');
       const delta = e.deltaY * -0.01;
       const newZoom = Math.max(0.5, Math.min(3, zoom + delta));
       setZoom(newZoom);
     };
 
-    // Add event listeners with proper parameters
-    imageContainer.addEventListener('touchstart', handleTouchStart, { passive: false });
-    imageContainer.addEventListener('touchmove', handleTouchMove, { passive: false });
-    imageContainer.addEventListener('touchend', handleTouchEnd);
-    
-    imageContainer.addEventListener('mousedown', handleMouseDown);
-    window.addEventListener('mousemove', handleMouseMove);
-    window.addEventListener('mouseup', handleMouseUp);
-    imageContainer.addEventListener('wheel', handleWheel, { passive: false });
-
-    return () => {
-      imageContainer.removeEventListener('touchstart', handleTouchStart);
-      imageContainer.removeEventListener('touchmove', handleTouchMove);
-      imageContainer.removeEventListener('touchend', handleTouchEnd);
+    const attachListeners = () => {
+      if (listenersAttached) return;
       
-      imageContainer.removeEventListener('mousedown', handleMouseDown);
-      window.removeEventListener('mousemove', handleMouseMove);
-      window.removeEventListener('mouseup', handleMouseUp);
-      imageContainer.removeEventListener('wheel', handleWheel);
+      console.log('Attaching event listeners for image interaction');
+
+      // Add event listeners with proper parameters
+      imageContainer.addEventListener('touchstart', handleTouchStart, { passive: false });
+      imageContainer.addEventListener('touchmove', handleTouchMove, { passive: false });
+      imageContainer.addEventListener('touchend', handleTouchEnd);
+      
+      imageContainer.addEventListener('mousedown', handleMouseDown);
+      window.addEventListener('mousemove', handleMouseMove);
+      window.addEventListener('mouseup', handleMouseUp);
+      imageContainer.addEventListener('wheel', handleWheel, { passive: false });
+
+      listenersAttached = true;
+
+      // Create and store cleanup function
+      cleanupFunction = () => {
+        console.log('Cleaning up event listeners');
+        imageContainer.removeEventListener('touchstart', handleTouchStart);
+        imageContainer.removeEventListener('touchmove', handleTouchMove);
+        imageContainer.removeEventListener('touchend', handleTouchEnd);
+        
+        imageContainer.removeEventListener('mousedown', handleMouseDown);
+        window.removeEventListener('mousemove', handleMouseMove);
+        window.removeEventListener('mouseup', handleMouseUp);
+        imageContainer.removeEventListener('wheel', handleWheel);
+        
+        listenersAttached = false;
+      };
     };
-  }, [position, zoom, showImageEditor]);
+
+    // If image is already loaded, attach listeners immediately
+    if (image && image.complete && image.naturalHeight > 0) {
+      console.log('Image already loaded, attaching listeners immediately');
+      attachListeners();
+      return cleanupFunction;
+    } else if (image) {
+      // Wait for image to load before attaching listeners
+      console.log('Waiting for image to load before attaching listeners');
+      const handleImageLoad = () => {
+        console.log('Image loaded, now attaching listeners');
+        attachListeners();
+      };
+
+      image.addEventListener('load', handleImageLoad);
+      
+      return () => {
+        image.removeEventListener('load', handleImageLoad);
+        if (cleanupFunction) {
+          cleanupFunction();
+        }
+      };
+    }
+  }, [showImageEditor, selectedImage]);
+
+  // Separate effect to handle position and zoom changes without affecting event listeners
+  useEffect(() => {
+    // This effect only handles state-dependent logic that doesn't require event listener re-attachment
+    // Currently, all position and zoom logic is handled in the event handlers themselves
+  }, [position, zoom]);
 
   return (
     <div className="flex flex-col items-center">
