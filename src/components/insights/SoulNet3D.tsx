@@ -10,7 +10,7 @@ import { useIsMobile } from '../../hooks/use-mobile';
 import { useR3FBulkTranslation } from '../../hooks/useR3FBulkTranslation';
 import { useTheme } from '@/hooks/use-theme';
 import { BillboardText } from './BillboardText';
-import { preloadCritical3DFonts } from '../../utils/imagePreloader';
+
 
 // Types
 interface SoulNet3DNode {
@@ -417,43 +417,9 @@ function Scene3D({ data, selectedNodeId, onNodeClick, isMobile, getTranslatedTex
 export function SoulNet3D({ timeRange, insightsData, userId, onTimeRangeChange }: SoulNet3DProps) {
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
-  const [fontsLoaded, setFontsLoaded] = useState(false);
-  const [forceRender, setForceRender] = useState(false);
   const mobileDetection = useIsMobile();
   const isMobile = mobileDetection.isMobile;
 
-  // Master timeout to force render if resources take too long
-  useEffect(() => {
-    const masterTimeout = setTimeout(() => {
-      console.warn('SoulNet3D: Master timeout reached, forcing render with available resources');
-      setForceRender(true);
-      setFontsLoaded(true);
-    }, 8000); // 8 second maximum wait time for everything
-
-    return () => clearTimeout(masterTimeout);
-  }, []);
-
-  // Preload 3D fonts on component mount with timeout fallback
-  useEffect(() => {
-    const fontTimeout = setTimeout(() => {
-      console.warn('Font loading timeout reached, proceeding with default fonts');
-      setFontsLoaded(true);
-    }, 3000); // Reduced to 3 seconds
-
-    preloadCritical3DFonts()
-      .then(() => {
-        console.log('3D fonts loaded successfully');
-      })
-      .catch((error) => {
-        console.warn('Font loading failed, proceeding with fallback:', error);
-      })
-      .finally(() => {
-        clearTimeout(fontTimeout);
-        setFontsLoaded(true);
-      });
-
-    return () => clearTimeout(fontTimeout);
-  }, []);
   
   // Defensive theme access with fallback
   let theme = 'dark';
@@ -734,8 +700,8 @@ export function SoulNet3D({ timeRange, insightsData, userId, onTimeRangeChange }
         </Button>
       </div>
 
-      {/* 3D Canvas - Render when resources are ready or force render is triggered */}
-      {(translationsReady && fontsLoaded) || forceRender ? (
+      {/* 3D Canvas - Render when translations are ready */}
+      {translationsReady ? (
         <Canvas
           style={{ height: canvasHeight }}
           camera={{ position: [0, -30.8, 0], fov: 75, up: [0, 0, 1] }}

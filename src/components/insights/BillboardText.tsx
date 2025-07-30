@@ -29,41 +29,10 @@ export const BillboardText: React.FC<BillboardTextProps> = ({
 }) => {
   const meshRef = useRef<THREE.Group>(null);
   const { camera } = useThree();
-  const [fontUrl, setFontUrl] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const fontUrl = simplifiedFontService.getFontUrl();
   
   // Memoize the position as a Vector3 for performance
   const positionVector = useMemo(() => new THREE.Vector3(...position), [position]);
-  
-  // Load appropriate font based on text content with timeout
-  useEffect(() => {
-    setIsLoading(true);
-    
-    // Set timeout to force rendering even if font fails
-    const fontTimeout = setTimeout(() => {
-      console.warn('BillboardText: Font loading timeout for text:', children);
-      setFontUrl(null); // Use default font
-      setIsLoading(false);
-    }, 1500); // 1.5 second timeout
-
-    const loadFont = async () => {
-      try {
-        const url = simplifiedFontService.getFontUrl(children);
-        setFontUrl(url);
-        clearTimeout(fontTimeout);
-        setIsLoading(false);
-      } catch (error) {
-        console.warn('BillboardText: Error loading font for text:', children, error);
-        clearTimeout(fontTimeout);
-        setFontUrl(null); // Use default font
-        setIsLoading(false);
-      }
-    };
-
-    loadFont();
-
-    return () => clearTimeout(fontTimeout);
-  }, [children]);
   
   // Track last update to limit frequency
   const lastUpdateRef = useRef(0);
@@ -106,10 +75,6 @@ export const BillboardText: React.FC<BillboardTextProps> = ({
     meshRef.current.rotation.setFromRotationMatrix(matrix);
   });
 
-  // Don't render until font is loaded to prevent flashing
-  if (isLoading) {
-    return null;
-  }
 
   return (
     <group ref={meshRef} position={positionVector}>
@@ -120,7 +85,7 @@ export const BillboardText: React.FC<BillboardTextProps> = ({
         textAlign={textAlign}
         anchorX={anchorX}
         anchorY={anchorY}
-        font={fontUrl || undefined}
+        font={fontUrl}
         {...props}
       >
         {children}
