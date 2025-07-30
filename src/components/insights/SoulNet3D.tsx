@@ -11,7 +11,6 @@ import { useR3FBulkTranslation } from '../../hooks/useR3FBulkTranslation';
 import { useTheme } from '@/hooks/use-theme';
 import { BillboardText } from './BillboardText';
 
-
 // Types
 interface SoulNet3DNode {
   id: string;
@@ -419,7 +418,6 @@ export function SoulNet3D({ timeRange, insightsData, userId, onTimeRangeChange }
   const [isFullscreen, setIsFullscreen] = useState(false);
   const mobileDetection = useIsMobile();
   const isMobile = mobileDetection.isMobile;
-
   
   // Defensive theme access with fallback
   let theme = 'dark';
@@ -448,25 +446,8 @@ export function SoulNet3D({ timeRange, insightsData, userId, onTimeRangeChange }
     return Array.from(labels);
   }, [insightsData]);
 
-  // Use bulk translation for all labels with timeout
+  // Use bulk translation for all labels
   const { getTranslatedText, isComplete: translationsComplete } = useR3FBulkTranslation(uniqueLabels);
-  
-  // Add translation timeout handling
-  const [translationsReady, setTranslationsReady] = useState(false);
-  
-  useEffect(() => {
-    if (translationsComplete) {
-      setTranslationsReady(true);
-      return;
-    }
-    
-    const translationTimeout = setTimeout(() => {
-      console.warn('Translation timeout reached, proceeding with original text');
-      setTranslationsReady(true);
-    }, 5000); // 5 second timeout for translations
-    
-    return () => clearTimeout(translationTimeout);
-  }, [translationsComplete]);
 
   // Process data from themeemotion column with time filtering
   const processedData = useMemo((): SoulNet3DData => {
@@ -700,8 +681,8 @@ export function SoulNet3D({ timeRange, insightsData, userId, onTimeRangeChange }
         </Button>
       </div>
 
-      {/* 3D Canvas - Render when translations are ready */}
-      {translationsReady ? (
+      {/* 3D Canvas - Only render when translations are complete */}
+      {translationsComplete ? (
         <Canvas
           style={{ height: canvasHeight }}
           camera={{ position: [0, -30.8, 0], fov: 75, up: [0, 0, 1] }}

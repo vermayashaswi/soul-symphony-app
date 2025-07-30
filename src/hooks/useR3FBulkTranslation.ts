@@ -38,41 +38,21 @@ export const useR3FBulkTranslation = (texts: string[], sourceLanguage?: string) 
       setIsLoading(true);
       setIsComplete(false);
 
-      // Set timeout for the entire translation process
-      const translationTimeout = setTimeout(() => {
-        console.warn('useR3FBulkTranslation: Translation timeout reached, using original texts');
-        const fallbackTranslations: Record<string, string> = {};
-        uniqueTexts.forEach(text => {
-          fallbackTranslations[text] = text;
-        });
-        setTranslatedTexts(fallbackTranslations);
-        setIsComplete(true);
-        setIsLoading(false);
-      }, 4000); // 4 second timeout for all translations
-
       try {
-        // Translate all texts in parallel with individual timeouts
+        // Translate all texts in parallel
         const translationPromises = uniqueTexts.map(async (text) => {
           if (!text) return { original: text, translated: '' };
           
           try {
-            // Create a timeout promise for each translation
-            const timeoutPromise = new Promise<never>((_, reject) => {
-              setTimeout(() => reject(new Error('Individual translation timeout')), 2000);
-            });
-            
-            const translationPromise = translate(text, sourceLanguage);
-            const result = await Promise.race([translationPromise, timeoutPromise]);
+            const result = await translate(text, sourceLanguage);
             return { original: text, translated: result || text };
           } catch (error) {
-            console.warn(`Translation failed for "${text}":`, error);
+            console.error(`Translation failed for "${text}":`, error);
             return { original: text, translated: text }; // Fallback to original
           }
         });
 
         const results = await Promise.all(translationPromises);
-        
-        clearTimeout(translationTimeout);
         
         const translations: Record<string, string> = {};
         results.forEach(({ original, translated }) => {
@@ -82,8 +62,7 @@ export const useR3FBulkTranslation = (texts: string[], sourceLanguage?: string) 
         setTranslatedTexts(translations);
         setIsComplete(true);
       } catch (error) {
-        console.warn('Bulk translation failed:', error);
-        clearTimeout(translationTimeout);
+        console.error('Bulk translation failed:', error);
         // Fallback: use original texts
         const fallbackTranslations: Record<string, string> = {};
         uniqueTexts.forEach(text => {

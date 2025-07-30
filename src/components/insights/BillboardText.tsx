@@ -1,8 +1,7 @@
-import React, { useRef, useMemo, useState, useEffect } from 'react';
+import React, { useRef, useMemo } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';
 import { Text } from '@react-three/drei';
 import * as THREE from 'three';
-import { simplifiedFontService } from '../../services/simplifiedFontService';
 
 interface BillboardTextProps {
   children: string;
@@ -29,7 +28,6 @@ export const BillboardText: React.FC<BillboardTextProps> = ({
 }) => {
   const meshRef = useRef<THREE.Group>(null);
   const { camera } = useThree();
-  const fontUrl = simplifiedFontService.getFontUrl();
   
   // Memoize the position as a Vector3 for performance
   const positionVector = useMemo(() => new THREE.Vector3(...position), [position]);
@@ -75,7 +73,6 @@ export const BillboardText: React.FC<BillboardTextProps> = ({
     meshRef.current.rotation.setFromRotationMatrix(matrix);
   });
 
-
   return (
     <group ref={meshRef} position={positionVector}>
       <Text
@@ -85,7 +82,6 @@ export const BillboardText: React.FC<BillboardTextProps> = ({
         textAlign={textAlign}
         anchorX={anchorX}
         anchorY={anchorY}
-        font={fontUrl}
         {...props}
       >
         {children}
