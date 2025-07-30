@@ -195,6 +195,14 @@ export function EnhancedProfilePictureUpload({
     startPosRef.current = { x: e.clientX, y: e.clientY };
   };
 
+  const handleTouchStart = (e: React.TouchEvent) => {
+    e.preventDefault();
+    if (e.touches.length === 1) {
+      isDraggingRef.current = true;
+      startPosRef.current = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+    }
+  };
+
   const handleMouseMove = (e: React.MouseEvent) => {
     if (!isDraggingRef.current) return;
     
@@ -202,14 +210,32 @@ export function EnhancedProfilePictureUpload({
     const deltaY = e.clientY - startPosRef.current.y;
     
     setPosition(prev => ({
-      x: prev.x + deltaX / zoom,
-      y: prev.y + deltaY / zoom
+      x: prev.x + deltaX * 0.5,
+      y: prev.y + deltaY * 0.5
     }));
     
     startPosRef.current = { x: e.clientX, y: e.clientY };
   };
 
+  const handleTouchMove = (e: React.TouchEvent) => {
+    if (!isDraggingRef.current || e.touches.length !== 1) return;
+    
+    const deltaX = e.touches[0].clientX - startPosRef.current.x;
+    const deltaY = e.touches[0].clientY - startPosRef.current.y;
+    
+    setPosition(prev => ({
+      x: prev.x + deltaX * 0.5,
+      y: prev.y + deltaY * 0.5
+    }));
+    
+    startPosRef.current = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+  };
+
   const handleMouseUp = () => {
+    isDraggingRef.current = false;
+  };
+
+  const handleTouchEnd = () => {
     isDraggingRef.current = false;
   };
 
@@ -262,6 +288,9 @@ export function EnhancedProfilePictureUpload({
                 onMouseMove={handleMouseMove}
                 onMouseUp={handleMouseUp}
                 onMouseLeave={handleMouseUp}
+                onTouchStart={handleTouchStart}
+                onTouchMove={handleTouchMove}
+                onTouchEnd={handleTouchEnd}
               >
                 <img
                   src={selectedImage}
