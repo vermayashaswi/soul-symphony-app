@@ -423,7 +423,8 @@ export function SoulNet3D({ timeRange, insightsData, userId, onTimeRangeChange }
   let theme = 'dark';
   try {
     const themeContext = useTheme();
-    theme = themeContext.theme;
+    // Resolve 'system' theme to actual system theme
+    theme = themeContext.theme === 'system' ? themeContext.systemTheme : themeContext.theme;
   } catch (error) {
     console.warn('SoulNet3D: ThemeProvider not ready, using default theme');
   }
