@@ -140,33 +140,44 @@ class JournalReminderService {
 
   private async setupNativeReminders(times: JournalReminderTime[]): Promise<void> {
     try {
-      this.log('Setting up native reminders');
+      this.log('Setting up native reminders with recurring schedule');
       
       // Cancel existing notifications
       await LocalNotifications.cancel({ notifications: [] });
 
-      // Schedule new notifications
+      // Schedule new recurring notifications
       const notifications = times.map((time, index) => {
-        const scheduledDate = this.getNextReminderTime(time);
+        const { hour, minute } = this.TIME_MAPPINGS[time];
         
         return {
           id: index + 1,
           title: this.getNotificationTitle(time),
           body: this.getNotificationBody(time),
           schedule: {
-            at: scheduledDate
+            on: {
+              hour,
+              minute
+            },
+            every: 'day' as const,
+            allowWhileIdle: true
           },
           sound: 'default',
           actionTypeId: 'JOURNAL_REMINDER',
           extra: {
             time,
-            scheduledFor: scheduledDate.toISOString(),
-            action: 'open_journal'
+            action: 'open_journal',
+            recurring: true
           }
         };
       });
 
       await LocalNotifications.schedule({ notifications });
+      
+      // Verify notifications were scheduled
+      const verified = await this.verifyNativeNotifications(notifications);
+      if (!verified) {
+        throw new Error('Failed to verify native notifications were scheduled');
+      }
       
       // Track reminders
       times.forEach(time => {
@@ -178,10 +189,7 @@ class JournalReminderService {
         });
       });
       
-      // Set up automatic rescheduling for the next day
-      this.setupNativeRescheduling(times);
-      
-      this.log(`Scheduled ${notifications.length} native reminders`);
+      this.log(`Scheduled ${notifications.length} recurring native reminders`);
       
     } catch (error) {
       this.error('Error setting up native reminders:', error);
@@ -190,51 +198,42 @@ class JournalReminderService {
     }
   }
 
-  private setupNativeRescheduling(times: JournalReminderTime[]): void {
-    this.log('Setting up native rescheduling for next day');
-    
-    // Schedule reminders for the next day using web timeouts
-    times.forEach(time => {
-      const todayTarget = this.getNextReminderTime(time);
-      const tomorrowTarget = new Date(todayTarget);
-      tomorrowTarget.setDate(tomorrowTarget.getDate() + 1);
+  private async verifyNativeNotifications(expectedNotifications: any[]): Promise<boolean> {
+    try {
+      this.log('Verifying native notifications were scheduled');
       
-      const timeoutMs = tomorrowTarget.getTime() - Date.now();
+      // Get all pending notifications
+      const result = await LocalNotifications.getPending();
+      const pendingNotifications = result.notifications;
       
-      const timeoutId = window.setTimeout(async () => {
-        this.log(`Rescheduling native reminder for ${time}`);
-        
-        try {
-          // Schedule the notification for tomorrow
-          const scheduledDate = this.getNextReminderTime(time);
-          await LocalNotifications.schedule({
-            notifications: [{
-              id: times.indexOf(time) + 1,
-              title: this.getNotificationTitle(time),
-              body: this.getNotificationBody(time),
-              schedule: {
-                at: scheduledDate
-              },
-              sound: 'default',
-              actionTypeId: 'JOURNAL_REMINDER',
-              extra: {
-                time,
-                scheduledFor: scheduledDate.toISOString(),
-                action: 'open_journal'
-              }
-            }]
-          });
-          
-          // Reschedule for the day after that
-          this.setupNativeRescheduling([time]);
-          
-        } catch (error) {
-          this.error(`Error rescheduling native reminder for ${time}:`, error);
+      this.log(`Found ${pendingNotifications.length} pending notifications, expected ${expectedNotifications.length}`);
+      
+      // Check if we have the expected number of notifications
+      if (pendingNotifications.length < expectedNotifications.length) {
+        this.error('Not all notifications were scheduled correctly', {
+          expected: expectedNotifications.length,
+          actual: pendingNotifications.length
+        });
+        return false;
+      }
+      
+      // Verify each expected notification exists
+      for (const expected of expectedNotifications) {
+        const found = pendingNotifications.find(pending => pending.id === expected.id);
+        if (!found) {
+          this.error(`Missing notification with ID ${expected.id}`);
+          return false;
         }
-      }, timeoutMs);
+        this.log(`Verified notification ${expected.id}: ${found.title}`);
+      }
       
-      this.log(`Set up rescheduling timeout for ${time} in ${Math.round(timeoutMs / 1000 / 60 / 60)} hours`);
-    });
+      this.log('All native notifications verified successfully');
+      return true;
+      
+    } catch (error) {
+      this.error('Error verifying native notifications:', error);
+      return false;
+    }
   }
 
   private async setupServiceWorkerReminders(times: JournalReminderTime[]): Promise<void> {
@@ -462,9 +461,57 @@ class JournalReminderService {
       return false;
     }
   }
+  
+  async getNotificationStatus(): Promise<{
+    strategy: string;
+    activeReminders: number;
+    pendingNative?: number;
+    permissionState: string;
+    verified: boolean;
+  }> {
+    try {
+      await this.ensureInitialized();
+      
+      const strategy = enhancedPlatformService.getBestNotificationStrategy();
+      const permissionState = await enhancedNotificationService.checkPermissionStatus();
+      const settings = this.getSettings();
+      
+      let pendingNative: number | undefined;
+      let verified = false;
+      
+      if (strategy === 'native') {
+        try {
+          const result = await LocalNotifications.getPending();
+          pendingNative = result.notifications.length;
+          verified = await this.verifyNativeNotificationSystem(settings.times);
+        } catch (error) {
+          this.error('Error getting native notification status:', error);
+        }
+      } else {
+        verified = await this.verifyScheduledReminders(settings.times);
+      }
+      
+      return {
+        strategy,
+        activeReminders: this.activeReminders.length,
+        pendingNative,
+        permissionState,
+        verified
+      };
+    } catch (error) {
+      this.error('Error getting notification status:', error);
+      return {
+        strategy: 'unknown',
+        activeReminders: 0,
+        permissionState: 'unknown',
+        verified: false
+      };
+    }
+  }
 
   private async testNativeReminder(): Promise<boolean> {
     try {
+      // Schedule immediate test notification
       await LocalNotifications.schedule({
         notifications: [{
           id: 999,
@@ -475,7 +522,16 @@ class JournalReminderService {
         }]
       });
 
-      this.log('Native test reminder scheduled');
+      // Verify it was scheduled
+      const result = await LocalNotifications.getPending();
+      const testNotification = result.notifications.find(n => n.id === 999);
+      
+      if (!testNotification) {
+        this.error('Test notification was not found in pending notifications');
+        return this.testWebReminder();
+      }
+
+      this.log('Native test reminder scheduled and verified');
       return true;
     } catch (error) {
       this.error('Error with native test reminder:', error);
@@ -522,7 +578,7 @@ class JournalReminderService {
       }
     }, this.HEALTH_CHECK_INTERVAL);
     
-    this.log('Health check started');
+    this.log('Health check started - will verify reminders every 6 hours');
   }
 
   private stopHealthCheck(): void {
@@ -557,9 +613,28 @@ class JournalReminderService {
         active: this.activeReminders.length
       });
       await this.setupReminders(settings.times);
+      return;
+    }
+
+    // For native strategy, perform deep verification with device system
+    const strategy = enhancedPlatformService.getBestNotificationStrategy();
+    if (strategy === 'native') {
+      try {
+        const systemVerified = await this.verifyNativeNotificationSystem(settings.times);
+        if (!systemVerified) {
+          this.log('Native notification system verification failed, reinitializing');
+          await this.setupReminders(settings.times);
+          return;
+        }
+      } catch (error) {
+        this.error('Error during native system verification:', error);
+        await this.setupReminders(settings.times);
+        return;
+      }
     }
 
     this.log('Health check passed', {
+      strategy,
       activeReminders: this.activeReminders.length,
       expectedReminders: settings.times.length
     });
@@ -574,6 +649,16 @@ class JournalReminderService {
       return false;
     }
     
+    // For native strategy, also verify with device's notification system
+    const strategy = enhancedPlatformService.getBestNotificationStrategy();
+    if (strategy === 'native') {
+      const nativeVerified = await this.verifyNativeNotificationSystem(times);
+      if (!nativeVerified) {
+        this.error('Native notification system verification failed');
+        return false;
+      }
+    }
+    
     // Verify each reminder is properly scheduled
     for (const time of times) {
       const reminder = this.activeReminders.find(r => r.time === time);
@@ -582,8 +667,8 @@ class JournalReminderService {
         return false;
       }
       
-      // Check if the scheduled time is in the future
-      if (reminder.scheduledFor.getTime() <= Date.now()) {
+      // For non-native strategies, check if the scheduled time is in the future
+      if (reminder.strategy !== 'native' && reminder.scheduledFor.getTime() <= Date.now()) {
         this.error(`Reminder for ${time} scheduled in the past: ${reminder.scheduledFor.toLocaleString()}`);
         return false;
       }
@@ -592,18 +677,65 @@ class JournalReminderService {
     this.log('All reminders verified successfully');
     return true;
   }
+  
+  private async verifyNativeNotificationSystem(times: JournalReminderTime[]): Promise<boolean> {
+    try {
+      const result = await LocalNotifications.getPending();
+      const pendingNotifications = result.notifications;
+      
+      this.log(`Device has ${pendingNotifications.length} pending notifications, expected ${times.length}`);
+      
+      // Check count
+      if (pendingNotifications.length < times.length) {
+        this.error('Device notification count mismatch', {
+          expected: times.length,
+          actual: pendingNotifications.length
+        });
+        return false;
+      }
+      
+      // Verify our notifications exist
+      for (let i = 0; i < times.length; i++) {
+        const expectedId = i + 1;
+        const found = pendingNotifications.find(n => n.id === expectedId);
+        if (!found) {
+          this.error(`Missing notification ${expectedId} for ${times[i]}`);
+          return false;
+        }
+      }
+      
+      this.log('Native notification system verification passed');
+      return true;
+      
+    } catch (error) {
+      this.error('Error verifying native notification system:', error);
+      return false;
+    }
+  }
 
   // Add app lifecycle handlers for better persistence
   private setupAppLifecycleHandlers(): void {
     // Handle visibility change (app backgrounding/foregrounding)
     document.addEventListener('visibilitychange', () => {
       if (!document.hidden) {
-        // App came to foreground, verify reminders
+        // App came to foreground, verify reminders after a short delay
         setTimeout(async () => {
           const settings = this.getSettings();
           if (settings.enabled && settings.times.length > 0) {
-            this.log('App foregrounded, checking reminders');
-            await this.setupReminders(settings.times);
+            this.log('App foregrounded, verifying reminder status');
+            
+            // For native reminders, just verify they're still there
+            const strategy = enhancedPlatformService.getBestNotificationStrategy();
+            if (strategy === 'native') {
+              const verified = await this.verifyNativeNotificationSystem(settings.times);
+              if (!verified) {
+                this.log('Native reminders missing after foreground, recreating');
+                await this.setupReminders(settings.times);
+              }
+            } else {
+              // For non-native, recreate as they may have been cleared
+              await this.setupReminders(settings.times);
+            }
           }
         }, 1000);
       }
@@ -611,8 +743,30 @@ class JournalReminderService {
 
     // Handle page unload (app closing)
     window.addEventListener('beforeunload', () => {
-      this.log('App closing, preserving reminder settings');
+      this.log('App closing, native reminders will persist');
     });
+    
+    // Handle Capacitor app state changes if available
+    if ((window as any).Capacitor?.Plugins?.App) {
+      const { App } = (window as any).Capacitor.Plugins;
+      
+      App.addListener('appStateChange', async (state: { isActive: boolean }) => {
+        if (state.isActive) {
+          const settings = this.getSettings();
+          if (settings.enabled && settings.times.length > 0) {
+            this.log('Native app became active, verifying reminders');
+            const strategy = enhancedPlatformService.getBestNotificationStrategy();
+            if (strategy === 'native') {
+              const verified = await this.verifyNativeNotificationSystem(settings.times);
+              if (!verified) {
+                this.log('Reminders missing after activation, recreating');
+                await this.setupReminders(settings.times);
+              }
+            }
+          }
+        }
+      });
+    }
   }
 
   // Initialize reminders on app start if enabled
