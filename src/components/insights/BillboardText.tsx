@@ -43,8 +43,34 @@ export const BillboardText: React.FC<BillboardTextProps> = ({
     if (now - lastUpdateRef.current < UPDATE_INTERVAL) return;
     lastUpdateRef.current = now;
     
-    // Simple and reliable billboard algorithm using lookAt
-    meshRef.current.lookAt(camera.position);
+    // Robust billboard algorithm that prevents text inversion
+    const textPosition = meshRef.current.position;
+    const cameraPosition = camera.position;
+    
+    // Calculate direction from text to camera
+    const direction = new THREE.Vector3()
+      .subVectors(cameraPosition, textPosition)
+      .normalize();
+    
+    // Get camera's up vector (handles non-standard orientations)
+    const cameraUp = camera.up.clone().normalize();
+    
+    // Calculate right vector (perpendicular to both direction and up)
+    const right = new THREE.Vector3()
+      .crossVectors(cameraUp, direction)
+      .normalize();
+    
+    // Recalculate up vector to ensure orthogonality
+    const up = new THREE.Vector3()
+      .crossVectors(direction, right)
+      .normalize();
+    
+    // Create rotation matrix that always faces camera without flipping
+    const matrix = new THREE.Matrix4();
+    matrix.makeBasis(right, up, direction);
+    
+    // Apply rotation to the text group
+    meshRef.current.rotation.setFromRotationMatrix(matrix);
   });
 
   return (
