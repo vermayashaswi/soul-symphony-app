@@ -12,7 +12,14 @@ export interface ChatThread {
 }
 
 export const createChatThread = async (userId: string, title: string = "New Conversation"): Promise<ChatThread | null> => {
+  if (!userId) {
+    console.error('Cannot create chat thread: userId is required');
+    return null;
+  }
+
   try {
+    console.log(`[ThreadService] Creating new thread for user ${userId} with title: ${title}`);
+    
     const { data, error } = await supabase
       .from('chat_threads')
       .insert({
@@ -26,13 +33,14 @@ export const createChatThread = async (userId: string, title: string = "New Conv
       .single();
 
     if (error) {
-      console.error('Error creating chat thread:', error);
+      console.error('[ThreadService] Error creating chat thread:', error);
       return null;
     }
 
+    console.log(`[ThreadService] Successfully created thread: ${data.id}`);
     return data;
   } catch (error) {
-    console.error('Exception creating chat thread:', error);
+    console.error('[ThreadService] Exception creating chat thread:', error);
     return null;
   }
 };
@@ -83,7 +91,14 @@ export const deleteChatThread = async (threadId: string, userId: string): Promis
 };
 
 export const getChatThreads = async (userId: string): Promise<ChatThread[]> => {
+  if (!userId) {
+    console.error('[ThreadService] Cannot fetch threads: userId is required');
+    return [];
+  }
+
   try {
+    console.log(`[ThreadService] Fetching threads for user: ${userId}`);
+    
     const { data, error } = await supabase
       .from('chat_threads')
       .select('*')
@@ -91,19 +106,27 @@ export const getChatThreads = async (userId: string): Promise<ChatThread[]> => {
       .order('updated_at', { ascending: false });
 
     if (error) {
-      console.error('Error fetching chat threads:', error);
+      console.error('[ThreadService] Error fetching chat threads:', error);
       return [];
     }
 
+    console.log(`[ThreadService] Successfully fetched ${data?.length || 0} threads`);
     return data || [];
   } catch (error) {
-    console.error('Exception fetching chat threads:', error);
+    console.error('[ThreadService] Exception fetching chat threads:', error);
     return [];
   }
 };
 
 export const getChatThread = async (threadId: string, userId: string): Promise<ChatThread | null> => {
+  if (!threadId || !userId) {
+    console.error('[ThreadService] Cannot fetch thread: threadId and userId are required');
+    return null;
+  }
+
   try {
+    console.log(`[ThreadService] Fetching thread ${threadId} for user ${userId}`);
+    
     const { data, error } = await supabase
       .from('chat_threads')
       .select('*')
@@ -112,13 +135,14 @@ export const getChatThread = async (threadId: string, userId: string): Promise<C
       .single();
 
     if (error) {
-      console.error('Error fetching chat thread:', error);
+      console.error(`[ThreadService] Error fetching chat thread ${threadId}:`, error);
       return null;
     }
 
+    console.log(`[ThreadService] Successfully fetched thread: ${threadId}`);
     return data;
   } catch (error) {
-    console.error('Exception fetching chat thread:', error);
+    console.error('[ThreadService] Exception fetching chat thread:', error);
     return null;
   }
 };

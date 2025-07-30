@@ -356,18 +356,72 @@ export default function MobileChatInterface({
     }
   };
 
-  const handleSelectThread = (threadId: string) => {
-    setSheetOpen(false);
-    if (onSelectThread) {
-      onSelectThread(threadId);
-    } else {
-      setThreadId(threadId);
-      loadThreadMessages(threadId);
+  const handleSelectThread = async (selectedThreadId: string) => {
+    if (!selectedThreadId || !user?.id) {
+      console.error('[MobileChat] Cannot select thread: invalid threadId or user not authenticated');
+      toast({
+        title: "Error",
+        description: "Failed to select conversation",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    try {
+      console.log('[MobileChat] Selecting thread:', selectedThreadId);
+      
+      // Set loading state before starting the process
+      setInitialLoading(true);
+      
+      // Verify thread exists and belongs to user
+      const { data: threadData, error: threadError } = await supabase
+        .from('chat_threads')
+        .select('id, title')
+        .eq('id', selectedThreadId)
+        .eq('user_id', user.id)
+        .single();
+        
+      if (threadError || !threadData) {
+        console.error('[MobileChat] Thread not found or access denied:', threadError);
+        toast({
+          title: "Error",
+          description: "Cannot access this conversation",
+          variant: "destructive"
+        });
+        setInitialLoading(false);
+        return;
+      }
+
+      // Close sheet immediately after verification
+      setSheetOpen(false);
+      
+      // Update thread state and load messages
+      setThreadId(selectedThreadId);
+      localStorage.setItem("lastActiveChatThreadId", selectedThreadId);
+      
+      if (onSelectThread) {
+        onSelectThread(selectedThreadId);
+      }
+      
+      // Load messages for the selected thread
+      await loadThreadMessages(selectedThreadId);
+      
+      console.log('[MobileChat] Successfully selected thread:', selectedThreadId);
+      
+    } catch (error) {
+      console.error('[MobileChat] Error selecting thread:', error);
+      toast({
+        title: "Error", 
+        description: "Failed to select conversation",
+        variant: "destructive"
+      });
+      setInitialLoading(false);
     }
   };
 
   const handleDeleteCurrentThread = async () => {
     if (!threadId || !user?.id) {
+      console.error('[MobileChat] Cannot delete: no active thread or user not authenticated');
       toast({
         title: "Error",
         description: "No active conversation to delete",
@@ -377,6 +431,7 @@ export default function MobileChatInterface({
     }
 
     if (isProcessing || processingStatus === 'processing') {
+      console.log('[MobileChat] Cannot delete thread while processing');
       toast({
         title: "Cannot delete conversation",
         description: "Please wait for the current request to complete before deleting this conversation.",
@@ -387,48 +442,73 @@ export default function MobileChatInterface({
     }
 
     try {
+      console.log('[MobileChat] Deleting thread:', threadId);
+      
+      // Delete messages first (foreign key relationship)
       const { error: messagesError } = await supabase
         .from('chat_messages')
         .delete()
         .eq('thread_id', threadId);
         
-      if (messagesError) throw messagesError;
+      if (messagesError) {
+        console.error('[MobileChat] Error deleting messages:', messagesError);
+        throw messagesError;
+      }
       
+      // Delete the thread
       const { error: threadError } = await supabase
         .from('chat_threads')
         .delete()
-        .eq('id', threadId);
+        .eq('id', threadId)
+        .eq('user_id', user.id); // Extra safety check
         
-      if (threadError) throw threadError;
+      if (threadError) {
+        console.error('[MobileChat] Error deleting thread:', threadError);
+        throw threadError;
+      }
       
+      console.log('[MobileChat] Successfully deleted thread:', threadId);
+      
+      // Clear current state
       setMessages([]);
       setShowSuggestions(true);
       loadedThreadRef.current = null;
+      localStorage.removeItem("lastActiveChatThreadId");
 
-      const { data: threads, error } = await supabase
+      // Try to find another thread to switch to
+      const { data: threads, error: threadsError } = await supabase
         .from('chat_threads')
         .select('*')
         .eq('user_id', user.id)
         .order('updated_at', { ascending: false })
         .limit(1);
 
-      if (error) throw error;
+      if (threadsError) {
+        console.error('[MobileChat] Error fetching remaining threads:', threadsError);
+      }
 
       if (threads && threads.length > 0) {
+        // Switch to the most recent remaining thread
+        console.log('[MobileChat] Switching to thread:', threads[0].id);
         setThreadId(threads[0].id);
-        loadThreadMessages(threads[0].id);
+        localStorage.setItem("lastActiveChatThreadId", threads[0].id);
+        await loadThreadMessages(threads[0].id);
       } else {
-        const newThreadId = uuidv4();
-        await supabase
-          .from('chat_threads')
-          .insert({
-            id: newThreadId,
-            user_id: user.id,
-            title: "New Conversation",
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString()
-          });
-        setThreadId(newThreadId);
+        // No threads left, create a new one
+        console.log('[MobileChat] No remaining threads, creating new one');
+        try {
+          const newThreadId = await onCreateNewThread();
+          if (newThreadId) {
+            setThreadId(newThreadId);
+            localStorage.setItem("lastActiveChatThreadId", newThreadId);
+          } else {
+            // Fallback if creation fails
+            setThreadId(null);
+          }
+        } catch (createError) {
+          console.error('[MobileChat] Error creating new thread after deletion:', createError);
+          setThreadId(null);
+        }
       }
 
       toast({
@@ -437,12 +517,15 @@ export default function MobileChatInterface({
       });
       
       setShowDeleteDialog(false);
+      
     } catch (error) {
+      console.error('[MobileChat] Error deleting conversation:', error);
       toast({
         title: "Error",
         description: "Failed to delete conversation",
         variant: "destructive"
       });
+      setShowDeleteDialog(false);
     }
   };
 
@@ -466,11 +549,56 @@ export default function MobileChatInterface({
               <SheetHeader className="flex flex-row items-center justify-between py-2">
                 <Button
                   className="flex items-center gap-1"
-                  onClick={() => {
-                    onCreateNewThread();
-                    setSheetOpen(false);
+                  onClick={async () => {
+                    try {
+                      console.log('[MobileChat] New Chat button clicked');
+                      
+                      if (!user?.id) {
+                        toast({
+                          title: "Authentication required",
+                          description: "Please sign in to create a new conversation",
+                          variant: "destructive"
+                        });
+                        return;
+                      }
+
+                      setSheetOpen(false);
+                      setInitialLoading(true);
+                      
+                      const newThreadId = await onCreateNewThread();
+                      if (newThreadId) {
+                        console.log('[MobileChat] New thread created:', newThreadId);
+                        setThreadId(newThreadId);
+                        setMessages([]);
+                        setShowSuggestions(true);
+                        loadedThreadRef.current = null;
+                        localStorage.setItem("lastActiveChatThreadId", newThreadId);
+                        
+                        toast({
+                          title: "Success",
+                          description: "New conversation started",
+                        });
+                      } else {
+                        console.error('[MobileChat] Failed to create new thread');
+                        toast({
+                          title: "Error",
+                          description: "Failed to create new conversation",
+                          variant: "destructive"
+                        });
+                      }
+                    } catch (error) {
+                      console.error('[MobileChat] Error in new chat creation:', error);
+                      toast({
+                        title: "Error",
+                        description: "Failed to create new conversation",
+                        variant: "destructive"
+                      });
+                    } finally {
+                      setInitialLoading(false);
+                    }
                   }}
                   size="sm"
+                  disabled={initialLoading}
                 >
                   <Plus className="h-4 w-4" />
                   <TranslatableText text="New Chat" />
