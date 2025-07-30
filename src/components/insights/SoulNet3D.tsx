@@ -421,11 +421,20 @@ export function SoulNet3D({ timeRange, insightsData, userId, onTimeRangeChange }
   const mobileDetection = useIsMobile();
   const isMobile = mobileDetection.isMobile;
 
-  // Preload 3D fonts on component mount
+  // Preload 3D fonts on component mount with timeout fallback
   useEffect(() => {
-    preloadCritical3DFonts().finally(() => {
+    const fontTimeout = setTimeout(() => {
+      console.warn('Font loading timeout reached, proceeding with default fonts');
       setFontsLoaded(true);
-    });
+    }, 5000); // 5 second maximum wait time
+
+    preloadCritical3DFonts()
+      .finally(() => {
+        clearTimeout(fontTimeout);
+        setFontsLoaded(true);
+      });
+
+    return () => clearTimeout(fontTimeout);
   }, []);
   
   // Defensive theme access with fallback

@@ -11,12 +11,13 @@ class SimplifiedFontService {
       name: 'Helvetiker',
       url: 'https://threejs.org/examples/fonts/helvetiker_regular.typeface.json',
       scripts: ['latin']
-    },
-    {
-      name: 'Noto Sans Devanagari',
-      url: 'https://cdn.jsdelivr.net/gh/mrdoob/three.js@dev/examples/fonts/noto_sans_devanagari_regular.typeface.json',
-      scripts: ['devanagari']
     }
+    // Removed problematic Devanagari font - fallback to Latin font for all scripts
+    // {
+    //   name: 'Noto Sans Devanagari',
+    //   url: 'https://cdn.jsdelivr.net/gh/mrdoob/three.js@dev/examples/fonts/noto_sans_devanagari_regular.typeface.json',
+    //   scripts: ['devanagari']
+    // }
   ];
 
   detectScript(text: string): string {
@@ -31,12 +32,12 @@ class SimplifiedFontService {
   getFontUrl(text: string): string {
     const script = this.detectScript(text);
     
-    const font = this.fonts.find(f => f.scripts.includes(script));
-    const fallbackFont = this.fonts.find(f => f.scripts.includes('latin'));
+    // Always use Latin font as fallback for now since other fonts are problematic
+    const font = this.fonts.find(f => f.scripts.includes('latin'));
     
-    const url = font?.url || fallbackFont?.url || this.fonts[0].url;
+    const url = font?.url || this.fonts[0]?.url;
     
-    console.log(`[SimplifiedFontService] Text: "${text}" -> Script: ${script} -> URL: ${url}`);
+    console.log(`[SimplifiedFontService] Text: "${text}" -> Script: ${script} -> Using Latin font: ${url}`);
     return url;
   }
 }
