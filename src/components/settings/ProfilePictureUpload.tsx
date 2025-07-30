@@ -72,13 +72,51 @@ export function ProfilePictureUpload() {
       ctx.closePath();
       ctx.clip();
       
-      // Draw the transformed image onto the canvas
+      // Get the natural dimensions of the image
+      const naturalWidth = imageRef.current.naturalWidth;
+      const naturalHeight = imageRef.current.naturalHeight;
+      
+      // Get the displayed dimensions of the image element
+      const displayedWidth = imageRef.current.clientWidth;
+      const displayedHeight = imageRef.current.clientHeight;
+      
+      // Calculate scale factors between natural and displayed dimensions
+      const scaleX = naturalWidth / displayedWidth;
+      const scaleY = naturalHeight / displayedHeight;
+      
+      // Calculate the container center
+      const centerX = containerWidth / 2;
+      const centerY = containerHeight / 2;
+      
+      // Calculate the image center in the display coordinate system
+      const imageDisplayCenterX = displayedWidth / 2;
+      const imageDisplayCenterY = displayedHeight / 2;
+      
+      // Calculate the offset from container center to image center in display coordinates
+      const offsetX = centerX - (imageDisplayCenterX + position.x);
+      const offsetY = centerY - (imageDisplayCenterY + position.y);
+      
+      // Convert offsets to natural image coordinates
+      const sourceOffsetX = offsetX * scaleX / zoom;
+      const sourceOffsetY = offsetY * scaleY / zoom;
+      
+      // Calculate the source region (what part of the natural image to crop)
+      const sourceX = Math.max(0, (naturalWidth / 2) - sourceOffsetX - (containerWidth * scaleX / zoom / 2));
+      const sourceY = Math.max(0, (naturalHeight / 2) - sourceOffsetY - (containerHeight * scaleY / zoom / 2));
+      const sourceWidth = Math.min(naturalWidth - sourceX, containerWidth * scaleX / zoom);
+      const sourceHeight = Math.min(naturalHeight - sourceY, containerHeight * scaleY / zoom);
+      
+      // Draw the cropped and scaled image onto the canvas
       ctx.drawImage(
         imageRef.current,
-        position.x,
-        position.y,
-        imageRef.current.width * zoom,
-        imageRef.current.height * zoom
+        sourceX,
+        sourceY,
+        sourceWidth,
+        sourceHeight,
+        0,
+        0,
+        containerWidth,
+        containerHeight
       );
       
       // Convert canvas to blob
