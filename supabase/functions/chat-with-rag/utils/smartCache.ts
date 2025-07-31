@@ -1,13 +1,13 @@
 // Smart caching system with TTL and compression
+interface CacheEntry {
+  data: any;
+  expiry: number;
+  hits: number;
+  size: number;
+}
+
 export class SmartCache {
   private static cache = new Map<string, CacheEntry>();
-  
-  interface CacheEntry {
-    data: any;
-    expiry: number;
-    hits: number;
-    size: number;
-  }
 
   // Generate cache key from request parameters
   static generateKey(message: string, userId: string, contextLength = 0): string {
