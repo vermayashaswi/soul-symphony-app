@@ -53,20 +53,72 @@ export class PerformanceOptimizer {
     return results;
   }
   
-  // Optimize OpenAI API calls
-  static optimizeOpenAIRequest(prompt: string, maxTokens: number = 1500): object {
+  // Optimize OpenAI API calls with intelligent model selection
+  static optimizeOpenAIRequest(prompt: string, maxTokens: number = 1500, isAnalytical = false): object {
     // Trim overly long prompts
     const optimizedPrompt = prompt.length > 8000 ? 
       prompt.substring(0, 7500) + "...[content truncated for performance]" : 
       prompt;
     
+    // Use faster model for simple queries, more powerful for complex analysis
+    const model = isAnalytical && prompt.length > 3000 ? 'gpt-4o' : 'gpt-4o-mini';
+    
     return {
-      model: 'gpt-4o-mini', // Use faster model
+      model,
       messages: [{ role: 'user', content: optimizedPrompt }],
-      temperature: 0.7,
-      max_tokens: maxTokens,
-      stream: false // We'll implement streaming later
+      temperature: isAnalytical ? 0.3 : 0.7, // Lower temperature for analytical responses
+      max_tokens: Math.min(maxTokens, isAnalytical ? 2000 : 1500),
+      stream: false
     };
+  }
+
+  // Compress prompts by removing redundancy
+  static compressPrompt(prompt: string, compressionRatio = 0.8): string {
+    if (prompt.length <= 1000) return prompt;
+    
+    const sentences = prompt.split(/[.!?]+/);
+    const targetLength = Math.floor(prompt.length * compressionRatio);
+    
+    // Keep most important sentences (first, last, and those with keywords)
+    const keywords = ['emotion', 'feeling', 'journal', 'entry', 'analysis', 'pattern'];
+    const scored = sentences.map(sentence => ({
+      sentence: sentence.trim(),
+      score: this.scoreSentence(sentence, keywords)
+    })).filter(item => item.sentence.length > 10);
+    
+    scored.sort((a, b) => b.score - a.score);
+    
+    let compressed = '';
+    let currentLength = 0;
+    
+    for (const item of scored) {
+      if (currentLength + item.sentence.length <= targetLength) {
+        compressed += item.sentence + '. ';
+        currentLength += item.sentence.length;
+      }
+    }
+    
+    return compressed.trim() || prompt; // Fallback to original if compression fails
+  }
+  
+  private static scoreSentence(sentence: string, keywords: string[]): number {
+    let score = 0;
+    const lowerSentence = sentence.toLowerCase();
+    
+    // Score based on keyword presence
+    keywords.forEach(keyword => {
+      if (lowerSentence.includes(keyword)) score += 2;
+    });
+    
+    // Prefer longer, more informative sentences
+    score += Math.min(sentence.length / 50, 3);
+    
+    // Boost sentences with emotional indicators
+    if (/feel|felt|emotion|mood|happy|sad|angry|excited/i.test(sentence)) {
+      score += 1;
+    }
+    
+    return score;
   }
   
   // Connection pool optimization

@@ -213,13 +213,16 @@ export async function generateResponse(
     const contextMessages = Array.isArray(conversationContext) ? conversationContext.slice(-8) : [];
     console.log(`[responseGenerator] Using ${contextMessages.length} conversation messages with database context`);
     
-    // Generate response with enhanced database-aware conversational formatting
+    // Generate response with enhanced database-aware conversational formatting and performance optimization
+    const performanceMode = contextMessages.length > 8 ? 'fast' : 'balanced';
+    
     const response = await OptimizedApiClient.generateResponseOptimized(
       systemPrompt,
       userPrompt,
       contextMessages,
       openAiApiKey,
-      isAnalyticalQuery
+      isAnalyticalQuery,
+      performanceMode
     );
     
     // Cache the response

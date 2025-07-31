@@ -61,3 +61,13 @@ verify_jwt = true
 
 [functions.translate-text]
 verify_jwt = false
+
+# RevenueCat integration edge functions
+[functions.revenuecat-webhook]
+verify_jwt = false
+
+[functions.revenuecat-init]
+verify_jwt = true
+
+[functions.revenuecat-purchase]
+verify_jwt = true
