@@ -1,6 +1,10 @@
 import { QueryTypes } from '@/utils/chat/queryAnalyzer';
 import { useChatMessageClassification, QueryCategory } from '@/hooks/use-chat-message-classification';
 import { supabase } from '@/integrations/supabase/client';
+import { analyzeQueryComplexity } from '@/services/chat/queryComplexityAnalyzer';
+import { SmartQueryRouter, QueryRoute } from '@/services/chat/smartQueryRouter';
+import { ConversationalFlowManager } from '@/services/chat/conversationalFlowManager';
+import { optimizeResponseLength, analyzeEmotionalContext, detectConversationalPattern } from '@/services/chat/responseOptimizer';
 
 interface ChatResponse {
   content: string;
@@ -12,6 +16,10 @@ interface ChatResponse {
   interactiveOptions?: any[];
 }
 
+// Initialize optimization managers (singleton pattern for performance)
+const queryRouter = new SmartQueryRouter();
+const flowManager = new ConversationalFlowManager();
+
 export async function processChatMessage(
   message: string,
   userId: string,
@@ -20,8 +28,18 @@ export async function processChatMessage(
   usePersonalContext: boolean = false,
   parameters: Record<string, any> = {}
 ): Promise<ChatResponse> {
+  const startTime = Date.now();
+  
   try {
-    console.log('[ChatService] Processing message with enhanced database-aware context:', message);
+    console.log('[ChatService] Processing message with RAG optimizations:', message);
+    
+    // PHASE 1: Query complexity analysis and routing
+    const complexityAnalysis = analyzeQueryComplexity(message);
+    console.log('[ChatService] Complexity analysis:', {
+      level: complexityAnalysis.complexityLevel,
+      score: complexityAnalysis.complexityScore,
+      strategy: complexityAnalysis.recommendedStrategy
+    });
     
     // Classify message for natural conversation flow
     const { data: classificationData, error: classificationError } = await supabase.functions.invoke('chat-query-classifier', {
@@ -71,6 +89,33 @@ export async function processChatMessage(
         timestamp: msg.created_at
       })) : [];
 
+    // PHASE 1: Smart query routing based on complexity
+    const contextFactors = {
+      hasPersonalPronouns: /\b(i|me|my|mine|myself)\b/i.test(message),
+      hasTimeReferences: /\b(last week|yesterday|this week|today|recently)\b/i.test(message),
+      hasEmotionKeywords: /\b(feel|emotion|mood|happy|sad|angry|anxious)\b/i.test(message),
+      conversationDepth: conversationContext.length,
+      userPreferences: parameters.userPreferences
+    };
+
+    const routingResult = queryRouter.routeQuery(complexityAnalysis, contextFactors);
+    console.log('[ChatService] Query routing:', {
+      route: routingResult.primaryRoute.routeName,
+      reason: routingResult.routingReason
+    });
+
+    // PHASE 2: Conversational flow analysis
+    const flowRecommendation = flowManager.analyzeConversationalFlow(
+      threadId,
+      message,
+      conversationContext
+    );
+    console.log('[ChatService] Flow analysis:', {
+      mode: flowRecommendation.suggestedTone,
+      length: flowRecommendation.suggestedResponseLength,
+      urgency: flowRecommendation.urgencyLevel
+    });
+
     // Get intelligent query plan with enhanced database-aware dual-search requirements
     const queryPlanResponse = await supabase.functions.invoke('smart-query-planner', {
       body: {
@@ -98,7 +143,17 @@ export async function processChatMessage(
       console.log(`[ChatService] DATABASE-AWARE DUAL SEARCH ENFORCED - Confidence: ${queryPlan.searchConfidence} <= 90%`);
     }
 
-    // Use enhanced conversational RAG with SOULo personality, dual-search, and database awareness
+    // PHASE 3: Optimize search strategy based on route and context
+    const searchStrategy = queryRouter.optimizeSearchStrategy(routingResult.primaryRoute, {
+      hasEntities: contextFactors.hasPersonalPronouns,
+      hasEmotions: contextFactors.hasEmotionKeywords,
+      hasThemes: /\b(work|relationship|health|goal|habit|stress)\b/i.test(message),
+      timeConstrained: flowRecommendation.urgencyLevel === 'high' || flowRecommendation.urgencyLevel === 'crisis',
+      userContext: parameters
+    });
+
+    // Use enhanced conversational RAG with optimized parameters
+    const ragStartTime = Date.now();
     const ragResponse = await supabase.functions.invoke('chat-with-rag', {
       body: {
         message,
@@ -110,20 +165,70 @@ export async function processChatMessage(
         hasPersonalPronouns: queryPlan.hasPersonalPronouns || false,
         hasExplicitTimeReference: queryPlan.hasExplicitTimeReference || false,
         enforceDualSearch: queryPlan.searchConfidence <= 0.9,
-        requireDatabaseValidation: true, // Enhanced database validation
+        requireDatabaseValidation: true,
         themeFilters: queryPlan.themeFilters || [],
         emotionFilters: queryPlan.emotionFilters || [],
         threadMetadata: {},
-        databaseAware: true // Flag for database-aware processing
+        databaseAware: true,
+        // PHASE 1 & 3: Pass optimization parameters
+        optimizationConfig: {
+          searchStrategy: searchStrategy.name,
+          maxEntries: searchStrategy.maxEntries,
+          timeout: searchStrategy.timeoutMs,
+          complexityLevel: complexityAnalysis.complexityLevel,
+          route: routingResult.primaryRoute.routeName
+        },
+        // PHASE 2 & 4: Pass flow recommendations
+        flowConfig: {
+          suggestedTone: flowRecommendation.suggestedTone,
+          urgencyLevel: flowRecommendation.urgencyLevel,
+          conversationMode: flowRecommendation.suggestedResponseLength
+        }
       },
       headers: {
         'Authorization': `Bearer ${session.access_token}`
       }
     });
 
+    const ragExecutionTime = Date.now() - ragStartTime;
+
     if (ragResponse.error) {
+      // Record failed performance
+      queryRouter.recordPerformance(routingResult.primaryRoute.routeName, ragExecutionTime, false);
       throw new Error(`Chat RAG error: ${ragResponse.error.message}`);
     }
+
+    // PHASE 4: Analyze emotional context for response optimization
+    const journalEmotions = ragResponse.data.referenceEntries?.[0]?.emotions || {};
+    const emotionalContext = analyzeEmotionalContext(message, journalEmotions, conversationContext);
+
+    // PHASE 2: Optimize response based on complexity and flow
+    const responseConfig = optimizeResponseLength(
+      ragResponse.data.response,
+      complexityAnalysis.complexityLevel,
+      {
+        isFirstMessage: conversationContext.length === 0,
+        isFollowUp: conversationContext.length > 0,
+        previousTopics: [],
+        userEngagementLevel: 'medium', // Could be enhanced with engagement tracking
+        conversationDepth: conversationContext.length,
+        lastResponseType: 'informational'
+      },
+      parameters.userPreferences
+    );
+
+    // Record successful performance
+    queryRouter.recordPerformance(routingResult.primaryRoute.routeName, ragExecutionTime, true);
+
+    const totalExecutionTime = Date.now() - startTime;
+    console.log('[ChatService] Optimization summary:', {
+      totalTime: totalExecutionTime,
+      ragTime: ragExecutionTime,
+      route: routingResult.primaryRoute.routeName,
+      complexity: complexityAnalysis.complexityLevel,
+      responseLength: responseConfig.preferredStyle,
+      emotionalTone: emotionalContext.suggestedTone
+    });
 
     return {
       content: ragResponse.data.response || ragResponse.data,
@@ -132,7 +237,21 @@ export async function processChatMessage(
       analysis: {
         ...ragResponse.data.analysis,
         databaseValidated: true,
-        enhancedThemeEmotionAwareness: true
+        enhancedThemeEmotionAwareness: true,
+        // OPTIMIZATION METADATA
+        optimization: {
+          complexity: complexityAnalysis,
+          routing: routingResult,
+          searchStrategy,
+          responseConfig,
+          emotionalContext,
+          flowRecommendation,
+          performance: {
+            totalTime: totalExecutionTime,
+            ragTime: ragExecutionTime,
+            route: routingResult.primaryRoute.routeName
+          }
+        }
       },
       hasNumericResult: ragResponse.data.hasNumericResult
     };
