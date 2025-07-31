@@ -7,6 +7,11 @@ import { DualSearchOrchestrator } from './utils/dualSearchOrchestrator.ts';
 import { generateResponse, generateSystemPrompt, generateUserPrompt } from './utils/responseGenerator.ts';
 import { planQuery } from './utils/queryPlanner.ts';
 import { RateLimitManager } from '../_shared/rateLimitUtils.ts';
+import { createStreamingResponse, SSEStreamManager } from './utils/streamingResponseManager.ts';
+import { BackgroundTaskManager } from './utils/backgroundTaskManager.ts';
+import { SmartCache } from './utils/smartCache.ts';
+import { OptimizedRagPipeline } from './utils/optimizedPipeline.ts';
+import { PerformanceOptimizer } from './utils/performanceOptimizer.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -24,8 +29,11 @@ serve(async (req) => {
   let errorMessage: string | undefined;
 
   try {
-    console.log('[chat-with-rag] Starting enhanced dual search RAG processing');
+    console.log('[chat-with-rag] Starting optimized RAG processing with streaming support');
 
+    // Performance tracking
+    const globalTimer = PerformanceOptimizer.startTimer('total_request');
+    
     // Initialize rate limiting
     const rateLimitManager = new RateLimitManager(
       Deno.env.get('SUPABASE_URL') ?? '',
@@ -67,51 +75,127 @@ serve(async (req) => {
       userId: requestUserId, 
       conversationContext = [], 
       userProfile = {},
-      queryPlan = null
+      queryPlan = null,
+      streaming = false
     } = requestBody;
 
-    console.log(`[chat-with-rag] Processing query: "${message}" for user: ${requestUserId}`);
+    console.log(`[chat-with-rag] Processing query: "${message}" for user: ${requestUserId}, streaming: ${streaming}`);
+
+    // Check for streaming request
+    if (streaming || req.headers.get('Accept') === 'text/event-stream') {
+      const { response, controller } = createStreamingResponse();
+      const streamManager = new SSEStreamManager(controller);
+      const pipeline = new OptimizedRagPipeline(streamManager, supabaseClient, openaiApiKey);
+
+      // Use background task for streaming pipeline
+      EdgeRuntime.waitUntil(
+        (async () => {
+          try {
+            await pipeline.processQuery(requestBody);
+            
+            // Log usage in background
+            BackgroundTaskManager.logApiUsage(rateLimitManager, {
+              userId,
+              ipAddress,
+              functionName: 'chat-with-rag',
+              statusCode: 200,
+              responseTimeMs: PerformanceOptimizer.endTimer(globalTimer, 'total_request')
+            });
+          } catch (error) {
+            console.error('[chat-with-rag] Streaming pipeline error:', error);
+            await streamManager.sendEvent('error', { message: error.message });
+          } finally {
+            await streamManager.close();
+          }
+        })()
+      );
+
+      return response;
+    }
+
+    // Traditional non-streaming approach with optimizations
+    const cacheTimer = PerformanceOptimizer.startTimer('cache_check');
+    
+    // Check cache first
+    const cacheKey = SmartCache.generateKey(message, requestUserId, conversationContext.length);
+    const cachedResult = SmartCache.get(cacheKey);
+    
+    PerformanceOptimizer.endTimer(cacheTimer, 'cache_check');
+    
+    if (cachedResult) {
+      console.log('[chat-with-rag] Cache hit - returning cached result');
+      
+      // Log usage in background
+      BackgroundTaskManager.logApiUsage(rateLimitManager, {
+        userId,
+        ipAddress,
+        functionName: 'chat-with-rag',
+        statusCode: 200,
+        responseTimeMs: PerformanceOptimizer.endTimer(globalTimer, 'total_request'),
+        fromCache: true
+      });
+
+      return new Response(JSON.stringify({
+        ...cachedResult,
+        analysis: {
+          ...cachedResult.analysis,
+          fromCache: true,
+          cacheHit: true
+        }
+      }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
 
     // Enhanced query planning with dual search support
+    const planningTimer = PerformanceOptimizer.startTimer('query_planning');
     const enhancedQueryPlan = queryPlan || planQuery(message, userProfile.timezone);
+    PerformanceOptimizer.endTimer(planningTimer, 'query_planning');
+    
     console.log(`[chat-with-rag] Query plan strategy: ${enhancedQueryPlan.strategy}, complexity: ${enhancedQueryPlan.complexity}`);
 
-    // Generate embedding for vector search component
-    console.log('[chat-with-rag] Generating query embedding for dual search');
+    // Generate embedding with optimization
+    const embeddingTimer = PerformanceOptimizer.startTimer('embedding_generation');
     const queryEmbedding = await OptimizedApiClient.getEmbedding(message, openaiApiKey);
+    PerformanceOptimizer.endTimer(embeddingTimer, 'embedding_generation');
 
-    // Execute dual search (always use both vector and SQL)
+    // Execute optimized dual search
+    const searchTimer = PerformanceOptimizer.startTimer('dual_search');
     const searchMethod = DualSearchOrchestrator.shouldUseParallelExecution(enhancedQueryPlan) ? 
       'parallel' : 'sequential';
     
     console.log(`[chat-with-rag] Executing ${searchMethod} dual search`);
     
-    const searchResults = searchMethod === 'parallel' ?
-      await DualSearchOrchestrator.executeParallelSearch(
-        supabaseClient,
-        requestUserId,
-        queryEmbedding,
-        enhancedQueryPlan,
-        message
-      ) :
-      await DualSearchOrchestrator.executeSequentialSearch(
-        supabaseClient,
-        requestUserId,
-        queryEmbedding,
-        enhancedQueryPlan,
-        message
-      );
+    const searchResults = await PerformanceOptimizer.withConnectionPooling(async () => {
+      return searchMethod === 'parallel' ?
+        await DualSearchOrchestrator.executeParallelSearch(
+          supabaseClient,
+          requestUserId,
+          queryEmbedding,
+          enhancedQueryPlan,
+          message
+        ) :
+        await DualSearchOrchestrator.executeSequentialSearch(
+          supabaseClient,
+          requestUserId,
+          queryEmbedding,
+          enhancedQueryPlan,
+          message
+        );
+    });
 
     const { vectorResults, sqlResults, combinedResults } = searchResults;
+    PerformanceOptimizer.endTimer(searchTimer, 'dual_search');
 
     console.log(`[chat-with-rag] Dual search completed: ${combinedResults.length} total results`);
 
-    // Detect if this is an analytical query for formatting
+    // Detect analytical query
     const isAnalyticalQuery = enhancedQueryPlan.expectedResponseType === 'analysis' ||
       enhancedQueryPlan.expectedResponseType === 'aggregated' ||
       /\b(pattern|trend|when do|what time|how often|frequency|usually|typically|statistics|insights|breakdown|analysis)\b/i.test(message);
 
-    // Generate enhanced system prompt with dual search context
+    // Generate prompts
+    const promptTimer = PerformanceOptimizer.startTimer('prompt_generation');
     const systemPrompt = generateSystemPrompt(
       userProfile.timezone || 'UTC',
       enhancedQueryPlan.timeRange,
@@ -125,10 +209,11 @@ serve(async (req) => {
       'dual'
     );
 
-    // Generate user prompt with formatted entries
     const userPrompt = generateUserPrompt(message, combinedResults, 'dual vector + SQL');
+    PerformanceOptimizer.endTimer(promptTimer, 'prompt_generation');
 
-    // Generate response with enhanced formatting
+    // Generate response with optimization
+    const responseTimer = PerformanceOptimizer.startTimer('ai_response');
     console.log('[chat-with-rag] Generating enhanced response with dual search results');
     const aiResponse = await generateResponse(
       systemPrompt,
@@ -137,21 +222,12 @@ serve(async (req) => {
       openaiApiKey,
       isAnalyticalQuery
     );
+    PerformanceOptimizer.endTimer(responseTimer, 'ai_response');
 
-    processingTime = Date.now() - startTime;
+    processingTime = PerformanceOptimizer.endTimer(globalTimer, 'total_request');
 
-    // Log successful API usage
-    await rateLimitManager.logApiUsage({
-      userId,
-      ipAddress,
-      functionName: 'chat-with-rag',
-      statusCode,
-      responseTimeMs: processingTime
-    });
-
-    console.log(`[chat-with-rag] Enhanced dual search RAG completed in ${processingTime}ms`);
-
-    return new Response(JSON.stringify({
+    // Prepare final response
+    const finalResponse = {
       response: aiResponse,
       analysis: {
         queryPlan: enhancedQueryPlan,
@@ -164,7 +240,9 @@ serve(async (req) => {
         isAnalyticalQuery,
         processingTime,
         enhancedFormatting: isAnalyticalQuery,
-        dualSearchEnabled: true
+        dualSearchEnabled: true,
+        fromCache: false,
+        performanceReport: PerformanceOptimizer.getPerformanceReport()
       },
       referenceEntries: combinedResults.slice(0, 8).map(entry => ({
         id: entry.id,
@@ -174,7 +252,25 @@ serve(async (req) => {
         emotions: entry.emotions || {},
         searchMethod: entry.searchMethod || 'combined'
       }))
-    }), {
+    };
+
+    // Cache result in background
+    BackgroundTaskManager.getInstance().addTask(
+      Promise.resolve(SmartCache.set(cacheKey, finalResponse, 300))
+    );
+
+    // Log successful API usage in background
+    BackgroundTaskManager.logApiUsage(rateLimitManager, {
+      userId,
+      ipAddress,
+      functionName: 'chat-with-rag',
+      statusCode,
+      responseTimeMs: processingTime
+    });
+
+    console.log(`[chat-with-rag] Enhanced dual search RAG completed in ${processingTime}ms`);
+
+    return new Response(JSON.stringify(finalResponse), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
 

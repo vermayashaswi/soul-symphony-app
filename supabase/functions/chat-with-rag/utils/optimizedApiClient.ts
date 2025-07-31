@@ -10,10 +10,14 @@ export class OptimizedApiClient {
     userPrompt: string,
     conversationContext: any[] = [],
     openAiApiKey: string,
-    isAnalyticalQuery: boolean = false
+    isAnalyticalQuery: boolean = false,
+    performanceMode: 'fast' | 'balanced' | 'quality' = 'balanced'
   ): Promise<string> {
     try {
-      console.log('[OptimizedApiClient] Generating response with analytical formatting detection');
+      console.log('[OptimizedApiClient] Generating response with performance optimization');
+      
+      // Import PerformanceOptimizer
+      const { PerformanceOptimizer } = await import('./performanceOptimizer.ts');
       
       // Detect if this is an analytical query that needs structured formatting
       const analyticalKeywords = [
@@ -28,11 +32,18 @@ export class OptimizedApiClient {
           systemPrompt.toLowerCase().includes(keyword)
         );
 
-      // Enhanced system prompt for analytical queries
-      let enhancedSystemPrompt = systemPrompt;
+      // Optimize prompts based on performance mode
+      let optimizedSystemPrompt = systemPrompt;
+      let optimizedUserPrompt = userPrompt;
       
+      if (performanceMode === 'fast') {
+        optimizedSystemPrompt = PerformanceOptimizer.compressPrompt(systemPrompt, 0.7);
+        optimizedUserPrompt = PerformanceOptimizer.compressPrompt(userPrompt, 0.8);
+      }
+
+      // Enhanced system prompt for analytical queries
       if (isAnalytical) {
-        enhancedSystemPrompt += `
+        optimizedSystemPrompt += `
 
 CRITICAL FORMATTING REQUIREMENTS FOR ANALYTICAL RESPONSES:
 - Use clear headers with ## markdown formatting
@@ -57,7 +68,7 @@ RESPONSE STRUCTURE TEMPLATE:
       }
 
       // Generate cache key
-      const cacheKey = this.generateCacheKey(enhancedSystemPrompt, userPrompt);
+      const cacheKey = this.generateCacheKey(optimizedSystemPrompt, optimizedUserPrompt);
       
       // Check cache first
       if (this.responseCache.has(cacheKey)) {
@@ -67,19 +78,36 @@ RESPONSE STRUCTURE TEMPLATE:
 
       // Prepare messages with enhanced context
       const messages = [
-        { role: 'system', content: enhancedSystemPrompt }
+        { role: 'system', content: optimizedSystemPrompt }
       ];
 
-      // Add conversation context (last 6 messages for better context)
+      // Add conversation context with smart truncation
       if (conversationContext.length > 0) {
-        messages.push(...conversationContext.slice(-6));
+        const contextLimit = performanceMode === 'fast' ? 4 : 6;
+        messages.push(...conversationContext.slice(-contextLimit));
       }
 
-      messages.push({ role: 'user', content: userPrompt });
+      messages.push({ role: 'user', content: optimizedUserPrompt });
 
-      // Use gpt-4o-mini for all responses in RAG pipeline
-      const model = 'gpt-4o-mini';
-      const maxTokens = isAnalytical ? 1000 : 600;
+      // Intelligent model selection based on performance mode and query complexity
+      let model = 'gpt-4o-mini';
+      let maxTokens = 600;
+      
+      if (performanceMode === 'quality' && isAnalytical) {
+        model = 'gpt-4o';
+        maxTokens = 1200;
+      } else if (isAnalytical) {
+        maxTokens = 800;
+      } else if (performanceMode === 'fast') {
+        maxTokens = 400;
+      }
+
+      // Use optimized request parameters
+      const requestParams = PerformanceOptimizer.optimizeOpenAIRequest(
+        JSON.stringify(messages), 
+        maxTokens, 
+        isAnalytical
+      );
 
       const response = await fetch('https://api.openai.com/v1/chat/completions', {
         method: 'POST',
@@ -88,10 +116,8 @@ RESPONSE STRUCTURE TEMPLATE:
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          model,
-          messages,
-          temperature: 0.7,
-          max_tokens: maxTokens
+          ...requestParams,
+          messages
         }),
       });
 
