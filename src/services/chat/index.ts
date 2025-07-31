@@ -6,4 +6,5 @@ export type { ChatThread, SubQueryResponse } from './types';
 // Export ChatMessage from only one place to avoid conflicts
 export type { ChatMessage as ServiceChatMessage } from './types'; 
 export * from './useChatPersistence';
-// Export any other chat services here
+// Export new conversation state persistence
+export * from './conversationStatePersistence';

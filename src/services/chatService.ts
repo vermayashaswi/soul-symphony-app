@@ -5,6 +5,7 @@ import { analyzeQueryComplexity } from '@/services/chat/queryComplexityAnalyzer'
 import { SmartQueryRouter, QueryRoute } from '@/services/chat/smartQueryRouter';
 import { ConversationalFlowManager } from '@/services/chat/conversationalFlowManager';
 import { optimizeResponseLength, analyzeEmotionalContext, detectConversationalPattern } from '@/services/chat/responseOptimizer';
+import { ConversationStatePersistence } from '@/services/chat/conversationStatePersistence';
 
 interface ChatResponse {
   content: string;
@@ -33,6 +34,12 @@ export async function processChatMessage(
   try {
     console.log('[ChatService] Processing message with RAG optimizations:', message);
     
+    // PHASE 2: Initialize conversation state persistence
+    const conversationPersistence = new ConversationStatePersistence(threadId, userId);
+    await conversationPersistence.loadConversationState();
+    
+    console.log('[ChatService] Conversation state loaded and validated');
+    
     // PHASE 1: Query complexity analysis and routing
     const complexityAnalysis = analyzeQueryComplexity(message);
     console.log('[ChatService] Complexity analysis:', {
@@ -41,23 +48,78 @@ export async function processChatMessage(
       strategy: complexityAnalysis.recommendedStrategy
     });
     
-    // Classify message for natural conversation flow
+    // PHASE 1: Enhanced context retrieval with better conversation loading
+    console.log('[ChatService] Loading enhanced conversation context');
+    const { data: previousMessages } = await supabase
+      .from('chat_messages')
+      .select('content, sender, role, created_at')
+      .eq('thread_id', threadId)
+      .order('created_at', { ascending: false })
+      .limit(10); // Increased limit for better context
+
+    const conversationContext = previousMessages ? 
+      [...previousMessages].reverse().map(msg => ({
+        role: msg.sender === 'user' ? 'user' : 'assistant',
+        content: msg.content,
+        timestamp: msg.created_at
+      })) : [];
+
+    console.log('[ChatService] Conversation context loaded:', {
+      messagesCount: conversationContext.length,
+      lastMessage: conversationContext[conversationContext.length - 1]?.content?.slice(0, 50),
+      isResumedSession: conversationContext.length > 0
+    });
+
+    // PHASE 3: Enhanced context-aware query classification with follow-up detection
+    const lastAssistantMessage = conversationContext
+      .slice()
+      .reverse()
+      .find(msg => msg.role === 'assistant');
+    
+    const isFollowUpMessage = conversationContext.length > 0 && 
+      lastAssistantMessage && 
+      /\b(sport|football|activity|exercise|physical)\b/i.test(lastAssistantMessage.content);
+
+    console.log('[ChatService] Follow-up detection:', {
+      isFollowUp: isFollowUpMessage,
+      lastAssistant: lastAssistantMessage?.content?.slice(0, 100),
+      contextLength: conversationContext.length
+    });
+
+    // Classify message with conversation context for better follow-up detection
     const { data: classificationData, error: classificationError } = await supabase.functions.invoke('chat-query-classifier', {
-      body: { message, conversationContext: [] }
+      body: { 
+        message, 
+        conversationContext,
+        lastAssistantMessage: lastAssistantMessage?.content,
+        isFollowUp: isFollowUpMessage
+      }
     });
 
     if (classificationError) {
       console.error('[ChatService] Classification error:', classificationError);
     }
 
-    const classification = classificationData || { category: 'JOURNAL_SPECIFIC', shouldUseJournal: true };
+    let classification = classificationData || { category: 'JOURNAL_SPECIFIC', shouldUseJournal: true };
+    
+    // PHASE 3: Override classification for follow-up messages that should be conversational
+    if (isFollowUpMessage && message.toLowerCase().includes('football')) {
+      console.log('[ChatService] Overriding classification for football follow-up');
+      classification = { 
+        category: 'CONVERSATIONAL', 
+        shouldUseJournal: false,
+        confidence: 0.9,
+        reasoning: 'Follow-up to sports/activity conversation'
+      };
+    }
+    
     console.log('[ChatService] Message classification:', classification);
 
     // Handle general mental health with conversational SOULo personality
     if (classification.category === 'GENERAL_MENTAL_HEALTH' || classification.category === 'CONVERSATIONAL') {
       console.log('[ChatService] Handling general/conversational question');
       
-      const generalResponse = await handleGeneralQuestion(message);
+      const generalResponse = await handleGeneralQuestion(message, conversationContext);
       return {
         content: generalResponse,
         role: 'assistant'
@@ -74,20 +136,6 @@ export async function processChatMessage(
       throw new Error('Authentication required');
     }
 
-    // Build conversation context for natural flow
-    const { data: previousMessages } = await supabase
-      .from('chat_messages')
-      .select('content, sender, role, created_at')
-      .eq('thread_id', threadId)
-      .order('created_at', { ascending: false })
-      .limit(5);
-
-    const conversationContext = previousMessages ? 
-      [...previousMessages].reverse().map(msg => ({
-        role: msg.sender === 'user' ? 'user' : 'assistant',
-        content: msg.content,
-        timestamp: msg.created_at
-      })) : [];
 
     // PHASE 1: Smart query routing based on complexity
     const contextFactors = {
@@ -230,8 +278,22 @@ export async function processChatMessage(
       emotionalTone: emotionalContext.suggestedTone
     });
 
+    const finalResponse = ragResponse.data.response || ragResponse.data;
+
+    // PHASE 2: Save conversation state after successful processing
+    await conversationPersistence.saveConversationState(
+      message,
+      finalResponse,
+      'new_query',
+      {
+        complexityLevel: complexityAnalysis.complexityLevel,
+        route: routingResult.primaryRoute.routeName,
+        emotionalTone: emotionalContext.suggestedTone
+      }
+    );
+
     return {
-      content: ragResponse.data.response || ragResponse.data,
+      content: finalResponse,
       role: 'assistant',
       references: ragResponse.data.references,
       analysis: {
@@ -265,28 +327,59 @@ export async function processChatMessage(
   }
 }
 
-async function handleGeneralQuestion(message: string): Promise<string> {
+async function handleGeneralQuestion(message: string, conversationContext: any[] = []): Promise<string> {
   console.log('[ChatService] Generating conversational response for:', message);
   
   try {
+    // PHASE 1: Pass conversation context to general chat for better follow-ups
     const { data, error } = await supabase.functions.invoke('general-mental-health-chat', {
-      body: { message }
+      body: { 
+        message,
+        conversationContext: conversationContext.slice(-3) // Last 3 messages for context
+      }
     });
 
     if (error) {
       console.error('[ChatService] General chat error:', error);
-      return getConversationalFallback(message);
+      return getConversationalFallback(message, conversationContext);
     }
 
-    return data.response || getConversationalFallback(message);
+    return data.response || getConversationalFallback(message, conversationContext);
   } catch (error) {
     console.error('[ChatService] General chat exception:', error);
-    return getConversationalFallback(message);
+    return getConversationalFallback(message, conversationContext);
   }
 }
 
-function getConversationalFallback(message: string): string {
+function getConversationalFallback(message: string, conversationContext: any[] = []): string {
   const lowerMessage = message.toLowerCase();
+  
+  // PHASE 1: Check for football/sports follow-up context
+  const lastAssistantMessage = conversationContext
+    .slice()
+    .reverse()
+    .find(msg => msg.role === 'assistant');
+    
+  if (lastAssistantMessage && /\b(sport|football|activity|exercise|physical)\b/i.test(lastAssistantMessage.content)) {
+    if (lowerMessage.includes('football')) {
+      return `That's exciting that you're interested in starting football! 🏈 
+
+Physical activity like football can be amazing for both your mental and physical wellbeing. Here are some thoughts on getting started:
+
+• **Start gradually** - maybe join a beginner-friendly league or casual pickup games
+• **Focus on fun first** - the enjoyment factor will keep you motivated
+• **Listen to your body** - proper warm-up and recovery are key
+• **Connect with others** - team sports are great for building social connections
+
+Football can be fantastic for:
+- Building confidence through skill development
+- Managing stress through physical activity  
+- Creating social bonds with teammates
+- Setting and achieving goals
+
+Have you thought about what type of football you'd like to try? Touch football, flag football, or full contact? Each has different benefits and requirements!`;
+    }
+  }
   
   if (lowerMessage.includes('confident')) {
     return `Building confidence is such a personal journey, and I love that you're thinking about it! 

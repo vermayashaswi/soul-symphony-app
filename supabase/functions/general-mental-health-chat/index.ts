@@ -18,10 +18,10 @@ function isWithinScope(message: string): boolean {
     'journal', 'journaling', 'reflection', 'sleep', 'exercise', 'habits'
   ];
   
-  // Clearly unrelated topics
+  // Clearly unrelated topics (removed sports/football for mental health context)
   const outOfScopeIndicators = [
     'president', 'politics', 'election', 'programming', 'coding', 'movie', 'film',
-    'sports', 'football', 'basketball', 'recipe', 'cooking', 'weather'
+    'recipe', 'cooking', 'weather', 'mathematics', 'physics', 'history'
   ];
   
   // Quick exclusion check
@@ -69,7 +69,7 @@ serve(async (req) => {
   }
 
   try {
-    const { message, conversationContext = [] } = await req.json();
+    const { message, conversationContext = [], lastAssistantMessage, isFollowUp } = await req.json();
 
     if (!message) {
       return new Response(
@@ -79,9 +79,18 @@ serve(async (req) => {
     }
 
     console.log(`[General Mental Health] Processing: "${message}"`);
+    console.log(`[General Mental Health] Is follow-up: ${isFollowUp}, Last assistant: ${lastAssistantMessage?.slice(0, 50)}`);
 
-    // Check scope
-    if (!isWithinScope(message)) {
+    // PHASE 3: Enhanced scope checking with follow-up detection
+    const isFootballFollowUp = isFollowUp && 
+      lastAssistantMessage && 
+      /\b(sport|football|activity|exercise|physical)\b/i.test(lastAssistantMessage) &&
+      /\b(football|sport)\b/i.test(message.toLowerCase());
+
+    if (isFootballFollowUp) {
+      console.log(`[General Mental Health] Handling football follow-up: "${message}"`);
+      // Don't check scope for follow-ups, handle directly
+    } else if (!isWithinScope(message)) {
       console.log(`[General Mental Health] Out of scope: "${message}"`);
       return new Response(
         JSON.stringify({ 
@@ -115,6 +124,7 @@ serve(async (req) => {
 - Emotional wellbeing and mental health support
 - Stress, anxiety, and mood management strategies
 - Self-care practices and healthy habits
+- Physical activities and exercise for mental health (including sports like football)
 - Understanding feelings and emotional patterns
 - Journaling and self-reflection guidance
 - Mindfulness and coping techniques
