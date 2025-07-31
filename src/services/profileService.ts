@@ -3,6 +3,7 @@ import { User } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { logInfo, logError, logProfile, logAuthError } from '@/components/debug/DebugPanel';
+import { enhancedLocationService } from './enhanced-location-service';
 
 /**
  * Maximum number of automatic retries for profile creation
@@ -10,7 +11,23 @@ import { logInfo, logError, logProfile, logAuthError } from '@/components/debug/
 const MAX_PROFILE_CREATION_RETRIES = 3;
 
 /**
- * Get user's timezone using browser API
+ * Get user's location data including timezone and country using enhanced detection
+ */
+const getUserLocationData = async () => {
+  try {
+    return await enhancedLocationService.detectUserLocation();
+  } catch (error) {
+    console.error('Error detecting location:', error);
+    return {
+      timezone: 'UTC',
+      country: 'DEFAULT',
+      currency: 'USD'
+    };
+  }
+};
+
+/**
+ * Get user's timezone using browser API (fallback for synchronous calls)
  */
 const getUserTimezone = (): string => {
   try {
@@ -86,14 +103,20 @@ export const ensureProfileExists = async (user: User | null): Promise<boolean> =
  */
 const updateMissingProfileFields = async (userId: string, user: User): Promise<boolean> => {
   try {
-    const timezone = getUserTimezone();
+    // Get enhanced location data including timezone and country
+    const locationData = await getUserLocationData();
     const updateData: any = {
       updated_at: new Date().toISOString()
     };
     
-    // Add timezone if missing
-    if (timezone !== 'UTC') {
-      updateData.timezone = timezone;
+    // Add timezone if missing or if it's currently UTC but we detected a better one
+    if (locationData.timezone !== 'UTC') {
+      updateData.timezone = locationData.timezone;
+    }
+    
+    // Add country if missing or if it's currently DEFAULT but we detected a better one
+    if (locationData.country !== 'DEFAULT') {
+      updateData.country = locationData.country;
     }
     
     // Add full_name if available and missing
@@ -141,7 +164,9 @@ const createProfileManually = async (user: User): Promise<boolean> => {
       let fullName = '';
       let avatarUrl = '';
       const email = user.email || '';
-      const timezone = getUserTimezone();
+      
+      // Get enhanced location data
+      const locationData = await getUserLocationData();
       
       // Handle different authentication providers' metadata formats
       if (user.app_metadata?.provider === 'google') {
@@ -170,7 +195,8 @@ const createProfileManually = async (user: User): Promise<boolean> => {
         email,
         full_name: fullName || null,
         avatar_url: avatarUrl || null, 
-        timezone: timezone,
+        timezone: locationData.timezone,
+        country: locationData.country,
         onboarding_completed: false,
         updated_at: new Date().toISOString()
       };
@@ -239,8 +265,15 @@ export const updateUserProfile = async (user: User | null, metadata: Record<stri
     
     // Add timezone to metadata if not provided
     if (!metadata.timezone) {
-      metadata.timezone = getUserTimezone();
-      logProfile(`Adding detected timezone to metadata: ${metadata.timezone}`, 'ProfileService');
+      try {
+        const locationData = await getUserLocationData();
+        metadata.timezone = locationData.timezone;
+        logProfile(`Adding detected timezone to metadata: ${metadata.timezone}`, 'ProfileService');
+      } catch (error) {
+        // Fallback to basic timezone detection
+        metadata.timezone = getUserTimezone();
+        logProfile(`Adding fallback timezone to metadata: ${metadata.timezone}`, 'ProfileService');
+      }
     }
     
     const { data, error } = await supabase.auth.updateUser({

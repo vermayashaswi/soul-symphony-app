@@ -58,11 +58,28 @@ export const useUserProfile = (): UserProfileData & {
         if (data && data.timezone) {
           setTimezone(data.timezone);
         } else {
-          // If profile exists but no timezone, update with browser timezone
-          const browserTimezone = getBrowserTimezone();
-          if (browserTimezone) {
-            await updateTimezone(browserTimezone);
-            setTimezone(browserTimezone);
+          // If profile exists but no timezone, detect using enhanced location service
+          try {
+            const { enhancedLocationService } = await import('@/services/enhanced-location-service');
+            const locationData = await enhancedLocationService.detectUserLocation();
+            if (locationData.timezone && locationData.timezone !== 'UTC') {
+              await updateTimezone(locationData.timezone);
+              setTimezone(locationData.timezone);
+            } else {
+              // Fallback to browser timezone if enhanced detection fails
+              const browserTimezone = getBrowserTimezone();
+              if (browserTimezone) {
+                await updateTimezone(browserTimezone);
+                setTimezone(browserTimezone);
+              }
+            }
+          } catch (error) {
+            console.error('Error detecting enhanced location, falling back to browser timezone:', error);
+            const browserTimezone = getBrowserTimezone();
+            if (browserTimezone) {
+              await updateTimezone(browserTimezone);
+              setTimezone(browserTimezone);
+            }
           }
         }
       } catch (error) {
