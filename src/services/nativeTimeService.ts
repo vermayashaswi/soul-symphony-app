@@ -1,5 +1,4 @@
 import { Capacitor } from '@capacitor/core';
-import { Device } from '@capacitor/device';
 import { formatInTimeZone, toZonedTime, fromZonedTime } from 'date-fns-tz';
 import { format, addDays, setHours, setMinutes, setSeconds, setMilliseconds } from 'date-fns';
 
@@ -55,12 +54,23 @@ class NativeTimeService {
       // Method 1: Use browser Intl API (most reliable on web)
       const browserTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
       
-      // Method 2: Use Capacitor Device info if available
+      // Method 2: Use Capacitor Device info if available on native platforms
       let deviceTimezone: string | undefined;
       if (Capacitor.isNativePlatform()) {
         try {
+          // Dynamically import Device only on native platforms
+          const { Device } = await import('@capacitor/device');
           const deviceInfo = await Device.getInfo();
-          console.log('[NativeTimeService] Device info available');
+          
+          console.log('[NativeTimeService] Device info:', {
+            platform: deviceInfo.platform,
+            model: deviceInfo.model,
+            operatingSystem: deviceInfo.operatingSystem,
+            osVersion: deviceInfo.osVersion
+          });
+          
+          // Device API doesn't provide timezone directly, rely on browser API
+          console.log('[NativeTimeService] Using browser timezone as device timezone is not available via Device API');
         } catch (error) {
           console.log('[NativeTimeService] Device info not available:', error);
         }
@@ -76,6 +86,7 @@ class NativeTimeService {
       this.detectedTimezone = 'UTC';
     }
   }
+
 
   getTimezone(): string {
     if (!this.isInitialized) {
