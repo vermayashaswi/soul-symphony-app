@@ -19,17 +19,43 @@ const PhoneVoiceAnimation = () => {
       setWaveform(newWaveform);
     };
 
-    const interval = setInterval(() => {
-      setAnimationStage((prev) => (prev + 1) % maxStages);
-      
-      if (animationStage === 0) {
-        generateWaveform();
-      }
-    }, 3000);
-
+    // Generate initial waveform
     generateWaveform();
 
-    return () => clearInterval(interval);
+    let animationInterval: NodeJS.Timeout | null = null;
+
+    // Start animation cycle after a short delay to prevent initial flicker
+    const startDelay = setTimeout(() => {
+      animationInterval = setInterval(() => {
+        setAnimationStage((prev) => {
+          const nextStage = (prev + 1) % maxStages;
+          if (nextStage === 0) {
+            generateWaveform();
+          }
+          return nextStage;
+        });
+      }, 3000);
+    }, 500);
+
+    return () => {
+      clearTimeout(startDelay);
+      if (animationInterval) {
+        clearInterval(animationInterval);
+      }
+    };
+  }, []); // Remove animationStage dependency to prevent re-initialization
+
+  // Separate effect for waveform updates during recording stage
+  useEffect(() => {
+    if (animationStage === 0) {
+      const waveformInterval = setInterval(() => {
+        setWaveform(prev => Array.from({ length: 30 }, () => 
+          Math.random() * 0.8 + 0.2
+        ));
+      }, 150);
+
+      return () => clearInterval(waveformInterval);
+    }
   }, [animationStage]);
 
   return (

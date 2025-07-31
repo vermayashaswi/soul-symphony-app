@@ -22,6 +22,8 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useOnboarding } from '@/hooks/use-onboarding';
 import { useSessionValidation } from '@/hooks/useSessionValidation';
 import { nativeIntegrationService } from '@/services/nativeIntegrationService';
+import { MarketingContextProvider } from '@/contexts/MarketingContextProvider';
+import { AppContextProvider } from '@/contexts/AppContextProvider';
 
 const AppRoutes = () => {
   const { user } = useAuth();
@@ -119,7 +121,7 @@ const AppRoutes = () => {
 
     // Web behavior - show marketing site only for web
     console.log('[AppRoutes] Web environment, showing marketing site');
-    return <Index />;
+    return <MarketingContextProvider><Index /></MarketingContextProvider>;
   };
 
   return (
@@ -132,47 +134,51 @@ const AppRoutes = () => {
         <Route path="/privacy-policy" element={
           nativeIntegrationService.isRunningNatively() ?
           <Navigate to="/app/home" replace /> :
-          <PrivacyPolicyPage />
+          <MarketingContextProvider><PrivacyPolicyPage /></MarketingContextProvider>
         } />
         <Route path="/faq" element={
           nativeIntegrationService.isRunningNatively() ?
           <Navigate to="/app/home" replace /> :
-          <FAQPage />
+          <MarketingContextProvider><FAQPage /></MarketingContextProvider>
         } />
         <Route path="/download" element={
           nativeIntegrationService.isRunningNatively() ?
           <Navigate to="/app/home" replace /> :
-          <AppDownload />
+          <MarketingContextProvider><AppDownload /></MarketingContextProvider>
         } />
         <Route path="/blog" element={
           nativeIntegrationService.isRunningNatively() ?
           <Navigate to="/app/home" replace /> :
-          <BlogPage />
+          <MarketingContextProvider><BlogPage /></MarketingContextProvider>
         } />
         <Route path="/blog/:slug" element={
           nativeIntegrationService.isRunningNatively() ?
           <Navigate to="/app/home" replace /> :
-          <BlogPostPage />
+          <MarketingContextProvider><BlogPostPage /></MarketingContextProvider>
         } />
 
         {/* App Routes */}
         {/* Public app routes (no auth required) */}
         <Route path="/app/onboarding" element={
-          <SessionRouter>
-            <OnboardingScreen />
-          </SessionRouter>
+          <AppContextProvider>
+            <SessionRouter>
+              <OnboardingScreen />
+            </SessionRouter>
+          </AppContextProvider>
         } />
         <Route path="/app/auth" element={
-          <SessionRouter>
-            <Auth />
-          </SessionRouter>
+          <AppContextProvider>
+            <SessionRouter>
+              <Auth />
+            </SessionRouter>
+          </AppContextProvider>
         } />
 
         {/* Root app route with smart redirect */}
-        <Route path="/app" element={<AppRootRedirect />} />
+        <Route path="/app" element={<AppContextProvider><AppRootRedirect /></AppContextProvider>} />
 
         {/* Protected App Routes */}
-        <Route path="/app" element={<ProtectedRoute />}>
+        <Route path="/app" element={<AppContextProvider><ProtectedRoute /></AppContextProvider>}>
           <Route path="home" element={<Home />} />
           <Route path="journal" element={<Journal />} />
           <Route path="insights" element={

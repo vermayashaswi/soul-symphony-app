@@ -30,7 +30,16 @@ const FeatureFlagsContext = createContext<FeatureFlagsContextValue>({
 });
 
 export const FeatureFlagsProvider = ({ children }: { children: ReactNode }) => {
-  const { user } = useAuth();
+  // Safely get user, might be null if called from marketing pages
+  let user = null;
+  try {
+    const authContext = useAuth();
+    user = authContext?.user;
+  } catch (error) {
+    // Auth context not available, continue without user (for marketing pages)
+    console.log('[FeatureFlags] Auth context not available, using defaults');
+  }
+  
   const [flags, setFlags] = useState<FeatureFlags>(defaultFlags);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
