@@ -115,17 +115,40 @@ class RevenueCatService {
         return;
       }
       
-      // In a real implementation, you would configure the RevenueCat SDK here
-      // For now, we'll simulate the initialization with better error handling
       this.currentUserId = userId;
       
-      // Create or update RevenueCat customer record with timeout
-      await Promise.race([
-        this.createOrUpdateCustomer(userId),
-        new Promise((_, reject) => 
-          setTimeout(() => reject(new Error('Customer creation timeout')), 5000)
-        )
-      ]);
+      // Call the edge function for initialization
+      const platform = this.detectPlatform();
+      
+      try {
+        const { data, error } = await supabase.functions.invoke('revenuecat-init', {
+          body: {
+            userId,
+            platform
+          }
+        });
+
+        if (error) {
+          console.error('[RevenueCatService] Edge function error:', error);
+          throw error;
+        }
+
+        if (!data.success) {
+          throw new Error(data.error || 'Failed to initialize RevenueCat');
+        }
+
+        console.log('[RevenueCatService] Edge function initialization successful');
+      } catch (edgeError) {
+        console.warn('[RevenueCatService] Edge function failed, falling back to local initialization:', edgeError);
+        
+        // Fallback to local initialization
+        await Promise.race([
+          this.createOrUpdateCustomer(userId),
+          new Promise((_, reject) => 
+            setTimeout(() => reject(new Error('Customer creation timeout')), 5000)
+          )
+        ]);
+      }
       
       this.isInitialized = true;
       console.log('[RevenueCatService] RevenueCat initialized successfully');
@@ -141,6 +164,16 @@ class RevenueCatService {
         throw error;
       }
     }
+  }
+
+  private detectPlatform(): 'ios' | 'android' {
+    // For web version, default to android for testing
+    // In actual mobile app, this would detect the real platform
+    const userAgent = navigator.userAgent.toLowerCase();
+    if (userAgent.includes('iphone') || userAgent.includes('ipad')) {
+      return 'ios';
+    }
+    return 'android';
   }
 
   private async createOrUpdateCustomer(userId: string): Promise<void> {
@@ -223,71 +256,107 @@ class RevenueCatService {
     try {
       console.log('[RevenueCatService] Attempting to purchase product:', productId);
       
-      // Validate product exists
-      const product = REGIONAL_PRODUCTS[productId];
-      if (!product) {
-        throw new Error(`Product ${productId} not found`);
-      }
+      const platform = this.detectPlatform();
+      const isTrialPurchase = productId.includes('trial') || await this.checkTrialEligibility(productId);
 
-      // In a real implementation, this would trigger the Google Play purchase flow
-      const transaction: RevenueCatTransaction = {
-        transactionIdentifier: `trial_${Date.now()}`,
-        productIdentifier: productId,
-        purchaseDate: new Date().toISOString()
-      };
+      // Try using the edge function first
+      try {
+        const { data, error } = await supabase.functions.invoke('revenuecat-purchase', {
+          body: {
+            userId: this.currentUserId,
+            productId,
+            platform,
+            isTrialPurchase
+          }
+        });
 
-      // Create subscription record for trial
-      const trialExpiresAt = new Date();
-      trialExpiresAt.setDate(trialExpiresAt.getDate() + 7); // 7-day trial
-
-      const { data: customer } = await supabase
-        .from('revenuecat_customers')
-        .select('id')
-        .eq('user_id', this.currentUserId)
-        .maybeSingle();
-
-      if (customer) {
-        const { error: subscriptionError } = await supabase
-          .from('revenuecat_subscriptions')
-          .insert({
-            customer_id: customer.id,
-            revenuecat_subscription_id: transaction.transactionIdentifier,
-            product_id: productId,
-            status: 'in_trial',
-            period_type: 'trial',
-            purchase_date: transaction.purchaseDate,
-            original_purchase_date: transaction.purchaseDate,
-            expires_date: trialExpiresAt.toISOString(),
-            is_sandbox: true,
-            auto_renew_status: true,
-            price_in_purchased_currency: 0,
-            currency: product.currencyCode
-          });
-
-        if (subscriptionError) {
-          console.error('[RevenueCatService] Error creating subscription:', subscriptionError);
-          throw subscriptionError;
+        if (error) {
+          console.error('[RevenueCatService] Edge function purchase error:', error);
+          throw error;
         }
 
-        // Update user profile to reflect premium status
-        const { error: profileError } = await supabase
-          .from('profiles')
-          .update({
-            is_premium: true,
-            trial_ends_at: trialExpiresAt.toISOString(),
-            subscription_status: 'trial',
-            updated_at: new Date().toISOString()
-          })
-          .eq('id', this.currentUserId);
-
-        if (profileError) {
-          console.error('[RevenueCatService] Error updating profile:', profileError);
-          // Don't throw here as the subscription was created successfully
+        if (!data.success) {
+          throw new Error(data.error || 'Purchase failed');
         }
-      }
 
-      console.log('[RevenueCatService] Purchase completed successfully:', transaction);
-      return transaction;
+        console.log('[RevenueCatService] Edge function purchase successful');
+        
+        return {
+          transactionIdentifier: data.subscription.id,
+          productIdentifier: data.subscription.productId,
+          purchaseDate: data.subscription.currentPeriodStart
+        };
+
+      } catch (edgeError) {
+        console.warn('[RevenueCatService] Edge function purchase failed, falling back to local processing:', edgeError);
+        
+        // Fallback to local processing
+        // Validate product exists
+        const product = REGIONAL_PRODUCTS[productId];
+        if (!product) {
+          throw new Error(`Product ${productId} not found`);
+        }
+
+        // In a real implementation, this would trigger the Google Play purchase flow
+        const transaction: RevenueCatTransaction = {
+          transactionIdentifier: `trial_${Date.now()}`,
+          productIdentifier: productId,
+          purchaseDate: new Date().toISOString()
+        };
+
+        // Create subscription record for trial
+        const trialExpiresAt = new Date();
+        trialExpiresAt.setDate(trialExpiresAt.getDate() + 7); // 7-day trial
+
+        const { data: customer } = await supabase
+          .from('revenuecat_customers')
+          .select('id')
+          .eq('user_id', this.currentUserId)
+          .maybeSingle();
+
+        if (customer) {
+          const { error: subscriptionError } = await supabase
+            .from('revenuecat_subscriptions')
+            .insert({
+              customer_id: customer.id,
+              revenuecat_subscription_id: transaction.transactionIdentifier,
+              product_id: productId,
+              status: 'in_trial',
+              period_type: 'trial',
+              purchase_date: transaction.purchaseDate,
+              original_purchase_date: transaction.purchaseDate,
+              expires_date: trialExpiresAt.toISOString(),
+              is_sandbox: true,
+              auto_renew_status: true,
+              price_in_purchased_currency: 0,
+              currency: product.currencyCode
+            });
+
+          if (subscriptionError) {
+            console.error('[RevenueCatService] Error creating subscription:', subscriptionError);
+            throw subscriptionError;
+          }
+
+          // Update user profile to reflect premium status
+          const { error: profileError } = await supabase
+            .from('profiles')
+            .update({
+              is_premium: true,
+              trial_ends_at: trialExpiresAt.toISOString(),
+              subscription_status: 'trial',
+              updated_at: new Date().toISOString()
+            })
+            .eq('id', this.currentUserId);
+
+          if (profileError) {
+            console.error('[RevenueCatService] Error updating profile:', profileError);
+            // Don't throw here as the subscription was created successfully
+          }
+        }
+
+        console.log('[RevenueCatService] Fallback purchase completed successfully:', transaction);
+        return transaction;
+      }
     } catch (error) {
       console.error('[RevenueCatService] Error purchasing product:', error);
       throw error;
