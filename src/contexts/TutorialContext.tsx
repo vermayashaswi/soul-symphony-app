@@ -173,6 +173,7 @@ export const TutorialProvider: React.FC<{ children: ReactNode }> = ({ children }
   const [tutorialCompleted, setTutorialCompleted] = useState(false);
   const [pendingTutorialStart, setPendingTutorialStart] = useState(false);
   const [isInitialized, setIsInitialized] = useState(false); // NEW: Track initialization
+  const [stuckUIDetected, setStuckUIDetected] = useState(false); // NEW: Track stuck UI state
   
   // Enhanced logging for debugging
   useEffect(() => {
@@ -188,22 +189,58 @@ export const TutorialProvider: React.FC<{ children: ReactNode }> = ({ children }
       navigationManagerState: navigationManager.getState(),
       highlightingManagerState: highlightingManager.getState()
     });
-  }, [isActive, currentStep, steps, location.pathname, navigationState, pendingTutorialStart, tutorialChecked, isInitialized]);
+  }, [isActive, currentStep, steps, location.pathname, navigationState, pendingTutorialStart, tutorialChecked]);
   
-  // NEW: Initialize the tutorial system
+  // NEW: Initialize the tutorial system synchronously to prevent race conditions
   useEffect(() => {
-    console.log('[TutorialContext] Initializing tutorial system');
+    console.log('[TutorialContext] Initializing tutorial system synchronously');
     
-    // Mark as initialized after a brief delay to ensure all dependencies are ready
-    const initTimeout = setTimeout(() => {
-      setIsInitialized(true);
-      console.log('[TutorialContext] Tutorial system initialized');
-    }, 100);
-    
-    return () => {
-      clearTimeout(initTimeout);
-    };
+    // Mark as initialized immediately to prevent race conditions
+    setIsInitialized(true);
+    console.log('[TutorialContext] Tutorial system initialized immediately');
   }, []);
+
+  // NEW: Stuck UI detection and recovery mechanism
+  useEffect(() => {
+    // Only check for stuck UI if we have a user and tutorial was checked
+    if (!user || !tutorialChecked) return;
+
+    const checkStuckUITimeout = setTimeout(() => {
+      // Check if we have the navigation bar faded but no tutorial modal active
+      const navBar = document.querySelector('.mobile-navigation-bar');
+      const tutorialModal = document.querySelector('.tutorial-step-container');
+      const bodyHasTutorialClass = document.body.classList.contains('tutorial-active');
+      
+      if (navBar && tutorialModal === null && (bodyHasTutorialClass || isActive)) {
+        console.warn('[TutorialContext] Stuck UI detected: faded navigation without tutorial modal');
+        setStuckUIDetected(true);
+        
+        // Force reset tutorial state
+        console.log('[TutorialContext] Forcing tutorial reset due to stuck UI');
+        setIsActive(false);
+        setPendingTutorialStart(false);
+        navigationManager.forceReset();
+        highlightingManager.reset();
+        
+        // Clean up stuck UI state
+        document.body.classList.remove('tutorial-active');
+        document.body.style.overflow = '';
+        document.body.style.touchAction = '';
+        document.body.removeAttribute('data-current-step');
+        
+        performStaggeredCleanup();
+        
+        setTimeout(() => {
+          setStuckUIDetected(false);
+          window.dispatchEvent(new Event('resize'));
+        }, 1000);
+      }
+    }, 3000); // Check after 3 seconds
+
+    return () => {
+      clearTimeout(checkStuckUITimeout);
+    };
+  }, [user, tutorialChecked, isActive]);
   
   // Subscribe to navigation manager state changes
   useEffect(() => {
@@ -244,7 +281,7 @@ export const TutorialProvider: React.FC<{ children: ReactNode }> = ({ children }
   
   // Enhanced navigation completion handler with timeout protection
   useEffect(() => {
-    if (!isInitialized) return; // NEW: Don't process navigation until initialized
+    // Process navigation immediately - don't wait for initialization flag
     
     const navManagerState = navigationManager.getState();
     
@@ -270,11 +307,11 @@ export const TutorialProvider: React.FC<{ children: ReactNode }> = ({ children }
         }, 500);
       }
     }
-  }, [location.pathname, pendingTutorialStart, currentStep, steps, isInitialized]);
+  }, [location.pathname, pendingTutorialStart, currentStep, steps]);
   
   // Check if tutorial should be active based on user's profile and current route
   useEffect(() => {
-    if (!isInitialized) return; // NEW: Don't check tutorial until initialized
+    // Check tutorial status immediately to prevent race conditions
     
     const checkTutorialStatus = async () => {
       if (!user || tutorialChecked) return;
@@ -333,7 +370,7 @@ export const TutorialProvider: React.FC<{ children: ReactNode }> = ({ children }
     };
     
     checkTutorialStatus();
-  }, [user, location.pathname, tutorialChecked, navigate, isInitialized]);
+  }, [user, location.pathname, tutorialChecked, navigate]);
   
   // ENHANCED: Helper function to check for target elements using new highlighting system
   const checkForTargetElementEnhanced = (stepData: TutorialStep) => {
