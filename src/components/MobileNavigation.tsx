@@ -90,7 +90,8 @@ const MobileNavigation: React.FC<MobileNavigationProps> = ({ onboardingComplete 
     
     const shouldShowNav = (isMobile.isMobile || isNativeApp()) && 
                           !isOnboardingOrAuth &&
-                          !!user;
+                          !!user &&
+                          onboardingComplete !== false;
     
     console.log('[MobileNavigation] Visibility check:', { 
       shouldShowNav, 

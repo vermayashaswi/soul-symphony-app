@@ -89,12 +89,7 @@ const AppRoutes = () => {
       return <Navigate to="/app/onboarding" replace />;
     }
 
-    // Check onboarding status for authenticated users
-    if (onboardingComplete === false) {
-      return <Navigate to="/app/onboarding" replace />;
-    }
-
-    // If user is authenticated and onboarding is complete, go to home
+    // If user is authenticated, go directly to home (ignore database onboarding flag)
     return <Navigate to="/app/home" replace />;
   };
 
@@ -163,7 +158,7 @@ const AppRoutes = () => {
         } />
 
         {/* App Routes */}
-        {/* Public app routes (no auth required) - Wrapped with AppContextProvider */}
+        {/* Public app routes (no auth required) */}
         <Route path="/app/onboarding" element={
           <AppContextProvider>
             <SessionRouter>
@@ -180,14 +175,10 @@ const AppRoutes = () => {
         } />
 
         {/* Root app route with smart redirect */}
-        <Route path="/app" element={<AppRootRedirect />} />
+        <Route path="/app" element={<AppContextProvider><AppRootRedirect /></AppContextProvider>} />
 
-        {/* Protected App Routes - Wrapped with AppContextProvider */}
-        <Route path="/app" element={
-          <AppContextProvider>
-            <ProtectedRoute />
-          </AppContextProvider>
-        }>
+        {/* Protected App Routes */}
+        <Route path="/app" element={<AppContextProvider><ProtectedRoute /></AppContextProvider>}>
           <Route path="home" element={<Home />} />
           <Route path="journal" element={<Journal />} />
           <Route path="insights" element={
