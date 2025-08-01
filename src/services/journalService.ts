@@ -146,6 +146,12 @@ export const reprocessJournalEntry = async (entryId: number, newContent: string)
       throw new Error(`Failed to reprocess entry: ${error.message}`);
     }
     
+    console.log('[JournalService] Successfully updated entry, triggering full text processing:', entryId);
+    
+    // Import and trigger the full text processing pipeline
+    const { triggerFullTextProcessing } = await import('@/utils/audio/theme-extractor');
+    await triggerFullTextProcessing(entryId);
+    
     console.log('[JournalService] Successfully reprocessed entry:', entryId);
     return true;
   } catch (error) {

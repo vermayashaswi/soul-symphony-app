@@ -100,13 +100,13 @@ const JournalSummaryCard: React.FC = () => {
         sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
         
         try {
-          // Fetch journal entries for theme data with proper date formatting
+          // Fetch journal entries for theme data with proper date formatting (using themes column)
           const { data: journalEntries, error: entriesError } = await supabase
             .from('Journal Entries')
-            .select('master_themes, sentiment')
+            .select('themes, sentiment')
             .eq('user_id', user.id)
             .gte('created_at', sevenDaysAgo.toISOString())
-            .not('master_themes', 'is', null);
+            .not('themes', 'is', null);
           
           console.log('JournalSummaryCard: Fetched journal entries', {
             entriesCount: journalEntries?.length || 0,
@@ -115,16 +115,16 @@ const JournalSummaryCard: React.FC = () => {
           });
           
           if (entriesError) {
-            console.error('Error fetching master themes:', entriesError);
+            console.error('Error fetching themes:', entriesError);
           } else if (journalEntries && journalEntries.length > 0) {
             // Process journal entries to extract theme data
             const themesWithSentiment: ThemeData[] = [];
             
             journalEntries.forEach(entry => {
-              if (entry.master_themes && Array.isArray(entry.master_themes)) {
+              if (entry.themes && Array.isArray(entry.themes)) {
                 const sentimentScore = entry.sentiment ? parseFloat(entry.sentiment) : 0;
                 
-                entry.master_themes.forEach(theme => {
+                entry.themes.forEach(theme => {
                   if (theme && typeof theme === 'string') {
                     themesWithSentiment.push({
                       theme,
