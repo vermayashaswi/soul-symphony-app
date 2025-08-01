@@ -19,9 +19,9 @@ android {
 
     signingConfigs {
         release {
-            storeFile file("soulo-release-key.jks")
+            storeFile file("upload-keystore.jks")
             storePassword "yashsrishti"
-            keyAlias "soulo-key"
+            keyAlias "upload"
             keyPassword "yashsrishti"
         }
     }
