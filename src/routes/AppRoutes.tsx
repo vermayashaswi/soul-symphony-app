@@ -160,21 +160,25 @@ const AppRoutes = () => {
         {/* App Routes */}
         {/* Public app routes (no auth required) */}
         <Route path="/app/onboarding" element={
-          <SessionRouter>
-            <OnboardingScreen />
-          </SessionRouter>
+          <AppContextProvider>
+            <SessionRouter>
+              <OnboardingScreen />
+            </SessionRouter>
+          </AppContextProvider>
         } />
         <Route path="/app/auth" element={
-          <SessionRouter>
-            <Auth />
-          </SessionRouter>
+          <AppContextProvider>
+            <SessionRouter>
+              <Auth />
+            </SessionRouter>
+          </AppContextProvider>
         } />
 
         {/* Root app route with smart redirect */}
-        <Route path="/app" element={<AppRootRedirect />} />
+        <Route path="/app" element={<AppContextProvider><AppRootRedirect /></AppContextProvider>} />
 
         {/* Protected App Routes */}
-        <Route path="/app" element={<ProtectedRoute />}>
+        <Route path="/app" element={<AppContextProvider><ProtectedRoute /></AppContextProvider>}>
           <Route path="home" element={<Home />} />
           <Route path="journal" element={<Journal />} />
           <Route path="insights" element={

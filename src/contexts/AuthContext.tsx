@@ -28,16 +28,6 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 const MAX_AUTO_PROFILE_ATTEMPTS = 2;
 const BASE_RETRY_DELAY = 2000; // Increased delay
 
-// Hook to safely use location with fallback
-const useSafeLocation = () => {
-  try {
-    return useLocation();
-  } catch (error) {
-    console.warn('[AuthContext] Router context not available, using fallback location');
-    return { pathname: '/app' };
-  }
-};
-
 function AuthProviderCore({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [user, setUser] = useState<User | null>(null);
@@ -52,7 +42,7 @@ function AuthProviderCore({ children }: { children: ReactNode }) {
   // Session tracking state removed - now handled by SessionProvider
   const [authInitialized, setAuthInitialized] = useState(false);
   const [authStateStable, setAuthStateStable] = useState(false);
-  const location = useSafeLocation();
+  const location = useLocation();
 
   // Initialize native services
   useEffect(() => {
