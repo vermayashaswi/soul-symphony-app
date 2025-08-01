@@ -274,7 +274,7 @@ export const TutorialProvider: React.FC<{ children: ReactNode }> = ({ children }
   
   // Check if tutorial should be active based on user's profile and current route
   useEffect(() => {
-    if (!isInitialized) return; // Don't check tutorial until initialized
+    if (!isInitialized) return; // NEW: Don't check tutorial until initialized
     
     const checkTutorialStatus = async () => {
       if (!user || tutorialChecked) return;
@@ -284,7 +284,7 @@ export const TutorialProvider: React.FC<{ children: ReactNode }> = ({ children }
         
         const { data, error } = await supabase
           .from('profiles')
-          .select('tutorial_completed, tutorial_step, created_at')
+          .select('tutorial_completed, tutorial_step')
           .eq('id', user.id)
           .single();
         
