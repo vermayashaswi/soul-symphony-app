@@ -272,7 +272,7 @@ export const TutorialProvider: React.FC<{ children: ReactNode }> = ({ children }
     }
   }, [location.pathname, pendingTutorialStart, currentStep, steps, isInitialized]);
   
-  // Check if tutorial should be active based on user's profile and current route
+  // ENHANCED: Check if tutorial should be active based on user's profile and current route
   useEffect(() => {
     if (!isInitialized) return; // NEW: Don't check tutorial until initialized
     

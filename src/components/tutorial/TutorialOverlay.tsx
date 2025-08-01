@@ -22,10 +22,11 @@ import { highlightingManager } from '@/utils/tutorial/tutorial-highlighting-mana
 const TutorialOverlay: React.FC = () => {
   const tutorialContext = useTutorial();
   
-  // NEW: Early return if context is not yet initialized to prevent errors
-  if (!tutorialContext.isInitialized) {
+  // FIXED: Don't return early if context is not initialized - let it render and handle gracefully
+  if (!tutorialContext || !tutorialContext.isInitialized) {
     console.log('[TutorialOverlay] Context not yet initialized, waiting...');
-    return null;
+    // Return empty div instead of null to maintain component lifecycle
+    return <div style={{ display: 'none' }} />;
   }
   
   const { 
@@ -42,9 +43,9 @@ const TutorialOverlay: React.FC = () => {
   
   const location = useLocation();
   
-  // Enhanced route checking for tutorial display
+  // FIXED: Simplified tutorial display logic - show when active and on app route
   const isAppRouteCurrent = isAppRoute(location.pathname);
-  const shouldShowTutorial = isActive && isAppRouteCurrent && !tutorialCompleted && !navigationState.inProgress;
+  const shouldShowTutorial = isActive && isAppRouteCurrent && !tutorialCompleted;
   
   // Log important state changes
   useEffect(() => {

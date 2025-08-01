@@ -263,12 +263,12 @@ body.tutorial-active[data-current-step="5"] .empty-chat-suggestion {
   text-shadow: 0 0 2px rgba(0,0,0,0.5) !important;
 }
 
-/* Navigation bar styling during active tutorial - GLOBAL */
+/* REMOVED: Navigation bar styling during active tutorial - this was causing unwanted fading
 .mobile-navigation-bar.tutorial-active {
   opacity: 0.3 !important;
   pointer-events: none !important;
   touch-action: none !important;
-}
+} */
 
 /* Step 5 input hiding - GLOBAL but less aggressive */
 body.tutorial-active[data-current-step="5"] .p-2.border-t.border-border,

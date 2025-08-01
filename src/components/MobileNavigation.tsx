@@ -134,7 +134,7 @@ const MobileNavigation: React.FC<MobileNavigationProps> = ({ onboardingComplete 
       key={`nav-${renderKey}-${currentLanguage}`}
       className={cn(
         "mobile-navigation",
-        isTutorialActive && "opacity-30 pointer-events-none",
+        // FIXED: Remove tutorial-related opacity and pointer-events to prevent fading
         isAndroid && "platform-android",
         platform === 'ios' && "platform-ios"
         // Note: keyboard-visible class is managed by useKeyboardDetection hook
