@@ -1,246 +1,194 @@
-import React, { useEffect, useCallback, useState } from 'react';
-import { Capacitor } from '@capacitor/core';
-import { StatusBar } from '@capacitor/status-bar';
-import { Keyboard } from '@capacitor/keyboard';
-import { statusBarAutoHideService } from '../services/statusBarAutoHideService';
+
+import React, { useEffect } from 'react';
+import { nativeIntegrationService } from '@/services/nativeIntegrationService';
 
 interface StatusBarManagerProps {
   children: React.ReactNode;
 }
 
-const StatusBarManager: React.FC<StatusBarManagerProps> = ({ children }) => {
-  const [isStatusBarVisible, setIsStatusBarVisible] = useState(false);
-  const [isKeyboardVisible, setIsKeyboardVisible] = useState(false);
-
-  const updateStatusBarState = useCallback((visible: boolean) => {
-    setIsStatusBarVisible(visible);
-    
-    // Update CSS classes for styling adjustments
-    if (visible) {
-      document.body.classList.add('status-bar-visible');
-    } else {
-      document.body.classList.remove('status-bar-visible');
-    }
-  }, []);
-
-  const handleKeyboardStateChange = useCallback((visible: boolean) => {
-    setIsKeyboardVisible(visible);
-    
-    // Update CSS classes for keyboard adjustments
-    if (visible) {
-      document.body.classList.add('keyboard-visible');
-      // Pause auto-hide when keyboard is open
-      statusBarAutoHideService.pauseAutoHide();
-    } else {
-      document.body.classList.remove('keyboard-visible');
-      // Resume auto-hide when keyboard closes
-      statusBarAutoHideService.resumeAutoHide();
-    }
-  }, []);
-
+export const StatusBarManager: React.FC<StatusBarManagerProps> = ({ children }) => {
   useEffect(() => {
-    if (!Capacitor.isNativePlatform()) {
-      console.log('[StatusBarManager] Not running natively, skipping status bar configuration');
-      return;
-    }
-
-    let isInitialized = false;
-
     const initializeStatusBar = async () => {
-      if (isInitialized) return;
-      
       try {
-        console.log('[StatusBarManager] Initializing fullscreen status bar configuration...');
-
-        // Configure for fullscreen immersive experience
-        await StatusBar.hide();
-        await StatusBar.setOverlaysWebView({ overlay: true });
-        await StatusBar.setStyle({ style: 'Dark' as any });
-        await StatusBar.setBackgroundColor({ color: '#000000' });
+        const isNative = nativeIntegrationService.isRunningNatively();
+        const isAndroid = /Android/.test(navigator.userAgent);
         
-        // Initialize auto-hide service
-        await statusBarAutoHideService.enable();
+        console.log('[StatusBarManager] ANDROID FIX: Initializing with native:', isNative, 'android:', isAndroid);
         
-        console.log('[StatusBarManager] Fullscreen status bar configured successfully');
-        isInitialized = true;
+        if (isNative) {
+          console.log('[StatusBarManager] Configuring native status bar for immersive experience...');
+          
+          // Hide status bar for full-screen immersive experience
+          await nativeIntegrationService.hideStatusBar();
+          
+          const statusBarPlugin = nativeIntegrationService.getPlugin('StatusBar');
+          if (statusBarPlugin) {
+            // Configure status bar to overlay web view for true full-screen
+            await statusBarPlugin.setOverlaysWebView({ overlay: true });
+            await statusBarPlugin.setStyle({ style: 'dark' });
+            
+            console.log('[StatusBarManager] Status bar hidden and configured for immersive experience');
+          }
+        } else {
+          console.log('[StatusBarManager] ANDROID FIX: Web environment - status bar styling handled by CSS');
+        }
+        
+        // Enhanced safe area detection and CSS variable setup
+        updateSafeAreaVariables();
         
       } catch (error) {
-        console.error('[StatusBarManager] Failed to configure status bar:', error);
+        console.error('[StatusBarManager] ANDROID FIX: Failed to configure status bar:', error);
       }
     };
 
-    const handleVisibilityChange = () => {
-      if (document.visibilityState === 'visible') {
-        console.log('[StatusBarManager] App became visible, re-applying status bar config');
-        setTimeout(() => {
-          initializeStatusBar();
-          updateSafeAreaVariables();
-        }, 100);
+    // FIX: Re-hide status bar when app becomes visible/active
+    const handleVisibilityChange = async () => {
+      if (!document.hidden && nativeIntegrationService.isRunningNatively()) {
+        console.log('[StatusBarManager] App became visible, re-hiding status bar');
+        try {
+          await nativeIntegrationService.hideStatusBar();
+          const statusBarPlugin = nativeIntegrationService.getPlugin('StatusBar');
+          if (statusBarPlugin) {
+            await statusBarPlugin.setOverlaysWebView({ overlay: true });
+          }
+        } catch (error) {
+          console.error('[StatusBarManager] Failed to re-hide status bar:', error);
+        }
       }
     };
 
-    const handleAppStateChange = (state: any) => {
-      if (state.isActive) {
-        console.log('[StatusBarManager] App resumed, re-applying status bar config');
-        setTimeout(() => {
-          initializeStatusBar();
-          updateSafeAreaVariables();
-        }, 100);
+    const handleAppStateChange = async (event: any) => {
+      console.log('[StatusBarManager] App state changed:', event);
+      if (event?.isActive && nativeIntegrationService.isRunningNatively()) {
+        console.log('[StatusBarManager] App resumed, re-hiding status bar');
+        try {
+          await nativeIntegrationService.hideStatusBar();
+          const statusBarPlugin = nativeIntegrationService.getPlugin('StatusBar');
+          if (statusBarPlugin) {
+            await statusBarPlugin.setOverlaysWebView({ overlay: true });
+          }
+        } catch (error) {
+          console.error('[StatusBarManager] Failed to re-hide status bar on resume:', error);
+        }
       }
     };
 
     const updateSafeAreaVariables = () => {
-      const userAgent = navigator.userAgent.toLowerCase();
-      const isAndroid = userAgent.includes('android');
-      const isIOS = /iphone|ipad|ipod/.test(userAgent);
+      // Detect platform and set appropriate CSS variables
+      const isAndroid = /Android/.test(navigator.userAgent);
+      const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || 
+                   (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
       
-      // Apply platform-specific classes
-      document.body.classList.toggle('platform-android', isAndroid);
-      document.body.classList.toggle('platform-ios', isIOS);
-      document.body.classList.add('platform-native');
+      let statusBarHeight = '0px';
+      let bottomInset = '0px';
       
-      // Get safe area values from CSS environment variables
-      const computedStyle = window.getComputedStyle(document.documentElement);
-      
-      const safeAreaTop = computedStyle.getPropertyValue('--safe-area-inset-top') || '0px';
-      const safeAreaBottom = computedStyle.getPropertyValue('--safe-area-inset-bottom') || '0px';
-      const safeAreaLeft = computedStyle.getPropertyValue('--safe-area-inset-left') || '0px';
-      const safeAreaRight = computedStyle.getPropertyValue('--safe-area-inset-right') || '0px';
-      
-      console.log('[StatusBarManager] Safe area insets:', {
-        top: safeAreaTop,
-        bottom: safeAreaBottom,
-        left: safeAreaLeft,
-        right: safeAreaRight,
-        statusBarVisible: isStatusBarVisible,
-        keyboardVisible: isKeyboardVisible
-      });
-
-      // Calculate fullscreen safe areas
       if (isAndroid) {
-        // Android fullscreen configuration
-        const cutoutSafeArea = 32; // Account for camera cutouts
-        const topSafeArea = Math.max(
-          parseInt(safeAreaTop.replace('px', '')) || 0,
-          cutoutSafeArea
-        );
+        statusBarHeight = '24px';
+        // ANDROID FIX: Force bottom inset for Android
+        bottomInset = '8px';
+        document.documentElement.classList.add('platform-android');
+        document.documentElement.classList.remove('platform-ios');
         
-        const bottomSafeArea = Math.max(
-          parseInt(safeAreaBottom.replace('px', '')) || 0,
-          8 // Minimum for gesture navigation
-        );
-        
-        document.documentElement.style.setProperty('--fullscreen-content-top', `${topSafeArea}px`);
-        document.documentElement.style.setProperty('--fullscreen-content-bottom', `${bottomSafeArea}px`);
-        document.documentElement.style.setProperty('--cutout-safe-area', `${cutoutSafeArea}px`);
-        
+        console.log('[StatusBarManager] ANDROID FIX: Android platform detected, setting bottom inset to 8px');
       } else if (isIOS) {
-        // iOS fullscreen configuration  
-        const cutoutSafeArea = 44; // Account for notch/dynamic island
-        const topSafeArea = Math.max(
-          parseInt(safeAreaTop.replace('px', '')) || 0,
-          cutoutSafeArea
-        );
-        
-        document.documentElement.style.setProperty('--fullscreen-content-top', `${topSafeArea}px`);
-        document.documentElement.style.setProperty('--fullscreen-content-bottom', safeAreaBottom);
-        document.documentElement.style.setProperty('--cutout-safe-area', `${cutoutSafeArea}px`);
+        statusBarHeight = '44px';
+        document.documentElement.classList.add('platform-ios');
+        document.documentElement.classList.remove('platform-android');
       }
       
-      // Set base safe area variables
-      document.documentElement.style.setProperty('--calculated-safe-area-top', safeAreaTop);
-      document.documentElement.style.setProperty('--calculated-safe-area-bottom', safeAreaBottom);
-      document.documentElement.style.setProperty('--calculated-safe-area-left', safeAreaLeft);
-      document.documentElement.style.setProperty('--calculated-safe-area-right', safeAreaRight);
-    };
-
-    // Set up keyboard listeners
-    const setupKeyboardListeners = async () => {
-      try {
-        const keyboardShowListener = await Keyboard.addListener('keyboardDidShow', (info) => {
-          console.log('[StatusBarManager] Keyboard shown:', info);
-          handleKeyboardStateChange(true);
-          updateSafeAreaVariables();
-        });
-        
-        const keyboardHideListener = await Keyboard.addListener('keyboardDidHide', () => {
-          console.log('[StatusBarManager] Keyboard hidden');
-          handleKeyboardStateChange(false);
-          updateSafeAreaVariables();
-        });
-        
-        return () => {
-          keyboardShowListener.remove();
-          keyboardHideListener.remove();
-        };
-      } catch (error) {
-        console.error('[StatusBarManager] Failed to set up keyboard listeners:', error);
-        return () => {};
+      // Set CSS custom properties for safe area handling
+      const root = document.documentElement;
+      root.style.setProperty('--status-bar-height', statusBarHeight);
+      
+      // ANDROID FIX: Force bottom inset for Android
+      if (isAndroid) {
+        root.style.setProperty('--safe-area-inset-bottom', bottomInset);
       }
+      
+      // Try to get actual safe area values from CSS env() if available
+      const computedStyle = getComputedStyle(root);
+      const actualTop = computedStyle.getPropertyValue('--safe-area-inset-top') || 'env(safe-area-inset-top, 0px)';
+      const actualBottom = computedStyle.getPropertyValue('--safe-area-inset-bottom') || 'env(safe-area-inset-bottom, 0px)';
+      const actualLeft = computedStyle.getPropertyValue('--safe-area-inset-left') || 'env(safe-area-inset-left, 0px)';
+      const actualRight = computedStyle.getPropertyValue('--safe-area-inset-right') || 'env(safe-area-inset-right, 0px)';
+      
+      // ANDROID FIX: For Android, ensure minimum bottom inset
+      if (isAndroid) {
+        const bottomValue = actualBottom.includes('env(') ? bottomInset : actualBottom;
+        root.style.setProperty('--safe-area-inset-bottom', bottomValue);
+        console.log('[StatusBarManager] ANDROID FIX: Forced bottom inset to:', bottomValue);
+      } else {
+        root.style.setProperty('--safe-area-inset-bottom', actualBottom);
+      }
+      
+      // Update other CSS variables
+      root.style.setProperty('--safe-area-inset-top', actualTop);
+      root.style.setProperty('--safe-area-inset-left', actualLeft);
+      root.style.setProperty('--safe-area-inset-right', actualRight);
+      
+      console.log('[StatusBarManager] ANDROID FIX: Safe area variables updated:', {
+        statusBarHeight,
+        bottomInset,
+        top: actualTop,
+        bottom: isAndroid ? bottomInset : actualBottom,
+        left: actualLeft,
+        right: actualRight,
+        platform: isAndroid ? 'android' : isIOS ? 'ios' : 'web'
+      });
     };
 
-    // Initialize on mount
     initializeStatusBar();
-    updateSafeAreaVariables();
-
-    // Set up event listeners
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-    window.addEventListener('focus', initializeStatusBar);
     
+    // FIX: Add listeners for app visibility and focus changes
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('focus', handleVisibilityChange);
+    
+    // Add native app state listeners if available
+    const appPlugin = nativeIntegrationService.getPlugin('App');
+    if (appPlugin) {
+      appPlugin.addListener('appStateChange', handleAppStateChange);
+    }
+    
+    // Update on orientation change and resize with debounce
+    let updateTimeout: NodeJS.Timeout;
     const handleOrientationChange = () => {
-      setTimeout(() => {
-        initializeStatusBar();
+      clearTimeout(updateTimeout);
+      updateTimeout = setTimeout(() => {
+        console.log('[StatusBarManager] ANDROID FIX: Orientation/resize detected, updating safe area');
         updateSafeAreaVariables();
-      }, 300);
+        // Also re-hide status bar on orientation change
+        if (nativeIntegrationService.isRunningNatively()) {
+          handleVisibilityChange();
+        }
+      }, 200);
     };
     
     window.addEventListener('orientationchange', handleOrientationChange);
-    window.addEventListener('resize', updateSafeAreaVariables);
+    window.addEventListener('resize', handleOrientationChange);
     
-    // Listen for visual viewport changes
+    // Also update when the visual viewport changes (for keyboard handling)
     if (window.visualViewport) {
-      window.visualViewport.addEventListener('resize', updateSafeAreaVariables);
+      window.visualViewport.addEventListener('resize', handleOrientationChange);
     }
-
-    // Set up Capacitor listeners
-    let appStateListener: any = null;
-    let keyboardCleanup: (() => void) | null = null;
-
-    const setupCapacitorListeners = async () => {
-      try {
-        const { App } = await import('@capacitor/app');
-        appStateListener = await App.addListener('appStateChange', handleAppStateChange);
-        keyboardCleanup = await setupKeyboardListeners();
-      } catch (error) {
-        console.error('[StatusBarManager] Failed to set up Capacitor listeners:', error);
-      }
-    };
-
-    setupCapacitorListeners();
-
-    // Cleanup function
+    
     return () => {
+      clearTimeout(updateTimeout);
       document.removeEventListener('visibilitychange', handleVisibilityChange);
-      window.removeEventListener('focus', initializeStatusBar);
+      window.removeEventListener('focus', handleVisibilityChange);
       window.removeEventListener('orientationchange', handleOrientationChange);
-      window.removeEventListener('resize', updateSafeAreaVariables);
+      window.removeEventListener('resize', handleOrientationChange);
+      
+      // Remove native app state listeners
+      const appPlugin = nativeIntegrationService.getPlugin('App');
+      if (appPlugin) {
+        appPlugin.removeAllListeners();
+      }
       
       if (window.visualViewport) {
-        window.visualViewport.removeEventListener('resize', updateSafeAreaVariables);
+        window.visualViewport.removeEventListener('resize', handleOrientationChange);
       }
-
-      // Remove Capacitor listeners
-      if (appStateListener) {
-        appStateListener.remove();
-      }
-      if (keyboardCleanup) {
-        keyboardCleanup();
-      }
-      
-      // Clean up auto-hide service
-      statusBarAutoHideService.destroy();
     };
-  }, [updateStatusBarState, handleKeyboardStateChange]);
+  }, []);
 
   return <>{children}</>;
 };
