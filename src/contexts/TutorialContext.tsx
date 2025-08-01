@@ -284,7 +284,7 @@ export const TutorialProvider: React.FC<{ children: ReactNode }> = ({ children }
         
         const { data, error } = await supabase
           .from('profiles')
-          .select('tutorial_completed, tutorial_step')
+          .select('tutorial_completed, tutorial_step, created_at')
           .eq('id', user.id)
           .single();
         
@@ -296,16 +296,27 @@ export const TutorialProvider: React.FC<{ children: ReactNode }> = ({ children }
         
         const shouldActivate = data?.tutorial_completed === 'NO';
         const startingStep = data?.tutorial_step || 0;
+        const isNewUser = data?.created_at && new Date(data.created_at) > new Date(Date.now() - 24 * 60 * 60 * 1000);
         
         console.log('[TutorialContext] Tutorial status check result:', {
           shouldActivate,
           startingStep,
           tutorialCompleted: data?.tutorial_completed,
           currentPath: location.pathname,
-          isAppRoute: isAppRoute(location.pathname)
+          isAppRoute: isAppRoute(location.pathname),
+          isNewUser,
+          profileAge: data?.created_at ? new Date(Date.now() - new Date(data.created_at).getTime()) : null
         });
         
         if (shouldActivate) {
+          // IMPROVED: Only auto-activate for new users or users with explicit tutorial progress
+          if (!isNewUser && startingStep === 0) {
+            console.log('[TutorialContext] Existing user with no tutorial progress - offering choice rather than auto-starting');
+            setTutorialCompleted(false);
+            setTutorialChecked(true);
+            return;
+          }
+          
           console.log('[TutorialContext] Tutorial should be activated at step:', startingStep);
           setCurrentStep(startingStep);
           
@@ -314,8 +325,11 @@ export const TutorialProvider: React.FC<{ children: ReactNode }> = ({ children }
           
           // Always start tutorial, but handle navigation properly
           if (isAppRoute(location.pathname)) {
-            console.log('[TutorialContext] On app route, activating tutorial immediately');
-            setIsActive(true);
+            console.log('[TutorialContext] On app route, activating tutorial with delay to prevent race conditions');
+            // Add delay to prevent race conditions with other UI elements
+            setTimeout(() => {
+              setIsActive(true);
+            }, 1000);
           } else {
             console.log('[TutorialContext] Not on app route, will navigate and then activate');
             setPendingTutorialStart(true);

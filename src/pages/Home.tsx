@@ -16,7 +16,7 @@ const Home = () => {
   const isInWelcomeTutorialStep = isActive && steps[currentStep]?.id === 1;
   const isInArrowTutorialStep = isActive && steps[currentStep]?.id === 2;
   
-  // Tutorial startup logic - let TutorialContext handle the main logic
+  // Tutorial startup logic - improved to prevent premature activation
   useEffect(() => {
     const initializeTutorialIfNeeded = async () => {
       if (!user) return;
@@ -26,7 +26,7 @@ const Home = () => {
         
         const { data: profile, error } = await supabase
           .from('profiles')
-          .select('tutorial_completed, tutorial_step')
+          .select('tutorial_completed, tutorial_step, created_at')
           .eq('id', user.id)
           .maybeSingle();
         
@@ -35,17 +35,25 @@ const Home = () => {
           return;
         }
         
-        // Only assist with tutorial startup if clearly needed and not already handled
+        const isNewUser = profile?.created_at && new Date(profile.created_at) > new Date(Date.now() - 24 * 60 * 60 * 1000);
+        
+        // IMPROVED: Only assist with tutorial for truly new users or explicit tutorial progress
         if (profile && profile.tutorial_completed === 'NO' && !isActive && !navigationState.inProgress) {
-          console.log('[Home] Tutorial needed but not active, requesting startup');
+          // Don't auto-start tutorial for existing users without explicit progress
+          if (!isNewUser && (profile.tutorial_step || 0) === 0) {
+            console.log('[Home] Existing user with no tutorial progress - letting TutorialContext handle decision');
+            return;
+          }
           
-          // Give TutorialContext a small delay to handle its own logic first
+          console.log('[Home] Tutorial needed for new user or user with progress, requesting startup');
+          
+          // Give TutorialContext more time to handle its own logic first
           setTimeout(() => {
             if (!isActive && !navigationState.inProgress) {
               console.log('[Home] Starting tutorial as backup measure');
               startTutorial();
             }
-          }, 200);
+          }, 1500); // Increased delay to prevent race conditions
         } else if (!profile) {
           // New user without profile - set up tutorial
           console.log('[Home] New user detected, setting up tutorial');
@@ -55,20 +63,22 @@ const Home = () => {
             .upsert({ 
               id: user.id,
               tutorial_completed: 'NO',
-              tutorial_step: 0
+              tutorial_step: 0,
+              created_at: new Date().toISOString()
             });
             
           if (!updateError) {
             setTimeout(() => {
               console.log('[Home] Starting tutorial for new user');
               startTutorial();
-            }, 200);
+            }, 1500); // Increased delay
           }
         } else {
           console.log('[Home] Tutorial status check complete:', {
             tutorialCompleted: profile.tutorial_completed,
             isActive,
-            navigationInProgress: navigationState.inProgress
+            navigationInProgress: navigationState.inProgress,
+            isNewUser
           });
         }
       } catch (err) {
@@ -76,9 +86,11 @@ const Home = () => {
       }
     };
     
-    // Only run if we haven't already started the tutorial
+    // Only run if we haven't already started the tutorial and add conservative timing
     if (!isActive && !navigationState.inProgress) {
-      initializeTutorialIfNeeded();
+      // Add longer delay to ensure TutorialContext has time to initialize properly
+      const timeoutId = setTimeout(initializeTutorialIfNeeded, 2500);
+      return () => clearTimeout(timeoutId);
     }
   }, [user, startTutorial, isActive, navigationState.inProgress]);
   

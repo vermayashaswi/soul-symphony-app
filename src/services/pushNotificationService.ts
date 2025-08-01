@@ -32,6 +32,7 @@ class PushNotificationService {
   private static instance: PushNotificationService;
   private vapidPublicKey = 'BMxGp7l5C1XnRIAr2oPKcLqvOjCDQOhNPJWGw8HXKsF9X9A1dKZb4rUwVyPjCDj3J5F7P2Y8GhQzW3N1SzX4V6R';
   private subscription: PushSubscription | null = null;
+  private isInitialized: boolean = false;
 
   static getInstance(): PushNotificationService {
     if (!PushNotificationService.instance) {
@@ -50,13 +51,27 @@ class PushNotificationService {
   }
 
   /**
-   * Request notification permission
+   * Initialize the service (called only when explicitly enabled)
+   */
+  async initialize(): Promise<void> {
+    if (this.isInitialized) {
+      console.log('[PushNotifications] Service already initialized');
+      return;
+    }
+
+    console.log('[PushNotifications] Initializing service...');
+    this.isInitialized = true;
+  }
+
+  /**
+   * Request notification permission (only after explicit user action)
    */
   async requestPermission(): Promise<NotificationPermission> {
     if (!this.isSupported()) {
       throw new Error('Push notifications not supported');
     }
 
+    console.log('[PushNotifications] Requesting permission after user action');
     const permission = await Notification.requestPermission();
     console.log('[PushNotifications] Permission result:', permission);
     
@@ -64,12 +79,17 @@ class PushNotificationService {
   }
 
   /**
-   * Subscribe to push notifications
+   * Subscribe to push notifications (only after initialization)
    */
   async subscribe(): Promise<PushSubscription | null> {
     if (!this.isSupported()) {
       console.warn('[PushNotifications] Push notifications not supported');
       return null;
+    }
+
+    if (!this.isInitialized) {
+      console.warn('[PushNotifications] Service not initialized - call initialize() first');
+      await this.initialize();
     }
 
     if (!serviceWorkerManager.isServiceWorkerRegistered()) {
