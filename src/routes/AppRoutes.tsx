@@ -131,7 +131,11 @@ const AppRoutes = () => {
 
   return (
     <Routes>
-      <Route element={<ViewportManager />}>
+      <Route element={
+        <AppContextProvider>
+          <ViewportManager />
+        </AppContextProvider>
+      }>
         {/* Root Route - context-aware */}
         <Route path="/" element={<RootRedirect />} />
 
@@ -163,31 +167,23 @@ const AppRoutes = () => {
         } />
 
         {/* App Routes */}
-        {/* Public app routes (no auth required) - Wrapped with AppContextProvider */}
+        {/* Public app routes (no auth required) */}
         <Route path="/app/onboarding" element={
-          <AppContextProvider>
-            <SessionRouter>
-              <OnboardingScreen />
-            </SessionRouter>
-          </AppContextProvider>
+          <SessionRouter>
+            <OnboardingScreen />
+          </SessionRouter>
         } />
         <Route path="/app/auth" element={
-          <AppContextProvider>
-            <SessionRouter>
-              <Auth />
-            </SessionRouter>
-          </AppContextProvider>
+          <SessionRouter>
+            <Auth />
+          </SessionRouter>
         } />
 
         {/* Root app route with smart redirect */}
         <Route path="/app" element={<AppRootRedirect />} />
 
-        {/* Protected App Routes - Wrapped with AppContextProvider */}
-        <Route path="/app" element={
-          <AppContextProvider>
-            <ProtectedRoute />
-          </AppContextProvider>
-        }>
+        {/* Protected App Routes */}
+        <Route path="/app" element={<ProtectedRoute />}>
           <Route path="home" element={<Home />} />
           <Route path="journal" element={<Journal />} />
           <Route path="insights" element={
