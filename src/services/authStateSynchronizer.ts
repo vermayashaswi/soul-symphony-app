@@ -139,7 +139,7 @@ class AuthStateSynchronizer {
         .single();
 
       if (selectError && selectError.code === 'PGRST116') {
-        // Profile doesn't exist, create it with correct tutorial defaults
+        // Profile doesn't exist, create it
         this.log('Profile not found, creating new profile');
 
         const displayName = localStorage.getItem('user_display_name');
@@ -152,8 +152,6 @@ class AuthStateSynchronizer {
             email: userEmail,
             display_name: displayName,
             onboarding_completed: onboardingComplete,
-            tutorial_completed: 'NO', // CRITICAL: Ensure new users start with tutorial incomplete
-            tutorial_step: 0,
             created_at: new Date().toISOString(),
             updated_at: new Date().toISOString()
           });
@@ -161,7 +159,7 @@ class AuthStateSynchronizer {
         if (insertError) {
           this.error('Failed to create profile:', insertError);
         } else {
-          this.log('Profile created successfully with tutorial defaults');
+          this.log('Profile created successfully');
         }
       } else if (selectError) {
         this.error('Error checking for existing profile:', selectError);

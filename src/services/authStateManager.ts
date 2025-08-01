@@ -308,23 +308,6 @@ class AuthStateManager {
   }
 
   private getFinalRedirectPath(providedPath?: string, onboardingComplete?: boolean): string {
-    // CRITICAL FIX: Prioritize onboarding status FIRST
-    const isOnboardingComplete = onboardingComplete !== undefined 
-      ? onboardingComplete 
-      : localStorage.getItem('onboardingComplete') === 'true';
-      
-    if (!isOnboardingComplete) {
-      this.log('Redirecting to onboarding - user has not completed onboarding');
-      // Clear any conflicting stored redirects for new users
-      const storedRedirect = localStorage.getItem('authRedirectTo');
-      if (storedRedirect && storedRedirect !== '/app/auth' && storedRedirect !== '/app/onboarding') {
-        this.log('Clearing conflicting redirect for new user:', storedRedirect);
-        localStorage.removeItem('authRedirectTo');
-      }
-      return '/app/onboarding';
-    }
-
-    // Only check redirects if onboarding is complete
     if (providedPath && providedPath !== '/app/auth') {
       this.log('Using provided redirect path:', providedPath);
       return providedPath;
@@ -334,6 +317,17 @@ class AuthStateManager {
     if (storedRedirect && storedRedirect !== '/app/auth') {
       this.log('Using stored redirect path:', storedRedirect);
       return storedRedirect;
+    }
+
+    // CRITICAL FIX: Use verified onboarding status if provided, otherwise check localStorage
+    // If onboarding is NOT complete, redirect to onboarding, not home
+    const isOnboardingComplete = onboardingComplete !== undefined 
+      ? onboardingComplete 
+      : localStorage.getItem('onboardingComplete') === 'true';
+      
+    if (!isOnboardingComplete) {
+      this.log('Redirecting to onboarding - user has not completed onboarding');
+      return '/app/onboarding';
     }
 
     this.log('Using default redirect to home - onboarding completed');
@@ -354,20 +348,14 @@ class AuthStateManager {
     try {
       const debugInfo = await this.getAuthDebugInfo();
       
-      if (!debugInfo.sessionExists || !debugInfo.userExists || !debugInfo.userId) {
+      if (!debugInfo.sessionExists || !debugInfo.userExists) {
         this.log('No valid session for onboarding check');
-        return false;
-      }
-
-      // Safety check: ensure we have a valid userId before proceeding
-      if (!debugInfo.userId) {
-        this.error('No userId found in session - treating as incomplete onboarding');
         return false;
       }
 
       // Use the new synchronizer for reliable status checking
       const { authStateSynchronizer } = await import('./authStateSynchronizer');
-      const isComplete = await authStateSynchronizer.syncOnboardingStatus(debugInfo.userId, {
+      const isComplete = await authStateSynchronizer.syncOnboardingStatus(debugInfo.userId!, {
         forceSync: true
       });
       
@@ -376,11 +364,7 @@ class AuthStateManager {
       
     } catch (error) {
       this.error('Failed to verify onboarding status:', error);
-      // For new users, default to incomplete onboarding rather than localStorage
-      // This ensures new users always go through onboarding even if localStorage is inconsistent
-      const fallbackStatus = localStorage.getItem('onboardingComplete') === 'true';
-      this.log('Using fallback onboarding status:', fallbackStatus);
-      return fallbackStatus;
+      return localStorage.getItem('onboardingComplete') === 'true';
     }
   }
 

@@ -807,17 +807,9 @@ const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ onComplete }) => {
       
       localStorage.setItem("onboardingComplete", "true");
       
-      // SIMPLIFIED: Always navigate to home after onboarding completion
-      // Clear any conflicting stored redirects
-      localStorage.removeItem('authRedirectTo');
-      
       if (onComplete) {
         onComplete();
-      } else if (user) {
-        console.log("Onboarding complete, user authenticated, navigating to /app/home");
-        navigate("/app/home", { replace: true });
       } else {
-        console.log("Onboarding complete, user not authenticated, navigating to /app/auth");
         navigate("/app/auth");
       }
     }
@@ -838,16 +830,13 @@ const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ onComplete }) => {
     
     localStorage.setItem("onboardingComplete", "true");
     
-    // SIMPLIFIED: Clear any conflicting stored redirects
-    localStorage.removeItem('authRedirectTo');
-    
     if (onComplete) {
       onComplete();
     } else {
       // Check if user is already authenticated
       if (user) {
         console.log("User is authenticated, navigating to /app/home");
-        navigate("/app/home", { replace: true });
+        navigate("/app/home");
       } else {
         console.log("User is not authenticated, navigating to /app/auth");
         navigate("/app/auth");

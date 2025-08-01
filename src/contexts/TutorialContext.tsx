@@ -217,23 +217,28 @@ export const TutorialProvider: React.FC<{ children: ReactNode }> = ({ children }
     return unsubscribe;
   }, []);
   
-  // SIMPLIFIED tutorial start function
+  // Function to manually start the tutorial with proper navigation
   const startTutorial = () => {
-    console.log('[TutorialContext] Starting tutorial');
+    console.log('[TutorialContext] Starting tutorial manually');
     
     // Reset highlighting manager
     highlightingManager.reset();
     
-    // SIMPLIFIED: Always navigate to home and start tutorial there
-    setIsActive(true);
+    // Set the tutorial as pending start until we're on the right route
+    setPendingTutorialStart(true);
     setCurrentStep(0);
     setTutorialCompleted(false);
-    setPendingTutorialStart(false);
     
-    // Always ensure we're on /app/home for tutorial
-    if (location.pathname !== '/app/home') {
-      console.log('[TutorialContext] Navigating to home for tutorial start');
-      navigate('/app/home', { replace: true });
+    // If we're not on an app route, navigate to home first
+    if (!isAppRoute(location.pathname)) {
+      console.log('[TutorialContext] Not on app route, navigating to /app/home');
+      navigationManager.startNavigation('/app/home', 0);
+      navigate('/app/home');
+    } else {
+      // We're already on an app route, activate tutorial immediately
+      console.log('[TutorialContext] Already on app route, activating tutorial');
+      setIsActive(true);
+      setPendingTutorialStart(false);
     }
   };
   
@@ -528,7 +533,7 @@ export const TutorialProvider: React.FC<{ children: ReactNode }> = ({ children }
     }
   };
   
-  // SIMPLIFIED reset tutorial function
+  // Enhanced reset tutorial function
   const resetTutorial = async () => {
     if (!user) return;
     
@@ -546,23 +551,23 @@ export const TutorialProvider: React.FC<{ children: ReactNode }> = ({ children }
         return;
       }
       
-      // Reset state and navigate to home to start tutorial
       setCurrentStep(0);
       setTutorialChecked(false);
       setTutorialCompleted(false);
       setPendingTutorialStart(false);
-      setIsActive(false);
       navigationManager.forceReset();
       highlightingManager.reset();
       
-      // Navigate to home and start tutorial
-      console.log('[TutorialContext] Navigating to home to restart tutorial');
-      navigate('/app/home', { replace: true });
-      
-      // Start tutorial after a brief delay to ensure navigation completes
-      setTimeout(() => {
-        startTutorial();
-      }, 500);
+      // Only navigate if we're not already on the app home page
+      if (location.pathname !== '/app/home') {
+        // First navigate to app home - use replace to prevent back navigation
+        console.log('[TutorialContext] Tutorial reset - redirecting to app home');
+        
+        navigate('/app/home', { replace: true });
+      } else {
+        // If already on /app/home, just set active tutorial
+        setIsActive(true);
+      }
     } catch (error) {
       console.error('[TutorialContext] Error resetting tutorial:', error);
     }
