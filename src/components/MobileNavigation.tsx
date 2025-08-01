@@ -90,8 +90,7 @@ const MobileNavigation: React.FC<MobileNavigationProps> = ({ onboardingComplete 
     
     const shouldShowNav = (isMobile.isMobile || isNativeApp()) && 
                           !isOnboardingOrAuth &&
-                          !!user &&
-                          onboardingComplete !== false;
+                          !!user;
     
     console.log('[MobileNavigation] Visibility check:', { 
       shouldShowNav, 
@@ -102,13 +101,16 @@ const MobileNavigation: React.FC<MobileNavigationProps> = ({ onboardingComplete 
       isOnboardingOrAuth,
       hasUser: !!user,
       onboardingComplete,
-      safeArea
+      safeArea,
+      finalDecision: shouldShowNav ? 'SHOW' : 'HIDE'
     });
     
     setIsVisible(shouldShowNav);
   }, [location.pathname, isMobile.isMobile, isKeyboardVisible, isTutorialActive, user, onboardingComplete, currentLanguage, renderKey, safeArea]);
   
-  if (!isVisible || onboardingComplete === false) {
+  // Only hide if not visible - removed onboardingComplete check
+  if (!isVisible) {
+    console.log('[MobileNavigation] Navigation hidden - not visible');
     return null;
   }
   
@@ -134,7 +136,8 @@ const MobileNavigation: React.FC<MobileNavigationProps> = ({ onboardingComplete 
       key={`nav-${renderKey}-${currentLanguage}`}
       className={cn(
         "mobile-navigation",
-        isTutorialActive && "opacity-30 pointer-events-none",
+        // CRITICAL FIX: Remove faded appearance and interaction blocking during tutorial
+        // The navigation should remain fully visible and interactive
         isAndroid && "platform-android",
         platform === 'ios' && "platform-ios"
         // Note: keyboard-visible class is managed by useKeyboardDetection hook

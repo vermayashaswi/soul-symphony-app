@@ -10,6 +10,9 @@ interface ExtendedLocationData {
 class EnhancedLocationService {
   private cache = new Map<string, ExtendedLocationData>();
   private cacheTimeout = 1000 * 60 * 60; // 1 hour
+  private updateRetryCount = new Map<string, number>();
+  private readonly MAX_RETRY_ATTEMPTS = 3;
+  private readonly RETRY_DELAY = 2000; // 2 seconds
 
   async detectUserLocation(): Promise<ExtendedLocationData> {
     const cacheKey = 'user_location';
@@ -76,8 +79,8 @@ class EnhancedLocationService {
       this.cache.set(cacheKey, locationData);
       setTimeout(() => this.cache.delete(cacheKey), this.cacheTimeout);
 
-      // Update user profile if authenticated
-      await this.updateUserProfile(locationData);
+      // Update user profile if authenticated (with retry logic)
+      await this.updateUserProfileWithRetry(locationData);
 
       return locationData;
     } catch (error) {
@@ -94,33 +97,133 @@ class EnhancedLocationService {
     }
   }
 
-  private async updateUserProfile(locationData: ExtendedLocationData): Promise<void> {
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      
-      if (user) {
-        const { error } = await supabase
-          .from('profiles')
-          .update({
-            timezone: locationData.timezone,
-            country: locationData.country,
-            updated_at: new Date().toISOString()
-          })
-          .eq('id', user.id);
+  private async updateUserProfileWithRetry(locationData: ExtendedLocationData): Promise<void> {
+    const { data: { user } } = await supabase.auth.getUser();
+    
+    if (!user) {
+      console.warn('[EnhancedLocationService] No authenticated user found, skipping profile update');
+      return;
+    }
 
-        if (error) {
-          console.error('[EnhancedLocationService] Failed to update user profile:', error);
-        } else {
-          console.log('[EnhancedLocationService] User profile updated with location data');
-        }
+    const retryKey = user.id;
+    const currentRetries = this.updateRetryCount.get(retryKey) || 0;
+
+    try {
+      // Check if profile exists first
+      const { data: existingProfile, error: fetchError } = await supabase
+        .from('profiles')
+        .select('id, timezone, country')
+        .eq('id', user.id)
+        .single();
+
+      if (fetchError && fetchError.code !== 'PGRST116') {
+        throw new Error(`Failed to fetch profile: ${fetchError.message}`);
       }
+
+      if (!existingProfile) {
+        console.warn('[EnhancedLocationService] Profile not found, waiting for profile creation...');
+        
+        if (currentRetries < this.MAX_RETRY_ATTEMPTS) {
+          this.updateRetryCount.set(retryKey, currentRetries + 1);
+          setTimeout(() => {
+            console.log(`[EnhancedLocationService] Retrying profile update (attempt ${currentRetries + 1}/${this.MAX_RETRY_ATTEMPTS})`);
+            this.updateUserProfileWithRetry(locationData);
+          }, this.RETRY_DELAY * (currentRetries + 1));
+        } else {
+          console.error('[EnhancedLocationService] Max retry attempts reached for profile update');
+          this.updateRetryCount.delete(retryKey);
+        }
+        return;
+      }
+
+      // Only update if values are different and not already correct
+      const needsUpdate = (
+        existingProfile.timezone !== locationData.timezone || 
+        existingProfile.country !== locationData.country ||
+        existingProfile.country === 'DEFAULT' ||
+        existingProfile.timezone === 'UTC'
+      );
+
+      if (!needsUpdate) {
+        console.log('[EnhancedLocationService] Profile location data is already correct, skipping update');
+        this.updateRetryCount.delete(retryKey);
+        return;
+      }
+
+      console.log('[EnhancedLocationService] Updating profile with location data:', {
+        from: { timezone: existingProfile.timezone, country: existingProfile.country },
+        to: { timezone: locationData.timezone, country: locationData.country }
+      });
+
+      const { error } = await supabase
+        .from('profiles')
+        .update({
+          timezone: locationData.timezone,
+          country: locationData.country,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', user.id);
+
+      if (error) {
+        throw new Error(`Profile update failed: ${error.message}`);
+      }
+
+      console.log('[EnhancedLocationService] ✅ Profile successfully updated with location data');
+      this.updateRetryCount.delete(retryKey);
+      
     } catch (error) {
       console.error('[EnhancedLocationService] Error updating user profile:', error);
+      
+      if (currentRetries < this.MAX_RETRY_ATTEMPTS) {
+        this.updateRetryCount.set(retryKey, currentRetries + 1);
+        setTimeout(() => {
+          console.log(`[EnhancedLocationService] Retrying profile update (attempt ${currentRetries + 1}/${this.MAX_RETRY_ATTEMPTS})`);
+          this.updateUserProfileWithRetry(locationData);
+        }, this.RETRY_DELAY * (currentRetries + 1));
+      } else {
+        console.error('[EnhancedLocationService] Max retry attempts reached for profile update');
+        this.updateRetryCount.delete(retryKey);
+      }
     }
+  }
+
+  // Maintain backward compatibility
+  private async updateUserProfile(locationData: ExtendedLocationData): Promise<void> {
+    return this.updateUserProfileWithRetry(locationData);
   }
 
   clearCache(): void {
     this.cache.clear();
+    this.updateRetryCount.clear();
+  }
+
+  // Force update profile for specific user (useful for fixing existing users)
+  async forceUpdateUserProfile(userId: string, locationData?: ExtendedLocationData): Promise<boolean> {
+    try {
+      const finalLocationData = locationData || await this.detectUserLocation();
+      
+      console.log('[EnhancedLocationService] Force updating profile for user:', userId, 'with data:', finalLocationData);
+      
+      const { error } = await supabase
+        .from('profiles')
+        .update({
+          timezone: finalLocationData.timezone,
+          country: finalLocationData.country,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', userId);
+
+      if (error) {
+        console.error('[EnhancedLocationService] Force update failed:', error);
+        return false;
+      }
+
+      console.log('[EnhancedLocationService] ✅ Force profile update completed successfully');
+      return true;
+    } catch (error) {
+      console.error('[EnhancedLocationService] Force update error:', error);
+      return false;
+    }
   }
 }
 

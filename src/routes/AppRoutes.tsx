@@ -89,7 +89,12 @@ const AppRoutes = () => {
       return <Navigate to="/app/onboarding" replace />;
     }
 
-    // If user is authenticated, go directly to home (ignore database onboarding flag)
+    // Check onboarding status for authenticated users
+    if (onboardingComplete === false) {
+      return <Navigate to="/app/onboarding" replace />;
+    }
+
+    // If user is authenticated and onboarding is complete, go to home
     return <Navigate to="/app/home" replace />;
   };
 
@@ -126,7 +131,11 @@ const AppRoutes = () => {
 
   return (
     <Routes>
-      <Route element={<ViewportManager />}>
+      <Route element={
+        <AppContextProvider>
+          <ViewportManager />
+        </AppContextProvider>
+      }>
         {/* Root Route - context-aware */}
         <Route path="/" element={<RootRedirect />} />
 
@@ -160,25 +169,21 @@ const AppRoutes = () => {
         {/* App Routes */}
         {/* Public app routes (no auth required) */}
         <Route path="/app/onboarding" element={
-          <AppContextProvider>
-            <SessionRouter>
-              <OnboardingScreen />
-            </SessionRouter>
-          </AppContextProvider>
+          <SessionRouter>
+            <OnboardingScreen />
+          </SessionRouter>
         } />
         <Route path="/app/auth" element={
-          <AppContextProvider>
-            <SessionRouter>
-              <Auth />
-            </SessionRouter>
-          </AppContextProvider>
+          <SessionRouter>
+            <Auth />
+          </SessionRouter>
         } />
 
         {/* Root app route with smart redirect */}
-        <Route path="/app" element={<AppContextProvider><AppRootRedirect /></AppContextProvider>} />
+        <Route path="/app" element={<AppRootRedirect />} />
 
         {/* Protected App Routes */}
-        <Route path="/app" element={<AppContextProvider><ProtectedRoute /></AppContextProvider>}>
+        <Route path="/app" element={<ProtectedRoute />}>
           <Route path="home" element={<Home />} />
           <Route path="journal" element={<Journal />} />
           <Route path="insights" element={

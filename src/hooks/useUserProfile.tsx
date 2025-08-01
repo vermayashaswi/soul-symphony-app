@@ -34,7 +34,7 @@ export const useUserProfile = (): UserProfileData & {
 
         const { data, error } = await supabase
           .from('profiles')
-          .select('display_name, full_name, timezone')
+          .select('display_name, full_name, timezone, country')
           .eq('id', user.id)
           .single();
 
@@ -55,20 +55,27 @@ export const useUserProfile = (): UserProfileData & {
         }
 
         // Set timezone from profile data
-        if (data && data.timezone) {
+        if (data && data.timezone && data.timezone !== 'UTC' && data.country !== 'DEFAULT') {
           setTimezone(data.timezone);
         } else {
-          // If profile exists but no timezone, detect using enhanced location service
+          // If profile exists but has default/UTC values, detect using enhanced location service
+          console.log('[useUserProfile] Profile has default location data, triggering enhanced location detection');
           try {
             const { enhancedLocationService } = await import('@/services/enhanced-location-service');
+            
+            // Clear cache to force fresh detection
+            enhancedLocationService.clearCache();
+            
             const locationData = await enhancedLocationService.detectUserLocation();
+            console.log('[useUserProfile] Enhanced location detection result:', locationData);
+            
             if (locationData.timezone && locationData.timezone !== 'UTC') {
               await updateTimezone(locationData.timezone);
               setTimezone(locationData.timezone);
             } else {
               // Fallback to browser timezone if enhanced detection fails
               const browserTimezone = getBrowserTimezone();
-              if (browserTimezone) {
+              if (browserTimezone && browserTimezone !== 'UTC') {
                 await updateTimezone(browserTimezone);
                 setTimezone(browserTimezone);
               }
@@ -76,7 +83,7 @@ export const useUserProfile = (): UserProfileData & {
           } catch (error) {
             console.error('Error detecting enhanced location, falling back to browser timezone:', error);
             const browserTimezone = getBrowserTimezone();
-            if (browserTimezone) {
+            if (browserTimezone && browserTimezone !== 'UTC') {
               await updateTimezone(browserTimezone);
               setTimezone(browserTimezone);
             }

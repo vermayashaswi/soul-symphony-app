@@ -28,6 +28,9 @@ export default defineConfig(({ mode }) => ({
     exclude: ['lovable-tagger'],
     include: ['react', 'react-dom']
   },
+  ssr: {
+    noExternal: ['@capacitor/core', '@capacitor/device', '@capacitor/local-notifications']
+  },
   // Ensure that Vite correctly resolves Node.js built-in modules
   build: {
     commonjsOptions: {
