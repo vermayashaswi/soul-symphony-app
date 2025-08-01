@@ -124,10 +124,10 @@ export function LocationProvider({ children }: { children: ReactNode }) {
   );
 }
 
-export function useLocation() {
+export function useLocationData() {
   const context = useContext(LocationContext);
   if (context === undefined) {
-    throw new Error('useLocation must be used within a LocationProvider');
+    throw new Error('useLocationData must be used within a LocationProvider');
   }
   return context;
 }

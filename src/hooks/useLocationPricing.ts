@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useLocation } from '@/contexts/LocationContext';
+import { useLocationData } from '@/contexts/LocationContext';
 
 interface LocationPricing {
   countryCode: string;
@@ -38,7 +38,7 @@ const PRICING_MAP: Record<string, LocationPricing> = {
 };
 
 export const useLocationPricing = () => {
-  const { locationData, isLoading: locationLoading, error: locationError } = useLocation();
+  const { locationData, isLoading: locationLoading, error: locationError } = useLocationData();
   const [pricing, setPricing] = useState<LocationPricing>(PRICING_MAP.DEFAULT);
 
   useEffect(() => {
