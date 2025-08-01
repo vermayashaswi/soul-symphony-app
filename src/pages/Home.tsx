@@ -16,13 +16,13 @@ const Home = () => {
   const isInWelcomeTutorialStep = isActive && steps[currentStep]?.id === 1;
   const isInArrowTutorialStep = isActive && steps[currentStep]?.id === 2;
   
-  // Tutorial startup logic - improved to prevent premature activation
+  // Simplified tutorial startup logic - ensure profiles exist for new users
   useEffect(() => {
-    const initializeTutorialIfNeeded = async () => {
+    const ensureProfileExists = async () => {
       if (!user) return;
       
       try {
-        console.log('[Home] Checking if tutorial should be started for user:', user.id);
+        console.log('[Home] Ensuring profile exists for user:', user.id);
         
         const { data: profile, error } = await supabase
           .from('profiles')
@@ -31,34 +31,15 @@ const Home = () => {
           .maybeSingle();
         
         if (error) {
-          console.error('[Home] Error checking tutorial status:', error);
+          console.error('[Home] Error checking profile:', error);
           return;
         }
         
-        const isNewUser = profile?.created_at && new Date(profile.created_at) > new Date(Date.now() - 24 * 60 * 60 * 1000);
-        
-        // IMPROVED: Only assist with tutorial for truly new users or explicit tutorial progress
-        if (profile && profile.tutorial_completed === 'NO' && !isActive && !navigationState.inProgress) {
-          // Don't auto-start tutorial for existing users without explicit progress
-          if (!isNewUser && (profile.tutorial_step || 0) === 0) {
-            console.log('[Home] Existing user with no tutorial progress - letting TutorialContext handle decision');
-            return;
-          }
+        if (!profile) {
+          // New user without profile - create it
+          console.log('[Home] New user detected, creating profile with tutorial enabled');
           
-          console.log('[Home] Tutorial needed for new user or user with progress, requesting startup');
-          
-          // Give TutorialContext more time to handle its own logic first
-          setTimeout(() => {
-            if (!isActive && !navigationState.inProgress) {
-              console.log('[Home] Starting tutorial as backup measure');
-              startTutorial();
-            }
-          }, 1500); // Increased delay to prevent race conditions
-        } else if (!profile) {
-          // New user without profile - set up tutorial
-          console.log('[Home] New user detected, setting up tutorial');
-          
-          const { error: updateError } = await supabase
+          await supabase
             .from('profiles')
             .upsert({ 
               id: user.id,
@@ -66,33 +47,14 @@ const Home = () => {
               tutorial_step: 0,
               created_at: new Date().toISOString()
             });
-            
-          if (!updateError) {
-            setTimeout(() => {
-              console.log('[Home] Starting tutorial for new user');
-              startTutorial();
-            }, 1500); // Increased delay
-          }
-        } else {
-          console.log('[Home] Tutorial status check complete:', {
-            tutorialCompleted: profile.tutorial_completed,
-            isActive,
-            navigationInProgress: navigationState.inProgress,
-            isNewUser
-          });
         }
       } catch (err) {
-        console.error('[Home] Error in tutorial initialization logic:', err);
+        console.error('[Home] Error in profile setup:', err);
       }
     };
     
-    // Only run if we haven't already started the tutorial and add conservative timing
-    if (!isActive && !navigationState.inProgress) {
-      // Add longer delay to ensure TutorialContext has time to initialize properly
-      const timeoutId = setTimeout(initializeTutorialIfNeeded, 2500);
-      return () => clearTimeout(timeoutId);
-    }
-  }, [user, startTutorial, isActive, navigationState.inProgress]);
+    ensureProfileExists();
+  }, [user]);
   
   useEffect(() => {
     console.log('[Home] Component mounted, tutorial state:', {
