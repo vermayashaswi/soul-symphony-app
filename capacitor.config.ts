@@ -39,6 +39,9 @@ const config: CapacitorConfig = {
       backgroundColor: "#000000",
       overlaysWebView: true
     },
+    StatusBarController: {
+      // Custom plugin for enhanced status bar control
+    },
     PushNotifications: {
       presentationOptions: ["badge", "sound", "alert"]
     },
@@ -61,7 +64,7 @@ const config: CapacitorConfig = {
     allowMixedContent: false,
     captureInput: true,
     webContentsDebuggingEnabled: false,
-    backgroundColor: "#FFFFFF",
+    backgroundColor: "#000000",
     launchMode: "singleTask",
     orientation: "portrait",
     useLegacyBridge: false,
@@ -71,7 +74,13 @@ const config: CapacitorConfig = {
     loadOnMainThread: true,
     handlePermissions: true,
     allowNavigationBarColorChange: true,
-    navigationBarColor: "#FFFFFF"
+    navigationBarColor: "#000000",
+    hideLogs: false,
+    mixedContentMode: "always_allow",
+    themeColor: "#000000",
+    overrideUserAgentString: "SouloApp/1.0.0 Mobile Android",
+    appendUserAgent: "SouloApp/1.0.0",
+    startPath: "/app"
   }
 };
 
