@@ -22,8 +22,6 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useOnboarding } from '@/hooks/use-onboarding';
 import { useSessionValidation } from '@/hooks/useSessionValidation';
 import { nativeIntegrationService } from '@/services/nativeIntegrationService';
-import { MarketingContextProvider } from '@/contexts/MarketingContextProvider';
-import { AppContextProvider } from '@/contexts/AppContextProvider';
 
 const AppRoutes = () => {
   const { user } = useAuth();
@@ -121,7 +119,7 @@ const AppRoutes = () => {
 
     // Web behavior - show marketing site only for web
     console.log('[AppRoutes] Web environment, showing marketing site');
-    return <MarketingContextProvider><Index /></MarketingContextProvider>;
+    return <Index />;
   };
 
   return (
@@ -134,27 +132,27 @@ const AppRoutes = () => {
         <Route path="/privacy-policy" element={
           nativeIntegrationService.isRunningNatively() ?
           <Navigate to="/app/home" replace /> :
-          <MarketingContextProvider><PrivacyPolicyPage /></MarketingContextProvider>
+          <PrivacyPolicyPage />
         } />
         <Route path="/faq" element={
           nativeIntegrationService.isRunningNatively() ?
           <Navigate to="/app/home" replace /> :
-          <MarketingContextProvider><FAQPage /></MarketingContextProvider>
+          <FAQPage />
         } />
         <Route path="/download" element={
           nativeIntegrationService.isRunningNatively() ?
           <Navigate to="/app/home" replace /> :
-          <MarketingContextProvider><AppDownload /></MarketingContextProvider>
+          <AppDownload />
         } />
         <Route path="/blog" element={
           nativeIntegrationService.isRunningNatively() ?
           <Navigate to="/app/home" replace /> :
-          <MarketingContextProvider><BlogPage /></MarketingContextProvider>
+          <BlogPage />
         } />
         <Route path="/blog/:slug" element={
           nativeIntegrationService.isRunningNatively() ?
           <Navigate to="/app/home" replace /> :
-          <MarketingContextProvider><BlogPostPage /></MarketingContextProvider>
+          <BlogPostPage />
         } />
 
         {/* App Routes */}

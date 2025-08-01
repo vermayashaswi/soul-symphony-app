@@ -8,7 +8,6 @@ import StatusBarManager from '@/components/StatusBarManager';
 import { isAppRoute, isWebsiteRoute } from './RouteHelpers';
 import { useOnboarding } from '@/hooks/use-onboarding';
 import { forceEnableScrolling } from '@/hooks/use-scroll-restoration';
-import { AppContextProvider } from '@/contexts/AppContextProvider';
 
 const ViewportManager: React.FC = () => {
   const location = useLocation();
@@ -81,28 +80,20 @@ const ViewportManager: React.FC = () => {
   // Render the appropriate layout based on route and device
   return (
     <StatusBarManager>
-      {/* Wrap app routes with AppContextProvider for subscription context */}
-      {isAppRoute(location.pathname) ? (
-        <AppContextProvider>
-          <div className={`app-container ${isMobile ? 'mobile-view' : 'desktop-view'} ${isHomePage ? 'overflow-hidden' : 'overflow-x-hidden'}`}>
-            <Outlet />
-          </div>
-          
-          {/* Only display mobile navigation when:
-              1. We're on an app route
-              2. User is logged in
-              3. We're not on onboarding/auth screens
-              4. If we're on /app, we also check if onboarding is complete */}
-          {user && 
-           !isOnboardingOrAuth && 
-           onboardingComplete && (
-            <MobileNavigation onboardingComplete={onboardingComplete} />
-          )}
-        </AppContextProvider>
-      ) : (
-        <div className={`app-container ${isMobile ? 'mobile-view' : 'desktop-view'} ${isHomePage ? 'overflow-hidden' : 'overflow-x-hidden'}`}>
-          <Outlet />
-        </div>
+      <div className={`app-container ${isMobile ? 'mobile-view' : 'desktop-view'} ${isHomePage ? 'overflow-hidden' : 'overflow-x-hidden'}`}>
+        <Outlet />
+      </div>
+      
+      {/* Only display mobile navigation when:
+          1. We're on an app route
+          2. User is logged in
+          3. We're not on onboarding/auth screens
+          4. If we're on /app, we also check if onboarding is complete */}
+      {isAppRoute(location.pathname) && 
+       user && 
+       !isOnboardingOrAuth && 
+       onboardingComplete && (
+        <MobileNavigation onboardingComplete={onboardingComplete} />
       )}
     </StatusBarManager>
   );

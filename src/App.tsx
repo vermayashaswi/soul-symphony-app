@@ -2,15 +2,17 @@ import React, { useEffect, useState } from 'react';
 import AppRoutes from './routes/AppRoutes';
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as SonnerToaster } from "@/components/ui/sonner";
+import { SubscriptionProvider } from '@/contexts/SubscriptionContext';
 import { TranslationLoadingOverlay } from '@/components/translation/TranslationLoadingOverlay';
 import { JournalProcessingInitializer } from './app/journal-processing-init';
+import { TutorialProvider } from './contexts/TutorialContext';
 import TutorialOverlay from './components/tutorial/TutorialOverlay';
 import ErrorBoundary from './components/insights/ErrorBoundary';
 import { preloadCriticalImages } from './utils/imagePreloader';
 import { toast } from 'sonner';
 import './styles/emoji.css';
 import './styles/tutorial.css';
-import { AuthProvider } from '@/contexts/AuthContext';
+import { FeatureFlagsProvider } from "./contexts/FeatureFlagsContext";
 import { nativeAppInitService } from './services/nativeAppInitService';
 import { mobileErrorHandler } from './services/mobileErrorHandler';
 import { mobileOptimizationService } from './services/mobileOptimizationService';
@@ -190,14 +192,18 @@ const App: React.FC = () => {
 
   return (
     <ErrorBoundary onError={handleAppError}>
-      <AuthProvider>
-        <TranslationLoadingOverlay />
-        <JournalProcessingInitializer />
-        <AppRoutes key={isInitialized ? 'initialized' : 'initializing'} />
-        <TutorialOverlay />
-        <Toaster />
-        <SonnerToaster position="top-right" />
-      </AuthProvider>
+      <FeatureFlagsProvider>
+        <SubscriptionProvider>
+          <TutorialProvider>
+            <TranslationLoadingOverlay />
+            <JournalProcessingInitializer />
+            <AppRoutes key={isInitialized ? 'initialized' : 'initializing'} />
+            <TutorialOverlay />
+            <Toaster />
+            <SonnerToaster position="top-right" />
+          </TutorialProvider>
+        </SubscriptionProvider>
+      </FeatureFlagsProvider>
     </ErrorBoundary>
   );
 };
