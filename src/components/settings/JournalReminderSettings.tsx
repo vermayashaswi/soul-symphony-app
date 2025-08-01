@@ -6,6 +6,7 @@ import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { TranslatableText } from '@/components/translation/TranslatableText';
 import { journalReminderService, JournalReminderTime } from '@/services/journalReminderService';
+import { nativeTimeService } from '@/services/nativeTimeService';
 import { toast } from 'sonner';
 
 const TIME_OPTIONS: { value: JournalReminderTime; label: string; time: string }[] = [
@@ -18,6 +19,7 @@ const TIME_OPTIONS: { value: JournalReminderTime; label: string; time: string }[
 export const JournalReminderSettings: React.FC = () => {
   const [settings, setSettings] = useState(journalReminderService.getSettings());
   const [isLoading, setIsLoading] = useState(false);
+  const [timeInfo, setTimeInfo] = useState<any>(null);
 
   const handleToggleEnabled = async (enabled: boolean) => {
     if (isLoading) return;
@@ -34,10 +36,16 @@ export const JournalReminderSettings: React.FC = () => {
         }
         
         console.log('[JournalReminderSettings] User enabling reminders');
+        
+        // Initialize time service first
+        await nativeTimeService.initialize();
+        
         const success = await journalReminderService.requestPermissionsAndSetup(settings.times);
         
         if (success) {
           setSettings(prev => ({ ...prev, enabled: true }));
+          // Update time info
+          setTimeInfo(nativeTimeService.getCurrentTimeInfo());
           toast.success('Journal reminders enabled!');
         } else {
           toast.error('Failed to enable reminders. Please check your notification settings.');
@@ -142,6 +150,14 @@ export const JournalReminderSettings: React.FC = () => {
             <p className="text-sm text-blue-800">
               <TranslatableText text="Please select at least one reminder time to enable notifications." />
             </p>
+          </div>
+        )}
+
+        {/* Time Sync Status */}
+        {timeInfo && (
+          <div className="text-xs text-muted-foreground space-y-1">
+            <div>Timezone: {timeInfo.timezone}</div>
+            <div>Local time: {timeInfo.formattedLocal}</div>
           </div>
         )}
       </CardContent>

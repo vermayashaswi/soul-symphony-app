@@ -22,10 +22,10 @@ import { highlightingManager } from '@/utils/tutorial/tutorial-highlighting-mana
 const TutorialOverlay: React.FC = () => {
   const tutorialContext = useTutorial();
   
-  // Check if context is initialized and log for debugging
+  // NEW: Early return if context is not yet initialized to prevent errors
   if (!tutorialContext.isInitialized) {
-    console.log('[TutorialOverlay] Context not yet initialized, but rendering anyway to prevent race conditions');
-    // Don't return null - continue rendering to prevent stuck UI states
+    console.log('[TutorialOverlay] Context not yet initialized, waiting...');
+    return null;
   }
   
   const { 
@@ -61,7 +61,7 @@ const TutorialOverlay: React.FC = () => {
       highlightingState: highlightingManager.getState(),
       tutorialInitialized: tutorialContext.isInitialized
     });
-  }, [isActive, currentStep, steps, navigationState, shouldShowTutorial, location.pathname, isAppRouteCurrent, tutorialCompleted]);
+  }, [isActive, currentStep, steps, navigationState, shouldShowTutorial, location.pathname, isAppRouteCurrent, tutorialCompleted, tutorialContext.isInitialized]);
   
   // Enhanced scrolling prevention with data attribute for current step
   useEffect(() => {

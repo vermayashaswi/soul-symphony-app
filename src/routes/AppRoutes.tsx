@@ -126,7 +126,6 @@ const AppRoutes = () => {
 
   return (
     <Routes>
-      {/* Marketing Routes - ViewportManager without app context */}
       <Route element={<ViewportManager />}>
         {/* Root Route - context-aware */}
         <Route path="/" element={<RootRedirect />} />
@@ -158,6 +157,40 @@ const AppRoutes = () => {
           <MarketingContextProvider><BlogPostPage /></MarketingContextProvider>
         } />
 
+        {/* App Routes */}
+        {/* Public app routes (no auth required) */}
+        <Route path="/app/onboarding" element={
+          <AppContextProvider>
+            <SessionRouter>
+              <OnboardingScreen />
+            </SessionRouter>
+          </AppContextProvider>
+        } />
+        <Route path="/app/auth" element={
+          <AppContextProvider>
+            <SessionRouter>
+              <Auth />
+            </SessionRouter>
+          </AppContextProvider>
+        } />
+
+        {/* Root app route with smart redirect */}
+        <Route path="/app" element={<AppContextProvider><AppRootRedirect /></AppContextProvider>} />
+
+        {/* Protected App Routes */}
+        <Route path="/app" element={<AppContextProvider><ProtectedRoute /></AppContextProvider>}>
+          <Route path="home" element={<Home />} />
+          <Route path="journal" element={<Journal />} />
+          <Route path="insights" element={
+            <React.Suspense fallback={<div className="flex items-center justify-center h-screen">Loading...</div>}>
+              <Insights />
+            </React.Suspense>
+          } />
+          <Route path="chat" element={<Chat />} />
+          <Route path="smart-chat" element={<SmartChat />} />
+          <Route path="settings" element={<Settings />} />
+        </Route>
+
         {/* Legacy Route Redirects - all app features redirect to /app/ routes */}
         <Route path="/auth" element={<Navigate to="/app/auth" replace />} />
         <Route path="/onboarding" element={<Navigate to="/app/onboarding" replace />} />
@@ -174,38 +207,6 @@ const AppRoutes = () => {
           <Navigate to="/app/home" replace /> :
           <NotFound />
         } />
-      </Route>
-
-      {/* App Routes - AppContextProvider wraps ViewportManager for subscription context */}
-      <Route element={<AppContextProvider><ViewportManager /></AppContextProvider>}>
-        {/* Public app routes (no auth required) */}
-        <Route path="/app/onboarding" element={
-          <SessionRouter>
-            <OnboardingScreen />
-          </SessionRouter>
-        } />
-        <Route path="/app/auth" element={
-          <SessionRouter>
-            <Auth />
-          </SessionRouter>
-        } />
-
-        {/* Root app route with smart redirect */}
-        <Route path="/app" element={<AppRootRedirect />} />
-
-        {/* Protected App Routes */}
-        <Route path="/app" element={<ProtectedRoute />}>
-          <Route path="home" element={<Home />} />
-          <Route path="journal" element={<Journal />} />
-          <Route path="insights" element={
-            <React.Suspense fallback={<div className="flex items-center justify-center h-screen">Loading...</div>}>
-              <Insights />
-            </React.Suspense>
-          } />
-          <Route path="chat" element={<Chat />} />
-          <Route path="smart-chat" element={<SmartChat />} />
-          <Route path="settings" element={<Settings />} />
-        </Route>
       </Route>
     </Routes>
   );
