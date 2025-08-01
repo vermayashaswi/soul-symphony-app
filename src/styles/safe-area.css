@@ -8,45 +8,24 @@
   --status-bar-height: 0px;
   --nav-bar-height: 4rem;
   --keyboard-height: 0px;
-  --cutout-safe-area: 0px;
   
-  /* Calculated safe areas for fullscreen mode */
-  --calculated-safe-area-top: max(var(--safe-area-inset-top), var(--cutout-safe-area));
+  /* Calculated safe areas */
+  --calculated-safe-area-top: var(--safe-area-inset-top);
   --calculated-safe-area-bottom: var(--safe-area-inset-bottom);
   --calculated-safe-area-left: var(--safe-area-inset-left);
   --calculated-safe-area-right: var(--safe-area-inset-right);
-  
-  /* Dynamic fullscreen adjustments */
-  --fullscreen-content-top: var(--calculated-safe-area-top);
-  --fullscreen-content-bottom: var(--calculated-safe-area-bottom);
 }
 
 /* Platform detection and adjustments */
 .platform-android {
-  --status-bar-height: 0px; /* Hidden in fullscreen */
-  --cutout-safe-area: 32px; /* Account for camera cutouts */
-  --safe-area-inset-bottom: max(env(safe-area-inset-bottom, 0px), 8px);
-  --calculated-safe-area-bottom: max(env(safe-area-inset-bottom, 0px), 8px);
-  
-  /* Fullscreen specific adjustments */
-  --fullscreen-content-top: max(var(--safe-area-inset-top), var(--cutout-safe-area));
-  --fullscreen-content-bottom: max(var(--safe-area-inset-bottom), 8px);
-}
-
-.platform-android.status-bar-visible {
   --status-bar-height: 24px;
-  --fullscreen-content-top: max(var(--status-bar-height), var(--safe-area-inset-top));
+  /* Ensure minimum safe area bottom for navigation gestures */
+  --safe-area-inset-bottom: max(env(safe-area-inset-bottom, 0px), 12px);
+  --calculated-safe-area-bottom: max(env(safe-area-inset-bottom, 0px), 12px);
 }
 
 .platform-ios {
-  --status-bar-height: 0px; /* Hidden in fullscreen */
-  --cutout-safe-area: 44px; /* Account for notch/dynamic island */
-  --fullscreen-content-top: max(var(--safe-area-inset-top), var(--cutout-safe-area));
-}
-
-.platform-ios.status-bar-visible {
   --status-bar-height: 44px;
-  --fullscreen-content-top: max(var(--status-bar-height), var(--safe-area-inset-top));
 }
 
 /* Keyboard state management */
@@ -62,13 +41,13 @@
   --effective-safe-area-bottom: 0px;
 }
 
-/* Safe area utilities for fullscreen */
+/* Safe area utilities */
 .safe-area-top {
-  padding-top: var(--fullscreen-content-top) !important;
+  padding-top: max(var(--status-bar-height), var(--calculated-safe-area-top)) !important;
 }
 
 .safe-area-bottom {
-  padding-bottom: var(--fullscreen-content-bottom) !important;
+  padding-bottom: var(--calculated-safe-area-bottom) !important;
 }
 
 .safe-area-left {
@@ -77,27 +56,6 @@
 
 .safe-area-right {
   padding-right: max(8px, var(--calculated-safe-area-right)) !important;
-}
-
-/* Fullscreen specific utilities */
-.fullscreen-safe-top {
-  margin-top: var(--fullscreen-content-top) !important;
-}
-
-.fullscreen-safe-bottom {
-  margin-bottom: var(--fullscreen-content-bottom) !important;
-}
-
-/* Edge-to-edge content */
-.edge-to-edge {
-  padding: 0 !important;
-  margin: 0 !important;
-}
-
-/* Dynamic spacing based on status bar visibility */
-.dynamic-top-spacing {
-  padding-top: var(--fullscreen-content-top);
-  transition: padding-top 0.3s ease-in-out;
 }
 
 /* Mobile container base styles */
