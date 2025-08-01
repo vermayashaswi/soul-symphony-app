@@ -51,7 +51,7 @@ interface TutorialContextType {
     inProgress: boolean;
     targetRoute: string | null;
   };
-  isInitialized: boolean; // NEW: Track initialization state
+  isInitialized: boolean;
 }
 
 // Create the context with a default undefined value
@@ -172,7 +172,7 @@ export const TutorialProvider: React.FC<{ children: ReactNode }> = ({ children }
   });
   const [tutorialCompleted, setTutorialCompleted] = useState(false);
   const [pendingTutorialStart, setPendingTutorialStart] = useState(false);
-  const [isInitialized, setIsInitialized] = useState(false); // NEW: Track initialization
+  const [isInitialized, setIsInitialized] = useState(true); // FIXED: Start as initialized
   
   // Enhanced logging for debugging
   useEffect(() => {
@@ -184,26 +184,11 @@ export const TutorialProvider: React.FC<{ children: ReactNode }> = ({ children }
       navigationState,
       pendingTutorialStart,
       tutorialChecked,
-      isInitialized, // NEW: Log initialization state
+      isInitialized,
       navigationManagerState: navigationManager.getState(),
       highlightingManagerState: highlightingManager.getState()
     });
   }, [isActive, currentStep, steps, location.pathname, navigationState, pendingTutorialStart, tutorialChecked, isInitialized]);
-  
-  // NEW: Initialize the tutorial system
-  useEffect(() => {
-    console.log('[TutorialContext] Initializing tutorial system');
-    
-    // Mark as initialized after a brief delay to ensure all dependencies are ready
-    const initTimeout = setTimeout(() => {
-      setIsInitialized(true);
-      console.log('[TutorialContext] Tutorial system initialized');
-    }, 100);
-    
-    return () => {
-      clearTimeout(initTimeout);
-    };
-  }, []);
   
   // Subscribe to navigation manager state changes
   useEffect(() => {
@@ -244,8 +229,6 @@ export const TutorialProvider: React.FC<{ children: ReactNode }> = ({ children }
   
   // Enhanced navigation completion handler with timeout protection
   useEffect(() => {
-    if (!isInitialized) return; // NEW: Don't process navigation until initialized
-    
     const navManagerState = navigationManager.getState();
     
     if (navManagerState.isNavigating && navManagerState.targetRoute === location.pathname) {
@@ -270,23 +253,60 @@ export const TutorialProvider: React.FC<{ children: ReactNode }> = ({ children }
         }, 500);
       }
     }
-  }, [location.pathname, pendingTutorialStart, currentStep, steps, isInitialized]);
+  }, [location.pathname, pendingTutorialStart, currentStep, steps]);
   
-  // ENHANCED: Check if tutorial should be active based on user's profile and current route
+  // FIXED: More aggressive tutorial activation for new users
   useEffect(() => {
-    if (!isInitialized) return; // NEW: Don't check tutorial until initialized
-    
     const checkTutorialStatus = async () => {
       if (!user || tutorialChecked) return;
       
       try {
         console.log('[TutorialContext] Checking tutorial status for user:', user.id);
         
+        // First, try to get existing profile
         const { data, error } = await supabase
           .from('profiles')
           .select('tutorial_completed, tutorial_step')
           .eq('id', user.id)
           .single();
+        
+        if (error && error.code === 'PGRST116') {
+          // Profile doesn't exist, create it with tutorial pending
+          console.log('[TutorialContext] No profile found, creating new profile with tutorial active');
+          
+          const { data: newProfile, error: createError } = await supabase
+            .from('profiles')
+            .insert([{
+              id: user.id,
+              tutorial_completed: 'NO',
+              tutorial_step: 0
+            }])
+            .select()
+            .single();
+          
+          if (createError) {
+            console.error('[TutorialContext] Error creating profile:', createError);
+            setTutorialChecked(true);
+            return;
+          }
+          
+          // AGGRESSIVE: Always start tutorial for new users
+          console.log('[TutorialContext] New user detected, starting tutorial immediately');
+          setCurrentStep(0);
+          highlightingManager.reset();
+          
+          if (isAppRoute(location.pathname)) {
+            setIsActive(true);
+          } else {
+            setPendingTutorialStart(true);
+            navigationManager.startNavigation('/app/home', 0);
+            navigate('/app/home');
+          }
+          
+          setTutorialCompleted(false);
+          setTutorialChecked(true);
+          return;
+        }
         
         if (error) {
           console.error('[TutorialContext] Error fetching tutorial status:', error);
@@ -294,7 +314,7 @@ export const TutorialProvider: React.FC<{ children: ReactNode }> = ({ children }
           return;
         }
         
-        const shouldActivate = data?.tutorial_completed === 'NO';
+        const shouldActivate = data?.tutorial_completed === 'NO' || data?.tutorial_completed === null;
         const startingStep = data?.tutorial_step || 0;
         
         console.log('[TutorialContext] Tutorial status check result:', {
@@ -308,11 +328,8 @@ export const TutorialProvider: React.FC<{ children: ReactNode }> = ({ children }
         if (shouldActivate) {
           console.log('[TutorialContext] Tutorial should be activated at step:', startingStep);
           setCurrentStep(startingStep);
-          
-          // Reset highlighting manager for fresh start
           highlightingManager.reset();
           
-          // Always start tutorial, but handle navigation properly
           if (isAppRoute(location.pathname)) {
             console.log('[TutorialContext] On app route, activating tutorial immediately');
             setIsActive(true);
@@ -333,7 +350,7 @@ export const TutorialProvider: React.FC<{ children: ReactNode }> = ({ children }
     };
     
     checkTutorialStatus();
-  }, [user, location.pathname, tutorialChecked, navigate, isInitialized]);
+  }, [user, location.pathname, tutorialChecked, navigate]);
   
   // ENHANCED: Helper function to check for target elements using new highlighting system
   const checkForTargetElementEnhanced = (stepData: TutorialStep) => {
@@ -558,11 +575,21 @@ export const TutorialProvider: React.FC<{ children: ReactNode }> = ({ children }
     }
   };
   
-  // Enhanced reset tutorial function
+  // FIXED: Reset tutorial function with proper cleanup order
   const resetTutorial = async () => {
     if (!user) return;
     
     try {
+      console.log('[TutorialContext] Starting tutorial reset');
+      
+      // STEP 1: First, clean up all existing tutorial styles and states
+      setIsActive(false);
+      setPendingTutorialStart(false);
+      navigationManager.forceReset();
+      highlightingManager.reset();
+      performStaggeredCleanup();
+      
+      // STEP 2: Update database
       const { error } = await supabase
         .from('profiles')
         .update({ 
@@ -576,21 +603,20 @@ export const TutorialProvider: React.FC<{ children: ReactNode }> = ({ children }
         return;
       }
       
+      // STEP 3: Reset state variables
       setCurrentStep(0);
       setTutorialChecked(false);
       setTutorialCompleted(false);
-      setPendingTutorialStart(false);
-      navigationManager.forceReset();
-      highlightingManager.reset();
       
-      // Only navigate if we're not already on the app home page
+      // STEP 4: Navigate and then activate
       if (location.pathname !== '/app/home') {
-        // First navigate to app home - use replace to prevent back navigation
-        console.log('[TutorialContext] Tutorial reset - redirecting to app home');
-        
+        console.log('[TutorialContext] Tutorial reset - navigating to app home');
+        setPendingTutorialStart(true);
+        navigationManager.startNavigation('/app/home', 0);
         navigate('/app/home', { replace: true });
       } else {
-        // If already on /app/home, just set active tutorial
+        // If already on /app/home, activate tutorial immediately
+        console.log('[TutorialContext] Tutorial reset - already on home, activating tutorial');
         setIsActive(true);
       }
     } catch (error) {

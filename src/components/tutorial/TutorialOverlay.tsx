@@ -22,10 +22,9 @@ import { highlightingManager } from '@/utils/tutorial/tutorial-highlighting-mana
 const TutorialOverlay: React.FC = () => {
   const tutorialContext = useTutorial();
   
-  // FIXED: Don't return early if context is not initialized - let it render and handle gracefully
-  if (!tutorialContext || !tutorialContext.isInitialized) {
-    console.log('[TutorialOverlay] Context not yet initialized, waiting...');
-    // Return empty div instead of null to maintain component lifecycle
+  // FIXED: Gracefully handle context during initialization
+  if (!tutorialContext) {
+    console.log('[TutorialOverlay] Context not available, rendering empty');
     return <div style={{ display: 'none' }} />;
   }
   
