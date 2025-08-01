@@ -101,13 +101,16 @@ const MobileNavigation: React.FC<MobileNavigationProps> = ({ onboardingComplete 
       isOnboardingOrAuth,
       hasUser: !!user,
       onboardingComplete,
-      safeArea
+      safeArea,
+      finalDecision: shouldShowNav ? 'SHOW' : 'HIDE'
     });
     
     setIsVisible(shouldShowNav);
   }, [location.pathname, isMobile.isMobile, isKeyboardVisible, isTutorialActive, user, onboardingComplete, currentLanguage, renderKey, safeArea]);
   
-  if (!isVisible || onboardingComplete === false) {
+  // Only hide if not visible - removed onboardingComplete check
+  if (!isVisible) {
+    console.log('[MobileNavigation] Navigation hidden - not visible');
     return null;
   }
   
