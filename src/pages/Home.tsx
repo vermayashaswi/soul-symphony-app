@@ -16,26 +16,17 @@ const Home = () => {
   const isInWelcomeTutorialStep = isActive && steps[currentStep]?.id === 1;
   const isInArrowTutorialStep = isActive && steps[currentStep]?.id === 2;
   
-  // SIMPLIFIED tutorial startup logic - more deterministic for new users
+  // Tutorial startup logic - let TutorialContext handle the main logic
   useEffect(() => {
     const initializeTutorialIfNeeded = async () => {
-      if (!user) {
-        console.log('[Home] No user found, skipping tutorial initialization');
-        return;
-      }
-      
-      // Don't interfere if tutorial is already active or navigation is in progress
-      if (isActive || navigationState.inProgress) {
-        console.log('[Home] Tutorial already active or navigation in progress, skipping');
-        return;
-      }
+      if (!user) return;
       
       try {
-        console.log('[Home] Checking tutorial status for user:', user.id);
+        console.log('[Home] Checking if tutorial should be started for user:', user.id);
         
         const { data: profile, error } = await supabase
           .from('profiles')
-          .select('tutorial_completed, tutorial_step, onboarding_completed')
+          .select('tutorial_completed, tutorial_step')
           .eq('id', user.id)
           .maybeSingle();
         
@@ -44,38 +35,49 @@ const Home = () => {
           return;
         }
         
-        console.log('[Home] Profile data:', profile);
-        
-        // SIMPLIFIED LOGIC: Start tutorial if NOT completed, regardless of profile existence
-        const shouldStartTutorial = !profile || profile.tutorial_completed === 'NO';
-        
-        if (shouldStartTutorial) {
-          console.log('[Home] Starting tutorial immediately for user');
+        // Only assist with tutorial startup if clearly needed and not already handled
+        if (profile && profile.tutorial_completed === 'NO' && !isActive && !navigationState.inProgress) {
+          console.log('[Home] Tutorial needed but not active, requesting startup');
           
-          // Ensure profile exists with correct tutorial status
-          if (!profile) {
-            await supabase
-              .from('profiles')
-              .upsert({ 
-                id: user.id,
-                tutorial_completed: 'NO',
-                tutorial_step: 0,
-                onboarding_completed: false
-              });
+          // Give TutorialContext a small delay to handle its own logic first
+          setTimeout(() => {
+            if (!isActive && !navigationState.inProgress) {
+              console.log('[Home] Starting tutorial as backup measure');
+              startTutorial();
+            }
+          }, 200);
+        } else if (!profile) {
+          // New user without profile - set up tutorial
+          console.log('[Home] New user detected, setting up tutorial');
+          
+          const { error: updateError } = await supabase
+            .from('profiles')
+            .upsert({ 
+              id: user.id,
+              tutorial_completed: 'NO',
+              tutorial_step: 0
+            });
+            
+          if (!updateError) {
+            setTimeout(() => {
+              console.log('[Home] Starting tutorial for new user');
+              startTutorial();
+            }, 200);
           }
-          
-          // Start tutorial immediately - no delays
-          startTutorial();
         } else {
-          console.log('[Home] Tutorial already completed, skipping');
+          console.log('[Home] Tutorial status check complete:', {
+            tutorialCompleted: profile.tutorial_completed,
+            isActive,
+            navigationInProgress: navigationState.inProgress
+          });
         }
       } catch (err) {
-        console.error('[Home] Error in tutorial initialization:', err);
+        console.error('[Home] Error in tutorial initialization logic:', err);
       }
     };
     
-    // Run immediately when user is available and tutorial is not active
-    if (user && !isActive && !navigationState.inProgress) {
+    // Only run if we haven't already started the tutorial
+    if (!isActive && !navigationState.inProgress) {
       initializeTutorialIfNeeded();
     }
   }, [user, startTutorial, isActive, navigationState.inProgress]);

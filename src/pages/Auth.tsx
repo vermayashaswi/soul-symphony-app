@@ -71,12 +71,10 @@ export default function Auth() {
 
   // Determine where to redirect after successful login
   const getFinalRedirectPath = () => {
-    // CRITICAL FIX: For native apps, let AuthStateManager handle the logic
-    // Don't override the onboarding flow by forcing home redirect
+    // CRITICAL: For native apps, always redirect to home after successful login
     if (nativeIntegrationService.isRunningNatively()) {
-      console.log('[Auth] Native app detected - letting AuthStateManager decide redirect');
-      // Return null to signal AuthStateManager should handle the logic
-      return null;
+      console.log('[Auth] Native app detected - redirecting to home after auth');
+      return '/app/home';
     }
 
     // For web, use redirect parameters or default to home
