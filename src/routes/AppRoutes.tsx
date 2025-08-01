@@ -126,6 +126,7 @@ const AppRoutes = () => {
 
   return (
     <Routes>
+      {/* Marketing Routes - no app context needed */}
       <Route element={<ViewportManager />}>
         {/* Root Route - context-aware */}
         <Route path="/" element={<RootRedirect />} />
@@ -157,28 +158,33 @@ const AppRoutes = () => {
           <MarketingContextProvider><BlogPostPage /></MarketingContextProvider>
         } />
 
-        {/* App Routes */}
+        {/* Catch-all route for marketing - context-aware */}
+        <Route path="*" element={
+          nativeIntegrationService.isRunningNatively() ?
+          <Navigate to="/app/home" replace /> :
+          <NotFound />
+        } />
+      </Route>
+
+      {/* App Routes - wrapped with AppContextProvider */}
+      <Route element={<AppContextProvider><ViewportManager /></AppContextProvider>}>
         {/* Public app routes (no auth required) */}
         <Route path="/app/onboarding" element={
-          <AppContextProvider>
-            <SessionRouter>
-              <OnboardingScreen />
-            </SessionRouter>
-          </AppContextProvider>
+          <SessionRouter>
+            <OnboardingScreen />
+          </SessionRouter>
         } />
         <Route path="/app/auth" element={
-          <AppContextProvider>
-            <SessionRouter>
-              <Auth />
-            </SessionRouter>
-          </AppContextProvider>
+          <SessionRouter>
+            <Auth />
+          </SessionRouter>
         } />
 
         {/* Root app route with smart redirect */}
-        <Route path="/app" element={<AppContextProvider><AppRootRedirect /></AppContextProvider>} />
+        <Route path="/app" element={<AppRootRedirect />} />
 
         {/* Protected App Routes */}
-        <Route path="/app" element={<AppContextProvider><ProtectedRoute /></AppContextProvider>}>
+        <Route path="/app" element={<ProtectedRoute />}>
           <Route path="home" element={<Home />} />
           <Route path="journal" element={<Journal />} />
           <Route path="insights" element={
@@ -200,13 +206,6 @@ const AppRoutes = () => {
         <Route path="/chat" element={<Navigate to="/app/chat" replace />} />
         <Route path="/smart-chat" element={<Navigate to="/app/smart-chat" replace />} />
         <Route path="/settings" element={<Navigate to="/app/settings" replace />} />
-
-        {/* Catch-all route - context-aware */}
-        <Route path="*" element={
-          nativeIntegrationService.isRunningNatively() ?
-          <Navigate to="/app/home" replace /> :
-          <NotFound />
-        } />
       </Route>
     </Routes>
   );
