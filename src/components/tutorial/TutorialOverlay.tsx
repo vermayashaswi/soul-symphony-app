@@ -22,8 +22,11 @@ import { highlightingManager } from '@/utils/tutorial/tutorial-highlighting-mana
 const TutorialOverlay: React.FC = () => {
   const tutorialContext = useTutorial();
   
-  // FIXED: Don't block rendering, just use safe defaults
-  console.log('[TutorialOverlay] Rendering with context:', tutorialContext.isInitialized ? 'initialized' : 'not initialized');
+  // NEW: Early return if context is not yet initialized to prevent errors
+  if (!tutorialContext.isInitialized) {
+    console.log('[TutorialOverlay] Context not yet initialized, waiting...');
+    return null;
+  }
   
   const { 
     isActive, 
@@ -39,11 +42,11 @@ const TutorialOverlay: React.FC = () => {
   
   const location = useLocation();
   
-  // SIMPLIFIED: More permissive conditions for showing tutorial
+  // Enhanced route checking for tutorial display
   const isAppRouteCurrent = isAppRoute(location.pathname);
-  const shouldShowTutorial = isActive && isAppRouteCurrent && !tutorialCompleted;
+  const shouldShowTutorial = isActive && isAppRouteCurrent && !tutorialCompleted && !navigationState.inProgress;
   
-  // Log important state changes with enhanced debugging
+  // Log important state changes
   useEffect(() => {
     console.log('[TutorialOverlay] State update:', {
       isActive,
@@ -56,25 +59,8 @@ const TutorialOverlay: React.FC = () => {
       tutorialCompleted,
       transitionProtected: navigationManager.isStepTransitionProtected(),
       highlightingState: highlightingManager.getState(),
-      tutorialInitialized: tutorialContext.isInitialized,
-      stepsLength: steps.length,
-      hasCurrentStep: !!steps[currentStep]
+      tutorialInitialized: tutorialContext.isInitialized
     });
-    
-    // CRITICAL: Log if tutorial should be showing but isn't
-    if (isActive && isAppRouteCurrent && !tutorialCompleted && !shouldShowTutorial) {
-      console.error('[TutorialOverlay] CRITICAL: Tutorial active but shouldShowTutorial is FALSE!', {
-        isActive,
-        isAppRouteCurrent, 
-        tutorialCompleted,
-        shouldShowTutorial,
-        allConditions: {
-          isActive,
-          isAppRouteCurrent,
-          notCompleted: !tutorialCompleted
-        }
-      });
-    }
   }, [isActive, currentStep, steps, navigationState, shouldShowTutorial, location.pathname, isAppRouteCurrent, tutorialCompleted, tutorialContext.isInitialized]);
   
   // Enhanced scrolling prevention with data attribute for current step

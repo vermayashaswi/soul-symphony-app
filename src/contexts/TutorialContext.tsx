@@ -190,10 +190,19 @@ export const TutorialProvider: React.FC<{ children: ReactNode }> = ({ children }
     });
   }, [isActive, currentStep, steps, location.pathname, navigationState, pendingTutorialStart, tutorialChecked, isInitialized]);
   
-  // FIXED: Initialize immediately without delay
+  // NEW: Initialize the tutorial system
   useEffect(() => {
-    console.log('[TutorialContext] Initializing tutorial system immediately');
-    setIsInitialized(true);
+    console.log('[TutorialContext] Initializing tutorial system');
+    
+    // Mark as initialized after a brief delay to ensure all dependencies are ready
+    const initTimeout = setTimeout(() => {
+      setIsInitialized(true);
+      console.log('[TutorialContext] Tutorial system initialized');
+    }, 100);
+    
+    return () => {
+      clearTimeout(initTimeout);
+    };
   }, []);
   
   // Subscribe to navigation manager state changes
@@ -235,6 +244,8 @@ export const TutorialProvider: React.FC<{ children: ReactNode }> = ({ children }
   
   // Enhanced navigation completion handler with timeout protection
   useEffect(() => {
+    if (!isInitialized) return; // NEW: Don't process navigation until initialized
+    
     const navManagerState = navigationManager.getState();
     
     if (navManagerState.isNavigating && navManagerState.targetRoute === location.pathname) {
@@ -259,10 +270,12 @@ export const TutorialProvider: React.FC<{ children: ReactNode }> = ({ children }
         }, 500);
       }
     }
-  }, [location.pathname, pendingTutorialStart, currentStep, steps]);
+  }, [location.pathname, pendingTutorialStart, currentStep, steps, isInitialized]);
   
-  // FIXED: Check tutorial immediately when user changes, don't wait for initialization
+  // Check if tutorial should be active based on user's profile and current route
   useEffect(() => {
+    if (!isInitialized) return; // Don't check tutorial until initialized
+    
     const checkTutorialStatus = async () => {
       if (!user || tutorialChecked) return;
       
@@ -320,7 +333,7 @@ export const TutorialProvider: React.FC<{ children: ReactNode }> = ({ children }
     };
     
     checkTutorialStatus();
-  }, [user, location.pathname, tutorialChecked, navigate]);
+  }, [user, location.pathname, tutorialChecked, navigate, isInitialized]);
   
   // ENHANCED: Helper function to check for target elements using new highlighting system
   const checkForTargetElementEnhanced = (stepData: TutorialStep) => {
