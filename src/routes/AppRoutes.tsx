@@ -89,12 +89,7 @@ const AppRoutes = () => {
       return <Navigate to="/app/onboarding" replace />;
     }
 
-    // Check onboarding status for authenticated users
-    if (onboardingComplete === false) {
-      return <Navigate to="/app/onboarding" replace />;
-    }
-
-    // If user is authenticated and onboarding is complete, go to home
+    // If user is authenticated, go directly to home (ignore database onboarding flag)
     return <Navigate to="/app/home" replace />;
   };
 
@@ -131,11 +126,7 @@ const AppRoutes = () => {
 
   return (
     <Routes>
-      <Route element={
-        <AppContextProvider>
-          <ViewportManager />
-        </AppContextProvider>
-      }>
+      <Route element={<ViewportManager />}>
         {/* Root Route - context-aware */}
         <Route path="/" element={<RootRedirect />} />
 

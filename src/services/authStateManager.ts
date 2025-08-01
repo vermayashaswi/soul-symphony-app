@@ -319,18 +319,17 @@ class AuthStateManager {
       return storedRedirect;
     }
 
-    // CRITICAL FIX: Use verified onboarding status if provided, otherwise check localStorage
-    // If onboarding is NOT complete, redirect to onboarding, not home
+    // Use verified onboarding status if provided, otherwise check localStorage
     const isOnboardingComplete = onboardingComplete !== undefined 
       ? onboardingComplete 
       : localStorage.getItem('onboardingComplete') === 'true';
       
     if (!isOnboardingComplete) {
-      this.log('Redirecting to onboarding - user has not completed onboarding');
+      this.log('Redirecting to onboarding - not completed');
       return '/app/onboarding';
     }
 
-    this.log('Using default redirect to home - onboarding completed');
+    this.log('Using default redirect to home');
     return '/app/home';
   }
 
