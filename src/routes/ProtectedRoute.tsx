@@ -55,11 +55,11 @@ const ProtectedRoute: React.FC = () => {
   }
   
   if (!user) {
-    console.log("[ProtectedRoute] REDIRECTING to auth from protected route:", location.pathname);
+    console.log("[ProtectedRoute] REDIRECTING unauthenticated user to onboarding:", location.pathname);
     
-    // Store redirect path and go to auth
+    // Store redirect path for after authentication + onboarding
     localStorage.setItem('authRedirectTo', location.pathname);
-    return <Navigate to="/app/auth" replace />;
+    return <Navigate to="/app/onboarding" replace />;
   }
   
   // Use Outlet to render child routes
