@@ -186,6 +186,8 @@ class TutorialHighlightingManager {
       return false;
     }
     
+    console.log(`[HighlightingManager] STARTING highlighting for step ${stepId} with selectors:`, selectors);
+    
     this.state.isHighlighting = true;
     this.state.currentStep = stepId;
     this.state.retryCount = 0;
