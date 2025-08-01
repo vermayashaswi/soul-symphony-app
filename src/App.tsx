@@ -10,7 +10,7 @@ import { preloadCriticalImages } from './utils/imagePreloader';
 import { toast } from 'sonner';
 import './styles/emoji.css';
 import './styles/tutorial.css';
-import { AuthProvider } from '@/contexts/AuthContext';
+
 import { nativeAppInitService } from './services/nativeAppInitService';
 import { mobileErrorHandler } from './services/mobileErrorHandler';
 import { mobileOptimizationService } from './services/mobileOptimizationService';
@@ -190,14 +190,12 @@ const App: React.FC = () => {
 
   return (
     <ErrorBoundary onError={handleAppError}>
-      <AuthProvider>
-        <TranslationLoadingOverlay />
-        <JournalProcessingInitializer />
-        <AppRoutes key={isInitialized ? 'initialized' : 'initializing'} />
-        <TutorialOverlay />
-        <Toaster />
-        <SonnerToaster position="top-right" />
-      </AuthProvider>
+      <TranslationLoadingOverlay />
+      <JournalProcessingInitializer />
+      <AppRoutes key={isInitialized ? 'initialized' : 'initializing'} />
+      <TutorialOverlay />
+      <Toaster />
+      <SonnerToaster position="top-right" />
     </ErrorBoundary>
   );
 };
