@@ -373,24 +373,6 @@ function SettingsContent() {
     
     if (checked) {
       try {
-        console.log('[Settings] User explicitly requested notifications - initializing services...');
-        
-        // Import onboarding state checker
-        const { onboardingStateManager } = await import('@/utils/onboarding-state');
-        
-        // Ensure onboarding is complete before requesting permissions
-        const isOnboardingComplete = await onboardingStateManager.checkOnboardingState(user);
-        
-        if (!isOnboardingComplete) {
-          console.warn('[Settings] Onboarding not complete, deferring notification request');
-          toast.error('Please complete onboarding first before enabling notifications');
-          return;
-        }
-        
-        // Dynamically import and initialize push notification service only when explicitly enabled
-        const { pushNotificationService } = await import('@/services/pushNotificationService');
-        await pushNotificationService.initialize();
-        
         console.log('[Settings] Requesting notification permission via enhanced service...');
         
         const result = await enhancedNotificationService.requestPermissions();

@@ -3,7 +3,6 @@ import { User } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { logInfo, logError, logProfile, logAuthError } from '@/components/debug/DebugPanel';
-import { enhancedLocationService } from './enhanced-location-service';
 
 /**
  * Maximum number of automatic retries for profile creation
@@ -11,23 +10,7 @@ import { enhancedLocationService } from './enhanced-location-service';
 const MAX_PROFILE_CREATION_RETRIES = 3;
 
 /**
- * Get user's location data including timezone and country using enhanced detection
- */
-const getUserLocationData = async () => {
-  try {
-    return await enhancedLocationService.detectUserLocation();
-  } catch (error) {
-    console.error('Error detecting location:', error);
-    return {
-      timezone: 'UTC',
-      country: 'DEFAULT',
-      currency: 'USD'
-    };
-  }
-};
-
-/**
- * Get user's timezone using browser API (fallback for synchronous calls)
+ * Get user's timezone using browser API
  */
 const getUserTimezone = (): string => {
   try {
@@ -57,7 +40,7 @@ export const ensureProfileExists = async (user: User | null): Promise<boolean> =
     // First check if the profile already exists
     const { data, error } = await supabase
       .from('profiles')
-      .select('id, full_name, avatar_url, timezone, subscription_status, subscription_tier, is_premium, trial_ends_at')
+      .select('id, full_name, avatar_url, timezone, subscription_status, subscription_tier, is_premium, trial_ends_at, tutorial_completed, tutorial_step, onboarding_completed')
       .eq('id', user.id)
       .maybeSingle();
       
@@ -68,27 +51,30 @@ export const ensureProfileExists = async (user: User | null): Promise<boolean> =
     
     // If profile exists, check if we need to update any missing fields
     if (data) {
-      logProfile(`Profile exists: ${data.id}`, 'ProfileService');
+      logProfile(`Profile exists: ${data.id}`, 'ProfileService', {
+        tutorialCompleted: data.tutorial_completed,
+        tutorialStep: data.tutorial_step,
+        onboardingCompleted: data.onboarding_completed
+      });
       
-      // Check if we need to update any missing fields
+      // Check if we need to update any missing fields including tutorial setup
       const needsUpdate = (!data.timezone && getUserTimezone() !== 'UTC') || 
                          (!data.full_name && user.user_metadata?.full_name) ||
-                         (!data.avatar_url && user.user_metadata?.avatar_url);
+                         (!data.avatar_url && user.user_metadata?.avatar_url) ||
+                         (data.tutorial_completed === null || data.tutorial_completed === undefined) ||
+                         (data.tutorial_step === null || data.tutorial_step === undefined) ||
+                         (data.onboarding_completed === null || data.onboarding_completed === undefined);
       
       if (needsUpdate) {
         logProfile('Profile exists but needs updates', 'ProfileService');
         await updateMissingProfileFields(user.id, user);
       }
       
-      // The auto_start_trial trigger should have handled trial setup automatically
-      // No need to manually set trial status here
-      
       return true;
     }
     
-    // If no profile exists, this should not happen with the trigger in place
-    // But as a fallback, let's create one manually
-    logProfile('Profile not found, creating manually as fallback', 'ProfileService');
+    // If no profile exists, create one manually (trigger should handle this, but fallback)
+    logProfile('Profile not found, creating manually with trigger handling', 'ProfileService');
     return await createProfileManually(user);
     
   } catch (err) {
@@ -103,20 +89,14 @@ export const ensureProfileExists = async (user: User | null): Promise<boolean> =
  */
 const updateMissingProfileFields = async (userId: string, user: User): Promise<boolean> => {
   try {
-    // Get enhanced location data including timezone and country
-    const locationData = await getUserLocationData();
+    const timezone = getUserTimezone();
     const updateData: any = {
       updated_at: new Date().toISOString()
     };
     
-    // Add timezone if missing or if it's currently UTC but we detected a better one
-    if (locationData.timezone !== 'UTC') {
-      updateData.timezone = locationData.timezone;
-    }
-    
-    // Add country if missing or if it's currently DEFAULT but we detected a better one
-    if (locationData.country !== 'DEFAULT') {
-      updateData.country = locationData.country;
+    // Add timezone if missing
+    if (timezone !== 'UTC') {
+      updateData.timezone = timezone;
     }
     
     // Add full_name if available and missing
@@ -132,6 +112,11 @@ const updateMissingProfileFields = async (userId: string, user: User): Promise<b
     } else if (user.user_metadata?.picture) {
       updateData.avatar_url = user.user_metadata.picture;
     }
+    
+    // Ensure tutorial fields are properly set for existing users
+    updateData.tutorial_completed = 'NO';
+    updateData.tutorial_step = 0;
+    updateData.onboarding_completed = false;
     
     const { error } = await supabase
       .from('profiles')
@@ -164,9 +149,7 @@ const createProfileManually = async (user: User): Promise<boolean> => {
       let fullName = '';
       let avatarUrl = '';
       const email = user.email || '';
-      
-      // Get enhanced location data
-      const locationData = await getUserLocationData();
+      const timezone = getUserTimezone();
       
       // Handle different authentication providers' metadata formats
       if (user.app_metadata?.provider === 'google') {
@@ -195,8 +178,7 @@ const createProfileManually = async (user: User): Promise<boolean> => {
         email,
         full_name: fullName || null,
         avatar_url: avatarUrl || null, 
-        timezone: locationData.timezone,
-        country: locationData.country,
+        timezone: timezone,
         onboarding_completed: false,
         updated_at: new Date().toISOString()
       };
@@ -265,15 +247,8 @@ export const updateUserProfile = async (user: User | null, metadata: Record<stri
     
     // Add timezone to metadata if not provided
     if (!metadata.timezone) {
-      try {
-        const locationData = await getUserLocationData();
-        metadata.timezone = locationData.timezone;
-        logProfile(`Adding detected timezone to metadata: ${metadata.timezone}`, 'ProfileService');
-      } catch (error) {
-        // Fallback to basic timezone detection
-        metadata.timezone = getUserTimezone();
-        logProfile(`Adding fallback timezone to metadata: ${metadata.timezone}`, 'ProfileService');
-      }
+      metadata.timezone = getUserTimezone();
+      logProfile(`Adding detected timezone to metadata: ${metadata.timezone}`, 'ProfileService');
     }
     
     const { data, error } = await supabase.auth.updateUser({

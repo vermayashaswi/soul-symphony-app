@@ -13,8 +13,7 @@ import { ThemeProvider } from './hooks/use-theme'
 import { initializeServiceWorker } from './utils/serviceWorker'
 import { backgroundSyncService } from './services/backgroundSyncService'
 import { periodicSyncService } from './services/periodicSyncService'
-// NOTE: pushNotificationService is NOT imported here to prevent auto-initialization
-// It will be lazily loaded only when explicitly enabled in settings
+import { pushNotificationService } from './services/pushNotificationService'
 import { mobileErrorHandler } from './services/mobileErrorHandler'
 import { mobileOptimizationService } from './services/mobileOptimizationService'
 

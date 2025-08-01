@@ -3,8 +3,6 @@ import { useEffect, useState } from 'react';
 import { journalReminderService } from '@/services/journalReminderService';
 import { initializeServiceWorker } from '@/utils/serviceWorker';
 import { enhancedPlatformService } from '@/services/enhancedPlatformService';
-import { nativeTimeService } from '@/services/nativeTimeService';
-import { enhancedNotificationScheduler } from '@/services/enhancedNotificationScheduler';
 
 interface AppInitializationState {
   isInitialized: boolean;
@@ -29,12 +27,6 @@ export const useAppInitialization = () => {
         
         // Initialize platform detection
         await enhancedPlatformService.detectPlatform();
-        
-        // Initialize time service for reliable timezone handling
-        await nativeTimeService.initialize();
-        
-        // Initialize enhanced notification scheduler
-        await enhancedNotificationScheduler.initialize();
         
         // Initialize journal reminder service
         await journalReminderService.initializeOnAppStart();

@@ -2,8 +2,6 @@ import { enhancedNotificationService } from './enhancedNotificationService';
 import { enhancedPlatformService } from './enhancedPlatformService';
 import { serviceWorkerManager } from '@/utils/serviceWorker';
 import { LocalNotifications } from '@capacitor/local-notifications';
-import { enhancedNotificationScheduler } from './enhancedNotificationScheduler';
-import { nativeTimeService } from './nativeTimeService';
 
 export type JournalReminderTime = 'morning' | 'afternoon' | 'evening' | 'night';
 
@@ -57,29 +55,6 @@ class JournalReminderService {
       // Initialize platform detection first
       await this.ensureInitialized();
       
-      // Use enhanced notification scheduler for better reliability
-      const success = await enhancedNotificationScheduler.scheduleReminders(times);
-      
-      if (success) {
-        // Save settings
-        this.saveSettings({ enabled: true, times });
-        this.startHealthCheck();
-        this.log('Enhanced reminders scheduled successfully');
-        return true;
-      } else {
-        this.error('Enhanced scheduler failed, falling back to legacy method');
-        // Fallback to legacy method
-        return await this.legacyRequestPermissionsAndSetup(times);
-      }
-    } catch (error) {
-      this.error('Error setting up journal reminders:', error);
-      // Fallback to legacy method
-      return await this.legacyRequestPermissionsAndSetup(times);
-    }
-  }
-
-  private async legacyRequestPermissionsAndSetup(times: JournalReminderTime[]): Promise<boolean> {
-    try {
       // Request notification permissions
       const permissionResult = await enhancedNotificationService.requestPermissions();
       
@@ -88,12 +63,12 @@ class JournalReminderService {
         return false;
       }
 
-      this.log('Permissions granted, setting up legacy reminders');
+      this.log('Permissions granted, setting up reminders');
       
       // Save settings
       this.saveSettings({ enabled: true, times });
       
-      // Setup reminders with legacy strategy
+      // Setup reminders with simplified strategy
       await this.setupReminders(times);
       
       // Immediate verification that reminders are scheduled
@@ -105,7 +80,7 @@ class JournalReminderService {
       
       return true;
     } catch (error) {
-      this.error('Error setting up legacy journal reminders:', error);
+      this.error('Error setting up journal reminders:', error);
       return false;
     }
   }
@@ -113,14 +88,7 @@ class JournalReminderService {
   async disableReminders(): Promise<void> {
     this.log('Disabling journal reminders');
     
-    // Clear enhanced notifications first
-    try {
-      await enhancedNotificationScheduler.clearAllNotifications();
-    } catch (error) {
-      this.error('Failed to clear enhanced notifications:', error);
-    }
-    
-    // Clear all active legacy reminders as fallback
+    // Clear all active reminders
     await this.clearAllReminders();
     
     // Stop health check
@@ -140,16 +108,9 @@ class JournalReminderService {
     try {
       // Initialize platform detection
       await enhancedPlatformService.detectPlatform();
-      
-      // Initialize enhanced notification scheduler
-      await enhancedNotificationScheduler.initialize();
-      
-      // Initialize native time service
-      await nativeTimeService.initialize();
-      
       this.setupAppLifecycleHandlers();
       this.isInitialized = true;
-      this.log('Service initialized successfully with enhanced components');
+      this.log('Service initialized successfully');
     } catch (error) {
       this.error('Failed to initialize service:', error);
       throw error;
@@ -476,19 +437,6 @@ class JournalReminderService {
     try {
       await this.ensureInitialized();
       
-      // Use enhanced notification scheduler for testing
-      await enhancedNotificationScheduler.testNotification();
-      this.log('Enhanced notification test completed');
-      return true;
-    } catch (error) {
-      this.error('Enhanced test failed, falling back to legacy:', error);
-      // Fallback to legacy test
-      return await this.legacyTestReminder();
-    }
-  }
-
-  private async legacyTestReminder(): Promise<boolean> {
-    try {
       const permissionState = await enhancedNotificationService.checkPermissionStatus();
       
       if (permissionState !== 'granted') {
@@ -520,15 +468,9 @@ class JournalReminderService {
     pendingNative?: number;
     permissionState: string;
     verified: boolean;
-    enhancedStatus?: any;
-    timeInfo?: any;
   }> {
     try {
       await this.ensureInitialized();
-      
-      // Get enhanced status first
-      const enhancedStatus = await enhancedNotificationScheduler.refreshStatus();
-      const timeInfo = nativeTimeService.getCurrentTimeInfo();
       
       const strategy = enhancedPlatformService.getBestNotificationStrategy();
       const permissionState = await enhancedNotificationService.checkPermissionStatus();
@@ -554,9 +496,7 @@ class JournalReminderService {
         activeReminders: this.activeReminders.length,
         pendingNative,
         permissionState,
-        verified,
-        enhancedStatus,
-        timeInfo
+        verified
       };
     } catch (error) {
       this.error('Error getting notification status:', error);
