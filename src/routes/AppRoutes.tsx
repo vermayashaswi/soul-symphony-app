@@ -126,7 +126,6 @@ const AppRoutes = () => {
 
   return (
     <Routes>
-      {/* Marketing Routes - no app context needed */}
       <Route element={<ViewportManager />}>
         {/* Root Route - context-aware */}
         <Route path="/" element={<RootRedirect />} />
@@ -158,16 +157,7 @@ const AppRoutes = () => {
           <MarketingContextProvider><BlogPostPage /></MarketingContextProvider>
         } />
 
-        {/* Catch-all route for marketing - context-aware */}
-        <Route path="*" element={
-          nativeIntegrationService.isRunningNatively() ?
-          <Navigate to="/app/home" replace /> :
-          <NotFound />
-        } />
-      </Route>
-
-      {/* App Routes - wrapped with AppContextProvider */}
-      <Route element={<AppContextProvider><ViewportManager /></AppContextProvider>}>
+        {/* App Routes */}
         {/* Public app routes (no auth required) */}
         <Route path="/app/onboarding" element={
           <SessionRouter>
@@ -206,6 +196,13 @@ const AppRoutes = () => {
         <Route path="/chat" element={<Navigate to="/app/chat" replace />} />
         <Route path="/smart-chat" element={<Navigate to="/app/smart-chat" replace />} />
         <Route path="/settings" element={<Navigate to="/app/settings" replace />} />
+
+        {/* Catch-all route - context-aware */}
+        <Route path="*" element={
+          nativeIntegrationService.isRunningNatively() ?
+          <Navigate to="/app/home" replace /> :
+          <NotFound />
+        } />
       </Route>
     </Routes>
   );

@@ -134,11 +134,10 @@ const MobileNavigation: React.FC<MobileNavigationProps> = ({ onboardingComplete 
       key={`nav-${renderKey}-${currentLanguage}`}
       className={cn(
         "mobile-navigation",
-        // DEFENSIVE: Never allow tutorial state to affect visibility
+        isTutorialActive && "opacity-30 pointer-events-none",
         isAndroid && "platform-android",
-        platform === 'ios' && "platform-ios",
-        // FORCED: Always ensure navigation is visible when it should be
-        isVisible && "!opacity-100 !pointer-events-auto"
+        platform === 'ios' && "platform-ios"
+        // Note: keyboard-visible class is managed by useKeyboardDetection hook
       )}
       initial={{ y: 100 }}
       animate={{ y: 0 }}

@@ -11,22 +11,23 @@ export const useNotificationPermissionSimple = () => {
 
   useEffect(() => {
     const checkPermission = async () => {
-      console.log('[NotificationPermission] Starting permission check (read-only)');
+      console.log('[NotificationPermission] Starting permission check');
       
       try {
         // Check if running natively first
         if (nativeIntegrationService.isRunningNatively()) {
           console.log('[NotificationPermission] Native environment detected');
           
-          // FIXED: Only check permission status, don't request permissions automatically
+          // Try to use native permissions API
           try {
-            // Check current permission status without requesting
-            setIsSupported(true);
-            // Default to 'default' since we're not requesting permissions automatically
-            setPermission('default');
-            console.log('[NotificationPermission] Native environment - permission set to default (request will be manual)');
-            setInitializationComplete(true);
-            return;
+            const result = await nativeIntegrationService.requestPermissions(['notifications']);
+            if (result && result.notifications) {
+              setIsSupported(true);
+              setPermission(result.notifications === 'granted' ? 'granted' : 'denied');
+              console.log('[NotificationPermission] Native permission status:', result.notifications);
+              setInitializationComplete(true);
+              return;
+            }
           } catch (error) {
             console.warn('[NotificationPermission] Native permission check failed:', error);
           }
