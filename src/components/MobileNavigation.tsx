@@ -76,7 +76,7 @@ const MobileNavigation: React.FC<MobileNavigationProps> = ({ onboardingComplete 
     });
   }, [isKeyboardVisible, keyboardHeight, platform]);
   
-  // Visibility logic - hide when keyboard is visible or on auth/onboarding pages
+  // Visibility logic - hide on auth/onboarding pages but NOT when keyboard is visible (CSS handles that)
   useEffect(() => {
     const onboardingOrAuthPaths = [
       '/app/onboarding',
@@ -102,11 +102,12 @@ const MobileNavigation: React.FC<MobileNavigationProps> = ({ onboardingComplete 
       isOnboardingOrAuth,
       hasUser: !!user,
       onboardingComplete,
-      safeArea
+      safeArea,
+      isTutorialActive
     });
     
     setIsVisible(shouldShowNav);
-  }, [location.pathname, isMobile.isMobile, isKeyboardVisible, isTutorialActive, user, onboardingComplete, currentLanguage, renderKey, safeArea]);
+  }, [location.pathname, isMobile.isMobile, user, onboardingComplete, currentLanguage, renderKey, safeArea]);
   
   if (!isVisible || onboardingComplete === false) {
     return null;
@@ -134,13 +135,13 @@ const MobileNavigation: React.FC<MobileNavigationProps> = ({ onboardingComplete 
       key={`nav-${renderKey}-${currentLanguage}`}
       className={cn(
         "mobile-navigation",
-        isTutorialActive && "opacity-30 pointer-events-none",
+        isTutorialActive ? "tutorial-dimmed" : "",
         isAndroid && "platform-android",
         platform === 'ios' && "platform-ios"
         // Note: keyboard-visible class is managed by useKeyboardDetection hook
       )}
       initial={{ y: 100 }}
-      animate={{ y: 0 }}
+      animate={{ y: isVisible ? 0 : 100 }}
       transition={{ duration: 0.3 }}
     >
       <div className="mobile-navigation-content">

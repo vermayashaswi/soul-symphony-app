@@ -96,6 +96,19 @@
   pointer-events: none;
 }
 
+/* Tutorial dimming - maintain visibility but reduce prominence */
+.mobile-navigation.tutorial-dimmed {
+  opacity: 0.3;
+  pointer-events: none;
+  transition: opacity 0.2s ease-in-out;
+}
+
+/* Ensure navigation always reappears when tutorial ends */
+.mobile-navigation:not(.tutorial-dimmed) {
+  opacity: 1;
+  pointer-events: auto;
+}
+
 /* Reposition input to bottom when keyboard is visible */
 .mobile-chat-input-container.keyboard-visible {
   bottom: 0px;

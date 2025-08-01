@@ -40,7 +40,7 @@ export const ensureProfileExists = async (user: User | null): Promise<boolean> =
     // First check if the profile already exists
     const { data, error } = await supabase
       .from('profiles')
-      .select('id, full_name, avatar_url, timezone, subscription_status, subscription_tier, is_premium, trial_ends_at')
+      .select('id, full_name, avatar_url, timezone, subscription_status, subscription_tier, is_premium, trial_ends_at, tutorial_completed, tutorial_step, onboarding_completed')
       .eq('id', user.id)
       .maybeSingle();
       
@@ -51,27 +51,30 @@ export const ensureProfileExists = async (user: User | null): Promise<boolean> =
     
     // If profile exists, check if we need to update any missing fields
     if (data) {
-      logProfile(`Profile exists: ${data.id}`, 'ProfileService');
+      logProfile(`Profile exists: ${data.id}`, 'ProfileService', {
+        tutorialCompleted: data.tutorial_completed,
+        tutorialStep: data.tutorial_step,
+        onboardingCompleted: data.onboarding_completed
+      });
       
-      // Check if we need to update any missing fields
+      // Check if we need to update any missing fields including tutorial setup
       const needsUpdate = (!data.timezone && getUserTimezone() !== 'UTC') || 
                          (!data.full_name && user.user_metadata?.full_name) ||
-                         (!data.avatar_url && user.user_metadata?.avatar_url);
+                         (!data.avatar_url && user.user_metadata?.avatar_url) ||
+                         (data.tutorial_completed === null || data.tutorial_completed === undefined) ||
+                         (data.tutorial_step === null || data.tutorial_step === undefined) ||
+                         (data.onboarding_completed === null || data.onboarding_completed === undefined);
       
       if (needsUpdate) {
         logProfile('Profile exists but needs updates', 'ProfileService');
         await updateMissingProfileFields(user.id, user);
       }
       
-      // The auto_start_trial trigger should have handled trial setup automatically
-      // No need to manually set trial status here
-      
       return true;
     }
     
-    // If no profile exists, this should not happen with the trigger in place
-    // But as a fallback, let's create one manually
-    logProfile('Profile not found, creating manually as fallback', 'ProfileService');
+    // If no profile exists, create one manually (trigger should handle this, but fallback)
+    logProfile('Profile not found, creating manually with trigger handling', 'ProfileService');
     return await createProfileManually(user);
     
   } catch (err) {
@@ -109,6 +112,11 @@ const updateMissingProfileFields = async (userId: string, user: User): Promise<b
     } else if (user.user_metadata?.picture) {
       updateData.avatar_url = user.user_metadata.picture;
     }
+    
+    // Ensure tutorial fields are properly set for existing users
+    updateData.tutorial_completed = 'NO';
+    updateData.tutorial_step = 0;
+    updateData.onboarding_completed = false;
     
     const { error } = await supabase
       .from('profiles')

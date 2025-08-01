@@ -16,17 +16,17 @@ const Home = () => {
   const isInWelcomeTutorialStep = isActive && steps[currentStep]?.id === 1;
   const isInArrowTutorialStep = isActive && steps[currentStep]?.id === 2;
   
-  // Tutorial startup logic - let TutorialContext handle the main logic
+  // Tutorial startup logic - simplified and more robust
   useEffect(() => {
     const initializeTutorialIfNeeded = async () => {
       if (!user) return;
       
       try {
-        console.log('[Home] Checking if tutorial should be started for user:', user.id);
+        console.log('[Home] Checking tutorial status for user:', user.id);
         
         const { data: profile, error } = await supabase
           .from('profiles')
-          .select('tutorial_completed, tutorial_step')
+          .select('tutorial_completed, tutorial_step, onboarding_completed')
           .eq('id', user.id)
           .maybeSingle();
         
@@ -35,51 +35,36 @@ const Home = () => {
           return;
         }
         
-        // Only assist with tutorial startup if clearly needed and not already handled
-        if (profile && profile.tutorial_completed === 'NO' && !isActive && !navigationState.inProgress) {
-          console.log('[Home] Tutorial needed but not active, requesting startup');
+        console.log('[Home] Profile data:', profile);
+        
+        // Determine if tutorial should start
+        const shouldStartTutorial = profile && 
+          profile.tutorial_completed === 'NO' && 
+          !isActive && 
+          !navigationState.inProgress;
           
-          // Give TutorialContext a small delay to handle its own logic first
+        if (shouldStartTutorial) {
+          console.log('[Home] Starting tutorial for user with tutorial_completed=NO');
+          // Small delay to ensure UI is ready
           setTimeout(() => {
-            if (!isActive && !navigationState.inProgress) {
-              console.log('[Home] Starting tutorial as backup measure');
-              startTutorial();
-            }
-          }, 200);
-        } else if (!profile) {
-          // New user without profile - set up tutorial
-          console.log('[Home] New user detected, setting up tutorial');
-          
-          const { error: updateError } = await supabase
-            .from('profiles')
-            .upsert({ 
-              id: user.id,
-              tutorial_completed: 'NO',
-              tutorial_step: 0
-            });
-            
-          if (!updateError) {
-            setTimeout(() => {
-              console.log('[Home] Starting tutorial for new user');
-              startTutorial();
-            }, 200);
-          }
+            console.log('[Home] Executing startTutorial()');
+            startTutorial();
+          }, 100);
         } else {
-          console.log('[Home] Tutorial status check complete:', {
-            tutorialCompleted: profile.tutorial_completed,
+          console.log('[Home] Tutorial conditions not met:', {
+            tutorialCompleted: profile?.tutorial_completed,
             isActive,
-            navigationInProgress: navigationState.inProgress
+            navigationInProgress: navigationState.inProgress,
+            hasProfile: !!profile
           });
         }
       } catch (err) {
-        console.error('[Home] Error in tutorial initialization logic:', err);
+        console.error('[Home] Error in tutorial initialization:', err);
       }
     };
     
-    // Only run if we haven't already started the tutorial
-    if (!isActive && !navigationState.inProgress) {
-      initializeTutorialIfNeeded();
-    }
+    // Run initialization
+    initializeTutorialIfNeeded();
   }, [user, startTutorial, isActive, navigationState.inProgress]);
   
   useEffect(() => {

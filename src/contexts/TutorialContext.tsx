@@ -563,11 +563,14 @@ export const TutorialProvider: React.FC<{ children: ReactNode }> = ({ children }
     if (!user) return;
     
     try {
+      console.log('[TutorialContext] Resetting tutorial for user:', user.id);
+      
       const { error } = await supabase
         .from('profiles')
         .update({ 
           tutorial_completed: 'NO',
-          tutorial_step: 0
+          tutorial_step: 0,
+          updated_at: new Date().toISOString()
         })
         .eq('id', user.id);
         
@@ -576,23 +579,33 @@ export const TutorialProvider: React.FC<{ children: ReactNode }> = ({ children }
         return;
       }
       
+      console.log('[TutorialContext] Tutorial reset in database, updating state');
+      
+      // Reset all tutorial state
       setCurrentStep(0);
       setTutorialChecked(false);
       setTutorialCompleted(false);
       setPendingTutorialStart(false);
+      setIsActive(false);
+      
+      // Clean up managers
       navigationManager.forceReset();
       highlightingManager.reset();
       
-      // Only navigate if we're not already on the app home page
-      if (location.pathname !== '/app/home') {
-        // First navigate to app home - use replace to prevent back navigation
-        console.log('[TutorialContext] Tutorial reset - redirecting to app home');
-        
+      // Force navigation to app home to restart tutorial
+      console.log('[TutorialContext] Navigating to app home to restart tutorial');
+      
+      // Use setTimeout to ensure state is updated before navigation
+      setTimeout(() => {
         navigate('/app/home', { replace: true });
-      } else {
-        // If already on /app/home, just set active tutorial
-        setIsActive(true);
-      }
+        
+        // After navigation, start the tutorial
+        setTimeout(() => {
+          console.log('[TutorialContext] Starting tutorial after reset');
+          startTutorial();
+        }, 200);
+      }, 100);
+      
     } catch (error) {
       console.error('[TutorialContext] Error resetting tutorial:', error);
     }
