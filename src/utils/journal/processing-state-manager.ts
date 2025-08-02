@@ -1,5 +1,6 @@
 import { BehaviorSubject, Observable } from 'rxjs';
-import { showToast } from './toast-helper';
+import { showSaveError, showGeneralError } from '@/utils/toast-messages';
+import { logger } from '@/utils/logger';
 
 // Define the processing state enum - simplified
 export enum EntryProcessingState {
@@ -25,21 +26,23 @@ export class ProcessingStateManager {
   private immediateProcessingState = new Set<string>(); // Track immediate processing
   private processingIntentFlag = false; // Emergency fallback flag
   
+  private logger = logger.createLogger('ProcessingStateManager');
+  
   constructor() {
-    console.log('[ProcessingStateManager] Initialized with immediate cleanup');
+    this.logger.debug('Initialized with immediate cleanup');
   }
   
   // Emergency fallback methods for immediate processing detection
   public setProcessingIntent(value: boolean): void {
     this.processingIntentFlag = value;
-    console.log(`[ProcessingStateManager] Processing intent set to ${value}`);
+    this.logger.debug('Processing intent set', { value });
     
     // Clear intent after shorter delay if not overridden
     if (value) {
       setTimeout(() => {
         if (this.processingIntentFlag && this.processingEntries.length === 0) {
           this.processingIntentFlag = false;
-          console.log('[ProcessingStateManager] Auto-cleared processing intent flag');
+          this.logger.debug('Auto-cleared processing intent flag');
         }
       }, 1000); // Reduced from 3s to 1s
     }
@@ -57,21 +60,21 @@ export class ProcessingStateManager {
   }
   
   public startProcessing(tempId: string): void {
-    console.log(`[ProcessingStateManager] Starting processing for ${tempId}`);
+    this.logger.debug('Starting processing', { tempId });
     
     // Clear processing intent since we now have real processing
     this.processingIntentFlag = false;
     
     // Strict duplicate prevention with active call tracking
     if (this.activeStartProcessingCalls.has(tempId)) {
-      console.log(`[ProcessingStateManager] StartProcessing already in progress for ${tempId}, ignoring`);
+      this.logger.debug('StartProcessing already in progress, ignoring', { tempId });
       return;
     }
     
     // Additional check for existing entries
     const existingEntry = this.processingEntries.find(e => e.tempId === tempId);
     if (existingEntry) {
-      console.log(`[ProcessingStateManager] Entry ${tempId} already exists, making visible instead`);
+      this.logger.debug('Entry already exists, making visible instead', { tempId });
       existingEntry.isVisible = true;
       this.immediateProcessingState.add(tempId);
       this.notifySubscribers();
@@ -92,7 +95,7 @@ export class ProcessingStateManager {
     };
     
     this.processingEntries.push(entry);
-    console.log(`[ProcessingStateManager] Added entry ${tempId}. Total entries: ${this.processingEntries.length}`);
+    this.logger.debug('Added entry', { tempId, totalEntries: this.processingEntries.length });
     
     // Immediately notify subscribers SYNCHRONOUSLY
     this.notifySubscribers();
@@ -131,7 +134,7 @@ export class ProcessingStateManager {
   public updateEntryState(tempId: string, state: EntryProcessingState, errorMessage?: string): void {
     const entry = this.processingEntries.find(e => e.tempId === tempId);
     if (!entry) {
-      console.log(`[ProcessingStateManager] Entry ${tempId} not found for state update`);
+      this.logger.debug('Entry not found for state update', { tempId });
       return;
     }
     
@@ -143,12 +146,12 @@ export class ProcessingStateManager {
     // Clear from immediate state when completing
     if (state === EntryProcessingState.COMPLETED) {
       this.immediateProcessingState.delete(tempId);
-      console.log(`[ProcessingStateManager] Entry ${tempId} completed, checking for real entry`);
+      this.logger.debug('Entry completed, checking for real entry', { tempId });
       this.checkAndHideEntry(tempId);
     }
     
     this.notifySubscribers();
-    console.log(`[ProcessingStateManager] Updated state for ${tempId} to ${state}`);
+    this.logger.debug('Updated state', { tempId, state });
   }
   
   private checkAndHideEntry(tempId: string): void {
@@ -156,7 +159,7 @@ export class ProcessingStateManager {
     const realEntryExists = this.hasRealEntryInDOM(tempId);
     
     if (realEntryExists) {
-      console.log(`[ProcessingStateManager] Real entry found for ${tempId}, hiding immediately`);
+      this.logger.debug('Real entry found, hiding immediately', { tempId });
       this.hideEntry(tempId);
       
       // Remove IMMEDIATELY - no delays
@@ -166,12 +169,12 @@ export class ProcessingStateManager {
       setTimeout(() => {
         const retryCheck = this.hasRealEntryInDOM(tempId);
         if (retryCheck) {
-          console.log(`[ProcessingStateManager] Real entry found on retry for ${tempId}`);
+          this.logger.debug('Real entry found on retry', { tempId });
           this.hideEntry(tempId);
           this.removeEntry(tempId); // Remove immediately on retry too
         } else {
           // Force cleanup if no real entry found
-          console.log(`[ProcessingStateManager] Force cleanup for ${tempId} - no real entry detected`);
+          this.logger.debug('Force cleanup - no real entry detected', { tempId });
           this.removeEntry(tempId);
         }
       }, 100); // Reduced from 500ms to 100ms
@@ -310,7 +313,7 @@ export class ProcessingStateManager {
       }
     } catch (error) {
       console.error('[ProcessingStateManager] Error restoring from localStorage:', error);
-      showToast("Error", "Failed to restore processing state");
+      showSaveError();
     }
   }
   
@@ -319,7 +322,7 @@ export class ProcessingStateManager {
       localStorage.setItem('processingEntries', JSON.stringify(this.processingEntries));
     } catch (error) {
       console.error('[ProcessingStateManager] Error saving to localStorage:', error);
-      showToast("Error", "Failed to save processing state");
+      showSaveError();
     }
   }
   
@@ -370,7 +373,7 @@ export class ProcessingStateManager {
       this.immediateProcessingState.delete(tempId);
       this.notifySubscribers();
       
-      showToast("Error", `Processing failed: ${errorMessage}`);
+      showGeneralError();
       console.log(`[ProcessingStateManager] Error for ${tempId}: ${errorMessage}`);
     }
   }
