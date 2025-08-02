@@ -1,6 +1,7 @@
 import { useEffect, useRef, useCallback } from 'react';
 import { useMobileKeyboardErrorRecovery } from './use-mobile-keyboard-error-recovery';
-import { usePlatformDetection } from './use-platform-detection';
+import { useCrossPlatformCompositionManager } from './use-cross-platform-composition-manager';
+import { useEnhancedDebuggingAnalytics } from './use-enhanced-debugging-analytics';
 
 interface EnhancedMobileInputOptions {
   preventZoom?: boolean;
@@ -14,9 +15,25 @@ export const useEnhancedMobileInput = (
   inputRef: React.RefObject<HTMLInputElement | HTMLTextAreaElement>,
   options: EnhancedMobileInputOptions = {}
 ) => {
-  const { platform, isNative, isReady } = usePlatformDetection();
   const { handleError } = useMobileKeyboardErrorRecovery({ 
     enableDebugMode: options.debugMode 
+  });
+  
+  // Use the new cross-platform composition manager
+  const compositionManager = useCrossPlatformCompositionManager(inputRef, {
+    enableConflictResolution: true,
+    prioritizeComposition: true,
+    enableSmartFallback: true,
+    debugMode: options.debugMode
+  });
+  
+  // Enhanced debugging and analytics
+  const analytics = useEnhancedDebuggingAnalytics(inputRef, {
+    enablePerformanceMonitoring: true,
+    enableInputTracking: true,
+    enableGestureTracking: options.enableSwipeProtection,
+    enableErrorTracking: true,
+    debugMode: options.debugMode
   });
   
   const {
@@ -26,6 +43,9 @@ export const useEnhancedMobileInput = (
     enableSwipeProtection = true,
     debugMode = false
   } = options;
+
+  // Extract platform info from composition manager
+  const { platform, isNative, isReady } = compositionManager;
 
   const isInputActive = useRef(false);
   const lastInputValue = useRef('');
@@ -241,8 +261,19 @@ export const useEnhancedMobileInput = (
 
   return {
     isInputActive: isInputActive.current,
-    platform,
-    isNative,
-    isReady
+    platform: compositionManager.platform,
+    isNative: compositionManager.isNative,
+    isReady: compositionManager.isReady,
+    // Composition data
+    isComposing: compositionManager.isComposing,
+    compositionText: compositionManager.compositionText,
+    keyboardType: compositionManager.keyboardType,
+    hasCompositionSupport: compositionManager.hasCompositionSupport,
+    // Conflict management
+    hasActiveConflict: compositionManager.hasActiveConflict,
+    conflictType: compositionManager.conflictType,
+    resolutionStrategy: compositionManager.resolutionStrategy,
+    // Analytics
+    generateAnalyticsReport: analytics.generateReport
   };
 };
