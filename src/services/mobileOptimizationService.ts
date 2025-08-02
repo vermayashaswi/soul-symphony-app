@@ -48,29 +48,48 @@ class MobileOptimizationService {
 
   private applyMobileCSSOptimizations(): void {
     const style = document.createElement('style');
+    style.id = 'mobile-optimizations';
     style.textContent = `
-      /* Mobile-specific optimizations */
+      /* Mobile-specific optimizations - enhanced for keyboard compatibility */
       * {
         -webkit-tap-highlight-color: transparent;
+      }
+
+      /* Selective touch and user-select policies */
+      body:not(.keyboard-visible) {
         -webkit-touch-callout: none;
         -webkit-user-select: none;
         user-select: none;
       }
 
-      input, textarea, [contenteditable] {
-        -webkit-user-select: text;
-        user-select: text;
+      /* Input elements always allow text selection and touch */
+      input, textarea, select, [contenteditable], 
+      [role="textbox"], [role="searchbox"], [role="combobox"],
+      .input-field, [data-input="true"] {
+        -webkit-user-select: text !important;
+        user-select: text !important;
+        -webkit-touch-callout: default !important;
+        touch-action: manipulation !important;
       }
 
+      /* Enhanced body touch policies based on keyboard state */
       body {
         -webkit-overflow-scrolling: touch;
         overscroll-behavior-y: contain;
+      }
+      
+      body:not(.keyboard-visible) {
         touch-action: pan-y;
       }
+      
+      body.keyboard-visible {
+        touch-action: manipulation;
+      }
 
-      /* Prevent zoom on input focus */
+      /* Prevent zoom on input focus while maintaining accessibility */
       input, select, textarea {
-        font-size: 16px !important;
+        font-size: max(16px, 1rem) !important;
+        zoom: 1;
       }
 
       /* Optimize scrolling performance */
@@ -79,40 +98,125 @@ class MobileOptimizationService {
         will-change: scroll-position;
       }
 
+      /* Keyboard-aware scroll containers */
+      .keyboard-visible .scroll-container {
+        touch-action: pan-y pinch-zoom;
+      }
+
+      /* Input container optimizations */
+      .mobile-chat-input-container,
+      .chat-input-container {
+        touch-action: manipulation;
+        -webkit-user-select: text;
+        user-select: text;
+      }
+
+      /* Platform-specific input optimizations */
+      .platform-ios input, .platform-ios textarea {
+        -webkit-appearance: none;
+        border-radius: 0;
+      }
+
+      .platform-android input, .platform-android textarea {
+        outline: none;
+      }
+
       /* Reduce motion for better performance */
       @media (prefers-reduced-motion: reduce) {
-        * {
+        *:not(input):not(textarea):not([contenteditable]) {
           animation-duration: 0.01ms !important;
           animation-iteration-count: 1 !important;
           transition-duration: 0.01ms !important;
         }
+      }
+
+      /* Debug styles for input detection */
+      .debug-mode input:focus,
+      .debug-mode textarea:focus,
+      .debug-mode [contenteditable]:focus {
+        outline: 2px solid #00ff00 !important;
       }
     `;
     document.head.appendChild(style);
   }
 
   private setupTouchOptimizations(): void {
-    // Prevent default touch behaviors that can cause issues
+    let keyboardVisible = false;
+    let debugMode = false;
+    
+    // Enhanced input element detection
+    const isInputElement = (element: HTMLElement): boolean => {
+      const inputTags = ['INPUT', 'TEXTAREA', 'SELECT'];
+      if (inputTags.includes(element.tagName)) return true;
+      if (element.isContentEditable) return true;
+      
+      const role = element.getAttribute('role');
+      if (role && ['textbox', 'searchbox', 'combobox'].includes(role)) return true;
+      
+      if (element.classList.contains('input-field') || element.dataset.input === 'true') return true;
+      if (element.closest('input, textarea, select, [contenteditable], [role="textbox"], [role="searchbox"], [role="combobox"]')) return true;
+      
+      return false;
+    };
+
+    // Listen for keyboard state changes
+    const handleKeyboardOpen = () => {
+      keyboardVisible = true;
+      console.log('[MobileOptimization] Keyboard opened - adjusting touch policies');
+    };
+
+    const handleKeyboardClose = () => {
+      keyboardVisible = false;
+      console.log('[MobileOptimization] Keyboard closed - restoring touch policies');
+    };
+
+    window.addEventListener('keyboardOpen', handleKeyboardOpen);
+    window.addEventListener('keyboardClose', handleKeyboardClose);
+
+    // Enhanced touch start handling
     document.addEventListener('touchstart', (e) => {
-      // Allow normal touch behavior for form elements
-      if (e.target instanceof HTMLInputElement || 
-          e.target instanceof HTMLTextAreaElement ||
-          e.target instanceof HTMLSelectElement) {
+      const target = e.target as HTMLElement;
+      
+      // Always allow normal touch behavior for input elements
+      if (target && isInputElement(target)) {
+        if (debugMode) {
+          console.log('[MobileOptimization] Touch allowed on input:', target.tagName, target.className);
+        }
         return;
+      }
+
+      // Respect keyboard state
+      if (keyboardVisible) {
+        if (debugMode) {
+          console.log('[MobileOptimization] Touch modified due to keyboard visibility');
+        }
       }
     }, { passive: true });
 
-    // Optimize scroll performance
+    // Optimized scroll performance with keyboard awareness
     document.addEventListener('touchmove', (e) => {
-      // Prevent rubber band scrolling at document level
-      if (e.target === document.body) {
+      const target = e.target as HTMLElement;
+      
+      // Allow scrolling in input elements when keyboard is visible
+      if (keyboardVisible && target && isInputElement(target)) {
+        return;
+      }
+      
+      // Prevent rubber band scrolling at document level only when safe
+      if (e.target === document.body && !keyboardVisible) {
         e.preventDefault();
       }
     }, { passive: false });
 
-    // Add visual feedback for touch interactions
+    // Enhanced visual feedback for touch interactions
     document.addEventListener('touchstart', (e) => {
       const target = e.target as HTMLElement;
+      
+      // Skip visual feedback for input elements to avoid interference
+      if (target && isInputElement(target)) {
+        return;
+      }
+      
       if (target.closest('button') || target.closest('[role="button"]')) {
         target.style.opacity = '0.7';
       }
@@ -120,12 +224,21 @@ class MobileOptimizationService {
 
     document.addEventListener('touchend', (e) => {
       const target = e.target as HTMLElement;
-      if (target.closest('button') || target.closest('[role="button"]')) {
+      
+      if (target && !isInputElement(target) && 
+          (target.closest('button') || target.closest('[role="button"]'))) {
         setTimeout(() => {
           target.style.opacity = '';
         }, 150);
       }
     }, { passive: true });
+
+    // Debug mode toggle
+    (window as any).toggleMobileOptimizationDebug = () => {
+      debugMode = !debugMode;
+      document.body.classList.toggle('debug-mode', debugMode);
+      console.log('[MobileOptimization] Debug mode:', debugMode ? 'enabled' : 'disabled');
+    };
   }
 
   private setupPerformanceMonitoring(): void {
