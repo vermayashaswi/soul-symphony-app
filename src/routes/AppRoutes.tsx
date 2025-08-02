@@ -16,6 +16,8 @@ import PrivacyPolicyPage from '@/pages/legal/PrivacyPolicyPage';
 import FAQPage from '@/pages/website/FAQPage';
 import BlogPage from '@/pages/website/BlogPage';
 import BlogPostPage from '@/pages/website/BlogPostPage';
+import AccountDeletion from '@/pages/AccountDeletion';
+import DataDeletion from '@/pages/DataDeletion';
 import OnboardingScreen from '@/components/onboarding/OnboardingScreen';
 import SessionRouter from '@/components/routing/SessionRouter';
 import { useAuth } from '@/contexts/AuthContext';
@@ -153,6 +155,16 @@ const AppRoutes = () => {
           nativeIntegrationService.isRunningNatively() ?
           <Navigate to="/app/home" replace /> :
           <BlogPostPage />
+        } />
+        <Route path="/account-deletion" element={
+          nativeIntegrationService.isRunningNatively() ?
+          <Navigate to="/app/home" replace /> :
+          <AccountDeletion />
+        } />
+        <Route path="/data-deletion" element={
+          nativeIntegrationService.isRunningNatively() ?
+          <Navigate to="/app/home" replace /> :
+          <DataDeletion />
         } />
 
         {/* App Routes */}

@@ -1,7 +1,7 @@
 import { CapacitorConfig } from '@capacitor/cli';
 
 const config: CapacitorConfig = {
-  appId: 'app.soulo.online',
+  appId: 'online.soulo.twa',
   appName: 'Soulo Dev',
   webDir: 'dist',
   // CRITICAL FIX: Remove external server URL - use bundled assets in development too
@@ -33,7 +33,7 @@ const config: CapacitorConfig = {
     },
     App: {
       // FIXED: No external URLs - handle deep links properly
-      urlScheme: "app.soulo.online"
+      urlScheme: "online.soulo.twa"
     },
     PushNotifications: {
       presentationOptions: ["badge", "sound", "alert"]

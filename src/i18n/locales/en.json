@@ -57,6 +57,130 @@
       "colorInfo": "Color indicates sentiment: red (negative), yellow (neutral), green (positive)"
     }
   },
+  "accountDeletion": {
+    "title": "Account Deletion",
+    "subtitle": "Request permanent deletion of your SOULo account",
+    "instructions": {
+      "title": "Account Deletion Instructions",
+      "description": "Follow these steps to permanently delete your SOULo account:",
+      "step1": "1. Sign in to your SOULo account",
+      "step2": "2. Go to Settings > Account Settings",
+      "step3": "3. Select 'Delete Account'",
+      "step4": "4. Confirm your deletion request",
+      "alternative": "Alternatively, you can contact us directly at support@soulo.online to request account deletion."
+    },
+    "whatWillBeDeleted": {
+      "title": "What Will Be Deleted",
+      "description": "When you delete your account, the following data will be permanently removed:",
+      "profileData": "Profile information (name, email, preferences)",
+      "journalEntries": "All journal entries, voice recordings, and transcriptions",
+      "chatHistory": "Chat conversations and message history",
+      "usageAnalytics": "Usage statistics and analytics data",
+      "subscriptionData": "Subscription information and billing history",
+      "technicalData": "Device information and session logs"
+    },
+    "processing": {
+      "title": "Processing Time",
+      "description": "Account deletion requests are processed within 30 days. During this period, your data remains accessible to allow for cancellation of the deletion request if needed."
+    },
+    "contact": {
+      "title": "Need Help?",
+      "description": "If you have questions about account deletion or need assistance, please contact us:",
+      "email": "Email: support@soulo.online",
+      "response": "We typically respond within 24-48 hours."
+    }
+  },
+  "dataDeletion": {
+    "title": "Data Deletion",
+    "subtitle": "Learn about SOULo data deletion policies and procedures",
+    "dataTypes": {
+      "title": "Types of Data We Collect",
+      "description": "SOULo collects and processes the following types of data:",
+      "personalData": {
+        "title": "Personal Data",
+        "items": [
+          "Account information (email, name, profile details)",
+          "Authentication credentials and security information",
+          "User preferences and settings"
+        ]
+      },
+      "journalData": {
+        "title": "Journal Data",
+        "items": [
+          "Voice recordings of journal entries",
+          "Transcribed text from voice recordings",
+          "AI-generated insights and emotional analysis",
+          "Timestamps and metadata"
+        ]
+      },
+      "interactionData": {
+        "title": "Interaction Data",
+        "items": [
+          "Chat conversations with AI assistant",
+          "User interface interactions and navigation",
+          "Feature usage patterns and preferences"
+        ]
+      },
+      "analyticsData": {
+        "title": "Analytics Data",
+        "items": [
+          "App usage statistics and session information",
+          "Performance metrics and error logs",
+          "Device information and technical specifications"
+        ]
+      },
+      "subscriptionData": {
+        "title": "Subscription Data",
+        "items": [
+          "Payment information and billing history",
+          "Subscription status and plan details",
+          "Revenue and transaction records"
+        ]
+      },
+      "technicalData": {
+        "title": "Technical Data",
+        "items": [
+          "IP addresses and device identifiers",
+          "Crash reports and diagnostic information",
+          "Security logs and access records"
+        ]
+      }
+    },
+    "deletionProcess": {
+      "title": "Data Deletion Process",
+      "description": "When you request data deletion through SOULo:",
+      "step1": "1. Submit deletion request through the app or via email",
+      "step2": "2. We verify your identity and process the request",
+      "step3": "3. All personal data is permanently deleted within 30 days",
+      "step4": "4. You receive confirmation once deletion is complete"
+    },
+    "retention": {
+      "title": "Data Retention",
+      "description": "Some data may be retained for legal compliance:",
+      "legal": "Legal and regulatory requirements may require retention of certain records",
+      "security": "Security logs may be retained for fraud prevention and security purposes",
+      "anonymized": "Anonymized and aggregated data may be retained for research and analytics",
+      "duration": "Retained data is kept only as long as legally required"
+    },
+    "rights": {
+      "title": "Your Data Rights",
+      "description": "You have the right to:",
+      "access": "Access your personal data",
+      "correct": "Correct inaccurate information",
+      "delete": "Request deletion of your data",
+      "portability": "Request data portability",
+      "restrict": "Restrict data processing",
+      "object": "Object to data processing"
+    },
+    "contact": {
+      "title": "Data Deletion Requests",
+      "description": "To request data deletion or exercise your data rights:",
+      "email": "Email: support@soulo.online",
+      "subject": "Subject: Data Deletion Request",
+      "include": "Please include your account email and specify which data you want deleted",
+      "response": "We will respond to your request within 30 days"
+    }
+  },
   "toasts": {
     "success": "Success",
     "error": "Error",

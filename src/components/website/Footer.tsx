@@ -78,7 +78,7 @@ const Footer = () => {
     { icon: Twitter, href: "https://twitter.com/souloapp", label: "Twitter" },
     { icon: Instagram, href: "https://instagram.com/souloapp", label: "Instagram" },
     { icon: Linkedin, href: "https://linkedin.com/company/soulo", label: "LinkedIn" },
-    { icon: Mail, href: "mailto:hello@soulo.online", label: "Email" }
+    { icon: Mail, href: "mailto:support@soulo.online", label: "Email" }
   ];
 
   return (

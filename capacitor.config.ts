@@ -2,7 +2,7 @@
 import { CapacitorConfig } from '@capacitor/cli';
 
 const config: CapacitorConfig = {
-  appId: 'app.soulo.online',
+  appId: 'online.soulo.twa',
   appName: 'Soulo',
   webDir: 'dist',
   server: {
@@ -16,7 +16,7 @@ const config: CapacitorConfig = {
       forceCodeForRefreshToken: true,
     },
     App: {
-      urlScheme: "app.soulo.online"
+      urlScheme: "online.soulo.twa"
     },
     SplashScreen: {
       launchAutoHide: false,

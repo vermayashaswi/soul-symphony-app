@@ -35,7 +35,7 @@
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
-                <data android:scheme="app.soulo.online" />
+                <data android:scheme="online.soulo.twa" />
             </intent-filter>
 
         </activity>
