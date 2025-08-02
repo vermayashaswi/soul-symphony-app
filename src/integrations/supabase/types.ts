@@ -753,6 +753,72 @@ export type Database = {
           },
         ]
       }
+      user_sessions: {
+        Row: {
+          app_language: string | null
+          country: string | null
+          created_at: string
+          device_type: string | null
+          id: string
+          ip_address: string | null
+          is_active: boolean
+          last_activity: string
+          most_interacted_page: string | null
+          page_interactions: Json | null
+          pages_visited: string[] | null
+          session_duration: unknown | null
+          session_end: string | null
+          session_start: string
+          session_timeout: string
+          start_page: string | null
+          total_page_views: number | null
+          updated_at: string
+          user_id: string | null
+        }
+        Insert: {
+          app_language?: string | null
+          country?: string | null
+          created_at?: string
+          device_type?: string | null
+          id?: string
+          ip_address?: string | null
+          is_active?: boolean
+          last_activity?: string
+          most_interacted_page?: string | null
+          page_interactions?: Json | null
+          pages_visited?: string[] | null
+          session_duration?: unknown | null
+          session_end?: string | null
+          session_start?: string
+          session_timeout?: string
+          start_page?: string | null
+          total_page_views?: number | null
+          updated_at?: string
+          user_id?: string | null
+        }
+        Update: {
+          app_language?: string | null
+          country?: string | null
+          created_at?: string
+          device_type?: string | null
+          id?: string
+          ip_address?: string | null
+          is_active?: boolean
+          last_activity?: string
+          most_interacted_page?: string | null
+          page_interactions?: Json | null
+          pages_visited?: string[] | null
+          session_duration?: unknown | null
+          session_end?: string | null
+          session_start?: string
+          session_timeout?: string
+          start_page?: string | null
+          total_page_views?: number | null
+          updated_at?: string
+          user_id?: string | null
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never

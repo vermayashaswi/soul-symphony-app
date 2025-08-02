@@ -13,6 +13,7 @@ import { toast } from 'sonner';
 import './styles/emoji.css';
 import './styles/tutorial.css';
 import { FeatureFlagsProvider } from "./contexts/FeatureFlagsContext";
+import { SessionTrackingProvider } from './contexts/SessionTrackingContext';
 import { nativeAppInitService } from './services/nativeAppInitService';
 import { mobileErrorHandler } from './services/mobileErrorHandler';
 import { mobileOptimizationService } from './services/mobileOptimizationService';
