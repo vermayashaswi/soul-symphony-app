@@ -16,6 +16,8 @@ import BlogPostPage from '@/pages/website/BlogPostPage';
 import HomePage from '@/pages/website/HomePage';
 import PrivacyPolicyPage from '@/pages/legal/PrivacyPolicyPage';
 import AppDownloadPage from '@/pages/AppDownloadPage';
+import AccountDeletion from '@/pages/AccountDeletion';
+import DataDeletion from '@/pages/DataDeletion';
 
 export type RouteConfig = {
   path: string;
@@ -50,6 +52,16 @@ export const websiteRoutes: RouteConfig[] = [
   {
     path: '/app-download',
     element: <AppDownloadPage />,
+    isWebsiteRoute: true,
+  },
+  {
+    path: '/account-deletion',
+    element: <AccountDeletion />,
+    isWebsiteRoute: true,
+  },
+  {
+    path: '/data-deletion',
+    element: <DataDeletion />,
     isWebsiteRoute: true,
   },
   // Legacy routes from before website update
