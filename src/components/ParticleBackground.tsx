@@ -29,7 +29,7 @@ export function ParticleBackground() {
     theme = themeData.theme;
     systemTheme = themeData.systemTheme;
   } catch (error) {
-    console.warn('ParticleBackground: ThemeProvider not ready, using defaults');
+    // ThemeProvider not ready, using defaults
   }
   
   // Golden color palette for particles

@@ -32,7 +32,7 @@ const EmotionBubbleDetail: React.FC<EmotionBubbleDetailProps> = ({
     const themeData = useTheme();
     colorTheme = themeData.colorTheme;
   } catch (error) {
-    console.warn('EmotionBubbleDetail: ThemeProvider not ready, using defaults');
+    // ThemeProvider not ready, using defaults
   }
   
   return (

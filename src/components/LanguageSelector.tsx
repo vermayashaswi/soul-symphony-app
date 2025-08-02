@@ -13,9 +13,9 @@ import {
 import { Button } from "@/components/ui/button";
 import { useTranslation } from '@/contexts/TranslationContext';
 import { useAuth } from '@/contexts/AuthContext';
-import { createDebugger } from '@/utils/debug/debugUtils';
+import { logger } from '@/utils/logger';
 
-const debug = createDebugger('languageSelector');
+const componentLogger = logger.createLogger('LanguageSelector');
 
 // Language groups for better organization
 const LANGUAGE_GROUPS = {
@@ -74,18 +74,18 @@ const LanguageSelector = () => {
   const [isOpen, setIsOpen] = useState(false);
 
   const handleLanguageChange = async (languageCode: string) => {
-    console.log('🌍 LanguageSelector: LANGUAGE CHANGE REQUESTED:', { 
+    componentLogger.info('Language change requested', { 
       from: currentLanguage, 
       to: languageCode,
-      timestamp: Date.now()
+      timestamp: Date.now().toString()
     });
     
     // First change the language which will clear caches and set loading states
     try {
       await setLanguage(languageCode);
-      console.log('🌍 LanguageSelector: ✅ Language change completed:', languageCode);
+      componentLogger.info('Language change completed', { languageCode });
     } catch (error) {
-      console.error('🌍 LanguageSelector: ❌ Language change failed:', error);
+      componentLogger.error('Language change failed', error, { languageCode });
       return;
     }
     
@@ -101,9 +101,9 @@ const LanguageSelector = () => {
         ...parsed.filter((code: string) => code !== languageCode)
       ].slice(0, 3);
       localStorage.setItem('recentLanguages', JSON.stringify(updated));
-      console.log('🌍 LanguageSelector: 💾 Stored recent language:', languageCode);
+      componentLogger.debug('Stored recent language', { languageCode });
     } catch (err) {
-      console.error('🌍 LanguageSelector: ❌ Failed to store recent language:', err);
+      componentLogger.error('Failed to store recent language', err, { languageCode });
     }
   };
 
