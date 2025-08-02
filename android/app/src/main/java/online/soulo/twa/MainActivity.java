@@ -1,4 +1,4 @@
-package app.soulo.online;
+package online.soulo.twa;
 
 import com.getcapacitor.BridgeActivity;
 
