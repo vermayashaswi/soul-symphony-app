@@ -67,7 +67,7 @@
       "step2": "2. Go to Settings > Account Settings",
       "step3": "3. Select 'Delete Account'",
       "step4": "4. Confirm your deletion request",
-      "alternative": "Alternatively, you can contact us directly at hello@soulo.online to request account deletion."
+      "alternative": "Alternatively, you can contact us directly at support@soulo.online to request account deletion."
     },
     "whatWillBeDeleted": {
       "title": "What Will Be Deleted",
@@ -86,7 +86,7 @@
     "contact": {
       "title": "Need Help?",
       "description": "If you have questions about account deletion or need assistance, please contact us:",
-      "email": "Email: hello@soulo.online",
+      "email": "Email: support@soulo.online",
       "response": "We typically respond within 24-48 hours."
     }
   },
@@ -175,7 +175,7 @@
     "contact": {
       "title": "Data Deletion Requests",
       "description": "To request data deletion or exercise your data rights:",
-      "email": "Email: hello@soulo.online",
+      "email": "Email: support@soulo.online",
       "subject": "Subject: Data Deletion Request",
       "include": "Please include your account email and specify which data you want deleted",
       "response": "We will respond to your request within 30 days"
