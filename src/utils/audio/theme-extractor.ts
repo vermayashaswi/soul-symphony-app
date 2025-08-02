@@ -55,17 +55,29 @@ export const triggerFullTextProcessing = async (entryId: number): Promise<void> 
     // Step 2: FIXED: Trigger sentiment analysis WITH entity extraction
     // This ensures entities are extracted by the sentiment analysis function only
     try {
-      const { error: sentimentError } = await supabase.functions.invoke('analyze-sentiment', {
-        body: {
-          entryId: entryId,
-          extractEntities: true // FIXED: Ensure entity extraction happens here
-        }
-      });
-      
-      if (sentimentError) {
-        console.error("[theme-extractor] Error triggering sentiment analysis with entity extraction:", sentimentError);
+      // First fetch the entry text for sentiment analysis
+      const { data: entryData, error: fetchError } = await supabase
+        .from('Journal Entries')
+        .select('"refined text"')
+        .eq('id', entryId)
+        .single();
+        
+      if (fetchError || !entryData || !entryData["refined text"]) {
+        console.error("[theme-extractor] Error fetching entry text for sentiment analysis:", fetchError);
       } else {
-        console.log("[theme-extractor] Sentiment analysis with entity extraction triggered successfully");
+        const { error: sentimentError } = await supabase.functions.invoke('analyze-sentiment', {
+          body: {
+            text: entryData["refined text"], // FIXED: Provide the required text parameter
+            entryId: entryId,
+            extractEntities: true // FIXED: Ensure entity extraction happens here
+          }
+        });
+        
+        if (sentimentError) {
+          console.error("[theme-extractor] Error triggering sentiment analysis with entity extraction:", sentimentError);
+        } else {
+          console.log("[theme-extractor] Sentiment analysis with entity extraction triggered successfully");
+        }
       }
     } catch (sentimentErr) {
       console.error("[theme-extractor] Error starting sentiment analysis with entity extraction:", sentimentErr);
