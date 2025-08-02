@@ -13,6 +13,7 @@ import { toast } from 'sonner';
 import './styles/emoji.css';
 import './styles/tutorial.css';
 import { FeatureFlagsProvider } from "./contexts/FeatureFlagsContext";
+import { SessionTrackingProvider } from './contexts/SessionTrackingContext';
 import { nativeAppInitService } from './services/nativeAppInitService';
 import { mobileErrorHandler } from './services/mobileErrorHandler';
 import { mobileOptimizationService } from './services/mobileOptimizationService';
@@ -198,14 +199,16 @@ const App: React.FC = () => {
     <ErrorBoundary onError={handleAppError}>
       <FeatureFlagsProvider>
         <SubscriptionProvider>
-          <TutorialProvider>
-            <TranslationLoadingOverlay />
-            <JournalProcessingInitializer />
-            <AppRoutes key={isInitialized ? 'initialized' : 'initializing'} />
-            <TutorialOverlay />
-            <Toaster />
-            <SonnerToaster position="top-right" />
-          </TutorialProvider>
+          <SessionTrackingProvider>
+            <TutorialProvider>
+              <TranslationLoadingOverlay />
+              <JournalProcessingInitializer />
+              <AppRoutes key={isInitialized ? 'initialized' : 'initializing'} />
+              <TutorialOverlay />
+              <Toaster />
+              <SonnerToaster position="top-right" />
+            </TutorialProvider>
+          </SessionTrackingProvider>
         </SubscriptionProvider>
       </FeatureFlagsProvider>
     </ErrorBoundary>
