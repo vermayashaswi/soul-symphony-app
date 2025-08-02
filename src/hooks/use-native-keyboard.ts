@@ -1,21 +1,27 @@
 import { useEffect } from 'react';
 import { usePlatformDetection } from './use-platform-detection';
+import { useUnifiedTouchActionManager } from './use-unified-touch-action-manager';
 
 /**
- * Hook to optimize native keyboard functionality on mobile platforms
+ * Enhanced hook to optimize native keyboard functionality on mobile platforms
+ * Now integrates with unified touch action management for better coordination
  * Ensures proper touch event handling and prevents interference with
  * native keyboard gestures like swipe-to-type and word prediction
  */
 export const useNativeKeyboard = () => {
   const { platform, isNative, isReady } = usePlatformDetection();
+  const touchActionManager = useUnifiedTouchActionManager({
+    debugMode: false,
+    respectCapacitorNative: isNative
+  });
 
   useEffect(() => {
     if (!isReady || !isNative) return;
 
-    // Set up platform-specific keyboard optimizations
+    // Set up platform-specific keyboard optimizations using unified touch action manager
     const optimizeKeyboardHandling = () => {
-      // Ensure body doesn't interfere with keyboard events
-      document.body.style.touchAction = 'manipulation';
+      // Use unified touch action management instead of direct manipulation
+      touchActionManager.setTouchAction(document.body, 'general', 'manipulation', 'native-keyboard-body');
       
       // Add platform-specific classes for debugging
       document.body.classList.add(`keyboard-optimized-${platform}`);
@@ -54,12 +60,13 @@ export const useNativeKeyboard = () => {
     return () => {
       clearTimeout(timeoutId);
       
-      // Clean up optimizations
+      // Clean up optimizations using unified touch action manager
+      touchActionManager.removeTouchAction('native-keyboard-body');
       document.body.classList.remove(`keyboard-optimized-${platform}`);
       document.documentElement.style.removeProperty('--ios-keyboard-optimization');
       document.documentElement.style.removeProperty('--android-keyboard-optimization');
     };
-  }, [platform, isNative, isReady]);
+  }, [platform, isNative, isReady, touchActionManager]);
 
   return {
     platform,
