@@ -10,7 +10,7 @@ export function useIsMobile() {
   const [isAndroid, setIsAndroid] = React.useState<boolean>(false);
 
   React.useEffect(() => {
-    // Function to check if mobile
+    // Function to check if mobile PHONE (not tablet)
     const checkIfMobile = () => {
       // Check URL parameter for demo mode
       const urlParams = new URLSearchParams(window.location.search);
@@ -25,14 +25,36 @@ export function useIsMobile() {
         return window.__forceMobileView;
       }
       
-      // Use multiple signals to determine if we're on mobile
-      const viewportWidth = window.innerWidth < MOBILE_BREAKPOINT;
-      const userAgentMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+      const userAgent = navigator.userAgent.toLowerCase();
+      const platform = navigator.platform?.toLowerCase() || '';
+      const screenWidth = window.innerWidth;
+      const screenHeight = window.innerHeight;
+      const minDimension = Math.min(screenWidth, screenHeight);
+      
+      // Exclude Chromebooks
+      const isChromebook = userAgent.includes('cros') || 
+                          platform.includes('cros') ||
+                          userAgent.includes('chromebook');
+      
+      if (isChromebook) return false;
+      
+      // Exclude tablets
+      const isTabletUA = /ipad|android(?!.*mobile)|tablet|kindle|silk|playbook|bb10/i.test(userAgent);
+      const isIpad = /ipad/i.test(userAgent) || 
+                     (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+      const isAndroidTablet = /android/i.test(userAgent) && !/mobile/i.test(userAgent);
+      const isLargeScreen = minDimension >= 768;
+      const isTablet = isTabletUA || isIpad || isAndroidTablet || 
+                       (isLargeScreen && Math.max(screenWidth, screenHeight) / minDimension < 2.1);
+      
+      if (isTablet) return false;
+      
+      // Only allow mobile phones
+      const isMobileUA = /android|webos|iphone|ipod|blackberry|iemobile|opera mini/i.test(userAgent);
+      const isSmallScreen = minDimension < 768;
       const touchCapable = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
       
-      // For most cases, viewport width is sufficient
-      // But combine with user agent for edge cases
-      return viewportWidth || (userAgentMobile && touchCapable);
+      return isMobileUA && isSmallScreen && touchCapable;
     };
     
     // Function to check iOS

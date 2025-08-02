@@ -2,6 +2,7 @@
 /* Import focused mobile stylesheets */
 @import './safe-area.css';
 @import './mobile-navigation.css';
+@import './device-restrictions.css';
 
 /* Mobile-specific styles - remaining rules */
 @media (max-width: 768px) {
