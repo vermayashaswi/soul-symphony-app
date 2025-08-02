@@ -8,6 +8,7 @@ import { useTutorial } from "@/contexts/TutorialContext";
 import { useTranslation } from "@/contexts/TranslationContext";
 import { cn } from "@/lib/utils";
 import { useKeyboardDetection } from "@/hooks/use-keyboard-detection";
+import { useNativeKeyboard } from "@/hooks/use-native-keyboard";
 
 interface MobileChatInputProps {
   onSendMessage: (message: string, isAudio?: boolean) => void;
@@ -30,6 +31,7 @@ export default function MobileChatInput({
   const { translate, currentLanguage } = useTranslation();
   
   const { isKeyboardVisible, keyboardHeight, platform, isNative, isReady } = useKeyboardDetection();
+  const { isOptimized } = useNativeKeyboard();
   
   const isInChatTutorialStep = isActive && isInStep(5);
 
@@ -179,6 +181,12 @@ export default function MobileChatInput({
           placeholder={placeholderText}
           className="w-full border border-muted shadow-sm bg-background text-foreground focus:outline-none focus:ring-0 focus:border-muted"
           disabled={isLoading || isSubmitting}
+          autoComplete="off"
+          autoCorrect="on"
+          autoCapitalize="sentences"
+          spellCheck="true"
+          inputMode="text"
+          data-testid="mobile-chat-input"
         />
       </div>
       

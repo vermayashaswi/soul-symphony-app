@@ -1,8 +1,10 @@
 import { toast } from '@/hooks/use-toast';
 import { nativeIntegrationService } from './nativeIntegrationService';
+import { logger } from '@/utils/logger';
 
 // Component mount tracking for safe DOM operations
 const mountedComponents = new Set<string>();
+const notificationLogger = logger.createLogger('NotificationService');
 
 export function registerComponent(componentId: string) {
   mountedComponents.add(componentId);
@@ -20,14 +22,14 @@ function isComponentMounted(componentId?: string): boolean {
 // Safe toast wrapper that checks if component is still mounted
 function safeToast(props: any, componentId?: string) {
   if (!isComponentMounted(componentId)) {
-    console.log('Skipping toast for unmounted component:', componentId);
+    notificationLogger.debug('Skipping toast for unmounted component', { componentId });
     return { id: '', dismiss: () => {}, update: () => {} };
   }
   
   try {
     return toast(props);
   } catch (error) {
-    console.error('Toast error:', error);
+    notificationLogger.error('Toast error', error, { componentId });
     return { id: '', dismiss: () => {}, update: () => {} };
   }
 }
@@ -60,7 +62,7 @@ export async function showTranslatedToast(
   componentId?: string
 ) {
   if (!isComponentMounted(componentId)) {
-    console.log('Skipping translated toast for unmounted component:', componentId);
+    notificationLogger.debug('Skipping translated toast for unmounted component', { componentId });
     return;
   }
 
@@ -90,7 +92,7 @@ export async function showTranslatedTutorialToast(
   componentId?: string
 ) {
   if (!isComponentMounted(componentId)) {
-    console.log('Skipping translated tutorial toast for unmounted component:', componentId);
+    notificationLogger.debug('Skipping translated tutorial toast for unmounted component', { componentId });
     return;
   }
 
@@ -106,7 +108,7 @@ export async function showTranslatedTutorialToast(
 
 // Legacy functions for backward compatibility
 export function clearAllToasts() {
-  console.log('clearAllToasts called - using sonner toast system');
+  notificationLogger.debug('clearAllToasts called - using sonner toast system');
 }
 
 export async function ensureAllToastsCleared() {
@@ -143,7 +145,7 @@ const TIME_MAPPINGS: Record<NotificationTime, { hour: number; minute: number }> 
 // Request notification permission
 export async function requestNotificationPermission(): Promise<boolean> {
   if (!('Notification' in window)) {
-    console.log('This browser does not support notifications');
+    notificationLogger.info('Browser does not support notifications');
     return false;
   }
 
@@ -152,7 +154,7 @@ export async function requestNotificationPermission(): Promise<boolean> {
   }
 
   if (Notification.permission === 'denied') {
-    console.log('Notification permission denied');
+    notificationLogger.info('Notification permission denied');
     return false;
   }
 
@@ -160,7 +162,7 @@ export async function requestNotificationPermission(): Promise<boolean> {
     const permission = await Notification.requestPermission();
     return permission === 'granted';
   } catch (error) {
-    console.error('Error requesting notification permission:', error);
+    notificationLogger.error('Error requesting notification permission', error);
     return false;
   }
 }
@@ -168,7 +170,7 @@ export async function requestNotificationPermission(): Promise<boolean> {
 // Show immediate notification
 export function showNotification(title: string, body: string, options?: NotificationOptions) {
   if (!('Notification' in window) || Notification.permission !== 'granted') {
-    console.log('Cannot show notification - permission not granted');
+    notificationLogger.debug('Cannot show notification - permission not granted');
     return;
   }
 
@@ -221,12 +223,12 @@ function scheduleNotification(time: NotificationTime): ScheduledNotification {
   const id = `${time}-${Date.now()}`;
   const scheduledFor = getNextNotificationTime(time);
   
-  console.log(`Scheduling notification for ${time} at ${scheduledFor.toLocaleString()}`);
+  notificationLogger.debug('Scheduling notification', { time, scheduledFor: scheduledFor.toLocaleString() });
   
   const timeoutMs = scheduledFor.getTime() - Date.now();
   
   const timeoutId = window.setTimeout(() => {
-    console.log(`Showing notification for ${time}`);
+    notificationLogger.debug('Showing scheduled notification', { time });
     
     showNotification(
       'Journal Reminder 📝',
@@ -263,7 +265,7 @@ function clearScheduledNotifications() {
     }
   });
   activeNotifications = [];
-  console.log('All scheduled notifications cleared');
+  notificationLogger.debug('All scheduled notifications cleared');
 }
 
 // Schedule native notifications using Capacitor LocalNotifications

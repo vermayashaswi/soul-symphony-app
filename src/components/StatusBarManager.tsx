@@ -1,22 +1,25 @@
 
 import React, { useEffect } from 'react';
 import { nativeIntegrationService } from '@/services/nativeIntegrationService';
+import { logger } from '@/utils/logger';
 
 interface StatusBarManagerProps {
   children: React.ReactNode;
 }
 
 export const StatusBarManager: React.FC<StatusBarManagerProps> = ({ children }) => {
+  const componentLogger = logger.createLogger('StatusBarManager');
+  
   useEffect(() => {
     const initializeStatusBar = async () => {
       try {
         const isNative = nativeIntegrationService.isRunningNatively();
         const isAndroid = /Android/.test(navigator.userAgent);
         
-        console.log('[StatusBarManager] ANDROID FIX: Initializing with native:', isNative, 'android:', isAndroid);
+        componentLogger.info('Initializing status bar', { native: isNative, android: isAndroid });
         
         if (isNative) {
-          console.log('[StatusBarManager] Configuring native status bar for immersive experience...');
+          componentLogger.info('Configuring native status bar for immersive experience');
           
           // Hide status bar for full-screen immersive experience
           await nativeIntegrationService.hideStatusBar();
@@ -27,24 +30,24 @@ export const StatusBarManager: React.FC<StatusBarManagerProps> = ({ children }) 
             await statusBarPlugin.setOverlaysWebView({ overlay: true });
             await statusBarPlugin.setStyle({ style: 'dark' });
             
-            console.log('[StatusBarManager] Status bar hidden and configured for immersive experience');
+            componentLogger.info('Status bar hidden and configured for immersive experience');
           }
         } else {
-          console.log('[StatusBarManager] ANDROID FIX: Web environment - status bar styling handled by CSS');
+          componentLogger.debug('Web environment - status bar styling handled by CSS');
         }
         
         // Enhanced safe area detection and CSS variable setup
         updateSafeAreaVariables();
         
       } catch (error) {
-        console.error('[StatusBarManager] ANDROID FIX: Failed to configure status bar:', error);
+        componentLogger.error('Failed to configure status bar', error);
       }
     };
 
     // FIX: Re-hide status bar when app becomes visible/active
     const handleVisibilityChange = async () => {
       if (!document.hidden && nativeIntegrationService.isRunningNatively()) {
-        console.log('[StatusBarManager] App became visible, re-hiding status bar');
+        componentLogger.debug('App became visible, re-hiding status bar');
         try {
           await nativeIntegrationService.hideStatusBar();
           const statusBarPlugin = nativeIntegrationService.getPlugin('StatusBar');
@@ -52,15 +55,15 @@ export const StatusBarManager: React.FC<StatusBarManagerProps> = ({ children }) 
             await statusBarPlugin.setOverlaysWebView({ overlay: true });
           }
         } catch (error) {
-          console.error('[StatusBarManager] Failed to re-hide status bar:', error);
+          componentLogger.error('Failed to re-hide status bar', error);
         }
       }
     };
 
     const handleAppStateChange = async (event: any) => {
-      console.log('[StatusBarManager] App state changed:', event);
+      componentLogger.debug('App state changed', { event });
       if (event?.isActive && nativeIntegrationService.isRunningNatively()) {
-        console.log('[StatusBarManager] App resumed, re-hiding status bar');
+        componentLogger.debug('App resumed, re-hiding status bar');
         try {
           await nativeIntegrationService.hideStatusBar();
           const statusBarPlugin = nativeIntegrationService.getPlugin('StatusBar');
@@ -68,7 +71,7 @@ export const StatusBarManager: React.FC<StatusBarManagerProps> = ({ children }) 
             await statusBarPlugin.setOverlaysWebView({ overlay: true });
           }
         } catch (error) {
-          console.error('[StatusBarManager] Failed to re-hide status bar on resume:', error);
+          componentLogger.error('Failed to re-hide status bar on resume', error);
         }
       }
     };
@@ -89,7 +92,7 @@ export const StatusBarManager: React.FC<StatusBarManagerProps> = ({ children }) 
         document.documentElement.classList.add('platform-android');
         document.documentElement.classList.remove('platform-ios');
         
-        console.log('[StatusBarManager] ANDROID FIX: Android platform detected, setting bottom inset to 8px');
+        componentLogger.debug('Android platform detected, setting bottom inset to 8px');
       } else if (isIOS) {
         statusBarHeight = '44px';
         document.documentElement.classList.add('platform-ios');
@@ -116,7 +119,7 @@ export const StatusBarManager: React.FC<StatusBarManagerProps> = ({ children }) 
       if (isAndroid) {
         const bottomValue = actualBottom.includes('env(') ? bottomInset : actualBottom;
         root.style.setProperty('--safe-area-inset-bottom', bottomValue);
-        console.log('[StatusBarManager] ANDROID FIX: Forced bottom inset to:', bottomValue);
+        componentLogger.debug('Forced bottom inset', { bottomValue });
       } else {
         root.style.setProperty('--safe-area-inset-bottom', actualBottom);
       }
@@ -126,7 +129,7 @@ export const StatusBarManager: React.FC<StatusBarManagerProps> = ({ children }) 
       root.style.setProperty('--safe-area-inset-left', actualLeft);
       root.style.setProperty('--safe-area-inset-right', actualRight);
       
-      console.log('[StatusBarManager] ANDROID FIX: Safe area variables updated:', {
+      componentLogger.debug('Safe area variables updated', {
         statusBarHeight,
         bottomInset,
         top: actualTop,
@@ -154,7 +157,7 @@ export const StatusBarManager: React.FC<StatusBarManagerProps> = ({ children }) 
     const handleOrientationChange = () => {
       clearTimeout(updateTimeout);
       updateTimeout = setTimeout(() => {
-        console.log('[StatusBarManager] ANDROID FIX: Orientation/resize detected, updating safe area');
+        componentLogger.debug('Orientation/resize detected, updating safe area');
         updateSafeAreaVariables();
         // Also re-hide status bar on orientation change
         if (nativeIntegrationService.isRunningNatively()) {

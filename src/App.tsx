@@ -19,6 +19,7 @@ import { mobileOptimizationService } from './services/mobileOptimizationService'
 import { nativeIntegrationService } from './services/nativeIntegrationService';
 import { nativeAuthService } from './services/nativeAuthService';
 import { useAppInitialization } from './hooks/useAppInitialization';
+import { logger } from './utils/logger';
 
 const App: React.FC = () => {
   const [isInitialized, setIsInitialized] = useState(false);
@@ -26,14 +27,16 @@ const App: React.FC = () => {
   const appInitialization = useAppInitialization();
 
   useEffect(() => {
+    const appLogger = logger.createLogger('App');
+    
     if (nativeIntegrationService.isRunningNatively()) {
-      console.log('[App] Initializing native services');
+      appLogger.info('Initializing native services');
       nativeAuthService.initialize();
     }
     
     const initializeApp = async () => {
       try {
-        console.log('[App] Starting app initialization...');
+        appLogger.info('Starting app initialization');
         
         // Clean up any malformed paths
         const currentPath = window.location.pathname;
@@ -48,11 +51,11 @@ const App: React.FC = () => {
         
         // Initialize mobile optimization service first
         try {
-          console.log('[App] Initializing mobile optimization service...');
+          appLogger.debug('Initializing mobile optimization service');
           await mobileOptimizationService.initialize();
-          console.log('[App] Mobile optimization service initialized');
+          appLogger.debug('Mobile optimization service initialized');
         } catch (error) {
-          console.warn('[App] Mobile optimization failed:', error);
+          appLogger.warn('Mobile optimization failed', error);
           mobileErrorHandler.handleError({
             type: 'unknown',
             message: `Mobile optimization failed: ${error}`
@@ -61,26 +64,26 @@ const App: React.FC = () => {
         
         // Initialize native app using the new service
         try {
-          console.log('[App] Initializing native app service...');
+          appLogger.debug('Initializing native app service');
           const nativeInitSuccess = await nativeAppInitService.initialize();
           
           if (nativeInitSuccess) {
-            console.log('[App] Native app initialization completed successfully');
+            appLogger.info('Native app initialization completed successfully');
             
             // Get initialization status for debugging
             const initStatus = await nativeAppInitService.getInitializationStatus();
-            console.log('[App] Native app initialization status:', initStatus);
+            appLogger.debug('Native app initialization status', { initStatus });
             
             // If we're in a native environment, ensure proper routing
             if (initStatus.nativeEnvironment) {
-              console.log('[App] Native environment confirmed - app will route to app interface');
+              appLogger.info('Native environment confirmed - app will route to app interface');
             }
             
           } else {
-            console.warn('[App] Native app initialization failed, continuing with web fallback');
+            appLogger.warn('Native app initialization failed, continuing with web fallback');
           }
         } catch (error) {
-          console.warn('[App] Native app initialization error:', error);
+          appLogger.warn('Native app initialization error', error);
           mobileErrorHandler.handleError({
             type: 'capacitor',
             message: `Native app init failed: ${error}`
@@ -89,10 +92,10 @@ const App: React.FC = () => {
         
         // Preload critical images including the chat avatar
         try {
-          console.log('[App] Preloading critical images...');
+          appLogger.debug('Preloading critical images');
           preloadCriticalImages();
         } catch (error) {
-          console.warn('Failed to preload some images:', error);
+          appLogger.warn('Failed to preload some images', error);
           // Non-critical error, continue app initialization
         }
 
@@ -101,15 +104,15 @@ const App: React.FC = () => {
         const isNativeApp = nativeAppInitService.isNativeAppInitialized();
         const initDelay = isNativeApp ? 200 : 500;
         
-        console.log('[App] Setting initialization delay:', initDelay, 'ms (native:', isNativeApp, ')');
+        appLogger.debug('Setting initialization delay', { initDelay, isNativeApp });
         
         setTimeout(() => {
-          console.log('[App] App initialization completed - setting isInitialized to true');
+          appLogger.info('App initialization completed');
           setIsInitialized(true);
         }, initDelay);
 
       } catch (error) {
-        console.error('[App] Critical initialization error:', error);
+        appLogger.error('Critical initialization error', error);
         setInitializationError(error.toString());
         mobileErrorHandler.handleError({
           type: 'crash',
@@ -122,7 +125,8 @@ const App: React.FC = () => {
   }, []);
 
   const handleAppError = (error: Error, errorInfo: any) => {
-    console.error('Application-level error:', error, errorInfo);
+    const appLogger = logger.createLogger('App');
+    appLogger.error('Application-level error', error, { errorInfo });
     
     // Use mobile error handler for consistent error tracking
     mobileErrorHandler.handleError({
@@ -143,7 +147,7 @@ const App: React.FC = () => {
       isNative: nativeAppInitService.isNativeAppInitialized()
     };
     
-    console.error('Detailed error info:', errorData);
+    appLogger.error('Detailed error context', undefined, errorData);
 
     // Show user-friendly error notification
     toast.error('Something went wrong. The app will try to recover automatically.');

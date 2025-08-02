@@ -2,18 +2,21 @@
 import { useEffect } from 'react';
 import { initializeJournalProcessing } from '@/utils/journal/initialize-processing';
 import { processingStateManager, EntryProcessingState } from '@/utils/journal/processing-state-manager';
+import { logger } from '@/utils/logger';
 
 export function JournalProcessingInitializer() {
+  const processingLogger = logger.createLogger('JournalProcessingInitializer');
+  
   useEffect(() => {
-    console.log('[JournalProcessingInitializer] Initializing journal processing system');
+    processingLogger.info('Initializing journal processing system');
     
     const { processingStateManager } = initializeJournalProcessing();
     
     // Immediate cleanup of any stale entries
-    console.log('[JournalProcessingInitializer] Running cleanup of stale entries');
+    processingLogger.debug('Running cleanup of stale entries');
     
     const entries = processingStateManager.getProcessingEntries();
-    console.log(`[JournalProcessingInitializer] Found ${entries.length} entries to check for cleanup`);
+    processingLogger.debug('Found entries to check for cleanup', { entryCount: entries.length });
     
     let cleanedCount = 0;
     
@@ -25,12 +28,12 @@ export function JournalProcessingInitializer() {
       if (shouldClean) {
         processingStateManager.removeEntry(entry.tempId);
         cleanedCount++;
-        console.log(`[JournalProcessingInitializer] Force cleaned up entry ${entry.tempId} (age: ${entryAge}ms)`);
+        processingLogger.debug('Force cleaned up entry', { tempId: entry.tempId, entryAge });
       }
     });
     
     if (cleanedCount > 0) {
-      console.log(`[JournalProcessingInitializer] Cleaned up ${cleanedCount} entries on init`);
+      processingLogger.info('Cleaned up stale entries on init', { cleanedCount });
     }
     
     // Set up a periodic cleanup check every 30 seconds
@@ -45,18 +48,18 @@ export function JournalProcessingInitializer() {
         if (entryAge > 60000) { 
           processingStateManager.removeEntry(entry.tempId);
           removedCount++;
-          console.log(`[JournalProcessingInitializer] Cleaned up stale entry ${entry.tempId} (age: ${entryAge}ms)`);
+          processingLogger.debug('Cleaned up stale entry', { tempId: entry.tempId, entryAge });
         }
       });
       
       if (removedCount > 0) {
-        console.log(`[JournalProcessingInitializer] Cleaned up ${removedCount} stale entries in periodic check`);
+        processingLogger.debug('Cleaned up stale entries in periodic check', { removedCount });
       }
     }, 30000); // Check every 30 seconds
     
     // Cleanup on unmount
     return () => {
-      console.log('[JournalProcessingInitializer] Cleaning up processing state manager');
+      processingLogger.debug('Cleaning up processing state manager');
       processingStateManager.dispose();
       clearInterval(cleanupInterval);
     };

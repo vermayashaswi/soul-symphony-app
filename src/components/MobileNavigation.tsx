@@ -13,6 +13,7 @@ import { useTranslation } from '@/contexts/TranslationContext';
 import { useSubscription } from '@/contexts/SubscriptionContext';
 import { useSafeArea } from '@/hooks/use-safe-area';
 import { useKeyboardDetection } from '@/hooks/use-keyboard-detection';
+import { logger } from '@/utils/logger';
 
 interface MobileNavigationProps {
   onboardingComplete: boolean | null;
@@ -33,10 +34,12 @@ const MobileNavigation: React.FC<MobileNavigationProps> = ({ onboardingComplete 
   const navRef = useRef<HTMLDivElement>(null);
   const [renderKey, setRenderKey] = useState(0);
   
+  const componentLogger = logger.createLogger('MobileNavigation');
+  
   // Handle language changes
   useEffect(() => {
     const handleLanguageChange = () => {
-      console.log('MobileNavigation: Language change detected, forcing re-render');
+      componentLogger.debug('Language change detected, forcing re-render');
       setRenderKey(prev => prev + 1);
     };
     
@@ -48,7 +51,7 @@ const MobileNavigation: React.FC<MobileNavigationProps> = ({ onboardingComplete 
   useEffect(() => {
     if (navRef.current) {
       applySafeAreaStyles(navRef.current);
-      console.log('MobileNavigation: Applied safe area styles:', safeArea);
+      componentLogger.debug('Applied safe area styles', { safeArea });
     }
   }, [safeArea, applySafeAreaStyles]);
   
@@ -67,7 +70,7 @@ const MobileNavigation: React.FC<MobileNavigationProps> = ({ onboardingComplete 
     nav.setAttribute('data-keyboard-visible', isKeyboardVisible.toString());
     nav.setAttribute('data-platform', platform);
     
-    console.log('[MobileNavigation] Keyboard state applied:', { 
+    componentLogger.debug('Keyboard state applied', { 
       isVisible: isKeyboardVisible, 
       height: keyboardHeight, 
       platform,
@@ -93,7 +96,7 @@ const MobileNavigation: React.FC<MobileNavigationProps> = ({ onboardingComplete 
                           !!user &&
                           onboardingComplete !== false;
     
-    console.log('[MobileNavigation] Visibility check:', { 
+    componentLogger.debug('Visibility check', { 
       shouldShowNav, 
       isMobile: isMobile.isMobile, 
       isNativeApp: isNativeApp(),

@@ -32,7 +32,7 @@ const SouloLogo = ({
     const themeData = useTheme();
     colorTheme = themeData.colorTheme;
   } catch (error) {
-    console.warn('SouloLogo: ThemeProvider not ready, using defaults');
+    // ThemeProvider not ready, using defaults
   }
   const [animationState, setAnimationState] = useState<'full' | 'soul' | 'none'>('full');
   const [micScale, setMicScale] = useState<number>(1);

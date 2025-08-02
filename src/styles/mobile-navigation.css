@@ -73,6 +73,7 @@
   padding: 0;
   height: var(--chat-input-height);
   box-sizing: border-box;
+  touch-action: manipulation;
   
   /* Position directly above navigation with no gap */
   bottom: var(--nav-bar-height);
@@ -141,13 +142,12 @@
 }
 
 /* Touch targets - Ensure minimum sizes for mobile */
-.mobile-chat-input-container button {
+.mobile-chat-input-container button,
+.mobile-chat-input-container input,
+.mobile-chat-input-container textarea {
   min-height: 44px;
   min-width: 44px;
-}
-
-.mobile-chat-input-container input {
-  min-height: 44px;
+  touch-action: manipulation;
 }
 
 /* Viewport fixes */

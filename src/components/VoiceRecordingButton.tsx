@@ -3,11 +3,12 @@ import { Mic, Square } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import RecordRTC, { StereoAudioRecorder } from 'recordrtc';
 import { formatTime } from "@/utils/format-time"; 
-import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import { LanguageBackground } from "@/components/voice-recorder/MultilingualTextAnimation";
 import { getAudioConfig, getRecorderOptions, RECORDING_LIMITS } from "@/utils/audio/recording-config";
 import { useTutorial } from "@/contexts/TutorialContext";
+import { logger } from '@/utils/logger';
+import { TOAST_MESSAGES, showErrorToast, showInfoToast } from '@/utils/toast-messages';
 
 interface VoiceRecordingButtonProps {
   isLoading: boolean;
@@ -30,8 +31,9 @@ const VoiceRecordingButton: React.FC<VoiceRecordingButtonProps> = ({
 }) => {
   const [recorder, setRecorder] = useState<RecordRTC | null>(null);
   const [stream, setStream] = useState<MediaStream | null>(null);
-  const { toast } = useToast();
   const { isInStep, tutorialCompleted, isActive } = useTutorial();
+  
+  const componentLogger = logger.createLogger('VoiceRecordingButton');
   
   // Check if we're in tutorial step 5 (chat) - hide the component
   const isInTutorialStep5 = isActive && isInStep(5);
@@ -41,7 +43,7 @@ const VoiceRecordingButton: React.FC<VoiceRecordingButtonProps> = ({
   
   // Enhanced check: If we're in tutorial step 5, don't render at all
   if (isInTutorialStep5) {
-    console.log('[VoiceRecordingButton] Hidden during tutorial step 5 (chat)');
+    componentLogger.debug('Hidden during tutorial step 5 (chat)');
     return null;
   }
   
@@ -68,11 +70,7 @@ const VoiceRecordingButton: React.FC<VoiceRecordingButtonProps> = ({
           
           const timeout = setTimeout(() => {
             if (isRecording) {
-              toast({
-                title: "Recording limit reached",
-                description: "Maximum recording duration reached (5 minutes)",
-                variant: "default"
-              });
+              showInfoToast("Recording limit reached", "Maximum recording duration reached (5 minutes)");
               handleVoiceRecording();
             }
           }, RECORDING_LIMITS.MAX_DURATION * 1000);
@@ -87,12 +85,8 @@ const VoiceRecordingButton: React.FC<VoiceRecordingButtonProps> = ({
             }
           };
         } catch (error) {
-          console.error("Error recording audio:", error);
-          toast({
-            title: "Recording error",
-            description: "Could not access microphone. Check browser permissions.",
-            variant: "destructive"
-          });
+          componentLogger.error("Error recording audio", error);
+          showErrorToast("Recording error", "Could not access microphone. Check browser permissions.");
         }
       };
       
@@ -100,14 +94,14 @@ const VoiceRecordingButton: React.FC<VoiceRecordingButtonProps> = ({
     }
     
     return cleanup;
-  }, [isRecording, toast]);
+  }, [isRecording]);
   
   const handleVoiceRecording = () => {
     if (isRecording && recorder) {
       recorder.stopRecording(() => {
         try {
           const blob = recorder.getBlob();
-          console.log("[VoiceRecordingButton] Recording stopped, blob created:", {
+          componentLogger.debug("Recording stopped, blob created", {
             size: blob.size,
             type: blob.type,
             duration: (blob as any).duration || 'unknown'
@@ -123,20 +117,16 @@ const VoiceRecordingButton: React.FC<VoiceRecordingButtonProps> = ({
                 value: recordingTime / 1000,
                 writable: false
               });
-              console.log("[VoiceRecordingButton] Added duration property to blob:", recordingTime / 1000);
+              componentLogger.debug("Added duration property to blob", { duration: recordingTime / 1000 });
             } catch (err) {
-              console.warn("[VoiceRecordingButton] Could not add duration to blob:", err);
+              componentLogger.warn("Could not add duration to blob", err);
             }
           }
           
           onStopRecording(blob);
         } catch (error) {
-          console.error("[VoiceRecordingButton] Error getting blob:", error);
-          toast({
-            title: "Recording error",
-            description: "Failed to process recording. Please try again.",
-            variant: "destructive"
-          });
+          componentLogger.error("Error getting blob", error);
+          showErrorToast("Recording error", "Failed to process recording. Please try again.");
         }
         
         if (stream) {

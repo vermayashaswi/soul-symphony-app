@@ -30,8 +30,8 @@ const config: CapacitorConfig = {
       splashScreenDelay: 2000
     },
     Keyboard: {
-      resize: "ionic",
-      style: "dark",
+      resize: "body",
+      style: "default",
       resizeOnFullScreen: true
     },
     StatusBar: {

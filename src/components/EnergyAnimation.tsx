@@ -24,7 +24,7 @@ const EnergyAnimation: React.FC<EnergyAnimationProps> = ({
     colorTheme = themeData.colorTheme;
     customColor = themeData.customColor || '#3b82f6';
   } catch (error) {
-    console.warn('EnergyAnimation: ThemeProvider not ready, using defaults');
+    // ThemeProvider not ready, using defaults
   }
   
   // Determine the base color to use based on the user's selected theme

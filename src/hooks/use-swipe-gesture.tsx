@@ -31,12 +31,16 @@ export function useSwipeGesture(
       startTarget = e.target;
       
       // Don't initiate swipe if touching an input, textarea or select field
+      // Also check for contenteditable elements and elements with keyboard interaction
       if (
         startTarget instanceof HTMLElement && 
         (startTarget.tagName === 'INPUT' || 
          startTarget.tagName === 'TEXTAREA' || 
-         startTarget.tagName === 'SELECT')
+         startTarget.tagName === 'SELECT' ||
+         startTarget.isContentEditable ||
+         startTarget.closest('input, textarea, select, [contenteditable]'))
       ) {
+        // Don't prevent default - let native keyboard gestures work
         return;
       }
       
@@ -93,9 +97,10 @@ export function useSwipeGesture(
       }
     };
 
+    // Use passive listeners to avoid interfering with native scrolling/keyboard gestures
     element.addEventListener('touchstart', handleTouchStart, { passive: true });
     element.addEventListener('touchmove', handleTouchMove, { passive: true });
-    element.addEventListener('touchend', handleTouchEnd);
+    element.addEventListener('touchend', handleTouchEnd, { passive: true });
 
     return () => {
       element.removeEventListener('touchstart', handleTouchStart);

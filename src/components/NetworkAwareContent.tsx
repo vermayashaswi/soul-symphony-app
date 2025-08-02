@@ -2,9 +2,10 @@
 import React, { Suspense, lazy, useEffect, useState } from 'react';
 import { useNetworkStatus } from '@/utils/network';
 import { Skeleton } from '@/components/ui/skeleton';
-import { useToast } from '@/hooks/use-toast';
 import { TranslatableText } from '@/components/translation/TranslatableText';
 import { useTranslation } from '@/contexts/TranslationContext';
+import { logger } from '@/utils/logger';
+import { TOAST_MESSAGES, showSuccessToast, showErrorToast, showInfoToast } from '@/utils/toast-messages';
 
 interface NetworkAwareContentProps {
   children: React.ReactNode;
@@ -22,35 +23,36 @@ export function NetworkAwareContent({
   retryOnReconnect = true,
 }: NetworkAwareContentProps) {
   const networkStatus = useNetworkStatus();
-  const { toast } = useToast();
   const { translate } = useTranslation();
   const [shouldRender, setShouldRender] = useState(true);
   const [hasReconnected, setHasReconnected] = useState(false);
-  const [backOnlineMsg, setBackOnlineMsg] = useState('Back online');
-  const [backOnlineDesc, setBackOnlineDesc] = useState('Your connection has been restored.');
-  const [offlineMsg, setOfflineMsg] = useState('You\'re offline');
-  const [offlineDesc, setOfflineDesc] = useState('Some content may not be available.');
+  const [backOnlineMsg, setBackOnlineMsg] = useState<string>(TOAST_MESSAGES.NETWORK.BACK_ONLINE.title);
+  const [backOnlineDesc, setBackOnlineDesc] = useState<string>(TOAST_MESSAGES.NETWORK.BACK_ONLINE.description);
+  const [offlineMsg, setOfflineMsg] = useState<string>(TOAST_MESSAGES.NETWORK.OFFLINE_MODE.title);
+  const [offlineDesc, setOfflineDesc] = useState<string>(TOAST_MESSAGES.NETWORK.OFFLINE_MODE.description);
   const [slowConnectionMsg, setSlowConnectionMsg] = useState('Slow connection detected');
   const [slowConnectionDesc, setSlowConnectionDesc] = useState('Loading optimized content for your connection speed.');
+  
+  const componentLogger = logger.createLogger('NetworkAwareContent');
   
   useEffect(() => {
     // Pre-translate common toast messages
     const preTranslateToastMessages = async () => {
       if (translate) {
         try {
-          console.log('NetworkAwareContent: Pre-translating toast messages...');
+          componentLogger.debug('Pre-translating toast messages');
           
           // Translate and store the messages
-          const translatedBackOnline = await translate("Back online", "en");
+          const translatedBackOnline = await translate(TOAST_MESSAGES.NETWORK.BACK_ONLINE.title, "en");
           if (translatedBackOnline) setBackOnlineMsg(translatedBackOnline);
           
-          const translatedBackOnlineDesc = await translate("Your connection has been restored.", "en");
+          const translatedBackOnlineDesc = await translate(TOAST_MESSAGES.NETWORK.BACK_ONLINE.description, "en");
           if (translatedBackOnlineDesc) setBackOnlineDesc(translatedBackOnlineDesc);
           
-          const translatedOffline = await translate("You're offline", "en");
+          const translatedOffline = await translate(TOAST_MESSAGES.NETWORK.OFFLINE_MODE.title, "en");
           if (translatedOffline) setOfflineMsg(translatedOffline);
           
-          const translatedOfflineDesc = await translate("Some content may not be available.", "en");
+          const translatedOfflineDesc = await translate(TOAST_MESSAGES.NETWORK.OFFLINE_MODE.description, "en");
           if (translatedOfflineDesc) setOfflineDesc(translatedOfflineDesc);
           
           const translatedSlowConnection = await translate("Slow connection detected", "en");
@@ -59,9 +61,9 @@ export function NetworkAwareContent({
           const translatedSlowConnectionDesc = await translate("Loading optimized content for your connection speed.", "en");
           if (translatedSlowConnectionDesc) setSlowConnectionDesc(translatedSlowConnectionDesc);
           
-          console.log('NetworkAwareContent: Pre-translation complete');
+          componentLogger.debug('Pre-translation complete');
         } catch (error) {
-          console.error("Error pre-translating network messages:", error);
+          componentLogger.error('Error pre-translating network messages', error);
         }
       }
     };
@@ -73,34 +75,21 @@ export function NetworkAwareContent({
       setShouldRender(true);
       setHasReconnected(true);
       
-      toast({
-        title: backOnlineMsg,
-        description: backOnlineDesc,
-        duration: 3000,
-      });
+      showSuccessToast(backOnlineMsg, backOnlineDesc, 3000);
     }
     
     // Handle offline state
     if (!networkStatus.online && shouldRender) {
       setShouldRender(false);
       
-      toast({
-        title: offlineMsg,
-        description: offlineDesc,
-        variant: "destructive",
-        duration: 5000,
-      });
+      showErrorToast(offlineMsg, offlineDesc, 5000);
     }
     
     // Handle slow connection
     if (networkStatus.online && networkStatus.speed === 'slow' && !hasReconnected) {
-      toast({
-        title: slowConnectionMsg,
-        description: slowConnectionDesc,
-        duration: 3000,
-      });
+      showInfoToast(slowConnectionMsg, slowConnectionDesc, 3000);
     }
-  }, [networkStatus.online, networkStatus.speed, shouldRender, retryOnReconnect, hasReconnected, toast, translate]);
+  }, [networkStatus.online, networkStatus.speed, shouldRender, retryOnReconnect, hasReconnected, translate]);
   
   // Listen for language changes to update toast messages
   useEffect(() => {
@@ -108,16 +97,16 @@ export function NetworkAwareContent({
       if (translate) {
         try {
           // Update translated messages
-          const translatedBackOnline = await translate("Back online", "en");
+          const translatedBackOnline = await translate(TOAST_MESSAGES.NETWORK.BACK_ONLINE.title, "en");
           if (translatedBackOnline) setBackOnlineMsg(translatedBackOnline);
           
-          const translatedBackOnlineDesc = await translate("Your connection has been restored.", "en");
+          const translatedBackOnlineDesc = await translate(TOAST_MESSAGES.NETWORK.BACK_ONLINE.description, "en");
           if (translatedBackOnlineDesc) setBackOnlineDesc(translatedBackOnlineDesc);
           
-          const translatedOffline = await translate("You're offline", "en");
+          const translatedOffline = await translate(TOAST_MESSAGES.NETWORK.OFFLINE_MODE.title, "en");
           if (translatedOffline) setOfflineMsg(translatedOffline);
           
-          const translatedOfflineDesc = await translate("Some content may not be available.", "en");
+          const translatedOfflineDesc = await translate(TOAST_MESSAGES.NETWORK.OFFLINE_MODE.description, "en");
           if (translatedOfflineDesc) setOfflineDesc(translatedOfflineDesc);
           
           const translatedSlowConnection = await translate("Slow connection detected", "en");
@@ -126,7 +115,7 @@ export function NetworkAwareContent({
           const translatedSlowConnectionDesc = await translate("Loading optimized content for your connection speed.", "en");
           if (translatedSlowConnectionDesc) setSlowConnectionDesc(translatedSlowConnectionDesc);
         } catch (error) {
-          console.error("Error updating translated network messages:", error);
+          componentLogger.error('Error updating translated network messages', error);
         }
       }
     };
