@@ -9,6 +9,11 @@ export const useSessionTracking = () => {
 
   // Initialize session when component mounts or user changes
   useEffect(() => {
+    // Only initialize session for /app routes
+    if (!location.pathname.startsWith('/app')) {
+      return;
+    }
+
     const initSession = async () => {
       const userId = session?.user?.id;
       await sessionTrackingService.initializeSession(userId);
@@ -20,16 +25,24 @@ export const useSessionTracking = () => {
     return () => {
       sessionTrackingService.endSession();
     };
-  }, [session?.user?.id]);
+  }, [session?.user?.id, location.pathname]);
 
-  // Track page views when route changes
+  // Track page views when route changes (only for /app routes)
   useEffect(() => {
+    if (!location.pathname.startsWith('/app')) {
+      return;
+    }
+    
     const currentPath = location.pathname + location.search;
     sessionTrackingService.trackPageView(currentPath);
   }, [location.pathname, location.search]);
 
-  // Track interactions
+  // Track interactions (only for /app routes)
   const trackInteraction = useCallback((action?: string) => {
+    if (!location.pathname.startsWith('/app')) {
+      return;
+    }
+    
     const currentPath = location.pathname + location.search;
     sessionTrackingService.trackInteraction(currentPath, action);
   }, [location.pathname, location.search]);

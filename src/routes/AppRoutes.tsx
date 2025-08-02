@@ -20,6 +20,7 @@ import AccountDeletion from '@/pages/AccountDeletion';
 import DataDeletion from '@/pages/DataDeletion';
 import OnboardingScreen from '@/components/onboarding/OnboardingScreen';
 import SessionRouter from '@/components/routing/SessionRouter';
+import { AppSessionProvider } from '@/components/session/AppSessionProvider';
 import { useAuth } from '@/contexts/AuthContext';
 import { useOnboarding } from '@/hooks/use-onboarding';
 import { useSessionValidation } from '@/hooks/useSessionValidation';
@@ -125,10 +126,11 @@ const AppRoutes = () => {
   };
 
   return (
-    <Routes>
-      <Route element={<ViewportManager />}>
-        {/* Root Route - context-aware */}
-        <Route path="/" element={<RootRedirect />} />
+    <AppSessionProvider>
+      <Routes>
+        <Route element={<ViewportManager />}>
+          {/* Root Route - context-aware */}
+          <Route path="/" element={<RootRedirect />} />
 
         {/* Website Routes - only accessible in web context */}
         <Route path="/privacy-policy" element={
@@ -213,8 +215,9 @@ const AppRoutes = () => {
           <Navigate to="/app/home" replace /> :
           <NotFound />
         } />
-      </Route>
-    </Routes>
+        </Route>
+      </Routes>
+    </AppSessionProvider>
   );
 };
 

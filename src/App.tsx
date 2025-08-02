@@ -199,16 +199,14 @@ const App: React.FC = () => {
     <ErrorBoundary onError={handleAppError}>
       <FeatureFlagsProvider>
         <SubscriptionProvider>
-          <SessionTrackingProvider>
-            <TutorialProvider>
-              <TranslationLoadingOverlay />
-              <JournalProcessingInitializer />
-              <AppRoutes key={isInitialized ? 'initialized' : 'initializing'} />
-              <TutorialOverlay />
-              <Toaster />
-              <SonnerToaster position="top-right" />
-            </TutorialProvider>
-          </SessionTrackingProvider>
+          <TutorialProvider>
+            <TranslationLoadingOverlay />
+            <JournalProcessingInitializer />
+            <AppRoutes key={isInitialized ? 'initialized' : 'initializing'} />
+            <TutorialOverlay />
+            <Toaster />
+            <SonnerToaster position="top-right" />
+          </TutorialProvider>
         </SubscriptionProvider>
       </FeatureFlagsProvider>
     </ErrorBoundary>
