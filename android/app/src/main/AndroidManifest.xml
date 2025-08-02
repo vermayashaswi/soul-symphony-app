@@ -15,11 +15,7 @@
             android:label="@string/title_activity_main"
             android:theme="@style/AppTheme.NoActionBarLaunch"
             android:launchMode="singleTask"
-            android:exported="true"
-            android:screenOrientation="portrait"
-            android:resizeableActivity="false"
-            android:hardwareAccelerated="true"
-            android:largeHeap="true">
+            android:exported="true">
 
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
@@ -72,37 +68,4 @@
     <!-- For background task management -->
     <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
     <uses-permission android:name="android.permission.ACCESS_NOTIFICATION_POLICY" />
-    
-    <!-- Device restrictions - phones only -->
-    <supports-screens 
-        android:smallScreens="true"
-        android:normalScreens="true"
-        android:largeScreens="false"
-        android:xlargeScreens="false"
-        android:anyDensity="true" />
-    
-    <!-- Hardware requirements for phones -->
-    <uses-feature 
-        android:name="android.hardware.touchscreen" 
-        android:required="true" />
-    <uses-feature 
-        android:name="android.hardware.telephony" 
-        android:required="false" />
-    <uses-feature 
-        android:name="android.hardware.microphone" 
-        android:required="true" />
-    
-    <!-- Exclude tablets and Chromebooks -->
-    <uses-feature 
-        android:name="android.software.leanback" 
-        android:required="false" />
-    <uses-feature 
-        android:name="android.hardware.type.television" 
-        android:required="false" />
-    <uses-feature 
-        android:name="android.hardware.type.watch" 
-        android:required="false" />
-    <uses-feature 
-        android:name="android.hardware.type.automotive" 
-        android:required="false" />
 </manifest>

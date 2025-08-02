@@ -20,7 +20,6 @@ import { nativeIntegrationService } from './services/nativeIntegrationService';
 import { nativeAuthService } from './services/nativeAuthService';
 import { useAppInitialization } from './hooks/useAppInitialization';
 import { logger } from './utils/logger';
-import DeviceRestriction from './components/DeviceRestriction';
 
 const App: React.FC = () => {
   const [isInitialized, setIsInitialized] = useState(false);
@@ -196,22 +195,20 @@ const App: React.FC = () => {
   }
 
   return (
-    <DeviceRestriction>
-      <ErrorBoundary onError={handleAppError}>
-        <FeatureFlagsProvider>
-          <SubscriptionProvider>
-            <TutorialProvider>
-              <TranslationLoadingOverlay />
-              <JournalProcessingInitializer />
-              <AppRoutes key={isInitialized ? 'initialized' : 'initializing'} />
-              <TutorialOverlay />
-              <Toaster />
-              <SonnerToaster position="top-right" />
-            </TutorialProvider>
-          </SubscriptionProvider>
-        </FeatureFlagsProvider>
-      </ErrorBoundary>
-    </DeviceRestriction>
+    <ErrorBoundary onError={handleAppError}>
+      <FeatureFlagsProvider>
+        <SubscriptionProvider>
+          <TutorialProvider>
+            <TranslationLoadingOverlay />
+            <JournalProcessingInitializer />
+            <AppRoutes key={isInitialized ? 'initialized' : 'initializing'} />
+            <TutorialOverlay />
+            <Toaster />
+            <SonnerToaster position="top-right" />
+          </TutorialProvider>
+        </SubscriptionProvider>
+      </FeatureFlagsProvider>
+    </ErrorBoundary>
   );
 };
 
