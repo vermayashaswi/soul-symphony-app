@@ -1,5 +1,5 @@
-
 import { supabase } from '@/integrations/supabase/client';
+import { Purchases, LOG_LEVEL, INTRO_ELIGIBILITY_STATUS } from '@revenuecat/purchases-capacitor';
 
 export interface RevenueCatProduct {
   identifier: string;
@@ -8,7 +8,7 @@ export interface RevenueCatProduct {
   price: number;
   priceString: string;
   currencyCode: string;
-  region?: string;
+  subscriptionPeriod?: string;
   introPrice?: {
     price: number;
     priceString: string;
@@ -19,39 +19,40 @@ export interface RevenueCatProduct {
 }
 
 export interface RevenueCatPurchaserInfo {
-  originalAppUserId: string;
-  allPurchasedProductIdentifiers: string[];
-  latestExpirationDate?: string;
+  originalPurchaseDate: string;
+  latestExpirationDate: string | null;
   activeSubscriptions: string[];
-  allExpirationDates: { [productId: string]: string };
-  entitlements: {
-    all: { [entitlementId: string]: RevenueCatEntitlement };
-    active: { [entitlementId: string]: RevenueCatEntitlement };
-  };
+  allPurchasedProductIds: string[];
+  nonSubscriptionPurchases: any[];
+  entitlements: { [key: string]: RevenueCatEntitlement };
 }
 
 export interface RevenueCatEntitlement {
   identifier: string;
+  productIdentifier: string;
+  purchaseDate: string;
+  originalPurchaseDate: string;
+  expirationDate: string | null;
+  store: string;
   isActive: boolean;
   willRenew: boolean;
-  periodType: 'TRIAL' | 'INTRO' | 'NORMAL';
+  periodType: 'trial' | 'normal' | 'intro';
   latestPurchaseDate: string;
-  originalPurchaseDate: string;
-  expirationDate?: string;
-  store: string;
-  productIdentifier: string;
   isSandbox: boolean;
-  unsubscribeDetectedAt?: string;
-  billingIssueDetectedAt?: string;
+  unsubscribeDetectedAt: string | null;
+  billingIssueDetectedAt: string | null;
 }
 
 export interface RevenueCatTransaction {
-  transactionIdentifier: string;
-  productIdentifier: string;
+  transactionId: string;
+  productId: string;
   purchaseDate: string;
+  originalTransactionId: string;
+  isTrialPeriod: boolean;
+  isIntroOfferPeriod: boolean;
 }
 
-// Regional product configurations for Google Play
+// Regional product configurations
 const REGIONAL_PRODUCTS: Record<string, RevenueCatProduct> = {
   'premium_monthly_in': {
     identifier: 'premium_monthly_in',
@@ -59,8 +60,7 @@ const REGIONAL_PRODUCTS: Record<string, RevenueCatProduct> = {
     title: 'Soulo Premium Monthly (India)',
     price: 99,
     priceString: '₹99',
-    currencyCode: 'INR',
-    region: 'India'
+    currencyCode: 'INR'
   },
   'premium_monthly_us': {
     identifier: 'premium_monthly_us',
@@ -68,8 +68,7 @@ const REGIONAL_PRODUCTS: Record<string, RevenueCatProduct> = {
     title: 'Soulo Premium Monthly (US)',
     price: 4.99,
     priceString: '$4.99',
-    currencyCode: 'USD',
-    region: 'United States'
+    currencyCode: 'USD'
   },
   'premium_monthly_gb': {
     identifier: 'premium_monthly_gb',
@@ -77,8 +76,7 @@ const REGIONAL_PRODUCTS: Record<string, RevenueCatProduct> = {
     title: 'Soulo Premium Monthly (UK)',
     price: 3.99,
     priceString: '£3.99',
-    currencyCode: 'GBP',
-    region: 'United Kingdom'
+    currencyCode: 'GBP'
   },
   'premium_monthly_default': {
     identifier: 'premium_monthly_default',
@@ -86,408 +84,428 @@ const REGIONAL_PRODUCTS: Record<string, RevenueCatProduct> = {
     title: 'Soulo Premium Monthly',
     price: 4.99,
     priceString: '$4.99',
-    currencyCode: 'USD',
-    region: 'Global'
+    currencyCode: 'USD'
   }
 };
 
 class RevenueCatService {
   private isInitialized = false;
   private currentUserId: string | null = null;
-  private initializationAttempts = 0;
-  private maxInitializationAttempts = 3;
 
+  // Initialize RevenueCat SDK for the user
   async initialize(userId: string): Promise<void> {
+    console.log('RevenueCat: Initializing for user', userId);
+    
     try {
-      console.log('[RevenueCatService] Initializing RevenueCat for user:', userId);
-      
-      // Reset attempts for new user
-      if (this.currentUserId !== userId) {
-        this.initializationAttempts = 0;
+      // Configure RevenueCat SDK
+      const apiKey = this.getApiKey();
+      if (!apiKey) {
+        throw new Error('RevenueCat API key not configured');
       }
-      
-      this.initializationAttempts++;
-      
-      if (this.initializationAttempts > this.maxInitializationAttempts) {
-        console.warn('[RevenueCatService] Max initialization attempts reached, using fallback mode');
-        this.isInitialized = true;
-        this.currentUserId = userId;
-        return;
-      }
-      
-      this.currentUserId = userId;
-      
-      // Call the edge function for initialization
-      const platform = this.detectPlatform();
-      
-      try {
-        const { data, error } = await supabase.functions.invoke('revenuecat-init', {
-          body: {
-            userId,
-            platform
-          }
-        });
 
-        if (error) {
-          console.error('[RevenueCatService] Edge function error:', error);
-          throw error;
-        }
-
-        if (!data.success) {
-          throw new Error(data.error || 'Failed to initialize RevenueCat');
-        }
-
-        console.log('[RevenueCatService] Edge function initialization successful');
-      } catch (edgeError) {
-        console.warn('[RevenueCatService] Edge function failed, falling back to local initialization:', edgeError);
-        
-        // Fallback to local initialization
-        await Promise.race([
-          this.createOrUpdateCustomer(userId),
-          new Promise((_, reject) => 
-            setTimeout(() => reject(new Error('Customer creation timeout')), 5000)
-          )
-        ]);
-      }
+      await Purchases.setLogLevel({ level: LOG_LEVEL.DEBUG });
+      await Purchases.configure({ apiKey, appUserID: userId });
       
       this.isInitialized = true;
-      console.log('[RevenueCatService] RevenueCat initialized successfully');
+      this.currentUserId = userId;
+      
+      console.log('RevenueCat: Native SDK initialized for user', userId);
+      
+      // Sync with our backend
+      await this.syncWithBackend(userId);
     } catch (error) {
-      console.error('[RevenueCatService] Failed to initialize RevenueCat:', error);
-      
-      // Still mark as initialized in fallback mode to prevent blocking the app
+      console.error('RevenueCat: Initialization failed', error);
+      // Fallback to local logic for development
+      await this.initializeLocal(userId);
       this.isInitialized = true;
       this.currentUserId = userId;
-      
-      // Only throw if this is a critical error and we're not in fallback mode
-      if (this.initializationAttempts <= 1) {
-        throw error;
-      }
     }
   }
 
-  private detectPlatform(): 'ios' | 'android' {
-    // For web version, default to android for testing
-    // In actual mobile app, this would detect the real platform
+  private getApiKey(): string {
+    // Get platform-specific API key
+    // In production, these would come from environment variables
+    // For now, we'll use placeholders that need to be configured
+    const platform = this.getCurrentPlatform();
+    
+    if (platform === 'ios') {
+      return 'appl_YOUR_IOS_API_KEY'; // Replace with actual iOS API key
+    } else if (platform === 'android') {
+      return 'goog_YOUR_ANDROID_API_KEY'; // Replace with actual Android API key
+    } else {
+      return 'web_YOUR_WEB_API_KEY'; // Replace with actual web API key
+    }
+  }
+
+  private getCurrentPlatform(): string {
+    // Detect current platform
     const userAgent = navigator.userAgent.toLowerCase();
-    if (userAgent.includes('iphone') || userAgent.includes('ipad')) {
-      return 'ios';
-    }
-    return 'android';
+    if (userAgent.includes('android')) return 'android';
+    if (userAgent.includes('iphone') || userAgent.includes('ipad')) return 'ios';
+    return 'web';
   }
 
-  private async createOrUpdateCustomer(userId: string): Promise<void> {
+  private async syncWithBackend(userId: string): Promise<void> {
     try {
-      console.log('[RevenueCatService] Creating/updating customer for user:', userId);
-      
-      // Test database connectivity with a simple query first
-      const { error: connectivityError } = await supabase
-        .from('profiles')
-        .select('id')
-        .limit(1);
+      // Try to use the Supabase edge function to sync
+      const { data, error } = await supabase.functions.invoke('revenuecat-init', {
+        body: { userId, platform: this.getCurrentPlatform() }
+      });
 
-      if (connectivityError) {
-        console.error('[RevenueCatService] Database connectivity test failed:', connectivityError);
-        throw new Error(`Database connection failed: ${connectivityError.message}`);
+      if (error) {
+        console.warn('RevenueCat: Backend sync failed', error);
+      } else {
+        console.log('RevenueCat: Backend sync successful', data);
       }
+    } catch (error) {
+      console.warn('RevenueCat: Backend sync error', error);
+    }
+  }
 
-      const { data: existingCustomer, error: fetchError } = await supabase
+  private async initializeLocal(userId: string): Promise<void> {
+    try {
+      // Fetch or create customer record
+      let { data: customer, error } = await supabase
         .from('revenuecat_customers')
         .select('*')
         .eq('user_id', userId)
-        .maybeSingle();
+        .single();
 
-      if (fetchError) {
-        console.error('[RevenueCatService] Error fetching existing customer:', fetchError);
-        // Don't throw here, just log the error and continue
-        return;
-      }
-
-      if (!existingCustomer) {
-        // Create new customer record
-        const { error: insertError } = await supabase
+      if (error && error.code === 'PGRST116') {
+        // Customer doesn't exist, create one
+        const { data: newCustomer, error: createError } = await supabase
           .from('revenuecat_customers')
-          .insert({
+          .insert([{
             user_id: userId,
-            revenuecat_user_id: userId,
-            revenuecat_app_user_id: userId
-          });
+            revenuecat_user_id: `customer_${userId}`
+          }])
+          .select()
+          .single();
 
-        if (insertError) {
-          console.error('[RevenueCatService] Error creating RevenueCat customer:', insertError);
-          // Don't throw here to prevent blocking app initialization
-          return;
+        if (createError) {
+          throw createError;
         }
-        
-        console.log('[RevenueCatService] Customer created successfully');
-      } else {
-        console.log('[RevenueCatService] Customer already exists');
+        customer = newCustomer;
+      } else if (error) {
+        throw error;
       }
+
+      console.log('RevenueCat: Local initialization complete', customer);
     } catch (error) {
-      console.error('[RevenueCatService] Error in createOrUpdateCustomer:', error);
-      // Don't re-throw to prevent blocking app initialization
-    }
-  }
-
-  async getProducts(): Promise<RevenueCatProduct[]> {
-    if (!this.isInitialized) {
-      console.warn('[RevenueCatService] Service not initialized, returning empty products');
-      return [];
-    }
-
-    console.log('[RevenueCatService] Fetching products...');
-    
-    // Return all regional products for now
-    return Object.values(REGIONAL_PRODUCTS);
-  }
-
-  async getProductByRegion(region: string): Promise<RevenueCatProduct | null> {
-    const products = await this.getProducts();
-    return products.find(product => product.region === region) || 
-           products.find(product => product.identifier === 'premium_monthly_default') || 
-           null;
-  }
-
-  async purchaseProduct(productId: string): Promise<RevenueCatTransaction> {
-    if (!this.isInitialized || !this.currentUserId) {
-      throw new Error('RevenueCat not initialized or user not set');
-    }
-
-    try {
-      console.log('[RevenueCatService] Attempting to purchase product:', productId);
-      
-      const platform = this.detectPlatform();
-      const isTrialPurchase = productId.includes('trial') || await this.checkTrialEligibility(productId);
-
-      // Try using the edge function first
-      try {
-        const { data, error } = await supabase.functions.invoke('revenuecat-purchase', {
-          body: {
-            userId: this.currentUserId,
-            productId,
-            platform,
-            isTrialPurchase
-          }
-        });
-
-        if (error) {
-          console.error('[RevenueCatService] Edge function purchase error:', error);
-          throw error;
-        }
-
-        if (!data.success) {
-          throw new Error(data.error || 'Purchase failed');
-        }
-
-        console.log('[RevenueCatService] Edge function purchase successful');
-        
-        return {
-          transactionIdentifier: data.subscription.id,
-          productIdentifier: data.subscription.productId,
-          purchaseDate: data.subscription.currentPeriodStart
-        };
-
-      } catch (edgeError) {
-        console.warn('[RevenueCatService] Edge function purchase failed, falling back to local processing:', edgeError);
-        
-        // Fallback to local processing
-        // Validate product exists
-        const product = REGIONAL_PRODUCTS[productId];
-        if (!product) {
-          throw new Error(`Product ${productId} not found`);
-        }
-
-        // In a real implementation, this would trigger the Google Play purchase flow
-        const transaction: RevenueCatTransaction = {
-          transactionIdentifier: `trial_${Date.now()}`,
-          productIdentifier: productId,
-          purchaseDate: new Date().toISOString()
-        };
-
-        // Create subscription record for trial
-        const trialExpiresAt = new Date();
-        trialExpiresAt.setDate(trialExpiresAt.getDate() + 7); // 7-day trial
-
-        const { data: customer } = await supabase
-          .from('revenuecat_customers')
-          .select('id')
-          .eq('user_id', this.currentUserId)
-          .maybeSingle();
-
-        if (customer) {
-          const { error: subscriptionError } = await supabase
-            .from('revenuecat_subscriptions')
-            .insert({
-              customer_id: customer.id,
-              revenuecat_subscription_id: transaction.transactionIdentifier,
-              product_id: productId,
-              status: 'in_trial',
-              period_type: 'trial',
-              purchase_date: transaction.purchaseDate,
-              original_purchase_date: transaction.purchaseDate,
-              expires_date: trialExpiresAt.toISOString(),
-              is_sandbox: true,
-              auto_renew_status: true,
-              price_in_purchased_currency: 0,
-              currency: product.currencyCode
-            });
-
-          if (subscriptionError) {
-            console.error('[RevenueCatService] Error creating subscription:', subscriptionError);
-            throw subscriptionError;
-          }
-
-          // Update user profile to reflect premium status
-          const { error: profileError } = await supabase
-            .from('profiles')
-            .update({
-              is_premium: true,
-              trial_ends_at: trialExpiresAt.toISOString(),
-              subscription_status: 'trial',
-              updated_at: new Date().toISOString()
-            })
-            .eq('id', this.currentUserId);
-
-          if (profileError) {
-            console.error('[RevenueCatService] Error updating profile:', profileError);
-            // Don't throw here as the subscription was created successfully
-          }
-        }
-
-        console.log('[RevenueCatService] Fallback purchase completed successfully:', transaction);
-        return transaction;
-      }
-    } catch (error) {
-      console.error('[RevenueCatService] Error purchasing product:', error);
+      console.error('RevenueCat: Local initialization failed', error);
       throw error;
     }
   }
 
-  async restorePurchases(): Promise<RevenueCatPurchaserInfo | null> {
-    if (!this.isInitialized || !this.currentUserId) {
-      console.warn('[RevenueCatService] Service not initialized, cannot restore purchases');
-      return null;
+  // Get available products for purchase
+  async getProducts(): Promise<RevenueCatProduct[]> {
+    console.log('RevenueCat: Getting products');
+    
+    try {
+      // Try to get products from RevenueCat SDK
+      const offerings = await Purchases.getOfferings();
+      
+      if (offerings.current && offerings.current.availablePackages.length > 0) {
+        // Convert RevenueCat packages to our format
+        return offerings.current.availablePackages.map(pkg => ({
+          identifier: pkg.identifier,
+          title: pkg.product?.title || pkg.identifier,
+          description: pkg.product?.description || 'Premium subscription',
+          priceString: pkg.product?.priceString || '$4.99',
+          price: pkg.product?.price || 4.99,
+          currencyCode: pkg.product?.currencyCode || 'USD',
+          subscriptionPeriod: pkg.product?.subscriptionPeriod
+        }));
+      }
+    } catch (error) {
+      console.warn('RevenueCat: Failed to get products from SDK, using fallback', error);
     }
+    
+    // Fallback to regional products
+    return Object.values(REGIONAL_PRODUCTS);
+  }
+
+  // Purchase a product
+  async purchaseProduct(productId: string): Promise<RevenueCatTransaction> {
+    console.log('RevenueCat: Purchasing product', productId);
 
     try {
-      // Fetch user's subscriptions from our database
-      const { data: subscriptions, error } = await supabase
-        .from('revenuecat_subscriptions')
-        .select(`
-          *,
-          revenuecat_customers!inner (
-            user_id,
-            revenuecat_user_id
-          )
-        `)
-        .eq('revenuecat_customers.user_id', this.currentUserId);
+      // Get the offerings first to find the package
+      const offerings = await Purchases.getOfferings();
+      const currentOffering = offerings.current;
+      
+      if (!currentOffering) {
+        throw new Error('No current offering available');
+      }
+      
+      // Find the package by identifier
+      const packageToPurchase = currentOffering.availablePackages.find(pkg => pkg.identifier === productId);
+      
+      if (!packageToPurchase) {
+        throw new Error(`Package ${productId} not found in current offering`);
+      }
+
+      const { customerInfo } = await Purchases.purchasePackage({ aPackage: packageToPurchase });
+      const productIdentifier = productId;
+
+      // Create transaction from purchase result
+      const transaction: RevenueCatTransaction = {
+        transactionId: customerInfo.originalPurchaseDate || `txn_${Date.now()}`,
+        productId: productIdentifier,
+        purchaseDate: customerInfo.originalPurchaseDate || new Date().toISOString(),
+        originalTransactionId: customerInfo.originalPurchaseDate || `orig_${Date.now()}`,
+        isTrialPeriod: this.isTrialPeriod(customerInfo, productIdentifier),
+        isIntroOfferPeriod: false // SDK doesn't provide this directly
+      };
+
+      // Sync purchase with backend
+      await this.syncPurchaseWithBackend(productIdentifier, transaction);
+
+      return transaction;
+    } catch (error) {
+      console.error('RevenueCat: Purchase failed', error);
+      
+      // Fallback to edge function for web/testing
+      try {
+        const { data, error: edgeError } = await supabase.functions.invoke('revenuecat-purchase', {
+          body: { 
+            userId: this.currentUserId,
+            productId,
+            platform: this.getCurrentPlatform()
+          }
+        });
+
+        if (edgeError) {
+          throw edgeError;
+        }
+
+        return {
+          transactionId: data.transactionId || `txn_${Date.now()}`,
+          productId,
+          purchaseDate: new Date().toISOString(),
+          originalTransactionId: data.originalTransactionId || `orig_${Date.now()}`,
+          isTrialPeriod: data.isTrialPeriod || false,
+          isIntroOfferPeriod: data.isIntroOfferPeriod || false
+        };
+      } catch (fallbackError) {
+        console.error('RevenueCat: Fallback purchase also failed', fallbackError);
+        throw error; // Throw original error
+      }
+    }
+  }
+
+  private isTrialPeriod(customerInfo: any, productId: string): boolean {
+    // Check if the user is in a trial period for this product
+    const entitlements = customerInfo.entitlements?.active || {};
+    for (const [key, entitlement] of Object.entries(entitlements)) {
+      if (entitlement && typeof entitlement === 'object' && 'productIdentifier' in entitlement) {
+        if ((entitlement as any).productIdentifier === productId && (entitlement as any).periodType === 'trial') {
+          return true;
+        }
+      }
+    }
+    return false;
+  }
+
+  private async syncPurchaseWithBackend(productId: string, transaction: RevenueCatTransaction): Promise<void> {
+    try {
+      const { error } = await supabase.functions.invoke('revenuecat-purchase', {
+        body: { 
+          userId: this.currentUserId,
+          productId,
+          platform: this.getCurrentPlatform(),
+          transactionId: transaction.transactionId,
+          isTrialPurchase: transaction.isTrialPeriod
+        }
+      });
 
       if (error) {
-        console.error('[RevenueCatService] Error fetching subscriptions:', error);
+        console.warn('RevenueCat: Failed to sync purchase with backend', error);
+      }
+    } catch (error) {
+      console.warn('RevenueCat: Backend sync error', error);
+    }
+  }
+
+  // Restore previous purchases
+  async restorePurchases(): Promise<RevenueCatPurchaserInfo | null> {
+    console.log('RevenueCat: Restoring purchases');
+    
+    try {
+      // Try to restore through RevenueCat SDK first
+      const { customerInfo } = await Purchases.restorePurchases();
+      
+      if (customerInfo && customerInfo.entitlements) {
+        // Convert to our format
+        const purchaserInfo: RevenueCatPurchaserInfo = {
+          originalPurchaseDate: customerInfo.originalPurchaseDate || new Date().toISOString(),
+          latestExpirationDate: customerInfo.latestExpirationDate || null,
+          activeSubscriptions: Object.keys(customerInfo.entitlements?.active || {}),
+          allPurchasedProductIds: Object.keys(customerInfo.entitlements?.all || {}),
+          nonSubscriptionPurchases: [],
+          entitlements: this.convertEntitlements(customerInfo.entitlements)
+        };
+
+        // Sync with backend
+        await this.syncRestoredPurchases(purchaserInfo);
+        
+        return purchaserInfo;
+      }
+    } catch (error) {
+      console.warn('RevenueCat: SDK restore failed, falling back to database', error);
+    }
+    
+    // Fallback to database query
+    try {
+      const { data: subscriptions, error } = await supabase
+        .from('revenuecat_subscriptions')
+        .select('*')
+        .eq('status', 'active')
+        .gte('expires_date', new Date().toISOString())
+        .limit(1);
+
+      if (error) {
+        console.error('RevenueCat: Error fetching subscriptions', error);
         return null;
       }
 
       if (!subscriptions || subscriptions.length === 0) {
+        console.log('RevenueCat: No active subscriptions found');
         return null;
       }
 
-      // Convert to RevenueCat format
-      const activeSubscriptions: string[] = [];
-      const allExpirationDates: { [productId: string]: string } = {};
-      const entitlements: { [entitlementId: string]: RevenueCatEntitlement } = {};
-
-      subscriptions.forEach(sub => {
-        if (sub.status === 'active' || sub.status === 'in_trial') {
-          activeSubscriptions.push(sub.product_id);
-        }
-        
-        if (sub.expires_date) {
-          allExpirationDates[sub.product_id] = sub.expires_date;
-        }
-
-        entitlements[sub.product_id] = {
-          identifier: sub.product_id,
-          isActive: sub.status === 'active' || sub.status === 'in_trial',
-          willRenew: sub.auto_renew_status || false,
-          periodType: sub.period_type === 'trial' ? 'TRIAL' : 'NORMAL',
-          latestPurchaseDate: sub.purchase_date || sub.created_at,
-          originalPurchaseDate: sub.original_purchase_date || sub.created_at,
-          expirationDate: sub.expires_date || undefined,
-          store: 'play_store',
-          productIdentifier: sub.product_id,
-          isSandbox: sub.is_sandbox || false,
-          unsubscribeDetectedAt: sub.unsubscribe_detected_at || undefined,
-          billingIssueDetectedAt: sub.billing_issues_detected_at || undefined
-        };
-      });
-
+      const subscription = subscriptions[0];
+      
       return {
-        originalAppUserId: this.currentUserId,
-        allPurchasedProductIdentifiers: subscriptions.map(sub => sub.product_id),
-        latestExpirationDate: Math.max(...Object.values(allExpirationDates).map(date => new Date(date).getTime())).toString(),
-        activeSubscriptions,
-        allExpirationDates,
+        originalPurchaseDate: subscription.created_at,
+        latestExpirationDate: subscription.expires_date,
+        activeSubscriptions: [subscription.product_id],
+        allPurchasedProductIds: [subscription.product_id],
+        nonSubscriptionPurchases: [],
         entitlements: {
-          all: entitlements,
-          active: Object.fromEntries(
-            Object.entries(entitlements).filter(([_, ent]) => ent.isActive)
-          )
+          premium: {
+            identifier: 'premium',
+            productIdentifier: subscription.product_id,
+            purchaseDate: subscription.created_at,
+            originalPurchaseDate: subscription.created_at,
+            expirationDate: subscription.expires_date,
+            store: 'app_store',
+            isActive: true,
+            willRenew: subscription.auto_renew_status || true,
+            periodType: 'normal' as const,
+            latestPurchaseDate: subscription.created_at,
+            isSandbox: false,
+            unsubscribeDetectedAt: null,
+            billingIssueDetectedAt: null
+          }
         }
       };
     } catch (error) {
-      console.error('[RevenueCatService] Error restoring purchases:', error);
+      console.error('RevenueCat: Restore purchases failed', error);
       return null;
     }
   }
 
+  private convertEntitlements(entitlements: any): { [key: string]: RevenueCatEntitlement } {
+    const converted: { [key: string]: RevenueCatEntitlement } = {};
+    
+    if (entitlements && typeof entitlements === 'object') {
+      Object.entries(entitlements).forEach(([key, entitlement]: [string, any]) => {
+        if (entitlement && typeof entitlement === 'object') {
+          converted[key] = {
+            identifier: entitlement.identifier || key,
+            productIdentifier: entitlement.productIdentifier || '',
+            purchaseDate: entitlement.purchaseDate || new Date().toISOString(),
+            originalPurchaseDate: entitlement.originalPurchaseDate || new Date().toISOString(),
+            expirationDate: entitlement.expirationDate || null,
+            store: entitlement.store || 'app_store',
+            isActive: entitlement.isActive || false,
+            willRenew: entitlement.willRenew || false,
+            periodType: entitlement.periodType || 'normal',
+            latestPurchaseDate: entitlement.latestPurchaseDate || new Date().toISOString(),
+            isSandbox: entitlement.isSandbox || false,
+            unsubscribeDetectedAt: entitlement.unsubscribeDetectedAt || null,
+            billingIssueDetectedAt: entitlement.billingIssueDetectedAt || null
+          };
+        }
+      });
+    }
+    
+    return converted;
+  }
+
+  private async syncRestoredPurchases(purchaserInfo: RevenueCatPurchaserInfo): Promise<void> {
+    try {
+      // Sync each active subscription with backend
+      for (const productId of purchaserInfo.activeSubscriptions) {
+        await supabase.functions.invoke('revenuecat-purchase', {
+          body: { 
+            userId: this.currentUserId,
+            productId,
+            platform: this.getCurrentPlatform(),
+            isRestore: true
+          }
+        });
+      }
+    } catch (error) {
+      console.warn('RevenueCat: Failed to sync restored purchases', error);
+    }
+  }
+
+  // Get current purchaser info (alias for restore)
   async getPurchaserInfo(): Promise<RevenueCatPurchaserInfo | null> {
     return this.restorePurchases();
   }
 
+  // Check if user is eligible for trial
   async checkTrialEligibility(productId: string): Promise<boolean> {
-    if (!this.isInitialized || !this.currentUserId) {
-      return false;
-    }
-
+    console.log('RevenueCat: Checking trial eligibility for', productId);
+    
     try {
-      // Check if user has already used a trial for this product
-      const { data: previousTrials, error } = await supabase
+      // Try to check eligibility through RevenueCat SDK
+      const { eligibilities } = await Purchases.checkTrialOrIntroductoryPriceEligibility({ productIdentifiers: [productId] });
+      
+      if (eligibilities && eligibilities[productId]) {
+        const eligibility = eligibilities[productId];
+        return eligibility.status === INTRO_ELIGIBILITY_STATUS.INTRO_ELIGIBILITY_STATUS_ELIGIBLE;
+      }
+    } catch (error) {
+      console.warn('RevenueCat: SDK trial eligibility check failed, falling back to database', error);
+    }
+    
+    // Fallback to database check
+    try {
+      const { data: subscriptions, error } = await supabase
         .from('revenuecat_subscriptions')
-        .select(`
-          *,
-          revenuecat_customers!inner (user_id)
-        `)
-        .eq('revenuecat_customers.user_id', this.currentUserId)
-        .eq('product_id', productId)
-        .eq('period_type', 'trial');
+        .select('*')
+        .eq('product_id', productId);
 
       if (error) {
-        console.error('[RevenueCatService] Error checking trial eligibility:', error);
-        return false;
+        console.error('RevenueCat: Error checking trial eligibility', error);
+        return true; // Default to eligible if we can't check
       }
 
-      return !previousTrials || previousTrials.length === 0;
+      // If user has any subscription with a trial for this product, they're not eligible
+      return !subscriptions || subscriptions.length === 0;
     } catch (error) {
-      console.error('[RevenueCatService] Error checking trial eligibility:', error);
-      return false;
+      console.error('RevenueCat: Trial eligibility check failed', error);
+      return true; // Default to eligible
     }
   }
 
+  // Helper methods
   isUserPremium(purchaserInfo: RevenueCatPurchaserInfo | null): boolean {
     if (!purchaserInfo) return false;
     
-    const activeEntitlements = Object.values(purchaserInfo.entitlements.active);
-    return activeEntitlements.some(entitlement => 
-      entitlement.isActive && 
-      (entitlement.periodType === 'TRIAL' || entitlement.periodType === 'NORMAL')
-    );
+    const activeEntitlements = Object.values(purchaserInfo.entitlements);
+    return activeEntitlements.some(entitlement => entitlement.isActive);
   }
 
   getTrialEndDate(purchaserInfo: RevenueCatPurchaserInfo | null): Date | null {
     if (!purchaserInfo) return null;
 
-    const trialEntitlements = Object.values(purchaserInfo.entitlements.active).filter(
-      ent => ent.periodType === 'TRIAL' && ent.isActive
+    const trialEntitlements = Object.values(purchaserInfo.entitlements).filter(
+      ent => ent.periodType === 'trial' && ent.isActive
     );
 
     if (trialEntitlements.length === 0) return null;

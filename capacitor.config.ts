@@ -18,6 +18,9 @@ const config: CapacitorConfig = {
     App: {
       urlScheme: "online.soulo.twa"
     },
+    RevenueCat: {
+      apiKey: "YOUR_REVENUECAT_API_KEY" // Replace with your actual RevenueCat API key
+    },
     SplashScreen: {
       launchAutoHide: false,
       backgroundColor: "#8b5cf6",
