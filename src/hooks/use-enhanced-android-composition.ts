@@ -117,7 +117,7 @@ export const useEnhancedAndroidComposition = (
     if (!enableGboardOptimization || keyboardType !== 'gboard') return;
 
     // Gboard swipe optimization
-    element.style.imeMode = 'active';
+    (element.style as any).imeMode = 'active';
     element.setAttribute('inputmode', 'text');
     element.setAttribute('autocomplete', 'on');
     element.setAttribute('autocorrect', 'on');

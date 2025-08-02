@@ -73,7 +73,7 @@ export const useUnifiedTouchActionManager = (options: TouchActionManagerOptions 
         // Add Capacitor-specific optimizations
         if (isNative && respectCapacitorNative) {
           if (highestPriority.source === 'keyboard') {
-            element.style.webkitTouchCallout = 'none';
+            (element.style as any).webkitTouchCallout = 'none';
             element.style.webkitUserSelect = 'text';
           }
         }

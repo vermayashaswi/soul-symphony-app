@@ -119,10 +119,10 @@ export const useCapacitorAndroidWebViewOptimization = (
 
   // Capacitor Keyboard Plugin integration
   const setupKeyboardPlugin = useCallback(async () => {
-    if (!enableKeyboardPlugin || !window.Capacitor?.Plugins?.Keyboard) return;
+    if (!enableKeyboardPlugin || !(window as any).Capacitor?.Plugins?.Keyboard) return;
 
     try {
-      const { Keyboard } = window.Capacitor.Plugins;
+      const { Keyboard } = (window as any).Capacitor.Plugins;
       
       // Configure keyboard behavior
       await Keyboard.setAccessoryBarVisible({ isVisible: false });
@@ -193,10 +193,10 @@ export const useCapacitorAndroidWebViewOptimization = (
 
   // Status bar adjustment for keyboard
   const setupStatusBarAdjustment = useCallback(async () => {
-    if (!enableStatusBarAdjustment || !window.Capacitor?.Plugins?.StatusBar) return;
+    if (!enableStatusBarAdjustment || !(window as any).Capacitor?.Plugins?.StatusBar) return;
 
     try {
-      const { StatusBar } = window.Capacitor.Plugins;
+      const { StatusBar } = (window as any).Capacitor.Plugins;
       
       // Get status bar info
       const info = await StatusBar.getInfo();
@@ -237,8 +237,8 @@ export const useCapacitorAndroidWebViewOptimization = (
 
     // Samsung WebView optimizations
     if (webViewInfo.current.brand === 'samsung') {
-      element.style.webkitTouchCallout = 'none';
-      element.style.webkitUserSelect = 'text';
+      (element.style as any).webkitTouchCallout = 'none';
+      (element.style as any).webkitUserSelect = 'text';
       (element.style as any).webkitTapHighlightColor = 'transparent';
     }
 
@@ -258,7 +258,7 @@ export const useCapacitorAndroidWebViewOptimization = (
         (element.style as any).webkitWritingMode = 'horizontal-tb';
       } else if (version >= 12.0) {
         // Modern Android optimizations
-        element.style.imeMode = 'active';
+        (element.style as any).imeMode = 'active';
         element.setAttribute('inputmode', 'text');
       }
     }
