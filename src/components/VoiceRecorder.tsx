@@ -17,6 +17,7 @@ import { RecordingStatus } from '@/components/voice-recorder/RecordingStatus';
 import { PlaybackControls } from '@/components/voice-recorder/PlaybackControls';
 import { AnimatedPrompt } from '@/components/voice-recorder/AnimatedPrompt';
 import { clearAllToasts, ensureAllToastsCleared } from '@/services/notificationService';
+import { logger } from '@/utils/logger';
 
 interface VoiceRecorderProps {
   onRecordingComplete?: (audioBlob: Blob, tempId?: string) => void;
@@ -42,6 +43,8 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className, update
   const { user } = useAuth();
   const { isMobile } = useIsMobile();
   const { isInStep } = useTutorial();
+  
+  const componentLogger = logger.createLogger('VoiceRecorder');
   
   const {
     isRecording,
@@ -72,11 +75,11 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className, update
   } = useAudioPlayback({ 
     audioBlob,
     onPlaybackStart: () => {
-      console.log('[VoiceRecorder] Playback started');
+      componentLogger.debug('Playback started');
       setHasPlayedOnce(true);
     },
     onPlaybackEnd: () => {
-      console.log('[VoiceRecorder] Playback ended');
+      componentLogger.debug('Playback ended');
     }
   });
 
