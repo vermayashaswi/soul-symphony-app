@@ -98,7 +98,7 @@ class RevenueCatService {
     
     try {
       // Configure RevenueCat SDK
-      const apiKey = this.getApiKey();
+      const apiKey = await this.getApiKey();
       if (!apiKey) {
         throw new Error('RevenueCat API key not configured');
       }
@@ -122,18 +122,33 @@ class RevenueCatService {
     }
   }
 
-  private getApiKey(): string {
-    // Get platform-specific API key
-    // In production, these would come from environment variables
-    // For now, we'll use placeholders that need to be configured
-    const platform = this.getCurrentPlatform();
-    
-    if (platform === 'ios') {
-      return 'appl_YOUR_IOS_API_KEY'; // Replace with actual iOS API key
-    } else if (platform === 'android') {
-      return 'goog_YOUR_ANDROID_API_KEY'; // Replace with actual Android API key
-    } else {
-      return 'web_YOUR_WEB_API_KEY'; // Replace with actual web API key
+  private async getApiKey(): Promise<string> {
+    // Get API key from Supabase edge function
+    try {
+      const { data, error } = await supabase.functions.invoke('revenuecat-init', {
+        body: { 
+          userId: this.currentUserId,
+          platform: this.getCurrentPlatform(),
+          getApiKeyOnly: true
+        }
+      });
+
+      if (error) {
+        throw error;
+      }
+
+      if (data?.apiKey) {
+        const platform = this.getCurrentPlatform();
+        // Format the API key with platform prefix if needed
+        return data.apiKey.startsWith('appl_') || data.apiKey.startsWith('goog_') || data.apiKey.startsWith('web_') 
+          ? data.apiKey 
+          : `${platform === 'ios' ? 'appl_' : platform === 'android' ? 'goog_' : 'web_'}${data.apiKey}`;
+      }
+
+      throw new Error('No API key returned from edge function');
+    } catch (error) {
+      console.error('Failed to get API key from edge function:', error);
+      throw new Error('RevenueCat API key not available');
     }
   }
 
