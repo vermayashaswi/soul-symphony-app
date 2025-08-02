@@ -8,7 +8,8 @@ const corsHeaders = {
 
 interface InitRequest {
   userId: string;
-  platform: 'android' | 'ios';
+  platform: 'android' | 'ios' | 'web';
+  getApiKeyOnly?: boolean;
 }
 
 serve(async (req) => {
@@ -25,10 +26,33 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
     );
 
-    const { userId, platform }: InitRequest = await req.json();
+    const { userId, platform, getApiKeyOnly }: InitRequest = await req.json();
     
     if (!userId) {
       throw new Error('User ID is required');
+    }
+
+    // Get RevenueCat API key from Supabase secrets
+    const revenueCatApiKey = Deno.env.get('REVENUECAT_API_KEY');
+    if (!revenueCatApiKey) {
+      throw new Error('RevenueCat API key not configured in Supabase secrets');
+    }
+
+    // If only API key is requested, return it immediately
+    if (getApiKeyOnly) {
+      console.log(`Returning API key for user: ${userId}, platform: ${platform}`);
+      return new Response(
+        JSON.stringify({
+          success: true,
+          apiKey: revenueCatApiKey
+        }),
+        { 
+          headers: { 
+            ...corsHeaders, 
+            'Content-Type': 'application/json' 
+          } 
+        }
+      );
     }
 
     console.log(`Initializing RevenueCat for user: ${userId}, platform: ${platform}`);
@@ -80,23 +104,59 @@ serve(async (req) => {
 
     console.log(`Found ${subscriptions?.length || 0} active subscriptions`);
 
-    // Get available products based on platform
-    const products = [
-      {
-        identifier: platform === 'ios' ? 'soulo_premium_monthly_ios' : 'soulo_premium_monthly_android',
-        title: 'Soulo Premium Monthly',
-        description: 'Unlock unlimited voice journaling with AI insights',
-        price: 9.99,
-        priceString: '$9.99',
-        currency: 'USD',
-        introPrice: {
-          price: 0,
-          priceString: 'Free',
-          period: 'P7D', // 7 days
-          cycles: 1
+    // Try to fetch products from RevenueCat API
+    let products = [];
+    try {
+      const revenueCatResponse = await fetch(`https://api.revenuecat.com/v1/subscribers/${userId}/offerings`, {
+        headers: {
+          'Authorization': `Bearer ${revenueCatApiKey}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (revenueCatResponse.ok) {
+        const offeringsData = await revenueCatResponse.json();
+        if (offeringsData.offerings && offeringsData.offerings.length > 0) {
+          const currentOffering = offeringsData.offerings[0];
+          products = currentOffering.packages?.map((pkg: any) => ({
+            identifier: pkg.identifier,
+            title: pkg.product?.display_name || 'Soulo Premium Monthly',
+            description: pkg.product?.description || 'Unlock unlimited voice journaling with AI insights',
+            price: pkg.product?.price || 9.99,
+            priceString: pkg.product?.price_string || '$9.99',
+            currency: pkg.product?.currency || 'USD',
+            introPrice: pkg.product?.intro_price ? {
+              price: pkg.product.intro_price.price || 0,
+              priceString: pkg.product.intro_price.price_string || 'Free',
+              period: pkg.product.intro_price.period || 'P7D',
+              cycles: pkg.product.intro_price.cycles || 1
+            } : undefined
+          })) || [];
         }
       }
-    ];
+    } catch (apiError) {
+      console.warn('Failed to fetch products from RevenueCat API:', apiError);
+    }
+
+    // Fallback products if API call failed
+    if (products.length === 0) {
+      products = [
+        {
+          identifier: platform === 'ios' ? 'soulo_premium_monthly_ios' : platform === 'android' ? 'soulo_premium_monthly_android' : 'soulo_premium_monthly_web',
+          title: 'Soulo Premium Monthly',
+          description: 'Unlock unlimited voice journaling with AI insights',
+          price: 9.99,
+          priceString: '$9.99',
+          currency: 'USD',
+          introPrice: {
+            price: 0,
+            priceString: 'Free',
+            period: 'P7D', // 7 days
+            cycles: 1
+          }
+        }
+      ];
+    }
 
     const response = {
       success: true,
