@@ -855,6 +855,10 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: Json
       }
+      cleanup_idle_sessions: {
+        Args: Record<PropertyKey, never>
+        Returns: number
+      }
       close_user_session: {
         Args: { p_session_id: string; p_user_id: string }
         Returns: boolean
@@ -916,6 +920,10 @@ export type Database = {
       execute_dynamic_query: {
         Args: { query_text: string }
         Returns: Json
+      }
+      extend_session_activity: {
+        Args: { p_session_id: string; p_user_id: string }
+        Returns: boolean
       }
       get_active_themes: {
         Args: Record<PropertyKey, never>
@@ -1323,6 +1331,14 @@ export type Database = {
       reset_user_auth: {
         Args: { target_user_id: string }
         Returns: Json
+      }
+      resume_or_create_session: {
+        Args: {
+          p_user_id: string
+          p_device_type?: string
+          p_entry_page?: string
+        }
+        Returns: string
       }
       setup_user_trial_fallback: {
         Args: { user_id: string }

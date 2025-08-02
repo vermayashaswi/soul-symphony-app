@@ -6,6 +6,9 @@ interface SessionTrackingContextType {
   trackPageInteraction: (page: string, action?: string) => void;
   getSessionStats: () => any;
   getCurrentSessionId: () => string | null;
+  endSession: (reason?: 'user_action' | 'idle_timeout' | 'app_close') => void;
+  isIdle: boolean;
+  isSessionActive: boolean;
 }
 
 const SessionTrackingContext = createContext<SessionTrackingContextType | undefined>(undefined);
