@@ -15,7 +15,6 @@ interface AuthDebugPanelProps {
 export const AuthDebugPanel: React.FC<AuthDebugPanelProps> = ({ onDiagnosticsRun }) => {
   const [isRunning, setIsRunning] = useState(false);
   const [diagnostics, setDiagnostics] = useState<any>(null);
-  const [authErrors, setAuthErrors] = useState<any[]>([]);
   const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set());
 
   const toggleSection = (section: string) => {
@@ -33,10 +32,6 @@ export const AuthDebugPanel: React.FC<AuthDebugPanelProps> = ({ onDiagnosticsRun
     try {
       const results = await enhancedAuthService.runDiagnostics();
       setDiagnostics(results);
-      
-      // Get auth errors
-      const errors = await authErrorService.getUserAuthErrors();
-      setAuthErrors(errors);
       
       onDiagnosticsRun?.(results);
       toast.success('Diagnostics completed');
@@ -108,94 +103,6 @@ export const AuthDebugPanel: React.FC<AuthDebugPanelProps> = ({ onDiagnosticsRun
               </div>
             </div>
 
-            {/* Auth Errors */}
-            {authErrors.length > 0 && (
-              <Collapsible>
-                <CollapsibleTrigger 
-                  onClick={() => toggleSection('errors')}
-                  className="flex items-center justify-between w-full p-3 border rounded-lg hover:bg-accent"
-                >
-                  <div className="flex items-center gap-2">
-                    <AlertTriangle className="h-4 w-4 text-yellow-500" />
-                    <span className="font-medium">Recent Auth Errors ({authErrors.length})</span>
-                  </div>
-                  {expandedSections.has('errors') ? 
-                    <ChevronDown className="h-4 w-4" /> : 
-                    <ChevronRight className="h-4 w-4" />
-                  }
-                </CollapsibleTrigger>
-                <CollapsibleContent className="mt-2">
-                  <div className="space-y-2">
-                    {authErrors.slice(0, 5).map((error) => (
-                      <div key={error.id} className="p-3 border rounded-lg bg-muted/50">
-                        <div className="flex items-center justify-between mb-1">
-                          <Badge variant="outline">{error.error_type}</Badge>
-                          <span className="text-xs text-muted-foreground">
-                            {new Date(error.created_at).toLocaleString()}
-                          </span>
-                        </div>
-                        <p className="text-sm text-muted-foreground">{error.error_message}</p>
-                        {error.context && (
-                          <p className="text-xs text-muted-foreground mt-1">Context: {error.context}</p>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                </CollapsibleContent>
-              </Collapsible>
-            )}
-
-            {/* Test Results */}
-            {diagnostics.testResults && (
-              <Collapsible>
-                <CollapsibleTrigger 
-                  onClick={() => toggleSection('tests')}
-                  className="flex items-center justify-between w-full p-3 border rounded-lg hover:bg-accent"
-                >
-                  <div className="flex items-center gap-2">
-                    <CheckCircle className="h-4 w-4 text-blue-500" />
-                    <span className="font-medium">Test Results</span>
-                  </div>
-                  {expandedSections.has('tests') ? 
-                    <ChevronDown className="h-4 w-4" /> : 
-                    <ChevronRight className="h-4 w-4" />
-                  }
-                </CollapsibleTrigger>
-                <CollapsibleContent className="mt-2">
-                  <div className="p-3 border rounded-lg bg-muted/50">
-                    <pre className="text-xs whitespace-pre-wrap overflow-auto">
-                      {JSON.stringify(diagnostics.testResults, null, 2)}
-                    </pre>
-                  </div>
-                </CollapsibleContent>
-              </Collapsible>
-            )}
-
-            {/* Debug Info */}
-            {diagnostics.debugInfo && (
-              <Collapsible>
-                <CollapsibleTrigger 
-                  onClick={() => toggleSection('debug')}
-                  className="flex items-center justify-between w-full p-3 border rounded-lg hover:bg-accent"
-                >
-                  <div className="flex items-center gap-2">
-                    <Bug className="h-4 w-4 text-purple-500" />
-                    <span className="font-medium">Debug Information</span>
-                  </div>
-                  {expandedSections.has('debug') ? 
-                    <ChevronDown className="h-4 w-4" /> : 
-                    <ChevronRight className="h-4 w-4" />
-                  }
-                </CollapsibleTrigger>
-                <CollapsibleContent className="mt-2">
-                  <div className="p-3 border rounded-lg bg-muted/50">
-                    <pre className="text-xs whitespace-pre-wrap overflow-auto max-h-96">
-                      {JSON.stringify(diagnostics.debugInfo, null, 2)}
-                    </pre>
-                  </div>
-                </CollapsibleContent>
-              </Collapsible>
-            )}
 
             {/* Timestamp */}
             <div className="text-xs text-muted-foreground text-center">

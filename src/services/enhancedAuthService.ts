@@ -51,11 +51,7 @@ class EnhancedAuthService {
         toast.success('Signed in successfully');
         
         // Log successful auth
-        await authErrorService.logAuthError(
-          'auth_success',
-          `${method} sign-in successful on attempt ${attempt}`,
-          `retry_attempt_${attempt}`
-        );
+        console.log(`[EnhancedAuth] ${method} sign-in successful on attempt ${attempt}`);
         
         return;
         
@@ -64,11 +60,7 @@ class EnhancedAuthService {
         console.error(`[EnhancedAuth] Sign-in attempt ${attempt} failed:`, error);
         
         // Log each attempt
-        await authErrorService.logAuthError(
-          'auth_attempt_failed',
-          error.message,
-          `${method}_signin_attempt_${attempt}`
-        );
+        console.error(`[EnhancedAuth] ${method} sign-in attempt ${attempt} failed:`, error.message);
         
         // Don't retry for certain errors
         if (this.shouldNotRetry(error)) {
@@ -87,7 +79,7 @@ class EnhancedAuthService {
     
     // All attempts failed
     console.error(`[EnhancedAuth] All ${this.retryConfig.maxRetries} sign-in attempts failed`);
-    authErrorService.handleAuthError(lastError, `${method}_signin_final_failure`);
+    console.error(`[EnhancedAuth] Final ${method} sign-in failure:`, lastError);
     throw lastError;
   }
 
@@ -169,11 +161,6 @@ class EnhancedAuthService {
         
       } catch (error) {
         console.error(`[EnhancedAuth] Profile verification attempt ${attempt} failed:`, error);
-        await authErrorService.logAuthError(
-          'profile_verification_failed',
-          error.message,
-          `attempt_${attempt}_user_${userId}`
-        );
         
         if (attempt === maxAttempts) {
           throw error;
@@ -182,11 +169,6 @@ class EnhancedAuthService {
     }
     
     console.error(`[EnhancedAuth] Profile verification failed after ${maxAttempts} attempts`);
-    await authErrorService.logAuthError(
-      'profile_verification_timeout',
-      `Profile not created after ${maxAttempts} attempts`,
-      `user_${userId}`
-    );
     
     return false;
   }
@@ -202,11 +184,6 @@ class EnhancedAuthService {
       
       if (error) {
         console.error('[EnhancedAuth] Session validation error:', error);
-        await authErrorService.logAuthError(
-          'session_validation_error',
-          error.message,
-          'session_check'
-        );
         return false;
       }
 
@@ -219,11 +196,6 @@ class EnhancedAuthService {
       const now = Date.now() / 1000;
       if (session.expires_at && session.expires_at < now) {
         console.log('[EnhancedAuth] Session is expired');
-        await authErrorService.logAuthError(
-          'session_expired',
-          'Session token has expired',
-          'session_check'
-        );
         return false;
       }
 
@@ -232,11 +204,6 @@ class EnhancedAuthService {
         const profileExists = await this.verifyProfileCreation(session.user.id, 1);
         if (!profileExists) {
           console.error('[EnhancedAuth] Session valid but profile missing');
-          await authErrorService.logAuthError(
-            'session_valid_profile_missing',
-            'Valid session but profile not found',
-            `user_${session.user.id}`
-          );
           return false;
         }
       }
@@ -246,11 +213,6 @@ class EnhancedAuthService {
       
     } catch (error: any) {
       console.error('[EnhancedAuth] Session validation failed:', error);
-      await authErrorService.logAuthError(
-        'session_validation_failed',
-        error.message,
-        'session_check'
-      );
       return false;
     }
   }
@@ -269,11 +231,6 @@ class EnhancedAuthService {
       
     } catch (error: any) {
       console.error('[EnhancedAuth] Enhanced sign-out failed:', error);
-      await authErrorService.logAuthError(
-        'enhanced_signout_failed',
-        error.message,
-        'signout'
-      );
       throw error;
     }
   }
@@ -288,10 +245,7 @@ class EnhancedAuthService {
       const results = {
         timestamp: new Date().toISOString(),
         sessionValid: false,
-        profileExists: false,
-        authErrors: [],
-        testResults: null,
-        debugInfo: null
+        profileExists: false
       };
 
       // Check session
@@ -303,23 +257,6 @@ class EnhancedAuthService {
       if (user) {
         // Check profile
         results.profileExists = await this.verifyProfileCreation(user.id, 1);
-        
-        // Get auth errors
-        results.authErrors = await authErrorService.getUserAuthErrors();
-        
-        try {
-          // Run test auth flow
-          results.testResults = await authErrorService.testAuthFlow();
-        } catch (error) {
-          console.warn('[EnhancedAuth] Test auth flow failed:', error);
-        }
-        
-        try {
-          // Get debug info
-          results.debugInfo = await authErrorService.debugUserAuth();
-        } catch (error) {
-          console.warn('[EnhancedAuth] Debug auth failed:', error);
-        }
       }
 
       console.log('[EnhancedAuth] Diagnostics completed:', results);
@@ -327,11 +264,6 @@ class EnhancedAuthService {
       
     } catch (error: any) {
       console.error('[EnhancedAuth] Diagnostics failed:', error);
-      await authErrorService.logAuthError(
-        'diagnostics_failed',
-        error.message,
-        'diagnostics'
-      );
       throw error;
     }
   }
