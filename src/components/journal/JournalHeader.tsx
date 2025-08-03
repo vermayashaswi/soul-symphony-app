@@ -30,7 +30,7 @@ const JournalHeader = () => {
     )}>
       <div className="container mx-auto px-4 max-w-5xl">
         <motion.h1 
-          className="text-2xl sm:text-2xl md:text-3xl font-bold flex items-center gap-2"
+          className="text-2xl sm:text-2xl md:text-3xl font-bold flex items-center gap-2 relative z-50"
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5 }}
