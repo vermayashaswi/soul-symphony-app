@@ -46,7 +46,25 @@ export class OptimizedRagPipeline {
         return;
       }
 
-      // Step 1: Check enhanced cache first
+      // Step 1: Enhanced query planning first
+      await this.streamManager.sendEvent('progress', { 
+        stage: 'planning', 
+        message: 'Analyzing query complexity and optimizing strategy...' 
+      });
+
+      const enhancedQueryPlan = queryPlan || planQuery(message, userProfile.timezone);
+      
+      // Send detailed planning result
+      await this.streamManager.sendEvent('progress', {
+        stage: 'planning_complete',
+        message: `Strategy: ${enhancedQueryPlan.strategy} | Complexity: ${enhancedQueryPlan.complexity?.level || 'standard'}`,
+        data: { 
+          strategy: enhancedQueryPlan.strategy, 
+          complexity: enhancedQueryPlan.complexity?.level || 'standard'
+        }
+      });
+
+      // Step 2: Check enhanced cache after planning
       await this.streamManager.sendEvent('progress', { 
         stage: 'cache_check', 
         message: 'Checking intelligent cache...' 
@@ -63,21 +81,6 @@ export class OptimizedRagPipeline {
         await this.streamManager.sendEvent('complete', { fromCache: true });
         return;
       }
-
-      // Step 2: Enhanced query planning with progress feedback
-      await this.streamManager.sendEvent('progress', { 
-        stage: 'planning', 
-        message: 'Analyzing query complexity and optimizing strategy...' 
-      });
-
-      const enhancedQueryPlan = queryPlan || planQuery(message, userProfile.timezone);
-      
-      // Send detailed planning result
-      await this.streamManager.sendEvent('progress', {
-        stage: 'planning_complete',
-        message: `Strategy: ${enhancedQueryPlan.strategy} | Complexity: ${enhancedQueryPlan.complexity?.level || 'standard'}`,
-        data: { 
-          strategy: enhancedQueryPlan.strategy, 
           complexity: enhancedQueryPlan.complexity,
           optimizationLevel: 'enhanced'
         }
