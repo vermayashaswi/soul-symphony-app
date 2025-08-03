@@ -26,6 +26,8 @@ import { useToast } from "@/hooks/use-toast";
 import { useTranslation } from "@/contexts/TranslationContext";
 import { useChatRealtime } from "@/hooks/use-chat-realtime";
 import { updateThreadProcessingStatus, createProcessingMessage, updateProcessingMessage, generateThreadTitle } from "@/utils/chat/threadUtils";
+import { useStreamingChat } from "@/hooks/useStreamingChat";
+import { StreamingProgress } from "@/components/chat/StreamingProgress";
 import { MentalHealthInsights } from "@/hooks/use-mental-health-insights";
 import VoiceRecordingButton from "./VoiceRecordingButton";
 import { ChatMessage } from "@/types/chat";
@@ -82,6 +84,15 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({ mentalHealthIns
     updateProcessingStage,
     setLocalLoading
   } = useChatRealtime(currentThreadId);
+
+  // Mock progress for testing StreamingProgress component
+  const currentProgress = isLoading || isProcessing ? {
+    stage: 'searching',
+    message: 'Searching through your journal entries...',
+    progress: 30,
+    estimatedCompletion: 8000,
+    data: {}
+  } : null;
 
   useEffect(() => {
     const onThreadChange = (event: CustomEvent) => {
@@ -778,6 +789,8 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({ mentalHealthIns
             processingStage={processingStage || undefined}
             threadId={currentThreadId}
             onInteractiveOptionClick={handleInteractiveOptionClick}
+            currentProgress={currentProgress}
+            isStreaming={false}
           />
         )}
       </div>

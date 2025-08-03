@@ -58,9 +58,6 @@ export const useStreamingChat = () => {
           userId: user?.id,
           threadId,
           streaming: true
-        },
-        headers: {
-          'Accept': 'text/event-stream'
         }
       });
 

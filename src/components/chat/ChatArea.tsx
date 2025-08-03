@@ -13,6 +13,7 @@ import EmotionRadarChart from "./EmotionRadarChart";
 import TypingIndicator from "./TypingIndicator";
 import ParticleAvatar from "./ParticleAvatar";
 import { ChatMessage } from "@/types/chat";
+import { StreamingProgress } from "./StreamingProgress";
 
 interface ChatAreaProps {
   chatMessages: ChatMessage[];
@@ -20,6 +21,14 @@ interface ChatAreaProps {
   processingStage?: string;
   threadId?: string | null;
   onInteractiveOptionClick?: (option: any) => void;
+  currentProgress?: {
+    stage: string;
+    message: string;
+    progress?: number;
+    estimatedCompletion?: number;
+    data?: any;
+  } | null;
+  isStreaming?: boolean;
 }
 
 const ChatArea: React.FC<ChatAreaProps> = ({ 
@@ -27,7 +36,9 @@ const ChatArea: React.FC<ChatAreaProps> = ({
   isLoading, 
   processingStage,
   threadId,
-  onInteractiveOptionClick
+  onInteractiveOptionClick,
+  currentProgress,
+  isStreaming
 }) => {
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -141,9 +152,28 @@ const ChatArea: React.FC<ChatAreaProps> = ({
         </div>
       ))}
 
-      {isLoading && (
+      {(isLoading || isStreaming) && (
         <div className="flex justify-start mb-4">
-          <TypingIndicator />
+          <div className="flex gap-3 max-w-[80%]">
+            <div className="mt-1">
+              <ParticleAvatar className="h-8 w-8" size={32} />
+            </div>
+            <Card className="bg-card">
+              <CardContent className="p-3">
+                {currentProgress ? (
+                  <StreamingProgress 
+                    stage={currentProgress.stage}
+                    message={currentProgress.message}
+                    progress={currentProgress.progress}
+                    estimatedCompletion={currentProgress.estimatedCompletion}
+                    data={currentProgress.data}
+                  />
+                ) : (
+                  <TypingIndicator />
+                )}
+              </CardContent>
+            </Card>
+          </div>
         </div>
       )}
 

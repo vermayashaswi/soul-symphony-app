@@ -82,7 +82,7 @@ serve(async (req) => {
     console.log(`[chat-with-rag] Processing query: "${message}" for user: ${requestUserId}, streaming: ${streaming}`);
 
     // Enable streaming by default for better performance
-    const enableStreaming = streaming || req.headers.get('Accept') === 'text/event-stream' || true;
+    const enableStreaming = true;
     
     if (enableStreaming) {
       const { response, controller } = createStreamingResponse();
