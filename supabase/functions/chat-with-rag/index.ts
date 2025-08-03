@@ -81,8 +81,10 @@ serve(async (req) => {
 
     console.log(`[chat-with-rag] Processing query: "${message}" for user: ${requestUserId}, streaming: ${streaming}`);
 
-    // Check for streaming request
-    if (streaming || req.headers.get('Accept') === 'text/event-stream') {
+    // Enable streaming by default for better performance
+    const enableStreaming = streaming || req.headers.get('Accept') === 'text/event-stream' || true;
+    
+    if (enableStreaming) {
       const { response, controller } = createStreamingResponse();
       const streamManager = new SSEStreamManager(controller);
       const pipeline = new OptimizedRagPipeline(streamManager, supabaseClient, openaiApiKey);

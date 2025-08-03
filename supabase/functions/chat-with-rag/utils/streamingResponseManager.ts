@@ -130,10 +130,39 @@ export class SSEStreamManager {
     const event = {
       type,
       data,
-      timestamp: Date.now()
+      timestamp: Date.now(),
+      id: `evt_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
     };
     
     const formatted = `data: ${JSON.stringify(event)}\n\n`;
+    this.controller.enqueue(this.encoder.encode(formatted));
+  }
+
+  // Phase 2: Enhanced progress messaging
+  async sendProgressWithEstimate(stage: string, message: string, progress?: number, estimatedTimeMs?: number): Promise<void> {
+    const progressEvent = {
+      type: 'progress_enhanced',
+      stage,
+      message,
+      progress: progress || 0,
+      estimatedCompletion: estimatedTimeMs ? Date.now() + estimatedTimeMs : null,
+      timestamp: Date.now()
+    };
+    
+    const formatted = `data: ${JSON.stringify(progressEvent)}\n\n`;
+    this.controller.enqueue(this.encoder.encode(formatted));
+  }
+
+  // Send streaming response chunks for real-time AI response
+  async sendResponseStream(chunk: string, isComplete = false): Promise<void> {
+    const streamEvent = {
+      type: 'response_stream',
+      chunk,
+      isComplete,
+      timestamp: Date.now()
+    };
+    
+    const formatted = `data: ${JSON.stringify(streamEvent)}\n\n`;
     this.controller.enqueue(this.encoder.encode(formatted));
   }
 

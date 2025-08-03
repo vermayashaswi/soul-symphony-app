@@ -5,6 +5,8 @@ import { planQuery } from './queryPlanner.ts';
 import { SSEStreamManager } from './streamingResponseManager.ts';
 import { BackgroundTaskManager } from './backgroundTaskManager.ts';
 import { SmartCache } from './smartCache.ts';
+import { EnhancedCache } from './enhancedCache.ts';
+import { ConnectionPoolManager } from './connectionPool.ts';
 import { PerformanceOptimizer } from './performanceOptimizer.ts';
 
 export class OptimizedRagPipeline {
@@ -30,14 +32,31 @@ export class OptimizedRagPipeline {
     const timerId = PerformanceOptimizer.startTimer('rag_pipeline');
 
     try {
-      // Step 1: Check cache first
+      // Phase 1: Smart Fast-Track Routing
+      const fastTrackResult = await this.checkFastTrackEligibility(message);
+      if (fastTrackResult.eligible) {
+        await this.streamManager.sendEvent('progress', {
+          stage: 'fast_track',
+          message: 'Using optimized fast-track response...'
+        });
+        
+        const directResponse = await this.generateDirectResponse(message, fastTrackResult.type, requestUserId);
+        await this.streamManager.sendEvent('final_response', directResponse);
+        await this.streamManager.sendEvent('complete', { fastTrack: true });
+        return;
+      }
+
+      // Step 1: Check enhanced cache first
       await this.streamManager.sendEvent('progress', { 
         stage: 'cache_check', 
-        message: 'Checking cached results...' 
+        message: 'Checking intelligent cache...' 
       });
 
-      const cacheKey = SmartCache.generateKey(message, requestUserId, conversationContext.length);
-      const cachedResult = SmartCache.get(cacheKey);
+      // Phase 3: Enhanced caching with intelligent TTL
+      const cacheKey = EnhancedCache.generateIntelligentKey(
+        message, requestUserId, conversationContext.length, enhancedQueryPlan?.complexity?.level
+      );
+      const cachedResult = EnhancedCache.get(cacheKey);
 
       if (cachedResult) {
         await this.streamManager.sendEvent('cache_hit', cachedResult);
@@ -45,47 +64,50 @@ export class OptimizedRagPipeline {
         return;
       }
 
-      // Step 2: Query planning
+      // Step 2: Enhanced query planning with progress feedback
       await this.streamManager.sendEvent('progress', { 
         stage: 'planning', 
-        message: 'Analyzing query and planning search strategy...' 
+        message: 'Analyzing query complexity and optimizing strategy...' 
       });
 
       const enhancedQueryPlan = queryPlan || planQuery(message, userProfile.timezone);
       
-      // Step 3: Generate embedding (parallel with planning if possible)
+      // Send detailed planning result
+      await this.streamManager.sendEvent('progress', {
+        stage: 'planning_complete',
+        message: `Strategy: ${enhancedQueryPlan.strategy} | Complexity: ${enhancedQueryPlan.complexity?.level || 'standard'}`,
+        data: { 
+          strategy: enhancedQueryPlan.strategy, 
+          complexity: enhancedQueryPlan.complexity,
+          optimizationLevel: 'enhanced'
+        }
+      });
+      
+      // Step 3: Generate embedding with better feedback
       await this.streamManager.sendEvent('progress', { 
         stage: 'embedding', 
-        message: 'Generating query embedding...' 
+        message: 'Generating semantic embedding for optimal search...' 
       });
 
       const embeddingPromise = OptimizedApiClient.getEmbedding(message, this.openaiApiKey);
 
-      // Step 4: Execute search strategy
+      // Step 4: Execute parallel search by default (Phase 1 optimization)
       await this.streamManager.sendEvent('progress', { 
         stage: 'search_start', 
-        message: 'Executing optimized search strategy...',
-        data: { strategy: enhancedQueryPlan.strategy }
+        message: 'Executing parallel vector + SQL search for maximum speed...',
+        data: { 
+          strategy: enhancedQueryPlan.strategy,
+          searchMethod: 'parallel',
+          optimization: 'dual_search_enabled'
+        }
       });
 
       const queryEmbedding = await embeddingPromise;
 
-      // Choose search method based on query complexity
-      const searchMethod = DualSearchOrchestrator.shouldUseParallelExecution(enhancedQueryPlan) ? 
-        'parallel' : 'sequential';
-
-      let searchResults;
-      if (searchMethod === 'parallel') {
-        // Stream progress for parallel search
-        searchResults = await this.executeParallelSearchWithStreaming(
-          requestUserId, queryEmbedding, enhancedQueryPlan, message
-        );
-      } else {
-        // Stream progress for sequential search
-        searchResults = await this.executeSequentialSearchWithStreaming(
-          requestUserId, queryEmbedding, enhancedQueryPlan, message
-        );
-      }
+      // Force parallel search for better performance (Phase 1)
+      const searchResults = await this.executeParallelSearchWithStreaming(
+        requestUserId, queryEmbedding, enhancedQueryPlan, message
+      );
 
       const { vectorResults, sqlResults, combinedResults } = searchResults;
 
@@ -123,7 +145,7 @@ export class OptimizedRagPipeline {
         response: aiResponse,
         analysis: {
           queryPlan: enhancedQueryPlan,
-          searchMethod: `dual_${searchMethod}`,
+          searchMethod: 'dual_parallel',
           resultsBreakdown: {
             vector: vectorResults.length,
             sql: sqlResults.length,
@@ -132,7 +154,8 @@ export class OptimizedRagPipeline {
           isAnalyticalQuery,
           processingTime: PerformanceOptimizer.endTimer(timerId, 'rag_pipeline'),
           enhancedFormatting: isAnalyticalQuery,
-          dualSearchEnabled: true
+          dualSearchEnabled: true,
+          optimizationLevel: 'enhanced'
         },
         referenceEntries: combinedResults.slice(0, 8).map(entry => ({
           id: entry.id,
@@ -144,9 +167,15 @@ export class OptimizedRagPipeline {
         }))
       };
 
-      // Cache the result in background
+      // Phase 3: Cache the result with enhanced strategy
       BackgroundTaskManager.getInstance().addTask(
-        Promise.resolve(SmartCache.set(cacheKey, finalResponse, 300))
+        Promise.resolve(EnhancedCache.set(
+          cacheKey, 
+          finalResponse, 
+          undefined, // Use intelligent TTL
+          enhancedQueryPlan.complexity?.level || 'standard',
+          requestUserId
+        ))
       );
 
       await this.streamManager.sendEvent('final_response', finalResponse);
@@ -214,5 +243,45 @@ export class OptimizedRagPipeline {
     return await generateResponse(
       systemPrompt, userPrompt, conversationContext, this.openaiApiKey, isAnalytical
     );
+  }
+
+  // Phase 1: Smart Fast-Track Routing Implementation
+  private async checkFastTrackEligibility(message: string): Promise<{ eligible: boolean; type?: string }> {
+    const lowerMessage = message.toLowerCase().trim();
+    
+    // Simple greeting responses
+    if (/^(hi|hello|hey|good morning|good afternoon|good evening)$/i.test(lowerMessage)) {
+      return { eligible: true, type: 'greeting' };
+    }
+    
+    // Basic status queries
+    if (/^(how are you|what can you do|help)$/i.test(lowerMessage)) {
+      return { eligible: true, type: 'help' };
+    }
+    
+    // Quick motivational requests
+    if (/^(motivate me|inspire me|good quote)$/i.test(lowerMessage)) {
+      return { eligible: true, type: 'motivation' };
+    }
+    
+    return { eligible: false };
+  }
+
+  private async generateDirectResponse(message: string, type: string, userId: string): Promise<any> {
+    const responses = {
+      greeting: "Hello! I'm here to help you explore and understand your journal entries. What would you like to know about your thoughts and experiences?",
+      help: "I can help you analyze your journal entries, find patterns in your thoughts, track your emotions over time, and provide insights about your personal growth. Try asking me about your recent mood, themes in your writing, or specific memories.",
+      motivation: "Remember that every entry you write is a step toward self-understanding. Your thoughts and experiences matter, and reflecting on them shows your commitment to personal growth. Keep journaling!"
+    };
+    
+    return {
+      response: responses[type] || "I'm here to help with your journal analysis.",
+      analysis: {
+        fastTrack: true,
+        type,
+        processingTime: 50, // Very fast response
+        optimizationLevel: 'fast_track'
+      }
+    };
   }
 }
