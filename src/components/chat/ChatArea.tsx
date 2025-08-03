@@ -13,7 +13,7 @@ import EmotionRadarChart from "./EmotionRadarChart";
 import TypingIndicator from "./TypingIndicator";
 import ParticleAvatar from "./ParticleAvatar";
 import { ChatMessage } from "@/types/chat";
-import { StreamingProgress } from "./StreamingProgress";
+
 
 interface ChatAreaProps {
   chatMessages: ChatMessage[];
@@ -21,14 +21,6 @@ interface ChatAreaProps {
   processingStage?: string;
   threadId?: string | null;
   onInteractiveOptionClick?: (option: any) => void;
-  currentProgress?: {
-    stage: string;
-    message: string;
-    progress?: number;
-    estimatedCompletion?: number;
-    data?: any;
-  } | null;
-  isStreaming?: boolean;
 }
 
 const ChatArea: React.FC<ChatAreaProps> = ({ 
@@ -36,9 +28,7 @@ const ChatArea: React.FC<ChatAreaProps> = ({
   isLoading, 
   processingStage,
   threadId,
-  onInteractiveOptionClick,
-  currentProgress,
-  isStreaming
+  onInteractiveOptionClick
 }) => {
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -152,7 +142,7 @@ const ChatArea: React.FC<ChatAreaProps> = ({
         </div>
       ))}
 
-      {(isLoading || isStreaming) && (
+      {isLoading && (
         <div className="flex justify-start mb-4">
           <div className="flex gap-3 max-w-[80%]">
             <div className="mt-1">
@@ -160,17 +150,7 @@ const ChatArea: React.FC<ChatAreaProps> = ({
             </div>
             <Card className="bg-card">
               <CardContent className="p-3">
-                {currentProgress ? (
-                  <StreamingProgress 
-                    stage={currentProgress.stage}
-                    message={currentProgress.message}
-                    progress={currentProgress.progress}
-                    estimatedCompletion={currentProgress.estimatedCompletion}
-                    data={currentProgress.data}
-                  />
-                ) : (
-                  <TypingIndicator />
-                )}
+                <TypingIndicator />
               </CardContent>
             </Card>
           </div>

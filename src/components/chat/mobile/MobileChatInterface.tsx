@@ -20,8 +20,6 @@ import { MentalHealthInsights } from "@/hooks/use-mental-health-insights";
 import { useChatRealtime } from "@/hooks/use-chat-realtime";
 import { updateThreadProcessingStatus, generateThreadTitle } from "@/utils/chat/threadUtils";
 import { useKeyboardDetection } from "@/hooks/use-keyboard-detection";
-import { useStreamingChat } from "@/hooks/useStreamingChat";
-import { StreamingProgress } from "@/components/chat/StreamingProgress";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -71,14 +69,6 @@ export default function MobileChatInterface({
     setLocalLoading
   } = useChatRealtime(threadId);
   
-  // Mock progress for testing StreamingProgress component
-  const currentProgress = isLoading || isProcessing ? {
-    stage: 'analyzing',
-    message: 'Analyzing your journal entries...',
-    progress: 45,
-    estimatedCompletion: 5000,
-    data: {}
-  } : null;
   
   const { isKeyboardVisible } = useKeyboardDetection();
   
@@ -716,20 +706,10 @@ export default function MobileChatInterface({
             {(isLoading || isProcessing) && (
               <div className="flex justify-start px-4">
                 <div className="bg-card border rounded-lg p-3 max-w-[85%]">
-                  {currentProgress ? (
-                    <StreamingProgress 
-                      stage={currentProgress.stage}
-                      message={currentProgress.message}
-                      progress={currentProgress.progress}
-                      estimatedCompletion={currentProgress.estimatedCompletion}
-                      data={currentProgress.data}
-                    />
-                  ) : (
-                    <MobileChatMessage 
-                      message={{ role: 'assistant', content: '' }}
-                      isLoading={true}
-                    />
-                  )}
+                  <MobileChatMessage 
+                    message={{ role: 'assistant', content: '' }}
+                    isLoading={true}
+                  />
                 </div>
               </div>
             )}

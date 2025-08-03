@@ -14,54 +14,6 @@ export type Database = {
   }
   public: {
     Tables: {
-      api_usage: {
-        Row: {
-          cost_usd: number | null
-          created_at: string
-          endpoint: string | null
-          error_message: string | null
-          function_name: string
-          id: number
-          ip_address: string | null
-          rate_limit_hit: boolean | null
-          request_method: string | null
-          response_time_ms: number | null
-          status_code: number | null
-          tokens_used: number | null
-          user_id: string | null
-        }
-        Insert: {
-          cost_usd?: number | null
-          created_at?: string
-          endpoint?: string | null
-          error_message?: string | null
-          function_name?: string
-          id?: number
-          ip_address?: string | null
-          rate_limit_hit?: boolean | null
-          request_method?: string | null
-          response_time_ms?: number | null
-          status_code?: number | null
-          tokens_used?: number | null
-          user_id?: string | null
-        }
-        Update: {
-          cost_usd?: number | null
-          created_at?: string
-          endpoint?: string | null
-          error_message?: string | null
-          function_name?: string
-          id?: number
-          ip_address?: string | null
-          rate_limit_hit?: boolean | null
-          request_method?: string | null
-          response_time_ms?: number | null
-          status_code?: number | null
-          tokens_used?: number | null
-          user_id?: string | null
-        }
-        Relationships: []
-      }
       auth_errors: {
         Row: {
           context: string | null
@@ -102,7 +54,6 @@ export type Database = {
           created_at: string
           has_numeric_result: boolean | null
           id: string
-          is_processing: boolean | null
           reference_entries: Json | null
           role: string | null
           sender: string
@@ -118,7 +69,6 @@ export type Database = {
           created_at?: string
           has_numeric_result?: boolean | null
           id?: string
-          is_processing?: boolean | null
           reference_entries?: Json | null
           role?: string | null
           sender: string
@@ -134,7 +84,6 @@ export type Database = {
           created_at?: string
           has_numeric_result?: boolean | null
           id?: string
-          is_processing?: boolean | null
           reference_entries?: Json | null
           role?: string | null
           sender?: string
@@ -158,8 +107,6 @@ export type Database = {
         Row: {
           created_at: string
           id: string
-          metadata: Json | null
-          processing_status: string
           title: string
           updated_at: string
           user_id: string
@@ -167,8 +114,6 @@ export type Database = {
         Insert: {
           created_at?: string
           id?: string
-          metadata?: Json | null
-          processing_status?: string
           title: string
           updated_at?: string
           user_id: string
@@ -176,8 +121,6 @@ export type Database = {
         Update: {
           created_at?: string
           id?: string
-          metadata?: Json | null
-          processing_status?: string
           title?: string
           updated_at?: string
           user_id?: string

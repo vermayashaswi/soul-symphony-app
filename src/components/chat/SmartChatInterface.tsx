@@ -26,8 +26,6 @@ import { useToast } from "@/hooks/use-toast";
 import { useTranslation } from "@/contexts/TranslationContext";
 import { useChatRealtime } from "@/hooks/use-chat-realtime";
 import { updateThreadProcessingStatus, createProcessingMessage, updateProcessingMessage, generateThreadTitle } from "@/utils/chat/threadUtils";
-import { useStreamingChat } from "@/hooks/useStreamingChat";
-import { StreamingProgress } from "@/components/chat/StreamingProgress";
 import { MentalHealthInsights } from "@/hooks/use-mental-health-insights";
 import VoiceRecordingButton from "./VoiceRecordingButton";
 import { ChatMessage } from "@/types/chat";
@@ -85,14 +83,6 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({ mentalHealthIns
     setLocalLoading
   } = useChatRealtime(currentThreadId);
 
-  // Mock progress for testing StreamingProgress component
-  const currentProgress = isLoading || isProcessing ? {
-    stage: 'searching',
-    message: 'Searching through your journal entries...',
-    progress: 30,
-    estimatedCompletion: 8000,
-    data: {}
-  } : null;
 
   useEffect(() => {
     const onThreadChange = (event: CustomEvent) => {
@@ -145,9 +135,9 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({ mentalHealthIns
     debugLog.addEvent("Thread Loading", `Loading messages for thread ${threadId}`, "info");
     
     try {
-      const { data: threadData, error: threadError } = await supabase
+        const { data: threadData, error: threadError } = await supabase
         .from('chat_threads')
-        .select('id, processing_status')
+        .select('id')
         .eq('id', threadId)
         .eq('user_id', user.id)
         .single();
@@ -789,8 +779,6 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({ mentalHealthIns
             processingStage={processingStage || undefined}
             threadId={currentThreadId}
             onInteractiveOptionClick={handleInteractiveOptionClick}
-            currentProgress={currentProgress}
-            isStreaming={false}
           />
         )}
       </div>

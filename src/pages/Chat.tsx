@@ -161,12 +161,12 @@ const Chat = () => {
       try {
         console.log("Initializing chat system...");
         
-        // Clean up stale sessions
+        // Clean up stale sessions (processing_status column removed)
         const { data: staleSessions, error } = await supabase
           .from('chat_threads')
           .select('id')
           .eq('user_id', user.id)
-          .eq('processing_status', 'processing');
+          .limit(0); // No stale sessions to clean since column doesn't exist
           
         if (error) {
           console.error("Error checking for stale sessions:", error);
@@ -176,27 +176,15 @@ const Chat = () => {
         if (staleSessions && staleSessions.length > 0) {
           console.log(`Found ${staleSessions.length} stale processing sessions, cleaning up...`);
           
-          for (const session of staleSessions) {
-            await supabase
-              .from('chat_threads')
-              .update({ processing_status: 'idle' })
-              .eq('id', session.id);
-              
-            await supabase
-              .from('chat_messages')
-              .delete()
-              .eq('thread_id', session.id)
-              .eq('is_processing', true);
-          }
+          // No cleanup needed since processing_status column doesn't exist
         }
         
-        // Initialize metadata for existing threads without it
+        // Initialize metadata for existing threads without it (metadata column removed)
         const { data: threads } = await supabase
           .from('chat_threads')
           .select('id')
           .eq('user_id', user.id)
-          .is('metadata', null)
-          .limit(10);
+          .limit(0); // No metadata to initialize since column doesn't exist
           
         if (threads && threads.length > 0) {
           console.log(`Initializing metadata for ${threads.length} threads`);
@@ -235,22 +223,7 @@ const Chat = () => {
               }
             }
             
-            // Initialize with default metadata
-            await supabase
-              .from('chat_threads')
-              .update({
-                metadata: {
-                  timeContext,
-                  topicContext,
-                  intentType: 'new_query',
-                  confidenceScore: 1.0,
-                  needsClarity: false,
-                  ambiguities: [],
-                  lastQueryType: 'journal_specific',
-                  lastUpdated: new Date().toISOString()
-                }
-              })
-              .eq('id', thread.id);
+            // No metadata to initialize since column doesn't exist
           }
         }
         
