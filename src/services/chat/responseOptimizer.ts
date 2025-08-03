@@ -6,11 +6,14 @@
 export interface ResponseOptimizationConfig {
   maxLength: number;
   minLength: number;
-  preferredStyle: 'concise' | 'detailed' | 'analytical' | 'conversational';
-  emotionalTone: 'supportive' | 'analytical' | 'encouraging' | 'neutral';
+  preferredStyle: 'concise' | 'detailed' | 'analytical' | 'conversational' | 'therapeutic';
+  emotionalTone: 'supportive' | 'analytical' | 'encouraging' | 'neutral' | 'empathetic' | 'validating';
   includeExamples: boolean;
   includeActionables: boolean;
   formatForMobile: boolean;
+  shouldAskFollowUp: boolean;
+  useFlexibleFormat: boolean;
+  therapistPersonality: 'warm' | 'analytical' | 'gentle' | 'encouraging';
 }
 
 export interface ConversationalFlowContext {
@@ -29,15 +32,18 @@ export function optimizeResponseLength(
   userPreferences?: { prefersBrief?: boolean; prefersDetailed?: boolean }
 ): ResponseOptimizationConfig {
   
-  // Phase 2: Context-aware response sizing
+  // Enhanced therapist-like response configuration
   let config: ResponseOptimizationConfig = {
     maxLength: 400,
     minLength: 100,
-    preferredStyle: 'conversational',
-    emotionalTone: 'supportive',
+    preferredStyle: 'therapeutic',
+    emotionalTone: 'empathetic',
     includeExamples: false,
     includeActionables: false,
-    formatForMobile: true
+    formatForMobile: true,
+    shouldAskFollowUp: true,
+    useFlexibleFormat: true,
+    therapistPersonality: 'warm'
   };
 
   // Adjust based on query complexity
@@ -227,4 +233,164 @@ export function detectConversationalPattern(
     confidence,
     suggestedDirection: directions[detectedPattern as keyof typeof directions]
   };
+}
+
+// Enhanced query classification for therapist-like responses
+export function classifyQueryIntent(
+  userMessage: string,
+  conversationContext: any[]
+): {
+  queryType: 'simple_question' | 'emotional_exploration' | 'pattern_analysis' | 'crisis_support' | 'reflection_prompt';
+  complexity: 'simple' | 'moderate' | 'complex';
+  needsFollowUp: boolean;
+  suggestedFollowUpType: 'clarification' | 'exploration' | 'validation' | 'none';
+  therapistApproach: 'reflective' | 'supportive' | 'analytical' | 'validating';
+} {
+  const lowerMessage = userMessage.toLowerCase();
+  
+  // Simple question indicators
+  const simpleQuestionPatterns = [
+    /^(what|how|when|where|why)\s/i,
+    /\b(tell me|show me|explain)\b/i,
+    /\?\s*$/
+  ];
+  
+  // Emotional exploration indicators
+  const emotionalPatterns = [
+    /\b(feel|feeling|emotion|mood|sad|happy|anxious|angry|worried|excited)\b/i,
+    /\b(struggling|difficult|hard|challenging)\b/i
+  ];
+  
+  // Pattern analysis indicators
+  const patternPatterns = [
+    /\b(pattern|trend|usually|always|never|often|sometimes)\b/i,
+    /\b(when do|what time|how often|frequency)\b/i
+  ];
+  
+  // Crisis support indicators
+  const crisisPatterns = [
+    /\b(crisis|emergency|urgent|desperate|can't|overwhelmed|suicide|harm)\b/i,
+    /\b(help me|need help|don't know what to do)\b/i
+  ];
+  
+  // Determine query type
+  let queryType: 'simple_question' | 'emotional_exploration' | 'pattern_analysis' | 'crisis_support' | 'reflection_prompt' = 'simple_question';
+  let complexity: 'simple' | 'moderate' | 'complex' = 'simple';
+  let therapistApproach: 'reflective' | 'supportive' | 'analytical' | 'validating' = 'supportive';
+  
+  if (crisisPatterns.some(pattern => pattern.test(lowerMessage))) {
+    queryType = 'crisis_support';
+    complexity = 'complex';
+    therapistApproach = 'supportive';
+  } else if (patternPatterns.some(pattern => pattern.test(lowerMessage))) {
+    queryType = 'pattern_analysis';
+    complexity = 'complex';
+    therapistApproach = 'analytical';
+  } else if (emotionalPatterns.some(pattern => pattern.test(lowerMessage))) {
+    queryType = 'emotional_exploration';
+    complexity = 'moderate';
+    therapistApproach = 'reflective';
+  } else if (simpleQuestionPatterns.some(pattern => pattern.test(lowerMessage))) {
+    queryType = 'simple_question';
+    complexity = 'simple';
+    therapistApproach = 'validating';
+  } else {
+    queryType = 'reflection_prompt';
+    complexity = 'moderate';
+    therapistApproach = 'reflective';
+  }
+  
+  // Determine follow-up needs
+  const needsFollowUp = queryType !== 'crisis_support' && (
+    userMessage.length < 50 || 
+    queryType === 'simple_question' ||
+    !userMessage.includes('?')
+  );
+  
+  let suggestedFollowUpType: 'clarification' | 'exploration' | 'validation' | 'none' = 'none';
+  
+  if (needsFollowUp) {
+    switch (queryType) {
+      case 'simple_question':
+        suggestedFollowUpType = 'clarification';
+        break;
+      case 'emotional_exploration':
+        suggestedFollowUpType = 'exploration';
+        break;
+      case 'reflection_prompt':
+        suggestedFollowUpType = 'validation';
+        break;
+      default:
+        suggestedFollowUpType = 'exploration';
+    }
+  }
+  
+  return {
+    queryType,
+    complexity,
+    needsFollowUp,
+    suggestedFollowUpType,
+    therapistApproach
+  };
+}
+
+// Generate intelligent follow-up questions
+export function generateFollowUpQuestions(
+  queryClassification: ReturnType<typeof classifyQueryIntent>,
+  userMessage: string,
+  emotionalContext?: ReturnType<typeof analyzeEmotionalContext>
+): string[] {
+  const followUpQuestions: string[] = [];
+  
+  switch (queryClassification.suggestedFollowUpType) {
+    case 'clarification':
+      followUpQuestions.push(
+        "What specific aspect of this would be most helpful to explore?",
+        "Is there a particular time period you'd like me to focus on?",
+        "Would you like me to look at any specific emotions or themes?"
+      );
+      break;
+      
+    case 'exploration':
+      if (emotionalContext?.needsSupport) {
+        followUpQuestions.push(
+          "How has this been affecting your daily life?",
+          "What support systems do you have in place?",
+          "When do you notice these feelings are strongest?"
+        );
+      } else {
+        followUpQuestions.push(
+          "What do you think might be behind these feelings?",
+          "Have you noticed any patterns in when this comes up?",
+          "What would it look like if this felt different?"
+        );
+      }
+      break;
+      
+    case 'validation':
+      followUpQuestions.push(
+        "What resonates most with you about this insight?",
+        "How does this awareness feel for you right now?",
+        "What would you like to explore further about this?"
+      );
+      break;
+  }
+  
+  // Add context-specific questions based on emotional state
+  if (emotionalContext?.sensitiveTopics.length) {
+    const topic = emotionalContext.sensitiveTopics[0];
+    switch (topic) {
+      case 'relationships':
+        followUpQuestions.push("How are your relationships feeling right now?");
+        break;
+      case 'work':
+        followUpQuestions.push("How is work impacting your wellbeing?");
+        break;
+      case 'self-worth':
+        followUpQuestions.push("What's your relationship with yourself like lately?");
+        break;
+    }
+  }
+  
+  return followUpQuestions.slice(0, 2); // Return top 2 most relevant
 }

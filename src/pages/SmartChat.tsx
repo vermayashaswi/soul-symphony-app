@@ -2,6 +2,7 @@
 import React, { useEffect, useState } from 'react';
 import SmartChatInterface from '@/components/chat/SmartChatInterface';
 import MobileChatInterface from '@/components/chat/mobile/MobileChatInterface';
+import DesktopChatLayout from '@/components/chat/DesktopChatLayout';
 import { useAuth } from '@/contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { useToast } from '@/hooks/use-toast';
@@ -89,8 +90,7 @@ const SmartChat = () => {
           user_id: user.id,
           title: "New Conversation",
           created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-          processing_status: 'idle'
+          updated_at: new Date().toISOString()
         });
       
       if (error) {
@@ -131,7 +131,12 @@ const SmartChat = () => {
             userId={user?.id}
           />
         ) : (
-          <SmartChatInterface />
+          <DesktopChatLayout
+            currentThreadId={currentThreadId}
+            onSelectThread={handleSelectThread}
+            onCreateNewThread={handleCreateNewThread}
+            userId={user?.id}
+          />
         )}
       </div>
     </PremiumFeatureGuard>

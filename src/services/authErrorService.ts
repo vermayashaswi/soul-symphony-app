@@ -39,25 +39,15 @@ class AuthErrorService {
         timestamp: new Date().toISOString()
       });
 
-      // Don't block the UI if logging fails
-      setTimeout(async () => {
-        try {
-          const { error } = await supabase
-            .from('auth_errors')
-            .insert({
-              user_id: userId || null,
-              error_type: errorType,
-              error_message: errorMessage,
-              context: context || null,
-              resolved: false
-            });
-
-          if (error) {
-            console.warn('[AuthErrorService] Failed to log auth error:', error);
-          }
-        } catch (logError) {
-          console.warn('[AuthErrorService] Error logging auth error:', logError);
-        }
+      // Log to console for debugging (database logging removed)
+      setTimeout(() => {
+        console.info('[AuthErrorService] Auth error logged:', {
+          errorType,
+          errorMessage,
+          context,
+          userId,
+          timestamp: new Date().toISOString()
+        });
       }, 0);
     } catch (error) {
       console.warn('[AuthErrorService] Failed to log auth error:', error);
@@ -65,47 +55,18 @@ class AuthErrorService {
   }
 
   /**
-   * Get auth errors for the current user
+   * Get auth errors for the current user (client-side only)
    */
   async getUserAuthErrors(): Promise<AuthError[]> {
-    try {
-      const { data, error } = await supabase
-        .from('auth_errors')
-        .select('*')
-        .order('created_at', { ascending: false })
-        .limit(10);
-
-      if (error) {
-        console.error('[AuthErrorService] Failed to fetch auth errors:', error);
-        return [];
-      }
-
-      return data || [];
-    } catch (error) {
-      console.error('[AuthErrorService] Error fetching auth errors:', error);
-      return [];
-    }
+    console.info('[AuthErrorService] Auth errors are now logged to console only');
+    return [];
   }
 
   /**
-   * Mark an auth error as resolved
+   * Mark an auth error as resolved (client-side only)
    */
   async resolveAuthError(errorId: string): Promise<void> {
-    try {
-      const { error } = await supabase
-        .from('auth_errors')
-        .update({
-          resolved: true,
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', errorId);
-
-      if (error) {
-        console.error('[AuthErrorService] Failed to resolve auth error:', error);
-      }
-    } catch (error) {
-      console.error('[AuthErrorService] Error resolving auth error:', error);
-    }
+    console.info('[AuthErrorService] Error marked as resolved (client-side):', errorId);
   }
 
   /**

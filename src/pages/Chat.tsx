@@ -161,33 +161,16 @@ const Chat = () => {
       try {
         console.log("Initializing chat system...");
         
-        // Clean up stale sessions
-        const { data: staleSessions, error } = await supabase
-          .from('chat_threads')
-          .select('id')
-          .eq('user_id', user.id)
-          .eq('processing_status', 'processing');
-          
-        if (error) {
-          console.error("Error checking for stale sessions:", error);
-          return;
-        }
-        
-        if (staleSessions && staleSessions.length > 0) {
-          console.log(`Found ${staleSessions.length} stale processing sessions, cleaning up...`);
-          
-          for (const session of staleSessions) {
-            await supabase
-              .from('chat_threads')
-              .update({ processing_status: 'idle' })
-              .eq('id', session.id);
-              
-            await supabase
-              .from('chat_messages')
-              .delete()
-              .eq('thread_id', session.id)
-              .eq('is_processing', true);
-          }
+        // Clean up stale processing messages (processing_status column removed)
+        try {
+          await supabase
+            .from('chat_messages')
+            .delete()
+            .eq('is_processing', true);
+            
+          console.log('Cleaned up stale processing messages');
+        } catch (cleanupError) {
+          console.error("Error cleaning up stale messages:", cleanupError);
         }
         
         // Initialize metadata for existing threads without it

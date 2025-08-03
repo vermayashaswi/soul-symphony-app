@@ -22,67 +22,7 @@ export function useChatRealtime(threadId: string | null) {
   useEffect(() => {
     if (!threadId) return;
     
-    // First, check the current processing status of the thread
-    const fetchThreadStatus = async () => {
-      try {
-        const { data: threadData, error } = await supabase
-          .from('chat_threads')
-          .select('processing_status')
-          .eq('id', threadId)
-          .single();
-          
-        if (error) {
-          console.error("Error fetching thread status:", error);
-          return;
-        }
-        
-        if (threadData && threadData.processing_status) {
-          const processingStatus = threadData.processing_status as ThreadProcessingStatus;
-          
-          setRealtimeState(prev => ({
-            ...prev,
-            isLoading: processingStatus === 'processing',
-            isProcessing: processingStatus === 'processing',
-            processingStatus: processingStatus,
-            processingStage: processingStatus === 'processing' ? 'Retrieving information...' : null
-          }));
-        }
-      } catch (error) {
-        console.error("Error in fetchThreadStatus:", error);
-      }
-    };
-    
-    fetchThreadStatus();
-    
-    // Subscribe to thread status changes
-    const threadChannel = supabase
-      .channel(`thread-status-${threadId}`)
-      .on('postgres_changes', 
-        { 
-          event: 'UPDATE', 
-          schema: 'public', 
-          table: 'chat_threads',
-          filter: `id=eq.${threadId}`
-        }, 
-        (payload) => {
-          const threadData = payload.new as any;
-          const processingStatus = threadData.processing_status as ThreadProcessingStatus;
-          
-          setRealtimeState(prev => ({
-            ...prev,
-            isLoading: processingStatus === 'processing',
-            isProcessing: processingStatus === 'processing',
-            processingStatus: processingStatus,
-            // Keep the current processing stage if we're still processing
-            processingStage: processingStatus === 'processing' 
-              ? prev.processingStage || 'Retrieving information...'
-              : null
-          }));
-        }
-      )
-      .subscribe();
-      
-    // Subscribe to new messages in this thread
+    // Subscribe to new messages in this thread for processing state detection
     const messageChannel = supabase
       .channel(`thread-messages-${threadId}`)
       .on('postgres_changes',
@@ -109,7 +49,6 @@ export function useChatRealtime(threadId: string | null) {
       .subscribe();
       
     return () => {
-      supabase.removeChannel(threadChannel);
       supabase.removeChannel(messageChannel);
     };
   }, [threadId]);
@@ -127,6 +66,8 @@ export function useChatRealtime(threadId: string | null) {
     setRealtimeState(prev => ({
       ...prev,
       isLoading: loading,
+      isProcessing: loading,
+      processingStatus: loading ? 'processing' : 'idle',
       processingStage: loading ? (stage || prev.processingStage || 'Processing...') : null
     }));
   };

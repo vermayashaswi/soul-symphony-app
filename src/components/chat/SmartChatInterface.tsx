@@ -51,10 +51,20 @@ import {
 } from "@/components/ui/tooltip";
 
 export interface SmartChatInterfaceProps {
+  currentThreadId?: string | null;
+  onSelectThread?: (threadId: string) => void;
+  onCreateNewThread?: () => Promise<string | null>;
+  userId?: string;
   mentalHealthInsights?: MentalHealthInsights;
 }
 
-const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({ mentalHealthInsights }) => {
+const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({ 
+  currentThreadId: propsThreadId, 
+  onSelectThread, 
+  onCreateNewThread, 
+  userId: propsUserId, 
+  mentalHealthInsights 
+}) => {
   const [chatHistory, setChatHistory] = useState<ChatMessage[]>([]);
   const [initialLoading, setInitialLoading] = useState(true);
   const [showSuggestions, setShowSuggestions] = useState(true);
@@ -67,8 +77,10 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({ mentalHealthIns
   const loadedThreadRef = useRef<string | null>(null);
   const debugLog = useDebugLog();
   
-  // State for the current thread
-  const [currentThreadId, setCurrentThreadId] = useState<string | null>(null);
+  // Use props for thread ID if available, otherwise manage locally
+  const [localThreadId, setLocalThreadId] = useState<string | null>(null);
+  const currentThreadId = propsThreadId ?? localThreadId;
+  const effectiveUserId = propsUserId ?? user?.id;
   
   // Use the GPT-based message classification hook
   const { classifyMessage, classification } = useChatMessageClassification();
@@ -83,11 +95,30 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({ mentalHealthIns
     setLocalLoading
   } = useChatRealtime(currentThreadId);
 
+  // Sync with props thread ID and update local storage
   useEffect(() => {
+    if (propsThreadId && propsThreadId !== currentThreadId) {
+      loadThreadMessages(propsThreadId);
+      // Update local storage to maintain consistency
+      if (propsThreadId) {
+        localStorage.setItem("lastActiveChatThreadId", propsThreadId);
+      }
+      debugLog.addEvent("Props Thread Change", `Thread selected via props: ${propsThreadId}`, "info");
+    }
+  }, [propsThreadId, currentThreadId]);
+
+  useEffect(() => {
+    // Only handle events and local storage if not using props
+    if (propsThreadId) return;
+    
     const onThreadChange = (event: CustomEvent) => {
       if (event.detail.threadId) {
-        setCurrentThreadId(event.detail.threadId);
+        setLocalThreadId(event.detail.threadId);
         loadThreadMessages(event.detail.threadId);
+        // Use the callback if available
+        if (onSelectThread) {
+          onSelectThread(event.detail.threadId);
+        }
         debugLog.addEvent("Thread Change", `Thread selected: ${event.detail.threadId}`, "info");
       }
     };
@@ -95,8 +126,8 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({ mentalHealthIns
     window.addEventListener('threadSelected' as any, onThreadChange);
     
     const storedThreadId = localStorage.getItem("lastActiveChatThreadId");
-    if (storedThreadId && user?.id) {
-      setCurrentThreadId(storedThreadId);
+    if (storedThreadId && effectiveUserId) {
+      setLocalThreadId(storedThreadId);
       loadThreadMessages(storedThreadId);
       debugLog.addEvent("Initialization", `Loading stored thread: ${storedThreadId}`, "info");
     } else {
@@ -107,7 +138,7 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({ mentalHealthIns
     return () => {
       window.removeEventListener('threadSelected' as any, onThreadChange);
     };
-  }, [user?.id]);
+  }, [effectiveUserId, propsThreadId]);
 
   useEffect(() => {
     scrollToBottom();
@@ -120,7 +151,7 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({ mentalHealthIns
   };
 
   const loadThreadMessages = async (threadId: string) => {
-    if (!threadId || !user?.id) {
+    if (!threadId || !effectiveUserId) {
       setInitialLoading(false);
       return;
     }
@@ -136,9 +167,9 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({ mentalHealthIns
     try {
       const { data: threadData, error: threadError } = await supabase
         .from('chat_threads')
-        .select('id, processing_status')
+        .select('id')
         .eq('id', threadId)
-        .eq('user_id', user.id)
+        .eq('user_id', effectiveUserId)
         .single();
         
       if (threadError || !threadData) {
@@ -151,7 +182,7 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({ mentalHealthIns
       }
       
       debugLog.addEvent("Thread Loading", `Thread ${threadId} found, fetching messages`, "success");
-      const messages = await getThreadMessages(threadId, user.id);
+      const messages = await getThreadMessages(threadId, effectiveUserId);
       
       if (messages && messages.length > 0) {
         debugLog.addEvent("Thread Loading", `Loaded ${messages.length} messages for thread ${threadId}`, "success");
@@ -190,7 +221,7 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({ mentalHealthIns
 
   const handleSendMessage = async (message: string, parameters: Record<string, any> = {}) => {
     if (!message.trim()) return;
-    if (!user?.id) {
+    if (!effectiveUserId) {
       toast({
         title: "Authentication required",
         description: "Please sign in to use the chat feature.",
@@ -203,13 +234,32 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({ mentalHealthIns
     let threadId = currentThreadId;
     
     if (!threadId) {
-      toast({
-        title: "No conversation selected",
-        description: "Please select a conversation or start a new one.",
-        variant: "destructive"
-      });
-      debugLog.addEvent("Thread Selection", "No thread selected for message sending", "error");
-      return;
+      // If no thread exists, try to create one if we have the callback
+      if (onCreateNewThread) {
+        debugLog.addEvent("Thread Creation", "No thread selected, creating new thread", "info");
+        const newThreadId = await onCreateNewThread();
+        if (newThreadId) {
+          threadId = newThreadId;
+          if (!propsThreadId) {
+            setLocalThreadId(newThreadId);
+          }
+        } else {
+          toast({
+            title: "Error",
+            description: "Failed to create new conversation",
+            variant: "destructive"
+          });
+          return;
+        }
+      } else {
+        toast({
+          title: "No conversation selected",
+          description: "Please select a conversation or start a new one.",
+          variant: "destructive"
+        });
+        debugLog.addEvent("Thread Selection", "No thread selected for message sending", "error");
+        return;
+      }
     }
     
     // Prevent multiple concurrent requests
@@ -248,7 +298,7 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({ mentalHealthIns
       let savedUserMessage: ChatMessage | null = null;
       try {
         debugLog.addEvent("Database", `Saving user message to thread ${threadId}`, "info");
-        savedUserMessage = await saveMessage(threadId, message, 'user', user.id);
+        savedUserMessage = await saveMessage(threadId, message, 'user', effectiveUserId);
         debugLog.addEvent("Database", `User message saved with ID: ${savedUserMessage?.id}`, "success");
         
         if (savedUserMessage) {
@@ -265,7 +315,7 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({ mentalHealthIns
           if (isFirstMessage) {
             try {
               debugLog.addEvent("Title Generation", "Generating thread title after first message", "info");
-              const generatedTitle = await generateThreadTitle(threadId, user.id);
+              const generatedTitle = await generateThreadTitle(threadId, effectiveUserId);
               if (generatedTitle) {
                 // Dispatch event to update sidebar
                 window.dispatchEvent(
@@ -332,7 +382,7 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({ mentalHealthIns
         const { data, error } = await supabase.functions.invoke('chat-with-rag', {
           body: {
             message,
-            userId: user.id,
+            userId: effectiveUserId,
             threadId,
             conversationContext,
             useAllEntries: queryClassification.useAllEntries || false,
@@ -424,7 +474,7 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({ mentalHealthIns
             threadId,
             response.content,
             'assistant',
-            user.id,
+            effectiveUserId,
             undefined,
             false,
             true,
@@ -478,7 +528,7 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({ mentalHealthIns
             threadId,
             response.content,
             'assistant',
-            user.id,
+            effectiveUserId,
             response.references,
             response.hasNumericResult
           );
@@ -537,7 +587,7 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({ mentalHealthIns
           threadId,
           errorContent,
           'assistant',
-          user.id
+          effectiveUserId
         );
         
         if (savedErrorMessage) {
@@ -621,7 +671,7 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({ mentalHealthIns
   };
 
   const handleDeleteCurrentThread = async () => {
-    if (!currentThreadId || !user?.id) {
+    if (!currentThreadId || !effectiveUserId) {
       toast({
         title: "Error",
         description: "No active conversation to delete",
@@ -669,14 +719,19 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({ mentalHealthIns
       const { data: threads, error } = await supabase
         .from('chat_threads')
         .select('*')
-        .eq('user_id', user.id)
+        .eq('user_id', effectiveUserId)
         .order('updated_at', { ascending: false })
         .limit(1);
 
       if (error) throw error;
 
       if (threads && threads.length > 0) {
-        setCurrentThreadId(threads[0].id);
+        if (!propsThreadId) {
+          setLocalThreadId(threads[0].id);
+        }
+        if (onSelectThread) {
+          onSelectThread(threads[0].id);
+        }
         loadThreadMessages(threads[0].id);
         window.dispatchEvent(
           new CustomEvent('threadSelected', { 
@@ -688,7 +743,7 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({ mentalHealthIns
         const { data: newThread, error: insertError } = await supabase
           .from('chat_threads')
           .insert({
-            user_id: user.id,
+            user_id: effectiveUserId,
             title: "New Conversation",
             created_at: new Date().toISOString(),
             updated_at: new Date().toISOString()
@@ -697,7 +752,12 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({ mentalHealthIns
           .single();
 
         if (!insertError && newThread) {
-          setCurrentThreadId(newThread.id);
+          if (!propsThreadId) {
+            setLocalThreadId(newThread.id);
+          }
+          if (onSelectThread) {
+            onSelectThread(newThread.id);
+          }
           window.dispatchEvent(
             new CustomEvent('threadSelected', { 
               detail: { threadId: newThread.id } 
@@ -788,7 +848,7 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({ mentalHealthIns
             <ChatInput 
               onSendMessage={handleSendMessage} 
               isLoading={isLoading || isProcessing} 
-              userId={user?.id}
+              userId={effectiveUserId}
             />
           </div>
           <VoiceRecordingButton 

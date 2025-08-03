@@ -33,28 +33,16 @@ serve(async (req) => {
     console.log(`Ensuring chat persistence for user ${userId}`);
     console.log(`User timezone offset: ${timezoneOffset || 0} minutes`);
     
-    // Insert the query into the user_queries table without generating embeddings
-    const { data, error } = await supabase
-      .from('user_queries')
-      .insert({
-        user_id: userId,
-        query_text: queryText,
-        thread_id: threadId,
-        message_id: messageId,
-        timezone_offset: timezoneOffset || 0
-      })
-      .select()
-      .single();
-      
-    if (error) {
-      console.error("Error logging user query:", error);
-      throw error;
-    }
-    
-    console.log("User query logged successfully with ID:", data.id);
+    // Log the query for debugging purposes
+    console.log(`Query logged for user ${userId}:`, {
+      threadId,
+      messageId,
+      content: queryText.substring(0, 100) + '...',
+      timezoneOffset: timezoneOffset || 0
+    });
 
     return new Response(
-      JSON.stringify({ success: true, queryId: data.id }),
+      JSON.stringify({ success: true, logged: true }),
       { headers: { 'Content-Type': 'application/json', ...corsHeaders } }
     );
   } catch (error) {

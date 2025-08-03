@@ -103,12 +103,19 @@ async function gptClassifyMessage(
    - "Thanks!", "That's helpful", "Tell me more", "How are you?"
    - Keep the conversation flowing naturally
 
-**ANALYSIS RULES:**
-- Personal pronouns ("I", "me", "my") = JOURNAL_SPECIFIC (high confidence)
+**CRITICAL PRIORITY RULES:**
+- **HIGHEST PRIORITY**: Any message containing personal pronouns ("I", "me", "my", "myself", "mine") MUST be classified as JOURNAL_SPECIFIC with confidence 0.9+
+- Personal questions about self = JOURNAL_SPECIFIC (always high confidence)
 - "How am I?" without time = useAllEntries: true  
 - "How was I yesterday?" = useAllEntries: false
 - Follow-ups and thanks = CONVERSATIONAL
 - Educational "how to" questions = GENERAL_MENTAL_HEALTH
+
+**EXAMPLES OF MANDATORY JOURNAL_SPECIFIC:**
+- "Am I an introvert?" (contains "I")
+- "What if you were to show my introversion" (contains "my") 
+- "Do I like people?" (contains "I")
+- "How have I been feeling?" (contains "I")
 
 User message: "${message}"${contextString}
 
