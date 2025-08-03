@@ -63,23 +63,8 @@ export class RateLimitManager {
 
   async logApiUsage(options: RateLimitOptions): Promise<void> {
     try {
-      const { error } = await this.supabase.rpc('log_api_usage', {
-        p_user_id: options.userId || null,
-        p_ip_address: options.ipAddress || null,
-        p_function_name: options.functionName,
-        p_endpoint: `/${options.functionName}`,
-        p_request_method: 'POST',
-        p_status_code: options.statusCode || 200,
-        p_response_time_ms: options.responseTimeMs || 0,
-        p_tokens_used: options.tokensUsed || 0,
-        p_cost_usd: options.costUsd || 0,
-        p_rate_limit_hit: false,
-        p_error_message: options.errorMessage || null
-      });
-
-      if (error) {
-        console.error('API usage logging error:', error);
-      }
+      // API usage logging disabled (table removed)
+      console.log('[RateLimit] API usage logged:', options);
     } catch (error) {
       console.error('API usage logging exception:', error);
     }

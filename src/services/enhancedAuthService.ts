@@ -1,5 +1,5 @@
 import { supabase } from '@/integrations/supabase/client';
-import { authErrorService } from './authErrorService';
+
 import * as authService from './authService';
 import { toast } from 'sonner';
 
