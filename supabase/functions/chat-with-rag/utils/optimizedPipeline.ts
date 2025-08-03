@@ -72,10 +72,6 @@ export class OptimizedRagPipeline {
         await this.streamManager.sendEvent('complete', { fromCache: true });
         return;
       }
-          complexity: enhancedQueryPlan.complexity,
-          optimizationLevel: 'enhanced'
-        }
-      });
       
       // Step 3: Generate embedding with better feedback
       await this.streamManager.sendProgressWithEstimate('embedding', undefined, 30, 3000);
