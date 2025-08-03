@@ -4,14 +4,17 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.7.1';
 import { OptimizedApiClient } from './utils/optimizedApiClient.ts';
 import { DualSearchOrchestrator } from './utils/dualSearchOrchestrator.ts';
+import { AsyncSearchOrchestrator } from './utils/asyncSearchOrchestrator.ts';
+import { DirectResponseHandler } from './utils/directResponseHandler.ts';
 import { generateResponse, generateSystemPrompt, generateUserPrompt } from './utils/responseGenerator.ts';
 import { planQuery } from './utils/queryPlanner.ts';
-import { RateLimitManager } from '../_shared/rateLimitUtils.ts';
+// Rate limiting temporarily removed - tables deleted from database
 import { createStreamingResponse, SSEStreamManager } from './utils/streamingResponseManager.ts';
 import { BackgroundTaskManager } from './utils/backgroundTaskManager.ts';
 import { SmartCache } from './utils/smartCache.ts';
 import { OptimizedRagPipeline } from './utils/optimizedPipeline.ts';
 import { PerformanceOptimizer } from './utils/performanceOptimizer.ts';
+import { analyzeQueryComplexity } from './utils/queryComplexityAnalyzer.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -34,25 +37,24 @@ serve(async (req) => {
     // Performance tracking
     const globalTimer = PerformanceOptimizer.startTimer('total_request');
     
-    // Initialize rate limiting
-    const rateLimitManager = new RateLimitManager(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
-    );
-
-    const { userId, ipAddress } = RateLimitManager.getClientInfo(req);
-
-    // Check rate limits
-    const rateLimitCheck = await rateLimitManager.checkRateLimit({
-      userId,
-      ipAddress,
-      functionName: 'chat-with-rag'
-    });
-
-    if (!rateLimitCheck.allowed) {
-      console.log(`[chat-with-rag] Rate limit exceeded for user ${userId || 'anonymous'} from IP ${ipAddress}`);
-      return rateLimitManager.createRateLimitResponse(rateLimitCheck);
+    // Rate limiting temporarily disabled - using basic request info extraction
+    const authHeader = req.headers.get('Authorization');
+    let userId: string | undefined;
+    
+    if (authHeader?.startsWith('Bearer ')) {
+      try {
+        const token = authHeader.substring(7);
+        const payload = JSON.parse(atob(token.split('.')[1]));
+        userId = payload.sub;
+      } catch (error) {
+        console.warn('Failed to parse auth token:', error);
+      }
     }
+
+    const ipAddress = req.headers.get('x-forwarded-for')?.split(',')[0] ||
+                     req.headers.get('x-real-ip') ||
+                     req.headers.get('cf-connecting-ip') ||
+                     '127.0.0.1';
 
     const supabaseClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
@@ -81,6 +83,30 @@ serve(async (req) => {
 
     console.log(`[chat-with-rag] Processing query: "${message}" for user: ${requestUserId}, streaming: ${streaming}`);
 
+    // NEW: Check if this should be handled as a direct response (no journal search needed)
+    if (DirectResponseHandler.shouldHandleDirectly(message, conversationContext, queryPlan)) {
+      console.log('[chat-with-rag] Routing to direct response handler');
+      
+      try {
+        const directResponse = await DirectResponseHandler.generateDirectResponse(
+          message,
+          conversationContext,
+          openaiApiKey,
+          userProfile
+        );
+
+        console.log(`[chat-with-rag] Direct response completed in ${directResponse.analysis.processingTime}ms`);
+
+        return new Response(JSON.stringify(directResponse), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+
+      } catch (error) {
+        console.error('[chat-with-rag] Direct response failed, falling back to journal search:', error);
+        // Continue to journal search as fallback
+      }
+    }
+
     // Check for streaming request
     if (streaming || req.headers.get('Accept') === 'text/event-stream') {
       const { response, controller } = createStreamingResponse();
@@ -93,14 +119,8 @@ serve(async (req) => {
           try {
             await pipeline.processQuery(requestBody);
             
-            // Log usage in background
-            BackgroundTaskManager.logApiUsage(rateLimitManager, {
-              userId,
-              ipAddress,
-              functionName: 'chat-with-rag',
-              statusCode: 200,
-              responseTimeMs: PerformanceOptimizer.endTimer(globalTimer, 'total_request')
-            });
+            // Usage logging disabled - related tables removed
+            console.log(`[chat-with-rag] Streaming completed in ${PerformanceOptimizer.endTimer(globalTimer, 'total_request')}ms`);
           } catch (error) {
             console.error('[chat-with-rag] Streaming pipeline error:', error);
             await streamManager.sendEvent('error', { message: error.message });
@@ -125,15 +145,8 @@ serve(async (req) => {
     if (cachedResult) {
       console.log('[chat-with-rag] Cache hit - returning cached result');
       
-      // Log usage in background
-      BackgroundTaskManager.logApiUsage(rateLimitManager, {
-        userId,
-        ipAddress,
-        functionName: 'chat-with-rag',
-        statusCode: 200,
-        responseTimeMs: PerformanceOptimizer.endTimer(globalTimer, 'total_request'),
-        fromCache: true
-      });
+      // Usage logging disabled - related tables removed
+      console.log(`[chat-with-rag] Cache hit, completed in ${PerformanceOptimizer.endTimer(globalTimer, 'total_request')}ms`);
 
       return new Response(JSON.stringify({
         ...cachedResult,
@@ -147,47 +160,36 @@ serve(async (req) => {
       });
     }
 
-    // Enhanced query planning with dual search support
+    // Enhanced query planning with async optimization
     const planningTimer = PerformanceOptimizer.startTimer('query_planning');
     const enhancedQueryPlan = queryPlan || planQuery(message, userProfile.timezone);
     PerformanceOptimizer.endTimer(planningTimer, 'query_planning');
     
-    console.log(`[chat-with-rag] Query plan strategy: ${enhancedQueryPlan.strategy}, complexity: ${enhancedQueryPlan.complexity}`);
-
-    // Generate embedding with optimization
-    const embeddingTimer = PerformanceOptimizer.startTimer('embedding_generation');
-    const queryEmbedding = await OptimizedApiClient.getEmbedding(message, openaiApiKey);
-    PerformanceOptimizer.endTimer(embeddingTimer, 'embedding_generation');
-
-    // Execute optimized dual search
-    const searchTimer = PerformanceOptimizer.startTimer('dual_search');
-    const searchMethod = DualSearchOrchestrator.shouldUseParallelExecution(enhancedQueryPlan) ? 
-      'parallel' : 'sequential';
+    // Determine complexity for async optimization
+    const complexity = analyzeQueryComplexity(message, conversationContext, enhancedQueryPlan);
     
-    console.log(`[chat-with-rag] Executing ${searchMethod} dual search`);
+    console.log(`[chat-with-rag] Query plan strategy: ${enhancedQueryPlan.strategy}, complexity: ${complexity}`);
+
+    // NEW: Use async search orchestrator for high-performance search
+    const searchTimer = PerformanceOptimizer.startTimer('async_search');
+    
+    console.log(`[chat-with-rag] Executing async ${complexity} search`);
+    
+    const asyncOrchestrator = new AsyncSearchOrchestrator(supabaseClient, openaiApiKey);
     
     const searchResults = await PerformanceOptimizer.withConnectionPooling(async () => {
-      return searchMethod === 'parallel' ?
-        await DualSearchOrchestrator.executeParallelSearch(
-          supabaseClient,
-          requestUserId,
-          queryEmbedding,
-          enhancedQueryPlan,
-          message
-        ) :
-        await DualSearchOrchestrator.executeSequentialSearch(
-          supabaseClient,
-          requestUserId,
-          queryEmbedding,
-          enhancedQueryPlan,
-          message
-        );
+      return await asyncOrchestrator.executeAsyncSearch(
+        requestUserId,
+        message,
+        enhancedQueryPlan,
+        complexity
+      );
     });
 
-    const { vectorResults, sqlResults, combinedResults } = searchResults;
-    PerformanceOptimizer.endTimer(searchTimer, 'dual_search');
+    const { vectorResults, sqlResults, combinedResults, performance } = searchResults;
+    PerformanceOptimizer.endTimer(searchTimer, 'async_search');
 
-    console.log(`[chat-with-rag] Dual search completed: ${combinedResults.length} total results`);
+    console.log(`[chat-with-rag] Async search completed: ${combinedResults.length} total results in ${performance.totalTime}ms`);
 
     // Detect analytical query
     const isAnalyticalQuery = enhancedQueryPlan.expectedResponseType === 'analysis' ||
@@ -231,7 +233,8 @@ serve(async (req) => {
       response: aiResponse,
       analysis: {
         queryPlan: enhancedQueryPlan,
-        searchMethod: `dual_${searchMethod}`,
+        searchMethod: searchResults.searchMethod || 'async_optimized',
+        complexity,
         resultsBreakdown: {
           vector: vectorResults.length,
           sql: sqlResults.length,
@@ -240,9 +243,10 @@ serve(async (req) => {
         isAnalyticalQuery,
         processingTime,
         enhancedFormatting: isAnalyticalQuery,
-        dualSearchEnabled: true,
+        asyncOptimizationsEnabled: true,
         fromCache: false,
-        performanceReport: PerformanceOptimizer.getPerformanceReport()
+        performanceReport: PerformanceOptimizer.getPerformanceReport(),
+        searchPerformance: performance
       },
       referenceEntries: combinedResults.slice(0, 8).map(entry => ({
         id: entry.id,
@@ -259,14 +263,8 @@ serve(async (req) => {
       Promise.resolve(SmartCache.set(cacheKey, finalResponse, 300))
     );
 
-    // Log successful API usage in background
-    BackgroundTaskManager.logApiUsage(rateLimitManager, {
-      userId,
-      ipAddress,
-      functionName: 'chat-with-rag',
-      statusCode,
-      responseTimeMs: processingTime
-    });
+    // Usage logging disabled - related tables removed
+    console.log(`[chat-with-rag] Request completed successfully in ${processingTime}ms`);
 
     console.log(`[chat-with-rag] Enhanced dual search RAG completed in ${processingTime}ms`);
 
@@ -280,25 +278,8 @@ serve(async (req) => {
     errorMessage = error.message;
     processingTime = Date.now() - startTime;
 
-    // Log failed API usage
-    try {
-      const rateLimitManager = new RateLimitManager(
-        Deno.env.get('SUPABASE_URL') ?? '',
-        Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
-      );
-      const { userId, ipAddress } = RateLimitManager.getClientInfo(req);
-      
-      await rateLimitManager.logApiUsage({
-        userId,
-        ipAddress,
-        functionName: 'chat-with-rag',
-        statusCode,
-        responseTimeMs: processingTime,
-        errorMessage
-      });
-    } catch (logError) {
-      console.error('[chat-with-rag] Failed to log error usage:', logError);
-    }
+    // Error logging simplified - usage tables removed
+    console.error(`[chat-with-rag] Request failed in ${processingTime}ms:`, errorMessage);
 
     return new Response(JSON.stringify({
       error: error.message,

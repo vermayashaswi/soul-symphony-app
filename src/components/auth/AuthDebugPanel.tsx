@@ -5,7 +5,7 @@ import { Badge } from '@/components/ui/badge';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { ChevronDown, ChevronRight, RefreshCw, Bug, CheckCircle, XCircle, AlertTriangle } from 'lucide-react';
 import { enhancedAuthService } from '@/services/enhancedAuthService';
-import { authErrorService } from '@/services/authErrorService';
+// Auth error service removed - using simplified error handling
 import { toast } from 'sonner';
 
 interface AuthDebugPanelProps {
@@ -34,9 +34,8 @@ export const AuthDebugPanel: React.FC<AuthDebugPanelProps> = ({ onDiagnosticsRun
       const results = await enhancedAuthService.runDiagnostics();
       setDiagnostics(results);
       
-      // Get auth errors
-      const errors = await authErrorService.getUserAuthErrors();
-      setAuthErrors(errors);
+      // Auth errors disabled - related service removed
+      setAuthErrors([]);
       
       onDiagnosticsRun?.(results);
       toast.success('Diagnostics completed');
