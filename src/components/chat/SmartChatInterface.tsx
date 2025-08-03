@@ -83,7 +83,6 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({ mentalHealthIns
     setLocalLoading
   } = useChatRealtime(currentThreadId);
 
-
   useEffect(() => {
     const onThreadChange = (event: CustomEvent) => {
       if (event.detail.threadId) {
@@ -135,9 +134,9 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({ mentalHealthIns
     debugLog.addEvent("Thread Loading", `Loading messages for thread ${threadId}`, "info");
     
     try {
-        const { data: threadData, error: threadError } = await supabase
+      const { data: threadData, error: threadError } = await supabase
         .from('chat_threads')
-        .select('id')
+        .select('id, processing_status')
         .eq('id', threadId)
         .eq('user_id', user.id)
         .single();

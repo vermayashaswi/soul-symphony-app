@@ -80,24 +80,6 @@
       "buttonText": "开始使用"
     }
   },
-  "streaming": {
-    "understanding": "理解您的问题...",
-    "planning": "计划如何帮助您...",
-    "searching": "搜索相关条目...",
-    "analyzing": "分析您的日记数据...",
-    "generating": "生成您的回复...",
-    "cacheCheck": "检查之前的对话...",
-    "embedding": "处理您的问题...",
-    "vectorSearch": "搜索您的条目...",
-    "sqlSearch": "在您的数据中查找模式...",
-    "responseGeneration": "创建您的个性化回复...",
-    "finalizing": "完成中...",
-    "error": "出了点问题，请重试",
-    "fastTrack": "快速回复即将到来...",
-    "initializing": "开始中...",
-    "connecting": "连接到您的日记...",
-    "complete": "回复准备就绪！"
-  },
   "toasts": {
     "success": "成功",
     "error": "错误",

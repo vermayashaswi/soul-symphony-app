@@ -14,7 +14,6 @@ import TypingIndicator from "./TypingIndicator";
 import ParticleAvatar from "./ParticleAvatar";
 import { ChatMessage } from "@/types/chat";
 
-
 interface ChatAreaProps {
   chatMessages: ChatMessage[];
   isLoading?: boolean;
@@ -144,16 +143,7 @@ const ChatArea: React.FC<ChatAreaProps> = ({
 
       {isLoading && (
         <div className="flex justify-start mb-4">
-          <div className="flex gap-3 max-w-[80%]">
-            <div className="mt-1">
-              <ParticleAvatar className="h-8 w-8" size={32} />
-            </div>
-            <Card className="bg-card">
-              <CardContent className="p-3">
-                <TypingIndicator />
-              </CardContent>
-            </Card>
-          </div>
+          <TypingIndicator />
         </div>
       )}
 

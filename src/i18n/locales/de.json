@@ -80,24 +80,6 @@
       "buttonText": "Loslegen"
     }
   },
-  "streaming": {
-    "understanding": "Verstehe Ihre Frage...",
-    "planning": "Plane, wie ich Ihnen helfen kann...",
-    "searching": "Suche relevante Einträge...",
-    "analyzing": "Analysiere Ihre Tagebuchdaten...",
-    "generating": "Erstelle Ihre Antwort...",
-    "cacheCheck": "Überprüfe vorherige Gespräche...",
-    "embedding": "Verarbeite Ihre Frage...",
-    "vectorSearch": "Durchsuche Ihre Einträge...",
-    "sqlSearch": "Finde Muster in Ihren Daten...",
-    "responseGeneration": "Erstelle Ihre personalisierte Antwort...",
-    "finalizing": "Abschließen...",
-    "error": "Etwas ist schiefgelaufen, bitte versuchen Sie es erneut",
-    "fastTrack": "Schnelle Antwort kommt...",
-    "initializing": "Beginne...",
-    "connecting": "Verbinde mit Ihrem Tagebuch...",
-    "complete": "Antwort bereit!"
-  },
   "toasts": {
     "success": "Erfolg",
     "error": "Fehler",

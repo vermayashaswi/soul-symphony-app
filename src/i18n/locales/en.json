@@ -181,24 +181,6 @@
       "response": "We will respond to your request within 30 days"
     }
   },
-  "streaming": {
-    "understanding": "Understanding your question...",
-    "planning": "Planning how to help you...",
-    "searching": "Finding relevant entries...",
-    "analyzing": "Analyzing your journal data...",
-    "generating": "Crafting your response...",
-    "cacheCheck": "Checking previous conversations...",
-    "embedding": "Processing your question...",
-    "vectorSearch": "Searching through your entries...",
-    "sqlSearch": "Finding patterns in your data...",
-    "responseGeneration": "Creating your personalized response...",
-    "finalizing": "Finishing up...",
-    "error": "Something went wrong, please try again",
-    "fastTrack": "Quick response incoming...",
-    "initializing": "Getting started...",
-    "connecting": "Connecting to your journal...",
-    "complete": "Response ready!"
-  },
   "toasts": {
     "success": "Success",
     "error": "Error",

@@ -25,14 +25,28 @@ export function useChatRealtime(threadId: string | null) {
     // First, check the current processing status of the thread
     const fetchThreadStatus = async () => {
       try {
-        // Since processing_status column no longer exists, just set to idle
-        setRealtimeState(prev => ({
-          ...prev,
-          isLoading: false,
-          isProcessing: false,
-          processingStatus: 'idle',
-          processingStage: null
-        }));
+        const { data: threadData, error } = await supabase
+          .from('chat_threads')
+          .select('processing_status')
+          .eq('id', threadId)
+          .single();
+          
+        if (error) {
+          console.error("Error fetching thread status:", error);
+          return;
+        }
+        
+        if (threadData && threadData.processing_status) {
+          const processingStatus = threadData.processing_status as ThreadProcessingStatus;
+          
+          setRealtimeState(prev => ({
+            ...prev,
+            isLoading: processingStatus === 'processing',
+            isProcessing: processingStatus === 'processing',
+            processingStatus: processingStatus,
+            processingStage: processingStatus === 'processing' ? 'Retrieving information...' : null
+          }));
+        }
       } catch (error) {
         console.error("Error in fetchThreadStatus:", error);
       }
@@ -51,8 +65,19 @@ export function useChatRealtime(threadId: string | null) {
           filter: `id=eq.${threadId}`
         }, 
         (payload) => {
-          // Processing status column removed, keep existing state
-          console.log('Thread updated:', payload.new);
+          const threadData = payload.new as any;
+          const processingStatus = threadData.processing_status as ThreadProcessingStatus;
+          
+          setRealtimeState(prev => ({
+            ...prev,
+            isLoading: processingStatus === 'processing',
+            isProcessing: processingStatus === 'processing',
+            processingStatus: processingStatus,
+            // Keep the current processing stage if we're still processing
+            processingStage: processingStatus === 'processing' 
+              ? prev.processingStage || 'Retrieving information...'
+              : null
+          }));
         }
       )
       .subscribe();
@@ -70,7 +95,7 @@ export function useChatRealtime(threadId: string | null) {
         (payload) => {
           // New message was added, if it's from the assistant, we're no longer processing
           const messageData = payload.new as any;
-          if (messageData.sender === 'assistant') {
+          if (messageData.sender === 'assistant' && !messageData.is_processing) {
             setRealtimeState(prev => ({
               ...prev,
               isLoading: false,

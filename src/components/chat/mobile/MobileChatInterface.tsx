@@ -69,7 +69,6 @@ export default function MobileChatInterface({
     setLocalLoading
   } = useChatRealtime(threadId);
   
-  
   const { isKeyboardVisible } = useKeyboardDetection();
   
   const suggestionQuestions = [
@@ -704,14 +703,10 @@ export default function MobileChatInterface({
             ))}
             
             {(isLoading || isProcessing) && (
-              <div className="flex justify-start px-4">
-                <div className="bg-card border rounded-lg p-3 max-w-[85%]">
-                  <MobileChatMessage 
-                    message={{ role: 'assistant', content: '' }}
-                    isLoading={true}
-                  />
-                </div>
-              </div>
+              <MobileChatMessage 
+                message={{ role: 'assistant', content: '' }}
+                isLoading={true}
+              />
             )}
           </div>
         )}

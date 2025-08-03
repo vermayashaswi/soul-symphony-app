@@ -14,6 +14,48 @@ export type Database = {
   }
   public: {
     Tables: {
+      api_usage: {
+        Row: {
+          created_at: string
+          endpoint: string
+          id: string
+          ip_address: string | null
+          method: string
+          request_size: number | null
+          response_size: number | null
+          response_time_ms: number | null
+          status_code: number | null
+          user_agent: string | null
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          endpoint: string
+          id?: string
+          ip_address?: string | null
+          method: string
+          request_size?: number | null
+          response_size?: number | null
+          response_time_ms?: number | null
+          status_code?: number | null
+          user_agent?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          endpoint?: string
+          id?: string
+          ip_address?: string | null
+          method?: string
+          request_size?: number | null
+          response_size?: number | null
+          response_time_ms?: number | null
+          status_code?: number | null
+          user_agent?: string | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       auth_errors: {
         Row: {
           context: string | null
@@ -54,6 +96,7 @@ export type Database = {
           created_at: string
           has_numeric_result: boolean | null
           id: string
+          is_processing: boolean | null
           reference_entries: Json | null
           role: string | null
           sender: string
@@ -69,6 +112,7 @@ export type Database = {
           created_at?: string
           has_numeric_result?: boolean | null
           id?: string
+          is_processing?: boolean | null
           reference_entries?: Json | null
           role?: string | null
           sender: string
@@ -84,6 +128,7 @@ export type Database = {
           created_at?: string
           has_numeric_result?: boolean | null
           id?: string
+          is_processing?: boolean | null
           reference_entries?: Json | null
           role?: string | null
           sender?: string
@@ -107,6 +152,8 @@ export type Database = {
         Row: {
           created_at: string
           id: string
+          metadata: Json | null
+          processing_status: string
           title: string
           updated_at: string
           user_id: string
@@ -114,6 +161,8 @@ export type Database = {
         Insert: {
           created_at?: string
           id?: string
+          metadata?: Json | null
+          processing_status?: string
           title: string
           updated_at?: string
           user_id: string
@@ -121,6 +170,8 @@ export type Database = {
         Update: {
           created_at?: string
           id?: string
+          metadata?: Json | null
+          processing_status?: string
           title?: string
           updated_at?: string
           user_id?: string
@@ -781,14 +832,6 @@ export type Database = {
         Args: { entry_id_param: number }
         Returns: boolean
       }
-      check_rate_limit: {
-        Args: {
-          p_user_id?: string
-          p_ip_address?: string
-          p_function_name?: string
-        }
-        Returns: Json
-      }
       check_table_columns: {
         Args: { table_name: string }
         Returns: {
@@ -1051,22 +1094,6 @@ export type Database = {
       is_trial_eligible: {
         Args: { user_id_param: string }
         Returns: boolean
-      }
-      log_api_usage: {
-        Args: {
-          p_user_id?: string
-          p_ip_address?: string
-          p_function_name?: string
-          p_endpoint?: string
-          p_request_method?: string
-          p_status_code?: number
-          p_response_time_ms?: number
-          p_tokens_used?: number
-          p_cost_usd?: number
-          p_error_message?: string
-          p_rate_limit_hit?: boolean
-        }
-        Returns: undefined
       }
       manage_user_session: {
         Args: {

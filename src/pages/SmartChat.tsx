@@ -89,7 +89,8 @@ const SmartChat = () => {
           user_id: user.id,
           title: "New Conversation",
           created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString()
+          updated_at: new Date().toISOString(),
+          processing_status: 'idle'
         });
       
       if (error) {

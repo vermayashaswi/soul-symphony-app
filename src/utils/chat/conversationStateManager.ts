@@ -245,8 +245,8 @@ export class ConversationStateManager {
         return null;
       }
       
-      // Metadata column no longer exists, use empty object
-      const metadata = {};
+      // Safely handle metadata with type checking
+      const metadata = data.metadata || {};
       let metadataObj: Record<string, any> = {};
       
       if (isThreadMetadata(metadata)) {

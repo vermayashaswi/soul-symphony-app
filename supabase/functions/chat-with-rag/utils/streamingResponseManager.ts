@@ -130,86 +130,10 @@ export class SSEStreamManager {
     const event = {
       type,
       data,
-      timestamp: Date.now(),
-      id: `evt_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+      timestamp: Date.now()
     };
     
     const formatted = `data: ${JSON.stringify(event)}\n\n`;
-    this.controller.enqueue(this.encoder.encode(formatted));
-  }
-
-  // Enhanced progress messaging with user-friendly standardized stages
-  async sendProgressWithEstimate(stage: string, message?: string, progress?: number, estimatedTimeMs?: number): Promise<void> {
-    // Map technical stage names to user-friendly standardized ones
-    const stageMapping = {
-      'fast_track': 'fastTrack',
-      'cache_hit': 'cacheCheck', 
-      'planning': 'planning',
-      'embedding': 'embedding',
-      'search_start': 'searching',
-      'vector_search': 'vectorSearch',
-      'sql_search': 'sqlSearch', 
-      'parallel_search': 'searching',
-      'response_generation': 'generating',
-      'error': 'error',
-      'complete': 'complete',
-      'cache_check': 'cacheCheck',
-      'query_analysis': 'understanding',
-      'data_processing': 'analyzing',
-      'finalizing': 'finalizing'
-    };
-
-    const standardizedStage = stageMapping[stage] || stage;
-    
-    // Use simplified user-friendly message if none provided
-    const userMessage = message || this.getDefaultMessage(standardizedStage);
-    
-    const progressEvent = {
-      type: 'progress_enhanced',
-      stage: standardizedStage,
-      message: userMessage,
-      progress: progress || 0,
-      estimatedCompletion: estimatedTimeMs ? Date.now() + estimatedTimeMs : null,
-      timestamp: Date.now()
-    };
-    
-    const formatted = `data: ${JSON.stringify(progressEvent)}\n\n`;
-    this.controller.enqueue(this.encoder.encode(formatted));
-  }
-
-  // Get default user-friendly messages for stages
-  private getDefaultMessage(stage: string): string {
-    const defaultMessages = {
-      'fastTrack': 'Quick response incoming...',
-      'cacheCheck': 'Checking previous conversations...',
-      'planning': 'Planning how to help you...',
-      'understanding': 'Understanding your question...',
-      'embedding': 'Processing your question...',
-      'searching': 'Finding relevant entries...',
-      'vectorSearch': 'Searching through your entries...',
-      'sqlSearch': 'Finding patterns in your data...',
-      'analyzing': 'Analyzing your journal data...',
-      'generating': 'Crafting your response...',
-      'finalizing': 'Finishing up...',
-      'complete': 'Response ready!',
-      'error': 'Something went wrong, please try again',
-      'initializing': 'Getting started...',
-      'connecting': 'Connecting to your journal...'
-    };
-    
-    return defaultMessages[stage] || 'Processing...';
-  }
-
-  // Send streaming response chunks for real-time AI response
-  async sendResponseStream(chunk: string, isComplete = false): Promise<void> {
-    const streamEvent = {
-      type: 'response_stream',
-      chunk,
-      isComplete,
-      timestamp: Date.now()
-    };
-    
-    const formatted = `data: ${JSON.stringify(streamEvent)}\n\n`;
     this.controller.enqueue(this.encoder.encode(formatted));
   }
 
