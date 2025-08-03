@@ -2,6 +2,7 @@
 import React, { useEffect, useState } from 'react';
 import SmartChatInterface from '@/components/chat/SmartChatInterface';
 import MobileChatInterface from '@/components/chat/mobile/MobileChatInterface';
+import DesktopChatLayout from '@/components/chat/DesktopChatLayout';
 import { useAuth } from '@/contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { useToast } from '@/hooks/use-toast';
@@ -130,7 +131,12 @@ const SmartChat = () => {
             userId={user?.id}
           />
         ) : (
-          <SmartChatInterface />
+          <DesktopChatLayout
+            currentThreadId={currentThreadId}
+            onSelectThread={handleSelectThread}
+            onCreateNewThread={handleCreateNewThread}
+            userId={user?.id}
+          />
         )}
       </div>
     </PremiumFeatureGuard>
