@@ -16,42 +16,48 @@ export type Database = {
     Tables: {
       api_usage: {
         Row: {
+          cost_usd: number | null
           created_at: string
-          endpoint: string
-          id: string
+          endpoint: string | null
+          error_message: string | null
+          function_name: string
+          id: number
           ip_address: string | null
-          method: string
-          request_size: number | null
-          response_size: number | null
+          rate_limit_hit: boolean | null
+          request_method: string | null
           response_time_ms: number | null
           status_code: number | null
-          user_agent: string | null
+          tokens_used: number | null
           user_id: string | null
         }
         Insert: {
+          cost_usd?: number | null
           created_at?: string
-          endpoint: string
-          id?: string
+          endpoint?: string | null
+          error_message?: string | null
+          function_name?: string
+          id?: number
           ip_address?: string | null
-          method: string
-          request_size?: number | null
-          response_size?: number | null
+          rate_limit_hit?: boolean | null
+          request_method?: string | null
           response_time_ms?: number | null
           status_code?: number | null
-          user_agent?: string | null
+          tokens_used?: number | null
           user_id?: string | null
         }
         Update: {
+          cost_usd?: number | null
           created_at?: string
-          endpoint?: string
-          id?: string
+          endpoint?: string | null
+          error_message?: string | null
+          function_name?: string
+          id?: number
           ip_address?: string | null
-          method?: string
-          request_size?: number | null
-          response_size?: number | null
+          rate_limit_hit?: boolean | null
+          request_method?: string | null
           response_time_ms?: number | null
           status_code?: number | null
-          user_agent?: string | null
+          tokens_used?: number | null
           user_id?: string | null
         }
         Relationships: []
@@ -832,6 +838,14 @@ export type Database = {
         Args: { entry_id_param: number }
         Returns: boolean
       }
+      check_rate_limit: {
+        Args: {
+          p_user_id?: string
+          p_ip_address?: string
+          p_function_name?: string
+        }
+        Returns: Json
+      }
       check_table_columns: {
         Args: { table_name: string }
         Returns: {
@@ -1094,6 +1108,22 @@ export type Database = {
       is_trial_eligible: {
         Args: { user_id_param: string }
         Returns: boolean
+      }
+      log_api_usage: {
+        Args: {
+          p_user_id?: string
+          p_ip_address?: string
+          p_function_name?: string
+          p_endpoint?: string
+          p_request_method?: string
+          p_status_code?: number
+          p_response_time_ms?: number
+          p_tokens_used?: number
+          p_cost_usd?: number
+          p_error_message?: string
+          p_rate_limit_hit?: boolean
+        }
+        Returns: undefined
       }
       manage_user_session: {
         Args: {
