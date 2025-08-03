@@ -135,23 +135,25 @@ export const ensureThreadExists = async (threadId: string, userId: string): Prom
 };
 
 /**
- * Updates the processing status of a chat thread
+ * Updates the processing status of a chat thread (client-side only)
+ * Note: processing_status column was removed from database
  */
 export const updateThreadProcessingStatus = async (
   threadId: string, 
   status: 'idle' | 'processing' | 'failed'
 ): Promise<boolean> => {
   try {
+    // This function now only updates the updated_at timestamp
+    // Processing status is managed client-side only
     const { error } = await supabase
       .from('chat_threads')
       .update({ 
-        processing_status: status,
         updated_at: new Date().toISOString() 
       })
       .eq('id', threadId);
       
     if (error) {
-      console.error("Error updating thread processing status:", error);
+      console.error("Error updating thread timestamp:", error);
       return false;
     }
     

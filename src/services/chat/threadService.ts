@@ -7,7 +7,6 @@ export interface ChatThread {
   title: string;
   created_at: string;
   updated_at: string;
-  processing_status?: string;
   metadata?: any;
 }
 
@@ -26,8 +25,7 @@ export const createChatThread = async (userId: string, title: string = "New Conv
         user_id: userId, // Ensure user_id is set for RLS
         title,
         created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-        processing_status: 'idle'
+        updated_at: new Date().toISOString()
       })
       .select()
       .single();

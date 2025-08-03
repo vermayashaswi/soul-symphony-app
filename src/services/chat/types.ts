@@ -6,7 +6,6 @@ export interface ChatThread {
   user_id: string;
   created_at: string;
   updated_at: string;
-  processing_status?: 'idle' | 'processing' | 'failed';
   metadata?: {
     timeContext?: string | null;
     topicContext?: string | null;

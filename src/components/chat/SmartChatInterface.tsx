@@ -136,7 +136,7 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({ mentalHealthIns
     try {
       const { data: threadData, error: threadError } = await supabase
         .from('chat_threads')
-        .select('id, processing_status')
+        .select('id')
         .eq('id', threadId)
         .eq('user_id', user.id)
         .single();
