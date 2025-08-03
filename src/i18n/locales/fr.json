@@ -80,6 +80,24 @@
       "buttonText": "Commencer"
     }
   },
+  "streaming": {
+    "understanding": "Comprendre votre question...",
+    "planning": "Planifier comment vous aider...",
+    "searching": "Recherche d'entrées pertinentes...",
+    "analyzing": "Analyse de vos données de journal...",
+    "generating": "Création de votre réponse...",
+    "cacheCheck": "Vérification des conversations précédentes...",
+    "embedding": "Traitement de votre question...",
+    "vectorSearch": "Recherche dans vos entrées...",
+    "sqlSearch": "Recherche de motifs dans vos données...",
+    "responseGeneration": "Création de votre réponse personnalisée...",
+    "finalizing": "Finalisation...",
+    "error": "Quelque chose s'est mal passé, veuillez réessayer",
+    "fastTrack": "Réponse rapide en cours...",
+    "initializing": "Démarrage...",
+    "connecting": "Connexion à votre journal...",
+    "complete": "Réponse prête !"
+  },
   "toasts": {
     "success": "Succès",
     "error": "Erreur",

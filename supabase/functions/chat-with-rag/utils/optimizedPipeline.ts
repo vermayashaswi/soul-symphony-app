@@ -35,10 +35,7 @@ export class OptimizedRagPipeline {
       // Phase 1: Smart Fast-Track Routing
       const fastTrackResult = await this.checkFastTrackEligibility(message);
       if (fastTrackResult.eligible) {
-        await this.streamManager.sendEvent('progress', {
-          stage: 'fast_track',
-          message: 'Using optimized fast-track response...'
-        });
+        await this.streamManager.sendProgressWithEstimate('fast_track', undefined, 90, 1000);
         
         const directResponse = await this.generateDirectResponse(message, fastTrackResult.type, requestUserId);
         await this.streamManager.sendEvent('final_response', directResponse);
@@ -47,10 +44,7 @@ export class OptimizedRagPipeline {
       }
 
       // Step 1: Enhanced query planning first
-      await this.streamManager.sendEvent('progress', { 
-        stage: 'planning', 
-        message: 'Analyzing query complexity and optimizing strategy...' 
-      });
+      await this.streamManager.sendProgressWithEstimate('planning', undefined, 10, 2000);
 
       const enhancedQueryPlan = queryPlan || planQuery(message, userProfile.timezone);
       
@@ -65,10 +59,7 @@ export class OptimizedRagPipeline {
       });
 
       // Step 2: Check enhanced cache after planning
-      await this.streamManager.sendEvent('progress', { 
-        stage: 'cache_check', 
-        message: 'Checking intelligent cache...' 
-      });
+      await this.streamManager.sendProgressWithEstimate('cache_check', undefined, 20, 1500);
 
       // Phase 3: Enhanced caching with intelligent TTL
       const cacheKey = EnhancedCache.generateIntelligentKey(
@@ -87,23 +78,12 @@ export class OptimizedRagPipeline {
       });
       
       // Step 3: Generate embedding with better feedback
-      await this.streamManager.sendEvent('progress', { 
-        stage: 'embedding', 
-        message: 'Generating semantic embedding for optimal search...' 
-      });
+      await this.streamManager.sendProgressWithEstimate('embedding', undefined, 30, 3000);
 
       const embeddingPromise = OptimizedApiClient.getEmbedding(message, this.openaiApiKey);
 
       // Step 4: Execute parallel search by default (Phase 1 optimization)
-      await this.streamManager.sendEvent('progress', { 
-        stage: 'search_start', 
-        message: 'Executing parallel vector + SQL search for maximum speed...',
-        data: { 
-          strategy: enhancedQueryPlan.strategy,
-          searchMethod: 'parallel',
-          optimization: 'dual_search_enabled'
-        }
-      });
+      await this.streamManager.sendProgressWithEstimate('search_start', undefined, 50, 4000);
 
       const queryEmbedding = await embeddingPromise;
 
@@ -115,10 +95,7 @@ export class OptimizedRagPipeline {
       const { vectorResults, sqlResults, combinedResults } = searchResults;
 
       // Step 5: Generate response with streaming
-      await this.streamManager.sendEvent('progress', { 
-        stage: 'response_generation', 
-        message: 'Generating AI response...' 
-      });
+      await this.streamManager.sendProgressWithEstimate('response_generation', undefined, 80, 5000);
 
       const isAnalyticalQuery = enhancedQueryPlan.expectedResponseType === 'analysis' ||
         /\b(pattern|trend|when do|what time|how often|frequency|usually|typically|statistics|insights|breakdown|analysis)\b/i.test(message);
@@ -186,20 +163,14 @@ export class OptimizedRagPipeline {
 
     } catch (error) {
       console.error('[OptimizedPipeline] Error:', error);
-      await this.streamManager.sendEvent('error', { 
-        message: error.message,
-        stage: 'pipeline_error' 
-      });
+      await this.streamManager.sendProgressWithEstimate('error', 'Something went wrong, please try again');
     }
   }
 
   private async executeParallelSearchWithStreaming(
     userId: string, queryEmbedding: number[], queryPlan: any, message: string
   ): Promise<any> {
-    await this.streamManager.sendEvent('progress', { 
-      stage: 'parallel_search', 
-      message: 'Executing parallel vector and SQL search...' 
-    });
+    await this.streamManager.sendProgressWithEstimate('parallel_search', undefined, 60, 3000);
 
     const searchResults = await DualSearchOrchestrator.executeParallelSearch(
       this.supabaseClient, userId, queryEmbedding, queryPlan, message
@@ -218,10 +189,7 @@ export class OptimizedRagPipeline {
   private async executeSequentialSearchWithStreaming(
     userId: string, queryEmbedding: number[], queryPlan: any, message: string
   ): Promise<any> {
-    await this.streamManager.sendEvent('progress', { 
-      stage: 'vector_search', 
-      message: 'Executing vector search...' 
-    });
+    await this.streamManager.sendProgressWithEstimate('vector_search', undefined, 55, 2500);
 
     // Note: Would need to modify DualSearchOrchestrator to support mid-process callbacks
     const searchResults = await DualSearchOrchestrator.executeSequentialSearch(
