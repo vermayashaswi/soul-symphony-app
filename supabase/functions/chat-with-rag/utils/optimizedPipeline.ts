@@ -1,7 +1,7 @@
 import { OptimizedApiClient } from './optimizedApiClient.ts';
 import { DualSearchOrchestrator } from './dualSearchOrchestrator.ts';
 import { generateResponse, generateSystemPrompt, generateUserPrompt } from './responseGenerator.ts';
-import { planQuery } from './queryPlanner.ts';
+
 import { SSEStreamManager } from './streamingResponseManager.ts';
 import { BackgroundTaskManager } from './backgroundTaskManager.ts';
 import { SmartCache } from './smartCache.ts';
@@ -45,13 +45,37 @@ export class OptimizedRagPipeline {
         return;
       }
 
-      // Step 2: Query planning
+      // Step 2: Query planning with GPT
       await this.streamManager.sendEvent('progress', { 
         stage: 'planning', 
         message: 'Analyzing query and planning search strategy...' 
       });
 
-      const enhancedQueryPlan = queryPlan || planQuery(message, userProfile.timezone);
+      let enhancedQueryPlan = queryPlan;
+      
+      if (!enhancedQueryPlan) {
+        try {
+          const { data: plannerResult, error } = await this.supabaseClient.functions.invoke('smart-query-planner', {
+            body: { 
+              userMessage: message, 
+              conversationContext,
+              userProfile 
+            }
+          });
+          
+          if (error) throw error;
+          enhancedQueryPlan = plannerResult;
+        } catch (error) {
+          console.error('[OptimizedPipeline] GPT query planner failed, using fallback:', error);
+          enhancedQueryPlan = {
+            strategy: 'intelligent_sub_query',
+            complexity: 'moderate',
+            searchStrategy: 'hybrid',
+            useVector: true,
+            useSQL: true
+          };
+        }
+      }
       
       // Step 3: Generate embedding (parallel with planning if possible)
       await this.streamManager.sendEvent('progress', { 

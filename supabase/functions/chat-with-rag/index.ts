@@ -4,14 +4,13 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.7.1';
 import { OptimizedApiClient } from './utils/optimizedApiClient.ts';
 import { DualSearchOrchestrator } from './utils/dualSearchOrchestrator.ts';
 import { generateResponse, generateSystemPrompt, generateUserPrompt } from './utils/responseGenerator.ts';
-import { planQuery } from './utils/queryPlanner.ts';
 import { createStreamingResponse, SSEStreamManager } from './utils/streamingResponseManager.ts';
 import { BackgroundTaskManager } from './utils/backgroundTaskManager.ts';
 import { SmartCache } from './utils/smartCache.ts';
 import { OptimizedRagPipeline } from './utils/optimizedPipeline.ts';
 import { PerformanceOptimizer } from './utils/performanceOptimizer.ts';
 import { determineResponseFormat, generateSystemPromptWithFormat, combineSubQuestionResults } from './utils/dynamicResponseFormatter.ts';
-import { generateSubQuestions, shouldGenerateMultipleSubQuestions } from './utils/enhancedSubQuestionGenerator.ts';
+import { shouldGenerateMultipleSubQuestions } from './utils/enhancedSubQuestionGenerator.ts';
 import { SearchDebugger } from './utils/searchDebugger.ts';
 
 const corsHeaders = {
@@ -109,11 +108,38 @@ serve(async (req) => {
       });
     }
 
-    // Enhanced query planning with dual search support
+    // Enhanced query planning with GPT-based planning
     const planningTimer = PerformanceOptimizer.startTimer('query_planning');
-    const enhancedQueryPlan = queryPlan || planQuery(message, userProfile.timezone);
-    PerformanceOptimizer.endTimer(planningTimer, 'query_planning');
+    let enhancedQueryPlan = queryPlan;
     
+    if (!enhancedQueryPlan) {
+      try {
+        console.log('[chat-with-rag] Calling GPT-based smart query planner...');
+        const { data: plannerResult, error } = await supabaseClient.functions.invoke('smart-query-planner', {
+          body: { 
+            userMessage: message, 
+            conversationContext,
+            userProfile 
+          }
+        });
+        
+        if (error) throw error;
+        enhancedQueryPlan = plannerResult;
+        console.log('[chat-with-rag] GPT query planner result:', plannerResult.strategy);
+      } catch (error) {
+        console.error('[chat-with-rag] GPT query planner failed, using fallback:', error);
+        // Fallback to simple plan
+        enhancedQueryPlan = {
+          strategy: 'intelligent_sub_query',
+          complexity: 'moderate',
+          searchStrategy: 'hybrid',
+          useVector: true,
+          useSQL: true
+        };
+      }
+    }
+    
+    PerformanceOptimizer.endTimer(planningTimer, 'query_planning');
     console.log(`[chat-with-rag] Query plan strategy: ${enhancedQueryPlan.strategy}, complexity: ${enhancedQueryPlan.complexity}`);
 
     // Generate embedding with optimization and debugging
@@ -158,13 +184,44 @@ serve(async (req) => {
     // ENHANCED: Dynamic response formatting based on query complexity
     const formatTimer = PerformanceOptimizer.startTimer('format_determination');
     
-    // Enhanced sub-question generation for complex queries
+    // Enhanced sub-question generation using GPT
     const shouldGenerateMultiple = shouldGenerateMultipleSubQuestions(message, enhancedQueryPlan);
     let actualSubQuestions = [];
+    let themeEmotionData = null;
     
     if (shouldGenerateMultiple) {
-      actualSubQuestions = generateSubQuestions(message, enhancedQueryPlan, conversationContext);
-      console.log(`[chat-with-rag] Generated ${actualSubQuestions.length} sub-questions for complex analysis`);
+      try {
+        console.log('[chat-with-rag] Calling GPT sub-question generator...');
+        const { data: subQuestionResult, error: subQuestionError } = await supabaseClient.functions.invoke('gpt-sub-question-generator', {
+          body: { 
+            userMessage: message, 
+            conversationContext,
+            userPatterns: userProfile 
+          }
+        });
+        
+        if (subQuestionError) throw subQuestionError;
+        actualSubQuestions = subQuestionResult.subQuestions || [];
+        console.log(`[chat-with-rag] GPT generated ${actualSubQuestions.length} sub-questions for complex analysis`);
+        
+        // Also call theme-emotion selector for enhanced context
+        const { data: themeEmotionResult, error: themeEmotionError } = await supabaseClient.functions.invoke('gpt-theme-emotion-selector', {
+          body: { 
+            subQuestions: actualSubQuestions,
+            userQuery: message,
+            userContext: conversationContext 
+          }
+        });
+        
+        if (!themeEmotionError && themeEmotionResult) {
+          themeEmotionData = themeEmotionResult;
+          console.log(`[chat-with-rag] GPT identified ${themeEmotionResult.themes?.length || 0} themes and ${themeEmotionResult.emotions?.length || 0} emotions`);
+        }
+        
+      } catch (error) {
+        console.error('[chat-with-rag] GPT sub-question generation failed, using fallback:', error);
+        actualSubQuestions = [{ question: message, type: 'specific', priority: 1, searchStrategy: 'hybrid' }];
+      }
     } else {
       actualSubQuestions = [{ question: message, type: 'specific', priority: 1, searchStrategy: 'hybrid' }];
     }
