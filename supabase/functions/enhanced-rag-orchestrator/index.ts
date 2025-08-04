@@ -159,34 +159,40 @@ async function executeSearchQueries(queryPlans: any[], selections: any, userId: 
     try {
       let result;
       
-      switch (plan.searchMethod) {
-        case 'vector_similarity':
-          result = await executeVectorSearch(plan, userId, supabase);
-          break;
-        case 'sql_query':
-          result = await executeSQLSearch(plan, selections, userId, supabase);
-          break;
-        case 'hybrid_search':
-          result = await executeHybridSearch(plan, selections, userId, supabase);
-          break;
-        case 'emotion_analysis':
-          result = await executeEmotionSearch(plan, selections, userId, supabase);
-          break;
-        default:
-          result = await executeFallbackSearch(plan, userId, supabase);
+      // Check if plan has sqlQueries array (from smart-query-planner)
+      if (plan.searchPlan?.sqlQueries && Array.isArray(plan.searchPlan.sqlQueries)) {
+        result = await executeSQLRPCQueries(plan.searchPlan.sqlQueries, userId, supabase);
+      } else {
+        // Handle legacy search methods
+        switch (plan.searchMethod) {
+          case 'vector_similarity':
+            result = await executeVectorSearch(plan, userId, supabase);
+            break;
+          case 'sql_query':
+            result = await executeSQLSearch(plan, selections, userId, supabase);
+            break;
+          case 'hybrid_search':
+            result = await executeHybridSearch(plan, selections, userId, supabase);
+            break;
+          case 'emotion_analysis':
+            result = await executeEmotionSearch(plan, selections, userId, supabase);
+            break;
+          default:
+            result = await executeFallbackSearch(plan, userId, supabase);
+        }
       }
 
       searchResults.push({
-        planId: plan.subQuestionId,
-        method: plan.searchMethod,
+        planId: plan.subQuestionId || plan.question,
+        method: plan.searchMethod || 'sql_rpc',
         entries: result.entries || [],
         metadata: result.metadata || {}
       });
 
     } catch (error) {
-      console.error(`Search error for plan ${plan.subQuestionId}:`, error);
+      console.error(`Search error for plan ${plan.subQuestionId || plan.question}:`, error);
       searchResults.push({
-        planId: plan.subQuestionId,
+        planId: plan.subQuestionId || plan.question,
         method: 'fallback',
         entries: [],
         error: error.message
@@ -195,6 +201,50 @@ async function executeSearchQueries(queryPlans: any[], selections: any, userId: 
   }
 
   return searchResults;
+}
+
+async function executeSQLRPCQueries(sqlQueries: any[], userId: string, supabase: any) {
+  const allEntries = [];
+  const metadata = { method: 'sql_rpc', functions_called: [] };
+
+  for (const sqlQuery of sqlQueries) {
+    try {
+      const { function: functionName, parameters } = sqlQuery;
+      
+      // Replace placeholder user_id with actual userId
+      const actualParameters = { ...parameters };
+      if (actualParameters.user_id === 'user_id_placeholder') {
+        actualParameters.user_id = userId;
+      }
+      if (actualParameters.user_id_filter === 'user_id_placeholder') {
+        actualParameters.user_id_filter = userId;
+      }
+      if (actualParameters.user_id_param === 'user_id_placeholder') {
+        actualParameters.user_id_param = userId;
+      }
+
+      console.log(`Calling RPC function: ${functionName} with params:`, actualParameters);
+      
+      const { data, error } = await supabase.rpc(functionName, actualParameters);
+      
+      if (error) {
+        console.error(`RPC function ${functionName} error:`, error);
+        metadata.functions_called.push({ function: functionName, status: 'error', error: error.message });
+        continue;
+      }
+
+      if (data && Array.isArray(data)) {
+        allEntries.push(...data);
+        metadata.functions_called.push({ function: functionName, status: 'success', count: data.length });
+      }
+
+    } catch (error) {
+      console.error(`Error executing SQL RPC query:`, error);
+      metadata.functions_called.push({ function: sqlQuery.function, status: 'error', error: error.message });
+    }
+  }
+
+  return { entries: allEntries, metadata };
 }
 
 async function executeVectorSearch(plan: any, userId: string, supabase: any) {
