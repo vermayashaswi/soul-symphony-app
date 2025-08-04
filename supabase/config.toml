@@ -71,3 +71,16 @@ verify_jwt = true
 
 [functions.revenuecat-purchase]
 verify_jwt = true
+
+# Enhanced GPT-driven RAG pipeline functions
+[functions.gpt-analysis-orchestrator]
+verify_jwt = true
+
+[functions.gpt-response-consolidator]
+verify_jwt = true
+
+[functions.chat-with-rag]
+verify_jwt = true
+
+[functions.smart-query-planner]
+verify_jwt = true

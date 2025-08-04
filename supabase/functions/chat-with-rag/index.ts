@@ -109,9 +109,37 @@ serve(async (req) => {
       });
     }
 
-    // Enhanced query planning with dual search support
+    // ENHANCED: Use GPT-powered query planning via smart-query-planner
     const planningTimer = PerformanceOptimizer.startTimer('query_planning');
-    const enhancedQueryPlan = queryPlan || planQuery(message, userProfile.timezone);
+    let enhancedQueryPlan;
+    
+    try {
+      // Call the smart-query-planner edge function for GPT-driven planning
+      const { data: gptPlan, error: plannerError } = await supabaseClient.functions.invoke(
+        'smart-query-planner',
+        {
+          body: {
+            message,
+            userId: requestUserId,
+            conversationContext,
+            userProfile,
+            timeRange: userProfile.timeRange || null
+          }
+        }
+      );
+      
+      if (plannerError) {
+        console.warn('[chat-with-rag] GPT planner error, falling back to local planning:', plannerError);
+        enhancedQueryPlan = queryPlan || planQuery(message, userProfile.timezone);
+      } else {
+        enhancedQueryPlan = gptPlan.queryPlan;
+        console.log('[chat-with-rag] Using GPT-generated query plan:', enhancedQueryPlan);
+      }
+    } catch (error) {
+      console.warn('[chat-with-rag] GPT planner unavailable, using local planning:', error);
+      enhancedQueryPlan = queryPlan || planQuery(message, userProfile.timezone);
+    }
+    
     PerformanceOptimizer.endTimer(planningTimer, 'query_planning');
     
     console.log(`[chat-with-rag] Query plan strategy: ${enhancedQueryPlan.strategy}, complexity: ${enhancedQueryPlan.complexity}`);
@@ -155,63 +183,133 @@ serve(async (req) => {
 
     console.log(`[chat-with-rag] Dual search completed: ${combinedResults.length} total results`);
 
-    // ENHANCED: Dynamic response formatting based on query complexity
-    const formatTimer = PerformanceOptimizer.startTimer('format_determination');
+    // ENHANCED: GPT-driven sub-question analysis and response consolidation
+    const analysisTimer = PerformanceOptimizer.startTimer('gpt_analysis');
+    let aiResponse;
+    let finalAnalysisData = {};
+
+    // Check if we should use GPT-driven analysis for complex queries
+    const shouldUseGptAnalysis = enhancedQueryPlan.subQuestions && enhancedQueryPlan.subQuestions.length > 1;
     
-    // Enhanced sub-question generation for complex queries
-    const shouldGenerateMultiple = shouldGenerateMultipleSubQuestions(message, enhancedQueryPlan);
-    let actualSubQuestions = [];
-    
-    if (shouldGenerateMultiple) {
-      actualSubQuestions = generateSubQuestions(message, enhancedQueryPlan, conversationContext);
-      console.log(`[chat-with-rag] Generated ${actualSubQuestions.length} sub-questions for complex analysis`);
+    if (shouldUseGptAnalysis) {
+      console.log(`[chat-with-rag] Using GPT-driven analysis pipeline for ${enhancedQueryPlan.subQuestions.length} sub-questions`);
+      
+      try {
+        // Step 1: Call GPT Analysis Orchestrator for sub-question analysis
+        const { data: analysisResults, error: analysisError } = await supabaseClient.functions.invoke(
+          'gpt-analysis-orchestrator',
+          {
+            body: {
+              subQuestions: enhancedQueryPlan.subQuestions,
+              userMessage: message,
+              userId: requestUserId,
+              timeRange: enhancedQueryPlan.timeRange
+            }
+          }
+        );
+
+        if (analysisError) {
+          console.warn('[chat-with-rag] Analysis orchestrator error, falling back to simple response:', analysisError);
+          throw new Error('Analysis orchestrator failed');
+        }
+
+        // Step 2: Call GPT Response Consolidator to synthesize the results
+        const { data: consolidationResult, error: consolidationError } = await supabaseClient.functions.invoke(
+          'gpt-response-consolidator',
+          {
+            body: {
+              userMessage: message,
+              analysisResults: analysisResults.analysisResults,
+              conversationContext,
+              userProfile,
+              streamingMode: false
+            }
+          }
+        );
+
+        if (consolidationError) {
+          console.warn('[chat-with-rag] Response consolidator error, falling back to simple response:', consolidationError);
+          throw new Error('Response consolidator failed');
+        }
+
+        aiResponse = consolidationResult.response;
+        finalAnalysisData = {
+          gptDrivenAnalysis: true,
+          subQuestionAnalysis: analysisResults.summary,
+          consolidationMetadata: consolidationResult.analysisMetadata
+        };
+
+        console.log('[chat-with-rag] Successfully completed GPT-driven analysis pipeline');
+
+      } catch (gptError) {
+        console.warn('[chat-with-rag] GPT analysis pipeline failed, falling back to traditional approach:', gptError);
+        
+        // Fallback to traditional approach
+        const responseFormat = determineResponseFormat(message, enhancedQueryPlan, conversationContext, []);
+        const contextData = combinedResults.length > 0 ? 
+          combinedResults.map(entry => ({
+            content: entry.content,
+            created_at: entry.created_at,
+            themes: entry.master_themes || [],
+            emotions: entry.emotions || {},
+            searchMethod: entry.searchMethod || 'dual'
+          })).slice(0, 20).map(entry => 
+            `Entry (${entry.created_at}): ${entry.content?.slice(0, 300) || 'No content'} [Themes: ${entry.themes.join(', ')}] [Search: ${entry.searchMethod}]`
+          ).join('\n\n') :
+          'No relevant entries found.';
+        
+        const systemPrompt = generateSystemPromptWithFormat(responseFormat, message, contextData, enhancedQueryPlan);
+        const userPrompt = generateUserPrompt(message, combinedResults, 'dual vector + SQL');
+        
+        aiResponse = await generateResponse(
+          systemPrompt,
+          userPrompt,
+          conversationContext,
+          openaiApiKey,
+          responseFormat.complexity !== 'simple'
+        );
+
+        finalAnalysisData = {
+          gptDrivenAnalysis: false,
+          fallbackReason: gptError.message,
+          traditionalApproach: true
+        };
+      }
     } else {
-      actualSubQuestions = [{ question: message, type: 'specific', priority: 1, searchStrategy: 'hybrid' }];
+      // Simple query - use traditional approach
+      console.log('[chat-with-rag] Using traditional response generation for simple query');
+      
+      const responseFormat = determineResponseFormat(message, enhancedQueryPlan, conversationContext, []);
+      const contextData = combinedResults.length > 0 ? 
+        combinedResults.map(entry => ({
+          content: entry.content,
+          created_at: entry.created_at,
+          themes: entry.master_themes || [],
+          emotions: entry.emotions || {},
+          searchMethod: entry.searchMethod || 'dual'
+        })).slice(0, 20).map(entry => 
+          `Entry (${entry.created_at}): ${entry.content?.slice(0, 300) || 'No content'} [Themes: ${entry.themes.join(', ')}] [Search: ${entry.searchMethod}]`
+        ).join('\n\n') :
+        'No relevant entries found.';
+      
+      const systemPrompt = generateSystemPromptWithFormat(responseFormat, message, contextData, enhancedQueryPlan);
+      const userPrompt = generateUserPrompt(message, combinedResults, 'dual vector + SQL');
+      
+      aiResponse = await generateResponse(
+        systemPrompt,
+        userPrompt,
+        conversationContext,
+        openaiApiKey,
+        responseFormat.complexity !== 'simple'
+      );
+
+      finalAnalysisData = {
+        gptDrivenAnalysis: false,
+        simpleQuery: true
+      };
     }
     
-    // Create sub-question results for format determination
-    const mockSubResults = actualSubQuestions.map(q => ({ 
-      context: 'mock', 
-      subQuestion: typeof q === 'string' ? { question: q } : q 
-    }));
-    const responseFormat = determineResponseFormat(message, enhancedQueryPlan, conversationContext, mockSubResults);
-    
-    PerformanceOptimizer.endTimer(formatTimer, 'format_determination');
-    
-    console.log(`[chat-with-rag] Using ${responseFormat.formatType} format with complexity: ${responseFormat.complexity}`);
-
-    // Generate enhanced prompts with dynamic formatting
-    const promptTimer = PerformanceOptimizer.startTimer('prompt_generation');
-    
-    // Combine results into structured context for multi-question scenarios
-    const contextData = combinedResults.length > 0 ? 
-      combinedResults.map(entry => ({
-        content: entry.content,
-        created_at: entry.created_at,
-        themes: entry.master_themes || [],
-        emotions: entry.emotions || {},
-        searchMethod: entry.searchMethod || 'dual'
-      })).slice(0, 20).map(entry => 
-        `Entry (${entry.created_at}): ${entry.content?.slice(0, 300) || 'No content'} [Themes: ${entry.themes.join(', ')}] [Search: ${entry.searchMethod}]`
-      ).join('\n\n') :
-      'No relevant entries found.';
-    
-    const systemPrompt = generateSystemPromptWithFormat(responseFormat, message, contextData, enhancedQueryPlan);
-    const userPrompt = generateUserPrompt(message, combinedResults, 'dual vector + SQL');
-    
-    PerformanceOptimizer.endTimer(promptTimer, 'prompt_generation');
-
-    // Generate response with enhanced formatting
-    const responseTimer = PerformanceOptimizer.startTimer('ai_response');
-    console.log(`[chat-with-rag] Generating ${responseFormat.formatType} response with dual search results`);
-    const aiResponse = await generateResponse(
-      systemPrompt,
-      userPrompt,
-      conversationContext,
-      openaiApiKey,
-      responseFormat.complexity !== 'simple'
-    );
-    PerformanceOptimizer.endTimer(responseTimer, 'ai_response');
+    PerformanceOptimizer.endTimer(analysisTimer, 'gpt_analysis');
 
     processingTime = PerformanceOptimizer.endTimer(globalTimer, 'total_request');
 
@@ -221,19 +319,16 @@ serve(async (req) => {
       analysis: {
         queryPlan: enhancedQueryPlan,
         searchMethod: `dual_${searchMethod}`,
-        responseFormat: responseFormat,
         resultsBreakdown: {
           vector: vectorResults.length,
           sql: sqlResults.length,
           combined: combinedResults.length
         },
-        isAnalyticalQuery: responseFormat.complexity !== 'simple',
         processingTime,
-        enhancedFormatting: responseFormat.useStructuredFormat,
-        multiQuestionGeneration: enhancedQueryPlan.subQuestions?.length > 1,
         dualSearchEnabled: true,
         fromCache: false,
-        performanceReport: PerformanceOptimizer.getPerformanceReport()
+        performanceReport: PerformanceOptimizer.getPerformanceReport(),
+        ...finalAnalysisData
       },
       referenceEntries: combinedResults.slice(0, 8).map(entry => ({
         id: entry.id,
