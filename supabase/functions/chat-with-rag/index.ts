@@ -97,7 +97,8 @@ serve(async (req) => {
     
     const { data: queryPlan, error: planError } = await supabaseClient.functions.invoke('smart-query-planner', {
       body: { 
-        userMessage: message, 
+        message: message, 
+        userId: requestUserId,
         conversationContext,
         userProfile 
       }
