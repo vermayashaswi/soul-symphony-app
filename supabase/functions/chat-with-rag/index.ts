@@ -210,8 +210,7 @@ async function processStreamingPipeline(
     }
     
     // Step 2: Analysis orchestration with status updates
-    streamManager.sendUserMessage("Searching through your journal entries");
-    streamManager.sendBackendTask("analysis_orchestration", "Running analysis on journal data");
+    streamManager.sendBackendTask("Searching your journal...", "Looking through journal entries");
     
     const { data: analysisResults, error: analysisError } = await supabaseClient.functions.invoke(
       'gpt-analysis-orchestrator',
@@ -229,9 +228,10 @@ async function processStreamingPipeline(
       throw new Error(`Analysis orchestrator failed: ${analysisError.message}`);
     }
 
+    streamManager.sendBackendTask("Journal analysis complete", "Processing insights");
+
     // Step 3: Response consolidation with status updates
-    streamManager.sendUserMessage("Crafting your personalized insights now");
-    streamManager.sendBackendTask("response_consolidation", "Synthesizing analysis into personalized response");
+    streamManager.sendBackendTask("Crafting your response...", "Generating personalized insights");
     
     const { data: consolidationResult, error: consolidationError } = await supabaseClient.functions.invoke(
       'gpt-response-consolidator',

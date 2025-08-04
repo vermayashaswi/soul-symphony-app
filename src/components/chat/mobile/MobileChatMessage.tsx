@@ -25,14 +25,22 @@ interface MobileChatMessageProps {
   };
   showAnalysis?: boolean;
   isLoading?: boolean;
+  streamingMessage?: string;
+  showStreamingDots?: boolean;
 }
 
-const MobileChatMessage: React.FC<MobileChatMessageProps> = ({ message, showAnalysis = false, isLoading = false }) => {
+const MobileChatMessage: React.FC<MobileChatMessageProps> = ({ 
+  message, 
+  showAnalysis = false, 
+  isLoading = false, 
+  streamingMessage,
+  showStreamingDots = false 
+}) => {
   const [showReferences, setShowReferences] = useState(false);
   const { user } = useAuth();
   
-  // Show typing indicator for loading state
-  if (isLoading) {
+  // Show typing indicator for basic loading state (when no streaming message)
+  if (isLoading && !streamingMessage) {
     return (
       <motion.div 
         initial={{ opacity: 0, y: 10 }}
@@ -41,6 +49,53 @@ const MobileChatMessage: React.FC<MobileChatMessageProps> = ({ message, showAnal
         className="mb-3"
       >
         <TypingIndicator className="justify-start" />
+      </motion.div>
+    );
+  }
+  
+  // Show streaming message with pulsating dots
+  if (streamingMessage) {
+    return (
+      <motion.div 
+        initial={{ opacity: 0, y: 10 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.3 }}
+        className="relative flex items-start gap-2 justify-start mb-3"
+      >
+        <div className="border border-primary/20 rounded-full">
+          <ParticleAvatar className="w-8 h-8" size={32} />
+        </div>
+        
+        <div className="min-w-0 max-w-[85%] rounded-2xl rounded-tl-none p-3.5 text-sm shadow-sm bg-muted/60 border border-border/50">
+          <div className="flex items-center gap-2">
+            <span className="text-muted-foreground">{streamingMessage}</span>
+            {showStreamingDots && (
+              <div className="flex space-x-1">
+                <div 
+                  className="w-1.5 h-1.5 bg-muted-foreground rounded-full animate-pulse"
+                  style={{
+                    animationDelay: '0ms',
+                    animationDuration: '1.4s'
+                  }}
+                />
+                <div 
+                  className="w-1.5 h-1.5 bg-muted-foreground rounded-full animate-pulse"
+                  style={{
+                    animationDelay: '200ms',
+                    animationDuration: '1.4s'
+                  }}
+                />
+                <div 
+                  className="w-1.5 h-1.5 bg-muted-foreground rounded-full animate-pulse"
+                  style={{
+                    animationDelay: '400ms',
+                    animationDuration: '1.4s'
+                  }}
+                />
+              </div>
+            )}
+          </div>
+        </div>
       </motion.div>
     );
   }

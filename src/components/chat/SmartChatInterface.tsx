@@ -34,7 +34,6 @@ import { useDebugLog } from "@/utils/debug/DebugContext";
 import { TranslatableText } from "@/components/translation/TranslatableText";
 import { useChatMessageClassification, QueryCategory } from "@/hooks/use-chat-message-classification";
 import { useStreamingChat } from "@/hooks/useStreamingChat";
-import StreamingStatusDisplay from "./StreamingStatusDisplay";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -865,13 +864,7 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({
           />
         )}
         
-        {/* Streaming status display */}
-        <StreamingStatusDisplay
-          isStreaming={isStreaming}
-          currentUserMessage={currentUserMessage}
-          showBackendAnimation={showBackendAnimation}
-          streamingMessages={streamingMessages}
-        />
+        {/* Legacy streaming display removed - now integrated into message flow */}
       </div>
       
       <div className="chat-input-container bg-white border-t p-4">

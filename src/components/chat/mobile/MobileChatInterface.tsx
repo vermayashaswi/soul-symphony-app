@@ -21,7 +21,6 @@ import { useChatRealtime } from "@/hooks/use-chat-realtime";
 import { updateThreadProcessingStatus, generateThreadTitle } from "@/utils/chat/threadUtils";
 import { useKeyboardDetection } from "@/hooks/use-keyboard-detection";
 import { useStreamingChat } from "@/hooks/useStreamingChat";
-import StreamingStatusDisplay from "../StreamingStatusDisplay";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -709,7 +708,20 @@ export default function MobileChatInterface({
               />
             ))}
             
-            {(isLoading || isProcessing) && (
+            {/* Show streaming status or basic loading */}
+            {isStreaming ? (
+              <MobileChatMessage 
+                message={{ role: 'assistant', content: '' }}
+                streamingMessage={
+                  streamingMessages.length > 0 
+                    ? streamingMessages[streamingMessages.length - 1].task || 
+                      streamingMessages[streamingMessages.length - 1].message ||
+                      "Processing..."
+                    : "Analyzing your request..."
+                }
+                showStreamingDots={showBackendAnimation}
+              />
+            ) : (isLoading || isProcessing) && (
               <MobileChatMessage 
                 message={{ role: 'assistant', content: '' }}
                 isLoading={true}
@@ -718,13 +730,7 @@ export default function MobileChatInterface({
           </div>
         )}
         
-        {/* Streaming status display */}
-        <StreamingStatusDisplay
-          isStreaming={isStreaming}
-          currentUserMessage={currentUserMessage}
-          showBackendAnimation={showBackendAnimation}
-          streamingMessages={streamingMessages}
-        />
+        {/* Legacy streaming display removed - now integrated into message flow */}
         
         <div ref={messagesEndRef} />
       </div>
