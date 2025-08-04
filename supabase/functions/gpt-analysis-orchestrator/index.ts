@@ -44,7 +44,7 @@ Available search methods:
 2. SQL_QUERY: Structured data queries for entities, themes, emotions, dates (best for factual, statistical, or time-based queries)  
 3. HYBRID: Both vector and SQL search (best for complex queries needing both semantic and structured data)
 
-Available SQL query types:
+Available SQL query types (with EXACT parameter names):
 - get_top_emotions_with_entries(user_id_param, start_date, end_date, limit_count)
 - get_top_entities_with_entries(user_id_param, start_date, end_date, limit_count) 
 - get_theme_statistics(user_id_filter, start_date, end_date, limit_count)
@@ -52,6 +52,13 @@ Available SQL query types:
 - match_journal_entries_by_theme(theme_query, user_id_filter, match_threshold, match_count, start_date, end_date)
 - match_journal_entries_by_emotion(emotion_name, user_id_filter, min_score, start_date, end_date, limit_count)
 - match_journal_entries_by_entities(entity_queries, user_id_filter, match_threshold, match_count, start_date, end_date)
+
+CRITICAL PARAMETER MAPPING:
+- Use "user_id_param" ONLY for: get_top_emotions_with_entries, get_top_entities_with_entries
+- Use "user_id_filter" for ALL other functions
+- Use "match_threshold" and "match_count" for theme/entity matching functions
+- Use "min_score" for emotion matching functions
+- Use "limit_count" for statistics functions
 
 Respond with a JSON object containing:
 {
@@ -265,41 +272,42 @@ Focus on extracting specific entities, emotions, or themes mentioned in the sub-
                 results.error = `SQL Error: ${sqlError.message}`;
                 
                 // Fallback to vector search if SQL fails
-                if (analysisPlan.vectorQuery) {
-                  console.log('Attempting fallback to vector search...');
-                  try {
-                    const vectorResponse = await fetch('https://api.openai.com/v1/embeddings', {
-                      method: 'POST',
-                      headers: {
-                        'Authorization': `Bearer ${openAIApiKey}`,
-                        'Content-Type': 'application/json',
-                      },
-                      body: JSON.stringify({
-                        model: 'text-embedding-3-small',
-                        input: analysisPlan.vectorQuery,
-                      }),
-                    });
+                console.log('Attempting fallback to vector search...');
+                const fallbackQuery = analysisPlan.vectorQuery || subQuestion.question;
+                
+                try {
+                  const vectorResponse = await fetch('https://api.openai.com/v1/embeddings', {
+                    method: 'POST',
+                    headers: {
+                      'Authorization': `Bearer ${openAIApiKey}`,
+                      'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                      model: 'text-embedding-3-small',
+                      input: fallbackQuery,
+                    }),
+                  });
 
-                    const vectorData = await vectorResponse.json();
-                    const embedding = vectorData.data[0].embedding;
+                  const vectorData = await vectorResponse.json();
+                  const embedding = vectorData.data[0].embedding;
 
-                    const { data: fallbackResults, error: fallbackError } = await supabase.rpc(
-                      'match_journal_entries',
-                      {
-                        query_embedding: embedding,
-                        match_threshold: 0.3,
-                        match_count: 5,
-                        user_id_filter: userId
-                      }
-                    );
-
-                    if (!fallbackError) {
-                      results.vectorResults = fallbackResults;
-                      results.error = `SQL failed, used vector search fallback: ${sqlError.message}`;
+                  const { data: fallbackResults, error: fallbackError } = await supabase.rpc(
+                    'match_journal_entries',
+                    {
+                      query_embedding: embedding,
+                      match_threshold: 0.3,
+                      match_count: 5,
+                      user_id_filter: userId
                     }
-                  } catch (fallbackError) {
-                    console.error('Fallback vector search also failed:', fallbackError);
+                  );
+
+                  if (!fallbackError) {
+                    results.vectorResults = fallbackResults;
+                    results.error = `SQL failed, used vector search fallback: ${sqlError.message}`;
                   }
+                } catch (fallbackError) {
+                  console.error('Fallback vector search also failed:', fallbackError);
+                  results.error = `Both SQL and vector search failed: ${sqlError.message}`;
                 }
               } else {
                 results.sqlResults = sqlResults;
