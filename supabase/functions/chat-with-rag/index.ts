@@ -123,6 +123,7 @@ serve(async (req) => {
     const { data: orchestrationResult, error: orchestrationError } = await supabaseClient.functions.invoke('enhanced-rag-orchestrator', {
       body: {
         userMessage: message,
+        userId: requestUserId,
         threadId: requestBody.threadId || 'default',
         conversationContext,
         userProfile,
@@ -193,15 +194,31 @@ serve(async (req) => {
     console.error('[chat-with-rag] Error in unified GPT-driven RAG:', error);
     processingTime = Date.now() - startTime;
 
+    // Provide user-friendly error messages based on error type
+    let userFriendlyMessage = "I'm having trouble analyzing your journal entries right now. Please try again in a moment.";
+    let errorType = 'unified_pipeline_error';
+    
+    if (error.message.includes('Missing required user identification')) {
+      userFriendlyMessage = "I need to verify your identity to access your journal entries. Please try refreshing the page.";
+      errorType = 'authentication_error';
+    } else if (error.message.includes('GPT query planner failed')) {
+      userFriendlyMessage = "I'm having trouble understanding your question right now. Could you try rephrasing it?";
+      errorType = 'query_planning_error';
+    } else if (error.message.includes('Enhanced RAG orchestrator failed')) {
+      userFriendlyMessage = "I'm experiencing some technical difficulties while searching your journal entries. Please try again.";
+      errorType = 'orchestration_error';
+    }
+
     return new Response(JSON.stringify({
-      error: error.message,
-      response: "I apologize, but I encountered an error while analyzing your journal entries. The GPT-driven pipeline requires all components to be working properly.",
+      response: userFriendlyMessage,
       analysis: {
         queryType: 'error',
-        errorType: 'unified_pipeline_error',
+        errorType,
         processingTime,
-        timestamp: new Date().toISOString()
-      }
+        timestamp: new Date().toISOString(),
+        hasError: true
+      },
+      referenceEntries: []
     }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },

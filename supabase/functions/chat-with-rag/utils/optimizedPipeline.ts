@@ -77,6 +77,7 @@ export class OptimizedRagPipeline {
       const { data: orchestrationResult, error: orchestrationError } = await this.supabaseClient.functions.invoke('enhanced-rag-orchestrator', {
         body: {
           userMessage: message,
+          userId: requestUserId,
           threadId: 'streaming',
           conversationContext,
           userProfile,

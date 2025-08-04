@@ -30,11 +30,28 @@ serve(async (req) => {
     const startTime = Date.now();
     const { userMessage, threadId, userId, conversationContext = [] } = await req.json();
     
+    // Validate userId parameter
+    if (!userId) {
+      console.error('[enhanced-rag-orchestrator] Missing userId parameter');
+      return new Response(JSON.stringify({
+        error: 'Missing required user identification',
+        response: "I'm sorry, but I need to verify your identity to access your journal entries. Please try refreshing the page.",
+        analysis: {
+          queryType: 'error',
+          errorType: 'missing_user_id',
+          timestamp: new Date().toISOString()
+        }
+      }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+    
     const supabaseUrl = Deno.env.get('SUPABASE_URL');
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
     const supabase = createClient(supabaseUrl!, supabaseKey!);
 
-    console.log('Starting enhanced RAG orchestration for user:', userId);
+    console.log(`[enhanced-rag-orchestrator] Starting orchestration for user: ${userId}`);
 
     // Step 1: Generate Sub-Questions using GPT
     console.log('Step 1: Generating sub-questions...');
