@@ -1,4 +1,3 @@
-
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.7.1';
@@ -6,7 +5,6 @@ import { OptimizedApiClient } from './utils/optimizedApiClient.ts';
 import { DualSearchOrchestrator } from './utils/dualSearchOrchestrator.ts';
 import { generateResponse, generateSystemPrompt, generateUserPrompt } from './utils/responseGenerator.ts';
 import { planQuery } from './utils/queryPlanner.ts';
-import { RateLimitManager } from '../_shared/rateLimitUtils.ts';
 import { createStreamingResponse, SSEStreamManager } from './utils/streamingResponseManager.ts';
 import { BackgroundTaskManager } from './utils/backgroundTaskManager.ts';
 import { SmartCache } from './utils/smartCache.ts';
@@ -34,26 +32,6 @@ serve(async (req) => {
     // Performance tracking
     const globalTimer = PerformanceOptimizer.startTimer('total_request');
     
-    // Initialize rate limiting
-    const rateLimitManager = new RateLimitManager(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
-    );
-
-    const { userId, ipAddress } = RateLimitManager.getClientInfo(req);
-
-    // Check rate limits
-    const rateLimitCheck = await rateLimitManager.checkRateLimit({
-      userId,
-      ipAddress,
-      functionName: 'chat-with-rag'
-    });
-
-    if (!rateLimitCheck.allowed) {
-      console.log(`[chat-with-rag] Rate limit exceeded for user ${userId || 'anonymous'} from IP ${ipAddress}`);
-      return rateLimitManager.createRateLimitResponse(rateLimitCheck);
-    }
-
     const supabaseClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_ANON_KEY') ?? '',
@@ -92,15 +70,6 @@ serve(async (req) => {
         (async () => {
           try {
             await pipeline.processQuery(requestBody);
-            
-            // Log usage in background
-            BackgroundTaskManager.logApiUsage(rateLimitManager, {
-              userId,
-              ipAddress,
-              functionName: 'chat-with-rag',
-              statusCode: 200,
-              responseTimeMs: PerformanceOptimizer.endTimer(globalTimer, 'total_request')
-            });
           } catch (error) {
             console.error('[chat-with-rag] Streaming pipeline error:', error);
             await streamManager.sendEvent('error', { message: error.message });
@@ -125,16 +94,6 @@ serve(async (req) => {
     if (cachedResult) {
       console.log('[chat-with-rag] Cache hit - returning cached result');
       
-      // Log usage in background
-      BackgroundTaskManager.logApiUsage(rateLimitManager, {
-        userId,
-        ipAddress,
-        functionName: 'chat-with-rag',
-        statusCode: 200,
-        responseTimeMs: PerformanceOptimizer.endTimer(globalTimer, 'total_request'),
-        fromCache: true
-      });
-
       return new Response(JSON.stringify({
         ...cachedResult,
         analysis: {
@@ -259,15 +218,6 @@ serve(async (req) => {
       Promise.resolve(SmartCache.set(cacheKey, finalResponse, 300))
     );
 
-    // Log successful API usage in background
-    BackgroundTaskManager.logApiUsage(rateLimitManager, {
-      userId,
-      ipAddress,
-      functionName: 'chat-with-rag',
-      statusCode,
-      responseTimeMs: processingTime
-    });
-
     console.log(`[chat-with-rag] Enhanced dual search RAG completed in ${processingTime}ms`);
 
     return new Response(JSON.stringify(finalResponse), {
@@ -279,26 +229,6 @@ serve(async (req) => {
     statusCode = 500;
     errorMessage = error.message;
     processingTime = Date.now() - startTime;
-
-    // Log failed API usage
-    try {
-      const rateLimitManager = new RateLimitManager(
-        Deno.env.get('SUPABASE_URL') ?? '',
-        Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
-      );
-      const { userId, ipAddress } = RateLimitManager.getClientInfo(req);
-      
-      await rateLimitManager.logApiUsage({
-        userId,
-        ipAddress,
-        functionName: 'chat-with-rag',
-        statusCode,
-        responseTimeMs: processingTime,
-        errorMessage
-      });
-    } catch (logError) {
-      console.error('[chat-with-rag] Failed to log error usage:', logError);
-    }
 
     return new Response(JSON.stringify({
       error: error.message,

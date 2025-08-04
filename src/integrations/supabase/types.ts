@@ -14,81 +14,6 @@ export type Database = {
   }
   public: {
     Tables: {
-      api_usage: {
-        Row: {
-          created_at: string
-          endpoint: string
-          id: string
-          ip_address: string | null
-          method: string
-          request_size: number | null
-          response_size: number | null
-          response_time_ms: number | null
-          status_code: number | null
-          user_agent: string | null
-          user_id: string | null
-        }
-        Insert: {
-          created_at?: string
-          endpoint: string
-          id?: string
-          ip_address?: string | null
-          method: string
-          request_size?: number | null
-          response_size?: number | null
-          response_time_ms?: number | null
-          status_code?: number | null
-          user_agent?: string | null
-          user_id?: string | null
-        }
-        Update: {
-          created_at?: string
-          endpoint?: string
-          id?: string
-          ip_address?: string | null
-          method?: string
-          request_size?: number | null
-          response_size?: number | null
-          response_time_ms?: number | null
-          status_code?: number | null
-          user_agent?: string | null
-          user_id?: string | null
-        }
-        Relationships: []
-      }
-      auth_errors: {
-        Row: {
-          context: string | null
-          created_at: string | null
-          error_message: string
-          error_type: string
-          id: string
-          resolved: boolean | null
-          updated_at: string | null
-          user_id: string | null
-        }
-        Insert: {
-          context?: string | null
-          created_at?: string | null
-          error_message: string
-          error_type: string
-          id?: string
-          resolved?: boolean | null
-          updated_at?: string | null
-          user_id?: string | null
-        }
-        Update: {
-          context?: string | null
-          created_at?: string | null
-          error_message?: string
-          error_type?: string
-          id?: string
-          resolved?: boolean | null
-          updated_at?: string | null
-          user_id?: string | null
-        }
-        Relationships: []
-      }
       chat_messages: {
         Row: {
           analysis_data: Json | null
@@ -96,7 +21,6 @@ export type Database = {
           created_at: string
           has_numeric_result: boolean | null
           id: string
-          is_processing: boolean | null
           reference_entries: Json | null
           role: string | null
           sender: string
@@ -112,7 +36,6 @@ export type Database = {
           created_at?: string
           has_numeric_result?: boolean | null
           id?: string
-          is_processing?: boolean | null
           reference_entries?: Json | null
           role?: string | null
           sender: string
@@ -128,7 +51,6 @@ export type Database = {
           created_at?: string
           has_numeric_result?: boolean | null
           id?: string
-          is_processing?: boolean | null
           reference_entries?: Json | null
           role?: string | null
           sender?: string
@@ -152,8 +74,6 @@ export type Database = {
         Row: {
           created_at: string
           id: string
-          metadata: Json | null
-          processing_status: string
           title: string
           updated_at: string
           user_id: string
@@ -161,8 +81,6 @@ export type Database = {
         Insert: {
           created_at?: string
           id?: string
-          metadata?: Json | null
-          processing_status?: string
           title: string
           updated_at?: string
           user_id: string
@@ -170,8 +88,6 @@ export type Database = {
         Update: {
           created_at?: string
           id?: string
-          metadata?: Json | null
-          processing_status?: string
           title?: string
           updated_at?: string
           user_id?: string
@@ -334,39 +250,6 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
-      }
-      openai_usage: {
-        Row: {
-          cost_usd: number | null
-          created_at: string
-          id: string
-          model: string
-          request_type: string | null
-          session_id: string | null
-          tokens_used: number
-          user_id: string | null
-        }
-        Insert: {
-          cost_usd?: number | null
-          created_at?: string
-          id?: string
-          model: string
-          request_type?: string | null
-          session_id?: string | null
-          tokens_used: number
-          user_id?: string | null
-        }
-        Update: {
-          cost_usd?: number | null
-          created_at?: string
-          id?: string
-          model?: string
-          request_type?: string | null
-          session_id?: string | null
-          tokens_used?: number
-          user_id?: string | null
-        }
-        Relationships: []
       }
       profiles: {
         Row: {
