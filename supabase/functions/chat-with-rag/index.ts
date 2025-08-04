@@ -2,11 +2,17 @@ import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.7.1';
 import { OptimizedApiClient } from './utils/optimizedApiClient.ts';
+import { DualSearchOrchestrator } from './utils/dualSearchOrchestrator.ts';
+import { generateResponse, generateSystemPrompt, generateUserPrompt } from './utils/responseGenerator.ts';
+import { planQuery } from './utils/queryPlanner.ts';
 import { createStreamingResponse, SSEStreamManager } from './utils/streamingResponseManager.ts';
 import { BackgroundTaskManager } from './utils/backgroundTaskManager.ts';
 import { SmartCache } from './utils/smartCache.ts';
 import { OptimizedRagPipeline } from './utils/optimizedPipeline.ts';
 import { PerformanceOptimizer } from './utils/performanceOptimizer.ts';
+import { determineResponseFormat, generateSystemPromptWithFormat, combineSubQuestionResults } from './utils/dynamicResponseFormatter.ts';
+import { generateSubQuestions, shouldGenerateMultipleSubQuestions } from './utils/enhancedSubQuestionGenerator.ts';
+import { SearchDebugger } from './utils/searchDebugger.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -20,10 +26,13 @@ serve(async (req) => {
 
   const startTime = Date.now();
   let processingTime = 0;
+  let statusCode = 200;
+  let errorMessage: string | undefined;
 
   try {
-    console.log('[chat-with-rag] Starting unified GPT-driven RAG processing');
+    console.log('[chat-with-rag] Starting optimized RAG processing with streaming support');
 
+    // Performance tracking
     const globalTimer = PerformanceOptimizer.startTimer('total_request');
     
     const supabaseClient = createClient(
@@ -47,6 +56,7 @@ serve(async (req) => {
       userId: requestUserId, 
       conversationContext = [], 
       userProfile = {},
+      queryPlan = null,
       streaming = false
     } = requestBody;
 
@@ -75,107 +85,163 @@ serve(async (req) => {
       return response;
     }
 
-    // Check cache first
+    // Traditional non-streaming approach with optimizations
     const cacheTimer = PerformanceOptimizer.startTimer('cache_check');
+    
+    // Check cache first
     const cacheKey = SmartCache.generateKey(message, requestUserId, conversationContext.length);
     const cachedResult = SmartCache.get(cacheKey);
+    
     PerformanceOptimizer.endTimer(cacheTimer, 'cache_check');
     
     if (cachedResult) {
       console.log('[chat-with-rag] Cache hit - returning cached result');
+      
       return new Response(JSON.stringify({
         ...cachedResult,
-        analysis: { ...cachedResult.analysis, fromCache: true }
+        analysis: {
+          ...cachedResult.analysis,
+          fromCache: true,
+          cacheHit: true
+        }
       }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
 
-    // Step 1: GPT Query Planning - Always call, no fallbacks
+    // Enhanced query planning with dual search support
     const planningTimer = PerformanceOptimizer.startTimer('query_planning');
-    console.log('[chat-with-rag] Calling GPT smart query planner...');
-    
-    const { data: queryPlan, error: planError } = await supabaseClient.functions.invoke('smart-query-planner', {
-      body: { 
-        message: message, 
-        userId: requestUserId,
-        conversationContext,
-        userProfile 
-      }
-    });
-    
-    if (planError || !queryPlan) {
-      throw new Error(`GPT query planner failed: ${planError?.message || 'No plan returned'}`);
-    }
-    
+    const enhancedQueryPlan = queryPlan || planQuery(message, userProfile.timezone);
     PerformanceOptimizer.endTimer(planningTimer, 'query_planning');
-    console.log(`[chat-with-rag] Query plan strategy: ${queryPlan.strategy}, complexity: ${queryPlan.complexity}`);
+    
+    console.log(`[chat-with-rag] Query plan strategy: ${enhancedQueryPlan.strategy}, complexity: ${enhancedQueryPlan.complexity}`);
 
-    // Step 2: Generate Embedding
+    // Generate embedding with optimization and debugging
+    SearchDebugger.reset();
     const embeddingTimer = PerformanceOptimizer.startTimer('embedding_generation');
     const queryEmbedding = await OptimizedApiClient.getEmbedding(message, openaiApiKey);
     PerformanceOptimizer.endTimer(embeddingTimer, 'embedding_generation');
+    
+    // Debug query processing
+    SearchDebugger.logQueryProcessing(message, message.trim(), queryEmbedding);
 
-    // Step 3: Execute Enhanced RAG Orchestrator with GPT sub-questions
-    const orchestratorTimer = PerformanceOptimizer.startTimer('enhanced_orchestrator');
-    console.log('[chat-with-rag] Calling enhanced RAG orchestrator...');
+    // Execute optimized dual search
+    const searchTimer = PerformanceOptimizer.startTimer('dual_search');
+    const searchMethod = DualSearchOrchestrator.shouldUseParallelExecution(enhancedQueryPlan) ? 
+      'parallel' : 'sequential';
     
-    const { data: orchestrationResult, error: orchestrationError } = await supabaseClient.functions.invoke('enhanced-rag-orchestrator', {
-      body: {
-        userMessage: message,
-        userId: requestUserId,
-        threadId: requestBody.threadId || 'default',
-        conversationContext,
-        userProfile,
-        queryPlan,
-        queryEmbedding
-      }
+    console.log(`[chat-with-rag] Executing ${searchMethod} dual search`);
+    
+    const searchResults = await PerformanceOptimizer.withConnectionPooling(async () => {
+      return searchMethod === 'parallel' ?
+        await DualSearchOrchestrator.executeParallelSearch(
+          supabaseClient,
+          requestUserId,
+          queryEmbedding,
+          enhancedQueryPlan,
+          message
+        ) :
+        await DualSearchOrchestrator.executeSequentialSearch(
+          supabaseClient,
+          requestUserId,
+          queryEmbedding,
+          enhancedQueryPlan,
+          message
+        );
     });
+
+    const { vectorResults, sqlResults, combinedResults } = searchResults;
+    PerformanceOptimizer.endTimer(searchTimer, 'dual_search');
+
+    console.log(`[chat-with-rag] Dual search completed: ${combinedResults.length} total results`);
+
+    // ENHANCED: Dynamic response formatting based on query complexity
+    const formatTimer = PerformanceOptimizer.startTimer('format_determination');
     
-    if (orchestrationError || !orchestrationResult) {
-      throw new Error(`Enhanced RAG orchestrator failed: ${orchestrationError?.message || 'No result returned'}`);
+    // Enhanced sub-question generation for complex queries
+    const shouldGenerateMultiple = shouldGenerateMultipleSubQuestions(message, enhancedQueryPlan);
+    let actualSubQuestions = [];
+    
+    if (shouldGenerateMultiple) {
+      actualSubQuestions = generateSubQuestions(message, enhancedQueryPlan, conversationContext);
+      console.log(`[chat-with-rag] Generated ${actualSubQuestions.length} sub-questions for complex analysis`);
+    } else {
+      actualSubQuestions = [{ question: message, type: 'specific', priority: 1, searchStrategy: 'hybrid' }];
     }
     
-    PerformanceOptimizer.endTimer(orchestratorTimer, 'enhanced_orchestrator');
+    // Create sub-question results for format determination
+    const mockSubResults = actualSubQuestions.map(q => ({ 
+      context: 'mock', 
+      subQuestion: typeof q === 'string' ? { question: q } : q 
+    }));
+    const responseFormat = determineResponseFormat(message, enhancedQueryPlan, conversationContext, mockSubResults);
+    
+    PerformanceOptimizer.endTimer(formatTimer, 'format_determination');
+    
+    console.log(`[chat-with-rag] Using ${responseFormat.formatType} format with complexity: ${responseFormat.complexity}`);
 
-    const { 
-      subQuestions = [], 
-      queryPlans = [], 
-      searchResults = [], 
-      finalResponse: aiResponse,
-      metadata = {}
-    } = orchestrationResult;
+    // Generate enhanced prompts with dynamic formatting
+    const promptTimer = PerformanceOptimizer.startTimer('prompt_generation');
+    
+    // Combine results into structured context for multi-question scenarios
+    const contextData = combinedResults.length > 0 ? 
+      combinedResults.map(entry => ({
+        content: entry.content,
+        created_at: entry.created_at,
+        themes: entry.master_themes || [],
+        emotions: entry.emotions || {},
+        searchMethod: entry.searchMethod || 'dual'
+      })).slice(0, 20).map(entry => 
+        `Entry (${entry.created_at}): ${entry.content?.slice(0, 300) || 'No content'} [Themes: ${entry.themes.join(', ')}] [Search: ${entry.searchMethod}]`
+      ).join('\n\n') :
+      'No relevant entries found.';
+    
+    const systemPrompt = generateSystemPromptWithFormat(responseFormat, message, contextData, enhancedQueryPlan);
+    const userPrompt = generateUserPrompt(message, combinedResults, 'dual vector + SQL');
+    
+    PerformanceOptimizer.endTimer(promptTimer, 'prompt_generation');
+
+    // Generate response with enhanced formatting
+    const responseTimer = PerformanceOptimizer.startTimer('ai_response');
+    console.log(`[chat-with-rag] Generating ${responseFormat.formatType} response with dual search results`);
+    const aiResponse = await generateResponse(
+      systemPrompt,
+      userPrompt,
+      conversationContext,
+      openaiApiKey,
+      responseFormat.complexity !== 'simple'
+    );
+    PerformanceOptimizer.endTimer(responseTimer, 'ai_response');
 
     processingTime = PerformanceOptimizer.endTimer(globalTimer, 'total_request');
 
-    // Prepare unified final response using GPT orchestration results
+    // Prepare enhanced final response
     const finalResponse = {
       response: aiResponse,
       analysis: {
-        queryPlan,
-        subQuestions,
-        queryPlans,
-        searchMethod: 'enhanced_rag_orchestrator',
+        queryPlan: enhancedQueryPlan,
+        searchMethod: `dual_${searchMethod}`,
+        responseFormat: responseFormat,
         resultsBreakdown: {
-          totalResults: searchResults.length,
-          subQuestions: subQuestions.length,
-          orchestrated: true
+          vector: vectorResults.length,
+          sql: sqlResults.length,
+          combined: combinedResults.length
         },
-        isAnalyticalQuery: queryPlan.expectedResponse === 'analysis',
+        isAnalyticalQuery: responseFormat.complexity !== 'simple',
         processingTime,
-        gptDriven: true,
-        unifiedPipeline: true,
+        enhancedFormatting: responseFormat.useStructuredFormat,
+        multiQuestionGeneration: enhancedQueryPlan.subQuestions?.length > 1,
+        dualSearchEnabled: true,
         fromCache: false,
-        metadata,
         performanceReport: PerformanceOptimizer.getPerformanceReport()
       },
-      referenceEntries: searchResults.slice(0, 8).map(entry => ({
+      referenceEntries: combinedResults.slice(0, 8).map(entry => ({
         id: entry.id,
         content: entry.content?.slice(0, 200) || 'No content',
         created_at: entry.created_at,
-        themes: entry.themes || [],
+        themes: entry.master_themes || [],
         emotions: entry.emotions || {},
-        searchMethod: entry.searchMethod || 'orchestrated'
+        searchMethod: entry.searchMethod || 'combined'
       }))
     };
 
@@ -184,43 +250,28 @@ serve(async (req) => {
       Promise.resolve(SmartCache.set(cacheKey, finalResponse, 300))
     );
 
-    console.log(`[chat-with-rag] Unified GPT-driven RAG completed in ${processingTime}ms`);
+    console.log(`[chat-with-rag] Enhanced dual search RAG completed in ${processingTime}ms`);
 
     return new Response(JSON.stringify(finalResponse), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
 
   } catch (error) {
-    console.error('[chat-with-rag] Error in unified GPT-driven RAG:', error);
+    console.error('[chat-with-rag] Error in enhanced dual search RAG:', error);
+    statusCode = 500;
+    errorMessage = error.message;
     processingTime = Date.now() - startTime;
 
-    // Provide user-friendly error messages based on error type
-    let userFriendlyMessage = "I'm having trouble analyzing your journal entries right now. Please try again in a moment.";
-    let errorType = 'unified_pipeline_error';
-    
-    if (error.message.includes('Missing required user identification')) {
-      userFriendlyMessage = "I need to verify your identity to access your journal entries. Please try refreshing the page.";
-      errorType = 'authentication_error';
-    } else if (error.message.includes('GPT query planner failed')) {
-      userFriendlyMessage = "I'm having trouble understanding your question right now. Could you try rephrasing it?";
-      errorType = 'query_planning_error';
-    } else if (error.message.includes('Enhanced RAG orchestrator failed')) {
-      userFriendlyMessage = "I'm experiencing some technical difficulties while searching your journal entries. Please try again.";
-      errorType = 'orchestration_error';
-    }
-
     return new Response(JSON.stringify({
-      response: userFriendlyMessage,
+      error: error.message,
+      response: "I apologize, but I encountered an error while analyzing your journal entries. Please try again.",
       analysis: {
         queryType: 'error',
-        errorType,
-        processingTime,
-        timestamp: new Date().toISOString(),
-        hasError: true
-      },
-      referenceEntries: []
+        errorType: 'dual_search_error',
+        timestamp: new Date().toISOString()
+      }
     }), {
-      status: 500,
+      status: statusCode,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   }

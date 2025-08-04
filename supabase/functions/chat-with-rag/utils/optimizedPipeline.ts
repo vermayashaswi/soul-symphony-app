@@ -1,4 +1,7 @@
 import { OptimizedApiClient } from './optimizedApiClient.ts';
+import { DualSearchOrchestrator } from './dualSearchOrchestrator.ts';
+import { generateResponse, generateSystemPrompt, generateUserPrompt } from './responseGenerator.ts';
+import { planQuery } from './queryPlanner.ts';
 import { SSEStreamManager } from './streamingResponseManager.ts';
 import { BackgroundTaskManager } from './backgroundTaskManager.ts';
 import { SmartCache } from './smartCache.ts';
@@ -20,10 +23,11 @@ export class OptimizedRagPipeline {
       message, 
       userId: requestUserId, 
       conversationContext = [], 
-      userProfile = {}
+      userProfile = {},
+      queryPlan = null
     } = requestData;
 
-    const timerId = PerformanceOptimizer.startTimer('unified_rag_pipeline');
+    const timerId = PerformanceOptimizer.startTimer('rag_pipeline');
 
     try {
       // Step 1: Check cache first
@@ -41,89 +45,102 @@ export class OptimizedRagPipeline {
         return;
       }
 
-      // Step 2: GPT Query Planning - Required, no fallbacks
+      // Step 2: Query planning
       await this.streamManager.sendEvent('progress', { 
-        stage: 'gpt_planning', 
-        message: 'Calling GPT query planner...' 
+        stage: 'planning', 
+        message: 'Analyzing query and planning search strategy...' 
       });
 
-      const { data: queryPlan, error: planError } = await this.supabaseClient.functions.invoke('smart-query-planner', {
-        body: { 
-          userMessage: message, 
-          conversationContext,
-          userProfile 
-        }
-      });
+      const enhancedQueryPlan = queryPlan || planQuery(message, userProfile.timezone);
       
-      if (planError || !queryPlan) {
-        throw new Error(`GPT query planner failed: ${planError?.message || 'No plan returned'}`);
-      }
-
-      // Step 3: Generate embedding
+      // Step 3: Generate embedding (parallel with planning if possible)
       await this.streamManager.sendEvent('progress', { 
         stage: 'embedding', 
         message: 'Generating query embedding...' 
       });
 
-      const queryEmbedding = await OptimizedApiClient.getEmbedding(message, this.openaiApiKey);
+      const embeddingPromise = OptimizedApiClient.getEmbedding(message, this.openaiApiKey);
 
-      // Step 4: Execute Enhanced RAG Orchestrator
+      // Step 4: Execute search strategy
       await this.streamManager.sendEvent('progress', { 
-        stage: 'enhanced_orchestrator', 
-        message: 'Executing enhanced RAG orchestration...',
-        data: { strategy: queryPlan.strategy }
+        stage: 'search_start', 
+        message: 'Executing optimized search strategy...',
+        data: { strategy: enhancedQueryPlan.strategy }
       });
 
-      const { data: orchestrationResult, error: orchestrationError } = await this.supabaseClient.functions.invoke('enhanced-rag-orchestrator', {
-        body: {
-          userMessage: message,
-          userId: requestUserId,
-          threadId: 'streaming',
-          conversationContext,
-          userProfile,
-          queryPlan,
-          queryEmbedding
-        }
-      });
+      const queryEmbedding = await embeddingPromise;
 
-      if (orchestrationError || !orchestrationResult) {
-        throw new Error(`Enhanced RAG orchestrator failed: ${orchestrationError?.message || 'No result returned'}`);
+      // Choose search method based on query complexity
+      const searchMethod = DualSearchOrchestrator.shouldUseParallelExecution(enhancedQueryPlan) ? 
+        'parallel' : 'sequential';
+
+      let searchResults;
+      if (searchMethod === 'parallel') {
+        // Stream progress for parallel search
+        searchResults = await this.executeParallelSearchWithStreaming(
+          requestUserId, queryEmbedding, enhancedQueryPlan, message
+        );
+      } else {
+        // Stream progress for sequential search
+        searchResults = await this.executeSequentialSearchWithStreaming(
+          requestUserId, queryEmbedding, enhancedQueryPlan, message
+        );
       }
 
-      const { 
-        subQuestions = [], 
-        queryPlans = [], 
-        searchResults = [], 
-        finalResponse: aiResponse,
-        metadata = {}
-      } = orchestrationResult;
+      const { vectorResults, sqlResults, combinedResults } = searchResults;
 
-      // Step 5: Prepare final response
+      // Step 5: Generate response with streaming
+      await this.streamManager.sendEvent('progress', { 
+        stage: 'response_generation', 
+        message: 'Generating AI response...' 
+      });
+
+      const isAnalyticalQuery = enhancedQueryPlan.expectedResponseType === 'analysis' ||
+        /\b(pattern|trend|when do|what time|how often|frequency|usually|typically|statistics|insights|breakdown|analysis)\b/i.test(message);
+
+      const systemPrompt = generateSystemPrompt(
+        userProfile.timezone || 'UTC',
+        enhancedQueryPlan.timeRange,
+        enhancedQueryPlan.expectedResponseType,
+        combinedResults.length,
+        `Dual search analysis: ${vectorResults.length} vector + ${sqlResults.length} SQL results`,
+        conversationContext,
+        false,
+        /\b(I|me|my|myself)\b/i.test(message),
+        enhancedQueryPlan.requiresTimeFilter,
+        'dual'
+      );
+
+      const userPrompt = generateUserPrompt(message, combinedResults, 'dual vector + SQL');
+
+      // Generate response with potential streaming
+      const aiResponse = await this.generateStreamingResponse(
+        systemPrompt, userPrompt, conversationContext, isAnalyticalQuery
+      );
+
+      // Step 6: Prepare final response
       const finalResponse = {
         response: aiResponse,
         analysis: {
-          queryPlan,
-          subQuestions,
-          queryPlans,
-          searchMethod: 'enhanced_rag_orchestrator',
+          queryPlan: enhancedQueryPlan,
+          searchMethod: `dual_${searchMethod}`,
           resultsBreakdown: {
-            totalResults: searchResults.length,
-            subQuestions: subQuestions.length,
-            orchestrated: true
+            vector: vectorResults.length,
+            sql: sqlResults.length,
+            combined: combinedResults.length
           },
-          isAnalyticalQuery: queryPlan.expectedResponse === 'analysis',
-          processingTime: PerformanceOptimizer.endTimer(timerId, 'unified_rag_pipeline'),
-          gptDriven: true,
-          unifiedPipeline: true,
-          metadata
+          isAnalyticalQuery,
+          processingTime: PerformanceOptimizer.endTimer(timerId, 'rag_pipeline'),
+          enhancedFormatting: isAnalyticalQuery,
+          dualSearchEnabled: true
         },
-        referenceEntries: searchResults.slice(0, 8).map(entry => ({
+        referenceEntries: combinedResults.slice(0, 8).map(entry => ({
           id: entry.id,
           content: entry.content?.slice(0, 200) || 'No content',
           created_at: entry.created_at,
-          themes: entry.themes || [],
+          themes: entry.master_themes || [],
           emotions: entry.emotions || {},
-          searchMethod: entry.searchMethod || 'orchestrated'
+          searchMethod: entry.searchMethod || 'combined'
         }))
       };
 
@@ -136,11 +153,66 @@ export class OptimizedRagPipeline {
       await this.streamManager.sendEvent('complete', { fromCache: false });
 
     } catch (error) {
-      console.error('[UnifiedPipeline] Error:', error);
+      console.error('[OptimizedPipeline] Error:', error);
       await this.streamManager.sendEvent('error', { 
         message: error.message,
-        stage: 'unified_pipeline_error' 
+        stage: 'pipeline_error' 
       });
     }
+  }
+
+  private async executeParallelSearchWithStreaming(
+    userId: string, queryEmbedding: number[], queryPlan: any, message: string
+  ): Promise<any> {
+    await this.streamManager.sendEvent('progress', { 
+      stage: 'parallel_search', 
+      message: 'Executing parallel vector and SQL search...' 
+    });
+
+    const searchResults = await DualSearchOrchestrator.executeParallelSearch(
+      this.supabaseClient, userId, queryEmbedding, queryPlan, message
+    );
+
+    await this.streamManager.sendEvent('search_complete', {
+      method: 'parallel',
+      vector_count: searchResults.vectorResults.length,
+      sql_count: searchResults.sqlResults.length,
+      total_count: searchResults.combinedResults.length
+    });
+
+    return searchResults;
+  }
+
+  private async executeSequentialSearchWithStreaming(
+    userId: string, queryEmbedding: number[], queryPlan: any, message: string
+  ): Promise<any> {
+    await this.streamManager.sendEvent('progress', { 
+      stage: 'vector_search', 
+      message: 'Executing vector search...' 
+    });
+
+    // Note: Would need to modify DualSearchOrchestrator to support mid-process callbacks
+    const searchResults = await DualSearchOrchestrator.executeSequentialSearch(
+      this.supabaseClient, userId, queryEmbedding, queryPlan, message
+    );
+
+    await this.streamManager.sendEvent('search_complete', {
+      method: 'sequential',
+      vector_count: searchResults.vectorResults.length,
+      sql_count: searchResults.sqlResults.length,
+      total_count: searchResults.combinedResults.length
+    });
+
+    return searchResults;
+  }
+
+  private async generateStreamingResponse(
+    systemPrompt: string, userPrompt: string, conversationContext: any[], isAnalytical: boolean
+  ): Promise<string> {
+    // For now, use the existing response generator
+    // In a full implementation, this would stream chunks as they're generated
+    return await generateResponse(
+      systemPrompt, userPrompt, conversationContext, this.openaiApiKey, isAnalytical
+    );
   }
 }

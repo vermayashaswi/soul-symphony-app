@@ -14,35 +14,24 @@ export interface QueryPlan {
 export function planQuery(message: string, timeRange?: any): QueryPlan {
   const lowerMessage = message.toLowerCase();
   
-  // Enhanced complexity determination with progress tracking and meditation indicators
+  // Determine complexity
   let complexity: 'simple' | 'complex' | 'multi_part' = 'simple';
   
   const questionMarkers = (lowerMessage.match(/\?/g) || []).length;
   const andMarkers = (lowerMessage.match(/\band\b/g) || []).length;
   const alsoMarkers = (lowerMessage.match(/\balso\b/g) || []).length;
   
-  // Enhanced complexity patterns including progress and temporal indicators
-  const complexPatterns = [
-    /\b(pattern|trend|analysis|compare|correlation|top\s+\d+|most\s+(common|frequent)|when do|what time|how often|frequency|usually|typically)\b/i,
-    /\b(progress|journey|development|evolution|growth|improvement|change|transformation)\b/i,
-    /\b(meditation|practice|mindfulness|spiritual|wellness)\b.*\b(since|started|began|going|been|over time)\b/i,
-    /\b(how.*been|how.*going|since.*started|since.*began|over.*time|throughout)\b/i,
-    /\b(better|worse|improve|decline|positive|negative).*\b(since|over|throughout|during)\b/i
-  ];
-  
   if (questionMarkers > 1 || (andMarkers > 0 && (questionMarkers > 0 || alsoMarkers > 0))) {
     complexity = 'multi_part';
-  } else if (complexPatterns.some(pattern => pattern.test(lowerMessage))) {
+  } else if (/\b(pattern|trend|analysis|compare|correlation|top\s+\d+|most\s+(common|frequent)|when do|what time|how often|frequency|usually|typically)\b/i.test(lowerMessage)) {
     complexity = 'complex';
   }
   
-  // Enhanced time filtering detection including progress tracking indicators
-  const requiresTimeFilter = !!(timeRange || 
-    /\b(last|this|current|recent|past)\s+(week|month|year|day)\b/i.test(lowerMessage) ||
-    /\b(since|started|began|over.*time|throughout|during)\b/i.test(lowerMessage));
+  // Determine if time filtering is required
+  const requiresTimeFilter = !!(timeRange || /\b(last|this|current|recent|past)\s+(week|month|year|day)\b/i.test(lowerMessage));
   
-  // Enhanced aggregation detection for progress and meditation analysis
-  const requiresAggregation = /\b(top\s+\d+|most\s+(common|frequent)|average|total|sum|count|how\s+many|how\s+often|when do|what time|frequency|usually|typically|pattern|trend|progress|journey|how.*been|how.*going)\b/i.test(lowerMessage);
+  // Determine if aggregation is required
+  const requiresAggregation = /\b(top\s+\d+|most\s+(common|frequent)|average|total|sum|count|how\s+many|how\s+often|when do|what time|frequency|usually|typically|pattern|trend)\b/i.test(lowerMessage);
   
   // Always use dual search strategy - this is the key change
   let searchStrategy: 'dual_vector_sql' | 'dual_parallel' | 'dual_sequential' = 'dual_vector_sql';
@@ -68,15 +57,10 @@ export function planQuery(message: string, timeRange?: any): QueryPlan {
     expectedResponseType = 'analysis';
   }
   
-  // Enhanced strategy determination with progress and meditation tracking
+  // Determine strategy - always include dual search
   let strategy = 'dual_search_default';
   
-  // Domain-specific strategies
-  if (/\b(meditation|practice|mindfulness)\b/i.test(lowerMessage) && requiresTimeFilter) {
-    strategy = 'dual_search_meditation_progress';
-  } else if (/\b(how.*been|how.*going|progress|journey)\b/i.test(lowerMessage)) {
-    strategy = 'dual_search_progress_tracking';
-  } else if (complexity === 'multi_part') {
+  if (complexity === 'multi_part') {
     strategy = 'dual_search_segmented_processing';
   } else if (expectedResponseType === 'aggregated') {
     strategy = 'dual_search_data_aggregation';
@@ -115,18 +99,14 @@ export function getMaxEntries(plan: QueryPlan): number {
 }
 
 export function shouldUseAnalyticalFormatting(plan: QueryPlan, message: string): boolean {
-  // Enhanced analytical formatting detection including progress and meditation queries
+  // Detect queries that need structured formatting
   const analyticalKeywords = [
     'pattern', 'trend', 'analysis', 'when do', 'what time', 'how often',
     'frequency', 'usually', 'typically', 'most', 'least', 'statistics',
-    'insights', 'breakdown', 'summary', 'overview', 'comparison',
-    'progress', 'journey', 'how.*been', 'how.*going', 'since.*started',
-    'meditation.*progress', 'practice.*evolution', 'development', 'growth'
+    'insights', 'breakdown', 'summary', 'overview', 'comparison'
   ];
   
   return plan.expectedResponseType === 'analysis' ||
          plan.expectedResponseType === 'aggregated' ||
-         plan.strategy?.includes('progress') ||
-         plan.strategy?.includes('meditation') ||
          analyticalKeywords.some(keyword => message.toLowerCase().includes(keyword));
 }
