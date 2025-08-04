@@ -16,7 +16,7 @@ import Matter, {
   Vector
 } from 'matter-js';
 import EmotionBubbleDetail from './EmotionBubbleDetail';
-import { useToast } from '@/components/ui/use-toast';
+import { useToast } from '@/hooks/use-toast';
 
 interface EmotionBubblesProps {
   emotions?: Record<string, number>;

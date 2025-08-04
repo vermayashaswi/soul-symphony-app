@@ -89,13 +89,16 @@ export const useStreamingChat = ({ onFinalResponse, onError }: UseStreamingChatP
 
       // If the response includes streaming data, it will be handled by the EventSource
       // For non-streaming responses, handle them directly
-      if (!data.isStreaming && data.response) {
+      if (!data?.isStreaming && data?.response) {
         addStreamingMessage({
           type: 'final_response',
           response: data.response,
           analysis: data.analysis,
           timestamp: Date.now()
         });
+      } else if (data?.isStreaming) {
+        // Streaming is active, the SSE events will be handled by the EventSource
+        console.log('[useStreamingChat] Streaming mode activated');
       }
 
     } catch (error) {
