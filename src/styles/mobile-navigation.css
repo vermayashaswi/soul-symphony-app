@@ -22,6 +22,11 @@
   
   /* Default positioning with safe area */
   padding-bottom: var(--calculated-safe-area-bottom, env(safe-area-inset-bottom, 0px));
+  
+  /* Ensure navigation is visible by default for app routes */
+  display: block;
+  opacity: 1;
+  pointer-events: auto;
 }
 
 /* Platform-specific navigation adjustments */

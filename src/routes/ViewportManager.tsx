@@ -15,33 +15,43 @@ const ViewportManager: React.FC = () => {
   const isMobile = useIsMobile();
   const { onboardingComplete } = useOnboarding();
   
-  // Comprehensive list of routes where navigation should be hidden
-  const onboardingOrAuthPaths = [
+  // Routes where navigation should be hidden
+  const navigationHiddenPaths = [
     '/app/onboarding',
     '/app/auth',
-    '/onboarding',
-    '/auth',
-    '/' // Also hide on root path
+    '/onboarding', 
+    '/auth'
   ];
   
-  // Check if current path is in the list of paths where navigation should be hidden
-  const isOnboardingOrAuth = onboardingOrAuthPaths.includes(location.pathname);
+  // Check if current path should hide navigation
+  const shouldHideNavigation = navigationHiddenPaths.includes(location.pathname);
+  
+  // Handle special transitional routes that need proper navigation
+  const isTransitionalRoute = location.pathname === '/app' || location.pathname === '/';
+  const isInAppContext = isAppRoute(location.pathname);
   
   // Is this the home page where scrolling should be disabled?
   const isHomePage = location.pathname === '/app/home';
   
+  // Determine if navigation should be visible
+  const shouldShowNavigation = isInAppContext && 
+    user && 
+    !shouldHideNavigation && 
+    onboardingComplete &&
+    // Show navigation even on transitional routes if user is authenticated and onboarded
+    (onboardingComplete || !isTransitionalRoute);
+
   // Debug log to understand route detection
   console.log('ViewportManager - Path:', location.pathname, {
     isAppRoute: isAppRoute(location.pathname),
     isWebsiteRoute: isWebsiteRoute(location.pathname),
     isHomePage,
     user: !!user,
-    isOnboardingOrAuth,
+    shouldHideNavigation,
     onboardingComplete,
-    hideNavigation: 
-      isOnboardingOrAuth || 
-      !user || 
-      (location.pathname === '/app' && !onboardingComplete)
+    isTransitionalRoute,
+    isInAppContext,
+    shouldShowNavigation
   });
   
   // Ensure proper scrolling behavior on route changes
@@ -84,15 +94,8 @@ const ViewportManager: React.FC = () => {
         <Outlet />
       </div>
       
-      {/* Only display mobile navigation when:
-          1. We're on an app route
-          2. User is logged in
-          3. We're not on onboarding/auth screens
-          4. If we're on /app, we also check if onboarding is complete */}
-      {isAppRoute(location.pathname) && 
-       user && 
-       !isOnboardingOrAuth && 
-       onboardingComplete && (
+      {/* Display mobile navigation when all conditions are met */}
+      {shouldShowNavigation && (
         <MobileNavigation onboardingComplete={onboardingComplete} />
       )}
     </StatusBarManager>
