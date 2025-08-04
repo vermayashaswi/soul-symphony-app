@@ -95,97 +95,35 @@ export const useStreamingChat = ({ onFinalResponse, onError }: UseStreamingChatP
           throw new Error('No auth token available');
         }
 
-        // Make streaming request with fetch
-        const streamingResponse = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/chat-with-rag`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${authToken}`,
-            'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY || '',
-          },
-          body: JSON.stringify({
+        // Use Supabase function invoke for better reliability
+        const { data: streamingResponse, error: streamingError } = await supabase.functions.invoke('chat-with-rag', {
+          body: {
             message,
             userId,
             threadId,
             conversationContext,
             userProfile,
             streamingMode: true
-          }),
-          signal: abortController.signal
+          }
         });
 
-        clearTimeout(timeoutId);
-
-        if (!streamingResponse.ok) {
-          throw new Error(`HTTP ${streamingResponse.status}: ${streamingResponse.statusText}`);
+        if (streamingError) {
+          throw new Error(`Streaming request failed: ${streamingError.message}`);
         }
 
-        // Check if the response is streaming (SSE)
-        const contentType = streamingResponse.headers.get('content-type');
-        if (contentType?.includes('text/event-stream')) {
-          console.log('[useStreamingChat] Processing SSE stream...');
-          
-          // Process the streaming response
-          const reader = streamingResponse.body?.getReader();
-          const decoder = new TextDecoder();
-          
-          if (!reader) {
-            throw new Error('No readable stream available');
-          }
-
-          try {
-            while (true) {
-              const { done, value } = await reader.read();
-              
-              if (done) {
-                console.log('[useStreamingChat] Stream completed');
-                break;
-              }
-
-              const chunk = decoder.decode(value, { stream: true });
-              const lines = chunk.split('\n');
-              
-              for (const line of lines) {
-                if (line.startsWith('data: ')) {
-                  try {
-                    const eventData = JSON.parse(line.slice(6)); // Remove 'data: ' prefix
-                    console.log('[useStreamingChat] Received SSE event:', eventData);
-                    
-                    addStreamingMessage({
-                      type: eventData.type,
-                      message: eventData.message,
-                      task: eventData.task,
-                      description: eventData.description,
-                      stage: eventData.stage,
-                      progress: eventData.progress,
-                      response: eventData.data?.response,
-                      analysis: eventData.data?.analysis,
-                      error: eventData.error,
-                      timestamp: eventData.timestamp || Date.now()
-                    });
-                  } catch (parseError) {
-                    console.error('[useStreamingChat] Error parsing SSE data:', parseError);
-                  }
-                }
-              }
-            }
-          } finally {
-            reader.releaseLock();
-          }
+        // For now, handle as non-streaming since Supabase client doesn't support SSE directly
+        if (streamingResponse?.response) {
+          addStreamingMessage({
+            type: 'final_response',
+            response: streamingResponse.response,
+            analysis: streamingResponse.analysis,
+            timestamp: Date.now()
+          });
         } else {
-          // Handle non-streaming response
-          const data = await streamingResponse.json();
-          if (data.response) {
-            addStreamingMessage({
-              type: 'final_response',
-              response: data.response,
-              analysis: data.analysis,
-              timestamp: Date.now()
-            });
-          } else {
-            throw new Error('No response data received');
-          }
+          throw new Error('No response data from streaming request');
         }
+
+        clearTimeout(timeoutId);
 
       } catch (streamingError) {
         clearTimeout(timeoutId);
@@ -220,12 +158,53 @@ export const useStreamingChat = ({ onFinalResponse, onError }: UseStreamingChatP
     try {
       console.log('[useStreamingChat] Using non-streaming mode');
       
-      // Show a simple loading message
-      addStreamingMessage({
-        type: 'user_message',
-        message: 'Analyzing your request...',
-        timestamp: Date.now()
+      // First classify the query to show appropriate UI
+      const { data: classification } = await supabase.functions.invoke('chat-query-classifier', {
+        body: { message, conversationContext }
       });
+
+      const queryCategory = classification?.category || 'CONVERSATIONAL';
+      
+      // Show different UI based on classification
+      if (queryCategory === 'JOURNAL_SPECIFIC') {
+        // For journal queries, simulate streaming with progressive messages
+        addStreamingMessage({
+          type: 'user_message',
+          message: 'Understanding your question',
+          timestamp: Date.now()
+        });
+        
+        // Add a short delay and show backend processing
+        setTimeout(() => {
+          addStreamingMessage({
+            type: 'backend_task',
+            task: 'analyzing_journal',
+            description: 'Searching through your journal entries...',
+            timestamp: Date.now()
+          });
+        }, 500);
+        
+        setTimeout(() => {
+          addStreamingMessage({
+            type: 'user_message',
+            message: 'Analyzing your patterns and insights',
+            timestamp: Date.now()
+          });
+        }, 1500);
+      } else if (queryCategory === 'JOURNAL_SPECIFIC_NEEDS_CLARIFICATION') {
+        addStreamingMessage({
+          type: 'user_message',
+          message: 'Creating space for deeper understanding',
+          timestamp: Date.now()
+        });
+      } else {
+        // For other types, show simple three-dot animation
+        addStreamingMessage({
+          type: 'user_message',
+          message: 'Processing your request...',
+          timestamp: Date.now()
+        });
+      }
 
       const { data, error } = await supabase.functions.invoke('chat-with-rag', {
         body: {

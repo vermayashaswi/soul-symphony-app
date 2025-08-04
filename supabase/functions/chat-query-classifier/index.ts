@@ -91,11 +91,14 @@ async function gptClassifyMessage(
 
 1. **JOURNAL_SPECIFIC** - Specific, analyzable personal questions about their emotional patterns
    - "How am I feeling about work lately?", "What are my stress patterns this month?"
-   - Clear, specific personal questions that can be effectively analyzed
+   - "Do you think meditation helped me?", "How have I been feeling the last few months?"
+   - "No, since last 2 months I've been fighting a lot. I'm not sure if meditating helped me overcome this anger I get"
+   - Clear, specific personal questions that can be effectively analyzed with journal data
 
-2. **JOURNAL_SPECIFIC_NEEDS_CLARIFICATION** - Vague personal questions needing gentle follow-up
-   - "How am I?", "What's going on with me?", "I need help", "I feel lost"
-   - Personal but too broad/vague to analyze without more context
+2. **JOURNAL_SPECIFIC_NEEDS_CLARIFICATION** - Only truly vague personal questions needing follow-up
+   - "How am I?", "I need help", "I feel lost", "What's wrong with me?"
+   - Personal but extremely vague with no context to analyze
+   - **IMPORTANT**: Be selective - if there's ANY specific context or detail, use JOURNAL_SPECIFIC instead
 
 3. **GENERAL_MENTAL_HEALTH** - General wellness questions  
    - "How to manage anxiety?", "What are coping strategies?", "Tips for better sleep?"
@@ -105,19 +108,24 @@ async function gptClassifyMessage(
    - "Thanks!", "That's helpful", "Tell me more", "How are you?"
    - Keep the conversation flowing naturally
 
-**CLASSIFICATION RULES:**
-- Specific personal questions with clear direction = JOURNAL_SPECIFIC
-- Vague personal questions ("How am I?", "I need help") = JOURNAL_SPECIFIC_NEEDS_CLARIFICATION  
+**UPDATED CLASSIFICATION RULES - FAVOR JOURNAL_SPECIFIC:**
+- Any personal question with specific context or details = JOURNAL_SPECIFIC (be generous here)
+- Questions about personal feelings, behaviors, patterns = JOURNAL_SPECIFIC
+- Only use JOURNAL_SPECIFIC_NEEDS_CLARIFICATION for extremely vague questions with zero context
 - Educational/general questions = GENERAL_MENTAL_HEALTH
 - Greetings/thanks/follow-ups = CONVERSATIONAL
 
-**EXAMPLES:**
+**UPDATED EXAMPLES:**
 - "How am I feeling about work?" → JOURNAL_SPECIFIC
-- "How am I?" → JOURNAL_SPECIFIC_NEEDS_CLARIFICATION
-- "What are my stress patterns this month?" → JOURNAL_SPECIFIC  
-- "I need help" → JOURNAL_SPECIFIC_NEEDS_CLARIFICATION
+- "How have I been feeling the last few months?" → JOURNAL_SPECIFIC
+- "Do you think meditation helped me?" → JOURNAL_SPECIFIC
+- "I fight with my partner" → JOURNAL_SPECIFIC
+- "I've been fighting a lot lately" → JOURNAL_SPECIFIC
+- "How am I?" (with no context) → JOURNAL_SPECIFIC_NEEDS_CLARIFICATION
+- "I need help" (with no specifics) → JOURNAL_SPECIFIC_NEEDS_CLARIFICATION
 - "What is anxiety?" → GENERAL_MENTAL_HEALTH
 - "Thank you" → CONVERSATIONAL
+- "Okay" → CONVERSATIONAL
 
 User message: "${message}"${contextString}
 
