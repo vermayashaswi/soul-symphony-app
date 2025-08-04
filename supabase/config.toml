@@ -62,6 +62,19 @@ verify_jwt = true
 [functions.translate-text]
 verify_jwt = false
 
+# New GPT-driven RAG enhancement functions
+[functions.gpt-sub-question-generator]
+verify_jwt = true
+
+[functions.gpt-query-planner]
+verify_jwt = true
+
+[functions.gpt-theme-emotion-selector]
+verify_jwt = true
+
+[functions.enhanced-rag-orchestrator]
+verify_jwt = true
+
 # RevenueCat integration edge functions
 [functions.revenuecat-webhook]
 verify_jwt = false
