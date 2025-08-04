@@ -250,6 +250,7 @@ Return ONLY valid JSON:
   "searchConfidence": number (0.0-1.0),
   "useOnlySQL": boolean (only if searchConfidence > 0.9),
   "useOnlyVector": boolean (only if searchConfidence > 0.9),
+  "userStatusMessage": "exactly 5 words describing what you're doing (e.g., 'Breaking down your complex question' or 'Finding insights from patterns')",
   "subQuestions": [
     {
       "question": "Specific sub-question",

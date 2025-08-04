@@ -95,7 +95,13 @@ RESPONSE GUIDELINES:
 4. **Practical Guidance**: Offer concrete next steps, reflection prompts, and ask clarification questions to deepen understanding
 5. **Supportive Tone**: Maintain an encouraging, non-judgmental perspective
 
-RESPONSE STRUCTURE:
+Your response should be a JSON object with this structure:
+{
+  "userStatusMessage": "exactly 5 words describing final response synthesis (e.g., 'Crafting your personalized wellness insights' or 'Connecting patterns to meaningful guidance')",
+  "response": "your full response content"
+}
+
+RESPONSE CONTENT STRUCTURE:
 • 🤗 **Opening**: Warm acknowledgment of their question
 • 💡 **Key Insights**: 2-3 main findings from the analysis (with specific data when available)
 • 🔗 **Patterns & Connections**: Highlight relationships between emotions, themes, or time periods with supporting evidences from the journal entries
@@ -128,11 +134,27 @@ Remember: You're not just reporting data - you're providing compassionate, profe
     });
 
     const data = await response.json();
-    const consolidatedResponse = data.choices[0].message.content;
+    const rawResponse = data.choices[0].message.content;
+    
+    // Try to parse JSON response with status message
+    let consolidatedResponse = rawResponse;
+    let userStatusMessage = null;
+    
+    try {
+      const parsedResponse = JSON.parse(rawResponse);
+      if (parsedResponse.userStatusMessage && parsedResponse.response) {
+        userStatusMessage = parsedResponse.userStatusMessage;
+        consolidatedResponse = parsedResponse.response;
+      }
+    } catch (parseError) {
+      // If JSON parsing fails, use the raw response as is
+      console.log('Could not parse JSON response, using raw content');
+    }
 
     return new Response(JSON.stringify({
       success: true,
       response: consolidatedResponse,
+      userStatusMessage,
       analysisMetadata: {
         totalSubQuestions: analysisResults.length,
         strategiesUsed: analysisResults.map((r: any) => r.analysisPlan.searchStrategy),

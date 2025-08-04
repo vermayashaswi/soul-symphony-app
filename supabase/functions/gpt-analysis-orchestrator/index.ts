@@ -72,7 +72,8 @@ Respond with a JSON object containing:
     "threshold": number_if_applicable
   } | null,
   "vectorQuery": "reformulated_query_for_semantic_search" | null,
-  "reasoning": "brief_explanation_of_strategy_choice"
+  "reasoning": "brief_explanation_of_strategy_choice",
+  "userStatusMessage": "exactly 5 words describing this analysis step (e.g., 'Analyzing emotional patterns from entries' or 'Finding relevant themes and topics')"
 }
 
 Focus on extracting specific entities, emotions, or themes mentioned in the sub-question. Be precise with parameter extraction.

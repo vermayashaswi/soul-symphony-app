@@ -33,6 +33,8 @@ import { getThreadMessages, saveMessage } from "@/services/chat";
 import { useDebugLog } from "@/utils/debug/DebugContext";
 import { TranslatableText } from "@/components/translation/TranslatableText";
 import { useChatMessageClassification, QueryCategory } from "@/hooks/use-chat-message-classification";
+import { useStreamingChat } from "@/hooks/useStreamingChat";
+import StreamingStatusDisplay from "./StreamingStatusDisplay";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -84,6 +86,35 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({
   
   // Use the GPT-based message classification hook
   const { classifyMessage, classification } = useChatMessageClassification();
+  
+  // Use streaming chat for enhanced UX
+  const {
+    isStreaming,
+    streamingMessages,
+    currentUserMessage,
+    showBackendAnimation,
+    startStreamingChat
+  } = useStreamingChat({
+    onFinalResponse: (response, analysis) => {
+      // Handle final streaming response
+      const finalMessage: ChatMessage = {
+        id: uuidv4(),
+        thread_id: currentThreadId!,
+        content: response,
+        sender: 'assistant',
+        role: 'assistant',
+        created_at: new Date().toISOString()
+      };
+      setChatHistory(prev => [...prev, finalMessage]);
+    },
+    onError: (error) => {
+      toast({
+        title: "Error",
+        description: error,
+        variant: "destructive"
+      });
+    }
+  });
   
   // Use our enhanced realtime hook to track processing status
   const {
