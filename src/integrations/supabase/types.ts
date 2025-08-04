@@ -380,36 +380,6 @@ export type Database = {
         }
         Relationships: []
       }
-      rate_limits: {
-        Row: {
-          created_at: string
-          endpoint: string
-          id: string
-          ip_address: string | null
-          request_count: number
-          user_id: string | null
-          window_start: string
-        }
-        Insert: {
-          created_at?: string
-          endpoint: string
-          id?: string
-          ip_address?: string | null
-          request_count?: number
-          user_id?: string | null
-          window_start?: string
-        }
-        Update: {
-          created_at?: string
-          endpoint?: string
-          id?: string
-          ip_address?: string | null
-          request_count?: number
-          user_id?: string | null
-          window_start?: string
-        }
-        Relationships: []
-      }
       revenuecat_customers: {
         Row: {
           created_at: string
