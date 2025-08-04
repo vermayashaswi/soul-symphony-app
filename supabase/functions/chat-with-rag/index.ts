@@ -10,6 +10,7 @@ import { BackgroundTaskManager } from './utils/backgroundTaskManager.ts';
 import { SmartCache } from './utils/smartCache.ts';
 import { OptimizedRagPipeline } from './utils/optimizedPipeline.ts';
 import { PerformanceOptimizer } from './utils/performanceOptimizer.ts';
+import { determineResponseFormat, generateSystemPromptWithFormat, combineSubQuestionResults } from './utils/dynamicResponseFormatter.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -148,57 +149,68 @@ serve(async (req) => {
 
     console.log(`[chat-with-rag] Dual search completed: ${combinedResults.length} total results`);
 
-    // Detect analytical query
-    const isAnalyticalQuery = enhancedQueryPlan.expectedResponseType === 'analysis' ||
-      enhancedQueryPlan.expectedResponseType === 'aggregated' ||
-      /\b(pattern|trend|when do|what time|how often|frequency|usually|typically|statistics|insights|breakdown|analysis)\b/i.test(message);
+    // ENHANCED: Dynamic response formatting based on query complexity
+    const formatTimer = PerformanceOptimizer.startTimer('format_determination');
+    
+    // Create mock sub-question results for format determination
+    const mockSubResults = enhancedQueryPlan.subQuestions?.map(q => ({ context: 'mock', subQuestion: q })) || [{ context: 'single', subQuestion: { question: message } }];
+    const responseFormat = determineResponseFormat(message, enhancedQueryPlan, conversationContext, mockSubResults);
+    
+    PerformanceOptimizer.endTimer(formatTimer, 'format_determination');
+    
+    console.log(`[chat-with-rag] Using ${responseFormat.formatType} format with complexity: ${responseFormat.complexity}`);
 
-    // Generate prompts
+    // Generate enhanced prompts with dynamic formatting
     const promptTimer = PerformanceOptimizer.startTimer('prompt_generation');
-    const systemPrompt = generateSystemPrompt(
-      userProfile.timezone || 'UTC',
-      enhancedQueryPlan.timeRange,
-      enhancedQueryPlan.expectedResponseType,
-      combinedResults.length,
-      `Dual search analysis: ${vectorResults.length} vector + ${sqlResults.length} SQL results`,
-      conversationContext,
-      false,
-      /\b(I|me|my|myself)\b/i.test(message),
-      enhancedQueryPlan.requiresTimeFilter,
-      'dual'
-    );
-
+    
+    // Combine results into structured context for multi-question scenarios
+    const contextData = combinedResults.length > 0 ? 
+      combinedResults.map(entry => ({
+        content: entry.content,
+        created_at: entry.created_at,
+        themes: entry.master_themes || [],
+        emotions: entry.emotions || {},
+        searchMethod: entry.searchMethod || 'dual'
+      })).slice(0, 20).map(entry => 
+        `Entry (${entry.created_at}): ${entry.content?.slice(0, 300) || 'No content'} [Themes: ${entry.themes.join(', ')}] [Search: ${entry.searchMethod}]`
+      ).join('\n\n') :
+      'No relevant entries found.';
+    
+    const systemPrompt = generateSystemPromptWithFormat(responseFormat, message, contextData, enhancedQueryPlan);
     const userPrompt = generateUserPrompt(message, combinedResults, 'dual vector + SQL');
+    
     PerformanceOptimizer.endTimer(promptTimer, 'prompt_generation');
 
-    // Generate response with optimization
+    // Generate response with enhanced formatting
     const responseTimer = PerformanceOptimizer.startTimer('ai_response');
-    console.log('[chat-with-rag] Generating enhanced response with dual search results');
+    console.log(`[chat-with-rag] Generating ${responseFormat.formatType} response with dual search results`);
     const aiResponse = await generateResponse(
       systemPrompt,
       userPrompt,
       conversationContext,
       openaiApiKey,
-      isAnalyticalQuery
+      responseFormat.complexity !== 'simple'
     );
     PerformanceOptimizer.endTimer(responseTimer, 'ai_response');
 
     processingTime = PerformanceOptimizer.endTimer(globalTimer, 'total_request');
 
-    // Prepare final response
+    // Prepare enhanced final response
     const finalResponse = {
       response: aiResponse,
       analysis: {
         queryPlan: enhancedQueryPlan,
         searchMethod: `dual_${searchMethod}`,
+        responseFormat: responseFormat,
         resultsBreakdown: {
           vector: vectorResults.length,
           sql: sqlResults.length,
           combined: combinedResults.length
         },
-        isAnalyticalQuery,
+        isAnalyticalQuery: responseFormat.complexity !== 'simple',
         processingTime,
-        enhancedFormatting: isAnalyticalQuery,
+        enhancedFormatting: responseFormat.useStructuredFormat,
+        multiQuestionGeneration: enhancedQueryPlan.subQuestions?.length > 1,
         dualSearchEnabled: true,
         fromCache: false,
         performanceReport: PerformanceOptimizer.getPerformanceReport()

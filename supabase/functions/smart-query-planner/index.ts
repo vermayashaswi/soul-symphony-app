@@ -46,7 +46,7 @@ MANDATORY SEARCH STRATEGY:
  */
 function extractDateRangeFromQuery(message: string): { startDate: string; endDate: string } | null {
   const now = new Date();
-  const currentYear = now.getFullYear();
+  const currentYear = now.getFullYear(); // FIXED: Using current year (2025)
   const lowerMessage = message.toLowerCase();
   
   console.log(`[Date Extraction] Processing temporal query: "${message}" at ${now.toISOString()}`);
@@ -122,6 +122,50 @@ function extractDateRangeFromQuery(message: string): { startDate: string; endDat
       startDate: today.toISOString(),
       endDate: now.toISOString()
     };
+  }
+  
+  // FIXED: Handle "since" patterns like "since late April"
+  const sincePattern = /\bsince\s+(late|early|mid)\s+(january|february|march|april|may|june|july|august|september|october|november|december|jan|feb|mar|apr|may|jun|jul|aug|sep|sept|oct|nov|dec)\b/i;
+  const sinceMatch = sincePattern.exec(lowerMessage);
+  
+  if (sinceMatch) {
+    const modifier = sinceMatch[1].toLowerCase(); // late, early, mid
+    const monthName = sinceMatch[2].toLowerCase();
+    
+    // Get month index
+    const monthNames = ['january', 'february', 'march', 'april', 'may', 'june', 'july', 'august', 'september', 'october', 'november', 'december'];
+    const shortMonthNames = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'];
+    
+    let monthIndex = monthNames.indexOf(monthName);
+    if (monthIndex === -1) {
+      monthIndex = shortMonthNames.indexOf(monthName);
+    }
+    
+    if (monthIndex !== -1) {
+      // Determine which year to use
+      let yearToUse = currentYear;
+      if (monthIndex > now.getMonth()) {
+        yearToUse = currentYear - 1; // Use last year if month is in the future
+      }
+      
+      // Set start date based on modifier
+      const startDate = new Date(yearToUse, monthIndex, 1);
+      if (modifier === 'late') {
+        startDate.setDate(20); // Late = around 20th
+      } else if (modifier === 'mid') {
+        startDate.setDate(15); // Mid = around 15th
+      } else if (modifier === 'early') {
+        startDate.setDate(1); // Early = beginning of month
+      }
+      startDate.setHours(0, 0, 0, 0);
+      
+      console.log(`[Date Extraction] Since ${modifier} ${monthName} calculated: ${startDate.toISOString()} to ${now.toISOString()}`);
+      
+      return {
+        startDate: startDate.toISOString(),
+        endDate: now.toISOString()
+      };
+    }
   }
   
   console.log(`[Date Extraction] No temporal pattern found in: "${message}"`);
@@ -589,31 +633,190 @@ function generateRequiredSQLQueries(isEmotionQuery: boolean, isThemeQuery: boole
 }
 
 /**
- * Create default dual-search sub-questions
+ * ENHANCED: Create multiple parallel sub-questions for complex queries
  */
 function createDefaultDualSearchSubQuestions(message: string, isPersonality: boolean, isEmotion: boolean, isTheme: boolean, isTemporal: boolean, useAllEntries: boolean, themeFilters: string[], emotionFilters: string[]) {
   const subQuestions = [];
+  const lowerMessage = message.toLowerCase();
   
-  console.log(`[Default Dual-Search] Creating for - Personal: ${isPersonality}, Emotion: ${isEmotion}, Theme: ${isTheme}, Temporal: ${isTemporal}, UseAllEntries: ${useAllEntries}`);
+  console.log(`[Multi-Question Generation] Creating for - Personal: ${isPersonality}, Emotion: ${isEmotion}, Theme: ${isTheme}, Temporal: ${isTemporal}, UseAllEntries: ${useAllEntries}`);
   
-  // Always include vector search
-  subQuestions.push({
-    question: isTemporal ? 
-      "Find relevant journal entries from the specified time period using semantic search" :
-      (useAllEntries ? "Find all relevant journal entries for comprehensive semantic analysis" : "Find relevant journal entries using semantic search"),
-    purpose: "Gather contextual information through semantic similarity",
-    searchPlan: {
-      vectorSearch: {
-        enabled: true,
-        threshold: isPersonality ? 0.01 : 0.05,
-        query: message,
-        dateFilter: useAllEntries ? null : null
-      },
-      sqlQueries: generateRequiredSQLQueries(isEmotion, isTheme, themeFilters, emotionFilters, useAllEntries),
-      fallbackStrategy: useAllEntries ? "recent_entries" : (isTemporal ? null : "recent_entries")
-    }
-  });
+  // ENHANCED: Detect complex queries that need multiple sub-questions
+  const isComplexAnalysis = /analyze|analysis|patterns|trends|comparison|insights|overall|generally|typically|usually|how am i/i.test(lowerMessage);
+  const hasMoodImpact = /impact|effect|influence|affect|outcome|result|relationship/i.test(lowerMessage);
+  const hasPositiveNegativeAspects = /positive|negative|good|bad|better|worse|improve|decline/i.test(lowerMessage);
   
+  // For complex queries like meditation impact analysis, create multiple specialized sub-questions
+  if (isComplexAnalysis && (lowerMessage.includes('meditation') || lowerMessage.includes('practice'))) {
+    console.log(`[Multi-Question] Detected meditation impact analysis - generating 3 sub-questions`);
+    
+    // Sub-question 1: Positive emotional impact
+    subQuestions.push({
+      question: "Find journal entries showing positive emotions and states during or after meditation practice",
+      purpose: "Analyze positive emotional benefits and outcomes of meditation",
+      searchPlan: {
+        vectorSearch: {
+          enabled: true,
+          threshold: 0.05,
+          query: "meditation calm peaceful relaxed centered focused clarity positive",
+          dateFilter: useAllEntries ? null : null
+        },
+        sqlQueries: [
+          {
+            function: "match_journal_entries_by_emotion",
+            parameters: {
+              emotion_name: "calm",
+              user_id_filter: "USER_ID_PLACEHOLDER",
+              min_score: 0.3,
+              start_date: useAllEntries ? null : null,
+              end_date: useAllEntries ? null : null,
+              limit_count: 5
+            },
+            purpose: "Find entries with high calm emotion scores"
+          }
+        ],
+        fallbackStrategy: useAllEntries ? "recent_entries" : null
+      }
+    });
+    
+    // Sub-question 2: Negative emotional patterns
+    subQuestions.push({
+      question: "Find journal entries showing stress, anxiety, or negative emotions that meditation might help with",
+      purpose: "Identify emotional challenges and stress patterns that meditation addresses",
+      searchPlan: {
+        vectorSearch: {
+          enabled: true,
+          threshold: 0.05,
+          query: "stress anxiety overwhelmed restless scattered negative tension worried",
+          dateFilter: useAllEntries ? null : null
+        },
+        sqlQueries: [
+          {
+            function: "match_journal_entries_by_emotion",
+            parameters: {
+              emotion_name: "anxious",
+              user_id_filter: "USER_ID_PLACEHOLDER",
+              min_score: 0.3,
+              start_date: useAllEntries ? null : null,
+              end_date: useAllEntries ? null : null,
+              limit_count: 5
+            },
+            purpose: "Find entries with high anxiety emotion scores"
+          }
+        ],
+        fallbackStrategy: useAllEntries ? "recent_entries" : null
+      }
+    });
+    
+    // Sub-question 3: General meditation context and practice patterns
+    subQuestions.push({
+      question: "Find all journal entries mentioning meditation, mindfulness, or related practices",
+      purpose: "Gather comprehensive context about meditation practice frequency and experiences",
+      searchPlan: {
+        vectorSearch: {
+          enabled: true,
+          threshold: 0.03,
+          query: message, // Use original query for broader context
+          dateFilter: useAllEntries ? null : null
+        },
+        sqlQueries: [
+          {
+            function: "get_top_emotions_with_entries",
+            parameters: {
+              user_id_param: "USER_ID_PLACEHOLDER",
+              start_date: useAllEntries ? null : null,
+              end_date: useAllEntries ? null : null,
+              limit_count: 8
+            },
+            purpose: "Get overall emotional landscape for context"
+          }
+        ],
+        fallbackStrategy: useAllEntries ? "recent_entries" : null
+      }
+    });
+    
+  } else if (isComplexAnalysis || hasPositiveNegativeAspects) {
+    console.log(`[Multi-Question] Detected complex analysis - generating 2 sub-questions`);
+    
+    // Sub-question 1: Positive aspects/emotions
+    subQuestions.push({
+      question: `Analyze positive emotions and experiences ${isTemporal ? 'from the specified time period' : 'from journal entries'}`,
+      purpose: "Identify positive patterns, emotions, and successful experiences",
+      searchPlan: {
+        vectorSearch: {
+          enabled: true,
+          threshold: isPersonality ? 0.01 : 0.05,
+          query: message + " positive happy successful good progress growth",
+          dateFilter: useAllEntries ? null : null
+        },
+        sqlQueries: [
+          {
+            function: "match_journal_entries_by_emotion",
+            parameters: {
+              emotion_name: "happy",
+              user_id_filter: "USER_ID_PLACEHOLDER", 
+              min_score: 0.3,
+              start_date: useAllEntries ? null : null,
+              end_date: useAllEntries ? null : null,
+              limit_count: 5
+            },
+            purpose: "Find entries with positive emotional content"
+          }
+        ],
+        fallbackStrategy: useAllEntries ? "recent_entries" : null
+      }
+    });
+    
+    // Sub-question 2: Challenges/negative aspects
+    subQuestions.push({
+      question: `Analyze challenges and difficult emotions ${isTemporal ? 'from the specified time period' : 'from journal entries'}`,
+      purpose: "Identify challenges, negative patterns, and areas for improvement",
+      searchPlan: {
+        vectorSearch: {
+          enabled: true,
+          threshold: isPersonality ? 0.01 : 0.05,
+          query: message + " difficult challenge struggle negative anxious stressed",
+          dateFilter: useAllEntries ? null : null
+        },
+        sqlQueries: [
+          {
+            function: "match_journal_entries_by_emotion",
+            parameters: {
+              emotion_name: "anxious",
+              user_id_filter: "USER_ID_PLACEHOLDER",
+              min_score: 0.3,
+              start_date: useAllEntries ? null : null,
+              end_date: useAllEntries ? null : null,
+              limit_count: 5
+            },
+            purpose: "Find entries with challenging emotional content"
+          }
+        ],
+        fallbackStrategy: useAllEntries ? "recent_entries" : null
+      }
+    });
+    
+  } else {
+    // Single comprehensive question for simpler queries
+    subQuestions.push({
+      question: isTemporal ? 
+        "Find relevant journal entries from the specified time period using semantic search" :
+        (useAllEntries ? "Find all relevant journal entries for comprehensive semantic analysis" : "Find relevant journal entries using semantic search"),
+      purpose: "Gather contextual information through semantic similarity",
+      searchPlan: {
+        vectorSearch: {
+          enabled: true,
+          threshold: isPersonality ? 0.01 : 0.05,
+          query: message,
+          dateFilter: useAllEntries ? null : null
+        },
+        sqlQueries: generateRequiredSQLQueries(isEmotion, isTheme, themeFilters, emotionFilters, useAllEntries),
+        fallbackStrategy: useAllEntries ? "recent_entries" : (isTemporal ? null : "recent_entries")
+      }
+    });
+  }
+  
+  console.log(`[Multi-Question] Generated ${subQuestions.length} sub-questions`);
   return subQuestions;
 }
 

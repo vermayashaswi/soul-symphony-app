@@ -343,7 +343,7 @@ export function analyzeQueryTypes(message: string): QueryTypes {
                                 lowerQuery.includes('pattern') || 
                                 lowerQuery.includes('routine');
   
-  // Enhanced temporal queries detection to include month names
+  // Enhanced temporal queries detection to include month names AND "since" patterns
   result.isTemporalQuery = lowerQuery.includes('yesterday') ||
                           lowerQuery.includes('last week') ||
                           lowerQuery.includes('past week') ||
@@ -354,8 +354,10 @@ export function analyzeQueryTypes(message: string): QueryTypes {
                           lowerQuery.includes('lately') ||
                           lowerQuery.includes('recently') ||
                           lowerQuery.includes('of late') ||
+                          lowerQuery.includes('since') ||  // FIXED: Include "since" patterns
                           /\b(january|february|march|april|may|june|july|august|september|october|november|december)\b/.test(lowerQuery) ||
-                          /\b(jan|feb|mar|apr|may|jun|jul|aug|sep|sept|oct|nov|dec)\b/.test(lowerQuery);
+                          /\b(jan|feb|mar|apr|may|jun|jul|aug|sep|sept|oct|nov|dec)\b/.test(lowerQuery) ||
+                          /\bsince\s+(late|early|mid)\s+\w+/i.test(lowerQuery);  // FIXED: "since late April" patterns
   
   // Detect "when" questions
   result.isWhenQuestion = lowerQuery.startsWith('when') || 
@@ -400,7 +402,7 @@ export function analyzeQueryTypes(message: string): QueryTypes {
  */
 function extractTimeRange(query: string): { startDate: string | null, endDate: string | null, periodName: string, duration: number } {
   const now = new Date();
-  const year = now.getFullYear();
+  const year = now.getFullYear(); // FIXED: Using current year (2025)
   const month = now.getMonth();
   const date = now.getDate();
   
@@ -505,9 +507,42 @@ function extractTimeRange(query: string): { startDate: string | null, endDate: s
     }
   }
   
-  // If no month was found, match common time expressions
+  // FIXED: Handle "since" patterns before other time expressions
   if (startDate === null) {
-    if (lowerQuery.includes('yesterday')) {
+    // Handle "since late April", "since early May", etc.
+    const sincePattern = /\bsince\s+(late|early|mid)\s+(january|february|march|april|may|june|july|august|september|october|november|december|jan|feb|mar|apr|may|jun|jul|aug|sep|sept|oct|nov|dec)\b/i;
+    const sinceMatch = sincePattern.exec(lowerQuery);
+    
+    if (sinceMatch) {
+      const modifier = sinceMatch[1].toLowerCase(); // late, early, mid
+      const monthName = sinceMatch[2].toLowerCase();
+      const monthIndex = getMonthIndex(monthName);
+      
+      if (monthIndex !== -1) {
+        // Determine which year to use
+        let yearToUse = year;
+        if (monthIndex > month) {
+          yearToUse = year - 1; // Use last year if month is in the future
+        }
+        
+        // Set start date based on modifier
+        startDate = new Date(yearToUse, monthIndex, 1);
+        if (modifier === 'late') {
+          startDate.setDate(20); // Late = around 20th
+        } else if (modifier === 'mid') {
+          startDate.setDate(15); // Mid = around 15th
+        } else if (modifier === 'early') {
+          startDate.setDate(1); // Early = beginning of month
+        }
+        startDate.setHours(0, 0, 0, 0);
+        
+        endDate = now;
+        periodName = `since ${modifier} ${monthName}`;
+        duration = Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
+      }
+    }
+    // If no "since" pattern found, check other expressions
+    else if (lowerQuery.includes('yesterday')) {
       startDate = new Date(year, month, date - 1);
       startDate.setHours(0, 0, 0, 0);
       endDate = new Date(year, month, date - 1);
