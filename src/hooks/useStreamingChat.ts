@@ -25,7 +25,6 @@ export const useStreamingChat = ({ onFinalResponse, onError }: UseStreamingChatP
   const [currentUserMessage, setCurrentUserMessage] = useState<string>('');
   const [showBackendAnimation, setShowBackendAnimation] = useState(false);
   
-  const eventSourceRef = useRef<EventSource | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
 
   const addStreamingMessage = useCallback((message: StreamingMessage) => {
@@ -70,39 +69,138 @@ export const useStreamingChat = ({ onFinalResponse, onError }: UseStreamingChatP
     setCurrentUserMessage('');
     setShowBackendAnimation(false);
 
+    // Create abort controller for timeout
+    const abortController = new AbortController();
+    abortControllerRef.current = abortController;
+
     try {
-      // Call the chat-with-rag function with streaming enabled
-      const { data, error } = await supabase.functions.invoke('chat-with-rag', {
-        body: {
-          message,
-          userId,
-          threadId,
-          conversationContext,
-          userProfile,
-          streamingMode: true
+      // Set up timeout (30 seconds)
+      const timeoutId = setTimeout(() => {
+        console.warn('[useStreamingChat] Request timeout, falling back to non-streaming');
+        abortController.abort();
+        
+        // Fall back to non-streaming mode due to timeout
+        startNonStreamingChatInternal(message, userId, threadId, conversationContext, userProfile);
+      }, 30000);
+
+      // Try streaming using fetch with proper auth headers
+      try {
+        console.log('[useStreamingChat] Starting streaming request...');
+        
+        // Get Supabase session for auth headers
+        const { data: session } = await supabase.auth.getSession();
+        const authToken = session.session?.access_token;
+        
+        if (!authToken) {
+          throw new Error('No auth token available');
         }
-      });
 
-      if (error) {
-        throw new Error(error.message);
-      }
-
-      // If the response includes streaming data, it will be handled by the EventSource
-      // For non-streaming responses, handle them directly
-      if (!data?.isStreaming && data?.response) {
-        addStreamingMessage({
-          type: 'final_response',
-          response: data.response,
-          analysis: data.analysis,
-          timestamp: Date.now()
+        // Make streaming request with fetch
+        const streamingResponse = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/chat-with-rag`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${authToken}`,
+            'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY || '',
+          },
+          body: JSON.stringify({
+            message,
+            userId,
+            threadId,
+            conversationContext,
+            userProfile,
+            streamingMode: true
+          }),
+          signal: abortController.signal
         });
-      } else if (data?.isStreaming) {
-        // Streaming is active, the SSE events will be handled by the EventSource
-        console.log('[useStreamingChat] Streaming mode activated');
+
+        clearTimeout(timeoutId);
+
+        if (!streamingResponse.ok) {
+          throw new Error(`HTTP ${streamingResponse.status}: ${streamingResponse.statusText}`);
+        }
+
+        // Check if the response is streaming (SSE)
+        const contentType = streamingResponse.headers.get('content-type');
+        if (contentType?.includes('text/event-stream')) {
+          console.log('[useStreamingChat] Processing SSE stream...');
+          
+          // Process the streaming response
+          const reader = streamingResponse.body?.getReader();
+          const decoder = new TextDecoder();
+          
+          if (!reader) {
+            throw new Error('No readable stream available');
+          }
+
+          try {
+            while (true) {
+              const { done, value } = await reader.read();
+              
+              if (done) {
+                console.log('[useStreamingChat] Stream completed');
+                break;
+              }
+
+              const chunk = decoder.decode(value, { stream: true });
+              const lines = chunk.split('\n');
+              
+              for (const line of lines) {
+                if (line.startsWith('data: ')) {
+                  try {
+                    const eventData = JSON.parse(line.slice(6)); // Remove 'data: ' prefix
+                    console.log('[useStreamingChat] Received SSE event:', eventData);
+                    
+                    addStreamingMessage({
+                      type: eventData.type,
+                      message: eventData.message,
+                      task: eventData.task,
+                      description: eventData.description,
+                      stage: eventData.stage,
+                      progress: eventData.progress,
+                      response: eventData.data?.response,
+                      analysis: eventData.data?.analysis,
+                      error: eventData.error,
+                      timestamp: eventData.timestamp || Date.now()
+                    });
+                  } catch (parseError) {
+                    console.error('[useStreamingChat] Error parsing SSE data:', parseError);
+                  }
+                }
+              }
+            }
+          } finally {
+            reader.releaseLock();
+          }
+        } else {
+          // Handle non-streaming response
+          const data = await streamingResponse.json();
+          if (data.response) {
+            addStreamingMessage({
+              type: 'final_response',
+              response: data.response,
+              analysis: data.analysis,
+              timestamp: Date.now()
+            });
+          } else {
+            throw new Error('No response data received');
+          }
+        }
+
+      } catch (streamingError) {
+        clearTimeout(timeoutId);
+        
+        // Only fall back if not aborted
+        if (streamingError.name !== 'AbortError') {
+          console.warn('[useStreamingChat] Streaming failed, falling back to non-streaming:', streamingError);
+          await startNonStreamingChatInternal(message, userId, threadId, conversationContext, userProfile);
+        } else {
+          console.log('[useStreamingChat] Request was aborted');
+        }
       }
 
     } catch (error) {
-      console.error('Streaming chat error:', error);
+      console.error('[useStreamingChat] Error in streaming chat:', error);
       addStreamingMessage({
         type: 'error',
         error: error instanceof Error ? error.message : 'Unknown error occurred',
@@ -111,12 +209,73 @@ export const useStreamingChat = ({ onFinalResponse, onError }: UseStreamingChatP
     }
   }, [isStreaming, addStreamingMessage]);
 
-  const stopStreaming = useCallback(() => {
-    if (eventSourceRef.current) {
-      eventSourceRef.current.close();
-      eventSourceRef.current = null;
+  // Internal function for non-streaming fallback
+  const startNonStreamingChatInternal = async (
+    message: string,
+    userId: string,
+    threadId: string,
+    conversationContext: any[] = [],
+    userProfile: any = {}
+  ) => {
+    try {
+      console.log('[useStreamingChat] Using non-streaming mode');
+      
+      // Show a simple loading message
+      addStreamingMessage({
+        type: 'user_message',
+        message: 'Analyzing your request...',
+        timestamp: Date.now()
+      });
+
+      const { data, error } = await supabase.functions.invoke('chat-with-rag', {
+        body: {
+          message,
+          userId,
+          threadId,
+          conversationContext,
+          userProfile,
+          streamingMode: false
+        }
+      });
+
+      if (error) {
+        throw new Error(error.message);
+      }
+
+      // Handle non-streaming response
+      if (data?.response) {
+        addStreamingMessage({
+          type: 'final_response',
+          response: data.response,
+          analysis: data.analysis,
+          timestamp: Date.now()
+        });
+      } else {
+        throw new Error('No response received from chat service');
+      }
+
+    } catch (error) {
+      console.error('[useStreamingChat] Non-streaming fallback error:', error);
+      addStreamingMessage({
+        type: 'error',
+        error: error instanceof Error ? error.message : 'Failed to get response',
+        timestamp: Date.now()
+      });
     }
-    
+  };
+
+  // Public function for non-streaming chat
+  const startNonStreamingChat = useCallback(async (
+    message: string,
+    userId: string,
+    threadId: string,
+    conversationContext: any[] = [],
+    userProfile: any = {}
+  ) => {
+    await startNonStreamingChatInternal(message, userId, threadId, conversationContext, userProfile);
+  }, [addStreamingMessage]);
+
+  const stopStreaming = useCallback(() => {
     if (abortControllerRef.current) {
       abortControllerRef.current.abort();
       abortControllerRef.current = null;
@@ -138,6 +297,7 @@ export const useStreamingChat = ({ onFinalResponse, onError }: UseStreamingChatP
     currentUserMessage,
     showBackendAnimation,
     startStreamingChat,
+    startNonStreamingChat,
     stopStreaming,
     clearStreamingMessages
   };

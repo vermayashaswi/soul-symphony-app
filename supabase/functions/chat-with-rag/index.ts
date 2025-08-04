@@ -51,6 +51,7 @@ serve(async (req) => {
       
       // Start pipeline with streaming status updates
       processStreamingPipeline(streamManager, requestBody, supabaseClient, openaiApiKey).catch(error => {
+        console.error('[chat-with-rag] Streaming pipeline error:', error);
         streamManager.sendEvent('error', { error: error.message });
         streamManager.close();
       });
