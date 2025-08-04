@@ -407,33 +407,26 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({
       
       // Route to appropriate edge function based on classification
       if (queryClassification.category === QueryCategory.JOURNAL_SPECIFIC) {
-        debugLog.addEvent("Routing", "Using chat-with-rag for journal-specific query", "info");
+        debugLog.addEvent("Routing", "Using chat-with-rag for journal-specific query with streaming", "info");
         
-        // Call chat-with-rag edge function
-        const { data, error } = await supabase.functions.invoke('chat-with-rag', {
-          body: {
-            message,
-            userId: effectiveUserId,
-            threadId,
-            conversationContext,
+        // Start streaming chat for enhanced UX
+        await startStreamingChat(
+          message,
+          effectiveUserId,
+          threadId,
+          conversationContext,
+          {
             useAllEntries: queryClassification.useAllEntries || false,
             hasPersonalPronouns: message.toLowerCase().includes('i ') || message.toLowerCase().includes('my '),
             hasExplicitTimeReference: /\b(last week|yesterday|this week|last month|today|recently|lately)\b/i.test(message),
             threadMetadata: {}
           }
-        });
+        );
         
-        if (error) {
-          throw new Error(`Journal analysis error: ${error.message}`);
-        }
+        // Skip the rest since streaming handles the response
+        return;
         
-        response = {
-          content: data.response,
-          references: data.references || [],
-          analysis: data.analysis || {},
-          hasNumericResult: false,
-          role: 'assistant' as const
-        };
+        // This code block is no longer needed as streaming handles the response
         
       } else if (queryClassification.category === QueryCategory.GENERAL_MENTAL_HEALTH) {
         debugLog.addEvent("Routing", "Using general-mental-health-chat for mental health query", "info");
@@ -871,6 +864,14 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({
             onInteractiveOptionClick={handleInteractiveOptionClick}
           />
         )}
+        
+        {/* Streaming status display */}
+        <StreamingStatusDisplay
+          isStreaming={isStreaming}
+          currentUserMessage={currentUserMessage}
+          showBackendAnimation={showBackendAnimation}
+          streamingMessages={streamingMessages}
+        />
       </div>
       
       <div className="chat-input-container bg-white border-t p-4">

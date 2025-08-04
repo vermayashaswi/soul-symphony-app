@@ -20,6 +20,8 @@ import { MentalHealthInsights } from "@/hooks/use-mental-health-insights";
 import { useChatRealtime } from "@/hooks/use-chat-realtime";
 import { updateThreadProcessingStatus, generateThreadTitle } from "@/utils/chat/threadUtils";
 import { useKeyboardDetection } from "@/hooks/use-keyboard-detection";
+import { useStreamingChat } from "@/hooks/useStreamingChat";
+import StreamingStatusDisplay from "../StreamingStatusDisplay";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -70,6 +72,32 @@ export default function MobileChatInterface({
   } = useChatRealtime(threadId);
   
   const { isKeyboardVisible } = useKeyboardDetection();
+  
+  // Use streaming chat for enhanced UX
+  const {
+    isStreaming,
+    streamingMessages,
+    currentUserMessage,
+    showBackendAnimation,
+    startStreamingChat
+  } = useStreamingChat({
+    onFinalResponse: (response, analysis) => {
+      // Handle final streaming response
+      const finalMessage: UIChatMessage = {
+        role: 'assistant',
+        content: response,
+        ...(analysis && { analysis })
+      };
+      setMessages(prev => [...prev, finalMessage]);
+    },
+    onError: (error) => {
+      toast({
+        title: "Error",
+        description: error,
+        variant: "destructive"
+      });
+    }
+  });
   
   const suggestionQuestions = [
     {
@@ -304,43 +332,22 @@ export default function MobileChatInterface({
         })
       );
       
-      const queryTypes = analyzeQueryTypes(message);
+      // Use streaming chat for enhanced UX
+      const conversationContext = messages.slice(-5).map(msg => ({
+        role: msg.role,
+        content: msg.content
+      }));
       
-      const response = await processChatMessage(
-        message, 
-        user.id, 
-        queryTypes, 
+      // Start streaming chat with conversation context
+      await startStreamingChat(
+        message,
+        user.id,
         currentThreadId,
-        false
+        conversationContext,
+        {}
       );
       
       await updateThreadProcessingStatus(currentThreadId, 'idle');
-      
-      const uiResponse: UIChatMessage = {
-        role: response.role === 'error' ? 'assistant' : response.role as 'user' | 'assistant',
-        content: response.content,
-        ...(response.references && { references: response.references }),
-        ...(response.analysis && { analysis: response.analysis }),
-        ...(response.hasNumericResult !== undefined && { hasNumericResult: response.hasNumericResult })
-      };
-      
-      const savedResponse = await saveMessage(
-        currentThreadId,
-        response.content,
-        'assistant',
-        user.id,
-        response.references || null,
-        response.hasNumericResult || false
-      );
-      
-      // Note: Title generation is now handled automatically after first message is saved
-      
-      await supabase
-        .from('chat_threads')
-        .update({ updated_at: new Date().toISOString() })
-        .eq('id', currentThreadId);
-      
-      setMessages(prev => [...prev, uiResponse]);
     } catch (error: any) {
       if (currentThreadId) {
         await updateThreadProcessingStatus(currentThreadId, 'failed');
@@ -710,6 +717,14 @@ export default function MobileChatInterface({
             )}
           </div>
         )}
+        
+        {/* Streaming status display */}
+        <StreamingStatusDisplay
+          isStreaming={isStreaming}
+          currentUserMessage={currentUserMessage}
+          showBackendAnimation={showBackendAnimation}
+          streamingMessages={streamingMessages}
+        />
         
         <div ref={messagesEndRef} />
       </div>
