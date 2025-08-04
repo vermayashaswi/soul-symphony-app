@@ -7,7 +7,7 @@ import { transcribeAudioWithWhisper, translateAndRefineText, analyzeEmotions, ge
 import { createSupabaseAdmin, createProfileIfNeeded, extractThemes, storeJournalEntry, storeEmbedding } from './databaseOperations.ts';
 import { storeAudioFile } from './storageOperations.ts';
 import { processBase64Chunks, detectFileType, isValidAudioData } from './audioProcessing.ts';
-import { RateLimitManager } from '../_shared/rateLimitUtils.ts';
+
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -122,26 +122,6 @@ serve(async (req) => {
     console.log("=== FIXED TRANSCRIBE-AUDIO PIPELINE START ===");
     logMemoryUsage('pipeline-start');
     
-    // Initialize rate limiting
-    const rateLimitManager = new RateLimitManager(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
-    );
-
-    // FIXED: Rename to avoid conflicts with later userId declaration
-    const { userId: rateLimitUserId, ipAddress } = RateLimitManager.getClientInfo(req);
-
-    // Check rate limits - transcription is resource intensive so we check early
-    const rateLimitCheck = await rateLimitManager.checkRateLimit({
-      userId: rateLimitUserId,
-      ipAddress,
-      functionName: 'transcribe-audio'
-    });
-
-    if (!rateLimitCheck.allowed) {
-      console.log(`[transcribe-audio] Rate limit exceeded for user ${rateLimitUserId || 'anonymous'} from IP ${ipAddress}`);
-      return rateLimitManager.createRateLimitResponse(rateLimitCheck);
-    }
 
     // Step 1: Enhanced environment validation
     console.log("FIXED: Validating environment configuration");
@@ -554,25 +534,6 @@ serve(async (req) => {
       errorMessage = error.message;
     }
 
-    // Log failed API usage - FIXED: Use rateLimitUserId for consistency
-    try {
-      const rateLimitManager = new RateLimitManager(
-        Deno.env.get('SUPABASE_URL') ?? '',
-        Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
-      );
-      const { userId: errorUserId, ipAddress: errorIpAddress } = RateLimitManager.getClientInfo(req);
-      
-      await rateLimitManager.logApiUsage({
-        userId: errorUserId,
-        ipAddress: errorIpAddress,
-        functionName: 'transcribe-audio',
-        statusCode,
-        responseTimeMs: totalTime,
-        errorMessage
-      });
-    } catch (logError) {
-      console.error('[transcribe-audio] Failed to log error usage:', logError);
-    }
 
     logMemoryUsage('error-state');
     
