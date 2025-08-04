@@ -19,40 +19,58 @@ export function determineResponseFormat(
 ): ResponseFormatConfig {
   const lowerMessage = userMessage.toLowerCase();
   
-  // Analyze query characteristics
-  const isComplexAnalysis = /analyze|analysis|patterns|trends|comparison|insights|overall|generally|typically|usually|how am i/i.test(lowerMessage);
-  const hasMultipleAspects = /positive|negative|good|bad|better|worse|improve|decline|both|different|various|multiple/i.test(lowerMessage);
+  // Enhanced analytical query detection
+  const isComplexAnalysis = /analyze|analysis|patterns|trends|comparison|insights|overall|generally|typically|usually|how am i|what has|when do|how often|frequency|breakdown|summary|overview|statistics|what time|most|least|improve|decline|changed|better|worse|since|throughout|during|recently|lately/i.test(lowerMessage);
+  
+  // Enhanced multi-aspect detection
+  const hasMultipleAspects = /positive|negative|good|bad|better|worse|improve|decline|both|different|various|multiple|aspects|sides|perspectives|areas|issues|topics|themes|ways|before and after|then and now|comparison/i.test(lowerMessage);
+  
+  // Enhanced format-requiring query detection
+  const requiresStructuredFormat = /breakdown|list|explain|describe.*patterns|show me|tell me about.*trends|what are|identify|categorize|organize|structure/i.test(lowerMessage);
+  
+  // Enhanced complexity indicators
+  const complexityIndicators = [
+    /why.*happening|what.*causing|relationship.*between|correlation|impact.*on|effect.*of/i.test(lowerMessage),
+    /over time|timeline|progression|evolution|development|journey|growth|change/i.test(lowerMessage),
+    /different.*ways|various.*methods|multiple.*factors|several.*reasons|many.*aspects/i.test(lowerMessage),
+    hasMultipleAspects,
+    isComplexAnalysis
+  ];
+  
   const isMeditation = lowerMessage.includes('meditation') || lowerMessage.includes('practice');
-  const isImpactQuery = /impact|effect|influence|affect|outcome|result|relationship/i.test(lowerMessage);
-  const hasPersonalPronouns = queryPlan?.hasPersonalPronouns || false;
+  const isImpactQuery = /impact|effect|influence|affect|outcome|result|relationship|consequence|leads to|results in|causes/i.test(lowerMessage);
+  const hasPersonalPronouns = queryPlan?.hasPersonalPronouns || /\b(i|my|me|myself|i'm|i've|i'll|i'd)\b/i.test(lowerMessage);
   const isMultiQuestion = subQuestionResults.length > 1;
   
-  // Determine complexity
+  // Enhanced complexity determination
   let complexity: 'simple' | 'moderate' | 'complex' = 'simple';
-  if (isComplexAnalysis || isMultiQuestion || (hasMultipleAspects && isMeditation)) {
+  const complexityScore = complexityIndicators.filter(Boolean).length;
+  
+  if (complexityScore >= 3 || isMultiQuestion || (isComplexAnalysis && hasMultipleAspects)) {
     complexity = 'complex';
-  } else if (hasPersonalPronouns || isImpactQuery || hasMultipleAspects) {
+  } else if (complexityScore >= 2 || hasPersonalPronouns || isImpactQuery || hasMultipleAspects || requiresStructuredFormat) {
     complexity = 'moderate';
   }
   
-  // Determine format type
+  // Enhanced format type determination
   let formatType: 'conversational' | 'analytical' | 'structured' | 'narrative' = 'conversational';
-  if (isComplexAnalysis && isMultiQuestion) {
+  
+  if (isComplexAnalysis || requiresStructuredFormat || complexityScore >= 3) {
     formatType = 'analytical';
-  } else if (complexity === 'complex') {
+  } else if (complexity === 'complex' || isMultiQuestion || hasMultipleAspects) {
     formatType = 'structured';
-  } else if (hasPersonalPronouns && !isComplexAnalysis) {
+  } else if (hasPersonalPronouns && !isComplexAnalysis && complexity === 'simple') {
     formatType = 'narrative';
   }
   
-  // Configure format options
+  // Enhanced format options configuration
   const config: ResponseFormatConfig = {
-    useStructuredFormat: complexity !== 'simple' && formatType !== 'conversational',
-    includeHeaders: formatType === 'analytical' || (formatType === 'structured' && isMultiQuestion),
-    includeEmojis: complexity !== 'simple' || formatType === 'conversational',
-    useBulletPoints: formatType === 'analytical' || (formatType === 'structured' && isMultiQuestion),
-    includeInsights: complexity === 'complex' || isComplexAnalysis,
-    includeSummary: isMultiQuestion || complexity === 'complex',
+    useStructuredFormat: formatType === 'analytical' || formatType === 'structured' || complexity !== 'simple',
+    includeHeaders: formatType === 'analytical' || formatType === 'structured' || requiresStructuredFormat,
+    includeEmojis: formatType === 'analytical' || formatType === 'structured' || formatType === 'conversational',
+    useBulletPoints: formatType === 'analytical' || formatType === 'structured' || hasMultipleAspects,
+    includeInsights: complexity !== 'simple' || isComplexAnalysis || formatType === 'analytical',
+    includeSummary: isMultiQuestion || complexity === 'complex' || formatType === 'analytical',
     formatType,
     complexity
   };
@@ -76,37 +94,74 @@ export function generateSystemPromptWithFormat(
 ): string {
   let basePrompt = `You are SOULo, an empathetic AI companion helping someone understand their journal entries.`;
   
-  // Add format-specific instructions
+  // Add format-specific instructions with enhanced formatting requirements
   if (formatConfig.formatType === 'analytical') {
-    basePrompt += `\n\nRESPONSE FORMAT - ANALYTICAL:
-- Use clear headers with emojis (e.g., "🌟 Positive Patterns", "⚠️ Areas of Concern")
-- Present findings in bulleted lists with specific examples
-- Include an "✨ Key Insights" section
-- End with a brief summary and actionable suggestions
-- Be thorough but organized - this is complex analysis`;
+    basePrompt += `\n\nCRITICAL FORMATTING REQUIREMENTS - ANALYTICAL:
+## FORMAT STRUCTURE (MANDATORY):
+- **ALWAYS** use ## markdown headers for main sections
+- **ALWAYS** use - for bullet points (not •)
+- **ALWAYS** use **bold text** for key insights and data points
+- **ALWAYS** include emojis in headers for visual appeal
+
+## REQUIRED SECTIONS:
+### 🔍 **Key Insights**
+- **Primary finding**: [main insight with specific data]
+- **Supporting evidence**: [specific examples from journal entries]
+
+### 📊 **Patterns Identified**  
+- [Pattern 1 with specific dates/examples]
+- [Pattern 2 with quantifiable evidence]
+
+### 💡 **Recommendations**
+- [Actionable suggestion based on analysis]
+
+EXAMPLE RESPONSE FORMAT:
+## 🌟 **Positive Patterns**
+- **Meditation consistency**: You've been meditating 5 days a week since April
+- **Mood improvement**: 40% increase in positive emotional words
+
+## ⚠️ **Areas for Growth**
+- **Sleep patterns**: Inconsistent bedtime affecting energy levels
+- **Work stress**: Peak stress during Mondays and Wednesdays`;
     
   } else if (formatConfig.formatType === 'structured') {
-    basePrompt += `\n\nRESPONSE FORMAT - STRUCTURED:
-- Organize your response with clear sections
-- Use emojis for section headers when appropriate
-- Include specific examples from the journal entries
-- Provide both observations and insights
-- Keep it well-organized but warm and personal`;
+    basePrompt += `\n\nCRITICAL FORMATTING REQUIREMENTS - STRUCTURED:
+## FORMAT STRUCTURE (MANDATORY):
+- **ALWAYS** use ## markdown headers for main sections
+- **ALWAYS** use - for bullet points with **bold** key terms
+- **ALWAYS** include emojis in section headers
+- **ALWAYS** provide specific examples with dates
+
+## REQUIRED STRUCTURE:
+### 📝 **Overview**
+- Brief summary of findings
+
+### 🔍 **Detailed Analysis**
+- **Key observation 1**: [specific example]
+- **Key observation 2**: [specific example]
+
+### 💭 **Personal Insights**
+- [Insight related to personal growth]`;
     
   } else if (formatConfig.formatType === 'narrative') {
-    basePrompt += `\n\nRESPONSE FORMAT - NARRATIVE:
-- Write in a flowing, conversational style
-- Weave insights naturally into the narrative
-- Be warm and supportive in tone
-- Include specific examples but integrate them smoothly
-- Focus on personal growth and understanding`;
+    basePrompt += `\n\nCRITICAL FORMATTING REQUIREMENTS - NARRATIVE:
+## FORMAT STRUCTURE (MANDATORY):
+- Write in flowing paragraphs with **bold emphasis** on key insights
+- Use ## headers sparingly for major topic shifts
+- Include specific dates and examples naturally in the text
+- Use emojis to highlight emotional moments
+
+EXAMPLE: "Looking at your meditation journey since late April 💫, I can see a **remarkable transformation** in your approach to stress. On April 28th, you wrote about feeling overwhelmed, but by May 15th, your entries show **significantly more calm and centeredness**."`;
     
   } else {
-    basePrompt += `\n\nRESPONSE FORMAT - CONVERSATIONAL:
-- Respond naturally and warmly
-- Use specific examples from the journal entries
-- Be supportive and insightful
-- Keep it personal and engaging`;
+    basePrompt += `\n\nCRITICAL FORMATTING REQUIREMENTS - CONVERSATIONAL:
+## FORMAT STRUCTURE (MANDATORY):
+- Use natural language with **bold emphasis** on important points
+- Include specific examples and dates in conversational tone
+- Use emojis to convey warmth and support
+- Keep bullet points minimal but use - when listing items
+
+EXAMPLE: "I noticed something interesting in your entries 😊 - your **meditation practice** really seems to be making a difference! On May 10th you mentioned feeling more centered, and that pattern continues through your recent entries."`;
   }
   
   // Add context awareness

@@ -21,40 +21,6 @@ interface ChatMessageProps {
 export const ChatMessage: React.FC<ChatMessageProps> = ({ message }) => {
   const isUser = message.sender === 'user';
 
-  const customRenderers = {
-    h1: ({ children }: any) => (
-      <h1 className="text-lg font-bold mb-2 text-theme">
-        {children}
-      </h1>
-    ),
-    h2: ({ children }: any) => (
-      <h2 className="text-base font-bold mb-2 text-theme">
-        {children}
-      </h2>
-    ),
-    h3: ({ children }: any) => (
-      <h3 className="text-sm font-bold mb-2 text-theme">
-        {children}
-      </h3>
-    ),
-    strong: ({ children }: any) => (
-      <strong className="font-bold text-theme">
-        {children}
-      </strong>
-    ),
-    ul: ({ children }: any) => (
-      <ul className="list-none space-y-1 ml-2">
-        {children}
-      </ul>
-    ),
-    li: ({ children }: any) => (
-      <li className="flex items-start gap-2">
-        <span className="text-theme mt-1 text-sm">•</span>
-        <span className="flex-1">{children}</span>
-      </li>
-    ),
-  };
-
   return (
     <div className={`flex gap-3 ${isUser ? 'justify-end' : 'justify-start'} mb-4`}>
       {!isUser && (
@@ -84,7 +50,18 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({ message }) => {
                 scalingContext="general"
               />
             ) : (
-              <div className="prose prose-sm max-w-none dark:prose-invert">
+              <div className="prose prose-sm max-w-none dark:prose-invert 
+                prose-headings:text-theme prose-headings:font-bold
+                prose-h1:text-lg prose-h1:mb-3 prose-h1:flex prose-h1:items-center prose-h1:gap-2
+                prose-h2:text-base prose-h2:mb-3 prose-h2:mt-4 prose-h2:flex prose-h2:items-center prose-h2:gap-2
+                prose-h3:text-sm prose-h3:mb-2 prose-h3:mt-3 prose-h3:flex prose-h3:items-center prose-h3:gap-2
+                prose-strong:text-theme prose-strong:font-bold
+                prose-ul:list-none prose-ul:space-y-2 prose-ul:ml-1 prose-ul:my-2
+                prose-ol:list-decimal prose-ol:list-inside prose-ol:space-y-2 prose-ol:ml-4 prose-ol:my-2
+                prose-li:flex prose-li:items-start prose-li:gap-2 prose-li:mb-1
+                prose-p:mb-2 prose-p:leading-relaxed
+                prose-blockquote:border-l-4 prose-blockquote:border-theme prose-blockquote:pl-4 prose-blockquote:py-2 prose-blockquote:my-3 prose-blockquote:bg-muted/30 prose-blockquote:rounded-r
+              ">
                 <TranslatableMarkdown 
                   className="text-sm leading-relaxed"
                   forceTranslate={true}

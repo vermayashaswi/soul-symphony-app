@@ -141,6 +141,19 @@ RESPONSE STRUCTURE TEMPLATE:
 
   static async getEmbedding(text: string, openaiApiKey: string): Promise<number[]> {
     try {
+      console.log(`[OptimizedApiClient] Generating embedding for text: "${text.substring(0, 100)}..."`);
+      
+      // Enhanced text preprocessing for better embeddings
+      const cleanedText = text
+        .trim()
+        .replace(/\s+/g, ' ') // normalize whitespace
+        .substring(0, 8000); // OpenAI limit
+      
+      if (!cleanedText) {
+        console.error('[OptimizedApiClient] Empty text provided for embedding');
+        throw new Error('Cannot generate embedding for empty text');
+      }
+
       const response = await fetch('https://api.openai.com/v1/embeddings', {
         method: 'POST',
         headers: {
@@ -149,17 +162,28 @@ RESPONSE STRUCTURE TEMPLATE:
         },
         body: JSON.stringify({
           model: 'text-embedding-3-small',
-          input: text.substring(0, 8000),
+          input: cleanedText,
           encoding_format: 'float'
         }),
       });
 
       if (!response.ok) {
-        throw new Error(`Embedding API error: ${response.status}`);
+        const errorText = await response.text();
+        console.error(`[OptimizedApiClient] Embedding API error: ${response.status} - ${errorText}`);
+        throw new Error(`Embedding API error: ${response.status} - ${errorText}`);
       }
 
       const result = await response.json();
-      return result.data[0].embedding;
+      
+      if (!result.data || !result.data[0] || !result.data[0].embedding) {
+        console.error('[OptimizedApiClient] Invalid embedding response structure:', result);
+        throw new Error('Invalid embedding response structure');
+      }
+
+      const embedding = result.data[0].embedding;
+      console.log(`[OptimizedApiClient] Successfully generated embedding of length: ${embedding.length}`);
+      
+      return embedding;
     } catch (error) {
       console.error('[OptimizedApiClient] Embedding generation failed:', error);
       throw error;

@@ -11,6 +11,8 @@ import { SmartCache } from './utils/smartCache.ts';
 import { OptimizedRagPipeline } from './utils/optimizedPipeline.ts';
 import { PerformanceOptimizer } from './utils/performanceOptimizer.ts';
 import { determineResponseFormat, generateSystemPromptWithFormat, combineSubQuestionResults } from './utils/dynamicResponseFormatter.ts';
+import { generateSubQuestions, shouldGenerateMultipleSubQuestions } from './utils/enhancedSubQuestionGenerator.ts';
+import { SearchDebugger } from './utils/searchDebugger.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -114,10 +116,14 @@ serve(async (req) => {
     
     console.log(`[chat-with-rag] Query plan strategy: ${enhancedQueryPlan.strategy}, complexity: ${enhancedQueryPlan.complexity}`);
 
-    // Generate embedding with optimization
+    // Generate embedding with optimization and debugging
+    SearchDebugger.reset();
     const embeddingTimer = PerformanceOptimizer.startTimer('embedding_generation');
     const queryEmbedding = await OptimizedApiClient.getEmbedding(message, openaiApiKey);
     PerformanceOptimizer.endTimer(embeddingTimer, 'embedding_generation');
+    
+    // Debug query processing
+    SearchDebugger.logQueryProcessing(message, message.trim(), queryEmbedding);
 
     // Execute optimized dual search
     const searchTimer = PerformanceOptimizer.startTimer('dual_search');
@@ -152,8 +158,22 @@ serve(async (req) => {
     // ENHANCED: Dynamic response formatting based on query complexity
     const formatTimer = PerformanceOptimizer.startTimer('format_determination');
     
-    // Create mock sub-question results for format determination
-    const mockSubResults = enhancedQueryPlan.subQuestions?.map(q => ({ context: 'mock', subQuestion: q })) || [{ context: 'single', subQuestion: { question: message } }];
+    // Enhanced sub-question generation for complex queries
+    const shouldGenerateMultiple = shouldGenerateMultipleSubQuestions(message, enhancedQueryPlan);
+    let actualSubQuestions = [];
+    
+    if (shouldGenerateMultiple) {
+      actualSubQuestions = generateSubQuestions(message, enhancedQueryPlan, conversationContext);
+      console.log(`[chat-with-rag] Generated ${actualSubQuestions.length} sub-questions for complex analysis`);
+    } else {
+      actualSubQuestions = [{ question: message, type: 'specific', priority: 1, searchStrategy: 'hybrid' }];
+    }
+    
+    // Create sub-question results for format determination
+    const mockSubResults = actualSubQuestions.map(q => ({ 
+      context: 'mock', 
+      subQuestion: typeof q === 'string' ? { question: q } : q 
+    }));
     const responseFormat = determineResponseFormat(message, enhancedQueryPlan, conversationContext, mockSubResults);
     
     PerformanceOptimizer.endTimer(formatTimer, 'format_determination');
