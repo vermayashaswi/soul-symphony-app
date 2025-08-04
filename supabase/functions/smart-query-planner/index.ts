@@ -41,136 +41,7 @@ MANDATORY SEARCH STRATEGY:
 - Vector search provides semantic similarity and context understanding
 `;
 
-/**
- * FIXED: Extract date ranges from natural language temporal references using current year
- */
-function extractDateRangeFromQuery(message: string): { startDate: string; endDate: string } | null {
-  const now = new Date();
-  const currentYear = now.getFullYear(); // FIXED: Using current year (2025)
-  const lowerMessage = message.toLowerCase();
-  
-  console.log(`[Date Extraction] Processing temporal query: "${message}" at ${now.toISOString()}`);
-  
-  if (lowerMessage.includes('last week')) {
-    // FIXED: Calculate last week using Monday as week start (ISO week)
-    const currentDate = new Date(now);
-    const currentDayOfWeek = currentDate.getDay(); // 0 = Sunday, 1 = Monday, etc.
-    const daysToMonday = currentDayOfWeek === 0 ? 6 : currentDayOfWeek - 1; // Days back to this Monday
-    
-    // Start of this week (Monday)
-    const thisWeekStart = new Date(currentDate);
-    thisWeekStart.setDate(currentDate.getDate() - daysToMonday);
-    thisWeekStart.setHours(0, 0, 0, 0);
-    
-    // Last week = this week - 7 days
-    const lastWeekStart = new Date(thisWeekStart);
-    lastWeekStart.setDate(thisWeekStart.getDate() - 7);
-    
-    const lastWeekEnd = new Date(lastWeekStart);
-    lastWeekEnd.setDate(lastWeekStart.getDate() + 6); // Sunday end
-    lastWeekEnd.setHours(23, 59, 59, 999);
-    
-    console.log(`[Date Extraction] Last week calculated: ${lastWeekStart.toISOString()} to ${lastWeekEnd.toISOString()}`);
-    
-    return {
-      startDate: lastWeekStart.toISOString(),
-      endDate: lastWeekEnd.toISOString()
-    };
-  }
-  
-  if (lowerMessage.includes('yesterday')) {
-    const yesterday = new Date(now);
-    yesterday.setDate(now.getDate() - 1);
-    yesterday.setHours(0, 0, 0, 0);
-    
-    const yesterdayEnd = new Date(yesterday);
-    yesterdayEnd.setHours(23, 59, 59, 999);
-    
-    console.log(`[Date Extraction] Yesterday calculated: ${yesterday.toISOString()} to ${yesterdayEnd.toISOString()}`);
-    
-    return {
-      startDate: yesterday.toISOString(),
-      endDate: yesterdayEnd.toISOString()
-    };
-  }
-  
-  if (lowerMessage.includes('this week')) {
-    // FIXED: Calculate this week using Monday as week start
-    const currentDate = new Date(now);
-    const currentDayOfWeek = currentDate.getDay(); // 0 = Sunday, 1 = Monday, etc.
-    const daysToMonday = currentDayOfWeek === 0 ? 6 : currentDayOfWeek - 1; // Days back to Monday
-    
-    const thisWeekStart = new Date(currentDate);
-    thisWeekStart.setDate(currentDate.getDate() - daysToMonday);
-    thisWeekStart.setHours(0, 0, 0, 0);
-    
-    console.log(`[Date Extraction] This week calculated: ${thisWeekStart.toISOString()} to ${now.toISOString()}`);
-    
-    return {
-      startDate: thisWeekStart.toISOString(),
-      endDate: now.toISOString()
-    };
-  }
-  
-  if (lowerMessage.includes('today')) {
-    const today = new Date(now);
-    today.setHours(0, 0, 0, 0);
-    
-    console.log(`[Date Extraction] Today calculated: ${today.toISOString()} to ${now.toISOString()}`);
-    
-    return {
-      startDate: today.toISOString(),
-      endDate: now.toISOString()
-    };
-  }
-  
-  // FIXED: Handle "since" patterns like "since late April"
-  const sincePattern = /\bsince\s+(late|early|mid)\s+(january|february|march|april|may|june|july|august|september|october|november|december|jan|feb|mar|apr|may|jun|jul|aug|sep|sept|oct|nov|dec)\b/i;
-  const sinceMatch = sincePattern.exec(lowerMessage);
-  
-  if (sinceMatch) {
-    const modifier = sinceMatch[1].toLowerCase(); // late, early, mid
-    const monthName = sinceMatch[2].toLowerCase();
-    
-    // Get month index
-    const monthNames = ['january', 'february', 'march', 'april', 'may', 'june', 'july', 'august', 'september', 'october', 'november', 'december'];
-    const shortMonthNames = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'];
-    
-    let monthIndex = monthNames.indexOf(monthName);
-    if (monthIndex === -1) {
-      monthIndex = shortMonthNames.indexOf(monthName);
-    }
-    
-    if (monthIndex !== -1) {
-      // Determine which year to use
-      let yearToUse = currentYear;
-      if (monthIndex > now.getMonth()) {
-        yearToUse = currentYear - 1; // Use last year if month is in the future
-      }
-      
-      // Set start date based on modifier
-      const startDate = new Date(yearToUse, monthIndex, 1);
-      if (modifier === 'late') {
-        startDate.setDate(20); // Late = around 20th
-      } else if (modifier === 'mid') {
-        startDate.setDate(15); // Mid = around 15th
-      } else if (modifier === 'early') {
-        startDate.setDate(1); // Early = beginning of month
-      }
-      startDate.setHours(0, 0, 0, 0);
-      
-      console.log(`[Date Extraction] Since ${modifier} ${monthName} calculated: ${startDate.toISOString()} to ${now.toISOString()}`);
-      
-      return {
-        startDate: startDate.toISOString(),
-        endDate: now.toISOString()
-      };
-    }
-  }
-  
-  console.log(`[Date Extraction] No temporal pattern found in: "${message}"`);
-  return null;
-}
+// REMOVED: Custom time detection logic - GPT handles all temporal analysis
 
 /**
  * Enhanced JSON extraction with better temporal query handling
@@ -215,32 +86,39 @@ function extractAndParseJSON(content: string, originalMessage: string): any {
 }
 
 /**
- * Create enhanced fallback that preserves temporal context
+ * Create fallback with mandatory sub-question generation
  */
 function createTemporalAwareFallback(originalMessage: string): any {
   const lowerMessage = originalMessage.toLowerCase();
   
-  // Detect if this is a temporal query
-  const isTemporalQuery = /last week|yesterday|today|this week|this month|last month|recently/.test(lowerMessage);
-  const isEmotionQuery = /emotion|feel|mood|happy|sad|anxious|stressed|emotional/.test(lowerMessage);
+  // Check for temporal patterns using current year (2025)
+  const isTemporalQuery = /since|started|began|last|this|recently|april|may|june|july|august|september|october|november|december/i.test(lowerMessage);
+  const isMeditationQuery = /meditat|mindful|practice|spiritual/i.test(lowerMessage);
   
-  // Extract date range if temporal
-  const dateRange = isTemporalQuery ? extractDateRangeFromQuery(originalMessage) : null;
+  // Generate date range for "since April" type queries
+  let dateRange = null;
+  if (isTemporalQuery && /since.*april|started.*april|april/i.test(lowerMessage)) {
+    const now = new Date();
+    const april2025 = new Date(2025, 3, 1); // April 1, 2025
+    dateRange = {
+      startDate: april2025.toISOString(),
+      endDate: now.toISOString()
+    };
+  }
   
   const subQuestion = {
-    question: isTemporalQuery ? 
-      `Find journal entries from the specified time period with ultra-sensitive search` :
-      "Find relevant journal entries with ultra-sensitive search",
-    purpose: isTemporalQuery ? 
-      "Locate entries within the specific date range mentioned in the query" :
-      "Gather relevant information from journal entries",
+    question: isMeditationQuery ? 
+      "What emotional patterns and themes emerge from my meditation practice?" :
+      "What insights can be found in my journal entries?",
+    purpose: "Analyze journal data to provide personalized insights",
     searchPlan: {
       vectorSearch: {
         threshold: 0.01,
         enabled: true,
+        query: originalMessage,
         dateFilter: dateRange
       },
-      sqlQueries: isEmotionQuery ? [
+      sqlQueries: [
         {
           function: "get_top_emotions_with_entries",
           parameters: {
@@ -249,10 +127,10 @@ function createTemporalAwareFallback(originalMessage: string): any {
             end_date: dateRange?.endDate || null,
             limit_count: 5
           },
-          purpose: "Get top emotions with sample entries for the time period"
+          purpose: "Get top emotions with sample entries"
         }
-      ] : [],
-      fallbackStrategy: isTemporalQuery ? null : "recent_entries" // No fallback for temporal queries
+      ],
+      fallbackStrategy: "recent_entries"
     }
   };
   
@@ -260,13 +138,11 @@ function createTemporalAwareFallback(originalMessage: string): any {
     queryType: "journal_specific",
     strategy: "intelligent_sub_query",
     subQuestions: [subQuestion],
-    confidence: 0.4,
-    reasoning: isTemporalQuery ? 
-      "Enhanced temporal fallback preserving date constraints" : 
-      "Emergency fallback with ultra-low threshold",
-    isTemporalQuery,
-    isEmotionQuery,
-    hasDateConstraints: !!dateRange,
+    confidence: 0.6,
+    reasoning: "Fallback with mandatory sub-question generation and 2025 date context",
+    useAllEntries: !dateRange,
+    hasPersonalPronouns: /\b(i|me|my|mine)\b/i.test(originalMessage),
+    hasExplicitTimeReference: isTemporalQuery,
     dateRange
   };
 }
@@ -338,30 +214,34 @@ async function analyzeQueryWithSubQuestions(message: string, conversationContext
     
     console.log(`[Query Analysis] Personal pronouns: ${hasPersonalPronouns}, Time reference: ${hasExplicitTimeReference}`);
 
-    const prompt = `You are SOULo's intelligent query planner with MANDATORY dual-search requirements. Help me understand how to best answer this user's question using their journal data.
+    const prompt = `You are SOULo's intelligent query planner specializing in temporal analysis and journal insights. Analyze this user query and create a comprehensive search strategy.
 
 ${DATABASE_SCHEMA_CONTEXT}
+
+**CURRENT DATE CONTEXT:**
+- Today's date: ${new Date().toISOString()}
+- Current year: 2025
+- Current month: ${new Date().toLocaleDateString('en-US', { month: 'long' })}
 
 User query: "${message}"
 User has ${userEntryCount} journal entries.${contextString}
 
-**CRITICAL SEARCH REQUIREMENTS:**
-- You MUST use BOTH SQL and vector search unless you have >90% confidence that only one method is sufficient
-- SQL search provides: emotion filtering, theme filtering, theme-emotion relationship analysis
-- Vector search provides: semantic similarity, context understanding, nuanced matching
-- Default to dual search - only use single method if extremely confident (>90%)
+**TEMPORAL ANALYSIS PRIORITY:**
+- Detect ALL temporal references: "since April", "started in April", "last week", "recently", etc.
+- For queries like "Started meditating in April. Has it helped?" → Use date range from April 2025 to present
+- For personal pronouns (I, me, my) WITHOUT time references → analyze ALL entries (useAllEntries: true)
+- For personal pronouns WITH time references → respect the time constraint
+- Always use current year (2025) for date calculations unless clearly specified otherwise
 
-**PERSONAL PRONOUN PRIORITY RULES:**
-- Personal pronouns (I, me, my) WITHOUT time references → analyze ALL entries (useAllEntries: true)
-- Personal pronouns WITH time references → respect the time constraint
-- Questions like "How am I doing?" should use ALL entries for comprehensive insights
-- Questions like "How was I last week?" should use date filters
+**MANDATORY SUB-QUESTION GENERATION:**
+- ALWAYS generate at least 1 sub-question for every query (even simple ones)
+- Break down complex queries into focused, actionable sub-questions
+- Each sub-question should target specific analysis goals
 
-**THEME-EMOTION ANALYSIS:**
-- Use themeemotion column for theme-emotion relationship insights
-- Filter by specific themes when mentioned in query
-- Filter by emotions when emotional states are discussed
-- Combine theme and emotion filters for complex relationship analysis
+**SEARCH STRATEGY:**
+- Default to dual search (SQL + vector) for comprehensive results
+- SQL provides structured data (emotions, themes, dates)
+- Vector provides semantic understanding and context
 
 Return ONLY valid JSON:
 {
@@ -375,18 +255,18 @@ Return ONLY valid JSON:
       "question": "Specific sub-question",
       "purpose": "Why this helps answer the main query",
       "searchPlan": {
-        "vectorSearch": {
-          "enabled": boolean,
-          "threshold": number (0.01-0.05 for personal, 0.05-0.15 for others),
-          "query": "optimized search query",
-          "dateFilter": null | {"startDate": "ISO", "endDate": "ISO"}
-        },
+         "vectorSearch": {
+           "enabled": boolean,
+           "threshold": number (0.01-0.05 for personal, 0.05-0.15 for others),
+           "query": "optimized search query",
+           "dateFilter": null | {"startDate": "2025-MM-DDTHH:mm:ss.sssZ", "endDate": "2025-MM-DDTHH:mm:ss.sssZ"}
+         },
         "sqlQueries": [
-          {
-            "function": "function_name",
-            "parameters": {...},
-            "purpose": "what this achieves"
-          }
+           {
+             "function": "function_name",
+             "parameters": {"user_id": "user_id_placeholder", "start_date": "2025-MM-DD", "end_date": "2025-MM-DD", "limit_count": 5},
+             "purpose": "what this achieves"
+           }
         ],
         "fallbackStrategy": null | "recent_entries" | "theme_based"
       }
@@ -402,7 +282,13 @@ Return ONLY valid JSON:
   "emotionFilters": string[]
 }
 
-Focus on creating a comprehensive dual-search analysis plan that leverages both SQL structured data and vector semantic understanding.`;
+**CRITICAL INSTRUCTIONS:**
+- ALWAYS generate sub-questions (minimum 1, typically 1-3)
+- Use current year 2025 for all date calculations
+- Detect temporal patterns like "since April" and convert to proper date ranges
+- For meditation queries like "started in April", use April 2025 as start date
+
+Focus on creating comprehensive analysis plans with mandatory sub-question generation.`;
 
     const promptFunction = () => fetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
@@ -411,7 +297,7 @@ Focus on creating a comprehensive dual-search analysis plan that leverages both 
         "Authorization": `Bearer ${apiKey}`
       },
       body: JSON.stringify({
-        model: "gpt-4o-mini",
+        model: "gpt-4.1-2025-04-14",
         messages: [{ role: "user", content: prompt }],
         temperature: 0.1,
         max_tokens: 1000,

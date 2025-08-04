@@ -107,87 +107,8 @@ If any analysis returned no results or errors, acknowledge this gracefully and f
 Remember: You're not just reporting data - you're providing compassionate, professional insight that helps them understand themselves better.
 `;
 
-    if (streamingMode) {
-      // Create streaming response
-      const stream = new ReadableStream({
-        async start(controller) {
-          try {
-            const response = await fetch('https://api.openai.com/v1/chat/completions', {
-              method: 'POST',
-              headers: {
-                'Authorization': `Bearer ${openAIApiKey}`,
-                'Content-Type': 'application/json',
-              },
-              body: JSON.stringify({
-                model: 'gpt-4.1-2025-04-14',
-                messages: [
-                  { 
-                    role: 'system', 
-                    content: 'You are SOULo, a warm and insightful wellness coach. Provide thoughtful, data-driven responses based on journal analysis.' 
-                  },
-                  { role: 'user', content: consolidationPrompt }
-                ],
-                temperature: 0.7,
-                max_tokens: 1500,
-                stream: true
-              }),
-            });
-
-            if (!response.ok) {
-              throw new Error(`OpenAI API error: ${response.status}`);
-            }
-
-            const reader = response.body?.getReader();
-            if (!reader) {
-              throw new Error('No reader available');
-            }
-
-            const decoder = new TextDecoder();
-            
-            while (true) {
-              const { done, value } = await reader.read();
-              if (done) break;
-              
-              const chunk = decoder.decode(value);
-              const lines = chunk.split('\n').filter(line => line.trim().startsWith('data: '));
-              
-              for (const line of lines) {
-                const data = line.replace('data: ', '');
-                if (data === '[DONE]') {
-                  controller.close();
-                  return;
-                }
-                
-                try {
-                  const parsed = JSON.parse(data);
-                  const content = parsed.choices[0]?.delta?.content;
-                  if (content) {
-                    controller.enqueue(new TextEncoder().encode(`data: ${JSON.stringify({ content })}\n\n`));
-                  }
-                } catch (e) {
-                  // Skip invalid JSON lines
-                }
-              }
-            }
-          } catch (error) {
-            console.error('Streaming error:', error);
-            controller.enqueue(new TextEncoder().encode(`data: ${JSON.stringify({ error: error.message })}\n\n`));
-            controller.close();
-          }
-        }
-      });
-
-      return new Response(stream, {
-        headers: {
-          ...corsHeaders,
-          'Content-Type': 'text/event-stream',
-          'Cache-Control': 'no-cache',
-          'Connection': 'keep-alive',
-        },
-      });
-    } else {
-      // Non-streaming response
-      const response = await fetch('https://api.openai.com/v1/chat/completions', {
+    // Non-streaming response only
+    const response = await fetch('https://api.openai.com/v1/chat/completions', {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${openAIApiKey}`,
@@ -204,28 +125,27 @@ Remember: You're not just reporting data - you're providing compassionate, profe
           ],
           temperature: 0.7,
           max_tokens: 1500,
-        }),
-      });
+      }),
+    });
 
-      const data = await response.json();
-      const consolidatedResponse = data.choices[0].message.content;
+    const data = await response.json();
+    const consolidatedResponse = data.choices[0].message.content;
 
-      return new Response(JSON.stringify({
-        success: true,
-        response: consolidatedResponse,
-        analysisMetadata: {
-          totalSubQuestions: analysisResults.length,
-          strategiesUsed: analysisResults.map((r: any) => r.analysisPlan.searchStrategy),
-          dataSourcesUsed: {
-            vectorSearch: analysisResults.some((r: any) => r.vectorResults),
-            sqlQueries: analysisResults.some((r: any) => r.sqlResults),
-            errors: analysisResults.some((r: any) => r.error)
-          }
+    return new Response(JSON.stringify({
+      success: true,
+      response: consolidatedResponse,
+      analysisMetadata: {
+        totalSubQuestions: analysisResults.length,
+        strategiesUsed: analysisResults.map((r: any) => r.analysisPlan.searchStrategy),
+        dataSourcesUsed: {
+          vectorSearch: analysisResults.some((r: any) => r.vectorResults),
+          sqlQueries: analysisResults.some((r: any) => r.sqlResults),
+          errors: analysisResults.some((r: any) => r.error)
         }
-      }), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
-    }
+      }
+    }), {
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    });
 
   } catch (error) {
     console.error('Error in GPT Response Consolidator:', error);
