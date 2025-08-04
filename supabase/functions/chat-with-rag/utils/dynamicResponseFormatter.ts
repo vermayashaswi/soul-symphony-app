@@ -94,74 +94,41 @@ export function generateSystemPromptWithFormat(
 ): string {
   let basePrompt = `You are SOULo, an empathetic AI companion helping someone understand their journal entries.`;
   
-  // Add format-specific instructions with enhanced formatting requirements
+  // Simplified formatting instructions - let GPT decide structure and headers
   if (formatConfig.formatType === 'analytical') {
-    basePrompt += `\n\nCRITICAL FORMATTING REQUIREMENTS - ANALYTICAL:
-## FORMAT STRUCTURE (MANDATORY):
-- **ALWAYS** use ## markdown headers for main sections
-- **ALWAYS** use - for bullet points (not •)
-- **ALWAYS** use **bold text** for key insights and data points
-- **ALWAYS** include emojis in headers for visual appeal
-
-## REQUIRED SECTIONS:
-### 🔍 **Key Insights**
-- **Primary finding**: [main insight with specific data]
-- **Supporting evidence**: [specific examples from journal entries]
-
-### 📊 **Patterns Identified**  
-- [Pattern 1 with specific dates/examples]
-- [Pattern 2 with quantifiable evidence]
-
-### 💡 **Recommendations**
-- [Actionable suggestion based on analysis]
-
-EXAMPLE RESPONSE FORMAT:
-## 🌟 **Positive Patterns**
-- **Meditation consistency**: You've been meditating 5 days a week since April
-- **Mood improvement**: 40% increase in positive emotional words
-
-## ⚠️ **Areas for Growth**
-- **Sleep patterns**: Inconsistent bedtime affecting energy levels
-- **Work stress**: Peak stress during Mondays and Wednesdays`;
+    basePrompt += `\n\nFORMATING GUIDELINES - ANALYTICAL:
+- Use ## markdown headers for main sections (choose appropriate section names based on the query)
+- Use - for bullet points (not •)
+- Use **bold text** for key insights and data points
+- Include emojis in headers for visual appeal
+- Organize your response logically based on the specific analysis requested
+- Focus on data-driven insights and patterns from the journal entries
+- Support findings with specific examples and dates when available`;
     
   } else if (formatConfig.formatType === 'structured') {
-    basePrompt += `\n\nCRITICAL FORMATTING REQUIREMENTS - STRUCTURED:
-## FORMAT STRUCTURE (MANDATORY):
-- **ALWAYS** use ## markdown headers for main sections
-- **ALWAYS** use - for bullet points with **bold** key terms
-- **ALWAYS** include emojis in section headers
-- **ALWAYS** provide specific examples with dates
-
-## REQUIRED STRUCTURE:
-### 📝 **Overview**
-- Brief summary of findings
-
-### 🔍 **Detailed Analysis**
-- **Key observation 1**: [specific example]
-- **Key observation 2**: [specific example]
-
-### 💭 **Personal Insights**
-- [Insight related to personal growth]`;
+    basePrompt += `\n\nFORMATING GUIDELINES - STRUCTURED:
+- Use ## markdown headers for main sections (choose names that fit the content)
+- Use - for bullet points with **bold** key terms
+- Include emojis in section headers for visual appeal
+- Provide specific examples with dates
+- Structure your response to clearly address all aspects of the query
+- Break down complex information into digestible sections`;
     
   } else if (formatConfig.formatType === 'narrative') {
-    basePrompt += `\n\nCRITICAL FORMATTING REQUIREMENTS - NARRATIVE:
-## FORMAT STRUCTURE (MANDATORY):
+    basePrompt += `\n\nFORMATING GUIDELINES - NARRATIVE:
 - Write in flowing paragraphs with **bold emphasis** on key insights
-- Use ## headers sparingly for major topic shifts
+- Use ## headers sparingly for major topic shifts (choose descriptive names)
 - Include specific dates and examples naturally in the text
-- Use emojis to highlight emotional moments
-
-EXAMPLE: "Looking at your meditation journey since late April 💫, I can see a **remarkable transformation** in your approach to stress. On April 28th, you wrote about feeling overwhelmed, but by May 15th, your entries show **significantly more calm and centeredness**."`;
+- Use emojis to highlight emotional moments and create warmth
+- Tell the story of their journal journey in an engaging, personal way`;
     
   } else {
-    basePrompt += `\n\nCRITICAL FORMATTING REQUIREMENTS - CONVERSATIONAL:
-## FORMAT STRUCTURE (MANDATORY):
+    basePrompt += `\n\nFORMATING GUIDELINES - CONVERSATIONAL:
 - Use natural language with **bold emphasis** on important points
 - Include specific examples and dates in conversational tone
 - Use emojis to convey warmth and support
 - Keep bullet points minimal but use - when listing items
-
-EXAMPLE: "I noticed something interesting in your entries 😊 - your **meditation practice** really seems to be making a difference! On May 10th you mentioned feeling more centered, and that pattern continues through your recent entries."`;
+- Respond as if having a supportive conversation with a friend`;
   }
   
   // Add context awareness
