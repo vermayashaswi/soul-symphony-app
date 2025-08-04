@@ -14,7 +14,7 @@ serve(async (req) => {
   }
 
   try {
-    console.log('[chat-with-rag] Starting streamlined RAG processing without caching or streaming');
+    console.log('[chat-with-rag] Starting enhanced RAG processing with classification');
 
     const supabaseClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
@@ -59,101 +59,168 @@ serve(async (req) => {
       return response;
     }
 
-    // Step 1: Use GPT-powered query planning via smart-query-planner
-    let enhancedQueryPlan;
-    
-    try {
-      // Call the smart-query-planner edge function for GPT-driven planning
-      const { data: gptPlan, error: plannerError } = await supabaseClient.functions.invoke(
-        'smart-query-planner',
-        {
-          body: {
-            message,
-            userId: requestUserId,
-            conversationContext,
-            userProfile,
-            timeRange: userProfile.timeRange || null
-          }
-        }
-      );
-      
-      if (plannerError) {
-        throw new Error(`GPT planner error: ${plannerError.message}`);
+    // Step 1: Classify the query to determine processing approach
+    console.log('[chat-with-rag] Step 1: Query Classification');
+    const { data: classification, error: classificationError } = await supabaseClient.functions.invoke(
+      'chat-query-classifier',
+      {
+        body: { message, conversationContext }
       }
-      
-      enhancedQueryPlan = gptPlan.queryPlan;
-      console.log('[chat-with-rag] Using GPT-generated query plan:', enhancedQueryPlan);
-    } catch (error) {
-      console.error('[chat-with-rag] GPT planner failed:', error);
-      throw new Error('Query planning failed');
+    );
+
+    if (classificationError) {
+      throw new Error(`Query classification failed: ${classificationError.message}`);
     }
-    
-    console.log(`[chat-with-rag] Query plan strategy: ${enhancedQueryPlan.strategy}, complexity: ${enhancedQueryPlan.complexity}`);
 
-    // Step 2: Check if we should use GPT-driven analysis (any sub-questions >= 1)
-    const shouldUseGptAnalysis = enhancedQueryPlan.subQuestions && enhancedQueryPlan.subQuestions.length >= 1;
-    
-    if (shouldUseGptAnalysis) {
-      console.log(`[chat-with-rag] Using GPT-driven analysis pipeline for ${enhancedQueryPlan.subQuestions.length} sub-questions`);
-      
-      // Step 3: Call GPT Analysis Orchestrator for sub-question analysis
-      const { data: analysisResults, error: analysisError } = await supabaseClient.functions.invoke(
-        'gpt-analysis-orchestrator',
+    console.log(`[chat-with-rag] Query classified as: ${classification.category}`);
+
+    // Handle clarification queries directly
+    if (classification.category === 'JOURNAL_SPECIFIC_NEEDS_CLARIFICATION') {
+      console.log('[chat-with-rag] Handling clarification query');
+      const { data: clarificationResult, error: clarificationError } = await supabaseClient.functions.invoke(
+        'gpt-clarification-generator',
         {
-          body: {
-            subQuestions: enhancedQueryPlan.subQuestions,
+          body: { 
             userMessage: message,
-            userId: requestUserId,
-            timeRange: enhancedQueryPlan.timeRange
-          }
-        }
-      );
-
-      if (analysisError) {
-        throw new Error(`Analysis orchestrator failed: ${analysisError.message}`);
-      }
-
-      // Step 4: Call GPT Response Consolidator to synthesize the results
-      const { data: consolidationResult, error: consolidationError } = await supabaseClient.functions.invoke(
-        'gpt-response-consolidator',
-        {
-          body: {
-            userMessage: message,
-            analysisResults: analysisResults.analysisResults,
             conversationContext,
-            userProfile,
-            streamingMode: false
+            userProfile 
           }
         }
       );
 
-      if (consolidationError) {
-        throw new Error(`Response consolidator failed: ${consolidationError.message}`);
+      if (clarificationError) {
+        throw new Error(`Clarification generation failed: ${clarificationError.message}`);
       }
-
-      console.log('[chat-with-rag] Successfully completed GPT-driven analysis pipeline');
 
       return new Response(JSON.stringify({
-        response: consolidationResult.response,
+        response: clarificationResult.response,
+        userStatusMessage: clarificationResult.userStatusMessage,
         analysis: {
-          queryPlan: enhancedQueryPlan,
-          gptDrivenAnalysis: true,
-          subQuestionAnalysis: analysisResults.summary,
-          consolidationMetadata: consolidationResult.analysisMetadata
+          queryType: 'clarification',
+          classification,
+          timestamp: new Date().toISOString()
         }
       }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
-    } else {
-      throw new Error('No sub-questions generated - unable to process query');
     }
 
+    // For JOURNAL_SPECIFIC queries, process through the full RAG pipeline
+    if (classification.category === 'JOURNAL_SPECIFIC') {
+      console.log('[chat-with-rag] Processing through full RAG pipeline');
+      
+      // Step 2: Use GPT-powered query planning via smart-query-planner
+      let enhancedQueryPlan;
+      
+      try {
+        const { data: gptPlan, error: plannerError } = await supabaseClient.functions.invoke(
+          'smart-query-planner',
+          {
+            body: {
+              message,
+              userId: requestUserId,
+              conversationContext,
+              userProfile,
+              timeRange: userProfile.timeRange || null
+            }
+          }
+        );
+        
+        if (plannerError) {
+          throw new Error(`GPT planner error: ${plannerError.message}`);
+        }
+        
+        enhancedQueryPlan = gptPlan.queryPlan;
+        console.log('[chat-with-rag] Using GPT-generated query plan:', enhancedQueryPlan);
+      } catch (error) {
+        console.error('[chat-with-rag] GPT planner failed:', error);
+        throw new Error('Query planning failed');
+      }
+      
+      console.log(`[chat-with-rag] Query plan strategy: ${enhancedQueryPlan.strategy}, complexity: ${enhancedQueryPlan.complexity}`);
+
+      // Step 3: Check if we should use GPT-driven analysis (any sub-questions >= 1)
+      const shouldUseGptAnalysis = enhancedQueryPlan.subQuestions && enhancedQueryPlan.subQuestions.length >= 1;
+      
+      if (shouldUseGptAnalysis) {
+        console.log(`[chat-with-rag] Using GPT-driven analysis pipeline for ${enhancedQueryPlan.subQuestions.length} sub-questions`);
+        
+        // Step 4: Call GPT Analysis Orchestrator for sub-question analysis
+        const { data: analysisResults, error: analysisError } = await supabaseClient.functions.invoke(
+          'gpt-analysis-orchestrator',
+          {
+            body: {
+              subQuestions: enhancedQueryPlan.subQuestions,
+              userMessage: message,
+              userId: requestUserId,
+              timeRange: enhancedQueryPlan.timeRange
+            }
+          }
+        );
+
+        if (analysisError) {
+          throw new Error(`Analysis orchestrator failed: ${analysisError.message}`);
+        }
+
+        // Step 5: Call GPT Response Consolidator to synthesize the results
+        const { data: consolidationResult, error: consolidationError } = await supabaseClient.functions.invoke(
+          'gpt-response-consolidator',
+          {
+            body: {
+              userMessage: message,
+              analysisResults: analysisResults.analysisResults,
+              conversationContext,
+              userProfile,
+              streamingMode: false
+            }
+          }
+        );
+
+        if (consolidationError) {
+          throw new Error(`Response consolidator failed: ${consolidationError.message}`);
+        }
+
+        console.log('[chat-with-rag] Successfully completed GPT-driven analysis pipeline');
+
+        return new Response(JSON.stringify({
+          response: consolidationResult.response,
+          userStatusMessage: consolidationResult.userStatusMessage,
+          analysis: {
+            queryPlan: enhancedQueryPlan,
+            gptDrivenAnalysis: true,
+            subQuestionAnalysis: analysisResults.summary,
+            consolidationMetadata: consolidationResult.analysisMetadata,
+            classification
+          }
+        }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      } else {
+        throw new Error('No sub-questions generated - unable to process query');
+      }
+    }
+
+    // For other categories (GENERAL_MENTAL_HEALTH, CONVERSATIONAL), handle appropriately
+    console.log(`[chat-with-rag] Handling ${classification.category} query`);
+    
+    // This could route to other specialized functions in the future
+    return new Response(JSON.stringify({
+      response: "I understand you're reaching out. For questions about your personal journal insights, I'm here to help analyze your entries. For general wellness information, feel free to ask specific questions!",
+      analysis: {
+        queryType: 'general',
+        classification,
+        timestamp: new Date().toISOString()
+      }
+    }), {
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    });
+
   } catch (error) {
-    console.error('[chat-with-rag] Error in streamlined RAG:', error);
+    console.error('[chat-with-rag] Error in enhanced RAG:', error);
 
     return new Response(JSON.stringify({
       error: error.message,
-      response: "I apologize, but I encountered an error while analyzing your journal entries. Please try again.",
+      response: "I apologize, but I encountered an error while processing your request. Please try again.",
       analysis: {
         queryType: 'error',
         errorType: 'rag_pipeline_error',
@@ -181,92 +248,160 @@ async function processStreamingPipeline(
       userProfile = {}
     } = requestBody;
 
-    // Step 1: Query planning with status updates
-    streamManager.sendUserMessage("Breaking down your question carefully");
-    streamManager.sendBackendTask("query_planning", "Analyzing query structure and requirements");
+    // Step 1: Query classification with status updates
+    streamManager.sendUserMessage("Understanding your question");
+    streamManager.sendBackendTask("query_classification", "Analyzing query type and requirements");
     
-    const { data: gptPlan, error: plannerError } = await supabaseClient.functions.invoke(
-      'smart-query-planner',
+    const { data: classification, error: classificationError } = await supabaseClient.functions.invoke(
+      'chat-query-classifier',
       {
-        body: {
-          message,
-          userId: requestUserId,
-          conversationContext,
-          userProfile,
-          timeRange: userProfile.timeRange || null
-        }
+        body: { message, conversationContext }
       }
     );
     
-    if (plannerError) {
-      throw new Error(`GPT planner error: ${plannerError.message}`);
+    if (classificationError) {
+      throw new Error(`Query classification failed: ${classificationError.message}`);
     }
-    
-    const enhancedQueryPlan = gptPlan.queryPlan;
-    
-    // Check for user status message from query planner
-    if (gptPlan.userStatusMessage) {
-      streamManager.sendUserMessage(gptPlan.userStatusMessage);
-    }
-    
-    // Step 2: Analysis orchestration with status updates
-    streamManager.sendBackendTask("Searching your journal...", "Looking through journal entries");
-    
-    const { data: analysisResults, error: analysisError } = await supabaseClient.functions.invoke(
-      'gpt-analysis-orchestrator',
-      {
-        body: {
-          subQuestions: enhancedQueryPlan.subQuestions,
-          userMessage: message,
-          userId: requestUserId,
-          timeRange: enhancedQueryPlan.timeRange
+
+    // Handle clarification queries in streaming mode
+    if (classification.category === 'JOURNAL_SPECIFIC_NEEDS_CLARIFICATION') {
+      streamManager.sendUserMessage("Creating space for deeper understanding");
+      streamManager.sendBackendTask("clarification_generation", "Generating thoughtful questions");
+      
+      const { data: clarificationResult, error: clarificationError } = await supabaseClient.functions.invoke(
+        'gpt-clarification-generator',
+        {
+          body: { 
+            userMessage: message,
+            conversationContext,
+            userProfile 
+          }
         }
+      );
+
+      if (clarificationError) {
+        throw new Error(`Clarification generation failed: ${clarificationError.message}`);
       }
-    );
 
-    if (analysisError) {
-      throw new Error(`Analysis orchestrator failed: ${analysisError.message}`);
-    }
+      if (clarificationResult.userStatusMessage) {
+        streamManager.sendUserMessage(clarificationResult.userStatusMessage);
+      }
 
-    streamManager.sendBackendTask("Journal analysis complete", "Processing insights");
-
-    // Step 3: Response consolidation with status updates
-    streamManager.sendBackendTask("Crafting your response...", "Generating personalized insights");
-    
-    const { data: consolidationResult, error: consolidationError } = await supabaseClient.functions.invoke(
-      'gpt-response-consolidator',
-      {
-        body: {
-          userMessage: message,
-          analysisResults: analysisResults.analysisResults,
-          conversationContext,
-          userProfile,
-          streamingMode: false
+      streamManager.sendEvent('final_response', {
+        response: clarificationResult.response,
+        analysis: {
+          queryType: 'clarification',
+          classification,
+          timestamp: new Date().toISOString()
         }
-      }
-    );
+      });
 
-    if (consolidationError) {
-      throw new Error(`Response consolidator failed: ${consolidationError.message}`);
+      streamManager.close();
+      return;
     }
 
-    // Check for user status message from response consolidator
-    if (consolidationResult.userStatusMessage) {
-      streamManager.sendUserMessage(consolidationResult.userStatusMessage);
-    }
-
-    // Send final response
-    streamManager.sendEvent('final_response', {
-      response: consolidationResult.response,
-      analysis: {
-        queryPlan: enhancedQueryPlan,
-        gptDrivenAnalysis: true,
-        subQuestionAnalysis: analysisResults.summary,
-        consolidationMetadata: consolidationResult.analysisMetadata
+    // For JOURNAL_SPECIFIC, continue with full pipeline
+    if (classification.category === 'JOURNAL_SPECIFIC') {
+      // Step 2: Query planning with status updates
+      streamManager.sendUserMessage("Breaking down your question carefully");
+      streamManager.sendBackendTask("query_planning", "Analyzing query structure and requirements");
+      
+      const { data: gptPlan, error: plannerError } = await supabaseClient.functions.invoke(
+        'smart-query-planner',
+        {
+          body: {
+            message,
+            userId: requestUserId,
+            conversationContext,
+            userProfile,
+            timeRange: userProfile.timeRange || null
+          }
+        }
+      );
+      
+      if (plannerError) {
+        throw new Error(`GPT planner error: ${plannerError.message}`);
       }
-    });
+      
+      const enhancedQueryPlan = gptPlan.queryPlan;
+      
+      // Check for user status message from query planner
+      if (gptPlan.userStatusMessage) {
+        streamManager.sendUserMessage(gptPlan.userStatusMessage);
+      }
+      
+      // Step 3: Analysis orchestration with status updates
+      streamManager.sendBackendTask("Searching your journal...", "Looking through journal entries");
+      
+      const { data: analysisResults, error: analysisError } = await supabaseClient.functions.invoke(
+        'gpt-analysis-orchestrator',
+        {
+          body: {
+            subQuestions: enhancedQueryPlan.subQuestions,
+            userMessage: message,
+            userId: requestUserId,
+            timeRange: enhancedQueryPlan.timeRange
+          }
+        }
+      );
 
-    streamManager.close();
+      if (analysisError) {
+        throw new Error(`Analysis orchestrator failed: ${analysisError.message}`);
+      }
+
+      streamManager.sendBackendTask("Journal analysis complete", "Processing insights");
+
+      // Step 4: Response consolidation with status updates
+      streamManager.sendBackendTask("Crafting your response...", "Generating personalized insights");
+      
+      const { data: consolidationResult, error: consolidationError } = await supabaseClient.functions.invoke(
+        'gpt-response-consolidator',
+        {
+          body: {
+            userMessage: message,
+            analysisResults: analysisResults.analysisResults,
+            conversationContext,
+            userProfile,
+            streamingMode: false
+          }
+        }
+      );
+
+      if (consolidationError) {
+        throw new Error(`Response consolidator failed: ${consolidationError.message}`);
+      }
+
+      // Check for user status message from response consolidator
+      if (consolidationResult.userStatusMessage) {
+        streamManager.sendUserMessage(consolidationResult.userStatusMessage);
+      }
+
+      // Send final response
+      streamManager.sendEvent('final_response', {
+        response: consolidationResult.response,
+        analysis: {
+          queryPlan: enhancedQueryPlan,
+          gptDrivenAnalysis: true,
+          subQuestionAnalysis: analysisResults.summary,
+          consolidationMetadata: consolidationResult.analysisMetadata,
+          classification
+        }
+      });
+
+      streamManager.close();
+    } else {
+      // Handle other categories
+      streamManager.sendEvent('final_response', {
+        response: "I understand you're reaching out. For questions about your personal journal insights, I'm here to help analyze your entries.",
+        analysis: {
+          queryType: 'general',
+          classification,
+          timestamp: new Date().toISOString()
+        }
+      });
+
+      streamManager.close();
+    }
 
   } catch (error) {
     streamManager.sendEvent('error', { error: error.message });
