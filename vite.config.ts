@@ -25,7 +25,7 @@ export default defineConfig(({ mode }) => ({
     dedupe: ['react', 'react-dom']
   },
   optimizeDeps: {
-    exclude: ['lovable-tagger', '@codetrix-studio/capacitor-google-auth'],
+    exclude: ['lovable-tagger'],
     include: ['react', 'react-dom', 'framer-motion']
   },
   // Ensure that Vite correctly resolves Node.js built-in modules

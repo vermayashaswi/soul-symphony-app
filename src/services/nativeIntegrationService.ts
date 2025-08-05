@@ -300,9 +300,25 @@ class NativeIntegrationService {
     }
   }
 
-  // Public methods
+  // Public methods - cached for performance
+  private _nativeCheckCache: boolean | null = null;
+  private _nativeCheckTimestamp: number = 0;
+  private readonly CACHE_DURATION = 5000; // 5 seconds cache
+
   isRunningNatively(): boolean {
-    return this.isActuallyNative;
+    const now = Date.now();
+    
+    // Use cached result if still valid
+    if (this._nativeCheckCache !== null && (now - this._nativeCheckTimestamp) < this.CACHE_DURATION) {
+      return this._nativeCheckCache;
+    }
+    
+    // Recalculate and cache
+    this._nativeCheckCache = this.isActuallyNative;
+    this._nativeCheckTimestamp = now;
+    
+    console.log('[NativeIntegration] isRunningNatively check:', this._nativeCheckCache, '(cached)');
+    return this._nativeCheckCache;
   }
 
   getPlatform(): string {
