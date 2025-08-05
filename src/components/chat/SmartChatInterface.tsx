@@ -231,20 +231,32 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({
 
   const loadThreadMessages = async (threadId: string) => {
     if (!threadId || !effectiveUserId) {
+      console.log('[Desktop] loadThreadMessages: Missing threadId or user, resetting states');
       setInitialLoading(false);
       setShowSuggestions(true);
       return;
     }
     
+    // Prevent race conditions by checking if this thread is already being loaded
     if (loadedThreadRef.current === threadId) {
       debugLog.addEvent("Thread Loading", `Thread ${threadId} already loaded, skipping`, "info");
+      console.log(`[Desktop] Thread ${threadId} already loaded, skipping load`);
       setInitialLoading(false);
       return;
     }
     
-    debugLog.addEvent("Thread Loading", `Loading messages for thread ${threadId}`, "info");
+    // Prevent loading the same thread multiple times concurrently
+    const loadingFlag = `loading-${threadId}`;
+    if ((window as any)[loadingFlag]) {
+      console.log(`[Desktop] Thread ${threadId} is already being loaded, skipping`);
+      return;
+    }
+    
+    (window as any)[loadingFlag] = true;
+    debugLog.addEvent("Thread Loading", `[Desktop] Starting to load messages for thread ${threadId}`, "info");
     
     try {
+      // Verify thread exists and belongs to user
       const { data: threadData, error: threadError } = await supabase
         .from('chat_threads')
         .select('id')
@@ -253,20 +265,20 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({
         .single();
         
       if (threadError || !threadData) {
-        debugLog.addEvent("Thread Loading", `Thread not found or doesn't belong to user: ${threadError?.message || "Unknown error"}`, "error");
-        console.error("Thread not found or doesn't belong to user:", threadError);
+        debugLog.addEvent("Thread Loading", `[Desktop] Thread not found or doesn't belong to user: ${threadError?.message || "Unknown error"}`, "error");
+        console.log(`[Desktop] Thread ${threadId} not found or access denied`);
         setChatHistory([]);
         setShowSuggestions(true);
-        setInitialLoading(false);
         return;
       }
       
+      // Load messages
       debugLog.addEvent("Thread Loading", `Thread ${threadId} found, fetching messages`, "success");
       const messages = await getThreadMessages(threadId, effectiveUserId);
       
       if (messages && messages.length > 0) {
         debugLog.addEvent("Thread Loading", `Loaded ${messages.length} messages for thread ${threadId}`, "success");
-        console.log(`Loaded ${messages.length} messages for thread ${threadId}`);
+        console.log(`[Desktop] Successfully loaded ${messages.length} messages for thread ${threadId}`);
         
         // Convert the messages to the correct type
         const typedMessages: ChatMessage[] = messages.map(msg => ({
@@ -280,12 +292,13 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({
         loadedThreadRef.current = threadId;
       } else {
         debugLog.addEvent("Thread Loading", `No messages found for thread ${threadId}`, "info");
-        console.log(`No messages found for thread ${threadId}`);
+        console.log(`[Desktop] No messages found for thread ${threadId}, showing suggestions`);
         setChatHistory([]);
         setShowSuggestions(true);
+        loadedThreadRef.current = threadId; // Still mark as loaded even if empty
       }
     } catch (error) {
-      console.error("Error loading messages:", error);
+      console.error(`[Desktop] Error loading thread ${threadId}:`, error);
       debugLog.addEvent("Thread Loading", `Error loading messages: ${error instanceof Error ? error.message : "Unknown error"}`, "error");
       toast({
         title: "Error loading messages",
@@ -295,7 +308,10 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({
       setChatHistory([]);
       setShowSuggestions(true);
     } finally {
+      // Always reset loading state and clear the loading flag
       setInitialLoading(false);
+      delete (window as any)[loadingFlag];
+      console.log(`[Desktop] Finished loading thread ${threadId}, initialLoading reset to false`);
     }
   };
 

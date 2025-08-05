@@ -178,26 +178,41 @@ export default function MobileChatInterface({
   const { translate } = useTranslation();
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
+  const scrollToBottom = () => {
+    setTimeout(() => {
+      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }, 100);
+  };
+
   useEffect(() => {
+    console.log(`[Mobile] Thread initialization effect triggered - threadId: ${threadId}, userId: ${user?.id}`);
+    
     if (threadId) {
+      console.log(`[Mobile] Loading current thread: ${threadId}`);
       actions.setInitialLoading(true);
       loadThreadMessages(threadId);
       debugLog.addEvent("Thread Initialization", `Loading current thread: ${threadId}`, "info");
     } else {
       const storedThreadId = localStorage.getItem("lastActiveChatThreadId");
+      console.log(`[Mobile] No current thread, checking localStorage: ${storedThreadId}`);
+      
       if (storedThreadId && user?.id) {
+        console.log(`[Mobile] Loading stored thread: ${storedThreadId}`);
         actions.setInitialLoading(true);
         actions.setThreadId(storedThreadId);
         loadThreadMessages(storedThreadId);
         debugLog.addEvent("Thread Initialization", `Loading stored thread: ${storedThreadId}`, "info");
       } else {
-        // No thread to load - show suggestions immediately
+        // No thread to load - reset states and show suggestions immediately
+        console.log(`[Mobile] No thread available, resetting to suggestion state`);
         actions.setInitialLoading(false);
         actions.setShowSuggestions(true);
+        actions.setMessages([]); // Clear any existing messages
+        loadedThreadRef.current = null; // Clear loaded thread reference
         debugLog.addEvent("Thread Initialization", "No stored thread found, showing suggestions", "info");
       }
     }
-  }, [threadId, user?.id, actions, debugLog]);
+  }, [threadId, user?.id]);
   
   useEffect(() => {
     const onThreadChange = (event: CustomEvent) => {
@@ -216,34 +231,40 @@ export default function MobileChatInterface({
     
     addCleanupFunction(cleanup);
     return cleanup;
-  }, [actions, debugLog, addCleanupFunction]);
+  }, [addCleanupFunction]);
 
   useEffect(() => {
     scrollToBottom();
   }, [messages, isLoading, isProcessing]);
 
-  const scrollToBottom = () => {
-    setTimeout(() => {
-      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-    }, 100);
-  };
-
   const loadThreadMessages = async (currentThreadId: string) => {
     if (!currentThreadId || !user?.id) {
+      console.log('[Mobile] loadThreadMessages: Missing threadId or user, resetting states');
       actions.setInitialLoading(false);
       actions.setShowSuggestions(true);
       return;
     }
     
+    // Prevent race conditions by checking if this thread is already being loaded
     if (loadedThreadRef.current === currentThreadId) {
       debugLog.addEvent("Thread Loading", `Thread ${currentThreadId} already loaded, skipping`, "info");
+      console.log(`[Mobile] Thread ${currentThreadId} already loaded, skipping load`);
       actions.setInitialLoading(false);
       return;
     }
     
-    debugLog.addEvent("Thread Loading", `[Mobile] Loading messages for thread ${currentThreadId}`, "info");
+    // Prevent loading the same thread multiple times concurrently
+    const loadingFlag = `loading-${currentThreadId}`;
+    if ((window as any)[loadingFlag]) {
+      console.log(`[Mobile] Thread ${currentThreadId} is already being loaded, skipping`);
+      return;
+    }
+    
+    (window as any)[loadingFlag] = true;
+    debugLog.addEvent("Thread Loading", `[Mobile] Starting to load messages for thread ${currentThreadId}`, "info");
     
     try {
+      // Verify thread exists and belongs to user
       const { data: threadData, error: threadError } = await supabase
         .from('chat_threads')
         .select('id')
@@ -253,12 +274,13 @@ export default function MobileChatInterface({
         
       if (threadError || !threadData) {
         debugLog.addEvent("Thread Loading", `[Mobile] Thread not found or doesn't belong to user: ${threadError?.message || "Unknown error"}`, "error");
+        console.log(`[Mobile] Thread ${currentThreadId} not found or access denied`);
         actions.setMessages([]);
         actions.setShowSuggestions(true);
-        actions.setInitialLoading(false);
         return;
       }
       
+      // Load messages
       const chatMessages = await getThreadMessages(currentThreadId, user.id);
       
       if (chatMessages && chatMessages.length > 0) {
@@ -271,15 +293,19 @@ export default function MobileChatInterface({
           timestamp: new Date(msg.created_at || Date.now()).getTime()
         }));
         
+        console.log(`[Mobile] Successfully loaded ${uiMessages.length} messages for thread ${currentThreadId}`);
         actions.setMessages(uiMessages);
         actions.setShowSuggestions(false);
         loadedThreadRef.current = currentThreadId;
       } else {
+        console.log(`[Mobile] No messages found for thread ${currentThreadId}, showing suggestions`);
         actions.setMessages([]);
         actions.setShowSuggestions(true);
+        loadedThreadRef.current = currentThreadId; // Still mark as loaded even if empty
       }
     } catch (error) {
       debugLog.addEvent("Thread Loading", `[Mobile] Error loading messages: ${error instanceof Error ? error.message : "Unknown error"}`, "error");
+      console.error(`[Mobile] Error loading thread ${currentThreadId}:`, error);
       toast({
         title: "Error loading messages",
         description: "Could not load conversation history.",
@@ -288,7 +314,10 @@ export default function MobileChatInterface({
       actions.setMessages([]);
       actions.setShowSuggestions(true);
     } finally {
+      // Always reset loading state and clear the loading flag
       actions.setInitialLoading(false);
+      delete (window as any)[loadingFlag];
+      console.log(`[Mobile] Finished loading thread ${currentThreadId}, initialLoading reset to false`);
     }
   };
 

@@ -115,6 +115,7 @@ export const useChatState = (initialThreadId?: string | null) => {
 
   const loadedThreadRef = useRef<string | null>(null);
   const cleanupFunctions = useRef<Set<() => void>>(new Set());
+  const loadingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // Cleanup function for preventing memory leaks
   const addCleanupFunction = useCallback((cleanup: () => void) => {
@@ -124,9 +125,46 @@ export const useChatState = (initialThreadId?: string | null) => {
     };
   }, []);
 
+  // Reset loading states on page visibility change or focus
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        console.log('[useChatState] Page became visible, checking loading states');
+        if (state.initialLoading) {
+          console.log('[useChatState] Resetting stuck initialLoading state on visibility change');
+          dispatch({ type: 'SET_INITIAL_LOADING', payload: false });
+        }
+      }
+    };
+
+    const handleFocus = () => {
+      console.log('[useChatState] Window focused, checking loading states');
+      if (state.initialLoading) {
+        console.log('[useChatState] Resetting stuck initialLoading state on focus');
+        dispatch({ type: 'SET_INITIAL_LOADING', payload: false });
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('focus', handleFocus);
+
+    const cleanup = () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('focus', handleFocus);
+    };
+
+    addCleanupFunction(cleanup);
+    return cleanup;
+  }, [state.initialLoading, addCleanupFunction]);
+
   // Cleanup all functions on unmount
   useEffect(() => {
     return () => {
+      // Clear any pending timeout
+      if (loadingTimeoutRef.current) {
+        clearTimeout(loadingTimeoutRef.current);
+      }
+      
       cleanupFunctions.current.forEach(cleanup => {
         try {
           cleanup();
@@ -172,7 +210,23 @@ export const useChatState = (initialThreadId?: string | null) => {
     }, []),
 
     setInitialLoading: useCallback((loading: boolean) => {
+      // Clear any existing timeout when setting loading state
+      if (loadingTimeoutRef.current) {
+        clearTimeout(loadingTimeoutRef.current);
+        loadingTimeoutRef.current = null;
+      }
+      
+      console.log(`[useChatState] Setting initialLoading: ${loading}`);
       dispatch({ type: 'SET_INITIAL_LOADING', payload: loading });
+      
+      // Set a timeout to automatically reset loading state after 10 seconds
+      if (loading) {
+        loadingTimeoutRef.current = setTimeout(() => {
+          console.log('[useChatState] Loading timeout reached, resetting initialLoading');
+          dispatch({ type: 'SET_INITIAL_LOADING', payload: false });
+          loadingTimeoutRef.current = null;
+        }, 10000);
+      }
     }, []),
 
     setShowDeleteDialog: useCallback((show: boolean) => {
