@@ -113,7 +113,7 @@ ${conversationContext ? conversationContext.slice(-6).map((msg: any) => `${msg.s
 Look at the past conversation history provided to you and accordingly frame your response cleverly setting the emotional tone that's been running through up until now.
 
 **RESPONSE GUIDELINES:**
-Respond naturally in your authentic voice without any specific formatting requirements. Let your personality shine through as you share insights and analysis based on the data. Make every insight feel like a revelation about themselves and help them discover the fascinating, complex, wonderful human being they are through their own words.
+Use **bold headers**, *italics*, bullet points, and emojis appropriately to make your responses engaging and easy to read. Keep responses under 150 words unless the question requires more depth. Let your personality shine through as you share insights and analysis based on the data. Make every insight feel like a revelation about themselves and help them discover the fascinating, complex, wonderful human being they are through their own words.
 
 Your response should be a JSON object with this structure:
 {
