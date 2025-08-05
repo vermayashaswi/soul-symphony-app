@@ -44,6 +44,10 @@ serve(async (req) => {
     // Check if streaming is enabled
     const enableStreaming = requestBody.streamingMode || false;
     
+    // Create a classification cache key to ensure consistency
+    const classificationCacheKey = `${message}_${JSON.stringify(conversationContext.slice(-2))}`;
+    let cachedClassification = null;
+    
     if (enableStreaming) {
       // Create streaming response
       const { response, controller } = createStreamingResponse();
@@ -59,7 +63,7 @@ serve(async (req) => {
       return response;
     }
 
-    // Step 1: Classify the query to determine processing approach
+    // Step 1: Classify the query to determine processing approach (single invocation)
     console.log('[chat-with-rag] Step 1: Query Classification');
     const { data: classification, error: classificationError } = await supabaseClient.functions.invoke(
       'chat-query-classifier',
@@ -72,11 +76,19 @@ serve(async (req) => {
       throw new Error(`Query classification failed: ${classificationError.message}`);
     }
 
-    console.log(`[chat-with-rag] Query classified as: ${classification.category}`);
+    // Validate classification result structure
+    if (!classification || !classification.category) {
+      throw new Error('Invalid classification result - missing category');
+    }
+
+    console.log(`[chat-with-rag] Query classified as: ${classification.category} (confidence: ${classification.confidence})`);
+    
+    // Cache the classification to prevent inconsistencies
+    cachedClassification = classification;
 
     // Handle unrelated queries with polite denial
-    if (classification.category === 'UNRELATED') {
-      console.log('[chat-with-rag] Handling unrelated query - polite denial');
+    if (cachedClassification.category === 'UNRELATED') {
+      console.log('[chat-with-rag] EXECUTING: UNRELATED pipeline - polite denial');
       return new Response(JSON.stringify({
         response: "I appreciate your question, but I'm specifically designed to help you explore your journal entries, understand your emotional patterns, and support your mental health and well-being. I focus on analyzing your personal reflections and providing insights about your journey. Is there something about your thoughts, feelings, or experiences you'd like to discuss instead?",
         userStatusMessage: null,
@@ -91,8 +103,8 @@ serve(async (req) => {
     }
 
     // Handle clarification queries directly
-    if (classification.category === 'JOURNAL_SPECIFIC_NEEDS_CLARIFICATION') {
-      console.log('[chat-with-rag] Handling clarification query');
+    if (cachedClassification.category === 'JOURNAL_SPECIFIC_NEEDS_CLARIFICATION') {
+      console.log('[chat-with-rag] EXECUTING: CLARIFICATION pipeline');
       const { data: clarificationResult, error: clarificationError } = await supabaseClient.functions.invoke(
         'gpt-clarification-generator',
         {
@@ -122,8 +134,8 @@ serve(async (req) => {
     }
 
     // For JOURNAL_SPECIFIC queries, process through the full RAG pipeline
-    if (classification.category === 'JOURNAL_SPECIFIC') {
-      console.log('[chat-with-rag] Processing through full RAG pipeline');
+    if (cachedClassification.category === 'JOURNAL_SPECIFIC') {
+      console.log('[chat-with-rag] EXECUTING: JOURNAL_SPECIFIC pipeline - full RAG processing');
       
       // Step 2: Use GPT-powered query planning via smart-query-planner
       let enhancedQueryPlan;
@@ -217,8 +229,8 @@ serve(async (req) => {
     }
 
     // For GENERAL_MENTAL_HEALTH category (including conversational responses)
-    if (classification.category === 'GENERAL_MENTAL_HEALTH') {
-      console.log('[chat-with-rag] Handling GENERAL_MENTAL_HEALTH query');
+    if (cachedClassification.category === 'GENERAL_MENTAL_HEALTH') {
+      console.log('[chat-with-rag] EXECUTING: GENERAL_MENTAL_HEALTH pipeline');
       
       try {
         const { data: generalResponse, error: generalError } = await supabaseClient.functions.invoke(
@@ -259,12 +271,13 @@ serve(async (req) => {
     }
 
     // Fallback for any other categories
-    console.log(`[chat-with-rag] Handling unknown category: ${classification.category}`);
+    console.log(`[chat-with-rag] EXECUTING: UNKNOWN_CATEGORY pipeline for: ${cachedClassification.category}`);
+    console.error(`[chat-with-rag] WARNING: Unhandled classification category: ${cachedClassification.category}`);
     return new Response(JSON.stringify({
       response: "I understand you're reaching out. For questions about your personal journal insights, I'm here to help analyze your entries. For general wellness information, feel free to ask specific questions!",
       analysis: {
         queryType: 'unknown_category',
-        classification,
+        classification: cachedClassification,
         timestamp: new Date().toISOString()
       }
     }), {
@@ -304,7 +317,7 @@ async function processStreamingPipeline(
       userProfile = {}
     } = requestBody;
 
-    // Step 1: Query classification with status updates
+    // Step 1: Query classification with status updates (streaming mode)
     streamManager.sendUserMessage("Understanding your question");
     streamManager.sendBackendTask("query_classification", "Analyzing query type and requirements");
     
@@ -319,8 +332,16 @@ async function processStreamingPipeline(
       throw new Error(`Query classification failed: ${classificationError.message}`);
     }
 
+    // Validate classification result in streaming mode
+    if (!classification || !classification.category) {
+      throw new Error('Invalid classification result - missing category');
+    }
+
+    console.log(`[chat-with-rag] STREAMING: Query classified as: ${classification.category} (confidence: ${classification.confidence})`);
+
     // Handle unrelated queries in streaming mode
     if (classification.category === 'UNRELATED') {
+      console.log('[chat-with-rag] STREAMING EXECUTING: UNRELATED pipeline');
       streamManager.sendUserMessage("Gently redirecting to wellness focus");
       
       streamManager.sendEvent('final_response', {
@@ -338,6 +359,7 @@ async function processStreamingPipeline(
 
     // Handle clarification queries in streaming mode
     if (classification.category === 'JOURNAL_SPECIFIC_NEEDS_CLARIFICATION') {
+      console.log('[chat-with-rag] STREAMING EXECUTING: CLARIFICATION pipeline');
       streamManager.sendUserMessage("Creating space for deeper understanding");
       streamManager.sendBackendTask("clarification_generation", "Generating thoughtful questions");
       
@@ -375,6 +397,7 @@ async function processStreamingPipeline(
 
     // For JOURNAL_SPECIFIC, continue with full pipeline
     if (classification.category === 'JOURNAL_SPECIFIC') {
+      console.log('[chat-with-rag] STREAMING EXECUTING: JOURNAL_SPECIFIC pipeline');
       // Step 2: Query planning with status updates
       streamManager.sendUserMessage("Breaking down your question carefully");
       streamManager.sendBackendTask("query_planning", "Analyzing query structure and requirements");
@@ -463,6 +486,7 @@ async function processStreamingPipeline(
 
       streamManager.close();
     } else if (classification.category === 'GENERAL_MENTAL_HEALTH') {
+      console.log('[chat-with-rag] STREAMING EXECUTING: GENERAL_MENTAL_HEALTH pipeline');
       // Handle general mental health queries (including conversational ones) in streaming mode
       streamManager.sendUserMessage("Processing your wellness question");
       streamManager.sendBackendTask("general_mental_health", "Generating helpful response");
