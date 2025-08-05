@@ -1,14 +1,26 @@
-import { GoogleAuth } from '@codetrix-studio/capacitor-google-auth';
 import { supabase } from '@/integrations/supabase/client';
 import { nativeIntegrationService } from './nativeIntegrationService';
 import { nativeNavigationService } from './nativeNavigationService';
 import { toast } from 'sonner';
+
+// Type definitions for GoogleAuth to avoid import errors in web environment
+interface GoogleAuthPlugin {
+  initialize(options: { clientId: string; scopes: string[] }): Promise<void>;
+  signIn(): Promise<{
+    authentication: { idToken: string; accessToken?: string };
+    email: string;
+    name: string;
+    id: string;
+  }>;
+  signOut(): Promise<void>;
+}
 
 class NativeAuthService {
   private static instance: NativeAuthService;
   private isInitialized = false;
   private initializationError: string | null = null;
   private hasValidClientId = false;
+  private googleAuthPlugin: GoogleAuthPlugin | null = null;
 
   static getInstance(): NativeAuthService {
     if (!NativeAuthService.instance) {
@@ -53,6 +65,11 @@ class NativeAuthService {
         scopes: ['profile', 'email'],
         expectedClientId: '11083941790-oi1vrl8bmsjajc0h1ka4f9q0qjmm80o9.apps.googleusercontent.com'
       });
+
+      const GoogleAuth = await this.getGoogleAuthPlugin();
+      if (!GoogleAuth) {
+        throw new Error('GoogleAuth plugin could not be loaded');
+      }
 
       await GoogleAuth.initialize({
         clientId: clientId,
@@ -137,6 +154,11 @@ class NativeAuthService {
         }
 
         console.log('[NativeAuth] Calling GoogleAuth.signIn()...');
+
+        const GoogleAuth = await this.getGoogleAuthPlugin();
+        if (!GoogleAuth) {
+          throw new Error('GoogleAuth plugin not available');
+        }
 
         // ENHANCED: Add proper error handling and retry logic
         let result;
@@ -268,8 +290,11 @@ class NativeAuthService {
 
       if (this.shouldUseNativeAuth() && !this.initializationError && this.hasValidClientId) {
         try {
-          await GoogleAuth.signOut();
-          console.log('[NativeAuth] Signed out from Google natively');
+          const GoogleAuth = await this.getGoogleAuthPlugin();
+          if (GoogleAuth) {
+            await GoogleAuth.signOut();
+            console.log('[NativeAuth] Signed out from Google natively');
+          }
         } catch (error) {
           console.warn('[NativeAuth] Failed to sign out from Google natively:', error);
         }
@@ -329,6 +354,26 @@ class NativeAuthService {
 
   hasValidConfiguration(): boolean {
     return this.hasValidClientId;
+  }
+
+  private async getGoogleAuthPlugin(): Promise<GoogleAuthPlugin | null> {
+    if (this.googleAuthPlugin) {
+      return this.googleAuthPlugin;
+    }
+
+    if (!nativeIntegrationService.isRunningNatively()) {
+      console.log('[NativeAuth] Not running natively - GoogleAuth plugin not available');
+      return null;
+    }
+
+    try {
+      const { GoogleAuth } = await import('@codetrix-studio/capacitor-google-auth');
+      this.googleAuthPlugin = GoogleAuth;
+      return GoogleAuth;
+    } catch (error) {
+      console.error('[NativeAuth] Failed to load GoogleAuth plugin:', error);
+      return null;
+    }
   }
 }
 
