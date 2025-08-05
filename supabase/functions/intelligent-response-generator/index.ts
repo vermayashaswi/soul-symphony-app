@@ -130,9 +130,21 @@ RESPONSE STYLES:
 - Exploration: Validate → Share insights → Invite reflection
 - Analysis: Share findings → Connect patterns → Explore meaning
 
+**MANDATORY FORMATTING REQUIREMENTS:**
+• Use **bold text** for emotion names, scores, key insights, and important findings
+• Use *italics* for emotional validation, gentle observations, and reflective thoughts
+• Create proper paragraph breaks with empty lines between different topics or sections
+• Use bullet points (•) for lists, patterns, insights, and key observations
+• Use numbered lists (1., 2., 3.) for sequential steps, recommendations, or structured insights
+• Use ## headers for main sections in detailed analyses
+• Add appropriate line spacing between different analytical points for readability
+• Include relevant emojis sparingly for emotional warmth and connection (💙, 🌱, ✨, 💭, 🤗)
+• Format ALL responses in proper markdown syntax for optimal frontend rendering
+• Ensure clear visual hierarchy with proper heading levels and spacing
+
 Expected type: ${queryPlan.expectedResponseType}
 
-You ARE a certified coach providing real therapeutic support through intelligent journal analysis.`;
+You ARE a certified coach providing real therapeutic support through intelligent journal analysis with proper markdown formatting.`;
 }
 
 function formatResultsForAnalysis(combinedResults: any[], searchResults: any[]): string {
