@@ -80,14 +80,62 @@ export default function MobileChatInterface({
     showBackendAnimation,
     startStreamingChat
   } = useStreamingChat({
-    onFinalResponse: (response, analysis) => {
+    onFinalResponse: async (response, analysis) => {
       // Handle final streaming response
-      const finalMessage: UIChatMessage = {
-        role: 'assistant',
-        content: response,
-        ...(analysis && { analysis })
-      };
-      setMessages(prev => [...prev, finalMessage]);
+      if (!response || !threadId || !user?.id) {
+        debugLog.addEvent("Streaming Response", "[Mobile] Missing required data for final response", "error");
+        console.error("[Mobile] [Streaming] Missing response data:", { response: !!response, threadId: !!threadId, userId: !!user?.id });
+        return;
+      }
+      
+      debugLog.addEvent("Streaming Response", `[Mobile] Final response received: ${response.substring(0, 100)}...`, "success");
+      
+      try {
+        // Save the assistant response to database
+        debugLog.addEvent("Database", "[Mobile] Saving streaming assistant response to database", "info");
+        const savedResponse = await saveMessage(
+          threadId,
+          response,
+          'assistant',
+          user.id,
+          analysis?.references || undefined,
+          analysis?.hasNumericResult || false
+        );
+        
+        if (savedResponse) {
+          debugLog.addEvent("Database", `[Mobile] Streaming assistant response saved with ID: ${savedResponse.id}`, "success");
+          
+          // Add the saved response to messages
+          const finalMessage: UIChatMessage = {
+            role: 'assistant',
+            content: response,
+            references: analysis?.references,
+            analysis: analysis || undefined,
+            hasNumericResult: analysis?.hasNumericResult || false
+          };
+          setMessages(prev => [...prev, finalMessage]);
+        } else {
+          debugLog.addEvent("Database", "[Mobile] Failed to save streaming response - null response", "error");
+          throw new Error("Failed to save streaming response");
+        }
+      } catch (saveError) {
+        debugLog.addEvent("Database", `[Mobile] Error saving streaming response: ${saveError instanceof Error ? saveError.message : "Unknown error"}`, "error");
+        console.error("[Mobile] [Streaming] Failed to save response:", saveError);
+        
+        // Fallback: Add temporary message to UI
+        const fallbackMessage: UIChatMessage = {
+          role: 'assistant',
+          content: response,
+          ...(analysis && { analysis })
+        };
+        setMessages(prev => [...prev, fallbackMessage]);
+        
+        toast({
+          title: "Warning",
+          description: "Response displayed but couldn't be saved to your conversation history",
+          variant: "default"
+        });
+      }
     },
     onError: (error) => {
       toast({

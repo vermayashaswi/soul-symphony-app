@@ -94,17 +94,63 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({
     showBackendAnimation,
     startStreamingChat
   } = useStreamingChat({
-    onFinalResponse: (response, analysis) => {
+    onFinalResponse: async (response, analysis) => {
       // Handle final streaming response
-      const finalMessage: ChatMessage = {
-        id: uuidv4(),
-        thread_id: currentThreadId!,
-        content: response,
-        sender: 'assistant',
-        role: 'assistant',
-        created_at: new Date().toISOString()
-      };
-      setChatHistory(prev => [...prev, finalMessage]);
+      if (!response || !currentThreadId || !effectiveUserId) {
+        debugLog.addEvent("Streaming Response", "Missing required data for final response", "error");
+        console.error("[Streaming] Missing response data:", { response: !!response, threadId: !!currentThreadId, userId: !!effectiveUserId });
+        return;
+      }
+      
+      debugLog.addEvent("Streaming Response", `Final response received: ${response.substring(0, 100)}...`, "success");
+      
+      try {
+        // Save the assistant response to database
+        debugLog.addEvent("Database", "Saving streaming assistant response to database", "info");
+        const savedResponse = await saveMessage(
+          currentThreadId,
+          response,
+          'assistant',
+          effectiveUserId,
+          analysis?.references || undefined,
+          analysis?.hasNumericResult || false
+        );
+        
+        if (savedResponse) {
+          debugLog.addEvent("Database", `Streaming assistant response saved with ID: ${savedResponse.id}`, "success");
+          
+          // Add the saved response to chat history
+          const typedSavedResponse: ChatMessage = {
+            ...savedResponse,
+            sender: savedResponse.sender as 'user' | 'assistant' | 'error',
+            role: savedResponse.role as 'user' | 'assistant' | 'error'
+          };
+          setChatHistory(prev => [...prev, typedSavedResponse]);
+        } else {
+          debugLog.addEvent("Database", "Failed to save streaming response - null response", "error");
+          throw new Error("Failed to save streaming response");
+        }
+      } catch (saveError) {
+        debugLog.addEvent("Database", `Error saving streaming response: ${saveError instanceof Error ? saveError.message : "Unknown error"}`, "error");
+        console.error("[Streaming] Failed to save response:", saveError);
+        
+        // Fallback: Add temporary message to UI
+        const fallbackMessage: ChatMessage = {
+          id: `temp-streaming-${Date.now()}`,
+          thread_id: currentThreadId,
+          content: response,
+          sender: 'assistant',
+          role: 'assistant',
+          created_at: new Date().toISOString()
+        };
+        setChatHistory(prev => [...prev, fallbackMessage]);
+        
+        toast({
+          title: "Warning",
+          description: "Response displayed but couldn't be saved to your conversation history",
+          variant: "default"
+        });
+      }
     },
     onError: (error) => {
       toast({
@@ -462,8 +508,21 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({
           }
         });
         
+        debugLog.addEvent("Edge Function Response", `Smart-chat response: ${JSON.stringify({
+          hasData: !!data,
+          hasError: !!error,
+          errorMessage: error?.message,
+          dataKeys: data ? Object.keys(data) : [],
+          responseLength: data?.response?.length || 0
+        })}`, data ? "success" : "error");
+        
         if (error) {
           throw new Error(`Smart chat error: ${error.message}`);
+        }
+        
+        if (!data || !data.response) {
+          debugLog.addEvent("Edge Function Response", "Smart-chat returned no response data", "error");
+          throw new Error("No response received from smart-chat function");
         }
         
         response = {
@@ -473,6 +532,12 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({
           hasNumericResult: false,
           role: 'assistant' as const
         };
+        
+        debugLog.addEvent("Response Processing", `Created response object: ${JSON.stringify({
+          contentLength: response.content?.length || 0,
+          hasReferences: !!response.references?.length,
+          role: response.role
+        })}`, "success");
       }
       
       // Update or delete the processing message
