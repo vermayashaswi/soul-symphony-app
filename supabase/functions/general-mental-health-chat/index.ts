@@ -120,6 +120,11 @@ serve(async (req) => {
 - Encouraging without dismissing real struggles
 - Knowledgeable but not preachy
 
+**RESPONDING TO GREETINGS:**
+- For simple greetings like "Hey", "Hi", "Hello": Respond naturally as a caring friend would, then gently invite conversation about wellbeing
+- Example responses: "Hey there! How are you feeling today?" or "Hi! I'm glad you're here. What's on your mind?"
+- Keep it natural and warm, not formal or clinical
+
 **WHAT YOU HELP WITH:**
 - Emotional wellbeing and mental health support
 - Stress, anxiety, and mood management strategies
@@ -177,8 +182,13 @@ Remember: You're a caring companion, not a therapist. Be helpful, warm, and genu
     }
 
     const data = await response.json();
-    const responseContent = data.choices[0]?.message?.content || 
-      'I understand you\'re reaching out, and I want to help. Could you tell me more about what\'s on your mind regarding your emotional wellbeing?';
+    
+    if (!data.choices || !data.choices[0] || !data.choices[0].message || !data.choices[0].message.content) {
+      console.error('[General Mental Health] Invalid OpenAI response structure:', data);
+      throw new Error('Invalid response from OpenAI API');
+    }
+    
+    const responseContent = data.choices[0].message.content;
 
     console.log(`[General Mental Health] Generated response`);
 
@@ -189,8 +199,17 @@ Remember: You're a caring companion, not a therapist. Be helpful, warm, and genu
 
   } catch (error) {
     console.error('[General Mental Health] Error:', error);
+    
+    // Return a proper error that can be handled by the frontend
+    if (error.message?.includes('OpenAI API error')) {
+      return new Response(
+        JSON.stringify({ error: 'OpenAI service temporarily unavailable' }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 503 }
+      );
+    }
+    
     return new Response(
-      JSON.stringify({ error: 'I apologize, but I\'m having trouble responding right now. Please try again in a moment.' }),
+      JSON.stringify({ error: 'Service temporarily unavailable' }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 500 }
     );
   }
