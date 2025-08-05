@@ -94,7 +94,7 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({
     showBackendAnimation,
     startStreamingChat
   } = useStreamingChat({
-    onFinalResponse: async (response, analysis) => {
+    onFinalResponse: async (response, analysis, analysisMetadata) => {
       // Handle final streaming response
       if (!response || !currentThreadId || !effectiveUserId) {
         debugLog.addEvent("Streaming Response", "Missing required data for final response", "error");

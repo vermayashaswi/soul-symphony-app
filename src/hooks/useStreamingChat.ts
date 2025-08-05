@@ -10,12 +10,13 @@ export interface StreamingMessage {
   progress?: number;
   response?: string;
   analysis?: any;
+  analysisMetadata?: any;
   error?: string;
   timestamp: number;
 }
 
 interface UseStreamingChatProps {
-  onFinalResponse?: (response: string, analysis?: any) => void;
+  onFinalResponse?: (response: string, analysis?: any, analysisMetadata?: any) => void;
   onError?: (error: string) => void;
 }
 
@@ -45,7 +46,7 @@ export const useStreamingChat = ({ onFinalResponse, onError }: UseStreamingChatP
       case 'final_response':
         setIsStreaming(false);
         setShowBackendAnimation(false);
-        onFinalResponse?.(message.response || '', message.analysis);
+        onFinalResponse?.(message.response || '', message.analysis, message.analysisMetadata);
         break;
       case 'error':
         setIsStreaming(false);
@@ -190,6 +191,7 @@ export const useStreamingChat = ({ onFinalResponse, onError }: UseStreamingChatP
           addStreamingMessage({
             type: 'final_response',
             response: streamingResponse.response,
+            analysisMetadata: streamingResponse.analysisMetadata,
             analysis: streamingResponse.analysis,
             timestamp: Date.now()
           });
@@ -301,6 +303,7 @@ export const useStreamingChat = ({ onFinalResponse, onError }: UseStreamingChatP
           type: 'final_response',
           response: data.response,
           analysis: data.analysis,
+          analysisMetadata: data.analysisMetadata,
           timestamp: Date.now()
         });
       } else {

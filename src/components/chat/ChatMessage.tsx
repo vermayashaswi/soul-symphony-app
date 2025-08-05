@@ -51,16 +51,20 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({ message }) => {
               />
             ) : (
               <div className="prose prose-sm max-w-none dark:prose-invert 
-                prose-headings:text-theme prose-headings:font-bold
-                prose-h1:text-lg prose-h1:mb-3 prose-h1:flex prose-h1:items-center prose-h1:gap-2
-                prose-h2:text-base prose-h2:mb-3 prose-h2:mt-4 prose-h2:flex prose-h2:items-center prose-h2:gap-2
-                prose-h3:text-sm prose-h3:mb-2 prose-h3:mt-3 prose-h3:flex prose-h3:items-center prose-h3:gap-2
+                prose-headings:text-theme prose-headings:font-bold prose-headings:mb-3
+                prose-h1:text-lg prose-h1:mb-4 prose-h1:mt-6 prose-h1:font-bold prose-h1:text-theme
+                prose-h2:text-base prose-h2:mb-3 prose-h2:mt-5 prose-h2:font-bold prose-h2:text-theme
+                prose-h3:text-sm prose-h3:mb-2 prose-h3:mt-4 prose-h3:font-bold prose-h3:text-theme
+                prose-h4:text-sm prose-h4:mb-2 prose-h4:mt-3 prose-h4:font-semibold prose-h4:text-theme
                 prose-strong:text-theme prose-strong:font-bold
-                prose-ul:list-none prose-ul:space-y-2 prose-ul:ml-1 prose-ul:my-2
-                prose-ol:list-decimal prose-ol:list-inside prose-ol:space-y-2 prose-ol:ml-4 prose-ol:my-2
-                prose-li:flex prose-li:items-start prose-li:gap-2 prose-li:mb-1
-                prose-p:mb-2 prose-p:leading-relaxed
-                prose-blockquote:border-l-4 prose-blockquote:border-theme prose-blockquote:pl-4 prose-blockquote:py-2 prose-blockquote:my-3 prose-blockquote:bg-muted/30 prose-blockquote:rounded-r
+                prose-ul:list-disc prose-ul:list-inside prose-ul:space-y-1 prose-ul:ml-4 prose-ul:my-3
+                prose-ol:list-decimal prose-ol:list-inside prose-ol:space-y-1 prose-ol:ml-4 prose-ol:my-3
+                prose-li:mb-1 prose-li:leading-relaxed
+                prose-p:mb-3 prose-p:leading-relaxed prose-p:text-foreground
+                prose-blockquote:border-l-4 prose-blockquote:border-theme prose-blockquote:pl-4 prose-blockquote:py-2 prose-blockquote:my-3 prose-blockquote:bg-muted/30 prose-blockquote:rounded-r prose-blockquote:italic
+                prose-code:text-theme prose-code:bg-muted prose-code:px-1 prose-code:py-0.5 prose-code:rounded prose-code:text-xs
+                prose-pre:bg-muted prose-pre:p-4 prose-pre:rounded-lg prose-pre:overflow-x-auto prose-pre:my-3
+                [&>*:first-child]:mt-0 [&>*:last-child]:mb-0
               ">
                 <TranslatableMarkdown 
                   className="text-sm leading-relaxed"

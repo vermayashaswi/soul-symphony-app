@@ -83,7 +83,7 @@ export default function MobileChatInterface({
     currentMessageIndex,
     useThreeDotFallback
   } = useStreamingChat({
-    onFinalResponse: async (response, analysis) => {
+    onFinalResponse: async (response, analysis, analysisMetadata) => {
       // Handle final streaming response
       if (!response || !threadId || !user?.id) {
         debugLog.addEvent("Streaming Response", "[Mobile] Missing required data for final response", "error");

@@ -13,12 +13,14 @@ import { TranslatableText } from "@/components/translation/TranslatableText";
 import { TranslatableMarkdown } from "@/components/translation/TranslatableMarkdown";
 import TypingIndicator from "../TypingIndicator";
 import ParticleAvatar from "../ParticleAvatar";
+import { AnalysisMetadataCard } from "../AnalysisMetadataCard";
 
 interface MobileChatMessageProps {
   message: {
     role: 'user' | 'assistant' | 'error';
     content: string;
     analysis?: any;
+    analysisMetadata?: any;
     references?: any[];
     diagnostics?: any;
     hasNumericResult?: boolean;
@@ -122,17 +124,35 @@ const MobileChatMessage: React.FC<MobileChatMessageProps> = ({
         </div>
       )}
       
-      <div
-        className={cn(
-          "min-w-0 max-w-[85%] rounded-2xl p-3.5 text-sm shadow-sm",
-          displayRole === 'user' 
-            ? 'bg-primary text-primary-foreground rounded-tr-none' 
-            : 'bg-muted/60 border border-border/50 rounded-tl-none'
+      <div className="flex flex-col gap-2 min-w-0 max-w-[85%]">
+        {/* Analysis Metadata Card for assistant messages */}
+        {displayRole === 'assistant' && message.analysisMetadata && (
+          <AnalysisMetadataCard metadata={message.analysisMetadata} />
         )}
-      >
-        {displayRole === 'assistant' ? (
+        
+        <div
+          className={cn(
+            "rounded-2xl p-3.5 text-sm shadow-sm",
+            displayRole === 'user' 
+              ? 'bg-primary text-primary-foreground rounded-tr-none' 
+              : 'bg-muted/60 border border-border/50 rounded-tl-none'
+          )}
+        >
+          {displayRole === 'assistant' ? (
           <TranslatableMarkdown 
-            className="prose dark:prose-invert prose-sm max-w-none break-words" 
+            className="prose dark:prose-invert prose-sm max-w-none break-words
+              prose-headings:text-theme prose-headings:font-bold prose-headings:mb-2
+              prose-h1:text-base prose-h1:mb-3 prose-h1:mt-4 prose-h1:font-bold prose-h1:text-theme
+              prose-h2:text-sm prose-h2:mb-2 prose-h2:mt-3 prose-h2:font-bold prose-h2:text-theme
+              prose-h3:text-xs prose-h3:mb-1 prose-h3:mt-2 prose-h3:font-bold prose-h3:text-theme
+              prose-strong:text-theme prose-strong:font-bold
+              prose-ul:list-disc prose-ul:list-inside prose-ul:space-y-1 prose-ul:ml-3 prose-ul:my-2
+              prose-ol:list-decimal prose-ol:list-inside prose-ol:space-y-1 prose-ol:ml-3 prose-ol:my-2
+              prose-li:mb-0.5 prose-li:leading-relaxed prose-li:text-xs
+              prose-p:mb-2 prose-p:leading-relaxed prose-p:text-foreground prose-p:text-xs
+              prose-blockquote:border-l-2 prose-blockquote:border-theme prose-blockquote:pl-2 prose-blockquote:py-1 prose-blockquote:my-2 prose-blockquote:bg-muted/30 prose-blockquote:rounded-r prose-blockquote:italic prose-blockquote:text-xs
+              prose-code:text-theme prose-code:bg-muted prose-code:px-1 prose-code:py-0.5 prose-code:rounded prose-code:text-[10px]
+              [&>*:first-child]:mt-0 [&>*:last-child]:mb-0" 
             forceTranslate={true}
             enableFontScaling={true}
             scalingContext="compact"
@@ -243,6 +263,7 @@ const MobileChatMessage: React.FC<MobileChatMessageProps> = ({
             </AnimatePresence>
           </div>
         )}
+        </div>
       </div>
       
       {displayRole === 'user' && (
