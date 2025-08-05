@@ -100,38 +100,36 @@ async function gptClassifyMessage(
    - Personal but extremely vague with no context to analyze
    - **IMPORTANT**: Be selective - if there's ANY specific context or detail, use JOURNAL_SPECIFIC instead
 
-3. **GENERAL_MENTAL_HEALTH** - General wellness questions, conversational responses, and existential/philosophical questions
+3. **GENERAL_MENTAL_HEALTH** - General wellness questions and conversational responses
    - "How to manage anxiety?", "What are coping strategies?", "Tips for better sleep?"
    - "Thanks!", "That's helpful", "Tell me more", "How are you?"
-   - "My journal entries apart, is this something that most people feel?"
-   - "What is the best time of the day for me to start meditating?" (when asking for general advice)
-   - "Can you trace my emotions this week and draw a map?" (creative/analytical requests needing conversational response)
-   - Educational content, natural chat flow, greetings, follow-ups, and universal human experience questions
+   - Educational content, natural chat flow, greetings and follow-ups
 
 4. **UNRELATED** - Queries completely unrelated to journaling, mental health, or wellness
    - Technical questions, random topics, unrelated requests
    - When the query has nothing to do with the user's well-being or journal analysis
    - "What's the weather?", "How to cook pasta?", "Tell me about history"
 
-**CRITICAL CLASSIFICATION FIXES:**
-- **Existential/philosophical questions about universal human experiences = GENERAL_MENTAL_HEALTH**
-- **Creative requests for emotional mapping/visualization = GENERAL_MENTAL_HEALTH** 
-- **Questions asking "is this normal?" or "do others feel this?" = GENERAL_MENTAL_HEALTH**
-- **General meditation/wellness timing questions = GENERAL_MENTAL_HEALTH**
-- Only classify as JOURNAL_SPECIFIC if they're asking for personal analysis of their specific patterns
-- When in doubt between JOURNAL_SPECIFIC and GENERAL_MENTAL_HEALTH, choose GENERAL_MENTAL_HEALTH for better conversational flow
+**UPDATED CLASSIFICATION RULES - FAVOR JOURNAL_SPECIFIC:**
+- Any personal question with specific context or details = JOURNAL_SPECIFIC (be generous here)
+- Questions about personal feelings, behaviors, patterns = JOURNAL_SPECIFIC
+- Only use JOURNAL_SPECIFIC_NEEDS_CLARIFICATION for extremely vague questions with zero context
+- Educational/general questions and conversational responses = GENERAL_MENTAL_HEALTH
+- Completely unrelated topics = UNRELATED
 
 **UPDATED EXAMPLES:**
 - "How am I feeling about work?" → JOURNAL_SPECIFIC
 - "How have I been feeling the last few months?" → JOURNAL_SPECIFIC
-- "Can you tell me about my stressors based on my entries?" → JOURNAL_SPECIFIC
-- "What is the best time of the day for me to start meditating?" → GENERAL_MENTAL_HEALTH (asking for general advice)
-- "My journal entries apart, is this something that most people feel?" → GENERAL_MENTAL_HEALTH (existential question)
-- "Can you trace my emotions this week and draw a map?" → GENERAL_MENTAL_HEALTH (creative request)
+- "Do you think meditation helped me?" → JOURNAL_SPECIFIC
+- "I fight with my partner" → JOURNAL_SPECIFIC
+- "I've been fighting a lot lately" → JOURNAL_SPECIFIC
 - "How am I?" (with no context) → JOURNAL_SPECIFIC_NEEDS_CLARIFICATION
+- "I need help" (with no specifics) → JOURNAL_SPECIFIC_NEEDS_CLARIFICATION
 - "What is anxiety?" → GENERAL_MENTAL_HEALTH
 - "Thank you" → GENERAL_MENTAL_HEALTH
+- "Okay" → GENERAL_MENTAL_HEALTH
 - "What's the weather like?" → UNRELATED
+- "How do I cook pasta?" → UNRELATED
 
 User message: "${message}"${contextString}
 
