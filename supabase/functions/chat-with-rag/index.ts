@@ -216,14 +216,54 @@ serve(async (req) => {
       }
     }
 
-    // For other categories (GENERAL_MENTAL_HEALTH, CONVERSATIONAL), handle appropriately
-    console.log(`[chat-with-rag] Handling ${classification.category} query`);
-    
-    // This could route to other specialized functions in the future
+    // For GENERAL_MENTAL_HEALTH category (including conversational responses)
+    if (classification.category === 'GENERAL_MENTAL_HEALTH') {
+      console.log('[chat-with-rag] Handling GENERAL_MENTAL_HEALTH query');
+      
+      try {
+        const { data: generalResponse, error: generalError } = await supabaseClient.functions.invoke(
+          'general-mental-health-chat',
+          {
+            body: { message, conversationContext }
+          }
+        );
+
+        if (generalError) {
+          throw new Error(`General mental health chat failed: ${generalError.message}`);
+        }
+
+        return new Response(JSON.stringify({
+          response: generalResponse.response,
+          analysis: {
+            queryType: 'general_mental_health',
+            classification,
+            timestamp: new Date().toISOString()
+          }
+        }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      } catch (error) {
+        // Fallback response for general mental health queries
+        console.error('[chat-with-rag] General mental health chat failed:', error);
+        return new Response(JSON.stringify({
+          response: "I understand you're reaching out. For questions about your personal journal insights, I'm here to help analyze your entries. For general wellness information, feel free to ask specific questions!",
+          analysis: {
+            queryType: 'general_fallback',
+            classification,
+            timestamp: new Date().toISOString()
+          }
+        }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+    }
+
+    // Fallback for any other categories
+    console.log(`[chat-with-rag] Handling unknown category: ${classification.category}`);
     return new Response(JSON.stringify({
       response: "I understand you're reaching out. For questions about your personal journal insights, I'm here to help analyze your entries. For general wellness information, feel free to ask specific questions!",
       analysis: {
-        queryType: 'general',
+        queryType: 'unknown_category',
         classification,
         timestamp: new Date().toISOString()
       }
@@ -422,12 +462,50 @@ async function processStreamingPipeline(
       });
 
       streamManager.close();
+    } else if (classification.category === 'GENERAL_MENTAL_HEALTH') {
+      // Handle general mental health queries (including conversational ones) in streaming mode
+      streamManager.sendUserMessage("Processing your wellness question");
+      streamManager.sendBackendTask("general_mental_health", "Generating helpful response");
+      
+      try {
+        const { data: generalResponse, error: generalError } = await supabaseClient.functions.invoke(
+          'general-mental-health-chat',
+          {
+            body: { message, conversationContext }
+          }
+        );
+
+        if (generalError) {
+          throw new Error(`General mental health chat failed: ${generalError.message}`);
+        }
+
+        streamManager.sendEvent('final_response', {
+          response: generalResponse.response,
+          analysis: {
+            queryType: 'general_mental_health',
+            classification,
+            timestamp: new Date().toISOString()
+          }
+        });
+      } catch (error) {
+        // Fallback response
+        streamManager.sendEvent('final_response', {
+          response: "I understand you're reaching out. For questions about your personal journal insights, I'm here to help analyze your entries. For general wellness information, feel free to ask specific questions!",
+          analysis: {
+            queryType: 'general_fallback',
+            classification,
+            timestamp: new Date().toISOString()
+          }
+        });
+      }
+
+      streamManager.close();
     } else {
-      // Handle other categories
+      // Handle unknown categories
       streamManager.sendEvent('final_response', {
         response: "I understand you're reaching out. For questions about your personal journal insights, I'm here to help analyze your entries.",
         analysis: {
-          queryType: 'general',
+          queryType: 'unknown_category',
           classification,
           timestamp: new Date().toISOString()
         }

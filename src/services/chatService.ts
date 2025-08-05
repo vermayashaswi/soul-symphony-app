@@ -102,11 +102,11 @@ export async function processChatMessage(
 
     let classification = classificationData || { category: 'JOURNAL_SPECIFIC', shouldUseJournal: true };
     
-    // PHASE 3: Override classification for follow-up messages that should be conversational
+    // PHASE 3: Override classification for follow-up messages that should be general mental health
     if (isFollowUpMessage && message.toLowerCase().includes('football')) {
       console.log('[ChatService] Overriding classification for football follow-up');
       classification = { 
-        category: 'CONVERSATIONAL', 
+        category: 'GENERAL_MENTAL_HEALTH', 
         shouldUseJournal: false,
         confidence: 0.9,
         reasoning: 'Follow-up to sports/activity conversation'
@@ -116,8 +116,8 @@ export async function processChatMessage(
     console.log('[ChatService] Message classification:', classification);
 
     // Handle general mental health with conversational SOULo personality
-    if (classification.category === 'GENERAL_MENTAL_HEALTH' || classification.category === 'CONVERSATIONAL') {
-      console.log('[ChatService] Handling general/conversational question');
+    if (classification.category === 'GENERAL_MENTAL_HEALTH') {
+      console.log('[ChatService] Handling general mental health question');
       
       const generalResponse = await handleGeneralQuestion(message, conversationContext);
       return {

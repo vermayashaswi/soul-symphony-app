@@ -6,7 +6,6 @@ export enum QueryCategory {
   JOURNAL_SPECIFIC = 'JOURNAL_SPECIFIC',
   JOURNAL_SPECIFIC_NEEDS_CLARIFICATION = 'JOURNAL_SPECIFIC_NEEDS_CLARIFICATION',
   GENERAL_MENTAL_HEALTH = 'GENERAL_MENTAL_HEALTH', 
-  CONVERSATIONAL = 'CONVERSATIONAL',
   UNRELATED = 'UNRELATED'
 }
 
@@ -22,7 +21,7 @@ interface MessageClassification {
 
 export function useChatMessageClassification() {
   const [classification, setClassification] = useState<MessageClassification>({
-    category: QueryCategory.CONVERSATIONAL,
+    category: QueryCategory.GENERAL_MENTAL_HEALTH,
     confidence: 0,
     reasoning: '',
     shouldUseJournal: false,
@@ -37,7 +36,7 @@ export function useChatMessageClassification() {
   const classifyMessage = useCallback(async (message: string, conversationContext: any[] = []) => {
     if (!message?.trim()) {
       return {
-        category: QueryCategory.CONVERSATIONAL,
+        category: QueryCategory.GENERAL_MENTAL_HEALTH,
         confidence: 0,
         reasoning: 'Empty message',
         shouldUseJournal: false,
@@ -93,7 +92,7 @@ export function useChatMessageClassification() {
       const hasTimeReference = /\b(last week|yesterday|this week|last month|today|recently|lately|this morning|last night)\b/i.test(message.toLowerCase());
       
       const fallbackResult = {
-        category: hasPersonalPronouns ? QueryCategory.JOURNAL_SPECIFIC : QueryCategory.CONVERSATIONAL,
+        category: hasPersonalPronouns ? QueryCategory.JOURNAL_SPECIFIC : QueryCategory.GENERAL_MENTAL_HEALTH,
         confidence: hasPersonalPronouns ? 0.9 : 0.3,
         reasoning: hasPersonalPronouns ? 'PERSONAL PRONOUNS DETECTED (fallback) - automatically classified as journal-specific' : 'Error in classification (fallback)',
         shouldUseJournal: hasPersonalPronouns,

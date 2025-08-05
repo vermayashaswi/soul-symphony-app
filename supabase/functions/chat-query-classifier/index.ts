@@ -100,15 +100,12 @@ async function gptClassifyMessage(
    - Personal but extremely vague with no context to analyze
    - **IMPORTANT**: Be selective - if there's ANY specific context or detail, use JOURNAL_SPECIFIC instead
 
-3. **GENERAL_MENTAL_HEALTH** - General wellness questions  
+3. **GENERAL_MENTAL_HEALTH** - General wellness questions and conversational responses
    - "How to manage anxiety?", "What are coping strategies?", "Tips for better sleep?"
-   - Educational content, not personal analysis
-
-4. **CONVERSATIONAL** - Natural chat flow
    - "Thanks!", "That's helpful", "Tell me more", "How are you?"
-   - Keep the conversation flowing naturally
+   - Educational content, natural chat flow, greetings and follow-ups
 
-5. **UNRELATED** - Queries completely unrelated to journaling, mental health, or wellness
+4. **UNRELATED** - Queries completely unrelated to journaling, mental health, or wellness
    - Technical questions, random topics, unrelated requests
    - When the query has nothing to do with the user's well-being or journal analysis
    - "What's the weather?", "How to cook pasta?", "Tell me about history"
@@ -117,8 +114,7 @@ async function gptClassifyMessage(
 - Any personal question with specific context or details = JOURNAL_SPECIFIC (be generous here)
 - Questions about personal feelings, behaviors, patterns = JOURNAL_SPECIFIC
 - Only use JOURNAL_SPECIFIC_NEEDS_CLARIFICATION for extremely vague questions with zero context
-- Educational/general questions = GENERAL_MENTAL_HEALTH
-- Greetings/thanks/follow-ups = CONVERSATIONAL
+- Educational/general questions and conversational responses = GENERAL_MENTAL_HEALTH
 - Completely unrelated topics = UNRELATED
 
 **UPDATED EXAMPLES:**
@@ -130,8 +126,8 @@ async function gptClassifyMessage(
 - "How am I?" (with no context) → JOURNAL_SPECIFIC_NEEDS_CLARIFICATION
 - "I need help" (with no specifics) → JOURNAL_SPECIFIC_NEEDS_CLARIFICATION
 - "What is anxiety?" → GENERAL_MENTAL_HEALTH
-- "Thank you" → CONVERSATIONAL
-- "Okay" → CONVERSATIONAL
+- "Thank you" → GENERAL_MENTAL_HEALTH
+- "Okay" → GENERAL_MENTAL_HEALTH
 - "What's the weather like?" → UNRELATED
 - "How do I cook pasta?" → UNRELATED
 
@@ -139,7 +135,7 @@ User message: "${message}"${contextString}
 
 Respond with ONLY this JSON:
 {
-  "category": "JOURNAL_SPECIFIC" | "JOURNAL_SPECIFIC_NEEDS_CLARIFICATION" | "GENERAL_MENTAL_HEALTH" | "CONVERSATIONAL",
+  "category": "JOURNAL_SPECIFIC" | "JOURNAL_SPECIFIC_NEEDS_CLARIFICATION" | "GENERAL_MENTAL_HEALTH" | "UNRELATED",
   "confidence": 0.0-1.0,
   "shouldUseJournal": boolean,
   "useAllEntries": boolean,
@@ -184,7 +180,7 @@ Respond with ONLY this JSON:
     const result = JSON.parse(content);
     
     // Validate the response
-    if (!result.category || !['JOURNAL_SPECIFIC', 'JOURNAL_SPECIFIC_NEEDS_CLARIFICATION', 'GENERAL_MENTAL_HEALTH', 'CONVERSATIONAL', 'UNRELATED'].includes(result.category)) {
+    if (!result.category || !['JOURNAL_SPECIFIC', 'JOURNAL_SPECIFIC_NEEDS_CLARIFICATION', 'GENERAL_MENTAL_HEALTH', 'UNRELATED'].includes(result.category)) {
       throw new Error('Invalid category in GPT response');
     }
 
@@ -265,7 +261,7 @@ function enhancedRuleBasedClassification(message: string): {
     }
   }
   
-  // Conversational patterns
+  // Conversational patterns - now classified as GENERAL_MENTAL_HEALTH
   const conversationalPatterns = [
     /^(hi|hello|hey|good morning|good afternoon|good evening)\b/i,
     /^(thank you|thanks|thank u|thx)\b/i,
@@ -279,10 +275,10 @@ function enhancedRuleBasedClassification(message: string): {
   for (const pattern of conversationalPatterns) {
     if (pattern.test(lowerMessage)) {
       return {
-        category: "CONVERSATIONAL",
+        category: "GENERAL_MENTAL_HEALTH",
         confidence: 0.9,
         shouldUseJournal: false,
-        reasoning: "Conversational response for natural flow"
+        reasoning: "Conversational response - handled as general mental health interaction"
       };
     }
   }
@@ -329,12 +325,12 @@ function enhancedRuleBasedClassification(message: string): {
     }
   }
   
-  console.log(`[Rule-Based] No clear patterns found, defaulting to CONVERSATIONAL`);
+  console.log(`[Rule-Based] No clear patterns found, defaulting to GENERAL_MENTAL_HEALTH`);
   
   return {
-    category: "CONVERSATIONAL",
+    category: "GENERAL_MENTAL_HEALTH",
     confidence: 0.6,
     shouldUseJournal: false,
-    reasoning: "Unclear intent - maintaining conversational flow"
+    reasoning: "Unclear intent - treating as general mental health interaction"
   };
 }

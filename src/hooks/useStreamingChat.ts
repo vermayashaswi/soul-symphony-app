@@ -163,7 +163,7 @@ export const useStreamingChat = ({ onFinalResponse, onError }: UseStreamingChatP
         body: { message, conversationContext }
       });
 
-      const queryCategory = classification?.category || 'CONVERSATIONAL';
+      const queryCategory = classification?.category || 'GENERAL_MENTAL_HEALTH';
       
       // Show different UI based on classification
       if (queryCategory === 'JOURNAL_SPECIFIC') {
