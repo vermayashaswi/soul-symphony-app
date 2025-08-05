@@ -75,40 +75,72 @@ const MobileChatMessage: React.FC<MobileChatMessageProps> = ({
         transition={{ duration: 0.3 }}
         className="relative flex items-start gap-2 justify-start mb-3"
       >
-        <div className="border border-primary/20 rounded-full">
-          <ParticleAvatar className="w-8 h-8" size={32} />
-        </div>
-        
-        <div className="min-w-0 max-w-[85%] rounded-2xl rounded-tl-none p-3.5 text-sm shadow-sm bg-muted/60 border border-border/50">
-          <div className="flex items-center gap-2">
-            <span className="text-muted-foreground">{streamingMessage}</span>
-            {showStreamingDots && (
-              <div className="flex space-x-1">
-                <div 
-                  className="w-1.5 h-1.5 bg-muted-foreground rounded-full animate-pulse"
-                  style={{
-                    animationDelay: '0ms',
-                    animationDuration: '1.4s'
-                  }}
-                />
-                <div 
-                  className="w-1.5 h-1.5 bg-muted-foreground rounded-full animate-pulse"
-                  style={{
-                    animationDelay: '200ms',
-                    animationDuration: '1.4s'
-                  }}
-                />
-                <div 
-                  className="w-1.5 h-1.5 bg-muted-foreground rounded-full animate-pulse"
-                  style={{
-                    animationDelay: '400ms',
-                    animationDuration: '1.4s'
-                  }}
-                />
-              </div>
-            )}
+        {/* Show avatar only when there's a streaming message with content */}
+        {streamingMessage && (
+          <div className="border border-primary/20 rounded-full">
+            <ParticleAvatar className="w-8 h-8" size={32} />
           </div>
-        </div>
+        )}
+        
+        {/* For general mental health queries (showStreamingDots=true, streamingMessage=undefined), show only dots */}
+        {showStreamingDots && !streamingMessage ? (
+          <div className="flex items-center space-x-1 bg-muted/60 border border-border/50 rounded-2xl rounded-tl-none px-4 py-3">
+            <div className="flex space-x-1">
+              <div 
+                className="w-2 h-2 bg-muted-foreground rounded-full animate-pulse"
+                style={{
+                  animationDelay: '0ms',
+                  animationDuration: '1.4s'
+                }}
+              />
+              <div 
+                className="w-2 h-2 bg-muted-foreground rounded-full animate-pulse"
+                style={{
+                  animationDelay: '200ms',
+                  animationDuration: '1.4s'
+                }}
+              />
+              <div 
+                className="w-2 h-2 bg-muted-foreground rounded-full animate-pulse"
+                style={{
+                  animationDelay: '400ms',
+                  animationDuration: '1.4s'
+                }}
+              />
+            </div>
+          </div>
+        ) : streamingMessage && (
+          <div className="min-w-0 max-w-[85%] rounded-2xl rounded-tl-none p-3.5 text-sm shadow-sm bg-muted/60 border border-border/50">
+            <div className="flex items-center gap-2">
+              <span className="text-muted-foreground">{streamingMessage}</span>
+              {showStreamingDots && (
+                <div className="flex space-x-1">
+                  <div 
+                    className="w-1.5 h-1.5 bg-muted-foreground rounded-full animate-pulse"
+                    style={{
+                      animationDelay: '0ms',
+                      animationDuration: '1.4s'
+                    }}
+                  />
+                  <div 
+                    className="w-1.5 h-1.5 bg-muted-foreground rounded-full animate-pulse"
+                    style={{
+                      animationDelay: '200ms',
+                      animationDuration: '1.4s'
+                    }}
+                  />
+                  <div 
+                    className="w-1.5 h-1.5 bg-muted-foreground rounded-full animate-pulse"
+                    style={{
+                      animationDelay: '400ms',
+                      animationDuration: '1.4s'
+                    }}
+                  />
+                </div>
+              )}
+            </div>
+          </div>
+        )}
       </motion.div>
     );
   }
