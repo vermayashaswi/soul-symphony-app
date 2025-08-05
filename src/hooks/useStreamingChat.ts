@@ -85,7 +85,7 @@ export const useStreamingChat = ({ onFinalResponse, onError }: UseStreamingChatP
     }
   }, []);
 
-  // Cycle through dynamic messages
+  // Cycle through dynamic messages with proper cleanup
   useEffect(() => {
     if (!isStreaming || useThreeDotFallback || dynamicMessages.length === 0) return;
 
@@ -93,7 +93,9 @@ export const useStreamingChat = ({ onFinalResponse, onError }: UseStreamingChatP
       setCurrentMessageIndex(prev => (prev + 1) % dynamicMessages.length);
     }, 2000); // Change message every 2 seconds
 
-    return () => clearInterval(interval);
+    return () => {
+      clearInterval(interval);
+    };
   }, [isStreaming, useThreeDotFallback, dynamicMessages.length]);
 
   const startStreamingChat = useCallback(async (
@@ -339,6 +341,9 @@ export const useStreamingChat = ({ onFinalResponse, onError }: UseStreamingChatP
     
     setIsStreaming(false);
     setShowBackendAnimation(false);
+    setDynamicMessages([]);
+    setCurrentMessageIndex(0);
+    setUseThreeDotFallback(false);
   }, []);
 
   const clearStreamingMessages = useCallback(() => {
