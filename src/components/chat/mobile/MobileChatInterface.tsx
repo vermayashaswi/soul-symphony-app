@@ -78,7 +78,10 @@ export default function MobileChatInterface({
     streamingMessages,
     currentUserMessage,
     showBackendAnimation,
-    startStreamingChat
+    startStreamingChat,
+    dynamicMessages,
+    currentMessageIndex,
+    useThreeDotFallback
   } = useStreamingChat({
     onFinalResponse: async (response, analysis) => {
       // Handle final streaming response
@@ -761,13 +764,11 @@ export default function MobileChatInterface({
               <MobileChatMessage 
                 message={{ role: 'assistant', content: '' }}
                 streamingMessage={
-                  streamingMessages.length > 0 
-                    ? streamingMessages[streamingMessages.length - 1].task || 
-                      streamingMessages[streamingMessages.length - 1].message ||
-                      "Processing..."
-                    : "Analyzing your request..."
+                  useThreeDotFallback || dynamicMessages.length === 0
+                    ? undefined // Show only three-dot animation
+                    : dynamicMessages[currentMessageIndex] // Show dynamic message
                 }
-                showStreamingDots={showBackendAnimation}
+                showStreamingDots={true}
               />
             ) : (isLoading || isProcessing) && (
               <MobileChatMessage 

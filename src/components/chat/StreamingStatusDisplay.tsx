@@ -8,35 +8,45 @@ interface StreamingStatusDisplayProps {
   currentUserMessage: string;
   showBackendAnimation: boolean;
   streamingMessages: StreamingMessage[];
+  dynamicMessages: string[];
+  currentMessageIndex: number;
+  useThreeDotFallback: boolean;
 }
 
 const StreamingStatusDisplay: React.FC<StreamingStatusDisplayProps> = ({
   isStreaming,
   currentUserMessage,
   showBackendAnimation,
-  streamingMessages
+  streamingMessages,
+  dynamicMessages,
+  currentMessageIndex,
+  useThreeDotFallback
 }) => {
   if (!isStreaming) return null;
-
-  const getLatestUserMessage = () => {
-    const userMessages = streamingMessages.filter(msg => msg.type === 'user_message');
-    return userMessages.length > 0 ? userMessages[userMessages.length - 1].message : currentUserMessage;
-  };
 
   const getLatestBackendTask = () => {
     const backendTasks = streamingMessages.filter(msg => msg.type === 'backend_task');
     return backendTasks.length > 0 ? backendTasks[backendTasks.length - 1] : null;
   };
 
-  const latestMessage = getLatestUserMessage();
   const latestTask = getLatestBackendTask();
+  
+  // Determine what message to show
+  const getDisplayMessage = () => {
+    if (useThreeDotFallback || dynamicMessages.length === 0) {
+      return null; // Show three-dot animation
+    }
+    return dynamicMessages[currentMessageIndex] || null;
+  };
+
+  const displayMessage = getDisplayMessage();
 
   return (
     <div className="flex flex-col space-y-2 p-4 bg-muted/20 rounded-lg border">
       <AnimatePresence mode="wait">
-        {latestMessage && !showBackendAnimation && (
+        {!showBackendAnimation && (
           <motion.div
-            key="user-message"
+            key={displayMessage || "three-dots"}
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -10 }}
@@ -59,9 +69,17 @@ const StreamingStatusDisplay: React.FC<StreamingStatusDisplayProps> = ({
                 transition={{ duration: 1, repeat: Infinity, delay: 0.4 }}
               />
             </div>
-            <span className="text-sm text-foreground/80">
-              {latestMessage}
-            </span>
+            {displayMessage && (
+              <motion.span 
+                key={displayMessage}
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                className="text-sm text-foreground/80"
+              >
+                {displayMessage}
+              </motion.span>
+            )}
           </motion.div>
         )}
 
@@ -89,7 +107,7 @@ const StreamingStatusDisplay: React.FC<StreamingStatusDisplayProps> = ({
           className="bg-primary h-2 rounded-full"
           initial={{ width: "0%" }}
           animate={{ 
-            width: showBackendAnimation ? "85%" : latestMessage ? "60%" : "30%"
+            width: showBackendAnimation ? "85%" : displayMessage ? "60%" : "30%"
           }}
           transition={{ duration: 0.5 }}
         />

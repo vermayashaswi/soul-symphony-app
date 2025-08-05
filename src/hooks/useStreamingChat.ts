@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback } from 'react';
+import { useState, useRef, useCallback, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 
 export interface StreamingMessage {
@@ -24,6 +24,9 @@ export const useStreamingChat = ({ onFinalResponse, onError }: UseStreamingChatP
   const [streamingMessages, setStreamingMessages] = useState<StreamingMessage[]>([]);
   const [currentUserMessage, setCurrentUserMessage] = useState<string>('');
   const [showBackendAnimation, setShowBackendAnimation] = useState(false);
+  const [dynamicMessages, setDynamicMessages] = useState<string[]>([]);
+  const [currentMessageIndex, setCurrentMessageIndex] = useState(0);
+  const [useThreeDotFallback, setUseThreeDotFallback] = useState(false);
   
   const abortControllerRef = useRef<AbortController | null>(null);
 
@@ -52,6 +55,46 @@ export const useStreamingChat = ({ onFinalResponse, onError }: UseStreamingChatP
     }
   }, [onFinalResponse, onError]);
 
+  // Generate streaming messages based on category
+  const generateStreamingMessages = useCallback(async (message: string, category: string, conversationContext?: any[], userProfile?: any) => {
+    try {
+      const { data, error } = await supabase.functions.invoke('generate-streaming-messages', {
+        body: {
+          userMessage: message,
+          category,
+          conversationContext,
+          userProfile
+        }
+      });
+
+      if (error) throw error;
+
+      if (data.shouldUseFallback || !data.messages || data.messages.length === 0) {
+        setUseThreeDotFallback(true);
+        setDynamicMessages([]);
+      } else {
+        setUseThreeDotFallback(false);
+        setDynamicMessages(data.messages);
+        setCurrentMessageIndex(0);
+      }
+    } catch (error) {
+      console.error('[useStreamingChat] Error generating streaming messages:', error);
+      setUseThreeDotFallback(true);
+      setDynamicMessages([]);
+    }
+  }, []);
+
+  // Cycle through dynamic messages
+  useEffect(() => {
+    if (!isStreaming || useThreeDotFallback || dynamicMessages.length === 0) return;
+
+    const interval = setInterval(() => {
+      setCurrentMessageIndex(prev => (prev + 1) % dynamicMessages.length);
+    }, 2000); // Change message every 2 seconds
+
+    return () => clearInterval(interval);
+  }, [isStreaming, useThreeDotFallback, dynamicMessages.length]);
+
   const startStreamingChat = useCallback(async (
     message: string,
     userId: string,
@@ -68,6 +111,37 @@ export const useStreamingChat = ({ onFinalResponse, onError }: UseStreamingChatP
     setStreamingMessages([]);
     setCurrentUserMessage('');
     setShowBackendAnimation(false);
+    setUseThreeDotFallback(false);
+    setDynamicMessages([]);
+    setCurrentMessageIndex(0);
+
+    // Add user message immediately
+    addStreamingMessage({
+      type: 'user_message',
+      message,
+      timestamp: Date.now()
+    });
+
+    // Classify message to determine streaming behavior
+    let messageCategory = 'GENERAL_MENTAL_HEALTH'; // Default fallback
+    try {
+      const { data: classificationData, error: classificationError } = await supabase.functions.invoke('chat-query-classifier', {
+        body: {
+          message,
+          conversationContext: conversationContext || []
+        }
+      });
+      
+      if (!classificationError && classificationData?.category) {
+        messageCategory = classificationData.category;
+        console.log(`[useStreamingChat] Message classified as: ${messageCategory}`);
+      }
+    } catch (error) {
+      console.error('[useStreamingChat] Classification failed, using fallback:', error);
+    }
+
+    // Generate appropriate streaming messages based on category
+    await generateStreamingMessages(message, messageCategory, conversationContext, userProfile);
 
     // Create abort controller for timeout
     const abortController = new AbortController();
@@ -268,6 +342,9 @@ export const useStreamingChat = ({ onFinalResponse, onError }: UseStreamingChatP
     setStreamingMessages([]);
     setCurrentUserMessage('');
     setShowBackendAnimation(false);
+    setDynamicMessages([]);
+    setCurrentMessageIndex(0);
+    setUseThreeDotFallback(false);
   }, []);
 
   return {
@@ -278,6 +355,9 @@ export const useStreamingChat = ({ onFinalResponse, onError }: UseStreamingChatP
     startStreamingChat,
     startNonStreamingChat,
     stopStreaming,
-    clearStreamingMessages
+    clearStreamingMessages,
+    dynamicMessages,
+    currentMessageIndex,
+    useThreeDotFallback
   };
 };

@@ -84,3 +84,6 @@ verify_jwt = true
 
 [functions.smart-query-planner]
 verify_jwt = true
+
+[functions.generate-streaming-messages]
+verify_jwt = true
