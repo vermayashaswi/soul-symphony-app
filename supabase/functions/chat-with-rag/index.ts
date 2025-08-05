@@ -201,16 +201,6 @@ serve(async (req) => {
         return new Response(JSON.stringify({
           response: consolidationResult.response,
           userStatusMessage: consolidationResult.userStatusMessage,
-          analysisMetadata: {
-            entriesAnalyzed: consolidationResult.analysisMetadata?.entriesAnalyzed || analysisResults.totalEntries || 0,
-            totalEntries: consolidationResult.analysisMetadata?.totalEntries || analysisResults.totalEntries || 0,
-            dateRange: {
-              earliest: consolidationResult.analysisMetadata?.dateRange?.earliest || null,
-              latest: consolidationResult.analysisMetadata?.dateRange?.latest || null
-            },
-            subQuestionsUsed: enhancedQueryPlan.subQuestions?.length || 0,
-            analysisApproaches: enhancedQueryPlan.subQuestions?.map(sq => sq.question || sq) || []
-          },
           analysis: {
             queryPlan: enhancedQueryPlan,
             gptDrivenAnalysis: true,
@@ -462,16 +452,6 @@ async function processStreamingPipeline(
       // Send final response
       streamManager.sendEvent('final_response', {
         response: consolidationResult.response,
-        analysisMetadata: {
-          entriesAnalyzed: consolidationResult.analysisMetadata?.entriesAnalyzed || analysisResults.totalEntries || 0,
-          totalEntries: consolidationResult.analysisMetadata?.totalEntries || analysisResults.totalEntries || 0,
-          dateRange: {
-            earliest: consolidationResult.analysisMetadata?.dateRange?.earliest || null,
-            latest: consolidationResult.analysisMetadata?.dateRange?.latest || null
-          },
-          subQuestionsUsed: enhancedQueryPlan.subQuestions?.length || 0,
-          analysisApproaches: enhancedQueryPlan.subQuestions?.map(sq => sq.question || sq) || []
-        },
         analysis: {
           queryPlan: enhancedQueryPlan,
           gptDrivenAnalysis: true,

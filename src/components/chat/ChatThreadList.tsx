@@ -75,17 +75,8 @@ export const ChatThreadList: React.FC<ChatThreadListProps> = ({
       }
     };
     
-    // Listen for thread deletion events to refresh the list
-    const handleThreadDeleted = (event: any) => {
-      if (event.detail?.threadId) {
-        setIsLoading(true);
-        loadThreads(); // Refresh the entire list
-      }
-    };
-    
     window.addEventListener('threadSelected', handleThreadSelected);
     window.addEventListener('threadTitleUpdated', handleThreadTitleUpdated);
-    window.addEventListener('threadDeleted', handleThreadDeleted);
     
     // Set up real-time subscription for thread updates if user exists
     let subscription: any;
@@ -97,10 +88,7 @@ export const ChatThreadList: React.FC<ChatThreadListProps> = ({
           schema: 'public',
           table: 'chat_threads',
           filter: `user_id=eq.${user.id}`
-        }, (payload) => {
-          console.log('Thread change detected:', payload);
-          // Refresh threads on any change (insert, update, delete)
-          setIsLoading(true);
+        }, () => {
           loadThreads();
         })
         .subscribe();
@@ -109,7 +97,6 @@ export const ChatThreadList: React.FC<ChatThreadListProps> = ({
     return () => {
       window.removeEventListener('threadSelected', handleThreadSelected);
       window.removeEventListener('threadTitleUpdated', handleThreadTitleUpdated);
-      window.removeEventListener('threadDeleted', handleThreadDeleted);
       if (subscription) {
         supabase.removeChannel(subscription);
       }

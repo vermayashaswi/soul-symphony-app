@@ -21,8 +21,6 @@ import { useChatRealtime } from "@/hooks/use-chat-realtime";
 import { updateThreadProcessingStatus, generateThreadTitle } from "@/utils/chat/threadUtils";
 import { useKeyboardDetection } from "@/hooks/use-keyboard-detection";
 import { useStreamingChat } from "@/hooks/useStreamingChat";
-import { useChatState, UIChatMessage } from "@/hooks/useChatState";
-import { ErrorBoundary } from "@/components/common/ErrorBoundary";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -34,7 +32,13 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 
-// UIChatMessage now imported from useChatState hook
+interface UIChatMessage {
+  role: 'user' | 'assistant' | 'error';
+  content: string;
+  references?: any[];
+  analysis?: any;
+  hasNumericResult?: boolean;
+}
 
 interface MobileChatInterfaceProps {
   currentThreadId: string | null;
@@ -51,20 +55,13 @@ export default function MobileChatInterface({
   userId,
   mentalHealthInsights,
 }: MobileChatInterfaceProps) {
+  const [messages, setMessages] = useState<UIChatMessage[]>([]);
+  const [initialLoading, setInitialLoading] = useState(true);
+  const [threadId, setThreadId] = useState<string | null>(initialThreadId || null);
+  const [showSuggestions, setShowSuggestions] = useState(true);
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [sheetOpen, setSheetOpen] = useState(false);
   const debugLog = useDebugLog();
-  
-  // Use centralized state management
-  const { state, actions, loadedThreadRef, addCleanupFunction } = useChatState(initialThreadId);
-  
-  const {
-    messages,
-    threadId,
-    showSuggestions,
-    initialLoading,
-    showDeleteDialog,
-    sheetOpen,
-    error
-  } = state;
   
   const {
     isLoading,
@@ -86,7 +83,7 @@ export default function MobileChatInterface({
     currentMessageIndex,
     useThreeDotFallback
   } = useStreamingChat({
-    onFinalResponse: async (response, analysis, analysisMetadata) => {
+    onFinalResponse: async (response, analysis) => {
       // Handle final streaming response
       if (!response || !threadId || !user?.id) {
         debugLog.addEvent("Streaming Response", "[Mobile] Missing required data for final response", "error");
@@ -112,13 +109,14 @@ export default function MobileChatInterface({
           debugLog.addEvent("Database", `[Mobile] Streaming assistant response saved with ID: ${savedResponse.id}`, "success");
           
           // Add the saved response to messages
-          actions.addMessage({
+          const finalMessage: UIChatMessage = {
             role: 'assistant',
             content: response,
             references: analysis?.references,
             analysis: analysis || undefined,
             hasNumericResult: analysis?.hasNumericResult || false
-          });
+          };
+          setMessages(prev => [...prev, finalMessage]);
         } else {
           debugLog.addEvent("Database", "[Mobile] Failed to save streaming response - null response", "error");
           throw new Error("Failed to save streaming response");
@@ -128,11 +126,12 @@ export default function MobileChatInterface({
         console.error("[Mobile] [Streaming] Failed to save response:", saveError);
         
         // Fallback: Add temporary message to UI
-        actions.addMessage({
+        const fallbackMessage: UIChatMessage = {
           role: 'assistant',
           content: response,
           ...(analysis && { analysis })
-        });
+        };
+        setMessages(prev => [...prev, fallbackMessage]);
         
         toast({
           title: "Warning",
@@ -177,39 +176,21 @@ export default function MobileChatInterface({
   const { user } = useAuth();
   const { translate } = useTranslation();
   const messagesEndRef = useRef<HTMLDivElement>(null);
-
-  const scrollToBottom = () => {
-    setTimeout(() => {
-      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-    }, 100);
-  };
+  const loadedThreadRef = useRef<string | null>(null);
 
   useEffect(() => {
-    console.log(`[Mobile] Thread initialization effect triggered - threadId: ${threadId}, userId: ${user?.id}`);
-    
     if (threadId) {
-      console.log(`[Mobile] Loading current thread: ${threadId}`);
-      actions.setInitialLoading(true);
       loadThreadMessages(threadId);
       debugLog.addEvent("Thread Initialization", `Loading current thread: ${threadId}`, "info");
     } else {
       const storedThreadId = localStorage.getItem("lastActiveChatThreadId");
-      console.log(`[Mobile] No current thread, checking localStorage: ${storedThreadId}`);
-      
       if (storedThreadId && user?.id) {
-        console.log(`[Mobile] Loading stored thread: ${storedThreadId}`);
-        actions.setInitialLoading(true);
-        actions.setThreadId(storedThreadId);
+        setThreadId(storedThreadId);
         loadThreadMessages(storedThreadId);
         debugLog.addEvent("Thread Initialization", `Loading stored thread: ${storedThreadId}`, "info");
       } else {
-        // No thread to load - reset states and show suggestions immediately
-        console.log(`[Mobile] No thread available, resetting to suggestion state`);
-        actions.setInitialLoading(false);
-        actions.setShowSuggestions(true);
-        actions.setMessages([]); // Clear any existing messages
-        loadedThreadRef.current = null; // Clear loaded thread reference
-        debugLog.addEvent("Thread Initialization", "No stored thread found, showing suggestions", "info");
+        setInitialLoading(false);
+        debugLog.addEvent("Thread Initialization", "No stored thread found", "info");
       }
     }
   }, [threadId, user?.id]);
@@ -217,7 +198,7 @@ export default function MobileChatInterface({
   useEffect(() => {
     const onThreadChange = (event: CustomEvent) => {
       if (event.detail.threadId) {
-        actions.setThreadId(event.detail.threadId);
+        setThreadId(event.detail.threadId);
         loadThreadMessages(event.detail.threadId);
         debugLog.addEvent("Thread Change", `Thread selected: ${event.detail.threadId}`, "info");
       }
@@ -225,46 +206,36 @@ export default function MobileChatInterface({
     
     window.addEventListener('threadSelected' as any, onThreadChange);
     
-    const cleanup = () => {
+    return () => {
       window.removeEventListener('threadSelected' as any, onThreadChange);
     };
-    
-    addCleanupFunction(cleanup);
-    return cleanup;
-  }, [addCleanupFunction]);
+  }, []);
 
   useEffect(() => {
     scrollToBottom();
   }, [messages, isLoading, isProcessing]);
 
+  const scrollToBottom = () => {
+    setTimeout(() => {
+      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }, 100);
+  };
+
   const loadThreadMessages = async (currentThreadId: string) => {
     if (!currentThreadId || !user?.id) {
-      console.log('[Mobile] loadThreadMessages: Missing threadId or user, resetting states');
-      actions.setInitialLoading(false);
-      actions.setShowSuggestions(true);
+      setInitialLoading(false);
       return;
     }
     
-    // Prevent race conditions by checking if this thread is already being loaded
     if (loadedThreadRef.current === currentThreadId) {
       debugLog.addEvent("Thread Loading", `Thread ${currentThreadId} already loaded, skipping`, "info");
-      console.log(`[Mobile] Thread ${currentThreadId} already loaded, skipping load`);
-      actions.setInitialLoading(false);
       return;
     }
     
-    // Prevent loading the same thread multiple times concurrently
-    const loadingFlag = `loading-${currentThreadId}`;
-    if ((window as any)[loadingFlag]) {
-      console.log(`[Mobile] Thread ${currentThreadId} is already being loaded, skipping`);
-      return;
-    }
-    
-    (window as any)[loadingFlag] = true;
-    debugLog.addEvent("Thread Loading", `[Mobile] Starting to load messages for thread ${currentThreadId}`, "info");
+    setInitialLoading(true);
+    debugLog.addEvent("Thread Loading", `[Mobile] Loading messages for thread ${currentThreadId}`, "info");
     
     try {
-      // Verify thread exists and belongs to user
       const { data: threadData, error: threadError } = await supabase
         .from('chat_threads')
         .select('id')
@@ -274,50 +245,40 @@ export default function MobileChatInterface({
         
       if (threadError || !threadData) {
         debugLog.addEvent("Thread Loading", `[Mobile] Thread not found or doesn't belong to user: ${threadError?.message || "Unknown error"}`, "error");
-        console.log(`[Mobile] Thread ${currentThreadId} not found or access denied`);
-        actions.setMessages([]);
-        actions.setShowSuggestions(true);
+        setMessages([]);
+        setShowSuggestions(true);
+        setInitialLoading(false);
         return;
       }
       
-      // Load messages
       const chatMessages = await getThreadMessages(currentThreadId, user.id);
       
       if (chatMessages && chatMessages.length > 0) {
-        const uiMessages = chatMessages.map((msg, index) => ({
-          id: `${msg.id || Date.now()}-${index}`, // Ensure unique ID
+        const uiMessages = chatMessages.map(msg => ({
           role: msg.sender as 'user' | 'assistant',
           content: msg.content,
           references: msg.reference_entries ? Array.isArray(msg.reference_entries) ? msg.reference_entries : [] : undefined,
-          hasNumericResult: msg.has_numeric_result,
-          timestamp: new Date(msg.created_at || Date.now()).getTime()
+          hasNumericResult: msg.has_numeric_result
         }));
         
-        console.log(`[Mobile] Successfully loaded ${uiMessages.length} messages for thread ${currentThreadId}`);
-        actions.setMessages(uiMessages);
-        actions.setShowSuggestions(false);
+        setMessages(uiMessages);
+        setShowSuggestions(false);
         loadedThreadRef.current = currentThreadId;
       } else {
-        console.log(`[Mobile] No messages found for thread ${currentThreadId}, showing suggestions`);
-        actions.setMessages([]);
-        actions.setShowSuggestions(true);
-        loadedThreadRef.current = currentThreadId; // Still mark as loaded even if empty
+        setMessages([]);
+        setShowSuggestions(true);
       }
     } catch (error) {
       debugLog.addEvent("Thread Loading", `[Mobile] Error loading messages: ${error instanceof Error ? error.message : "Unknown error"}`, "error");
-      console.error(`[Mobile] Error loading thread ${currentThreadId}:`, error);
       toast({
         title: "Error loading messages",
         description: "Could not load conversation history.",
         variant: "destructive"
       });
-      actions.setMessages([]);
-      actions.setShowSuggestions(true);
+      setMessages([]);
+      setShowSuggestions(true);
     } finally {
-      // Always reset loading state and clear the loading flag
-      actions.setInitialLoading(false);
-      delete (window as any)[loadingFlag];
-      console.log(`[Mobile] Finished loading thread ${currentThreadId}, initialLoading reset to false`);
+      setInitialLoading(false);
     }
   };
 
@@ -367,7 +328,7 @@ export default function MobileChatInterface({
           if (error) throw error;
           
           currentThreadId = newThreadId;
-          actions.setThreadId(newThreadId);
+          setThreadId(newThreadId);
         }
       } catch (error: any) {
         toast({
@@ -386,7 +347,7 @@ export default function MobileChatInterface({
       isFirstMessage = !error && count === 0;
     }
     
-    actions.addMessage({ role: 'user', content: message });
+    setMessages(prev => [...prev, { role: 'user', content: message }]);
     setLocalLoading(true, "Processing your request...");
     
     try {
@@ -445,10 +406,13 @@ export default function MobileChatInterface({
       const errorMessageContent = "I'm having trouble processing your request. Please try again later. " + 
                  (error?.message ? `Error: ${error.message}` : "");
       
-      actions.addMessage({
-        role: 'assistant', 
-        content: errorMessageContent
-      });
+      setMessages(prev => [
+        ...prev, 
+        { 
+          role: 'assistant', 
+          content: errorMessageContent
+        }
+      ]);
     } finally {
       setLocalLoading(false);
     }
@@ -469,7 +433,7 @@ export default function MobileChatInterface({
       console.log('[MobileChat] Selecting thread:', selectedThreadId);
       
       // Set loading state before starting the process
-      actions.setInitialLoading(true);
+      setInitialLoading(true);
       
       // Verify thread exists and belongs to user
       const { data: threadData, error: threadError } = await supabase
@@ -486,15 +450,15 @@ export default function MobileChatInterface({
           description: "Cannot access this conversation",
           variant: "destructive"
         });
-        actions.setInitialLoading(false);
+        setInitialLoading(false);
         return;
       }
 
       // Close sheet immediately after verification
-      actions.setSheetOpen(false);
+      setSheetOpen(false);
       
       // Update thread state and load messages
-      actions.setThreadId(selectedThreadId);
+      setThreadId(selectedThreadId);
       localStorage.setItem("lastActiveChatThreadId", selectedThreadId);
       
       if (onSelectThread) {
@@ -513,7 +477,7 @@ export default function MobileChatInterface({
         description: "Failed to select conversation",
         variant: "destructive"
       });
-      actions.setInitialLoading(false);
+      setInitialLoading(false);
     }
   };
 
@@ -535,7 +499,7 @@ export default function MobileChatInterface({
         description: "Please wait for the current request to complete before deleting this conversation.",
         variant: "destructive"
       });
-      actions.setShowDeleteDialog(false);
+      setShowDeleteDialog(false);
       return;
     }
 
@@ -567,16 +531,9 @@ export default function MobileChatInterface({
       
       console.log('[MobileChat] Successfully deleted thread:', threadId);
       
-      // Dispatch event to update sidebar
-      window.dispatchEvent(
-        new CustomEvent('threadDeleted', {
-          detail: { threadId }
-        })
-      );
-      
       // Clear current state
-      actions.setMessages([]);
-      actions.setShowSuggestions(true);
+      setMessages([]);
+      setShowSuggestions(true);
       loadedThreadRef.current = null;
       localStorage.removeItem("lastActiveChatThreadId");
 
@@ -595,7 +552,7 @@ export default function MobileChatInterface({
       if (threads && threads.length > 0) {
         // Switch to the most recent remaining thread
         console.log('[MobileChat] Switching to thread:', threads[0].id);
-        actions.setThreadId(threads[0].id);
+        setThreadId(threads[0].id);
         localStorage.setItem("lastActiveChatThreadId", threads[0].id);
         await loadThreadMessages(threads[0].id);
       } else {
@@ -604,15 +561,15 @@ export default function MobileChatInterface({
         try {
           const newThreadId = await onCreateNewThread();
           if (newThreadId) {
-            actions.setThreadId(newThreadId);
+            setThreadId(newThreadId);
             localStorage.setItem("lastActiveChatThreadId", newThreadId);
           } else {
             // Fallback if creation fails
-            actions.setThreadId(null);
+            setThreadId(null);
           }
         } catch (createError) {
           console.error('[MobileChat] Error creating new thread after deletion:', createError);
-          actions.setThreadId(null);
+          setThreadId(null);
         }
       }
 
@@ -621,7 +578,7 @@ export default function MobileChatInterface({
         description: "Conversation deleted successfully",
       });
       
-      actions.setShowDeleteDialog(false);
+      setShowDeleteDialog(false);
       
     } catch (error) {
       console.error('[MobileChat] Error deleting conversation:', error);
@@ -630,19 +587,18 @@ export default function MobileChatInterface({
         description: "Failed to delete conversation",
         variant: "destructive"
       });
-      actions.setShowDeleteDialog(false);
+      setShowDeleteDialog(false);
     }
   };
 
   const isDeletionDisabled = isProcessing || processingStatus === 'processing' || isLoading;
 
   return (
-    <ErrorBoundary>
-      <div className="mobile-chat-interface">
+    <div className="mobile-chat-interface">
       {/* Header */}
       <div className="sticky top-0 z-40 w-full bg-background border-b safe-area-top">
         <div className="container flex h-14 max-w-screen-lg items-center">
-          <Sheet open={sheetOpen} onOpenChange={actions.setSheetOpen}>
+          <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
             <SheetTrigger asChild>
               <Button variant="ghost" size="icon" className="mr-2">
                 <Menu className="h-5 w-5" />
@@ -668,15 +624,15 @@ export default function MobileChatInterface({
                         return;
                       }
 
-                      actions.setSheetOpen(false);
-                      actions.setInitialLoading(true);
+                      setSheetOpen(false);
+                      setInitialLoading(true);
                       
                       const newThreadId = await onCreateNewThread();
                       if (newThreadId) {
                         console.log('[MobileChat] New thread created:', newThreadId);
-                        actions.setThreadId(newThreadId);
-                        actions.setMessages([]);
-                        actions.setShowSuggestions(true);
+                        setThreadId(newThreadId);
+                        setMessages([]);
+                        setShowSuggestions(true);
                         loadedThreadRef.current = null;
                         localStorage.setItem("lastActiveChatThreadId", newThreadId);
                         
@@ -700,7 +656,7 @@ export default function MobileChatInterface({
                         variant: "destructive"
                       });
                     } finally {
-                      actions.setInitialLoading(false);
+                      setInitialLoading(false);
                     }
                   }}
                   size="sm"
@@ -735,7 +691,7 @@ export default function MobileChatInterface({
                 ? 'text-muted-foreground/50 cursor-not-allowed' 
                 : 'text-muted-foreground hover:text-destructive'
             }`}
-            onClick={() => !isDeletionDisabled && actions.setShowDeleteDialog(true)}
+            onClick={() => !isDeletionDisabled && setShowDeleteDialog(true)}
             disabled={isDeletionDisabled}
           >
             <Trash2 className="h-5 w-5" />
@@ -795,9 +751,9 @@ export default function MobileChatInterface({
           </div>
         ) : (
           <div className="space-y-3">
-            {messages.map((message) => (
+            {messages.map((message, index) => (
               <MobileChatMessage 
-                key={message.id} 
+                key={index} 
                 message={message} 
                 showAnalysis={false}
               />
@@ -836,7 +792,7 @@ export default function MobileChatInterface({
       />
       
       {/* Delete Dialog */}
-      <AlertDialog open={showDeleteDialog} onOpenChange={actions.setShowDeleteDialog}>
+      <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>
@@ -868,7 +824,6 @@ export default function MobileChatInterface({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-      </div>
-    </ErrorBoundary>
+    </div>
   );
 }

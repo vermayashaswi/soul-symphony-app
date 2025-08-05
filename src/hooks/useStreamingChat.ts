@@ -10,13 +10,12 @@ export interface StreamingMessage {
   progress?: number;
   response?: string;
   analysis?: any;
-  analysisMetadata?: any;
   error?: string;
   timestamp: number;
 }
 
 interface UseStreamingChatProps {
-  onFinalResponse?: (response: string, analysis?: any, analysisMetadata?: any) => void;
+  onFinalResponse?: (response: string, analysis?: any) => void;
   onError?: (error: string) => void;
 }
 
@@ -46,7 +45,7 @@ export const useStreamingChat = ({ onFinalResponse, onError }: UseStreamingChatP
       case 'final_response':
         setIsStreaming(false);
         setShowBackendAnimation(false);
-        onFinalResponse?.(message.response || '', message.analysis, message.analysisMetadata);
+        onFinalResponse?.(message.response || '', message.analysis);
         break;
       case 'error':
         setIsStreaming(false);
@@ -85,7 +84,7 @@ export const useStreamingChat = ({ onFinalResponse, onError }: UseStreamingChatP
     }
   }, []);
 
-  // Cycle through dynamic messages with proper cleanup
+  // Cycle through dynamic messages
   useEffect(() => {
     if (!isStreaming || useThreeDotFallback || dynamicMessages.length === 0) return;
 
@@ -93,9 +92,7 @@ export const useStreamingChat = ({ onFinalResponse, onError }: UseStreamingChatP
       setCurrentMessageIndex(prev => (prev + 1) % dynamicMessages.length);
     }, 2000); // Change message every 2 seconds
 
-    return () => {
-      clearInterval(interval);
-    };
+    return () => clearInterval(interval);
   }, [isStreaming, useThreeDotFallback, dynamicMessages.length]);
 
   const startStreamingChat = useCallback(async (
@@ -193,7 +190,6 @@ export const useStreamingChat = ({ onFinalResponse, onError }: UseStreamingChatP
           addStreamingMessage({
             type: 'final_response',
             response: streamingResponse.response,
-            analysisMetadata: streamingResponse.analysisMetadata,
             analysis: streamingResponse.analysis,
             timestamp: Date.now()
           });
@@ -305,7 +301,6 @@ export const useStreamingChat = ({ onFinalResponse, onError }: UseStreamingChatP
           type: 'final_response',
           response: data.response,
           analysis: data.analysis,
-          analysisMetadata: data.analysisMetadata,
           timestamp: Date.now()
         });
       } else {
@@ -341,9 +336,6 @@ export const useStreamingChat = ({ onFinalResponse, onError }: UseStreamingChatP
     
     setIsStreaming(false);
     setShowBackendAnimation(false);
-    setDynamicMessages([]);
-    setCurrentMessageIndex(0);
-    setUseThreeDotFallback(false);
   }, []);
 
   const clearStreamingMessages = useCallback(() => {
