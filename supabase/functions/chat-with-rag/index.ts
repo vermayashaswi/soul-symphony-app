@@ -74,6 +74,22 @@ serve(async (req) => {
 
     console.log(`[chat-with-rag] Query classified as: ${classification.category}`);
 
+    // Handle unrelated queries with polite denial
+    if (classification.category === 'UNRELATED') {
+      console.log('[chat-with-rag] Handling unrelated query - polite denial');
+      return new Response(JSON.stringify({
+        response: "I appreciate your question, but I'm specifically designed to help you explore your journal entries, understand your emotional patterns, and support your mental health and well-being. I focus on analyzing your personal reflections and providing insights about your journey. Is there something about your thoughts, feelings, or experiences you'd like to discuss instead?",
+        userStatusMessage: null,
+        analysis: {
+          queryType: 'unrelated_denial',
+          classification,
+          timestamp: new Date().toISOString()
+        }
+      }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
     // Handle clarification queries directly
     if (classification.category === 'JOURNAL_SPECIFIC_NEEDS_CLARIFICATION') {
       console.log('[chat-with-rag] Handling clarification query');
@@ -261,6 +277,23 @@ async function processStreamingPipeline(
     
     if (classificationError) {
       throw new Error(`Query classification failed: ${classificationError.message}`);
+    }
+
+    // Handle unrelated queries in streaming mode
+    if (classification.category === 'UNRELATED') {
+      streamManager.sendUserMessage("Gently redirecting to wellness focus");
+      
+      streamManager.sendEvent('final_response', {
+        response: "I appreciate your question, but I'm specifically designed to help you explore your journal entries, understand your emotional patterns, and support your mental health and well-being. I focus on analyzing your personal reflections and providing insights about your journey. Is there something about your thoughts, feelings, or experiences you'd like to discuss instead?",
+        analysis: {
+          queryType: 'unrelated_denial',
+          classification,
+          timestamp: new Date().toISOString()
+        }
+      });
+
+      streamManager.close();
+      return;
     }
 
     // Handle clarification queries in streaming mode

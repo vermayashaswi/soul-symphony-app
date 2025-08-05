@@ -108,12 +108,18 @@ async function gptClassifyMessage(
    - "Thanks!", "That's helpful", "Tell me more", "How are you?"
    - Keep the conversation flowing naturally
 
+5. **UNRELATED** - Queries completely unrelated to journaling, mental health, or wellness
+   - Technical questions, random topics, unrelated requests
+   - When the query has nothing to do with the user's well-being or journal analysis
+   - "What's the weather?", "How to cook pasta?", "Tell me about history"
+
 **UPDATED CLASSIFICATION RULES - FAVOR JOURNAL_SPECIFIC:**
 - Any personal question with specific context or details = JOURNAL_SPECIFIC (be generous here)
 - Questions about personal feelings, behaviors, patterns = JOURNAL_SPECIFIC
 - Only use JOURNAL_SPECIFIC_NEEDS_CLARIFICATION for extremely vague questions with zero context
 - Educational/general questions = GENERAL_MENTAL_HEALTH
 - Greetings/thanks/follow-ups = CONVERSATIONAL
+- Completely unrelated topics = UNRELATED
 
 **UPDATED EXAMPLES:**
 - "How am I feeling about work?" → JOURNAL_SPECIFIC
@@ -126,6 +132,8 @@ async function gptClassifyMessage(
 - "What is anxiety?" → GENERAL_MENTAL_HEALTH
 - "Thank you" → CONVERSATIONAL
 - "Okay" → CONVERSATIONAL
+- "What's the weather like?" → UNRELATED
+- "How do I cook pasta?" → UNRELATED
 
 User message: "${message}"${contextString}
 
@@ -176,7 +184,7 @@ Respond with ONLY this JSON:
     const result = JSON.parse(content);
     
     // Validate the response
-    if (!result.category || !['JOURNAL_SPECIFIC', 'JOURNAL_SPECIFIC_NEEDS_CLARIFICATION', 'GENERAL_MENTAL_HEALTH', 'CONVERSATIONAL'].includes(result.category)) {
+    if (!result.category || !['JOURNAL_SPECIFIC', 'JOURNAL_SPECIFIC_NEEDS_CLARIFICATION', 'GENERAL_MENTAL_HEALTH', 'CONVERSATIONAL', 'UNRELATED'].includes(result.category)) {
       throw new Error('Invalid category in GPT response');
     }
 
@@ -294,6 +302,29 @@ function enhancedRuleBasedClassification(message: string): {
         confidence: 0.7,
         shouldUseJournal: false,
         reasoning: "General mental health question"
+      };
+    }
+  }
+  
+  console.log(`[Rule-Based] No clear patterns found, defaulting to CONVERSATIONAL`);
+  
+  // Check for unrelated queries
+  const unrelatedPatterns = [
+    /\b(weather|temperature|forecast)\b/i,
+    /\b(recipe|cook|cooking|food preparation)\b/i,
+    /\b(history|geography|science|mathematics|physics)\b/i,
+    /\b(sports|games|entertainment|movies|music)\b/i,
+    /\b(technology|programming|computer|software)\b/i,
+    /\b(news|politics|current events)\b/i
+  ];
+  
+  for (const pattern of unrelatedPatterns) {
+    if (pattern.test(lowerMessage)) {
+      return {
+        category: "UNRELATED",
+        confidence: 0.8,
+        shouldUseJournal: false,
+        reasoning: "Query unrelated to mental health, wellness, or journaling"
       };
     }
   }
