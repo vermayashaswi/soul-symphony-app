@@ -26,7 +26,7 @@ export default defineConfig(({ mode }) => ({
   },
   optimizeDeps: {
     exclude: ['lovable-tagger'],
-    include: ['react', 'react-dom']
+    include: ['react', 'react-dom', 'framer-motion']
   },
   // Ensure that Vite correctly resolves Node.js built-in modules
   build: {
