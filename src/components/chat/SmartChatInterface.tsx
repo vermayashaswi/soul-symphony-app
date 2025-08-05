@@ -67,7 +67,7 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({
   mentalHealthInsights 
 }) => {
   const [chatHistory, setChatHistory] = useState<ChatMessage[]>([]);
-  const [initialLoading, setInitialLoading] = useState(true);
+  const [initialLoading, setInitialLoading] = useState(false); // Start with false
   const [showSuggestions, setShowSuggestions] = useState(true);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [showDebugPanel, setShowDebugPanel] = useState(false);
@@ -174,6 +174,7 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({
   // Sync with props thread ID and update local storage
   useEffect(() => {
     if (propsThreadId && propsThreadId !== currentThreadId) {
+      setInitialLoading(true);
       loadThreadMessages(propsThreadId);
       // Update local storage to maintain consistency
       if (propsThreadId) {
@@ -203,12 +204,14 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({
     
     const storedThreadId = localStorage.getItem("lastActiveChatThreadId");
     if (storedThreadId && effectiveUserId) {
+      setInitialLoading(true);
       setLocalThreadId(storedThreadId);
       loadThreadMessages(storedThreadId);
       debugLog.addEvent("Initialization", `Loading stored thread: ${storedThreadId}`, "info");
     } else {
       setInitialLoading(false);
-      debugLog.addEvent("Initialization", "No stored thread found, showing empty state", "info");
+      setShowSuggestions(true);
+      debugLog.addEvent("Initialization", "No stored thread found, showing suggestions", "info");
     }
     
     return () => {
@@ -229,15 +232,16 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({
   const loadThreadMessages = async (threadId: string) => {
     if (!threadId || !effectiveUserId) {
       setInitialLoading(false);
+      setShowSuggestions(true);
       return;
     }
     
     if (loadedThreadRef.current === threadId) {
       debugLog.addEvent("Thread Loading", `Thread ${threadId} already loaded, skipping`, "info");
+      setInitialLoading(false);
       return;
     }
     
-    setInitialLoading(true);
     debugLog.addEvent("Thread Loading", `Loading messages for thread ${threadId}`, "info");
     
     try {
@@ -798,6 +802,13 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({
         console.error("[Desktop] Error deleting thread:", threadError);
         throw threadError;
       }
+
+      // Dispatch event to update sidebar
+      window.dispatchEvent(
+        new CustomEvent('threadDeleted', {
+          detail: { threadId: currentThreadId }
+        })
+      );
 
       setChatHistory([]);
       setShowSuggestions(true);

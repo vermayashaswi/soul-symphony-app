@@ -42,7 +42,7 @@ const initialState: ChatState = {
   isLoading: false,
   isProcessing: false,
   showSuggestions: true,
-  initialLoading: true,
+  initialLoading: false, // Start with false, set to true only when actually loading
   showDeleteDialog: false,
   sheetOpen: false,
   error: null,
@@ -87,7 +87,8 @@ function chatReducer(state: ChatState, action: ChatAction): ChatState {
     case 'RESET_CHAT':
       return {
         ...initialState,
-        threadId: state.threadId, // Keep thread ID when resetting
+        threadId: null, // Clear thread ID when resetting
+        showSuggestions: true, // Show suggestions after reset
         initialLoading: false
       };
     

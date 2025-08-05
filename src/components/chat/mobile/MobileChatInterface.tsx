@@ -180,17 +180,21 @@ export default function MobileChatInterface({
 
   useEffect(() => {
     if (threadId) {
+      actions.setInitialLoading(true);
       loadThreadMessages(threadId);
       debugLog.addEvent("Thread Initialization", `Loading current thread: ${threadId}`, "info");
     } else {
       const storedThreadId = localStorage.getItem("lastActiveChatThreadId");
       if (storedThreadId && user?.id) {
+        actions.setInitialLoading(true);
         actions.setThreadId(storedThreadId);
         loadThreadMessages(storedThreadId);
         debugLog.addEvent("Thread Initialization", `Loading stored thread: ${storedThreadId}`, "info");
       } else {
+        // No thread to load - show suggestions immediately
         actions.setInitialLoading(false);
-        debugLog.addEvent("Thread Initialization", "No stored thread found", "info");
+        actions.setShowSuggestions(true);
+        debugLog.addEvent("Thread Initialization", "No stored thread found, showing suggestions", "info");
       }
     }
   }, [threadId, user?.id, actions, debugLog]);
@@ -227,15 +231,16 @@ export default function MobileChatInterface({
   const loadThreadMessages = async (currentThreadId: string) => {
     if (!currentThreadId || !user?.id) {
       actions.setInitialLoading(false);
+      actions.setShowSuggestions(true);
       return;
     }
     
     if (loadedThreadRef.current === currentThreadId) {
       debugLog.addEvent("Thread Loading", `Thread ${currentThreadId} already loaded, skipping`, "info");
+      actions.setInitialLoading(false);
       return;
     }
     
-    actions.setInitialLoading(true);
     debugLog.addEvent("Thread Loading", `[Mobile] Loading messages for thread ${currentThreadId}`, "info");
     
     try {
@@ -532,6 +537,13 @@ export default function MobileChatInterface({
       }
       
       console.log('[MobileChat] Successfully deleted thread:', threadId);
+      
+      // Dispatch event to update sidebar
+      window.dispatchEvent(
+        new CustomEvent('threadDeleted', {
+          detail: { threadId }
+        })
+      );
       
       // Clear current state
       actions.setMessages([]);
