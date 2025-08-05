@@ -21,6 +21,7 @@ import { useChatRealtime } from "@/hooks/use-chat-realtime";
 import { updateThreadProcessingStatus, generateThreadTitle } from "@/utils/chat/threadUtils";
 import { useKeyboardDetection } from "@/hooks/use-keyboard-detection";
 import { useStreamingChat } from "@/hooks/useStreamingChat";
+import ChatErrorBoundary from "../ChatErrorBoundary";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -752,29 +753,34 @@ export default function MobileChatInterface({
         ) : (
           <div className="space-y-3">
             {messages.map((message, index) => (
-              <MobileChatMessage 
-                key={index} 
-                message={message} 
-                showAnalysis={false}
-              />
+              <ChatErrorBoundary key={index}>
+                <MobileChatMessage 
+                  message={message} 
+                  showAnalysis={false}
+                />
+              </ChatErrorBoundary>
             ))}
             
             {/* Show streaming status or basic loading */}
             {isStreaming ? (
-              <MobileChatMessage 
-                message={{ role: 'assistant', content: '' }}
-                streamingMessage={
-                  useThreeDotFallback || dynamicMessages.length === 0
-                    ? undefined // Show only three-dot animation
-                    : dynamicMessages[currentMessageIndex] // Show dynamic message
-                }
-                showStreamingDots={true}
-              />
+              <ChatErrorBoundary>
+                <MobileChatMessage 
+                  message={{ role: 'assistant', content: '' }}
+                  streamingMessage={
+                    useThreeDotFallback || dynamicMessages.length === 0
+                      ? undefined // Show only three-dot animation
+                      : dynamicMessages[currentMessageIndex] // Show dynamic message
+                  }
+                  showStreamingDots={true}
+                />
+              </ChatErrorBoundary>
             ) : (isLoading || isProcessing) && (
-              <MobileChatMessage 
-                message={{ role: 'assistant', content: '' }}
-                isLoading={true}
-              />
+              <ChatErrorBoundary>
+                <MobileChatMessage 
+                  message={{ role: 'assistant', content: '' }}
+                  isLoading={true}
+                />
+              </ChatErrorBoundary>
             )}
           </div>
         )}

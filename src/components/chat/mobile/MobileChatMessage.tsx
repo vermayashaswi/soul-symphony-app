@@ -1,4 +1,3 @@
-
 import React from "react";
 import { Separator } from "@/components/ui/separator";
 import { ChevronDown, ChevronUp, FileText } from "lucide-react";
@@ -36,11 +35,26 @@ const MobileChatMessage: React.FC<MobileChatMessageProps> = ({
   streamingMessage,
   showStreamingDots = false 
 }) => {
+  // CRITICAL FIX: Always call all hooks before any conditional logic
   const [showReferences, setShowReferences] = useState(false);
   const { user } = useAuth();
   
-  // Show typing indicator for basic loading state (when no streaming message)
-  if (isLoading && !streamingMessage) {
+  // Memoize formatted content - this hook must always be called
+  const formattedContent = React.useMemo(() => {
+    return message.content;
+  }, [message]);
+  
+  // Determine what type of content to render
+  const shouldShowLoading = isLoading && !streamingMessage;
+  const shouldShowStreaming = !!streamingMessage;
+  const shouldShowMessage = !shouldShowLoading && !shouldShowStreaming;
+  
+  // Calculate derived values
+  const hasReferences = message.role === 'assistant' && message.references && message.references.length > 0;
+  const displayRole = message.role === 'error' ? 'assistant' : message.role;
+  
+  // RENDER LOGIC: All conditional rendering moved after all hooks
+  if (shouldShowLoading) {
     return (
       <motion.div 
         initial={{ opacity: 0, y: 10 }}
@@ -53,8 +67,7 @@ const MobileChatMessage: React.FC<MobileChatMessageProps> = ({
     );
   }
   
-  // Show streaming message with pulsating dots
-  if (streamingMessage) {
+  if (shouldShowStreaming) {
     return (
       <motion.div 
         initial={{ opacity: 0, y: 10 }}
@@ -99,15 +112,6 @@ const MobileChatMessage: React.FC<MobileChatMessageProps> = ({
       </motion.div>
     );
   }
-  
-  const hasReferences = message.role === 'assistant' && message.references && message.references.length > 0;
-  
-  const formattedContent = React.useMemo(() => {
-    return message.content;
-  }, [message]);
-  
-  // For UI purposes, treat 'error' role as 'assistant'
-  const displayRole = message.role === 'error' ? 'assistant' : message.role;
   
   return (
     <motion.div 
