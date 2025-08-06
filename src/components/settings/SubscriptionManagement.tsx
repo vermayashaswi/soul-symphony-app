@@ -10,7 +10,6 @@ import { motion } from 'framer-motion';
 import { toast } from 'sonner';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { SubscriptionModal } from '@/components/subscription/SubscriptionModal';
-import { EmbeddingStatus } from './EmbeddingStatus';
 
 export const SubscriptionManagement: React.FC = () => {
   console.log('[SubscriptionManagement] Rendering component');
@@ -90,7 +89,6 @@ export const SubscriptionManagement: React.FC = () => {
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.3 }}
-        className="space-y-6"
       >
         <Card className="p-6">
           <div className="flex items-center justify-between mb-4">
@@ -235,8 +233,6 @@ export const SubscriptionManagement: React.FC = () => {
             </div>
           </div>
         </Card>
-        
-        <EmbeddingStatus />
       </motion.div>
 
       <SubscriptionModal 

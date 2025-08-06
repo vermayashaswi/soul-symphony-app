@@ -93,16 +93,13 @@ const MobileNavigation: React.FC<MobileNavigationProps> = ({ onboardingComplete 
     const isInAppContext = isAppRoute(location.pathname);
     
     // Show navigation if:
-    // 1. We're in app context (app routes) AND mobile device
+    // 1. We're in app context (app routes) - removed mobile-only restriction
     // 2. User is authenticated
     // 3. Not on hidden paths (onboarding/auth)
     // 4. Onboarding is complete OR we're not on a transitional route
-    // 5. Keyboard is not visible (for mobile)
     const shouldShowNav = isInAppContext &&
-                          isMobile.isMobile &&
                           !!user &&
                           !shouldHideNavigation &&
-                          !isKeyboardVisible &&
                           (onboardingComplete || !isTransitionalRoute);
     
     componentLogger.debug('Enhanced visibility check', { 
