@@ -34,6 +34,7 @@ import { useDebugLog } from "@/utils/debug/DebugContext";
 import { TranslatableText } from "@/components/translation/TranslatableText";
 import { useChatMessageClassification, QueryCategory } from "@/hooks/use-chat-message-classification";
 import { useStreamingChat } from "@/hooks/useStreamingChat";
+import { useAutoScroll } from "@/hooks/use-auto-scroll";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -74,7 +75,6 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({
   const { toast } = useToast();
   const { user } = useAuth();
   const { translate } = useTranslation();
-  const chatBottomRef = useRef<HTMLDivElement>(null);
   const loadedThreadRef = useRef<string | null>(null);
   const debugLog = useDebugLog();
   
@@ -171,6 +171,13 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({
     updateProcessingStage,
     setLocalLoading
   } = useChatRealtime(currentThreadId);
+  
+  // Use unified auto-scroll hook
+  const { scrollElementRef, scrollToBottom } = useAutoScroll({
+    dependencies: [chatHistory, isLoading, isProcessing, isStreaming, streamingMessages],
+    delay: 50,
+    scrollThreshold: 100
+  });
 
   // Sync with props thread ID and update local storage
   useEffect(() => {
@@ -217,15 +224,7 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({
     };
   }, [effectiveUserId, propsThreadId]);
 
-  useEffect(() => {
-    scrollToBottom();
-  }, [chatHistory, isLoading, isProcessing]);
-
-  const scrollToBottom = () => {
-    setTimeout(() => {
-      chatBottomRef.current?.scrollIntoView({ behavior: 'smooth' });
-    }, 100);
-  };
+  // Auto-scroll is now handled by the useAutoScroll hook
 
   const loadThreadMessages = async (threadId: string) => {
     if (!threadId || !effectiveUserId) {

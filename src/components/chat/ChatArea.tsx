@@ -13,6 +13,7 @@ import EmotionRadarChart from "./EmotionRadarChart";
 import TypingIndicator from "./TypingIndicator";
 import ParticleAvatar from "./ParticleAvatar";
 import { ChatMessage } from "@/types/chat";
+import { useAutoScroll } from "@/hooks/use-auto-scroll";
 
 interface ChatAreaProps {
   chatMessages: ChatMessage[];
@@ -29,11 +30,12 @@ const ChatArea: React.FC<ChatAreaProps> = ({
   threadId,
   onInteractiveOptionClick
 }) => {
-  const messagesEndRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [chatMessages, isLoading]);
+  // Use unified auto-scroll hook
+  const { scrollElementRef, scrollToBottom } = useAutoScroll({
+    dependencies: [chatMessages, isLoading, processingStage],
+    delay: 50,
+    scrollThreshold: 100
+  });
 
   // Enhanced logging to ensure context is being passed properly
   useEffect(() => {
@@ -57,7 +59,7 @@ const ChatArea: React.FC<ChatAreaProps> = ({
   }, [chatMessages, threadId]);
 
   return (
-    <div className="flex flex-col p-4 overflow-y-auto h-full pb-20">
+    <div ref={scrollElementRef} className="flex flex-col p-4 overflow-y-auto h-full pb-20">
       {chatMessages.map((message, index) => (
         <div
           key={index}
@@ -147,7 +149,7 @@ const ChatArea: React.FC<ChatAreaProps> = ({
         </div>
       )}
 
-      <div ref={messagesEndRef} className="pb-5" />
+      <div className="pb-5" />
     </div>
   );
 };

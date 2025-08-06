@@ -22,6 +22,7 @@ import { updateThreadProcessingStatus, generateThreadTitle } from "@/utils/chat/
 import { useKeyboardDetection } from "@/hooks/use-keyboard-detection";
 import { useStreamingChat } from "@/hooks/useStreamingChat";
 import ChatErrorBoundary from "../ChatErrorBoundary";
+import { useAutoScroll } from "@/hooks/use-auto-scroll";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -177,8 +178,14 @@ export default function MobileChatInterface({
   const { toast } = useToast();
   const { user } = useAuth();
   const { translate } = useTranslation();
-  const messagesEndRef = useRef<HTMLDivElement>(null);
   const loadedThreadRef = useRef<string | null>(null);
+  
+  // Use unified auto-scroll hook
+  const { scrollElementRef, scrollToBottom } = useAutoScroll({
+    dependencies: [messages, isLoading, isProcessing, isStreaming, streamingMessages],
+    delay: 50,
+    scrollThreshold: 100
+  });
 
   useEffect(() => {
     if (threadId) {
@@ -213,15 +220,7 @@ export default function MobileChatInterface({
     };
   }, []);
 
-  useEffect(() => {
-    scrollToBottom();
-  }, [messages, isLoading, isProcessing]);
-
-  const scrollToBottom = () => {
-    setTimeout(() => {
-      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-    }, 100);
-  };
+  // Auto-scroll is now handled by the useAutoScroll hook
 
   const loadThreadMessages = async (currentThreadId: string) => {
     if (!currentThreadId || !user?.id) {
@@ -752,7 +751,7 @@ export default function MobileChatInterface({
             </div>
           </div>
         ) : (
-          <div className="space-y-3">
+          <div ref={scrollElementRef} className="space-y-3 h-full overflow-y-auto">
             {messages.map((message, index) => (
               <ChatErrorBoundary key={index}>
                 <MobileChatMessage 
@@ -783,12 +782,11 @@ export default function MobileChatInterface({
                 />
               </ChatErrorBoundary>
             )}
+            
+            {/* Spacer for auto-scroll */}
+            <div className="pb-5" />
           </div>
         )}
-        
-        {/* Legacy streaming display removed - now integrated into message flow */}
-        
-        <div ref={messagesEndRef} />
       </div>
       
       {/* Chat Input */}
