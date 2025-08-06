@@ -57,7 +57,7 @@ export const SubscriptionProvider: React.FC<{ children: ReactNode }> = ({ childr
       console.log('[SubscriptionContext] Fetching subscription data for user:', user.id);
       
       // First call the cleanup function to ensure expired trials are processed
-      const { error: cleanupError } = await supabase.rpc('cleanup_expired_trials');
+      const { error: cleanupError } = await supabase.rpc('comprehensive_cleanup');
       if (cleanupError) {
         console.warn('[SubscriptionContext] Cleanup function error:', cleanupError);
       }
@@ -80,6 +80,8 @@ export const SubscriptionProvider: React.FC<{ children: ReactNode }> = ({ childr
         const userStatus = (subscriptionData.current_status as SubscriptionStatus) || 'free';
         const userTrialEndDate = subscriptionData.trial_end_date ? new Date(subscriptionData.trial_end_date) : null;
         const userIsTrialActive = subscriptionData.is_trial_active || false;
+        
+        console.log('[SubscriptionContext] Raw subscription data from function:', subscriptionData);
         
         setTier(userTier);
         setStatus(userStatus);
