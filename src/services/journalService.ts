@@ -136,7 +136,6 @@ export const reprocessJournalEntry = async (entryId: number, newContent: string)
       .from('Journal Entries')
       .update({
         'refined text': newContent,
-        'transcription text': newContent,
         Edit_Status: 1
       })
       .eq('id', entryId);
