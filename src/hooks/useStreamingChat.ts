@@ -209,14 +209,13 @@ export const useStreamingChat = ({ onFinalResponse, onError }: UseStreamingChatP
     let timeoutId: NodeJS.Timeout;
     
     if (queryCategory === 'JOURNAL_SPECIFIC') {
-      // Sequential display: 5 seconds each message for JOURNAL_SPECIFIC
-      timeoutId = setTimeout(() => {
-        setCurrentMessageIndex(prev => {
-          const nextIndex = prev + 1;
-          // Loop back to start after showing all messages
-          return nextIndex >= dynamicMessages.length ? 0 : nextIndex;
-        });
-      }, 5000);
+      // Sequential display: 5 seconds each message, then stay on last message
+      if (currentMessageIndex < dynamicMessages.length - 1) {
+        timeoutId = setTimeout(() => {
+          setCurrentMessageIndex(prev => prev + 1);
+        }, 5000);
+      }
+      // If we're at the last message, don't advance further
     } else {
       // Regular cycling every 2 seconds for other categories
       const interval = setInterval(() => {
@@ -333,6 +332,12 @@ export const useStreamingChat = ({ onFinalResponse, onError }: UseStreamingChatP
             }, 500);
             return;
           }
+          
+          // Show custom error toast for "non-2xx code" errors
+          if (streamingError.message?.includes('non-2xx code')) {
+            onError?.('Oops! I faced a hiccup. Try again!');
+          }
+          
           throw new Error(`Streaming request failed: ${streamingError.message}`);
         }
 
@@ -449,6 +454,12 @@ export const useStreamingChat = ({ onFinalResponse, onError }: UseStreamingChatP
           }, 500);
           return;
         }
+        
+        // Show custom error toast for "non-2xx code" errors
+        if (error.message?.includes('non-2xx code')) {
+          onError?.('Oops! I faced a hiccup. Try again!');
+        }
+        
         throw new Error(error.message);
       }
 

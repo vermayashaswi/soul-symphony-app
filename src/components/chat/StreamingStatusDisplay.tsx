@@ -43,19 +43,7 @@ const StreamingStatusDisplay: React.FC<StreamingStatusDisplayProps> = ({
 
   const displayMessage = getDisplayMessage();
 
-  // Determine if we should show Loader2 animation based on query category
-  const shouldShowLoader2 = () => {
-    if (!showBackendAnimation || !latestTask) return false;
-    
-    // Hide Loader2 for specific query categories
-    const categoriesWithoutLoader2 = [
-      'GENERAL_MENTAL_HEALTH',
-      'JOURNAL_SPECIFIC_NEEDS_CLARIFICATION', 
-      'UNRELATED'
-    ];
-    
-    return !queryCategory || !categoriesWithoutLoader2.includes(queryCategory);
-  };
+  // Loader2 animation is completely removed as per plan
 
   return (
     <div className="flex flex-col space-y-2 p-4 bg-muted/20 rounded-lg border">
@@ -99,22 +87,7 @@ const StreamingStatusDisplay: React.FC<StreamingStatusDisplayProps> = ({
           </motion.div>
         )}
 
-        {shouldShowLoader2() && (
-          <motion.div
-            key="backend-task"
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -10 }}
-            className="flex items-center space-x-2"
-          >
-            <Loader2 className="w-4 h-4 animate-spin text-primary" />
-            <div className="flex flex-col">
-              <span className="text-sm text-foreground/60">
-                {latestTask.description || latestTask.task}
-              </span>
-            </div>
-          </motion.div>
-        )}
+        {/* Loader2 animation completely removed */}
       </AnimatePresence>
 
       {/* Progress indicator */}
@@ -123,7 +96,7 @@ const StreamingStatusDisplay: React.FC<StreamingStatusDisplayProps> = ({
           className="bg-primary h-2 rounded-full"
           initial={{ width: "0%" }}
           animate={{ 
-            width: shouldShowLoader2() ? "85%" : displayMessage ? "60%" : "30%"
+            width: displayMessage ? "60%" : "30%"
           }}
           transition={{ duration: 0.5 }}
         />
