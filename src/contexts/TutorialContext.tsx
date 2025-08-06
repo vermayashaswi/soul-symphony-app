@@ -532,15 +532,47 @@ export const TutorialProvider: React.FC<{ children: ReactNode }> = ({ children }
     if (!user) return;
     
     try {
+      console.log('[TutorialContext] Skipping tutorial for user:', user.id);
+      
+      // First get current profile to preserve subscription status
+      const { data: currentProfile, error: fetchError } = await supabase
+        .from('profiles')
+        .select('subscription_status, subscription_tier, is_premium, trial_ends_at')
+        .eq('id', user.id)
+        .single();
+        
+      if (fetchError) {
+        console.error('[TutorialContext] Error fetching current profile:', fetchError);
+        return;
+      }
+      
+      console.log('[TutorialContext] Current subscription status before skip:', {
+        status: currentProfile.subscription_status,
+        tier: currentProfile.subscription_tier,
+        isPremium: currentProfile.is_premium,
+        trialEndsAt: currentProfile.trial_ends_at
+      });
+      
+      // Update tutorial completion while preserving subscription status
       const { error } = await supabase
         .from('profiles')
-        .update({ tutorial_completed: 'YES' })
+        .update({ 
+          tutorial_completed: 'YES',
+          // Explicitly preserve subscription fields to prevent any trigger issues
+          subscription_status: currentProfile.subscription_status,
+          subscription_tier: currentProfile.subscription_tier,
+          is_premium: currentProfile.is_premium,
+          trial_ends_at: currentProfile.trial_ends_at,
+          updated_at: new Date().toISOString()
+        })
         .eq('id', user.id);
         
       if (error) {
         console.error('[TutorialContext] Error skipping tutorial:', error);
         return;
       }
+      
+      console.log('[TutorialContext] Tutorial skipped successfully, subscription status preserved');
       
       setIsActive(false);
       setPendingTutorialStart(false);
