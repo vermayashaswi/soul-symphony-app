@@ -456,26 +456,12 @@ export function SoulNet3D({ timeRange, insightsData, userId, onTimeRangeChange }
       return { nodes: [], links: [] };
     }
 
-    // Enhanced filtering: use correct data source based on time range
+    // Always respect the selected time range - use only filtered entries
     const filteredEntries = insightsData?.entries || [];
+    console.log(`[SoulNet3D] Processing ${filteredEntries.length} entries for timeRange: ${timeRange}`);
     
-    // If filtered entries are too sparse for shorter time ranges, fall back to broader data
-    const minimumDataThreshold = timeRange === 'today' ? 1 : timeRange === 'week' ? 2 : 5;
-    let entriesForProcessing = filteredEntries;
-    
-    if (filteredEntries.length < minimumDataThreshold) {
-      console.log(`[SoulNet3D] Sparse data detected (${filteredEntries.length} entries). Using fallback strategy for ${timeRange}`);
-      
-      // For sparse data, use a broader time window from allEntries
-      if (timeRange === 'today' || timeRange === 'week') {
-        // For very short time ranges, show recent entries if current period is empty
-        const recentEntries = insightsData.allEntries?.slice(0, 10) || [];
-        entriesForProcessing = recentEntries.length > filteredEntries.length ? recentEntries : filteredEntries;
-      } else {
-        // For month/year, stick with filtered data even if sparse
-        entriesForProcessing = filteredEntries;
-      }
-    }
+    // Always use the correctly time-filtered entries, never override with broader data
+    const entriesForProcessing = filteredEntries;
 
     const nodes: SoulNet3DNode[] = [];
     const links: SoulNet3DLink[] = [];
