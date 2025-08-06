@@ -1,5 +1,5 @@
 
-import { fetchWithRetry, parseRateLimitInfo } from '@/utils/api-client';
+import { fetchWithRetry } from '@/utils/api-client';
 
 export type TranscriptionOptions = {
   highQuality?: boolean;
@@ -94,7 +94,7 @@ export class TranscriptionService {
         headers['Authorization'] = `Bearer ${this.authToken}`;
       }
 
-      // Use enhanced fetch with rate limiting support
+      // Use enhanced fetch
       const response = await fetchWithRetry(`${this.supabaseUrl}/functions/v1/transcribe-audio`, {
         method: 'POST',
         headers,
@@ -106,15 +106,9 @@ export class TranscriptionService {
           recordingTime: options.recordingTime
         }),
         retries: 2,
-        timeout: 60000, // 60 seconds for transcription
-        respectRateLimit: true
+        timeout: 60000 // 60 seconds for transcription
       });
 
-      // Handle rate limiting specifically
-      if (response.status === 429) {
-        const rateLimitInfo = await parseRateLimitInfo(response);
-        throw new Error(`Rate limit exceeded: ${rateLimitInfo?.message || 'Too many requests'}`);
-      }
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
@@ -154,14 +148,6 @@ export class TranscriptionService {
     } catch (error) {
       console.error('Transcription failed:', error);
       
-      // Enhanced error handling for rate limiting
-      if (error.message.includes('Rate limit')) {
-        throw new TranscriptionError(
-          'Rate limit exceeded. Please wait before making another request.',
-          'RATE_LIMIT_EXCEEDED',
-          { retryable: false, rateLimited: true }
-        );
-      }
 
       if (error.message.includes('Audio file size exceeds the limit')) {
         throw new TranscriptionError(

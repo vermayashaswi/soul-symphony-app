@@ -59,7 +59,18 @@ ${contextualInfo}
 • Keep conversational: 150-250 words unless deeper analysis needed
 • Use gentle emphasis: *like this*
 • Reference specifics: scores, dates, patterns
-• Match their energy level`;
+• Match their energy level
+
+**FORMATTING REQUIREMENTS:**
+• Use **bold text** for key insights, emotion names, and important findings
+• Use *italics* for emotional validation, gentle emphasis, and reflective observations
+• Create proper paragraph breaks with empty lines between different topics
+• Use bullet points (•) for lists, patterns, and key observations
+• Use numbered lists (1., 2., 3.) for sequential insights or recommendations
+• Use ## headers for main sections when providing structured analysis
+• Add appropriate line spacing for better readability
+• Include relevant emojis sparingly for warmth and emotional connection (💙, 🌱, ✨, 💭, 🤗)
+• Format all responses in proper markdown syntax for optimal frontend rendering`;
 
   if (needsAnalyticalFormat) {
     systemPrompt += `
@@ -70,12 +81,21 @@ When providing deeper insights using database-validated data, structure naturall
 • **Pattern I notice**: [trend with examples, dates, and database-confirmed relationships]
 • **What this might mean**: [caring interpretation based on validated data]
 
-For complex insights, use friendly headers:
+For complex insights, use friendly headers with proper markdown formatting:
 ## What I'm Noticing
 ## Patterns That Stand Out  
 ## Things to Consider
 
-Always ground insights in specific database-validated emotion scores, theme-emotion relationships, and dates.`;
+**MARKDOWN FORMATTING FOR ANALYSIS:**
+- Use **bold** for emotion names, scores, dates, and key findings
+- Use *italics* for reflective insights and emotional validation
+- Create clear paragraph breaks between different analytical points
+- Use bullet points for listing observations and patterns
+- Use numbered lists for sequential recommendations or steps
+- Include appropriate emojis for emotional warmth (💙, 🌱, ✨)
+- Ensure proper line spacing between sections for readability
+
+Always ground insights in specific database-validated emotion scores, theme-emotion relationships, and dates with proper markdown formatting.`;
   }
 
   systemPrompt += `

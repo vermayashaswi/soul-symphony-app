@@ -33,6 +33,8 @@ import { getThreadMessages, saveMessage } from "@/services/chat";
 import { useDebugLog } from "@/utils/debug/DebugContext";
 import { TranslatableText } from "@/components/translation/TranslatableText";
 import { useChatMessageClassification, QueryCategory } from "@/hooks/use-chat-message-classification";
+import { useStreamingChat } from "@/hooks/useStreamingChat";
+import { useAutoScroll } from "@/hooks/use-auto-scroll";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -73,7 +75,6 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({
   const { toast } = useToast();
   const { user } = useAuth();
   const { translate } = useTranslation();
-  const chatBottomRef = useRef<HTMLDivElement>(null);
   const loadedThreadRef = useRef<string | null>(null);
   const debugLog = useDebugLog();
   
@@ -85,6 +86,82 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({
   // Use the GPT-based message classification hook
   const { classifyMessage, classification } = useChatMessageClassification();
   
+  // Use streaming chat for enhanced UX
+  const {
+    isStreaming,
+    streamingMessages,
+    currentUserMessage,
+    showBackendAnimation,
+    startStreamingChat,
+    queryCategory
+  } = useStreamingChat({
+    onFinalResponse: async (response, analysis) => {
+      // Handle final streaming response
+      if (!response || !currentThreadId || !effectiveUserId) {
+        debugLog.addEvent("Streaming Response", "Missing required data for final response", "error");
+        console.error("[Streaming] Missing response data:", { response: !!response, threadId: !!currentThreadId, userId: !!effectiveUserId });
+        return;
+      }
+      
+      debugLog.addEvent("Streaming Response", `Final response received: ${response.substring(0, 100)}...`, "success");
+      
+      try {
+        // Save the assistant response to database
+        debugLog.addEvent("Database", "Saving streaming assistant response to database", "info");
+        const savedResponse = await saveMessage(
+          currentThreadId,
+          response,
+          'assistant',
+          effectiveUserId,
+          analysis?.references || undefined,
+          analysis?.hasNumericResult || false
+        );
+        
+        if (savedResponse) {
+          debugLog.addEvent("Database", `Streaming assistant response saved with ID: ${savedResponse.id}`, "success");
+          
+          // Add the saved response to chat history
+          const typedSavedResponse: ChatMessage = {
+            ...savedResponse,
+            sender: savedResponse.sender as 'user' | 'assistant' | 'error',
+            role: savedResponse.role as 'user' | 'assistant' | 'error'
+          };
+          setChatHistory(prev => [...prev, typedSavedResponse]);
+        } else {
+          debugLog.addEvent("Database", "Failed to save streaming response - null response", "error");
+          throw new Error("Failed to save streaming response");
+        }
+      } catch (saveError) {
+        debugLog.addEvent("Database", `Error saving streaming response: ${saveError instanceof Error ? saveError.message : "Unknown error"}`, "error");
+        console.error("[Streaming] Failed to save response:", saveError);
+        
+        // Fallback: Add temporary message to UI
+        const fallbackMessage: ChatMessage = {
+          id: `temp-streaming-${Date.now()}`,
+          thread_id: currentThreadId,
+          content: response,
+          sender: 'assistant',
+          role: 'assistant',
+          created_at: new Date().toISOString()
+        };
+        setChatHistory(prev => [...prev, fallbackMessage]);
+        
+        toast({
+          title: "Warning",
+          description: "Response displayed but couldn't be saved to your conversation history",
+          variant: "default"
+        });
+      }
+    },
+    onError: (error) => {
+      toast({
+        title: "Error",
+        description: error,
+        variant: "destructive"
+      });
+    }
+  });
+  
   // Use our enhanced realtime hook to track processing status
   const {
     isLoading,
@@ -94,6 +171,13 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({
     updateProcessingStage,
     setLocalLoading
   } = useChatRealtime(currentThreadId);
+  
+  // Use unified auto-scroll hook
+  const { scrollElementRef, scrollToBottom } = useAutoScroll({
+    dependencies: [chatHistory, isLoading, isProcessing, isStreaming, streamingMessages],
+    delay: 50,
+    scrollThreshold: 100
+  });
 
   // Sync with props thread ID and update local storage
   useEffect(() => {
@@ -140,15 +224,7 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({
     };
   }, [effectiveUserId, propsThreadId]);
 
-  useEffect(() => {
-    scrollToBottom();
-  }, [chatHistory, isLoading, isProcessing]);
-
-  const scrollToBottom = () => {
-    setTimeout(() => {
-      chatBottomRef.current?.scrollIntoView({ behavior: 'smooth' });
-    }, 100);
-  };
+  // Auto-scroll is now handled by the useAutoScroll hook
 
   const loadThreadMessages = async (threadId: string) => {
     if (!threadId || !effectiveUserId) {
@@ -376,33 +452,26 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({
       
       // Route to appropriate edge function based on classification
       if (queryClassification.category === QueryCategory.JOURNAL_SPECIFIC) {
-        debugLog.addEvent("Routing", "Using chat-with-rag for journal-specific query", "info");
+        debugLog.addEvent("Routing", "Using chat-with-rag for journal-specific query with streaming", "info");
         
-        // Call chat-with-rag edge function
-        const { data, error } = await supabase.functions.invoke('chat-with-rag', {
-          body: {
-            message,
-            userId: effectiveUserId,
-            threadId,
-            conversationContext,
+        // Start streaming chat for enhanced UX
+        await startStreamingChat(
+          message,
+          effectiveUserId,
+          threadId,
+          conversationContext,
+          {
             useAllEntries: queryClassification.useAllEntries || false,
             hasPersonalPronouns: message.toLowerCase().includes('i ') || message.toLowerCase().includes('my '),
             hasExplicitTimeReference: /\b(last week|yesterday|this week|last month|today|recently|lately)\b/i.test(message),
             threadMetadata: {}
           }
-        });
+        );
         
-        if (error) {
-          throw new Error(`Journal analysis error: ${error.message}`);
-        }
+        // Skip the rest since streaming handles the response
+        return;
         
-        response = {
-          content: data.response,
-          references: data.references || [],
-          analysis: data.analysis || {},
-          hasNumericResult: false,
-          role: 'assistant' as const
-        };
+        // This code block is no longer needed as streaming handles the response
         
       } else if (queryClassification.category === QueryCategory.GENERAL_MENTAL_HEALTH) {
         debugLog.addEvent("Routing", "Using general-mental-health-chat for mental health query", "info");
@@ -439,8 +508,21 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({
           }
         });
         
+        debugLog.addEvent("Edge Function Response", `Smart-chat response: ${JSON.stringify({
+          hasData: !!data,
+          hasError: !!error,
+          errorMessage: error?.message,
+          dataKeys: data ? Object.keys(data) : [],
+          responseLength: data?.response?.length || 0
+        })}`, data ? "success" : "error");
+        
         if (error) {
           throw new Error(`Smart chat error: ${error.message}`);
+        }
+        
+        if (!data || !data.response) {
+          debugLog.addEvent("Edge Function Response", "Smart-chat returned no response data", "error");
+          throw new Error("No response received from smart-chat function");
         }
         
         response = {
@@ -450,6 +532,12 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({
           hasNumericResult: false,
           role: 'assistant' as const
         };
+        
+        debugLog.addEvent("Response Processing", `Created response object: ${JSON.stringify({
+          contentLength: response.content?.length || 0,
+          hasReferences: !!response.references?.length,
+          role: response.role
+        })}`, "success");
       }
       
       // Update or delete the processing message
@@ -840,6 +928,8 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({
             onInteractiveOptionClick={handleInteractiveOptionClick}
           />
         )}
+        
+        {/* Legacy streaming display removed - now integrated into message flow */}
       </div>
       
       <div className="chat-input-container bg-white border-t p-4">

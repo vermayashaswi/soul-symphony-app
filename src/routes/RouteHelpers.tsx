@@ -9,49 +9,92 @@ export const isNativeApp = (): boolean => {
   return /native/i.test(window.navigator.userAgent);
 };
 
-// CRITICAL FIX: Update the path-based check to treat ALL routes as app routes for native apps
+// CRITICAL FIX: Memoized route check to prevent infinite loops
+const routeCheckCache = new Map<string, { result: boolean; timestamp: number; isNative: boolean }>();
+const ROUTE_CACHE_DURATION = 5000; // 5 seconds
+
 export const isAppRoute = (pathname: string): boolean => {
-  // For native apps, ALL routes are considered app routes
-  if (nativeIntegrationService.isRunningNatively()) {
-    console.log(`isAppRoute check for ${pathname}: true (native app - all routes are app routes)`);
-    return true;
+  const now = Date.now();
+  const isNative = nativeIntegrationService.isRunningNatively();
+  const cacheKey = `${pathname}-${isNative}`;
+  
+  // Check cache
+  const cached = routeCheckCache.get(cacheKey);
+  if (cached && (now - cached.timestamp) < ROUTE_CACHE_DURATION && cached.isNative === isNative) {
+    return cached.result;
   }
   
-  // For web apps, app routes must start with /app/ or be exactly /app
-  const isApp = pathname.startsWith('/app/') || pathname === '/app';
-  console.log(`isAppRoute check for ${pathname}: ${isApp} (web app)`);
-  return isApp;
+  let result: boolean;
+  
+  // For native apps, ALL routes are considered app routes
+  if (isNative) {
+    console.log(`[RouteHelpers] isAppRoute check for ${pathname}: true (native app - all routes are app routes)`);
+    result = true;
+  } else {
+    // For web apps, app routes must start with /app/ or be exactly /app
+    result = pathname.startsWith('/app/') || pathname === '/app';
+    console.log(`[RouteHelpers] isAppRoute check for ${pathname}: ${result} (web app)`);
+  }
+  
+  // Cache the result
+  routeCheckCache.set(cacheKey, { result, timestamp: now, isNative });
+  
+  // Clean old cache entries
+  if (routeCheckCache.size > 50) {
+    const cutoff = now - ROUTE_CACHE_DURATION;
+    for (const [key, value] of routeCheckCache.entries()) {
+      if (value.timestamp < cutoff) {
+        routeCheckCache.delete(key);
+      }
+    }
+  }
+  
+  return result;
 };
 
 export const isWebsiteRoute = (pathname: string): boolean => {
+  const now = Date.now();
+  const isNative = nativeIntegrationService.isRunningNatively();
+  const cacheKey = `website-${pathname}-${isNative}`;
+  
+  // Check cache
+  const cached = routeCheckCache.get(cacheKey);
+  if (cached && (now - cached.timestamp) < ROUTE_CACHE_DURATION && cached.isNative === isNative) {
+    return cached.result;
+  }
+  
+  let result: boolean;
+  
   // For native apps, NO routes are website routes - everything is treated as app routes
-  if (nativeIntegrationService.isRunningNatively()) {
-    console.log(`${pathname} is not a website route (native app - all routes are app routes)`);
-    return false;
+  if (isNative) {
+    console.log(`[RouteHelpers] ${pathname} is not a website route (native app - all routes are app routes)`);
+    result = false;
+  } else {
+    // If it has an app prefix, it's not a website route
+    if (isAppRoute(pathname)) {
+      console.log(`[RouteHelpers] ${pathname} is an app route, so not a website route`);
+      result = false;
+    } else if (pathname === '/') {
+      // For root URL (/), consider it as a website route in web mode
+      console.log(`[RouteHelpers] ${pathname} is root, treating as website route (web mode)`);
+      result = true;
+    } else {
+      // Explicitly define website routes for web mode
+      const websitePrefixes = ['/', '/about', '/pricing', '/terms', '/privacy', '/blog', '/contact', '/faq', '/download'];
+      
+      // Check for specific website routes
+      result = websitePrefixes.some(prefix => 
+        pathname === prefix || pathname.startsWith(`${prefix}/`)
+      );
+      
+      console.log(`[RouteHelpers] isWebsiteRoute check for ${pathname}: ${result} (web mode)`);
+    }
   }
   
-  // If it has an app prefix, it's not a website route
-  if (isAppRoute(pathname)) {
-    console.log(`${pathname} is an app route, so not a website route`);
-    return false;
-  }
+  // Cache the result
+  routeCheckCache.set(cacheKey, { result, timestamp: now, isNative });
   
-  // For root URL (/), consider it as a website route in web mode
-  if (pathname === '/') {
-    console.log(`${pathname} is root, treating as website route (web mode)`);
-    return true;
-  }
-  
-  // Explicitly define website routes for web mode
-  const websitePrefixes = ['/', '/about', '/pricing', '/terms', '/privacy', '/blog', '/contact', '/faq', '/download'];
-  
-  // Check for specific website routes
-  const isWebsite = websitePrefixes.some(prefix => 
-    pathname === prefix || pathname.startsWith(`${prefix}/`)
-  );
-  
-  console.log(`isWebsiteRoute check for ${pathname}: ${isWebsite} (web mode)`);
-  return isWebsite;
+  return result;
 };
 
 export const getBaseUrl = (): string => {
@@ -86,10 +129,11 @@ export const AppRouteWrapper = ({
   const navigate = useNavigate();
   const location = useLocation();
   
-  console.log('AppRouteWrapper rendering:', location.pathname, { 
+  console.log('[RouteHelpers] AppRouteWrapper rendering:', location.pathname, { 
     requiresAuth, 
     userExists: !!user,
-    isAppRoute: isAppRoute(location.pathname)
+    isAppRoute: isAppRoute(location.pathname),
+    isNative: nativeIntegrationService.isRunningNatively()
   });
   
   useEffect(() => {

@@ -106,3 +106,34 @@ html, body {
     }
   }
 }
+
+/* Improved mobile navigation visibility for app routes */
+@media (max-width: 768px) {
+  .app-container {
+    position: relative;
+    min-height: 100vh;
+    min-height: 100dvh;
+  }
+  
+  .mobile-navigation {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    z-index: 1000;
+    background: hsl(var(--background));
+    border-top: 1px solid hsl(var(--border));
+    transform: translateY(0);
+    transition: transform 0.3s ease-in-out;
+  }
+  
+  /* Ensure navigation is always visible on app routes when it should be */
+  .app-route .mobile-navigation {
+    display: block;
+  }
+  
+  /* Hide navigation during keyboard input on mobile */
+  .keyboard-visible .mobile-navigation {
+    transform: translateY(100%);
+  }
+}

@@ -1,22 +1,13 @@
-
 import { debounce } from '@/lib/utils';
 
 type FetchOptions = RequestInit & {
   retries?: number;
   retryDelay?: number;
   timeout?: number;
-  respectRateLimit?: boolean;
 };
 
-interface RateLimitResponse {
-  error?: string;
-  message?: string;
-  limitType?: string;
-  retryAfter?: number;
-}
-
 /**
- * Enhanced fetch function with retry logic, timeout, rate limiting awareness
+ * Enhanced fetch function with retry logic and timeout
  */
 export async function fetchWithRetry(
   url: string, 
@@ -26,7 +17,6 @@ export async function fetchWithRetry(
     retries = 2,
     retryDelay = 1000, 
     timeout = 15000,
-    respectRateLimit = true,
     ...fetchOptions 
   } = options;
   
@@ -40,22 +30,13 @@ export async function fetchWithRetry(
       signal: controller.signal
     });
     
-    // Handle rate limiting
-    if (response.status === 429 && respectRateLimit) {
-      const retryAfter = parseInt(response.headers.get('Retry-After') || '60');
-      
-      // For rate limiting, don't retry automatically to respect the limits
-      // The calling code should handle this with the rate limit hook
-      return response;
-    }
-    
     // If the response is ok, return it
     if (response.ok) {
       return response;
     }
     
-    // If we have retries left and the error is retryable (but not rate limited), retry
-    if (retries > 0 && isRetryableError(response.status) && response.status !== 429) {
+    // If we have retries left and the error is retryable, retry
+    if (retries > 0 && isRetryableError(response.status)) {
       // Wait for the specified delay
       await new Promise(resolve => setTimeout(resolve, retryDelay));
       
@@ -110,41 +91,7 @@ function isNetworkError(error: any): boolean {
 function isRetryableError(status: number): boolean {
   // 408: Request Timeout
   // 500, 502, 503, 504: Server errors
-  // Note: 429 (Too Many Requests) is handled separately
   return [408, 500, 502, 503, 504].includes(status);
-}
-
-/**
- * Enhanced utility to check if a response indicates rate limiting
- */
-export function isRateLimitResponse(response: Response): boolean {
-  return response.status === 429;
-}
-
-/**
- * Parse rate limit information from response
- */
-export async function parseRateLimitInfo(response: Response): Promise<RateLimitResponse | null> {
-  if (!isRateLimitResponse(response)) {
-    return null;
-  }
-
-  try {
-    const data = await response.json();
-    return {
-      error: data.error,
-      message: data.message,
-      limitType: data.limitType,
-      retryAfter: data.retryAfter || parseInt(response.headers.get('Retry-After') || '60')
-    };
-  } catch (error) {
-    console.warn('Failed to parse rate limit response:', error);
-    return {
-      error: 'Rate limit exceeded',
-      message: 'Too many requests. Please try again later.',
-      retryAfter: parseInt(response.headers.get('Retry-After') || '60')
-    };
-  }
 }
 
 /**

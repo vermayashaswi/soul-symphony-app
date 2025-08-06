@@ -79,30 +79,40 @@ const MobileNavigation: React.FC<MobileNavigationProps> = ({ onboardingComplete 
     });
   }, [isKeyboardVisible, keyboardHeight, platform]);
   
-  // Visibility logic - hide on auth/onboarding pages but NOT when keyboard is visible (CSS handles that)
+  // Enhanced visibility logic - aligned with ViewportManager
   useEffect(() => {
-    const onboardingOrAuthPaths = [
+    const navigationHiddenPaths = [
       '/app/onboarding',
       '/app/auth',
       '/onboarding',
-      '/auth',
-      '/'
+      '/auth'
     ];
     
-    const isOnboardingOrAuth = onboardingOrAuthPaths.includes(location.pathname);
+    const shouldHideNavigation = navigationHiddenPaths.includes(location.pathname);
+    const isTransitionalRoute = location.pathname === '/app' || location.pathname === '/';
+    const isInAppContext = isAppRoute(location.pathname);
     
+    // Show navigation if:
+    // 1. We're on mobile or native app
+    // 2. We're in app context (app routes)
+    // 3. User is authenticated
+    // 4. Not on hidden paths (onboarding/auth)
+    // 5. Onboarding is complete OR we're not on a transitional route
     const shouldShowNav = (isMobile.isMobile || isNativeApp()) && 
-                          !isOnboardingOrAuth &&
+                          isInAppContext &&
                           !!user &&
-                          onboardingComplete !== false;
+                          !shouldHideNavigation &&
+                          (onboardingComplete || !isTransitionalRoute);
     
-    componentLogger.debug('Visibility check', { 
+    componentLogger.debug('Enhanced visibility check', { 
       shouldShowNav, 
       isMobile: isMobile.isMobile, 
       isNativeApp: isNativeApp(),
       path: location.pathname,
+      isInAppContext,
       isKeyboardVisible,
-      isOnboardingOrAuth,
+      shouldHideNavigation,
+      isTransitionalRoute,
       hasUser: !!user,
       onboardingComplete,
       safeArea,

@@ -145,6 +145,25 @@ export function classifyQueryComplexity(message: string): 'simple' | 'complex' |
   return 'simple';
 }
 
+export function detectUnrelatedQuery(message: string): boolean {
+  const lowerMessage = message.toLowerCase().trim();
+  
+  const unrelatedPatterns = [
+    /\b(weather|temperature|forecast|climate)\b/i,
+    /\b(recipe|cook|cooking|food preparation|ingredient)\b/i,
+    /\b(history|geography|science|mathematics|physics|chemistry|biology)\b/i,
+    /\b(sports|games|entertainment|movies|music|tv|television)\b/i,
+    /\b(technology|programming|computer|software|app|coding)\b/i,
+    /\b(news|politics|current events|election|government)\b/i,
+    /\b(travel|vacation|tourist|destination)\b/i,
+    /\b(fashion|style|clothing|makeup)\b/i,
+    /\b(business|finance|stocks|investment|money|salary)\b/i,
+    /\b(car|automobile|vehicle|transportation)\b/i
+  ];
+  
+  return unrelatedPatterns.some(pattern => pattern.test(lowerMessage));
+}
+
 export function generateSubQueries(message: string): string[] {
   const lowerMessage = message.toLowerCase();
   

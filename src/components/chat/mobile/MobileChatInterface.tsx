@@ -20,6 +20,9 @@ import { MentalHealthInsights } from "@/hooks/use-mental-health-insights";
 import { useChatRealtime } from "@/hooks/use-chat-realtime";
 import { updateThreadProcessingStatus, generateThreadTitle } from "@/utils/chat/threadUtils";
 import { useKeyboardDetection } from "@/hooks/use-keyboard-detection";
+import { useStreamingChat } from "@/hooks/useStreamingChat";
+import ChatErrorBoundary from "../ChatErrorBoundary";
+import { useAutoScroll } from "@/hooks/use-auto-scroll";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -71,6 +74,84 @@ export default function MobileChatInterface({
   
   const { isKeyboardVisible } = useKeyboardDetection();
   
+  // Use streaming chat for enhanced UX
+  const {
+    isStreaming,
+    streamingMessages,
+    currentUserMessage,
+    showBackendAnimation,
+    startStreamingChat,
+    dynamicMessages,
+    currentMessageIndex,
+    useThreeDotFallback,
+    queryCategory
+  } = useStreamingChat({
+    onFinalResponse: async (response, analysis) => {
+      // Handle final streaming response
+      if (!response || !threadId || !user?.id) {
+        debugLog.addEvent("Streaming Response", "[Mobile] Missing required data for final response", "error");
+        console.error("[Mobile] [Streaming] Missing response data:", { response: !!response, threadId: !!threadId, userId: !!user?.id });
+        return;
+      }
+      
+      debugLog.addEvent("Streaming Response", `[Mobile] Final response received: ${response.substring(0, 100)}...`, "success");
+      
+      try {
+        // Save the assistant response to database
+        debugLog.addEvent("Database", "[Mobile] Saving streaming assistant response to database", "info");
+        const savedResponse = await saveMessage(
+          threadId,
+          response,
+          'assistant',
+          user.id,
+          analysis?.references || undefined,
+          analysis?.hasNumericResult || false
+        );
+        
+        if (savedResponse) {
+          debugLog.addEvent("Database", `[Mobile] Streaming assistant response saved with ID: ${savedResponse.id}`, "success");
+          
+          // Add the saved response to messages
+          const finalMessage: UIChatMessage = {
+            role: 'assistant',
+            content: response,
+            references: analysis?.references,
+            analysis: analysis || undefined,
+            hasNumericResult: analysis?.hasNumericResult || false
+          };
+          setMessages(prev => [...prev, finalMessage]);
+        } else {
+          debugLog.addEvent("Database", "[Mobile] Failed to save streaming response - null response", "error");
+          throw new Error("Failed to save streaming response");
+        }
+      } catch (saveError) {
+        debugLog.addEvent("Database", `[Mobile] Error saving streaming response: ${saveError instanceof Error ? saveError.message : "Unknown error"}`, "error");
+        console.error("[Mobile] [Streaming] Failed to save response:", saveError);
+        
+        // Fallback: Add temporary message to UI
+        const fallbackMessage: UIChatMessage = {
+          role: 'assistant',
+          content: response,
+          ...(analysis && { analysis })
+        };
+        setMessages(prev => [...prev, fallbackMessage]);
+        
+        toast({
+          title: "Warning",
+          description: "Response displayed but couldn't be saved to your conversation history",
+          variant: "default"
+        });
+      }
+    },
+    onError: (error) => {
+      toast({
+        title: "Error",
+        description: error,
+        variant: "destructive"
+      });
+    }
+  });
+  
   const suggestionQuestions = [
     {
       text: "What were my top emotions last week?",
@@ -97,8 +178,14 @@ export default function MobileChatInterface({
   const { toast } = useToast();
   const { user } = useAuth();
   const { translate } = useTranslation();
-  const messagesEndRef = useRef<HTMLDivElement>(null);
   const loadedThreadRef = useRef<string | null>(null);
+  
+  // Use unified auto-scroll hook
+  const { scrollElementRef, scrollToBottom } = useAutoScroll({
+    dependencies: [messages, isLoading, isProcessing, isStreaming, streamingMessages],
+    delay: 50,
+    scrollThreshold: 100
+  });
 
   useEffect(() => {
     if (threadId) {
@@ -133,15 +220,7 @@ export default function MobileChatInterface({
     };
   }, []);
 
-  useEffect(() => {
-    scrollToBottom();
-  }, [messages, isLoading, isProcessing]);
-
-  const scrollToBottom = () => {
-    setTimeout(() => {
-      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-    }, 100);
-  };
+  // Auto-scroll is now handled by the useAutoScroll hook
 
   const loadThreadMessages = async (currentThreadId: string) => {
     if (!currentThreadId || !user?.id) {
@@ -304,43 +383,22 @@ export default function MobileChatInterface({
         })
       );
       
-      const queryTypes = analyzeQueryTypes(message);
+      // Use streaming chat for enhanced UX
+      const conversationContext = messages.slice(-5).map(msg => ({
+        role: msg.role,
+        content: msg.content
+      }));
       
-      const response = await processChatMessage(
-        message, 
-        user.id, 
-        queryTypes, 
+      // Start streaming chat with conversation context
+      await startStreamingChat(
+        message,
+        user.id,
         currentThreadId,
-        false
+        conversationContext,
+        {}
       );
       
       await updateThreadProcessingStatus(currentThreadId, 'idle');
-      
-      const uiResponse: UIChatMessage = {
-        role: response.role === 'error' ? 'assistant' : response.role as 'user' | 'assistant',
-        content: response.content,
-        ...(response.references && { references: response.references }),
-        ...(response.analysis && { analysis: response.analysis }),
-        ...(response.hasNumericResult !== undefined && { hasNumericResult: response.hasNumericResult })
-      };
-      
-      const savedResponse = await saveMessage(
-        currentThreadId,
-        response.content,
-        'assistant',
-        user.id,
-        response.references || null,
-        response.hasNumericResult || false
-      );
-      
-      // Note: Title generation is now handled automatically after first message is saved
-      
-      await supabase
-        .from('chat_threads')
-        .update({ updated_at: new Date().toISOString() })
-        .eq('id', currentThreadId);
-      
-      setMessages(prev => [...prev, uiResponse]);
     } catch (error: any) {
       if (currentThreadId) {
         await updateThreadProcessingStatus(currentThreadId, 'failed');
@@ -693,25 +751,42 @@ export default function MobileChatInterface({
             </div>
           </div>
         ) : (
-          <div className="space-y-3">
+          <div ref={scrollElementRef} className="space-y-3 h-full overflow-y-auto">
             {messages.map((message, index) => (
-              <MobileChatMessage 
-                key={index} 
-                message={message} 
-                showAnalysis={false}
-              />
+              <ChatErrorBoundary key={index}>
+                <MobileChatMessage 
+                  message={message} 
+                  showAnalysis={false}
+                />
+              </ChatErrorBoundary>
             ))}
             
-            {(isLoading || isProcessing) && (
-              <MobileChatMessage 
-                message={{ role: 'assistant', content: '' }}
-                isLoading={true}
-              />
+            {/* Show streaming status or basic loading */}
+            {isStreaming ? (
+              <ChatErrorBoundary>
+                <MobileChatMessage 
+                  message={{ role: 'assistant', content: '' }}
+                  streamingMessage={
+                    useThreeDotFallback || dynamicMessages.length === 0
+                      ? undefined // Show only three-dot animation
+                      : dynamicMessages[currentMessageIndex] // Show dynamic message
+                  }
+                  showStreamingDots={true}
+                />
+              </ChatErrorBoundary>
+            ) : (isLoading || isProcessing) && (
+              <ChatErrorBoundary>
+                <MobileChatMessage 
+                  message={{ role: 'assistant', content: '' }}
+                  isLoading={true}
+                />
+              </ChatErrorBoundary>
             )}
+            
+            {/* Spacer for auto-scroll */}
+            <div className="pb-5" />
           </div>
         )}
-        
-        <div ref={messagesEndRef} />
       </div>
       
       {/* Chat Input */}

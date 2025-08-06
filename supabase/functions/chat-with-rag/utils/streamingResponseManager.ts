@@ -137,6 +137,45 @@ export class SSEStreamManager {
     this.controller.enqueue(this.encoder.encode(formatted));
   }
 
+  // Send user-friendly status message for backend tasks
+  async sendUserMessage(message: string, stage?: string): Promise<void> {
+    const event = {
+      type: 'user_message',
+      message,
+      stage,
+      timestamp: Date.now()
+    };
+    
+    const formatted = `data: ${JSON.stringify(event)}\n\n`;
+    this.controller.enqueue(this.encoder.encode(formatted));
+  }
+
+  // Send backend task update (triggers loading animation)
+  async sendBackendTask(task: string, description?: string): Promise<void> {
+    const event = {
+      type: 'backend_task',
+      task,
+      description,
+      timestamp: Date.now()
+    };
+    
+    const formatted = `data: ${JSON.stringify(event)}\n\n`;
+    this.controller.enqueue(this.encoder.encode(formatted));
+  }
+
+  // Send progress update
+  async sendProgress(stage: string, progress?: number): Promise<void> {
+    const event = {
+      type: 'progress',
+      stage,
+      progress,
+      timestamp: Date.now()
+    };
+    
+    const formatted = `data: ${JSON.stringify(event)}\n\n`;
+    this.controller.enqueue(this.encoder.encode(formatted));
+  }
+
   async close(): Promise<void> {
     this.controller.close();
   }

@@ -245,29 +245,10 @@ export class ConversationStateManager {
         return null;
       }
       
-      // Safely handle metadata with type checking
-      const metadata = data.metadata || {};
-      let metadataObj: Record<string, any> = {};
+      // Reset state for thread without metadata
+      this.resetState();
       
-      if (isThreadMetadata(metadata)) {
-        metadataObj = metadata;
-        this.loadFromMetadata(metadataObj);
-      } else {
-        console.warn('Thread metadata is not in expected format:', metadata);
-        // Create default metadata
-        metadataObj = {
-          timeContext: null,
-          topicContext: null,
-          intentType: 'new_query',
-          confidenceScore: 1.0,
-          needsClarity: false,
-          ambiguities: [],
-          domainContext: null,
-          lastUpdated: new Date().toISOString()
-        };
-      }
-      
-      return metadataObj;
+      return null;
     } catch (error) {
       console.error('Error loading conversation state:', error);
       return null;
@@ -302,7 +283,6 @@ export class ConversationStateManager {
       const { error } = await supabase
         .from('chat_threads')
         .update({ 
-          metadata: state,
           updated_at: new Date().toISOString()
         })
         .eq('id', this.threadId)
@@ -318,5 +298,18 @@ export class ConversationStateManager {
       console.error('Error saving conversation state:', error);
       return false;
     }
+  }
+
+  /**
+   * Reset state to defaults
+   */
+  private resetState(): void {
+    this.timeContext = null;
+    this.topicContext = null;
+    this.confidenceScore = 1.0;
+    this.needsClarity = false;
+    this.intentType = 'new_query';
+    this.ambiguities = [];
+    this.domainContext = null;
   }
 }

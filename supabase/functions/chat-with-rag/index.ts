@@ -1,17 +1,7 @@
-
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.7.1';
-import { OptimizedApiClient } from './utils/optimizedApiClient.ts';
-import { DualSearchOrchestrator } from './utils/dualSearchOrchestrator.ts';
-import { generateResponse, generateSystemPrompt, generateUserPrompt } from './utils/responseGenerator.ts';
-import { planQuery } from './utils/queryPlanner.ts';
-import { RateLimitManager } from '../_shared/rateLimitUtils.ts';
 import { createStreamingResponse, SSEStreamManager } from './utils/streamingResponseManager.ts';
-import { BackgroundTaskManager } from './utils/backgroundTaskManager.ts';
-import { SmartCache } from './utils/smartCache.ts';
-import { OptimizedRagPipeline } from './utils/optimizedPipeline.ts';
-import { PerformanceOptimizer } from './utils/performanceOptimizer.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -23,36 +13,8 @@ serve(async (req) => {
     return new Response(null, { headers: corsHeaders });
   }
 
-  const startTime = Date.now();
-  let processingTime = 0;
-  let statusCode = 200;
-  let errorMessage: string | undefined;
-
   try {
-    console.log('[chat-with-rag] Starting optimized RAG processing with streaming support');
-
-    // Performance tracking
-    const globalTimer = PerformanceOptimizer.startTimer('total_request');
-    
-    // Initialize rate limiting
-    const rateLimitManager = new RateLimitManager(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
-    );
-
-    const { userId, ipAddress } = RateLimitManager.getClientInfo(req);
-
-    // Check rate limits
-    const rateLimitCheck = await rateLimitManager.checkRateLimit({
-      userId,
-      ipAddress,
-      functionName: 'chat-with-rag'
-    });
-
-    if (!rateLimitCheck.allowed) {
-      console.log(`[chat-with-rag] Rate limit exceeded for user ${userId || 'anonymous'} from IP ${ipAddress}`);
-      return rateLimitManager.createRateLimitResponse(rateLimitCheck);
-    }
+    console.log('[chat-with-rag] Starting enhanced RAG processing with classification');
 
     const supabaseClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
@@ -74,243 +36,510 @@ serve(async (req) => {
       message, 
       userId: requestUserId, 
       conversationContext = [], 
-      userProfile = {},
-      queryPlan = null,
-      streaming = false
+      userProfile = {}
     } = requestBody;
 
-    console.log(`[chat-with-rag] Processing query: "${message}" for user: ${requestUserId}, streaming: ${streaming}`);
+    console.log(`[chat-with-rag] Processing query: "${message}" for user: ${requestUserId}`);
 
-    // Check for streaming request
-    if (streaming || req.headers.get('Accept') === 'text/event-stream') {
+    // Check if streaming is enabled
+    const enableStreaming = requestBody.streamingMode || false;
+    
+    // Create a classification cache key to ensure consistency
+    const classificationCacheKey = `${message}_${JSON.stringify(conversationContext.slice(-2))}`;
+    let cachedClassification = null;
+    
+    if (enableStreaming) {
+      // Create streaming response
       const { response, controller } = createStreamingResponse();
       const streamManager = new SSEStreamManager(controller);
-      const pipeline = new OptimizedRagPipeline(streamManager, supabaseClient, openaiApiKey);
-
-      // Use background task for streaming pipeline
-      EdgeRuntime.waitUntil(
-        (async () => {
-          try {
-            await pipeline.processQuery(requestBody);
-            
-            // Log usage in background
-            BackgroundTaskManager.logApiUsage(rateLimitManager, {
-              userId,
-              ipAddress,
-              functionName: 'chat-with-rag',
-              statusCode: 200,
-              responseTimeMs: PerformanceOptimizer.endTimer(globalTimer, 'total_request')
-            });
-          } catch (error) {
-            console.error('[chat-with-rag] Streaming pipeline error:', error);
-            await streamManager.sendEvent('error', { message: error.message });
-          } finally {
-            await streamManager.close();
-          }
-        })()
-      );
-
+      
+      // Start pipeline with streaming status updates
+      processStreamingPipeline(streamManager, requestBody, supabaseClient, openaiApiKey).catch(error => {
+        console.error('[chat-with-rag] Streaming pipeline error:', error);
+        streamManager.sendEvent('error', { error: error.message });
+        streamManager.close();
+      });
+      
       return response;
     }
 
-    // Traditional non-streaming approach with optimizations
-    const cacheTimer = PerformanceOptimizer.startTimer('cache_check');
-    
-    // Check cache first
-    const cacheKey = SmartCache.generateKey(message, requestUserId, conversationContext.length);
-    const cachedResult = SmartCache.get(cacheKey);
-    
-    PerformanceOptimizer.endTimer(cacheTimer, 'cache_check');
-    
-    if (cachedResult) {
-      console.log('[chat-with-rag] Cache hit - returning cached result');
-      
-      // Log usage in background
-      BackgroundTaskManager.logApiUsage(rateLimitManager, {
-        userId,
-        ipAddress,
-        functionName: 'chat-with-rag',
-        statusCode: 200,
-        responseTimeMs: PerformanceOptimizer.endTimer(globalTimer, 'total_request'),
-        fromCache: true
-      });
+    // Step 1: Classify the query to determine processing approach (single invocation)
+    console.log('[chat-with-rag] Step 1: Query Classification');
+    const { data: classification, error: classificationError } = await supabaseClient.functions.invoke(
+      'chat-query-classifier',
+      {
+        body: { message, conversationContext }
+      }
+    );
 
+    if (classificationError) {
+      throw new Error(`Query classification failed: ${classificationError.message}`);
+    }
+
+    // Validate classification result structure
+    if (!classification || !classification.category) {
+      throw new Error('Invalid classification result - missing category');
+    }
+
+    console.log(`[chat-with-rag] Query classified as: ${classification.category} (confidence: ${classification.confidence})`);
+    
+    // Cache the classification to prevent inconsistencies
+    cachedClassification = classification;
+
+    // Handle unrelated queries with polite denial
+    if (cachedClassification.category === 'UNRELATED') {
+      console.log('[chat-with-rag] EXECUTING: UNRELATED pipeline - polite denial');
       return new Response(JSON.stringify({
-        ...cachedResult,
+        response: "I appreciate your question, but I'm specifically designed to help you explore your journal entries, understand your emotional patterns, and support your mental health and well-being. I focus on analyzing your personal reflections and providing insights about your journey. Is there something about your thoughts, feelings, or experiences you'd like to discuss instead?",
+        userStatusMessage: null,
         analysis: {
-          ...cachedResult.analysis,
-          fromCache: true,
-          cacheHit: true
+          queryType: 'unrelated_denial',
+          classification,
+          timestamp: new Date().toISOString()
         }
       }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
 
-    // Enhanced query planning with dual search support
-    const planningTimer = PerformanceOptimizer.startTimer('query_planning');
-    const enhancedQueryPlan = queryPlan || planQuery(message, userProfile.timezone);
-    PerformanceOptimizer.endTimer(planningTimer, 'query_planning');
-    
-    console.log(`[chat-with-rag] Query plan strategy: ${enhancedQueryPlan.strategy}, complexity: ${enhancedQueryPlan.complexity}`);
+    // Handle clarification queries directly
+    if (cachedClassification.category === 'JOURNAL_SPECIFIC_NEEDS_CLARIFICATION') {
+      console.log('[chat-with-rag] EXECUTING: CLARIFICATION pipeline');
+      const { data: clarificationResult, error: clarificationError } = await supabaseClient.functions.invoke(
+        'gpt-clarification-generator',
+        {
+          body: { 
+            userMessage: message,
+            conversationContext,
+            userProfile 
+          }
+        }
+      );
 
-    // Generate embedding with optimization
-    const embeddingTimer = PerformanceOptimizer.startTimer('embedding_generation');
-    const queryEmbedding = await OptimizedApiClient.getEmbedding(message, openaiApiKey);
-    PerformanceOptimizer.endTimer(embeddingTimer, 'embedding_generation');
+      if (clarificationError) {
+        throw new Error(`Clarification generation failed: ${clarificationError.message}`);
+      }
 
-    // Execute optimized dual search
-    const searchTimer = PerformanceOptimizer.startTimer('dual_search');
-    const searchMethod = DualSearchOrchestrator.shouldUseParallelExecution(enhancedQueryPlan) ? 
-      'parallel' : 'sequential';
-    
-    console.log(`[chat-with-rag] Executing ${searchMethod} dual search`);
-    
-    const searchResults = await PerformanceOptimizer.withConnectionPooling(async () => {
-      return searchMethod === 'parallel' ?
-        await DualSearchOrchestrator.executeParallelSearch(
-          supabaseClient,
-          requestUserId,
-          queryEmbedding,
-          enhancedQueryPlan,
-          message
-        ) :
-        await DualSearchOrchestrator.executeSequentialSearch(
-          supabaseClient,
-          requestUserId,
-          queryEmbedding,
-          enhancedQueryPlan,
-          message
+      return new Response(JSON.stringify({
+        response: clarificationResult.response,
+        userStatusMessage: clarificationResult.userStatusMessage,
+        analysis: {
+          queryType: 'clarification',
+          classification,
+          timestamp: new Date().toISOString()
+        }
+      }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    // For JOURNAL_SPECIFIC queries, process through the full RAG pipeline
+    if (cachedClassification.category === 'JOURNAL_SPECIFIC') {
+      console.log('[chat-with-rag] EXECUTING: JOURNAL_SPECIFIC pipeline - full RAG processing');
+      
+      // Step 2: Use GPT-powered query planning via smart-query-planner
+      let enhancedQueryPlan;
+      
+      try {
+        const { data: gptPlan, error: plannerError } = await supabaseClient.functions.invoke(
+          'smart-query-planner',
+          {
+            body: {
+              message,
+              userId: requestUserId,
+              conversationContext,
+              userProfile,
+              timeRange: userProfile.timeRange || null
+            }
+          }
         );
-    });
+        
+        if (plannerError) {
+          throw new Error(`GPT planner error: ${plannerError.message}`);
+        }
+        
+        enhancedQueryPlan = gptPlan.queryPlan;
+        console.log('[chat-with-rag] Using GPT-generated query plan:', enhancedQueryPlan);
+      } catch (error) {
+        console.error('[chat-with-rag] GPT planner failed:', error);
+        throw new Error('Query planning failed');
+      }
+      
+      console.log(`[chat-with-rag] Query plan strategy: ${enhancedQueryPlan.strategy}, complexity: ${enhancedQueryPlan.complexity}`);
 
-    const { vectorResults, sqlResults, combinedResults } = searchResults;
-    PerformanceOptimizer.endTimer(searchTimer, 'dual_search');
+      // Step 3: Check if we should use GPT-driven analysis (any sub-questions >= 1)
+      const shouldUseGptAnalysis = enhancedQueryPlan.subQuestions && enhancedQueryPlan.subQuestions.length >= 1;
+      
+      if (shouldUseGptAnalysis) {
+        console.log(`[chat-with-rag] Using GPT-driven analysis pipeline for ${enhancedQueryPlan.subQuestions.length} sub-questions`);
+        
+        // Step 4: Call GPT Analysis Orchestrator for sub-question analysis
+        const { data: analysisResults, error: analysisError } = await supabaseClient.functions.invoke(
+          'gpt-analysis-orchestrator',
+          {
+            body: {
+              subQuestions: enhancedQueryPlan.subQuestions,
+              userMessage: message,
+              userId: requestUserId,
+              timeRange: enhancedQueryPlan.timeRange
+            }
+          }
+        );
 
-    console.log(`[chat-with-rag] Dual search completed: ${combinedResults.length} total results`);
+        if (analysisError) {
+          throw new Error(`Analysis orchestrator failed: ${analysisError.message}`);
+        }
 
-    // Detect analytical query
-    const isAnalyticalQuery = enhancedQueryPlan.expectedResponseType === 'analysis' ||
-      enhancedQueryPlan.expectedResponseType === 'aggregated' ||
-      /\b(pattern|trend|when do|what time|how often|frequency|usually|typically|statistics|insights|breakdown|analysis)\b/i.test(message);
+        // Step 5: Call GPT Response Consolidator to synthesize the results
+        const { data: consolidationResult, error: consolidationError } = await supabaseClient.functions.invoke(
+          'gpt-response-consolidator',
+          {
+            body: {
+              userMessage: message,
+              analysisResults: analysisResults.analysisResults,
+              conversationContext,
+              userProfile,
+              streamingMode: false
+            }
+          }
+        );
 
-    // Generate prompts
-    const promptTimer = PerformanceOptimizer.startTimer('prompt_generation');
-    const systemPrompt = generateSystemPrompt(
-      userProfile.timezone || 'UTC',
-      enhancedQueryPlan.timeRange,
-      enhancedQueryPlan.expectedResponseType,
-      combinedResults.length,
-      `Dual search analysis: ${vectorResults.length} vector + ${sqlResults.length} SQL results`,
-      conversationContext,
-      false,
-      /\b(I|me|my|myself)\b/i.test(message),
-      enhancedQueryPlan.requiresTimeFilter,
-      'dual'
-    );
+        if (consolidationError) {
+          throw new Error(`Response consolidator failed: ${consolidationError.message}`);
+        }
 
-    const userPrompt = generateUserPrompt(message, combinedResults, 'dual vector + SQL');
-    PerformanceOptimizer.endTimer(promptTimer, 'prompt_generation');
+        console.log('[chat-with-rag] Successfully completed GPT-driven analysis pipeline');
 
-    // Generate response with optimization
-    const responseTimer = PerformanceOptimizer.startTimer('ai_response');
-    console.log('[chat-with-rag] Generating enhanced response with dual search results');
-    const aiResponse = await generateResponse(
-      systemPrompt,
-      userPrompt,
-      conversationContext,
-      openaiApiKey,
-      isAnalyticalQuery
-    );
-    PerformanceOptimizer.endTimer(responseTimer, 'ai_response');
+        return new Response(JSON.stringify({
+          response: consolidationResult.response,
+          userStatusMessage: consolidationResult.userStatusMessage,
+          analysis: {
+            queryPlan: enhancedQueryPlan,
+            gptDrivenAnalysis: true,
+            subQuestionAnalysis: analysisResults.summary,
+            consolidationMetadata: consolidationResult.analysisMetadata,
+            classification
+          }
+        }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      } else {
+        throw new Error('No sub-questions generated - unable to process query');
+      }
+    }
 
-    processingTime = PerformanceOptimizer.endTimer(globalTimer, 'total_request');
+    // For GENERAL_MENTAL_HEALTH category (including conversational responses)
+    if (cachedClassification.category === 'GENERAL_MENTAL_HEALTH') {
+      console.log('[chat-with-rag] EXECUTING: GENERAL_MENTAL_HEALTH pipeline');
+      
+      try {
+        const { data: generalResponse, error: generalError } = await supabaseClient.functions.invoke(
+          'general-mental-health-chat',
+          {
+            body: { message, conversationContext }
+          }
+        );
 
-    // Prepare final response
-    const finalResponse = {
-      response: aiResponse,
+        if (generalError) {
+          throw new Error(`General mental health chat failed: ${generalError.message}`);
+        }
+
+        return new Response(JSON.stringify({
+          response: generalResponse.response,
+          analysis: {
+            queryType: 'general_mental_health',
+            classification,
+            timestamp: new Date().toISOString()
+          }
+        }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      } catch (error) {
+        // Fallback response for general mental health queries
+        console.error('[chat-with-rag] General mental health chat failed:', error);
+        return new Response(JSON.stringify({
+          response: "I understand you're reaching out. For questions about your personal journal insights, I'm here to help analyze your entries. For general wellness information, feel free to ask specific questions!",
+          analysis: {
+            queryType: 'general_fallback',
+            classification,
+            timestamp: new Date().toISOString()
+          }
+        }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+    }
+
+    // Fallback for any other categories
+    console.log(`[chat-with-rag] EXECUTING: UNKNOWN_CATEGORY pipeline for: ${cachedClassification.category}`);
+    console.error(`[chat-with-rag] WARNING: Unhandled classification category: ${cachedClassification.category}`);
+    return new Response(JSON.stringify({
+      response: "I understand you're reaching out. For questions about your personal journal insights, I'm here to help analyze your entries. For general wellness information, feel free to ask specific questions!",
       analysis: {
-        queryPlan: enhancedQueryPlan,
-        searchMethod: `dual_${searchMethod}`,
-        resultsBreakdown: {
-          vector: vectorResults.length,
-          sql: sqlResults.length,
-          combined: combinedResults.length
-        },
-        isAnalyticalQuery,
-        processingTime,
-        enhancedFormatting: isAnalyticalQuery,
-        dualSearchEnabled: true,
-        fromCache: false,
-        performanceReport: PerformanceOptimizer.getPerformanceReport()
-      },
-      referenceEntries: combinedResults.slice(0, 8).map(entry => ({
-        id: entry.id,
-        content: entry.content?.slice(0, 200) || 'No content',
-        created_at: entry.created_at,
-        themes: entry.master_themes || [],
-        emotions: entry.emotions || {},
-        searchMethod: entry.searchMethod || 'combined'
-      }))
-    };
-
-    // Cache result in background
-    BackgroundTaskManager.getInstance().addTask(
-      Promise.resolve(SmartCache.set(cacheKey, finalResponse, 300))
-    );
-
-    // Log successful API usage in background
-    BackgroundTaskManager.logApiUsage(rateLimitManager, {
-      userId,
-      ipAddress,
-      functionName: 'chat-with-rag',
-      statusCode,
-      responseTimeMs: processingTime
-    });
-
-    console.log(`[chat-with-rag] Enhanced dual search RAG completed in ${processingTime}ms`);
-
-    return new Response(JSON.stringify(finalResponse), {
+        queryType: 'unknown_category',
+        classification: cachedClassification,
+        timestamp: new Date().toISOString()
+      }
+    }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
 
   } catch (error) {
-    console.error('[chat-with-rag] Error in enhanced dual search RAG:', error);
-    statusCode = 500;
-    errorMessage = error.message;
-    processingTime = Date.now() - startTime;
-
-    // Log failed API usage
-    try {
-      const rateLimitManager = new RateLimitManager(
-        Deno.env.get('SUPABASE_URL') ?? '',
-        Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
-      );
-      const { userId, ipAddress } = RateLimitManager.getClientInfo(req);
-      
-      await rateLimitManager.logApiUsage({
-        userId,
-        ipAddress,
-        functionName: 'chat-with-rag',
-        statusCode,
-        responseTimeMs: processingTime,
-        errorMessage
-      });
-    } catch (logError) {
-      console.error('[chat-with-rag] Failed to log error usage:', logError);
-    }
+    console.error('[chat-with-rag] Error in enhanced RAG:', error);
 
     return new Response(JSON.stringify({
       error: error.message,
-      response: "I apologize, but I encountered an error while analyzing your journal entries. Please try again.",
+      response: "I apologize, but I encountered an error while processing your request. Please try again.",
       analysis: {
         queryType: 'error',
-        errorType: 'dual_search_error',
+        errorType: 'rag_pipeline_error',
         timestamp: new Date().toISOString()
       }
     }), {
-      status: statusCode,
+      status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   }
 });
+
+// Streaming pipeline function for real-time status updates
+async function processStreamingPipeline(
+  streamManager: SSEStreamManager, 
+  requestBody: any, 
+  supabaseClient: any, 
+  openaiApiKey: string
+) {
+  try {
+    const { 
+      message, 
+      userId: requestUserId, 
+      conversationContext = [], 
+      userProfile = {}
+    } = requestBody;
+
+    // Step 1: Query classification with status updates (streaming mode)
+    streamManager.sendUserMessage("Understanding your question");
+    streamManager.sendBackendTask("query_classification", "Analyzing query type and requirements");
+    
+    const { data: classification, error: classificationError } = await supabaseClient.functions.invoke(
+      'chat-query-classifier',
+      {
+        body: { message, conversationContext }
+      }
+    );
+    
+    if (classificationError) {
+      throw new Error(`Query classification failed: ${classificationError.message}`);
+    }
+
+    // Validate classification result in streaming mode
+    if (!classification || !classification.category) {
+      throw new Error('Invalid classification result - missing category');
+    }
+
+    console.log(`[chat-with-rag] STREAMING: Query classified as: ${classification.category} (confidence: ${classification.confidence})`);
+
+    // Handle unrelated queries in streaming mode
+    if (classification.category === 'UNRELATED') {
+      console.log('[chat-with-rag] STREAMING EXECUTING: UNRELATED pipeline');
+      streamManager.sendUserMessage("Gently redirecting to wellness focus");
+      
+      streamManager.sendEvent('final_response', {
+        response: "I appreciate your question, but I'm specifically designed to help you explore your journal entries, understand your emotional patterns, and support your mental health and well-being. I focus on analyzing your personal reflections and providing insights about your journey. Is there something about your thoughts, feelings, or experiences you'd like to discuss instead?",
+        analysis: {
+          queryType: 'unrelated_denial',
+          classification,
+          timestamp: new Date().toISOString()
+        }
+      });
+
+      streamManager.close();
+      return;
+    }
+
+    // Handle clarification queries in streaming mode
+    if (classification.category === 'JOURNAL_SPECIFIC_NEEDS_CLARIFICATION') {
+      console.log('[chat-with-rag] STREAMING EXECUTING: CLARIFICATION pipeline');
+      streamManager.sendUserMessage("Creating space for deeper understanding");
+      streamManager.sendBackendTask("clarification_generation", "Generating thoughtful questions");
+      
+      const { data: clarificationResult, error: clarificationError } = await supabaseClient.functions.invoke(
+        'gpt-clarification-generator',
+        {
+          body: { 
+            userMessage: message,
+            conversationContext,
+            userProfile 
+          }
+        }
+      );
+
+      if (clarificationError) {
+        throw new Error(`Clarification generation failed: ${clarificationError.message}`);
+      }
+
+      if (clarificationResult.userStatusMessage) {
+        streamManager.sendUserMessage(clarificationResult.userStatusMessage);
+      }
+
+      streamManager.sendEvent('final_response', {
+        response: clarificationResult.response,
+        analysis: {
+          queryType: 'clarification',
+          classification,
+          timestamp: new Date().toISOString()
+        }
+      });
+
+      streamManager.close();
+      return;
+    }
+
+    // For JOURNAL_SPECIFIC, continue with full pipeline
+    if (classification.category === 'JOURNAL_SPECIFIC') {
+      console.log('[chat-with-rag] STREAMING EXECUTING: JOURNAL_SPECIFIC pipeline');
+      // Step 2: Query planning with status updates
+      streamManager.sendUserMessage("Breaking down your question carefully");
+      streamManager.sendBackendTask("query_planning", "Analyzing query structure and requirements");
+      
+      const { data: gptPlan, error: plannerError } = await supabaseClient.functions.invoke(
+        'smart-query-planner',
+        {
+          body: {
+            message,
+            userId: requestUserId,
+            conversationContext,
+            userProfile,
+            timeRange: userProfile.timeRange || null
+          }
+        }
+      );
+      
+      if (plannerError) {
+        throw new Error(`GPT planner error: ${plannerError.message}`);
+      }
+      
+      const enhancedQueryPlan = gptPlan.queryPlan;
+      
+      // Check for user status message from query planner
+      if (gptPlan.userStatusMessage) {
+        streamManager.sendUserMessage(gptPlan.userStatusMessage);
+      }
+      
+      // Step 3: Analysis orchestration with status updates
+      streamManager.sendBackendTask("Searching your journal...", "Looking through journal entries");
+      
+      const { data: analysisResults, error: analysisError } = await supabaseClient.functions.invoke(
+        'gpt-analysis-orchestrator',
+        {
+          body: {
+            subQuestions: enhancedQueryPlan.subQuestions,
+            userMessage: message,
+            userId: requestUserId,
+            timeRange: enhancedQueryPlan.timeRange
+          }
+        }
+      );
+
+      if (analysisError) {
+        throw new Error(`Analysis orchestrator failed: ${analysisError.message}`);
+      }
+
+      streamManager.sendBackendTask("Journal analysis complete", "Processing insights");
+
+      // Step 4: Response consolidation with status updates
+      streamManager.sendBackendTask("Crafting your response...", "Generating personalized insights");
+      
+      const { data: consolidationResult, error: consolidationError } = await supabaseClient.functions.invoke(
+        'gpt-response-consolidator',
+        {
+          body: {
+            userMessage: message,
+            analysisResults: analysisResults.analysisResults,
+            conversationContext,
+            userProfile,
+            streamingMode: false
+          }
+        }
+      );
+
+      if (consolidationError) {
+        throw new Error(`Response consolidator failed: ${consolidationError.message}`);
+      }
+
+      // Check for user status message from response consolidator
+      if (consolidationResult.userStatusMessage) {
+        streamManager.sendUserMessage(consolidationResult.userStatusMessage);
+      }
+
+      // Send final response
+      streamManager.sendEvent('final_response', {
+        response: consolidationResult.response,
+        analysis: {
+          queryPlan: enhancedQueryPlan,
+          gptDrivenAnalysis: true,
+          subQuestionAnalysis: analysisResults.summary,
+          consolidationMetadata: consolidationResult.analysisMetadata,
+          classification
+        }
+      });
+
+      streamManager.close();
+    } else if (classification.category === 'GENERAL_MENTAL_HEALTH') {
+      console.log('[chat-with-rag] STREAMING EXECUTING: GENERAL_MENTAL_HEALTH pipeline');
+      // Handle general mental health queries (including conversational ones) in streaming mode
+      streamManager.sendUserMessage("Processing your wellness question");
+      streamManager.sendBackendTask("general_mental_health", "Generating helpful response");
+      
+      try {
+        const { data: generalResponse, error: generalError } = await supabaseClient.functions.invoke(
+          'general-mental-health-chat',
+          {
+            body: { message, conversationContext }
+          }
+        );
+
+        if (generalError) {
+          throw new Error(`General mental health chat failed: ${generalError.message}`);
+        }
+
+        streamManager.sendEvent('final_response', {
+          response: generalResponse.response,
+          analysis: {
+            queryType: 'general_mental_health',
+            classification,
+            timestamp: new Date().toISOString()
+          }
+        });
+      } catch (error) {
+        // Fallback response
+        streamManager.sendEvent('final_response', {
+          response: "I understand you're reaching out. For questions about your personal journal insights, I'm here to help analyze your entries. For general wellness information, feel free to ask specific questions!",
+          analysis: {
+            queryType: 'general_fallback',
+            classification,
+            timestamp: new Date().toISOString()
+          }
+        });
+      }
+
+      streamManager.close();
+    } else {
+      // Handle unknown categories
+      streamManager.sendEvent('final_response', {
+        response: "I understand you're reaching out. For questions about your personal journal insights, I'm here to help analyze your entries.",
+        analysis: {
+          queryType: 'unknown_category',
+          classification,
+          timestamp: new Date().toISOString()
+        }
+      });
+
+      streamManager.close();
+    }
+
+  } catch (error) {
+    streamManager.sendEvent('error', { error: error.message });
+    streamManager.close();
+  }
+}

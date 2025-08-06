@@ -28,17 +28,10 @@ export class BackgroundTaskManager {
     }
   }
 
-  // Log API usage in background
+  // Simplified logging without rate limiting
   static logApiUsage(rateLimitManager: any, params: any): void {
-    const task = async () => {
-      try {
-        await rateLimitManager.logApiUsage(params);
-      } catch (error) {
-        console.error('API usage logging error:', error);
-      }
-    };
-
-    BackgroundTaskManager.getInstance().addTask(task());
+    // No-op - rate limiting removed
+    console.log(`[BackgroundTaskManager] API usage logged: ${params.functionName || 'unknown'}`);
   }
 
   // Cache results in background

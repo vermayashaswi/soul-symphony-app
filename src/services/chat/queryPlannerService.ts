@@ -132,7 +132,8 @@ export async function planQuery(message: string, threadId: string, userId: strin
     ];
     
     const hasPersonalPronouns = personalPronounPatterns.some(pattern => pattern.test(message.toLowerCase()));
-    const hasExplicitTimeReference = /\b(last week|yesterday|this week|last month|today|recently|lately|this morning|last night)\b/i.test(message.toLowerCase());
+    const hasExplicitTimeReference = /\b(last week|yesterday|this week|last month|today|recently|lately|this morning|last night|since|past)\b/i.test(message.toLowerCase()) ||
+      /\bsince\s+(late|early|mid)\s+\w+/i.test(message.toLowerCase());  // FIXED: Include "since" patterns
     
     // Enhanced detection for personality queries requiring all entries
     const isPersonalityQuery = /trait|personality|character|behavior|habit|am i|do i|my personality|negative|positive|improve|rate|worst|best/.test(message.toLowerCase());
