@@ -413,12 +413,13 @@ export const TutorialProvider: React.FC<{ children: ReactNode }> = ({ children }
       // Comprehensive cleanup
       performStaggeredCleanup();
       
-      // Then update database
+      // Then update database - mark both tutorial AND onboarding as complete
       const { error } = await supabase
         .from('profiles')
         .update({ 
           tutorial_completed: 'YES',
-          tutorial_step: steps.length
+          tutorial_step: steps.length,
+          onboarding_completed: true
         })
         .eq('id', user.id);
         

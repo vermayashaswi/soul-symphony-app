@@ -8,12 +8,14 @@ import StatusBarManager from '@/components/StatusBarManager';
 import { isAppRoute, isWebsiteRoute } from './RouteHelpers';
 import { useOnboarding } from '@/hooks/use-onboarding';
 import { forceEnableScrolling } from '@/hooks/use-scroll-restoration';
+import { useTutorial } from '@/contexts/TutorialContext';
 
 const ViewportManager: React.FC = () => {
   const location = useLocation();
   const { user } = useAuth();
   const isMobile = useIsMobile();
   const { onboardingComplete } = useOnboarding();
+  const { tutorialCompleted } = useTutorial();
   
   // Routes where navigation should be hidden
   const navigationHiddenPaths = [
@@ -33,13 +35,11 @@ const ViewportManager: React.FC = () => {
   // Is this the home page where scrolling should be disabled?
   const isHomePage = location.pathname === '/app/home';
   
-  // Determine if navigation should be visible
+  // Determine if navigation should be visible - show if onboarding OR tutorial is complete
   const shouldShowNavigation = isInAppContext && 
     user && 
     !shouldHideNavigation && 
-    onboardingComplete &&
-    // Show navigation even on transitional routes if user is authenticated and onboarded
-    (onboardingComplete || !isTransitionalRoute);
+    (onboardingComplete || tutorialCompleted);
 
   // Debug log to understand route detection
   console.log('ViewportManager - Path:', location.pathname, {
@@ -51,7 +51,8 @@ const ViewportManager: React.FC = () => {
     onboardingComplete,
     isTransitionalRoute,
     isInAppContext,
-    shouldShowNavigation
+    shouldShowNavigation,
+    tutorialCompleted
   });
   
   // Ensure proper scrolling behavior on route changes

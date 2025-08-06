@@ -23,7 +23,7 @@ const MobileNavigation: React.FC<MobileNavigationProps> = ({ onboardingComplete 
   const location = useLocation();
   const isMobile = useIsMobile();
   const [isVisible, setIsVisible] = useState(false);
-  const { isActive: isTutorialActive } = useTutorial();
+  const { isActive: isTutorialActive, tutorialCompleted } = useTutorial();
   const { user } = useAuth();
   const { currentLanguage } = useTranslation();
   const { hasActiveSubscription, isTrialActive } = useSubscription();
@@ -95,12 +95,12 @@ const MobileNavigation: React.FC<MobileNavigationProps> = ({ onboardingComplete 
     // Show navigation if:
     // 1. We're in app context (app routes) - removed mobile-only restriction
     // 2. User is authenticated
-    // 3. Not on hidden paths (onboarding/auth)
-    // 4. Onboarding is complete OR we're not on a transitional route
+    // 3. Not on hidden paths (onboarding/auth)  
+    // 4. Onboarding is complete OR tutorial is complete OR we're not on a transitional route
     const shouldShowNav = isInAppContext &&
                           !!user &&
                           !shouldHideNavigation &&
-                          (onboardingComplete || !isTransitionalRoute);
+                          (onboardingComplete || tutorialCompleted || !isTransitionalRoute);
     
     componentLogger.debug('Enhanced visibility check', { 
       shouldShowNav, 
@@ -113,13 +113,14 @@ const MobileNavigation: React.FC<MobileNavigationProps> = ({ onboardingComplete 
       isTransitionalRoute,
       hasUser: !!user,
       onboardingComplete,
+      tutorialCompleted,
       safeArea,
       isTutorialActive,
       note: 'Navigation now shows on all screen sizes within /app routes'
     });
     
     setIsVisible(shouldShowNav);
-  }, [location.pathname, isMobile.isMobile, user, onboardingComplete, currentLanguage, renderKey, safeArea]);
+  }, [location.pathname, isMobile.isMobile, user, onboardingComplete, tutorialCompleted, currentLanguage, renderKey, safeArea]);
   
   if (!isVisible || onboardingComplete === false) {
     return null;
