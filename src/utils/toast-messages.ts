@@ -108,6 +108,10 @@ export const TOAST_MESSAGES = {
     LOAD_FAILED: {
       title: "Loading issue",
       description: "We couldn't load your content. Please refresh and try again."
+    },
+    EDGE_FUNCTION_RETRY: {
+      title: "Oops! Something is wrong. Wait, let me re-try to get back online",
+      description: "Automatically retrying your request..."
     }
   },
 
@@ -199,4 +203,10 @@ export const showNetworkError = () => showErrorToast(
 export const showSaveError = () => showErrorToast(
   TOAST_MESSAGES.ERROR.SAVE_FAILED.title,
   TOAST_MESSAGES.ERROR.SAVE_FAILED.description
+);
+
+export const showEdgeFunctionRetryToast = () => showInfoToast(
+  TOAST_MESSAGES.ERROR.EDGE_FUNCTION_RETRY.title,
+  TOAST_MESSAGES.ERROR.EDGE_FUNCTION_RETRY.description,
+  4000
 );

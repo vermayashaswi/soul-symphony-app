@@ -1,5 +1,6 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
+import { showEdgeFunctionRetryToast } from '@/utils/toast-messages';
 
 export interface StreamingMessage {
   type: 'user_message' | 'backend_task' | 'progress' | 'final_response' | 'error';
@@ -28,7 +29,30 @@ export const useStreamingChat = ({ onFinalResponse, onError }: UseStreamingChatP
   const [currentMessageIndex, setCurrentMessageIndex] = useState(0);
   const [useThreeDotFallback, setUseThreeDotFallback] = useState(false);
   
+  // Retry state management
+  const [isRetrying, setIsRetrying] = useState(false);
+  const [retryAttempts, setRetryAttempts] = useState(0);
+  const [lastFailedMessage, setLastFailedMessage] = useState<{
+    message: string;
+    userId: string;
+    threadId: string;
+    conversationContext: any[];
+    userProfile: any;
+  } | null>(null);
+  
   const abortControllerRef = useRef<AbortController | null>(null);
+  const maxRetryAttempts = 2;
+
+  // Utility function to detect edge function errors
+  const isEdgeFunctionError = useCallback((error: any): boolean => {
+    const errorMessage = error?.message || error?.toString() || '';
+    return (
+      errorMessage.includes('non-2xx code') ||
+      errorMessage.includes('edge function') ||
+      errorMessage.includes('FunctionsError') ||
+      error?.status >= 400
+    );
+  }, []);
 
   const addStreamingMessage = useCallback((message: StreamingMessage) => {
     setStreamingMessages(prev => [...prev, message]);
@@ -45,6 +69,10 @@ export const useStreamingChat = ({ onFinalResponse, onError }: UseStreamingChatP
       case 'final_response':
         setIsStreaming(false);
         setShowBackendAnimation(false);
+        // Reset retry state on success
+        setRetryAttempts(0);
+        setLastFailedMessage(null);
+        setIsRetrying(false);
         onFinalResponse?.(message.response || '', message.analysis);
         break;
       case 'error':
@@ -54,6 +82,13 @@ export const useStreamingChat = ({ onFinalResponse, onError }: UseStreamingChatP
         break;
     }
   }, [onFinalResponse, onError]);
+
+  // Reset retry state when starting new conversation
+  const resetRetryState = useCallback(() => {
+    setRetryAttempts(0);
+    setLastFailedMessage(null);
+    setIsRetrying(false);
+  }, []);
 
   // Generate streaming messages based on category
   const generateStreamingMessages = useCallback(async (message: string, category: string, conversationContext?: any[], userProfile?: any) => {
@@ -84,6 +119,88 @@ export const useStreamingChat = ({ onFinalResponse, onError }: UseStreamingChatP
     }
   }, []);
 
+  // Automatic retry function for failed messages
+  const retryLastMessage = useCallback(async () => {
+    if (!lastFailedMessage || retryAttempts >= maxRetryAttempts || isRetrying) {
+      return;
+    }
+
+    console.log(`[useStreamingChat] Retrying message (attempt ${retryAttempts + 1}/${maxRetryAttempts})`);
+    setIsRetrying(true);
+    setRetryAttempts(prev => prev + 1);
+
+    // Show toast notification
+    showEdgeFunctionRetryToast();
+
+    // Small delay to let user see the retry message
+    await new Promise(resolve => setTimeout(resolve, 1000));
+
+    try {
+      // Continue showing streaming UI while retrying
+      await generateStreamingMessages(
+        lastFailedMessage.message, 
+        'GENERAL_MENTAL_HEALTH', 
+        lastFailedMessage.conversationContext, 
+        lastFailedMessage.userProfile
+      );
+
+      // Try the request again
+      const { data, error } = await supabase.functions.invoke('chat-with-rag', {
+        body: {
+          message: lastFailedMessage.message,
+          userId: lastFailedMessage.userId,
+          threadId: lastFailedMessage.threadId,
+          conversationContext: lastFailedMessage.conversationContext,
+          userProfile: lastFailedMessage.userProfile,
+          streamingMode: false
+        }
+      });
+
+      if (error) {
+        if (isEdgeFunctionError(error) && retryAttempts < maxRetryAttempts - 1) {
+          // Will retry again
+          throw error;
+        } else {
+          // Max retries reached, show final error
+          addStreamingMessage({
+            type: 'error',
+            error: 'Unable to process your request after multiple attempts. Please try again later.',
+            timestamp: Date.now()
+          });
+          resetRetryState();
+          return;
+        }
+      }
+
+      // Success! Handle the response
+      if (data?.response) {
+        addStreamingMessage({
+          type: 'final_response',
+          response: data.response,
+          analysis: data.analysis,
+          timestamp: Date.now()
+        });
+        resetRetryState();
+      } else {
+        throw new Error('No response received from chat service');
+      }
+
+    } catch (error) {
+      console.error('[useStreamingChat] Retry failed:', error);
+      // If this was the last retry attempt, show error
+      if (retryAttempts >= maxRetryAttempts - 1) {
+        addStreamingMessage({
+          type: 'error',
+          error: 'Unable to process your request after multiple attempts. Please try again later.',
+          timestamp: Date.now()
+        });
+        resetRetryState();
+      }
+    } finally {
+      setIsRetrying(false);
+    }
+  }, [lastFailedMessage, retryAttempts, isRetrying, isEdgeFunctionError, addStreamingMessage, resetRetryState, generateStreamingMessages]);
+
   // Cycle through dynamic messages
   useEffect(() => {
     if (!isStreaming || useThreeDotFallback || dynamicMessages.length === 0) return;
@@ -106,6 +223,9 @@ export const useStreamingChat = ({ onFinalResponse, onError }: UseStreamingChatP
       console.warn('Already streaming, ignoring new request');
       return;
     }
+
+    // Reset retry state for new conversation
+    resetRetryState();
 
     setIsStreaming(true);
     setStreamingMessages([]);
@@ -182,6 +302,17 @@ export const useStreamingChat = ({ onFinalResponse, onError }: UseStreamingChatP
         });
 
         if (streamingError) {
+          // Check if this is an edge function error that should trigger retry
+          if (isEdgeFunctionError(streamingError) && retryAttempts < maxRetryAttempts) {
+            console.log('[useStreamingChat] Edge function error detected, storing message for retry');
+            setLastFailedMessage({ message, userId, threadId, conversationContext, userProfile });
+            
+            // Trigger automatic retry
+            setTimeout(() => {
+              retryLastMessage();
+            }, 500);
+            return;
+          }
           throw new Error(`Streaming request failed: ${streamingError.message}`);
         }
 
@@ -219,7 +350,7 @@ export const useStreamingChat = ({ onFinalResponse, onError }: UseStreamingChatP
         timestamp: Date.now()
       });
     }
-  }, [isStreaming, addStreamingMessage]);
+  }, [isStreaming, addStreamingMessage, resetRetryState, generateStreamingMessages, isEdgeFunctionError, retryLastMessage]);
 
   // Internal function for non-streaming fallback
   const startNonStreamingChatInternal = async (
@@ -292,6 +423,17 @@ export const useStreamingChat = ({ onFinalResponse, onError }: UseStreamingChatP
       });
 
       if (error) {
+        // Check if this is an edge function error that should trigger retry
+        if (isEdgeFunctionError(error) && retryAttempts < maxRetryAttempts) {
+          console.log('[useStreamingChat] Edge function error in non-streaming mode, storing message for retry');
+          setLastFailedMessage({ message, userId, threadId, conversationContext, userProfile });
+          
+          // Trigger automatic retry
+          setTimeout(() => {
+            retryLastMessage();
+          }, 500);
+          return;
+        }
         throw new Error(error.message);
       }
 
@@ -326,7 +468,7 @@ export const useStreamingChat = ({ onFinalResponse, onError }: UseStreamingChatP
     userProfile: any = {}
   ) => {
     await startNonStreamingChatInternal(message, userId, threadId, conversationContext, userProfile);
-  }, [addStreamingMessage]);
+  }, [addStreamingMessage, isEdgeFunctionError, retryAttempts, maxRetryAttempts, retryLastMessage]);
 
   const stopStreaming = useCallback(() => {
     if (abortControllerRef.current) {
@@ -358,6 +500,8 @@ export const useStreamingChat = ({ onFinalResponse, onError }: UseStreamingChatP
     clearStreamingMessages,
     dynamicMessages,
     currentMessageIndex,
-    useThreeDotFallback
+    useThreeDotFallback,
+    isRetrying,
+    retryAttempts
   };
 };
