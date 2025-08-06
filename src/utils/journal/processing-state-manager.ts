@@ -155,53 +155,111 @@ export class ProcessingStateManager {
   }
   
   private checkAndHideEntry(tempId: string): void {
-    // IMMEDIATE DOM check with smart selectors
+    // IMMEDIATE DOM check with enhanced detection
     const realEntryExists = this.hasRealEntryInDOM(tempId);
     
     if (realEntryExists) {
       this.logger.debug('Real entry found, hiding immediately', { tempId });
       this.hideEntry(tempId);
-      
-      // Remove IMMEDIATELY - no delays
       this.removeEntry(tempId);
-    } else {
-      // Quick retry with much shorter timeout
-      setTimeout(() => {
-        const retryCheck = this.hasRealEntryInDOM(tempId);
-        if (retryCheck) {
-          this.logger.debug('Real entry found on retry', { tempId });
-          this.hideEntry(tempId);
-          this.removeEntry(tempId); // Remove immediately on retry too
-        } else {
-          // Force cleanup if no real entry found
-          this.logger.debug('Force cleanup - no real entry detected', { tempId });
-          this.removeEntry(tempId);
-        }
-      }, 100); // Reduced from 500ms to 100ms
+      return;
     }
+
+    // Enhanced retry strategy with multiple attempts
+    this.performRetryChecks(tempId, 0);
+  }
+
+  private performRetryChecks(tempId: string, attempt: number): void {
+    const maxAttempts = 5;
+    const timeouts = [50, 100, 200, 500, 1000]; // Progressive timeouts
+
+    if (attempt >= maxAttempts) {
+      this.logger.debug('Max retry attempts reached, force cleanup', { tempId });
+      this.removeEntry(tempId);
+      return;
+    }
+
+    setTimeout(() => {
+      const retryCheck = this.hasRealEntryInDOM(tempId);
+      if (retryCheck) {
+        this.logger.debug('Real entry found on retry attempt', { tempId, attempt: attempt + 1 });
+        this.hideEntry(tempId);
+        this.removeEntry(tempId);
+      } else {
+        // Continue retrying
+        this.performRetryChecks(tempId, attempt + 1);
+      }
+    }, timeouts[attempt]);
   }
   
   private hasRealEntryInDOM(tempId: string): boolean {
-    // Multiple strategies to detect real entry
+    // Enhanced detection with better selectors and content verification
     const selectors = [
-      `[data-temp-id="${tempId}"][data-processing="false"]`,
-      `[data-temp-id="${tempId}"].journal-entry-card:not(.processing-card)`,
+      // Most specific: Real entry cards with proper data attributes
+      `[data-temp-id="${tempId}"][data-processing="false"]:not(.loading-entry):not(.processing-card)`,
+      `[data-temp-id="${tempId}"].journal-entry-card:not(.processing-card):not(.loading-skeleton)`,
       `[data-entry-id]:not([data-loading-skeleton="true"])[data-temp-id="${tempId}"]`,
+      // More general selectors for fallback
+      `[data-temp-id="${tempId}"] .journal-entry-content`,
+      `[data-temp-id="${tempId}"] .entry-content`,
+      `[data-temp-id="${tempId}"] [data-content-ready="true"]`,
     ];
     
     for (const selector of selectors) {
       const element = document.querySelector(selector);
       if (element) {
-        // Additional check for content
-        const hasContent = element.querySelector('.journal-entry-content') || 
-                          element.textContent?.trim().length > 20;
-        if (hasContent) {
+        // Comprehensive content verification
+        const hasRealContent = this.verifyRealContent(element);
+        if (hasRealContent) {
+          this.logger.debug('Real entry detected via selector', { tempId, selector });
           return true;
         }
       }
     }
     
+    // Fallback: check for any journal card with the temp ID that has meaningful content
+    const fallbackElement = document.querySelector(`[data-temp-id="${tempId}"]`);
+    if (fallbackElement) {
+      const hasRealContent = this.verifyRealContent(fallbackElement);
+      if (hasRealContent) {
+        this.logger.debug('Real entry detected via fallback', { tempId });
+        return true;
+      }
+    }
+    
     return false;
+  }
+
+  private verifyRealContent(element: Element): boolean {
+    // Check for loading/processing indicators
+    if (element.classList.contains('loading-entry') || 
+        element.classList.contains('processing-card') ||
+        element.querySelector('[data-loading-skeleton="true"]') ||
+        element.querySelector('.shimmer-skeleton')) {
+      return false;
+    }
+
+    // Check for real content indicators
+    const contentChecks = [
+      // Text content length (more than typical loading text)
+      () => element.textContent && element.textContent.trim().length > 50,
+      // Presence of actual content elements
+      () => element.querySelector('.journal-entry-content, .entry-content, .transcript'),
+      // Content ready indicator
+      () => element.hasAttribute('data-content-ready') && element.getAttribute('data-content-ready') === 'true',
+      // Specific entry elements
+      () => element.querySelector('.entry-text, .entry-transcript, .journal-content'),
+      // Non-loading audio elements
+      () => element.querySelector('audio:not(.loading), .audio-player:not(.loading)'),
+    ];
+
+    return contentChecks.some(check => {
+      try {
+        return check();
+      } catch (e) {
+        return false;
+      }
+    });
   }
   
   public hideEntry(tempId: string): void {
@@ -225,12 +283,30 @@ export class ProcessingStateManager {
       entry.entryId = entryId;
       this.immediateProcessingState.delete(tempId);
       this.notifySubscribers();
-      console.log(`[ProcessingStateManager] Set entry ID for ${tempId} to ${entryId}`);
+      this.logger.debug('Set entry ID, performing enhanced cleanup', { tempId, entryId });
       
-      // Immediately hide since we have a real entry ID
-      this.hideEntry(tempId);
-      this.removeEntry(tempId); // Remove immediately, no delays
+      // Enhanced cleanup when we have a real entry ID
+      this.performEnhancedCleanup(tempId);
     }
+  }
+
+  private performEnhancedCleanup(tempId: string): void {
+    // Dispatch events to ensure all components are notified
+    window.dispatchEvent(new CustomEvent('entryContentReady', {
+      detail: { tempId, timestamp: Date.now() }
+    }));
+
+    window.dispatchEvent(new CustomEvent('processingEntryCompleted', {
+      detail: { tempId, timestamp: Date.now() }
+    }));
+
+    // Immediate cleanup
+    this.hideEntry(tempId);
+    
+    // Give a brief moment for events to propagate, then force cleanup
+    setTimeout(() => {
+      this.removeEntry(tempId);
+    }, 50);
   }
   
   public removeEntry(tempId: string): void {
