@@ -93,13 +93,11 @@ const MobileNavigation: React.FC<MobileNavigationProps> = ({ onboardingComplete 
     const isInAppContext = isAppRoute(location.pathname);
     
     // Show navigation if:
-    // 1. We're on mobile or native app
-    // 2. We're in app context (app routes)
-    // 3. User is authenticated
-    // 4. Not on hidden paths (onboarding/auth)
-    // 5. Onboarding is complete OR we're not on a transitional route
-    const shouldShowNav = (isMobile.isMobile || isNativeApp()) && 
-                          isInAppContext &&
+    // 1. We're in app context (app routes) - removed mobile-only restriction
+    // 2. User is authenticated
+    // 3. Not on hidden paths (onboarding/auth)
+    // 4. Onboarding is complete OR we're not on a transitional route
+    const shouldShowNav = isInAppContext &&
                           !!user &&
                           !shouldHideNavigation &&
                           (onboardingComplete || !isTransitionalRoute);
@@ -116,7 +114,8 @@ const MobileNavigation: React.FC<MobileNavigationProps> = ({ onboardingComplete 
       hasUser: !!user,
       onboardingComplete,
       safeArea,
-      isTutorialActive
+      isTutorialActive,
+      note: 'Navigation now shows on all screen sizes within /app routes'
     });
     
     setIsVisible(shouldShowNav);
