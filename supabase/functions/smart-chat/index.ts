@@ -1,10 +1,8 @@
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.38.4";
 
-// Define Supabase client
-const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
-const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
-const supabase = createClient(supabaseUrl, supabaseServiceKey);
+// Import auth utilities
+import { getAuthenticatedContext } from '../_shared/auth.ts';
 
 // Get OpenAI API key from environment variable
 const apiKey = Deno.env.get('OPENAI_API_KEY');
@@ -119,7 +117,7 @@ function detectMentalHealthQuery(message: string): boolean {
 }
 
 // New function for query planning
-async function planQuery(query) {
+async function planQuery(supabase, query) {
   try {
     console.log("Planning query execution for:", query);
     
@@ -222,7 +220,7 @@ Now generate a breakdown of steps using the available tools, database schema and
 }
 
 // New function to process a single sub-query
-async function processSubQuery(subQuery, userId, timeRange) {
+async function processSubQuery(subQuery, supabase, userId, timeRange) {
   console.log(`Processing sub-query: ${subQuery}`);
   
   // Generate embedding for the sub-query
@@ -250,9 +248,9 @@ async function processSubQuery(subQuery, userId, timeRange) {
   // Search for relevant entries
   let entries = [];
   if (timeRange && (timeRange.startDate || timeRange.endDate)) {
-    entries = await searchEntriesWithTimeRange(userId, queryEmbedding, timeRange);
+    entries = await searchEntriesWithTimeRange(supabase, userId, queryEmbedding, timeRange);
   } else {
-    entries = await searchEntriesWithVector(userId, queryEmbedding);
+    entries = await searchEntriesWithVector(supabase, userId, queryEmbedding);
   }
   
   if (entries.length === 0) {
@@ -412,6 +410,9 @@ serve(async (req) => {
   }
 
   try {
+    // Extract authenticated context
+    const { supabase, userContext } = await getAuthenticatedContext(req);
+    
     // First check if this is a title generation request
     const reqBody = await req.json();
     if (reqBody.generateTitleOnly && reqBody.userId && reqBody.messages) {
@@ -668,10 +669,10 @@ serve(async (req) => {
       let entries = [];
       if (timeRange && (timeRange.startDate || timeRange.endDate)) {
         console.log(`Using time-filtered search with range: ${JSON.stringify(timeRange)}`);
-        entries = await searchEntriesWithTimeRange(userId, queryEmbedding, timeRange);
+        entries = await searchEntriesWithTimeRange(supabase, userId, queryEmbedding, timeRange);
       } else {
         console.log("Using standard vector search without time filtering");
-        entries = await searchEntriesWithVector(userId, queryEmbedding);
+        entries = await searchEntriesWithVector(supabase, userId, queryEmbedding);
       }
       
       console.log(`Found ${entries.length} relevant entries`);
@@ -904,7 +905,7 @@ serve(async (req) => {
       const subQueryResponses = [];
       for (const query of subQueries) {
         try {
-          const response = await processSubQuery(query, userId, timeRange);
+          const response = await processSubQuery(query, supabase, userId, timeRange);
           subQueryResponses.push(response);
         } catch (error) {
           console.error(`Error processing sub-query "${query}":`, error);
@@ -1027,6 +1028,7 @@ function checkForHallucinatedDates(response, entries) {
 
 // Standard vector search without time filtering
 async function searchEntriesWithVector(
+  supabase: any,
   userId: string, 
   queryEmbedding: any[]
 ) {
@@ -1059,6 +1061,7 @@ async function searchEntriesWithVector(
 
 // Time-filtered vector search
 async function searchEntriesWithTimeRange(
+  supabase: any,
   userId: string, 
   queryEmbedding: any[], 
   timeRange: { startDate?: string; endDate?: string }
