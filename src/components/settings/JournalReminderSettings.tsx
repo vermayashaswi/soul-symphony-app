@@ -6,6 +6,7 @@ import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { TranslatableText } from '@/components/translation/TranslatableText';
 import { journalReminderService, JournalReminderTime } from '@/services/journalReminderService';
+import { enhancedAndroidNotificationService } from '@/services/enhancedAndroidNotificationService';
 import { toast } from 'sonner';
 
 const TIME_OPTIONS: { value: JournalReminderTime; label: string; time: string }[] = [
@@ -18,6 +19,7 @@ const TIME_OPTIONS: { value: JournalReminderTime; label: string; time: string }[
 export const JournalReminderSettings: React.FC = () => {
   const [settings, setSettings] = useState(journalReminderService.getSettings());
   const [isLoading, setIsLoading] = useState(false);
+  const [systemStatus, setSystemStatus] = useState<any>(null);
 
   const handleToggleEnabled = async (enabled: boolean) => {
     if (isLoading) return;
@@ -39,8 +41,12 @@ export const JournalReminderSettings: React.FC = () => {
         if (success) {
           setSettings(prev => ({ ...prev, enabled: true }));
           toast.success('Journal reminders enabled!');
+          
+          // Update system status
+          const status = await journalReminderService.getNotificationStatus();
+          setSystemStatus(status);
         } else {
-          toast.error('Failed to enable reminders. Please check your notification settings.');
+          toast.error('Failed to enable reminders. Please check your notification settings and try again.');
         }
       } else {
         console.log('[JournalReminderSettings] User disabling reminders');
@@ -69,6 +75,37 @@ export const JournalReminderSettings: React.FC = () => {
     } else if (settings.enabled && newTimes.length === 0) {
       // If no times selected, disable reminders
       handleToggleEnabled(false);
+    }
+  };
+
+  const handleTestNotification = async () => {
+    setIsLoading(true);
+    try {
+      const success = await enhancedAndroidNotificationService.testNotification();
+      if (success) {
+        toast.success('Test notification sent! Check your notification panel.');
+      } else {
+        toast.error('Failed to send test notification.');
+      }
+    } catch (error) {
+      console.error('Error sending test notification:', error);
+      toast.error('Error sending test notification.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleRefreshStatus = async () => {
+    setIsLoading(true);
+    try {
+      const status = await journalReminderService.getNotificationStatus();
+      setSystemStatus(status);
+      toast.success('Status refreshed');
+    } catch (error) {
+      console.error('Error refreshing status:', error);
+      toast.error('Failed to refresh status');
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -142,6 +179,56 @@ export const JournalReminderSettings: React.FC = () => {
             <p className="text-sm text-blue-800">
               <TranslatableText text="Please select at least one reminder time to enable notifications." />
             </p>
+          </div>
+        )}
+
+        {/* Enhanced Android Status Display */}
+        {systemStatus?.androidEnhancedStatus && (
+          <div className="space-y-2 p-3 bg-gray-50 border rounded-lg">
+            <h4 className="text-sm font-medium">System Status</h4>
+            <div className="text-xs space-y-1">
+              <div className="flex justify-between">
+                <span>Notification Permission:</span>
+                <span className={systemStatus.androidEnhancedStatus.hasNotificationPermission ? 'text-green-600' : 'text-red-600'}>
+                  {systemStatus.androidEnhancedStatus.hasNotificationPermission ? 'Granted' : 'Denied'}
+                </span>
+              </div>
+              <div className="flex justify-between">
+                <span>Channels Created:</span>
+                <span className={systemStatus.androidEnhancedStatus.channelsCreated ? 'text-green-600' : 'text-red-600'}>
+                  {systemStatus.androidEnhancedStatus.channelsCreated ? 'Yes' : 'No'}
+                </span>
+              </div>
+              <div className="flex justify-between">
+                <span>Scheduled Count:</span>
+                <span>{systemStatus.androidEnhancedStatus.scheduledCount}</span>
+              </div>
+              {systemStatus.androidEnhancedStatus.lastError && (
+                <div className="text-red-600 text-xs">
+                  Error: {systemStatus.androidEnhancedStatus.lastError}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Action Buttons */}
+        {settings.enabled && (
+          <div className="flex gap-2">
+            <button
+              onClick={handleTestNotification}
+              disabled={isLoading}
+              className="px-3 py-2 text-xs bg-blue-500 text-white rounded hover:bg-blue-600 disabled:opacity-50"
+            >
+              Test Notification
+            </button>
+            <button
+              onClick={handleRefreshStatus}
+              disabled={isLoading}
+              className="px-3 py-2 text-xs bg-gray-500 text-white rounded hover:bg-gray-600 disabled:opacity-50"
+            >
+              Refresh Status
+            </button>
           </div>
         )}
       </CardContent>
