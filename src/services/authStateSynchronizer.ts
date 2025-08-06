@@ -98,6 +98,7 @@ class AuthStateSynchronizer {
     try {
       this.log('Syncing profile data', { userId });
 
+      // RLS policies ensure user can only access their own profile
       const { data: profile, error } = await supabase
         .from('profiles')
         .select('display_name, onboarding_completed')
@@ -132,6 +133,7 @@ class AuthStateSynchronizer {
     try {
       this.log('Ensuring profile exists for user', { userId, userEmail });
 
+      // RLS policies ensure user can only access their own profile
       const { data: existingProfile, error: selectError } = await supabase
         .from('profiles')
         .select('id')
@@ -145,6 +147,7 @@ class AuthStateSynchronizer {
         const displayName = localStorage.getItem('user_display_name');
         const onboardingComplete = localStorage.getItem('onboardingComplete') === 'true';
 
+        // RLS policies ensure user can only insert their own profile
         const { error: insertError } = await supabase
           .from('profiles')
           .insert({

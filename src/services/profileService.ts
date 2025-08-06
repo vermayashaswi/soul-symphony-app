@@ -23,6 +23,7 @@ const getUserTimezone = (): string => {
 
 /**
  * Ensures a profile exists for the given user with automatic retries
+ * Uses authenticated Supabase client with RLS enforcement
  */
 export const ensureProfileExists = async (user: User | null): Promise<boolean> => {
   if (!user) {

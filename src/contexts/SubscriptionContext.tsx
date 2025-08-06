@@ -62,7 +62,7 @@ export const SubscriptionProvider: React.FC<{ children: ReactNode }> = ({ childr
         console.warn('[SubscriptionContext] Cleanup function error:', cleanupError);
       }
       
-      // Use the comprehensive subscription status function
+      // Use the comprehensive subscription status function with authenticated user context
       const { data: statusData, error: statusError } = await supabase
         .rpc('get_user_subscription_status', {
           user_id_param: user.id
@@ -93,7 +93,7 @@ export const SubscriptionProvider: React.FC<{ children: ReactNode }> = ({ childr
           isPremium: subscriptionData.is_premium_access
         });
       } else {
-        // Fallback to direct profile query if function fails
+        // Fallback to direct profile query if function fails - RLS ensures user can only access their own profile
         const { data: profileData, error: profileError } = await supabase
           .from('profiles')
           .select('subscription_tier, subscription_status, trial_ends_at, is_premium')
@@ -129,7 +129,7 @@ export const SubscriptionProvider: React.FC<{ children: ReactNode }> = ({ childr
         }
       }
 
-      // Check trial eligibility
+      // Check trial eligibility - function validates user context internally
       if (user.id) {
         const { data: eligibilityData, error: eligibilityError } = await supabase
           .rpc('is_trial_eligible', {
