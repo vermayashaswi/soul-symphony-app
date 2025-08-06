@@ -92,7 +92,8 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({
     streamingMessages,
     currentUserMessage,
     showBackendAnimation,
-    startStreamingChat
+    startStreamingChat,
+    queryCategory
   } = useStreamingChat({
     onFinalResponse: async (response, analysis) => {
       // Handle final streaming response

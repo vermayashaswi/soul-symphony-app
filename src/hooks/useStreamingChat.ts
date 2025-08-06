@@ -28,6 +28,7 @@ export const useStreamingChat = ({ onFinalResponse, onError }: UseStreamingChatP
   const [dynamicMessages, setDynamicMessages] = useState<string[]>([]);
   const [currentMessageIndex, setCurrentMessageIndex] = useState(0);
   const [useThreeDotFallback, setUseThreeDotFallback] = useState(false);
+  const [queryCategory, setQueryCategory] = useState<string>('');
   
   // Retry state management
   const [isRetrying, setIsRetrying] = useState(false);
@@ -201,16 +202,34 @@ export const useStreamingChat = ({ onFinalResponse, onError }: UseStreamingChatP
     }
   }, [lastFailedMessage, retryAttempts, isRetrying, isEdgeFunctionError, addStreamingMessage, resetRetryState, generateStreamingMessages]);
 
-  // Cycle through dynamic messages
+  // Cycle through dynamic messages with sequential timing for JOURNAL_SPECIFIC
   useEffect(() => {
     if (!isStreaming || useThreeDotFallback || dynamicMessages.length === 0) return;
 
-    const interval = setInterval(() => {
-      setCurrentMessageIndex(prev => (prev + 1) % dynamicMessages.length);
-    }, 2000); // Change message every 2 seconds
+    let timeoutId: NodeJS.Timeout;
+    
+    if (queryCategory === 'JOURNAL_SPECIFIC') {
+      // Sequential display: 5 seconds each message for JOURNAL_SPECIFIC
+      timeoutId = setTimeout(() => {
+        setCurrentMessageIndex(prev => {
+          const nextIndex = prev + 1;
+          // Loop back to start after showing all messages
+          return nextIndex >= dynamicMessages.length ? 0 : nextIndex;
+        });
+      }, 5000);
+    } else {
+      // Regular cycling every 2 seconds for other categories
+      const interval = setInterval(() => {
+        setCurrentMessageIndex(prev => (prev + 1) % dynamicMessages.length);
+      }, 2000);
+      
+      return () => clearInterval(interval);
+    }
 
-    return () => clearInterval(interval);
-  }, [isStreaming, useThreeDotFallback, dynamicMessages.length]);
+    return () => {
+      if (timeoutId) clearTimeout(timeoutId);
+    };
+  }, [isStreaming, useThreeDotFallback, dynamicMessages.length, currentMessageIndex, queryCategory]);
 
   const startStreamingChat = useCallback(async (
     message: string,
@@ -252,8 +271,9 @@ export const useStreamingChat = ({ onFinalResponse, onError }: UseStreamingChatP
         }
       });
       
-      if (!classificationError && classificationData?.category) {
+    if (!classificationError && classificationData?.category) {
         messageCategory = classificationData.category;
+        setQueryCategory(messageCategory);
         console.log(`[useStreamingChat] Message classified as: ${messageCategory}`);
       }
     } catch (error) {
@@ -370,16 +390,16 @@ export const useStreamingChat = ({ onFinalResponse, onError }: UseStreamingChatP
 
       const queryCategory = classification?.category || 'GENERAL_MENTAL_HEALTH';
       
-      // Show different UI based on classification
+      // Show different UI based on classification - don't add backend_task for non-journal queries
       if (queryCategory === 'JOURNAL_SPECIFIC') {
-        // For journal queries, simulate streaming with progressive messages
+        // For journal queries, simulate streaming with progressive messages and show backend animation
         addStreamingMessage({
           type: 'user_message',
           message: 'Understanding your question',
           timestamp: Date.now()
         });
         
-        // Add a short delay and show backend processing
+        // Add backend processing task for journal queries only
         setTimeout(() => {
           addStreamingMessage({
             type: 'backend_task',
@@ -396,14 +416,9 @@ export const useStreamingChat = ({ onFinalResponse, onError }: UseStreamingChatP
             timestamp: Date.now()
           });
         }, 1500);
-      } else if (queryCategory === 'JOURNAL_SPECIFIC_NEEDS_CLARIFICATION') {
-        addStreamingMessage({
-          type: 'user_message',
-          message: 'Creating space for deeper understanding',
-          timestamp: Date.now()
-        });
       } else {
-        // For other types, show simple three-dot animation
+        // For other types (GENERAL_MENTAL_HEALTH, JOURNAL_SPECIFIC_NEEDS_CLARIFICATION, UNRELATED), 
+        // only show simple three-dot animation - no backend_task messages
         addStreamingMessage({
           type: 'user_message',
           message: 'Processing your request...',
@@ -501,6 +516,7 @@ export const useStreamingChat = ({ onFinalResponse, onError }: UseStreamingChatP
     dynamicMessages,
     currentMessageIndex,
     useThreeDotFallback,
+    queryCategory,
     isRetrying,
     retryAttempts
   };

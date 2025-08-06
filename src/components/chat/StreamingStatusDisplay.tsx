@@ -11,6 +11,7 @@ interface StreamingStatusDisplayProps {
   dynamicMessages: string[];
   currentMessageIndex: number;
   useThreeDotFallback: boolean;
+  queryCategory?: string;
 }
 
 const StreamingStatusDisplay: React.FC<StreamingStatusDisplayProps> = ({
@@ -20,7 +21,8 @@ const StreamingStatusDisplay: React.FC<StreamingStatusDisplayProps> = ({
   streamingMessages,
   dynamicMessages,
   currentMessageIndex,
-  useThreeDotFallback
+  useThreeDotFallback,
+  queryCategory
 }) => {
   if (!isStreaming) return null;
 
@@ -40,6 +42,20 @@ const StreamingStatusDisplay: React.FC<StreamingStatusDisplayProps> = ({
   };
 
   const displayMessage = getDisplayMessage();
+
+  // Determine if we should show Loader2 animation based on query category
+  const shouldShowLoader2 = () => {
+    if (!showBackendAnimation || !latestTask) return false;
+    
+    // Hide Loader2 for specific query categories
+    const categoriesWithoutLoader2 = [
+      'GENERAL_MENTAL_HEALTH',
+      'JOURNAL_SPECIFIC_NEEDS_CLARIFICATION', 
+      'UNRELATED'
+    ];
+    
+    return !queryCategory || !categoriesWithoutLoader2.includes(queryCategory);
+  };
 
   return (
     <div className="flex flex-col space-y-2 p-4 bg-muted/20 rounded-lg border">
@@ -83,7 +99,7 @@ const StreamingStatusDisplay: React.FC<StreamingStatusDisplayProps> = ({
           </motion.div>
         )}
 
-        {showBackendAnimation && latestTask && (
+        {shouldShowLoader2() && (
           <motion.div
             key="backend-task"
             initial={{ opacity: 0, y: 10 }}
@@ -107,7 +123,7 @@ const StreamingStatusDisplay: React.FC<StreamingStatusDisplayProps> = ({
           className="bg-primary h-2 rounded-full"
           initial={{ width: "0%" }}
           animate={{ 
-            width: showBackendAnimation ? "85%" : displayMessage ? "60%" : "30%"
+            width: shouldShowLoader2() ? "85%" : displayMessage ? "60%" : "30%"
           }}
           transition={{ duration: 0.5 }}
         />

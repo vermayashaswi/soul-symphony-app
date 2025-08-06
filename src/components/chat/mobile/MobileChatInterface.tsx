@@ -82,7 +82,8 @@ export default function MobileChatInterface({
     startStreamingChat,
     dynamicMessages,
     currentMessageIndex,
-    useThreeDotFallback
+    useThreeDotFallback,
+    queryCategory
   } = useStreamingChat({
     onFinalResponse: async (response, analysis) => {
       // Handle final streaming response
