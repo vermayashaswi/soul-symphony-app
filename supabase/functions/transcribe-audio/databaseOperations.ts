@@ -5,6 +5,7 @@ import { Configuration, OpenAIApi } from "https://esm.sh/openai@3.2.1";
 
 /**
  * Creates a Supabase client with admin privileges
+ * DEPRECATED: Use authenticated clients for user operations instead
  */
 export function createSupabaseAdmin(supabaseUrl: string, supabaseServiceKey: string) {
   return new SupabaseClient(supabaseUrl, supabaseServiceKey, {
@@ -26,6 +27,8 @@ export function getTimezoneFromRequest(req: Request): string {
 
 /**
  * Checks if a user profile exists and creates one if it doesn't
+ * NOTE: This should only be used for system operations with admin clients
+ * User-specific operations should use authenticated clients with RLS
  */
 export async function createProfileIfNeeded(supabase: SupabaseClient, userId: string, timezone?: string) {
   try {
@@ -139,6 +142,7 @@ export async function extractThemes(supabase: SupabaseClient, text: string, entr
 /**
  * FIXED: Stores a journal entry and triggers sentiment analysis with entity extraction
  * Entity extraction is now handled ONLY by the sentiment analysis function
+ * Uses authenticated client to ensure RLS compliance
  */
 export async function storeJournalEntry(
   supabase: SupabaseClient,
@@ -207,6 +211,15 @@ export async function storeJournalEntry(
       }
     } catch (sentErr) {
       console.error("[storeJournalEntry] FIXED: Error triggering sentiment analysis:", sentErr);
+    }
+
+    // FIXED: Extract themes to trigger generate-themes function
+    try {
+      console.log(`[storeJournalEntry] FIXED: Extracting themes for entry ${data.id}`);
+      await extractThemes(supabase, refinedText, data.id);
+      console.log("[storeJournalEntry] FIXED: Successfully triggered theme extraction");
+    } catch (themeErr) {
+      console.error("[storeJournalEntry] FIXED: Error extracting themes:", themeErr);
     }
     
     return data.id;

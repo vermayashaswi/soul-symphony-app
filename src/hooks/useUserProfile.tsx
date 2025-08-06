@@ -2,7 +2,7 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
-import { ensureProfileExists } from '@/services/profileService';
+import { secureEnsureProfile } from '@/services/secureProfileService';
 
 export interface UserProfileData {
   displayName: string | null;
@@ -22,8 +22,8 @@ export const useUserProfile = (): UserProfileData & {
       if (!user) return;
 
       try {
-        // First ensure the profile exists (this will work with our improved trigger)
-        const profileExists = await ensureProfileExists(user);
+        // First ensure the profile exists using secure RLS-enforced operations
+        const profileExists = await secureEnsureProfile(user);
         if (!profileExists) {
           console.error('Failed to ensure profile exists');
           return;
@@ -32,6 +32,7 @@ export const useUserProfile = (): UserProfileData & {
         // Check for local storage name first
         const localName = localStorage.getItem('user_display_name');
 
+        // RLS policies ensure user can only access their own profile
         const { data, error } = await supabase
           .from('profiles')
           .select('display_name, full_name, timezone')
@@ -86,6 +87,7 @@ export const useUserProfile = (): UserProfileData & {
     if (!user) return;
 
     try {
+      // RLS policies ensure user can only update their own profile
       const { error } = await supabase
         .from('profiles')
         .update({
@@ -108,6 +110,7 @@ export const useUserProfile = (): UserProfileData & {
     if (!user) return;
 
     try {
+      // RLS policies ensure user can only update their own profile
       const { error } = await supabase
         .from('profiles')
         .update({

@@ -2,6 +2,7 @@
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.7.1";
+import { getAuthenticatedContext, createAdminClient } from '../_shared/auth.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -213,12 +214,11 @@ serve(async (req) => {
       }
     }
     
-    // If an entry ID was provided, update the entry directly
-    if (entryId && Deno.env.get('SUPABASE_URL') && Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')) {
+    // If an entry ID was provided, update the entry using authenticated context
+    if (entryId) {
       try {
-        const supabaseUrl = Deno.env.get('SUPABASE_URL') as string;
-        const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') as string;
-        const supabase = createClient(supabaseUrl, supabaseServiceKey);
+        // Get authenticated context for RLS compliance
+        const { supabase: authSupabase } = await getAuthenticatedContext(req);
         
         console.log(`FIXED: Updating sentiment and entities for entry ID: ${entryId}`);
         
@@ -228,7 +228,7 @@ serve(async (req) => {
           updateData.entities = entities;
         }
         
-        const { error: updateError } = await supabase
+        const { error: updateError } = await authSupabase
           .from('Journal Entries')
           .update(updateData)
           .eq('id', entryId);

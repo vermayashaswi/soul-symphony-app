@@ -8,6 +8,7 @@ import ParticleAvatar from './ParticleAvatar';
 import { TranslatableMarkdown } from '@/components/translation/TranslatableMarkdown';
 import { TranslatableText } from '@/components/translation/TranslatableText';
 import ChatErrorBoundary from './ChatErrorBoundary';
+import { getDisplayContent, isMalformedJSON, recoverFromMalformedJSON } from '@/utils/messageParser';
 
 interface ChatMessageProps {
   message: {
@@ -21,6 +22,28 @@ interface ChatMessageProps {
 
 export const ChatMessage: React.FC<ChatMessageProps> = ({ message }) => {
   const isUser = message.sender === 'user';
+  
+  // Parse message content to handle JSON responses properly
+  const displayContent = React.useMemo(() => {
+    if (isUser) {
+      return message.content; // User messages are always plain text
+    }
+    
+    // For assistant messages, try to parse and extract response
+    const parsedContent = getDisplayContent(message.content);
+    
+    // If content appears malformed, try to recover it
+    if (isMalformedJSON(message.content)) {
+      const recovered = recoverFromMalformedJSON(message.content);
+      console.warn('[ChatMessage] Recovered from malformed JSON:', {
+        original: message.content.substring(0, 100),
+        recovered: recovered.substring(0, 100)
+      });
+      return recovered;
+    }
+    
+    return parsedContent;
+  }, [message.content, isUser]);
 
   return (
     <div className={`flex gap-3 ${isUser ? 'justify-end' : 'justify-start'} mb-4`}>
@@ -45,7 +68,7 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({ message }) => {
             <ChatErrorBoundary>
               {isUser ? (
                 <TranslatableText 
-                  text={message.content} 
+                  text={displayContent} 
                   className="text-sm"
                   forceTranslate={true}
                   enableFontScaling={true}
@@ -70,7 +93,7 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({ message }) => {
                     enableFontScaling={true}
                     scalingContext="general"
                   >
-                    {message.content}
+                    {displayContent}
                   </TranslatableMarkdown>
                 </div>
               )}

@@ -29,6 +29,37 @@
   pointer-events: auto;
 }
 
+/* Responsive adjustments for larger screens */
+@media (min-width: 768px) {
+  .mobile-navigation {
+    /* Add subtle backdrop blur for larger screens */
+    backdrop-filter: blur(8px);
+    background-color: hsla(var(--background) / 0.95);
+    
+    /* Increase height slightly for better touch targets on tablets */
+    height: 5rem;
+    --nav-bar-height: 5rem;
+  }
+  
+  .mobile-navigation-content {
+    height: 5rem;
+    padding: 0.75rem 2rem;
+    max-width: 600px;
+    margin: 0 auto;
+  }
+}
+
+@media (min-width: 1024px) {
+  .mobile-navigation {
+    /* Center navigation on desktop with max width */
+    max-width: 800px;
+    left: 50%;
+    transform: translateX(-50%);
+    border-radius: 12px 12px 0 0;
+    margin-bottom: 0;
+  }
+}
+
 /* Platform-specific navigation adjustments */
 .mobile-navigation.platform-android {
   padding-bottom: max(var(--calculated-safe-area-bottom, 0px), 12px);

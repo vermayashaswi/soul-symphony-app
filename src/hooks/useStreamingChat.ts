@@ -1,6 +1,7 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { showEdgeFunctionRetryToast } from '@/utils/toast-messages';
+import { saveChatStreamingState, getChatStreamingState, clearChatStreamingState } from '@/utils/chatStateStorage';
 
 export interface StreamingMessage {
   type: 'user_message' | 'backend_task' | 'progress' | 'final_response' | 'error';
@@ -29,6 +30,9 @@ export const useStreamingChat = ({ onFinalResponse, onError }: UseStreamingChatP
   const [currentMessageIndex, setCurrentMessageIndex] = useState(0);
   const [useThreeDotFallback, setUseThreeDotFallback] = useState(false);
   const [queryCategory, setQueryCategory] = useState<string>('');
+  const [currentThreadId, setCurrentThreadId] = useState<string | null>(null);
+  const [expectedProcessingTime, setExpectedProcessingTime] = useState<number | null>(null);
+  const [processingStartTime, setProcessingStartTime] = useState<number | null>(null);
   
   // Retry state management
   const [isRetrying, setIsRetrying] = useState(false);
@@ -74,6 +78,10 @@ export const useStreamingChat = ({ onFinalResponse, onError }: UseStreamingChatP
         setRetryAttempts(0);
         setLastFailedMessage(null);
         setIsRetrying(false);
+        // Clear persisted state on completion
+        if (currentThreadId) {
+          clearChatStreamingState(currentThreadId);
+        }
         onFinalResponse?.(message.response || '', message.analysis);
         break;
       case 'error':
@@ -202,20 +210,30 @@ export const useStreamingChat = ({ onFinalResponse, onError }: UseStreamingChatP
     }
   }, [lastFailedMessage, retryAttempts, isRetrying, isEdgeFunctionError, addStreamingMessage, resetRetryState, generateStreamingMessages]);
 
-  // Cycle through dynamic messages with sequential timing for JOURNAL_SPECIFIC
+  // Enhanced timing logic with proper calculation for streaming messages
   useEffect(() => {
     if (!isStreaming || useThreeDotFallback || dynamicMessages.length === 0) return;
 
     let timeoutId: NodeJS.Timeout;
     
     if (queryCategory === 'JOURNAL_SPECIFIC') {
-      // Sequential display: 5 seconds each message, then stay on last message
+      // Calculate timing based on expected processing time
+      const remainingTime = expectedProcessingTime ? 
+        Math.max(0, expectedProcessingTime - (Date.now() - (processingStartTime || Date.now()))) : 
+        15000; // Default 15 seconds
+      
+      const messagesLeft = dynamicMessages.length - currentMessageIndex;
+      const timePerMessage = messagesLeft > 1 ? Math.min(5000, remainingTime / messagesLeft) : remainingTime;
+      
+      // Sequential display with calculated timing
       if (currentMessageIndex < dynamicMessages.length - 1) {
         timeoutId = setTimeout(() => {
           setCurrentMessageIndex(prev => prev + 1);
-        }, 5000);
+        }, timePerMessage);
+        
+        console.log(`[StreamingChat] Next message in ${timePerMessage}ms (${messagesLeft} left, ${remainingTime}ms remaining)`);
       }
-      // If we're at the last message, don't advance further
+      // If we're at the last message, stay there until processing completes
     } else {
       // Regular cycling every 2 seconds for other categories
       const interval = setInterval(() => {
@@ -228,7 +246,7 @@ export const useStreamingChat = ({ onFinalResponse, onError }: UseStreamingChatP
     return () => {
       if (timeoutId) clearTimeout(timeoutId);
     };
-  }, [isStreaming, useThreeDotFallback, dynamicMessages.length, currentMessageIndex, queryCategory]);
+  }, [isStreaming, useThreeDotFallback, dynamicMessages.length, currentMessageIndex, queryCategory, expectedProcessingTime, processingStartTime]);
 
   const startStreamingChat = useCallback(async (
     message: string,
@@ -245,6 +263,10 @@ export const useStreamingChat = ({ onFinalResponse, onError }: UseStreamingChatP
     // Reset retry state for new conversation
     resetRetryState();
 
+    // Set current thread and timing info
+    setCurrentThreadId(threadId);
+    setProcessingStartTime(Date.now());
+    
     setIsStreaming(true);
     setStreamingMessages([]);
     setCurrentUserMessage('');
@@ -281,6 +303,24 @@ export const useStreamingChat = ({ onFinalResponse, onError }: UseStreamingChatP
 
     // Generate appropriate streaming messages based on category
     await generateStreamingMessages(message, messageCategory, conversationContext, userProfile);
+    
+    // Set expected processing time based on category
+    const estimatedTime = messageCategory === 'JOURNAL_SPECIFIC' ? 20000 : 10000;
+    setExpectedProcessingTime(estimatedTime);
+    
+    // Save streaming state for persistence
+    saveChatStreamingState(threadId, {
+      isStreaming: true,
+      streamingMessages,
+      currentUserMessage: message,
+      showBackendAnimation: false,
+      dynamicMessages,
+      currentMessageIndex: 0,
+      useThreeDotFallback: false,
+      queryCategory: messageCategory,
+      expectedProcessingTime: estimatedTime,
+      processingStartTime: Date.now()
+    });
 
     // Create abort controller for timeout
     const abortController = new AbortController();
@@ -513,6 +553,32 @@ export const useStreamingChat = ({ onFinalResponse, onError }: UseStreamingChatP
     setDynamicMessages([]);
     setCurrentMessageIndex(0);
     setUseThreeDotFallback(false);
+    // Clear persisted state
+    if (currentThreadId) {
+      clearChatStreamingState(currentThreadId);
+    }
+  }, [currentThreadId]);
+
+  // Function to restore streaming state for a thread
+  const restoreStreamingState = useCallback((threadId: string) => {
+    const savedState = getChatStreamingState(threadId);
+    if (!savedState) return false;
+
+    console.log('[StreamingChat] Restoring streaming state for thread:', threadId);
+    
+    setCurrentThreadId(threadId);
+    setIsStreaming(savedState.isStreaming);
+    setStreamingMessages(savedState.streamingMessages);
+    setCurrentUserMessage(savedState.currentUserMessage);
+    setShowBackendAnimation(savedState.showBackendAnimation);
+    setDynamicMessages(savedState.dynamicMessages);
+    setCurrentMessageIndex(savedState.currentMessageIndex);
+    setUseThreeDotFallback(savedState.useThreeDotFallback);
+    setQueryCategory(savedState.queryCategory);
+    setExpectedProcessingTime(savedState.expectedProcessingTime || null);
+    setProcessingStartTime(savedState.processingStartTime || null);
+    
+    return true;
   }, []);
 
   return {
@@ -524,11 +590,14 @@ export const useStreamingChat = ({ onFinalResponse, onError }: UseStreamingChatP
     startNonStreamingChat,
     stopStreaming,
     clearStreamingMessages,
+    restoreStreamingState,
     dynamicMessages,
     currentMessageIndex,
     useThreeDotFallback,
     queryCategory,
     isRetrying,
-    retryAttempts
+    retryAttempts,
+    expectedProcessingTime,
+    processingStartTime
   };
 };

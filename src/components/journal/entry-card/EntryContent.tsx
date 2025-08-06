@@ -43,7 +43,12 @@ export function EntryContent({
   }
 
   return (
-    <div ref={contentRef} className="w-full">
+    <div 
+      ref={contentRef} 
+      className="w-full journal-entry-content" 
+      data-content-ready="true"
+      data-entry-content="true"
+    >
       <TranslatedContent 
         content={content} 
         isExpanded={isExpanded} 

@@ -37,7 +37,7 @@ export async function analyzeTimePatterns(
     let query = supabase
       .from('Journal Entries')
       .select('id, created_at, sentiment, emotions')
-      .eq('user_id', userId)
+      // RLS policies automatically filter to user's entries
       .order('created_at', { ascending: false });
 
     // Apply time range filters if provided
@@ -272,7 +272,7 @@ export async function analyzeTimeEmotionPatterns(
     let query = supabase
       .from('Journal Entries')
       .select('id, created_at, sentiment, emotions')
-      .eq('user_id', userId)
+      // RLS policies automatically filter to user's entries
       .order('created_at', { ascending: true });
 
     // Apply time range filters if provided

@@ -114,7 +114,7 @@ const EntityBubbles: React.FC<EntityBubblesProps> = ({
         const { data: entries, error } = await supabase
           .from('Journal Entries')
           .select('entities, sentiment')
-          .eq('user_id', userId)
+          // RLS policies automatically filter to user's entries
           .gte('created_at', startDate)
           .lte('created_at', endDate);
         

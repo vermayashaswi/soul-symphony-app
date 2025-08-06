@@ -1,6 +1,7 @@
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.38.4";
+import { getAuthenticatedContext, createAdminClient } from '../_shared/auth.ts';
 
 const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
@@ -83,11 +84,13 @@ serve(async (req) => {
   }
 
   try {
-    const reqData = await req.json();
-    const { userId, entryIds, processTranslated = false } = reqData;
+    // Get authenticated context for RLS compliance
+    const { supabase: authSupabase } = await getAuthenticatedContext(req);
     
-    console.log('Processing request with params:', {
-      userId: userId || 'not provided',
+    const reqData = await req.json();
+    const { entryIds, processTranslated = false } = reqData;
+    
+    console.log('Processing authenticated request with params:', {
       entryIds: entryIds ? `[${entryIds.join(', ')}]` : 'not provided',
       hasGoogleApiKey: !!googleNLApiKey,
       processTranslated: processTranslated ? 'YES' : 'NO'
@@ -111,7 +114,7 @@ serve(async (req) => {
       // Select the appropriate text field based on processTranslated flag
       const textField = processTranslated ? 'refined text' : 'refined text';
       
-      const { data: specificEntries, error: fetchSpecificError } = await supabase
+      const { data: specificEntries, error: fetchSpecificError } = await authSupabase
         .from('Journal Entries')
         .select(`id, "${textField}"`)
         .in('id', entryIds);
@@ -165,8 +168,8 @@ serve(async (req) => {
         
         const sentimentScore = await analyzeSentiment(text);
         
-        // Update the database with the sentiment score
-        const { error: updateError } = await supabase
+        // Update the database with the sentiment score (uses authenticated context)
+        const { error: updateError } = await authSupabase
           .from('Journal Entries')
           .update({ sentiment: sentimentScore.toString() })
           .eq('id', entry.id);

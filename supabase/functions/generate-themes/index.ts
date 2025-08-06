@@ -2,13 +2,10 @@
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.38.4";
+import { getAuthenticatedContext, createAdminClient } from '../_shared/auth.ts';
 import { createThemeEmotionService } from '../_shared/themeEmotionService.ts';
 
 const openAIApiKey = Deno.env.get('OPENAI_API_KEY') || '';
-const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
-const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
-
-const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -190,21 +187,24 @@ serve(async (req) => {
   }
 
   try {
+    // Get authenticated context for RLS compliance
+    const { supabase: authSupabase } = await getAuthenticatedContext(req);
+    
     const requestData = await req.json();
     const { text, entryId, fromEdit = false } = requestData;
     let textToProcess = text;
     let entryIdToUpdate = entryId;
 
-    console.log('[generate-themes] Processing request with enhanced database context:', {
+    console.log('[generate-themes] Processing authenticated request with enhanced database context:', {
       hasText: !!textToProcess,
       entryId: entryIdToUpdate,
       fromEdit,
       timestamp: new Date().toISOString()
     });
 
-    // If no direct text, fetch entry text by ID
+    // If no direct text, fetch entry text by ID (uses authenticated context)
     if (!textToProcess && entryIdToUpdate) {
-      const { data: entryData, error: entryError } = await supabase
+      const { data: entryData, error: entryError } = await authSupabase
         .from('Journal Entries')
         .select('"refined text"')
         .eq('id', entryIdToUpdate)
@@ -222,8 +222,9 @@ serve(async (req) => {
       throw new Error('No text provided for theme extraction');
     }
 
-    // Initialize theme/emotion service and get database context
-    const themeEmotionService = createThemeEmotionService();
+    // Initialize theme/emotion service and get database context (uses admin client for system data)
+    const adminSupabase = createAdminClient();
+    const themeEmotionService = createThemeEmotionService(adminSupabase);
     const themeEmotionContext = await themeEmotionService.getThemeEmotionContext();
 
     console.log(`[generate-themes] Using database context: ${themeEmotionContext.themes.length} themes, ${themeEmotionContext.emotions.length} emotions`);
@@ -268,7 +269,7 @@ serve(async (req) => {
     console.log('[generate-themes] Enhanced database updates:', updates);
 
     if (entryIdToUpdate && Object.keys(updates).length > 0) {
-      const { error } = await supabase
+      const { error } = await authSupabase
         .from('Journal Entries')
         .update(updates)
         .eq('id', entryIdToUpdate);

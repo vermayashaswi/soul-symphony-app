@@ -456,8 +456,12 @@ export function SoulNet3D({ timeRange, insightsData, userId, onTimeRangeChange }
       return { nodes: [], links: [] };
     }
 
-    // Filter entries based on timeRange - use entries instead of allEntries for time filtering
-    const filteredEntries = insightsData?.entries || insightsData?.allEntries || [];
+    // Always respect the selected time range - use only filtered entries
+    const filteredEntries = insightsData?.entries || [];
+    console.log(`[SoulNet3D] Processing ${filteredEntries.length} entries for timeRange: ${timeRange}`);
+    
+    // Always use the correctly time-filtered entries, never override with broader data
+    const entriesForProcessing = filteredEntries;
 
     const nodes: SoulNet3DNode[] = [];
     const links: SoulNet3DLink[] = [];
@@ -467,8 +471,8 @@ export function SoulNet3D({ timeRange, insightsData, userId, onTimeRangeChange }
     const emotionMap = new Map<string, { totalIntensity: number; count: number }>();
     const themeEmotionConnections = new Map<string, Map<string, { intensity: number; count: number }>>();
 
-    // Process themeemotion data using filtered entries
-    filteredEntries.forEach((entry: any) => {
+    // Process themeemotion data using processed entries
+    entriesForProcessing.forEach((entry: any) => {
       if (entry.themeemotion && typeof entry.themeemotion === 'object') {
         Object.entries(entry.themeemotion).forEach(([theme, emotions]: [string, any]) => {
           
@@ -569,6 +573,15 @@ export function SoulNet3D({ timeRange, insightsData, userId, onTimeRangeChange }
       });
     });
 
+    // Enhanced validation: require minimum meaningful connections
+    const hasValidData = nodes.length >= 2 && links.length >= 1;
+    
+    if (!hasValidData) {
+      console.log(`[SoulNet3D] Insufficient meaningful connections. Nodes: ${nodes.length}, Links: ${links.length}`);
+      return { nodes: [], links: [] };
+    }
+
+    console.log(`[SoulNet3D] Generated ${nodes.length} nodes and ${links.length} links for ${timeRange}`);
     return { nodes, links };
   }, [insightsData, timeRange]);
 
@@ -642,11 +655,37 @@ export function SoulNet3D({ timeRange, insightsData, userId, onTimeRangeChange }
   }, [isFullscreen]);
 
   if (processedData.nodes.length === 0) {
+    // Enhanced messaging based on time range
+    const getNoDataMessage = () => {
+      switch (timeRange) {
+        case 'today':
+          return "No journal entries found for today. Try recording your first entry!";
+        case 'week':
+          return "No journal entries found for this week. Consider writing about your experiences.";
+        case 'month':
+          return "No journal entries found for this month. Start journaling to see your emotional patterns.";
+        case 'year':
+          return "No journal entries found for this year. Begin your mindfulness journey with your first entry.";
+        default:
+          return "No theme-emotion connections found for the selected time period.";
+      }
+    };
+
     return (
-      <div className="flex items-center justify-center h-96 bg-card/50 rounded-lg border">
-        <p className="text-muted-foreground">
-          <TranslatableText text="No theme-emotion connections found for the selected time period." />
-        </p>
+      <div className="flex flex-col items-center justify-center h-96 bg-card/50 rounded-lg border space-y-3">
+        <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center">
+          <span className="text-2xl">🧠</span>
+        </div>
+        <div className="text-center space-y-2">
+          <p className="text-muted-foreground font-medium">
+            <TranslatableText text={getNoDataMessage()} />
+          </p>
+          {(timeRange === 'today' || timeRange === 'week') && (
+            <p className="text-sm text-muted-foreground/70">
+              <TranslatableText text="Switch to a longer time range to see historical patterns." />
+            </p>
+          )}
+        </div>
       </div>
     );
   }

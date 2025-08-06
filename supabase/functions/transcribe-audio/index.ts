@@ -2,6 +2,7 @@
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.7.1';
+import { getAuthenticatedContext, createAdminClient } from '../_shared/auth.ts';
 import { analyzeWithGoogleNL } from './nlProcessing.ts';
 import { transcribeAudioWithWhisper, translateAndRefineText, analyzeEmotions, generateEmbedding } from './aiProcessing.ts';
 import { createSupabaseAdmin, createProfileIfNeeded, extractThemes, storeJournalEntry, storeEmbedding } from './databaseOperations.ts';
@@ -53,11 +54,7 @@ function validateRequest(requestData: any): { valid: boolean; errors: string[] }
     errors.push('No audio data provided');
   }
   
-  if (!requestData.userId) {
-    errors.push('User ID is required');
-  } else if (typeof requestData.userId !== 'string' || requestData.userId.length < 10) {
-    errors.push('Invalid user ID format');
-  }
+  // userId is no longer required in request - comes from JWT authentication
   
   const audioData = requestData.audio || requestData.audioData;
   if (audioData && (typeof audioData !== 'string' || audioData.length < 100)) {
@@ -136,26 +133,29 @@ serve(async (req) => {
     
     console.log("FIXED: Environment validation passed");
 
-    // Step 2: Enhanced Supabase client initialization with error handling
-    processingStage = 'supabase-init';
-    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
-    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+    // Step 2: Authentication and Supabase client initialization
+    processingStage = 'authentication';
+    console.log("FIXED: Authenticating user from JWT token");
     
-    let supabaseAdmin;
-    let supabaseClient;
+    let supabase; // Authenticated client that respects RLS
+    let userContext;
+    let supabaseAdmin; // Admin client for system operations only
     
     try {
-      supabaseAdmin = createSupabaseAdmin(supabaseUrl, supabaseServiceKey);
-      supabaseClient = createClient(supabaseUrl, Deno.env.get('SUPABASE_ANON_KEY') ?? '', {
-        global: {
-          headers: { Authorization: req.headers.get('Authorization')! },
-        },
-      });
+      // Get authenticated context from JWT token
+      const authResult = await getAuthenticatedContext(req);
+      supabase = authResult.supabase;
+      userContext = authResult.userContext;
       
-      console.log("FIXED: Supabase clients initialized successfully");
+      // Admin client for system operations (reading themes/emotions)
+      supabaseAdmin = createAdminClient();
+      
+      console.log(`FIXED: User authenticated - ID: ${userContext.userId}`);
     } catch (error) {
-      console.error("FIXED: Failed to initialize Supabase clients:", error);
-      throw new Error(`Database connection failed: ${error.message}`);
+      console.error("FIXED: Authentication failed:", error);
+      statusCode = 401;
+      errorMessage = `Authentication failed: ${error.message}`;
+      throw new Error(errorMessage);
     }
 
     // Step 3: Enhanced request parsing with timeout
@@ -191,12 +191,13 @@ serve(async (req) => {
       });
     }
     
-    // Extract validated parameters - this is the userId from the request data
-    const { userId, highQuality = true, directTranscription = false, recordingTime = null } = requestData;
+    // Extract validated parameters - userId comes from authenticated JWT token
+    const { highQuality = true, directTranscription = false, recordingTime = null } = requestData;
     const actualAudioData = requestData.audio || requestData.audioData;
+    const userId = userContext.userId; // Use authenticated user ID, not request data
     
     console.log("=== FIXED REQUEST PARAMETERS ===");
-    console.log(`User ID: ${userId}`);
+    console.log(`Authenticated User ID: ${userId}`);
     console.log(`Direct transcription mode: ${directTranscription ? 'YES' : 'NO'}`);
     console.log(`High quality mode: ${highQuality ? 'YES' : 'NO'}`);
     console.log(`Audio data length: ${actualAudioData?.length || 0}`);
@@ -435,7 +436,7 @@ serve(async (req) => {
     
     try {
       entryId = await storeJournalEntry(
-        supabaseAdmin,
+        supabase, // Use authenticated client for user data
         transcribedText,
         refinedText,
         audioUrl,

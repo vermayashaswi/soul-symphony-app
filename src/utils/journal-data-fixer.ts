@@ -185,7 +185,7 @@ export const findProblematicEntries = async (userId?: string): Promise<{
       }
     });
     
-    // Check for missing embeddings
+    // Check for missing embeddings - RLS will automatically filter to user's entries
     const { data: embeddingData, error: embeddingError } = await supabase
       .from('journal_embeddings')
       .select('journal_entry_id');

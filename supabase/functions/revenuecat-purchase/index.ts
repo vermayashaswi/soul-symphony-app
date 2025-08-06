@@ -1,5 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { getAuthenticatedContext } from '../_shared/auth.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -7,7 +7,6 @@ const corsHeaders = {
 };
 
 interface PurchaseRequest {
-  userId: string;
   productId: string;
   platform: 'android' | 'ios';
   transactionId?: string;
@@ -23,15 +22,14 @@ serve(async (req) => {
   try {
     console.log('RevenueCat purchase request received');
     
-    const supabase = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
-    );
+    // Get authenticated context - this ensures JWT token validation and RLS compliance
+    const { supabase, userContext } = await getAuthenticatedContext(req);
+    const userId = userContext.userId; // Use authenticated user ID
 
-    const { userId, productId, platform, transactionId, isTrialPurchase }: PurchaseRequest = await req.json();
+    const { productId, platform, transactionId, isTrialPurchase }: PurchaseRequest = await req.json();
     
-    if (!userId || !productId) {
-      throw new Error('User ID and Product ID are required');
+    if (!productId) {
+      throw new Error('Product ID is required');
     }
 
     console.log(`Processing purchase for user: ${userId}, product: ${productId}, trial: ${isTrialPurchase}`);

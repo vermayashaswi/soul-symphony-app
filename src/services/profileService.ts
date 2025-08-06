@@ -3,6 +3,7 @@ import { User } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { logInfo, logError, logProfile, logAuthError } from '@/components/debug/DebugPanel';
+import { enhancedLocationService } from '@/services/enhanced-location-service';
 
 /**
  * Maximum number of automatic retries for profile creation
@@ -23,6 +24,7 @@ const getUserTimezone = (): string => {
 
 /**
  * Ensures a profile exists for the given user with automatic retries
+ * Uses authenticated Supabase client with RLS enforcement
  */
 export const ensureProfileExists = async (user: User | null): Promise<boolean> => {
   if (!user) {
@@ -89,14 +91,22 @@ export const ensureProfileExists = async (user: User | null): Promise<boolean> =
  */
 const updateMissingProfileFields = async (userId: string, user: User): Promise<boolean> => {
   try {
-    const timezone = getUserTimezone();
+    // Detect location data (timezone and country) using enhanced service
+    const locationData = await enhancedLocationService.detectUserLocation();
+    
     const updateData: any = {
       updated_at: new Date().toISOString()
     };
     
-    // Add timezone if missing
-    if (timezone !== 'UTC') {
-      updateData.timezone = timezone;
+    // Add timezone and country from enhanced location detection
+    if (locationData.timezone !== 'UTC') {
+      updateData.timezone = locationData.timezone;
+      logProfile(`Setting timezone from enhanced detection: ${locationData.timezone}`, 'ProfileService');
+    }
+    
+    if (locationData.country && locationData.country !== 'DEFAULT') {
+      updateData.country = locationData.country;
+      logProfile(`Setting country from enhanced detection: ${locationData.country}`, 'ProfileService');
     }
     
     // Add full_name if available and missing
@@ -149,7 +159,10 @@ const createProfileManually = async (user: User): Promise<boolean> => {
       let fullName = '';
       let avatarUrl = '';
       const email = user.email || '';
-      const timezone = getUserTimezone();
+      
+      // Detect location data (timezone and country) using enhanced service
+      const locationData = await enhancedLocationService.detectUserLocation();
+      logProfile(`Enhanced location detection for new profile: timezone=${locationData.timezone}, country=${locationData.country}`, 'ProfileService');
       
       // Handle different authentication providers' metadata formats
       if (user.app_metadata?.provider === 'google') {
@@ -178,7 +191,8 @@ const createProfileManually = async (user: User): Promise<boolean> => {
         email,
         full_name: fullName || null,
         avatar_url: avatarUrl || null, 
-        timezone: timezone,
+        timezone: locationData.timezone,
+        country: locationData.country !== 'DEFAULT' ? locationData.country : null,
         onboarding_completed: false,
         updated_at: new Date().toISOString()
       };

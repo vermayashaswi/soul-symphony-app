@@ -93,7 +93,8 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({
     currentUserMessage,
     showBackendAnimation,
     startStreamingChat,
-    queryCategory
+    queryCategory,
+    restoreStreamingState
   } = useStreamingChat({
     onFinalResponse: async (response, analysis) => {
       // Handle final streaming response
@@ -183,13 +184,18 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({
   useEffect(() => {
     if (propsThreadId && propsThreadId !== currentThreadId) {
       loadThreadMessages(propsThreadId);
+      // Try to restore streaming state for this thread
+      const restored = restoreStreamingState(propsThreadId);
+      if (restored) {
+        debugLog.addEvent("Props Thread Change", `Restored streaming state for props thread: ${propsThreadId}`, "info");
+      }
       // Update local storage to maintain consistency
       if (propsThreadId) {
         localStorage.setItem("lastActiveChatThreadId", propsThreadId);
       }
       debugLog.addEvent("Props Thread Change", `Thread selected via props: ${propsThreadId}`, "info");
     }
-  }, [propsThreadId, currentThreadId]);
+  }, [propsThreadId, currentThreadId, restoreStreamingState]);
 
   useEffect(() => {
     // Only handle events and local storage if not using props
@@ -213,6 +219,11 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({
     if (storedThreadId && effectiveUserId) {
       setLocalThreadId(storedThreadId);
       loadThreadMessages(storedThreadId);
+      // Try to restore streaming state for stored thread
+      const restored = restoreStreamingState(storedThreadId);
+      if (restored) {
+        debugLog.addEvent("Initialization", `Restored streaming state for stored thread: ${storedThreadId}`, "info");
+      }
       debugLog.addEvent("Initialization", `Loading stored thread: ${storedThreadId}`, "info");
     } else {
       setInitialLoading(false);

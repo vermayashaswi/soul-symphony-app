@@ -71,22 +71,46 @@ export function LoadingEntryContent({ error }: { error?: string }) {
     // Reduced timeout for "taking too long" message
     const longProcessingTimeout = setTimeout(() => {
       if (isVisible) {
+        console.log('[LoadingEntryContent] Processing taking longer than expected');
         setProcessingTakingTooLong(true);
       }
     }, 10000); // Reduced timeout
     
     longProcessingTimeoutRef.current = longProcessingTimeout;
     
-    // Listen for immediate hide events
-    const handleHide = () => {
-      console.log('[LoadingEntryContent] Hide event received, immediate transition');
+    // Enhanced event listeners with better debugging
+    const handleHide = (event: any) => {
+      console.log('[LoadingEntryContent] Hide event received:', {
+        type: event.type,
+        detail: event.detail,
+        componentId: componentId.current
+      });
+      setIsVisible(false);
+    };
+
+    const handleProcessingCompleted = (event: any) => {
+      console.log('[LoadingEntryContent] Processing completed event received:', {
+        type: event.type,
+        detail: event.detail,
+        componentId: componentId.current
+      });
       setIsVisible(false);
     };
     
+    // Add multiple event listeners for better coverage
     window.addEventListener('processingEntryHidden', handleHide);
     window.addEventListener('entryContentReady', handleHide);
+    window.addEventListener('processingEntryCompleted', handleProcessingCompleted);
+
+    // Failsafe cleanup after extended time
+    const failsafeTimeout = setTimeout(() => {
+      console.log('[LoadingEntryContent] Failsafe cleanup triggered for:', componentId.current);
+      setIsVisible(false);
+    }, 30000);
     
     return () => {
+      console.log('[LoadingEntryContent] Component cleanup:', componentId.current);
+      
       if (stepsIntervalRef.current) {
         clearInterval(stepsIntervalRef.current);
       }
@@ -94,9 +118,12 @@ export function LoadingEntryContent({ error }: { error?: string }) {
       if (longProcessingTimeoutRef.current) {
         clearTimeout(longProcessingTimeoutRef.current);
       }
+
+      clearTimeout(failsafeTimeout);
       
       window.removeEventListener('processingEntryHidden', handleHide);
       window.removeEventListener('entryContentReady', handleHide);
+      window.removeEventListener('processingEntryCompleted', handleProcessingCompleted);
     };
   }, [isVisible]);
   
