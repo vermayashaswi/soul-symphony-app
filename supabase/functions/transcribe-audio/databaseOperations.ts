@@ -212,6 +212,15 @@ export async function storeJournalEntry(
     } catch (sentErr) {
       console.error("[storeJournalEntry] FIXED: Error triggering sentiment analysis:", sentErr);
     }
+
+    // FIXED: Extract themes to trigger generate-themes function
+    try {
+      console.log(`[storeJournalEntry] FIXED: Extracting themes for entry ${data.id}`);
+      await extractThemes(supabase, refinedText, data.id);
+      console.log("[storeJournalEntry] FIXED: Successfully triggered theme extraction");
+    } catch (themeErr) {
+      console.error("[storeJournalEntry] FIXED: Error extracting themes:", themeErr);
+    }
     
     return data.id;
   } catch (error) {
