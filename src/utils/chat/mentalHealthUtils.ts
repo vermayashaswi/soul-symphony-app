@@ -10,7 +10,7 @@ export async function analyzeMentalHealthEntries(userId: string, timeRange?: { s
     const { data: entries, error } = await supabase
       .from('Journal Entries')
       .select('*, emotions, sentiment, master_themes')
-      .eq('user_id', userId)
+      // RLS policies automatically filter to user's entries
       .order('created_at', { ascending: false })
       .limit(20);
       

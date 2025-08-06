@@ -4,14 +4,14 @@ import { JournalEntry } from '@/types/journal';
 
 export const createJournalEntry = async (entryData: Partial<JournalEntry>, userId: string): Promise<JournalEntry | null> => {
   try {
-    // Ensure user_id is set for RLS compliance
+    // RLS policies automatically handle user_id - we still include it for explicit clarity
     const insertData = {
       ...entryData,
-      user_id: userId, // This is critical for RLS policies
+      user_id: userId, // Set for RLS validation
       created_at: new Date().toISOString(),
     };
 
-    console.log('[JournalEntryService] Creating entry with user_id:', userId);
+    console.log('[JournalEntryService] Creating entry for authenticated user:', userId);
 
     const { data, error } = await supabase
       .from('Journal Entries')
@@ -61,7 +61,7 @@ export const updateJournalEntry = async (entryId: number, entryData: Partial<Jou
       .from('Journal Entries')
       .update(updateData)
       .eq('id', entryId)
-      .eq('user_id', userId) // Ensure user can only update their own entries - RLS will handle this but explicit for clarity
+      // RLS policies ensure user can only update their own entries
       .select()
       .single();
 
@@ -91,8 +91,8 @@ export const deleteJournalEntry = async (entryId: number, userId: string): Promi
     const { error } = await supabase
       .from('Journal Entries')
       .delete()
-      .eq('id', entryId)
-      .eq('user_id', userId); // Ensure user can only delete their own entries - RLS will handle this but explicit for clarity
+      .eq('id', entryId);
+      // RLS policies ensure user can only delete their own entries
 
     if (error) {
       console.error('Error deleting journal entry:', error);
@@ -113,7 +113,7 @@ export const getJournalEntries = async (userId: string, limit?: number, offset?:
     let query = supabase
       .from('Journal Entries')
       .select('*')
-      .eq('user_id', userId) // RLS will handle this, but explicit for clarity
+      // RLS policies automatically filter to user's entries
       .order('created_at', { ascending: false });
 
     if (limit) {

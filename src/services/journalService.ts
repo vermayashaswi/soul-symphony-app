@@ -92,7 +92,7 @@ export const fetchJournalEntries = async (userId: string, timeoutRef?: React.Mut
     const { data, error } = await supabase
       .from('Journal Entries')
       .select('*')
-      .eq('user_id', userId)
+      // RLS policies automatically filter to user's entries
       .order('created_at', { ascending: false });
     
     if (timeoutRef?.current) {

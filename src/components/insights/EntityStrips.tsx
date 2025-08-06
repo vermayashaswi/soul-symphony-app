@@ -114,7 +114,7 @@ const EntityStrips: React.FC<EntityStripsProps> = ({
         const { data: entries, error } = await supabase
           .from('Journal Entries')
           .select('master_themes, sentiment')
-          .eq('user_id', userId)
+          // RLS policies automatically filter to user's entries
           .gte('created_at', startDate)
           .lte('created_at', endDate)
           .not('master_themes', 'is', null);

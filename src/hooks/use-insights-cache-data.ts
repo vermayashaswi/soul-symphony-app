@@ -81,7 +81,7 @@ export const useInsightsCacheData = (
       const { data: allEntries, error: allEntriesError } = await supabase
         .from('Journal Entries')
         .select('*')
-        .eq('user_id', userId)
+        // RLS policies automatically filter to user's entries
         .order('created_at', { ascending: false });
 
       if (allEntriesError) {
