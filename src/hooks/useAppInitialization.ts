@@ -4,6 +4,7 @@ import { journalReminderService } from '@/services/journalReminderService';
 import { initializeServiceWorker } from '@/utils/serviceWorker';
 import { enhancedPlatformService } from '@/services/enhancedPlatformService';
 import { nativeIntegrationService } from '@/services/nativeIntegrationService';
+import { useNativeAuthInitialization } from './useNativeAuthInitialization';
 
 interface AppInitializationState {
   isInitialized: boolean;
@@ -20,13 +21,15 @@ export const useAppInitialization = () => {
     initializationTimeout: false
   });
 
+  const nativeAuth = useNativeAuthInitialization();
+  const isNative = nativeIntegrationService.isRunningNatively();
+
   useEffect(() => {
     const initializeApp = async () => {
       try {
-        console.log('[AppInit] Initializing critical app services...');
+        console.log('[AppInit] Initializing critical app services...', { isNative });
         
         // Set initialization timeout for native apps to prevent splash screen hanging
-        const isNative = nativeIntegrationService.isRunningNatively();
         let timeoutId: NodeJS.Timeout | null = null;
         
         if (isNative) {
@@ -38,7 +41,25 @@ export const useAppInitialization = () => {
               isInitializing: false,
               initializationTimeout: true
             }));
-          }, 5000); // 5 second timeout for native apps
+          }, 8000); // Extended timeout for native auth
+        }
+        
+        // For native apps, wait for auth initialization before proceeding
+        if (isNative) {
+          console.log('[AppInit] Waiting for native auth initialization...');
+          
+          // Wait for native auth to complete (with timeout)
+          let authWaitCount = 0;
+          while (!nativeAuth.isInitialized && authWaitCount < 60) { // 6 seconds max
+            await new Promise(resolve => setTimeout(resolve, 100));
+            authWaitCount++;
+          }
+          
+          if (!nativeAuth.isInitialized) {
+            console.warn('[AppInit] Native auth not initialized after timeout, proceeding anyway');
+          } else {
+            console.log('[AppInit] Native auth initialization complete');
+          }
         }
         
         // Core services that must complete for basic app functionality
@@ -94,7 +115,11 @@ export const useAppInitialization = () => {
     };
 
     initializeApp();
-  }, []);
+  }, [isNative, nativeAuth.isInitialized]);
 
-  return state;
+  return {
+    ...state,
+    nativeAuthSession: nativeAuth.session,
+    nativeAuthError: nativeAuth.error
+  };
 };

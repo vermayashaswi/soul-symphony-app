@@ -20,8 +20,20 @@ export const useSessionValidation = () => {
 
   const isNative = nativeIntegrationService.isRunningNatively();
 
-  const validateStoredSession = (): Session | null => {
+  const validateStoredSession = async (): Promise<Session | null> => {
     try {
+      // For native apps, always use Supabase's session management
+      if (isNative) {
+        console.log('[useSessionValidation] Native app - checking Supabase session directly');
+        const { data: { session }, error } = await supabase.auth.getSession();
+        if (error) {
+          console.warn('[useSessionValidation] Native session check error:', error);
+          return null;
+        }
+        return session;
+      }
+
+      // For web, check localStorage as fallback
       const storedSession = localStorage.getItem('sb-kwnwhgucnzqxndzjayyq-auth-token');
       if (!storedSession) return null;
 
@@ -47,27 +59,27 @@ export const useSessionValidation = () => {
 
   const checkSession = async () => {
     try {
-      console.log('[useSessionValidation] Starting session validation...');
+      console.log('[useSessionValidation] Starting session validation...', { isNative });
       
-      // For native apps, try synchronous validation first
-      if (isNative) {
-        const storedSession = validateStoredSession();
-        if (storedSession) {
-          setState({
-            session: storedSession,
-            isLoading: false,
-            isValid: true,
-            error: null
-          });
-          return storedSession;
-        }
-      }
-
-      // Async validation fallback
+      // Always use Supabase's getSession for reliable session checking
       const { data: { session }, error } = await supabase.auth.getSession();
       
       if (error) {
         console.error('[useSessionValidation] Session validation error:', error);
+        
+        // For native apps, if we get a refresh token error, clear storage and try again
+        if (isNative && error.message?.includes('refresh_token_not_found')) {
+          console.log('[useSessionValidation] Clearing auth state due to refresh token error');
+          await supabase.auth.signOut();
+          setState({
+            session: null,
+            isLoading: false,
+            isValid: false,
+            error: null // Don't show error for token refresh issues
+          });
+          return null;
+        }
+        
         setState({
           session: null,
           isLoading: false,
@@ -82,7 +94,8 @@ export const useSessionValidation = () => {
       console.log('[useSessionValidation] Session validation complete:', {
         hasSession: !!session,
         isValid,
-        userId: session?.user?.id
+        userId: session?.user?.id,
+        isNative
       });
 
       setState({
