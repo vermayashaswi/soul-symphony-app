@@ -39,31 +39,31 @@ public class MainActivity extends BridgeActivity {
     }
     
     @Override
-    protected void onStart() {
+    public void onStart() {
         super.onStart();
         Log.d(TAG, "MainActivity onStart");
     }
     
     @Override
-    protected void onResume() {
+    public void onResume() {
         super.onResume();
         Log.d(TAG, "MainActivity onResume");
     }
     
     @Override
-    protected void onPause() {
+    public void onPause() {
         super.onPause();
         Log.d(TAG, "MainActivity onPause");
     }
     
     @Override
-    protected void onStop() {
+    public void onStop() {
         super.onStop();
         Log.d(TAG, "MainActivity onStop");
     }
     
     @Override
-    protected void onDestroy() {
+    public void onDestroy() {
         super.onDestroy();
         Log.d(TAG, "MainActivity onDestroy");
     }

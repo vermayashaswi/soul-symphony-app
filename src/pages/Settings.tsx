@@ -10,7 +10,7 @@ import { useTheme } from '@/hooks/use-theme';
 import { setupJournalReminder, initializeCapacitorNotifications, NotificationFrequency, NotificationTime } from '@/services/notificationService';
 import { enhancedNotificationService } from '@/services/enhancedNotificationService';
 import { useAuth } from '@/contexts/AuthContext';
-import { useSubscription } from '@/contexts/SubscriptionContext';
+import { useNonBlockingSubscription } from '@/contexts/NonBlockingSubscriptionContext';
 import { supabase } from '@/integrations/supabase/client';
 import { useJournalEntries } from '@/hooks/use-journal-entries';
 import { useNavigate } from 'react-router-dom';
@@ -99,10 +99,10 @@ function SettingsContent() {
   const { 
     isPremium, 
     isTrialActive, 
-    subscriptionStatus, 
+    status: subscriptionStatus, 
     isLoading: subscriptionLoading,
     error: subscriptionError
-  } = useSubscription();
+  } = useNonBlockingSubscription();
   const [maxStreak, setMaxStreak] = useState(0);
   const { entries } = useJournalEntries(user?.id, 0, !!user);
   const navigate = useNavigate();

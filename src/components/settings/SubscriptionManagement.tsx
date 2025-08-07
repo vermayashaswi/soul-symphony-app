@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Crown, Clock, Calendar, RefreshCw, AlertCircle, Wifi, WifiOff } from 'lucide-react';
 import { TranslatableText } from '@/components/translation/TranslatableText';
-import { useSubscription } from '@/contexts/SubscriptionContext';
+import { useNonBlockingSubscription } from '@/contexts/NonBlockingSubscriptionContext';
 import { useLocationPricing } from '@/hooks/useLocationPricing';
 import { motion } from 'framer-motion';
 import { toast } from 'sonner';
@@ -19,12 +19,11 @@ export const SubscriptionManagement: React.FC = () => {
     isTrialActive,
     trialEndDate,
     daysRemainingInTrial,
-    subscriptionStatus,
+    status: subscriptionStatus,
     isLoading,
     error,
-    refreshSubscriptionStatus,
-    hasInitialLoadCompleted
-  } = useSubscription();
+    refreshSubscription: refreshSubscriptionStatus
+  } = useNonBlockingSubscription();
 
   const { pricing, isLoading: pricingLoading } = useLocationPricing();
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -36,7 +35,6 @@ export const SubscriptionManagement: React.FC = () => {
     subscriptionStatus,
     isLoading,
     error,
-    hasInitialLoadCompleted,
     pricing
   });
 
