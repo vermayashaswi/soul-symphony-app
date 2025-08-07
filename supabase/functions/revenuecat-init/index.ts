@@ -101,7 +101,7 @@ serve(async (req) => {
           .from('revenuecat_customers')
           .insert({
             user_id: userId,
-            revenuecat_customer_id: userId, // Use user ID as customer ID
+            revenuecat_user_id: userId, // Use user ID as customer ID
             platform: platform,
             app_store_country: platform === 'ios' ? 'US' : null,
             play_store_country: platform === 'android' ? 'US' : null,
@@ -115,7 +115,7 @@ serve(async (req) => {
           customer = {
             id: userId,
             user_id: userId,
-            revenuecat_customer_id: userId,
+            revenuecat_user_id: userId,
             platform: platform,
             app_store_country: platform === 'ios' ? 'US' : null,
             play_store_country: platform === 'android' ? 'US' : null,
@@ -129,7 +129,7 @@ serve(async (req) => {
       customer = {
         id: userId,
         user_id: userId,
-        revenuecat_customer_id: userId,
+        revenuecat_user_id: userId,
         platform: platform,
         app_store_country: platform === 'ios' ? 'US' : null,
         play_store_country: platform === 'android' ? 'US' : null,
@@ -215,7 +215,7 @@ serve(async (req) => {
     const response = {
       success: true,
       customer: {
-        id: customer.revenuecat_customer_id,
+        id: customer.revenuecat_user_id,
         platform: customer.platform,
         subscriptions: subscriptions || []
       },
