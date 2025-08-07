@@ -20,6 +20,7 @@ import { mobileOptimizationService } from './services/mobileOptimizationService'
 import { nativeIntegrationService } from './services/nativeIntegrationService';
 import { nativeAuthService } from './services/nativeAuthService';
 import { useAppInitialization } from './hooks/useAppInitialization';
+import { SplashScreenManager } from './components/splash/SplashScreenManager';
 import { logger } from './utils/logger';
 
 const App: React.FC = () => {
@@ -197,18 +198,20 @@ const App: React.FC = () => {
 
   return (
     <ErrorBoundary onError={handleAppError}>
-      <FeatureFlagsProvider>
-        <SubscriptionProvider>
-          <TutorialProvider>
-            <TranslationLoadingOverlay />
-            <JournalProcessingInitializer />
-            <AppRoutes key={isInitialized ? 'initialized' : 'initializing'} />
-            <TutorialOverlay />
-            <Toaster />
-            <SonnerToaster position="top-right" />
-          </TutorialProvider>
-        </SubscriptionProvider>
-      </FeatureFlagsProvider>
+      <SplashScreenManager isAppInitialized={isInitialized}>
+        <FeatureFlagsProvider>
+          <SubscriptionProvider>
+            <TutorialProvider>
+              <TranslationLoadingOverlay />
+              <JournalProcessingInitializer />
+              <AppRoutes key={isInitialized ? 'initialized' : 'initializing'} />
+              <TutorialOverlay />
+              <Toaster />
+              <SonnerToaster position="top-right" />
+            </TutorialProvider>
+          </SubscriptionProvider>
+        </FeatureFlagsProvider>
+      </SplashScreenManager>
     </ErrorBoundary>
   );
 };
