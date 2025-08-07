@@ -27,7 +27,9 @@
 			"spinnerColor": "#FFFFFF",
 			"splashFullScreen": true,
 			"splashImmersive": true,
-			"splashScreenDelay": 2000
+			"splashScreenDelay": 1000,
+			"androidSplashResourceName": "splash",
+			"iosLaunchStoryboard": "LaunchScreen"
 		},
 		"Keyboard": {
 			"resize": "body",

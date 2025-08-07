@@ -15,6 +15,7 @@ export const SplashScreenManager: React.FC<SplashScreenManagerProps> = ({
 }) => {
   const [isSplashHidden, setIsSplashHidden] = useState(false);
   const [forceHideTriggered, setForceHideTriggered] = useState(false);
+  const [minimumTimeElapsed, setMinimumTimeElapsed] = useState(false);
 
   useEffect(() => {
     const isNative = nativeIntegrationService.isRunningNatively();
@@ -26,6 +27,11 @@ export const SplashScreenManager: React.FC<SplashScreenManagerProps> = ({
     }
 
     console.log('[SplashManager] Managing native splash screen...');
+
+    // Ensure minimum splash time for smooth UX
+    const minimumTimeTimeout = setTimeout(() => {
+      setMinimumTimeElapsed(true);
+    }, 1500); // 1.5 seconds minimum
 
     // Force hide splash screen after maximum duration regardless of initialization status
     const forceHideTimeout = setTimeout(() => {
@@ -44,8 +50,8 @@ export const SplashScreenManager: React.FC<SplashScreenManagerProps> = ({
       }
     }, maxSplashDuration);
 
-    // Hide splash when app is initialized (but respect minimum show time)
-    if (isAppInitialized && !isSplashHidden && !forceHideTriggered) {
+    // Hide splash when app is initialized and minimum time elapsed
+    if (isAppInitialized && minimumTimeElapsed && !isSplashHidden && !forceHideTriggered) {
       console.log('[SplashManager] App initialized, hiding splash screen');
       
       // Add small delay to ensure smooth transition
@@ -75,13 +81,15 @@ export const SplashScreenManager: React.FC<SplashScreenManagerProps> = ({
       return () => {
         clearTimeout(hideDelay);
         clearTimeout(forceHideTimeout);
+        clearTimeout(minimumTimeTimeout);
       };
     }
 
     return () => {
       clearTimeout(forceHideTimeout);
+      clearTimeout(minimumTimeTimeout);
     };
-  }, [isAppInitialized, isSplashHidden, forceHideTriggered, maxSplashDuration]);
+  }, [isAppInitialized, minimumTimeElapsed, isSplashHidden, forceHideTriggered, maxSplashDuration]);
 
   // In native apps, don't render the app content until splash is handled
   if (nativeIntegrationService.isRunningNatively() && !isSplashHidden) {

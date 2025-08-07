@@ -1,6 +1,6 @@
 
 export { revenueCatService } from './revenueCatService';
-export { useRevenueCat } from '../../hooks/useRevenueCat';
+export { useNonBlockingRevenueCat } from '../../hooks/useNonBlockingRevenueCat';
 export type {
   RevenueCatProduct,
   RevenueCatPurchaserInfo,
