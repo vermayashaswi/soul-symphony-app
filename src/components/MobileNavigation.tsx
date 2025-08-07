@@ -10,7 +10,7 @@ import { TranslatableText } from '@/components/translation/TranslatableText';
 import { useTutorial } from '@/contexts/TutorialContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTranslation } from '@/contexts/TranslationContext';
-import { useSubscription } from '@/contexts/SubscriptionContext';
+import { useNonBlockingSubscription } from '@/contexts/NonBlockingSubscriptionContext';
 import { useSafeArea } from '@/hooks/use-safe-area';
 import { useKeyboardDetection } from '@/hooks/use-keyboard-detection';
 import { logger } from '@/utils/logger';
@@ -26,7 +26,7 @@ const MobileNavigation: React.FC<MobileNavigationProps> = ({ onboardingComplete 
   const { isActive: isTutorialActive, tutorialCompleted } = useTutorial();
   const { user } = useAuth();
   const { currentLanguage } = useTranslation();
-  const { hasActiveSubscription, isTrialActive } = useSubscription();
+  const { hasActiveSubscription, isTrialActive } = useNonBlockingSubscription();
   const { safeArea, isNative, isAndroid, applySafeAreaStyles } = useSafeArea();
   
   const { isKeyboardVisible, keyboardHeight, platform } = useKeyboardDetection();

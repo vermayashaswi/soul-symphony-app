@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import { useSubscription } from '@/contexts/SubscriptionContext';
+import { useNonBlockingSubscription } from '@/contexts/NonBlockingSubscriptionContext';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Crown, Clock, ArrowRight } from 'lucide-react';
@@ -31,7 +31,7 @@ export const PremiumFeatureGuard: React.FC<PremiumFeatureGuardProps> = ({
     tier,
     status,
     isTrialEligible
-  } = useSubscription();
+  } = useNonBlockingSubscription();
   const navigate = useNavigate();
   const [isSubscriptionModalOpen, setIsSubscriptionModalOpen] = useState(false);
 

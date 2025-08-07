@@ -13,7 +13,7 @@ import { Badge } from '@/components/ui/badge';
 import { Crown, Check, X, Loader2 } from 'lucide-react';
 import { TranslatableText } from '@/components/translation/TranslatableText';
 import { useNonBlockingRevenueCat } from '@/hooks/useNonBlockingRevenueCat';
-import { useSubscription } from '@/contexts/SubscriptionContext';
+import { useNonBlockingSubscription } from '@/contexts/NonBlockingSubscriptionContext';
 import { useLocationPricing } from '@/hooks/useLocationPricing';
 import { toast } from 'sonner';
 import { motion } from 'framer-motion';
@@ -36,7 +36,7 @@ export const SubscriptionModal: React.FC<SubscriptionModalProps> = ({
   onClose
 }) => {
   const { purchaseProduct, isInitializing: revenueCatLoading } = useNonBlockingRevenueCat();
-  const { isPremium, isTrialActive } = useSubscription();
+  const { isPremium, isTrialActive } = useNonBlockingSubscription();
   const { pricing, isLoading: pricingLoading, error: pricingError } = useLocationPricing();
   const [isPurchasing, setIsPurchasing] = useState(false);
 
