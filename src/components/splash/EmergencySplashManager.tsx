@@ -25,8 +25,33 @@ export const EmergencySplashManager: React.FC<EmergencySplashManagerProps> = ({
   useEffect(() => {
     const isNative = nativeIntegrationService.isRunningNatively();
     
+    splashLogger.info('EmergencySplashManager effect running', {
+      isNative,
+      isAppInitialized,
+      isSplashHidden,
+      emergencyHide,
+      userAgent: navigator.userAgent.substring(0, 100)
+    });
+    
     if (!isNative) {
       // Not a native app, no splash screen to manage
+      splashLogger.info('Not a native app - skipping splash screen management');
+      setIsSplashHidden(true);
+      return;
+    }
+
+    // Check if Capacitor and SplashScreen plugin are available
+    const hasCapacitor = !!(window as any).Capacitor;
+    const hasSplashScreen = !!(window as any).Capacitor?.Plugins?.SplashScreen;
+    
+    splashLogger.info('Capacitor availability check', {
+      hasCapacitor,
+      hasSplashScreen,
+      platform: hasCapacitor ? (window as any).Capacitor.getPlatform?.() : 'unknown'
+    });
+
+    if (!hasCapacitor || !hasSplashScreen) {
+      splashLogger.warn('Capacitor or SplashScreen plugin not available - marking splash as hidden');
       setIsSplashHidden(true);
       return;
     }
@@ -36,31 +61,57 @@ export const EmergencySplashManager: React.FC<EmergencySplashManagerProps> = ({
     // EMERGENCY TIMEOUT - This ALWAYS fires regardless of initialization status
     const emergencyTimeout = setTimeout(() => {
       if (!isSplashHidden) {
-        splashLogger.warn('EMERGENCY: Force hiding splash screen due to absolute timeout');
+        splashLogger.warn('🚨 EMERGENCY: Force hiding splash screen due to absolute timeout');
         setEmergencyHide(true);
         
-        // Try multiple hide strategies in sequence
+        // Enhanced hide strategies with more debugging
         const hideStrategies = [
-          () => SplashScreen.hide({ fadeOutDuration: 100 }),
-          () => SplashScreen.hide(),
-          () => Promise.resolve() // Final fallback
+          {
+            name: 'Fast fade',
+            action: () => SplashScreen.hide({ fadeOutDuration: 100 })
+          },
+          {
+            name: 'Instant hide',
+            action: () => SplashScreen.hide()
+          },
+          {
+            name: 'Direct plugin call',
+            action: async () => {
+              const splashPlugin = (window as any).Capacitor?.Plugins?.SplashScreen;
+              if (splashPlugin && typeof splashPlugin.hide === 'function') {
+                return splashPlugin.hide();
+              }
+              throw new Error('Direct plugin call failed');
+            }
+          },
+          {
+            name: 'Force resolve',
+            action: () => Promise.resolve()
+          }
         ];
 
         const tryHideSequence = async () => {
+          splashLogger.info('Starting emergency hide sequence with strategies:', hideStrategies.map(s => s.name));
+          
           for (const strategy of hideStrategies) {
             try {
-              await strategy();
-              splashLogger.info('Emergency splash hide successful');
+              splashLogger.info(`Trying strategy: ${strategy.name}`);
+              await Promise.race([
+                strategy.action(),
+                new Promise((_, reject) => setTimeout(() => reject(new Error('Strategy timeout')), 2000))
+              ]);
+              
+              splashLogger.info(`✅ Emergency splash hide successful with strategy: ${strategy.name}`);
               setIsSplashHidden(true);
               break;
             } catch (error) {
-              splashLogger.warn('Emergency hide strategy failed, trying next', error);
+              splashLogger.warn(`❌ Strategy '${strategy.name}' failed:`, error);
             }
           }
           
           // Force mark as hidden even if all strategies failed
           if (!isSplashHidden) {
-            splashLogger.warn('All emergency hide strategies failed, marking as hidden anyway');
+            splashLogger.warn('🆘 All emergency hide strategies failed, marking as hidden anyway');
             setIsSplashHidden(true);
           }
         };
@@ -71,17 +122,19 @@ export const EmergencySplashManager: React.FC<EmergencySplashManagerProps> = ({
 
     // Normal hide when app is initialized (but only if emergency hasn't fired)
     if (isAppInitialized && !emergencyHide && !isSplashHidden) {
-      splashLogger.info('App initialized, hiding splash screen normally');
+      splashLogger.info('✅ App initialized, hiding splash screen normally');
       
       const normalHide = setTimeout(() => {
+        splashLogger.info('Executing normal splash hide...');
+        
         SplashScreen.hide({ fadeOutDuration: 300 })
           .then(() => {
-            splashLogger.info('Normal splash hide successful');
+            splashLogger.info('✅ Normal splash hide successful');
             setIsSplashHidden(true);
             clearTimeout(emergencyTimeout);
           })
           .catch((error) => {
-            splashLogger.warn('Normal splash hide failed, emergency will handle it', error);
+            splashLogger.warn('❌ Normal splash hide failed, emergency will handle it', error);
           });
       }, 200); // Small delay for smooth transition
 

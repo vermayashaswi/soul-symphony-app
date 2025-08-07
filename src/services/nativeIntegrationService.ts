@@ -64,44 +64,105 @@ class NativeIntegrationService {
 
   private async detectNativeEnvironment(): Promise<void> {
     try {
-      console.log('[NativeIntegration] Starting native environment detection...');
+      console.log('[NativeIntegration] Starting enhanced native environment detection...');
 
       const { Capacitor } = (window as any);
 
       if (Capacitor) {
+        // Enhanced debugging for Android WebView issues
+        console.log('[NativeIntegration] Capacitor object available:', {
+          isNativePlatform: Capacitor.isNativePlatform,
+          platform: Capacitor.getPlatform?.(),
+          hasPlugins: !!Capacitor.Plugins,
+          pluginCount: Capacitor.Plugins ? Object.keys(Capacitor.Plugins).length : 0
+        });
+
+        // Enable WebView debugging for Android
+        if (typeof Capacitor.DEBUG !== 'undefined') {
+          Capacitor.DEBUG = true;
+          console.log('[NativeIntegration] Capacitor debugging enabled');
+        }
+
         const platform = Capacitor.getPlatform();
         console.log('[NativeIntegration] Capacitor platform detected:', platform);
 
+        // Enhanced native detection with multiple checks
+        const isNativePlatform = platform === 'ios' || platform === 'android';
+        const hasNativeFeatures = !!Capacitor.isNativePlatform;
+        const hasDevicePlugin = !!Capacitor.Plugins?.Device;
+
+        console.log('[NativeIntegration] Native environment checks:', {
+          isNativePlatform,
+          hasNativeFeatures,
+          hasDevicePlugin,
+          userAgent: navigator.userAgent.substring(0, 100)
+        });
+
         // CRITICAL FIX: Only consider it native if platform is 'ios' or 'android'
-        this.isActuallyNative = platform === 'ios' || platform === 'android';
+        this.isActuallyNative = isNativePlatform;
 
         console.log('[NativeIntegration] Platform-based native detection:', this.isActuallyNative);
 
         if (this.isActuallyNative) {
-          console.log('[NativeIntegration] Confirmed native environment - no browser fallbacks will be used');
+          console.log('[NativeIntegration] ✅ Confirmed native environment - no browser fallbacks will be used');
 
-          // Additional verification for completeness
+          // Android-specific WebView debugging
+          if (platform === 'android') {
+            console.log('[NativeIntegration] Android detected - enabling additional debugging');
+            
+            // Enable WebView debugging if available
+            try {
+              if ((window as any).webkit?.messageHandlers) {
+                console.log('[NativeIntegration] WebKit message handlers detected');
+              }
+              
+              // Log WebView info
+              console.log('[NativeIntegration] WebView UserAgent:', navigator.userAgent);
+              
+              // Check for Android WebView debug flags
+              const androidApp = (window as any).AndroidInterface || (window as any).Android;
+              if (androidApp) {
+                console.log('[NativeIntegration] Android JavaScript interface detected');
+              }
+            } catch (webViewError) {
+              console.warn('[NativeIntegration] WebView debug setup failed:', webViewError);
+            }
+          }
+
+          // Device plugin verification with timeout
           try {
             if (Capacitor.Plugins?.Device) {
-              const deviceInfo = await Capacitor.Plugins.Device.getInfo();
-              console.log('[NativeIntegration] Device plugin confirmed:', {
+              console.log('[NativeIntegration] Testing Device plugin...');
+              
+              const deviceInfoPromise = Capacitor.Plugins.Device.getInfo();
+              const timeoutPromise = new Promise((_, reject) => 
+                setTimeout(() => reject(new Error('Device plugin timeout')), 3000)
+              );
+              
+              const deviceInfo = await Promise.race([deviceInfoPromise, timeoutPromise]);
+              
+              console.log('[NativeIntegration] ✅ Device plugin confirmed:', {
                 platform: deviceInfo.platform,
-                model: deviceInfo.model
+                model: deviceInfo.model,
+                osVersion: deviceInfo.osVersion,
+                manufacturer: deviceInfo.manufacturer
               });
+            } else {
+              console.warn('[NativeIntegration] ⚠️ Device plugin not available');
             }
           } catch (error) {
-            console.warn('[NativeIntegration] Device plugin check failed:', error);
+            console.warn('[NativeIntegration] ⚠️ Device plugin check failed:', error);
             // Don't fail the native detection for this
           }
         }
       } else {
-        console.log('[NativeIntegration] Capacitor not detected - web environment');
+        console.log('[NativeIntegration] ❌ Capacitor not detected - web environment');
         this.isActuallyNative = false;
       }
 
-      console.log('[NativeIntegration] Final native environment status:', this.isActuallyNative);
+      console.log('[NativeIntegration] 🏁 Final native environment status:', this.isActuallyNative);
     } catch (error) {
-      console.error('[NativeIntegration] Error detecting native environment:', error);
+      console.error('[NativeIntegration] ❌ Error detecting native environment:', error);
       this.isActuallyNative = false;
     }
   }

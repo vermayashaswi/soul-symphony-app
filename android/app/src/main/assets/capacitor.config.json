@@ -32,14 +32,13 @@
 			"iosLaunchStoryboard": "LaunchScreen"
 		},
 		"Keyboard": {
-			"resize": "ionic",
+			"resize": "body",
 			"style": "dark",
 			"resizeOnFullScreen": true
 		},
 		"StatusBar": {
 			"style": "dark",
-			"backgroundColor": "#000000",
-			"overlaysWebView": true
+			"backgroundColor": "#000000"
 		},
 		"PushNotifications": {
 			"presentationOptions": [
@@ -51,17 +50,21 @@
 		"LocalNotifications": {
 			"smallIcon": "ic_stat_icon_config_sample",
 			"iconColor": "#8b5cf6",
-			"sound": "beep.wav"
+			"sound": "beep.wav",
+			"requestPermissionsOnLoad": true,
+			"attachments": [],
+			"enableAndroidExtraLargeIcon": true,
+			"androidAllowWhileIdle": true,
+			"androidExact": true
 		}
 	},
 	"ios": {
-		"contentInset": "never",
+		"contentInset": "always",
 		"allowsLinkPreview": false,
 		"scrollEnabled": true,
 		"backgroundColor": "#FFFFFF",
 		"scheme": "Soulo",
-		"preferredContentMode": "mobile",
-		"handleApplicationURL": true
+		"preferredContentMode": "mobile"
 	},
 	"android": {
 		"allowMixedContent": false,
@@ -75,8 +78,6 @@
 		"overrideUserAgent": "SouloApp/1.0.0 Mobile",
 		"androidScheme": "https",
 		"loadOnMainThread": true,
-		"handlePermissions": true,
-		"allowNavigationBarColorChange": true,
-		"navigationBarColor": "#FFFFFF"
+		"handlePermissions": true
 	}
 }

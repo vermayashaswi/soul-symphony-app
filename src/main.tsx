@@ -187,43 +187,158 @@ const initializePWA = async () => {
   }
 };
 
-// Initialize systems
+// Emergency JavaScript execution guard
+const createEmergencyGuard = () => {
+  console.log('[EMERGENCY] Setting up emergency JavaScript execution guard');
+  
+  // Force enable WebView debugging if on Android
+  if (/Android/.test(navigator.userAgent)) {
+    console.log('[EMERGENCY] Android detected - enabling WebView debugging');
+    try {
+      // Enable Capacitor debugging
+      (window as any).Capacitor = (window as any).Capacitor || {};
+      (window as any).Capacitor.DEBUG = true;
+      console.log('[EMERGENCY] Capacitor debug mode enabled');
+    } catch (error) {
+      console.error('[EMERGENCY] Failed to enable Capacitor debug:', error);
+    }
+  }
+  
+  // Emergency timeout to ensure app never hangs
+  const emergencyTimeout = setTimeout(() => {
+    console.error('[EMERGENCY] JavaScript execution timeout - forcing app render');
+    // Force render the app even if initialization fails
+    const root = document.getElementById('root');
+    if (root && !root.hasChildNodes()) {
+      console.log('[EMERGENCY] No content detected, force rendering fallback');
+      renderApp();
+    }
+  }, 5000); // 5 second absolute timeout
+  
+  return () => clearTimeout(emergencyTimeout);
+};
+
+// Simplified app initialization for native environments
 const initializeApp = async () => {
+  console.log('[INIT] Starting app initialization');
+  
+  // Set up emergency guard first
+  const clearEmergencyGuard = createEmergencyGuard();
+  
   try {
-    // Initialize font system first
-    await initializeFontSystem();
+    // Detect platform early and log everything
+    const isAndroid = /Android/.test(navigator.userAgent);
+    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || 
+                  (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+    const isNative = !!(window as any).Capacitor;
     
-    // Initialize viewport fix
-    fixViewportHeight();
+    console.log('[INIT] Platform detection:', { isAndroid, isIOS, isNative });
     
-    // Initialize mobile optimizations early
-    await mobileOptimizationService.initialize();
-    
-    // Initialize PWA features
-    await initializePWA();
-    
-    // Detect iOS and set a class on the HTML element
-    if (/iPad|iPhone|iPod/.test(navigator.userAgent) || 
-        (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)) {
+    // Set platform classes immediately
+    if (isIOS) {
       document.documentElement.classList.add('ios-device');
+      console.log('[INIT] iOS class added');
     }
     
-    // Detect Android and set a class
-    if (/Android/.test(navigator.userAgent)) {
+    if (isAndroid) {
       document.documentElement.classList.add('android-device');
+      console.log('[INIT] Android class added');
     }
     
-    console.log('[App] Initialization complete');
+    // For native apps, use minimal initialization
+    if (isNative) {
+      console.log('[INIT] Native app detected - using minimal initialization');
+      
+      // Essential viewport fix only
+      fixViewportHeight();
+      console.log('[INIT] Viewport height fixed');
+      
+      // Skip heavy initializations for native apps
+      console.log('[INIT] Skipping heavy initializations for native app');
+      
+    } else {
+      console.log('[INIT] Web app detected - full initialization');
+      
+      // Full initialization for web
+      await initializeFontSystem();
+      fixViewportHeight();
+      await mobileOptimizationService.initialize();
+      await initializePWA();
+    }
+    
+    console.log('[INIT] App initialization complete');
+    clearEmergencyGuard();
+    
   } catch (error) {
-    console.error('[App] Initialization failed:', error);
-    mobileErrorHandler.handleError({
-      type: 'crash',
-      message: `App initialization failed: ${error}`
-    });
+    console.error('[INIT] Initialization failed:', error);
+    clearEmergencyGuard();
+    
+    // Try to handle error gracefully
+    try {
+      mobileErrorHandler.handleError({
+        type: 'crash',
+        message: `App initialization failed: ${error}`
+      });
+    } catch (handlerError) {
+      console.error('[INIT] Error handler also failed:', handlerError);
+    }
+    
+    // Force render anyway
+    console.log('[INIT] Forcing app render despite errors');
   }
 };
 
-// Start initialization
+// Separate render function for emergency fallback
+const renderApp = () => {
+  console.log('[RENDER] Starting React app render');
+  
+  try {
+    const root = document.getElementById('root');
+    if (!root) {
+      throw new Error('Root element not found');
+    }
+    
+    ReactDOM.createRoot(root).render(
+      <React.StrictMode>
+        <ThemeErrorBoundary>
+          <BrowserRouter>
+            <ContextReadinessProvider>
+              <ThemeProvider>
+                <TranslationProvider>
+                  <AuthProvider>
+                    <App />
+                  </AuthProvider>
+                </TranslationProvider>
+              </ThemeProvider>
+            </ContextReadinessProvider>
+          </BrowserRouter>
+        </ThemeErrorBoundary>
+      </React.StrictMode>
+    );
+    
+    console.log('[RENDER] React app rendered successfully');
+    
+  } catch (error) {
+    console.error('[RENDER] React render failed:', error);
+    
+    // Emergency fallback - render minimal content
+    const root = document.getElementById('root');
+    if (root) {
+      root.innerHTML = `
+        <div style="display: flex; align-items: center; justify-content: center; height: 100vh; font-family: sans-serif;">
+          <div style="text-align: center;">
+            <h2>Loading Soulo...</h2>
+            <p>Please wait while the app initializes</p>
+          </div>
+        </div>
+      `;
+      console.log('[RENDER] Emergency fallback content rendered');
+    }
+  }
+};
+
+// Start initialization immediately
+console.log('[BOOTSTRAP] Starting app bootstrap');
 initializeApp();
 
 // Error boundary specifically for theme provider issues
@@ -278,20 +393,8 @@ class ThemeErrorBoundary extends React.Component<ThemeErrorBoundaryProps, ThemeE
   }
 }
 
-ReactDOM.createRoot(document.getElementById('root')!).render(
-  <React.StrictMode>
-    <ThemeErrorBoundary>
-      <BrowserRouter>
-        <ContextReadinessProvider>
-          <ThemeProvider>
-            <TranslationProvider>
-              <AuthProvider>
-                <App />
-              </AuthProvider>
-            </TranslationProvider>
-          </ThemeProvider>
-        </ContextReadinessProvider>
-      </BrowserRouter>
-    </ThemeErrorBoundary>
-  </React.StrictMode>,
-)
+// Start the render process after a short delay to ensure DOM is ready
+setTimeout(() => {
+  console.log('[BOOTSTRAP] Starting React render after DOM ready');
+  renderApp();
+}, 100);
