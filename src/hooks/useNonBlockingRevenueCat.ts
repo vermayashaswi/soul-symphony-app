@@ -150,7 +150,10 @@ export const useNonBlockingRevenueCat = () => {
     }
     
     try {
-      const purchaserInfo = await revenueCatService.purchaseProduct(productId);
+      const result = await revenueCatService.purchaseProduct(productId);
+      
+      // purchaseProduct returns RevenueCatTransaction, need to get purchaserInfo separately
+      const purchaserInfo = await revenueCatService.getPurchaserInfo();
       
       // Update state with new purchaser info
       const isPremium = revenueCatService.isUserPremium(purchaserInfo);
@@ -165,7 +168,7 @@ export const useNonBlockingRevenueCat = () => {
         trialEndDate
       }));
 
-      return purchaserInfo;
+      return result;
     } catch (error) {
       console.error('[NonBlockingRevenueCat] Purchase failed:', error);
       throw error;
