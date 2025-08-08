@@ -41,9 +41,7 @@ export const scheduleSplashHide = () => {
  */
 export const exposeNativeDebugInfo = () => {
   if (typeof window !== 'undefined') {
-    // @ts-expect-error: debug fields
-    window.__NATIVE__ = isNativePlatform;
-    // @ts-expect-error: debug fields
-    window.__PLATFORM__ = nativePlatform;
+    (window as any).__NATIVE__ = isNativePlatform;
+    (window as any).__PLATFORM__ = nativePlatform;
   }
 };

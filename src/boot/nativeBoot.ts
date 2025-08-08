@@ -1,6 +1,6 @@
 
 import { exposeNativeDebugInfo, isNativePlatform, nativePlatform, scheduleSplashHide } from '@/lib/native';
-
+import { nativeIntegrationService } from '@/services/nativeIntegrationService';
 /**
  * Runs as early as possible on app startup to reduce chances of blank screen on native.
  * It only runs any action if we're in a native environment.
@@ -17,8 +17,25 @@ declare global {
 const runNativeBoot = () => {
   exposeNativeDebugInfo();
 
+  // Unconditionally attempt early native integration init with a short timeout
+  try {
+    const initPromise = nativeIntegrationService.initialize();
+    Promise.race([
+      initPromise,
+      new Promise((resolve) => setTimeout(resolve, 1200))
+    ])
+      .then(() => {
+        console.log('[nativeBoot] nativeIntegrationService init attempted');
+      })
+      .catch((e) => {
+        console.warn('[nativeBoot] nativeIntegrationService init error', e);
+      });
+  } catch (e) {
+    console.warn('[nativeBoot] nativeIntegrationService init threw', e);
+  }
+
   if (!isNativePlatform) {
-    // No-op on web
+    // Web: no splash to manage
     return;
   }
 
