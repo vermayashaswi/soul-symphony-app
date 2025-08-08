@@ -138,6 +138,9 @@ async function executeSearchMethod(
     
     case 'aggregation_search':
       return await executeAggregationSearch(query, queryPlan, userId, supabase);
+
+    case 'temporal_stats':
+      return await executeTemporalStats(query, queryPlan, userId, supabase);
     
     default:
       throw new Error(`Unknown search method: ${method}`);
@@ -496,6 +499,45 @@ async function executeAggregationSearch(
     confidence: 0.9,
     reasoning: 'Statistical analysis of emotional patterns and top emotions using aggregated data',
     schemaUtilization: 'Used emotions JSONB column for statistical aggregation with sample entries'
+  };
+}
+
+async function executeTemporalStats(
+  query: string,
+  queryPlan: any,
+  userId: string,
+  supabase: any
+): Promise<SearchResult> {
+  // Determine user timezone from profile
+  const { data: profile, error: profileError } = await supabase
+    .from('profiles')
+    .select('timezone')
+    .eq('id', userId)
+    .maybeSingle();
+
+  if (profileError) {
+    console.warn('[Temporal Stats] Could not fetch user profile timezone, defaulting to UTC:', profileError);
+  }
+
+  const timezone = profile?.timezone || 'UTC';
+
+  const { data, error } = await supabase.rpc(
+    'get_time_of_day_distribution',
+    {
+      start_date: queryPlan.filters?.timeRange?.startDate || null,
+      end_date: queryPlan.filters?.timeRange?.endDate || null,
+      user_timezone: timezone
+    }
+  );
+
+  if (error) throw error;
+
+  return {
+    method: 'temporal_stats',
+    results: data || [],
+    confidence: 0.9,
+    reasoning: `Calculated time-of-day distribution (${timezone}) with optional date filters`,
+    schemaUtilization: 'Used created_at with timezone bucketing via get_time_of_day_distribution'
   };
 }
 

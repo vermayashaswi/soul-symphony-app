@@ -30,32 +30,45 @@ class NativeAuthService {
   }
 
   async initialize(): Promise<void> {
-    if (this.isInitialized) return;
+    // If already fully initialized with a valid client ID and plugin, skip
+    if (this.isInitialized && this.hasValidClientId && this.googleAuthPlugin) return;
 
     try {
       console.log('[NativeAuth] Initializing native auth service');
 
-      // Enhanced configuration validation
-      const validation = this.validateConfiguration();
-      console.log('[NativeAuth] Configuration validation:', validation);
+      // Ensure native integration is ready first (idempotent)
+      await nativeIntegrationService.initialize();
 
-      if (!validation.isValid) {
-        console.warn('[NativeAuth] Configuration validation failed:', validation.errors);
-        this.initializationError = validation.errors.join(', ');
-        this.isInitialized = true;
+      // Wait for native environment and GoogleAuth plugin with retries to avoid race conditions
+      const maxAttempts = 8;
+      const delay = (ms: number) => new Promise((res) => setTimeout(res, ms));
+      let attempt = 0;
+
+      while (
+        attempt < maxAttempts &&
+        (!nativeIntegrationService.isRunningNatively() || !nativeIntegrationService.isGoogleAuthAvailable())
+      ) {
+        attempt++;
+        console.log(
+          `[NativeAuth] Waiting for native env/plugin (attempt ${attempt}/${maxAttempts})`
+        );
+        await delay(250);
+      }
+
+      // Validate configuration after waiting
+      const isNative = nativeIntegrationService.isRunningNatively();
+      const pluginAvailable = nativeIntegrationService.isGoogleAuthAvailable();
+
+      if (!isNative) {
+        console.warn('[NativeAuth] Not running natively - skipping GoogleAuth initialization');
+        this.initializationError = 'Not running in native environment';
+        // Keep isInitialized false so we can retry if environment changes
         return;
       }
 
-      if (!nativeIntegrationService.isRunningNatively()) {
-        console.log('[NativeAuth] Not running natively - skipping GoogleAuth initialization');
-        this.isInitialized = true;
-        return;
-      }
-
-      if (!nativeIntegrationService.isGoogleAuthAvailable()) {
-        console.warn('[NativeAuth] GoogleAuth plugin not available');
+      if (!pluginAvailable) {
+        console.warn('[NativeAuth] GoogleAuth plugin not available (after retries)');
         this.initializationError = 'GoogleAuth plugin not available';
-        this.isInitialized = true;
         return;
       }
 
@@ -72,7 +85,7 @@ class NativeAuthService {
       }
 
       await GoogleAuth.initialize({
-        clientId: clientId,
+        clientId,
         scopes: ['profile', 'email'],
       });
 
@@ -82,7 +95,7 @@ class NativeAuthService {
     } catch (error) {
       console.error('[NativeAuth] Failed to initialize:', error);
       this.initializationError = error.toString();
-      this.isInitialized = true;
+      this.isInitialized = false; // allow future retries
     }
   }
 
@@ -251,8 +264,20 @@ class NativeAuthService {
         return;
 
       } else {
-        console.log('[NativeAuth] Native auth not available - throwing error instead of web fallback');
-        throw new Error('Native Google authentication not available');
+        console.log('[NativeAuth] Native auth not available - falling back to web OAuth');
+        const redirectUrl = 'online.soulo.twa://oauth/callback';
+        const { data, error } = await supabase.auth.signInWithOAuth({
+          provider: 'google',
+          options: { redirectTo: redirectUrl },
+        });
+        if (error) {
+          throw error;
+        }
+        if (data?.url) {
+          // Open the OAuth URL; Supabase will redirect back via our URL scheme
+          window.location.href = data.url;
+        }
+        return;
       }
     } catch (error: any) {
       console.error('[NativeAuth] Google sign-in failed:', {

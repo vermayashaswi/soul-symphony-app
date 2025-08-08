@@ -850,6 +850,14 @@ export type Database = {
           last_occurrence: string
         }[]
       }
+      get_time_of_day_distribution: {
+        Args: { start_date?: string; end_date?: string; user_timezone?: string }
+        Returns: {
+          bucket: string
+          entry_count: number
+          percentage: number
+        }[]
+      }
       get_top_emotions: {
         Args:
           | { start_date?: string; end_date?: string; limit_count?: number }

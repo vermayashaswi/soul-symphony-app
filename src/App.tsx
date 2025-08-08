@@ -18,7 +18,7 @@ import { nativeAppInitService } from './services/nativeAppInitService';
 import { mobileErrorHandler } from './services/mobileErrorHandler';
 import { mobileOptimizationService } from './services/mobileOptimizationService';
 import { nativeIntegrationService } from './services/nativeIntegrationService';
-import { nativeAuthService } from './services/nativeAuthService';
+
 import { useAppInitialization } from './hooks/useAppInitialization';
 import { logger } from './utils/logger';
 
@@ -30,10 +30,6 @@ const App: React.FC = () => {
   useEffect(() => {
     const appLogger = logger.createLogger('App');
     
-    if (nativeIntegrationService.isRunningNatively()) {
-      appLogger.info('Initializing native services');
-      nativeAuthService.initialize();
-    }
     
     const initializeApp = async () => {
       try {

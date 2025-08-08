@@ -11,7 +11,7 @@ export const getRedirectUrl = (): string => {
   // CRITICAL FIX: For native apps, never use external URLs
   if (nativeIntegrationService.isRunningNatively()) {
     console.log('[AuthService] Native app detected - using app URL scheme for redirect');
-    return 'app.soulo.online://oauth/callback';
+    return 'online.soulo.twa://oauth/callback';
   }
 
   // For web, use current origin
