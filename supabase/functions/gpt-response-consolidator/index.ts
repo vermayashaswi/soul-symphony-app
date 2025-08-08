@@ -225,14 +225,14 @@ serve(async (req) => {
             { role: 'user', content: [{ type: 'input_text', text: consolidationPrompt }] }
           ],
           max_output_tokens: 1500,
-          response_format: { type: 'json_object' },
+          text: { format: "json" },
         }),
     });
 
     // Handle non-OK responses gracefully
     if (!response.ok) {
       const errText = await response.text();
-      console.error('OpenAI chat.completions error:', response.status, errText);
+      console.error('OpenAI Responses API error:', response.status, errText);
       const fallbackText = "I couldn’t finalize your insight right now. Let’s try again in a moment.";
       return new Response(JSON.stringify({
         success: true,
