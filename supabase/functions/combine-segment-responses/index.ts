@@ -11,9 +11,13 @@ serve(async (req) => {
     return new Response(null, { headers: corsHeaders });
   }
 
-  try {
-    const { originalQuery, subQueryResponses, conversationContext = [] } = await req.json();
+  // Read request body ONCE
+  const body = await req.json().catch(() => null);
+  const originalQuery: string | undefined = body?.originalQuery;
+  const subQueryResponses: Array<{ query: string; response: string }> | undefined = body?.subQueryResponses;
+  const conversationContext: any[] = Array.isArray(body?.conversationContext) ? body.conversationContext : [];
 
+  try {
     if (!originalQuery || !subQueryResponses) {
       return new Response(
         JSON.stringify({ error: 'Original query and sub-query responses are required' }),
@@ -23,9 +27,15 @@ serve(async (req) => {
 
     const openAiApiKey = Deno.env.get('OPENAI_API_KEY');
     if (!openAiApiKey) {
+      console.warn('[Combine Segment Responses] OPENAI_API_KEY missing. Returning concatenated fallback.');
+      let fallbackResponse = '';
+      subQueryResponses.forEach((sqr, index) => {
+        if (index > 0) fallbackResponse += '\n\n';
+        fallbackResponse += `**Q${index + 1}: ${sqr.query}**\n${sqr.response}`;
+      });
       return new Response(
-        JSON.stringify({ error: 'OpenAI API key not configured' }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 500 }
+        JSON.stringify({ response: fallbackResponse }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
@@ -104,25 +114,16 @@ Generate a comprehensive response that feels like a single, thoughtful analysis 
 
   } catch (error) {
     console.error('[Combine Segment Responses] Error:', error);
-    
-    // Fallback to simple concatenation
-    try {
-      const { subQueryResponses } = await req.json();
-      let fallbackResponse = '';
-      subQueryResponses.forEach((sqr, index) => {
-        if (index > 0) fallbackResponse += '\n\n';
-        fallbackResponse += `**Q${index + 1}: ${sqr.query}**\n${sqr.response}`;
-      });
-      
-      return new Response(
-        JSON.stringify({ response: fallbackResponse }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    } catch (fallbackError) {
-      return new Response(
-        JSON.stringify({ error: 'Failed to combine responses' }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 500 }
-      );
-    }
+
+    // Fallback to simple concatenation without re-reading body
+    let fallbackResponse = '';
+    (subQueryResponses || []).forEach((sqr, index) => {
+      if (index > 0) fallbackResponse += '\n\n';
+      fallbackResponse += `**Q${index + 1}: ${sqr.query}**\n${sqr.response}`;
+    });
+    return new Response(
+      JSON.stringify({ response: fallbackResponse }),
+      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    );
   }
 });
