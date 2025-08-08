@@ -11,8 +11,9 @@ export async function generateEmbedding(text: string, apiKey: string): Promise<n
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'text-embedding-ada-002',
+        model: 'text-embedding-3-small',
         input: text,
+        encoding_format: 'float'
       }),
     });
 

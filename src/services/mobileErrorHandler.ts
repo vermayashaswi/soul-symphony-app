@@ -35,6 +35,11 @@ class MobileErrorHandler {
   private errorQueue: MobileError[] = [];
   private isOnline: boolean = navigator.onLine;
   private crashDetectionActive: boolean = false;
+  // Suppress noisy toasts during startup and dedupe frequent messages
+  private appStartTime: number = Date.now();
+  private suppressStartupMs: number = 7000; // Do not toast minor errors in first 7s
+  private lastToastAt: Record<string, number> = {};
+
 
   static getInstance(): MobileErrorHandler {
     if (!MobileErrorHandler.instance) {
@@ -271,6 +276,14 @@ class MobileErrorHandler {
   }
 
   private showUserFriendlyError(error: MobileError): void {
+    // Suppress noisy non-critical toasts right after startup (especially in native)
+    const now = Date.now();
+    const isStartup = now - this.appStartTime < this.suppressStartupMs;
+    if (isStartup && (error.type === 'unknown' || error.type === 'capacitor')) {
+      console.log('[MobileErrorHandler] Suppressing startup toast for minor error:', error.type);
+      return;
+    }
+
     let userMessage = '';
 
     switch (error.type) {
@@ -298,6 +311,15 @@ class MobileErrorHandler {
       default:
         userMessage = 'Something went wrong. The app will try to recover.';
     }
+
+    // Dedupe frequent identical toasts within 30s
+    const key = `${error.type}:${userMessage}`;
+    const last = this.lastToastAt[key] || 0;
+    if (now - last < 30000) {
+      console.log('[MobileErrorHandler] Suppressing duplicate toast:', key);
+      return;
+    }
+    this.lastToastAt[key] = now;
 
     toast.error(userMessage);
   }
