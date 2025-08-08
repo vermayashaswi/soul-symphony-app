@@ -179,7 +179,6 @@ MUST HAVE/DO: ALWAYS BE AWARE OF THE CONVERSATION HISTORY TO UNDERSTAND WHAT THE
         model: 'gpt-5-mini-2025-08-07',
         input: messages.map((m: any) => ({ role: m.role, content: [{ type: 'input_text', text: m.content }] })),
         max_output_tokens: 800,
-        temperature: 0.7,
         reasoning: { effort: 'medium' }
       }),
     });

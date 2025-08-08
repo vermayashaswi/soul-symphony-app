@@ -81,7 +81,6 @@ Return a JSON object with this structure:
           { role: 'system', content: [{ type: 'input_text', text: 'Return a strict JSON object only. No code fences, no extra text.' }] },
           { role: 'user', content: [{ type: 'input_text', text: prompt }] }
         ],
-        temperature: 0.3,
         max_output_tokens: 800,
         response_format: { type: 'json_object' }
       }),

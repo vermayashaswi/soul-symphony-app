@@ -89,7 +89,6 @@ Generate a comprehensive response that feels like a single, thoughtful analysis 
         input: [
           { role: 'user', content: [{ type: 'input_text', text: prompt }] }
         ],
-        temperature: 0.7,
         max_output_tokens: 1200,
       }),
     });

@@ -137,7 +137,6 @@ User message: "${message}"${contextString}`;
             { role: 'system', content: [{ type: 'input_text', text: 'You are a strict JSON classifier. Respond with a single JSON object only that matches the provided schema. No code fences, no commentary.' }] },
             { role: 'user', content: [{ type: 'input_text', text: classificationPrompt }] }
           ],
-          temperature: 0.2,
           max_output_tokens: 600,
           response_format: { type: 'json_object' },
           reasoning: { effort: 'medium' }

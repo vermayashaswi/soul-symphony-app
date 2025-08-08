@@ -313,10 +313,9 @@ Focus on creating comprehensive analysis plans with mandatory sub-question gener
       body: JSON.stringify({
         model: "gpt-5-2025-08-07",
         input: [
-          { role: "system", content: [{ type: "text", text: "You are an expert analysis planner. Respond only with valid JSON." }] },
-          { role: "user", content: [{ type: "text", text: prompt }] }
+          { role: "system", content: [{ type: "input_text", text: "You are an expert analysis planner. Respond only with valid JSON." }] },
+          { role: "user", content: [{ type: "input_text", text: prompt }] }
         ],
-        temperature: 0.1,
         max_output_tokens: 1000,
         reasoning: { effort: "medium" },
         response_format: { type: "json_object" }
