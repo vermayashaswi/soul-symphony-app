@@ -19,6 +19,7 @@ import { useStreamlinedInitialization } from './hooks/useStreamlinedInitializati
 import { EmergencySplashManager } from './components/splash/EmergencySplashManager';
 import { BackgroundSubscriptionInitializer } from '@/components/subscription/BackgroundSubscriptionInitializer';
 import { logger } from './utils/logger';
+import { NativeStartupHandler } from '@/components/native/NativeStartupHandler';
 
 const App: React.FC = () => {
   const appLogger = logger.createLogger('App');
@@ -111,19 +112,21 @@ const App: React.FC = () => {
   return (
     <ErrorBoundary onError={handleAppError}>
       <EmergencySplashManager isAppInitialized={isInitialized} maxEmergencyTimeout={2500}>
-        <FeatureFlagsProvider>
-          <NonBlockingSubscriptionProvider>
-            <TutorialProvider>
-              <TranslationLoadingOverlay />
-              <JournalProcessingInitializer />
-              <AppRoutes key={isInitialized ? 'initialized' : 'initializing'} />
-              <TutorialOverlay />
-              <BackgroundSubscriptionInitializer />
-              <Toaster />
-              <SonnerToaster position="top-right" />
-            </TutorialProvider>
-          </NonBlockingSubscriptionProvider>
-        </FeatureFlagsProvider>
+        <NativeStartupHandler>
+          <FeatureFlagsProvider>
+            <NonBlockingSubscriptionProvider>
+              <TutorialProvider>
+                <TranslationLoadingOverlay />
+                <JournalProcessingInitializer />
+                <AppRoutes key={isInitialized ? 'initialized' : 'initializing'} />
+                <TutorialOverlay />
+                <BackgroundSubscriptionInitializer />
+                <Toaster />
+                <SonnerToaster position="top-right" />
+              </TutorialProvider>
+            </NonBlockingSubscriptionProvider>
+          </FeatureFlagsProvider>
+        </NativeStartupHandler>
       </EmergencySplashManager>
     </ErrorBoundary>
   );
