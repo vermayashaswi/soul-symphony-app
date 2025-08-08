@@ -186,14 +186,23 @@ Focus on extracting specific entities, emotions, or themes mentioned in the sub-
               const embedding = vectorData.data[0].embedding;
 
               // Use the vector to search journal entries
+              // Choose correct RPC based on presence of time range
+              const useDate = !!(timeRange && (timeRange.start || timeRange.end));
+              const rpcName = useDate ? 'match_journal_entries_with_date' : 'match_journal_entries_fixed';
+              const rpcParams: any = {
+                query_embedding: embedding,
+                match_threshold: 0.3,
+                match_count: 10,
+                user_id_filter: userId
+              };
+              if (useDate) {
+                rpcParams.start_date = timeRange.start || null;
+                rpcParams.end_date = timeRange.end || null;
+              }
+
               const { data: vectorResults, error: vectorError } = await supabase.rpc(
-                'match_journal_entries',
-                {
-                  query_embedding: embedding,
-                  match_threshold: 0.3,
-                  match_count: 10,
-                  user_id_filter: userId
-                }
+                rpcName,
+                rpcParams
               );
 
               if (vectorError) {
@@ -303,14 +312,22 @@ Focus on extracting specific entities, emotions, or themes mentioned in the sub-
                   const vectorData = await vectorResponse.json();
                   const embedding = vectorData.data[0].embedding;
 
+                  const useDate = !!(timeRange && (timeRange.start || timeRange.end));
+                  const fallbackRpc = useDate ? 'match_journal_entries_with_date' : 'match_journal_entries_fixed';
+                  const fallbackParams: any = {
+                    query_embedding: embedding,
+                    match_threshold: 0.3,
+                    match_count: 5,
+                    user_id_filter: userId
+                  };
+                  if (useDate) {
+                    fallbackParams.start_date = timeRange.start || null;
+                    fallbackParams.end_date = timeRange.end || null;
+                  }
+
                   const { data: fallbackResults, error: fallbackError } = await supabase.rpc(
-                    'match_journal_entries',
-                    {
-                      query_embedding: embedding,
-                      match_threshold: 0.3,
-                      match_count: 5,
-                      user_id_filter: userId
-                    }
+                    fallbackRpc,
+                    fallbackParams
                   );
 
                   if (!fallbackError) {

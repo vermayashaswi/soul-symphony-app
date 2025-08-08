@@ -185,6 +185,15 @@ serve(async (req) => {
       if (shouldUseGptAnalysis) {
         console.log(`[chat-with-rag] Using GPT-driven analysis pipeline for ${enhancedQueryPlan.subQuestions.length} sub-questions`);
         
+        // Normalize time range from plan (supports dateRange {startDate,endDate} or timeRange {start,end})
+        const normalizedTimeRange = (() => {
+          const tr = enhancedQueryPlan?.timeRange || enhancedQueryPlan?.dateRange || null;
+          if (!tr) return null;
+          const start = tr.start ?? tr.startDate ?? null;
+          const end = tr.end ?? tr.endDate ?? null;
+          return (start || end) ? { start, end } : null;
+        })();
+        
         // Step 4: Call GPT Analysis Orchestrator for sub-question analysis
         const { data: analysisResults, error: analysisError } = await supabaseClient.functions.invoke(
           'gpt-analysis-orchestrator',
@@ -193,7 +202,7 @@ serve(async (req) => {
               subQuestions: enhancedQueryPlan.subQuestions,
               userMessage: message,
               userId: requestUserId,
-              timeRange: enhancedQueryPlan.timeRange,
+              timeRange: normalizedTimeRange,
               threadId
             }
           }
@@ -466,6 +475,15 @@ async function processStreamingPipeline(
       // Step 3: Analysis orchestration with status updates
       streamManager.sendBackendTask("Searching your journal...", "Looking through journal entries");
       
+      // Normalize time range for orchestrator
+      const normalizedTimeRange = (() => {
+        const tr = enhancedQueryPlan?.timeRange || enhancedQueryPlan?.dateRange || null;
+        if (!tr) return null;
+        const start = tr.start ?? tr.startDate ?? null;
+        const end = tr.end ?? tr.endDate ?? null;
+        return (start || end) ? { start, end } : null;
+      })();
+      
       const { data: analysisResults, error: analysisError } = await supabaseClient.functions.invoke(
         'gpt-analysis-orchestrator',
         {
@@ -473,7 +491,7 @@ async function processStreamingPipeline(
             subQuestions: enhancedQueryPlan.subQuestions,
             userMessage: message,
             userId: requestUserId,
-            timeRange: enhancedQueryPlan.timeRange,
+            timeRange: normalizedTimeRange,
             threadId
           }
         }
