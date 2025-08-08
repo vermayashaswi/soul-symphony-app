@@ -298,7 +298,7 @@ Focus on creating comprehensive analysis plans with mandatory sub-question gener
         "Authorization": `Bearer ${apiKey}`
       },
       body: JSON.stringify({
-        model: "gpt-4.1-2025-04-14",
+        model: "gpt-5-mini",
         messages: [{ role: "user", content: prompt }],
         temperature: 0.1,
         max_tokens: 1000,

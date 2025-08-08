@@ -413,7 +413,7 @@ serve(async (req) => {
       .join('\n\n');
 
     // Use gpt-4o-mini for all responses in master orchestrator
-    const model = 'gpt-4o-mini';
+    const model = 'gpt-5-mini';
     const maxTokens = isComplexQuery ? 1200 : 800;
 
     // Optimized system prompt for better performance
