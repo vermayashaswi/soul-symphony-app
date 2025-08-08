@@ -82,7 +82,7 @@ async function gptClassifyMessage(
 }> {
   
   const contextString = conversationContext.length > 0 
-    ? `\nConversation context: ${conversationContext.slice(-3).map(msg => `${msg.role}: ${msg.content}`).join('\n')}`
+    ? `\nConversation context: ${conversationContext.slice(-6).map(msg => `${msg.role}: ${msg.content}`).join('\n')}`
     : '';
 
   const classificationPrompt = `You're SOULo's conversation flow analyzer. Help me understand how to respond naturally to this user message.

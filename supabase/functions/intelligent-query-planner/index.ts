@@ -156,7 +156,7 @@ USER CONTEXT:
 - Entity-emotion relationships: ${userPatterns.entityEmotionRelationships?.length || 0} detected
 - Theme frequency statistics: ${JSON.stringify(userPatterns.themeStats || {})}
 - Entity frequency statistics: ${JSON.stringify(userPatterns.entityStats || {})}
-- Conversation history: ${conversationContext.slice(-3).map(c => c.content).join('; ')}
+- Conversation history: ${conversationContext.slice(-6).map(c => c.content).join('; ')}
 - User timezone: ${userProfile.timezone || 'UTC'}
 
 AVAILABLE SEARCH METHODS (ENHANCED):
@@ -169,6 +169,7 @@ AVAILABLE SEARCH METHODS (ENHANCED):
 7. entity_emotion_statistics - NEW: Statistical analysis of entity-emotion patterns
 8. hybrid_search - Combine multiple methods intelligently
 9. aggregation_search - Statistical analysis across entries for patterns
+10. temporal_stats - Time-of-day distribution stats (counts, percentages) using get_time_of_day_distribution
 
 ENTITY-EMOTION QUERY DETECTION:
 - Look for relationship queries: "How do I feel about X?", "My feelings toward Y"
