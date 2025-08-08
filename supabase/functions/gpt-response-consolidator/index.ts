@@ -220,9 +220,9 @@ serve(async (req) => {
           input: [
             { 
               role: 'system', 
-              content: [{ type: 'text', text: 'You are Ruh by SOuLO, a warm and insightful wellness coach. Provide thoughtful, data-driven responses based on journal analysis.' }]
+              content: [{ type: 'input_text', text: 'You are Ruh by SOuLO, a warm and insightful wellness coach. Provide thoughtful, data-driven responses based on journal analysis.' }]
             },
-            { role: 'user', content: [{ type: 'text', text: consolidationPrompt }] }
+            { role: 'user', content: [{ type: 'input_text', text: consolidationPrompt }] }
           ],
           temperature: 0.7,
           max_output_tokens: 1500,

@@ -69,20 +69,20 @@ Return a JSON object with this structure:
   "reasoning": "brief explanation of refinements made"
 }`;
 
-    const response = await fetch('https://api.openai.com/v1/chat/completions', {
+    const response = await fetch('https://api.openai.com/v1/responses', {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${openAiApiKey}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'gpt-4o-mini',
-        messages: [
-          { role: 'system', content: 'Return a strict JSON object only. No code fences, no extra text.' },
-          { role: 'user', content: prompt }
+        model: 'gpt-5-mini-2025-08-07',
+        input: [
+          { role: 'system', content: [{ type: 'input_text', text: 'Return a strict JSON object only. No code fences, no extra text.' }] },
+          { role: 'user', content: [{ type: 'input_text', text: prompt }] }
         ],
         temperature: 0.3,
-        max_tokens: 800,
+        max_output_tokens: 800,
         response_format: { type: 'json_object' }
       }),
     });
@@ -94,7 +94,18 @@ Return a JSON object with this structure:
     }
 
     const data = await response.json();
-    const content = data.choices[0]?.message?.content as string | undefined;
+    let content = '';
+    if (typeof data.output_text === 'string' && data.output_text.trim()) {
+      content = data.output_text;
+    } else if (Array.isArray(data.output)) {
+      content = data.output
+        .map((item: any) => (item?.content ?? [])
+          .map((c: any) => c?.text ?? '')
+          .join(''))
+        .join('');
+    } else if (Array.isArray(data.content)) {
+      content = data.content.map((c: any) => c?.text ?? '').join('');
+    }
 
     if (!content) {
       throw new Error('No content in OpenAI response');

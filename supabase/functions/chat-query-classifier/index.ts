@@ -131,17 +131,17 @@ User message: "${message}"${contextString}`;
         'Authorization': `Bearer ${apiKey}`,
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({
-        model: 'gpt-5-mini-2025-08-07',
-        input: [
-          { role: 'system', content: [{ type: 'text', text: 'You are a strict JSON classifier. Respond with a single JSON object only that matches the provided schema. No code fences, no commentary.' }] },
-          { role: 'user', content: [{ type: 'text', text: classificationPrompt }] }
-        ],
-        temperature: 0.2,
-        max_output_tokens: 600,
-        response_format: { type: 'json_object' },
-        reasoning: { effort: 'medium' }
-      }),
+        body: JSON.stringify({
+          model: 'gpt-5-mini-2025-08-07',
+          input: [
+            { role: 'system', content: [{ type: 'input_text', text: 'You are a strict JSON classifier. Respond with a single JSON object only that matches the provided schema. No code fences, no commentary.' }] },
+            { role: 'user', content: [{ type: 'input_text', text: classificationPrompt }] }
+          ],
+          temperature: 0.2,
+          max_output_tokens: 600,
+          response_format: { type: 'json_object' },
+          reasoning: { effort: 'medium' }
+        }),
       signal: controller.signal
     });
 
