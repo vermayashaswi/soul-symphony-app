@@ -724,10 +724,6 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: Json
       }
-      create_profile_safe: {
-        Args: { p_user_id: string; p_email?: string; p_full_name?: string }
-        Returns: boolean
-      }
       debug_user_auth: {
         Args: { target_user_id: string }
         Returns: Json
@@ -782,19 +778,6 @@ export type Database = {
         Args: { p_session_id: string; p_user_id: string }
         Returns: boolean
       }
-      get_active_revenuecat_subscriptions: {
-        Args: { p_user_id: string }
-        Returns: {
-          id: string
-          customer_id: string
-          subscription_id: string
-          product_id: string
-          status: string
-          expires_at: string
-          created_at: string
-          updated_at: string
-        }[]
-      }
       get_active_themes: {
         Args: Record<PropertyKey, never>
         Returns: {
@@ -803,10 +786,6 @@ export type Database = {
           description: string
           display_order: number
         }[]
-      }
-      get_authenticated_user_id: {
-        Args: Record<PropertyKey, never>
-        Returns: string
       }
       get_entity_emotion_statistics: {
         Args: {
@@ -854,19 +833,6 @@ export type Database = {
           id: number
           content: string
           created_at: string
-        }[]
-      }
-      get_or_create_revenuecat_customer: {
-        Args: { p_user_id: string; p_platform?: string }
-        Returns: {
-          id: string
-          user_id: string
-          revenuecat_customer_id: string
-          platform: string
-          app_store_country: string
-          play_store_country: string
-          created_at: string
-          updated_at: string
         }[]
       }
       get_theme_statistics: {

@@ -1,8 +1,6 @@
 
 import { nativeIntegrationService } from './nativeIntegrationService';
 import { nativeAuthService } from './nativeAuthService';
-import { enhancedPlatformService } from './enhancedPlatformService';
-import { SplashScreen } from '@capacitor/splash-screen';
 import { mobileErrorHandler } from './mobileErrorHandler';
 import { toast } from 'sonner';
 
@@ -27,68 +25,62 @@ class NativeAppInitService {
       return this.initializationPromise;
     }
 
-    this.initializationPromise = this.performInitialization().then(() => {
-      this.isInitialized = true;
-      return true;
-    }).catch(() => {
-      this.isInitialized = true; // Mark as initialized even if failed
-      return false;
-    });
+    this.initializationPromise = this.performInitialization();
     return this.initializationPromise;
   }
 
-  private async performInitialization(): Promise<void> {
+  private async performInitialization(): Promise<boolean> {
     try {
       console.log('[NativeAppInit] Starting native app initialization...');
-      
-      // Set timeout for native initialization to prevent hanging
-      const initTimeout = setTimeout(() => {
-        console.warn('[NativeAppInit] Initialization timeout reached, proceeding with basic setup');
-        this.isInitialized = true;
-      }, 3000); // 3 second timeout
-      
-      try {
-        // Initialize native integration service first
-        await nativeIntegrationService.initialize();
-        
-        // Check if we're actually running in a native environment
-        const isNative = nativeIntegrationService.isRunningNatively();
-        console.log('[NativeAppInit] Native environment detected:', isNative);
-        
-        if (isNative) {
-          // Initialize native-specific services with individual error handling
-          try {
-            await nativeAuthService.initialize();
-          } catch (authError) {
-            console.warn('[NativeAppInit] Native auth initialization failed (non-critical):', authError);
-          }
-          
-          // Set up native event listeners
-          try {
-            this.setupNativeEventListeners();
-          } catch (listenerError) {
-            console.warn('[NativeAppInit] Event listener setup failed (non-critical):', listenerError);
-          }
-          
-          // Configure native UI
-          try {
-            await this.configureNativeUI();
-          } catch (uiError) {
-            console.warn('[NativeAppInit] Native UI configuration failed (non-critical):', uiError);
-          }
+
+      // Step 1: Initialize native integration service
+      console.log('[NativeAppInit] Initializing native integration...');
+      await nativeIntegrationService.initialize();
+
+      // Step 2: Check if we're actually running natively
+      const isActuallyNative = nativeIntegrationService.isRunningNatively();
+      console.log('[NativeAppInit] Native environment detected:', isActuallyNative);
+
+      if (isActuallyNative) {
+        // Step 3: Initialize native auth service only if truly native
+        console.log('[NativeAppInit] Initializing native auth service...');
+        try {
+          await nativeAuthService.initialize();
+          console.log('[NativeAppInit] Native auth service initialized successfully');
+        } catch (authError) {
+          console.warn('[NativeAppInit] Native auth initialization failed (non-fatal):', authError);
+          mobileErrorHandler.handleError({
+            type: 'capacitor',
+            message: `Native auth init failed: ${authError}`,
+            context: 'nativeAppInit'
+          });
         }
-        
-        // Clear timeout if we completed successfully
-        clearTimeout(initTimeout);
-        console.log('[NativeAppInit] Native app initialization completed successfully');
-      } catch (error) {
-        clearTimeout(initTimeout);
-        throw error;
+
+        // Step 4: Setup native-specific event listeners
+        this.setupNativeEventListeners();
+
+        // Step 5: Configure native UI
+        await this.configureNativeUI();
+
+        console.log('[NativeAppInit] Skipping automatic permission requests - will be handled by user action');
+      } else {
+        console.log('[NativeAppInit] Running in web environment, skipping native-specific initialization');
       }
+
+      this.isInitialized = true;
+      console.log('[NativeAppInit] Native app initialization completed successfully');
+      return true;
+
     } catch (error) {
       console.error('[NativeAppInit] Native app initialization failed:', error);
-      // Don't throw the error - allow app to continue with limited functionality
-      console.warn('[NativeAppInit] Continuing with limited native functionality');
+      mobileErrorHandler.handleError({
+        type: 'crash',
+        message: `Native app init failed: ${error}`,
+        context: 'nativeAppInit'
+      });
+      
+      this.isInitialized = true;
+      return false;
     }
   }
 
@@ -141,57 +133,35 @@ class NativeAppInitService {
   private async configureNativeUI(): Promise<void> {
     try {
       console.log('[NativeAppInit] Configuring native UI...');
-      
-      // Show status bar with error handling
-      try {
-        await nativeIntegrationService.showStatusBar();
-      } catch (statusError) {
-        console.warn('[NativeAppInit] Status bar configuration failed:', statusError);
-      }
-      
-      // Hide splash screen with multiple fallback strategies and forced timeout
-      try {
-        // Set a forced timeout to hide splash screen regardless
-        const forceHide = setTimeout(() => {
-          console.warn('[NativeAppInit] Force hiding splash screen due to timeout');
-          SplashScreen.hide().catch(() => {
-            console.warn('[NativeAppInit] Force hide also failed, splash may remain visible');
-          });
-        }, 2000); // Force hide after 2 seconds
-        
+
+      // Configure status bar
+      await nativeIntegrationService.showStatusBar();
+
+      // Hide splash screen after initialization
+      const splashPlugin = nativeIntegrationService.getPlugin('SplashScreen');
+      if (splashPlugin) {
+        console.log('[NativeAppInit] Hiding splash screen...');
         try {
-          await SplashScreen.hide({
-            fadeOutDuration: 300
-          });
-          clearTimeout(forceHide);
-          console.log('[NativeAppInit] Splash screen hidden with animation');
-        } catch (splashError) {
-          console.warn('[NativeAppInit] Animated splash hide failed, trying basic hide:', splashError);
-          
-          // Fallback to basic hide
+          await splashPlugin.hide();
+          console.log('[NativeAppInit] Splash screen hidden successfully');
+        } catch (error) {
+          console.warn('[NativeAppInit] Failed to hide splash screen:', error);
           try {
-            await SplashScreen.hide();
-            clearTimeout(forceHide);
-            console.log('[NativeAppInit] Splash screen hidden (fallback)');
+            await splashPlugin.hide({ fadeOutDuration: 300 });
+            console.log('[NativeAppInit] Splash screen hidden with fadeOut');
           } catch (fallbackError) {
-            console.warn('[NativeAppInit] Basic splash hide failed, relying on timeout:', fallbackError);
-            // Let the timeout handle it
+            console.error('[NativeAppInit] Splash screen hide fallback also failed:', fallbackError);
           }
         }
-      } catch (error) {
-        console.warn('[NativeAppInit] All splash screen hide attempts failed:', error);
-        // Try one more time with a delay
-        setTimeout(() => {
-          SplashScreen.hide().catch(() => {
-            console.error('[NativeAppInit] Final splash screen hide attempt failed');
-          });
-        }, 1000);
       }
-      
-      console.log('[NativeAppInit] Native UI configuration completed');
+
     } catch (error) {
-      console.error('[NativeAppInit] Native UI configuration failed:', error);
-      // Don't throw - allow app to continue
+      console.warn('[NativeAppInit] Native UI configuration failed:', error);
+      mobileErrorHandler.handleError({
+        type: 'capacitor',
+        message: `Native UI config failed: ${error}`,
+        context: 'nativeAppInit'
+      });
     }
   }
 
