@@ -90,11 +90,11 @@ RESPONSE STRUCTURE TEMPLATE:
       messages.push({ role: 'user', content: optimizedUserPrompt });
 
       // Intelligent model selection based on performance mode and query complexity
-      let model = 'gpt-5-mini';
+      let model = 'gpt-4o-mini';
       let maxTokens = 600;
       
       if (performanceMode === 'quality' && isAnalytical) {
-        model = 'gpt-5';
+        model = 'gpt-4o';
         maxTokens = 1200;
       } else if (isAnalytical) {
         maxTokens = 800;
