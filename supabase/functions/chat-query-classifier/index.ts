@@ -87,23 +87,22 @@ async function gptClassifyMessage(
     ? `\nConversation context: ${conversationContext.slice(-6).map(msg => `${msg.role}: ${msg.content}`).join('\n')}`
     : '';
 
-  const classificationPrompt = `You are SOULo's chat query classifier for a therapeutic journaling companion named Ruh. Your job is to keep the conversation feeling natural and clinically-informed while routing to the most helpful pipeline. Use the recent conversation context to detect follow‑ups and preserve flow.
+  const classificationPrompt = `You are SOULo's chat query classifier. Classify the user's latest message while maintaining smooth 1-1 conversational flow.
 
 Categories:
-- JOURNAL_SPECIFIC: First‑person, personally analyzable questions about the user's own feelings/behaviors/patterns. Be generous—any concrete personal detail counts.
-- JOURNAL_SPECIFIC_NEEDS_CLARIFICATION: Personal but too vague to analyze; ask one precise follow‑up to unlock analysis.
-- GENERAL_MENTAL_HEALTH: Greetings, rapport, general tips/education, acknowledgements, or small talk within scope.
+- JOURNAL_SPECIFIC: Personal, analyzable questions about the user's feelings/behaviors/patterns. Be generous—any concrete personal detail counts.
+- JOURNAL_SPECIFIC_NEEDS_CLARIFICATION: Personal but too vague to analyze; ask one targeted follow-up.
+- GENERAL_MENTAL_HEALTH: General education/tips/resources, greetings/acknowledgements, small talk.
 - UNRELATED: Outside mental health/wellbeing/journaling.
 
 Core rules:
-1) Prefer JOURNAL_SPECIFIC for first‑person self‑reflection with any specific detail (even small). 
-2) Use JOURNAL_SPECIFIC_NEEDS_CLARIFICATION only if there is zero analyzable detail.
-3) Follow‑up continuity: if the message is a short reply (e.g., "yes", "tell me more", "go on", "what now?", "what should i do now?") and context shows ongoing personal analysis → set isFollowUp=true and maintainPreviousPipeline=true. If it seeks personal guidance, prefer JOURNAL_SPECIFIC (or _NEEDS_CLARIFICATION if still vague), not GENERAL_MENTAL_HEALTH.
-4) Pure etiquette/closure like "thanks", "ok", "cool" → GENERAL_MENTAL_HEALTH with maintainPreviousPipeline=false.
-5) shouldUseJournal = true for JOURNAL_SPECIFIC and when isFollowUp && maintainPreviousPipeline.
-6) useAllEntries = true if no timeframe is mentioned; else set timeScopeHint to one of: recent | last_week | this_month | last_month, and useAllEntries=false.
-7) journalHintStrength: "high" for strong first‑person introspection; "medium" for somewhat personal; "low" otherwise.
-8) If category is JOURNAL_SPECIFIC_NEEDS_CLARIFICATION, include exactly one short clarifyingQuestion (max 18 words) that unlocks analysis. Otherwise clarifyingQuestion=null.
+1) Prefer JOURNAL_SPECIFIC for first-person queries about the user's own state/patterns, even if slightly vague but with any specific detail.
+2) Use JOURNAL_SPECIFIC_NEEDS_CLARIFICATION only for extremely vague personal prompts with zero analyzable detail.
+3) Follow-up continuity: if the message is a short reply (e.g., "yes", "tell me more", "what should I do now?", "what do you think i should do now?") and recent context suggests ongoing personal analysis, set isFollowUp=true and maintainPreviousPipeline=true. If it asks for personal guidance, choose JOURNAL_SPECIFIC or JOURNAL_SPECIFIC_NEEDS_CLARIFICATION (not GENERAL_MENTAL_HEALTH).
+4) Pure small talk like "thanks", "ok", "cool" → GENERAL_MENTAL_HEALTH with maintainPreviousPipeline=false.
+5) shouldUseJournal = true for JOURNAL_SPECIFIC and also when isFollowUp && maintainPreviousPipeline.
+6) useAllEntries = true if personal question has no explicit timeframe; if timeframe is mentioned/implied (last week, this month, last month, recent), set useAllEntries=false and set timeScopeHint accordingly.
+7) journalHintStrength: "high" for strong first-person self-reflection; "medium" for somewhat personal; "low" otherwise.
 
 Return ONLY valid JSON matching this schema (no code fences):
 {
