@@ -143,6 +143,19 @@ class NativeAuthService {
         initializationError: this.initializationError
       });
 
+      // Ensure service is initialized before deciding path
+      if (!this.isInitialized) {
+        console.log('[NativeAuth] Not initialized yet - initializing now before sign-in');
+        await this.initialize();
+        console.log('[NativeAuth] Re-checking native availability after initialize', {
+          isRunningNatively: nativeIntegrationService.isRunningNatively(),
+          isGoogleAuthAvailable: nativeIntegrationService.isGoogleAuthAvailable(),
+          isInitialized: this.isInitialized,
+          hasValidClientId: this.hasValidClientId,
+          initializationError: this.initializationError
+        });
+      }
+
       if (this.shouldUseNativeAuth()) {
         console.log('[NativeAuth] Using native Google Sign-In - no browser redirects');
 
@@ -264,20 +277,8 @@ class NativeAuthService {
         return;
 
       } else {
-        console.log('[NativeAuth] Native auth not available - falling back to web OAuth');
-        const redirectUrl = 'online.soulo.twa://oauth/callback';
-        const { data, error } = await supabase.auth.signInWithOAuth({
-          provider: 'google',
-          options: { redirectTo: redirectUrl },
-        });
-        if (error) {
-          throw error;
-        }
-        if (data?.url) {
-          // Open the OAuth URL; Supabase will redirect back via our URL scheme
-          window.location.href = data.url;
-        }
-        return;
+        console.warn('[NativeAuth] Native auth not available after initialization - no web fallback will be used');
+        throw new Error('Native Google sign-in is not available. Please try again or contact support.');
       }
     } catch (error: any) {
       console.error('[NativeAuth] Google sign-in failed:', {
