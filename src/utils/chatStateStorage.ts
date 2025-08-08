@@ -46,10 +46,26 @@ export const getChatStreamingState = (threadId: string): ChatStreamingState | nu
     
     if (!state) return null;
     
-    // Check if state is expired
-    if (Date.now() - state.timestamp > STATE_EXPIRY_MS) {
+    // Check if state is expired (absolute cap)
+    const now = Date.now();
+    if (now - state.timestamp > STATE_EXPIRY_MS) {
       clearChatStreamingState(threadId);
       return null;
+    }
+
+    // Additional guard: if a streaming session exceeded its expected time by a grace period, treat it as stale
+    if (state.isStreaming && state.processingStartTime) {
+      const expected = state.expectedProcessingTime ?? 0;
+      const graceMs = expected > 0 ? 2 * 60 * 1000 : 5 * 60 * 1000; // 2m if we had an ETA, else 5m fallback
+      if (expected > 0 && now - state.processingStartTime > expected + graceMs) {
+        clearChatStreamingState(threadId);
+        return null;
+      }
+      // If no expected time provided, still avoid restoring very old in-progress sessions
+      if (expected === 0 && now - state.processingStartTime > graceMs) {
+        clearChatStreamingState(threadId);
+        return null;
+      }
     }
     
     return state;

@@ -564,6 +564,17 @@ export const useStreamingChat = ({ onFinalResponse, onError }: UseStreamingChatP
     const savedState = getChatStreamingState(threadId);
     if (!savedState) return false;
 
+    // If a prior session clearly exceeded its expected window, don't restore
+    if (
+      savedState.isStreaming &&
+      savedState.processingStartTime &&
+      savedState.expectedProcessingTime &&
+      Date.now() - savedState.processingStartTime > savedState.expectedProcessingTime + 2 * 60 * 1000
+    ) {
+      clearChatStreamingState(threadId);
+      return false;
+    }
+
     console.log('[StreamingChat] Restoring streaming state for thread:', threadId);
     
     setCurrentThreadId(threadId);
@@ -577,6 +588,39 @@ export const useStreamingChat = ({ onFinalResponse, onError }: UseStreamingChatP
     setQueryCategory(savedState.queryCategory);
     setExpectedProcessingTime(savedState.expectedProcessingTime || null);
     setProcessingStartTime(savedState.processingStartTime || null);
+
+    // Asynchronously validate against database to avoid restoring stale state
+    (async () => {
+      try {
+        const { data: msgs, error } = await supabase
+          .from('chat_messages')
+          .select('id,sender,is_processing,created_at')
+          .eq('thread_id', threadId)
+          .order('created_at', { ascending: false })
+          .limit(1);
+
+        if (error) {
+          console.warn('[StreamingChat] Validation query failed, keeping restored state temporarily:', error);
+          return;
+        }
+
+        const lastMsg: any | undefined = msgs?.[0];
+        const lastProcessing = lastMsg?.is_processing ?? false;
+
+        // If there is no message, or last message is not processing anymore -> clear stale UI
+        if (!lastMsg || !lastProcessing) {
+          console.log('[StreamingChat] Cleared stale streaming state after DB validation');
+          clearChatStreamingState(threadId);
+          setIsStreaming(false);
+          setShowBackendAnimation(false);
+          setUseThreeDotFallback(false);
+          setDynamicMessages([]);
+          setCurrentMessageIndex(0);
+        }
+      } catch (e) {
+        console.warn('[StreamingChat] DB validation threw, ignoring:', e);
+      }
+    })();
     
     return true;
   }, []);
