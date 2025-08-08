@@ -11,7 +11,7 @@ import { formatShortDate } from "@/utils/format-time";
 import { TranslatableText } from "@/components/translation/TranslatableText";
 import { TranslatableMarkdown } from "@/components/translation/TranslatableMarkdown";
 import TypingIndicator from "../TypingIndicator";
-import ParticleAvatar from "../ParticleAvatar";
+
 
 interface MobileChatMessageProps {
   message: {
@@ -78,7 +78,9 @@ const MobileChatMessage: React.FC<MobileChatMessageProps> = ({
         {/* Show avatar only when there's a streaming message with content */}
         {streamingMessage && (
           <div className="border border-primary/20 rounded-full">
-            <ParticleAvatar className="w-8 h-8" size={32} />
+            <Avatar className="w-8 h-8">
+              <AvatarFallback className="bg-muted text-muted-foreground">AI</AvatarFallback>
+            </Avatar>
           </div>
         )}
         
@@ -154,7 +156,9 @@ const MobileChatMessage: React.FC<MobileChatMessageProps> = ({
     >
       {displayRole === 'assistant' && (
         <div className="border border-primary/20 rounded-full">
-          <ParticleAvatar className="w-8 h-8" size={32} />
+          <Avatar className="w-8 h-8">
+            <AvatarFallback className="bg-muted text-muted-foreground">AI</AvatarFallback>
+          </Avatar>
         </div>
       )}
       

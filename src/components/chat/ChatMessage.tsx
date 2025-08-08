@@ -4,7 +4,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Card, CardContent } from '@/components/ui/card';
 import { User } from 'lucide-react';
 import { AnalysisMetadataCard } from './AnalysisMetadataCard';
-import ParticleAvatar from './ParticleAvatar';
+
 import { TranslatableMarkdown } from '@/components/translation/TranslatableMarkdown';
 import { TranslatableText } from '@/components/translation/TranslatableText';
 import ChatErrorBoundary from './ChatErrorBoundary';
@@ -48,9 +48,11 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({ message }) => {
   return (
     <div className={`flex gap-3 ${isUser ? 'justify-end' : 'justify-start'} mb-4`}>
       {!isUser && (
-        <div className="mt-1">
-          <ParticleAvatar className="h-8 w-8" size={32} />
-        </div>
+        <Avatar className="h-8 w-8 mt-1 border border-primary/20">
+          <AvatarFallback className="bg-muted text-muted-foreground">
+            AI
+          </AvatarFallback>
+        </Avatar>
       )}
 
       <div className={`max-w-[80%] ${isUser ? 'order-first' : ''}`}>
