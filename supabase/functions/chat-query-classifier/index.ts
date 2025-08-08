@@ -74,88 +74,73 @@ async function gptClassifyMessage(
   shouldUseJournal: boolean;
   reasoning: string;
   useAllEntries?: boolean;
+  // Optional enriched fields for downstream logic
+  recommendedPipeline?: 'general' | 'clarification' | 'rag_full';
+  isFollowUp?: boolean;
+  maintainPreviousPipeline?: boolean;
+  clarifyingQuestion?: string | null;
+  journalHintStrength?: 'low' | 'medium' | 'high';
+  timeScopeHint?: 'all' | 'recent' | 'last_week' | 'this_month' | 'last_month' | null;
 }> {
   
   const contextString = conversationContext.length > 0 
     ? `\nConversation context: ${conversationContext.slice(-6).map(msg => `${msg.role}: ${msg.content}`).join('\n')}`
     : '';
 
-  const classificationPrompt = `You're SOULo's conversation flow analyzer. Help me understand how to respond naturally to this user message.
+  const classificationPrompt = `You are SOULo's chat query classifier. Classify the user's latest message while maintaining smooth 1-1 conversational flow.
 
-**RESPONSE TYPES:**
+Categories:
+- JOURNAL_SPECIFIC: Personal, analyzable questions about the user's feelings/behaviors/patterns. Be generous—any concrete personal detail counts.
+- JOURNAL_SPECIFIC_NEEDS_CLARIFICATION: Personal but too vague to analyze; ask one targeted follow-up.
+- GENERAL_MENTAL_HEALTH: General education/tips/resources, greetings/acknowledgements, small talk.
+- UNRELATED: Outside mental health/wellbeing/journaling.
 
-1. **JOURNAL_SPECIFIC** - Specific, analyzable personal questions about their emotional patterns
-   - "How am I feeling about work lately?", "What are my stress patterns this month?"
-   - "Do you think meditation helped me?", "How have I been feeling the last few months?"
-   - "No, since last 2 months I've been fighting a lot. I'm not sure if meditating helped me overcome this anger I get"
-   - Clear, specific personal questions that can be effectively analyzed with journal data
+Core rules:
+1) Prefer JOURNAL_SPECIFIC for first-person queries about the user's own state/patterns, even if slightly vague but with any specific detail.
+2) Use JOURNAL_SPECIFIC_NEEDS_CLARIFICATION only for extremely vague personal prompts with zero analyzable detail.
+3) Follow-up continuity: if the message is a short reply (e.g., "yes", "tell me more", "what should I do now?", "what do you think i should do now?") and recent context suggests ongoing personal analysis, set isFollowUp=true and maintainPreviousPipeline=true. If it asks for personal guidance, choose JOURNAL_SPECIFIC or JOURNAL_SPECIFIC_NEEDS_CLARIFICATION (not GENERAL_MENTAL_HEALTH).
+4) Pure small talk like "thanks", "ok", "cool" → GENERAL_MENTAL_HEALTH with maintainPreviousPipeline=false.
+5) shouldUseJournal = true for JOURNAL_SPECIFIC and also when isFollowUp && maintainPreviousPipeline.
+6) useAllEntries = true if personal question has no explicit timeframe; if timeframe is mentioned/implied (last week, this month, last month, recent), set useAllEntries=false and set timeScopeHint accordingly.
+7) journalHintStrength: "high" for strong first-person self-reflection; "medium" for somewhat personal; "low" otherwise.
 
-2. **JOURNAL_SPECIFIC_NEEDS_CLARIFICATION** - Only truly vague personal questions needing follow-up
-   - "How am I?", "I need help", "I feel lost", "What's wrong with me?"
-   - Personal but extremely vague with no context to analyze
-   - **IMPORTANT**: Be selective - if there's ANY specific context or detail, use JOURNAL_SPECIFIC instead
-
-3. **GENERAL_MENTAL_HEALTH** - General wellness questions and conversational responses
-   - "How to manage anxiety?", "What are coping strategies?", "Tips for better sleep?"
-   - "Thanks!", "That's helpful", "Tell me more", "How are you?"
-   - Educational content, natural chat flow, greetings and follow-ups
-
-4. **UNRELATED** - Queries completely unrelated to journaling, mental health, or wellness
-   - Technical questions, random topics, unrelated requests
-   - When the query has nothing to do with the user's well-being or journal analysis
-   - "What's the weather?", "How to cook pasta?", "Tell me about history"
-
-**UPDATED CLASSIFICATION RULES - FAVOR JOURNAL_SPECIFIC:**
-- Any personal question with specific context or details = JOURNAL_SPECIFIC (be generous here)
-- Questions about personal feelings, behaviors, patterns = JOURNAL_SPECIFIC
-- Only use JOURNAL_SPECIFIC_NEEDS_CLARIFICATION for extremely vague questions with zero context
-- Educational/general questions and conversational responses = GENERAL_MENTAL_HEALTH
-- Completely unrelated topics = UNRELATED
-
-**UPDATED EXAMPLES:**
-- "How am I feeling about work?" → JOURNAL_SPECIFIC
-- "How have I been feeling the last few months?" → JOURNAL_SPECIFIC
-- "Do you think meditation helped me?" → JOURNAL_SPECIFIC
-- "I fight with my partner" → JOURNAL_SPECIFIC
-- "I've been fighting a lot lately" → JOURNAL_SPECIFIC
-- "How am I?" (with no context) → JOURNAL_SPECIFIC_NEEDS_CLARIFICATION
-- "I need help" (with no specifics) → JOURNAL_SPECIFIC_NEEDS_CLARIFICATION
-- "What is anxiety?" → GENERAL_MENTAL_HEALTH
-- "Thank you" → GENERAL_MENTAL_HEALTH
-- "Okay" → GENERAL_MENTAL_HEALTH
-- "What's the weather like?" → UNRELATED
-- "How do I cook pasta?" → UNRELATED
-
-User message: "${message}"${contextString}
-
-Respond with ONLY this JSON:
+Return ONLY valid JSON matching this schema (no code fences):
 {
   "category": "JOURNAL_SPECIFIC" | "JOURNAL_SPECIFIC_NEEDS_CLARIFICATION" | "GENERAL_MENTAL_HEALTH" | "UNRELATED",
-  "confidence": 0.0-1.0,
+  "confidence": number,
   "shouldUseJournal": boolean,
   "useAllEntries": boolean,
-  "reasoning": "Brief explanation"
-}`;
+  "reasoning": string,
+  "recommendedPipeline": "general" | "clarification" | "rag_full",
+  "isFollowUp": boolean,
+  "maintainPreviousPipeline": boolean,
+  "clarifyingQuestion": string | null,
+  "journalHintStrength": "low" | "medium" | "high",
+  "timeScopeHint": "all" | "recent" | "last_week" | "this_month" | "last_month" | null
+}
+
+User message: "${message}"${contextString}`;
 
   try {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 15000);
 
-    const response = await fetch('https://api.openai.com/v1/chat/completions', {
+    const response = await fetch('https://api.openai.com/v1/responses', {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${apiKey}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'gpt-4.1-mini-2025-04-14',
-        messages: [
-          { role: 'system', content: 'You are a strict JSON classifier. Respond with a single JSON object only. No code fences, no commentary.' },
-          { role: 'user', content: classificationPrompt }
+        model: 'gpt-5-mini-2025-08-07',
+        input: [
+          { role: 'system', content: [{ type: 'text', text: 'You are a strict JSON classifier. Respond with a single JSON object only that matches the provided schema. No code fences, no commentary.' }] },
+          { role: 'user', content: [{ type: 'text', text: classificationPrompt }] }
         ],
-        temperature: 0.1,
-        max_tokens: 300,
-        response_format: { type: 'json_object' }
+        temperature: 0.2,
+        max_output_tokens: 600,
+        response_format: { type: 'json_object' },
+        reasoning: { effort: 'medium' }
       }),
       signal: controller.signal
     });
@@ -167,9 +152,20 @@ Respond with ONLY this JSON:
     }
 
     const data = await response.json();
-    const content = data.choices[0]?.message?.content;
+    let content = '';
+    if (typeof data.output_text === 'string' && data.output_text.trim()) {
+      content = data.output_text;
+    } else if (Array.isArray(data.output)) {
+      content = data.output
+        .map((item: any) => (item?.content ?? [])
+          .map((c: any) => c?.text ?? '')
+          .join(''))
+        .join('');
+    } else if (Array.isArray(data.content)) {
+      content = data.content.map((c: any) => c?.text ?? '').join('');
+    }
 
-    if (!content) {
+    if (!content || !content.trim()) {
       throw new Error('No content in OpenAI response');
     }
 
@@ -196,12 +192,22 @@ Respond with ONLY this JSON:
       throw new Error('Invalid category in GPT response');
     }
 
+    console.log(`[Query Classifier] Meta: followUp=${!!result.isFollowUp}, maintainPipeline=${!!result.maintainPreviousPipeline}, pipeline=${result.recommendedPipeline || 'n/a'}, timeScope=${result.timeScopeHint || 'n/a'}`);
+
     return {
       category: result.category,
-      confidence: Math.max(0, Math.min(1, result.confidence ?? 0.8)),
-      shouldUseJournal: typeof result.shouldUseJournal === 'boolean' ? result.shouldUseJournal : result.category === 'JOURNAL_SPECIFIC',
+      confidence: Math.max(0, Math.min(1, result.confidence ?? 0.85)),
+      shouldUseJournal: typeof result.shouldUseJournal === 'boolean'
+        ? result.shouldUseJournal
+        : (result.category === 'JOURNAL_SPECIFIC' || (result.isFollowUp && result.maintainPreviousPipeline) || false),
       useAllEntries: !!result.useAllEntries,
-      reasoning: result.reasoning || 'GPT classification for conversational flow'
+      reasoning: result.reasoning || 'GPT classification for conversational flow',
+      recommendedPipeline: result.recommendedPipeline,
+      isFollowUp: result.isFollowUp,
+      maintainPreviousPipeline: result.maintainPreviousPipeline,
+      clarifyingQuestion: result.clarifyingQuestion ?? null,
+      journalHintStrength: result.journalHintStrength,
+      timeScopeHint: result.timeScopeHint ?? null
     };
 
   } catch (error) {

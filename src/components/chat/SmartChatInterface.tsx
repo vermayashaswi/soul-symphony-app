@@ -430,12 +430,8 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({
         });
       }
       
-      // Create a processing message placeholder
-      const processingMessageId = await createProcessingMessage(threadId, "Processing your request...");
-      
-      if (processingMessageId) {
-        debugLog.addEvent("Database", `Created processing message with ID: ${processingMessageId}`, "success");
-      }
+      // Initialize processing message placeholder (only created for non-journal queries)
+      let processingMessageId: string | null = null;
       
       // Use GPT-based query classification with conversation context
       debugLog.addEvent("Query Classification", `Classifying query: "${message.substring(0, 30)}${message.length > 30 ? '...' : ''}"`, "info");
@@ -459,8 +455,19 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({
       
       updateProcessingStage("Generating response...");
       
-      let response;
+      // Create processing placeholder only for non-journal-specific queries
+      if (queryClassification.category !== QueryCategory.JOURNAL_SPECIFIC) {
+        processingMessageId = await createProcessingMessage(threadId, "Processing your request...");
+        if (processingMessageId) {
+          debugLog.addEvent("Database", `Created processing message with ID: ${processingMessageId}`, "success");
+        }
+      } else if (processingMessageId) {
+        // Safety: if a placeholder exists, remove it for streaming path
+        await updateProcessingMessage(processingMessageId, null);
+        processingMessageId = null;
+      }
       
+      let response;
       // Route to appropriate edge function based on classification
       if (queryClassification.category === QueryCategory.JOURNAL_SPECIFIC) {
         debugLog.addEvent("Routing", "Using chat-with-rag for journal-specific query with streaming", "info");

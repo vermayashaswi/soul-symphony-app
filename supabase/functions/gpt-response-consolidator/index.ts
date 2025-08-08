@@ -209,23 +209,24 @@ serve(async (req) => {
     `;
 
     // Non-streaming response only
-    const response = await fetch('https://api.openai.com/v1/chat/completions', {
+    const response = await fetch('https://api.openai.com/v1/responses', {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${openAIApiKey}`,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          model: 'gpt-4.1-2025-04-14',
-          messages: [
+          model: 'gpt-5-2025-08-07',
+          input: [
             { 
               role: 'system', 
-              content: 'You are Ruh by SOuLO, a warm and insightful wellness coach. Provide thoughtful, data-driven responses based on journal analysis.' 
+              content: [{ type: 'text', text: 'You are Ruh by SOuLO, a warm and insightful wellness coach. Provide thoughtful, data-driven responses based on journal analysis.' }]
             },
-            { role: 'user', content: consolidationPrompt }
+            { role: 'user', content: [{ type: 'text', text: consolidationPrompt }] }
           ],
           temperature: 0.7,
-          max_tokens: 1500,
+          max_output_tokens: 1500,
+          reasoning: { effort: 'medium' },
           response_format: { type: 'json_object' },
         }),
     });
@@ -254,7 +255,18 @@ serve(async (req) => {
     }
 
     const data = await response.json();
-    const rawResponse = data?.choices?.[0]?.message?.content ?? '';
+    let rawResponse = '';
+    if (typeof data.output_text === 'string' && data.output_text.trim()) {
+      rawResponse = data.output_text;
+    } else if (Array.isArray(data.output)) {
+      rawResponse = data.output
+        .map((item: any) => (item?.content ?? [])
+          .map((c: any) => c?.text ?? '')
+          .join(''))
+        .join('');
+    } else if (Array.isArray(data.content)) {
+      rawResponse = data.content.map((c: any) => c?.text ?? '').join('');
+    }
 
     // Sanitize and extract consolidated response
     const sanitized = sanitizeConsolidatorOutput(rawResponse);

@@ -266,12 +266,14 @@ export default function MobileChatInterface({
       const chatMessages = await getThreadMessages(currentThreadId, user.id);
       
       if (chatMessages && chatMessages.length > 0) {
-        const uiMessages = chatMessages.map(msg => ({
-          role: msg.sender as 'user' | 'assistant',
-          content: msg.content,
-          references: msg.reference_entries ? Array.isArray(msg.reference_entries) ? msg.reference_entries : [] : undefined,
-          hasNumericResult: msg.has_numeric_result
-        }));
+        const uiMessages = chatMessages
+          .filter(msg => !msg.is_processing)
+          .map(msg => ({
+            role: msg.sender as 'user' | 'assistant',
+            content: msg.content,
+            references: msg.reference_entries ? Array.isArray(msg.reference_entries) ? msg.reference_entries : [] : undefined,
+            hasNumericResult: msg.has_numeric_result
+          }));
         
         setMessages(uiMessages);
         setShowSuggestions(false);
