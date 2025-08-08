@@ -153,7 +153,7 @@ Respond with ONLY this JSON:
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'gpt-5-mini',
+        model: 'gpt-4.1-mini-2025-04-14',
         messages: [{ role: 'user', content: classificationPrompt }],
         temperature: 0.1,
         max_tokens: 300,
