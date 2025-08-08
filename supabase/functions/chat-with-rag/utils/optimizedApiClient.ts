@@ -116,7 +116,7 @@ RESPONSE STRUCTURE TEMPLATE:
         // Convert chat messages to Responses API input format
         const input = messages.map((m: any) => ({
           role: m.role,
-          content: [{ type: 'input_text', text: m.content }]
+          content: [{ type: m.role === 'assistant' ? 'output_text' : 'input_text', text: m.content }]
         }));
         // Remove chat-specific params (like max_tokens, messages) and keep general tuning params
         const { max_tokens, messages: _ignoredMessages, temperature: _ignoredTemperature, ...restParams } = (requestParams as any);
