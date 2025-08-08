@@ -125,21 +125,22 @@ User message: "${message}"${contextString}`;
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 15000);
 
-    const response = await fetch('https://api.openai.com/v1/chat/completions', {
+    const response = await fetch('https://api.openai.com/v1/responses', {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${apiKey}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'gpt-4.1-2025-04-14',
-        messages: [
-          { role: 'system', content: 'You are a strict JSON classifier. Respond with a single JSON object only that matches the provided schema. No code fences, no commentary.' },
-          { role: 'user', content: classificationPrompt }
+        model: 'gpt-5-mini-2025-08-07',
+        input: [
+          { role: 'system', content: [{ type: 'text', text: 'You are a strict JSON classifier. Respond with a single JSON object only that matches the provided schema. No code fences, no commentary.' }] },
+          { role: 'user', content: [{ type: 'text', text: classificationPrompt }] }
         ],
         temperature: 0.2,
-        max_tokens: 600,
-        response_format: { type: 'json_object' }
+        max_output_tokens: 600,
+        response_format: { type: 'json_object' },
+        reasoning: { effort: 'medium' }
       }),
       signal: controller.signal
     });
@@ -151,9 +152,20 @@ User message: "${message}"${contextString}`;
     }
 
     const data = await response.json();
-    const content = data.choices[0]?.message?.content;
+    let content = '';
+    if (typeof data.output_text === 'string' && data.output_text.trim()) {
+      content = data.output_text;
+    } else if (Array.isArray(data.output)) {
+      content = data.output
+        .map((item: any) => (item?.content ?? [])
+          .map((c: any) => c?.text ?? '')
+          .join(''))
+        .join('');
+    } else if (Array.isArray(data.content)) {
+      content = data.content.map((c: any) => c?.text ?? '').join('');
+    }
 
-    if (!content) {
+    if (!content || !content.trim()) {
       throw new Error('No content in OpenAI response');
     }
 

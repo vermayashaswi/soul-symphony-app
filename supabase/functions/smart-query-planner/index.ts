@@ -166,7 +166,20 @@ async function retryOpenAICall(promptFunction: () => Promise<Response>, maxRetri
       }
       
       const data = await response.json();
-      return data.choices[0].message?.content || '{}';
+      if (typeof data.output_text === 'string' && data.output_text.trim()) {
+        return data.output_text;
+      }
+      if (Array.isArray(data.output)) {
+        return data.output
+          .map((item: any) => (item?.content ?? [])
+            .map((c: any) => c?.text ?? '')
+            .join(''))
+          .join('');
+      }
+      if (Array.isArray(data.content)) {
+        return data.content.map((c: any) => c?.text ?? '').join('');
+      }
+      return '{}';
       
     } catch (error) {
       lastError = error;
@@ -291,17 +304,22 @@ Return ONLY valid JSON:
 
 Focus on creating comprehensive analysis plans with mandatory sub-question generation.`;
 
-    const promptFunction = () => fetch("https://api.openai.com/v1/chat/completions", {
+    const promptFunction = () => fetch("https://api.openai.com/v1/responses", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
         "Authorization": `Bearer ${apiKey}`
       },
       body: JSON.stringify({
-        model: "gpt-4.1-2025-04-14",
-        messages: [{ role: "user", content: prompt }],
+        model: "gpt-5-2025-08-07",
+        input: [
+          { role: "system", content: [{ type: "text", text: "You are an expert analysis planner. Respond only with valid JSON." }] },
+          { role: "user", content: [{ type: "text", text: prompt }] }
+        ],
         temperature: 0.1,
-        max_tokens: 1000,
+        max_output_tokens: 1000,
+        reasoning: { effort: "medium" },
+        response_format: { type: "json_object" }
       })
     });
 

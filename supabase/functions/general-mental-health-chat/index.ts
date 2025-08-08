@@ -169,17 +169,18 @@ MUST HAVE/DO: ALWAYS BE AWARE OF THE CONVERSATION HISTORY TO UNDERSTAND WHAT THE
     // Add current message
     messages.push({ role: 'user', content: message });
 
-    const response = await fetch('https://api.openai.com/v1/chat/completions', {
+    const response = await fetch('https://api.openai.com/v1/responses', {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${openAiApiKey}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'gpt-4o-mini',
-        messages: messages,
-        max_tokens: 800,
+        model: 'gpt-5-mini-2025-08-07',
+        input: messages.map((m: any) => ({ role: m.role, content: [{ type: 'text', text: m.content }] })),
+        max_output_tokens: 800,
         temperature: 0.7,
+        reasoning: { effort: 'medium' }
       }),
     });
 
@@ -190,14 +191,24 @@ MUST HAVE/DO: ALWAYS BE AWARE OF THE CONVERSATION HISTORY TO UNDERSTAND WHAT THE
     }
 
     const data = await response.json();
-    
-    if (!data.choices || !data.choices[0] || !data.choices[0].message || !data.choices[0].message.content) {
+    let responseContent = '';
+    if (typeof data.output_text === 'string' && data.output_text.trim()) {
+      responseContent = data.output_text;
+    } else if (Array.isArray(data.output)) {
+      responseContent = data.output
+        .map((item: any) => (item?.content ?? [])
+          .map((c: any) => c?.text ?? '')
+          .join(''))
+        .join('');
+    } else if (Array.isArray(data.content)) {
+      responseContent = data.content.map((c: any) => c?.text ?? '').join('');
+    }
+
+    if (!responseContent || !responseContent.trim()) {
       console.error('[General Mental Health] Invalid OpenAI response structure:', data);
       throw new Error('Invalid response from OpenAI API');
     }
     
-    const responseContent = data.choices[0].message.content;
-
     console.log(`[General Mental Health] Generated response`);
 
     return new Response(

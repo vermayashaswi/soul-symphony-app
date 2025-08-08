@@ -80,25 +80,38 @@ Focus on extracting specific entities, emotions, or themes mentioned in the sub-
 `;
 
         try {
-          const response = await fetch('https://api.openai.com/v1/chat/completions', {
+          const response = await fetch('https://api.openai.com/v1/responses', {
             method: 'POST',
             headers: {
               'Authorization': `Bearer ${openAIApiKey}`,
               'Content-Type': 'application/json',
             },
             body: JSON.stringify({
-              model: 'gpt-4.1-mini-2025-04-14',
-              messages: [
-                { role: 'system', content: 'You are an expert analysis planner. Respond only with valid JSON.' },
-                { role: 'user', content: analysisPrompt }
+              model: 'gpt-5-2025-08-07',
+              input: [
+                { role: 'system', content: [{ type: 'text', text: 'You are an expert analysis planner. Respond only with valid JSON.' }] },
+                { role: 'user', content: [{ type: 'text', text: analysisPrompt }] }
               ],
               temperature: 0.3,
-              max_tokens: 500,
+              max_output_tokens: 500,
+              reasoning: { effort: 'medium' },
+              response_format: { type: 'json_object' }
             }),
           });
 
           const data = await response.json();
-          const planText = data.choices[0].message.content;
+          let planText = '';
+          if (typeof data.output_text === 'string' && data.output_text.trim()) {
+            planText = data.output_text;
+          } else if (Array.isArray(data.output)) {
+            planText = data.output
+              .map((item: any) => (item?.content ?? [])
+                .map((c: any) => c?.text ?? '')
+                .join(''))
+              .join('');
+          } else if (Array.isArray(data.content)) {
+            planText = data.content.map((c: any) => c?.text ?? '').join('');
+          }
           
           let analysisPlan;
           try {
