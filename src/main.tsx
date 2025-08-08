@@ -1,3 +1,5 @@
+// Import native boot FIRST so it runs as early as possible
+import '@/boot/nativeBoot';
 
 import React from 'react'
 import ReactDOM from 'react-dom/client'
