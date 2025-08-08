@@ -724,6 +724,10 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: Json
       }
+      create_profile_safe: {
+        Args: { p_user_id: string; p_email?: string; p_full_name?: string }
+        Returns: boolean
+      }
       debug_user_auth: {
         Args: { target_user_id: string }
         Returns: Json
@@ -799,6 +803,10 @@ export type Database = {
           description: string
           display_order: number
         }[]
+      }
+      get_authenticated_user_id: {
+        Args: Record<PropertyKey, never>
+        Returns: string
       }
       get_entity_emotion_statistics: {
         Args: {
