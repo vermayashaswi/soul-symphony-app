@@ -14,16 +14,19 @@ serve(async (req) => {
     return new Response(null, { headers: corsHeaders });
   }
 
+  // Parse body once to avoid re-reading on fallback
+  const body = await req.json().catch(() => null);
+  const message: string | undefined = body?.message;
+  const conversationContext: any[] = Array.isArray(body?.conversationContext) ? body.conversationContext : [];
+
+  if (!message) {
+    return new Response(
+      JSON.stringify({ error: 'Message is required' }),
+      { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
+    );
+  }
+
   try {
-    const { message, conversationContext = [] } = await req.json();
-
-    if (!message) {
-      return new Response(
-        JSON.stringify({ error: 'Message is required' }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
-      );
-    }
-
     console.log(`[Query Classifier] Analyzing message: "${message}"`);
 
     // Get OpenAI API key
@@ -48,21 +51,13 @@ serve(async (req) => {
     );
   } catch (error) {
     console.error('[Query Classifier] Error:', error);
-    
-    // Fallback to rule-based classification
-    try {
-      const { message } = await req.json();
-      const fallbackResult = enhancedRuleBasedClassification(message);
-      return new Response(
-        JSON.stringify({ ...fallbackResult, fallbackUsed: true }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    } catch (fallbackError) {
-      return new Response(
-        JSON.stringify({ error: 'Classification failed' }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 500 }
-      );
-    }
+
+    // Fallback to rule-based classification WITHOUT re-reading the body
+    const fallbackResult = enhancedRuleBasedClassification(message);
+    return new Response(
+      JSON.stringify({ ...fallbackResult, fallbackUsed: true }),
+      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    );
   }
 });
 
@@ -154,9 +149,13 @@ Respond with ONLY this JSON:
       },
       body: JSON.stringify({
         model: 'gpt-4.1-mini-2025-04-14',
-        messages: [{ role: 'user', content: classificationPrompt }],
+        messages: [
+          { role: 'system', content: 'You are a strict JSON classifier. Respond with a single JSON object only. No code fences, no commentary.' },
+          { role: 'user', content: classificationPrompt }
+        ],
         temperature: 0.1,
         max_tokens: 300,
+        response_format: { type: 'json_object' }
       }),
       signal: controller.signal
     });
@@ -176,8 +175,21 @@ Respond with ONLY this JSON:
 
     console.log(`[Query Classifier] GPT Response: ${content}`);
 
-    // Parse the JSON response
-    const result = JSON.parse(content);
+    // Helper to extract JSON from possible fenced or prefixed content
+    const extractJsonObject = (text: string): string => {
+      // ```json ... ```
+      const fenceMatch = text.match(/```(?:json)?\s*([\s\S]*?)\s*```/i);
+      if (fenceMatch) return fenceMatch[1].trim();
+      // First { ... last }
+      const start = text.indexOf('{');
+      const end = text.lastIndexOf('}');
+      if (start !== -1 && end !== -1 && end > start) return text.slice(start, end + 1).trim();
+      return text.trim();
+    };
+
+    // Parse the JSON response safely
+    const jsonString = extractJsonObject(content);
+    const result = JSON.parse(jsonString);
     
     // Validate the response
     if (!result.category || !['JOURNAL_SPECIFIC', 'JOURNAL_SPECIFIC_NEEDS_CLARIFICATION', 'GENERAL_MENTAL_HEALTH', 'UNRELATED'].includes(result.category)) {
@@ -186,9 +198,9 @@ Respond with ONLY this JSON:
 
     return {
       category: result.category,
-      confidence: Math.max(0, Math.min(1, result.confidence || 0.8)),
-      shouldUseJournal: result.category === 'JOURNAL_SPECIFIC',
-      useAllEntries: result.useAllEntries || false,
+      confidence: Math.max(0, Math.min(1, result.confidence ?? 0.8)),
+      shouldUseJournal: typeof result.shouldUseJournal === 'boolean' ? result.shouldUseJournal : result.category === 'JOURNAL_SPECIFIC',
+      useAllEntries: !!result.useAllEntries,
       reasoning: result.reasoning || 'GPT classification for conversational flow'
     };
 

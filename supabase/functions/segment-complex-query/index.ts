@@ -11,9 +11,14 @@ serve(async (req) => {
     return new Response(null, { headers: corsHeaders });
   }
 
-  try {
-    const { originalQuery, subQuestions, conversationContext = [], queryPlan } = await req.json();
+  // Read request body ONCE
+  const body = await req.json().catch(() => null);
+  const originalQuery: string | undefined = body?.originalQuery;
+  const subQuestions: string[] | undefined = body?.subQuestions;
+  const conversationContext: any[] = Array.isArray(body?.conversationContext) ? body.conversationContext : [];
+  const queryPlan = body?.queryPlan;
 
+  try {
     if (!originalQuery || !subQuestions) {
       return new Response(
         JSON.stringify({ error: 'Original query and sub-questions are required' }),
@@ -23,9 +28,10 @@ serve(async (req) => {
 
     const openAiApiKey = Deno.env.get('OPENAI_API_KEY');
     if (!openAiApiKey) {
+      console.warn('[Segment Complex Query] OPENAI_API_KEY missing. Returning original sub-questions.');
       return new Response(
-        JSON.stringify({ error: 'OpenAI API key not configured' }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 500 }
+        JSON.stringify({ subQuestions, reasoning: 'No OPENAI_API_KEY configured - returning original sub-questions' }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
@@ -71,9 +77,13 @@ Return a JSON object with this structure:
       },
       body: JSON.stringify({
         model: 'gpt-4o-mini',
-        messages: [{ role: 'user', content: prompt }],
+        messages: [
+          { role: 'system', content: 'Return a strict JSON object only. No code fences, no extra text.' },
+          { role: 'user', content: prompt }
+        ],
         temperature: 0.3,
         max_tokens: 800,
+        response_format: { type: 'json_object' }
       }),
     });
 
@@ -84,7 +94,7 @@ Return a JSON object with this structure:
     }
 
     const data = await response.json();
-    const content = data.choices[0]?.message?.content;
+    const content = data.choices[0]?.message?.content as string | undefined;
 
     if (!content) {
       throw new Error('No content in OpenAI response');
@@ -92,9 +102,19 @@ Return a JSON object with this structure:
 
     console.log(`[Segment Complex Query] GPT Response: ${content}`);
 
-    // Parse the JSON response
-    const result = JSON.parse(content);
-    
+    // Extract JSON safely from content
+    const extractJsonObject = (text: string): string => {
+      const fenceMatch = text.match(/```(?:json)?\s*([\s\S]*?)\s*```/i);
+      if (fenceMatch) return fenceMatch[1].trim();
+      const start = text.indexOf('{');
+      const end = text.lastIndexOf('}');
+      if (start !== -1 && end !== -1 && end > start) return text.slice(start, end + 1).trim();
+      return text.trim();
+    };
+
+    const jsonString = extractJsonObject(content);
+    const result = JSON.parse(jsonString);
+
     if (!result.subQuestions || !Array.isArray(result.subQuestions)) {
       throw new Error('Invalid response format from GPT');
     }
@@ -108,22 +128,14 @@ Return a JSON object with this structure:
 
   } catch (error) {
     console.error('[Segment Complex Query] Error:', error);
-    
-    // Fallback to original sub-questions
-    try {
-      const { subQuestions } = await req.json();
-      return new Response(
-        JSON.stringify({ 
-          subQuestions: subQuestions || [],
-          reasoning: 'Fallback due to processing error'
-        }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    } catch (fallbackError) {
-      return new Response(
-        JSON.stringify({ error: 'Failed to process query segmentation' }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 500 }
-      );
-    }
+
+    // Fallback to original sub-questions (avoid re-reading request body)
+    return new Response(
+      JSON.stringify({ 
+        subQuestions: subQuestions || [],
+        reasoning: 'Fallback due to processing error'
+      }),
+      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    );
   }
 });
