@@ -67,6 +67,9 @@ class NativeAppInitService {
         console.log('[NativeAppInit] Running in web environment, skipping native-specific initialization');
       }
 
+      // Safety: Always attempt to hide splash screen if plugin exists
+      await nativeIntegrationService.tryHideSplashScreenSafe();
+
       this.isInitialized = true;
       console.log('[NativeAppInit] Native app initialization completed successfully');
       return true;
