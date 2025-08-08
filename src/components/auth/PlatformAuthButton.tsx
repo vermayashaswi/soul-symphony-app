@@ -2,7 +2,7 @@ import React from 'react';
 import { Button } from '@/components/ui/button';
 import { TranslatableText } from '@/components/translation/TranslatableText';
 import { useIsMobile } from '@/hooks/use-mobile';
-import { signInWithGoogle, signInWithApple } from '@/services/authService';
+import { signInWithGoogle, signInWithApple, getRedirectUrl } from '@/services/authService';
 import { nativeIntegrationService } from '@/services/nativeIntegrationService';
 import { nativeAuthService } from '@/services/nativeAuthService';
 import { supabase } from '@/integrations/supabase/client';
@@ -69,12 +69,50 @@ const PlatformAuthButton: React.FC<PlatformAuthButtonProps> = ({
             userFriendlyMessage = 'Google sign-in is not available on this device.';
           }
 
-          // FIXED: Only show error toast for actual failures, not cancellations or success scenarios
+          // Only show error toast for actual failures, not cancellations
           if (shouldShowError) {
             onError(userFriendlyMessage);
             toast.error(userFriendlyMessage);
           }
-          throw nativeError;
+
+          // Do not fallback if user explicitly cancelled
+          if (nativeError.message?.includes('cancelled')) {
+            return;
+          }
+
+          // Fallback to web OAuth flow with correct redirect URL (supports native deep links)
+          console.log('[PlatformAuth] Falling back to web OAuth for Google');
+          try {
+            const redirectTo = getRedirectUrl();
+            const { data, error: oauthError } = await supabase.auth.signInWithOAuth({
+              provider: 'google',
+              options: {
+                redirectTo,
+                queryParams: {
+                  access_type: 'offline',
+                  prompt: 'consent',
+                },
+              },
+            });
+
+            if (oauthError) {
+              console.error('[PlatformAuth] Web OAuth fallback error:', oauthError);
+              throw oauthError;
+            }
+
+            if (data?.url) {
+              console.log('[PlatformAuth] Redirecting to OAuth URL:', data.url);
+              window.location.href = data.url;
+              return;
+            }
+
+            // If no URL returned, throw to outer catch
+            throw new Error('OAuth flow did not return a redirect URL');
+          } catch (fallbackError: any) {
+            console.error('[PlatformAuth] Fallback OAuth flow failed:', fallbackError);
+            // Re-throw to be handled by outer catch
+            throw fallbackError;
+          }
         }
       }
 
@@ -83,7 +121,7 @@ const PlatformAuthButton: React.FC<PlatformAuthButtonProps> = ({
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
-          redirectTo: `${window.location.origin}/app/auth`,
+          redirectTo: getRedirectUrl(),
           queryParams: {
             access_type: 'offline',
             prompt: 'consent',
