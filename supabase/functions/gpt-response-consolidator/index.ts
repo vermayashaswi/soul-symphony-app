@@ -92,14 +92,16 @@ serve(async (req) => {
       analysisResults, 
       conversationContext, 
       userProfile,
-      streamingMode = false 
+      streamingMode = false,
+      messageId 
     } = await req.json();
     
     console.log('GPT Response Consolidator called with:', { 
       userMessage: userMessage?.substring(0, 100),
       analysisResultsCount: analysisResults?.length || 0,
       contextCount: conversationContext?.length || 0,
-      streamingMode
+      streamingMode,
+      messageId
     });
 
     // Prepare analysis summary for GPT
@@ -225,7 +227,7 @@ serve(async (req) => {
             { role: 'user', content: [{ type: 'input_text', text: consolidationPrompt }] }
           ],
           max_output_tokens: 1500,
-          text: { format: "json" },
+          response_format: { type: "json_object" },
         }),
     });
 

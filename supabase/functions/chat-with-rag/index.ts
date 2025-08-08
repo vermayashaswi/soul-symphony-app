@@ -37,10 +37,11 @@ serve(async (req) => {
       userId: requestUserId, 
       conversationContext = [], 
       userProfile = {},
-      threadId
+      threadId,
+      messageId
     } = requestBody;
 
-    console.log(`[chat-with-rag] Processing query: "${message}" for user: ${requestUserId} (threadId: ${threadId || 'none'})`);
+    console.log(`[chat-with-rag] Processing query: "${message}" for user: ${requestUserId} (threadId: ${threadId || 'none'}, messageId: ${messageId || 'none'})`);
 
     // Check if streaming is enabled
     const enableStreaming = requestBody.streamingMode || false;
@@ -69,7 +70,7 @@ serve(async (req) => {
     const { data: classification, error: classificationError } = await supabaseClient.functions.invoke(
       'chat-query-classifier',
       {
-        body: { message, conversationContext, threadId }
+        body: { message, conversationContext, threadId, messageId }
       }
     );
 
@@ -122,7 +123,8 @@ serve(async (req) => {
             userMessage: message,
             conversationContext,
             userProfile,
-            threadId 
+            threadId,
+            messageId 
           }
         }
       );
@@ -161,7 +163,8 @@ serve(async (req) => {
               conversationContext,
               userProfile,
               timeRange: userProfile.timeRange || null,
-              threadId
+              threadId,
+              messageId
             }
           }
         );
@@ -203,7 +206,8 @@ serve(async (req) => {
               userMessage: message,
               userId: requestUserId,
               timeRange: normalizedTimeRange,
-              threadId
+              threadId,
+              messageId
             }
           }
         );
@@ -222,7 +226,8 @@ serve(async (req) => {
               conversationContext,
               userProfile,
               streamingMode: false,
-              threadId
+              threadId,
+              messageId
             }
           }
         );
@@ -346,7 +351,8 @@ async function processStreamingPipeline(
       userId: requestUserId, 
       conversationContext = [], 
       userProfile = {},
-      threadId
+      threadId,
+      messageId
     } = requestBody;
 
     // Step 1: Query classification with status updates (streaming mode)
@@ -356,7 +362,7 @@ async function processStreamingPipeline(
     const { data: classification, error: classificationError } = await supabaseClient.functions.invoke(
       'chat-query-classifier',
       {
-        body: { message, conversationContext, threadId }
+        body: { message, conversationContext, threadId, messageId }
       }
     );
     
@@ -414,7 +420,8 @@ async function processStreamingPipeline(
             userMessage: message,
             conversationContext,
             userProfile,
-            threadId 
+            threadId,
+            messageId 
           }
         }
       );
@@ -448,17 +455,18 @@ async function processStreamingPipeline(
       streamManager.sendBackendTask("query_planning", "Analyzing query structure and requirements");
       
       const { data: gptPlan, error: plannerError } = await supabaseClient.functions.invoke(
-        'smart-query-planner',
-        {
-          body: {
-            message,
-            userId: requestUserId,
-            conversationContext,
-            userProfile,
-            timeRange: userProfile.timeRange || null,
-            threadId
-          }
+      'smart-query-planner',
+      {
+        body: {
+          message,
+          userId: requestUserId,
+          conversationContext,
+          userProfile,
+          timeRange: userProfile.timeRange || null,
+          threadId,
+          messageId
         }
+      }
       );
       
       if (plannerError) {

@@ -317,7 +317,7 @@ Focus on creating comprehensive analysis plans with mandatory sub-question gener
           { role: "user", content: [{ type: "input_text", text: prompt }] }
         ],
         max_output_tokens: 1000,
-        text: { format: "json" }
+        response_format: { type: "json_object" }
       })
     });
 
@@ -829,7 +829,8 @@ serve(async (req) => {
       isFollowUp = false, 
       preserveTopicContext = false, 
       threadMetadata = {}, 
-      isAnalysisFollowUp = false 
+      isAnalysisFollowUp = false,
+      messageId = null 
     } = await req.json();
 
     if (!message || !userId) {
@@ -839,7 +840,7 @@ serve(async (req) => {
       );
     }
 
-    console.log(`[Smart Query Planner] Conversational analysis: "${message}"`);
+    console.log(`[Smart Query Planner] Conversational analysis: "${message}" (messageId: ${messageId || 'none'})`);
 
     // Get user's entry count for context
     const { count: userEntryCount } = await supabase

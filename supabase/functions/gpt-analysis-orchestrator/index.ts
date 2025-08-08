@@ -17,13 +17,14 @@ serve(async (req) => {
   }
 
   try {
-    const { subQuestions, userMessage, userId, timeRange } = await req.json();
+    const { subQuestions, userMessage, userId, timeRange, messageId } = await req.json();
     
     console.log('GPT Analysis Orchestrator called with:', { 
       subQuestionsCount: subQuestions?.length || 0,
       userMessage: userMessage?.substring(0, 100),
       userId,
-      timeRange 
+      timeRange,
+      messageId 
     });
 
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
@@ -93,7 +94,7 @@ Focus on extracting specific entities, emotions, or themes mentioned in the sub-
                 { role: 'user', content: [{ type: 'input_text', text: analysisPrompt }] }
               ],
               max_output_tokens: 500,
-              text: { format: "json" }
+              response_format: { type: "json_object" }
             }),
           });
 

@@ -138,7 +138,7 @@ User message: "${message}"${contextString}`;
             { role: 'user', content: [{ type: 'input_text', text: classificationPrompt }] }
           ],
           max_output_tokens: 600,
-          text: { format: "json" }
+          response_format: { type: "json_object" }
         }),
       signal: controller.signal
     });

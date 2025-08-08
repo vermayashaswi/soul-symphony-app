@@ -82,7 +82,7 @@ Return a JSON object with this structure:
           { role: 'user', content: [{ type: 'input_text', text: prompt }] }
         ],
         max_output_tokens: 800,
-        text: { format: 'json' }
+        response_format: { type: 'json_object' }
       }),
     });
 

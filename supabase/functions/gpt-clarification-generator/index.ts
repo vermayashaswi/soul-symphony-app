@@ -17,12 +17,14 @@ serve(async (req) => {
     const { 
       userMessage, 
       conversationContext,
-      userProfile 
+      userProfile,
+      messageId 
     } = await req.json();
     
     console.log('GPT Clarification Generator called with:', { 
       userMessage: userMessage?.substring(0, 100),
-      contextCount: conversationContext?.length || 0
+      contextCount: conversationContext?.length || 0,
+      messageId
     });
 
     const clarificationPrompt = `
@@ -94,7 +96,7 @@ TONE: Warm, grounded, spiritually aware but not preachy, genuinely caring, with 
             { role: 'user', content: [{ type: 'input_text', text: clarificationPrompt }] }
           ],
           max_output_tokens: 800,
-          text: { format: 'json' }
+          response_format: { type: 'json_object' }
         }),
     });
 
