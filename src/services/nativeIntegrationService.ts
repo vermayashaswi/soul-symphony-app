@@ -32,8 +32,14 @@ class NativeIntegrationService {
     try {
       if (this.isCapacitorAvailable()) {
         console.log('[NativeIntegration] Capacitor detected');
-        await this.initializeCapacitor();
+        // Detect platform first so we know if we're truly native
         await this.detectNativeEnvironment();
+        // Initialize Capacitor (plugins map, readiness)
+        await this.initializeCapacitor();
+        // Now that we know we're native and plugins are ready, init core plugins
+        if (this.isActuallyNative && this.isCapacitorReady) {
+          await this.initializeCorePlugins();
+        }
       } else {
         console.log('[NativeIntegration] Running in web environment');
       }
@@ -115,12 +121,7 @@ class NativeIntegrationService {
         this.isCapacitorReady = true;
 
         console.log('[NativeIntegration] Available Capacitor plugins:', Object.keys(this.plugins));
-
-        if (this.isActuallyNative) {
-          await this.initializeCorePlugins();
-        } else {
-          console.log('[NativeIntegration] Skipping native plugin initialization - running in web environment');
-        }
+        // Core plugin initialization is triggered after platform detection in initialize()
       }
     } catch (error) {
       console.error('[NativeIntegration] Capacitor initialization failed:', error);
@@ -307,17 +308,41 @@ class NativeIntegrationService {
 
   isRunningNatively(): boolean {
     const now = Date.now();
-    
-    // Use cached result if still valid
-    if (this._nativeCheckCache !== null && (now - this._nativeCheckTimestamp) < this.CACHE_DURATION) {
-      return this._nativeCheckCache;
+
+    // If we recently checked and it's true, trust cache
+    if (this._nativeCheckCache === true && (now - this._nativeCheckTimestamp) < this.CACHE_DURATION) {
+      return true;
     }
-    
+
+    // If cache is recent false, perform a quick platform probe to correct early false-negatives
+    if (this._nativeCheckCache === false && (now - this._nativeCheckTimestamp) < this.CACHE_DURATION) {
+      try {
+        const cap = (window as any).Capacitor;
+        const platform = cap?.getPlatform?.();
+        if (platform === 'ios' || platform === 'android') {
+          this._nativeCheckCache = true;
+          this._nativeCheckTimestamp = now;
+          console.log('[NativeIntegration] Native quick-probe corrected cached false to true');
+          return true;
+        }
+      } catch {}
+      return false;
+    }
+
     // Recalculate and cache
-    this._nativeCheckCache = this.isActuallyNative;
+    let detected = this.isActuallyNative;
+    try {
+      const cap = (window as any).Capacitor;
+      const platform = cap?.getPlatform?.();
+      if (platform === 'ios' || platform === 'android') {
+        detected = true;
+      }
+    } catch {}
+
+    this._nativeCheckCache = detected;
     this._nativeCheckTimestamp = now;
-    
-    console.log('[NativeIntegration] isRunningNatively check:', this._nativeCheckCache, '(cached)');
+
+    console.log('[NativeIntegration] isRunningNatively check:', this._nativeCheckCache, '(refreshed)');
     return this._nativeCheckCache;
   }
 
@@ -495,6 +520,29 @@ class NativeIntegrationService {
         console.error('[NativeIntegration] Failed to show status bar:', error);
         mobileErrorHandler.handleCapacitorError('StatusBar', error.toString());
       }
+    }
+  }
+
+  // Safety utility: try to hide splash screen regardless of native detection state
+  async tryHideSplashScreenSafe(): Promise<void> {
+    try {
+      const cap = (window as any).Capacitor;
+      const splash = cap?.Plugins?.SplashScreen;
+      if (splash?.hide) {
+        console.log('[NativeIntegration] Attempting to hide splash screen (safe)');
+        try {
+          await splash.hide();
+        } catch {
+          // try fadeOut if supported
+          try {
+            await splash.hide({ fadeOutDuration: 300 });
+          } catch (e) {
+            console.warn('[NativeIntegration] Safe splash hide failed:', e);
+          }
+        }
+      }
+    } catch (e) {
+      // no-op
     }
   }
 

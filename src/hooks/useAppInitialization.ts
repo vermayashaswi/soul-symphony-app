@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 import { journalReminderService } from '@/services/journalReminderService';
 import { initializeServiceWorker } from '@/utils/serviceWorker';
 import { enhancedPlatformService } from '@/services/enhancedPlatformService';
+import { nativeIntegrationService } from '@/services/nativeIntegrationService';
 
 interface AppInitializationState {
   isInitialized: boolean;
@@ -22,14 +23,24 @@ export const useAppInitialization = () => {
       try {
         console.log('[AppInit] Initializing app services...');
         
-        // Initialize service worker for background notifications
-        await initializeServiceWorker();
-        
         // Initialize platform detection
         await enhancedPlatformService.detectPlatform();
         
+        // Initialize native integration early to know environment
+        await nativeIntegrationService.initialize();
+        
+        // Initialize service worker only for web/PWA
+        if (!nativeIntegrationService.isRunningNatively()) {
+          await initializeServiceWorker();
+        } else {
+          console.log('[AppInit] Skipping service worker on native environment');
+        }
+        
         // Initialize journal reminder service
         await journalReminderService.initializeOnAppStart();
+        
+        // Safety: ensure splash screen is hidden if plugin exists
+        await nativeIntegrationService.tryHideSplashScreenSafe();
         
         console.log('[AppInit] App initialization completed');
         setState({
