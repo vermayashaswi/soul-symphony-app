@@ -366,21 +366,39 @@ class NativeIntegrationService {
   private _nativeCheckTimestamp: number = 0;
   private readonly CACHE_DURATION = 5000; // 5 seconds cache
 
-  isRunningNatively(): boolean {
-    const now = Date.now();
-    
-    // Use cached result if still valid
-    if (this._nativeCheckCache !== null && (now - this._nativeCheckTimestamp) < this.CACHE_DURATION) {
-      return this._nativeCheckCache;
-    }
-    
-    // Recalculate and cache
-    this._nativeCheckCache = this.isActuallyNative;
-    this._nativeCheckTimestamp = now;
-    
-    console.log('[NativeIntegration] isRunningNatively check:', this._nativeCheckCache, '(cached)');
+isRunningNatively(): boolean {
+  const now = Date.now();
+  
+  // Use cached result if still valid
+  if (this._nativeCheckCache !== null && (now - this._nativeCheckTimestamp) < this.CACHE_DURATION) {
     return this._nativeCheckCache;
   }
+  
+  // Recalculate with fallbacks
+  let result = this.isActuallyNative;
+
+  // Fallback 1: Capacitor platform check
+  try {
+    const cap = (window as any).Capacitor;
+    const platform = cap?.getPlatform?.();
+    if (!result && (platform === 'ios' || platform === 'android')) {
+      result = true;
+    }
+  } catch {}
+
+  // Fallback 2: Debug flag set by native boot
+  try {
+    if (!result && (window as any).__NATIVE__ === true) {
+      result = true;
+    }
+  } catch {}
+  
+  this._nativeCheckCache = result;
+  this._nativeCheckTimestamp = now;
+  
+  console.log('[NativeIntegration] isRunningNatively check:', result);
+  return result;
+}
 
   getPlatform(): string {
     if (this.isActuallyNative && this.isCapacitorReady) {

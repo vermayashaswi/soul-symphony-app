@@ -22,39 +22,45 @@ export const EmergencySplashManager: React.FC<EmergencySplashManagerProps> = ({
   const [emergencyHide, setEmergencyHide] = useState(false);
   const splashLogger = logger.createLogger('EmergencySplash');
 
-  useEffect(() => {
-    const isNative = nativeIntegrationService.isRunningNatively();
-    
-    splashLogger.info('EmergencySplashManager effect running', {
-      isNative,
-      isAppInitialized,
-      isSplashHidden,
-      emergencyHide,
-      userAgent: navigator.userAgent.substring(0, 100)
-    });
-    
-    if (!isNative) {
-      // Not a native app, no splash screen to manage
-      splashLogger.info('Not a native app - skipping splash screen management');
-      setIsSplashHidden(true);
-      return;
-    }
+useEffect(() => {
+  const isNative = nativeIntegrationService.isRunningNatively();
 
-    // Check if Capacitor and SplashScreen plugin are available
-    const hasCapacitor = !!(window as any).Capacitor;
-    const hasSplashScreen = !!(window as any).Capacitor?.Plugins?.SplashScreen;
-    
-    splashLogger.info('Capacitor availability check', {
-      hasCapacitor,
-      hasSplashScreen,
-      platform: hasCapacitor ? (window as any).Capacitor.getPlatform?.() : 'unknown'
-    });
+  // Detect plugin availability up front
+  const cap = (window as any).Capacitor;
+  const hasCapacitor = !!cap;
+  const hasSplashScreen = !!cap?.Plugins?.SplashScreen;
+  const platform = hasCapacitor ? cap.getPlatform?.() : 'unknown';
 
-    if (!hasCapacitor || !hasSplashScreen) {
-      splashLogger.warn('Capacitor or SplashScreen plugin not available - marking splash as hidden');
-      setIsSplashHidden(true);
-      return;
-    }
+  const shouldManage = Boolean(
+    hasSplashScreen ||
+    (platform === 'ios' || platform === 'android') ||
+    isNative
+  );
+  
+  splashLogger.info('EmergencySplashManager effect running', {
+    isNative,
+    isAppInitialized,
+    isSplashHidden,
+    emergencyHide,
+    hasCapacitor,
+    hasSplashScreen,
+    platform,
+    shouldManage,
+    userAgent: navigator.userAgent.substring(0, 100)
+  });
+  
+  if (!shouldManage) {
+    // No native splash to manage
+    splashLogger.info('No native splash to manage - marking as hidden');
+    setIsSplashHidden(true);
+    return;
+  }
+
+  if (!hasCapacitor || !hasSplashScreen) {
+    splashLogger.warn('Capacitor or SplashScreen plugin not available - marking splash as hidden');
+    setIsSplashHidden(true);
+    return;
+  }
 
     splashLogger.info('Managing emergency splash screen', { maxEmergencyTimeout });
 
@@ -149,8 +155,9 @@ export const EmergencySplashManager: React.FC<EmergencySplashManagerProps> = ({
     };
   }, [isAppInitialized, emergencyHide, isSplashHidden, maxEmergencyTimeout, splashLogger]);
 
-  // In native apps, don't render content until splash is handled
-  if (nativeIntegrationService.isRunningNatively() && !isSplashHidden) {
+  // In native apps (or when Splash plugin exists), don't render content until splash is handled
+  const hasSplashPlugin = typeof window !== 'undefined' && !!(window as any).Capacitor?.Plugins?.SplashScreen;
+  if ((nativeIntegrationService.isRunningNatively() || hasSplashPlugin) && !isSplashHidden) {
     return null;
   }
 
