@@ -89,9 +89,9 @@ TONE: Warm, grounded, spiritually aware but not preachy, genuinely caring, with 
           input: [
             { 
               role: 'system', 
-              content: [{ type: 'text', text: 'You are Ruh, the soul-centered wellness companion by SOuLO. You combine ancient wisdom with modern psychology to help people connect with their deepest truth and inner knowing.' }]
+              content: [{ type: 'input_text', text: 'You are Ruh, the soul-centered wellness companion by SOuLO. You combine ancient wisdom with modern psychology to help people connect with their deepest truth and inner knowing.' }]
             },
-            { role: 'user', content: [{ type: 'text', text: clarificationPrompt }] }
+            { role: 'user', content: [{ type: 'input_text', text: clarificationPrompt }] }
           ],
           temperature: 0.8,
           max_output_tokens: 800,

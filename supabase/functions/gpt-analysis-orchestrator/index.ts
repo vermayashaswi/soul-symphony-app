@@ -89,8 +89,8 @@ Focus on extracting specific entities, emotions, or themes mentioned in the sub-
             body: JSON.stringify({
               model: 'gpt-5-2025-08-07',
               input: [
-                { role: 'system', content: [{ type: 'text', text: 'You are an expert analysis planner. Respond only with valid JSON.' }] },
-                { role: 'user', content: [{ type: 'text', text: analysisPrompt }] }
+                { role: 'system', content: [{ type: 'input_text', text: 'You are an expert analysis planner. Respond only with valid JSON.' }] },
+                { role: 'user', content: [{ type: 'input_text', text: analysisPrompt }] }
               ],
               temperature: 0.3,
               max_output_tokens: 500,
