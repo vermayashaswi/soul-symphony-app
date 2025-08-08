@@ -31,7 +31,7 @@ You are Ruh by SOuLO, a brilliantly witty, non-judgmental mental health companio
 USER QUESTION: "${userMessage}"
 
 CONVERSATION CONTEXT:
-${conversationContext ? conversationContext.slice(-6).map((msg: any) => `${msg.sender}: ${msg.content}`).join('\n') : 'No prior context'}
+${conversationContext ? conversationContext.slice(-6).map((msg: any) => `${(msg.role || msg.sender || 'user')}: ${msg.content}`).join('\n') : 'No prior context'}
 
 USER PROFILE:
 - Timezone: ${userProfile?.timezone || 'Unknown'}
@@ -94,7 +94,6 @@ TONE: Warm, grounded, spiritually aware but not preachy, genuinely caring, with 
             { role: 'user', content: [{ type: 'input_text', text: clarificationPrompt }] }
           ],
           max_output_tokens: 800,
-          reasoning: { effort: 'medium' },
           response_format: { type: 'json_object' }
         }),
     });

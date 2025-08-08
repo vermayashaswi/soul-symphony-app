@@ -153,7 +153,7 @@ serve(async (req) => {
     ${JSON.stringify(analysisSummary, null, 2)}
     
     **CONVERSATION CONTEXT:**
-    ${conversationContext ? conversationContext.slice(-6).map((msg: any) => `${msg.sender}: ${msg.content}`).join('\n') : 'No prior context'}
+    ${conversationContext ? conversationContext.slice(-6).map((msg: any) => `${(msg.role || msg.sender || 'user')}: ${msg.content}`).join('\n') : 'No prior context'}
     
     **USER PROFILE:**
     - Timezone: ${userProfile?.timezone || 'Unknown'}
@@ -225,7 +225,6 @@ serve(async (req) => {
             { role: 'user', content: [{ type: 'input_text', text: consolidationPrompt }] }
           ],
           max_output_tokens: 1500,
-          reasoning: { effort: 'medium' },
           response_format: { type: 'json_object' },
         }),
     });

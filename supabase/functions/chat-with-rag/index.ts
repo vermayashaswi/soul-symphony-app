@@ -36,10 +36,11 @@ serve(async (req) => {
       message, 
       userId: requestUserId, 
       conversationContext = [], 
-      userProfile = {}
+      userProfile = {},
+      threadId
     } = requestBody;
 
-    console.log(`[chat-with-rag] Processing query: "${message}" for user: ${requestUserId}`);
+    console.log(`[chat-with-rag] Processing query: "${message}" for user: ${requestUserId} (threadId: ${threadId || 'none'})`);
 
     // Check if streaming is enabled
     const enableStreaming = requestBody.streamingMode || false;
@@ -68,7 +69,7 @@ serve(async (req) => {
     const { data: classification, error: classificationError } = await supabaseClient.functions.invoke(
       'chat-query-classifier',
       {
-        body: { message, conversationContext }
+        body: { message, conversationContext, threadId }
       }
     );
 
@@ -111,7 +112,8 @@ serve(async (req) => {
           body: { 
             userMessage: message,
             conversationContext,
-            userProfile 
+            userProfile,
+            threadId 
           }
         }
       );
@@ -149,7 +151,8 @@ serve(async (req) => {
               userId: requestUserId,
               conversationContext,
               userProfile,
-              timeRange: userProfile.timeRange || null
+              timeRange: userProfile.timeRange || null,
+              threadId
             }
           }
         );
@@ -181,7 +184,8 @@ serve(async (req) => {
               subQuestions: enhancedQueryPlan.subQuestions,
               userMessage: message,
               userId: requestUserId,
-              timeRange: enhancedQueryPlan.timeRange
+              timeRange: enhancedQueryPlan.timeRange,
+              threadId
             }
           }
         );
@@ -199,7 +203,8 @@ serve(async (req) => {
               analysisResults: analysisResults.analysisResults,
               conversationContext,
               userProfile,
-              streamingMode: false
+              streamingMode: false,
+              threadId
             }
           }
         );
@@ -210,8 +215,12 @@ serve(async (req) => {
 
         console.log('[chat-with-rag] Successfully completed GPT-driven analysis pipeline');
 
+        const finalResponse = (typeof consolidationResult?.response === 'string' && consolidationResult.response.trim())
+          ? consolidationResult.response
+          : "I couldn't synthesize a confident insight just now. Let's try again in a moment.";
+
         return new Response(JSON.stringify({
-          response: consolidationResult.response,
+          response: finalResponse,
           userStatusMessage: consolidationResult.userStatusMessage,
           analysis: {
             queryPlan: enhancedQueryPlan,
@@ -236,7 +245,7 @@ serve(async (req) => {
         const { data: generalResponse, error: generalError } = await supabaseClient.functions.invoke(
           'general-mental-health-chat',
           {
-            body: { message, conversationContext }
+            body: { message, conversationContext, threadId }
           }
         );
 
@@ -244,8 +253,12 @@ serve(async (req) => {
           throw new Error(`General mental health chat failed: ${generalError.message}`);
         }
 
+        const reply = (typeof generalResponse?.response === 'string' && generalResponse.response.trim())
+          ? generalResponse.response
+          : "I’m here to support your mental health journey. Could you share a bit more so I can respond meaningfully?";
+
         return new Response(JSON.stringify({
-          response: generalResponse.response,
+          response: reply,
           analysis: {
             queryType: 'general_mental_health',
             classification,
@@ -314,7 +327,8 @@ async function processStreamingPipeline(
       message, 
       userId: requestUserId, 
       conversationContext = [], 
-      userProfile = {}
+      userProfile = {},
+      threadId
     } = requestBody;
 
     // Step 1: Query classification with status updates (streaming mode)
@@ -324,7 +338,7 @@ async function processStreamingPipeline(
     const { data: classification, error: classificationError } = await supabaseClient.functions.invoke(
       'chat-query-classifier',
       {
-        body: { message, conversationContext }
+        body: { message, conversationContext, threadId }
       }
     );
     
@@ -369,7 +383,8 @@ async function processStreamingPipeline(
           body: { 
             userMessage: message,
             conversationContext,
-            userProfile 
+            userProfile,
+            threadId 
           }
         }
       );
@@ -410,7 +425,8 @@ async function processStreamingPipeline(
             userId: requestUserId,
             conversationContext,
             userProfile,
-            timeRange: userProfile.timeRange || null
+            timeRange: userProfile.timeRange || null,
+            threadId
           }
         }
       );
@@ -436,7 +452,8 @@ async function processStreamingPipeline(
             subQuestions: enhancedQueryPlan.subQuestions,
             userMessage: message,
             userId: requestUserId,
-            timeRange: enhancedQueryPlan.timeRange
+            timeRange: enhancedQueryPlan.timeRange,
+            threadId
           }
         }
       );
@@ -458,7 +475,8 @@ async function processStreamingPipeline(
             analysisResults: analysisResults.analysisResults,
             conversationContext,
             userProfile,
-            streamingMode: false
+            streamingMode: false,
+            threadId
           }
         }
       );

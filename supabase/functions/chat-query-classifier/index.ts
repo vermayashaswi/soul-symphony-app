@@ -84,7 +84,7 @@ async function gptClassifyMessage(
 }> {
   
   const contextString = conversationContext.length > 0 
-    ? `\nConversation context: ${conversationContext.slice(-6).map(msg => `${msg.role}: ${msg.content}`).join('\n')}`
+    ? `\nConversation context: ${conversationContext.slice(-6).map(msg => `${(msg.role || msg.sender || 'user')}: ${msg.content}`).join('\n')}`
     : '';
 
   const classificationPrompt = `You are SOULo's chat query classifier. Classify the user's latest message while maintaining smooth 1-1 conversational flow.
@@ -138,8 +138,7 @@ User message: "${message}"${contextString}`;
             { role: 'user', content: [{ type: 'input_text', text: classificationPrompt }] }
           ],
           max_output_tokens: 600,
-          response_format: { type: 'json_object' },
-          reasoning: { effort: 'medium' }
+          response_format: { type: 'json_object' }
         }),
       signal: controller.signal
     });
