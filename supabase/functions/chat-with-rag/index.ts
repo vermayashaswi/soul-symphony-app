@@ -84,9 +84,18 @@ serve(async (req) => {
 
     console.log(`[chat-with-rag] Query classified as: ${classification.category} (confidence: ${classification.confidence})`);
     
+    // Heuristic override for obvious journal-specific queries
+    const lowerMsg = (message || '').toLowerCase();
+    const personalLikely = /\b(i|me|my|mine|myself)\b/i.test(lowerMsg);
+    const temporalLikely = /\b(last week|last month|this week|this month|today|yesterday|recently|lately)\b/i.test(lowerMsg);
+    const journalHints = /\b(journal|entry|entries|log|logged)\b/i.test(lowerMsg);
+    if (classification.category === 'GENERAL_MENTAL_HEALTH' && ((personalLikely && temporalLikely) || journalHints)) {
+      console.warn('[chat-with-rag] OVERRIDE: Forcing JOURNAL_SPECIFIC due to personal+temporal/journal hints');
+      classification.category = 'JOURNAL_SPECIFIC';
+    }
+    
     // Cache the classification to prevent inconsistencies
     cachedClassification = classification;
-
     // Handle unrelated queries with polite denial
     if (cachedClassification.category === 'UNRELATED') {
       console.log('[chat-with-rag] EXECUTING: UNRELATED pipeline - polite denial');
@@ -352,6 +361,18 @@ async function processStreamingPipeline(
     }
 
     console.log(`[chat-with-rag] STREAMING: Query classified as: ${classification.category} (confidence: ${classification.confidence})`);
+
+    // Heuristic override for obvious journal-specific queries (streaming)
+    {
+      const lowerMsg = (message || '').toLowerCase();
+      const personalLikely = /\b(i|me|my|mine|myself)\b/i.test(lowerMsg);
+      const temporalLikely = /\b(last week|last month|this week|this month|today|yesterday|recently|lately)\b/i.test(lowerMsg);
+      const journalHints = /\b(journal|entry|entries|log|logged)\b/i.test(lowerMsg);
+      if (classification.category === 'GENERAL_MENTAL_HEALTH' && ((personalLikely && temporalLikely) || journalHints)) {
+        console.warn('[chat-with-rag] STREAMING OVERRIDE: Forcing JOURNAL_SPECIFIC due to personal+temporal/journal hints');
+        classification.category = 'JOURNAL_SPECIFIC';
+      }
+    }
 
     // Handle unrelated queries in streaming mode
     if (classification.category === 'UNRELATED') {

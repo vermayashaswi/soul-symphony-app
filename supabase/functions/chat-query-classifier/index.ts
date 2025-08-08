@@ -132,7 +132,7 @@ User message: "${message}"${contextString}`;
         'Content-Type': 'application/json',
       },
         body: JSON.stringify({
-          model: 'gpt-5-mini-2025-08-07',
+          model: 'gpt-5-mini',
           input: [
             { role: 'system', content: [{ type: 'input_text', text: 'You are a strict JSON classifier. Respond with a single JSON object only that matches the provided schema. No code fences, no commentary.' }] },
             { role: 'user', content: [{ type: 'input_text', text: classificationPrompt }] }
@@ -250,19 +250,33 @@ function enhancedRuleBasedClassification(message: string): {
     }
   }
   
+  // Strong personal + timeframe detection
+  const hasMy = /\bmy\b/i.test(lowerMessage);
+  const hasTemporalReference = /\b(last week|last month|this week|this month|today|yesterday|recently|lately)\b/i.test(lowerMessage);
+  if (hasMy && hasTemporalReference) {
+    console.log(`[Rule-Based] PERSONAL + TIMEFRAME detected`);
+    return {
+      category: "JOURNAL_SPECIFIC",
+      confidence: 0.9,
+      shouldUseJournal: true,
+      useAllEntries: false,
+      reasoning: "Personal pronoun with explicit timeframe"
+    };
+  }
+  
   // Specific personal pronouns = JOURNAL_SPECIFIC
   const personalPatterns = [
-    /\b(i|me|my|mine|myself)\b.*\b(work|stress|feel|emotion|mood|relationship)\b/i,
+    /\b(i|me|my|mine|myself)\b.*\b(work|stress|feel|feeling|feelings|emotion|emotions|mood|moods|relationship|journal|entries|pattern|patterns?|theme|themes?)\b/i,
     /\bam i\b.*\b(good|bad|better|worse|okay)\b/i,
     /\bhow (am i|was i).*\b(lately|recently|today|this week|this month)\b/i,
     /\bwhat makes me\b/i,
     /\bwhen do i\b/i,
-    /\bwhy do i\b/i
+    /\bwhy do i\b/i,
+    /\bmy\s+(top|common|most|biggest)\s+(emotions?|moods?|themes?)\b/i
   ];
   
   for (const pattern of personalPatterns) {
     if (pattern.test(lowerMessage)) {
-      const hasTemporalReference = /\b(last week|yesterday|this week|last month|today|recently|lately)\b/i.test(lowerMessage);
       const useAllEntries = !hasTemporalReference;
       
       console.log(`[Rule-Based] SPECIFIC PERSONAL - UseAllEntries: ${useAllEntries}`);

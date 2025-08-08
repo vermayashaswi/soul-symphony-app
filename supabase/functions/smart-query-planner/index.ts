@@ -311,7 +311,7 @@ Focus on creating comprehensive analysis plans with mandatory sub-question gener
         "Authorization": `Bearer ${apiKey}`
       },
       body: JSON.stringify({
-        model: "gpt-5-2025-08-07",
+        model: "gpt-5-mini",
         input: [
           { role: "system", content: [{ type: "input_text", text: "You are an expert analysis planner. Respond only with valid JSON." }] },
           { role: "user", content: [{ type: "input_text", text: prompt }] }

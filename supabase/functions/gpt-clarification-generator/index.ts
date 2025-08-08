@@ -85,7 +85,7 @@ TONE: Warm, grounded, spiritually aware but not preachy, genuinely caring, with 
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          model: 'gpt-5-mini-2025-08-07',
+          model: 'gpt-5-mini',
           input: [
             { 
               role: 'system', 
@@ -94,7 +94,7 @@ TONE: Warm, grounded, spiritually aware but not preachy, genuinely caring, with 
             { role: 'user', content: [{ type: 'input_text', text: clarificationPrompt }] }
           ],
           max_output_tokens: 800,
-          response_format: { type: 'json_object' }
+          text: { format: 'json' }
         }),
     });
 

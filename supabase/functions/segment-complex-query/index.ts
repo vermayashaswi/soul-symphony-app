@@ -76,7 +76,7 @@ Return a JSON object with this structure:
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'gpt-5-mini-2025-08-07',
+        model: 'gpt-5-mini',
         input: [
           { role: 'system', content: [{ type: 'input_text', text: 'Return a strict JSON object only. No code fences, no extra text.' }] },
           { role: 'user', content: [{ type: 'input_text', text: prompt }] }

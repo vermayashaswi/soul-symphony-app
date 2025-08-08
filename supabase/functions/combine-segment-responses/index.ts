@@ -85,7 +85,7 @@ Generate a comprehensive response that feels like a single, thoughtful analysis 
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'gpt-5-mini-2025-08-07',
+        model: 'gpt-5-mini',
         input: [
           { role: 'user', content: [{ type: 'input_text', text: prompt }] }
         ],
