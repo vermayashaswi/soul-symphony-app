@@ -227,7 +227,7 @@ serve(async (req) => {
             { role: 'user', content: [{ type: 'input_text', text: consolidationPrompt }] }
           ],
           max_output_tokens: 1500,
-          response_format: { type: "json_object" },
+          text: { format: 'json' },
         }),
     });
 

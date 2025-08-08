@@ -96,7 +96,7 @@ TONE: Warm, grounded, spiritually aware but not preachy, genuinely caring, with 
             { role: 'user', content: [{ type: 'input_text', text: clarificationPrompt }] }
           ],
           max_output_tokens: 800,
-          response_format: { type: 'json_object' }
+          text: { format: 'json' }
         }),
     });
 

@@ -94,7 +94,7 @@ Focus on extracting specific entities, emotions, or themes mentioned in the sub-
                 { role: 'user', content: [{ type: 'input_text', text: analysisPrompt }] }
               ],
               max_output_tokens: 500,
-              response_format: { type: "json_object" }
+              text: { format: 'json' }
             }),
           });
 
