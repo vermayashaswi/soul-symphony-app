@@ -44,6 +44,8 @@ function AuthProviderCore({ children }: { children: ReactNode }) {
   const [authStateStable, setAuthStateStable] = useState(false);
   const location = useLocation();
 
+  useEffect(() => {
+    const initializeNativeServices = async () => {
       try {
         console.log('[AuthContext] Initializing native services');
         await nativeIntegrationService.initialize();
