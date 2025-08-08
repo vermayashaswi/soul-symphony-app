@@ -166,20 +166,9 @@ async function retryOpenAICall(promptFunction: () => Promise<Response>, maxRetri
       }
       
       const data = await response.json();
-      if (typeof data.output_text === 'string' && data.output_text.trim()) {
-        return data.output_text;
-      }
-      if (Array.isArray(data.output)) {
-        return data.output
-          .map((item: any) => (item?.content ?? [])
-            .map((c: any) => c?.text ?? '')
-            .join(''))
-          .join('');
-      }
-      if (Array.isArray(data.content)) {
-        return data.content.map((c: any) => c?.text ?? '').join('');
-      }
-      return '{}';
+      const content = data?.choices?.[0]?.message?.content ?? '';
+      return content;
+
       
     } catch (error) {
       lastError = error;
@@ -304,20 +293,20 @@ Return ONLY valid JSON:
 
 Focus on creating comprehensive analysis plans with mandatory sub-question generation.`;
 
-    const promptFunction = () => fetch("https://api.openai.com/v1/responses", {
+    const promptFunction = () => fetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
         "Authorization": `Bearer ${apiKey}`
       },
       body: JSON.stringify({
-        model: "gpt-5-mini",
-        input: [
-          { role: "system", content: [{ type: "input_text", text: "You are an expert analysis planner. Respond only with valid JSON." }] },
-          { role: "user", content: [{ type: "input_text", text: prompt }] }
+        model: "gpt-4.1-2025-04-14",
+        messages: [
+          { role: "system", content: "You are an expert analysis planner. Respond only with valid JSON." },
+          { role: "user", content: prompt }
         ],
-        max_output_tokens: 1000,
-        text: { format: 'json' }
+        response_format: { type: 'json_object' },
+        max_tokens: 1000
       })
     });
 

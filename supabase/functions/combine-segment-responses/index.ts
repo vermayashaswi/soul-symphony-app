@@ -78,18 +78,18 @@ Guidelines:
 
 Generate a comprehensive response that feels like a single, thoughtful analysis rather than separate pieces.`;
 
-    const response = await fetch('https://api.openai.com/v1/responses', {
+    const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${openAiApiKey}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'gpt-5-mini',
-        input: [
-          { role: 'user', content: [{ type: 'input_text', text: prompt }] }
+        model: 'gpt-4.1-2025-04-14',
+        messages: [
+          { role: 'user', content: prompt }
         ],
-        max_output_tokens: 1200,
+        max_tokens: 1200
       }),
     });
 
@@ -100,18 +100,8 @@ Generate a comprehensive response that feels like a single, thoughtful analysis 
     }
 
     const data = await response.json();
-    let combinedResponse = '';
-    if (typeof data.output_text === 'string' && data.output_text.trim()) {
-      combinedResponse = data.output_text;
-    } else if (Array.isArray(data.output)) {
-      combinedResponse = data.output
-        .map((item: any) => (item?.content ?? [])
-          .map((c: any) => c?.text ?? '')
-          .join(''))
-        .join('');
-    } else if (Array.isArray(data.content)) {
-      combinedResponse = data.content.map((c: any) => c?.text ?? '').join('');
-    }
+    let combinedResponse = data?.choices?.[0]?.message?.content ?? '';
+
 
     if (!combinedResponse) {
       throw new Error('No content in OpenAI response');
