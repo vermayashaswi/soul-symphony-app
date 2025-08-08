@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { useNonBlockingRevenueCat } from '@/hooks/useNonBlockingRevenueCat';
+import { useRevenueCat } from '@/hooks/useRevenueCat';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -16,15 +16,15 @@ const SubscriptionManager: React.FC<SubscriptionManagerProps> = ({ className = '
     isInitialized,
     purchaserInfo,
     products,
-    isInitializing,
+    isLoading,
     isPremium,
     isTrialActive,
     trialEndDate,
-    
+    daysRemainingInTrial,
     purchaseProduct,
     restorePurchases,
     checkTrialEligibility
-  } = useNonBlockingRevenueCat();
+  } = useRevenueCat();
 
   const [isEligibleForTrial, setIsEligibleForTrial] = React.useState<boolean | null>(null);
 
@@ -47,7 +47,7 @@ const SubscriptionManager: React.FC<SubscriptionManagerProps> = ({ className = '
     }
   };
 
-  if (!isInitialized || isInitializing) {
+  if (!isInitialized || isLoading) {
     return (
       <Card className={className}>
         <CardHeader>
@@ -77,9 +77,9 @@ const SubscriptionManager: React.FC<SubscriptionManagerProps> = ({ className = '
           <div className="space-y-4">
             <div className="flex items-center gap-2">
               <Clock className="h-4 w-4 text-muted-foreground" />
-               <span className="text-sm">
-                 {trialEndDate ? Math.ceil((trialEndDate.getTime() - Date.now()) / (1000 * 60 * 60 * 24)) : 0} days remaining in your trial
-               </span>
+              <span className="text-sm">
+                {daysRemainingInTrial} days remaining in your trial
+              </span>
             </div>
             
             {trialEndDate && (
@@ -143,21 +143,21 @@ const SubscriptionManager: React.FC<SubscriptionManagerProps> = ({ className = '
               
               <div className="flex gap-2">
                 {isEligibleForTrial && (
-                   <Button 
-                     onClick={handleStartTrial}
-                     disabled={isInitializing}
-                     className="flex-1"
-                   >
+                  <Button 
+                    onClick={handleStartTrial}
+                    disabled={isLoading}
+                    className="flex-1"
+                  >
                     Start Free Trial
                   </Button>
                 )}
                 
-                 <Button 
-                   variant="outline" 
-                   onClick={restorePurchases}
-                   disabled={isInitializing}
-                   className="flex items-center gap-2"
-                 >
+                <Button 
+                  variant="outline" 
+                  onClick={restorePurchases}
+                  disabled={isLoading}
+                  className="flex items-center gap-2"
+                >
                   <RefreshCw className="h-4 w-4" />
                   Restore
                 </Button>

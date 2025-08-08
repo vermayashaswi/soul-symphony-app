@@ -21,32 +21,10 @@ serve(async (req) => {
   try {
     console.log('RevenueCat initialization request received');
     
-    // Create authenticated client using the JWT token from the request
-    const authHeader = req.headers.get('Authorization');
-    let supabase;
-    
-    if (authHeader && authHeader.startsWith('Bearer ')) {
-      // Use the user's JWT token for authenticated context
-      console.log('Using authenticated context for user operations');
-      supabase = createClient(
-        Deno.env.get('SUPABASE_URL') ?? '',
-        Deno.env.get('SUPABASE_ANON_KEY') ?? '',
-        {
-          global: {
-            headers: {
-              Authorization: authHeader,
-            },
-          },
-        }
-      );
-    } else {
-      // Fallback to service role for non-authenticated operations
-      console.log('Using service role for fallback operations');
-      supabase = createClient(
-        Deno.env.get('SUPABASE_URL') ?? '',
-        Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
-      );
-    }
+    const supabase = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
+    );
 
     const { userId, platform, getApiKeyOnly }: InitRequest = await req.json();
     
@@ -79,81 +57,49 @@ serve(async (req) => {
 
     console.log(`Initializing RevenueCat for user: ${userId}, platform: ${platform}`);
 
-    // Get or create RevenueCat customer with better error handling
-    let customer = null;
-    try {
-      const { data: existingCustomer, error: customerError } = await supabase
-        .from('revenuecat_customers')
-        .select('*')
-        .eq('user_id', userId)
-        .single();
+    // Get or create RevenueCat customer
+    let { data: customer, error: customerError } = await supabase
+      .from('revenuecat_customers')
+      .select('*')
+      .eq('user_id', userId)
+      .single();
 
-      if (customerError && customerError.code !== 'PGRST116') {
-        console.error('Error fetching customer:', customerError);
-        // Don't throw - continue with fallback
-      } else {
-        customer = existingCustomer;
-      }
-
-      if (!customer) {
-        console.log('Creating new RevenueCat customer');
-        const { data: newCustomer, error: createError } = await supabase
-          .from('revenuecat_customers')
-          .insert({
-            user_id: userId,
-            revenuecat_user_id: userId, // Use user ID as customer ID
-            platform: platform,
-            app_store_country: platform === 'ios' ? 'US' : null,
-            play_store_country: platform === 'android' ? 'US' : null,
-          })
-          .select()
-          .single();
-
-        if (createError) {
-          console.error('Error creating customer:', createError);
-          // Don't throw - use fallback customer data
-          customer = {
-            id: userId,
-            user_id: userId,
-            revenuecat_user_id: userId,
-            platform: platform,
-            app_store_country: platform === 'ios' ? 'US' : null,
-            play_store_country: platform === 'android' ? 'US' : null,
-          };
-        } else {
-          customer = newCustomer;
-        }
-      }
-    } catch (error) {
-      console.error('Customer operations failed, using fallback:', error);
-      customer = {
-        id: userId,
-        user_id: userId,
-        revenuecat_user_id: userId,
-        platform: platform,
-        app_store_country: platform === 'ios' ? 'US' : null,
-        play_store_country: platform === 'android' ? 'US' : null,
-      };
+    if (customerError && customerError.code !== 'PGRST116') {
+      console.error('Error fetching customer:', customerError);
+      throw customerError;
     }
 
-    // Check for existing active subscriptions with error handling
-    let subscriptions = [];
-    try {
-      const { data: subs, error: subsError } = await supabase
-        .from('revenuecat_subscriptions')
-        .select('*')
-        .eq('customer_id', customer.id)
-        .eq('status', 'active');
+    if (!customer) {
+      console.log('Creating new RevenueCat customer');
+      const { data: newCustomer, error: createError } = await supabase
+        .from('revenuecat_customers')
+        .insert({
+          user_id: userId,
+          revenuecat_customer_id: userId, // Use user ID as customer ID
+          platform: platform,
+          app_store_country: platform === 'ios' ? 'US' : null,
+          play_store_country: platform === 'android' ? 'US' : null,
+        })
+        .select()
+        .single();
 
-      if (subsError) {
-        console.error('Error fetching subscriptions:', subsError);
-        // Continue with empty subscriptions rather than failing
-      } else {
-        subscriptions = subs || [];
+      if (createError) {
+        console.error('Error creating customer:', createError);
+        throw createError;
       }
-    } catch (error) {
-      console.error('Subscription fetch failed, continuing with empty list:', error);
-      subscriptions = [];
+      customer = newCustomer;
+    }
+
+    // Check for existing active subscriptions
+    const { data: subscriptions, error: subsError } = await supabase
+      .from('revenuecat_subscriptions')
+      .select('*')
+      .eq('customer_id', customer.id)
+      .eq('status', 'active');
+
+    if (subsError) {
+      console.error('Error fetching subscriptions:', subsError);
+      throw subsError;
     }
 
     console.log(`Found ${subscriptions?.length || 0} active subscriptions`);
@@ -215,7 +161,7 @@ serve(async (req) => {
     const response = {
       success: true,
       customer: {
-        id: customer.revenuecat_user_id,
+        id: customer.revenuecat_customer_id,
         platform: customer.platform,
         subscriptions: subscriptions || []
       },
