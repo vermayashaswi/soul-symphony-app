@@ -32,6 +32,9 @@ const PlatformAuthButton: React.FC<PlatformAuthButtonProps> = ({
       if (nativeIntegrationService.isRunningNatively()) {
         console.log('[PlatformAuth] Native environment - using native Google auth');
         
+        // Ensure native auth is initialized to avoid race conditions
+        await nativeAuthService.initialize();
+
         // Add timeout for native auth
         const timeoutPromise = new Promise<never>((_, reject) => {
           setTimeout(() => {

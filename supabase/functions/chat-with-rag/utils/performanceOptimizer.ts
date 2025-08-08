@@ -61,7 +61,7 @@ export class PerformanceOptimizer {
       prompt;
     
     // Use faster model for simple queries, more powerful for complex analysis
-    const model = isAnalytical && prompt.length > 3000 ? 'gpt-4o' : 'gpt-4o-mini';
+    const model = isAnalytical && prompt.length > 3000 ? 'gpt-5' : 'gpt-5-mini';
     
     return {
       model,
