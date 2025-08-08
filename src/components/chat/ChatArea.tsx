@@ -11,7 +11,7 @@ import { TranslatableText } from "@/components/translation/TranslatableText";
 import AnalyticsDisplay from "./AnalyticsDisplay";
 import EmotionRadarChart from "./EmotionRadarChart";
 import TypingIndicator from "./TypingIndicator";
-
+import ParticleAvatar from "./ParticleAvatar";
 import { ChatMessage } from "@/types/chat";
 import { useAutoScroll } from "@/hooks/use-auto-scroll";
 
@@ -90,11 +90,7 @@ const ChatArea: React.FC<ChatAreaProps> = ({
                   </AvatarFallback>
                 </Avatar>
               ) : (
-                <Avatar className="h-8 w-8 border border-primary/20">
-                  <AvatarFallback className="bg-muted text-muted-foreground">
-                    AI
-                  </AvatarFallback>
-                </Avatar>
+                <ParticleAvatar className="h-8 w-8" size={32} />
               )}
             </div>
 
