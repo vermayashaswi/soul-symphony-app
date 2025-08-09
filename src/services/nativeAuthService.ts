@@ -46,18 +46,17 @@ class NativeAuthService {
 
       while (
         attempt < maxAttempts &&
-        (!nativeIntegrationService.isRunningNatively() || !nativeIntegrationService.isGoogleAuthAvailable())
+        (!nativeIntegrationService.isRunningNatively())
       ) {
         attempt++;
         console.log(
-          `[NativeAuth] Waiting for native env/plugin (attempt ${attempt}/${maxAttempts})`
+          `[NativeAuth] Waiting for native env (attempt ${attempt}/${maxAttempts})`
         );
         await delay(250);
       }
 
       // Validate configuration after waiting
       const isNative = nativeIntegrationService.isRunningNatively();
-      const pluginAvailable = nativeIntegrationService.isGoogleAuthAvailable();
 
       if (!isNative) {
         console.warn('[NativeAuth] Not running natively - skipping GoogleAuth initialization');
@@ -66,11 +65,6 @@ class NativeAuthService {
         return;
       }
 
-      if (!pluginAvailable) {
-        console.warn('[NativeAuth] GoogleAuth plugin not available (after retries)');
-        this.initializationError = 'GoogleAuth plugin not available';
-        return;
-      }
 
       const clientId = this.getGoogleClientId();
       console.log('[NativeAuth] Initializing GoogleAuth plugin with configuration:', {
@@ -114,11 +108,6 @@ class NativeAuthService {
     // Check if running natively
     if (!nativeIntegrationService.isRunningNatively()) {
       errors.push('Not running in native environment');
-    }
-    
-    // Check if GoogleAuth plugin is available
-    if (!nativeIntegrationService.isGoogleAuthAvailable()) {
-      errors.push('GoogleAuth plugin not available');
     }
     
     // Check client ID configuration
@@ -343,7 +332,7 @@ class NativeAuthService {
 
   private shouldUseNativeAuth(): boolean {
     return nativeIntegrationService.isRunningNatively() &&
-           nativeIntegrationService.isGoogleAuthAvailable() &&
+           !!this.googleAuthPlugin &&
            this.isInitialized &&
            this.hasValidClientId;
   }
