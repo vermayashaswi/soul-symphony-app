@@ -17,7 +17,7 @@ export interface StreamingMessage {
 }
 
 interface UseStreamingChatProps {
-  onFinalResponse?: (response: string, analysis?: any) => void;
+  onFinalResponse?: (response: string, analysis: any | undefined, originThreadId: string | null) => void;
   onError?: (error: string) => void;
 }
 
@@ -31,6 +31,8 @@ export const useStreamingChat = ({ onFinalResponse, onError }: UseStreamingChatP
   const [useThreeDotFallback, setUseThreeDotFallback] = useState(false);
   const [queryCategory, setQueryCategory] = useState<string>('');
   const [currentThreadId, setCurrentThreadId] = useState<string | null>(null);
+  // The thread id for which a streaming request is currently active
+  const [streamingThreadId, setStreamingThreadId] = useState<string | null>(null);
   const [expectedProcessingTime, setExpectedProcessingTime] = useState<number | null>(null);
   const [processingStartTime, setProcessingStartTime] = useState<number | null>(null);
   
@@ -79,14 +81,19 @@ export const useStreamingChat = ({ onFinalResponse, onError }: UseStreamingChatP
         setLastFailedMessage(null);
         setIsRetrying(false);
         // Clear persisted state on completion
-        if (currentThreadId) {
-          clearChatStreamingState(currentThreadId);
+        if (streamingThreadId) {
+          clearChatStreamingState(streamingThreadId);
         }
-        onFinalResponse?.(message.response || '', message.analysis);
+        onFinalResponse?.(message.response || '', message.analysis, streamingThreadId);
+        setStreamingThreadId(null);
         break;
       case 'error':
         setIsStreaming(false);
         setShowBackendAnimation(false);
+        if (streamingThreadId) {
+          clearChatStreamingState(streamingThreadId);
+        }
+        setStreamingThreadId(null);
         onError?.(message.error || 'Unknown error occurred');
         break;
     }
@@ -266,6 +273,7 @@ export const useStreamingChat = ({ onFinalResponse, onError }: UseStreamingChatP
 
     // Set current thread and timing info
     setCurrentThreadId(threadId);
+    setStreamingThreadId(threadId);
     setProcessingStartTime(Date.now());
     
     setIsStreaming(true);
@@ -557,10 +565,11 @@ export const useStreamingChat = ({ onFinalResponse, onError }: UseStreamingChatP
     setCurrentMessageIndex(0);
     setUseThreeDotFallback(false);
     // Clear persisted state
-    if (currentThreadId) {
-      clearChatStreamingState(currentThreadId);
+    const target = streamingThreadId || currentThreadId;
+    if (target) {
+      clearChatStreamingState(target);
     }
-  }, [currentThreadId]);
+  }, [currentThreadId, streamingThreadId]);
 
   // Function to restore streaming state for a thread
   const restoreStreamingState = useCallback((threadId: string) => {
@@ -582,6 +591,7 @@ export const useStreamingChat = ({ onFinalResponse, onError }: UseStreamingChatP
     
     setCurrentThreadId(threadId);
     setIsStreaming(savedState.isStreaming);
+    setStreamingThreadId(savedState.isStreaming ? threadId : null);
     setStreamingMessages(savedState.streamingMessages);
     setCurrentUserMessage(savedState.currentUserMessage);
     setShowBackendAnimation(savedState.showBackendAnimation);
@@ -630,6 +640,7 @@ export const useStreamingChat = ({ onFinalResponse, onError }: UseStreamingChatP
 
   return {
     isStreaming,
+    streamingThreadId,
     streamingMessages,
     currentUserMessage,
     showBackendAnimation,
