@@ -71,20 +71,16 @@ async function gptClassifyMessage(
 ): Promise<{
   category: string;
   confidence: number;
-  shouldUseJournal: boolean;
   reasoning: string;
   useAllEntries?: boolean;
-  // Optional enriched fields for downstream logic
   recommendedPipeline?: 'general' | 'clarification' | 'rag_full';
-  isFollowUp?: boolean;
-  maintainPreviousPipeline?: boolean;
   clarifyingQuestion?: string | null;
   journalHintStrength?: 'low' | 'medium' | 'high';
   timeScopeHint?: 'all' | 'recent' | 'last_week' | 'this_month' | 'last_month' | null;
 }> {
   
   const contextString = conversationContext.length > 0 
-    ? `\nConversation context: ${conversationContext.slice(-6).map(msg => `${msg.role}: ${msg.content}`).join('\n')}`
+    ? `\nConversation context: ${conversationContext.slice(-6).map(msg => `${(msg.role || msg.sender || 'user')}: ${msg.content}`).join('\n')}`
     : '';
 
   const classificationPrompt = `You are SOULo's chat query classifier. Classify the user's latest message while maintaining smooth 1-1 conversational flow.
@@ -96,24 +92,19 @@ Categories:
 - UNRELATED: Outside mental health/wellbeing/journaling.
 
 Core rules:
-1) Prefer JOURNAL_SPECIFIC for first-person queries about the user's own state/patterns, even if slightly vague but with any specific detail.
-2) Use JOURNAL_SPECIFIC_NEEDS_CLARIFICATION only for extremely vague personal prompts with zero analyzable detail.
-3) Follow-up continuity: if the message is a short reply (e.g., "yes", "tell me more", "what should I do now?", "what do you think i should do now?") and recent context suggests ongoing personal analysis, set isFollowUp=true and maintainPreviousPipeline=true. If it asks for personal guidance, choose JOURNAL_SPECIFIC or JOURNAL_SPECIFIC_NEEDS_CLARIFICATION (not GENERAL_MENTAL_HEALTH).
-4) Pure small talk like "thanks", "ok", "cool" → GENERAL_MENTAL_HEALTH with maintainPreviousPipeline=false.
-5) shouldUseJournal = true for JOURNAL_SPECIFIC and also when isFollowUp && maintainPreviousPipeline.
-6) useAllEntries = true if personal question has no explicit timeframe; if timeframe is mentioned/implied (last week, this month, last month, recent), set useAllEntries=false and set timeScopeHint accordingly.
-7) journalHintStrength: "high" for strong first-person self-reflection; "medium" for somewhat personal; "low" otherwise.
+1) Prefer JOURNAL_SPECIFIC for first-person queries about the user's own state/patterns when there is at least one concrete, analyzable detail (e.g., a timeframe, trigger/cause, event, behavior, or explicit question).
+2) Short, bare-emotion statements with no analyzable detail (e.g., "I'm sad", "I feel bad") MUST be classified as JOURNAL_SPECIFIC_NEEDS_CLARIFICATION. Provide one targeted clarifyingQuestion.
+3) useAllEntries = true if the personal question has no explicit timeframe; if a timeframe is mentioned/implied (last week, this month, last month, recent), set useAllEntries=false and set timeScopeHint accordingly.
+4) journalHintStrength: "high" for strong first-person self-reflection; "medium" for somewhat personal; "low" otherwise.
+5) When choosing JOURNAL_SPECIFIC_NEEDS_CLARIFICATION, always supply a brief, concrete clarifyingQuestion tailored to the message.
 
 Return ONLY valid JSON matching this schema (no code fences):
 {
   "category": "JOURNAL_SPECIFIC" | "JOURNAL_SPECIFIC_NEEDS_CLARIFICATION" | "GENERAL_MENTAL_HEALTH" | "UNRELATED",
   "confidence": number,
-  "shouldUseJournal": boolean,
   "useAllEntries": boolean,
   "reasoning": string,
   "recommendedPipeline": "general" | "clarification" | "rag_full",
-  "isFollowUp": boolean,
-  "maintainPreviousPipeline": boolean,
   "clarifyingQuestion": string | null,
   "journalHintStrength": "low" | "medium" | "high",
   "timeScopeHint": "all" | "recent" | "last_week" | "this_month" | "last_month" | null
@@ -125,23 +116,21 @@ User message: "${message}"${contextString}`;
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 15000);
 
-    const response = await fetch('https://api.openai.com/v1/responses', {
+    const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${apiKey}`,
         'Content-Type': 'application/json',
       },
-        body: JSON.stringify({
-          model: 'gpt-5-mini-2025-08-07',
-          input: [
-            { role: 'system', content: [{ type: 'input_text', text: 'You are a strict JSON classifier. Respond with a single JSON object only that matches the provided schema. No code fences, no commentary.' }] },
-            { role: 'user', content: [{ type: 'input_text', text: classificationPrompt }] }
-          ],
-          temperature: 0.2,
-          max_output_tokens: 600,
-          response_format: { type: 'json_object' },
-          reasoning: { effort: 'medium' }
-        }),
+      body: JSON.stringify({
+        model: 'gpt-4.1-2025-04-14',
+            messages: [
+              { role: 'system', content: 'You are a strict JSON classifier. Respond with a single JSON object only that matches the provided schema. No code fences, no commentary.' },
+              { role: 'user', content: classificationPrompt }
+            ],
+            response_format: { type: 'json_object' },
+            max_tokens: 600
+      }),
       signal: controller.signal
     });
 
@@ -152,21 +141,17 @@ User message: "${message}"${contextString}`;
     }
 
     const data = await response.json();
-    let content = '';
-    if (typeof data.output_text === 'string' && data.output_text.trim()) {
-      content = data.output_text;
-    } else if (Array.isArray(data.output)) {
-      content = data.output
-        .map((item: any) => (item?.content ?? [])
-          .map((c: any) => c?.text ?? '')
-          .join(''))
-        .join('');
-    } else if (Array.isArray(data.content)) {
-      content = data.content.map((c: any) => c?.text ?? '').join('');
-    }
+    const content = data?.choices?.[0]?.message?.content?.trim() || '';
 
-    if (!content || !content.trim()) {
-      throw new Error('No content in OpenAI response');
+    if (!content) {
+      console.warn('[Query Classifier] Empty OpenAI content, using rule-based fallback');
+      const rb = enhancedRuleBasedClassification(message);
+      return {
+        category: rb.category,
+        confidence: rb.confidence ?? 0.6,
+        useAllEntries: rb.useAllEntries,
+        reasoning: rb.reasoning + ' (fallback due to empty OpenAI response)'
+      } as any;
     }
 
     console.log(`[Query Classifier] GPT Response: ${content}`);
@@ -192,19 +177,14 @@ User message: "${message}"${contextString}`;
       throw new Error('Invalid category in GPT response');
     }
 
-    console.log(`[Query Classifier] Meta: followUp=${!!result.isFollowUp}, maintainPipeline=${!!result.maintainPreviousPipeline}, pipeline=${result.recommendedPipeline || 'n/a'}, timeScope=${result.timeScopeHint || 'n/a'}`);
+    console.log(`[Query Classifier] Meta: pipeline=${result.recommendedPipeline || 'n/a'}, timeScope=${result.timeScopeHint || 'n/a'}`);
 
     return {
       category: result.category,
       confidence: Math.max(0, Math.min(1, result.confidence ?? 0.85)),
-      shouldUseJournal: typeof result.shouldUseJournal === 'boolean'
-        ? result.shouldUseJournal
-        : (result.category === 'JOURNAL_SPECIFIC' || (result.isFollowUp && result.maintainPreviousPipeline) || false),
       useAllEntries: !!result.useAllEntries,
       reasoning: result.reasoning || 'GPT classification for conversational flow',
       recommendedPipeline: result.recommendedPipeline,
-      isFollowUp: result.isFollowUp,
-      maintainPreviousPipeline: result.maintainPreviousPipeline,
       clarifyingQuestion: result.clarifyingQuestion ?? null,
       journalHintStrength: result.journalHintStrength,
       timeScopeHint: result.timeScopeHint ?? null
@@ -222,7 +202,6 @@ User message: "${message}"${contextString}`;
 function enhancedRuleBasedClassification(message: string): {
   category: string;
   confidence: number;
-  shouldUseJournal: boolean;
   reasoning: string;
   useAllEntries?: boolean;
 } {
@@ -246,25 +225,50 @@ function enhancedRuleBasedClassification(message: string): {
       return {
         category: "JOURNAL_SPECIFIC_NEEDS_CLARIFICATION",
         confidence: 0.9,
-        shouldUseJournal: false,
         reasoning: "Vague personal question requiring clarification"
       };
     }
   }
   
+  // Bare emotion statements => needs clarification (even if a timeframe is present)
+  const bareEmotionPattern = /^(i\s*(?:am|'m)\s+\w+|i\s*feel\s+\w+|feeling\s+\w+)$/i;
+  const hasTemporalReference = /\b(last week|last month|this week|this month|today|yesterday|recently|lately)\b/i.test(lowerMessage);
+  if (bareEmotionPattern.test(lowerMessage)) {
+    console.log(`[Rule-Based] BARE EMOTION - Needs clarification (temporalRef=${hasTemporalReference})`);
+    return {
+      category: "JOURNAL_SPECIFIC_NEEDS_CLARIFICATION",
+      confidence: 0.9,
+      reasoning: hasTemporalReference
+        ? "Bare emotion with timeframe; ask a targeted clarifying question"
+        : "Bare emotion statement without timeframe; ask a clarifying question"
+    };
+  }
+  
+  // Strong personal + timeframe detection
+  const hasMy = /\bmy\b/i.test(lowerMessage);
+  if (hasMy && hasTemporalReference) {
+    console.log(`[Rule-Based] PERSONAL + TIMEFRAME detected`);
+      return {
+        category: "JOURNAL_SPECIFIC",
+        confidence: 0.9,
+        useAllEntries: false,
+        reasoning: "Personal pronoun with explicit timeframe"
+      };
+  }
+  
   // Specific personal pronouns = JOURNAL_SPECIFIC
   const personalPatterns = [
-    /\b(i|me|my|mine|myself)\b.*\b(work|stress|feel|emotion|mood|relationship)\b/i,
+    /\b(i|me|my|mine|myself)\b.*\b(work|stress|feel|feeling|feelings|emotion|emotions|mood|moods|relationship|journal|entries|pattern|patterns?|theme|themes?)\b/i,
     /\bam i\b.*\b(good|bad|better|worse|okay)\b/i,
     /\bhow (am i|was i).*\b(lately|recently|today|this week|this month)\b/i,
     /\bwhat makes me\b/i,
     /\bwhen do i\b/i,
-    /\bwhy do i\b/i
+    /\bwhy do i\b/i,
+    /\bmy\s+(top|common|most|biggest)\s+(emotions?|moods?|themes?)\b/i
   ];
   
   for (const pattern of personalPatterns) {
     if (pattern.test(lowerMessage)) {
-      const hasTemporalReference = /\b(last week|yesterday|this week|last month|today|recently|lately)\b/i.test(lowerMessage);
       const useAllEntries = !hasTemporalReference;
       
       console.log(`[Rule-Based] SPECIFIC PERSONAL - UseAllEntries: ${useAllEntries}`);
@@ -272,7 +276,6 @@ function enhancedRuleBasedClassification(message: string): {
       return {
         category: "JOURNAL_SPECIFIC",
         confidence: 0.85,
-        shouldUseJournal: true,
         useAllEntries: useAllEntries,
         reasoning: `Specific personal question - analyzing ${hasTemporalReference ? 'specific timeframe' : 'all entries'}`
       };
@@ -295,7 +298,6 @@ function enhancedRuleBasedClassification(message: string): {
       return {
         category: "GENERAL_MENTAL_HEALTH",
         confidence: 0.9,
-        shouldUseJournal: false,
         reasoning: "Conversational response - handled as general mental health interaction"
       };
     }
@@ -314,7 +316,6 @@ function enhancedRuleBasedClassification(message: string): {
       return {
         category: "GENERAL_MENTAL_HEALTH",
         confidence: 0.7,
-        shouldUseJournal: false,
         reasoning: "General mental health question"
       };
     }
@@ -337,7 +338,6 @@ function enhancedRuleBasedClassification(message: string): {
       return {
         category: "UNRELATED",
         confidence: 0.8,
-        shouldUseJournal: false,
         reasoning: "Query unrelated to mental health, wellness, or journaling"
       };
     }
@@ -348,7 +348,6 @@ function enhancedRuleBasedClassification(message: string): {
   return {
     category: "GENERAL_MENTAL_HEALTH",
     confidence: 0.6,
-    shouldUseJournal: false,
     reasoning: "Unclear intent - treating as general mental health interaction"
   };
 }

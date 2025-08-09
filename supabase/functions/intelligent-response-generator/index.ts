@@ -256,7 +256,7 @@ Please provide a thoughtful, therapeutically informed response based on the cura
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
-      model: 'gpt-4o-mini',
+      model: 'gpt-4.1-2025-04-14',
       messages,
       temperature: 0.7,
       max_tokens: 1000
@@ -268,5 +268,6 @@ Please provide a thoughtful, therapeutically informed response based on the cura
   }
 
   const data = await response.json();
-  return data.choices[0].message.content;
+  const content = data?.choices?.[0]?.message?.content?.trim() || '';
+  return content || "I’m having a moment processing your journal analysis. Let’s try that again, or feel free to rephrase your question.";
 }

@@ -90,14 +90,14 @@ RESPONSE STRUCTURE TEMPLATE:
       messages.push({ role: 'user', content: optimizedUserPrompt });
 
       // Intelligent model selection based on performance mode and query complexity
-      let model = 'gpt-5-mini-2025-08-07';
+      let model = 'gpt-4.1-2025-04-14';
       let maxTokens = 600;
       
       if (performanceMode === 'quality' && isAnalytical) {
-        model = 'gpt-5-2025-08-07';
+        model = 'gpt-4.1-2025-04-14';
         maxTokens = 1200;
       } else if (isAnalytical) {
-        model = 'gpt-5-2025-08-07';
+        model = 'gpt-4.1-2025-04-14';
         maxTokens = 800;
       } else if (performanceMode === 'fast') {
         maxTokens = 400;
@@ -113,28 +113,21 @@ RESPONSE STRUCTURE TEMPLATE:
       // Helper to make a timed OpenAI call
       const makeCall = async (mdl: string, tokens: number) => {
         const start = Date.now();
-        // Convert chat messages to Responses API input format
-        const input = messages.map((m: any) => ({
-          role: m.role,
-          content: [{ type: 'input_text', text: m.content }]
-        }));
-        // Remove chat-specific params (like max_tokens, messages) and keep general tuning params
-        const { max_tokens, messages: _ignoredMessages, ...restParams } = (requestParams as any);
-        const resp = await fetch('https://api.openai.com/v1/responses', {
+        const resp = await fetch('https://api.openai.com/v1/chat/completions', {
           method: 'POST',
           headers: {
             'Authorization': `Bearer ${openAiApiKey}`,
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({
-            ...restParams,
             model: mdl,
-            max_output_tokens: tokens,
-            input
+            messages,
+            max_tokens: tokens,
+            temperature: 0.7
           }),
         });
         const duration = Date.now() - start;
-        console.log(`[OptimizedApiClient] OpenAI call (Responses API) model=${mdl} status=${resp.status} duration=${duration}ms`);
+        console.log(`[OptimizedApiClient] OpenAI call (Chat Completions) model=${mdl} status=${resp.status} duration=${duration}ms`);
         return resp;
       };
 
@@ -146,7 +139,7 @@ RESPONSE STRUCTURE TEMPLATE:
         console.warn(`[OptimizedApiClient] Primary model failed (status ${response.status}). Trying fallback model...`);
         const errText = await response.text().catch(() => '');
         console.warn('[OptimizedApiClient] Primary error text:', errText?.slice(0, 250));
-        const fallbackModel = 'gpt-5-mini-2025-08-07';
+        const fallbackModel = 'gpt-4.1-2025-04-14';
         const fallbackTokens = Math.min(400, Math.floor(maxTokens * 0.7));
         response = await makeCall(fallbackModel, fallbackTokens);
         if (!response.ok) {
@@ -157,20 +150,10 @@ RESPONSE STRUCTURE TEMPLATE:
       }
 
       const data = await response.json();
-      let result = '';
-      if (typeof data.output_text === 'string' && data.output_text.trim()) {
-        result = data.output_text;
-      } else if (Array.isArray(data.output)) {
-        result = data.output
-          .map((item: any) => (item?.content ?? [])
-            .map((c: any) => c?.text ?? '')
-            .join(''))
-          .join('');
-      } else if (Array.isArray(data.content)) {
-        result = data.content.map((c: any) => c?.text ?? '').join('');
-      }
-      if (!result || !result.trim()) {
-        throw new Error('Empty completion content from OpenAI Responses API');
+      let result = data?.choices?.[0]?.message?.content?.trim() || '';
+      if (!result) {
+        console.warn('[OptimizedApiClient] Empty completion content from OpenAI, using graceful fallback');
+        result = "I’m here and listening. Could you share a bit more about what you’re feeling so I can help?";
       }
 
       // Cache the response

@@ -36,10 +36,12 @@ serve(async (req) => {
       message, 
       userId: requestUserId, 
       conversationContext = [], 
-      userProfile = {}
+      userProfile = {},
+      threadId,
+      messageId
     } = requestBody;
 
-    console.log(`[chat-with-rag] Processing query: "${message}" for user: ${requestUserId}`);
+    console.log(`[chat-with-rag] Processing query: "${message}" for user: ${requestUserId} (threadId: ${threadId || 'none'}, messageId: ${messageId || 'none'})`);
 
     // Check if streaming is enabled
     const enableStreaming = requestBody.streamingMode || false;
@@ -68,7 +70,7 @@ serve(async (req) => {
     const { data: classification, error: classificationError } = await supabaseClient.functions.invoke(
       'chat-query-classifier',
       {
-        body: { message, conversationContext }
+        body: { message, conversationContext, threadId, messageId }
       }
     );
 
@@ -83,9 +85,24 @@ serve(async (req) => {
 
     console.log(`[chat-with-rag] Query classified as: ${classification.category} (confidence: ${classification.confidence})`);
     
+    // Heuristic override for obvious journal-specific queries with protection for bare emotions
+    const lowerMsg = (message || '').toLowerCase();
+    const personalLikely = /\b(i|me|my|mine|myself)\b/i.test(lowerMsg);
+    const temporalLikely = /\b(last week|last month|this week|this month|today|yesterday|recently|lately)\b/i.test(lowerMsg);
+    const journalHints = /\b(journal|entry|entries|log|logged)\b/i.test(lowerMsg);
+    const bareEmotion = /^(i\s*(?:am|'m)\s+\w+|i\s*feel\s+\w+|feeling\s+\w+)\b/i.test(lowerMsg);
+    if (classification.category === 'GENERAL_MENTAL_HEALTH') {
+      if (bareEmotion) {
+        console.warn('[chat-with-rag] OVERRIDE: Bare emotion detected -> JOURNAL_SPECIFIC_NEEDS_CLARIFICATION');
+        classification.category = 'JOURNAL_SPECIFIC_NEEDS_CLARIFICATION';
+      } else if ((personalLikely && temporalLikely) || journalHints) {
+        console.warn('[chat-with-rag] OVERRIDE: Forcing JOURNAL_SPECIFIC due to personal+temporal/journal hints');
+        classification.category = 'JOURNAL_SPECIFIC';
+      }
+    }
+    
     // Cache the classification to prevent inconsistencies
     cachedClassification = classification;
-
     // Handle unrelated queries with polite denial
     if (cachedClassification.category === 'UNRELATED') {
       console.log('[chat-with-rag] EXECUTING: UNRELATED pipeline - polite denial');
@@ -111,7 +128,9 @@ serve(async (req) => {
           body: { 
             userMessage: message,
             conversationContext,
-            userProfile 
+            userProfile,
+            threadId,
+            messageId 
           }
         }
       );
@@ -149,7 +168,9 @@ serve(async (req) => {
               userId: requestUserId,
               conversationContext,
               userProfile,
-              timeRange: userProfile.timeRange || null
+              timeRange: userProfile.timeRange || null,
+              threadId,
+              messageId
             }
           }
         );
@@ -173,6 +194,15 @@ serve(async (req) => {
       if (shouldUseGptAnalysis) {
         console.log(`[chat-with-rag] Using GPT-driven analysis pipeline for ${enhancedQueryPlan.subQuestions.length} sub-questions`);
         
+        // Normalize time range from plan (supports dateRange {startDate,endDate} or timeRange {start,end})
+        const normalizedTimeRange = (() => {
+          const tr = enhancedQueryPlan?.timeRange || enhancedQueryPlan?.dateRange || null;
+          if (!tr) return null;
+          const start = tr.start ?? tr.startDate ?? null;
+          const end = tr.end ?? tr.endDate ?? null;
+          return (start || end) ? { start, end } : null;
+        })();
+        
         // Step 4: Call GPT Analysis Orchestrator for sub-question analysis
         const { data: analysisResults, error: analysisError } = await supabaseClient.functions.invoke(
           'gpt-analysis-orchestrator',
@@ -181,7 +211,9 @@ serve(async (req) => {
               subQuestions: enhancedQueryPlan.subQuestions,
               userMessage: message,
               userId: requestUserId,
-              timeRange: enhancedQueryPlan.timeRange
+              timeRange: normalizedTimeRange,
+              threadId,
+              messageId
             }
           }
         );
@@ -199,7 +231,9 @@ serve(async (req) => {
               analysisResults: analysisResults.analysisResults,
               conversationContext,
               userProfile,
-              streamingMode: false
+              streamingMode: false,
+              threadId,
+              messageId
             }
           }
         );
@@ -210,8 +244,12 @@ serve(async (req) => {
 
         console.log('[chat-with-rag] Successfully completed GPT-driven analysis pipeline');
 
+        const finalResponse = (typeof consolidationResult?.response === 'string' && consolidationResult.response.trim())
+          ? consolidationResult.response
+          : "I couldn't synthesize a confident insight just now. Let's try again in a moment.";
+
         return new Response(JSON.stringify({
-          response: consolidationResult.response,
+          response: finalResponse,
           userStatusMessage: consolidationResult.userStatusMessage,
           analysis: {
             queryPlan: enhancedQueryPlan,
@@ -236,7 +274,7 @@ serve(async (req) => {
         const { data: generalResponse, error: generalError } = await supabaseClient.functions.invoke(
           'general-mental-health-chat',
           {
-            body: { message, conversationContext }
+            body: { message, conversationContext, threadId }
           }
         );
 
@@ -244,8 +282,12 @@ serve(async (req) => {
           throw new Error(`General mental health chat failed: ${generalError.message}`);
         }
 
+        const reply = (typeof generalResponse?.response === 'string' && generalResponse.response.trim())
+          ? generalResponse.response
+          : "I’m here to support your mental health journey. Could you share a bit more so I can respond meaningfully?";
+
         return new Response(JSON.stringify({
-          response: generalResponse.response,
+          response: reply,
           analysis: {
             queryType: 'general_mental_health',
             classification,
@@ -314,7 +356,9 @@ async function processStreamingPipeline(
       message, 
       userId: requestUserId, 
       conversationContext = [], 
-      userProfile = {}
+      userProfile = {},
+      threadId,
+      messageId
     } = requestBody;
 
     // Step 1: Query classification with status updates (streaming mode)
@@ -324,7 +368,7 @@ async function processStreamingPipeline(
     const { data: classification, error: classificationError } = await supabaseClient.functions.invoke(
       'chat-query-classifier',
       {
-        body: { message, conversationContext }
+        body: { message, conversationContext, threadId, messageId }
       }
     );
     
@@ -338,6 +382,24 @@ async function processStreamingPipeline(
     }
 
     console.log(`[chat-with-rag] STREAMING: Query classified as: ${classification.category} (confidence: ${classification.confidence})`);
+
+    // Heuristic override for obvious journal-specific queries (streaming)
+    {
+      const lowerMsg = (message || '').toLowerCase();
+      const personalLikely = /\b(i|me|my|mine|myself)\b/i.test(lowerMsg);
+      const temporalLikely = /\b(last week|last month|this week|this month|today|yesterday|recently|lately)\b/i.test(lowerMsg);
+      const journalHints = /\b(journal|entry|entries|log|logged)\b/i.test(lowerMsg);
+      const bareEmotion = /^(i\s*(?:am|'m)\s+\w+|i\s*feel\s+\w+|feeling\s+\w+)\b/i.test(lowerMsg);
+      if (classification.category === 'GENERAL_MENTAL_HEALTH') {
+        if (bareEmotion) {
+          console.warn('[chat-with-rag] STREAMING OVERRIDE: Bare emotion detected -> JOURNAL_SPECIFIC_NEEDS_CLARIFICATION');
+          classification.category = 'JOURNAL_SPECIFIC_NEEDS_CLARIFICATION';
+        } else if ((personalLikely && temporalLikely) || journalHints) {
+          console.warn('[chat-with-rag] STREAMING OVERRIDE: Forcing JOURNAL_SPECIFIC due to personal+temporal/journal hints');
+          classification.category = 'JOURNAL_SPECIFIC';
+        }
+      }
+    }
 
     // Handle unrelated queries in streaming mode
     if (classification.category === 'UNRELATED') {
@@ -369,7 +431,9 @@ async function processStreamingPipeline(
           body: { 
             userMessage: message,
             conversationContext,
-            userProfile 
+            userProfile,
+            threadId,
+            messageId 
           }
         }
       );
@@ -403,16 +467,18 @@ async function processStreamingPipeline(
       streamManager.sendBackendTask("query_planning", "Analyzing query structure and requirements");
       
       const { data: gptPlan, error: plannerError } = await supabaseClient.functions.invoke(
-        'smart-query-planner',
-        {
-          body: {
-            message,
-            userId: requestUserId,
-            conversationContext,
-            userProfile,
-            timeRange: userProfile.timeRange || null
-          }
+      'smart-query-planner',
+      {
+        body: {
+          message,
+          userId: requestUserId,
+          conversationContext,
+          userProfile,
+          timeRange: userProfile.timeRange || null,
+          threadId,
+          messageId
         }
+      }
       );
       
       if (plannerError) {
@@ -429,6 +495,15 @@ async function processStreamingPipeline(
       // Step 3: Analysis orchestration with status updates
       streamManager.sendBackendTask("Searching your journal...", "Looking through journal entries");
       
+      // Normalize time range for orchestrator
+      const normalizedTimeRange = (() => {
+        const tr = enhancedQueryPlan?.timeRange || enhancedQueryPlan?.dateRange || null;
+        if (!tr) return null;
+        const start = tr.start ?? tr.startDate ?? null;
+        const end = tr.end ?? tr.endDate ?? null;
+        return (start || end) ? { start, end } : null;
+      })();
+      
       const { data: analysisResults, error: analysisError } = await supabaseClient.functions.invoke(
         'gpt-analysis-orchestrator',
         {
@@ -436,7 +511,8 @@ async function processStreamingPipeline(
             subQuestions: enhancedQueryPlan.subQuestions,
             userMessage: message,
             userId: requestUserId,
-            timeRange: enhancedQueryPlan.timeRange
+            timeRange: normalizedTimeRange,
+            threadId
           }
         }
       );
@@ -458,7 +534,8 @@ async function processStreamingPipeline(
             analysisResults: analysisResults.analysisResults,
             conversationContext,
             userProfile,
-            streamingMode: false
+            streamingMode: false,
+            threadId
           }
         }
       );

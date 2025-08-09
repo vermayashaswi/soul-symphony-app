@@ -166,20 +166,9 @@ async function retryOpenAICall(promptFunction: () => Promise<Response>, maxRetri
       }
       
       const data = await response.json();
-      if (typeof data.output_text === 'string' && data.output_text.trim()) {
-        return data.output_text;
-      }
-      if (Array.isArray(data.output)) {
-        return data.output
-          .map((item: any) => (item?.content ?? [])
-            .map((c: any) => c?.text ?? '')
-            .join(''))
-          .join('');
-      }
-      if (Array.isArray(data.content)) {
-        return data.content.map((c: any) => c?.text ?? '').join('');
-      }
-      return '{}';
+      const content = data?.choices?.[0]?.message?.content ?? '';
+      return content;
+
       
     } catch (error) {
       lastError = error;
@@ -304,22 +293,20 @@ Return ONLY valid JSON:
 
 Focus on creating comprehensive analysis plans with mandatory sub-question generation.`;
 
-    const promptFunction = () => fetch("https://api.openai.com/v1/responses", {
+    const promptFunction = () => fetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
         "Authorization": `Bearer ${apiKey}`
       },
       body: JSON.stringify({
-        model: "gpt-5-2025-08-07",
-        input: [
-          { role: "system", content: [{ type: "text", text: "You are an expert analysis planner. Respond only with valid JSON." }] },
-          { role: "user", content: [{ type: "text", text: prompt }] }
+        model: "gpt-4.1-2025-04-14",
+        messages: [
+          { role: "system", content: "You are an expert analysis planner. Respond only with valid JSON." },
+          { role: "user", content: prompt }
         ],
-        temperature: 0.1,
-        max_output_tokens: 1000,
-        reasoning: { effort: "medium" },
-        response_format: { type: "json_object" }
+        response_format: { type: 'json_object' },
+        max_tokens: 1000
       })
     });
 
@@ -828,10 +815,9 @@ serve(async (req) => {
       message, 
       userId, 
       conversationContext = [], 
-      isFollowUp = false, 
       preserveTopicContext = false, 
       threadMetadata = {}, 
-      isAnalysisFollowUp = false 
+      messageId = null 
     } = await req.json();
 
     if (!message || !userId) {
@@ -841,7 +827,7 @@ serve(async (req) => {
       );
     }
 
-    console.log(`[Smart Query Planner] Conversational analysis: "${message}"`);
+    console.log(`[Smart Query Planner] Conversational analysis: "${message}" (messageId: ${messageId || 'none'})`);
 
     // Get user's entry count for context
     const { count: userEntryCount } = await supabase
@@ -859,7 +845,6 @@ serve(async (req) => {
     return new Response(JSON.stringify({
       queryPlan,
       conversationMetadata: {
-        isFollowUp,
         preserveTopicContext,
         threadMetadata
       },

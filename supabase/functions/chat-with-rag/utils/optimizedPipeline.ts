@@ -105,7 +105,6 @@ export class OptimizedRagPipeline {
         combinedResults.length,
         `Dual search analysis: ${vectorResults.length} vector + ${sqlResults.length} SQL results`,
         conversationContext,
-        false,
         /\b(I|me|my|myself)\b/i.test(message),
         enhancedQueryPlan.requiresTimeFilter,
         'dual'

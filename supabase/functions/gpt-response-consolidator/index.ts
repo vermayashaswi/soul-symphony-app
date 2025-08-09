@@ -92,14 +92,16 @@ serve(async (req) => {
       analysisResults, 
       conversationContext, 
       userProfile,
-      streamingMode = false 
+      streamingMode = false,
+      messageId 
     } = await req.json();
     
     console.log('GPT Response Consolidator called with:', { 
       userMessage: userMessage?.substring(0, 100),
       analysisResultsCount: analysisResults?.length || 0,
       contextCount: conversationContext?.length || 0,
-      streamingMode
+      streamingMode,
+      messageId
     });
 
     // Prepare analysis summary for GPT
@@ -153,7 +155,7 @@ serve(async (req) => {
     ${JSON.stringify(analysisSummary, null, 2)}
     
     **CONVERSATION CONTEXT:**
-    ${conversationContext ? conversationContext.slice(-6).map((msg: any) => `${msg.sender}: ${msg.content}`).join('\n') : 'No prior context'}
+    ${conversationContext ? conversationContext.slice(-6).map((msg: any) => `${(msg.role || msg.sender || 'user')}: ${msg.content}`).join('\n') : 'No prior context'}
     
     **USER PROFILE:**
     - Timezone: ${userProfile?.timezone || 'Unknown'}
@@ -208,33 +210,26 @@ serve(async (req) => {
     - Do not include trailing explanations or extra fields.
     `;
 
-    // Non-streaming response only
-    const response = await fetch('https://api.openai.com/v1/responses', {
+    const response = await fetch('https://api.openai.com/v1/chat/completions', {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${openAIApiKey}`,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          model: 'gpt-5-2025-08-07',
-          input: [
-            { 
-              role: 'system', 
-              content: [{ type: 'input_text', text: 'You are Ruh by SOuLO, a warm and insightful wellness coach. Provide thoughtful, data-driven responses based on journal analysis.' }]
-            },
-            { role: 'user', content: [{ type: 'input_text', text: consolidationPrompt }] }
+          model: 'gpt-4.1-2025-04-14',
+          messages: [
+            { role: 'system', content: 'You are Ruh by SOuLO, a warm and insightful wellness coach. Provide thoughtful, data-driven responses based on journal analysis.' },
+            { role: 'user', content: consolidationPrompt }
           ],
-          temperature: 0.7,
-          max_output_tokens: 1500,
-          reasoning: { effort: 'medium' },
-          response_format: { type: 'json_object' },
+          max_tokens: 1500
         }),
     });
 
     // Handle non-OK responses gracefully
     if (!response.ok) {
       const errText = await response.text();
-      console.error('OpenAI chat.completions error:', response.status, errText);
+      console.error('OpenAI Responses API error:', response.status, errText);
       const fallbackText = "I couldn’t finalize your insight right now. Let’s try again in a moment.";
       return new Response(JSON.stringify({
         success: true,
@@ -255,19 +250,7 @@ serve(async (req) => {
     }
 
     const data = await response.json();
-    let rawResponse = '';
-    if (typeof data.output_text === 'string' && data.output_text.trim()) {
-      rawResponse = data.output_text;
-    } else if (Array.isArray(data.output)) {
-      rawResponse = data.output
-        .map((item: any) => (item?.content ?? [])
-          .map((c: any) => c?.text ?? '')
-          .join(''))
-        .join('');
-    } else if (Array.isArray(data.content)) {
-      rawResponse = data.content.map((c: any) => c?.text ?? '').join('');
-    }
-
+    const rawResponse = data?.choices?.[0]?.message?.content || '';
     // Sanitize and extract consolidated response
     const sanitized = sanitizeConsolidatorOutput(rawResponse);
     console.log('Consolidator sanitization meta:', sanitized.meta);

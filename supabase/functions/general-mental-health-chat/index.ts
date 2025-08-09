@@ -69,7 +69,7 @@ serve(async (req) => {
   }
 
   try {
-    const { message, conversationContext = [], lastAssistantMessage, isFollowUp } = await req.json();
+    const { message, conversationContext = [] } = await req.json();
 
     if (!message) {
       return new Response(
@@ -79,18 +79,10 @@ serve(async (req) => {
     }
 
     console.log(`[General Mental Health] Processing: "${message}"`);
-    console.log(`[General Mental Health] Is follow-up: ${isFollowUp}, Last assistant: ${lastAssistantMessage?.slice(0, 50)}`);
+    // Follow-up flags removed from pipeline
 
-    // PHASE 3: Enhanced scope checking with follow-up detection
-    const isFootballFollowUp = isFollowUp && 
-      lastAssistantMessage && 
-      /\b(sport|football|activity|exercise|physical)\b/i.test(lastAssistantMessage) &&
-      /\b(football|sport)\b/i.test(message.toLowerCase());
-
-    if (isFootballFollowUp) {
-      console.log(`[General Mental Health] Handling football follow-up: "${message}"`);
-      // Don't check scope for follow-ups, handle directly
-    } else if (!isWithinScope(message)) {
+    // Scope checking
+    if (!isWithinScope(message)) {
       console.log(`[General Mental Health] Out of scope: "${message}"`);
       return new Response(
         JSON.stringify({ 
@@ -169,67 +161,68 @@ MUST HAVE/DO: ALWAYS BE AWARE OF THE CONVERSATION HISTORY TO UNDERSTAND WHAT THE
     // Add current message
     messages.push({ role: 'user', content: message });
 
-    const response = await fetch('https://api.openai.com/v1/responses', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${openAiApiKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: 'gpt-5-mini-2025-08-07',
-        input: messages.map((m: any) => ({ role: m.role, content: [{ type: 'input_text', text: m.content }] })),
-        max_output_tokens: 800,
-        temperature: 0.7,
-        reasoning: { effort: 'medium' }
-      }),
-    });
+    // Try OpenAI with lightweight retries and graceful fallback
+    const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+    let content = '';
+    const maxAttempts = 3;
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      try {
+        const response = await fetch('https://api.openai.com/v1/chat/completions', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${openAiApiKey}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            model: 'gpt-4.1-2025-04-14',
+            messages,
+            max_tokens: 800
+          }),
+        });
 
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error('[General Mental Health] OpenAI API error:', errorText);
-      throw new Error(`OpenAI API error: ${response.status}`);
+        if (!response.ok) {
+          const errorText = await response.text();
+          console.error(`[General Mental Health] OpenAI attempt ${attempt}/${maxAttempts} failed:`, errorText);
+          if (attempt < maxAttempts) {
+            await sleep(400 * attempt);
+            continue;
+          }
+        } else {
+          const data = await response.json();
+          content = data?.choices?.[0]?.message?.content?.trim() || '';
+        }
+        break; // break whether ok or not after processing
+      } catch (err) {
+        console.error(`[General Mental Health] OpenAI attempt ${attempt}/${maxAttempts} error:`, err);
+        if (attempt < maxAttempts) {
+          await sleep(400 * attempt);
+        }
+      }
     }
 
-    const data = await response.json();
-    let responseContent = '';
-    if (typeof data.output_text === 'string' && data.output_text.trim()) {
-      responseContent = data.output_text;
-    } else if (Array.isArray(data.output)) {
-      responseContent = data.output
-        .map((item: any) => (item?.content ?? [])
-          .map((c: any) => c?.text ?? '')
-          .join(''))
-        .join('');
-    } else if (Array.isArray(data.content)) {
-      responseContent = data.content.map((c: any) => c?.text ?? '').join('');
-    }
-
-    if (!responseContent || !responseContent.trim()) {
-      console.error('[General Mental Health] Invalid OpenAI response structure:', data);
-      throw new Error('Invalid response from OpenAI API');
+    if (!content) {
+      console.warn('[General Mental Health] Using graceful fallback after OpenAI failure');
+      const fallback = "Hey, I’m here with you. *Even if tech is being moody right now*, I’m still listening. **What’s been most on your mind or heart today?** If it helps, try finishing this: *“Lately, I’ve been feeling… because…”* 💛";
+      return new Response(
+        JSON.stringify({ response: fallback, fallbackUsed: true }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
     }
     
     console.log(`[General Mental Health] Generated response`);
 
     return new Response(
-      JSON.stringify({ response: responseContent }),
+      JSON.stringify({ response: content }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
 
   } catch (error) {
     console.error('[General Mental Health] Error:', error);
-    
-    // Return a proper error that can be handled by the frontend
-    if (error.message?.includes('OpenAI API error')) {
-      return new Response(
-        JSON.stringify({ error: 'OpenAI service temporarily unavailable' }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 503 }
-      );
-    }
-    
+    // Graceful 200 fallback so callers don't fail on non-2xx
+    const fallback = "I’m here with you. Let’s keep it simple: **what’s feeling heaviest right now** or **what would you like support with today?** 💙";
     return new Response(
-      JSON.stringify({ error: 'Service temporarily unavailable' }),
-      { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 500 }
+      JSON.stringify({ response: fallback, fallbackUsed: true }),
+      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }
 });

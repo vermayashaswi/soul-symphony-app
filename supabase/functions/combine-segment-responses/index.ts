@@ -78,19 +78,18 @@ Guidelines:
 
 Generate a comprehensive response that feels like a single, thoughtful analysis rather than separate pieces.`;
 
-    const response = await fetch('https://api.openai.com/v1/responses', {
+    const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${openAiApiKey}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'gpt-5-mini-2025-08-07',
-        input: [
-          { role: 'user', content: [{ type: 'input_text', text: prompt }] }
+        model: 'gpt-4.1-2025-04-14',
+        messages: [
+          { role: 'user', content: prompt }
         ],
-        temperature: 0.7,
-        max_output_tokens: 1200,
+        max_tokens: 1200
       }),
     });
 
@@ -101,21 +100,19 @@ Generate a comprehensive response that feels like a single, thoughtful analysis 
     }
 
     const data = await response.json();
-    let combinedResponse = '';
-    if (typeof data.output_text === 'string' && data.output_text.trim()) {
-      combinedResponse = data.output_text;
-    } else if (Array.isArray(data.output)) {
-      combinedResponse = data.output
-        .map((item: any) => (item?.content ?? [])
-          .map((c: any) => c?.text ?? '')
-          .join(''))
-        .join('');
-    } else if (Array.isArray(data.content)) {
-      combinedResponse = data.content.map((c: any) => c?.text ?? '').join('');
-    }
+    let combinedResponse = data?.choices?.[0]?.message?.content?.trim() ?? '';
 
     if (!combinedResponse) {
-      throw new Error('No content in OpenAI response');
+      console.warn('[Combine Segment Responses] Empty content from OpenAI, returning concatenated fallback');
+      let fallbackResponse = '';
+      subQueryResponses.forEach((sqr, index) => {
+        if (index > 0) fallbackResponse += '\n\n';
+        fallbackResponse += `**Q${index + 1}: ${sqr.query}**\n${sqr.response}`;
+      });
+      return new Response(
+        JSON.stringify({ response: fallbackResponse, fallbackUsed: true }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
     }
 
     console.log(`[Combine Segment Responses] Successfully combined responses with conversation context`);

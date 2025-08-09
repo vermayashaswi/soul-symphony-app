@@ -154,7 +154,7 @@ async function planQuery(supabase, query) {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'gpt-4o-mini',
+        model: 'gpt-5-mini-2025-08-07',
         messages: [
           {
             role: 'system',
@@ -310,8 +310,11 @@ async function processSubQuery(subQuery, supabase, userId, timeRange) {
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
-      model: 'gpt-3.5-turbo',
-      messages: [{ role: 'system', content: subQueryPrompt }],
+      model: 'gpt-5-mini-2025-08-07',
+            messages: [
+              { role: 'system', content: subQueryPrompt },
+              { role: 'user', content: subQuery }
+            ],
     }),
   });
 
@@ -357,7 +360,7 @@ async function synthesizeResponses(originalQuery, subQueries, subQueryResponses)
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'gpt-4o-mini',
+        model: 'gpt-5-mini-2025-08-07',
         messages: [
           {
             role: 'system',
@@ -427,7 +430,7 @@ serve(async (req) => {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          model: 'gpt-3.5-turbo',
+          model: 'gpt-5-mini-2025-08-07',
           messages: messages,
         }),
       });
@@ -549,7 +552,7 @@ serve(async (req) => {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          model: 'gpt-3.5-turbo',
+          model: 'gpt-5-mini-2025-08-07',
           messages: [
             {
               role: 'system',
@@ -574,7 +577,7 @@ serve(async (req) => {
             { role: 'user', content: message }
           ],
           temperature: 0.1,
-          max_tokens: 10
+          max_completion_tokens: 10
         }),
       });
 
@@ -600,7 +603,7 @@ serve(async (req) => {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          model: 'gpt-3.5-turbo',
+          model: 'gpt-5-mini-2025-08-07',
           messages: [
             { role: 'system', content: GENERAL_QUESTION_PROMPT },
             ...(conversationContext.length > 0 ? conversationContext : []),
@@ -812,8 +815,8 @@ serve(async (req) => {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          model: 'gpt-3.5-turbo',
-          messages: conversationContext.length > 0 ? messages : [{ role: 'system', content: promptFormatted }],
+          model: 'gpt-5-mini-2025-08-07',
+          messages: conversationContext.length > 0 ? messages : [{ role: 'system', content: promptFormatted }, { role: 'user', content: message }],
         }),
       });
 

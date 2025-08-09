@@ -89,6 +89,7 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({
   // Use streaming chat for enhanced UX
   const {
     isStreaming,
+    streamingThreadId,
     streamingMessages,
     currentUserMessage,
     showBackendAnimation,
@@ -96,21 +97,21 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({
     queryCategory,
     restoreStreamingState
   } = useStreamingChat({
-    onFinalResponse: async (response, analysis) => {
-      // Handle final streaming response
-      if (!response || !currentThreadId || !effectiveUserId) {
+    onFinalResponse: async (response, analysis, originThreadId) => {
+      // Handle final streaming response scoped to its origin thread
+      if (!response || !originThreadId || !effectiveUserId) {
         debugLog.addEvent("Streaming Response", "Missing required data for final response", "error");
-        console.error("[Streaming] Missing response data:", { response: !!response, threadId: !!currentThreadId, userId: !!effectiveUserId });
+        console.error("[Streaming] Missing response data:", { response: !!response, originThreadId: !!originThreadId, userId: !!effectiveUserId });
         return;
       }
       
-      debugLog.addEvent("Streaming Response", `Final response received: ${response.substring(0, 100)}...`, "success");
+      debugLog.addEvent("Streaming Response", `Final response received for ${originThreadId}: ${response.substring(0, 100)}...`, "success");
       
       try {
-        // Save the assistant response to database
+        // Save the assistant response to database (always save to origin thread)
         debugLog.addEvent("Database", "Saving streaming assistant response to database", "info");
         const savedResponse = await saveMessage(
-          currentThreadId,
+          originThreadId,
           response,
           'assistant',
           effectiveUserId,
@@ -121,13 +122,17 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({
         if (savedResponse) {
           debugLog.addEvent("Database", `Streaming assistant response saved with ID: ${savedResponse.id}`, "success");
           
-          // Add the saved response to chat history
-          const typedSavedResponse: ChatMessage = {
-            ...savedResponse,
-            sender: savedResponse.sender as 'user' | 'assistant' | 'error',
-            role: savedResponse.role as 'user' | 'assistant' | 'error'
-          };
-          setChatHistory(prev => [...prev, typedSavedResponse]);
+          // Only append to UI if the origin thread is currently active
+          if (originThreadId === currentThreadId) {
+            const typedSavedResponse: ChatMessage = {
+              ...savedResponse,
+              sender: savedResponse.sender as 'user' | 'assistant' | 'error',
+              role: savedResponse.role as 'user' | 'assistant' | 'error'
+            };
+            setChatHistory(prev => [...prev, typedSavedResponse]);
+          } else {
+            debugLog.addEvent("Streaming Response", `Response saved for background thread ${originThreadId}, not appending to current UI thread ${currentThreadId}`, "info");
+          }
         } else {
           debugLog.addEvent("Database", "Failed to save streaming response - null response", "error");
           throw new Error("Failed to save streaming response");
@@ -136,16 +141,18 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({
         debugLog.addEvent("Database", `Error saving streaming response: ${saveError instanceof Error ? saveError.message : "Unknown error"}`, "error");
         console.error("[Streaming] Failed to save response:", saveError);
         
-        // Fallback: Add temporary message to UI
-        const fallbackMessage: ChatMessage = {
-          id: `temp-streaming-${Date.now()}`,
-          thread_id: currentThreadId,
-          content: response,
-          sender: 'assistant',
-          role: 'assistant',
-          created_at: new Date().toISOString()
-        };
-        setChatHistory(prev => [...prev, fallbackMessage]);
+        // Fallback: Add temporary message to UI only if still on origin thread
+        if (originThreadId === currentThreadId) {
+          const fallbackMessage: ChatMessage = {
+            id: `temp-streaming-${Date.now()}`,
+            thread_id: originThreadId,
+            content: response,
+            sender: 'assistant',
+            role: 'assistant',
+            created_at: new Date().toISOString()
+          };
+          setChatHistory(prev => [...prev, fallbackMessage]);
+        }
         
         toast({
           title: "Warning",
@@ -368,12 +375,17 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({
       created_at: new Date().toISOString()
     };
     
-    debugLog.addEvent("User Message", `Adding temporary message to UI: ${tempUserMessage.id}`, "info");
+     debugLog.addEvent("User Message", `Adding temporary message to UI: ${tempUserMessage.id}`, "info");
     setChatHistory(prev => [...prev, tempUserMessage]);
+    
+    // Force chat area to jump to bottom on send
+    window.dispatchEvent(new Event('chat:forceScrollToBottom'));
     
     // Set local loading state for immediate UI feedback
     setLocalLoading(true, "Analyzing your question...");
     
+    // Ensure we stay pinned to bottom as processing begins
+    window.dispatchEvent(new Event('chat:forceScrollToBottom'));
     try {
       // Update thread processing status to 'processing'
       await updateThreadProcessingStatus(threadId, 'processing');
@@ -448,10 +460,9 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({
       debugLog.addEvent("Query Classification", `Classification result: ${JSON.stringify({
         category: queryClassification.category,
         confidence: queryClassification.confidence,
-        shouldUseJournal: queryClassification.shouldUseJournal,
         useAllEntries: queryClassification.useAllEntries,
         reasoning: queryClassification.reasoning
-      })}`, "success");
+      })}` , "success");
       
       updateProcessingStage("Generating response...");
       
@@ -507,8 +518,13 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({
           throw new Error(`Mental health chat error: ${error.message}`);
         }
         
+        const text = data?.response ?? data?.data ?? (typeof data === 'string' ? data : null);
+        if (!text) {
+          throw new Error('No response received from mental health chat function');
+        }
+        
         response = {
-          content: data.response,
+          content: text,
           references: [],
           analysis: {},
           hasNumericResult: false,
@@ -538,13 +554,14 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({
           throw new Error(`Smart chat error: ${error.message}`);
         }
         
-        if (!data || !data.response) {
-          debugLog.addEvent("Edge Function Response", "Smart-chat returned no response data", "error");
+        const text = data?.response ?? data?.data ?? data?.message ?? (typeof data === 'string' ? data : null);
+        if (!text) {
+          debugLog.addEvent("Edge Function Response", "Smart-chat returned no usable response payload", "error");
           throw new Error("No response received from smart-chat function");
         }
         
         response = {
-          content: data.response,
+          content: text,
           references: [],
           analysis: {},
           hasNumericResult: false,
@@ -891,6 +908,11 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({
   // Check if deletion should be disabled - use realtime processing state
   const isDeletionDisabled = isProcessing || processingStatus === 'processing' || isLoading;
 
+  // Thread-scoped loading indicator: during streaming, only show for the originating thread
+  const showLoadingForThisThread = streamingThreadId
+    ? (isStreaming && streamingThreadId === currentThreadId)
+    : (isLoading || isProcessing);
+
   return (
     <div className="chat-interface flex flex-col h-full">
       <div className="chat-header flex items-center justify-between py-3 px-4 border-b">
@@ -940,7 +962,7 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({
         ) : (
           <ChatArea 
             chatMessages={chatHistory}
-            isLoading={isLoading || isProcessing}
+            isLoading={showLoadingForThisThread}
             processingStage={processingStage || undefined}
             threadId={currentThreadId}
             onInteractiveOptionClick={handleInteractiveOptionClick}
@@ -955,7 +977,7 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({
           <div className="flex-1">
             <ChatInput 
               onSendMessage={handleSendMessage} 
-              isLoading={isLoading || isProcessing} 
+              isLoading={showLoadingForThisThread} 
               userId={effectiveUserId}
             />
           </div>

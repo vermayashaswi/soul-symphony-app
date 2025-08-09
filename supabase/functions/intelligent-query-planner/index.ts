@@ -227,12 +227,13 @@ ENHANCED ANALYSIS GUIDELINES:
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
-      model: 'gpt-4.1-mini-2025-04-14',
+      model: 'gpt-4.1-2025-04-14',
       messages: [
         { role: 'system', content: systemPrompt },
         { role: 'user', content: message }
       ],
       temperature: 0.1,
+      response_format: { type: 'json_object' },
       max_tokens: 1000
     }),
   });

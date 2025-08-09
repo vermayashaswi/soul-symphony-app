@@ -58,6 +58,21 @@ const ChatArea: React.FC<ChatAreaProps> = ({
     }
   }, [chatMessages, threadId]);
 
+  // Listen for global force-scroll events (e.g., after user presses Send)
+  useEffect(() => {
+    const handleForceScroll = () => {
+      // Force scroll regardless of user's current position
+      scrollToBottom(true);
+    };
+    window.addEventListener('chat:forceScrollToBottom' as any, handleForceScroll);
+    // Backward-compatible alias if needed in future
+    window.addEventListener('chat:scrollToBottom' as any, handleForceScroll);
+    return () => {
+      window.removeEventListener('chat:forceScrollToBottom' as any, handleForceScroll);
+      window.removeEventListener('chat:scrollToBottom' as any, handleForceScroll);
+    };
+  }, [scrollToBottom]);
+
   return (
     <div ref={scrollElementRef} className="flex flex-col p-4 overflow-y-auto h-full pb-20">
       {chatMessages.filter(msg => !msg.is_processing).map((message, index) => (
