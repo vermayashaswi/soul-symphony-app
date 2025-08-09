@@ -1,5 +1,5 @@
 
-import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { createContext, useContext, useState, useEffect, useRef, ReactNode } from 'react';
 import { Session, User } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
@@ -42,7 +42,11 @@ function AuthProviderCore({ children }: { children: ReactNode }) {
   // Session tracking state removed - now handled by SessionProvider
   const [authInitialized, setAuthInitialized] = useState(false);
   const [authStateStable, setAuthStateStable] = useState(false);
-  const location = useLocation();
+const location = useLocation();
+
+  // Track previous session to avoid false "Signed out" toast on first load
+  const previousSessionRef = useRef<Session | null>(null);
+  const initialAuthCheckedRef = useRef(false);
 
   useEffect(() => {
     const initializeNativeServices = async () => {
@@ -459,6 +463,7 @@ function AuthProviderCore({ children }: { children: ReactNode }) {
           return;
         }
         
+        const hadPrevSession = !!previousSessionRef.current;
         setSession(currentSession);
         setUser(currentSession?.user ?? null);
         
@@ -548,10 +553,14 @@ function AuthProviderCore({ children }: { children: ReactNode }) {
             setAutoRetryTimeoutId(null);
           }
           
-          if (isAppRoute(location.pathname)) {
+          // Suppress initial false toast: only show if we had a prior session and initial check completed
+          if (isAppRoute(location.pathname) && initialAuthCheckedRef.current && hadPrevSession) {
             toast.info('Signed out');
           }
         }
+
+        // Update previous session reference for next event
+        previousSessionRef.current = currentSession;
       }
     );
 
@@ -562,6 +571,9 @@ function AuthProviderCore({ children }: { children: ReactNode }) {
       });
       setSession(currentSession);
       setUser(currentSession?.user ?? null);
+      // Record initial session and mark initial auth as checked
+      previousSessionRef.current = currentSession;
+      initialAuthCheckedRef.current = true;
       
       if (currentSession?.user) {
         // Session tracking now handled by SessionProvider
