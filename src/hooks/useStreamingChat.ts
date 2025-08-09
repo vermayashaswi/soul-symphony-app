@@ -49,7 +49,7 @@ export const useStreamingChat = ({ onFinalResponse, onError }: UseStreamingChatP
   
   const abortControllerRef = useRef<AbortController | null>(null);
   const maxRetryAttempts = 2;
-
+ 
   // Utility function to detect edge function errors
   const isEdgeFunctionError = useCallback((error: any): boolean => {
     const errorMessage = error?.message || error?.toString() || '';
@@ -60,6 +60,65 @@ export const useStreamingChat = ({ onFinalResponse, onError }: UseStreamingChatP
       error?.status >= 400
     );
   }, []);
+
+  // Detect network errors (offline, fetch failures)
+  const isNetworkError = useCallback((error: any): boolean => {
+    const msg = (error?.message || error?.toString() || '').toLowerCase();
+    return (
+      !navigator.onLine ||
+      error instanceof TypeError ||
+      msg.includes('failed to fetch') ||
+      msg.includes('networkerror') ||
+      msg.includes('network error') ||
+      msg.includes('timeout')
+    );
+  }, []);
+
+  const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+  // Backoff wrapper for supabase.functions.invoke
+  const invokeWithBackoff = useCallback(
+    async (
+      body: Record<string, any>,
+      options?: { attempts?: number; baseDelay?: number }
+    ): Promise<{ data: any; error: any }> => {
+      const attempts = options?.attempts ?? 3;
+      const baseDelay = options?.baseDelay ?? 900;
+
+      let lastErr: any = null;
+      for (let i = 0; i < attempts; i++) {
+        try {
+          const timeoutMs = 20000 + i * 5000; // grow timeout slightly per attempt
+          const timeoutPromise = new Promise((_, rej) =>
+            setTimeout(() => rej(new Error('Request timed out')), timeoutMs)
+          );
+
+          const result = (await Promise.race([
+            supabase.functions.invoke('chat-with-rag', { body }),
+            timeoutPromise,
+          ])) as { data: any; error: any };
+
+          if ((result as any)?.error) {
+            lastErr = (result as any).error;
+            if (isEdgeFunctionError(lastErr) || isNetworkError(lastErr)) {
+              // retryable
+            } else {
+              return result;
+            }
+          } else {
+            return result;
+          }
+        } catch (e) {
+          lastErr = e;
+        }
+        // exponential backoff with jitter
+        const delay = Math.min(6000, baseDelay * Math.pow(2, i)) + Math.floor(Math.random() * 250);
+        await sleep(delay);
+      }
+      return { data: null, error: lastErr || new Error('Unknown error') };
+    },
+    [isEdgeFunctionError, isNetworkError]
+  );
 
   const addStreamingMessage = useCallback((message: StreamingMessage) => {
     setStreamingMessages(prev => [...prev, message]);
@@ -161,15 +220,13 @@ export const useStreamingChat = ({ onFinalResponse, onError }: UseStreamingChatP
       );
 
       // Try the request again
-      const { data, error } = await supabase.functions.invoke('chat-with-rag', {
-        body: {
-          message: lastFailedMessage.message,
-          userId: lastFailedMessage.userId,
-          threadId: lastFailedMessage.threadId,
-          conversationContext: lastFailedMessage.conversationContext,
-          userProfile: lastFailedMessage.userProfile,
-          streamingMode: false
-        }
+      const { data, error } = await invokeWithBackoff({
+        message: lastFailedMessage.message,
+        userId: lastFailedMessage.userId,
+        threadId: lastFailedMessage.threadId,
+        conversationContext: lastFailedMessage.conversationContext,
+        userProfile: lastFailedMessage.userProfile,
+        streamingMode: false
       });
 
       if (error) {
@@ -331,101 +388,48 @@ export const useStreamingChat = ({ onFinalResponse, onError }: UseStreamingChatP
       processingStartTime: Date.now()
     });
 
-    // Create abort controller for timeout
-    const abortController = new AbortController();
-    abortControllerRef.current = abortController;
-
+    // Directly use robust non-streaming flow with backoff; keep streaming UI
     try {
-      // Set up timeout (30 seconds)
-      const timeoutId = setTimeout(() => {
-        console.warn('[useStreamingChat] Request timeout, falling back to non-streaming');
-        abortController.abort();
-        
-        // Fall back to non-streaming mode due to timeout
-        startNonStreamingChatInternal(message, userId, threadId, conversationContext, userProfile);
-      }, 30000);
+      const { data, error } = await invokeWithBackoff({
+        message,
+        userId,
+        threadId,
+        conversationContext,
+        userProfile,
+        streamingMode: false
+      }, { attempts: 3, baseDelay: 900 });
 
-      // Try streaming using fetch with proper auth headers
-      try {
-        console.log('[useStreamingChat] Starting streaming request...');
-        
-        // Get Supabase session for auth headers
-        const { data: session } = await supabase.auth.getSession();
-        const authToken = session.session?.access_token;
-        
-        if (!authToken) {
-          throw new Error('No auth token available');
+      if (error) {
+        // Store for auto-retry when coming back online
+        if (isEdgeFunctionError(error) || isNetworkError(error)) {
+          setLastFailedMessage({ message, userId, threadId, conversationContext, userProfile });
+          // schedule a quick retry
+          setTimeout(() => { retryLastMessage(); }, 800);
+          return;
         }
-
-        // Use Supabase function invoke for better reliability
-        const { data: streamingResponse, error: streamingError } = await supabase.functions.invoke('chat-with-rag', {
-          body: {
-            message,
-            userId,
-            threadId,
-            conversationContext,
-            userProfile,
-            streamingMode: true
-          }
-        });
-
-        if (streamingError) {
-          // Check if this is an edge function error that should trigger retry
-          if (isEdgeFunctionError(streamingError) && retryAttempts < maxRetryAttempts) {
-            console.log('[useStreamingChat] Edge function error detected, storing message for retry');
-            setLastFailedMessage({ message, userId, threadId, conversationContext, userProfile });
-            
-            // Trigger automatic retry
-            setTimeout(() => {
-              retryLastMessage();
-            }, 500);
-            return;
-          }
-          
-          // Show custom error toast for "non-2xx code" errors
-          if (streamingError.message?.includes('non-2xx code')) {
-            onError?.('Oops! I faced a hiccup. Try again!');
-          }
-          
-          throw new Error(`Streaming request failed: ${streamingError.message}`);
-        }
-
-        // For now, handle as non-streaming since Supabase client doesn't support SSE directly
-        const text = streamingResponse?.response ?? streamingResponse?.data ?? streamingResponse?.message ?? (typeof streamingResponse === 'string' ? streamingResponse : null);
-        if (text) {
-          addStreamingMessage({
-            type: 'final_response',
-            response: text,
-            analysis: streamingResponse?.analysis,
-            timestamp: Date.now()
-          });
-        } else {
-          throw new Error('No response data from streaming request');
-        }
-
-        clearTimeout(timeoutId);
-
-      } catch (streamingError) {
-        clearTimeout(timeoutId);
-        
-        // Only fall back if not aborted
-        if (streamingError.name !== 'AbortError') {
-          console.warn('[useStreamingChat] Streaming failed, falling back to non-streaming:', streamingError);
-          await startNonStreamingChatInternal(message, userId, threadId, conversationContext, userProfile);
-        } else {
-          console.log('[useStreamingChat] Request was aborted');
-        }
+        throw new Error(error?.message || 'Request failed');
       }
 
-    } catch (error) {
-      console.error('[useStreamingChat] Error in streaming chat:', error);
+      const text = data?.response ?? data?.data ?? data?.message ?? (typeof data === 'string' ? data : null);
+      if (text) {
+        addStreamingMessage({
+          type: 'final_response',
+          response: text,
+          analysis: data?.analysis,
+          timestamp: Date.now()
+        });
+      } else {
+        throw new Error('No response received from chat service');
+      }
+    } catch (err: any) {
+      console.warn('[useStreamingChat] Backoff flow failed:', err);
       addStreamingMessage({
         type: 'error',
-        error: error instanceof Error ? error.message : 'Unknown error occurred',
+        error: err?.message || 'Unknown error occurred',
         timestamp: Date.now()
       });
     }
-  }, [isStreaming, addStreamingMessage, resetRetryState, generateStreamingMessages, isEdgeFunctionError, retryLastMessage]);
+  }, [isStreaming, addStreamingMessage, resetRetryState, generateStreamingMessages, invokeWithBackoff, isEdgeFunctionError, isNetworkError, retryLastMessage]);
 
   // Internal function for non-streaming fallback
   const startNonStreamingChatInternal = async (
@@ -481,15 +485,13 @@ export const useStreamingChat = ({ onFinalResponse, onError }: UseStreamingChatP
         });
       }
 
-      const { data, error } = await supabase.functions.invoke('chat-with-rag', {
-        body: {
-          message,
-          userId,
-          threadId,
-          conversationContext,
-          userProfile,
-          streamingMode: false
-        }
+      const { data, error } = await invokeWithBackoff({
+        message,
+        userId,
+        threadId,
+        conversationContext,
+        userProfile,
+        streamingMode: false
       });
 
       if (error) {
@@ -638,6 +640,17 @@ export const useStreamingChat = ({ onFinalResponse, onError }: UseStreamingChatP
     return true;
   }, []);
 
+  // Auto-retry when network comes back online
+  useEffect(() => {
+    const handleOnline = () => {
+      if (lastFailedMessage && !isRetrying) {
+        retryLastMessage();
+      }
+    };
+    window.addEventListener('online', handleOnline);
+    return () => window.removeEventListener('online', handleOnline);
+  }, [lastFailedMessage, isRetrying, retryLastMessage]);
+ 
   return {
     isStreaming,
     streamingThreadId,
@@ -656,6 +669,7 @@ export const useStreamingChat = ({ onFinalResponse, onError }: UseStreamingChatP
     isRetrying,
     retryAttempts,
     expectedProcessingTime,
-    processingStartTime
+    processingStartTime,
+    retryLastMessage
   };
 };
