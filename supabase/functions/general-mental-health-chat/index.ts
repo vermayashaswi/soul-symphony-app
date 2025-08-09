@@ -161,31 +161,48 @@ MUST HAVE/DO: ALWAYS BE AWARE OF THE CONVERSATION HISTORY TO UNDERSTAND WHAT THE
     // Add current message
     messages.push({ role: 'user', content: message });
 
-    const response = await fetch('https://api.openai.com/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${openAiApiKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: 'gpt-4.1-2025-04-14',
-        messages,
-        max_tokens: 800
-      }),
-    });
+    // Try OpenAI with lightweight retries and graceful fallback
+    const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+    let content = '';
+    const maxAttempts = 3;
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      try {
+        const response = await fetch('https://api.openai.com/v1/chat/completions', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${openAiApiKey}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            model: 'gpt-4.1-2025-04-14',
+            messages,
+            max_tokens: 800
+          }),
+        });
 
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error('[General Mental Health] OpenAI API error:', errorText);
-      throw new Error(`OpenAI API error: ${response.status}`);
-  }
-
-    const data = await response.json();
-    const content = data?.choices?.[0]?.message?.content?.trim() || '';
+        if (!response.ok) {
+          const errorText = await response.text();
+          console.error(`[General Mental Health] OpenAI attempt ${attempt}/${maxAttempts} failed:`, errorText);
+          if (attempt < maxAttempts) {
+            await sleep(400 * attempt);
+            continue;
+          }
+        } else {
+          const data = await response.json();
+          content = data?.choices?.[0]?.message?.content?.trim() || '';
+        }
+        break; // break whether ok or not after processing
+      } catch (err) {
+        console.error(`[General Mental Health] OpenAI attempt ${attempt}/${maxAttempts} error:`, err);
+        if (attempt < maxAttempts) {
+          await sleep(400 * attempt);
+        }
+      }
+    }
 
     if (!content) {
-      console.warn('[General Mental Health] Empty OpenAI content, returning graceful fallback');
-      const fallback = "I'm here with you. Based on what you've shared, how are you feeling right now—and what would feel supportive in this moment?";
+      console.warn('[General Mental Health] Using graceful fallback after OpenAI failure');
+      const fallback = "Hey, I’m here with you. *Even if tech is being moody right now*, I’m still listening. **What’s been most on your mind or heart today?** If it helps, try finishing this: *“Lately, I’ve been feeling… because…”* 💛";
       return new Response(
         JSON.stringify({ response: fallback, fallbackUsed: true }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -201,18 +218,11 @@ MUST HAVE/DO: ALWAYS BE AWARE OF THE CONVERSATION HISTORY TO UNDERSTAND WHAT THE
 
   } catch (error) {
     console.error('[General Mental Health] Error:', error);
-    
-    // Return a proper error that can be handled by the frontend
-    if (error.message?.includes('OpenAI API error')) {
-      return new Response(
-        JSON.stringify({ error: 'OpenAI service temporarily unavailable' }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 503 }
-      );
-    }
-    
+    // Graceful 200 fallback so callers don't fail on non-2xx
+    const fallback = "I’m here with you. Let’s keep it simple: **what’s feeling heaviest right now** or **what would you like support with today?** 💙";
     return new Response(
-      JSON.stringify({ error: 'Service temporarily unavailable' }),
-      { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 500 }
+      JSON.stringify({ response: fallback, fallbackUsed: true }),
+      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }
 });
