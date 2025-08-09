@@ -234,7 +234,7 @@ serve(async (req) => {
             }
           ],
           response_format: { type: 'json_object' },
-          max_completion_tokens: 1500
+          max_output_tokens: 1500
         }),
     });
 

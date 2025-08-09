@@ -80,7 +80,7 @@ Your response should be a JSON object with this structure:
 TONE: Warm, grounded, spiritually aware but not preachy, genuinely caring, with brilliant wit and a sense of deeper understanding. Speak to both their mind and their soul.
 `;
 
-    const response = await fetch('https://api.openai.com/v1/chat/completions', {
+    const response = await fetch('https://api.openai.com/v1/responses', {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${openAIApiKey}`,
@@ -88,20 +88,29 @@ TONE: Warm, grounded, spiritually aware but not preachy, genuinely caring, with 
         },
         body: JSON.stringify({
           model: 'gpt-5-mini-2025-08-07',
-          messages: [
+          input: [
             { 
               role: 'system', 
-              content: 'You are Ruh, the soul-centered wellness companion by SOuLO. You combine ancient wisdom with modern psychology to help people connect with their deepest truth and inner knowing.'
+              content: [{ type: 'input_text', text: 'You are Ruh, the soul-centered wellness companion by SOuLO. You combine ancient wisdom with modern psychology to help people connect with their deepest truth and inner knowing.' }]
             },
-            { role: 'user', content: clarificationPrompt }
+            { role: 'user', content: [{ type: 'input_text', text: clarificationPrompt }] }
           ],
           response_format: { type: 'json_object' },
-          max_tokens: 800
+          max_output_tokens: 800
         }),
     });
 
     const data = await response.json();
-    let rawResponse = data?.choices?.[0]?.message?.content ?? '';
+    let rawResponse = '';
+    if (typeof data.output_text === 'string' && data.output_text.trim()) {
+      rawResponse = data.output_text;
+    } else if (Array.isArray(data.output)) {
+      rawResponse = data.output
+        .map((item: any) => (item?.content ?? []).map((c: any) => c?.text ?? '').join(''))
+        .join('');
+    } else if (Array.isArray(data.content)) {
+      rawResponse = data.content.map((c: any) => c?.text ?? '').join('');
+    }
 
     
     // Try to parse JSON response with status message
