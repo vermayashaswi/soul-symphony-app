@@ -96,21 +96,21 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({
     queryCategory,
     restoreStreamingState
   } = useStreamingChat({
-    onFinalResponse: async (response, analysis) => {
-      // Handle final streaming response
-      if (!response || !currentThreadId || !effectiveUserId) {
+    onFinalResponse: async (response, analysis, originThreadId) => {
+      // Handle final streaming response scoped to its origin thread
+      if (!response || !originThreadId || !effectiveUserId) {
         debugLog.addEvent("Streaming Response", "Missing required data for final response", "error");
-        console.error("[Streaming] Missing response data:", { response: !!response, threadId: !!currentThreadId, userId: !!effectiveUserId });
+        console.error("[Streaming] Missing response data:", { response: !!response, originThreadId: !!originThreadId, userId: !!effectiveUserId });
         return;
       }
       
-      debugLog.addEvent("Streaming Response", `Final response received: ${response.substring(0, 100)}...`, "success");
+      debugLog.addEvent("Streaming Response", `Final response received for ${originThreadId}: ${response.substring(0, 100)}...`, "success");
       
       try {
-        // Save the assistant response to database
+        // Save the assistant response to database (always save to origin thread)
         debugLog.addEvent("Database", "Saving streaming assistant response to database", "info");
         const savedResponse = await saveMessage(
-          currentThreadId,
+          originThreadId,
           response,
           'assistant',
           effectiveUserId,
@@ -121,13 +121,17 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({
         if (savedResponse) {
           debugLog.addEvent("Database", `Streaming assistant response saved with ID: ${savedResponse.id}`, "success");
           
-          // Add the saved response to chat history
-          const typedSavedResponse: ChatMessage = {
-            ...savedResponse,
-            sender: savedResponse.sender as 'user' | 'assistant' | 'error',
-            role: savedResponse.role as 'user' | 'assistant' | 'error'
-          };
-          setChatHistory(prev => [...prev, typedSavedResponse]);
+          // Only append to UI if the origin thread is currently active
+          if (originThreadId === currentThreadId) {
+            const typedSavedResponse: ChatMessage = {
+              ...savedResponse,
+              sender: savedResponse.sender as 'user' | 'assistant' | 'error',
+              role: savedResponse.role as 'user' | 'assistant' | 'error'
+            };
+            setChatHistory(prev => [...prev, typedSavedResponse]);
+          } else {
+            debugLog.addEvent("Streaming Response", `Response saved for background thread ${originThreadId}, not appending to current UI thread ${currentThreadId}`, "info");
+          }
         } else {
           debugLog.addEvent("Database", "Failed to save streaming response - null response", "error");
           throw new Error("Failed to save streaming response");
@@ -136,16 +140,18 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({
         debugLog.addEvent("Database", `Error saving streaming response: ${saveError instanceof Error ? saveError.message : "Unknown error"}`, "error");
         console.error("[Streaming] Failed to save response:", saveError);
         
-        // Fallback: Add temporary message to UI
-        const fallbackMessage: ChatMessage = {
-          id: `temp-streaming-${Date.now()}`,
-          thread_id: currentThreadId,
-          content: response,
-          sender: 'assistant',
-          role: 'assistant',
-          created_at: new Date().toISOString()
-        };
-        setChatHistory(prev => [...prev, fallbackMessage]);
+        // Fallback: Add temporary message to UI only if still on origin thread
+        if (originThreadId === currentThreadId) {
+          const fallbackMessage: ChatMessage = {
+            id: `temp-streaming-${Date.now()}`,
+            thread_id: originThreadId,
+            content: response,
+            sender: 'assistant',
+            role: 'assistant',
+            created_at: new Date().toISOString()
+          };
+          setChatHistory(prev => [...prev, fallbackMessage]);
+        }
         
         toast({
           title: "Warning",

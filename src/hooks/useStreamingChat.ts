@@ -33,9 +33,18 @@ export const useStreamingChat = ({ onFinalResponse, onError }: UseStreamingChatP
   const [currentThreadId, setCurrentThreadId] = useState<string | null>(null);
   // The thread id for which a streaming request is currently active
   const [streamingThreadId, setStreamingThreadId] = useState<string | null>(null);
+  // Ref mirror to avoid stale closures in callbacks
+  const streamingThreadIdRef = useRef<string | null>(null);
+  // Store the pending request payload for safety guard retries
+  const pendingRequestRef = useRef<{
+    message: string;
+    userId: string;
+    threadId: string;
+    conversationContext: any[];
+    userProfile: any;
+  } | null>(null);
   const [expectedProcessingTime, setExpectedProcessingTime] = useState<number | null>(null);
   const [processingStartTime, setProcessingStartTime] = useState<number | null>(null);
-  
   // Retry state management
   const [isRetrying, setIsRetrying] = useState(false);
   const [retryAttempts, setRetryAttempts] = useState(0);
@@ -139,21 +148,28 @@ export const useStreamingChat = ({ onFinalResponse, onError }: UseStreamingChatP
         setRetryAttempts(0);
         setLastFailedMessage(null);
         setIsRetrying(false);
-        // Clear persisted state on completion
-        if (streamingThreadId) {
-          clearChatStreamingState(streamingThreadId);
+        // Clear persisted state on completion using ref to avoid stale closure
+        const originId = streamingThreadIdRef.current;
+        if (originId) {
+          clearChatStreamingState(originId);
         }
-        onFinalResponse?.(message.response || '', message.analysis, streamingThreadId);
+        onFinalResponse?.(message.response || '', message.analysis, originId);
         setStreamingThreadId(null);
+        streamingThreadIdRef.current = null;
+        pendingRequestRef.current = null;
         break;
       case 'error':
         setIsStreaming(false);
         setShowBackendAnimation(false);
-        if (streamingThreadId) {
-          clearChatStreamingState(streamingThreadId);
+        // Clear persisted state on error
+        const errOrigin = streamingThreadIdRef.current;
+        if (errOrigin) {
+          clearChatStreamingState(errOrigin);
         }
         setStreamingThreadId(null);
+        streamingThreadIdRef.current = null;
         onError?.(message.error || 'Unknown error occurred');
+        pendingRequestRef.current = null;
         break;
     }
   }, [onFinalResponse, onError]);
@@ -313,6 +329,27 @@ export const useStreamingChat = ({ onFinalResponse, onError }: UseStreamingChatP
     };
   }, [isStreaming, useThreeDotFallback, dynamicMessages.length, currentMessageIndex, queryCategory, expectedProcessingTime, processingStartTime]);
 
+  // Safety completion guard to end stuck streaming sessions
+  useEffect(() => {
+    if (!isStreaming) return;
+    const graceMs = 45000; // 45s grace on top of ETA or use 60s default
+    const budget = (expectedProcessingTime ?? 60000) + graceMs;
+    const startedAt = processingStartTime ?? Date.now();
+    const remaining = Math.max(5000, budget - (Date.now() - startedAt));
+    const timer = setTimeout(() => {
+      console.warn('[useStreamingChat] Safety guard triggered: terminating stuck streaming session');
+      addStreamingMessage({
+        type: 'error',
+        error: 'Connection seems unstable. Please retry.',
+        timestamp: Date.now()
+      });
+      if (pendingRequestRef.current) {
+        setLastFailedMessage(pendingRequestRef.current);
+      }
+    }, remaining);
+    return () => clearTimeout(timer);
+  }, [isStreaming, expectedProcessingTime, processingStartTime, addStreamingMessage]);
+
   const startStreamingChat = useCallback(async (
     message: string,
     userId: string,
@@ -331,9 +368,10 @@ export const useStreamingChat = ({ onFinalResponse, onError }: UseStreamingChatP
     // Set current thread and timing info
     setCurrentThreadId(threadId);
     setStreamingThreadId(threadId);
+    streamingThreadIdRef.current = threadId;
     setProcessingStartTime(Date.now());
-    
-    setIsStreaming(true);
+    // Store pending payload for potential retry by safety guard
+    pendingRequestRef.current = { message, userId, threadId, conversationContext, userProfile };
     setStreamingMessages([]);
     setCurrentUserMessage('');
     setShowBackendAnimation(false);
