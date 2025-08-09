@@ -77,7 +77,7 @@ Respond with ONLY a JSON array of 3 strings, nothing else:
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'gpt-4o-mini',
+        model: 'gpt-5-mini-2025-08-07',
         messages: [
           {
             role: 'system',
