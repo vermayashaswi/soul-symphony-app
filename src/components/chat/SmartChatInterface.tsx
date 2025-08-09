@@ -448,10 +448,9 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({
       debugLog.addEvent("Query Classification", `Classification result: ${JSON.stringify({
         category: queryClassification.category,
         confidence: queryClassification.confidence,
-        shouldUseJournal: queryClassification.shouldUseJournal,
         useAllEntries: queryClassification.useAllEntries,
         reasoning: queryClassification.reasoning
-      })}`, "success");
+      })}` , "success");
       
       updateProcessingStage("Generating response...");
       
