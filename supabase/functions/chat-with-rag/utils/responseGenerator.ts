@@ -11,7 +11,6 @@ export function generateSystemPrompt(
   entryCount?: number,
   analysisScope?: string,
   conversationContext?: any[],
-  isFollowUp?: boolean,
   hasPersonalPronouns?: boolean,
   hasTimeReference?: boolean,
   searchMethod?: string

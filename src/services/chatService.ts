@@ -91,8 +91,7 @@ export async function processChatMessage(
       body: { 
         message, 
         conversationContext,
-        lastAssistantMessage: lastAssistantMessage?.content,
-        isFollowUp: isFollowUpMessage
+        lastAssistantMessage: lastAssistantMessage?.content
       }
     });
 
@@ -100,14 +99,13 @@ export async function processChatMessage(
       console.error('[ChatService] Classification error:', classificationError);
     }
 
-    let classification = classificationData || { category: 'JOURNAL_SPECIFIC', shouldUseJournal: true };
+    let classification = classificationData || { category: 'JOURNAL_SPECIFIC' };
     
     // PHASE 3: Override classification for follow-up messages that should be general mental health
     if (isFollowUpMessage && message.toLowerCase().includes('football')) {
       console.log('[ChatService] Overriding classification for football follow-up');
       classification = { 
         category: 'GENERAL_MENTAL_HEALTH', 
-        shouldUseJournal: false,
         confidence: 0.9,
         reasoning: 'Follow-up to sports/activity conversation'
       };
@@ -170,10 +168,8 @@ export async function processChatMessage(
         message,
         userId,
         conversationContext,
-        isFollowUp: conversationContext.length > 0,
         preserveTopicContext: true,
         threadMetadata: {},
-        isAnalysisFollowUp: false,
         requireDualSearch: true,
         requireDatabaseValidation: true, // Enhanced requirement for database-validated themes/emotions
         confidenceThreshold: 0.9

@@ -69,7 +69,7 @@ serve(async (req) => {
   }
 
   try {
-    const { message, conversationContext = [], lastAssistantMessage, isFollowUp } = await req.json();
+    const { message, conversationContext = [] } = await req.json();
 
     if (!message) {
       return new Response(
@@ -79,18 +79,10 @@ serve(async (req) => {
     }
 
     console.log(`[General Mental Health] Processing: "${message}"`);
-    console.log(`[General Mental Health] Is follow-up: ${isFollowUp}, Last assistant: ${lastAssistantMessage?.slice(0, 50)}`);
+    // Follow-up flags removed from pipeline
 
-    // PHASE 3: Enhanced scope checking with follow-up detection
-    const isFootballFollowUp = isFollowUp && 
-      lastAssistantMessage && 
-      /\b(sport|football|activity|exercise|physical)\b/i.test(lastAssistantMessage) &&
-      /\b(football|sport)\b/i.test(message.toLowerCase());
-
-    if (isFootballFollowUp) {
-      console.log(`[General Mental Health] Handling football follow-up: "${message}"`);
-      // Don't check scope for follow-ups, handle directly
-    } else if (!isWithinScope(message)) {
+    // Scope checking
+    if (!isWithinScope(message)) {
       console.log(`[General Mental Health] Out of scope: "${message}"`);
       return new Response(
         JSON.stringify({ 

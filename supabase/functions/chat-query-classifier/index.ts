@@ -71,13 +71,9 @@ async function gptClassifyMessage(
 ): Promise<{
   category: string;
   confidence: number;
-  shouldUseJournal: boolean;
   reasoning: string;
   useAllEntries?: boolean;
-  // Optional enriched fields for downstream logic
   recommendedPipeline?: 'general' | 'clarification' | 'rag_full';
-  isFollowUp?: boolean;
-  maintainPreviousPipeline?: boolean;
   clarifyingQuestion?: string | null;
   journalHintStrength?: 'low' | 'medium' | 'high';
   timeScopeHint?: 'all' | 'recent' | 'last_week' | 'this_month' | 'last_month' | null;
@@ -98,22 +94,16 @@ Categories:
 Core rules:
 1) Prefer JOURNAL_SPECIFIC for first-person queries about the user's own state/patterns, even if slightly vague but with any specific detail.
 2) Use JOURNAL_SPECIFIC_NEEDS_CLARIFICATION only for extremely vague personal prompts with zero analyzable detail.
-3) Follow-up continuity: if the message is a short reply (e.g., "yes", "tell me more", "what should I do now?", "what do you think i should do now?") and recent context suggests ongoing personal analysis, set isFollowUp=true and maintainPreviousPipeline=true. If it asks for personal guidance, choose JOURNAL_SPECIFIC or JOURNAL_SPECIFIC_NEEDS_CLARIFICATION (not GENERAL_MENTAL_HEALTH).
-4) Pure small talk like "thanks", "ok", "cool" → GENERAL_MENTAL_HEALTH with maintainPreviousPipeline=false.
-5) shouldUseJournal = true for JOURNAL_SPECIFIC and also when isFollowUp && maintainPreviousPipeline.
-6) useAllEntries = true if personal question has no explicit timeframe; if timeframe is mentioned/implied (last week, this month, last month, recent), set useAllEntries=false and set timeScopeHint accordingly.
-7) journalHintStrength: "high" for strong first-person self-reflection; "medium" for somewhat personal; "low" otherwise.
+3) useAllEntries = true if personal question has no explicit timeframe; if timeframe is mentioned/implied (last week, this month, last month, recent), set useAllEntries=false and set timeScopeHint accordingly.
+4) journalHintStrength: "high" for strong first-person self-reflection; "medium" for somewhat personal; "low" otherwise.
 
 Return ONLY valid JSON matching this schema (no code fences):
 {
   "category": "JOURNAL_SPECIFIC" | "JOURNAL_SPECIFIC_NEEDS_CLARIFICATION" | "GENERAL_MENTAL_HEALTH" | "UNRELATED",
   "confidence": number,
-  "shouldUseJournal": boolean,
   "useAllEntries": boolean,
   "reasoning": string,
   "recommendedPipeline": "general" | "clarification" | "rag_full",
-  "isFollowUp": boolean,
-  "maintainPreviousPipeline": boolean,
   "clarifyingQuestion": string | null,
   "journalHintStrength": "low" | "medium" | "high",
   "timeScopeHint": "all" | "recent" | "last_week" | "this_month" | "last_month" | null
@@ -180,19 +170,14 @@ User message: "${message}"${contextString}`;
       throw new Error('Invalid category in GPT response');
     }
 
-    console.log(`[Query Classifier] Meta: followUp=${!!result.isFollowUp}, maintainPipeline=${!!result.maintainPreviousPipeline}, pipeline=${result.recommendedPipeline || 'n/a'}, timeScope=${result.timeScopeHint || 'n/a'}`);
+    console.log(`[Query Classifier] Meta: pipeline=${result.recommendedPipeline || 'n/a'}, timeScope=${result.timeScopeHint || 'n/a'}`);
 
     return {
       category: result.category,
       confidence: Math.max(0, Math.min(1, result.confidence ?? 0.85)),
-      shouldUseJournal: typeof result.shouldUseJournal === 'boolean'
-        ? result.shouldUseJournal
-        : (result.category === 'JOURNAL_SPECIFIC' || (result.isFollowUp && result.maintainPreviousPipeline) || false),
       useAllEntries: !!result.useAllEntries,
       reasoning: result.reasoning || 'GPT classification for conversational flow',
       recommendedPipeline: result.recommendedPipeline,
-      isFollowUp: result.isFollowUp,
-      maintainPreviousPipeline: result.maintainPreviousPipeline,
       clarifyingQuestion: result.clarifyingQuestion ?? null,
       journalHintStrength: result.journalHintStrength,
       timeScopeHint: result.timeScopeHint ?? null
@@ -210,7 +195,6 @@ User message: "${message}"${contextString}`;
 function enhancedRuleBasedClassification(message: string): {
   category: string;
   confidence: number;
-  shouldUseJournal: boolean;
   reasoning: string;
   useAllEntries?: boolean;
 } {
@@ -234,7 +218,6 @@ function enhancedRuleBasedClassification(message: string): {
       return {
         category: "JOURNAL_SPECIFIC_NEEDS_CLARIFICATION",
         confidence: 0.9,
-        shouldUseJournal: false,
         reasoning: "Vague personal question requiring clarification"
       };
     }
@@ -245,13 +228,12 @@ function enhancedRuleBasedClassification(message: string): {
   const hasTemporalReference = /\b(last week|last month|this week|this month|today|yesterday|recently|lately)\b/i.test(lowerMessage);
   if (hasMy && hasTemporalReference) {
     console.log(`[Rule-Based] PERSONAL + TIMEFRAME detected`);
-    return {
-      category: "JOURNAL_SPECIFIC",
-      confidence: 0.9,
-      shouldUseJournal: true,
-      useAllEntries: false,
-      reasoning: "Personal pronoun with explicit timeframe"
-    };
+      return {
+        category: "JOURNAL_SPECIFIC",
+        confidence: 0.9,
+        useAllEntries: false,
+        reasoning: "Personal pronoun with explicit timeframe"
+      };
   }
   
   // Specific personal pronouns = JOURNAL_SPECIFIC
@@ -274,7 +256,6 @@ function enhancedRuleBasedClassification(message: string): {
       return {
         category: "JOURNAL_SPECIFIC",
         confidence: 0.85,
-        shouldUseJournal: true,
         useAllEntries: useAllEntries,
         reasoning: `Specific personal question - analyzing ${hasTemporalReference ? 'specific timeframe' : 'all entries'}`
       };
@@ -297,7 +278,6 @@ function enhancedRuleBasedClassification(message: string): {
       return {
         category: "GENERAL_MENTAL_HEALTH",
         confidence: 0.9,
-        shouldUseJournal: false,
         reasoning: "Conversational response - handled as general mental health interaction"
       };
     }
@@ -316,7 +296,6 @@ function enhancedRuleBasedClassification(message: string): {
       return {
         category: "GENERAL_MENTAL_HEALTH",
         confidence: 0.7,
-        shouldUseJournal: false,
         reasoning: "General mental health question"
       };
     }
@@ -339,7 +318,6 @@ function enhancedRuleBasedClassification(message: string): {
       return {
         category: "UNRELATED",
         confidence: 0.8,
-        shouldUseJournal: false,
         reasoning: "Query unrelated to mental health, wellness, or journaling"
       };
     }
@@ -350,7 +328,6 @@ function enhancedRuleBasedClassification(message: string): {
   return {
     category: "GENERAL_MENTAL_HEALTH",
     confidence: 0.6,
-    shouldUseJournal: false,
     reasoning: "Unclear intent - treating as general mental health interaction"
   };
 }

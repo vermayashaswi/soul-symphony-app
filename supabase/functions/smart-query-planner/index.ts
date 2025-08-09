@@ -815,10 +815,8 @@ serve(async (req) => {
       message, 
       userId, 
       conversationContext = [], 
-      isFollowUp = false, 
       preserveTopicContext = false, 
       threadMetadata = {}, 
-      isAnalysisFollowUp = false,
       messageId = null 
     } = await req.json();
 
@@ -847,7 +845,6 @@ serve(async (req) => {
     return new Response(JSON.stringify({
       queryPlan,
       conversationMetadata: {
-        isFollowUp,
         preserveTopicContext,
         threadMetadata
       },

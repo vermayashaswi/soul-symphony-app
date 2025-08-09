@@ -13,7 +13,6 @@ interface MessageClassification {
   category: QueryCategory;
   confidence: number;
   reasoning: string;
-  shouldUseJournal: boolean;
   useAllEntries?: boolean; // NEW: Flag for using all entries vs time-constrained
   isLoading: boolean;
   error: string | null;
@@ -24,7 +23,6 @@ export function useChatMessageClassification() {
     category: QueryCategory.GENERAL_MENTAL_HEALTH,
     confidence: 0,
     reasoning: '',
-    shouldUseJournal: false,
     useAllEntries: false,
     isLoading: false,
     error: null
@@ -39,7 +37,6 @@ export function useChatMessageClassification() {
         category: QueryCategory.GENERAL_MENTAL_HEALTH,
         confidence: 0,
         reasoning: 'Empty message',
-        shouldUseJournal: false,
         useAllEntries: false
       };
     }
@@ -65,7 +62,6 @@ export function useChatMessageClassification() {
           category: data.category as QueryCategory,
           confidence: data.confidence,
           reasoning: data.reasoning,
-          shouldUseJournal: data.shouldUseJournal || data.category === 'JOURNAL_SPECIFIC',
           useAllEntries: data.useAllEntries || false // NEW: Support for all entries flag
         };
         
@@ -95,7 +91,6 @@ export function useChatMessageClassification() {
         category: hasPersonalPronouns ? QueryCategory.JOURNAL_SPECIFIC : QueryCategory.GENERAL_MENTAL_HEALTH,
         confidence: hasPersonalPronouns ? 0.9 : 0.3,
         reasoning: hasPersonalPronouns ? 'PERSONAL PRONOUNS DETECTED (fallback) - automatically classified as journal-specific' : 'Error in classification (fallback)',
-        shouldUseJournal: hasPersonalPronouns,
         useAllEntries: hasPersonalPronouns && !hasTimeReference // Use all entries if personal pronouns but no time reference
       };
       
