@@ -368,12 +368,17 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({
       created_at: new Date().toISOString()
     };
     
-    debugLog.addEvent("User Message", `Adding temporary message to UI: ${tempUserMessage.id}`, "info");
+     debugLog.addEvent("User Message", `Adding temporary message to UI: ${tempUserMessage.id}`, "info");
     setChatHistory(prev => [...prev, tempUserMessage]);
+    
+    // Force chat area to jump to bottom on send
+    window.dispatchEvent(new Event('chat:forceScrollToBottom'));
     
     // Set local loading state for immediate UI feedback
     setLocalLoading(true, "Analyzing your question...");
     
+    // Ensure we stay pinned to bottom as processing begins
+    window.dispatchEvent(new Event('chat:forceScrollToBottom'));
     try {
       // Update thread processing status to 'processing'
       await updateThreadProcessingStatus(threadId, 'processing');

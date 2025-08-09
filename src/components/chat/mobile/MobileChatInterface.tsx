@@ -362,7 +362,11 @@ export default function MobileChatInterface({
     }
     
     setMessages(prev => [...prev, { role: 'user', content: message }]);
+    // Force scroll to bottom on send so user sees streaming/processing
+    scrollToBottom(true);
     setLocalLoading(true, "Processing your request...");
+    // Ensure we remain pinned to bottom as processing begins
+    scrollToBottom(true);
     
     try {
       await updateThreadProcessingStatus(currentThreadId, 'processing');
