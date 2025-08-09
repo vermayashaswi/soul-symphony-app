@@ -90,14 +90,14 @@ RESPONSE STRUCTURE TEMPLATE:
       messages.push({ role: 'user', content: optimizedUserPrompt });
 
       // Intelligent model selection based on performance mode and query complexity
-      let model = 'gpt-4.1-2025-04-14';
+      let model = 'gpt-5';
       let maxTokens = 600;
       
       if (performanceMode === 'quality' && isAnalytical) {
-        model = 'gpt-4.1-2025-04-14';
+        model = 'gpt-5';
         maxTokens = 1200;
       } else if (isAnalytical) {
-        model = 'gpt-4.1-2025-04-14';
+        model = 'gpt-5';
         maxTokens = 800;
       } else if (performanceMode === 'fast') {
         maxTokens = 400;
@@ -139,7 +139,7 @@ RESPONSE STRUCTURE TEMPLATE:
         console.warn(`[OptimizedApiClient] Primary model failed (status ${response.status}). Trying fallback model...`);
         const errText = await response.text().catch(() => '');
         console.warn('[OptimizedApiClient] Primary error text:', errText?.slice(0, 250));
-        const fallbackModel = 'gpt-4.1-2025-04-14';
+        const fallbackModel = 'gpt-5-mini';
         const fallbackTokens = Math.min(400, Math.floor(maxTokens * 0.7));
         response = await makeCall(fallbackModel, fallbackTokens);
         if (!response.ok) {
