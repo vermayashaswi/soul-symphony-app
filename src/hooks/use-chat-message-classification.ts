@@ -82,15 +82,25 @@ export function useChatMessageClassification() {
       
       console.error("[Classification Hook] Classification error:", errorMessage);
       
-      // Enhanced fallback for personal pronoun detection with HIGHEST PRIORITY
+      // Enhanced fallback for personal pronoun detection with clarification for bare emotions
+      const text = message.toLowerCase().trim();
       const personalPronounPattern = /\b(i|me|my|mine|myself|am i|do i|how am i|what makes me|how do i|what about me)\b/i;
-      const hasPersonalPronouns = personalPronounPattern.test(message.toLowerCase());
-      const hasTimeReference = /\b(last week|yesterday|this week|last month|today|recently|lately|this morning|last night)\b/i.test(message.toLowerCase());
+      const hasPersonalPronouns = personalPronounPattern.test(text);
+      const hasTimeReference = /\b(last week|yesterday|this week|last month|today|recently|lately|this morning|last night)\b/i.test(text);
+      const isBareEmotion = /^(i\s*(?:am|'m)\s+\w+|i\s*feel\s+\w+|feeling\s+\w+)$/i.test(text);
+      
+      const inferredCategory = hasPersonalPronouns
+        ? (isBareEmotion && !hasTimeReference ? QueryCategory.JOURNAL_SPECIFIC_NEEDS_CLARIFICATION : QueryCategory.JOURNAL_SPECIFIC)
+        : QueryCategory.GENERAL_MENTAL_HEALTH;
       
       const fallbackResult = {
-        category: hasPersonalPronouns ? QueryCategory.JOURNAL_SPECIFIC : QueryCategory.GENERAL_MENTAL_HEALTH,
+        category: inferredCategory,
         confidence: hasPersonalPronouns ? 0.9 : 0.3,
-        reasoning: hasPersonalPronouns ? 'PERSONAL PRONOUNS DETECTED (fallback) - automatically classified as journal-specific' : 'Error in classification (fallback)',
+        reasoning: hasPersonalPronouns
+          ? (inferredCategory === QueryCategory.JOURNAL_SPECIFIC_NEEDS_CLARIFICATION
+              ? 'BARE EMOTION DETECTED (fallback) - needs a clarifying question'
+              : 'PERSONAL PRONOUNS DETECTED (fallback) - journal-specific')
+          : 'Error in classification (fallback)',
         useAllEntries: hasPersonalPronouns && !hasTimeReference // Use all entries if personal pronouns but no time reference
       };
       

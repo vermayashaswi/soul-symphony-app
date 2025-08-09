@@ -77,7 +77,7 @@ Respond with ONLY a JSON array of 3 strings, nothing else:
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'gpt-5-mini-2025-08-07',
+        model: 'gpt-4o-mini',
         messages: [
           {
             role: 'system',
@@ -132,15 +132,20 @@ Respond with ONLY a JSON array of 3 strings, nothing else:
 
   } catch (error) {
     console.error('[generate-streaming-messages] Error:', error);
-    
+    const messages = [
+      "Analyzing your journal patterns...",
+      "Finding relevant emotional insights...",
+      "Processing your mental wellness..."
+    ];
     return new Response(
       JSON.stringify({ 
-        success: false, 
-        error: error.message,
-        shouldUseFallback: true 
+        success: true, 
+        messages,
+        shouldUseFallback: true,
+        error: (error as any)?.message || String(error)
       }),
       { 
-        status: 500,
+        status: 200,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
       }
     );

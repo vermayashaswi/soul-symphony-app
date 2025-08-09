@@ -92,10 +92,11 @@ Categories:
 - UNRELATED: Outside mental health/wellbeing/journaling.
 
 Core rules:
-1) Prefer JOURNAL_SPECIFIC for first-person queries about the user's own state/patterns, even if slightly vague but with any specific detail.
-2) Use JOURNAL_SPECIFIC_NEEDS_CLARIFICATION only for extremely vague personal prompts with zero analyzable detail.
-3) useAllEntries = true if personal question has no explicit timeframe; if timeframe is mentioned/implied (last week, this month, last month, recent), set useAllEntries=false and set timeScopeHint accordingly.
+1) Prefer JOURNAL_SPECIFIC for first-person queries about the user's own state/patterns when there is at least one concrete, analyzable detail (e.g., a timeframe, trigger/cause, event, behavior, or explicit question).
+2) Short, bare-emotion statements with no analyzable detail (e.g., "I'm sad", "I feel bad") MUST be classified as JOURNAL_SPECIFIC_NEEDS_CLARIFICATION. Provide one targeted clarifyingQuestion.
+3) useAllEntries = true if the personal question has no explicit timeframe; if a timeframe is mentioned/implied (last week, this month, last month, recent), set useAllEntries=false and set timeScopeHint accordingly.
 4) journalHintStrength: "high" for strong first-person self-reflection; "medium" for somewhat personal; "low" otherwise.
+5) When choosing JOURNAL_SPECIFIC_NEEDS_CLARIFICATION, always supply a brief, concrete clarifyingQuestion tailored to the message.
 
 Return ONLY valid JSON matching this schema (no code fences):
 {
@@ -221,9 +222,20 @@ function enhancedRuleBasedClassification(message: string): {
     }
   }
   
+  // Bare emotion statements without detail => needs clarification
+  const bareEmotionPattern = /^(i\s*(?:am|'m)\s+\w+|i\s*feel\s+\w+|feeling\s+\w+)$/i;
+  const hasTemporalReference = /\b(last week|last month|this week|this month|today|yesterday|recently|lately)\b/i.test(lowerMessage);
+  if (bareEmotionPattern.test(lowerMessage) && !hasTemporalReference) {
+    console.log(`[Rule-Based] BARE EMOTION - Needs clarification`);
+    return {
+      category: "JOURNAL_SPECIFIC_NEEDS_CLARIFICATION",
+      confidence: 0.9,
+      reasoning: "Bare emotion statement without timeframe or context; ask a clarifying question"
+    };
+  }
+  
   // Strong personal + timeframe detection
   const hasMy = /\bmy\b/i.test(lowerMessage);
-  const hasTemporalReference = /\b(last week|last month|this week|this month|today|yesterday|recently|lately)\b/i.test(lowerMessage);
   if (hasMy && hasTemporalReference) {
     console.log(`[Rule-Based] PERSONAL + TIMEFRAME detected`);
       return {
