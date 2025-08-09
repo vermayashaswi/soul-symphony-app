@@ -123,7 +123,7 @@ export async function generateResponse(
     // Call OpenAI with conversational SOULo prompt
     console.log("Calling OpenAI with conversational SOULo prompt structure");
     
-    // Prepare the messages array with system prompt and conversation context
+    // Prepare the messages array with system prompt, conversation context, and current user message
     const messages = [];
     
     // Add system prompt
@@ -133,8 +133,10 @@ export async function generateResponse(
     if (conversationContext.length > 0) {
       console.log(`Including ${conversationContext.length} messages of conversation context`);
       messages.push(...conversationContext);
-      messages.push({ role: 'user', content: message });
     }
+    
+    // Always include the current user message
+    messages.push({ role: 'user', content: message });
     
     const completionResponse = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
@@ -144,8 +146,8 @@ export async function generateResponse(
       },
       body: JSON.stringify({
         model: 'gpt-5-mini-2025-08-07',
-        messages: conversationContext.length > 0 ? messages : [{ role: 'system', content: promptFormatted }],
-        max_tokens: 400,
+        messages,
+        max_completion_tokens: 400,
         temperature: 0.8,
       }),
     });

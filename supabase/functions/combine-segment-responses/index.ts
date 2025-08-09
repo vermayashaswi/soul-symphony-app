@@ -89,7 +89,7 @@ Generate a comprehensive response that feels like a single, thoughtful analysis 
         messages: [
           { role: 'user', content: prompt }
         ],
-        max_tokens: 1200
+        max_completion_tokens: 1200
       }),
     });
 

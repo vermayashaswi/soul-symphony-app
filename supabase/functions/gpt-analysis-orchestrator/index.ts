@@ -93,7 +93,8 @@ Focus on extracting specific entities, emotions, or themes mentioned in the sub-
                 { role: 'system', content: 'You are an expert analysis planner. Respond only with valid JSON.' },
                 { role: 'user', content: analysisPrompt }
               ],
-              max_tokens: 500
+              response_format: { type: 'json_object' },
+              max_completion_tokens: 500
             }),
           });
 

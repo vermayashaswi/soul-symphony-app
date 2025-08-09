@@ -233,7 +233,8 @@ ENHANCED ANALYSIS GUIDELINES:
         { role: 'user', content: message }
       ],
       temperature: 0.1,
-      max_tokens: 1000
+      response_format: { type: 'json_object' },
+      max_completion_tokens: 1000
     }),
   });
 

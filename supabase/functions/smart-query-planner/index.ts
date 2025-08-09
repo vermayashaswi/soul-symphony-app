@@ -306,7 +306,7 @@ Focus on creating comprehensive analysis plans with mandatory sub-question gener
           { role: "user", content: prompt }
         ],
         response_format: { type: 'json_object' },
-        max_tokens: 1000
+        max_completion_tokens: 1000
       })
     });
 

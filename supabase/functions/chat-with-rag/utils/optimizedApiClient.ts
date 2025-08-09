@@ -122,7 +122,7 @@ RESPONSE STRUCTURE TEMPLATE:
           body: JSON.stringify({
             model: mdl,
             messages,
-            max_tokens: tokens,
+            max_completion_tokens: tokens,
             temperature: 0.7
           }),
         });

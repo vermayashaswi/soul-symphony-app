@@ -88,7 +88,7 @@ Respond with ONLY a JSON array of 3 strings, nothing else:
             content: prompt
           }
         ],
-        max_tokens: 150,
+        max_completion_tokens: 150,
         temperature: 0.7
       }),
     });

@@ -81,7 +81,8 @@ Return a JSON object with this structure:
           { role: 'system', content: 'Return a strict JSON object only. No code fences, no extra text.' },
           { role: 'user', content: prompt }
         ],
-        max_tokens: 800
+        response_format: { type: 'json_object' },
+        max_completion_tokens: 800
       }),
     });
 

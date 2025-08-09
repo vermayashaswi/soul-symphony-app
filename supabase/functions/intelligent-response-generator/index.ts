@@ -259,7 +259,7 @@ Please provide a thoughtful, therapeutically informed response based on the cura
       model: 'gpt-5-mini-2025-08-07',
       messages,
       temperature: 0.7,
-      max_tokens: 1000
+      max_completion_tokens: 1000
     }),
   });
 

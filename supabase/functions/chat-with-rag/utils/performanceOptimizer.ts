@@ -67,7 +67,7 @@ export class PerformanceOptimizer {
       model,
       messages: [{ role: 'user', content: optimizedPrompt }],
       temperature: isAnalytical ? 0.3 : 0.7, // Lower temperature for analytical responses
-      max_tokens: Math.min(maxTokens, isAnalytical ? 2000 : 1500),
+      max_completion_tokens: Math.min(maxTokens, isAnalytical ? 2000 : 1500),
       stream: false
     };
   }
