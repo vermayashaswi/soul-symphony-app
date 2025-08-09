@@ -222,15 +222,17 @@ function enhancedRuleBasedClassification(message: string): {
     }
   }
   
-  // Bare emotion statements without detail => needs clarification
+  // Bare emotion statements => needs clarification (even if a timeframe is present)
   const bareEmotionPattern = /^(i\s*(?:am|'m)\s+\w+|i\s*feel\s+\w+|feeling\s+\w+)$/i;
   const hasTemporalReference = /\b(last week|last month|this week|this month|today|yesterday|recently|lately)\b/i.test(lowerMessage);
-  if (bareEmotionPattern.test(lowerMessage) && !hasTemporalReference) {
-    console.log(`[Rule-Based] BARE EMOTION - Needs clarification`);
+  if (bareEmotionPattern.test(lowerMessage)) {
+    console.log(`[Rule-Based] BARE EMOTION - Needs clarification (temporalRef=${hasTemporalReference})`);
     return {
       category: "JOURNAL_SPECIFIC_NEEDS_CLARIFICATION",
       confidence: 0.9,
-      reasoning: "Bare emotion statement without timeframe or context; ask a clarifying question"
+      reasoning: hasTemporalReference
+        ? "Bare emotion with timeframe; ask a targeted clarifying question"
+        : "Bare emotion statement without timeframe; ask a clarifying question"
     };
   }
   

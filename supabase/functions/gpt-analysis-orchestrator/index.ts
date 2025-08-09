@@ -97,15 +97,42 @@ Focus on extracting specific entities, emotions, or themes mentioned in the sub-
             }),
           });
 
-          const data = await response.json();
-          const planText = data?.choices?.[0]?.message?.content || '';
+          if (!response.ok) {
+            const errorText = await response.text();
+            console.error(`[GPT Analysis Orchestrator] OpenAI API error for sub-question ${index}:`, errorText);
+            // Fallback plan on HTTP error
+            return {
+              subQuestion,
+              analysisPlan: {
+                searchStrategy: "HYBRID",
+                sqlFunction: null,
+                sqlParameters: null,
+                vectorQuery: subQuestion.question,
+                reasoning: `Fallback due to OpenAI error: ${response.status}`
+              },
+              index
+            };
+          }
 
-          
+          const data = await response.json();
+          const content = data?.choices?.[0]?.message?.content || '';
+
+          // Try to extract JSON if the model added extra text
+          const extractJsonObject = (text: string): string => {
+            const fenceMatch = text.match(/```(?:json)?\s*([\s\S]*?)\s*```/i);
+            if (fenceMatch) return fenceMatch[1].trim();
+            const start = text.indexOf('{');
+            const end = text.lastIndexOf('}');
+            if (start !== -1 && end !== -1 && end > start) return text.slice(start, end + 1).trim();
+            return text.trim();
+          };
+
           let analysisPlan;
           try {
-            analysisPlan = JSON.parse(planText);
+            const jsonString = extractJsonObject(content);
+            analysisPlan = JSON.parse(jsonString);
           } catch (parseError) {
-            console.warn(`Failed to parse GPT response for sub-question ${index}:`, planText);
+            console.warn(`Failed to parse GPT response for sub-question ${index}:`, content);
             // Fallback plan
             analysisPlan = {
               searchStrategy: "HYBRID",

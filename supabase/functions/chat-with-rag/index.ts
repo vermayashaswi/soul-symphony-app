@@ -85,14 +85,20 @@ serve(async (req) => {
 
     console.log(`[chat-with-rag] Query classified as: ${classification.category} (confidence: ${classification.confidence})`);
     
-    // Heuristic override for obvious journal-specific queries
+    // Heuristic override for obvious journal-specific queries with protection for bare emotions
     const lowerMsg = (message || '').toLowerCase();
     const personalLikely = /\b(i|me|my|mine|myself)\b/i.test(lowerMsg);
     const temporalLikely = /\b(last week|last month|this week|this month|today|yesterday|recently|lately)\b/i.test(lowerMsg);
     const journalHints = /\b(journal|entry|entries|log|logged)\b/i.test(lowerMsg);
-    if (classification.category === 'GENERAL_MENTAL_HEALTH' && ((personalLikely && temporalLikely) || journalHints)) {
-      console.warn('[chat-with-rag] OVERRIDE: Forcing JOURNAL_SPECIFIC due to personal+temporal/journal hints');
-      classification.category = 'JOURNAL_SPECIFIC';
+    const bareEmotion = /^(i\s*(?:am|'m)\s+\w+|i\s*feel\s+\w+|feeling\s+\w+)\b/i.test(lowerMsg);
+    if (classification.category === 'GENERAL_MENTAL_HEALTH') {
+      if (bareEmotion) {
+        console.warn('[chat-with-rag] OVERRIDE: Bare emotion detected -> JOURNAL_SPECIFIC_NEEDS_CLARIFICATION');
+        classification.category = 'JOURNAL_SPECIFIC_NEEDS_CLARIFICATION';
+      } else if ((personalLikely && temporalLikely) || journalHints) {
+        console.warn('[chat-with-rag] OVERRIDE: Forcing JOURNAL_SPECIFIC due to personal+temporal/journal hints');
+        classification.category = 'JOURNAL_SPECIFIC';
+      }
     }
     
     // Cache the classification to prevent inconsistencies
@@ -383,9 +389,15 @@ async function processStreamingPipeline(
       const personalLikely = /\b(i|me|my|mine|myself)\b/i.test(lowerMsg);
       const temporalLikely = /\b(last week|last month|this week|this month|today|yesterday|recently|lately)\b/i.test(lowerMsg);
       const journalHints = /\b(journal|entry|entries|log|logged)\b/i.test(lowerMsg);
-      if (classification.category === 'GENERAL_MENTAL_HEALTH' && ((personalLikely && temporalLikely) || journalHints)) {
-        console.warn('[chat-with-rag] STREAMING OVERRIDE: Forcing JOURNAL_SPECIFIC due to personal+temporal/journal hints');
-        classification.category = 'JOURNAL_SPECIFIC';
+      const bareEmotion = /^(i\s*(?:am|'m)\s+\w+|i\s*feel\s+\w+|feeling\s+\w+)\b/i.test(lowerMsg);
+      if (classification.category === 'GENERAL_MENTAL_HEALTH') {
+        if (bareEmotion) {
+          console.warn('[chat-with-rag] STREAMING OVERRIDE: Bare emotion detected -> JOURNAL_SPECIFIC_NEEDS_CLARIFICATION');
+          classification.category = 'JOURNAL_SPECIFIC_NEEDS_CLARIFICATION';
+        } else if ((personalLikely && temporalLikely) || journalHints) {
+          console.warn('[chat-with-rag] STREAMING OVERRIDE: Forcing JOURNAL_SPECIFIC due to personal+temporal/journal hints');
+          classification.category = 'JOURNAL_SPECIFIC';
+        }
       }
     }
 
