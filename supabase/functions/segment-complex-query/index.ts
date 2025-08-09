@@ -76,13 +76,13 @@ Return a JSON object with this structure:
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'gpt-5-mini-2025-08-07',
+        model: 'gpt-5-mini',
         messages: [
           { role: 'system', content: 'Return a strict JSON object only. No code fences, no extra text.' },
           { role: 'user', content: prompt }
         ],
         response_format: { type: 'json_object' },
-        max_completion_tokens: 800
+        max_tokens: 800
       }),
     });
 

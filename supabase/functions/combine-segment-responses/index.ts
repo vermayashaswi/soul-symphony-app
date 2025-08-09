@@ -85,11 +85,11 @@ Generate a comprehensive response that feels like a single, thoughtful analysis 
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'gpt-5-mini-2025-08-07',
+        model: 'gpt-5-mini',
         messages: [
           { role: 'user', content: prompt }
         ],
-        max_completion_tokens: 1200
+        max_tokens: 1200
       }),
     });
 

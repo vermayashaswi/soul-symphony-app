@@ -412,7 +412,7 @@ serve(async (req) => {
       })
       .join('\n\n');
 
-    const model = 'gpt-5-mini-2025-08-07';
+    const model = 'gpt-5-mini';
     const maxTokens = isComplexQuery ? 1200 : 800;
 
     // Optimized system prompt for better performance
@@ -460,7 +460,7 @@ Guidelines:
           { role: 'user', content: message }
         ],
         temperature: 0.7,
-        max_completion_tokens: maxTokens
+        max_tokens: maxTokens
       }),
     });
 

@@ -256,10 +256,10 @@ Please provide a thoughtful, therapeutically informed response based on the cura
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
-      model: 'gpt-5-mini-2025-08-07',
+      model: 'gpt-5-mini',
       messages,
       temperature: 0.7,
-      max_completion_tokens: 1000
+      max_tokens: 1000
     }),
   });
 

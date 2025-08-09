@@ -77,7 +77,7 @@ Respond with ONLY a JSON array of 3 strings, nothing else:
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'gpt-5-mini-2025-08-07',
+        model: 'gpt-5-mini',
         messages: [
           {
             role: 'system',
@@ -88,7 +88,7 @@ Respond with ONLY a JSON array of 3 strings, nothing else:
             content: prompt
           }
         ],
-        max_completion_tokens: 150,
+        max_tokens: 150,
         temperature: 0.7
       }),
     });

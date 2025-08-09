@@ -87,13 +87,13 @@ TONE: Warm, grounded, spiritually aware but not preachy, genuinely caring, with 
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          model: 'gpt-5-mini-2025-08-07',
+          model: 'gpt-5-mini',
           messages: [
             { role: 'system', content: 'You are Ruh, the soul-centered wellness companion by SOuLO. You combine ancient wisdom with modern psychology to help people connect with their deepest truth and inner knowing.' },
             { role: 'user', content: clarificationPrompt }
           ],
           response_format: { type: 'json_object' },
-          max_completion_tokens: 800
+          max_tokens: 800
         }),
     });
 
