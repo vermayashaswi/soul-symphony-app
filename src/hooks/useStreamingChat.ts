@@ -370,6 +370,8 @@ export const useStreamingChat = ({ onFinalResponse, onError }: UseStreamingChatP
     setStreamingThreadId(threadId);
     streamingThreadIdRef.current = threadId;
     setProcessingStartTime(Date.now());
+    // Immediately mark as streaming so UI shows dynamic messages
+    setIsStreaming(true);
     // Store pending payload for potential retry by safety guard
     pendingRequestRef.current = { message, userId, threadId, conversationContext, userProfile };
     setStreamingMessages([]);
@@ -479,6 +481,9 @@ export const useStreamingChat = ({ onFinalResponse, onError }: UseStreamingChatP
   ) => {
     try {
       console.log('[useStreamingChat] Using non-streaming mode');
+      
+      // Show streaming UI even in non-streaming mode for better UX
+      setIsStreaming(true);
       
       // First classify the query to show appropriate UI
       const { data: classification } = await supabase.functions.invoke('chat-query-classifier', {

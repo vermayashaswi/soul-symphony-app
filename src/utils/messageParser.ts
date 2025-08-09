@@ -126,3 +126,34 @@ export const recoverFromMalformedJSON = (content: string): string => {
   console.warn('[MessageParser] Could not recover content from malformed JSON');
   return content;
 };
+
+/**
+ * Remove any "userStatusMessage" artifacts and labels from raw content
+ */
+export const stripUserStatusArtifacts = (content: string): string => {
+  if (!content) return content;
+  const withoutLines = content
+    .split('\n')
+    .filter(line => !/user\s*status\s*message/i.test(line) && !/"userStatusMessage"\s*:/i.test(line))
+    .join('\n');
+  // Remove inline labels like "UserStatusMessage: ..."
+  return withoutLines.replace(/user\s*status\s*message\s*:.*$/gim, '').trim();
+};
+
+/**
+ * Produces the final sanitized text to save/display for assistant replies
+ */
+export const getSanitizedFinalContent = (content: string): string => {
+  if (!content) return content;
+  const parsed = parseMessageContent(content);
+  if (parsed.response && parsed.response.trim()) {
+    return parsed.response.trim();
+  }
+  if (isMalformedJSON(content)) {
+    const recovered = recoverFromMalformedJSON(content);
+    if (recovered && recovered !== content) {
+      return stripUserStatusArtifacts(recovered);
+    }
+  }
+  return stripUserStatusArtifacts(content);
+};

@@ -1,7 +1,7 @@
 
 import { supabase } from '@/integrations/supabase/client';
 import { ChatMessage } from '@/types/chat';
-import { parseMessageContent } from '@/utils/messageParser';
+import { parseMessageContent, getSanitizedFinalContent } from '@/utils/messageParser';
 
 export const createChatMessage = async (
   threadId: string, 
@@ -203,13 +203,9 @@ export const saveMessage = async (
   // Process content for assistant messages to handle JSON responses
   let processedContent = content;
   if (sender === 'assistant') {
+    // Sanitize content to avoid leaking status messages or raw JSON
+    processedContent = getSanitizedFinalContent(content);
     const parsed = parseMessageContent(content);
-    
-    // If we have a parsed response field, use that as the content
-    if (parsed.response && parsed.response.trim()) {
-      processedContent = parsed.response;
-      console.log('[MessageService] Extracted response from JSON content');
-    }
     
     // Update references and analysis from parsed content if available
     if (parsed.references && !references) {
