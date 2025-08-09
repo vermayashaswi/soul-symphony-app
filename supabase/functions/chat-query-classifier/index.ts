@@ -115,20 +115,19 @@ User message: "${message}"${contextString}`;
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 15000);
 
-    const response = await fetch('https://api.openai.com/v1/responses', {
+    const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${apiKey}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'gpt-5-mini-2025-08-07',
-        input: [
-          { role: 'system', content: [{ type: 'input_text', text: 'You are a strict JSON classifier. Respond with a single JSON object only that matches the provided schema. No code fences, no commentary.' }] },
-          { role: 'user', content: [{ type: 'input_text', text: classificationPrompt }] }
+        model: 'gpt-4.1-2025-04-14',
+        messages: [
+          { role: 'system', content: 'You are a strict JSON classifier. Respond with a single JSON object only that matches the provided schema. No code fences, no commentary.' },
+          { role: 'user', content: classificationPrompt }
         ],
-        response_format: { type: 'json_object' },
-        max_output_tokens: 600
+        max_tokens: 600
       }),
       signal: controller.signal
     });
@@ -140,16 +139,7 @@ User message: "${message}"${contextString}`;
     }
 
     const data = await response.json();
-    let content = '';
-    if (typeof data.output_text === 'string' && data.output_text.trim()) {
-      content = data.output_text;
-    } else if (Array.isArray(data.output)) {
-      content = data.output
-        .map((item: any) => (item?.content ?? []).map((c: any) => c?.text ?? '').join(''))
-        .join('');
-    } else if (Array.isArray(data.content)) {
-      content = data.content.map((c: any) => c?.text ?? '').join('');
-    }
+    const content = data?.choices?.[0]?.message?.content || '';
 
     if (!content || !content.trim()) {
       throw new Error('No content in OpenAI response');

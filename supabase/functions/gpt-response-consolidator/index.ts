@@ -210,31 +210,19 @@ serve(async (req) => {
     - Do not include trailing explanations or extra fields.
     `;
 
-    // Non-streaming response only
-    const response = await fetch('https://api.openai.com/v1/responses', {
+    const response = await fetch('https://api.openai.com/v1/chat/completions', {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${openAIApiKey}`,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          model: 'gpt-5-mini-2025-08-07',
-          input: [
-            {
-              role: 'system',
-              content: [
-                { type: 'input_text', text: 'You are Ruh by SOuLO, a warm and insightful wellness coach. Provide thoughtful, data-driven responses based on journal analysis.' }
-              ]
-            },
-            {
-              role: 'user',
-              content: [
-                { type: 'input_text', text: consolidationPrompt }
-              ]
-            }
+          model: 'gpt-4.1-2025-04-14',
+          messages: [
+            { role: 'system', content: 'You are Ruh by SOuLO, a warm and insightful wellness coach. Provide thoughtful, data-driven responses based on journal analysis.' },
+            { role: 'user', content: consolidationPrompt }
           ],
-          response_format: { type: 'json_object' },
-          max_output_tokens: 1500
+          max_tokens: 1500
         }),
     });
 
@@ -262,18 +250,7 @@ serve(async (req) => {
     }
 
     const data = await response.json();
-    let rawResponse = '';
-    if (typeof data.output_text === 'string' && data.output_text.trim()) {
-      rawResponse = data.output_text;
-    } else if (Array.isArray(data.output)) {
-      rawResponse = data.output
-        .map((item: any) => (item?.content ?? [])
-          .map((c: any) => c?.text ?? '')
-          .join(''))
-        .join('');
-    } else if (Array.isArray(data.content)) {
-      rawResponse = data.content.map((c: any) => c?.text ?? '').join('');
-    }
+    const rawResponse = data?.choices?.[0]?.message?.content || '';
     // Sanitize and extract consolidated response
     const sanitized = sanitizeConsolidatorOutput(rawResponse);
     console.log('Consolidator sanitization meta:', sanitized.meta);
