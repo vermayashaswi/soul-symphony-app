@@ -786,7 +786,7 @@ export default function MobileChatInterface({
             ))}
             
             {/* Show streaming status or basic loading */}
-            {isStreaming ? (
+            {isStreaming && streamingThreadId === threadId ? (
               <ChatErrorBoundary>
                 <MobileChatMessage 
                   message={{ role: 'assistant', content: '' }}
@@ -798,14 +798,14 @@ export default function MobileChatInterface({
                   showStreamingDots={true}
                 />
               </ChatErrorBoundary>
-            ) : (isLoading || isProcessing) && (
+            ) : (!isStreaming && (isLoading || isProcessing)) ? (
               <ChatErrorBoundary>
                 <MobileChatMessage 
                   message={{ role: 'assistant', content: '' }}
                   isLoading={true}
                 />
               </ChatErrorBoundary>
-            )}
+            ) : null}
             
             {/* Spacer for auto-scroll */}
             <div className="pb-5" />

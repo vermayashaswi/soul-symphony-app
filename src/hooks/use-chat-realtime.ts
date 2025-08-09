@@ -52,6 +52,16 @@ export function useChatRealtime(threadId: string | null) {
       supabase.removeChannel(messageChannel);
     };
   }, [threadId]);
+  
+  // Reset realtime state when switching threads to prevent indicator leakage across threads
+  useEffect(() => {
+    setRealtimeState({
+      isLoading: false,
+      isProcessing: false,
+      processingStage: null,
+      processingStatus: 'idle'
+    });
+  }, [threadId]);
 
   // Update the processing stage - this is a local UI state only
   const updateProcessingStage = (stage: string | null) => {
