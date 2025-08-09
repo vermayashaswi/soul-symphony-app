@@ -217,7 +217,7 @@ serve(async (req) => {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          model: 'gpt-5-mini',
+          model: 'gpt-4.1-2025-04-14',
           messages: [
             { role: 'system', content: 'You are Ruh by SOuLO, a warm and insightful wellness coach. Provide thoughtful, data-driven responses based on journal analysis.' },
             { role: 'user', content: consolidationPrompt }
