@@ -182,11 +182,12 @@ export const useStreamingChat = ({ onFinalResponse, onError }: UseStreamingChatP
       }
 
       // Success! Handle the response
-      if (data?.response) {
+      const text = data?.response ?? data?.data ?? data?.message ?? (typeof data === 'string' ? data : null);
+      if (text) {
         addStreamingMessage({
           type: 'final_response',
-          response: data.response,
-          analysis: data.analysis,
+          response: text,
+          analysis: data?.analysis,
           timestamp: Date.now()
         });
         resetRetryState();
@@ -382,11 +383,12 @@ export const useStreamingChat = ({ onFinalResponse, onError }: UseStreamingChatP
         }
 
         // For now, handle as non-streaming since Supabase client doesn't support SSE directly
-        if (streamingResponse?.response) {
+        const text = streamingResponse?.response ?? streamingResponse?.data ?? streamingResponse?.message ?? (typeof streamingResponse === 'string' ? streamingResponse : null);
+        if (text) {
           addStreamingMessage({
             type: 'final_response',
-            response: streamingResponse.response,
-            analysis: streamingResponse.analysis,
+            response: text,
+            analysis: streamingResponse?.analysis,
             timestamp: Date.now()
           });
         } else {
@@ -504,11 +506,12 @@ export const useStreamingChat = ({ onFinalResponse, onError }: UseStreamingChatP
       }
 
       // Handle non-streaming response
-      if (data?.response) {
+      const text = data?.response ?? data?.data ?? data?.message ?? (typeof data === 'string' ? data : null);
+      if (text) {
         addStreamingMessage({
           type: 'final_response',
-          response: data.response,
-          analysis: data.analysis,
+          response: text,
+          analysis: data?.analysis,
           timestamp: Date.now()
         });
       } else {

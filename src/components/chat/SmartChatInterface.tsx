@@ -511,8 +511,13 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({
           throw new Error(`Mental health chat error: ${error.message}`);
         }
         
+        const text = data?.response ?? data?.data ?? (typeof data === 'string' ? data : null);
+        if (!text) {
+          throw new Error('No response received from mental health chat function');
+        }
+        
         response = {
-          content: data.response,
+          content: text,
           references: [],
           analysis: {},
           hasNumericResult: false,
@@ -542,13 +547,14 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({
           throw new Error(`Smart chat error: ${error.message}`);
         }
         
-        if (!data || !data.response) {
-          debugLog.addEvent("Edge Function Response", "Smart-chat returned no response data", "error");
+        const text = data?.response ?? data?.data ?? data?.message ?? (typeof data === 'string' ? data : null);
+        if (!text) {
+          debugLog.addEvent("Edge Function Response", "Smart-chat returned no usable response payload", "error");
           throw new Error("No response received from smart-chat function");
         }
         
         response = {
-          content: data.response,
+          content: text,
           references: [],
           analysis: {},
           hasNumericResult: false,
