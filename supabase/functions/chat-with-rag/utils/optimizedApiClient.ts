@@ -150,9 +150,10 @@ RESPONSE STRUCTURE TEMPLATE:
       }
 
       const data = await response.json();
-      let result = data?.choices?.[0]?.message?.content ?? '';
-      if (!result || !result.trim()) {
-        throw new Error('Empty completion content from OpenAI Chat Completions');
+      let result = data?.choices?.[0]?.message?.content?.trim() || '';
+      if (!result) {
+        console.warn('[OptimizedApiClient] Empty completion content from OpenAI, using graceful fallback');
+        result = "I’m here and listening. Could you share a bit more about what you’re feeling so I can help?";
       }
 
       // Cache the response

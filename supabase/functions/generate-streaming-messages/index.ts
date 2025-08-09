@@ -105,8 +105,11 @@ Respond with ONLY a JSON array of 3 strings, nothing else:
     // Parse GPT response
     let messages: string[] = [];
     try {
-      messages = JSON.parse(gptResponse);
-      if (!Array.isArray(messages) || messages.length !== 3) {
+      const raw = gptResponse || '';
+      const arrayMatch = raw.match(/\[[\s\S]*\]/);
+      const jsonText = arrayMatch ? arrayMatch[0] : raw;
+      messages = JSON.parse(jsonText);
+      if (!Array.isArray(messages) || messages.length !== 3 || messages.some(m => typeof m !== 'string')) {
         throw new Error('Invalid response format');
       }
     } catch (parseError) {

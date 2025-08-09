@@ -268,5 +268,6 @@ Please provide a thoughtful, therapeutically informed response based on the cura
   }
 
   const data = await response.json();
-  return data.choices[0].message.content;
+  const content = data?.choices?.[0]?.message?.content?.trim() || '';
+  return content || "I’m having a moment processing your journal analysis. Let’s try that again, or feel free to rephrase your question.";
 }

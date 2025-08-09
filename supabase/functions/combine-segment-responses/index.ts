@@ -100,11 +100,19 @@ Generate a comprehensive response that feels like a single, thoughtful analysis 
     }
 
     const data = await response.json();
-    let combinedResponse = data?.choices?.[0]?.message?.content ?? '';
-
+    let combinedResponse = data?.choices?.[0]?.message?.content?.trim() ?? '';
 
     if (!combinedResponse) {
-      throw new Error('No content in OpenAI response');
+      console.warn('[Combine Segment Responses] Empty content from OpenAI, returning concatenated fallback');
+      let fallbackResponse = '';
+      subQueryResponses.forEach((sqr, index) => {
+        if (index > 0) fallbackResponse += '\n\n';
+        fallbackResponse += `**Q${index + 1}: ${sqr.query}**\n${sqr.response}`;
+      });
+      return new Response(
+        JSON.stringify({ response: fallbackResponse, fallbackUsed: true }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
     }
 
     console.log(`[Combine Segment Responses] Successfully combined responses with conversation context`);

@@ -178,20 +178,24 @@ MUST HAVE/DO: ALWAYS BE AWARE OF THE CONVERSATION HISTORY TO UNDERSTAND WHAT THE
       const errorText = await response.text();
       console.error('[General Mental Health] OpenAI API error:', errorText);
       throw new Error(`OpenAI API error: ${response.status}`);
-    }
+  }
 
     const data = await response.json();
-    const responseContent = data?.choices?.[0]?.message?.content || '';
+    const content = data?.choices?.[0]?.message?.content?.trim() || '';
 
-    if (!responseContent || !responseContent.trim()) {
-      console.error('[General Mental Health] Invalid OpenAI response structure:', data);
-      throw new Error('Invalid response from OpenAI API');
+    if (!content) {
+      console.warn('[General Mental Health] Empty OpenAI content, returning graceful fallback');
+      const fallback = "I'm here with you. Based on what you've shared, how are you feeling right now—and what would feel supportive in this moment?";
+      return new Response(
+        JSON.stringify({ response: fallback, fallbackUsed: true }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
     }
     
     console.log(`[General Mental Health] Generated response`);
 
     return new Response(
-      JSON.stringify({ response: responseContent }),
+      JSON.stringify({ response: content }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
 

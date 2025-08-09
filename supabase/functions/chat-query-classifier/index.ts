@@ -141,10 +141,17 @@ User message: "${message}"${contextString}`;
     }
 
     const data = await response.json();
-    const content = data?.choices?.[0]?.message?.content || '';
+    const content = data?.choices?.[0]?.message?.content?.trim() || '';
 
-    if (!content || !content.trim()) {
-      throw new Error('No content in OpenAI response');
+    if (!content) {
+      console.warn('[Query Classifier] Empty OpenAI content, using rule-based fallback');
+      const rb = enhancedRuleBasedClassification(message);
+      return {
+        category: rb.category,
+        confidence: rb.confidence ?? 0.6,
+        useAllEntries: rb.useAllEntries,
+        reasoning: rb.reasoning + ' (fallback due to empty OpenAI response)'
+      } as any;
     }
 
     console.log(`[Query Classifier] GPT Response: ${content}`);
