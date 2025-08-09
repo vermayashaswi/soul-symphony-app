@@ -256,7 +256,7 @@ Please provide a thoughtful, therapeutically informed response based on the cura
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
-      model: 'gpt-4o-mini',
+      model: 'gpt-5-mini-2025-08-07',
       messages,
       temperature: 0.7,
       max_tokens: 1000

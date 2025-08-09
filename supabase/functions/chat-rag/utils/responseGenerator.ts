@@ -143,7 +143,7 @@ export async function generateResponse(
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'gpt-4o-mini',
+        model: 'gpt-5-mini-2025-08-07',
         messages: conversationContext.length > 0 ? messages : [{ role: 'system', content: promptFormatted }],
         max_tokens: 400,
         temperature: 0.8,
