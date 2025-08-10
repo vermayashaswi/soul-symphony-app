@@ -1,6 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { generateDatabaseSchemaContext, getStrictTermPolicy } from "../_shared/databaseSchemaContext.ts";
+import { JOURNAL_ENTRY_SCHEMA, THEMES_MASTER_TABLE, EMOTIONS_MASTER_TABLE } from "../_shared/databaseSchemaContext.ts";
 
 const apiKey = Deno.env.get('OPENAI_API_KEY');
 if (!apiKey) {
@@ -17,7 +17,40 @@ const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
 const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-// Database schema context will be generated dynamically
+// Enhanced database context with complete master tables
+const DATABASE_SCHEMA_CONTEXT = `
+**COMPLETE DATABASE SCHEMA FOR ANALYST AGENT:**
+
+**Journal Entries Table Structure:**
+${Object.entries(JOURNAL_ENTRY_SCHEMA.columns).map(([column, info]) => 
+  `- ${column} (${info.type}): ${info.description}${info.example ? `\n  Example: ${JSON.stringify(info.example)}` : ''}`
+).join('\n')}
+
+**THEMES MASTER TABLE (Complete Reference):**
+${THEMES_MASTER_TABLE.map(theme => 
+  `- ID: ${theme.id}, Name: "${theme.name}", Description: "${theme.description}"`
+).join('\n')}
+
+**EMOTIONS MASTER TABLE (Complete Reference):**
+${EMOTIONS_MASTER_TABLE.map(emotion => 
+  `- ID: ${emotion.id}, Name: "${emotion.name}", Description: "${emotion.description}"`
+).join('\n')}
+
+**IMPORTANT ANALYSIS CAPABILITIES:**
+- Use ONLY standard SQL queries (no PostgreSQL RPC functions)
+- Leverage themeemotion column for theme-emotion correlation analysis
+- Use emotions column for emotion-based filtering and analysis
+- Use master_themes array for categorical grouping
+- Apply user_id filtering for data isolation (MANDATORY)
+- Use created_at for temporal analysis and date filtering
+- Vector search available via separate embedding system
+
+**QUERY GENERATION RULES:**
+- All SQL queries MUST include WHERE user_id = $user_id for security
+- Use parameterized queries with proper escaping
+- Prefer structured filters over complex raw SQL when possible
+- Generate step-by-step analysis plans with specific queries
+`;
 
 /**
  * Enhanced JSON extraction with better error handling
@@ -144,10 +177,6 @@ async function retryOpenAICall(promptFunction: () => Promise<Response>, maxRetri
  */
 async function analyzeQueryWithSubQuestions(message: string, conversationContext: any[], userEntryCount: number) {
   try {
-    // Generate dynamic database schema context
-    const databaseSchemaContext = await generateDatabaseSchemaContext(supabase);
-    const strictTermPolicy = getStrictTermPolicy();
-    
     const contextString = conversationContext.length > 0 
       ? `\nConversation context: ${conversationContext.slice(-2).map(msg => `${msg.role}: ${msg.content}`).join('\n')}`
       : '';
@@ -159,9 +188,7 @@ async function analyzeQueryWithSubQuestions(message: string, conversationContext
 
     const prompt = `You are SOULo's Analyst Agent - an intelligent query planning specialist for journal data analysis. Your role is to break down user queries into comprehensive, actionable analysis plans.
 
-${databaseSchemaContext}
-
-${strictTermPolicy}
+${DATABASE_SCHEMA_CONTEXT}
 
 **CURRENT CONTEXT:**
 - Today's date: ${new Date().toISOString()}

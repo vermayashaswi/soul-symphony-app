@@ -1,7 +1,7 @@
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.38.4';
-import { JOURNAL_ENTRY_SCHEMA } from "../_shared/databaseSchemaContext.ts";
+import { JOURNAL_ENTRY_SCHEMA, THEMES_MASTER_TABLE, EMOTIONS_MASTER_TABLE } from "../_shared/databaseSchemaContext.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -12,7 +12,32 @@ const openaiApiKey = Deno.env.get('OPENAI_API_KEY');
 const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
 
-// ENHANCED_SCHEMA_CONTEXT will be constructed dynamically per-request using master tables
+// Enhanced schema context with complete master tables
+const ENHANCED_SCHEMA_CONTEXT = `
+**COMPLETE DATABASE CONTEXT FOR RESEARCHER AGENT:**
+
+**Journal Entries Table:**
+${Object.entries(JOURNAL_ENTRY_SCHEMA.columns).map(([column, info]) => 
+  `- ${column} (${info.type}): ${info.description}${info.example ? `\n  Example: ${JSON.stringify(info.example)}` : ''}`
+).join('\n')}
+
+**THEMES MASTER TABLE:**
+${THEMES_MASTER_TABLE.map(theme => 
+  `- "${theme.name}": ${theme.description}`
+).join('\n')}
+
+**EMOTIONS MASTER TABLE:**
+${EMOTIONS_MASTER_TABLE.map(emotion => 
+  `- "${emotion.name}": ${emotion.description}`
+).join('\n')}
+
+**SECURITY & ANALYSIS CONSTRAINTS:**
+- ALL queries MUST include WHERE user_id = $user_id for data isolation
+- Use proper SQL escaping and parameterization
+- Leverage themeemotion column for theme-emotion correlations
+- Use emotions column for emotion-based filtering and analysis
+- Apply temporal filtering via created_at when date ranges are specified
+`;
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -35,47 +60,6 @@ serve(async (req) => {
 
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    // Fetch canonical master terms dynamically
-    const { data: themeRows } = await supabase
-      .from('themes')
-      .select('name, description')
-      .eq('is_active', true)
-      .order('display_order', { ascending: true });
-
-    const { data: emotionRows } = await supabase
-      .from('emotions')
-      .select('name, description')
-      .order('name', { ascending: true });
-
-    const themesListStr = (themeRows || []).map(t => `- "${t.name}"${t.description ? `: ${t.description}` : ''}`).join('\n') || '- (none found)';
-    const emotionsListStr = (emotionRows || []).map(e => `- "${e.name}"${e.description ? `: ${e.description}` : ''}`).join('\n') || '- (none found)';
-
-    const ENHANCED_SCHEMA_CONTEXT = `
-**COMPLETE DATABASE CONTEXT FOR RESEARCHER AGENT:**
-
-**Journal Entries Table:**
-${Object.entries(JOURNAL_ENTRY_SCHEMA.columns).map(([column, info]) => 
-  `- ${column} (${info.type}): ${info.description}${info.example ? `\n  Example: ${JSON.stringify(info.example)}` : ''}`
-).join('\n')}
-
-**CANONICAL MASTER TERMS (SOURCE OF TRUTH):**
-• Themes:
-${themesListStr}
-
-• Emotions:
-${emotionsListStr}
-
-**STRICT TERM POLICY:**
-- Use ONLY the exact names from the master tables above in ALL SQL queries and outputs
-- If the user mentions a non-canonical variant/synonym (e.g., adjective vs. noun), choose the closest canonical term and proceed using that canonical term
-
-**SECURITY & ANALYSIS CONSTRAINTS:**
-- ALL queries MUST include WHERE user_id = $user_id for data isolation
-- Use proper SQL escaping and parameterization
-- Leverage themeemotion column for theme-emotion correlations
-- Use emotions column for emotion-based filtering and analysis
-- Apply temporal filtering via created_at when date ranges are specified
-`;
     // Validate input
     if (!analysisPlan || !analysisPlan.subQuestions) {
       throw new Error("Invalid analysis plan received from Analyst Agent");
@@ -139,8 +123,7 @@ Analysis Steps: ${JSON.stringify(subQuestion.analysisSteps, null, 2)}
 **VALIDATION RULES:**
 - All SQL queries MUST include WHERE user_id = $user_id
 - Add time range filters if timeRange is provided
-- Ensure ONLY canonical theme/emotion names from the master tables are used in SQL (reject or map non-canonical terms)
-- Validate emotion queries use proper jsonb operators
+- Ensure emotion queries use proper jsonb operators
 - Validate theme queries use correct array operations
 - Add missing analysis steps if plan is incomplete
 
