@@ -1,6 +1,7 @@
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.38.4';
+import { JOURNAL_ENTRY_SCHEMA, THEMES_MASTER_TABLE, EMOTIONS_MASTER_TABLE } from "../_shared/databaseSchemaContext.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -11,16 +12,43 @@ const openaiApiKey = Deno.env.get('OPENAI_API_KEY');
 const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
 
+// Enhanced schema context with complete master tables
+const ENHANCED_SCHEMA_CONTEXT = `
+**COMPLETE DATABASE CONTEXT FOR RESEARCHER AGENT:**
+
+**Journal Entries Table:**
+${Object.entries(JOURNAL_ENTRY_SCHEMA.columns).map(([column, info]) => 
+  `- ${column} (${info.type}): ${info.description}${info.example ? `\n  Example: ${JSON.stringify(info.example)}` : ''}`
+).join('\n')}
+
+**THEMES MASTER TABLE:**
+${THEMES_MASTER_TABLE.map(theme => 
+  `- "${theme.name}": ${theme.description}`
+).join('\n')}
+
+**EMOTIONS MASTER TABLE:**
+${EMOTIONS_MASTER_TABLE.map(emotion => 
+  `- "${emotion.name}": ${emotion.description}`
+).join('\n')}
+
+**SECURITY & ANALYSIS CONSTRAINTS:**
+- ALL queries MUST include WHERE user_id = $user_id for data isolation
+- Use proper SQL escaping and parameterization
+- Leverage themeemotion column for theme-emotion correlations
+- Use emotions column for emotion-based filtering and analysis
+- Apply temporal filtering via created_at when date ranges are specified
+`;
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    const { subQuestions, userMessage, userId, timeRange, messageId } = await req.json();
+    const { analysisPlan, userMessage, userId, timeRange, messageId } = await req.json();
     
-    console.log('GPT Analysis Orchestrator called with:', { 
-      subQuestionsCount: subQuestions?.length || 0,
+    console.log('GPT Analysis Orchestrator (Researcher Agent) called with:', { 
+      subQuestionsCount: analysisPlan?.subQuestions?.length || 0,
       userMessage: userMessage?.substring(0, 100),
       userId,
       timeRange,
@@ -29,101 +57,76 @@ serve(async (req) => {
 
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    // Prepare sub-questions (fallback to original message if none provided)
-    const effectiveSubQuestions = (Array.isArray(subQuestions) && subQuestions.length > 0)
-      ? subQuestions
-      : [{ question: userMessage, type: 'unknown', priority: 1 }];
+    // Validate input
+    if (!analysisPlan || !analysisPlan.subQuestions) {
+      throw new Error("Invalid analysis plan received from Analyst Agent");
+    }
 
-    // Enhanced schema/context for GPT planning with full analytical capabilities
-    const SCHEMA_CONTEXT = `
-You operate over a single user-scoped table named "Journal Entries" with columns:
-- id (bigint, primary key)
-- user_id (uuid, required)
-- created_at (timestamptz)
-- "refined text" (text)
-- "transcription text" (text)
-- master_themes (text[]) -- array of theme strings like ["love", "work", "family"]
-- themes (text[])
-- entities (jsonb) -- object of arrays, e.g. { "person": ["alice"], "organization": ["acme"] }
-- emotions (jsonb) -- object of numeric scores, e.g. { "happy": 0.72, "anxious": 0.12 }
-- sentiment (text) -- 'positive' | 'neutral' | 'negative'
-- duration (numeric) -- length in seconds if applicable
-- entityemotion (jsonb) -- entity-emotion relationships with strength scores
-
-ANALYTICAL CAPABILITIES:
-You can generate complex SQL calculations including:
-- Percentage calculations: COUNT(CASE WHEN condition THEN 1 END) * 100.0 / COUNT(*) as percentage
-- Ratios and proportions between different groups
-- Aggregations with CTEs and window functions
-- Theme/emotion frequency analysis
-- Temporal trends and comparisons
-
-SAFETY CONSTRAINTS:
-- All queries MUST include WHERE user_id = $user_id for data isolation
-- Only SELECT operations allowed (no INSERT/UPDATE/DELETE)
-- No system tables or functions access
-- No nested function calls or complex permissions
-
-Row Level Security ensures access is per user; you MUST include user filter in your plan.
-`;
-
-    // Ask GPT-4.1 to create a JSON execution plan for each sub-question
-    const analysisPlans = await Promise.all(
-      effectiveSubQuestions.map(async (subQuestion: any, index: number) => {
-        const plannerPrompt = `
-Return ONLY a strict JSON object describing how to answer this sub-question using SQL, vector search, or advanced SQL calculation.
-Use the following output schema exactly:
-{
-  "query_type": "sql_count" | "sql_select" | "sql_calculation" | "vector_search" | "hybrid",
-  "reasoning": "short rationale",
-  "sql": {
-    "operation": "count" | "select" | "calculation",
-    "raw_query": "SELECT ... FROM \\"Journal Entries\\" WHERE user_id = $1 AND ...",
-    "columns": ["id","created_at","master_themes","emotions"] | null,
-    "filters": [
-      // Supported ops: eq, eq_auth_uid, gte, lte, ilike, cs, json_key_gte
-      { "column": "user_id", "op": "eq_auth_uid" },
-      { "column": "created_at", "op": "gte", "value": "ISO-8601" },
-      { "column": "created_at", "op": "lte", "value": "ISO-8601" },
-      { "column": "master_themes", "op": "cs", "value": ["work"] },
-      { "column": "emotions", "op": "json_key_gte", "key": "anxious", "value": 0.5 }
-    ],
-    "order_by": [{ "column": "created_at", "direction": "desc" }] | [],
-    "limit": number | null
-  } | null,
-  "vector": {
-    "enabled": boolean,
-    "query_text": string,
-    "top_k": number,
-    "threshold": number,
-    "use_date_filter": boolean,
-    "date_range": { "start": "ISO-8601" | null, "end": "ISO-8601" | null } | null
-  } | null
-}
-Rules:
-- Use "sql_calculation" for percentage, ratio, and complex analytical queries
-- For calculations, provide a complete SELECT statement in "raw_query" field
-- Always use parameterized queries with $1 for user_id in raw_query
-- Prefer sql_count for simple counts like "how many entries since ..."
-- Always include a user filter via eq_auth_uid in SQL filters or WHERE user_id = $1 in raw_query
-- If the text implies a date range (e.g., "since July", "last week"), include created_at filters
-- Use vector_search only for semantic retrieval of example passages; never for simple counts
-- If both are useful, choose "hybrid" and fill both sections
-- Output must be valid JSON, no code fences
-
-CALCULATION EXAMPLES:
-- Percentage: "SELECT (COUNT(CASE WHEN 'love' = ANY(master_themes) THEN 1 END) * 100.0 / COUNT(*)) as percentage FROM \\"Journal Entries\\" WHERE user_id = $1"
-- Theme distribution: "SELECT theme, COUNT(*) * 100.0 / SUM(COUNT(*)) OVER() as percentage FROM (SELECT unnest(master_themes) as theme FROM \\"Journal Entries\\" WHERE user_id = $1) t GROUP BY theme"
-- Emotion averages: "SELECT emotion_key, AVG((emotion_value)::numeric) as avg_score FROM \\"Journal Entries\\", jsonb_each(emotions) WHERE user_id = $1 GROUP BY emotion_key"
-
-Context:
-SCHEMA:\n${SCHEMA_CONTEXT}\n
-Sub-question: "${subQuestion.question}"
-Original user message (for context): "${userMessage}"
-Incoming timeRange (may be null): ${timeRange ? JSON.stringify(timeRange) : 'null'}
-        `;
-
+    // Process each sub-question through the Researcher Agent
+    const researchResults = await Promise.all(
+      analysisPlan.subQuestions.map(async (subQuestion: any, index: number) => {
         try {
+          // Researcher Agent: Validate and refine the analysis plan
+          const researcherPrompt = `
+You are SOULo's Researcher Agent. Your role is to validate, refine, and execute the analysis plan created by the Analyst Agent.
+
+**CONTEXT:**
+${ENHANCED_SCHEMA_CONTEXT}
+
+**ANALYST AGENT OUTPUT TO VALIDATE:**
+Sub-question: "${subQuestion.question}"
+Purpose: "${subQuestion.purpose}"
+Search Strategy: "${subQuestion.searchStrategy}"
+Analysis Steps: ${JSON.stringify(subQuestion.analysisSteps, null, 2)}
+
+**ORIGINAL USER MESSAGE:** "${userMessage}"
+**TIME RANGE:** ${timeRange ? JSON.stringify(timeRange) : 'null'}
+
+**YOUR TASKS AS RESEARCHER AGENT:**
+1. **Validate** the analysis plan for correctness and completeness
+2. **Refine** SQL queries to ensure proper user scoping and time filtering
+3. **Enhance** the plan with missing elements (date filters, emotion thresholds, etc.)
+4. **Generate** the final execution plan with validated queries
+
+**VALIDATION RULES:**
+- All SQL queries MUST include WHERE user_id = $user_id
+- Add time range filters if timeRange is provided
+- Ensure emotion queries use proper jsonb operators
+- Validate theme queries use correct array operations
+- Add missing analysis steps if plan is incomplete
+
+**OUTPUT SCHEMA:**
+Return ONLY valid JSON:
+{
+  "validatedPlan": {
+    "subQuestion": "${subQuestion.question}",
+    "searchStrategy": "sql_primary" | "vector_primary" | "hybrid",
+    "executionSteps": [
+      {
+        "stepId": 1,
+        "type": "sql_query" | "vector_search",
+        "description": "what this step accomplishes",
+        "sql": {
+          "query": "SELECT ... FROM \\"Journal Entries\\" WHERE user_id = $1 AND ...",
+          "parameters": ["$user_id"],
+          "purpose": "calculation/count/analysis description"
+        } | null,
+        "vector": {
+          "queryText": "semantic search query",
+          "threshold": 0.3,
+          "limit": 10,
+          "dateFilter": true/false
+        } | null
+      }
+    ]
+  },
+  "confidence": 0.9,
+  "validationIssues": ["list of issues found and fixed"],
+  "enhancements": ["list of improvements made"]
+}
+
+Focus on ensuring the plan is complete, secure, and executable.`;
+
           const response = await fetch('https://api.openai.com/v1/chat/completions', {
             method: 'POST',
             headers: {
@@ -133,399 +136,68 @@ Incoming timeRange (may be null): ${timeRange ? JSON.stringify(timeRange) : 'nul
             body: JSON.stringify({
               model: 'gpt-4.1-2025-04-14',
               messages: [
-                { role: 'system', content: 'You are a precise query planner. Respond only with valid JSON per the requested schema.' },
-                { role: 'user', content: plannerPrompt }
+                { role: 'system', content: 'You are SOULo\'s Researcher Agent. Validate and refine analysis plans with rigorous attention to security and correctness.' },
+                { role: 'user', content: researcherPrompt }
               ],
               response_format: { type: 'json_object' },
-              max_tokens: 700
+              max_tokens: 1000
             }),
           });
 
           if (!response.ok) {
-            const errorText = await response.text();
-            console.error(`[GPT Analysis Orchestrator] OpenAI planning error for sub-question ${index}:`, errorText);
-            return {
-              subQuestion,
-              analysisPlan: {
-                query_type: 'vector_search',
-                reasoning: `Fallback due to OpenAI error: ${response.status}`,
-                sql: null,
-                vector: {
-                  enabled: true,
-                  query_text: subQuestion.question,
-                  top_k: 10,
-                  threshold: 0.3,
-                  use_date_filter: Boolean(timeRange?.start || timeRange?.end),
-                  date_range: timeRange || null
-                }
-              },
-              index
-            };
+            throw new Error(`Researcher Agent OpenAI error: ${response.status}`);
           }
 
           const data = await response.json();
           const content = data?.choices?.[0]?.message?.content || '';
-
-          let plan: any;
+          
+          let researcherOutput;
           try {
-            plan = JSON.parse(content);
+            researcherOutput = JSON.parse(content);
           } catch (e) {
-            console.warn(`Failed to parse planner JSON for sub-question ${index}, content:`, content);
-            plan = {
-              query_type: 'vector_search',
-              reasoning: 'Fallback due to parsing error',
-              sql: null,
-              vector: {
-                enabled: true,
-                query_text: subQuestion.question,
-                top_k: 10,
-                threshold: 0.3,
-                use_date_filter: Boolean(timeRange?.start || timeRange?.end),
-                date_range: timeRange || null
-              }
-            };
+            console.warn(`Failed to parse Researcher Agent JSON for sub-question ${index}`);
+            throw new Error("Researcher Agent returned invalid JSON");
           }
 
-          // If timeRange was provided by caller and plan lacks date filters, inject them
-          if (timeRange && plan) {
-            if (plan.sql && Array.isArray(plan.sql.filters)) {
-              const hasGte = plan.sql.filters.some((f: any) => f.column === 'created_at' && f.op === 'gte');
-              const hasLte = plan.sql.filters.some((f: any) => f.column === 'created_at' && f.op === 'lte');
-              if (timeRange.start && !hasGte) plan.sql.filters.push({ column: 'created_at', op: 'gte', value: timeRange.start });
-              if (timeRange.end && !hasLte) plan.sql.filters.push({ column: 'created_at', op: 'lte', value: timeRange.end });
-            }
-            if (plan.vector && plan.vector.enabled && plan.vector.use_date_filter && !plan.vector.date_range) {
-              plan.vector.date_range = timeRange;
-            }
-          }
+          // Execute the validated plan
+          const executionResults = await executeValidatedPlan(
+            researcherOutput.validatedPlan,
+            userId,
+            timeRange,
+            supabase
+          );
 
-          return { subQuestion, analysisPlan: plan, index };
-        } catch (error) {
-          console.error(`Error planning analysis for sub-question ${index}:`, error);
           return {
             subQuestion,
-            analysisPlan: {
-              query_type: 'vector_search',
-              reasoning: 'Fallback due to exception',
-              sql: null,
-              vector: {
-                enabled: true,
-                query_text: subQuestion.question,
-                top_k: 10,
-                threshold: 0.3,
-                use_date_filter: Boolean(timeRange?.start || timeRange?.end),
-                date_range: timeRange || null
-              }
-            },
+            researcherOutput,
+            executionResults,
+            index
+          };
+
+        } catch (error) {
+          console.error(`Error processing sub-question ${index}:`, error);
+          return {
+            subQuestion,
+            researcherOutput: null,
+            executionResults: { error: error.message },
             index
           };
         }
       })
     );
 
-    // Corrector phase: validate and fix plans using GPT-4.1-mini with a confidence gate
-    const correctedPlans = await Promise.all(
-      analysisPlans.map(async ({ subQuestion, analysisPlan, index }) => {
-        try {
-          const correctorInput = {
-            schema_context: SCHEMA_CONTEXT,
-            sub_question: subQuestion?.question ?? '',
-            original_user_message: userMessage ?? '',
-            time_range: timeRange ?? null,
-            proposed_plan: analysisPlan
-          };
-
-          const correctorSystem = 'You are a strict analysis-plan verifier and fixer. You only return valid JSON. You must ensure user scoping and correctness. If the plan is good, keep it. If not, correct it.';
-          const correctorUser = `Return ONLY JSON with this shape:\n{\n  "confidence": number,\n  "verdict": "use_original" | "use_corrected" | "needs_revision",\n  "issues": string[],\n  "corrected_plan": { /* same schema as planner output */ } | null\n}\n\nValidation rules:\n- Plan MUST include user isolation (filters with eq_auth_uid or WHERE user_id = $1).\n- For percentage or ratio questions (sql_calculation), ensure subset filters reflect the intent (e.g., emotions json keys via json_key_gte, themes, or entities filters).\n- Prefer filters in structured form over raw SQL.\n- Add created_at gte/lte filters if time_range is provided and relevant.\n- Use vector_search only for semantic examples, not for counts.\n- Keep output concise; no markdown.\n\nHere is the context and plan to validate:\n${JSON.stringify(correctorInput)}`;
-
-          const response = await fetch('https://api.openai.com/v1/chat/completions', {
-            method: 'POST',
-            headers: {
-              'Authorization': `Bearer ${openaiApiKey}`,
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-              model: 'gpt-4.1-mini-2025-04-14',
-              messages: [
-                { role: 'system', content: correctorSystem },
-                { role: 'user', content: correctorUser }
-              ],
-              response_format: { type: 'json_object' },
-              max_tokens: 600
-            }),
-          });
-
-          let correction: any = null;
-          if (response.ok) {
-            const data = await response.json();
-            const content = data?.choices?.[0]?.message?.content || '{}';
-            try { correction = JSON.parse(content); } catch { correction = null; }
-          } else {
-            const errText = await response.text();
-            console.warn('[Corrector] OpenAI error for sub-question', index, errText);
-          }
-
-          let finalPlan = analysisPlan;
-          if (correction && typeof correction === 'object') {
-            const conf = Number(correction.confidence ?? 0);
-            const verdict = String(correction.verdict || '').toLowerCase();
-            if (conf >= 0.9 && verdict !== 'needs_revision' && correction.corrected_plan) {
-              finalPlan = correction.corrected_plan;
-            }
-          }
-
-          return { subQuestion, analysisPlan: finalPlan, index, correctionMeta: correction, originalPlan: analysisPlan };
-        } catch (e) {
-          console.warn('[Corrector] Exception, using original plan for sub-question', index, e);
-          return { subQuestion, analysisPlan, index, correctionMeta: null, originalPlan: analysisPlan };
-        }
-      })
-    );
-
-    // Execute the planned analyses (dynamic SQL via query builder + minimal vector RPCs)
-    const analysisResults = await Promise.all(
-      correctedPlans.map(async ({ subQuestion, analysisPlan, index, correctionMeta, originalPlan }) => {
-        const results: any = {
-          subQuestion,
-          analysisPlan,
-          vectorResults: null,
-          sqlResults: null,
-          error: null
-        };
-
-        // Helpers to apply filters safely
-        const applyFilters = (query: any, filters: any[] = []) => {
-          for (const f of filters) {
-            const op = f.op;
-            const col = f.column;
-            switch (op) {
-              case 'eq_auth_uid':
-                query = query.eq('user_id', userId);
-                break;
-              case 'eq':
-                query = query.eq(col, f.value);
-                break;
-              case 'gte':
-                query = query.gte(col, f.value);
-                break;
-              case 'lte':
-                query = query.lte(col, f.value);
-                break;
-              case 'ilike':
-                query = query.ilike(col, f.value);
-                break;
-              case 'cs': // contains
-                query = query.contains(col, f.value);
-                break;
-              case 'json_key_gte':
-                if (f.key) {
-                  query = query.filter(`${col}->>${f.key}`, 'gte', String(f.value));
-                }
-                break;
-              default:
-                console.warn('Unsupported filter op:', f);
-            }
-          }
-          return query;
-        };
-
-        try {
-          // VECTOR EXECUTION
-          const wantVector = analysisPlan?.query_type === 'vector_search' || analysisPlan?.query_type === 'hybrid';
-          if (wantVector && analysisPlan?.vector?.enabled) {
-            const v = analysisPlan.vector;
-            const vectorQueryText = v.query_text || subQuestion.question;
-            const embedResp = await fetch('https://api.openai.com/v1/embeddings', {
-              method: 'POST',
-              headers: {
-                'Authorization': `Bearer ${openaiApiKey}`,
-                'Content-Type': 'application/json',
-              },
-              body: JSON.stringify({
-                model: 'text-embedding-3-small',
-                input: vectorQueryText,
-              }),
-            });
-            const embedJson = await embedResp.json();
-            const embedding = embedJson?.data?.[0]?.embedding;
-
-            const dateRange = (v.use_date_filter && v.date_range) ? v.date_range : (timeRange || null);
-            const useDate = Boolean(dateRange && (dateRange.start || dateRange.end));
-            const rpcName = useDate ? 'match_journal_entries_with_date' : 'match_journal_entries';
-            const rpcParams: any = {
-              query_embedding: embedding,
-              match_threshold: v.threshold ?? 0.3,
-              match_count: v.top_k ?? 10,
-              user_id_filter: userId
-            };
-            if (useDate) {
-              rpcParams.start_date = dateRange.start || null;
-              rpcParams.end_date = dateRange.end || null;
-            }
-
-            console.log(`[Vector Search] Calling ${rpcName} with params:`, { ...rpcParams, query_embedding: '[omitted]' });
-            const { data: vectorResults, error: vectorError } = await createClient(supabaseUrl, supabaseServiceKey).rpc(rpcName, rpcParams);
-            if (vectorError) {
-              console.error('Vector search error:', vectorError);
-            } else {
-              results.vectorResults = vectorResults;
-            }
-          }
-
-          // SQL EXECUTION
-          const wantSql = analysisPlan?.query_type === 'sql_count' || analysisPlan?.query_type === 'sql_select' || analysisPlan?.query_type === 'sql_calculation' || analysisPlan?.query_type === 'hybrid';
-          if (wantSql && analysisPlan?.sql) {
-            const sqlPlan = analysisPlan.sql;
-            const quoted = (c: string) => (c.includes(' ') ? `"${c}"` : c);
-
-            if (sqlPlan.operation === 'calculation') {
-              // Safe calculation path: derive counts via query builder and RPC, then compute percentage
-              const filters = Array.isArray(sqlPlan.filters) ? [...sqlPlan.filters] : [];
-              const gteIdx = filters.findIndex((f: any) => f.column === 'created_at' && f.op === 'gte');
-              const lteIdx = filters.findIndex((f: any) => f.column === 'created_at' && f.op === 'lte');
-              const rangeStart = (gteIdx >= 0 ? filters[gteIdx].value : (timeRange?.start || null));
-              const rangeEnd = (lteIdx >= 0 ? filters[lteIdx].value : (timeRange?.end || null));
-              // Ensure time range filters exist in filtered query
-              if (rangeStart && gteIdx === -1) filters.push({ column: 'created_at', op: 'gte', value: rangeStart });
-              if (rangeEnd && lteIdx === -1) filters.push({ column: 'created_at', op: 'lte', value: rangeEnd });
-
-              // Subset count with filters
-              let qCount = supabase
-                .from('Journal Entries')
-                .select('id', { count: 'exact', head: true });
-              qCount = applyFilters(qCount, filters);
-              qCount = qCount.eq('user_id', userId);
-              const { count: filteredCount, error: filteredError } = await qCount;
-              if (filteredError) {
-                console.error('SQL calculation subset count error:', filteredError);
-                results.error = `SQL calculation subset count error: ${filteredError.message}`;
-              } else {
-                // Total count in same range
-                const { data: total, error: totalError } = await supabase.rpc('get_journal_entry_count', {
-                  user_id_filter: userId,
-                  start_date: rangeStart || null,
-                  end_date: rangeEnd || null
-                });
-                if (totalError) {
-                  console.error('SQL calculation total count error:', totalError);
-                  results.error = `SQL calculation total count error: ${totalError.message}`;
-                } else {
-                  const totalNum = (total as number) ?? 0;
-                  const subset = filteredCount ?? 0;
-                  const percentage = totalNum > 0 ? Math.round((subset * 10000) / totalNum) / 100 : 0;
-                  results.sqlResults = { filteredCount: subset, totalCount: totalNum, percentage };
-                  console.log(`[SQL Calculation] subset/total/percentage:`, subset, totalNum, percentage);
-                }
-              }
-            } else if (sqlPlan.operation === 'count') {
-              // Use the new dedicated count RPC for reliable counting
-              const startDate = sqlPlan.filters?.find(f => f.column === 'created_at' && f.op === 'gte')?.value || null;
-              const endDate = sqlPlan.filters?.find(f => f.column === 'created_at' && f.op === 'lte')?.value || null;
-              
-              console.log(`[SQL Count] Using get_journal_entry_count with dates: ${startDate} to ${endDate}`);
-              const { data: count, error } = await supabase.rpc('get_journal_entry_count', {
-                user_id_filter: userId,
-                start_date: startDate,
-                end_date: endDate
-              });
-              
-              if (error) {
-                console.error('SQL count error:', error);
-                results.error = `SQL count error: ${error.message}`;
-              } else {
-                results.sqlResults = { count: count ?? 0 };
-                console.log(`[SQL Count] Result: ${count} entries`);
-              }
-            } else if (sqlPlan.operation === 'select') {
-              const cols = (sqlPlan.columns && sqlPlan.columns.length)
-                ? sqlPlan.columns.map(quoted).join(',')
-                : 'id,created_at,master_themes,emotions';
-
-              let q = createClient(supabaseUrl, supabaseServiceKey)
-                .from('Journal Entries')
-                .select(cols);
-
-              q = applyFilters(q, sqlPlan.filters || []);
-              // Ensure user scoping even if GPT forgot eq_auth_uid
-              q = q.eq('user_id', userId);
-
-              if (Array.isArray(sqlPlan.order_by)) {
-                for (const ob of sqlPlan.order_by) {
-                  q = q.order(ob.column, { ascending: (ob.direction || 'asc').toLowerCase() === 'asc' });
-                }
-              }
-
-              if (sqlPlan.limit) q = q.limit(sqlPlan.limit);
-
-              const { data, error } = await q;
-              if (error) {
-                console.error('SQL select error:', error);
-                results.error = `SQL select error: ${error.message}`;
-              } else {
-                results.sqlResults = data || [];
-              }
-            }
-          }
-        } catch (error) {
-          console.error(`Error executing analysis for sub-question ${index}:`, error);
-          results.error = (error as Error).message;
-        }
-
-        return results;
-      })
-    );
-
-    // Process analysis results and create structured analytics data
-    const processedAnalytics = analysisResults.map((result: any) => {
-      const analytics: any = {
-        subQuestion: result.subQuestion.question,
-        strategy: result.analysisPlan?.searchStrategy || result.analysisPlan?.query_type,
-        hasData: !!(result.vectorResults || result.sqlResults)
-      };
-
-      // Process SQL calculation results for percentage/quantitative data
-      if (result.sqlResults && typeof result.sqlResults === 'object') {
-        if ('percentage' in result.sqlResults) {
-          analytics.type = 'quantitative_emotion';
-          analytics.score = result.sqlResults.percentage;
-          analytics.subset = result.sqlResults.filteredCount;
-          analytics.total = result.sqlResults.totalCount;
-          analytics.description = `${result.sqlResults.percentage}% of entries (${result.sqlResults.filteredCount}/${result.sqlResults.totalCount})`;
-        } else if ('count' in result.sqlResults) {
-          analytics.type = 'entry_count';
-          analytics.count = result.sqlResults.count;
-          analytics.description = `${result.sqlResults.count} total entries found`;
-        }
-      }
-
-      // Process vector results for content insights
-      if (result.vectorResults && Array.isArray(result.vectorResults)) {
-        analytics.sampleEntries = result.vectorResults.slice(0, 3).map((entry: any) => ({
-          date: entry.created_at,
-          content: entry.content?.substring(0, 150),
-          similarity: entry.similarity,
-          emotions: entry.emotions
-        }));
-        analytics.vectorCount = result.vectorResults.length;
-      }
-
-      return analytics;
-    }).filter(a => a.hasData);
-
     return new Response(JSON.stringify({
       success: true,
-      analysisResults,
-      analyticsData: processedAnalytics,
-      summary: {
-        totalSubQuestions: (Array.isArray(effectiveSubQuestions) ? effectiveSubQuestions.length : 0),
-        completedAnalyses: analysisResults.length,
-        strategies: analysisResults.map((r: any) => r.analysisPlan?.query_type),
-        hasAnalytics: processedAnalytics.length > 0
+      researchResults,
+      metadata: {
+        orchestratorVersion: "researcher_agent_v1",
+        timestamp: new Date().toISOString(),
+        processedSubQuestions: researchResults.length,
+        hasErrors: researchResults.some(r => r.executionResults.error)
       }
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
-
 
   } catch (error) {
     console.error('Error in GPT Analysis Orchestrator:', error);
@@ -538,3 +210,169 @@ Incoming timeRange (may be null): ${timeRange ? JSON.stringify(timeRange) : 'nul
     });
   }
 });
+
+/**
+ * Execute the validated plan from Researcher Agent
+ */
+async function executeValidatedPlan(validatedPlan: any, userId: string, timeRange: any, supabase: any) {
+  const results: any = {
+    sqlResults: null,
+    vectorResults: null,
+    error: null,
+    executionDetails: []
+  };
+
+  try {
+    for (const step of validatedPlan.executionSteps) {
+      const stepResult: any = {
+        stepId: step.stepId,
+        type: step.type,
+        description: step.description,
+        result: null,
+        error: null
+      };
+
+      if (step.type === 'sql_query' && step.sql) {
+        try {
+          // Execute SQL query using dynamic query building
+          const sqlResult = await executeDynamicSQL(step.sql, userId, timeRange, supabase);
+          stepResult.result = sqlResult;
+          
+          // Store primary SQL result
+          if (!results.sqlResults) {
+            results.sqlResults = sqlResult;
+          }
+        } catch (sqlError) {
+          stepResult.error = sqlError.message;
+          console.error(`SQL execution error for step ${step.stepId}:`, sqlError);
+        }
+      }
+
+      if (step.type === 'vector_search' && step.vector) {
+        try {
+          // Execute vector search
+          const vectorResult = await executeVectorSearch(step.vector, userId, timeRange, supabase);
+          stepResult.result = vectorResult;
+          
+          // Store primary vector result
+          if (!results.vectorResults) {
+            results.vectorResults = vectorResult;
+          }
+        } catch (vectorError) {
+          stepResult.error = vectorError.message;
+          console.error(`Vector search error for step ${step.stepId}:`, vectorError);
+        }
+      }
+
+      results.executionDetails.push(stepResult);
+    }
+
+  } catch (error) {
+    results.error = error.message;
+    console.error('Execution plan error:', error);
+  }
+
+  return results;
+}
+
+/**
+ * Execute dynamic SQL with proper parameterization
+ */
+async function executeDynamicSQL(sqlConfig: any, userId: string, timeRange: any, supabase: any) {
+  try {
+    let query = sqlConfig.query;
+    let params = [userId];
+
+    // Apply time range filtering if specified
+    if (timeRange && (timeRange.start || timeRange.end)) {
+      if (timeRange.start && !query.includes('created_at >=')) {
+        query = query.replace('WHERE user_id = $1', 'WHERE user_id = $1 AND created_at >= $2');
+        params.push(timeRange.start);
+      }
+      if (timeRange.end && !query.includes('created_at <=')) {
+        const paramIndex = params.length + 1;
+        query = query.replace(/WHERE (.*?)$/, `WHERE $1 AND created_at <= $${paramIndex}`);
+        params.push(timeRange.end);
+      }
+    }
+
+    console.log('Executing SQL:', { query, params: params.map((p, i) => i === 0 ? '[user_id]' : p) });
+
+    const { data, error } = await supabase.rpc('execute_dynamic_query', {
+      query_text: query.replace(/\$\d+/g, (match, offset) => {
+        const paramIndex = parseInt(match.substring(1)) - 1;
+        return paramIndex === 0 ? `'${userId}'` : `'${params[paramIndex]}'`;
+      })
+    });
+
+    if (error) {
+      throw new Error(`SQL execution error: ${error.message}`);
+    }
+
+    return data?.data || [];
+
+  } catch (error) {
+    console.error('Dynamic SQL execution error:', error);
+    throw error;
+  }
+}
+
+/**
+ * Execute vector search with embeddings
+ */
+async function executeVectorSearch(vectorConfig: any, userId: string, timeRange: any, supabase: any) {
+  try {
+    // Generate embedding for the query
+    const embedResponse = await fetch('https://api.openai.com/v1/embeddings', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${openaiApiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: 'text-embedding-3-small',
+        input: vectorConfig.queryText,
+      }),
+    });
+
+    if (!embedResponse.ok) {
+      throw new Error(`Embedding API error: ${embedResponse.status}`);
+    }
+
+    const embedData = await embedResponse.json();
+    const embedding = embedData?.data?.[0]?.embedding;
+
+    if (!embedding) {
+      throw new Error('Failed to generate embedding');
+    }
+
+    // Choose appropriate RPC function based on date filtering
+    const useDate = vectorConfig.dateFilter && (timeRange?.start || timeRange?.end);
+    const rpcName = useDate ? 'match_journal_entries_with_date' : 'match_journal_entries';
+    
+    const rpcParams: any = {
+      query_embedding: embedding,
+      match_threshold: vectorConfig.threshold || 0.3,
+      match_count: vectorConfig.limit || 10,
+      user_id_filter: userId
+    };
+
+    if (useDate) {
+      rpcParams.start_date = timeRange?.start || null;
+      rpcParams.end_date = timeRange?.end || null;
+    }
+
+    console.log(`Executing vector search: ${rpcName}`);
+    const { data: vectorResults, error: vectorError } = await supabase.rpc(rpcName, rpcParams);
+
+    if (vectorError) {
+      throw new Error(`Vector search error: ${vectorError.message}`);
+    }
+
+    return vectorResults || [];
+
+  } catch (error) {
+    console.error('Vector search execution error:', error);
+    throw error;
+  }
+}

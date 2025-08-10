@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { JOURNAL_ENTRY_SCHEMA, THEMES_MASTER_TABLE, EMOTIONS_MASTER_TABLE } from "../_shared/databaseSchemaContext.ts";
 
 const apiKey = Deno.env.get('OPENAI_API_KEY');
 if (!apiKey) {
@@ -16,35 +17,43 @@ const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
 const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-// Database context for intelligent planning with correct column references
+// Enhanced database context with complete master tables
 const DATABASE_SCHEMA_CONTEXT = `
-Available PostgreSQL Functions:
-1. get_top_emotions_with_entries(user_id, start_date, end_date, limit_count) - Returns top emotions with sample entries
-2. match_journal_entries_by_emotion(emotion_name, user_id, min_score, start_date, end_date, limit_count) - Find entries by specific emotion
-3. match_journal_entries_by_theme(theme_query, user_id, match_threshold, match_count, start_date, end_date) - Find entries by theme
-4. match_journal_entries(query_embedding, match_threshold, match_count, user_id) - Vector similarity search
-5. match_journal_entries_with_date(query_embedding, match_threshold, match_count, user_id, start_date, end_date) - Vector search with date filter
+**COMPLETE DATABASE SCHEMA FOR ANALYST AGENT:**
 
-Table Structure:
-- Journal Entries: id, user_id, created_at, "refined text", "transcription text", emotions (jsonb), master_themes (array), themeemotion (jsonb), sentiment
-- Emotions: Stored as jsonb with emotion names as keys and scores (0-1) as values
-- Master Themes: Array of theme strings extracted from entries  
-- Theme-Emotion Links: Stored in themeemotion column as jsonb with theme names as keys and emotion objects as values
+**Journal Entries Table Structure:**
+${Object.entries(JOURNAL_ENTRY_SCHEMA.columns).map(([column, info]) => 
+  `- ${column} (${info.type}): ${info.description}${info.example ? `\n  Example: ${JSON.stringify(info.example)}` : ''}`
+).join('\n')}
 
-Common Emotions: happy, sad, anxious, excited, calm, stressed, angry, peaceful, grateful, frustrated, hopeful, lonely
-Common Themes: work, relationships, family, health, goals, travel, creativity, learning, challenges, growth
+**THEMES MASTER TABLE (Complete Reference):**
+${THEMES_MASTER_TABLE.map(theme => 
+  `- ID: ${theme.id}, Name: "${theme.name}", Description: "${theme.description}"`
+).join('\n')}
 
-MANDATORY SEARCH STRATEGY:
-- Use BOTH SQL and vector search unless confidence > 90% that only one method is needed
-- Always prefer dual search approach for comprehensive results
-- SQL provides structured data access (emotions, themes, theme-emotion relationships)
-- Vector search provides semantic similarity and context understanding
+**EMOTIONS MASTER TABLE (Complete Reference):**
+${EMOTIONS_MASTER_TABLE.map(emotion => 
+  `- ID: ${emotion.id}, Name: "${emotion.name}", Description: "${emotion.description}"`
+).join('\n')}
+
+**IMPORTANT ANALYSIS CAPABILITIES:**
+- Use ONLY standard SQL queries (no PostgreSQL RPC functions)
+- Leverage themeemotion column for theme-emotion correlation analysis
+- Use emotions column for emotion-based filtering and analysis
+- Use master_themes array for categorical grouping
+- Apply user_id filtering for data isolation (MANDATORY)
+- Use created_at for temporal analysis and date filtering
+- Vector search available via separate embedding system
+
+**QUERY GENERATION RULES:**
+- All SQL queries MUST include WHERE user_id = $user_id for security
+- Use parameterized queries with proper escaping
+- Prefer structured filters over complex raw SQL when possible
+- Generate step-by-step analysis plans with specific queries
 `;
 
-// REMOVED: Custom time detection logic - GPT handles all temporal analysis
-
 /**
- * Enhanced JSON extraction with better temporal query handling
+ * Enhanced JSON extraction with better error handling
  */
 function extractAndParseJSON(content: string, originalMessage: string): any {
   try {
@@ -58,8 +67,7 @@ function extractAndParseJSON(content: string, originalMessage: string): any {
       try {
         const cleanedJson = jsonBlockMatch[1]
           .replace(/,\s*}/g, '}')
-          .replace(/,\s*]/g, ']')
-          .replace(/([{,]\s*)(\w+):/g, '$1"$2":');
+          .replace(/,\s*]/g, ']');
         return JSON.parse(cleanedJson);
       } catch (e) {
         console.log("JSON block extraction failed");
@@ -73,65 +81,48 @@ function extractAndParseJSON(content: string, originalMessage: string): any {
         let jsonText = jsonMatch[0];
         jsonText = jsonText.replace(/,\s*\}/g, '}');
         jsonText = jsonText.replace(/,\s*\]/g, ']');
-        jsonText = jsonText.replace(/([{,]\s*)(\w+):/g, '$1"$2":');
         return JSON.parse(jsonText);
       } catch (e) {
         console.log("JSON pattern extraction failed");
       }
     }
     
-    console.error("All JSON extraction methods failed, using enhanced temporal fallback");
-    return createTemporalAwareFallback(originalMessage);
+    console.error("All JSON extraction methods failed, using fallback");
+    return createFallbackPlan(originalMessage);
   }
 }
 
 /**
- * Create fallback with mandatory sub-question generation
+ * Create comprehensive fallback plan with sub-questions
  */
-function createTemporalAwareFallback(originalMessage: string): any {
+function createFallbackPlan(originalMessage: string): any {
   const lowerMessage = originalMessage.toLowerCase();
   
-  // Check for temporal patterns using current year (2025)
-  const isTemporalQuery = /since|started|began|last|this|recently|april|may|june|july|august|september|october|november|december/i.test(lowerMessage);
-  const isMeditationQuery = /meditat|mindful|practice|spiritual/i.test(lowerMessage);
-  
-  // Generate date range for "since April" type queries
-  let dateRange = null;
-  if (isTemporalQuery && /since.*april|started.*april|april/i.test(lowerMessage)) {
-    const now = new Date();
-    const april2025 = new Date(2025, 3, 1); // April 1, 2025
-    dateRange = {
-      startDate: april2025.toISOString(),
-      endDate: now.toISOString()
-    };
-  }
+  const isEmotionQuery = /emotion|feel|mood|happy|sad|anxious|stressed/.test(lowerMessage);
+  const isThemeQuery = /work|relationship|family|health|goal|travel/.test(lowerMessage);
+  const hasPersonalPronouns = /\b(i|me|my|mine)\b/i.test(originalMessage);
   
   const subQuestion = {
-    question: isMeditationQuery ? 
-      "What emotional patterns and themes emerge from my meditation practice?" :
-      "What insights can be found in my journal entries?",
+    question: isEmotionQuery ? 
+      "What emotional patterns emerge from my journal entries?" :
+      "What key themes and insights can be found in my journal entries?",
     purpose: "Analyze journal data to provide personalized insights",
-    searchPlan: {
-      vectorSearch: {
-        threshold: 0.01,
-        enabled: true,
-        query: originalMessage,
-        dateFilter: dateRange
+    searchStrategy: "hybrid",
+    analysisSteps: [
+      {
+        step: 1,
+        description: "Retrieve relevant journal entries using semantic search",
+        queryType: "vector_search"
       },
-      sqlQueries: [
-        {
-          function: "get_top_emotions_with_entries",
-          parameters: {
-            user_id_param: "USER_ID_PLACEHOLDER",
-            start_date: dateRange?.startDate || null,
-            end_date: dateRange?.endDate || null,
-            limit_count: 5
-          },
-          purpose: "Get top emotions with sample entries"
-        }
-      ],
-      fallbackStrategy: "recent_entries"
-    }
+      {
+        step: 2,
+        description: isEmotionQuery ? "Analyze emotion patterns and frequencies" : "Analyze theme distributions and patterns",
+        queryType: "sql_analysis",
+        sqlQuery: isEmotionQuery ? 
+          "SELECT emotion_key, AVG((emotion_value)::numeric) as avg_score FROM \"Journal Entries\", jsonb_each(emotions) WHERE user_id = $user_id GROUP BY emotion_key ORDER BY avg_score DESC LIMIT 10" :
+          "SELECT theme, COUNT(*) as frequency FROM (SELECT unnest(master_themes) as theme FROM \"Journal Entries\" WHERE user_id = $user_id) t GROUP BY theme ORDER BY frequency DESC LIMIT 10"
+      }
+    ]
   };
   
   return {
@@ -139,16 +130,15 @@ function createTemporalAwareFallback(originalMessage: string): any {
     strategy: "intelligent_sub_query",
     subQuestions: [subQuestion],
     confidence: 0.6,
-    reasoning: "Fallback with mandatory sub-question generation and 2025 date context",
-    useAllEntries: !dateRange,
-    hasPersonalPronouns: /\b(i|me|my|mine)\b/i.test(originalMessage),
-    hasExplicitTimeReference: isTemporalQuery,
-    dateRange
+    reasoning: "Fallback analysis plan with hybrid search strategy",
+    useAllEntries: hasPersonalPronouns,
+    hasPersonalPronouns,
+    hasExplicitTimeReference: false
   };
 }
 
 /**
- * Retry wrapper for OpenAI API calls with exponential backoff
+ * Retry wrapper for OpenAI API calls
  */
 async function retryOpenAICall(promptFunction: () => Promise<Response>, maxRetries: number = 2): Promise<any> {
   let lastError;
@@ -168,8 +158,6 @@ async function retryOpenAICall(promptFunction: () => Promise<Response>, maxRetri
       const data = await response.json();
       const content = data?.choices?.[0]?.message?.content ?? '';
       return content;
-
-      
     } catch (error) {
       lastError = error;
       console.log(`OpenAI attempt ${attempt + 1} failed:`, error.message);
@@ -185,7 +173,7 @@ async function retryOpenAICall(promptFunction: () => Promise<Response>, maxRetri
 }
 
 /**
- * Enhanced conversational query analysis with mandatory dual-search and 90% confidence threshold
+ * Enhanced Analyst Agent - generates comprehensive analysis plans
  */
 async function analyzeQueryWithSubQuestions(message: string, conversationContext: any[], userEntryCount: number) {
   try {
@@ -193,105 +181,80 @@ async function analyzeQueryWithSubQuestions(message: string, conversationContext
       ? `\nConversation context: ${conversationContext.slice(-2).map(msg => `${msg.role}: ${msg.content}`).join('\n')}`
       : '';
 
-    // Enhanced personal pronoun detection
-    const personalPronounPatterns = [
-      /\b(i|me|my|mine|myself)\b/i,
-      /\bam i\b/i,
-      /\bdo i\b/i,
-      /\bhow am i\b/i,
-      /\bhow do i\b/i,
-      /\bwhat makes me\b/i,
-      /\bhow was i\b/i,
-      /\bwhat do i\b/i,
-      /\bwhere do i\b/i,
-      /\bwhen do i\b/i,
-      /\bwhy do i\b/i,
-      /\bwhat about me\b/i,
-      /\bam i getting\b/i,
-      /\bwhat can i\b/i
-    ];
+    const hasPersonalPronouns = /\b(i|me|my|mine|myself)\b/i.test(message.toLowerCase());
+    const hasExplicitTimeReference = /\b(last week|yesterday|this week|last month|today|recently|lately|since|started|began)\b/i.test(message.toLowerCase());
     
-    const hasPersonalPronouns = personalPronounPatterns.some(pattern => pattern.test(message.toLowerCase()));
-    const hasExplicitTimeReference = /\b(last week|yesterday|this week|last month|today|recently|lately|this morning|last night)\b/i.test(message.toLowerCase());
-    
-    console.log(`[Query Analysis] Personal pronouns: ${hasPersonalPronouns}, Time reference: ${hasExplicitTimeReference}`);
+    console.log(`[Analyst Agent] Personal pronouns: ${hasPersonalPronouns}, Time reference: ${hasExplicitTimeReference}`);
 
-    const prompt = `You are SOULo's intelligent query planner specializing in temporal analysis and journal insights. Analyze this user query and create a comprehensive search strategy.
+    const prompt = `You are SOULo's Analyst Agent - an intelligent query planning specialist for journal data analysis. Your role is to break down user queries into comprehensive, actionable analysis plans.
 
 ${DATABASE_SCHEMA_CONTEXT}
 
-**CURRENT DATE CONTEXT:**
+**CURRENT CONTEXT:**
 - Today's date: ${new Date().toISOString()}
 - Current year: 2025
-- Current month: ${new Date().toLocaleDateString('en-US', { month: 'long' })}
+- User query: "${message}"
+- User has ${userEntryCount} journal entries${contextString}
 
-User query: "${message}"
-User has ${userEntryCount} journal entries.${contextString}
+**YOUR RESPONSIBILITIES AS ANALYST AGENT:**
+1. **Sub-Question Generation**: Break down the query into 1-3 focused sub-questions
+2. **Analysis Planning**: For each sub-question, create detailed step-by-step analysis plans
+3. **Query Generation**: Generate specific SQL queries and vector search specifications
+4. **Search Strategy**: Determine optimal combination of SQL and vector search
 
-**TEMPORAL ANALYSIS PRIORITY:**
-- Detect ALL temporal references: "since April", "started in April", "last week", "recently", etc.
-- For queries like "Started meditating in April. Has it helped?" → Use date range from April 2025 to present
-- For personal pronouns (I, me, my) WITHOUT time references → analyze ALL entries (useAllEntries: true)
-- For personal pronouns WITH time references → respect the time constraint
-- Always use current year (2025) for date calculations unless clearly specified otherwise
-
-**MANDATORY SUB-QUESTION GENERATION:**
-- ALWAYS generate at least 1 sub-question for every query (even simple ones)
-- Break down complex queries into focused, actionable sub-questions
-- Each sub-question should target specific analysis goals
-
-**SEARCH STRATEGY:**
-- Default to dual search (SQL + vector) for comprehensive results
-- SQL provides structured data (emotions, themes, dates)
-- Vector provides semantic understanding and context
-
-Return ONLY valid JSON:
+**MANDATORY OUTPUT STRUCTURE:**
+Return ONLY valid JSON with this exact structure:
 {
-  "queryType": "journal_specific" | "general_question" | "direct_response",
+  "queryType": "journal_specific",
   "strategy": "intelligent_sub_query",
-  "searchConfidence": number (0.0-1.0),
-  "useOnlySQL": boolean (only if searchConfidence > 0.9),
-  "useOnlyVector": boolean (only if searchConfidence > 0.9),
-  "userStatusMessage": "exactly 5 words describing what you're doing (e.g., 'Breaking down your complex question' or 'Finding insights from patterns')",
+  "userStatusMessage": "exactly 5 words describing analysis approach",
   "subQuestions": [
     {
-      "question": "Specific sub-question",
-      "purpose": "Why this helps answer the main query",
-      "searchPlan": {
-         "vectorSearch": {
-           "enabled": boolean,
-           "threshold": number (0.01-0.05 for personal, 0.05-0.15 for others),
-           "query": "optimized search query",
-           "dateFilter": null | {"startDate": "2025-MM-DDTHH:mm:ss.sssZ", "endDate": "2025-MM-DDTHH:mm:ss.sssZ"}
-         },
-        "sqlQueries": [
-           {
-             "function": "function_name",
-             "parameters": {"user_id": "user_id_placeholder", "start_date": "2025-MM-DD", "end_date": "2025-MM-DD", "limit_count": 5},
-             "purpose": "what this achieves"
-           }
-        ],
-        "fallbackStrategy": null | "recent_entries" | "theme_based"
-      }
+      "question": "Specific focused sub-question",
+      "purpose": "How this helps answer the main query",
+      "searchStrategy": "sql_primary" | "vector_primary" | "hybrid",
+      "analysisSteps": [
+        {
+          "step": 1,
+          "description": "Clear description of what this step accomplishes",
+          "queryType": "sql_analysis" | "vector_search" | "sql_count" | "sql_calculation",
+          "sqlQuery": "SELECT ... FROM \\"Journal Entries\\" WHERE user_id = $user_id AND ..." | null,
+          "vectorSearch": {
+            "query": "optimized search query",
+            "threshold": 0.3,
+            "limit": 10
+          } | null
+        }
+      ]
     }
   ],
-  "confidence": number,
-  "reasoning": "brief explanation focusing on dual-search rationale",
-  "expectedResponse": "analysis" | "direct_answer" | "clarification_needed",
+  "confidence": 0.8,
+  "reasoning": "Brief explanation of the analysis strategy",
   "useAllEntries": boolean,
   "hasPersonalPronouns": boolean,
-  "hasExplicitTimeReference": boolean,
-  "themeFilters": string[],
-  "emotionFilters": string[]
+  "hasExplicitTimeReference": boolean
 }
 
-**CRITICAL INSTRUCTIONS:**
-- ALWAYS generate sub-questions (minimum 1, typically 1-3)
-- Use current year 2025 for all date calculations
-- Detect temporal patterns like "since April" and convert to proper date ranges
-- For meditation queries like "started in April", use April 2025 as start date
+**SQL QUERY GENERATION RULES:**
+- ALWAYS include WHERE user_id = $user_id for security
+- Use proper column names with quotes for spaced names like "refined text"
+- For emotion analysis: Use emotions column with jsonb operators
+- For theme analysis: Use master_themes array with unnest() or array operators
+- For percentages: Use COUNT(CASE WHEN condition THEN 1 END) * 100.0 / COUNT(*)
+- For date filtering: Use created_at with timestamp comparisons
 
-Focus on creating comprehensive analysis plans with mandatory sub-question generation.`;
+**SEARCH STRATEGY SELECTION:**
+- sql_primary: For statistical analysis, counts, percentages, structured data
+- vector_primary: For semantic content analysis, finding similar entries
+- hybrid: For comprehensive analysis requiring both approaches (recommended)
+
+**ANALYSIS STEP TYPES:**
+- sql_count: Simple counting queries
+- sql_calculation: Complex calculations, percentages, aggregations
+- sql_analysis: General SQL-based analysis
+- vector_search: Semantic similarity search
+
+Focus on creating comprehensive, executable analysis plans that will provide meaningful insights.`;
 
     const promptFunction = () => fetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
@@ -302,602 +265,36 @@ Focus on creating comprehensive analysis plans with mandatory sub-question gener
       body: JSON.stringify({
         model: "gpt-4.1-2025-04-14",
         messages: [
-          { role: "system", content: "You are an expert analysis planner. Respond only with valid JSON." },
+          { role: "system", content: "You are SOULo's Analyst Agent. Respond only with valid JSON analysis plans." },
           { role: "user", content: prompt }
         ],
         response_format: { type: 'json_object' },
-        max_tokens: 1000
+        max_tokens: 1500
       })
     });
 
     const content = await retryOpenAICall(promptFunction, 2);
-    console.log("Raw GPT response:", content);
+    console.log("Analyst Agent response:", content);
     
     const analysisResult = extractAndParseJSON(content, message);
     
-    if (!analysisResult) {
-      console.error("Failed to parse GPT response, using enhanced fallback");
-      return createEnhancedFallback(message, hasPersonalPronouns, hasExplicitTimeReference);
+    if (!analysisResult || !analysisResult.subQuestions) {
+      console.error("Failed to parse Analyst Agent response, using fallback");
+      return createFallbackPlan(message);
     }
     
-    // Validate and enhance with dual-search enforcement
-    const validatedResult = validateAndEnhanceDualSearch(analysisResult, message, hasPersonalPronouns, hasExplicitTimeReference);
+    // Enhance with detected characteristics
+    analysisResult.hasPersonalPronouns = hasPersonalPronouns;
+    analysisResult.hasExplicitTimeReference = hasExplicitTimeReference;
+    analysisResult.useAllEntries = hasPersonalPronouns && !hasExplicitTimeReference;
     
-    console.log("Final Analysis Result:", JSON.stringify(validatedResult, null, 2));
-    return validatedResult;
+    console.log("Final Analyst Plan:", JSON.stringify(analysisResult, null, 2));
+    return analysisResult;
 
   } catch (error) {
-    console.error("Error in GPT query analysis:", error);
-    return createEnhancedFallback(message, false, false);
+    console.error("Error in Analyst Agent:", error);
+    return createFallbackPlan(message);
   }
-}
-
-/**
- * ENHANCED: Validate and enforce dual-search requirements with 90% confidence threshold
- */
-function validateAndEnhanceDualSearch(analysis: any, message: string, hasPersonalPronouns: boolean, hasExplicitTimeReference: boolean) {
-  const lowerMessage = message.toLowerCase();
-  
-  // Enhanced detection
-  const isPersonalityQuery = /trait|personality|character|behavior|habit|am i|do i|my personality|negative|positive|improve|rate|worst|best/.test(lowerMessage);
-  const isEmotionQuery = /emotion|feel|mood|happy|sad|anxious|stressed|emotional/.test(lowerMessage);
-  const isThemeQuery = /work|relationship|family|health|goal|travel|creative|learn|challenge|growth/.test(lowerMessage);
-  const isTemporalQuery = hasExplicitTimeReference;
-  
-  // Extract themes and emotions from the query
-  const themeFilters = extractThemeFilters(lowerMessage);
-  const emotionFilters = extractEmotionFilters(lowerMessage);
-  
-  console.log("[Validation] Enhanced analysis:", {
-    hasPersonalPronouns,
-    hasExplicitTimeReference,
-    isPersonalityQuery,
-    isEmotionQuery,
-    isThemeQuery,
-    isTemporalQuery,
-    themeFilters,
-    emotionFilters
-  });
-  
-  // CRITICAL: Determine if we should use all entries
-  const useAllEntries = (hasPersonalPronouns && !hasExplicitTimeReference) || isPersonalityQuery;
-  
-  console.log(`[Validation] USE ALL ENTRIES: ${useAllEntries} (Personal pronouns: ${hasPersonalPronouns}, Time ref: ${hasExplicitTimeReference})`);
-  
-  // ENFORCE 90% CONFIDENCE THRESHOLD FOR SINGLE-METHOD SEARCH
-  const searchConfidence = analysis.searchConfidence || 0.7;
-  const mustUseDualSearch = searchConfidence <= 0.9;
-  
-  if (mustUseDualSearch) {
-    console.log(`[Validation] ENFORCING DUAL SEARCH - Confidence: ${searchConfidence} <= 90%`);
-    analysis.useOnlySQL = false;
-    analysis.useOnlyVector = false;
-  }
-  
-  // Ensure we have valid sub-questions
-  if (!analysis.subQuestions || !Array.isArray(analysis.subQuestions) || analysis.subQuestions.length === 0) {
-    analysis.subQuestions = createDefaultDualSearchSubQuestions(message, isPersonalityQuery, isEmotionQuery, isThemeQuery, isTemporalQuery, useAllEntries, themeFilters, emotionFilters);
-  }
-  
-  // Validate and enhance each sub-question with dual-search enforcement
-  analysis.subQuestions = analysis.subQuestions.map((subQ, index) => {
-    if (!subQ.searchPlan) {
-      subQ.searchPlan = {};
-    }
-    
-    // ENFORCE DUAL SEARCH UNLESS HIGH CONFIDENCE
-    if (mustUseDualSearch) {
-      // Ensure vector search is enabled
-      if (!subQ.searchPlan.vectorSearch) {
-        subQ.searchPlan.vectorSearch = {
-          enabled: true,
-          threshold: isPersonalityQuery ? 0.01 : isEmotionQuery ? 0.05 : 0.1,
-          query: subQ.question || message
-        };
-      } else {
-        subQ.searchPlan.vectorSearch.enabled = true;
-      }
-      
-      // Ensure SQL queries are present
-      if (!subQ.searchPlan.sqlQueries || subQ.searchPlan.sqlQueries.length === 0) {
-        subQ.searchPlan.sqlQueries = generateRequiredSQLQueries(isEmotionQuery, isThemeQuery, themeFilters, emotionFilters, useAllEntries);
-      }
-    }
-    
-    // Apply date range logic - check for ANY temporal reference in the original message
-    const dateRange = extractDateRangeFromQuery(message);
-    
-    // Only use ALL entries if there's truly no temporal context
-    if (dateRange) {
-      // Apply date filters for any temporal queries (including "since July" with personal pronouns)
-      if (subQ.searchPlan.vectorSearch) {
-        subQ.searchPlan.vectorSearch.dateFilter = dateRange;
-      }
-      subQ.searchPlan.fallbackStrategy = null;
-      console.log(`[Validation] Applying date filter for "${message}": ${dateRange.startDate} to ${dateRange.endDate}`);
-      
-      // Update SQL queries to include date parameters
-      if (subQ.searchPlan.sqlQueries) {
-        subQ.searchPlan.sqlQueries = subQ.searchPlan.sqlQueries.map(sqlQuery => {
-          if (sqlQuery.function === 'get_top_emotions_with_entries') {
-            sqlQuery.parameters.start_date = dateRange.startDate;
-            sqlQuery.parameters.end_date = dateRange.endDate;
-          } else if (sqlQuery.function === 'match_journal_entries_by_emotion') {
-            sqlQuery.parameters.start_date = dateRange.startDate;
-            sqlQuery.parameters.end_date = dateRange.endDate;
-          } else if (sqlQuery.function === 'match_journal_entries_by_theme') {
-            sqlQuery.parameters.start_date = dateRange.startDate;
-            sqlQuery.parameters.end_date = dateRange.endDate;
-          }
-          return sqlQuery;
-        });
-      }
-    } else if (useAllEntries) {
-      // Use ALL entries only for truly non-temporal personal queries
-      if (subQ.searchPlan.vectorSearch) {
-        subQ.searchPlan.vectorSearch.dateFilter = null;
-      }
-      subQ.searchPlan.fallbackStrategy = "recent_entries";
-      console.log(`[Validation] No date constraints - using all entries for personal query: ${subQ.question}`);
-    }
-    
-    return subQ;
-  });
-  
-  const validated = {
-    queryType: analysis.queryType || "journal_specific",
-    strategy: "intelligent_sub_query",
-    searchConfidence,
-    useOnlySQL: !mustUseDualSearch && (analysis.useOnlySQL || false),
-    useOnlyVector: !mustUseDualSearch && (analysis.useOnlyVector || false),
-    subQuestions: analysis.subQuestions,
-    confidence: typeof analysis.confidence === 'number' ? analysis.confidence : 0.7,
-    reasoning: `Enhanced dual-search planning ${mustUseDualSearch ? '(DUAL SEARCH ENFORCED)' : '(Single method allowed)'} - Confidence: ${searchConfidence}`,
-    expectedResponse: analysis.expectedResponse || "analysis",
-    useAllEntries,
-    hasPersonalPronouns,
-    hasExplicitTimeReference,
-    themeFilters,
-    emotionFilters,
-    isPersonalityQuery,
-    isEmotionQuery,
-    isThemeQuery,
-    isTemporalQuery,
-    hasDateConstraints: isTemporalQuery && !!dateRange,
-    dateRange: isTemporalQuery ? dateRange : null
-  };
-  
-  console.log(`Generated ${validated.subQuestions.length} sub-questions - Dual search: ${mustUseDualSearch}, UseAllEntries: ${useAllEntries}`);
-  
-  return validated;
-}
-
-/**
- * Extract theme filters from user query
- */
-function extractThemeFilters(lowerMessage: string): string[] {
-  const commonThemes = ['work', 'relationship', 'family', 'health', 'goal', 'travel', 'creative', 'learn', 'challenge', 'growth'];
-  return commonThemes.filter(theme => lowerMessage.includes(theme));
-}
-
-/**
- * Extract emotion filters from user query
- */
-function extractEmotionFilters(lowerMessage: string): string[] {
-  const commonEmotions = ['happy', 'sad', 'anxious', 'excited', 'calm', 'stressed', 'angry', 'peaceful', 'grateful', 'frustrated', 'hopeful', 'lonely'];
-  return commonEmotions.filter(emotion => lowerMessage.includes(emotion));
-}
-
-/**
- * Extract a UTC date range from natural language queries (e.g., "last week", "this week", "today", "yesterday", "last month", "this month").
- */
-function extractDateRangeFromQuery(message: string): { startDate: string; endDate: string } | null {
-  const text = message.toLowerCase();
-
-  const toStartOfDayUTC = (d: Date) => new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate(), 0, 0, 0, 0));
-  const toEndOfDayUTC = (d: Date) => new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate(), 23, 59, 59, 999));
-  const addDays = (d: Date, days: number) => new Date(d.getTime() + days * 24 * 60 * 60 * 1000);
-
-  const startOfWeekUTC = (d: Date) => {
-    // Monday as start of week
-    const day = d.getUTCDay(); // 0-6, 0 is Sunday
-    const diffToMonday = day === 0 ? -6 : 1 - day;
-    const monday = addDays(toStartOfDayUTC(d), diffToMonday);
-    return monday;
-  };
-
-  const now = new Date();
-  
-  // ENHANCED: Handle "since [month]" patterns for 2025
-  const monthNames = {
-    'january': 0, 'jan': 0,
-    'february': 1, 'feb': 1,
-    'march': 2, 'mar': 2,
-    'april': 3, 'apr': 3,
-    'may': 4,
-    'june': 5, 'jun': 5,
-    'july': 6, 'jul': 6,
-    'august': 7, 'aug': 7,
-    'september': 8, 'sep': 8, 'sept': 8,
-    'october': 9, 'oct': 9,
-    'november': 10, 'nov': 10,
-    'december': 11, 'dec': 11
-  };
-  
-  // Check for "since [month]" patterns
-  const sinceMonthMatch = text.match(/since\s+(january|february|march|april|may|june|july|august|september|october|november|december|jan|feb|mar|apr|jun|jul|aug|sep|sept|oct|nov|dec)/i);
-  if (sinceMonthMatch) {
-    const monthName = sinceMonthMatch[1].toLowerCase();
-    const monthIndex = monthNames[monthName];
-    if (monthIndex !== undefined) {
-      const startDate = new Date(Date.UTC(2025, monthIndex, 1, 0, 0, 0, 0));
-      const endDate = toEndOfDayUTC(now);
-      console.log(`[Date Extraction] "since ${monthName}" → ${startDate.toISOString()} to ${endDate.toISOString()}`);
-      return { startDate: startDate.toISOString(), endDate: endDate.toISOString() };
-    }
-  }
-
-  if (text.includes('last week')) {
-    const thisMonday = startOfWeekUTC(now);
-    const lastMonday = addDays(thisMonday, -7);
-    const lastSunday = toEndOfDayUTC(addDays(lastMonday, 6));
-    return { startDate: lastMonday.toISOString(), endDate: lastSunday.toISOString() };
-  }
-
-  if (text.includes('this week')) {
-    const thisMonday = startOfWeekUTC(now);
-    const end = toEndOfDayUTC(now);
-    return { startDate: thisMonday.toISOString(), endDate: end.toISOString() };
-  }
-
-  if (text.includes('today')) {
-    const start = toStartOfDayUTC(now);
-    const end = toEndOfDayUTC(now);
-    return { startDate: start.toISOString(), endDate: end.toISOString() };
-  }
-
-  if (text.includes('yesterday')) {
-    const y = addDays(now, -1);
-    const start = toStartOfDayUTC(y);
-    const end = toEndOfDayUTC(y);
-    return { startDate: start.toISOString(), endDate: end.toISOString() };
-  }
-
-  if (text.includes('last month')) {
-    const y = now.getUTCFullYear();
-    const m = now.getUTCMonth(); // 0-11
-    const firstLastMonth = new Date(Date.UTC(y, m - 1, 1));
-    const lastDayLastMonth = new Date(Date.UTC(y, m, 0));
-    return { startDate: toStartOfDayUTC(firstLastMonth).toISOString(), endDate: toEndOfDayUTC(lastDayLastMonth).toISOString() };
-  }
-
-  if (text.includes('this month')) {
-    const y = now.getUTCFullYear();
-    const m = now.getUTCMonth();
-    const firstThisMonth = new Date(Date.UTC(y, m, 1));
-    return { startDate: toStartOfDayUTC(firstThisMonth).toISOString(), endDate: toEndOfDayUTC(now).toISOString() };
-  }
-
-  return null;
-}
-
-
-/**
- * Generate required SQL queries for dual-search enforcement
- */
-function generateRequiredSQLQueries(isEmotionQuery: boolean, isThemeQuery: boolean, themeFilters: string[], emotionFilters: string[], useAllEntries: boolean) {
-  const sqlQueries = [];
-  
-  if (isEmotionQuery || emotionFilters.length > 0) {
-    sqlQueries.push({
-      function: "get_top_emotions_with_entries",
-      parameters: {
-        user_id_param: "USER_ID_PLACEHOLDER",
-        start_date: useAllEntries ? null : null,
-        end_date: useAllEntries ? null : null,
-        limit_count: 5
-      },
-      purpose: "Get top emotions with examples for emotion-based analysis"
-    });
-  }
-  
-  if (isThemeQuery || themeFilters.length > 0) {
-    sqlQueries.push({
-      function: "match_journal_entries_by_theme",
-      parameters: {
-        theme_query: themeFilters[0] || "general",
-        user_id_filter: "USER_ID_PLACEHOLDER",
-        match_threshold: 0.3,
-        match_count: 5,
-        start_date: useAllEntries ? null : null,
-        end_date: useAllEntries ? null : null
-      },
-      purpose: "Find entries matching theme patterns"
-    });
-  }
-  
-  return sqlQueries;
-}
-
-/**
- * ENHANCED: Create multiple parallel sub-questions for complex queries
- */
-function createDefaultDualSearchSubQuestions(message: string, isPersonality: boolean, isEmotion: boolean, isTheme: boolean, isTemporal: boolean, useAllEntries: boolean, themeFilters: string[], emotionFilters: string[]) {
-  const subQuestions = [];
-  const lowerMessage = message.toLowerCase();
-  
-  console.log(`[Multi-Question Generation] Creating for - Personal: ${isPersonality}, Emotion: ${isEmotion}, Theme: ${isTheme}, Temporal: ${isTemporal}, UseAllEntries: ${useAllEntries}`);
-  
-  // ENHANCED: Detect complex queries that need multiple sub-questions
-  const isComplexAnalysis = /analyze|analysis|patterns|trends|comparison|insights|overall|generally|typically|usually|how am i/i.test(lowerMessage);
-  const hasMoodImpact = /impact|effect|influence|affect|outcome|result|relationship/i.test(lowerMessage);
-  const hasPositiveNegativeAspects = /positive|negative|good|bad|better|worse|improve|decline/i.test(lowerMessage);
-  
-  // For complex queries like meditation impact analysis, create multiple specialized sub-questions
-  if (isComplexAnalysis && (lowerMessage.includes('meditation') || lowerMessage.includes('practice'))) {
-    console.log(`[Multi-Question] Detected meditation impact analysis - generating 3 sub-questions`);
-    
-    // Sub-question 1: Positive emotional impact
-    subQuestions.push({
-      question: "Find journal entries showing positive emotions and states during or after meditation practice",
-      purpose: "Analyze positive emotional benefits and outcomes of meditation",
-      searchPlan: {
-        vectorSearch: {
-          enabled: true,
-          threshold: 0.05,
-          query: "meditation calm peaceful relaxed centered focused clarity positive",
-          dateFilter: useAllEntries ? null : null
-        },
-        sqlQueries: [
-          {
-            function: "match_journal_entries_by_emotion",
-            parameters: {
-              emotion_name: "calm",
-              user_id_filter: "USER_ID_PLACEHOLDER",
-              min_score: 0.3,
-              start_date: useAllEntries ? null : null,
-              end_date: useAllEntries ? null : null,
-              limit_count: 5
-            },
-            purpose: "Find entries with high calm emotion scores"
-          }
-        ],
-        fallbackStrategy: useAllEntries ? "recent_entries" : null
-      }
-    });
-    
-    // Sub-question 2: Negative emotional patterns
-    subQuestions.push({
-      question: "Find journal entries showing stress, anxiety, or negative emotions that meditation might help with",
-      purpose: "Identify emotional challenges and stress patterns that meditation addresses",
-      searchPlan: {
-        vectorSearch: {
-          enabled: true,
-          threshold: 0.05,
-          query: "stress anxiety overwhelmed restless scattered negative tension worried",
-          dateFilter: useAllEntries ? null : null
-        },
-        sqlQueries: [
-          {
-            function: "match_journal_entries_by_emotion",
-            parameters: {
-              emotion_name: "anxious",
-              user_id_filter: "USER_ID_PLACEHOLDER",
-              min_score: 0.3,
-              start_date: useAllEntries ? null : null,
-              end_date: useAllEntries ? null : null,
-              limit_count: 5
-            },
-            purpose: "Find entries with high anxiety emotion scores"
-          }
-        ],
-        fallbackStrategy: useAllEntries ? "recent_entries" : null
-      }
-    });
-    
-    // Sub-question 3: General meditation context and practice patterns
-    subQuestions.push({
-      question: "Find all journal entries mentioning meditation, mindfulness, or related practices",
-      purpose: "Gather comprehensive context about meditation practice frequency and experiences",
-      searchPlan: {
-        vectorSearch: {
-          enabled: true,
-          threshold: 0.03,
-          query: message, // Use original query for broader context
-          dateFilter: useAllEntries ? null : null
-        },
-        sqlQueries: [
-          {
-            function: "get_top_emotions_with_entries",
-            parameters: {
-              user_id_param: "USER_ID_PLACEHOLDER",
-              start_date: useAllEntries ? null : null,
-              end_date: useAllEntries ? null : null,
-              limit_count: 8
-            },
-            purpose: "Get overall emotional landscape for context"
-          }
-        ],
-        fallbackStrategy: useAllEntries ? "recent_entries" : null
-      }
-    });
-    
-  } else if (isComplexAnalysis || hasPositiveNegativeAspects) {
-    console.log(`[Multi-Question] Detected complex analysis - generating 2 sub-questions`);
-    
-    // Sub-question 1: Positive aspects/emotions
-    subQuestions.push({
-      question: `Analyze positive emotions and experiences ${isTemporal ? 'from the specified time period' : 'from journal entries'}`,
-      purpose: "Identify positive patterns, emotions, and successful experiences",
-      searchPlan: {
-        vectorSearch: {
-          enabled: true,
-          threshold: isPersonality ? 0.01 : 0.05,
-          query: message + " positive happy successful good progress growth",
-          dateFilter: useAllEntries ? null : null
-        },
-        sqlQueries: [
-          {
-            function: "match_journal_entries_by_emotion",
-            parameters: {
-              emotion_name: "happy",
-              user_id_filter: "USER_ID_PLACEHOLDER", 
-              min_score: 0.3,
-              start_date: useAllEntries ? null : null,
-              end_date: useAllEntries ? null : null,
-              limit_count: 5
-            },
-            purpose: "Find entries with positive emotional content"
-          }
-        ],
-        fallbackStrategy: useAllEntries ? "recent_entries" : null
-      }
-    });
-    
-    // Sub-question 2: Challenges/negative aspects
-    subQuestions.push({
-      question: `Analyze challenges and difficult emotions ${isTemporal ? 'from the specified time period' : 'from journal entries'}`,
-      purpose: "Identify challenges, negative patterns, and areas for improvement",
-      searchPlan: {
-        vectorSearch: {
-          enabled: true,
-          threshold: isPersonality ? 0.01 : 0.05,
-          query: message + " difficult challenge struggle negative anxious stressed",
-          dateFilter: useAllEntries ? null : null
-        },
-        sqlQueries: [
-          {
-            function: "match_journal_entries_by_emotion",
-            parameters: {
-              emotion_name: "anxious",
-              user_id_filter: "USER_ID_PLACEHOLDER",
-              min_score: 0.3,
-              start_date: useAllEntries ? null : null,
-              end_date: useAllEntries ? null : null,
-              limit_count: 5
-            },
-            purpose: "Find entries with challenging emotional content"
-          }
-        ],
-        fallbackStrategy: useAllEntries ? "recent_entries" : null
-      }
-    });
-    
-  } else {
-    // Single comprehensive question for simpler queries
-    subQuestions.push({
-      question: isTemporal ? 
-        "Find relevant journal entries from the specified time period using semantic search" :
-        (useAllEntries ? "Find all relevant journal entries for comprehensive semantic analysis" : "Find relevant journal entries using semantic search"),
-      purpose: "Gather contextual information through semantic similarity",
-      searchPlan: {
-        vectorSearch: {
-          enabled: true,
-          threshold: isPersonality ? 0.01 : 0.05,
-          query: message,
-          dateFilter: useAllEntries ? null : null
-        },
-        sqlQueries: generateRequiredSQLQueries(isEmotion, isTheme, themeFilters, emotionFilters, useAllEntries),
-        fallbackStrategy: useAllEntries ? "recent_entries" : (isTemporal ? null : "recent_entries")
-      }
-    });
-  }
-  
-  console.log(`[Multi-Question] Generated ${subQuestions.length} sub-questions`);
-  return subQuestions;
-}
-
-/**
- * Enhanced fallback with dual-search requirements
- */
-function createEnhancedFallback(message: string, hasPersonalPronouns: boolean, hasExplicitTimeReference: boolean) {
-  const lowerMessage = message.toLowerCase();
-  const isEmotionQuery = /emotion|feel|mood|happy|sad|anxious|stressed|emotional/.test(lowerMessage);
-  const isThemeQuery = /work|relationship|family|health|goal|travel|creative|learn|challenge|growth/.test(lowerMessage);
-  
-  console.log(`[Enhanced Fallback] Personal pronouns: ${hasPersonalPronouns}, Time ref: ${hasExplicitTimeReference}`);
-  
-  const subQuestion = {
-    question: hasPersonalPronouns ? 
-      (hasExplicitTimeReference ? 
-        "Find journal entries from the specified time period for personal analysis using dual search" :
-        "Find all journal entries for comprehensive personal analysis using dual search") :
-      "Find relevant journal entries with enhanced dual search",
-    purpose: hasPersonalPronouns ? 
-      "Analyze personal patterns using both SQL structured data and semantic search" :
-      "Gather relevant information using comprehensive search methods",
-    searchPlan: {
-      vectorSearch: {
-        threshold: hasPersonalPronouns ? 0.01 : 0.05,
-        enabled: true,
-        dateFilter: (hasPersonalPronouns && !hasExplicitTimeReference) ? null : null
-      },
-      sqlQueries: [
-        {
-          function: "get_top_emotions_with_entries",
-          parameters: {
-            user_id_param: "USER_ID_PLACEHOLDER",
-            start_date: (hasPersonalPronouns && !hasExplicitTimeReference) ? null : null,
-            end_date: (hasPersonalPronouns && !hasExplicitTimeReference) ? null : null,
-            limit_count: 5
-          },
-          purpose: "Get structured emotion data for comprehensive analysis"
-        }
-      ],
-      fallbackStrategy: (hasExplicitTimeReference && !hasPersonalPronouns) ? null : "recent_entries"
-    }
-  };
-  
-  return {
-    queryType: "journal_specific",
-    strategy: "intelligent_sub_query",
-    searchConfidence: 0.4,
-    useOnlySQL: false,
-    useOnlyVector: false,
-    subQuestions: [subQuestion],
-    confidence: 0.4,
-    reasoning: hasPersonalPronouns ? 
-      `Enhanced dual-search fallback with personal pronoun prioritization (useAllEntries: ${!hasExplicitTimeReference})` :
-      (hasExplicitTimeReference ? "Enhanced temporal fallback with dual search" : "Emergency dual-search fallback"),
-    isTemporalQuery: hasExplicitTimeReference,
-    isEmotionQuery,
-    isThemeQuery,
-    hasDateConstraints: !!hasExplicitTimeReference,
-    useAllEntries: hasPersonalPronouns && !hasExplicitTimeReference,
-    hasPersonalPronouns,
-    hasExplicitTimeReference,
-    themeFilters: [],
-    emotionFilters: []
-  };
-}
-
-/**
- * Create basic fallback plan for error handling
- */
-function createBasicFallbackPlan() {
-  return {
-    strategy: "intelligent_sub_query",
-    queryType: "journal_specific",
-    subQuestions: [
-      {
-        question: "Find relevant journal entries with ultra-sensitive search",
-        searchPlan: {
-          vectorSearch: {
-            enabled: true,
-            threshold: 0.01
-          },
-          sqlQueries: [],
-          fallbackStrategy: "keyword_search"
-        }
-      }
-    ],
-    totalEntryCount: 0,
-    confidence: 0.3,
-    reasoning: "Emergency fallback plan with enhanced error handling",
-    expectedResponse: "analysis",
-    useAllEntries: true, // Default to all entries on error
-    isErrorFallback: true
-  };
 }
 
 serve(async (req) => {
@@ -906,58 +303,43 @@ serve(async (req) => {
   }
 
   try {
-    const { 
-      message, 
-      userId, 
-      conversationContext = [], 
-      preserveTopicContext = false, 
-      threadMetadata = {}, 
-      messageId = null 
-    } = await req.json();
-
-    if (!message || !userId) {
-      return new Response(
-        JSON.stringify({ error: 'Message and userId are required' }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
-      );
-    }
-
-    console.log(`[Smart Query Planner] Conversational analysis: "${message}" (messageId: ${messageId || 'none'})`);
-
-    // Get user's entry count for context
-    const { count: userEntryCount } = await supabase
-      .from('Journal Entries')
-      .select('*', { count: 'exact', head: true })
-      .eq('user_id', userId);
-
-    console.log(`User ${userId} has ${userEntryCount} journal entries`);
-
-    // Generate conversational query plan
-    const queryPlan = await analyzeQueryWithSubQuestions(message, conversationContext, userEntryCount || 0);
+    const { message, conversationContext = [], userId } = await req.json();
     
-    console.log(`Conversational Query Plan: ${JSON.stringify(queryPlan, null, 2)}`);
+    console.log('Smart Query Planner (Analyst Agent) called with:', { 
+      message: message?.substring(0, 100),
+      contextCount: conversationContext?.length || 0,
+      userId 
+    });
 
+    // Get user's journal entry count for context
+    const { data: countData } = await supabase
+      .rpc('get_journal_entry_count', { user_id_filter: userId });
+    
+    const userEntryCount = countData || 0;
+
+    // Generate comprehensive analysis plan
+    const analysisPlan = await analyzeQueryWithSubQuestions(message, conversationContext, userEntryCount);
+    
     return new Response(JSON.stringify({
-      queryPlan,
-      conversationMetadata: {
-        preserveTopicContext,
-        threadMetadata
-      },
-      userContext: {
-        entryCount: userEntryCount,
-        hasPersonalPronouns: queryPlan.hasPersonalPronouns,
-        hasTimeReference: queryPlan.hasExplicitTimeReference
-      },
-      timestamp: new Date().toISOString()
+      success: true,
+      queryPlan: analysisPlan,
+      userEntryCount,
+      metadata: {
+        plannerVersion: "analyst_agent_v1",
+        timestamp: new Date().toISOString(),
+        hasSubQuestions: Boolean(analysisPlan.subQuestions?.length),
+        searchStrategies: analysisPlan.subQuestions?.map(sq => sq.searchStrategy) || []
+      }
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
 
   } catch (error) {
-    console.error('Error in smart query planner:', error);
-    return new Response(JSON.stringify({
+    console.error('Error in Smart Query Planner:', error);
+    return new Response(JSON.stringify({ 
+      success: false, 
       error: error.message,
-      fallbackPlan: createBasicFallbackPlan()
+      fallbackPlan: createFallbackPlan("general analysis")
     }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },

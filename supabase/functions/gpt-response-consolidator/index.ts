@@ -89,7 +89,7 @@ serve(async (req) => {
   try {
     const { 
       userMessage, 
-      analysisResults, 
+      researchResults, 
       conversationContext, 
       userProfile,
       streamingMode = false,
@@ -98,64 +98,89 @@ serve(async (req) => {
     
     console.log('GPT Response Consolidator called with:', { 
       userMessage: userMessage?.substring(0, 100),
-      analysisResultsCount: analysisResults?.length || 0,
+      researchResultsCount: researchResults?.length || 0,
       contextCount: conversationContext?.length || 0,
       streamingMode,
       messageId
     });
 
-    // Enhanced analysis summary for GPT with detailed quantitative insights
-    const analysisSummary = analysisResults.map((result: any, index: number) => {
+    // Process Researcher Agent results into consolidated insights
+    const analysisSummary = researchResults.map((research: any, index: number) => {
       const summary = {
-        subQuestion: result.subQuestion.question,
-        type: result.subQuestion.type,
-        strategy: result.analysisPlan?.searchStrategy || result.analysisPlan?.query_type,
-        reasoning: result.analysisPlan?.reasoning,
+        subQuestion: research.subQuestion.question,
+        purpose: research.subQuestion.purpose,
+        searchStrategy: research.researcherOutput?.validatedPlan?.searchStrategy,
+        researcherValidation: {
+          confidence: research.researcherOutput?.confidence,
+          validationIssues: research.researcherOutput?.validationIssues || [],
+          enhancements: research.researcherOutput?.enhancements || []
+        },
         quantitativeFindings: {},
         qualitativeFindings: {},
-        error: result.error
+        error: research.executionResults?.error
       };
 
-      // Enhanced processing of SQL calculation results
-      if (result.sqlResults && typeof result.sqlResults === 'object') {
-        if ('percentage' in result.sqlResults) {
-          summary.quantitativeFindings = {
-            type: 'percentage_analysis',
-            percentage: result.sqlResults.percentage,
-            subset: result.sqlResults.filteredCount,
-            total: result.sqlResults.totalCount,
-            interpretation: result.sqlResults.percentage >= 50 ? 'majority_presence' : 'minority_presence',
-            significance: result.sqlResults.percentage > 75 ? 'very_high' : 
-                        result.sqlResults.percentage > 50 ? 'high' :
-                        result.sqlResults.percentage > 25 ? 'moderate' : 'low'
-          };
-        } else if ('count' in result.sqlResults) {
-          summary.quantitativeFindings = {
-            type: 'count_analysis',
-            count: result.sqlResults.count,
-            magnitude: result.sqlResults.count > 50 ? 'extensive' :
-                     result.sqlResults.count > 20 ? 'substantial' :
-                     result.sqlResults.count > 10 ? 'moderate' : 'limited'
-          };
+      // Process SQL results from execution
+      if (research.executionResults?.sqlResults && Array.isArray(research.executionResults.sqlResults)) {
+        const sqlData = research.executionResults.sqlResults;
+        
+        if (sqlData.length > 0) {
+          const firstRow = sqlData[0];
+          
+          // Handle percentage calculations
+          if ('percentage' in firstRow) {
+            summary.quantitativeFindings = {
+              type: 'percentage_analysis',
+              percentage: firstRow.percentage,
+              count: firstRow.count || sqlData.length,
+              interpretation: firstRow.percentage >= 50 ? 'majority_presence' : 'minority_presence',
+              significance: firstRow.percentage > 75 ? 'very_high' : 
+                          firstRow.percentage > 50 ? 'high' :
+                          firstRow.percentage > 25 ? 'moderate' : 'low'
+            };
+          }
+          // Handle count data
+          else if ('count' in firstRow || 'frequency' in firstRow) {
+            const countValue = firstRow.count || firstRow.frequency || sqlData.length;
+            summary.quantitativeFindings = {
+              type: 'count_analysis',
+              count: countValue,
+              data: sqlData.slice(0, 5), // Top 5 results
+              magnitude: countValue > 50 ? 'extensive' :
+                        countValue > 20 ? 'substantial' :
+                        countValue > 10 ? 'moderate' : 'limited'
+            };
+          }
+          // Handle average/score data
+          else if ('avg_score' in firstRow || 'score' in firstRow) {
+            summary.quantitativeFindings = {
+              type: 'score_analysis',
+              topResults: sqlData.slice(0, 5),
+              avgScore: firstRow.avg_score || firstRow.score,
+              dataPoints: sqlData.length
+            };
+          }
         }
       }
 
-      // Enhanced vector search insights
-      if (result.vectorResults && result.vectorResults.length > 0) {
+      // Process vector search results
+      if (research.executionResults?.vectorResults && research.executionResults.vectorResults.length > 0) {
+        const vectorData = research.executionResults.vectorResults;
         summary.qualitativeFindings = {
           type: 'semantic_insights',
-          entryCount: result.vectorResults.length,
-          sampleEntries: result.vectorResults.slice(0, 2).map((entry: any) => ({
+          entryCount: vectorData.length,
+          sampleEntries: vectorData.slice(0, 2).map((entry: any) => ({
             date: entry.created_at,
             contentPreview: entry.content?.substring(0, 150),
-            similarity: Math.round(entry.similarity * 100),
+            similarity: Math.round((entry.similarity || 0) * 100),
+            themes: entry.themes || [],
             topEmotions: entry.emotions ? Object.entries(entry.emotions)
               .sort(([,a], [,b]) => (b as number) - (a as number))
               .slice(0, 3)
               .map(([emotion, score]) => `${emotion}: ${(score as number * 100).toFixed(0)}%`)
               : []
           })),
-          avgSimilarity: Math.round(result.vectorResults.reduce((sum: number, entry: any) => sum + entry.similarity, 0) / result.vectorResults.length * 100)
+          avgSimilarity: Math.round(vectorData.reduce((sum: number, entry: any) => sum + (entry.similarity || 0), 0) / vectorData.length * 100)
         };
       }
 
@@ -256,12 +281,12 @@ serve(async (req) => {
         userStatusMessage: null,
         analysisMetadata: {
           totalSubQuestions: analysisResults.length,
-          strategiesUsed: analysisResults.map((r: any) => r.analysisPlan?.searchStrategy),
-          dataSourcesUsed: {
-            vectorSearch: analysisResults.some((r: any) => r.vectorResults),
-            sqlQueries: analysisResults.some((r: any) => r.sqlResults),
-            errors: analysisResults.some((r: any) => r.error)
-          }
+        strategiesUsed: [],
+        dataSourcesUsed: {
+          vectorSearch: false,
+          sqlQueries: false,
+          errors: true
+        }
         }
       }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -282,12 +307,16 @@ serve(async (req) => {
       response: consolidatedResponse,
       userStatusMessage,
       analysisMetadata: {
-        totalSubQuestions: analysisResults.length,
-        strategiesUsed: analysisResults.map((r: any) => r.analysisPlan?.searchStrategy),
+        totalSubQuestions: researchResults.length,
+        strategiesUsed: researchResults.map((r: any) => r.researcherOutput?.validatedPlan?.searchStrategy),
         dataSourcesUsed: {
-          vectorSearch: analysisResults.some((r: any) => r.vectorResults),
-          sqlQueries: analysisResults.some((r: any) => r.sqlResults),
-          errors: analysisResults.some((r: any) => r.error)
+          vectorSearch: researchResults.some((r: any) => r.executionResults?.vectorResults),
+          sqlQueries: researchResults.some((r: any) => r.executionResults?.sqlResults),
+          errors: researchResults.some((r: any) => r.executionResults?.error)
+        },
+        researcherValidation: {
+          totalValidationIssues: researchResults.reduce((sum: number, r: any) => sum + (r.researcherOutput?.validationIssues?.length || 0), 0),
+          totalEnhancements: researchResults.reduce((sum: number, r: any) => sum + (r.researcherOutput?.enhancements?.length || 0), 0)
         }
       }
     }), {
