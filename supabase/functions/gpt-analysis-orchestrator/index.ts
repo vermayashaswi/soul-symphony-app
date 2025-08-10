@@ -417,13 +417,52 @@ Incoming timeRange (may be null): ${timeRange ? JSON.stringify(timeRange) : 'nul
       })
     );
 
+    // Process analysis results and create structured analytics data
+    const processedAnalytics = analysisResults.map((result: any) => {
+      const analytics: any = {
+        subQuestion: result.subQuestion.question,
+        strategy: result.analysisPlan?.searchStrategy || result.analysisPlan?.query_type,
+        hasData: !!(result.vectorResults || result.sqlResults)
+      };
+
+      // Process SQL calculation results for percentage/quantitative data
+      if (result.sqlResults && typeof result.sqlResults === 'object') {
+        if ('percentage' in result.sqlResults) {
+          analytics.type = 'quantitative_emotion';
+          analytics.score = result.sqlResults.percentage;
+          analytics.subset = result.sqlResults.filteredCount;
+          analytics.total = result.sqlResults.totalCount;
+          analytics.description = `${result.sqlResults.percentage}% of entries (${result.sqlResults.filteredCount}/${result.sqlResults.totalCount})`;
+        } else if ('count' in result.sqlResults) {
+          analytics.type = 'entry_count';
+          analytics.count = result.sqlResults.count;
+          analytics.description = `${result.sqlResults.count} total entries found`;
+        }
+      }
+
+      // Process vector results for content insights
+      if (result.vectorResults && Array.isArray(result.vectorResults)) {
+        analytics.sampleEntries = result.vectorResults.slice(0, 3).map((entry: any) => ({
+          date: entry.created_at,
+          content: entry.content?.substring(0, 150),
+          similarity: entry.similarity,
+          emotions: entry.emotions
+        }));
+        analytics.vectorCount = result.vectorResults.length;
+      }
+
+      return analytics;
+    }).filter(a => a.hasData);
+
     return new Response(JSON.stringify({
       success: true,
       analysisResults,
+      analyticsData: processedAnalytics,
       summary: {
         totalSubQuestions: (Array.isArray(effectiveSubQuestions) ? effectiveSubQuestions.length : 0),
         completedAnalyses: analysisResults.length,
-        strategies: analysisResults.map((r: any) => r.analysisPlan?.query_type)
+        strategies: analysisResults.map((r: any) => r.analysisPlan?.query_type),
+        hasAnalytics: processedAnalytics.length > 0
       }
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },

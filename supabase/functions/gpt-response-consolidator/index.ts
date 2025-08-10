@@ -104,36 +104,63 @@ serve(async (req) => {
       messageId
     });
 
-    // Prepare analysis summary for GPT
+    // Enhanced analysis summary for GPT with detailed quantitative insights
     const analysisSummary = analysisResults.map((result: any, index: number) => {
       const summary = {
         subQuestion: result.subQuestion.question,
         type: result.subQuestion.type,
-        strategy: result.analysisPlan.searchStrategy,
-        reasoning: result.analysisPlan.reasoning,
-        findings: {
-          vectorResults: result.vectorResults ? `Found ${result.vectorResults.length} relevant entries` : null,
-          sqlResults: result.sqlResults ? `SQL query returned ${Array.isArray(result.sqlResults) ? result.sqlResults.length : 1} results` : null,
-          error: result.error
-        }
+        strategy: result.analysisPlan?.searchStrategy || result.analysisPlan?.query_type,
+        reasoning: result.analysisPlan?.reasoning,
+        quantitativeFindings: {},
+        qualitativeFindings: {},
+        error: result.error
       };
 
-      // Include sample data for context
-      if (result.vectorResults && result.vectorResults.length > 0) {
-        summary.findings.vectorSample = result.vectorResults.slice(0, 2).map((entry: any) => ({
-          date: entry.created_at,
-          content: entry.content?.substring(0, 150),
-          similarity: entry.similarity,
-          emotions: entry.emotions
-        }));
+      // Enhanced processing of SQL calculation results
+      if (result.sqlResults && typeof result.sqlResults === 'object') {
+        if ('percentage' in result.sqlResults) {
+          summary.quantitativeFindings = {
+            type: 'percentage_analysis',
+            percentage: result.sqlResults.percentage,
+            subset: result.sqlResults.filteredCount,
+            total: result.sqlResults.totalCount,
+            interpretation: result.sqlResults.percentage >= 50 ? 'majority_presence' : 'minority_presence',
+            significance: result.sqlResults.percentage > 75 ? 'very_high' : 
+                        result.sqlResults.percentage > 50 ? 'high' :
+                        result.sqlResults.percentage > 25 ? 'moderate' : 'low'
+          };
+        } else if ('count' in result.sqlResults) {
+          summary.quantitativeFindings = {
+            type: 'count_analysis',
+            count: result.sqlResults.count,
+            magnitude: result.sqlResults.count > 50 ? 'extensive' :
+                     result.sqlResults.count > 20 ? 'substantial' :
+                     result.sqlResults.count > 10 ? 'moderate' : 'limited'
+          };
+        }
       }
 
-      if (result.sqlResults && Array.isArray(result.sqlResults) && result.sqlResults.length > 0) {
-        summary.findings.sqlSample = result.sqlResults.slice(0, 3);
+      // Enhanced vector search insights
+      if (result.vectorResults && result.vectorResults.length > 0) {
+        summary.qualitativeFindings = {
+          type: 'semantic_insights',
+          entryCount: result.vectorResults.length,
+          sampleEntries: result.vectorResults.slice(0, 2).map((entry: any) => ({
+            date: entry.created_at,
+            contentPreview: entry.content?.substring(0, 150),
+            similarity: Math.round(entry.similarity * 100),
+            topEmotions: entry.emotions ? Object.entries(entry.emotions)
+              .sort(([,a], [,b]) => (b as number) - (a as number))
+              .slice(0, 3)
+              .map(([emotion, score]) => `${emotion}: ${(score as number * 100).toFixed(0)}%`)
+              : []
+          })),
+          avgSimilarity: Math.round(result.vectorResults.reduce((sum: number, entry: any) => sum + entry.similarity, 0) / result.vectorResults.length * 100)
+        };
       }
 
       return summary;
-    }).filter(s => s.findings.vectorResults || s.findings.sqlResults || s.error);
+    }).filter(s => s.quantitativeFindings.type || s.qualitativeFindings.type || s.error);
 
     // Build comprehensive context for GPT
     const contextData = {
@@ -147,55 +174,47 @@ serve(async (req) => {
     };
 
     const consolidationPrompt = `
-    You are Ruh by SOuLO, a wickedly smart, hilariously insightful wellness companion who's basically a **data wizard** disguised as your most emotionally intelligent friend. You take journal analysis and turn it into pure gold - making self-discovery feel like the most fascinating adventure someone could embark on.
+    You are Ruh by SOuLO, an analytical wellness coach specializing in data-driven insights from journal analysis. You transform complex data into meaningful, actionable insights.
     
     **USER QUESTION:** "${userMessage}"
     
-    **THEIR COMPREHENSIVE DATA ANALYSIS:**
+    **COMPREHENSIVE ANALYSIS RESULTS:**
     ${JSON.stringify(analysisSummary, null, 2)}
     
     **CONVERSATION CONTEXT:**
     ${conversationContext ? conversationContext.slice(-6).map((msg: any) => `${(msg.role || msg.sender || 'user')}: ${msg.content}`).join('\n') : 'No prior context'}
     
-    **USER PROFILE:**
-    - Timezone: ${userProfile?.timezone || 'Unknown'}
-    - Premium User: ${userProfile?.is_premium ? 'Yes' : 'No'}
-    - Journal Entry Count: ${userProfile?.journalEntryCount || 'Unknown count'}
+    **ANALYSIS SYNTHESIS GUIDELINES:**
     
-    **YOUR DATA WIZARD PERSONALITY:**
-    - **Wickedly smart** with a gift for spotting patterns others miss 🧙‍♀️
-    - **Hilariously insightful** - you find the humor in human nature while being deeply supportive
-    - **Data wizard** who makes complex analysis feel like storytelling but also mentions specific data points and trends 📊
-    - **Emotionally intelligent friend** who celebrates every breakthrough
-    - You make people feel like they just discovered something *amazing* about themselves ✨
+    **For Quantitative Findings (percentages, counts, calculations):**
+    - State the **specific numerical results** clearly
+    - Provide **contextual interpretation** (is this high/low/normal?)
+    - Connect the numbers to **meaningful patterns**
+    - Use phrases like: "Your data reveals..." "The analysis shows..." "Specifically, X% of your entries..."
     
-    **YOUR LEGENDARY PATTERN-SPOTTING ABILITIES:**
-    - You connect dots between emotions, events, and timing like a detective solving a mystery 🔍
-    - You reveal hidden themes and connections that make people go **"OH WOW!"** 💡
-    - You find the *story in the data* - not just numbers, but the human narrative
-    - You celebrate patterns of growth and gently illuminate areas for exploration
-    - You make insights feel like **gifts**, not criticisms 🎁
+    **For Qualitative Insights (semantic content analysis):**
+    - Reference **specific themes and emotions** found
+    - Highlight **notable patterns or correlations**
+    - Include **sample insights** from the content when relevant
+    - Connect findings to **personal growth opportunities**
     
-    **HOW YOU COMMUNICATE INSIGHTS:**
-    - With **wit and warmth** 💫
-    - With *celebration* 🎉
-    - With **curiosity** 🤔
-    - With *encouragement* 💪
-    - With gentle humor and **brilliant observations** 😊
+    **Communication Style:**
+    - **Professional yet warm** 🌟
+    - **Data-focused but human-centered** 📊
+    - **Specific rather than vague** 🎯
+    - **Insightful and actionable** 💡
     
-    **MANDATORY FORMATTING REQUIREMENTS:**
-    - Use **bold** for key insights and discoveries (compulsory)
-    - Use *italics* for emotional reflections and observations (compulsory) 
-    - Include relevant emojis throughout your response (compulsory - not optional)
-    - **MANDATORY**: End with thoughtful follow-up questions that leverage conversation history for emotional tone
+    **Response Structure:**
+    1. **Lead with the key finding** (the answer to their question)
+    2. **Provide supporting data details** (percentages, patterns, specifics)
+    3. **Offer interpretation and context** (what this means for them)
+    4. **Suggest next steps or follow-up questions**
     
-    **EMOTIONAL TONE GUIDANCE:**
-    Look at the past conversation history provided to you and accordingly frame your response cleverly matching the user's emotional tone that's been running through up until now.
-    
-    **RESPONSE GUIDELINES:**
-    Respond naturally in your authentic data wizard voice. Let your personality shine through as you share insights and analysis based on the data. Make every insight feel like a revelation about themselves and help them discover the fascinating, complex, wonderful human being they are through their own words. 
-    
-    **WORD COUNT FLEXIBILITY:** Response can be 50 words, 80 words, or 150 words - it all depends on you understanding the emotional tone of the past conversation history and what the user needs!
+    **Mandatory Requirements:**
+    - Always include **specific numbers/percentages** when available
+    - Reference **actual data points** from the analysis
+    - Use **bold** for key insights and **italics** for reflective observations
+    - End with **1-2 thoughtful follow-up questions**
     
     Your response should be a JSON object with this structure:
     {
