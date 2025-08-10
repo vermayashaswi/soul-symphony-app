@@ -270,6 +270,15 @@ export const useStreamingChat = ({ onFinalResponse, onError, threadId }: UseStre
     const activeThreadId = targetThreadId || threadId;
     if (!activeThreadId) return;
 
+    // Only generate dynamic messages for journal-specific queries
+    if (category !== 'JOURNAL_SPECIFIC') {
+      updateThreadState(activeThreadId, {
+        useThreeDotFallback: true,
+        dynamicMessages: [],
+        currentMessageIndex: 0
+      });
+      return;
+    }
 
     try {
       const { data, error } = await supabase.functions.invoke('generate-streaming-messages', {
@@ -540,7 +549,7 @@ export const useStreamingChat = ({ onFinalResponse, onError, threadId }: UseStre
       showBackendAnimation: false,
       dynamicMessages: [],
       currentMessageIndex: 0,
-      useThreeDotFallback: false,
+       useThreeDotFallback: messageCategory !== 'JOURNAL_SPECIFIC',
       queryCategory: messageCategory,
       expectedProcessingTime: estimatedTime,
       processingStartTime: Date.now()

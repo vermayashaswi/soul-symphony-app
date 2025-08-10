@@ -30,19 +30,12 @@ serve(async (req) => {
     
     // Generate dynamic messages for JOURNAL_SPECIFIC category, fallback for others
     if (category !== 'JOURNAL_SPECIFIC') {
-      console.log(`[generate-streaming-messages] Category ${category} using fallback messages`);
-      const fallbackMessages = [
-        "Processing your request now...",
-        "Analyzing relevant information...",
-        "Gathering insights for you...",
-        "Preparing thoughtful response...",
-        "Finalizing your personalized answer..."
-      ];
+      console.log(`[generate-streaming-messages] Category ${category} -> disabling dynamic messages, using three-dot UI`);
       return new Response(
         JSON.stringify({ 
           success: true, 
-          messages: fallbackMessages, 
-          shouldUseFallback: false 
+          messages: [], 
+          shouldUseFallback: true 
         }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
