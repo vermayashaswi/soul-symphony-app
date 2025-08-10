@@ -60,6 +60,38 @@ serve(async (req) => {
 
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
+    // Fetch canonical names from master tables (single source of truth)
+    let canonicalEmotionNames: string[] = [];
+    let canonicalThemeNames: string[] = [];
+    try {
+      const [{ data: emoData, error: emoErr }, { data: themeData, error: themeErr }] = await Promise.all([
+        supabase.from('emotions').select('name').order('name', { ascending: true }),
+        supabase.from('themes').select('name,is_active,display_order').eq('is_active', true).order('display_order', { ascending: true }).order('name', { ascending: true }),
+      ]);
+
+      if (!emoErr && Array.isArray(emoData)) {
+        canonicalEmotionNames = emoData.map((e: any) => e.name).filter(Boolean);
+      } else {
+        console.warn('[orchestrator] Failed to load emotions master list:', emoErr);
+      }
+
+      if (!themeErr && Array.isArray(themeData)) {
+        canonicalThemeNames = themeData.map((t: any) => t.name).filter(Boolean);
+      } else {
+        console.warn('[orchestrator] Failed to load themes master list:', themeErr);
+      }
+
+      console.log('[orchestrator] Canonical lists loaded', {
+        emotionsCount: canonicalEmotionNames.length,
+        themesCount: canonicalThemeNames.length,
+      });
+    } catch (e) {
+      console.warn('[orchestrator] Error loading canonical names:', e);
+    }
+
+    const canonicalEmotionsListStr = canonicalEmotionNames.map(n => `"${n}"`).join(', ');
+    const canonicalThemesListStr = canonicalThemeNames.map(n => `"${n}"`).join(', ');
+
     // Validate input
     if (!analysisPlan || !analysisPlan.subQuestions) {
       throw new Error("Invalid analysis plan received from Analyst Agent");
@@ -105,6 +137,19 @@ You are SOULo's Researcher Agent. Your role is to validate, refine, and execute 
 **CONTEXT:**
 ${ENHANCED_SCHEMA_CONTEXT}
 
+**CANONICAL NAMES (STRICT - ONLY SOURCE OF TRUTH):**
+- Emotions (exact): [${canonicalEmotionsListStr}]
+- Themes (exact): [${canonicalThemesListStr}]
+
+**STRICT TERM POLICY (MANDATORY):**
+- When filtering columns on "Journal Entries" — emotions (jsonb), master_themes (text[]), or themeemotion (jsonb) — you MUST use only the exact names listed above. Do NOT invent, infer, or use synonyms not in these lists.
+- If a non-canonical term appears in inputs, you MUST map it deterministically to the closest canonical name and record it in validationIssues (e.g., "Mapped 'confidence' -> 'confident'").
+- Examples:
+  - Emotions jsonb key check: (emotions ? 'confident') AND ((emotions->>'confident')::numeric >= 0.3)
+  - master_themes contains: 'work' = ANY(master_themes)
+  - themeemotion theme exists: (themeemotion ? 'work')
+  - themeemotion value check: ((themeemotion->'work'->>'confident')::numeric >= 0.3)
+
 **ANALYST AGENT OUTPUT TO VALIDATE:**
 Sub-question: "${subQuestion.question}"
 Purpose: "${subQuestion.purpose}"
@@ -125,6 +170,7 @@ Analysis Steps: ${JSON.stringify(subQuestion.analysisSteps, null, 2)}
 - Add time range filters if timeRange is provided
 - Ensure emotion queries use proper jsonb operators
 - Validate theme queries use correct array operations
+- Enforce STRICT TERM POLICY for themes/emotions; canonicalize non-canonical inputs and report mappings in validationIssues
 - Add missing analysis steps if plan is incomplete
 
 **OUTPUT SCHEMA:**
@@ -139,7 +185,7 @@ Return ONLY valid JSON:
         "type": "sql_query" | "vector_search",
         "description": "what this step accomplishes",
         "sql": {
-          "query": "SELECT ... FROM \\"Journal Entries\\" WHERE user_id = $1 AND ...",
+          "query": "SELECT ... FROM \"Journal Entries\" WHERE user_id = $1 AND ...",
           "parameters": ["$user_id"],
           "purpose": "calculation/count/analysis description"
         } | null,
