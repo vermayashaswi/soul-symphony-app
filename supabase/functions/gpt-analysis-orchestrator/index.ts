@@ -45,13 +45,16 @@ serve(async (req) => {
   }
 
   try {
-    const { analysisPlan, userMessage, userId, timeRange, messageId } = await req.json();
+    const raw = await req.json();
+    const { userMessage, userId, timeRange, messageId, threadId } = raw;
+    const analysisPlan = raw.analysisPlan ?? (raw.subQuestions ? { queryType: 'journal_specific', strategy: 'intelligent_sub_query', subQuestions: raw.subQuestions } : null);
     
     console.log('GPT Analysis Orchestrator (Researcher Agent) called with:', { 
       subQuestionsCount: analysisPlan?.subQuestions?.length || 0,
       userMessage: userMessage?.substring(0, 100),
       userId,
       timeRange,
+      threadId,
       messageId 
     });
 
@@ -189,6 +192,7 @@ Focus on ensuring the plan is complete, secure, and executable.`;
     return new Response(JSON.stringify({
       success: true,
       researchResults,
+      analysisResults: researchResults, // backward-compat alias for older callers
       metadata: {
         orchestratorVersion: "researcher_agent_v1",
         timestamp: new Date().toISOString(),

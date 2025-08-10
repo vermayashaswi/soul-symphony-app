@@ -87,14 +87,14 @@ serve(async (req) => {
   }
 
   try {
-    const { 
-      userMessage, 
-      researchResults, 
-      conversationContext, 
-      userProfile,
-      streamingMode = false,
-      messageId 
-    } = await req.json();
+    const raw = await req.json();
+    const userMessage = raw.userMessage;
+    const researchResults = raw.researchResults ?? raw.analysisResults ?? [];
+    const conversationContext = raw.conversationContext;
+    const userProfile = raw.userProfile;
+    const streamingMode = raw.streamingMode ?? false;
+    const messageId = raw.messageId;
+    const threadId = raw.threadId;
     
     console.log('GPT Response Consolidator called with:', { 
       userMessage: userMessage?.substring(0, 100),
@@ -280,13 +280,13 @@ serve(async (req) => {
         response: fallbackText,
         userStatusMessage: null,
         analysisMetadata: {
-          totalSubQuestions: analysisResults.length,
-        strategiesUsed: [],
-        dataSourcesUsed: {
-          vectorSearch: false,
-          sqlQueries: false,
-          errors: true
-        }
+          totalSubQuestions: researchResults.length,
+          strategiesUsed: [],
+          dataSourcesUsed: {
+            vectorSearch: false,
+            sqlQueries: false,
+            errors: true
+          }
         }
       }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },

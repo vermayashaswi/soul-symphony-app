@@ -208,6 +208,8 @@ serve(async (req) => {
           'gpt-analysis-orchestrator',
           {
             body: {
+              analysisPlan: enhancedQueryPlan,
+              // legacy for compatibility
               subQuestions: enhancedQueryPlan.subQuestions,
               userMessage: message,
               userId: requestUserId,
@@ -228,7 +230,7 @@ serve(async (req) => {
           {
             body: {
               userMessage: message,
-              analysisResults: analysisResults.analysisResults,
+              researchResults: analysisResults.researchResults ?? analysisResults.analysisResults,
               conversationContext,
               userProfile,
               streamingMode: false,
@@ -508,6 +510,7 @@ async function processStreamingPipeline(
         'gpt-analysis-orchestrator',
         {
           body: {
+            analysisPlan: enhancedQueryPlan,
             subQuestions: enhancedQueryPlan.subQuestions,
             userMessage: message,
             userId: requestUserId,
@@ -531,7 +534,7 @@ async function processStreamingPipeline(
         {
           body: {
             userMessage: message,
-            analysisResults: analysisResults.analysisResults,
+            researchResults: analysisResults.researchResults ?? analysisResults.analysisResults,
             conversationContext,
             userProfile,
             streamingMode: false,
