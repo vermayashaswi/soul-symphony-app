@@ -127,7 +127,7 @@ Incoming timeRange (may be null): ${timeRange ? JSON.stringify(timeRange) : 'nul
           const response = await fetch('https://api.openai.com/v1/chat/completions', {
             method: 'POST',
             headers: {
-              'Authorization': `Bearer ${openAIApiKey}`,
+              'Authorization': `Bearer ${openaiApiKey}`,
               'Content-Type': 'application/json',
             },
             body: JSON.stringify({
@@ -280,7 +280,7 @@ Incoming timeRange (may be null): ${timeRange ? JSON.stringify(timeRange) : 'nul
             const embedResp = await fetch('https://api.openai.com/v1/embeddings', {
               method: 'POST',
               headers: {
-                'Authorization': `Bearer ${openAIApiKey}`,
+                'Authorization': `Bearer ${openaiApiKey}`,
                 'Content-Type': 'application/json',
               },
               body: JSON.stringify({
@@ -320,28 +320,46 @@ Incoming timeRange (may be null): ${timeRange ? JSON.stringify(timeRange) : 'nul
             const sqlPlan = analysisPlan.sql;
             const quoted = (c: string) => (c.includes(' ') ? `"${c}"` : c);
 
-            if (sqlPlan.operation === 'calculation' && sqlPlan.raw_query) {
-              // Execute advanced SQL calculation via RPC
-              console.log(`[SQL Calculation] Executing: ${sqlPlan.raw_query.substring(0, 100)}...`);
-              
-              try {
-                const { data: calculationResult, error } = await supabase.rpc('execute_dynamic_query', {
-                  query_text: sqlPlan.raw_query.replace('$1', `'${userId}'`)
+            if (sqlPlan.operation === 'calculation') {
+              // Safe calculation path: derive counts via query builder and RPC, then compute percentage
+              const filters = Array.isArray(sqlPlan.filters) ? [...sqlPlan.filters] : [];
+              const gteIdx = filters.findIndex((f: any) => f.column === 'created_at' && f.op === 'gte');
+              const lteIdx = filters.findIndex((f: any) => f.column === 'created_at' && f.op === 'lte');
+              const rangeStart = (gteIdx >= 0 ? filters[gteIdx].value : (timeRange?.start || null));
+              const rangeEnd = (lteIdx >= 0 ? filters[lteIdx].value : (timeRange?.end || null));
+              // Ensure time range filters exist in filtered query
+              if (rangeStart && gteIdx === -1) filters.push({ column: 'created_at', op: 'gte', value: rangeStart });
+              if (rangeEnd && lteIdx === -1) filters.push({ column: 'created_at', op: 'lte', value: rangeEnd });
+
+              // Subset count with filters
+              let qCount = supabase
+                .from('Journal Entries')
+                .select('id', { count: 'exact', head: true });
+              qCount = applyFilters(qCount, filters);
+              qCount = qCount.eq('user_id', userId);
+              const { count: filteredCount, error: filteredError } = await qCount;
+              if (filteredError) {
+                console.error('SQL calculation subset count error:', filteredError);
+                results.error = `SQL calculation subset count error: ${filteredError.message}`;
+              } else {
+                // Total count in same range
+                const { data: total, error: totalError } = await supabase.rpc('get_journal_entry_count', {
+                  user_id_filter: userId,
+                  start_date: rangeStart || null,
+                  end_date: rangeEnd || null
                 });
-                
-                if (error) {
-                  console.error('SQL calculation error:', error);
-                  results.error = `SQL calculation error: ${error.message}`;
-                } else if (calculationResult?.success) {
-                  results.sqlResults = calculationResult.data;
-                  console.log(`[SQL Calculation] Result:`, calculationResult.data);
+                if (totalError) {
+                  console.error('SQL calculation total count error:', totalError);
+                  results.error = `SQL calculation total count error: ${totalError.message}`;
                 } else {
-                  results.error = `SQL calculation failed: ${calculationResult?.error || 'Unknown error'}`;
+                  const totalNum = (total as number) ?? 0;
+                  const subset = filteredCount ?? 0;
+                  const percentage = totalNum > 0 ? Math.round((subset * 10000) / totalNum) / 100 : 0;
+                  results.sqlResults = { filteredCount: subset, totalCount: totalNum, percentage };
+                  console.log(`[SQL Calculation] subset/total/percentage:`, subset, totalNum, percentage);
                 }
-              } catch (err) {
-                console.error('SQL calculation exception:', err);
-                results.error = `SQL calculation exception: ${err.message}`;
               }
+            }
             } else if (sqlPlan.operation === 'count') {
               // Use the new dedicated count RPC for reliable counting
               const startDate = sqlPlan.filters?.find(f => f.column === 'created_at' && f.op === 'gte')?.value || null;
