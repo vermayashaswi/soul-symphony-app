@@ -26,7 +26,7 @@ const MobileNavigation: React.FC<MobileNavigationProps> = ({ onboardingComplete 
   const { isActive: isTutorialActive, tutorialCompleted } = useTutorial();
   const { user } = useAuth();
   const { currentLanguage } = useTranslation();
-  const { hasActiveSubscription, isTrialActive } = useSubscription();
+  const { hasActiveSubscription, isTrialActive, isLoading: subscriptionLoading, hasInitialLoadCompleted } = useSubscription();
   const { safeArea, isNative, isAndroid, applySafeAreaStyles } = useSafeArea();
   
   const { isKeyboardVisible, keyboardHeight, platform } = useKeyboardDetection();
@@ -120,7 +120,8 @@ const MobileNavigation: React.FC<MobileNavigationProps> = ({ onboardingComplete 
     setIsVisible(shouldShowNav);
   }, [location.pathname, isMobile.isMobile, user, onboardingComplete, tutorialCompleted, currentLanguage, renderKey, safeArea]);
   
-  if (!isVisible) {
+  // Gate rendering until subscription data is ready to avoid premium-lock flicker
+  if (!isVisible || subscriptionLoading || !hasInitialLoadCompleted) {
     return null;
   }
   

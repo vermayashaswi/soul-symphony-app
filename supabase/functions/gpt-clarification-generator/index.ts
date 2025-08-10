@@ -80,21 +80,25 @@ Your response should be a JSON object with this structure:
 TONE: Warm, grounded, spiritually aware but not preachy, genuinely caring, with brilliant wit and a sense of deeper understanding. Speak to both their mind and their soul.
 `;
 
+    const model = 'gpt-4.1-2025-04-14';
+    const tokensKey = model.includes('gpt-5') ? 'max_completion_tokens' : 'max_tokens';
+    const payload: any = {
+      model,
+      messages: [
+        { role: 'system', content: 'You are Ruh, the soul-centered wellness companion by SOuLO. You combine ancient wisdom with modern psychology to help people connect with their deepest truth and inner knowing.' },
+        { role: 'user', content: clarificationPrompt }
+      ],
+      response_format: { type: 'json_object' }
+    };
+    (payload as any)[tokensKey] = 800;
+
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${openAIApiKey}`,
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          model: 'gpt-4.1-2025-04-14',
-          messages: [
-            { role: 'system', content: 'You are Ruh, the soul-centered wellness companion by SOuLO. You combine ancient wisdom with modern psychology to help people connect with their deepest truth and inner knowing.' },
-            { role: 'user', content: clarificationPrompt }
-          ],
-          response_format: { type: 'json_object' },
-          max_tokens: 800
-        }),
+        body: JSON.stringify(payload),
     });
 
     const data = await response.json();
