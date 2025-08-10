@@ -396,14 +396,9 @@ export const useStreamingChat = ({ onFinalResponse, onError, threadId }: UseStre
     let timeoutId: NodeJS.Timeout;
     
     if (state.queryCategory === 'JOURNAL_SPECIFIC') {
-      const remainingTime = state.expectedProcessingTime ? 
-        Math.max(0, state.expectedProcessingTime - (Date.now() - (state.processingStartTime || Date.now()))) : 
-        15000;
-      
-      const messagesLeft = state.dynamicMessages.length - state.currentMessageIndex;
-      const timePerMessage = messagesLeft > 1 ? Math.min(5000, remainingTime / messagesLeft) : remainingTime;
-      
-      if (state.currentMessageIndex < state.dynamicMessages.length - 1) {
+      // Rotate through messages every 7 seconds; keep the last one indefinitely until response
+      const isLast = state.currentMessageIndex >= state.dynamicMessages.length - 1;
+      if (!isLast) {
         timeoutId = setTimeout(() => {
           // Double-check we're still on the same thread
           if (threadId && getThreadState(threadId).isStreaming) {
@@ -411,7 +406,7 @@ export const useStreamingChat = ({ onFinalResponse, onError, threadId }: UseStre
               currentMessageIndex: state.currentMessageIndex + 1
             });
           }
-        }, timePerMessage);
+        }, 7000);
       }
     } else {
       const interval = setInterval(() => {
@@ -434,6 +429,11 @@ export const useStreamingChat = ({ onFinalResponse, onError, threadId }: UseStre
   // Safety completion guard with thread validation
   useEffect(() => {
     if (!threadId || !state.isStreaming) return;
+    
+    // For long-running journal-specific analysis, keep showing dynamic messages without forcing an error toast
+    if (state.queryCategory === 'JOURNAL_SPECIFIC') {
+      return; // disable safety error for this category
+    }
     
     const graceMs = 45000;
     const budget = (state.expectedProcessingTime ?? 60000) + graceMs;
@@ -529,7 +529,7 @@ export const useStreamingChat = ({ onFinalResponse, onError, threadId }: UseStre
 
     await generateStreamingMessages(message, messageCategory, conversationContext, userProfile, targetThreadId);
     
-    const estimatedTime = messageCategory === 'JOURNAL_SPECIFIC' ? 20000 : 10000;
+    const estimatedTime = messageCategory === 'JOURNAL_SPECIFIC' ? 60000 : 10000;
     updateThreadState(targetThreadId, { expectedProcessingTime: estimatedTime });
     
     // Save streaming state for persistence

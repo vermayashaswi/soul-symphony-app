@@ -65,6 +65,35 @@ serve(async (req) => {
       throw new Error("Invalid analysis plan received from Analyst Agent");
     }
 
+    // Collect user's available emotion keys from their data (to avoid mismatched labels like 'confident' vs 'confidence')
+    const availableEmotionKeys: string[] = [];
+    try {
+      const { data: emotionRows, error: emotionErr } = await supabase
+        .from('Journal Entries')
+        .select('emotions')
+        .eq('user_id', userId)
+        .limit(1000);
+
+      if (!emotionErr && Array.isArray(emotionRows)) {
+        const counts = new Map<string, number>();
+        for (const row of emotionRows) {
+          const emo = row?.emotions || {};
+          for (const key of Object.keys(emo)) {
+            // Count keys that appear with any non-zero-ish value
+            const val = Number(emo[key]);
+            if (!Number.isNaN(val) && val > 0) {
+              counts.set(key, (counts.get(key) || 0) + 1);
+            }
+          }
+        }
+        const sorted = Array.from(counts.entries()).sort((a, b) => b[1] - a[1]).map(([k]) => k);
+        availableEmotionKeys.push(...sorted);
+      }
+    } catch (e) {
+      console.warn('[orchestrator] Failed to collect available emotion keys:', e);
+    }
+
+
     // Process each sub-question through the Researcher Agent
     const researchResults = await Promise.all(
       analysisPlan.subQuestions.map(async (subQuestion: any, index: number) => {
