@@ -301,7 +301,8 @@ async function processVectorSearchOptimized(vectorSearch: any, context: any) {
     const threshold = Math.max(vectorSearch.threshold || 0.1, 0.2); // Higher threshold
     
     if (useAllEntries) {
-      const { data, error } = await supabaseService.rpc('match_journal_entries_fixed', {
+      console.log('[parallel-processor] RPC match_journal_entries params:', { match_threshold: threshold, match_count: matchCount, user_id_filter: validatedUserId, query_embedding: '[omitted]' });
+      const { data, error } = await supabaseService.rpc('match_journal_entries', {
         query_embedding: embedding,
         match_threshold: threshold,
         match_count: matchCount,
@@ -325,7 +326,8 @@ async function processVectorSearchOptimized(vectorSearch: any, context: any) {
       vectorSearchResults = data || [];
       
     } else {
-      const { data, error } = await supabaseService.rpc('match_journal_entries_fixed', {
+      console.log('[parallel-processor] RPC match_journal_entries params:', { match_threshold: threshold, match_count: matchCount, user_id_filter: validatedUserId, query_embedding: '[omitted]' });
+      const { data, error } = await supabaseService.rpc('match_journal_entries', {
         query_embedding: embedding,
         match_threshold: threshold,
         match_count: matchCount,

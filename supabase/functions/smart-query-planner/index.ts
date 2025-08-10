@@ -22,7 +22,7 @@ Available PostgreSQL Functions:
 1. get_top_emotions_with_entries(user_id, start_date, end_date, limit_count) - Returns top emotions with sample entries
 2. match_journal_entries_by_emotion(emotion_name, user_id, min_score, start_date, end_date, limit_count) - Find entries by specific emotion
 3. match_journal_entries_by_theme(theme_query, user_id, match_threshold, match_count, start_date, end_date) - Find entries by theme
-4. match_journal_entries_fixed(query_embedding, match_threshold, match_count, user_id) - Vector similarity search
+4. match_journal_entries(query_embedding, match_threshold, match_count, user_id) - Vector similarity search
 5. match_journal_entries_with_date(query_embedding, match_threshold, match_count, user_id, start_date, end_date) - Vector search with date filter
 
 Table Structure:
@@ -486,6 +486,71 @@ function extractEmotionFilters(lowerMessage: string): string[] {
   const commonEmotions = ['happy', 'sad', 'anxious', 'excited', 'calm', 'stressed', 'angry', 'peaceful', 'grateful', 'frustrated', 'hopeful', 'lonely'];
   return commonEmotions.filter(emotion => lowerMessage.includes(emotion));
 }
+
+/**
+ * Extract a UTC date range from natural language queries (e.g., "last week", "this week", "today", "yesterday", "last month", "this month").
+ */
+function extractDateRangeFromQuery(message: string): { startDate: string; endDate: string } | null {
+  const text = message.toLowerCase();
+
+  const toStartOfDayUTC = (d: Date) => new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate(), 0, 0, 0, 0));
+  const toEndOfDayUTC = (d: Date) => new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate(), 23, 59, 59, 999));
+  const addDays = (d: Date, days: number) => new Date(d.getTime() + days * 24 * 60 * 60 * 1000);
+
+  const startOfWeekUTC = (d: Date) => {
+    // Monday as start of week
+    const day = d.getUTCDay(); // 0-6, 0 is Sunday
+    const diffToMonday = day === 0 ? -6 : 1 - day;
+    const monday = addDays(toStartOfDayUTC(d), diffToMonday);
+    return monday;
+  };
+
+  const now = new Date();
+
+  if (text.includes('last week')) {
+    const thisMonday = startOfWeekUTC(now);
+    const lastMonday = addDays(thisMonday, -7);
+    const lastSunday = toEndOfDayUTC(addDays(lastMonday, 6));
+    return { startDate: lastMonday.toISOString(), endDate: lastSunday.toISOString() };
+  }
+
+  if (text.includes('this week')) {
+    const thisMonday = startOfWeekUTC(now);
+    const end = toEndOfDayUTC(now);
+    return { startDate: thisMonday.toISOString(), endDate: end.toISOString() };
+  }
+
+  if (text.includes('today')) {
+    const start = toStartOfDayUTC(now);
+    const end = toEndOfDayUTC(now);
+    return { startDate: start.toISOString(), endDate: end.toISOString() };
+  }
+
+  if (text.includes('yesterday')) {
+    const y = addDays(now, -1);
+    const start = toStartOfDayUTC(y);
+    const end = toEndOfDayUTC(y);
+    return { startDate: start.toISOString(), endDate: end.toISOString() };
+  }
+
+  if (text.includes('last month')) {
+    const y = now.getUTCFullYear();
+    const m = now.getUTCMonth(); // 0-11
+    const firstLastMonth = new Date(Date.UTC(y, m - 1, 1));
+    const lastDayLastMonth = new Date(Date.UTC(y, m, 0));
+    return { startDate: toStartOfDayUTC(firstLastMonth).toISOString(), endDate: toEndOfDayUTC(lastDayLastMonth).toISOString() };
+  }
+
+  if (text.includes('this month')) {
+    const y = now.getUTCFullYear();
+    const m = now.getUTCMonth();
+    const firstThisMonth = new Date(Date.UTC(y, m, 1));
+    return { startDate: toStartOfDayUTC(firstThisMonth).toISOString(), endDate: toEndOfDayUTC(now).toISOString() };
+  }
+
+  return null;
+}
+
 
 /**
  * Generate required SQL queries for dual-search enforcement

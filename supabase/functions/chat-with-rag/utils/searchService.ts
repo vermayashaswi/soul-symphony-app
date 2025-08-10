@@ -11,7 +11,7 @@ export async function searchEntriesWithVector(
     console.log(`[chat-with-rag/searchService] Searching entries with vector similarity for userId: ${userIdString}`);
     
     const { data, error } = await supabase.rpc(
-      'match_journal_entries_fixed',
+      'match_journal_entries',
       {
         query_embedding: queryEmbedding,
         match_threshold: 0.3, // Lowered threshold for better recall

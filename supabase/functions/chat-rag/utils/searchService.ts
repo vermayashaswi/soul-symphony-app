@@ -9,7 +9,7 @@ export async function searchEntriesWithVector(
     console.log(`Searching entries with vector similarity for userId: ${userId}`);
     
     const { data, error } = await supabase.rpc(
-      'match_journal_entries_fixed',
+      'match_journal_entries',
       {
         query_embedding: queryEmbedding,
         match_threshold: 0.5,

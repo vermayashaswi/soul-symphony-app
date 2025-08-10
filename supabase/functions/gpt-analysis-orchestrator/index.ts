@@ -206,7 +206,7 @@ Focus on extracting specific entities, emotions, or themes mentioned in the sub-
               // Use the vector to search journal entries
               // Choose correct RPC based on presence of time range
               const useDate = !!(timeRange && (timeRange.start || timeRange.end));
-              const rpcName = useDate ? 'match_journal_entries_with_date' : 'match_journal_entries_fixed';
+              const rpcName = useDate ? 'match_journal_entries_with_date' : 'match_journal_entries';
               const rpcParams: any = {
                 query_embedding: embedding,
                 match_threshold: 0.3,
@@ -217,6 +217,11 @@ Focus on extracting specific entities, emotions, or themes mentioned in the sub-
                 rpcParams.start_date = timeRange.start || null;
                 rpcParams.end_date = timeRange.end || null;
               }
+
+              console.log(`[Vector Search] Calling ${rpcName} with params:`, {
+                ...rpcParams,
+                query_embedding: '[omitted]',
+              });
 
               const { data: vectorResults, error: vectorError } = await supabase.rpc(
                 rpcName,
@@ -331,7 +336,7 @@ Focus on extracting specific entities, emotions, or themes mentioned in the sub-
                   const embedding = vectorData.data[0].embedding;
 
                   const useDate = !!(timeRange && (timeRange.start || timeRange.end));
-                  const fallbackRpc = useDate ? 'match_journal_entries_with_date' : 'match_journal_entries_fixed';
+                  const fallbackRpc = useDate ? 'match_journal_entries_with_date' : 'match_journal_entries';
                   const fallbackParams: any = {
                     query_embedding: embedding,
                     match_threshold: 0.3,
@@ -342,6 +347,11 @@ Focus on extracting specific entities, emotions, or themes mentioned in the sub-
                     fallbackParams.start_date = timeRange.start || null;
                     fallbackParams.end_date = timeRange.end || null;
                   }
+
+                  console.log(`[Vector Fallback] Calling ${fallbackRpc} with params:`, {
+                    ...fallbackParams,
+                    query_embedding: '[omitted]',
+                  });
 
                   const { data: fallbackResults, error: fallbackError } = await supabase.rpc(
                     fallbackRpc,
