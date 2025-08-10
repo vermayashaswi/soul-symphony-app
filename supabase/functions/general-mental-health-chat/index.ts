@@ -149,10 +149,7 @@ Look at the past conversation history provided and accordingly frame your respon
 - Always maintain the friend-like but professional boundary
 
 Add relevant follow up questions mandatorily. 
-    MUST HAVE/DO: ALWAYS BE AWARE OF THE CONVERSATION HISTORY TO UNDERSTAND WHAT THE USER DESIRES NEXT IN THE CONVERSATION. Response can be 10 words, 30 words or 50 words. It all depends on you understanding the emotional tone of the past conversation history!
-
-    SPECIAL RULE: If the query is a greeting, userStatusMessage must only be: "Waking up..."
-    `
+MUST HAVE/DO: ALWAYS BE AWARE OF THE CONVERSATION HISTORY TO UNDERSTAND WHAT THE USER DESIRES NEXT IN THE CONVERSATION. Response can be 10 words, 30 words or 50 words. It all depends on you understanding the emotional tone of the past conversation history!`
       }
     ];
 
