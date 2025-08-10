@@ -71,12 +71,6 @@ export default function MobileChatInterface({
     threadSafetyManager.setActiveThread(threadId || null);
   }, [threadId]);
   
-  // Keep a ref of the latest active thread to guard async UI updates
-  const currentThreadIdRef = useRef<string | null>(null);
-  useEffect(() => {
-    currentThreadIdRef.current = threadId;
-  }, [threadId]);
-  
   const {
     isLoading,
     isProcessing,
@@ -444,15 +438,13 @@ export default function MobileChatInterface({
       const errorMessageContent = "I'm having trouble processing your request. Please try again later. " + 
                  (error?.message ? `Error: ${error.message}` : "");
       
-      if (currentThreadId === currentThreadIdRef.current) {
-        setMessages(prev => [
-          ...prev, 
-          { 
-            role: 'assistant', 
-            content: errorMessageContent
-          }
-        ]);
-      }
+      setMessages(prev => [
+        ...prev, 
+        { 
+          role: 'assistant', 
+          content: errorMessageContent
+        }
+      ]);
     } finally {
       setLocalLoading(false);
     }
