@@ -404,23 +404,17 @@ function validateAndEnhanceDualSearch(analysis: any, message: string, hasPersona
       }
     }
     
-    // Apply date range logic
-    const dateRange = isTemporalQuery ? extractDateRangeFromQuery(message) : null;
+    // Apply date range logic - check for ANY temporal reference in the original message
+    const dateRange = extractDateRangeFromQuery(message);
     
-    if (useAllEntries) {
-      // Override: Remove date filters for personal pronoun queries without time references
-      if (subQ.searchPlan.vectorSearch) {
-        subQ.searchPlan.vectorSearch.dateFilter = null;
-      }
-      subQ.searchPlan.fallbackStrategy = "recent_entries";
-      console.log(`[Validation] Removing date filter for personal query: ${subQ.question}`);
-    } else if (isTemporalQuery && dateRange) {
-      // Apply date filters for temporal queries
+    // Only use ALL entries if there's truly no temporal context
+    if (dateRange) {
+      // Apply date filters for any temporal queries (including "since July" with personal pronouns)
       if (subQ.searchPlan.vectorSearch) {
         subQ.searchPlan.vectorSearch.dateFilter = dateRange;
       }
       subQ.searchPlan.fallbackStrategy = null;
-      console.log(`[Validation] Applying date filter: ${dateRange.startDate} to ${dateRange.endDate}`);
+      console.log(`[Validation] Applying date filter for "${message}": ${dateRange.startDate} to ${dateRange.endDate}`);
       
       // Update SQL queries to include date parameters
       if (subQ.searchPlan.sqlQueries) {
@@ -433,6 +427,19 @@ function validateAndEnhanceDualSearch(analysis: any, message: string, hasPersona
             sqlQuery.parameters.end_date = dateRange.endDate;
           } else if (sqlQuery.function === 'match_journal_entries_by_theme') {
             sqlQuery.parameters.start_date = dateRange.startDate;
+            sqlQuery.parameters.end_date = dateRange.endDate;
+          }
+          return sqlQuery;
+        });
+      }
+    } else if (useAllEntries) {
+      // Use ALL entries only for truly non-temporal personal queries
+      if (subQ.searchPlan.vectorSearch) {
+        subQ.searchPlan.vectorSearch.dateFilter = null;
+      }
+      subQ.searchPlan.fallbackStrategy = "recent_entries";
+      console.log(`[Validation] No date constraints - using all entries for personal query: ${subQ.question}`);
+    }
             sqlQuery.parameters.end_date = dateRange.endDate;
           }
           return sqlQuery;
@@ -506,6 +513,35 @@ function extractDateRangeFromQuery(message: string): { startDate: string; endDat
   };
 
   const now = new Date();
+  
+  // ENHANCED: Handle "since [month]" patterns for 2025
+  const monthNames = {
+    'january': 0, 'jan': 0,
+    'february': 1, 'feb': 1,
+    'march': 2, 'mar': 2,
+    'april': 3, 'apr': 3,
+    'may': 4,
+    'june': 5, 'jun': 5,
+    'july': 6, 'jul': 6,
+    'august': 7, 'aug': 7,
+    'september': 8, 'sep': 8, 'sept': 8,
+    'october': 9, 'oct': 9,
+    'november': 10, 'nov': 10,
+    'december': 11, 'dec': 11
+  };
+  
+  // Check for "since [month]" patterns
+  const sinceMonthMatch = text.match(/since\s+(january|february|march|april|may|june|july|august|september|october|november|december|jan|feb|mar|apr|jun|jul|aug|sep|sept|oct|nov|dec)/i);
+  if (sinceMonthMatch) {
+    const monthName = sinceMonthMatch[1].toLowerCase();
+    const monthIndex = monthNames[monthName];
+    if (monthIndex !== undefined) {
+      const startDate = new Date(Date.UTC(2025, monthIndex, 1, 0, 0, 0, 0));
+      const endDate = toEndOfDayUTC(now);
+      console.log(`[Date Extraction] "since ${monthName}" → ${startDate.toISOString()} to ${endDate.toISOString()}`);
+      return { startDate: startDate.toISOString(), endDate: endDate.toISOString() };
+    }
+  }
 
   if (text.includes('last week')) {
     const thisMonday = startOfWeekUTC(now);
