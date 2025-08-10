@@ -78,19 +78,23 @@ Guidelines:
 
 Generate a comprehensive response that feels like a single, thoughtful analysis rather than separate pieces.`;
 
+    const model = 'gpt-5-2025-08-07';
+    const tokensKey = model.includes('gpt-5') ? 'max_completion_tokens' : 'max_tokens';
+    const payload: any = {
+      model,
+      messages: [
+        { role: 'user', content: prompt }
+      ]
+    };
+    (payload as any)[tokensKey] = 1200;
+
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${openAiApiKey}`,
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({
-        model: 'gpt-4.1-2025-04-14',
-        messages: [
-          { role: 'user', content: prompt }
-        ],
-        max_tokens: 1200
-      }),
+      body: JSON.stringify(payload),
     });
 
     if (!response.ok) {

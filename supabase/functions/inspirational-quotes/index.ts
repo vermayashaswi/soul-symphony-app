@@ -23,14 +23,10 @@ serve(async (req) => {
       throw new Error('OpenAI API key is not configured');
     }
     
-    const response = await fetch('https://api.openai.com/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${openAIApiKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: 'gpt-4o-mini',
+      const model = 'gpt-5-mini-2025-08-07';
+      const tokensKey = model.includes('gpt-5') ? 'max_completion_tokens' : 'max_tokens';
+      const payload: any = {
+        model,
         messages: [
           { 
             role: 'system', 
@@ -41,10 +37,17 @@ serve(async (req) => {
             content: 'Generate 15 inspirational quotes with authors.' 
           }
         ],
-        temperature: 0.7,
-        max_tokens: 1500,
-      }),
-    });
+        temperature: 0.7
+      };
+      (payload as any)[tokensKey] = 1500;
+      const response = await fetch('https://api.openai.com/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${openAIApiKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(payload),
+      });
 
     if (!response.ok) {
       const errorData = await response.text();

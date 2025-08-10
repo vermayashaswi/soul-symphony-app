@@ -181,8 +181,8 @@ Language codes to use: en (English), es (Spanish), fr (French), de (German), it 
       try {
         console.log(`[AI] FIXED: Text refinement attempt ${attempt}/2`);
         
-        const completion = await openai.chat.completions.create({
-          model: "gpt-4o-mini",
+        const payload: any = {
+          model: "gpt-5-mini-2025-08-07",
           messages: [
             {
               role: "system",
@@ -193,10 +193,11 @@ Language codes to use: en (English), es (Spanish), fr (French), de (German), it 
               content: text
             }
           ],
-          max_tokens: 1500,
           temperature: 0.3,
           response_format: { type: "json_object" }
-        });
+        };
+        (payload as any)["max_completion_tokens"] = 1500;
+        const completion = await openai.chat.completions.create(payload as any);
         
         const result = completion.choices[0]?.message?.content;
         
@@ -304,7 +305,7 @@ export async function analyzeEmotions(
         console.log(`[AI] Emotion analysis attempt ${attempt}/2`);
         
         const completion = await openai.chat.completions.create({
-          model: "gpt-4o-mini",
+          model: "gpt-5-mini-2025-08-07",
           messages: [
             {
               role: "system",

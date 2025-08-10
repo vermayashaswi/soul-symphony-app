@@ -93,21 +93,25 @@ serve(async (req) => {
     // If we have journal entries, generate summary using OpenAI
     const prompt = `Analyze these journal entries from the last ${days} days and generate a brief summary in less than 30 words: \n\n${journalTexts}`;
     
+    const model = 'gpt-5-mini-2025-08-07';
+    const tokensKey = model.includes('gpt-5') ? 'max_completion_tokens' : 'max_tokens';
+    const payload: any = {
+      model,
+      messages: [
+        { role: 'system', content: 'You are an empathetic personal journal assistant. Create very brief, insightful summaries.' },
+        { role: 'user', content: prompt }
+      ],
+      temperature: 0.7
+    };
+    (payload as any)[tokensKey] = 100;
+
     const openAIResponse = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${openAIApiKey}`,
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({
-        model: 'gpt-4o-mini',
-        messages: [
-          { role: 'system', content: 'You are an empathetic personal journal assistant. Create very brief, insightful summaries.' },
-          { role: 'user', content: prompt }
-        ],
-        max_tokens: 100,
-        temperature: 0.7,
-      }),
+      body: JSON.stringify(payload),
     });
     
     if (!openAIResponse.ok) {
