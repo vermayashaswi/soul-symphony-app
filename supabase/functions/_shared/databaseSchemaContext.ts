@@ -288,3 +288,32 @@ export function getLanguageAnalysisGuidelines(): string {
    - Enable language-specific insights and recommendations
 `;
 }
+
+export function getStrictTermPolicy(): string {
+  return `
+**STRICT TERM AND QUERY POLICY:**
+
+1) Canonical Term Usage
+- Use ONLY canonical theme names from master_themes and canonical emotion names present as keys in the emotions JSONB.
+- Do NOT invent new themes/emotions. If the user mentions a non-canonical term, map it to the closest canonical term; mention the mapping in the "reasoning" field.
+
+2) Safe, Parameterized SQL
+- ALWAYS include WHERE user_id = $user_id in every SQL query.
+- Quote spaced column names exactly, e.g., "refined text".
+- Never inline user-provided text in SQL. Prefer parameters or fixed strings.
+
+3) Theme Filtering
+- Use unnest(master_themes) for grouping/filtering or the ANY/array operators.
+  Example: SELECT COUNT(*) FROM "Journal Entries" WHERE user_id = $user_id AND 'work' = ANY(master_themes);
+
+4) Emotion Filtering
+- Use emotions JSONB safely. Example patterns:
+  a) Presence: (emotions ? 'anxious')
+  b) Scores: (emotions->>'anxious')::numeric >= 0.3
+  c) Aggregation: SELECT key, AVG((value)::numeric) FROM "Journal Entries", jsonb_each(emotions) GROUP BY key;
+
+5) Unknown or Ambiguous Terms
+- If no close canonical match exists, do NOT guess. Proceed without that constraint and explain briefly in "reasoning".
+
+Respond ONLY with JSON matching the required structure.`;
+}
