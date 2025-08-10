@@ -315,7 +315,6 @@ Focus on creating comprehensive analysis plans with mandatory sub-question gener
         body: JSON.stringify(payload)
       });
     };
-    });
 
     const content = await retryOpenAICall(promptFunction, 2);
     console.log("Raw GPT response:", content);
