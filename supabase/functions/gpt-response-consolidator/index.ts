@@ -210,79 +210,26 @@ serve(async (req) => {
     - Do not include trailing explanations or extra fields.
     `;
 
-    const model = 'gpt-5';
-    console.log('Calling OpenAI Responses API with model:', model);
-    const response = await fetch('https://api.openai.com/v1/responses', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${openAIApiKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model,
-        input: [
-          { role: 'system', content: 'You are Ruh by SOuLO, a warm and insightful wellness coach. Provide thoughtful, data-driven responses based on journal analysis.' },
-          { role: 'user', content: consolidationPrompt }
-        ],
-        max_completion_tokens: 1500,
-      }),
+    const response = await fetch('https://api.openai.com/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${openAIApiKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: 'gpt-4.1-2025-04-14',
+          messages: [
+            { role: 'system', content: 'You are Ruh by SOuLO, a warm and insightful wellness coach. Provide thoughtful, data-driven responses based on journal analysis.' },
+            { role: 'user', content: consolidationPrompt }
+          ],
+          max_tokens: 1500
+        }),
     });
 
-    // Handle non-OK responses with a single retry for known parameter errors
+    // Handle non-OK responses gracefully
     if (!response.ok) {
       const errText = await response.text();
       console.error('OpenAI Responses API error:', response.status, errText);
-
-      // Retry once if the error mentions max_tokens or a transient issue
-      const shouldRetry = /max_tokens/i.test(errText) || response.status >= 500 || response.status === 429;
-      if (shouldRetry) {
-        console.log('Retrying OpenAI Responses API call with adjusted parameters...');
-        const retryRes = await fetch('https://api.openai.com/v1/responses', {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${openAIApiKey}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            model: 'gpt-5',
-            input: [
-              { role: 'system', content: 'You are Ruh by SOuLO, a warm and insightful wellness coach. Provide thoughtful, data-driven responses based on journal analysis.' },
-              { role: 'user', content: consolidationPrompt }
-            ],
-            max_completion_tokens: 1200,
-          }),
-        });
-
-        if (retryRes.ok) {
-          const retryData = await retryRes.json();
-          const retryRaw = retryData?.output_text 
-            || (Array.isArray(retryData?.output) 
-              ? retryData.output.flatMap((o: any) => (o?.content || [])).map((c: any) => c?.text || '').join('') 
-              : '');
-          const sanitizedRetry = sanitizeConsolidatorOutput(retryRaw || '');
-          console.log('Consolidator retry sanitization meta:', sanitizedRetry.meta);
-          return new Response(JSON.stringify({
-            success: true,
-            response: sanitizedRetry.responseText,
-            userStatusMessage: sanitizedRetry.statusMsg ?? null,
-            analysisMetadata: {
-              totalSubQuestions: analysisResults.length,
-              strategiesUsed: analysisResults.map((r: any) => r.analysisPlan?.searchStrategy),
-              dataSourcesUsed: {
-                vectorSearch: analysisResults.some((r: any) => r.vectorResults),
-                sqlQueries: analysisResults.some((r: any) => r.sqlResults),
-                errors: analysisResults.some((r: any) => r.error)
-              }
-            }
-          }), {
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          });
-        } else {
-          const retryErr = await retryRes.text();
-          console.error('Retry also failed:', retryRes.status, retryErr);
-        }
-      }
-
       const fallbackText = "I couldn’t finalize your insight right now. Let’s try again in a moment.";
       return new Response(JSON.stringify({
         success: true,
@@ -303,12 +250,9 @@ serve(async (req) => {
     }
 
     const data = await response.json();
-    const rawResponse = data?.output_text 
-      || (Array.isArray(data?.output) 
-        ? data.output.flatMap((o: any) => (o?.content || [])).map((c: any) => c?.text || '').join('') 
-        : '');
+    const rawResponse = data?.choices?.[0]?.message?.content || '';
     // Sanitize and extract consolidated response
-    const sanitized = sanitizeConsolidatorOutput(rawResponse || '');
+    const sanitized = sanitizeConsolidatorOutput(rawResponse);
     console.log('Consolidator sanitization meta:', sanitized.meta);
 
     const consolidatedResponse = sanitized.responseText;
