@@ -77,7 +77,7 @@ export default function MobileChatInterface({
   // Use streaming chat for enhanced UX
   const {
     isStreaming,
-    streamingThreadId,
+    // streamingThreadId - removed as part of thread isolation
     streamingMessages,
     currentUserMessage,
     showBackendAnimation,
@@ -190,7 +190,7 @@ export default function MobileChatInterface({
   
   // Use unified auto-scroll hook
   const { scrollElementRef, scrollToBottom } = useAutoScroll({
-    dependencies: [messages, isLoading, isProcessing, isStreaming, streamingMessages],
+    dependencies: [messages, isLoading, isProcessing, isStreaming],
     delay: 50,
     scrollThreshold: 100
   });
@@ -786,7 +786,7 @@ export default function MobileChatInterface({
             ))}
             
             {/* Show streaming status or basic loading */}
-            {isStreaming && streamingThreadId === threadId ? (
+            {isStreaming ? (
               <ChatErrorBoundary>
                 <MobileChatMessage 
                   message={{ role: 'assistant', content: '' }}

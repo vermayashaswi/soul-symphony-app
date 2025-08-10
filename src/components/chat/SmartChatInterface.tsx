@@ -89,7 +89,7 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({
   // Use streaming chat for enhanced UX
   const {
     isStreaming,
-    streamingThreadId,
+    // streamingThreadId - removed as part of thread isolation
     streamingMessages,
     currentUserMessage,
     showBackendAnimation,
@@ -908,10 +908,8 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({
   // Check if deletion should be disabled - use realtime processing state
   const isDeletionDisabled = isProcessing || processingStatus === 'processing' || isLoading;
 
-  // Thread-scoped loading indicator: during streaming, only show for the originating thread
-  const showLoadingForThisThread = streamingThreadId
-    ? (isStreaming && streamingThreadId === currentThreadId)
-    : (isLoading || isProcessing);
+  // Thread-scoped loading indicator: during streaming, only show for current thread
+  const showLoadingForThisThread = isLoading || isProcessing || isStreaming;
 
   return (
     <div className="chat-interface flex flex-col h-full">

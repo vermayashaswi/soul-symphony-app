@@ -19,46 +19,103 @@ export interface StreamingMessage {
 interface UseStreamingChatProps {
   onFinalResponse?: (response: string, analysis: any | undefined, originThreadId: string | null) => void;
   onError?: (error: string) => void;
+  threadId?: string | null; // Thread-specific hook instance
 }
 
-export const useStreamingChat = ({ onFinalResponse, onError }: UseStreamingChatProps = {}) => {
-  const [isStreaming, setIsStreaming] = useState(false);
-  const [streamingMessages, setStreamingMessages] = useState<StreamingMessage[]>([]);
-  const [currentUserMessage, setCurrentUserMessage] = useState<string>('');
-  const [showBackendAnimation, setShowBackendAnimation] = useState(false);
-  const [dynamicMessages, setDynamicMessages] = useState<string[]>([]);
-  const [currentMessageIndex, setCurrentMessageIndex] = useState(0);
-  const [useThreeDotFallback, setUseThreeDotFallback] = useState(false);
-  const [queryCategory, setQueryCategory] = useState<string>('');
-  const [currentThreadId, setCurrentThreadId] = useState<string | null>(null);
-  // The thread id for which a streaming request is currently active
-  const [streamingThreadId, setStreamingThreadId] = useState<string | null>(null);
-  // Ref mirror to avoid stale closures in callbacks
-  const streamingThreadIdRef = useRef<string | null>(null);
-  // Store the pending request payload for safety guard retries
-  const pendingRequestRef = useRef<{
-    message: string;
-    userId: string;
-    threadId: string;
-    conversationContext: any[];
-    userProfile: any;
-  } | null>(null);
-  const [expectedProcessingTime, setExpectedProcessingTime] = useState<number | null>(null);
-  const [processingStartTime, setProcessingStartTime] = useState<number | null>(null);
-  // Retry state management
-  const [isRetrying, setIsRetrying] = useState(false);
-  const [retryAttempts, setRetryAttempts] = useState(0);
-  const [lastFailedMessage, setLastFailedMessage] = useState<{
-    message: string;
-    userId: string;
-    threadId: string;
-    conversationContext: any[];
-    userProfile: any;
-  } | null>(null);
-  
-  const abortControllerRef = useRef<AbortController | null>(null);
+// Thread-isolated streaming state management
+interface ThreadStreamingState {
+  isStreaming: boolean;
+  streamingMessages: StreamingMessage[];
+  currentUserMessage: string;
+  showBackendAnimation: boolean;
+  dynamicMessages: string[];
+  currentMessageIndex: number;
+  useThreeDotFallback: boolean;
+  queryCategory: string;
+  expectedProcessingTime: number | null;
+  processingStartTime: number | null;
+  isRetrying: boolean;
+  retryAttempts: number;
+  lastFailedMessage: any | null;
+  abortController: AbortController | null;
+}
+
+const createInitialState = (): ThreadStreamingState => ({
+  isStreaming: false,
+  streamingMessages: [],
+  currentUserMessage: '',
+  showBackendAnimation: false,
+  dynamicMessages: [],
+  currentMessageIndex: 0,
+  useThreeDotFallback: false,
+  queryCategory: '',
+  expectedProcessingTime: null,
+  processingStartTime: null,
+  isRetrying: false,
+  retryAttempts: 0,
+  lastFailedMessage: null,
+  abortController: null,
+});
+
+// Global thread state store
+const threadStates = new Map<string, ThreadStreamingState>();
+
+export const useStreamingChat = ({ onFinalResponse, onError, threadId }: UseStreamingChatProps = {}) => {
+  // Get or create thread-specific state
+  const getThreadState = useCallback((id: string): ThreadStreamingState => {
+    if (!threadStates.has(id)) {
+      threadStates.set(id, createInitialState());
+    }
+    return threadStates.get(id)!;
+  }, []);
+
+  const updateThreadState = useCallback((id: string, updates: Partial<ThreadStreamingState>) => {
+    const currentState = getThreadState(id);
+    const newState = { ...currentState, ...updates };
+    threadStates.set(id, newState);
+    
+    // Only update local state if this is the active thread
+    if (id === threadId) {
+      setState(newState);
+    }
+  }, [threadId]);
+
+  // Local state mirrors the active thread state
+  const [state, setState] = useState<ThreadStreamingState>(() => 
+    threadId ? getThreadState(threadId) : createInitialState()
+  );
+
   const maxRetryAttempts = 2;
- 
+
+  // Thread switch handler - abort current operations and switch state
+  useEffect(() => {
+    if (!threadId) {
+      setState(createInitialState());
+      return;
+    }
+
+    console.log(`[useStreamingChat] Switching to thread: ${threadId}`);
+    
+    // Abort any ongoing requests for previous threads
+    threadStates.forEach((threadState, id) => {
+      if (id !== threadId && threadState.abortController) {
+        console.log(`[useStreamingChat] Aborting operations for thread: ${id}`);
+        threadState.abortController.abort();
+        threadState.abortController = null;
+        threadState.isStreaming = false;
+      }
+    });
+
+    // Set state to the new thread's state
+    const threadState = getThreadState(threadId);
+    setState(threadState);
+    
+    // Clear any event listeners from previous threads
+    return () => {
+      // Cleanup will be handled by the abort controller
+    };
+  }, [threadId, getThreadState]);
+
   // Utility function to detect edge function errors
   const isEdgeFunctionError = useCallback((error: any): boolean => {
     const errorMessage = error?.message || error?.toString() || '';
@@ -85,19 +142,35 @@ export const useStreamingChat = ({ onFinalResponse, onError }: UseStreamingChatP
 
   const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
-  // Backoff wrapper for supabase.functions.invoke
+  // Backoff wrapper for supabase.functions.invoke with abort support
   const invokeWithBackoff = useCallback(
     async (
       body: Record<string, any>,
-      options?: { attempts?: number; baseDelay?: number }
+      options?: { attempts?: number; baseDelay?: number },
+      targetThreadId?: string
     ): Promise<{ data: any; error: any }> => {
+      if (!targetThreadId || targetThreadId !== threadId) {
+        throw new Error('Thread mismatch - operation aborted');
+      }
+
       const attempts = options?.attempts ?? 3;
       const baseDelay = options?.baseDelay ?? 900;
+      const threadState = getThreadState(targetThreadId);
 
       let lastErr: any = null;
       for (let i = 0; i < attempts; i++) {
+        // Check if thread is still active
+        if (targetThreadId !== threadId) {
+          throw new Error('Thread switched - operation aborted');
+        }
+
+        // Check abort signal
+        if (threadState.abortController?.signal.aborted) {
+          throw new Error('Operation aborted');
+        }
+
         try {
-          const timeoutMs = 20000 + i * 5000; // grow timeout slightly per attempt
+          const timeoutMs = 20000 + i * 5000;
           const timeoutPromise = new Promise((_, rej) =>
             setTimeout(() => rej(new Error('Request timed out')), timeoutMs)
           );
@@ -120,69 +193,98 @@ export const useStreamingChat = ({ onFinalResponse, onError }: UseStreamingChatP
         } catch (e) {
           lastErr = e;
         }
-        // exponential backoff with jitter
+        
         const delay = Math.min(6000, baseDelay * Math.pow(2, i)) + Math.floor(Math.random() * 250);
         await sleep(delay);
       }
       return { data: null, error: lastErr || new Error('Unknown error') };
     },
-    [isEdgeFunctionError, isNetworkError]
+    [isEdgeFunctionError, isNetworkError, threadId, getThreadState]
   );
 
-  const addStreamingMessage = useCallback((message: StreamingMessage) => {
-    setStreamingMessages(prev => [...prev, message]);
+  const addStreamingMessage = useCallback((message: StreamingMessage, targetThreadId?: string) => {
+    const activeThreadId = targetThreadId || threadId;
+    if (!activeThreadId) return;
+
+    console.log(`[useStreamingChat] Adding message to thread ${activeThreadId}:`, message.type);
+    
+    const threadState = getThreadState(activeThreadId);
+    const newMessages = [...threadState.streamingMessages, message];
+    
+    const updates: Partial<ThreadStreamingState> = {
+      streamingMessages: newMessages
+    };
     
     // Handle different message types
     switch (message.type) {
       case 'user_message':
-        setCurrentUserMessage(message.message || '');
-        setShowBackendAnimation(false);
+        updates.currentUserMessage = message.message || '';
+        updates.showBackendAnimation = false;
         break;
       case 'backend_task':
-        setShowBackendAnimation(true);
+        updates.showBackendAnimation = true;
         break;
       case 'final_response':
-        setIsStreaming(false);
-        setShowBackendAnimation(false);
-        // Reset retry state on success
-        setRetryAttempts(0);
-        setLastFailedMessage(null);
-        setIsRetrying(false);
-        // Clear persisted state on completion using ref to avoid stale closure
-        const originId = streamingThreadIdRef.current;
-        if (originId) {
-          clearChatStreamingState(originId);
+        updates.isStreaming = false;
+        updates.showBackendAnimation = false;
+        updates.retryAttempts = 0;
+        updates.lastFailedMessage = null;
+        updates.isRetrying = false;
+        
+        // Clear persisted state and abort controller
+        clearChatStreamingState(activeThreadId);
+        if (threadState.abortController) {
+          threadState.abortController = null;
         }
-        onFinalResponse?.(message.response || '', message.analysis, originId);
-        setStreamingThreadId(null);
-        streamingThreadIdRef.current = null;
-        pendingRequestRef.current = null;
+        
+        // Only call callback if this is for the current thread
+        if (activeThreadId === threadId) {
+          onFinalResponse?.(message.response || '', message.analysis, activeThreadId);
+        }
         break;
       case 'error':
-        setIsStreaming(false);
-        setShowBackendAnimation(false);
-        // Clear persisted state on error
-        const errOrigin = streamingThreadIdRef.current;
-        if (errOrigin) {
-          clearChatStreamingState(errOrigin);
+        updates.isStreaming = false;
+        updates.showBackendAnimation = false;
+        
+        // Clear persisted state and abort controller
+        clearChatStreamingState(activeThreadId);
+        if (threadState.abortController) {
+          threadState.abortController = null;
         }
-        setStreamingThreadId(null);
-        streamingThreadIdRef.current = null;
-        onError?.(message.error || 'Unknown error occurred');
-        pendingRequestRef.current = null;
+        
+        // Only call callback if this is for the current thread
+        if (activeThreadId === threadId) {
+          onError?.(message.error || 'Unknown error occurred');
+        }
         break;
     }
-  }, [onFinalResponse, onError]);
+
+    updateThreadState(activeThreadId, updates);
+  }, [threadId, getThreadState, updateThreadState, onFinalResponse, onError]);
 
   // Reset retry state when starting new conversation
-  const resetRetryState = useCallback(() => {
-    setRetryAttempts(0);
-    setLastFailedMessage(null);
-    setIsRetrying(false);
-  }, []);
+  const resetRetryState = useCallback((targetThreadId?: string) => {
+    const activeThreadId = targetThreadId || threadId;
+    if (!activeThreadId) return;
+
+    updateThreadState(activeThreadId, {
+      retryAttempts: 0,
+      lastFailedMessage: null,
+      isRetrying: false
+    });
+  }, [threadId, updateThreadState]);
 
   // Generate streaming messages based on category
-  const generateStreamingMessages = useCallback(async (message: string, category: string, conversationContext?: any[], userProfile?: any) => {
+  const generateStreamingMessages = useCallback(async (
+    message: string, 
+    category: string, 
+    conversationContext?: any[], 
+    userProfile?: any,
+    targetThreadId?: string
+  ) => {
+    const activeThreadId = targetThreadId || threadId;
+    if (!activeThreadId || activeThreadId !== threadId) return;
+
     try {
       const { data, error } = await supabase.functions.invoke('generate-streaming-messages', {
         body: {
@@ -195,73 +297,88 @@ export const useStreamingChat = ({ onFinalResponse, onError }: UseStreamingChatP
 
       if (error) throw error;
 
-      if (data.shouldUseFallback || !data.messages || data.messages.length === 0) {
-        setUseThreeDotFallback(true);
-        setDynamicMessages([]);
-      } else {
-        setUseThreeDotFallback(false);
-        setDynamicMessages(data.messages);
-        setCurrentMessageIndex(0);
+      // Only update if still on the same thread
+      if (activeThreadId === threadId) {
+        if (data.shouldUseFallback || !data.messages || data.messages.length === 0) {
+          updateThreadState(activeThreadId, {
+            useThreeDotFallback: true,
+            dynamicMessages: []
+          });
+        } else {
+          updateThreadState(activeThreadId, {
+            useThreeDotFallback: false,
+            dynamicMessages: data.messages,
+            currentMessageIndex: 0
+          });
+        }
       }
     } catch (error) {
       console.error('[useStreamingChat] Error generating streaming messages:', error);
-      setUseThreeDotFallback(true);
-      setDynamicMessages([]);
+      if (activeThreadId === threadId) {
+        updateThreadState(activeThreadId, {
+          useThreeDotFallback: true,
+          dynamicMessages: []
+        });
+      }
     }
-  }, []);
+  }, [threadId, updateThreadState]);
 
   // Automatic retry function for failed messages
-  const retryLastMessage = useCallback(async () => {
-    if (!lastFailedMessage || retryAttempts >= maxRetryAttempts || isRetrying) {
+  const retryLastMessage = useCallback(async (targetThreadId?: string) => {
+    const activeThreadId = targetThreadId || threadId;
+    if (!activeThreadId || activeThreadId !== threadId) return;
+
+    const threadState = getThreadState(activeThreadId);
+    
+    if (!threadState.lastFailedMessage || threadState.retryAttempts >= maxRetryAttempts || threadState.isRetrying) {
       return;
     }
 
-    console.log(`[useStreamingChat] Retrying message (attempt ${retryAttempts + 1}/${maxRetryAttempts})`);
-    setIsRetrying(true);
-    setRetryAttempts(prev => prev + 1);
+    console.log(`[useStreamingChat] Retrying message for thread ${activeThreadId} (attempt ${threadState.retryAttempts + 1}/${maxRetryAttempts})`);
+    
+    updateThreadState(activeThreadId, {
+      isRetrying: true,
+      retryAttempts: threadState.retryAttempts + 1
+    });
 
-    // Show toast notification
     showEdgeFunctionRetryToast();
-
-    // Small delay to let user see the retry message
     await new Promise(resolve => setTimeout(resolve, 1000));
 
     try {
-      // Continue showing streaming UI while retrying
+      // Check if still on same thread
+      if (activeThreadId !== threadId) return;
+
       await generateStreamingMessages(
-        lastFailedMessage.message, 
+        threadState.lastFailedMessage.message, 
         'GENERAL_MENTAL_HEALTH', 
-        lastFailedMessage.conversationContext, 
-        lastFailedMessage.userProfile
+        threadState.lastFailedMessage.conversationContext, 
+        threadState.lastFailedMessage.userProfile,
+        activeThreadId
       );
 
-      // Try the request again
       const { data, error } = await invokeWithBackoff({
-        message: lastFailedMessage.message,
-        userId: lastFailedMessage.userId,
-        threadId: lastFailedMessage.threadId,
-        conversationContext: lastFailedMessage.conversationContext,
-        userProfile: lastFailedMessage.userProfile,
+        message: threadState.lastFailedMessage.message,
+        userId: threadState.lastFailedMessage.userId,
+        threadId: threadState.lastFailedMessage.threadId,
+        conversationContext: threadState.lastFailedMessage.conversationContext,
+        userProfile: threadState.lastFailedMessage.userProfile,
         streamingMode: false
-      });
+      }, undefined, activeThreadId);
 
       if (error) {
-        if (isEdgeFunctionError(error) && retryAttempts < maxRetryAttempts - 1) {
-          // Will retry again
+        if (isEdgeFunctionError(error) && threadState.retryAttempts < maxRetryAttempts - 1) {
           throw error;
         } else {
-          // Max retries reached, show final error
           addStreamingMessage({
             type: 'error',
             error: 'Unable to process your request after multiple attempts. Please try again later.',
             timestamp: Date.now()
-          });
-          resetRetryState();
+          }, activeThreadId);
+          resetRetryState(activeThreadId);
           return;
         }
       }
 
-      // Success! Handle the response
       const text = data?.response ?? data?.data ?? data?.message ?? (typeof data === 'string' ? data : null);
       if (text) {
         addStreamingMessage({
@@ -269,56 +386,60 @@ export const useStreamingChat = ({ onFinalResponse, onError }: UseStreamingChatP
           response: text,
           analysis: data?.analysis,
           timestamp: Date.now()
-        });
-        resetRetryState();
+        }, activeThreadId);
+        resetRetryState(activeThreadId);
       } else {
         throw new Error('No response received from chat service');
       }
 
     } catch (error) {
       console.error('[useStreamingChat] Retry failed:', error);
-      // If this was the last retry attempt, show error
-      if (retryAttempts >= maxRetryAttempts - 1) {
+      const currentState = getThreadState(activeThreadId);
+      if (currentState.retryAttempts >= maxRetryAttempts - 1) {
         addStreamingMessage({
           type: 'error',
           error: 'Unable to process your request after multiple attempts. Please try again later.',
           timestamp: Date.now()
-        });
-        resetRetryState();
+        }, activeThreadId);
+        resetRetryState(activeThreadId);
       }
     } finally {
-      setIsRetrying(false);
+      updateThreadState(activeThreadId, { isRetrying: false });
     }
-  }, [lastFailedMessage, retryAttempts, isRetrying, isEdgeFunctionError, addStreamingMessage, resetRetryState, generateStreamingMessages]);
+  }, [threadId, getThreadState, updateThreadState, generateStreamingMessages, invokeWithBackoff, isEdgeFunctionError, addStreamingMessage, resetRetryState]);
 
-  // Enhanced timing logic with proper calculation for streaming messages
+  // Enhanced timing logic with thread validation
   useEffect(() => {
-    if (!isStreaming || useThreeDotFallback || dynamicMessages.length === 0) return;
+    if (!threadId || !state.isStreaming || state.useThreeDotFallback || state.dynamicMessages.length === 0) return;
 
     let timeoutId: NodeJS.Timeout;
     
-    if (queryCategory === 'JOURNAL_SPECIFIC') {
-      // Calculate timing based on expected processing time
-      const remainingTime = expectedProcessingTime ? 
-        Math.max(0, expectedProcessingTime - (Date.now() - (processingStartTime || Date.now()))) : 
-        15000; // Default 15 seconds
+    if (state.queryCategory === 'JOURNAL_SPECIFIC') {
+      const remainingTime = state.expectedProcessingTime ? 
+        Math.max(0, state.expectedProcessingTime - (Date.now() - (state.processingStartTime || Date.now()))) : 
+        15000;
       
-      const messagesLeft = dynamicMessages.length - currentMessageIndex;
+      const messagesLeft = state.dynamicMessages.length - state.currentMessageIndex;
       const timePerMessage = messagesLeft > 1 ? Math.min(5000, remainingTime / messagesLeft) : remainingTime;
       
-      // Sequential display with calculated timing
-      if (currentMessageIndex < dynamicMessages.length - 1) {
+      if (state.currentMessageIndex < state.dynamicMessages.length - 1) {
         timeoutId = setTimeout(() => {
-          setCurrentMessageIndex(prev => prev + 1);
+          // Double-check we're still on the same thread
+          if (threadId && getThreadState(threadId).isStreaming) {
+            updateThreadState(threadId, {
+              currentMessageIndex: state.currentMessageIndex + 1
+            });
+          }
         }, timePerMessage);
-        
-        console.log(`[StreamingChat] Next message in ${timePerMessage}ms (${messagesLeft} left, ${remainingTime}ms remaining)`);
       }
-      // If we're at the last message, stay there until processing completes
     } else {
-      // Regular cycling every 2 seconds for other categories
       const interval = setInterval(() => {
-        setCurrentMessageIndex(prev => (prev + 1) % dynamicMessages.length);
+        if (threadId && getThreadState(threadId).isStreaming) {
+          const currentState = getThreadState(threadId);
+          updateThreadState(threadId, {
+            currentMessageIndex: (currentState.currentMessageIndex + 1) % currentState.dynamicMessages.length
+          });
+        }
       }, 2000);
       
       return () => clearInterval(interval);
@@ -327,69 +448,88 @@ export const useStreamingChat = ({ onFinalResponse, onError }: UseStreamingChatP
     return () => {
       if (timeoutId) clearTimeout(timeoutId);
     };
-  }, [isStreaming, useThreeDotFallback, dynamicMessages.length, currentMessageIndex, queryCategory, expectedProcessingTime, processingStartTime]);
+  }, [threadId, state.isStreaming, state.useThreeDotFallback, state.dynamicMessages.length, state.currentMessageIndex, state.queryCategory, state.expectedProcessingTime, state.processingStartTime, getThreadState, updateThreadState]);
 
-  // Safety completion guard to end stuck streaming sessions
+  // Safety completion guard with thread validation
   useEffect(() => {
-    if (!isStreaming) return;
-    const graceMs = 45000; // 45s grace on top of ETA or use 60s default
-    const budget = (expectedProcessingTime ?? 60000) + graceMs;
-    const startedAt = processingStartTime ?? Date.now();
+    if (!threadId || !state.isStreaming) return;
+    
+    const graceMs = 45000;
+    const budget = (state.expectedProcessingTime ?? 60000) + graceMs;
+    const startedAt = state.processingStartTime ?? Date.now();
     const remaining = Math.max(5000, budget - (Date.now() - startedAt));
+    
     const timer = setTimeout(() => {
-      console.warn('[useStreamingChat] Safety guard triggered: terminating stuck streaming session');
-      addStreamingMessage({
-        type: 'error',
-        error: 'Connection seems unstable. Please retry.',
-        timestamp: Date.now()
-      });
-      if (pendingRequestRef.current) {
-        setLastFailedMessage(pendingRequestRef.current);
+      // Verify we're still on the same thread before showing error
+      if (threadId && getThreadState(threadId).isStreaming) {
+        console.warn(`[useStreamingChat] Safety guard triggered for thread: ${threadId}`);
+        addStreamingMessage({
+          type: 'error',
+          error: 'Connection seems unstable. Please retry.',
+          timestamp: Date.now()
+        }, threadId);
+        
+        const currentState = getThreadState(threadId);
+        if (currentState.lastFailedMessage) {
+          updateThreadState(threadId, { lastFailedMessage: currentState.lastFailedMessage });
+        }
       }
     }, remaining);
+    
     return () => clearTimeout(timer);
-  }, [isStreaming, expectedProcessingTime, processingStartTime, addStreamingMessage]);
+  }, [threadId, state.isStreaming, state.expectedProcessingTime, state.processingStartTime, getThreadState, addStreamingMessage, updateThreadState]);
 
   const startStreamingChat = useCallback(async (
     message: string,
     userId: string,
-    threadId: string,
+    targetThreadId: string,
     conversationContext: any[] = [],
     userProfile: any = {}
   ) => {
-    if (isStreaming) {
-      console.warn('Already streaming, ignoring new request');
+    // Validate thread consistency
+    if (targetThreadId !== threadId) {
+      console.warn(`[useStreamingChat] Thread mismatch: target=${targetThreadId}, current=${threadId}`);
       return;
     }
 
-    // Reset retry state for new conversation
-    resetRetryState();
+    const threadState = getThreadState(targetThreadId);
+    if (threadState.isStreaming) {
+      console.warn(`[useStreamingChat] Already streaming for thread ${targetThreadId}, ignoring new request`);
+      return;
+    }
 
-    // Set current thread and timing info
-    setCurrentThreadId(threadId);
-    setStreamingThreadId(threadId);
-    streamingThreadIdRef.current = threadId;
-    setProcessingStartTime(Date.now());
-    // Immediately mark as streaming so UI shows dynamic messages
-    setIsStreaming(true);
-    // Store pending payload for potential retry by safety guard
-    pendingRequestRef.current = { message, userId, threadId, conversationContext, userProfile };
-    setStreamingMessages([]);
-    setCurrentUserMessage('');
-    setShowBackendAnimation(false);
-    setUseThreeDotFallback(false);
-    setDynamicMessages([]);
-    setCurrentMessageIndex(0);
+    console.log(`[useStreamingChat] Starting chat for thread: ${targetThreadId}`);
+
+    // Create abort controller for this streaming session
+    const abortController = new AbortController();
+    
+    // Reset and initialize state
+    const updates: Partial<ThreadStreamingState> = {
+      isStreaming: true,
+      processingStartTime: Date.now(),
+      streamingMessages: [],
+      currentUserMessage: '',
+      showBackendAnimation: false,
+      useThreeDotFallback: false,
+      dynamicMessages: [],
+      currentMessageIndex: 0,
+      retryAttempts: 0,
+      lastFailedMessage: null,
+      isRetrying: false,
+      abortController
+    };
+
+    updateThreadState(targetThreadId, updates);
 
     // Add user message immediately
     addStreamingMessage({
       type: 'user_message',
       message,
       timestamp: Date.now()
-    });
+    }, targetThreadId);
 
     // Classify message to determine streaming behavior
-    let messageCategory = 'GENERAL_MENTAL_HEALTH'; // Default fallback
+    let messageCategory = 'GENERAL_MENTAL_HEALTH';
     try {
       const { data: classificationData, error: classificationError } = await supabase.functions.invoke('chat-query-classifier', {
         body: {
@@ -398,29 +538,34 @@ export const useStreamingChat = ({ onFinalResponse, onError }: UseStreamingChatP
         }
       });
       
-    if (!classificationError && classificationData?.category) {
+      if (!classificationError && classificationData?.category) {
         messageCategory = classificationData.category;
-        setQueryCategory(messageCategory);
-        console.log(`[useStreamingChat] Message classified as: ${messageCategory}`);
+        console.log(`[useStreamingChat] Message classified as: ${messageCategory} for thread: ${targetThreadId}`);
       }
     } catch (error) {
       console.error('[useStreamingChat] Classification failed, using fallback:', error);
     }
 
-    // Generate appropriate streaming messages based on category
-    await generateStreamingMessages(message, messageCategory, conversationContext, userProfile);
+    // Check thread consistency before proceeding
+    if (targetThreadId !== threadId) {
+      console.warn(`[useStreamingChat] Thread switched during classification, aborting`);
+      return;
+    }
+
+    updateThreadState(targetThreadId, { queryCategory: messageCategory });
+
+    await generateStreamingMessages(message, messageCategory, conversationContext, userProfile, targetThreadId);
     
-    // Set expected processing time based on category
     const estimatedTime = messageCategory === 'JOURNAL_SPECIFIC' ? 20000 : 10000;
-    setExpectedProcessingTime(estimatedTime);
+    updateThreadState(targetThreadId, { expectedProcessingTime: estimatedTime });
     
     // Save streaming state for persistence
-    saveChatStreamingState(threadId, {
+    saveChatStreamingState(targetThreadId, {
       isStreaming: true,
-      streamingMessages,
+      streamingMessages: [],
       currentUserMessage: message,
       showBackendAnimation: false,
-      dynamicMessages,
+      dynamicMessages: [],
       currentMessageIndex: 0,
       useThreeDotFallback: false,
       queryCategory: messageCategory,
@@ -428,23 +573,28 @@ export const useStreamingChat = ({ onFinalResponse, onError }: UseStreamingChatP
       processingStartTime: Date.now()
     });
 
-    // Directly use robust non-streaming flow with backoff; keep streaming UI
     try {
       const { data, error } = await invokeWithBackoff({
         message,
         userId,
-        threadId,
+        threadId: targetThreadId,
         conversationContext,
         userProfile,
         streamingMode: false
-      }, { attempts: 3, baseDelay: 900 });
+      }, { attempts: 3, baseDelay: 900 }, targetThreadId);
+
+      // Final thread check before processing response
+      if (targetThreadId !== threadId) {
+        console.warn(`[useStreamingChat] Thread switched before response, ignoring result`);
+        return;
+      }
 
       if (error) {
-        // Store for auto-retry when coming back online
         if (isEdgeFunctionError(error) || isNetworkError(error)) {
-          setLastFailedMessage({ message, userId, threadId, conversationContext, userProfile });
-          // schedule a quick retry
-          setTimeout(() => { retryLastMessage(); }, 800);
+          updateThreadState(targetThreadId, {
+            lastFailedMessage: { message, userId, threadId: targetThreadId, conversationContext, userProfile }
+          });
+          setTimeout(() => retryLastMessage(targetThreadId), 800);
           return;
         }
         throw new Error(error?.message || 'Request failed');
@@ -457,262 +607,117 @@ export const useStreamingChat = ({ onFinalResponse, onError }: UseStreamingChatP
           response: text,
           analysis: data?.analysis,
           timestamp: Date.now()
-        });
+        }, targetThreadId);
       } else {
         throw new Error('No response received from chat service');
       }
     } catch (err: any) {
-      console.warn('[useStreamingChat] Backoff flow failed:', err);
-      addStreamingMessage({
-        type: 'error',
-        error: err?.message || 'Unknown error occurred',
-        timestamp: Date.now()
-      });
+      console.warn(`[useStreamingChat] Backoff flow failed for thread ${targetThreadId}:`, err);
+      
+      // Only show error if still on the same thread
+      if (targetThreadId === threadId) {
+        addStreamingMessage({
+          type: 'error',
+          error: err?.message || 'Unknown error occurred',
+          timestamp: Date.now()
+        }, targetThreadId);
+      }
     }
-  }, [isStreaming, addStreamingMessage, resetRetryState, generateStreamingMessages, invokeWithBackoff, isEdgeFunctionError, isNetworkError, retryLastMessage]);
+  }, [threadId, getThreadState, updateThreadState, addStreamingMessage, generateStreamingMessages, invokeWithBackoff, isEdgeFunctionError, isNetworkError, retryLastMessage]);
 
-  // Internal function for non-streaming fallback
-  const startNonStreamingChatInternal = async (
-    message: string,
-    userId: string,
-    threadId: string,
-    conversationContext: any[] = [],
-    userProfile: any = {}
-  ) => {
+  const stopStreaming = useCallback((targetThreadId?: string) => {
+    const activeThreadId = targetThreadId || threadId;
+    if (!activeThreadId) return;
+
+    console.log(`[useStreamingChat] Stopping streaming for thread: ${activeThreadId}`);
+    
+    const threadState = getThreadState(activeThreadId);
+    if (threadState.abortController) {
+      threadState.abortController.abort();
+    }
+    
+    updateThreadState(activeThreadId, {
+      isStreaming: false,
+      showBackendAnimation: false,
+      abortController: null
+    });
+    
+    clearChatStreamingState(activeThreadId);
+  }, [threadId, getThreadState, updateThreadState]);
+
+  const clearStreamingMessages = useCallback((targetThreadId?: string) => {
+    const activeThreadId = targetThreadId || threadId;
+    if (!activeThreadId) return;
+
+    console.log(`[useStreamingChat] Clearing messages for thread: ${activeThreadId}`);
+    
+    updateThreadState(activeThreadId, {
+      streamingMessages: [],
+      currentUserMessage: '',
+      showBackendAnimation: false,
+      useThreeDotFallback: false,
+      dynamicMessages: [],
+      currentMessageIndex: 0,
+      queryCategory: ''
+    });
+  }, [threadId, updateThreadState]);
+
+  const restoreStreamingState = useCallback((targetThreadId: string) => {
+    if (targetThreadId !== threadId) return false;
+
     try {
-      console.log('[useStreamingChat] Using non-streaming mode');
-      
-      // Show streaming UI even in non-streaming mode for better UX
-      setIsStreaming(true);
-      
-      // First classify the query to show appropriate UI
-      const { data: classification } = await supabase.functions.invoke('chat-query-classifier', {
-        body: { message, conversationContext }
-      });
-
-      const queryCategory = classification?.category || 'GENERAL_MENTAL_HEALTH';
-      
-      // Show different UI based on classification - don't add backend_task for non-journal queries
-      if (queryCategory === 'JOURNAL_SPECIFIC') {
-        // For journal queries, simulate streaming with progressive messages and show backend animation
-        addStreamingMessage({
-          type: 'user_message',
-          message: 'Understanding your question',
-          timestamp: Date.now()
+      const savedState = getChatStreamingState(targetThreadId);
+      if (savedState && savedState.isStreaming) {
+        console.log(`[useStreamingChat] Restoring streaming state for thread: ${targetThreadId}`);
+        
+        updateThreadState(targetThreadId, {
+          ...savedState,
+          abortController: new AbortController() // Create new abort controller
         });
         
-        // Add backend processing task for journal queries only
-        setTimeout(() => {
-          addStreamingMessage({
-            type: 'backend_task',
-            task: 'analyzing_journal',
-            description: 'Searching through your journal entries...',
-            timestamp: Date.now()
-          });
-        }, 500);
-        
-        setTimeout(() => {
-          addStreamingMessage({
-            type: 'user_message',
-            message: 'Analyzing your patterns and insights',
-            timestamp: Date.now()
-          });
-        }, 1500);
-      } else {
-        // For other types (GENERAL_MENTAL_HEALTH, JOURNAL_SPECIFIC_NEEDS_CLARIFICATION, UNRELATED), 
-        // only show simple three-dot animation - no backend_task messages
-        addStreamingMessage({
-          type: 'user_message',
-          message: 'Processing your request...',
-          timestamp: Date.now()
-        });
+        return true;
       }
-
-      const { data, error } = await invokeWithBackoff({
-        message,
-        userId,
-        threadId,
-        conversationContext,
-        userProfile,
-        streamingMode: false
-      });
-
-      if (error) {
-        // Check if this is an edge function error that should trigger retry
-        if (isEdgeFunctionError(error) && retryAttempts < maxRetryAttempts) {
-          console.log('[useStreamingChat] Edge function error in non-streaming mode, storing message for retry');
-          setLastFailedMessage({ message, userId, threadId, conversationContext, userProfile });
-          
-          // Trigger automatic retry
-          setTimeout(() => {
-            retryLastMessage();
-          }, 500);
-          return;
-        }
-        
-        // Show custom error toast for "non-2xx code" errors
-        if (error.message?.includes('non-2xx code')) {
-          onError?.('Oops! I faced a hiccup. Try again!');
-        }
-        
-        throw new Error(error.message);
-      }
-
-      // Handle non-streaming response
-      const text = data?.response ?? data?.data ?? data?.message ?? (typeof data === 'string' ? data : null);
-      if (text) {
-        addStreamingMessage({
-          type: 'final_response',
-          response: text,
-          analysis: data?.analysis,
-          timestamp: Date.now()
-        });
-      } else {
-        throw new Error('No response received from chat service');
-      }
-
     } catch (error) {
-      console.error('[useStreamingChat] Non-streaming fallback error:', error);
-      addStreamingMessage({
-        type: 'error',
-        error: error instanceof Error ? error.message : 'Failed to get response',
-        timestamp: Date.now()
-      });
+      console.error('[useStreamingChat] Error restoring streaming state:', error);
     }
-  };
+    return false;
+  }, [threadId, updateThreadState]);
 
-  // Public function for non-streaming chat
-  const startNonStreamingChat = useCallback(async (
-    message: string,
-    userId: string,
-    threadId: string,
-    conversationContext: any[] = [],
-    userProfile: any = {}
-  ) => {
-    await startNonStreamingChatInternal(message, userId, threadId, conversationContext, userProfile);
-  }, [addStreamingMessage, isEdgeFunctionError, retryAttempts, maxRetryAttempts, retryLastMessage]);
-
-  const stopStreaming = useCallback(() => {
-    if (abortControllerRef.current) {
-      abortControllerRef.current.abort();
-      abortControllerRef.current = null;
-    }
-    
-    setIsStreaming(false);
-    setShowBackendAnimation(false);
-  }, []);
-
-  const clearStreamingMessages = useCallback(() => {
-    setStreamingMessages([]);
-    setCurrentUserMessage('');
-    setShowBackendAnimation(false);
-    setDynamicMessages([]);
-    setCurrentMessageIndex(0);
-    setUseThreeDotFallback(false);
-    // Clear persisted state
-    const target = streamingThreadId || currentThreadId;
-    if (target) {
-      clearChatStreamingState(target);
-    }
-  }, [currentThreadId, streamingThreadId]);
-
-  // Function to restore streaming state for a thread
-  const restoreStreamingState = useCallback((threadId: string) => {
-    const savedState = getChatStreamingState(threadId);
-    if (!savedState) return false;
-
-    // If a prior session clearly exceeded its expected window, don't restore
-    if (
-      savedState.isStreaming &&
-      savedState.processingStartTime &&
-      savedState.expectedProcessingTime &&
-      Date.now() - savedState.processingStartTime > savedState.expectedProcessingTime + 2 * 60 * 1000
-    ) {
-      clearChatStreamingState(threadId);
-      return false;
-    }
-
-    console.log('[StreamingChat] Restoring streaming state for thread:', threadId);
-    
-    setCurrentThreadId(threadId);
-    setIsStreaming(savedState.isStreaming);
-    setStreamingThreadId(savedState.isStreaming ? threadId : null);
-    setStreamingMessages(savedState.streamingMessages);
-    setCurrentUserMessage(savedState.currentUserMessage);
-    setShowBackendAnimation(savedState.showBackendAnimation);
-    setDynamicMessages(savedState.dynamicMessages);
-    setCurrentMessageIndex(savedState.currentMessageIndex);
-    setUseThreeDotFallback(savedState.useThreeDotFallback);
-    setQueryCategory(savedState.queryCategory);
-    setExpectedProcessingTime(savedState.expectedProcessingTime || null);
-    setProcessingStartTime(savedState.processingStartTime || null);
-
-    // Asynchronously validate against database to avoid restoring stale state
-    (async () => {
-      try {
-        const { data: msgs, error } = await supabase
-          .from('chat_messages')
-          .select('id,sender,is_processing,created_at')
-          .eq('thread_id', threadId)
-          .order('created_at', { ascending: false })
-          .limit(1);
-
-        if (error) {
-          console.warn('[StreamingChat] Validation query failed, keeping restored state temporarily:', error);
-          return;
-        }
-
-        const lastMsg: any | undefined = msgs?.[0];
-        const lastProcessing = lastMsg?.is_processing ?? false;
-
-        // If there is no message, or last message is not processing anymore -> clear stale UI
-        if (!lastMsg || !lastProcessing) {
-          console.log('[StreamingChat] Cleared stale streaming state after DB validation');
-          clearChatStreamingState(threadId);
-          setIsStreaming(false);
-          setShowBackendAnimation(false);
-          setUseThreeDotFallback(false);
-          setDynamicMessages([]);
-          setCurrentMessageIndex(0);
-        }
-      } catch (e) {
-        console.warn('[StreamingChat] DB validation threw, ignoring:', e);
-      }
-    })();
-    
-    return true;
-  }, []);
-
-  // Auto-retry when network comes back online
+  // Cleanup when thread changes or component unmounts
   useEffect(() => {
-    const handleOnline = () => {
-      if (lastFailedMessage && !isRetrying) {
-        retryLastMessage();
+    return () => {
+      if (threadId) {
+        const threadState = getThreadState(threadId);
+        if (threadState.abortController) {
+          threadState.abortController.abort();
+        }
       }
     };
-    window.addEventListener('online', handleOnline);
-    return () => window.removeEventListener('online', handleOnline);
-  }, [lastFailedMessage, isRetrying, retryLastMessage]);
- 
+  }, [threadId, getThreadState]);
+
   return {
-    isStreaming,
-    streamingThreadId,
-    streamingMessages,
-    currentUserMessage,
-    showBackendAnimation,
+    // Thread-isolated state
+    isStreaming: state.isStreaming,
+    streamingMessages: state.streamingMessages,
+    currentUserMessage: state.currentUserMessage,
+    showBackendAnimation: state.showBackendAnimation,
+    dynamicMessages: state.dynamicMessages,
+    currentMessageIndex: state.currentMessageIndex,
+    useThreeDotFallback: state.useThreeDotFallback,
+    queryCategory: state.queryCategory,
+    expectedProcessingTime: state.expectedProcessingTime,
+    processingStartTime: state.processingStartTime,
+    isRetrying: state.isRetrying,
+    retryAttempts: state.retryAttempts,
+    
+    // Thread-safe methods
     startStreamingChat,
-    startNonStreamingChat,
     stopStreaming,
     clearStreamingMessages,
     restoreStreamingState,
-    dynamicMessages,
-    currentMessageIndex,
-    useThreeDotFallback,
-    queryCategory,
-    isRetrying,
-    retryAttempts,
-    expectedProcessingTime,
-    processingStartTime,
-    retryLastMessage
+    retryLastMessage: () => retryLastMessage(threadId),
+    
+    // Utility methods
+    addStreamingMessage: (message: StreamingMessage) => addStreamingMessage(message, threadId)
   };
 };
