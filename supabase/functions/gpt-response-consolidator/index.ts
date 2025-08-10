@@ -228,6 +228,7 @@ serve(async (req) => {
     - **Data-focused but human-centered** 📊
     - **Specific rather than vague** 🎯
     - **Insightful and actionable** 💡
+    - **Must include 1-3 relevant emojis** throughout the response to enhance engagement
     
     **Response Structure:**
     1. **Lead with the key finding** (the answer to their question)
@@ -239,6 +240,7 @@ serve(async (req) => {
     - Always include **specific numbers/percentages** when available
     - Reference **actual data points** from the analysis
     - Use **bold** for key insights and **italics** for reflective observations
+    - **Include 1-3 relevant emojis** throughout the response (mandatory)
     - End with **1-2 thoughtful follow-up questions**
     
     Your response should be a JSON object with this structure:

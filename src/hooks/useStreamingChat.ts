@@ -529,7 +529,7 @@ export const useStreamingChat = ({ onFinalResponse, onError, threadId }: UseStre
 
     await generateStreamingMessages(message, messageCategory, conversationContext, userProfile, targetThreadId);
     
-    const estimatedTime = messageCategory === 'JOURNAL_SPECIFIC' ? 60000 : 10000;
+    const estimatedTime = messageCategory === 'JOURNAL_SPECIFIC' ? 65000 : 10000;
     updateThreadState(targetThreadId, { expectedProcessingTime: estimatedTime });
     
     // Save streaming state for persistence
@@ -582,6 +582,13 @@ export const useStreamingChat = ({ onFinalResponse, onError, threadId }: UseStre
       }
     } catch (err: any) {
       console.warn(`[useStreamingChat] Backoff flow failed for thread ${targetThreadId}:`, err);
+      
+      // Silent handling for aborted operations
+      if (err?.message?.toLowerCase().includes('aborted')) {
+        console.log(`[useStreamingChat] Operation aborted silently for thread ${targetThreadId}`);
+        updateThreadState(targetThreadId, { isStreaming: false });
+        return;
+      }
       
       addStreamingMessage({
         type: 'error',
