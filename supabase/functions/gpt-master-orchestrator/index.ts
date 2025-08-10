@@ -446,25 +446,22 @@ Guidelines:
 - Keep responses conversational and helpful
 - Focus on patterns, growth, and positive insights`;
 
-    const tokensKey = model.includes('gpt-5') ? 'max_completion_tokens' : 'max_tokens';
-    const payload: any = {
-      model,
-      messages: [
-        { role: 'system', content: systemPrompt },
-        ...conversationContext.slice(-4), // Reduced context for performance
-        { role: 'user', content: message }
-      ],
-      temperature: 0.7
-    };
-    (payload as any)[tokensKey] = maxTokens;
-
     const chatResponse = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${openaiApiKey}`,
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify(payload),
+      body: JSON.stringify({
+        model,
+        messages: [
+          { role: 'system', content: systemPrompt },
+          ...conversationContext.slice(-4), // Reduced context for performance
+          { role: 'user', content: message }
+        ],
+        temperature: 0.7,
+        max_tokens: maxTokens
+      }),
     });
 
     if (!chatResponse.ok) {

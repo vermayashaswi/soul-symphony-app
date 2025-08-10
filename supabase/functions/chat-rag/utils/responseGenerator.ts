@@ -138,21 +138,18 @@ export async function generateResponse(
     // Always include the current user message
     messages.push({ role: 'user', content: message });
     
-    const model = 'gpt-5-2025-08-07';
-    const tokensKey = model.includes('gpt-5') ? 'max_completion_tokens' : 'max_tokens';
-    const payload: any = {
-      model: model,
-      messages,
-      temperature: 0.8
-    };
-    (payload as any)[tokensKey] = 400;
     const completionResponse = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${apiKey}`,
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify(payload),
+      body: JSON.stringify({
+        model: 'gpt-4.1-2025-04-14',
+        messages,
+        max_tokens: 400,
+        temperature: 0.8,
+      }),
     });
 
     if (!completionResponse.ok) {

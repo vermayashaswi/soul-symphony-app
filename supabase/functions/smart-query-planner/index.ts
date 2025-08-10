@@ -293,28 +293,22 @@ Return ONLY valid JSON:
 
 Focus on creating comprehensive analysis plans with mandatory sub-question generation.`;
 
-    const promptFunction = () => {
-      const model = "gpt-5-2025-08-07";
-      const tokensKey = model.includes('gpt-5') ? 'max_completion_tokens' : 'max_tokens';
-      const payload: any = {
-        model,
+    const promptFunction = () => fetch("https://api.openai.com/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${apiKey}`
+      },
+      body: JSON.stringify({
+        model: "gpt-4.1-2025-04-14",
         messages: [
           { role: "system", content: "You are an expert analysis planner. Respond only with valid JSON." },
           { role: "user", content: prompt }
         ],
-        response_format: { type: 'json_object' }
-      };
-      (payload as any)[tokensKey] = 1000;
-
-      return fetch("https://api.openai.com/v1/chat/completions", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${apiKey}`
-        },
-        body: JSON.stringify(payload)
-      });
-    };
+        response_format: { type: 'json_object' },
+        max_tokens: 1000
+      })
+    });
 
     const content = await retryOpenAICall(promptFunction, 2);
     console.log("Raw GPT response:", content);

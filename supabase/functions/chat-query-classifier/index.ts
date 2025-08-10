@@ -116,25 +116,21 @@ User message: "${message}"${contextString}`;
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 15000);
 
-    const model = 'gpt-5-mini-2025-08-07';
-    const tokensKey = model.includes('gpt-5') ? 'max_completion_tokens' : 'max_tokens';
-    const payload: any = {
-      model,
-      messages: [
-        { role: 'system', content: 'You are a strict JSON classifier. Respond with a single JSON object only that matches the provided schema. No code fences, no commentary.' },
-        { role: 'user', content: classificationPrompt }
-      ],
-      response_format: { type: 'json_object' }
-    };
-    (payload as any)[tokensKey] = 600;
-
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${apiKey}`,
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify(payload),
+      body: JSON.stringify({
+        model: 'gpt-4.1-2025-04-14',
+            messages: [
+              { role: 'system', content: 'You are a strict JSON classifier. Respond with a single JSON object only that matches the provided schema. No code fences, no commentary.' },
+              { role: 'user', content: classificationPrompt }
+            ],
+            response_format: { type: 'json_object' },
+            max_tokens: 600
+      }),
       signal: controller.signal
     });
 

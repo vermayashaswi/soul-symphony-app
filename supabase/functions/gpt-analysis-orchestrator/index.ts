@@ -88,13 +88,13 @@ Focus on extracting specific entities, emotions, or themes mentioned in the sub-
               'Content-Type': 'application/json',
             },
             body: JSON.stringify({
-              model: 'gpt-5-2025-08-07',
+              model: 'gpt-4.1-2025-04-14',
               messages: [
                 { role: 'system', content: 'You are an expert analysis planner. Respond only with valid JSON.' },
                 { role: 'user', content: analysisPrompt }
               ],
               response_format: { type: 'json_object' },
-              max_completion_tokens: 500
+              max_tokens: 500
             }),
           });
 
