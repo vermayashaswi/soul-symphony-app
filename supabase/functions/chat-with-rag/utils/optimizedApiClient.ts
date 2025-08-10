@@ -137,7 +137,7 @@ RESPONSE STRUCTURE TEMPLATE:
         console.warn(`[OptimizedApiClient] Primary model failed (status ${response.status}). Trying fallback model...`);
         const errText = await response.text().catch(() => '');
         console.warn('[OptimizedApiClient] Primary error text:', errText?.slice(0, 250));
-        const fallbackModel = 'gpt-4.1-2025-04-14';
+        const fallbackModel = 'gpt-5-mini-2025-08-07';
         const fallbackTokens = Math.min(400, Math.floor(maxTokens * 0.7));
         response = await makeCall(fallbackModel, fallbackTokens);
         if (!response.ok) {

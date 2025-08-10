@@ -210,7 +210,7 @@ serve(async (req) => {
     - Do not include trailing explanations or extra fields.
     `;
 
-    const model = 'gpt-4.1-2025-04-14';
+    const model = 'gpt-5-2025-08-07';
     const tokensKey = model.includes('gpt-5') ? 'max_completion_tokens' : 'max_tokens';
     const payload: any = {
       model,

@@ -167,7 +167,7 @@ MUST HAVE/DO: ALWAYS BE AWARE OF THE CONVERSATION HISTORY TO UNDERSTAND WHAT THE
     const maxAttempts = 3;
     for (let attempt = 1; attempt <= maxAttempts; attempt++) {
       try {
-        const model = 'gpt-4.1-2025-04-14';
+        const model = 'gpt-5-mini-2025-08-07';
         const tokensKey = model.includes('gpt-5') ? 'max_completion_tokens' : 'max_tokens';
         const payload: any = { model, messages };
         (payload as any)[tokensKey] = 800;

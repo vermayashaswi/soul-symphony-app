@@ -220,22 +220,26 @@ ENHANCED ANALYSIS GUIDELINES:
 - Use statistical functions for pattern recognition and trend analysis
 - Consider temporal aspects of relationship evolution`;
 
+  const model = 'gpt-5-2025-08-07';
+  const tokensKey = model.includes('gpt-5') ? 'max_completion_tokens' : 'max_tokens';
+  const payload: any = {
+    model,
+    messages: [
+      { role: 'system', content: systemPrompt },
+      { role: 'user', content: message }
+    ],
+    temperature: 0.1,
+    response_format: { type: 'json_object' }
+  };
+  (payload as any)[tokensKey] = 1000;
+
   const response = await fetch('https://api.openai.com/v1/chat/completions', {
     method: 'POST',
     headers: {
       'Authorization': `Bearer ${openaiApiKey}`,
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify({
-      model: 'gpt-4.1-2025-04-14',
-      messages: [
-        { role: 'system', content: systemPrompt },
-        { role: 'user', content: message }
-      ],
-      temperature: 0.1,
-      response_format: { type: 'json_object' },
-      max_tokens: 1000
-    }),
+    body: JSON.stringify(payload),
   });
 
   if (!response.ok) {

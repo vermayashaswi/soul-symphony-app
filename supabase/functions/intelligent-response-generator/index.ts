@@ -249,7 +249,7 @@ Please provide a thoughtful, therapeutically informed response based on the cura
 
   messages.push({ role: 'user', content: userPrompt });
 
-  const model = 'gpt-4.1-2025-04-14';
+  const model = 'gpt-5-2025-08-07';
   const tokensKey = model.includes('gpt-5') ? 'max_completion_tokens' : 'max_tokens';
   const payload: any = { model, messages, temperature: 0.7 };
   (payload as any)[tokensKey] = 1000;
