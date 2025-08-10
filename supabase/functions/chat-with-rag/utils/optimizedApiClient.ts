@@ -113,16 +113,18 @@ RESPONSE STRUCTURE TEMPLATE:
       // Helper to make a timed OpenAI call
       const makeCall = async (mdl: string, tokens: number) => {
         const start = Date.now();
-        const tokensKey = mdl.includes('gpt-5') ? 'max_completion_tokens' : 'max_tokens';
-        const bodyObj: any = { model: mdl, messages, temperature: 0.7 };
-        (bodyObj as any)[tokensKey] = tokens;
         const resp = await fetch('https://api.openai.com/v1/chat/completions', {
           method: 'POST',
           headers: {
             'Authorization': `Bearer ${openAiApiKey}`,
             'Content-Type': 'application/json',
           },
-          body: JSON.stringify(bodyObj),
+          body: JSON.stringify({
+            model: mdl,
+            messages,
+            max_tokens: tokens,
+            temperature: 0.7
+          }),
         });
         const duration = Date.now() - start;
         console.log(`[OptimizedApiClient] OpenAI call (Chat Completions) model=${mdl} status=${resp.status} duration=${duration}ms`);
