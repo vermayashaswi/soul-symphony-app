@@ -440,12 +440,6 @@ function validateAndEnhanceDualSearch(analysis: any, message: string, hasPersona
       subQ.searchPlan.fallbackStrategy = "recent_entries";
       console.log(`[Validation] No date constraints - using all entries for personal query: ${subQ.question}`);
     }
-            sqlQuery.parameters.end_date = dateRange.endDate;
-          }
-          return sqlQuery;
-        });
-      }
-    }
     
     return subQ;
   });
