@@ -29,56 +29,75 @@ serve(async (req) => {
 
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    // Generate analysis plans for each sub-question using GPT
-    const analysisPlans = await Promise.all(
-      subQuestions.map(async (subQuestion: any, index: number) => {
-        const analysisPrompt = `
-You are an expert analysis planner for a journal analytics system. Given a sub-question, determine the optimal search and analysis strategy.
+    // Prepare sub-questions (fallback to original message if none provided)
+    const effectiveSubQuestions = (Array.isArray(subQuestions) && subQuestions.length > 0)
+      ? subQuestions
+      : [{ question: userMessage, type: 'unknown', priority: 1 }];
 
-Sub-question: "${subQuestion.question}"
-Sub-question type: ${subQuestion.type}
-Priority: ${subQuestion.priority}
-Original user message: "${userMessage}"
+    // Minimal, explicit schema/context for GPT planning
+    const SCHEMA_CONTEXT = `
+You operate over a single user-scoped table named "Journal Entries" with columns:
+- id (bigint, primary key)
+- user_id (uuid, required)
+- created_at (timestamptz)
+- "refined text" (text)
+- "transcription text" (text)
+- master_themes (text[])
+- themes (text[])
+- entities (jsonb)  -- object of arrays, e.g. { person: ["alice"], organization: ["acme"] }
+- emotions (jsonb)  -- object of numeric scores, e.g. { happy: 0.72, anxious: 0.12 }
+- sentiment (text)  -- 'positive' | 'neutral' | 'negative'
 
-Available search methods:
-1. VECTOR_SEARCH: Semantic similarity search through journal embeddings (best for thematic, emotional, or conceptual queries)
-2. SQL_QUERY: Structured data queries for entities, themes, emotions, dates (best for factual, statistical, or time-based queries)  
-3. HYBRID: Both vector and SQL search (best for complex queries needing both semantic and structured data)
-
-Available SQL query types (with EXACT parameter names):
-- get_top_emotions_with_entries(user_id_param, start_date, end_date, limit_count)
-- get_top_entities_with_entries(user_id_param, start_date, end_date, limit_count) 
-- get_theme_statistics(user_id_filter, start_date, end_date, limit_count)
-- get_entity_emotion_statistics(user_id_filter, start_date, end_date, limit_count)
-- match_journal_entries_by_theme(theme_query, user_id_filter, match_threshold, match_count, start_date, end_date)
-- match_journal_entries_by_emotion(emotion_name, user_id_filter, min_score, start_date, end_date, limit_count)
-- match_journal_entries_by_entities(entity_queries, user_id_filter, match_threshold, match_count, start_date, end_date)
-
-CRITICAL PARAMETER MAPPING:
-- Use "user_id_param" ONLY for: get_top_emotions_with_entries, get_top_entities_with_entries
-- Use "user_id_filter" for ALL other functions
-- Use "match_threshold" and "match_count" for theme/entity matching functions
-- Use "min_score" for emotion matching functions
-- Use "limit_count" for statistics functions
-
-Respond with a JSON object containing:
-{
-  "searchStrategy": "VECTOR_SEARCH" | "SQL_QUERY" | "HYBRID",
-  "sqlFunction": "function_name_if_applicable" | null,
-  "sqlParameters": {
-    "theme": "extracted_theme_if_applicable",
-    "emotion": "extracted_emotion_if_applicable", 
-    "entities": ["entity1", "entity2"] | null,
-    "limit": number,
-    "threshold": number_if_applicable
-  } | null,
-  "vectorQuery": "reformulated_query_for_semantic_search" | null,
-  "reasoning": "brief_explanation_of_strategy_choice",
-  "userStatusMessage": "exactly 5 words describing this analysis step (e.g., 'Analyzing emotional patterns from entries' or 'Finding relevant themes and topics')"
-}
-
-Focus on extracting specific entities, emotions, or themes mentioned in the sub-question. Be precise with parameter extraction.
+Master tables are conceptual, NOT joined: themes and emotions are validated vocabularies.
+Row Level Security ensures access is per user; you MUST include user filter in your plan.
 `;
+
+    // Ask GPT-4.1 to create a JSON execution plan for each sub-question
+    const analysisPlans = await Promise.all(
+      effectiveSubQuestions.map(async (subQuestion: any, index: number) => {
+        const plannerPrompt = `
+Return ONLY a strict JSON object describing how to answer this sub-question using SQL, vector search, or both.
+Use the following output schema exactly:
+{
+  "query_type": "sql_count" | "sql_select" | "vector_search" | "hybrid",
+  "reasoning": "short rationale",
+  "sql": {
+    "operation": "count" | "select",
+    "columns": ["id","created_at","master_themes","emotions"] | null,
+    "filters": [
+      // Supported ops: eq, eq_auth_uid, gte, lte, ilike, cs, json_key_gte
+      { "column": "user_id", "op": "eq_auth_uid" },
+      { "column": "created_at", "op": "gte", "value": "ISO-8601" },
+      { "column": "created_at", "op": "lte", "value": "ISO-8601" },
+      { "column": "master_themes", "op": "cs", "value": ["work"] },
+      { "column": "emotions", "op": "json_key_gte", "key": "anxious", "value": 0.5 }
+    ],
+    "order_by": [{ "column": "created_at", "direction": "desc" }] | [],
+    "limit": number | null
+  } | null,
+  "vector": {
+    "enabled": boolean,
+    "query_text": string,
+    "top_k": number,
+    "threshold": number,
+    "use_date_filter": boolean,
+    "date_range": { "start": "ISO-8601" | null, "end": "ISO-8601" | null } | null
+  } | null
+}
+Rules:
+- Prefer sql_count for direct counts like "how many entries since ...".
+- Always include a user filter via eq_auth_uid in SQL filters.
+- If the text implies a date range (e.g., "since July", "last week"), include created_at gte/lte.
+- Use vector_search only for semantic retrieval of example passages; never for simple counts.
+- If both are useful, choose "hybrid" and fill both sections.
+- Output must be valid JSON, no code fences.
+
+Context:
+SCHEMA:\n${SCHEMA_CONTEXT}\n
+Sub-question: "${subQuestion.question}"
+Original user message (for context): "${userMessage}"
+Incoming timeRange (may be null): ${timeRange ? JSON.stringify(timeRange) : 'null'}
+        `;
 
         try {
           const response = await fetch('https://api.openai.com/v1/chat/completions', {
@@ -90,26 +109,31 @@ Focus on extracting specific entities, emotions, or themes mentioned in the sub-
             body: JSON.stringify({
               model: 'gpt-4.1-2025-04-14',
               messages: [
-                { role: 'system', content: 'You are an expert analysis planner. Respond only with valid JSON.' },
-                { role: 'user', content: analysisPrompt }
+                { role: 'system', content: 'You are a precise query planner. Respond only with valid JSON per the requested schema.' },
+                { role: 'user', content: plannerPrompt }
               ],
               response_format: { type: 'json_object' },
-              max_tokens: 500
+              max_tokens: 700
             }),
           });
 
           if (!response.ok) {
             const errorText = await response.text();
-            console.error(`[GPT Analysis Orchestrator] OpenAI API error for sub-question ${index}:`, errorText);
-            // Fallback plan on HTTP error
+            console.error(`[GPT Analysis Orchestrator] OpenAI planning error for sub-question ${index}:`, errorText);
             return {
               subQuestion,
               analysisPlan: {
-                searchStrategy: "HYBRID",
-                sqlFunction: null,
-                sqlParameters: null,
-                vectorQuery: subQuestion.question,
-                reasoning: `Fallback due to OpenAI error: ${response.status}`
+                query_type: 'vector_search',
+                reasoning: `Fallback due to OpenAI error: ${response.status}`,
+                sql: null,
+                vector: {
+                  enabled: true,
+                  query_text: subQuestion.question,
+                  top_k: 10,
+                  threshold: 0.3,
+                  use_date_filter: Boolean(timeRange?.start || timeRange?.end),
+                  date_range: timeRange || null
+                }
               },
               index
             };
@@ -118,54 +142,56 @@ Focus on extracting specific entities, emotions, or themes mentioned in the sub-
           const data = await response.json();
           const content = data?.choices?.[0]?.message?.content || '';
 
-          // Try to extract JSON if the model added extra text
-          const extractJsonObject = (text: string): string => {
-            const fenceMatch = text.match(/```(?:json)?\s*([\s\S]*?)\s*```/i);
-            if (fenceMatch) return fenceMatch[1].trim();
-            const start = text.indexOf('{');
-            const end = text.lastIndexOf('}');
-            if (start !== -1 && end !== -1 && end > start) return text.slice(start, end + 1).trim();
-            return text.trim();
-          };
-
-          let analysisPlan;
+          let plan: any;
           try {
-            const jsonString = extractJsonObject(content);
-            analysisPlan = JSON.parse(jsonString);
-          } catch (parseError) {
-            console.warn(`Failed to parse GPT response for sub-question ${index}:`, content);
-            // Fallback plan
-            analysisPlan = {
-              searchStrategy: "HYBRID",
-              sqlFunction: null,
-              sqlParameters: null,
-              vectorQuery: subQuestion.question,
-              reasoning: "Fallback due to parsing error"
+            plan = JSON.parse(content);
+          } catch (e) {
+            console.warn(`Failed to parse planner JSON for sub-question ${index}, content:`, content);
+            plan = {
+              query_type: 'vector_search',
+              reasoning: 'Fallback due to parsing error',
+              sql: null,
+              vector: {
+                enabled: true,
+                query_text: subQuestion.question,
+                top_k: 10,
+                threshold: 0.3,
+                use_date_filter: Boolean(timeRange?.start || timeRange?.end),
+                date_range: timeRange || null
+              }
             };
           }
 
-          // Add time range to SQL parameters if applicable
-          if (analysisPlan.sqlParameters && timeRange) {
-            analysisPlan.sqlParameters.start_date = timeRange.start;
-            analysisPlan.sqlParameters.end_date = timeRange.end;
+          // If timeRange was provided by caller and plan lacks date filters, inject them
+          if (timeRange && plan) {
+            if (plan.sql && Array.isArray(plan.sql.filters)) {
+              const hasGte = plan.sql.filters.some((f: any) => f.column === 'created_at' && f.op === 'gte');
+              const hasLte = plan.sql.filters.some((f: any) => f.column === 'created_at' && f.op === 'lte');
+              if (timeRange.start && !hasGte) plan.sql.filters.push({ column: 'created_at', op: 'gte', value: timeRange.start });
+              if (timeRange.end && !hasLte) plan.sql.filters.push({ column: 'created_at', op: 'lte', value: timeRange.end });
+            }
+            if (plan.vector && plan.vector.enabled && plan.vector.use_date_filter && !plan.vector.date_range) {
+              plan.vector.date_range = timeRange;
+            }
           }
 
-          return {
-            subQuestion,
-            analysisPlan,
-            index
-          };
-
+          return { subQuestion, analysisPlan: plan, index };
         } catch (error) {
           console.error(`Error planning analysis for sub-question ${index}:`, error);
           return {
             subQuestion,
             analysisPlan: {
-              searchStrategy: "VECTOR_SEARCH",
-              sqlFunction: null,
-              sqlParameters: null,
-              vectorQuery: subQuestion.question,
-              reasoning: "Fallback due to error"
+              query_type: 'vector_search',
+              reasoning: 'Fallback due to exception',
+              sql: null,
+              vector: {
+                enabled: true,
+                query_text: subQuestion.question,
+                top_k: 10,
+                threshold: 0.3,
+                use_date_filter: Boolean(timeRange?.start || timeRange?.end),
+                date_range: timeRange || null
+              }
             },
             index
           };
@@ -173,10 +199,11 @@ Focus on extracting specific entities, emotions, or themes mentioned in the sub-
       })
     );
 
-    // Execute the planned analyses
+
+    // Execute the planned analyses (dynamic SQL via query builder + minimal vector RPCs)
     const analysisResults = await Promise.all(
       analysisPlans.map(async ({ subQuestion, analysisPlan, index }) => {
-        const results = {
+        const results: any = {
           subQuestion,
           analysisPlan,
           vectorResults: null,
@@ -184,197 +211,140 @@ Focus on extracting specific entities, emotions, or themes mentioned in the sub-
           error: null
         };
 
-        try {
-          // Execute vector search if needed
-          if (analysisPlan.searchStrategy === "VECTOR_SEARCH" || analysisPlan.searchStrategy === "HYBRID") {
-            if (analysisPlan.vectorQuery) {
-              const vectorResponse = await fetch('https://api.openai.com/v1/embeddings', {
-                method: 'POST',
-                headers: {
-                  'Authorization': `Bearer ${openAIApiKey}`,
-                  'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                  model: 'text-embedding-3-small',
-                  input: analysisPlan.vectorQuery,
-                }),
-              });
-
-              const vectorData = await vectorResponse.json();
-              const embedding = vectorData.data[0].embedding;
-
-              // Use the vector to search journal entries
-              // Choose correct RPC based on presence of time range
-              const useDate = !!(timeRange && (timeRange.start || timeRange.end));
-              const rpcName = useDate ? 'match_journal_entries_with_date' : 'match_journal_entries';
-              const rpcParams: any = {
-                query_embedding: embedding,
-                match_threshold: 0.3,
-                match_count: 10,
-                user_id_filter: userId
-              };
-              if (useDate) {
-                rpcParams.start_date = timeRange.start || null;
-                rpcParams.end_date = timeRange.end || null;
-              }
-
-              console.log(`[Vector Search] Calling ${rpcName} with params:`, {
-                ...rpcParams,
-                query_embedding: '[omitted]',
-              });
-
-              const { data: vectorResults, error: vectorError } = await supabase.rpc(
-                rpcName,
-                rpcParams
-              );
-
-              if (vectorError) {
-                console.error('Vector search error:', vectorError);
-              } else {
-                results.vectorResults = vectorResults;
-              }
-            }
-          }
-
-          // Execute SQL query if needed
-          if (analysisPlan.searchStrategy === "SQL_QUERY" || analysisPlan.searchStrategy === "HYBRID") {
-            if (analysisPlan.sqlFunction && analysisPlan.sqlParameters) {
-              let params = {};
-              
-              // Map parameters correctly based on function signature
-              switch (analysisPlan.sqlFunction) {
-                case 'get_top_emotions_with_entries':
-                case 'get_top_entities_with_entries':
-                  params = {
-                    user_id_param: userId,
-                    start_date: analysisPlan.sqlParameters.start_date || null,
-                    end_date: analysisPlan.sqlParameters.end_date || null,
-                    limit_count: analysisPlan.sqlParameters.limit || 5
-                  };
-                  break;
-                  
-                case 'get_theme_statistics':
-                case 'get_entity_emotion_statistics':
-                  params = {
-                    user_id_filter: userId,
-                    start_date: analysisPlan.sqlParameters.start_date || null,
-                    end_date: analysisPlan.sqlParameters.end_date || null,
-                    limit_count: analysisPlan.sqlParameters.limit || 20
-                  };
-                  break;
-                  
-                case 'match_journal_entries_by_theme':
-                  params = {
-                    theme_query: analysisPlan.sqlParameters.theme,
-                    user_id_filter: userId,
-                    match_threshold: analysisPlan.sqlParameters.threshold || 0.5,
-                    match_count: analysisPlan.sqlParameters.limit || 5,
-                    start_date: analysisPlan.sqlParameters.start_date || null,
-                    end_date: analysisPlan.sqlParameters.end_date || null
-                  };
-                  break;
-                  
-                case 'match_journal_entries_by_emotion':
-                  params = {
-                    emotion_name: analysisPlan.sqlParameters.emotion,
-                    user_id_filter: userId,
-                    min_score: analysisPlan.sqlParameters.threshold || 0.3,
-                    start_date: analysisPlan.sqlParameters.start_date || null,
-                    end_date: analysisPlan.sqlParameters.end_date || null,
-                    limit_count: analysisPlan.sqlParameters.limit || 5
-                  };
-                  break;
-                  
-                case 'match_journal_entries_by_entities':
-                  params = {
-                    entity_queries: analysisPlan.sqlParameters.entities || [],
-                    user_id_filter: userId,
-                    match_threshold: analysisPlan.sqlParameters.threshold || 0.3,
-                    match_count: analysisPlan.sqlParameters.limit || 10,
-                    start_date: analysisPlan.sqlParameters.start_date || null,
-                    end_date: analysisPlan.sqlParameters.end_date || null
-                  };
-                  break;
-                  
-                default:
-                  console.warn(`Unknown SQL function: ${analysisPlan.sqlFunction}`);
-                  params = {
-                    user_id_filter: userId,
-                    ...analysisPlan.sqlParameters
-                  };
-              }
-
-              console.log(`Executing SQL function: ${analysisPlan.sqlFunction}`, params);
-
-              const { data: sqlResults, error: sqlError } = await supabase.rpc(
-                analysisPlan.sqlFunction,
-                params
-              );
-
-              if (sqlError) {
-                console.error(`SQL query error for ${analysisPlan.sqlFunction}:`, sqlError);
-                results.error = `SQL Error: ${sqlError.message}`;
-                
-                // Fallback to vector search if SQL fails
-                console.log('Attempting fallback to vector search...');
-                const fallbackQuery = analysisPlan.vectorQuery || subQuestion.question;
-                
-                try {
-                  const vectorResponse = await fetch('https://api.openai.com/v1/embeddings', {
-                    method: 'POST',
-                    headers: {
-                      'Authorization': `Bearer ${openAIApiKey}`,
-                      'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({
-                      model: 'text-embedding-3-small',
-                      input: fallbackQuery,
-                    }),
-                  });
-
-                  const vectorData = await vectorResponse.json();
-                  const embedding = vectorData.data[0].embedding;
-
-                  const useDate = !!(timeRange && (timeRange.start || timeRange.end));
-                  const fallbackRpc = useDate ? 'match_journal_entries_with_date' : 'match_journal_entries';
-                  const fallbackParams: any = {
-                    query_embedding: embedding,
-                    match_threshold: 0.3,
-                    match_count: 5,
-                    user_id_filter: userId
-                  };
-                  if (useDate) {
-                    fallbackParams.start_date = timeRange.start || null;
-                    fallbackParams.end_date = timeRange.end || null;
-                  }
-
-                  console.log(`[Vector Fallback] Calling ${fallbackRpc} with params:`, {
-                    ...fallbackParams,
-                    query_embedding: '[omitted]',
-                  });
-
-                  const { data: fallbackResults, error: fallbackError } = await supabase.rpc(
-                    fallbackRpc,
-                    fallbackParams
-                  );
-
-                  if (!fallbackError) {
-                    results.vectorResults = fallbackResults;
-                    results.error = `SQL failed, used vector search fallback: ${sqlError.message}`;
-                  }
-                } catch (fallbackError) {
-                  console.error('Fallback vector search also failed:', fallbackError);
-                  results.error = `Both SQL and vector search failed: ${sqlError.message}`;
+        // Helpers to apply filters safely
+        const applyFilters = (query: any, filters: any[] = []) => {
+          for (const f of filters) {
+            const op = f.op;
+            const col = f.column;
+            switch (op) {
+              case 'eq_auth_uid':
+                query = query.eq('user_id', userId);
+                break;
+              case 'eq':
+                query = query.eq(col, f.value);
+                break;
+              case 'gte':
+                query = query.gte(col, f.value);
+                break;
+              case 'lte':
+                query = query.lte(col, f.value);
+                break;
+              case 'ilike':
+                query = query.ilike(col, f.value);
+                break;
+              case 'cs': // contains
+                query = query.contains(col, f.value);
+                break;
+              case 'json_key_gte':
+                if (f.key) {
+                  query = query.filter(`${col}->>${f.key}`, 'gte', String(f.value));
                 }
-              } else {
-                results.sqlResults = sqlResults;
-              }
+                break;
+              default:
+                console.warn('Unsupported filter op:', f);
+            }
+          }
+          return query;
+        };
+
+        try {
+          // VECTOR EXECUTION
+          const wantVector = analysisPlan?.query_type === 'vector_search' || analysisPlan?.query_type === 'hybrid';
+          if (wantVector && analysisPlan?.vector?.enabled) {
+            const v = analysisPlan.vector;
+            const vectorQueryText = v.query_text || subQuestion.question;
+            const embedResp = await fetch('https://api.openai.com/v1/embeddings', {
+              method: 'POST',
+              headers: {
+                'Authorization': `Bearer ${openAIApiKey}`,
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                model: 'text-embedding-3-small',
+                input: vectorQueryText,
+              }),
+            });
+            const embedJson = await embedResp.json();
+            const embedding = embedJson?.data?.[0]?.embedding;
+
+            const dateRange = (v.use_date_filter && v.date_range) ? v.date_range : (timeRange || null);
+            const useDate = Boolean(dateRange && (dateRange.start || dateRange.end));
+            const rpcName = useDate ? 'match_journal_entries_with_date' : 'match_journal_entries';
+            const rpcParams: any = {
+              query_embedding: embedding,
+              match_threshold: v.threshold ?? 0.3,
+              match_count: v.top_k ?? 10,
+              user_id_filter: userId
+            };
+            if (useDate) {
+              rpcParams.start_date = dateRange.start || null;
+              rpcParams.end_date = dateRange.end || null;
+            }
+
+            console.log(`[Vector Search] Calling ${rpcName} with params:`, { ...rpcParams, query_embedding: '[omitted]' });
+            const { data: vectorResults, error: vectorError } = await createClient(supabaseUrl, supabaseServiceKey).rpc(rpcName, rpcParams);
+            if (vectorError) {
+              console.error('Vector search error:', vectorError);
+            } else {
+              results.vectorResults = vectorResults;
             }
           }
 
+          // SQL EXECUTION
+          const wantSql = analysisPlan?.query_type === 'sql_count' || analysisPlan?.query_type === 'sql_select' || analysisPlan?.query_type === 'hybrid';
+          if (wantSql && analysisPlan?.sql) {
+            const sqlPlan = analysisPlan.sql;
+            const quoted = (c: string) => (c.includes(' ') ? `"${c}"` : c);
+
+            if (sqlPlan.operation === 'count') {
+              let q = createClient(supabaseUrl, supabaseServiceKey)
+                .from('Journal Entries')
+                .select('id', { count: 'exact', head: true });
+
+              q = applyFilters(q, sqlPlan.filters || []);
+              // Ensure user scoping even if GPT forgot eq_auth_uid
+              q = q.eq('user_id', userId);
+
+              const { count, error } = await q;
+              if (error) {
+                console.error('SQL count error:', error);
+                results.error = `SQL count error: ${error.message}`;
+              } else {
+                results.sqlResults = { count: count ?? 0 };
+              }
+            } else if (sqlPlan.operation === 'select') {
+              const cols = (sqlPlan.columns && sqlPlan.columns.length)
+                ? sqlPlan.columns.map(quoted).join(',')
+                : 'id,created_at,master_themes,emotions';
+
+              let q = createClient(supabaseUrl, supabaseServiceKey)
+                .from('Journal Entries')
+                .select(cols);
+
+              q = applyFilters(q, sqlPlan.filters || []);
+              // Ensure user scoping even if GPT forgot eq_auth_uid
+              q = q.eq('user_id', userId);
+
+              if (Array.isArray(sqlPlan.order_by)) {
+                for (const ob of sqlPlan.order_by) {
+                  q = q.order(ob.column, { ascending: (ob.direction || 'asc').toLowerCase() === 'asc' });
+                }
+              }
+
+              if (sqlPlan.limit) q = q.limit(sqlPlan.limit);
+
+              const { data, error } = await q;
+              if (error) {
+                console.error('SQL select error:', error);
+                results.error = `SQL select error: ${error.message}`;
+              } else {
+                results.sqlResults = data || [];
+              }
+            }
+          }
         } catch (error) {
           console.error(`Error executing analysis for sub-question ${index}:`, error);
-          results.error = error.message;
+          results.error = (error as Error).message;
         }
 
         return results;
@@ -385,13 +355,14 @@ Focus on extracting specific entities, emotions, or themes mentioned in the sub-
       success: true,
       analysisResults,
       summary: {
-        totalSubQuestions: subQuestions.length,
+        totalSubQuestions: (Array.isArray(effectiveSubQuestions) ? effectiveSubQuestions.length : 0),
         completedAnalyses: analysisResults.length,
-        strategies: analysisResults.map(r => r.analysisPlan.searchStrategy)
+        strategies: analysisResults.map((r: any) => r.analysisPlan?.query_type)
       }
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
+
 
   } catch (error) {
     console.error('Error in GPT Analysis Orchestrator:', error);
