@@ -175,22 +175,30 @@ class NativeAuthService {
           throw new Error('GoogleAuth plugin not available');
         }
 
-        // ENHANCED: Add proper error handling and retry logic
+        // ENHANCED: Add proper error handling, plus a hard timeout to avoid hanging UI
         let result;
         try {
-          result = await GoogleAuth.signIn();
+          const signInTimeout = new Promise<never>((_, reject) =>
+            setTimeout(() => reject(new Error('Native Google sign-in timeout')), 15000)
+          );
+          result = await Promise.race([
+            GoogleAuth.signIn(),
+            signInTimeout,
+          ]);
         } catch (googleError: any) {
           console.error('[NativeAuth] GoogleAuth.signIn() failed:', googleError);
 
           // Check for specific Google Auth errors
-          if (googleError.message?.includes('User cancelled')) {
+          if (googleError.message?.includes('User cancelled') || googleError.message?.includes('cancelled')) {
             console.log('[NativeAuth] User cancelled Google sign-in');
             toast.info('Sign-in cancelled');
             return;
-          } else if (googleError.message?.includes('Network')) {
+          } else if (googleError.message?.toLowerCase().includes('network')) {
             throw new Error('Network error during Google sign-in. Please check your connection.');
-          } else if (googleError.message?.includes('Configuration')) {
+          } else if (googleError.message?.toLowerCase().includes('configuration')) {
             throw new Error('Google sign-in configuration error. Please contact support.');
+          } else if (googleError.message?.toLowerCase().includes('timeout')) {
+            throw new Error('Sign-in timed out. Please try again.');
           }
 
           throw new Error(`Google authentication failed: ${googleError.message}`);
@@ -382,7 +390,18 @@ class NativeAuthService {
     }
 
     try {
+      // Prefer the registered Capacitor plugin first
+      const cap = (window as any).Capacitor;
+      const registered = cap?.Plugins?.GoogleAuth;
+      if (registered) {
+        console.log('[NativeAuth] Using GoogleAuth from Capacitor.Plugins');
+        this.googleAuthPlugin = registered as GoogleAuthPlugin;
+        return this.googleAuthPlugin;
+      }
+
+      // Fallback to dynamic import
       const { GoogleAuth } = await import('@codetrix-studio/capacitor-google-auth');
+      console.log('[NativeAuth] Using GoogleAuth via dynamic import');
       this.googleAuthPlugin = GoogleAuth;
       return GoogleAuth;
     } catch (error) {
