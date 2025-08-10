@@ -64,6 +64,21 @@ serve(async (req) => {
     const userPatterns = await analyzeUserPatterns(recentEntries || [], supabaseClient, userId);
 
     // Generate database schema context
+    // Fetch canonical master terms
+    const { data: themeRows } = await supabaseClient
+      .from('themes')
+      .select('name')
+      .eq('is_active', true)
+      .order('display_order', { ascending: true });
+
+    const { data: emotionRows } = await supabaseClient
+      .from('emotions')
+      .select('name')
+      .order('name', { ascending: true });
+
+    const canonicalThemes = (themeRows || []).map((t: any) => t.name);
+    const canonicalEmotions = (emotionRows || []).map((e: any) => e.name);
+
     const databaseContext = generateDatabaseSchemaContext();
     const emotionGuidelines = getEmotionAnalysisGuidelines();
     const themeGuidelines = getThemeAnalysisGuidelines();
@@ -77,6 +92,8 @@ serve(async (req) => {
       databaseContext,
       emotionGuidelines,
       themeGuidelines,
+      canonicalThemes,
+      canonicalEmotions,
       openaiApiKey
     );
 
@@ -114,6 +131,8 @@ async function generateIntelligentQueryPlan(
   databaseContext: string,
   emotionGuidelines: string,
   themeGuidelines: string,
+  canonicalThemes: string[],
+  canonicalEmotions: string[],
   openaiApiKey: string
 ): Promise<QueryPlan> {
   const systemPrompt = `You are an intelligent query planning system for a personal journal analysis AI with ADVANCED ENTITY-EMOTION RELATIONSHIP ANALYSIS CAPABILITIES.
@@ -123,6 +142,14 @@ ${databaseContext}
 ${emotionGuidelines}
 
 ${themeGuidelines}
+
+CANONICAL MASTER TERMS (SOURCE OF TRUTH):
+- Themes: ${canonicalThemes.length ? canonicalThemes.join(', ') : '(none found)'}
+- Emotions: ${canonicalEmotions.length ? canonicalEmotions.join(', ') : '(none found)'}
+
+STRICT TERM POLICY:
+- Use ONLY the exact names from the master tables above in ALL SQL queries and outputs
+- If the user mentions a non-canonical variant/synonym (e.g., adjective vs. noun), choose the closest canonical term and proceed using that canonical term
 
 ENHANCED THEME FILTERING CAPABILITIES:
 - PostgreSQL array-based theme filtering with GIN index optimization
@@ -219,6 +246,7 @@ ENHANCED ANALYSIS GUIDELINES:
 - Combine entity, emotion, and relationship searches when all are relevant to the query
 - Use statistical functions for pattern recognition and trend analysis
 - Consider temporal aspects of relationship evolution`;
+
 
   const response = await fetch('https://api.openai.com/v1/chat/completions', {
     method: 'POST',

@@ -114,6 +114,7 @@ ${searchResults.map(result =>
 
 CORE INSTRUCTIONS:
 • Use ONLY provided emotion scores (0.0-1.0) - never infer from text
+• Use ONLY canonical theme/emotion names from the master tables; if user uses a non-canonical variant, choose the closest canonical term
 • Leverage master themes and temporal patterns with keen insights
 • Use refined and transcription text as available  
 • Reference specific scores, themes, and patterns with brilliant observations
