@@ -21,6 +21,7 @@ import { useChatRealtime } from "@/hooks/use-chat-realtime";
 import { updateThreadProcessingStatus, generateThreadTitle } from "@/utils/chat/threadUtils";
 import { useKeyboardDetection } from "@/hooks/use-keyboard-detection";
 import { useStreamingChat } from "@/hooks/useStreamingChat";
+import { threadSafetyManager } from "@/utils/threadSafetyManager";
 import ChatErrorBoundary from "../ChatErrorBoundary";
 import { useAutoScroll } from "@/hooks/use-auto-scroll";
 import {
@@ -65,6 +66,11 @@ export default function MobileChatInterface({
   const [sheetOpen, setSheetOpen] = useState(false);
   const debugLog = useDebugLog();
   
+  // Track active thread for safety manager
+  useEffect(() => {
+    threadSafetyManager.setActiveThread(threadId || null);
+  }, [threadId]);
+  
   const {
     isLoading,
     isProcessing,
@@ -88,6 +94,7 @@ export default function MobileChatInterface({
     queryCategory,
     restoreStreamingState
   } = useStreamingChat({
+     threadId: threadId,
     onFinalResponse: async (response, analysis, originThreadId) => {
       // Handle final streaming response scoped to its origin thread
       if (!response || !originThreadId || !user?.id) {

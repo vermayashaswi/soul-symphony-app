@@ -34,6 +34,7 @@ import { useDebugLog } from "@/utils/debug/DebugContext";
 import { TranslatableText } from "@/components/translation/TranslatableText";
 import { useChatMessageClassification, QueryCategory } from "@/hooks/use-chat-message-classification";
 import { useStreamingChat } from "@/hooks/useStreamingChat";
+import { threadSafetyManager } from "@/utils/threadSafetyManager";
 import { useAutoScroll } from "@/hooks/use-auto-scroll";
 import {
   AlertDialog,
@@ -83,6 +84,11 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({
   const currentThreadId = propsThreadId ?? localThreadId;
   const effectiveUserId = propsUserId ?? user?.id;
   
+  // Track active thread for safety manager
+  useEffect(() => {
+    threadSafetyManager.setActiveThread(currentThreadId || null);
+  }, [currentThreadId]);
+  
   // Use the GPT-based message classification hook
   const { classifyMessage, classification } = useChatMessageClassification();
   
@@ -97,6 +103,7 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({
     queryCategory,
     restoreStreamingState
   } = useStreamingChat({
+      threadId: currentThreadId,
     onFinalResponse: async (response, analysis, originThreadId) => {
       // Handle final streaming response scoped to its origin thread
       if (!response || !originThreadId || !effectiveUserId) {

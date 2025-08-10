@@ -96,15 +96,9 @@ export const useStreamingChat = ({ onFinalResponse, onError, threadId }: UseStre
 
     console.log(`[useStreamingChat] Switching to thread: ${threadId}`);
     
-    // Abort any ongoing requests for previous threads
-    threadStates.forEach((threadState, id) => {
-      if (id !== threadId && threadState.abortController) {
-        console.log(`[useStreamingChat] Aborting operations for thread: ${id}`);
-        threadState.abortController.abort();
-        threadState.abortController = null;
-        threadState.isStreaming = false;
-      }
-    });
+
+    // No cross-thread abort: allow background threads to continue processing
+
 
     // Set state to the new thread's state
     const threadState = getThreadState(threadId);
@@ -149,8 +143,8 @@ export const useStreamingChat = ({ onFinalResponse, onError, threadId }: UseStre
       options?: { attempts?: number; baseDelay?: number },
       targetThreadId?: string
     ): Promise<{ data: any; error: any }> => {
-      if (!targetThreadId || targetThreadId !== threadId) {
-        throw new Error('Thread mismatch - operation aborted');
+      if (!targetThreadId) {
+        throw new Error('Missing target thread');
       }
 
       const attempts = options?.attempts ?? 3;
@@ -159,10 +153,7 @@ export const useStreamingChat = ({ onFinalResponse, onError, threadId }: UseStre
 
       let lastErr: any = null;
       for (let i = 0; i < attempts; i++) {
-        // Check if thread is still active
-        if (targetThreadId !== threadId) {
-          throw new Error('Thread switched - operation aborted');
-        }
+        // Proceed even if not active; background processing allowed
 
         // Check abort signal
         if (threadState.abortController?.signal.aborted) {
@@ -237,10 +228,7 @@ export const useStreamingChat = ({ onFinalResponse, onError, threadId }: UseStre
           threadState.abortController = null;
         }
         
-        // Only call callback if this is for the current thread
-        if (activeThreadId === threadId) {
-          onFinalResponse?.(message.response || '', message.analysis, activeThreadId);
-        }
+        onFinalResponse?.(message.response || '', message.analysis, activeThreadId);
         break;
       case 'error':
         updates.isStreaming = false;
@@ -252,10 +240,7 @@ export const useStreamingChat = ({ onFinalResponse, onError, threadId }: UseStre
           threadState.abortController = null;
         }
         
-        // Only call callback if this is for the current thread
-        if (activeThreadId === threadId) {
-          onError?.(message.error || 'Unknown error occurred');
-        }
+        onError?.(message.error || 'Unknown error occurred');
         break;
     }
 
@@ -283,7 +268,8 @@ export const useStreamingChat = ({ onFinalResponse, onError, threadId }: UseStre
     targetThreadId?: string
   ) => {
     const activeThreadId = targetThreadId || threadId;
-    if (!activeThreadId || activeThreadId !== threadId) return;
+    if (!activeThreadId) return;
+
 
     try {
       const { data, error } = await supabase.functions.invoke('generate-streaming-messages', {
@@ -297,36 +283,32 @@ export const useStreamingChat = ({ onFinalResponse, onError, threadId }: UseStre
 
       if (error) throw error;
 
-      // Only update if still on the same thread
-      if (activeThreadId === threadId) {
-        if (data.shouldUseFallback || !data.messages || data.messages.length === 0) {
-          updateThreadState(activeThreadId, {
-            useThreeDotFallback: true,
-            dynamicMessages: []
-          });
-        } else {
-          updateThreadState(activeThreadId, {
-            useThreeDotFallback: false,
-            dynamicMessages: data.messages,
-            currentMessageIndex: 0
-          });
-        }
-      }
-    } catch (error) {
-      console.error('[useStreamingChat] Error generating streaming messages:', error);
-      if (activeThreadId === threadId) {
+      if (data.shouldUseFallback || !data.messages || data.messages.length === 0) {
         updateThreadState(activeThreadId, {
           useThreeDotFallback: true,
           dynamicMessages: []
         });
+      } else {
+        updateThreadState(activeThreadId, {
+          useThreeDotFallback: false,
+          dynamicMessages: data.messages,
+          currentMessageIndex: 0
+        });
       }
+    } catch (error) {
+      console.error('[useStreamingChat] Error generating streaming messages:', error);
+      updateThreadState(activeThreadId!, {
+        useThreeDotFallback: true,
+        dynamicMessages: []
+      });
     }
   }, [threadId, updateThreadState]);
 
   // Automatic retry function for failed messages
   const retryLastMessage = useCallback(async (targetThreadId?: string) => {
     const activeThreadId = targetThreadId || threadId;
-    if (!activeThreadId || activeThreadId !== threadId) return;
+    if (!activeThreadId) return;
+
 
     const threadState = getThreadState(activeThreadId);
     
@@ -345,8 +327,7 @@ export const useStreamingChat = ({ onFinalResponse, onError, threadId }: UseStre
     await new Promise(resolve => setTimeout(resolve, 1000));
 
     try {
-      // Check if still on same thread
-      if (activeThreadId !== threadId) return;
+      // Proceed even if user switched threads; keep retrying in background
 
       await generateStreamingMessages(
         threadState.lastFailedMessage.message, 
@@ -486,11 +467,7 @@ export const useStreamingChat = ({ onFinalResponse, onError, threadId }: UseStre
     conversationContext: any[] = [],
     userProfile: any = {}
   ) => {
-    // Validate thread consistency
-    if (targetThreadId !== threadId) {
-      console.warn(`[useStreamingChat] Thread mismatch: target=${targetThreadId}, current=${threadId}`);
-      return;
-    }
+    // Proceed even if user switched threads; keep processing in background
 
     const threadState = getThreadState(targetThreadId);
     if (threadState.isStreaming) {
@@ -546,11 +523,7 @@ export const useStreamingChat = ({ onFinalResponse, onError, threadId }: UseStre
       console.error('[useStreamingChat] Classification failed, using fallback:', error);
     }
 
-    // Check thread consistency before proceeding
-    if (targetThreadId !== threadId) {
-      console.warn(`[useStreamingChat] Thread switched during classification, aborting`);
-      return;
-    }
+    // Proceed even if user switched threads during classification
 
     updateThreadState(targetThreadId, { queryCategory: messageCategory });
 
@@ -583,11 +556,7 @@ export const useStreamingChat = ({ onFinalResponse, onError, threadId }: UseStre
         streamingMode: false
       }, { attempts: 3, baseDelay: 900 }, targetThreadId);
 
-      // Final thread check before processing response
-      if (targetThreadId !== threadId) {
-        console.warn(`[useStreamingChat] Thread switched before response, ignoring result`);
-        return;
-      }
+      // Continue even if user switched threads before response
 
       if (error) {
         if (isEdgeFunctionError(error) || isNetworkError(error)) {
@@ -614,14 +583,11 @@ export const useStreamingChat = ({ onFinalResponse, onError, threadId }: UseStre
     } catch (err: any) {
       console.warn(`[useStreamingChat] Backoff flow failed for thread ${targetThreadId}:`, err);
       
-      // Only show error if still on the same thread
-      if (targetThreadId === threadId) {
-        addStreamingMessage({
-          type: 'error',
-          error: err?.message || 'Unknown error occurred',
-          timestamp: Date.now()
-        }, targetThreadId);
-      }
+      addStreamingMessage({
+        type: 'error',
+        error: err?.message || 'Unknown error occurred',
+        timestamp: Date.now()
+      }, targetThreadId);
     }
   }, [threadId, getThreadState, updateThreadState, addStreamingMessage, generateStreamingMessages, invokeWithBackoff, isEdgeFunctionError, isNetworkError, retryLastMessage]);
 
