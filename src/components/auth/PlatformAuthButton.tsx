@@ -39,7 +39,7 @@ const PlatformAuthButton: React.FC<PlatformAuthButtonProps> = ({
         const timeoutPromise = new Promise<never>((_, reject) => {
           setTimeout(() => {
             reject(new Error('Native Google authentication timed out'));
-          }, 45000); // 45 seconds timeout
+          }, 15000); // 15 seconds timeout
         });
 
         const authPromise = nativeAuthService.signInWithGoogle();

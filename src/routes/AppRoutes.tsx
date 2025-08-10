@@ -25,6 +25,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useOnboarding } from '@/hooks/use-onboarding';
 import { useSessionValidation } from '@/hooks/useSessionValidation';
 import { nativeIntegrationService } from '@/services/nativeIntegrationService';
+import NativeAuthDiagnostics from '@/pages/NativeAuthDiagnostics';
 
 const AppRoutes = () => {
   const { user } = useAuth();
@@ -181,6 +182,7 @@ const AppRoutes = () => {
             <Auth />
           </SessionRouter>
         } />
+        <Route path="/app/native-auth-diagnostics" element={<NativeAuthDiagnostics />} />
 
         {/* Root app route with smart redirect */}
         <Route path="/app" element={<AppRootRedirect />} />
