@@ -210,20 +210,24 @@ serve(async (req) => {
     - Do not include trailing explanations or extra fields.
     `;
 
+    const model = 'gpt-4.1-2025-04-14';
+    const tokensKey = model.includes('gpt-5') ? 'max_completion_tokens' : 'max_tokens';
+    const payload: any = {
+      model,
+      messages: [
+        { role: 'system', content: 'You are Ruh by SOuLO, a warm and insightful wellness coach. Provide thoughtful, data-driven responses based on journal analysis.' },
+        { role: 'user', content: consolidationPrompt }
+      ]
+    };
+    (payload as any)[tokensKey] = 1500;
+
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${openAIApiKey}`,
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          model: 'gpt-4.1-2025-04-14',
-          messages: [
-            { role: 'system', content: 'You are Ruh by SOuLO, a warm and insightful wellness coach. Provide thoughtful, data-driven responses based on journal analysis.' },
-            { role: 'user', content: consolidationPrompt }
-          ],
-          max_tokens: 1500
-        }),
+        body: JSON.stringify(payload),
     });
 
     // Handle non-OK responses gracefully
