@@ -34,7 +34,7 @@ serve(async (req) => {
       ? subQuestions
       : [{ question: userMessage, type: 'unknown', priority: 1 }];
 
-    // Minimal, explicit schema/context for GPT planning
+    // Enhanced schema/context for GPT planning with full analytical capabilities
     const SCHEMA_CONTEXT = `
 You operate over a single user-scoped table named "Journal Entries" with columns:
 - id (bigint, primary key)
@@ -42,13 +42,28 @@ You operate over a single user-scoped table named "Journal Entries" with columns
 - created_at (timestamptz)
 - "refined text" (text)
 - "transcription text" (text)
-- master_themes (text[])
+- master_themes (text[]) -- array of theme strings like ["love", "work", "family"]
 - themes (text[])
-- entities (jsonb)  -- object of arrays, e.g. { person: ["alice"], organization: ["acme"] }
-- emotions (jsonb)  -- object of numeric scores, e.g. { happy: 0.72, anxious: 0.12 }
-- sentiment (text)  -- 'positive' | 'neutral' | 'negative'
+- entities (jsonb) -- object of arrays, e.g. { "person": ["alice"], "organization": ["acme"] }
+- emotions (jsonb) -- object of numeric scores, e.g. { "happy": 0.72, "anxious": 0.12 }
+- sentiment (text) -- 'positive' | 'neutral' | 'negative'
+- duration (numeric) -- length in seconds if applicable
+- entityemotion (jsonb) -- entity-emotion relationships with strength scores
 
-Master tables are conceptual, NOT joined: themes and emotions are validated vocabularies.
+ANALYTICAL CAPABILITIES:
+You can generate complex SQL calculations including:
+- Percentage calculations: COUNT(CASE WHEN condition THEN 1 END) * 100.0 / COUNT(*) as percentage
+- Ratios and proportions between different groups
+- Aggregations with CTEs and window functions
+- Theme/emotion frequency analysis
+- Temporal trends and comparisons
+
+SAFETY CONSTRAINTS:
+- All queries MUST include WHERE user_id = $user_id for data isolation
+- Only SELECT operations allowed (no INSERT/UPDATE/DELETE)
+- No system tables or functions access
+- No nested function calls or complex permissions
+
 Row Level Security ensures access is per user; you MUST include user filter in your plan.
 `;
 
@@ -56,13 +71,14 @@ Row Level Security ensures access is per user; you MUST include user filter in y
     const analysisPlans = await Promise.all(
       effectiveSubQuestions.map(async (subQuestion: any, index: number) => {
         const plannerPrompt = `
-Return ONLY a strict JSON object describing how to answer this sub-question using SQL, vector search, or both.
+Return ONLY a strict JSON object describing how to answer this sub-question using SQL, vector search, or advanced SQL calculation.
 Use the following output schema exactly:
 {
-  "query_type": "sql_count" | "sql_select" | "vector_search" | "hybrid",
+  "query_type": "sql_count" | "sql_select" | "sql_calculation" | "vector_search" | "hybrid",
   "reasoning": "short rationale",
   "sql": {
-    "operation": "count" | "select",
+    "operation": "count" | "select" | "calculation",
+    "raw_query": "SELECT ... FROM \\"Journal Entries\\" WHERE user_id = $1 AND ...",
     "columns": ["id","created_at","master_themes","emotions"] | null,
     "filters": [
       // Supported ops: eq, eq_auth_uid, gte, lte, ilike, cs, json_key_gte
@@ -85,12 +101,20 @@ Use the following output schema exactly:
   } | null
 }
 Rules:
-- Prefer sql_count for direct counts like "how many entries since ...".
-- Always include a user filter via eq_auth_uid in SQL filters.
-- If the text implies a date range (e.g., "since July", "last week"), include created_at gte/lte.
-- Use vector_search only for semantic retrieval of example passages; never for simple counts.
-- If both are useful, choose "hybrid" and fill both sections.
-- Output must be valid JSON, no code fences.
+- Use "sql_calculation" for percentage, ratio, and complex analytical queries
+- For calculations, provide a complete SELECT statement in "raw_query" field
+- Always use parameterized queries with $1 for user_id in raw_query
+- Prefer sql_count for simple counts like "how many entries since ..."
+- Always include a user filter via eq_auth_uid in SQL filters or WHERE user_id = $1 in raw_query
+- If the text implies a date range (e.g., "since July", "last week"), include created_at filters
+- Use vector_search only for semantic retrieval of example passages; never for simple counts
+- If both are useful, choose "hybrid" and fill both sections
+- Output must be valid JSON, no code fences
+
+CALCULATION EXAMPLES:
+- Percentage: "SELECT (COUNT(CASE WHEN 'love' = ANY(master_themes) THEN 1 END) * 100.0 / COUNT(*)) as percentage FROM \\"Journal Entries\\" WHERE user_id = $1"
+- Theme distribution: "SELECT theme, COUNT(*) * 100.0 / SUM(COUNT(*)) OVER() as percentage FROM (SELECT unnest(master_themes) as theme FROM \\"Journal Entries\\" WHERE user_id = $1) t GROUP BY theme"
+- Emotion averages: "SELECT emotion_key, AVG((emotion_value)::numeric) as avg_score FROM \\"Journal Entries\\", jsonb_each(emotions) WHERE user_id = $1 GROUP BY emotion_key"
 
 Context:
 SCHEMA:\n${SCHEMA_CONTEXT}\n
@@ -291,12 +315,34 @@ Incoming timeRange (may be null): ${timeRange ? JSON.stringify(timeRange) : 'nul
           }
 
           // SQL EXECUTION
-          const wantSql = analysisPlan?.query_type === 'sql_count' || analysisPlan?.query_type === 'sql_select' || analysisPlan?.query_type === 'hybrid';
+          const wantSql = analysisPlan?.query_type === 'sql_count' || analysisPlan?.query_type === 'sql_select' || analysisPlan?.query_type === 'sql_calculation' || analysisPlan?.query_type === 'hybrid';
           if (wantSql && analysisPlan?.sql) {
             const sqlPlan = analysisPlan.sql;
             const quoted = (c: string) => (c.includes(' ') ? `"${c}"` : c);
 
-            if (sqlPlan.operation === 'count') {
+            if (sqlPlan.operation === 'calculation' && sqlPlan.raw_query) {
+              // Execute advanced SQL calculation via RPC
+              console.log(`[SQL Calculation] Executing: ${sqlPlan.raw_query.substring(0, 100)}...`);
+              
+              try {
+                const { data: calculationResult, error } = await supabase.rpc('execute_dynamic_query', {
+                  query_text: sqlPlan.raw_query.replace('$1', `'${userId}'`)
+                });
+                
+                if (error) {
+                  console.error('SQL calculation error:', error);
+                  results.error = `SQL calculation error: ${error.message}`;
+                } else if (calculationResult?.success) {
+                  results.sqlResults = calculationResult.data;
+                  console.log(`[SQL Calculation] Result:`, calculationResult.data);
+                } else {
+                  results.error = `SQL calculation failed: ${calculationResult?.error || 'Unknown error'}`;
+                }
+              } catch (err) {
+                console.error('SQL calculation exception:', err);
+                results.error = `SQL calculation exception: ${err.message}`;
+              }
+            } else if (sqlPlan.operation === 'count') {
               // Use the new dedicated count RPC for reliable counting
               const startDate = sqlPlan.filters?.find(f => f.column === 'created_at' && f.op === 'gte')?.value || null;
               const endDate = sqlPlan.filters?.find(f => f.column === 'created_at' && f.op === 'lte')?.value || null;
