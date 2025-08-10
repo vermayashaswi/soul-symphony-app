@@ -32,11 +32,10 @@ serve(async (req) => {
     // Get OpenAI API key
     const openAiApiKey = Deno.env.get('OPENAI_API_KEY');
     if (!openAiApiKey) {
-      console.error('[Query Classifier] OpenAI API key not found, using rule-based classification');
-      const fallbackResult = enhancedRuleBasedClassification(message);
+      console.error('[Query Classifier] OPENAI_API_KEY missing - cannot classify via GPT');
       return new Response(
-        JSON.stringify(fallbackResult),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        JSON.stringify({ error: 'OPENAI_API_KEY not configured for chat-query-classifier' }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 500 }
       );
     }
 
@@ -52,11 +51,9 @@ serve(async (req) => {
   } catch (error) {
     console.error('[Query Classifier] Error:', error);
 
-    // Fallback to rule-based classification WITHOUT re-reading the body
-    const fallbackResult = enhancedRuleBasedClassification(message);
     return new Response(
-      JSON.stringify({ ...fallbackResult, fallbackUsed: true }),
-      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      JSON.stringify({ error: 'Classification failed', details: String((error as any)?.message || error) }),
+      { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 500 }
     );
   }
 });
@@ -83,34 +80,7 @@ async function gptClassifyMessage(
     ? `\nConversation context: ${conversationContext.slice(-6).map(msg => `${(msg.role || msg.sender || 'user')}: ${msg.content}`).join('\n')}`
     : '';
 
-  const classificationPrompt = `You are SOULo's chat query classifier. Classify the user's latest message while maintaining smooth 1-1 conversational flow.
-
-Categories:
-- JOURNAL_SPECIFIC: Personal, analyzable questions about the user's feelings/behaviors/patterns. Be generous—any concrete personal detail counts.
-- JOURNAL_SPECIFIC_NEEDS_CLARIFICATION: Personal but too vague to analyze; ask one targeted follow-up.
-- GENERAL_MENTAL_HEALTH: General education/tips/resources, greetings/acknowledgements, small talk.
-- UNRELATED: Outside mental health/wellbeing/journaling.
-
-Core rules:
-1) Prefer JOURNAL_SPECIFIC for first-person queries about the user's own state/patterns when there is at least one concrete, analyzable detail (e.g., a timeframe, trigger/cause, event, behavior, or explicit question).
-2) Short, bare-emotion statements with no analyzable detail (e.g., "I'm sad", "I feel bad") MUST be classified as JOURNAL_SPECIFIC_NEEDS_CLARIFICATION. Provide one targeted clarifyingQuestion.
-3) useAllEntries = true if the personal question has no explicit timeframe; if a timeframe is mentioned/implied (last week, this month, last month, recent), set useAllEntries=false and set timeScopeHint accordingly.
-4) journalHintStrength: "high" for strong first-person self-reflection; "medium" for somewhat personal; "low" otherwise.
-5) When choosing JOURNAL_SPECIFIC_NEEDS_CLARIFICATION, always supply a brief, concrete clarifyingQuestion tailored to the message.
-
-Return ONLY valid JSON matching this schema (no code fences):
-{
-  "category": "JOURNAL_SPECIFIC" | "JOURNAL_SPECIFIC_NEEDS_CLARIFICATION" | "GENERAL_MENTAL_HEALTH" | "UNRELATED",
-  "confidence": number,
-  "useAllEntries": boolean,
-  "reasoning": string,
-  "recommendedPipeline": "general" | "clarification" | "rag_full",
-  "clarifyingQuestion": string | null,
-  "journalHintStrength": "low" | "medium" | "high",
-  "timeScopeHint": "all" | "recent" | "last_week" | "this_month" | "last_month" | null
-}
-
-User message: "${message}"${contextString}`;
+  const classificationPrompt = `You are the conversation router and intent classifier for "Ruh by SOuLO" — a brilliantly witty, warm, non-judgmental mental health companion. Your job is to decide how the chat should proceed so the user experiences a fluid, 1-1 conversation with a wise, funny friend.\n\nUse the conversation history to understand what the user wants next and classify the latest user message. Be decisive and consistent.\n\nCategories:\n- JOURNAL_SPECIFIC: The user talks about their own feelings, patterns, triggers, behaviors, relationships, or wants insights about "me/my". Choose this when there is at least one analyzable detail (timeframe, trigger/event, behavior, symptom, metric, or explicit question).\n- JOURNAL_SPECIFIC_NEEDS_CLARIFICATION: The user is talking about themself but it's too vague to analyze (e.g., "I'm sad", "idk", "help"). Choose this when a single short clarifying question would unlock the next step.\n- GENERAL_MENTAL_HEALTH: General mental health info/skills/resources or light conversational turns not requiring personal analysis (greetings, thanks, small talk, meta questions about Ruh).\n- UNRELATED: Not about mental health/wellbeing/journaling; or purely factual/utility requests outside scope.\n\nDecisions:\n- useAllEntries:\n  - true when the personal request is holistic and no explicit timeframe is mentioned ("overall", "in general", "what do my entries say about me?").\n  - false when any timeframe is present or implied ("today", "yesterday", "last week", "this month", "last month", "recently").\n- timeScopeHint: one of "all" | "recent" | "last_week" | "this_month" | "last_month" | null.\n  - choose "recent" if the wording implies near-term without a clear window ("lately", "recently", "these days").\n  - choose "last_week" or "this_month" / "last_month" if clearly stated.\n  - null for GENERAL_MENTAL_HEALTH or UNRELATED.\n- recommendedPipeline:\n  - "rag_full" for JOURNAL_SPECIFIC with analyzable detail.\n  - "clarification" for JOURNAL_SPECIFIC_NEEDS_CLARIFICATION.\n  - "general" for GENERAL_MENTAL_HEALTH or UNRELATED.\n- clarifyingQuestion: Provide a single, friendly, specific question ONLY when category is JOURNAL_SPECIFIC_NEEDS_CLARIFICATION; otherwise null.\n- journalHintStrength: "high" for strong first-person self-reflection; "medium" when personal but less focused; "low" otherwise.\n\nOutput strictly as a single JSON object matching this schema (no code fences, no commentary):\n{\n  "category": "JOURNAL_SPECIFIC" | "JOURNAL_SPECIFIC_NEEDS_CLARIFICATION" | "GENERAL_MENTAL_HEALTH" | "UNRELATED",\n  "confidence": number,\n  "useAllEntries": boolean,\n  "reasoning": string,\n  "recommendedPipeline": "general" | "clarification" | "rag_full",\n  "clarifyingQuestion": string | null,\n  "journalHintStrength": "low" | "medium" | "high",\n  "timeScopeHint": "all" | "recent" | "last_week" | "this_month" | "last_month" | null\n}\n\nLatest user message: "${message}"${contextString}`;
 
   try {
     const controller = new AbortController();
@@ -144,14 +114,7 @@ User message: "${message}"${contextString}`;
     const content = data?.choices?.[0]?.message?.content?.trim() || '';
 
     if (!content) {
-      console.warn('[Query Classifier] Empty OpenAI content, using rule-based fallback');
-      const rb = enhancedRuleBasedClassification(message);
-      return {
-        category: rb.category,
-        confidence: rb.confidence ?? 0.6,
-        useAllEntries: rb.useAllEntries,
-        reasoning: rb.reasoning + ' (fallback due to empty OpenAI response)'
-      } as any;
+      throw new Error('Empty OpenAI response');
     }
 
     console.log(`[Query Classifier] GPT Response: ${content}`);
@@ -177,8 +140,6 @@ User message: "${message}"${contextString}`;
       throw new Error('Invalid category in GPT response');
     }
 
-    console.log(`[Query Classifier] Meta: pipeline=${result.recommendedPipeline || 'n/a'}, timeScope=${result.timeScopeHint || 'n/a'}`);
-
     return {
       category: result.category,
       confidence: Math.max(0, Math.min(1, result.confidence ?? 0.85)),
@@ -196,158 +157,4 @@ User message: "${message}"${contextString}`;
   }
 }
 
-/**
- * Enhanced rule-based classification with conversational flow support
- */
-function enhancedRuleBasedClassification(message: string): {
-  category: string;
-  confidence: number;
-  reasoning: string;
-  useAllEntries?: boolean;
-} {
-  const lowerMessage = message.toLowerCase().trim();
-  
-  console.log(`[Rule-Based] Analyzing: "${message}"`);
-  
-  // Vague personal questions = JOURNAL_SPECIFIC_NEEDS_CLARIFICATION
-  const vaguePersonalPatterns = [
-    /^how am i\??$/i,
-    /^i need help$/i,
-    /^help me$/i,
-    /^what's (going on|wrong) with me\??$/i,
-    /^i feel lost$/i,
-    /^i don't know$/i
-  ];
-  
-  for (const pattern of vaguePersonalPatterns) {
-    if (pattern.test(lowerMessage)) {
-      console.log(`[Rule-Based] VAGUE PERSONAL QUESTION - Needs clarification`);
-      return {
-        category: "JOURNAL_SPECIFIC_NEEDS_CLARIFICATION",
-        confidence: 0.9,
-        reasoning: "Vague personal question requiring clarification"
-      };
-    }
-  }
-  
-  // Bare emotion statements => needs clarification (even if a timeframe is present)
-  const bareEmotionPattern = /^(i\s*(?:am|'m)\s+\w+|i\s*feel\s+\w+|feeling\s+\w+)$/i;
-  const hasTemporalReference = /\b(last week|last month|this week|this month|today|yesterday|recently|lately)\b/i.test(lowerMessage);
-  if (bareEmotionPattern.test(lowerMessage)) {
-    console.log(`[Rule-Based] BARE EMOTION - Needs clarification (temporalRef=${hasTemporalReference})`);
-    return {
-      category: "JOURNAL_SPECIFIC_NEEDS_CLARIFICATION",
-      confidence: 0.9,
-      reasoning: hasTemporalReference
-        ? "Bare emotion with timeframe; ask a targeted clarifying question"
-        : "Bare emotion statement without timeframe; ask a clarifying question"
-    };
-  }
-  
-  // Strong personal + timeframe detection
-  const hasMy = /\bmy\b/i.test(lowerMessage);
-  if (hasMy && hasTemporalReference) {
-    console.log(`[Rule-Based] PERSONAL + TIMEFRAME detected`);
-      return {
-        category: "JOURNAL_SPECIFIC",
-        confidence: 0.9,
-        useAllEntries: false,
-        reasoning: "Personal pronoun with explicit timeframe"
-      };
-  }
-  
-  // Specific personal pronouns = JOURNAL_SPECIFIC
-  const personalPatterns = [
-    /\b(i|me|my|mine|myself)\b.*\b(work|stress|feel|feeling|feelings|emotion|emotions|mood|moods|relationship|journal|entries|pattern|patterns?|theme|themes?)\b/i,
-    /\bam i\b.*\b(good|bad|better|worse|okay)\b/i,
-    /\bhow (am i|was i).*\b(lately|recently|today|this week|this month)\b/i,
-    /\bwhat makes me\b/i,
-    /\bwhen do i\b/i,
-    /\bwhy do i\b/i,
-    /\bmy\s+(top|common|most|biggest)\s+(emotions?|moods?|themes?)\b/i
-  ];
-  
-  for (const pattern of personalPatterns) {
-    if (pattern.test(lowerMessage)) {
-      const useAllEntries = !hasTemporalReference;
-      
-      console.log(`[Rule-Based] SPECIFIC PERSONAL - UseAllEntries: ${useAllEntries}`);
-      
-      return {
-        category: "JOURNAL_SPECIFIC",
-        confidence: 0.85,
-        useAllEntries: useAllEntries,
-        reasoning: `Specific personal question - analyzing ${hasTemporalReference ? 'specific timeframe' : 'all entries'}`
-      };
-    }
-  }
-  
-  // Conversational patterns - now classified as GENERAL_MENTAL_HEALTH
-  const conversationalPatterns = [
-    /^(hi|hello|hey|good morning|good afternoon|good evening)\b/i,
-    /^(thank you|thanks|thank u|thx)\b/i,
-    /^(how are you|how do you)\b/i,
-    /^(what (are|is) you|who are you)\b/i,
-    /^(yes|no|okay|ok|sure|ya)\s*\.?\s*$/i,
-    /^(that's|thats) (helpful|interesting|good|great)/i,
-    /^(tell me more|more about|can you explain)/i
-  ];
-  
-  for (const pattern of conversationalPatterns) {
-    if (pattern.test(lowerMessage)) {
-      return {
-        category: "GENERAL_MENTAL_HEALTH",
-        confidence: 0.9,
-        reasoning: "Conversational response - handled as general mental health interaction"
-      };
-    }
-  }
-  
-  // General mental health patterns
-  const mentalHealthPatterns = [
-    /\b(anxiety|depression|stress|mental health|wellbeing)\b/i,
-    /\b(meditation|mindfulness|self[\s-]care|therapy)\b/i,
-    /\bwhat (are|is) (the )?(best|good|effective) (ways?|methods?|techniques?)\b/i,
-    /\bhow (to|can|do).{0,30}(improve|manage|cope with|deal with)\b/i
-  ];
-  
-  for (const pattern of mentalHealthPatterns) {
-    if (pattern.test(lowerMessage)) {
-      return {
-        category: "GENERAL_MENTAL_HEALTH",
-        confidence: 0.7,
-        reasoning: "General mental health question"
-      };
-    }
-  }
-  
-  console.log(`[Rule-Based] No clear patterns found, defaulting to CONVERSATIONAL`);
-  
-  // Check for unrelated queries
-  const unrelatedPatterns = [
-    /\b(weather|temperature|forecast)\b/i,
-    /\b(recipe|cook|cooking|food preparation)\b/i,
-    /\b(history|geography|science|mathematics|physics)\b/i,
-    /\b(sports|games|entertainment|movies|music)\b/i,
-    /\b(technology|programming|computer|software)\b/i,
-    /\b(news|politics|current events)\b/i
-  ];
-  
-  for (const pattern of unrelatedPatterns) {
-    if (pattern.test(lowerMessage)) {
-      return {
-        category: "UNRELATED",
-        confidence: 0.8,
-        reasoning: "Query unrelated to mental health, wellness, or journaling"
-      };
-    }
-  }
-  
-  console.log(`[Rule-Based] No clear patterns found, defaulting to GENERAL_MENTAL_HEALTH`);
-  
-  return {
-    category: "GENERAL_MENTAL_HEALTH",
-    confidence: 0.6,
-    reasoning: "Unclear intent - treating as general mental health interaction"
-  };
-}
+// Rule-based classification removed — GPT-only per requirements.
