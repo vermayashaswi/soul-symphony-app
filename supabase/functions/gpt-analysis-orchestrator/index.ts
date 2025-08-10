@@ -1,15 +1,15 @@
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.49.1';
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.38.4';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-const openAIApiKey = Deno.env.get('OPENAI_API_KEY');
-const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
-const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+const openaiApiKey = Deno.env.get('OPENAI_API_KEY');
+const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
+const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -297,20 +297,23 @@ Incoming timeRange (may be null): ${timeRange ? JSON.stringify(timeRange) : 'nul
             const quoted = (c: string) => (c.includes(' ') ? `"${c}"` : c);
 
             if (sqlPlan.operation === 'count') {
-              let q = createClient(supabaseUrl, supabaseServiceKey)
-                .from('Journal Entries')
-                .select('id', { count: 'exact', head: true });
-
-              q = applyFilters(q, sqlPlan.filters || []);
-              // Ensure user scoping even if GPT forgot eq_auth_uid
-              q = q.eq('user_id', userId);
-
-              const { count, error } = await q;
+              // Use the new dedicated count RPC for reliable counting
+              const startDate = sqlPlan.filters?.find(f => f.column === 'created_at' && f.op === 'gte')?.value || null;
+              const endDate = sqlPlan.filters?.find(f => f.column === 'created_at' && f.op === 'lte')?.value || null;
+              
+              console.log(`[SQL Count] Using get_journal_entry_count with dates: ${startDate} to ${endDate}`);
+              const { data: count, error } = await supabase.rpc('get_journal_entry_count', {
+                user_id_filter: userId,
+                start_date: startDate,
+                end_date: endDate
+              });
+              
               if (error) {
                 console.error('SQL count error:', error);
                 results.error = `SQL count error: ${error.message}`;
               } else {
                 results.sqlResults = { count: count ?? 0 };
+                console.log(`[SQL Count] Result: ${count} entries`);
               }
             } else if (sqlPlan.operation === 'select') {
               const cols = (sqlPlan.columns && sqlPlan.columns.length)

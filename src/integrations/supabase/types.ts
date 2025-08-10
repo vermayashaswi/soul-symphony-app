@@ -835,6 +835,10 @@ export type Database = {
           created_at: string
         }[]
       }
+      get_journal_entry_count: {
+        Args: { user_id_filter: string; start_date?: string; end_date?: string }
+        Returns: number
+      }
       get_theme_statistics: {
         Args: {
           user_id_filter: string
