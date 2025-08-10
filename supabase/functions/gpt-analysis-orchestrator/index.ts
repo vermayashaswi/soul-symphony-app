@@ -223,10 +223,68 @@ Incoming timeRange (may be null): ${timeRange ? JSON.stringify(timeRange) : 'nul
       })
     );
 
+    // Corrector phase: validate and fix plans using GPT-4.1-mini with a confidence gate
+    const correctedPlans = await Promise.all(
+      analysisPlans.map(async ({ subQuestion, analysisPlan, index }) => {
+        try {
+          const correctorInput = {
+            schema_context: SCHEMA_CONTEXT,
+            sub_question: subQuestion?.question ?? '',
+            original_user_message: userMessage ?? '',
+            time_range: timeRange ?? null,
+            proposed_plan: analysisPlan
+          };
+
+          const correctorSystem = 'You are a strict analysis-plan verifier and fixer. You only return valid JSON. You must ensure user scoping and correctness. If the plan is good, keep it. If not, correct it.';
+          const correctorUser = `Return ONLY JSON with this shape:\n{\n  "confidence": number,\n  "verdict": "use_original" | "use_corrected" | "needs_revision",\n  "issues": string[],\n  "corrected_plan": { /* same schema as planner output */ } | null\n}\n\nValidation rules:\n- Plan MUST include user isolation (filters with eq_auth_uid or WHERE user_id = $1).\n- For percentage or ratio questions (sql_calculation), ensure subset filters reflect the intent (e.g., emotions json keys via json_key_gte, themes, or entities filters).\n- Prefer filters in structured form over raw SQL.\n- Add created_at gte/lte filters if time_range is provided and relevant.\n- Use vector_search only for semantic examples, not for counts.\n- Keep output concise; no markdown.\n\nHere is the context and plan to validate:\n${JSON.stringify(correctorInput)}`;
+
+          const response = await fetch('https://api.openai.com/v1/chat/completions', {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${openaiApiKey}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              model: 'gpt-4.1-mini-2025-04-14',
+              messages: [
+                { role: 'system', content: correctorSystem },
+                { role: 'user', content: correctorUser }
+              ],
+              response_format: { type: 'json_object' },
+              max_tokens: 600
+            }),
+          });
+
+          let correction: any = null;
+          if (response.ok) {
+            const data = await response.json();
+            const content = data?.choices?.[0]?.message?.content || '{}';
+            try { correction = JSON.parse(content); } catch { correction = null; }
+          } else {
+            const errText = await response.text();
+            console.warn('[Corrector] OpenAI error for sub-question', index, errText);
+          }
+
+          let finalPlan = analysisPlan;
+          if (correction && typeof correction === 'object') {
+            const conf = Number(correction.confidence ?? 0);
+            const verdict = String(correction.verdict || '').toLowerCase();
+            if (conf >= 0.9 && verdict !== 'needs_revision' && correction.corrected_plan) {
+              finalPlan = correction.corrected_plan;
+            }
+          }
+
+          return { subQuestion, analysisPlan: finalPlan, index, correctionMeta: correction, originalPlan: analysisPlan };
+        } catch (e) {
+          console.warn('[Corrector] Exception, using original plan for sub-question', index, e);
+          return { subQuestion, analysisPlan, index, correctionMeta: null, originalPlan: analysisPlan };
+        }
+      })
+    );
 
     // Execute the planned analyses (dynamic SQL via query builder + minimal vector RPCs)
     const analysisResults = await Promise.all(
-      analysisPlans.map(async ({ subQuestion, analysisPlan, index }) => {
+      correctedPlans.map(async ({ subQuestion, analysisPlan, index, correctionMeta, originalPlan }) => {
         const results: any = {
           subQuestion,
           analysisPlan,
