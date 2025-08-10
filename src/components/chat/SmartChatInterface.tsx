@@ -79,10 +79,19 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({
   const loadedThreadRef = useRef<string | null>(null);
   const debugLog = useDebugLog();
   
-  // Use props for thread ID if available, otherwise manage locally
+  // Local thread state and current id
   const [localThreadId, setLocalThreadId] = useState<string | null>(null);
+  
+  // Track latest active thread id for guarding async UI updates
+  const currentThreadIdRef = useRef<string | null>(null);
+  
+  // Use props for thread ID if available, otherwise manage locally
   const currentThreadId = propsThreadId ?? localThreadId;
   const effectiveUserId = propsUserId ?? user?.id;
+  
+  useEffect(() => {
+    currentThreadIdRef.current = currentThreadId || null;
+  }, [currentThreadId]);
   
   // Track active thread for safety manager
   useEffect(() => {
@@ -620,7 +629,9 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({
               isInteractive: true,
               interactiveOptions: response.interactiveOptions
             };
-            setChatHistory(prev => [...prev, typedSavedResponse]);
+            if (threadId === currentThreadIdRef.current) {
+              setChatHistory(prev => [...prev, typedSavedResponse]);
+            }
           } else {
             throw new Error("Failed to save interactive message");
           }
@@ -638,7 +649,9 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({
             interactiveOptions: response.interactiveOptions
           };
           
-          setChatHistory(prev => [...prev, interactiveMessage]);
+          if (threadId === currentThreadIdRef.current) {
+            setChatHistory(prev => [...prev, interactiveMessage]);
+          }
         }
       } else {
         const responseInfo = {
@@ -672,7 +685,9 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({
               sender: savedResponse.sender as 'user' | 'assistant' | 'error',
               role: savedResponse.role as 'user' | 'assistant' | 'error'
             };
-            setChatHistory(prev => [...prev, typedSavedResponse]);
+            if (threadId === currentThreadIdRef.current) {
+              setChatHistory(prev => [...prev, typedSavedResponse]);
+            }
           } else {
             throw new Error("Failed to save assistant response");
           }
@@ -690,8 +705,10 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({
             has_numeric_result: response.hasNumericResult
           };
           
-          debugLog.addEvent("UI Update", "Adding fallback temporary assistant response to chat history", "warning");
-          setChatHistory(prev => [...prev, assistantMessage]);
+          if (threadId === currentThreadIdRef.current) {
+            debugLog.addEvent("UI Update", "Adding fallback temporary assistant response to chat history", "warning");
+            setChatHistory(prev => [...prev, assistantMessage]);
+          }
           
           toast({
             title: "Warning",
@@ -727,7 +744,9 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({
             sender: 'assistant',
             role: 'assistant'
           };
-          setChatHistory(prev => [...prev, typedErrorMessage]);
+          if (threadId === currentThreadIdRef.current) {
+            setChatHistory(prev => [...prev, typedErrorMessage]);
+          }
         } else {
           const errorMessage: ChatMessage = {
             id: `error-${Date.now()}`,
@@ -739,7 +758,9 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({
           };
           
           debugLog.addEvent("UI Update", "Adding fallback error message to chat history", "warning");
-          setChatHistory(prev => [...prev, errorMessage]);
+          if (threadId === currentThreadIdRef.current) {
+            setChatHistory(prev => [...prev, errorMessage]);
+          }
         }
         
         debugLog.addEvent("Error Handling", "Error message saved to database", "success");
@@ -756,12 +777,16 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({
         };
         
         debugLog.addEvent("UI Update", "Adding last-resort error message to chat history", "warning");
-        setChatHistory(prev => [...prev, errorMessage]);
+        if (threadId === currentThreadIdRef.current) {
+          setChatHistory(prev => [...prev, errorMessage]);
+        }
       }
     } finally {
-      // Clear local loading state - the realtime hook will handle the final state
-      setLocalLoading(false);
-      updateProcessingStage(null);
+      // Clear local loading state - only if still on originating thread
+      if (threadId === currentThreadIdRef.current) {
+        setLocalLoading(false);
+        updateProcessingStage(null);
+      }
     }
   };
 
