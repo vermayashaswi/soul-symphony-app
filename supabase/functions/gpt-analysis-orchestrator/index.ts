@@ -359,7 +359,6 @@ Incoming timeRange (may be null): ${timeRange ? JSON.stringify(timeRange) : 'nul
                   console.log(`[SQL Calculation] subset/total/percentage:`, subset, totalNum, percentage);
                 }
               }
-            }
             } else if (sqlPlan.operation === 'count') {
               // Use the new dedicated count RPC for reliable counting
               const startDate = sqlPlan.filters?.find(f => f.column === 'created_at' && f.op === 'gte')?.value || null;
