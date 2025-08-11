@@ -1,6 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { JOURNAL_ENTRY_SCHEMA, THEMES_MASTER_TABLE, EMOTIONS_MASTER_TABLE } from "../_shared/databaseSchemaContext.ts";
+import { generateDatabaseSchemaContext } from "../_shared/databaseSchemaContext.ts";
 
 const apiKey = Deno.env.get('OPENAI_API_KEY');
 if (!apiKey) {
@@ -17,40 +17,7 @@ const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
 const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-// Enhanced database context with complete master tables
-const DATABASE_SCHEMA_CONTEXT = `
-**COMPLETE DATABASE SCHEMA FOR ANALYST AGENT:**
-
-**Journal Entries Table Structure:**
-${Object.entries(JOURNAL_ENTRY_SCHEMA.columns).map(([column, info]) => 
-  `- ${column} (${info.type}): ${info.description}${info.example ? `\n  Example: ${JSON.stringify(info.example)}` : ''}`
-).join('\n')}
-
-**THEMES MASTER TABLE (Complete Reference):**
-${THEMES_MASTER_TABLE.map(theme => 
-  `- ID: ${theme.id}, Name: "${theme.name}", Description: "${theme.description}"`
-).join('\n')}
-
-**EMOTIONS MASTER TABLE (Complete Reference):**
-${EMOTIONS_MASTER_TABLE.map(emotion => 
-  `- ID: ${emotion.id}, Name: "${emotion.name}", Description: "${emotion.description}"`
-).join('\n')}
-
-**IMPORTANT ANALYSIS CAPABILITIES:**
-- Use ONLY standard SQL queries (no PostgreSQL RPC functions)
-- Leverage themeemotion column for theme-emotion correlation analysis
-- Use emotions column for emotion-based filtering and analysis
-- Use master_themes array for categorical grouping
-- Apply user_id filtering for data isolation (MANDATORY)
-- Use created_at for temporal analysis and date filtering
-- Vector search available via separate embedding system
-
-**QUERY GENERATION RULES:**
-- All SQL queries MUST include WHERE user_id = $user_id for security
-- Use parameterized queries with proper escaping
-- Prefer structured filters over complex raw SQL when possible
-- Generate step-by-step analysis plans with specific queries
-`;
+// Dynamic database context - will be populated with live data
 
 /**
  * Enhanced JSON extraction with better error handling
@@ -186,9 +153,12 @@ async function analyzeQueryWithSubQuestions(message: string, conversationContext
     
     console.log(`[Analyst Agent] Personal pronouns: ${hasPersonalPronouns}, Time reference: ${hasExplicitTimeReference}`);
 
+    // Get live database schema with real themes and emotions
+    const databaseSchemaContext = await generateDatabaseSchemaContext(supabase);
+
     const prompt = `You are SOULo's Analyst Agent - an intelligent query planning specialist for journal data analysis. Your role is to break down user queries into comprehensive, actionable analysis plans.
 
-${DATABASE_SCHEMA_CONTEXT}
+${databaseSchemaContext}
 
 **CURRENT CONTEXT:**
 - Today's date: ${new Date().toISOString()}
@@ -297,104 +267,92 @@ Focus on creating comprehensive, executable analysis plans that will provide mea
   }
 }
 
-// Execute a validated plan safely without raw SQL
+// Execute a validated plan with complete SQL freedom
 async function executeValidatedPlan(validatedPlan: any, userId: string, normalizedTimeRange: { start?: string | null; end?: string | null } | null, supabaseClient: any) {
   const results: any[] = [];
 
-  // Helper to derive a usable time range
-  const deriveTimeRange = (sqlText?: string) => {
-    if (normalizedTimeRange && (normalizedTimeRange.start || normalizedTimeRange.end)) {
-      return {
-        start: normalizedTimeRange.start ? new Date(normalizedTimeRange.start) : null,
-        end: normalizedTimeRange.end ? new Date(normalizedTimeRange.end) : null,
-      };
-    }
-    const text = (sqlText || '').toLowerCase();
-    // Detect "last week" pattern
-    if (text.includes("date_trunc('week', now() - interval '1 week')") || text.includes("last week")) {
-      const { start, end } = getLastWeekRangeUTC();
-      return { start, end };
-    }
-    return { start: null as Date | null, end: null as Date | null };
-  };
+  console.log(`[executeValidatedPlan] Processing ${validatedPlan.subQuestions?.length || 0} sub-questions`);
 
-  for (const step of (validatedPlan.executionSteps || [])) {
-    try {
-      if (step.type === 'vector_search') {
-        // Not executing vector search here to avoid embeddings; keep pipeline stable
-        results.push({ stepId: step.stepId, type: 'vector_search', skipped: true, reason: 'Vector search not executed in planner' });
-        continue;
-      }
+  for (const subQuestion of (validatedPlan.subQuestions || [])) {
+    console.log(`[executeValidatedPlan] Processing sub-question: ${subQuestion.question}`);
+    
+    for (const step of (subQuestion.analysisSteps || [])) {
+      try {
+        console.log(`[executeValidatedPlan] Executing step ${step.step}: ${step.description}`);
+        
+        if (step.queryType === 'vector_search') {
+          // Skip vector search to maintain pipeline stability
+          results.push({ 
+            stepId: `${subQuestion.question}_${step.step}`, 
+            type: 'vector_search', 
+            skipped: true, 
+            reason: 'Vector search not executed in planner' 
+          });
+          continue;
+        }
 
-      if (step.type === 'sql_query') {
-        const sql = String(step.sql?.query || '');
-        const { start, end } = deriveTimeRange(sql);
+        if (step.queryType === 'sql_analysis' || step.queryType === 'sql_calculation' || step.queryType === 'sql_count') {
+          const sqlQuery = step.sqlQuery;
+          
+          if (!sqlQuery) {
+            results.push({ 
+              stepId: `${subQuestion.question}_${step.step}`, 
+              type: 'sql_query', 
+              error: 'No SQL query provided' 
+            });
+            continue;
+          }
 
-        // Pattern 1: Average top emotions within time window (maps to RPC)
-        if (/jsonb_each_text\(emotions\)/i.test(sql) && /avg/i.test(sql)) {
-          const { data, error } = await supabaseClient.rpc('get_top_emotions_with_entries', {
-            user_id_param: userId,
-            start_date: start ? start.toISOString() : null,
-            end_date: end ? end.toISOString() : null,
-            limit_count: 5,
+          console.log(`[executeValidatedPlan] Executing SQL: ${sqlQuery.substring(0, 100)}...`);
+
+          // Execute the SQL query using the dynamic query executor
+          const { data, error } = await supabaseClient.rpc('execute_dynamic_query', {
+            query_text: sqlQuery.replace('$user_id', `'${userId}'`)
           });
 
           if (error) {
-            results.push({ stepId: step.stepId, type: 'sql_query', error: error.message });
+            console.error(`[executeValidatedPlan] SQL execution error:`, error);
+            results.push({ 
+              stepId: `${subQuestion.question}_${step.step}`, 
+              type: 'sql_query', 
+              error: error.message,
+              sql: sqlQuery
+            });
           } else {
-            results.push({ stepId: step.stepId, type: 'sql_query', rows: data });
+            console.log(`[executeValidatedPlan] SQL success, rows: ${data?.data?.length || 0}`);
+            results.push({ 
+              stepId: `${subQuestion.question}_${step.step}`, 
+              type: 'sql_query', 
+              success: true,
+              rows: data?.data || [],
+              sql: sqlQuery,
+              subQuestion: subQuestion.question,
+              description: step.description
+            });
           }
           continue;
         }
 
-        // Pattern 2: Frequency of emotions above threshold within time window (client-side aggregation)
-        if (/jsonb_each_text\(emotions\)/i.test(sql) && /count\(\*\)/i.test(sql)) {
-          const thresholdMatch = sql.match(/score\s*>\s*(0?\.\d+)/i);
-          const threshold = thresholdMatch ? parseFloat(thresholdMatch[1]) : 0.2;
-
-          let query = supabaseClient
-            .from('Journal Entries')
-            .select('id, created_at, emotions');
-
-          query = query.eq('user_id', userId);
-          if (start) query = query.gte('created_at', start.toISOString());
-          if (end) query = query.lt('created_at', end.toISOString());
-
-          const { data, error } = await query.limit(1000);
-          if (error) {
-            results.push({ stepId: step.stepId, type: 'sql_query', error: error.message });
-          } else {
-            const counts: Record<string, number> = {};
-            for (const row of data || []) {
-              const emo = row.emotions || {};
-              for (const [k, v] of Object.entries(emo)) {
-                const val = typeof v === 'string' ? parseFloat(v as string) : (v as number);
-                if (!isNaN(val) && val > threshold) {
-                  counts[k] = (counts[k] || 0) + 1;
-                }
-              }
-            }
-            const rows = Object.entries(counts)
-              .map(([emotion, count]) => ({ emotion, count }))
-              .sort((a, b) => b.count - a.count)
-              .slice(0, 5);
-            results.push({ stepId: step.stepId, type: 'sql_query', rows });
-          }
-          continue;
-        }
-
-        // Default: do not execute arbitrary SQL; return a safe notice
-        results.push({ stepId: step.stepId, type: 'sql_query', skipped: true, reason: 'Raw SQL not executed; pattern not recognized' });
-        continue;
+        // Unknown step type
+        results.push({ 
+          stepId: `${subQuestion.question}_${step.step}`, 
+          type: step.queryType, 
+          skipped: true, 
+          reason: 'Unknown step type' 
+        });
+        
+      } catch (e) {
+        console.error(`[executeValidatedPlan] Step execution error:`, e);
+        results.push({ 
+          stepId: `${subQuestion.question}_${step.step}`, 
+          type: step.queryType, 
+          error: (e as Error).message 
+        });
       }
-
-      // Unknown step type
-      results.push({ stepId: step.stepId, type: step.type, skipped: true, reason: 'Unknown step type' });
-    } catch (e) {
-      results.push({ stepId: step.stepId, type: step.type, error: (e as Error).message });
     }
   }
 
+  console.log(`[executeValidatedPlan] Completed execution with ${results.length} results`);
   return { steps: results };
 }
 
