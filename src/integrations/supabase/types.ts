@@ -21,6 +21,7 @@ export type Database = {
           created_at: string
           has_numeric_result: boolean | null
           id: string
+          idempotency_key: string | null
           reference_entries: Json | null
           role: string | null
           sender: string
@@ -36,6 +37,7 @@ export type Database = {
           created_at?: string
           has_numeric_result?: boolean | null
           id?: string
+          idempotency_key?: string | null
           reference_entries?: Json | null
           role?: string | null
           sender: string
@@ -51,6 +53,7 @@ export type Database = {
           created_at?: string
           has_numeric_result?: boolean | null
           id?: string
+          idempotency_key?: string | null
           reference_entries?: Json | null
           role?: string | null
           sender?: string
