@@ -17,7 +17,41 @@ const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
 const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-// Dynamic database context - will be populated with live data
+/**
+ * Generate embedding for text using OpenAI API
+ */
+async function generateEmbedding(text: string): Promise<number[]> {
+  try {
+    const response = await fetch('https://api.openai.com/v1/embeddings', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: 'text-embedding-3-small',
+        input: text,
+        encoding_format: 'float'
+      }),
+    });
+
+    if (!response.ok) {
+      const error = await response.text();
+      console.error('Failed to generate embedding:', error);
+      throw new Error('Could not generate embedding for the text');
+    }
+
+    const embeddingData = await response.json();
+    if (!embeddingData.data || embeddingData.data.length === 0) {
+      throw new Error('Empty embedding data received from OpenAI');
+    }
+
+    return embeddingData.data[0].embedding;
+  } catch (error) {
+    console.error('Error generating embedding:', error);
+    throw error;
+  }
+}
 
 /**
  * Enhanced JSON extraction with better error handling
@@ -79,7 +113,12 @@ function createFallbackPlan(originalMessage: string): any {
       {
         step: 1,
         description: "Retrieve relevant journal entries using semantic search",
-        queryType: "vector_search"
+        queryType: "vector_search",
+        vectorSearch: {
+          query: isEmotionQuery ? "emotions, feelings, mood" : "themes, insights, patterns",
+          threshold: 0.3,
+          limit: 10
+        }
       },
       {
         step: 2,
@@ -273,7 +312,7 @@ Focus on creating comprehensive, executable analysis plans that will provide mea
   }
 }
 
-// Execute a validated plan with complete SQL freedom
+// Execute a validated plan with proper SQL and vector search execution
 async function executeValidatedPlan(validatedPlan: any, userId: string, normalizedTimeRange: { start?: string | null; end?: string | null } | null, supabaseClient: any) {
   const results: any[] = [];
 
@@ -283,36 +322,43 @@ async function executeValidatedPlan(validatedPlan: any, userId: string, normaliz
 
   console.log(`[executeValidatedPlan] Processing ${stepsToProcess.length} sub-questions/steps`);
 
-  for (const subQuestion of stepsToProcess) {
+  // Execute all sub-questions asynchronously for better performance
+  const subQuestionPromises = stepsToProcess.map(async (subQuestion, index) => {
     console.log(`[executeValidatedPlan] Processing sub-question: ${subQuestion.question}`);
     
-    for (const step of (subQuestion.analysisSteps || [])) {
+    const stepResults: any[] = [];
+    
+    // Execute all steps within this sub-question asynchronously
+    const stepPromises = (subQuestion.analysisSteps || []).map(async (step, stepIndex) => {
       try {
         console.log(`[executeValidatedPlan] Executing step ${step.step}: ${step.description}`);
         
         if (step.queryType === 'vector_search') {
-          // Execute vector search using proper parameters
+          // Execute vector search with proper embedding generation
           if (step.vectorSearch) {
             console.log(`[executeValidatedPlan] Executing vector search: ${step.vectorSearch.query}`);
             
             try {
+              // Generate embedding for the search query
+              const queryEmbedding = await generateEmbedding(step.vectorSearch.query);
+              
               // Call the vector search function with proper parameters
               const { data: vectorData, error: vectorError } = await supabaseClient.rpc('match_journal_entries', {
-                query_embedding: [], // This would need to be generated from the search query
+                query_embedding: queryEmbedding,
                 match_threshold: step.vectorSearch.threshold || 0.3,
                 match_count: step.vectorSearch.limit || 10,
                 user_id_filter: userId
               });
               
               if (vectorError) {
-                results.push({ 
+                return { 
                   stepId: `${subQuestion.question}_${step.step}`, 
                   type: 'vector_search', 
                   error: vectorError.message,
                   query: step.vectorSearch.query
-                });
+                };
               } else {
-                results.push({ 
+                return { 
                   stepId: `${subQuestion.question}_${step.step}`, 
                   type: 'vector_search', 
                   success: true,
@@ -320,57 +366,55 @@ async function executeValidatedPlan(validatedPlan: any, userId: string, normaliz
                   query: step.vectorSearch.query,
                   subQuestion: subQuestion.question,
                   description: step.description
-                });
+                };
               }
             } catch (vectorErr) {
-              results.push({ 
+              return { 
                 stepId: `${subQuestion.question}_${step.step}`, 
                 type: 'vector_search', 
                 error: (vectorErr as Error).message,
                 query: step.vectorSearch.query
-              });
+              };
             }
           } else {
-            results.push({ 
+            return { 
               stepId: `${subQuestion.question}_${step.step}`, 
               type: 'vector_search', 
               skipped: true, 
               reason: 'No vector search parameters provided' 
-            });
+            };
           }
-          continue;
         }
 
         if (step.queryType === 'sql_analysis' || step.queryType === 'sql_calculation' || step.queryType === 'sql_count') {
           const sqlQuery = step.sqlQuery;
           
           if (!sqlQuery) {
-            results.push({ 
+            return { 
               stepId: `${subQuestion.question}_${step.step}`, 
               type: 'sql_query', 
               error: 'No SQL query provided' 
-            });
-            continue;
+            };
           }
 
           console.log(`[executeValidatedPlan] Executing SQL: ${sqlQuery.substring(0, 100)}...`);
 
-          // Execute the SQL query using the dynamic query executor
+          // Execute the SQL query with proper parameter binding
           const { data, error } = await supabaseClient.rpc('execute_dynamic_query', {
-            query_text: sqlQuery.replace('$user_id', `'${userId}'`)
+            query_text: sqlQuery.replace(/\$user_id/g, `'${userId}'`)
           });
 
           if (error) {
             console.error(`[executeValidatedPlan] SQL execution error:`, error);
-            results.push({ 
+            return { 
               stepId: `${subQuestion.question}_${step.step}`, 
               type: 'sql_query', 
               error: error.message,
               sql: sqlQuery
-            });
+            };
           } else {
             console.log(`[executeValidatedPlan] SQL success, rows: ${data?.data?.length || 0}`);
-            results.push({ 
+            return { 
               stepId: `${subQuestion.question}_${step.step}`, 
               type: 'sql_query', 
               success: true,
@@ -378,29 +422,39 @@ async function executeValidatedPlan(validatedPlan: any, userId: string, normaliz
               sql: sqlQuery,
               subQuestion: subQuestion.question,
               description: step.description
-            });
+            };
           }
-          continue;
         }
 
         // Unknown step type
-        results.push({ 
+        return { 
           stepId: `${subQuestion.question}_${step.step}`, 
           type: step.queryType, 
           skipped: true, 
           reason: 'Unknown step type' 
-        });
+        };
         
       } catch (e) {
         console.error(`[executeValidatedPlan] Step execution error:`, e);
-        results.push({ 
+        return { 
           stepId: `${subQuestion.question}_${step.step}`, 
           type: step.queryType, 
           error: (e as Error).message 
-        });
+        };
       }
-    }
-  }
+    });
+
+    // Wait for all steps in this sub-question to complete
+    const stepResults_resolved = await Promise.all(stepPromises);
+    return stepResults_resolved;
+  });
+
+  // Wait for all sub-questions to complete
+  const allResults = await Promise.all(subQuestionPromises);
+  
+  // Flatten the results
+  const flattenedResults = allResults.flat();
+  results.push(...flattenedResults);
 
   console.log(`[executeValidatedPlan] Completed execution with ${results.length} results`);
   return { steps: results };
@@ -442,122 +496,55 @@ serve(async (req) => {
     const userEntryCount = countData || 0;
 
     // Generate comprehensive analysis plan
-    const analysisPlan = await analyzeQueryWithSubQuestions(message, conversationContext, userEntryCount);
-
-    // Optionally execute the plan (Researcher Agent removed; direct execution)
-    let researchResults = null as any;
-    if (execute && analysisPlan?.subQuestions?.length) {
-      // Normalize time range
-      const normalizedTimeRange = (() => {
-        const tr = analysisPlan?.timeRange || analysisPlan?.dateRange || timeRange || null;
-        if (!tr) return null;
-        const start = tr.start ?? tr.startDate ?? null;
-        const end = tr.end ?? tr.endDate ?? null;
-        return (start || end) ? { start, end } : null;
-      })();
-
-      // Execute all sub-questions asynchronously for better performance
-      researchResults = await Promise.all(
-        analysisPlan.subQuestions.map(async (subQuestion: any, index: number) => {
-          try {
-            const executionSteps: any[] = [];
-            // Map analysisSteps to executionSteps
-            for (const step of (subQuestion.analysisSteps || [])) {
-              if (step.queryType?.includes('sql') && step.sqlQuery) {
-                // Ensure parameter placeholder and user filter
-                let sqlText = String(step.sqlQuery);
-                sqlText = sqlText.replace(/\$user_id/g, '$1');
-                if (!/WHERE\s+[^;]*user_id\s*=\s*\$1/i.test(sqlText)) {
-                  // Naively inject user filter if missing
-                  const whereMatch = sqlText.match(/\bWHERE\b/i);
-                  if (whereMatch) {
-                    sqlText = sqlText.replace(/\bWHERE\b/i, 'WHERE user_id = $1 AND ');
-                  } else {
-                    // Insert WHERE before ORDER/LIMIT/; if possible
-                    const insertIndex = sqlText.search(/\bORDER BY\b|\bLIMIT\b|;|$/i);
-                    sqlText = `${sqlText.slice(0, insertIndex)} WHERE user_id = $1 ${sqlText.slice(insertIndex)}`;
-                  }
-                }
-                executionSteps.push({
-                  stepId: executionSteps.length + 1,
-                  type: 'sql_query',
-                  description: step.description || 'SQL analysis',
-                  sql: {
-                    query: sqlText,
-                    parameters: ['$user_id'],
-                    purpose: step.description || 'analysis'
-                  },
-                  vector: null
-                });
-              } else if (step.queryType === 'vector_search' && step.vectorSearch) {
-                executionSteps.push({
-                  stepId: executionSteps.length + 1,
-                  type: 'vector_search',
-                  description: step.description || 'Vector search',
-                  sql: null,
-                  vector: {
-                    queryText: step.vectorSearch.query,
-                    threshold: step.vectorSearch.threshold ?? 0.3,
-                    limit: step.vectorSearch.limit ?? 10,
-                    dateFilter: Boolean(normalizedTimeRange)
-                  }
-                });
-              }
-            }
-
-            const validatedPlan = {
-              subQuestions: [{
-                question: subQuestion.question,
-                searchStrategy: subQuestion.searchStrategy || 'hybrid',
-                analysisSteps: subQuestion.analysisSteps || []
-              }]
-            };
-
-            const executionResults = await executeValidatedPlan(validatedPlan, userId, normalizedTimeRange, supabase);
-
-            return {
-              subQuestion,
-              researcherOutput: { validatedPlan, confidence: analysisPlan.confidence ?? 0.8, validationIssues: [], enhancements: [] },
-              executionResults,
-              index
-            };
-          } catch (err) {
-            console.error('[smart-query-planner] Execution error:', err);
-            return {
-              subQuestion,
-              researcherOutput: null,
-              executionResults: { error: err.message },
-              index
-            };
-          }
-        })
-      );
-    }
+    const analysisResult = await analyzeQueryWithSubQuestions(message, conversationContext, userEntryCount);
     
+    if (!execute) {
+      // Return just the plan without execution
+      return new Response(JSON.stringify({
+        success: true,
+        queryPlan: analysisResult,
+        userEntryCount
+      }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    // Execute the analysis plan
+    let normalizedTimeRange = null;
+    if (timeRange) {
+      if (timeRange.type === 'last_week') {
+        const range = getLastWeekRangeUTC();
+        normalizedTimeRange = {
+          start: range.start.toISOString(),
+          end: range.end.toISOString()
+        };
+      } else if (timeRange.start || timeRange.end) {
+        normalizedTimeRange = {
+          start: timeRange.start || null,
+          end: timeRange.end || null
+        };
+      }
+    }
+
+    const executionResult = await executeValidatedPlan(analysisResult, userId, normalizedTimeRange, supabase);
+
     return new Response(JSON.stringify({
       success: true,
-      queryPlan: analysisPlan,
+      queryPlan: analysisResult,
+      researchResults: executionResult.steps,
       userEntryCount,
-      researchResults: researchResults || undefined,
-      analysisResults: researchResults || undefined,
-      metadata: {
-        plannerVersion: "analyst_agent_v2",
-        timestamp: new Date().toISOString(),
-        hasSubQuestions: Boolean(analysisPlan.subQuestions?.length),
-        searchStrategies: analysisPlan.subQuestions?.map((sq: any) => sq.searchStrategy) || [],
-        processedSubQuestions: researchResults?.length || 0,
-        hasErrors: Array.isArray(researchResults) ? researchResults.some((r: any) => r.executionResults?.error) : false
-      }
+      timeRange: normalizedTimeRange
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
 
   } catch (error) {
-    console.error('Error in Smart Query Planner:', error);
-    return new Response(JSON.stringify({ 
-      success: false, 
+    console.error('Smart Query Planner error:', error);
+    
+    return new Response(JSON.stringify({
+      success: false,
       error: error.message,
-      fallbackPlan: createFallbackPlan("general analysis")
+      fallback: true
     }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },

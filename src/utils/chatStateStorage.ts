@@ -1,6 +1,6 @@
-// Chat state persistence utilities
+// Enhanced chat state storage with background handling
+
 export interface ChatStreamingState {
-  threadId: string;
   isStreaming: boolean;
   streamingMessages: any[];
   currentUserMessage: string;
@@ -9,118 +9,88 @@ export interface ChatStreamingState {
   currentMessageIndex: number;
   useThreeDotFallback: boolean;
   queryCategory: string;
-  timestamp: number;
-  expectedProcessingTime?: number;
-  processingStartTime?: number;
+  expectedProcessingTime: number | null;
+  processingStartTime: number | null;
+  activeRequestId?: string | null;
+  pausedDueToBackground?: boolean;
 }
 
-export interface PersistedChatState {
-  [threadId: string]: ChatStreamingState;
-}
+const CHAT_STATE_PREFIX = 'chat_streaming_state_';
+const STATE_EXPIRY_MS = 5 * 60 * 1000; // 5 minutes
 
-const CHAT_STATE_KEY = 'soulo_chat_streaming_states';
-const STATE_EXPIRY_MS = 10 * 60 * 1000; // 10 minutes
-
-export const saveChatStreamingState = (threadId: string, state: Omit<ChatStreamingState, 'threadId' | 'timestamp'>) => {
+export const saveChatStreamingState = (threadId: string, state: ChatStreamingState): void => {
   try {
-    const existingStates = getChatStreamingStates();
-    const chatState: ChatStreamingState = {
+    const stateWithTimestamp = {
       ...state,
-      threadId,
-      timestamp: Date.now()
+      savedAt: Date.now()
     };
-    
-    existingStates[threadId] = chatState;
-    localStorage.setItem(CHAT_STATE_KEY, JSON.stringify(existingStates));
-    
-    console.log('[ChatStateStorage] Saved streaming state for thread:', threadId);
+    localStorage.setItem(`${CHAT_STATE_PREFIX}${threadId}`, JSON.stringify(stateWithTimestamp));
   } catch (error) {
-    console.error('[ChatStateStorage] Failed to save streaming state:', error);
+    console.warn('Failed to save chat streaming state:', error);
   }
 };
 
 export const getChatStreamingState = (threadId: string): ChatStreamingState | null => {
   try {
-    const states = getChatStreamingStates();
-    const state = states[threadId];
+    const stored = localStorage.getItem(`${CHAT_STATE_PREFIX}${threadId}`);
+    if (!stored) return null;
     
-    if (!state) return null;
+    const parsed = JSON.parse(stored);
     
-    // Check if state is expired (absolute cap)
-    const now = Date.now();
-    if (now - state.timestamp > STATE_EXPIRY_MS) {
+    // Check if state is expired
+    if (parsed.savedAt && (Date.now() - parsed.savedAt) > STATE_EXPIRY_MS) {
       clearChatStreamingState(threadId);
       return null;
     }
-
-    // Additional guard: if a streaming session exceeded its expected time by a grace period, treat it as stale
-    if (state.isStreaming && state.processingStartTime) {
-      const expected = state.expectedProcessingTime ?? 0;
-      const graceMs = expected > 0 ? 2 * 60 * 1000 : 5 * 60 * 1000; // 2m if we had an ETA, else 5m fallback
-      if (expected > 0 && now - state.processingStartTime > expected + graceMs) {
-        clearChatStreamingState(threadId);
-        return null;
-      }
-      // If no expected time provided, still avoid restoring very old in-progress sessions
-      if (expected === 0 && now - state.processingStartTime > graceMs) {
-        clearChatStreamingState(threadId);
-        return null;
-      }
-    }
     
-    return state;
+    return parsed;
   } catch (error) {
-    console.error('[ChatStateStorage] Failed to get streaming state:', error);
+    console.warn('Failed to retrieve chat streaming state:', error);
     return null;
   }
 };
 
-export const clearChatStreamingState = (threadId: string) => {
+export const clearChatStreamingState = (threadId: string): void => {
   try {
-    const states = getChatStreamingStates();
-    delete states[threadId];
-    localStorage.setItem(CHAT_STATE_KEY, JSON.stringify(states));
-    
-    console.log('[ChatStateStorage] Cleared streaming state for thread:', threadId);
+    localStorage.removeItem(`${CHAT_STATE_PREFIX}${threadId}`);
   } catch (error) {
-    console.error('[ChatStateStorage] Failed to clear streaming state:', error);
+    console.warn('Failed to clear chat streaming state:', error);
   }
 };
 
-export const getChatStreamingStates = (): PersistedChatState => {
+export const clearAllChatStreamingStates = (): void => {
   try {
-    const stored = localStorage.getItem(CHAT_STATE_KEY);
-    if (!stored) return {};
+    const keys = Object.keys(localStorage).filter(key => key.startsWith(CHAT_STATE_PREFIX));
+    keys.forEach(key => localStorage.removeItem(key));
+  } catch (error) {
+    console.warn('Failed to clear all chat streaming states:', error);
+  }
+};
+
+// Auto-cleanup expired states
+export const cleanupExpiredChatStates = (): void => {
+  try {
+    const keys = Object.keys(localStorage).filter(key => key.startsWith(CHAT_STATE_PREFIX));
+    const now = Date.now();
     
-    const states = JSON.parse(stored) as PersistedChatState;
-    
-    // Clean up expired states
-    const currentTime = Date.now();
-    const cleanedStates: PersistedChatState = {};
-    
-    Object.entries(states).forEach(([threadId, state]) => {
-      if (currentTime - state.timestamp <= STATE_EXPIRY_MS) {
-        cleanedStates[threadId] = state;
+    keys.forEach(key => {
+      try {
+        const stored = localStorage.getItem(key);
+        if (stored) {
+          const parsed = JSON.parse(stored);
+          if (parsed.savedAt && (now - parsed.savedAt) > STATE_EXPIRY_MS) {
+            localStorage.removeItem(key);
+          }
+        }
+      } catch (error) {
+        // Invalid JSON, remove it
+        localStorage.removeItem(key);
       }
     });
-    
-    // Save cleaned states back
-    if (Object.keys(cleanedStates).length !== Object.keys(states).length) {
-      localStorage.setItem(CHAT_STATE_KEY, JSON.stringify(cleanedStates));
-    }
-    
-    return cleanedStates;
   } catch (error) {
-    console.error('[ChatStateStorage] Failed to get streaming states:', error);
-    return {};
+    console.warn('Failed to cleanup expired chat states:', error);
   }
 };
 
-export const clearAllExpiredStates = () => {
-  try {
-    getChatStreamingStates(); // This will automatically clean up expired states
-    console.log('[ChatStateStorage] Cleaned up expired streaming states');
-  } catch (error) {
-    console.error('[ChatStateStorage] Failed to clean up expired states:', error);
-  }
-};
+// Run cleanup on module load
+cleanupExpiredChatStates();
