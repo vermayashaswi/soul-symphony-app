@@ -80,7 +80,36 @@ async function gptClassifyMessage(
     ? `\nConversation context: ${conversationContext.slice(-6).map(msg => `${(msg.role || msg.sender || 'user')}: ${msg.content}`).join('\n')}`
     : '';
 
-  const classificationPrompt = `You are the conversation router and intent classifier for "Ruh by SOuLO" — a brilliantly witty, warm, non-judgmental mental health companion. Your job is to decide how the chat should proceed so the user experiences a fluid, 1-1 conversation with a wise, funny friend.\n\nUse the conversation history to understand what the user wants next and classify the latest user message. Be decisive and consistent.\n\nCategories:\n- JOURNAL_SPECIFIC: The user talks about their own feelings, patterns, triggers, behaviors, relationships, or wants insights about "me/my". Choose this when there is at least one analyzable detail (timeframe, trigger/event, behavior, symptom, metric, or explicit question).\n- JOURNAL_SPECIFIC_NEEDS_CLARIFICATION: The user is talking about themself but it's too vague to analyze (e.g., "I'm sad", "idk", "help"). Choose this when a single short clarifying question would unlock the next step.\n- GENERAL_MENTAL_HEALTH: General mental health info/skills/resources or light conversational turns not requiring personal analysis (greetings, thanks, small talk, meta questions about Ruh).\n- UNRELATED: Not about mental health/wellbeing/journaling; or purely factual/utility requests outside scope.\n\nDecisions:\n- useAllEntries:\n  - true when the personal request is holistic and no explicit timeframe is mentioned ("overall", "in general", "what do my entries say about me?").\n  - false when any timeframe is present or implied ("today", "yesterday", "last week", "this month", "last month", "recently").\n- timeScopeHint: one of "all" | "recent" | "last_week" | "this_month" | "last_month" | null.\n  - choose "recent" if the wording implies near-term without a clear window ("lately", "recently", "these days").\n  - choose "last_week" or "this_month" / "last_month" if clearly stated.\n  - null for GENERAL_MENTAL_HEALTH or UNRELATED.\n- recommendedPipeline:\n  - "rag_full" for JOURNAL_SPECIFIC with analyzable detail.\n  - "clarification" for JOURNAL_SPECIFIC_NEEDS_CLARIFICATION.\n  - "general" for GENERAL_MENTAL_HEALTH or UNRELATED.\n- clarifyingQuestion: Provide a single, friendly, specific question ONLY when category is JOURNAL_SPECIFIC_NEEDS_CLARIFICATION; otherwise null.\n- journalHintStrength: "high" for strong first-person self-reflection; "medium" when personal but less focused; "low" otherwise.\n\nOutput strictly as a single JSON object matching this schema (no code fences, no commentary):\n{\n  "category": "JOURNAL_SPECIFIC" | "JOURNAL_SPECIFIC_NEEDS_CLARIFICATION" | "GENERAL_MENTAL_HEALTH" | "UNRELATED",\n  "confidence": number,\n  "useAllEntries": boolean,\n  "reasoning": string,\n  "recommendedPipeline": "general" | "clarification" | "rag_full",\n  "clarifyingQuestion": string | null,\n  "journalHintStrength": "low" | "medium" | "high",\n  "timeScopeHint": "all" | "recent" | "last_week" | "this_month" | "last_month" | null\n}\n\nLatest user message: "${message}"${contextString}`;
+  const classificationPrompt = `You are the intent router for "Ruh by SOuLO". Use the conversation context to classify the latest user message and return ONE JSON object that exactly matches the schema. Be decisive and consistent.
+
+Categories (choose exactly one):
+- JOURNAL_SPECIFIC: First-person, analyzable questions about the user's own patterns/feelings/behaviors. Examples: "How have I felt this month?", "Did meditation help me?", "What are my stress patterns lately?".
+- JOURNAL_SPECIFIC_NEEDS_CLARIFICATION: Personal but too vague to analyze. Examples: "I'm sad", "Help", "How am I?". A single short follow-up question would unlock analysis.
+- GENERAL_MENTAL_HEALTH: General advice/skills/resources not about their own data. Examples: "How to manage anxiety?", "Tips for sleep".
+- UNRELATED: Small talk or off-topic. Examples: "Thanks", "Tell me more", "How are you?".
+
+Decisions:
+- useAllEntries: true if holistic with no explicit timeframe words ("overall", "in general", "what do my entries say about me?"); otherwise false when any timeframe appears or is implied ("today", "yesterday", "last week", "this month", "last month", "recently", "lately").
+- timeScopeHint: one of "all" | "recent" | "last_week" | "this_month" | "last_month" | null.
+  - "recent" for vague near-term ("recently", "lately", "these days").
+  - pick the exact window when stated; null for GENERAL_MENTAL_HEALTH or UNRELATED.
+- recommendedPipeline: "rag_full" for JOURNAL_SPECIFIC; "clarification" for JOURNAL_SPECIFIC_NEEDS_CLARIFICATION; "general" for GENERAL_MENTAL_HEALTH or UNRELATED.
+- clarifyingQuestion: Only for JOURNAL_SPECIFIC_NEEDS_CLARIFICATION; else null. Keep it one short, specific question.
+- journalHintStrength: "high" for clear first-person self-reflection; "medium" for personal but lighter focus; "low" otherwise.
+
+Output strictly a single JSON object (no code fences, no extra text) with this schema:
+{
+  "category": "JOURNAL_SPECIFIC" | "JOURNAL_SPECIFIC_NEEDS_CLARIFICATION" | "GENERAL_MENTAL_HEALTH" | "UNRELATED",
+  "confidence": number,
+  "useAllEntries": boolean,
+  "reasoning": string,
+  "recommendedPipeline": "general" | "clarification" | "rag_full",
+  "clarifyingQuestion": string | null,
+  "journalHintStrength": "low" | "medium" | "high",
+  "timeScopeHint": "all" | "recent" | "last_week" | "this_month" | "last_month" | null
+}
+
+Latest user message: "${message}"${contextString}`;
 
   try {
     const controller = new AbortController();
