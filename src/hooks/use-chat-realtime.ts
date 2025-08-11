@@ -18,6 +18,7 @@ interface ThreadRealtimeState {
   processingStage: string | null;
   processingStatus: ThreadProcessingStatus;
   subscription: any | null;
+  watchdogTimer?: ReturnType<typeof setTimeout> | null;
 }
 
 const createInitialRealtimeState = (): ThreadRealtimeState => ({
@@ -25,7 +26,8 @@ const createInitialRealtimeState = (): ThreadRealtimeState => ({
   isProcessing: false,
   processingStage: null,
   processingStatus: 'idle',
-  subscription: null
+  subscription: null,
+  watchdogTimer: null
 });
 
 // Global thread real-time state store
@@ -180,11 +182,34 @@ export function useChatRealtime(threadId: string | null) {
     if (!threadId) return;
     
     console.log(`[useChatRealtime] Setting loading state for thread ${threadId}:`, loading, stage);
+
+    // Clear existing watchdog timer
+    const current = getThreadRealtimeState(threadId);
+    if (current.watchdogTimer) {
+      clearTimeout(current.watchdogTimer);
+    }
+
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    if (loading) {
+      // Auto-reset after 75s to prevent stuck loaders
+      timer = setTimeout(() => {
+        console.warn(`[useChatRealtime] Watchdog timeout for thread: ${threadId}`);
+        updateThreadRealtimeState(threadId, {
+          isLoading: false,
+          isProcessing: false,
+          processingStatus: 'failed',
+          processingStage: null,
+          watchdogTimer: null
+        });
+      }, 75000);
+    }
+
     updateThreadRealtimeState(threadId, {
       isLoading: loading,
       isProcessing: loading,
       processingStatus: loading ? 'processing' : 'idle',
-      processingStage: loading ? (stage || 'Processing...') : null
+      processingStage: loading ? (stage || 'Processing...') : null,
+      watchdogTimer: timer
     });
   };
 

@@ -110,7 +110,8 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({
     showBackendAnimation,
     startStreamingChat,
     queryCategory,
-    restoreStreamingState
+    restoreStreamingState,
+    stopStreaming
   } = useStreamingChat({
       threadId: currentThreadId,
     onFinalResponse: async (response, analysis, originThreadId) => {
@@ -178,6 +179,9 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({
       }
     },
     onError: (error) => {
+      // Ensure UI never gets stuck on loader after errors
+      setLocalLoading(false);
+      updateProcessingStage(null);
       toast({
         title: "Error",
         description: error,
@@ -512,6 +516,10 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({
             threadMetadata: {}
           }
         );
+        
+        // Streaming owns the lifecycle; ensure local loader is cleared immediately
+        setLocalLoading(false);
+        updateProcessingStage(null);
         
         // Skip the rest since streaming handles the response
         return;
@@ -949,6 +957,20 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({
         <h2 className="text-xl font-semibold"><TranslatableText text="Rūḥ" /></h2>
         
         <div className="flex items-center gap-2">
+          {showLoadingForThisThread && currentThreadId && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                stopStreaming(currentThreadId);
+                setLocalLoading(false);
+                updateProcessingStage(null);
+              }}
+              aria-label="Cancel processing"
+            >
+              <TranslatableText text="Cancel" />
+            </Button>
+          )}
           {currentThreadId && (
             <TooltipProvider>
               <Tooltip>
