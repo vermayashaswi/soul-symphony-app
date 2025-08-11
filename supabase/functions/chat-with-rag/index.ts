@@ -157,7 +157,8 @@ serve(async (req) => {
       console.log('[chat-with-rag] EXECUTING: JOURNAL_SPECIFIC pipeline - full RAG processing');
       
       // Step 2: Use GPT-powered query planning via smart-query-planner
-      let enhancedQueryPlan;
+      let enhancedQueryPlan: any;
+      let plannerData: any = null;
       
       try {
         const { data: gptPlan, error: plannerError } = await supabaseClient.functions.invoke(
@@ -180,6 +181,7 @@ serve(async (req) => {
           throw new Error(`GPT planner error: ${plannerError.message}`);
         }
         
+        plannerData = gptPlan;
         enhancedQueryPlan = gptPlan.queryPlan;
         console.log('[chat-with-rag] Using GPT-generated query plan:', enhancedQueryPlan);
       } catch (error) {
@@ -194,7 +196,7 @@ serve(async (req) => {
       
       if (shouldUseGptAnalysis) {
         // Use researchResults returned by smart-query-planner (executed plan)
-        const researchResults = gptPlan.researchResults;
+        const researchResults = plannerData?.researchResults;
         if (!researchResults || !Array.isArray(researchResults)) {
           throw new Error('Analysis execution failed: missing researchResults');
         }

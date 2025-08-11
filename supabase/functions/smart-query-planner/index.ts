@@ -297,6 +297,119 @@ Focus on creating comprehensive, executable analysis plans that will provide mea
   }
 }
 
+// Execute a validated plan safely without raw SQL
+async function executeValidatedPlan(validatedPlan: any, userId: string, normalizedTimeRange: { start?: string | null; end?: string | null } | null, supabaseClient: any) {
+  const results: any[] = [];
+
+  // Helper to derive a usable time range
+  const deriveTimeRange = (sqlText?: string) => {
+    if (normalizedTimeRange && (normalizedTimeRange.start || normalizedTimeRange.end)) {
+      return {
+        start: normalizedTimeRange.start ? new Date(normalizedTimeRange.start) : null,
+        end: normalizedTimeRange.end ? new Date(normalizedTimeRange.end) : null,
+      };
+    }
+    const text = (sqlText || '').toLowerCase();
+    // Detect "last week" pattern
+    if (text.includes("date_trunc('week', now() - interval '1 week')") || text.includes("last week")) {
+      const { start, end } = getLastWeekRangeUTC();
+      return { start, end };
+    }
+    return { start: null as Date | null, end: null as Date | null };
+  };
+
+  for (const step of (validatedPlan.executionSteps || [])) {
+    try {
+      if (step.type === 'vector_search') {
+        // Not executing vector search here to avoid embeddings; keep pipeline stable
+        results.push({ stepId: step.stepId, type: 'vector_search', skipped: true, reason: 'Vector search not executed in planner' });
+        continue;
+      }
+
+      if (step.type === 'sql_query') {
+        const sql = String(step.sql?.query || '');
+        const { start, end } = deriveTimeRange(sql);
+
+        // Pattern 1: Average top emotions within time window (maps to RPC)
+        if (/jsonb_each_text\(emotions\)/i.test(sql) && /avg/i.test(sql)) {
+          const { data, error } = await supabaseClient.rpc('get_top_emotions_with_entries', {
+            user_id_param: userId,
+            start_date: start ? start.toISOString() : null,
+            end_date: end ? end.toISOString() : null,
+            limit_count: 5,
+          });
+
+          if (error) {
+            results.push({ stepId: step.stepId, type: 'sql_query', error: error.message });
+          } else {
+            results.push({ stepId: step.stepId, type: 'sql_query', rows: data });
+          }
+          continue;
+        }
+
+        // Pattern 2: Frequency of emotions above threshold within time window (client-side aggregation)
+        if (/jsonb_each_text\(emotions\)/i.test(sql) && /count\(\*\)/i.test(sql)) {
+          const thresholdMatch = sql.match(/score\s*>\s*(0?\.\d+)/i);
+          const threshold = thresholdMatch ? parseFloat(thresholdMatch[1]) : 0.2;
+
+          let query = supabaseClient
+            .from('Journal Entries')
+            .select('id, created_at, emotions');
+
+          query = query.eq('user_id', userId);
+          if (start) query = query.gte('created_at', start.toISOString());
+          if (end) query = query.lt('created_at', end.toISOString());
+
+          const { data, error } = await query.limit(1000);
+          if (error) {
+            results.push({ stepId: step.stepId, type: 'sql_query', error: error.message });
+          } else {
+            const counts: Record<string, number> = {};
+            for (const row of data || []) {
+              const emo = row.emotions || {};
+              for (const [k, v] of Object.entries(emo)) {
+                const val = typeof v === 'string' ? parseFloat(v as string) : (v as number);
+                if (!isNaN(val) && val > threshold) {
+                  counts[k] = (counts[k] || 0) + 1;
+                }
+              }
+            }
+            const rows = Object.entries(counts)
+              .map(([emotion, count]) => ({ emotion, count }))
+              .sort((a, b) => b.count - a.count)
+              .slice(0, 5);
+            results.push({ stepId: step.stepId, type: 'sql_query', rows });
+          }
+          continue;
+        }
+
+        // Default: do not execute arbitrary SQL; return a safe notice
+        results.push({ stepId: step.stepId, type: 'sql_query', skipped: true, reason: 'Raw SQL not executed; pattern not recognized' });
+        continue;
+      }
+
+      // Unknown step type
+      results.push({ stepId: step.stepId, type: step.type, skipped: true, reason: 'Unknown step type' });
+    } catch (e) {
+      results.push({ stepId: step.stepId, type: step.type, error: (e as Error).message });
+    }
+  }
+
+  return { steps: results };
+}
+
+function getLastWeekRangeUTC() {
+  const now = new Date();
+  const day = now.getUTCDay(); // 0 Sun .. 6 Sat
+  const daysSinceMonday = (day + 6) % 7; // Monday = 0
+  const startOfThisWeek = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+  startOfThisWeek.setUTCDate(startOfThisWeek.getUTCDate() - daysSinceMonday);
+  const start = new Date(startOfThisWeek);
+  start.setUTCDate(start.getUTCDate() - 7);
+  const end = startOfThisWeek; // exclusive
+  return { start, end };
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
