@@ -339,6 +339,44 @@ function sanitizeAndBindUserSql(sqlQuery: string, userId: string): { ok: true; s
 
 // Execute a validated plan with proper SQL and vector search execution
 async function executeValidatedPlan(validatedPlan: any, userId: string, normalizedTimeRange: { start?: string | null; end?: string | null } | null, supabaseClient: any) {
+  // Helpers
+  const extractThemeKeywords = (text: string | null | undefined): string[] => {
+    const src = (text || '').toLowerCase();
+    const familySet = new Set<string>(['family','mom','dad','mother','father','son','daughter','wife','husband','children','parents','siblings','sister','brother']);
+    const found = Array.from(familySet).filter(k => src.includes(k));
+    return found;
+  };
+
+  const getTotalCount = async (): Promise<number> => {
+    const { data: total } = await supabaseClient.rpc('get_journal_entry_count', {
+      user_id_filter: userId,
+      start_date: normalizedTimeRange?.start || null,
+      end_date: normalizedTimeRange?.end || null,
+    });
+    return (total as number) || 0;
+  };
+
+  const runFamilyThemeSql = async (): Promise<{ ids: number[]; count: number }> => {
+    let q = supabaseClient
+      .from('Journal Entries')
+      .select('id', { count: 'exact' })
+      .eq('user_id', userId);
+
+    if (normalizedTimeRange?.start) q = q.gte('created_at', normalizedTimeRange.start);
+    if (normalizedTimeRange?.end) q = q.lte('created_at', normalizedTimeRange.end);
+
+    // Master theme match on 'Family'
+    q = q.contains('master_themes', ['Family'])
+      .limit(1000);
+
+    const { data, count, error } = await q;
+    if (error) {
+      console.warn('[executeValidatedPlan] Safe SQL family query failed:', error.message);
+      return { ids: [], count: 0 };
+    }
+    return { ids: (data || []).map((r: any) => r.id), count: count || 0 };
+  };
+
   // Determine steps to process
   const stepsToProcess = validatedPlan.subQuestions || (validatedPlan.executionSteps ? [{ question: 'Analysis', purpose: 'Automated analysis', searchStrategy: 'hybrid', analysisSteps: validatedPlan.executionSteps }] : []);
   console.log(`[executeValidatedPlan] Processing ${stepsToProcess.length} sub-questions/steps`);
@@ -359,13 +397,11 @@ async function executeValidatedPlan(validatedPlan: any, userId: string, normaliz
               query_embedding: queryEmbedding,
               match_threshold: step.vectorSearch.threshold || 0.3,
               match_count: step.vectorSearch.limit || 10,
+              user_id_filter: userId,
             };
             if (useDated) {
-              rpcArgs.user_id_filter = userId;
               rpcArgs.start_date = normalizedTimeRange?.start || null;
               rpcArgs.end_date = normalizedTimeRange?.end || null;
-            } else {
-              rpcArgs.user_id_filter = userId;
             }
 
             const { data: vectorData, error: vectorError } = await supabaseClient.rpc(rpcName, rpcArgs);
@@ -378,18 +414,23 @@ async function executeValidatedPlan(validatedPlan: any, userId: string, normaliz
           }
         }
 
-        if ((step.queryType === 'sql_analysis' || step.queryType === 'sql_calculation' || step.queryType === 'sql_count') && step.sqlQuery) {
-          const check = sanitizeAndBindUserSql(step.sqlQuery, userId);
-          if (!check.ok) {
-            return { kind: 'sql', ok: false, error: check.error };
+        if ((step.queryType === 'sql_analysis' || step.queryType === 'sql_calculation' || step.queryType === 'sql_count')) {
+          // SAFE path: derive intent and execute known-safe SQL via query builder (no dynamic SQL)
+          const textForKeywords = `${step.sqlQuery || ''} ${step.description || ''} ${(step.vectorSearch?.query) || ''}`;
+          const kw = extractThemeKeywords(textForKeywords);
+
+          // Currently support family-oriented analysis safely
+          if (kw.some(k => k === 'family' || k === 'mom' || k === 'dad' || k === 'mother' || k === 'father' || k === 'wife' || k === 'husband' || k === 'children' || k === 'parents' || k === 'siblings' || k === 'sister' || k === 'brother')) {
+            const [{ ids, count }, totalCount] = await Promise.all([
+              runFamilyThemeSql(),
+              getTotalCount(),
+            ]);
+            const percentage = totalCount > 0 ? Math.round((count / totalCount) * 1000) / 10 : 0; // 1 decimal
+            return { kind: 'sql', ok: true, rows: [{ count, total_count: totalCount, percentage }], meta: { ids } };
           }
-          const { data, error } = await supabaseClient.rpc('execute_dynamic_query', { query_text: check.sql });
-          if (error) {
-            console.error('[executeValidatedPlan] SQL execution error:', error);
-            return { kind: 'sql', ok: false, error: error.message };
-          }
-          const rows = (data?.data || []) as any[];
-          return { kind: 'sql', ok: true, rows };
+
+          // Fallback: do not execute arbitrary SQL
+          return { kind: 'sql', ok: false, error: 'Unsafe or unsupported SQL step (dynamic SQL disabled).'};
         }
 
         return { kind: 'unknown', ok: false, error: 'Unknown or missing step configuration' };
@@ -401,10 +442,21 @@ async function executeValidatedPlan(validatedPlan: any, userId: string, normaliz
     const resolved = await Promise.all(stepPromises);
 
     // Aggregate results per sub-question
-    const sqlResults = resolved.filter(r => r.kind === 'sql' && r.ok && Array.isArray((r as any).rows))
-      .flatMap((r: any) => r.rows);
-    const vectorResults = resolved.filter(r => r.kind === 'vector' && r.ok && Array.isArray((r as any).entries))
-      .flatMap((r: any) => r.entries);
+    const sqlRows = resolved.filter(r => r.kind === 'sql' && r.ok && Array.isArray((r as any).rows)) as any[];
+    const vectorOk = resolved.filter(r => r.kind === 'vector' && r.ok && Array.isArray((r as any).entries)) as any[];
+
+    const sqlResults = sqlRows.flatMap(r => r.rows);
+    const vectorResults = vectorOk.flatMap(r => r.entries);
+
+    // Combined metrics (dedup by id when available)
+    const sqlIds = new Set<number>();
+    sqlRows.forEach(r => (r.meta?.ids || []).forEach((id: number) => sqlIds.add(id)));
+    const vectorIds = new Set<number>(vectorResults.map((e: any) => e.id));
+    const combinedIds = new Set<number>([...sqlIds, ...vectorIds]);
+
+    let totalCount = 0;
+    try { totalCount = await getTotalCount(); } catch {}
+    const combinedPercentage = totalCount > 0 ? Math.round((combinedIds.size / totalCount) * 1000) / 10 : 0;
 
     return {
       subQuestion: {
@@ -419,7 +471,14 @@ async function executeValidatedPlan(validatedPlan: any, userId: string, normaliz
       },
       executionResults: {
         sqlResults,
-        vectorResults
+        vectorResults,
+        combinedMetrics: {
+          sqlCount: sqlIds.size,
+          vectorCount: vectorIds.size,
+          combinedCount: combinedIds.size,
+          totalCount,
+          combinedPercentage
+        }
       }
     };
   });

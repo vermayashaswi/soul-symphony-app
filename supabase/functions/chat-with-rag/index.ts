@@ -230,29 +230,23 @@ serve(async (req) => {
         // Persist assistant message so the client can see it even after navigation
         if (threadId) {
           try {
-            // Idempotency: avoid duplicate assistant messages for same thread/content
-            const { data: recentMsgs, error: recentErr } = await supabaseClient
+            // Compute idempotency key based on thread + response content
+            const enc = new TextEncoder();
+            const digest = await crypto.subtle.digest('SHA-256', enc.encode(`${threadId}:${finalResponse}`));
+            const hex = Array.from(new Uint8Array(digest)).map(b => b.toString(16).padStart(2, '0')).join('');
+            const idempotencyKey = hex.slice(0, 32);
+
+            const { error: upsertErr } = await supabaseClient
               .from('chat_messages')
-              .select('id, content, created_at')
-              .eq('thread_id', threadId)
-              .eq('sender', 'assistant')
-              .order('created_at', { ascending: false })
-              .limit(3);
-            if (recentErr) console.warn('[chat-with-rag] Failed to check existing assistant messages:', recentErr.message);
-            const isDuplicate = (recentMsgs || []).some((m: any) => (m.content || '').trim() === finalResponse.trim());
-            if (!isDuplicate) {
-              const { error: insertErr } = await supabaseClient
-                .from('chat_messages')
-                .insert({
-                  thread_id: threadId,
-                  content: finalResponse,
-                  sender: 'assistant',
-                  role: 'assistant'
-                });
-              if (insertErr) console.warn('[chat-with-rag] Failed to persist assistant message:', insertErr.message);
-            } else {
-              console.log('[chat-with-rag] Skipping assistant insert due to duplicate content');
-            }
+              .upsert({
+                thread_id: threadId,
+                content: finalResponse,
+                sender: 'assistant',
+                role: 'assistant',
+                idempotency_key: idempotencyKey
+              }, { onConflict: 'thread_id,idempotency_key' });
+
+            if (upsertErr) console.warn('[chat-with-rag] Failed to upsert assistant message:', upsertErr.message);
           } catch (e) {
             console.warn('[chat-with-rag] Exception persisting assistant message:', (e as any)?.message || e);
           }
