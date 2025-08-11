@@ -250,9 +250,12 @@ Return ONLY valid JSON with this exact structure:
 - Use proper column names with quotes for spaced names like "refined text"
 - For emotion analysis: Use emotions column with jsonb operators
 - For theme analysis: Use master_themes array with unnest() or array operators AND consider entity mentions and text content search for semantic expansion
-- For percentages: Use COUNT(CASE WHEN condition THEN 1 END) * 100.0 / COUNT(*) 
+- For percentages: Always alias the result as percentage (e.g., SELECT ... AS percentage)
+- For counts: Alias as count (e.g., SELECT COUNT(*) AS count) or frequency for grouped counts
+- For averages/scores: Alias as avg_score (or score when singular)
 - For date filtering: Use created_at with timestamp comparisons
 - For theme-based queries like "family": AUTOMATICALLY expand to related terms (mom, dad, wife, husband, children, parents, siblings, mother, father, son, daughter, family) and search in master_themes, entities, AND text content
+- Use ONLY the $user_id placeholder for binding the user. Do not use {{user_id}} or :user_id.
 - Generate dynamic SQL - NO hardcoded RPC function calls
 - Always include semantic expansion for theme queries
 
@@ -312,176 +315,120 @@ Focus on creating comprehensive, executable analysis plans that will provide mea
   }
 }
 
+// Helper: sanitize and bind user in SQL safely
+function sanitizeAndBindUserSql(sqlQuery: string, userId: string): { ok: true; sql: string } | { ok: false; error: string } {
+  try {
+    const q = (sqlQuery || '').trim();
+    const upper = q.toUpperCase();
+    if (!upper.startsWith('SELECT')) return { ok: false, error: 'Only SELECT statements are allowed' };
+    const semiCount = (q.match(/;/g) || []).length;
+    if (semiCount > 1 || (semiCount === 1 && !q.trim().endsWith(';'))) {
+      return { ok: false, error: 'Multiple statements are not allowed' };
+    }
+    if (!q.includes('$user_id')) {
+      return { ok: false, error: 'Missing required $user_id placeholder' };
+    }
+    const isValidUUID = (val: string) => /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-5][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$/.test(val);
+    if (!isValidUUID(userId)) return { ok: false, error: 'Invalid userId format' };
+    const bound = q.replace(/\$user_id\b/g, `'${userId}'`);
+    return { ok: true, sql: bound };
+  } catch (e) {
+    return { ok: false, error: 'SQL sanitation failed' };
+  }
+}
+
 // Execute a validated plan with proper SQL and vector search execution
 async function executeValidatedPlan(validatedPlan: any, userId: string, normalizedTimeRange: { start?: string | null; end?: string | null } | null, supabaseClient: any) {
-  const results: any[] = [];
-
-  // Handle both old structure (subQuestions) and new structure (executionSteps)
-  const stepsToProcess = validatedPlan.subQuestions || 
-    (validatedPlan.executionSteps ? [{ question: 'Analysis', analysisSteps: validatedPlan.executionSteps }] : []);
-
+  // Determine steps to process
+  const stepsToProcess = validatedPlan.subQuestions || (validatedPlan.executionSteps ? [{ question: 'Analysis', purpose: 'Automated analysis', searchStrategy: 'hybrid', analysisSteps: validatedPlan.executionSteps }] : []);
   console.log(`[executeValidatedPlan] Processing ${stepsToProcess.length} sub-questions/steps`);
 
-  // Execute all sub-questions asynchronously for better performance
-  const subQuestionPromises = stepsToProcess.map(async (subQuestion, index) => {
+  const subQuestionPromises = stepsToProcess.map(async (subQuestion: any) => {
     console.log(`[executeValidatedPlan] Processing sub-question: ${subQuestion.question}`);
-    
-    const stepResults: any[] = [];
-    
-    // Execute all steps within this sub-question asynchronously
-    const stepPromises = (subQuestion.analysisSteps || []).map(async (step, stepIndex) => {
+
+    const stepPromises = (subQuestion.analysisSteps || []).map(async (step: any) => {
       try {
         console.log(`[executeValidatedPlan] Executing step ${step.step}: ${step.description}`);
-        
-        if (step.queryType === 'vector_search') {
-          // Execute vector search with proper embedding generation
-          if (step.vectorSearch) {
-            console.log(`[executeValidatedPlan] Executing vector search: ${step.vectorSearch.query}`);
-            
-            try {
-              // Generate embedding for the search query
-              const queryEmbedding = await generateEmbedding(step.vectorSearch.query);
-              
-              // Call the vector search function with proper parameters
-              const { data: vectorData, error: vectorError } = await supabaseClient.rpc('match_journal_entries', {
-                query_embedding: queryEmbedding,
-                match_threshold: step.vectorSearch.threshold || 0.3,
-                match_count: step.vectorSearch.limit || 10,
-                user_id_filter: userId
-              });
-              
-              if (vectorError) {
-                return { 
-                  stepId: `${subQuestion.question}_${step.step}`, 
-                  type: 'vector_search', 
-                  error: vectorError.message,
-                  query: step.vectorSearch.query
-                };
-              } else {
-                return { 
-                  stepId: `${subQuestion.question}_${step.step}`, 
-                  type: 'vector_search', 
-                  success: true,
-                  entries: vectorData || [],
-                  query: step.vectorSearch.query,
-                  subQuestion: subQuestion.question,
-                  description: step.description
-                };
-              }
-            } catch (vectorErr) {
-              return { 
-                stepId: `${subQuestion.question}_${step.step}`, 
-                type: 'vector_search', 
-                error: (vectorErr as Error).message,
-                query: step.vectorSearch.query
-              };
+
+        if (step.queryType === 'vector_search' && step.vectorSearch) {
+          try {
+            const queryEmbedding = await generateEmbedding(step.vectorSearch.query);
+            const useDated = !!(normalizedTimeRange && (normalizedTimeRange.start || normalizedTimeRange.end));
+            const rpcName = useDated ? 'match_journal_entries_with_date' : 'match_journal_entries';
+            const rpcArgs: Record<string, any> = {
+              query_embedding: queryEmbedding,
+              match_threshold: step.vectorSearch.threshold || 0.3,
+              match_count: step.vectorSearch.limit || 10,
+            };
+            if (useDated) {
+              rpcArgs.user_id_filter = userId;
+              rpcArgs.start_date = normalizedTimeRange?.start || null;
+              rpcArgs.end_date = normalizedTimeRange?.end || null;
+            } else {
+              rpcArgs.user_id_filter = userId;
             }
-          } else {
-            return { 
-              stepId: `${subQuestion.question}_${step.step}`, 
-              type: 'vector_search', 
-              skipped: true, 
-              reason: 'No vector search parameters provided' 
-            };
+
+            const { data: vectorData, error: vectorError } = await supabaseClient.rpc(rpcName, rpcArgs);
+            if (vectorError) {
+              return { kind: 'vector', ok: false, error: vectorError.message };
+            }
+            return { kind: 'vector', ok: true, entries: vectorData || [] };
+          } catch (e) {
+            return { kind: 'vector', ok: false, error: (e as Error).message };
           }
         }
 
-        if (step.queryType === 'sql_analysis' || step.queryType === 'sql_calculation' || step.queryType === 'sql_count') {
-          const sqlQuery = step.sqlQuery;
-          
-          if (!sqlQuery) {
-            return { 
-              stepId: `${subQuestion.question}_${step.step}`, 
-              type: 'sql_query', 
-              error: 'No SQL query provided' 
-            };
+        if ((step.queryType === 'sql_analysis' || step.queryType === 'sql_calculation' || step.queryType === 'sql_count') && step.sqlQuery) {
+          const check = sanitizeAndBindUserSql(step.sqlQuery, userId);
+          if (!check.ok) {
+            return { kind: 'sql', ok: false, error: check.error };
           }
-
-          console.log(`[executeValidatedPlan] Executing SQL: ${sqlQuery.substring(0, 100)}...`);
-
-          // Execute the SQL query with safer user id substitution
-          const isValidUUID = (val: string) => /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-5][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$/.test(val);
-          if (!isValidUUID(userId)) {
-            console.error('[executeValidatedPlan] Invalid userId format for SQL binding');
-            return { 
-              stepId: `${subQuestion.question}_${step.step}`, 
-              type: 'sql_query', 
-              error: 'Invalid userId format',
-              sql: sqlQuery
-            };
-          }
-
-          let safeSql = sqlQuery;
-          // Replace only well-known placeholders; do not touch positional params like $1
-          if (safeSql.includes('$user_id')) {
-            safeSql = safeSql.replace(/\$user_id\b/g, `'${userId}'`);
-          } else if (safeSql.includes('{{user_id}}')) {
-            safeSql = safeSql.replace(/\{\{user_id\}\}/g, `'${userId}'`);
-          } else if (safeSql.includes(':user_id')) {
-            safeSql = safeSql.replace(/:user_id\b/g, `'${userId}'`);
-          } else {
-            console.warn('[executeValidatedPlan] SQL missing user placeholder; proceeding without substitution');
-          }
-
-          const { data, error } = await supabaseClient.rpc('execute_dynamic_query', {
-            query_text: safeSql
-          });
-
+          const { data, error } = await supabaseClient.rpc('execute_dynamic_query', { query_text: check.sql });
           if (error) {
-            console.error(`[executeValidatedPlan] SQL execution error:`, error);
-            return { 
-              stepId: `${subQuestion.question}_${step.step}`, 
-              type: 'sql_query', 
-              error: error.message,
-              sql: sqlQuery
-            };
-          } else {
-            console.log(`[executeValidatedPlan] SQL success, rows: ${data?.data?.length || 0}`);
-            return { 
-              stepId: `${subQuestion.question}_${step.step}`, 
-              type: 'sql_query', 
-              success: true,
-              rows: data?.data || [],
-              sql: sqlQuery,
-              subQuestion: subQuestion.question,
-              description: step.description
-            };
+            console.error('[executeValidatedPlan] SQL execution error:', error);
+            return { kind: 'sql', ok: false, error: error.message };
           }
+          const rows = (data?.data || []) as any[];
+          return { kind: 'sql', ok: true, rows };
         }
 
-        // Unknown step type
-        return { 
-          stepId: `${subQuestion.question}_${step.step}`, 
-          type: step.queryType, 
-          skipped: true, 
-          reason: 'Unknown step type' 
-        };
-        
-      } catch (e) {
-        console.error(`[executeValidatedPlan] Step execution error:`, e);
-        return { 
-          stepId: `${subQuestion.question}_${step.step}`, 
-          type: step.queryType, 
-          error: (e as Error).message 
-        };
+        return { kind: 'unknown', ok: false, error: 'Unknown or missing step configuration' };
+      } catch (err) {
+        return { kind: 'unknown', ok: false, error: (err as Error).message };
       }
     });
 
-    // Wait for all steps in this sub-question to complete
-    const stepResults_resolved = await Promise.all(stepPromises);
-    return stepResults_resolved;
+    const resolved = await Promise.all(stepPromises);
+
+    // Aggregate results per sub-question
+    const sqlResults = resolved.filter(r => r.kind === 'sql' && r.ok && Array.isArray((r as any).rows))
+      .flatMap((r: any) => r.rows);
+    const vectorResults = resolved.filter(r => r.kind === 'vector' && r.ok && Array.isArray((r as any).entries))
+      .flatMap((r: any) => r.entries);
+
+    return {
+      subQuestion: {
+        question: subQuestion.question,
+        purpose: subQuestion.purpose,
+      },
+      researcherOutput: {
+        validatedPlan: { searchStrategy: subQuestion.searchStrategy },
+        confidence: validatedPlan.confidence ?? null,
+        validationIssues: [],
+        enhancements: []
+      },
+      executionResults: {
+        sqlResults,
+        vectorResults
+      }
+    };
   });
 
-  // Wait for all sub-questions to complete
-  const allResults = await Promise.all(subQuestionPromises);
-  
-  // Flatten the results
-  const flattenedResults = allResults.flat();
-  results.push(...flattenedResults);
-
-  console.log(`[executeValidatedPlan] Completed execution with ${results.length} results`);
-  return { steps: results };
+  const perSubQuestionResults = await Promise.all(subQuestionPromises);
+  console.log(`[executeValidatedPlan] Completed execution for ${perSubQuestionResults.length} sub-questions`);
+  return { researchResults: perSubQuestionResults };
 }
+
 
 function getLastWeekRangeUTC() {
   const now = new Date();
@@ -554,7 +501,7 @@ serve(async (req) => {
     return new Response(JSON.stringify({
       success: true,
       queryPlan: analysisResult,
-      researchResults: executionResult.steps,
+      researchResults: executionResult.researchResults,
       userEntryCount,
       timeRange: normalizedTimeRange
     }), {
