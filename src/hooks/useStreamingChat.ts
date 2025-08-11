@@ -130,34 +130,43 @@ export const useStreamingChat = ({ onFinalResponse, onError, threadId }: UseStre
 
   // Capacitor app lifecycle handling
   useEffect(() => {
-    if (typeof window !== 'undefined' && (window as any).Capacitor) {
-      const { App } = (window as any).Capacitor;
-      
-      const handleAppStateChange = (state: any) => {
-        setIsAppActive(state.isActive);
+    // Check if Capacitor App plugin is available using the correct path
+    if (typeof window !== 'undefined' && (window as any).Capacitor?.Plugins?.App) {
+      try {
+        const { App } = (window as any).Capacitor.Plugins;
         
-        if (!state.isActive && threadId) {
-          // App backgrounded
-          console.log(`[useStreamingChat] Capacitor app backgrounded for thread: ${threadId}`);
-          const threadState = getThreadState(threadId);
-          if (threadState.isStreaming) {
-            saveChatStreamingState(threadId, {
-              ...threadState,
-              pausedDueToBackground: true,
-            });
+        const handleAppStateChange = (state: any) => {
+          setIsAppActive(state.isActive);
+          
+          if (!state.isActive && threadId) {
+            // App backgrounded
+            console.log(`[useStreamingChat] Capacitor app backgrounded for thread: ${threadId}`);
+            const threadState = getThreadState(threadId);
+            if (threadState.isStreaming) {
+              saveChatStreamingState(threadId, {
+                ...threadState,
+                pausedDueToBackground: true,
+              });
+            }
+          } else if (state.isActive && threadId) {
+            // App foregrounded
+            console.log(`[useStreamingChat] Capacitor app foregrounded for thread: ${threadId}`);
+            // Don't trigger new requests automatically
           }
-        } else if (state.isActive && threadId) {
-          // App foregrounded
-          console.log(`[useStreamingChat] Capacitor app foregrounded for thread: ${threadId}`);
-          // Don't trigger new requests automatically
-        }
-      };
+        };
 
-      App.addListener('appStateChange', handleAppStateChange);
-      
-      return () => {
-        App.removeAllListeners();
-      };
+        App.addListener('appStateChange', handleAppStateChange);
+        
+        return () => {
+          try {
+            App.removeAllListeners();
+          } catch (error) {
+            console.warn('[useStreamingChat] Error removing Capacitor listeners:', error);
+          }
+        };
+      } catch (error) {
+        console.warn('[useStreamingChat] Error setting up Capacitor app lifecycle handlers:', error);
+      }
     }
   }, [threadId, getThreadState]);
 
