@@ -167,10 +167,11 @@ ${databaseSchemaContext}
 - User has ${userEntryCount} journal entries${contextString}
 
 **YOUR RESPONSIBILITIES AS ANALYST AGENT:**
-1. **Sub-Question Generation**: Break down the query into 1-3 focused sub-questions
-2. **Analysis Planning**: For each sub-question, create detailed step-by-step analysis plans
-3. **Query Generation**: Generate specific SQL queries and vector search specifications
-4. **Search Strategy**: Determine optimal combination of SQL and vector search
+1. **Smart Hypothesis Formation**: Create a smart hypothesis for what the query means and what the user truly wants to know, then logically deduce sub-questions to answer it comprehensively
+2. **Sub-Question Generation**: Break down the query into 1-3 focused sub-questions that capture both explicit themes AND related semantic concepts (e.g., "family" should include "mom", "dad", "wife", "husband", "children", "parents", "siblings")
+3. **Analysis Planning**: For each sub-question, create detailed step-by-step analysis plans
+4. **Query Generation**: Generate specific SQL queries and vector search specifications that include theme synonyms and entity mentions
+5. **Search Strategy**: Determine optimal combination of SQL and vector search
 
 **MANDATORY OUTPUT STRUCTURE:**
 Return ONLY valid JSON with this exact structure:
@@ -209,9 +210,10 @@ Return ONLY valid JSON with this exact structure:
 - ALWAYS include WHERE user_id = $user_id for security
 - Use proper column names with quotes for spaced names like "refined text"
 - For emotion analysis: Use emotions column with jsonb operators
-- For theme analysis: Use master_themes array with unnest() or array operators
-- For percentages: Use COUNT(CASE WHEN condition THEN 1 END) * 100.0 / COUNT(*)
+- For theme analysis: Use master_themes array with unnest() or array operators AND consider entity mentions and text content search for semantic expansion
+- For percentages: Use COUNT(CASE WHEN condition THEN 1 END) * 100.0 / COUNT(*) 
 - For date filtering: Use created_at with timestamp comparisons
+- For theme-based queries like "family": Include SQL that searches master_themes, entities for related terms, AND "refined text"/"transcription text" for semantic mentions (e.g., mom, dad, wife, children, parents, siblings)
 
 **SEARCH STRATEGY SELECTION:**
 - sql_primary: For statistical analysis, counts, percentages, structured data
@@ -271,9 +273,13 @@ Focus on creating comprehensive, executable analysis plans that will provide mea
 async function executeValidatedPlan(validatedPlan: any, userId: string, normalizedTimeRange: { start?: string | null; end?: string | null } | null, supabaseClient: any) {
   const results: any[] = [];
 
-  console.log(`[executeValidatedPlan] Processing ${validatedPlan.subQuestions?.length || 0} sub-questions`);
+  // Handle both old structure (subQuestions) and new structure (executionSteps)
+  const stepsToProcess = validatedPlan.subQuestions || 
+    (validatedPlan.executionSteps ? [{ question: 'Analysis', analysisSteps: validatedPlan.executionSteps }] : []);
 
-  for (const subQuestion of (validatedPlan.subQuestions || [])) {
+  console.log(`[executeValidatedPlan] Processing ${stepsToProcess.length} sub-questions/steps`);
+
+  for (const subQuestion of stepsToProcess) {
     console.log(`[executeValidatedPlan] Processing sub-question: ${subQuestion.question}`);
     
     for (const step of (subQuestion.analysisSteps || [])) {
@@ -456,9 +462,11 @@ serve(async (req) => {
             }
 
             const validatedPlan = {
-              subQuestion: subQuestion.question,
-              searchStrategy: subQuestion.searchStrategy || 'hybrid',
-              executionSteps
+              subQuestions: [{
+                question: subQuestion.question,
+                searchStrategy: subQuestion.searchStrategy || 'hybrid',
+                analysisSteps: subQuestion.analysisSteps || []
+              }]
             };
 
             const executionResults = await executeValidatedPlan(validatedPlan, userId, normalizedTimeRange, supabase);
