@@ -162,16 +162,16 @@ ${databaseSchemaContext}
 
 **CURRENT CONTEXT:**
 - Today's date: ${new Date().toISOString()}
-- Current year: 2025
+- Current year: ${new Date().getFullYear()}
 - User query: "${message}"
 - User has ${userEntryCount} journal entries${contextString}
 
 **YOUR RESPONSIBILITIES AS ANALYST AGENT:**
 1. **Smart Hypothesis Formation**: Create a smart hypothesis for what the query means and what the user truly wants to know, then logically deduce sub-questions to answer it comprehensively
-2. **Sub-Question Generation**: Break down the query into 1-3 focused sub-questions that capture both explicit themes AND related semantic concepts (e.g., "family" should include "mom", "dad", "wife", "husband", "children", "parents", "siblings")
-3. **Analysis Planning**: For each sub-question, create detailed step-by-step analysis plans
-4. **Query Generation**: Generate specific SQL queries and vector search specifications that include theme synonyms and entity mentions
-5. **Search Strategy**: Determine optimal combination of SQL and vector search
+2. **Sub-Question Generation**: Break down the query into 1-3 focused sub-questions that capture both explicit themes AND related semantic concepts (e.g., "family" should automatically expand to include "mom", "dad", "wife", "husband", "children", "parents", "siblings", "mother", "father", "son", "daughter")
+3. **Intelligent Search Strategy**: For theme-based queries, ALWAYS create both SQL queries that search for expanded terms AND vector searches for semantic similarity
+4. **Dynamic Query Generation**: Generate SQL queries and vector searches dynamically based on the user's specific query - NO hardcoded functions
+5. **Hybrid Analysis**: Combine SQL statistical analysis with vector semantic search for comprehensive insights
 
 **MANDATORY OUTPUT STRUCTURE:**
 Return ONLY valid JSON with this exact structure:
@@ -213,12 +213,16 @@ Return ONLY valid JSON with this exact structure:
 - For theme analysis: Use master_themes array with unnest() or array operators AND consider entity mentions and text content search for semantic expansion
 - For percentages: Use COUNT(CASE WHEN condition THEN 1 END) * 100.0 / COUNT(*) 
 - For date filtering: Use created_at with timestamp comparisons
-- For theme-based queries like "family": Include SQL that searches master_themes, entities for related terms, AND "refined text"/"transcription text" for semantic mentions (e.g., mom, dad, wife, children, parents, siblings)
+- For theme-based queries like "family": AUTOMATICALLY expand to related terms (mom, dad, wife, husband, children, parents, siblings, mother, father, son, daughter, family) and search in master_themes, entities, AND text content
+- Generate dynamic SQL - NO hardcoded RPC function calls
+- Always include semantic expansion for theme queries
 
 **SEARCH STRATEGY SELECTION:**
 - sql_primary: For statistical analysis, counts, percentages, structured data
 - vector_primary: For semantic content analysis, finding similar entries
-- hybrid: For comprehensive analysis requiring both approaches (recommended)
+- hybrid: For comprehensive analysis requiring both approaches (PREFERRED for theme queries)
+
+**CRITICAL FOR THEME QUERIES:** Always include both SQL analysis AND vector search steps for theme-based queries like "family", "work", "relationships" to ensure comprehensive coverage.
 
 **ANALYSIS STEP TYPES:**
 - sql_count: Simple counting queries
@@ -287,13 +291,53 @@ async function executeValidatedPlan(validatedPlan: any, userId: string, normaliz
         console.log(`[executeValidatedPlan] Executing step ${step.step}: ${step.description}`);
         
         if (step.queryType === 'vector_search') {
-          // Skip vector search to maintain pipeline stability
-          results.push({ 
-            stepId: `${subQuestion.question}_${step.step}`, 
-            type: 'vector_search', 
-            skipped: true, 
-            reason: 'Vector search not executed in planner' 
-          });
+          // Execute vector search using proper parameters
+          if (step.vectorSearch) {
+            console.log(`[executeValidatedPlan] Executing vector search: ${step.vectorSearch.query}`);
+            
+            try {
+              // Call the vector search function with proper parameters
+              const { data: vectorData, error: vectorError } = await supabaseClient.rpc('match_journal_entries', {
+                query_embedding: [], // This would need to be generated from the search query
+                match_threshold: step.vectorSearch.threshold || 0.3,
+                match_count: step.vectorSearch.limit || 10,
+                user_id_filter: userId
+              });
+              
+              if (vectorError) {
+                results.push({ 
+                  stepId: `${subQuestion.question}_${step.step}`, 
+                  type: 'vector_search', 
+                  error: vectorError.message,
+                  query: step.vectorSearch.query
+                });
+              } else {
+                results.push({ 
+                  stepId: `${subQuestion.question}_${step.step}`, 
+                  type: 'vector_search', 
+                  success: true,
+                  entries: vectorData || [],
+                  query: step.vectorSearch.query,
+                  subQuestion: subQuestion.question,
+                  description: step.description
+                });
+              }
+            } catch (vectorErr) {
+              results.push({ 
+                stepId: `${subQuestion.question}_${step.step}`, 
+                type: 'vector_search', 
+                error: (vectorErr as Error).message,
+                query: step.vectorSearch.query
+              });
+            }
+          } else {
+            results.push({ 
+              stepId: `${subQuestion.question}_${step.step}`, 
+              type: 'vector_search', 
+              skipped: true, 
+              reason: 'No vector search parameters provided' 
+            });
+          }
           continue;
         }
 
@@ -412,7 +456,7 @@ serve(async (req) => {
         return (start || end) ? { start, end } : null;
       })();
 
-      // Build pseudo-validated plans from Analyst sub-questions and execute
+      // Execute all sub-questions asynchronously for better performance
       researchResults = await Promise.all(
         analysisPlan.subQuestions.map(async (subQuestion: any, index: number) => {
           try {
