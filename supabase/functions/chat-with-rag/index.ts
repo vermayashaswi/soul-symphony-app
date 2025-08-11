@@ -227,6 +227,23 @@ serve(async (req) => {
           ? consolidationResult.response
           : "I couldn't synthesize a confident insight just now. Let's try again in a moment.";
 
+        // Persist assistant message so the client can see it even after navigation
+        if (threadId) {
+          try {
+            const { error: insertErr } = await supabaseClient
+              .from('chat_messages')
+              .insert({
+                thread_id: threadId,
+                content: finalResponse,
+                sender: 'assistant',
+                role: 'assistant'
+              });
+            if (insertErr) console.warn('[chat-with-rag] Failed to persist assistant message:', insertErr.message);
+          } catch (e) {
+            console.warn('[chat-with-rag] Exception persisting assistant message:', (e as any)?.message || e);
+          }
+        }
+
         return new Response(JSON.stringify({
           response: finalResponse,
           userStatusMessage: consolidationResult.userStatusMessage,
