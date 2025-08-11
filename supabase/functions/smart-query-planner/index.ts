@@ -399,9 +399,32 @@ async function executeValidatedPlan(validatedPlan: any, userId: string, normaliz
 
           console.log(`[executeValidatedPlan] Executing SQL: ${sqlQuery.substring(0, 100)}...`);
 
-          // Execute the SQL query with proper parameter binding
+          // Execute the SQL query with safer user id substitution
+          const isValidUUID = (val: string) => /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-5][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$/.test(val);
+          if (!isValidUUID(userId)) {
+            console.error('[executeValidatedPlan] Invalid userId format for SQL binding');
+            return { 
+              stepId: `${subQuestion.question}_${step.step}`, 
+              type: 'sql_query', 
+              error: 'Invalid userId format',
+              sql: sqlQuery
+            };
+          }
+
+          let safeSql = sqlQuery;
+          // Replace only well-known placeholders; do not touch positional params like $1
+          if (safeSql.includes('$user_id')) {
+            safeSql = safeSql.replace(/\$user_id\b/g, `'${userId}'`);
+          } else if (safeSql.includes('{{user_id}}')) {
+            safeSql = safeSql.replace(/\{\{user_id\}\}/g, `'${userId}'`);
+          } else if (safeSql.includes(':user_id')) {
+            safeSql = safeSql.replace(/:user_id\b/g, `'${userId}'`);
+          } else {
+            console.warn('[executeValidatedPlan] SQL missing user placeholder; proceeding without substitution');
+          }
+
           const { data, error } = await supabaseClient.rpc('execute_dynamic_query', {
-            query_text: sqlQuery.replace(/\$user_id/g, `'${userId}'`)
+            query_text: safeSql
           });
 
           if (error) {

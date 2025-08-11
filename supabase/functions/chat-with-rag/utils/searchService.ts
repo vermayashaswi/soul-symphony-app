@@ -78,7 +78,7 @@ export async function searchEntriesWithTimeRange(
     // Detailed logging of the actual parameters being sent to the database
     console.log("[chat-with-rag/searchService] Database function parameters:", {
       query_embedding: `[array with ${queryEmbedding.length} elements]`,
-      match_threshold: 0.5,
+      match_threshold: 0.3,
       match_count: 10,
       user_id_filter: userIdString,
       start_date: startDate,
@@ -90,7 +90,7 @@ export async function searchEntriesWithTimeRange(
       'match_journal_entries_with_date',
       {
         query_embedding: queryEmbedding,
-        match_threshold: 0.5,
+        match_threshold: 0.3,
         match_count: 10,
         user_id_filter: userIdString,
         start_date: startDate,
@@ -117,7 +117,16 @@ export async function searchEntriesWithTimeRange(
       }));
       console.log("[chat-with-rag/searchService] Time-filtered search - Entries found:", entryDates);
     } else {
-      console.log("[chat-with-rag/searchService] No entries found within time range");
+      console.log("[chat-with-rag/searchService] No entries found within time range; falling back to non-time-filtered vector search");
+      try {
+        const fallback = await searchEntriesWithVector(supabase, userIdString, queryEmbedding);
+        if (fallback && fallback.length > 0) {
+          console.log(`[chat-with-rag/searchService] Fallback vector search found ${fallback.length} entries`);
+          return fallback;
+        }
+      } catch (fallbackErr) {
+        console.warn("[chat-with-rag/searchService] Fallback vector search failed:", fallbackErr);
+      }
     }
     
     return data || [];
